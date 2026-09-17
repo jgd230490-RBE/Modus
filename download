@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# local databases (SQLite is used when DATABASE_URL is unset)
+*.db
+*.db-journal
+*.sqlite3
+
+# secrets
+.env
+.env.*
+!env.example
+
+# node / tooling
+node_modules/
+
+# editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# tenant exports downloaded while testing — a tenant package is customer data
+modus-tenant-*.json

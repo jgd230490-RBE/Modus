@@ -1,0 +1,64 @@
+# Render Blueprint for Modus.
+#
+# This creates a NEW web service (modus-web) and a NEW database (modus-db). It does not
+# touch any service or database that already exists in the Render account — including
+# the ones an earlier blueprint created under other names. Retire those by hand, after
+# exporting anything you need from them.
+#
+# ⚠️ THE PLAN VALUES ARE MONEY. `starter` and `basic-256mb` are paid plans. Change them
+#    to what you intend to buy BEFORE the first sync, and never move a database to a
+#    smaller or free plan by editing this file — on Render a free database expires.
+services:
+  - type: web
+    name: modus-web
+    runtime: python
+    plan: starter
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: modus-db
+          property: connectionString
+      # Secrets: set in the Render dashboard, NOT here — this file is in the repository.
+      # Listed with sync: false so a blueprint sync never wipes them. env.example
+      # explains each one.
+      - key: ADMIN_TOKEN            # required — admin calls are OPEN while it is unset
+        sync: false
+      - key: PLANNER_CODE           # required — nobody signs in until a code is set
+        sync: false
+      - key: ADMIN_CODE
+        sync: false
+      - key: IPT1_CODE              # team access codes; the names stay IPTn by decision
+        sync: false
+      - key: IPT2_CODE
+        sync: false
+      - key: IPT3_CODE
+        sync: false
+      - key: IPT4_CODE
+        sync: false
+      - key: IPT5_CODE
+        sync: false
+      - key: IPT6_CODE
+        sync: false
+      - key: MAP_PASSWORD           # the shared password for outside map viewers
+        sync: false
+      - key: GATE_SECRET            # optional
+        sync: false
+      - key: HERE_API_KEY           # needed to bake routes
+        sync: false
+      - key: MAPBOX_TOKEN           # the Mapbox PUBLIC token (pk.…) for the app and PDF map
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY    # optional — Street View
+        sync: false
+      - key: GOOGLE_MAPS_URL_SIGNING_SECRET   # optional, recommended with the key above
+        sync: false
+      - key: TENANT_ID              # optional — defaults to "default"
+        sync: false
+
+databases:
+  - name: modus-db
+    plan: basic-256mb
