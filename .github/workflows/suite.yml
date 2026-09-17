@@ -1,0 +1,65 @@
+# Runs every harness on every push and pull request.
+#
+# Python: the stubbed harnesses (backend/tests/test_*.py) run first on a Python WITHOUT
+# FastAPI, because that is the environment they are written for — they stub FastAPI
+# themselves and would behave differently beside the real one. Then the full
+# requirements go into a venv and http_smoke.py drives the real HTTP layer.
+#
+# Node: the four JS harnesses need typescript, react and react-dom installed globally
+# (they are resolved through NODE_PATH, as in the sandbox they were written in).
+name: suite
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Packages the stubbed harnesses expect — everything but the web server
+        # pydantic (main.py's request models), openpyxl + reportlab (the exports), pillow.
+        # NOT fastapi / uvicorn: the harnesses stub FastAPI and must get the stub.
+        run: pip install pydantic==2.13.4 openpyxl==3.1.5 reportlab==4.4.10 pillow==12.2.0
+      - name: Stubbed harnesses
+        run: |
+          set -o pipefail
+          fail=0
+          for f in backend/tests/test_*.py; do
+            echo "::group::$f"
+            python "$f" || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail
+      - name: Poppler for the PDF text check
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: The real HTTP layer
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install -r backend/requirements.txt httpx
+          /tmp/venv/bin/python backend/tests/http_smoke.py
+
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Global packages the harnesses resolve through NODE_PATH
+        run: npm install -g typescript react@18 react-dom@18
+      - name: JS harnesses
+        run: |
+          export NODE_PATH="$(npm root -g)"
+          fail=0
+          for f in backend/tests/parse_map.js backend/tests/parse_frontend.js \
+                   backend/tests/test_ipt_overlay.js backend/tests/render_frontend.js; do
+            echo "::group::$f"
+            node "$f" || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail

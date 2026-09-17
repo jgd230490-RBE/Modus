@@ -1,0 +1,594 @@
+"""
+Week 1, 2026-09-01 — the four-week look-ahead (Task C) and typed actuals (Task D).
+
+WHAT THIS IS
+------------
+A week layer that sits ON the monthly forecast line. It does not widen `forecasts`,
+it does not add a `week_index` to it, and it does not touch the monthly UNIQUE key.
+A `forecast_weeks` row is keyed by the forecast line's own key plus a week number, so
+a week can only exist for a line that exists, and the public map's monthly
+aggregation is untouched.
+
+THE FOUR RULES THAT MATTER
+--------------------------
+1. **Weeks exist only for APPROVED months.** A Pending month materialises nothing.
+   Materialisation happens when a month line becomes Approved, and again lazily on the
+   first read of the look-ahead for a line that was already Approved before this
+   shipped.
+
+2. **`derived` refreshes, `edited` and `confirmed` do not.** That is the whole reason
+   `status` is three values and not a boolean. A re-approved month rewrites its
+   derived weeks to quantity/n (n = the month's weeks) and leaves the others exactly as somebody left them.
+
+3. **`parent_qty` is what makes "parent month changed" truthful.** See db.py's note on
+   the column. An edited week always differs from parent/n, so the flag cannot be
+   derived by comparison — it needs the parent value as at the last write.
+
+4. **Saving an actual NEVER calibrates.** Calibration is a separate button, writes
+   exactly one week — the next one — and refuses when that week is confirmed. An
+   actual that silently rewrote next week's plan is the behaviour the build list
+   singles out to avoid, and it is one line away from happening by accident.
+
+WEEK BUCKETS — CALENDAR WEEKS SINCE 10 SEP 2026
+-----------------------------------------------
+A week is Monday to Sunday. It belongs to the month that holds its THURSDAY — the ISO
+8601 rule, the numbering printed on most European calendars — so a month has four or five
+weeks and no week belongs to two months. Week 1 of September 2026 is Mon 31 Aug – Sun
+6 Sep; October 2026 has five weeks (its Thursdays are the 1st, 8th, 15th, 22nd, 29th).
+A month's forecast splits over ITS number of weeks, ÷4 or ÷5.
+
+Until 10 Sep the buckets were days 1–7 / 8–14 / 15–21 / 22–end of the month (the Week 1
+build list's convention, "no ISO weeks"). The human's rule "Monday to Friday only,
+always starting from Monday" cannot be met by that definition in a month that does not
+begin on a Monday — 1 Sep 2026 is a Tuesday, and the commit grid opened on Tue 8 with
+Mon 14 at its end. `week_index` keeps its meaning (the k-th week of the month) so every
+existing forecast_weeks row keeps its identity; only the dates it covers moved, by at
+most six days. The old WEEKS_PER_MONTH constant is gone: use `weeks_in_month()`.
+"""
+import calendar
+import datetime
+
+import db
+
+WEEK_STATUSES = ("derived", "edited", "confirmed")
+#: Set by main.py at import, exactly as stockpiles.START_YEAR and days.START_YEAR are.
+START_YEAR = 2026
+FLAG_FIELDS = ("weather", "wetness", "traffic", "other")
+
+# Columns a caller may read back. Kept as a list rather than SELECT * so a new column
+# added to the table does not silently start appearing in an API response.
+_COLS = ("route_id, month_index, discipline, section_id, week_index, planned_qty, "
+         "unit, status, weather, wetness, traffic, other, confirmed_by, confirmed_at, "
+         "actual_qty, actual_note, actual_by, actual_at, parent_qty, "
+         # Look-ahead v2 slices 3-5 (2026-09-09): the confirmed cost, and what
+         # calibrate has already carried out of this week
+         "actual_cost_eur, calibrated_at, calibrated_qty")
+
+
+def _now():
+    return datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+# --------------------------------------------------------------------------- #
+#  Week arithmetic                                                             #
+# --------------------------------------------------------------------------- #
+def _month_of(month_index, start_year=None):
+    """(year, month) for an absolute month_index. 1 = January of START_YEAR."""
+    sy = int(start_year if start_year is not None else START_YEAR)
+    mi = int(month_index) - 1
+    return sy + mi // 12, mi % 12 + 1
+
+
+def month_index_of(date, start_year=None):
+    """Absolute month_index for a date. 1 = January of start_year."""
+    sy = int(start_year if start_year is not None else START_YEAR)
+    return (date.year - sy) * 12 + date.month
+
+
+def iso_weeks_of_month(year, month):
+    """
+    [(monday, sunday), …] of every Mon–Sun week whose Thursday falls in (year, month).
+    Four or five entries; consecutive months' lists never overlap and never leave a gap.
+    """
+    first = datetime.date(year, month, 1)
+    d = first - datetime.timedelta(days=first.weekday())        # the Monday on/before the 1st
+    out = []
+    while True:
+        thu = d + datetime.timedelta(days=3)
+        if (thu.year, thu.month) == (year, month):
+            out.append((d, d + datetime.timedelta(days=6)))
+        elif out:
+            break
+        d += datetime.timedelta(days=7)
+    return out
+
+
+def weeks_in_month(month_index, start_year=None):
+    """4 or 5 — how many weeks this month owns, and what its forecast is split over."""
+    return len(iso_weeks_of_month(*_month_of(month_index, start_year)))
+
+
+def week_span(month_index, week_index, start_year=None):
+    """(monday, sunday) of the k-th week of a month. Raises on a week the month lacks."""
+    ws = iso_weeks_of_month(*_month_of(month_index, start_year))
+    w = int(week_index)
+    if not 1 <= w <= len(ws):
+        raise ValueError(f"month {month_index} has {len(ws)} weeks, not week {week_index}")
+    return ws[w - 1]
+
+
+def week_of_date(date, start_year=None):
+    """
+    (month_index, week_index) of the week containing `date` — the week's month is the one
+    holding its Thursday, which is not always the date's own month (Mon 31 Aug 2026 is
+    week 1 of September).
+    """
+    thu = date - datetime.timedelta(days=date.weekday()) + datetime.timedelta(days=3)
+    mi = month_index_of(thu, start_year)
+    for k, (mon, sun) in enumerate(iso_weeks_of_month(thu.year, thu.month), 1):
+        if mon <= date <= sun:
+            return mi, k
+    raise AssertionError("unreachable: every date is in exactly one ISO week")
+
+
+def next_week(month_index, week_index, start_year=None):
+    """
+    The week after this one, as (month_index, week_index).
+
+    Past a month's last week, the next week is week 1 of the NEXT month — which is why
+    calibration can reach across a month boundary and why it has to look the parent line
+    up again when it does.
+    """
+    if int(week_index) >= weeks_in_month(month_index, start_year):
+        return int(month_index) + 1, 1
+    return int(month_index), int(week_index) + 1
+
+
+def prev_week(month_index, week_index, start_year=None):
+    """The week before this one; week 1 steps back to the previous month's last week."""
+    if int(week_index) <= 1:
+        return int(month_index) - 1, weeks_in_month(int(month_index) - 1, start_year)
+    return int(month_index), int(week_index) - 1
+
+
+def editable_week(start_year=None, today=None):
+    """
+    The week the look-ahead lets you edit and confirm — "next week" in the build
+    list's wording: *the week bucket that contains today.*
+
+    ⚠️ That wording is worth keeping verbatim, because it is not what "next week"
+    normally means. The editable bucket is the one TODAY is in, not the one after it.
+    Its month is the week's month (the Thursday rule), not necessarily today's.
+    """
+    d = today or datetime.date.today()
+    return week_of_date(d, start_year)
+
+
+# --------------------------------------------------------------------------- #
+#  Reads                                                                       #
+# --------------------------------------------------------------------------- #
+def _parent_lines(from_month, to_month, approved_only=True):
+    """The forecast lines (and their monthly quantities) in a month window."""
+    status_clause = " AND status = 'Approved'" if approved_only else ""
+    return db.query(
+        "SELECT route_id, month_index, discipline, section_id, quantity, unit, "
+        "material_type, vehicle_type, submitted_by, status, ipt FROM forecasts "
+        "WHERE tenant_id = ? AND month_index BETWEEN ? AND ?" + status_clause +
+        " ORDER BY route_id, month_index, discipline, section_id",
+        (db.current_tenant(), int(from_month), int(to_month)))
+
+
+def _parent_of(route_id, month_index, discipline, section_id):
+    rows = db.query(
+        "SELECT quantity, unit, status, material_type, vehicle_type FROM forecasts "
+        "WHERE tenant_id = ? AND route_id = ? AND month_index = ? AND discipline = ? "
+        "AND section_id = ?",
+        (db.current_tenant(), route_id, int(month_index), discipline or "",
+         section_id or ""))
+    return rows[0] if rows else None
+
+
+def _decorate(row, parent):
+    """Add the two derived fields no column holds: variance and parent_changed."""
+    planned, actual = row.get("planned_qty"), row.get("actual_qty")
+    # ⭐ Blank until an actual is typed. 0.0 is a real actual (nothing moved) and must
+    # produce a variance; None is "not reported yet" and must not.
+    row["variance"] = (float(planned or 0) - float(actual)) if actual is not None else None
+    pq = row.get("parent_qty")
+    row["parent_qty_now"] = parent["quantity"] if parent else None
+    row["parent_changed"] = bool(
+        parent is not None and pq is not None
+        and abs(float(pq) - float(parent["quantity"])) > 1e-9)
+    return row
+
+
+def get_week(route_id, month_index, discipline, section_id, week_index):
+    rows = db.query(
+        f"SELECT {_COLS} FROM forecast_weeks WHERE tenant_id = ? AND route_id = ? "
+        "AND month_index = ? AND discipline = ? AND section_id = ? AND week_index = ?",
+        (db.current_tenant(), route_id, int(month_index), discipline or "",
+         section_id or "", int(week_index)))
+    if not rows:
+        return None
+    return _decorate(rows[0],
+                     _parent_of(route_id, month_index, discipline, section_id))
+
+
+def list_weeks(from_month, to_month, route_id=None):
+    """
+    Every week row in a month window, materialising any that an already-Approved line
+    is still missing.
+
+    The lazy materialise is the second half of rule 1: a line approved before this
+    shipped has no week rows and would otherwise show an empty Look-ahead forever.
+    """
+    lo, hi = min(int(from_month), int(to_month)), max(int(from_month), int(to_month))
+    materialise_window(lo, hi)
+    if route_id:
+        rows = db.query(
+            f"SELECT {_COLS} FROM forecast_weeks WHERE tenant_id = ? "
+            "AND month_index BETWEEN ? AND ? AND route_id = ? "
+            "ORDER BY route_id, month_index, discipline, section_id, week_index",
+            (db.current_tenant(), lo, hi, route_id))
+    else:
+        rows = db.query(
+            f"SELECT {_COLS} FROM forecast_weeks WHERE tenant_id = ? "
+            "AND month_index BETWEEN ? AND ? "
+            "ORDER BY route_id, month_index, discipline, section_id, week_index",
+            (db.current_tenant(), lo, hi))
+    parents = {(p["route_id"], p["month_index"], p["discipline"] or "",
+                p["section_id"] or ""): p
+               for p in _parent_lines(lo, hi, approved_only=False)}
+    out = []
+    for r in rows:
+        key = (r["route_id"], r["month_index"], r["discipline"] or "",
+               r["section_id"] or "")
+        p = parents.get(key)
+        r = _decorate(r, p)
+        # the parent's own descriptive fields, so the Look-ahead table can label a row
+        # without a second request per line
+        r["material_type"] = p["material_type"] if p else None
+        r["vehicle_type"] = p["vehicle_type"] if p else None
+        r["parent_status"] = p["status"] if p else None
+        # Task F: the parent line's IPT rides along so the endpoint can filter on it
+        r["ipt"] = p.get("ipt") if p else None
+        out.append(r)
+    return out
+
+
+# --------------------------------------------------------------------------- #
+#  Materialisation                                                             #
+# --------------------------------------------------------------------------- #
+def _insert_week(route_id, month_index, discipline, section_id, week_index,
+                 planned_qty, unit, parent_qty):
+    now = _now()
+    db.execute(
+        "INSERT INTO forecast_weeks (tenant_id, route_id, month_index, discipline, "
+        "section_id, week_index, planned_qty, unit, status, parent_qty, created_at, "
+        "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (db.current_tenant(), route_id, int(month_index), discipline or "",
+         section_id or "", int(week_index), float(planned_qty), unit, "derived",
+         float(parent_qty), now, now))
+
+
+def materialise_line(route_id, discipline, section_id, month_index=None):
+    """
+    Create or refresh the weeks of one forecast LINE — four or five, the month's own.
+
+    Called when a line is approved, and lazily on read. Only Approved months are
+    materialised — a Pending month has nothing to plan against yet.
+
+    ⚠️ Un-approving a line does NOT delete its weeks. A confirmed week with an actual
+    typed against it is a record of what happened; dropping it because a planner
+    reopened the month would destroy that. The rows simply stop being refreshed, and
+    `parent_status` on the read tells the UI the parent is no longer approved.
+    """
+    created = refreshed = kept = 0
+    rows = db.query(
+        "SELECT route_id, month_index, discipline, section_id, quantity, unit "
+        "FROM forecasts WHERE tenant_id = ? AND route_id = ? AND discipline = ? "
+        "AND section_id = ? AND status = 'Approved'",
+        (db.current_tenant(), route_id, discipline or "", section_id or ""))
+    if month_index is not None:
+        rows = [r for r in rows if r["month_index"] == int(month_index)]
+
+    for p in rows:
+        n_weeks = weeks_in_month(p["month_index"])
+        share = float(p["quantity"] or 0) / n_weeks
+        have = {r["week_index"]: r for r in db.query(
+            "SELECT week_index, status, planned_qty, unit, parent_qty FROM forecast_weeks WHERE tenant_id = ? "
+            "AND route_id = ? AND month_index = ? AND discipline = ? "
+            "AND section_id = ?",
+            (db.current_tenant(), p["route_id"], p["month_index"],
+             p["discipline"] or "", p["section_id"] or ""))}
+        for w in range(1, n_weeks + 1):
+            cur = have.get(w)
+            if cur is None:
+                _insert_week(p["route_id"], p["month_index"], p["discipline"],
+                             p["section_id"], w, share, p["unit"], p["quantity"])
+                created += 1
+            elif cur["status"] == "derived":
+                # 09 Sep night: write ONLY when something moved — on Render every
+                # statement is a network round trip, and a read that rewrote every
+                # derived week it had just read paid for nothing. Unchanged ⇒ kept.
+                if (abs(float(cur.get("planned_qty") or 0) - float(share)) < 1e-9
+                        and (cur.get("unit") or "") == (p["unit"] or "")
+                        and cur.get("parent_qty") is not None
+                        and abs(float(cur["parent_qty"]) - float(p["quantity"] or 0)) < 1e-9):
+                    kept += 1
+                    continue
+                # ⭐ parent_qty is re-stamped HERE and nowhere else in this branch:
+                # a derived row is by definition in step with its parent again.
+                db.execute(
+                    "UPDATE forecast_weeks SET planned_qty = ?, unit = ?, "
+                    "parent_qty = ?, updated_at = ? WHERE tenant_id = ? "
+                    "AND route_id = ? AND month_index = ? AND discipline = ? "
+                    "AND section_id = ? AND week_index = ?",
+                    (share, p["unit"], float(p["quantity"] or 0), _now(),
+                     db.current_tenant(), p["route_id"], p["month_index"],
+                     p["discipline"] or "", p["section_id"] or "", w))
+                refreshed += 1
+            else:
+                # ⭐ edited / confirmed: left EXACTLY as it is, parent_qty included.
+                # Not re-stamping it is what makes parent_changed fire on the read.
+                kept += 1
+    return {"created": created, "refreshed": refreshed, "kept": kept}
+
+
+def materialise_window(from_month, to_month):
+    """Materialise every Approved line in a month window. Idempotent."""
+    seen, out = set(), {"created": 0, "refreshed": 0, "kept": 0}
+    for p in _parent_lines(from_month, to_month):
+        key = (p["route_id"], p["discipline"] or "", p["section_id"] or "",
+               p["month_index"])
+        if key in seen:
+            continue
+        seen.add(key)
+        r = materialise_line(p["route_id"], p["discipline"], p["section_id"],
+                             month_index=p["month_index"])
+        for k in out:
+            out[k] += r[k]
+    return out
+
+
+# --------------------------------------------------------------------------- #
+#  Writes                                                                      #
+# --------------------------------------------------------------------------- #
+def _flags_from(flags):
+    """Only the four named flag fields, each a string. Empty string is allowed."""
+    f = flags or {}
+    return {k: ("" if f.get(k) is None else str(f.get(k))) for k in FLAG_FIELDS
+            if k in f}
+
+
+def set_week(route_id, month_index, discipline, section_id, week_index,
+             planned_qty=None, flags=None, by=None):
+    """
+    Edit one week's planned quantity and/or its flags. Moves the row to `edited`.
+
+    parent_qty is re-stamped, which CLEARS any 'parent month changed' flag: somebody
+    has now set this number with the current parent in view.
+    """
+    cur = get_week(route_id, month_index, discipline, section_id, week_index)
+    if not cur:
+        return {"error": "no such week — the parent month is not approved"}
+    if cur["status"] == "confirmed":
+        return {"error": f"week {week_index} is confirmed and cannot be edited"}
+
+    parent = _parent_of(route_id, month_index, discipline, section_id)
+    qty = cur["planned_qty"] if planned_qty is None else float(planned_qty)
+    f = _flags_from(flags)
+    db.execute(
+        "UPDATE forecast_weeks SET planned_qty = ?, status = ?, parent_qty = ?, "
+        "weather = ?, wetness = ?, traffic = ?, other = ?, updated_at = ? "
+        "WHERE tenant_id = ? AND route_id = ? AND month_index = ? "
+        "AND discipline = ? AND section_id = ? AND week_index = ?",
+        (qty, "edited",
+         float(parent["quantity"]) if parent else cur.get("parent_qty"),
+         f.get("weather", cur.get("weather")), f.get("wetness", cur.get("wetness")),
+         f.get("traffic", cur.get("traffic")), f.get("other", cur.get("other")),
+         _now(), db.current_tenant(), route_id, int(month_index), discipline or "",
+         section_id or "", int(week_index)))
+    return {"week": get_week(route_id, month_index, discipline, section_id, week_index)}
+
+
+def _lock_baf_base(by=None):
+    try:
+        import costing
+        import fuel
+        return costing.lock_baf_base_if_empty(fuel.get_index(costing.settings()["fuel"]["country"]), by=by)
+    except Exception as e:           # the confirm itself must never fail on the surcharge
+        return {"locked": False, "base": None, "base_date": None, "error": str(e)[:120]}
+
+
+def confirm_week(route_id, month_index, discipline, section_id, week_index,
+                 by=None, flags=None):
+    """
+    Confirm one week. Separate from editing on purpose — the build list asks for a
+    distinct button, because "I have adjusted the number" and "I am committing to it"
+    are different acts and only the second one blocks calibration into this week.
+
+    The four flags are free text and every one of them may be empty. No scores, no
+    weather API, no colour used as logic — they are notes.
+    """
+    cur = get_week(route_id, month_index, discipline, section_id, week_index)
+    if not cur:
+        return {"error": "no such week — the parent month is not approved"}
+    parent = _parent_of(route_id, month_index, discipline, section_id)
+    f = _flags_from(flags)
+    db.execute(
+        "UPDATE forecast_weeks SET status = ?, confirmed_by = ?, confirmed_at = ?, "
+        "parent_qty = ?, weather = ?, wetness = ?, traffic = ?, other = ?, "
+        "updated_at = ? WHERE tenant_id = ? AND route_id = ? AND month_index = ? "
+        "AND discipline = ? AND section_id = ? AND week_index = ?",
+        ("confirmed", by, _now(),
+         float(parent["quantity"]) if parent else cur.get("parent_qty"),
+         f.get("weather", cur.get("weather")), f.get("wetness", cur.get("wetness")),
+         f.get("traffic", cur.get("traffic")), f.get("other", cur.get("other")),
+         _now(), db.current_tenant(), route_id, int(month_index), discipline or "",
+         section_id or "", int(week_index)))
+    # 10 Sep evening: the FIRST confirm that finds a fuel index row and no BAF base
+    # locks the base to that index (costing.py). Every later confirm finds a base and
+    # does nothing; an admin reset on Config is the only way it moves. No index row
+    # (feed never reached, nothing typed) locks nothing — a base is never guessed.
+    baf = _lock_baf_base(by)
+    return {"week": get_week(route_id, month_index, discipline, section_id, week_index),
+            "baf_base": baf}
+
+
+def set_actual(route_id, month_index, discipline, section_id, week_index,
+               actual_qty=None, actual_note=None, by=None, actual_cost_eur=None,
+               cost_given=False):
+    """
+    Type what actually moved in one week.
+
+    ⭐ THIS DOES NOT CALIBRATE, AND MUST NOT. Variance appears; next week's plan does
+    not move until somebody presses the button. See calibrate().
+
+    Writing an actual does not change `status` either: a week can be `derived` and
+    still have an actual against it, which is the normal case for a week nobody needed
+    to adjust.
+    """
+    cur = get_week(route_id, month_index, discipline, section_id, week_index)
+    if not cur:
+        return {"error": "no such week — the parent month is not approved"}
+    q = None if actual_qty is None or actual_qty == "" else float(actual_qty)
+    # 2026-09-09 (Look-ahead v2): stamp WHERE the figure came from. A clerk typing here
+    # is 'typed' and day actuals (days.py) will never overwrite it; clearing it leaves
+    # the source empty so the day sums may take over again. The one touch this module
+    # takes from slice 1, and it is a stamp, not a behaviour change.
+    db.execute(
+        "UPDATE forecast_weeks SET actual_qty = ?, actual_note = ?, actual_by = ?, "
+        "actual_at = ?, actual_source = ?, updated_at = ? WHERE tenant_id = ? "
+        "AND route_id = ? AND month_index = ? AND discipline = ? AND section_id = ? "
+        "AND week_index = ?",
+        (q, actual_note, by, _now(), ("typed" if q is not None else None), _now(),
+         db.current_tenant(), route_id, int(month_index), discipline or "",
+         section_id or "", int(week_index)))
+    # Look-ahead v2 slices 3-5: the confirmed cost of the week, in euros, typed beside
+    # the actual. Written ONLY when the caller sent the field — an absent field is not
+    # a cleared cost, and a day-actual sync (days.py) never touches it.
+    if cost_given:
+        c = None if actual_cost_eur is None or actual_cost_eur == "" else float(actual_cost_eur)
+        db.execute(
+            "UPDATE forecast_weeks SET actual_cost_eur = ?, updated_at = ? WHERE tenant_id = ? "
+            "AND route_id = ? AND month_index = ? AND discipline = ? AND section_id = ? "
+            "AND week_index = ?",
+            (c, _now(), db.current_tenant(), route_id, int(month_index), discipline or "",
+             section_id or "", int(week_index)))
+    return {"week": get_week(route_id, month_index, discipline, section_id, week_index)}
+
+
+def calibrate(route_id, month_index, discipline, section_id, week_index,
+              override_qty=None, by=None):
+    """
+    Carry this week's variance into NEXT week, and nowhere else.
+
+        next.planned_qty = next.planned_qty + (this.planned_qty - this.actual_qty)
+
+    or, with override_qty, next.planned_qty = override_qty — a replacement, not an
+    addition, because the dialog offers the typed figure INSTEAD of the formula.
+
+    ⭐ Exactly one row is written: the next week. Never this week, never week+2, never
+    the parent month. A calibration that walked the rest of the month would turn one
+    wet Tuesday into a rewritten quarter.
+
+    Refuses when next week is already confirmed. Somebody has committed to that number
+    and a button press must not quietly move it.
+    """
+    this = get_week(route_id, month_index, discipline, section_id, week_index)
+    if not this:
+        return {"error": "no such week — the parent month is not approved"}
+
+    nm, nw = next_week(month_index, week_index)
+    # crossing a month boundary reaches a different parent line, which may not have
+    # been materialised yet
+    materialise_line(route_id, discipline, section_id, month_index=nm)
+    nxt = get_week(route_id, nm, discipline, section_id, nw)
+    if not nxt:
+        return {"error": f"next week is month {nm} week {nw}, which has no row — "
+                         f"month {nm} is not approved for this line"}
+    if nxt["status"] == "confirmed":
+        return {"error": f"next week (month {nm}, week {nw}) is already confirmed — "
+                         "reopen it before calibrating into it",
+                "blocked_by": "confirmed"}
+
+    # Look-ahead v2 (2026-09-09, the Thursday case): a week may be calibrated TWICE —
+    # once on Thursday with a partial actual, again when Friday's figure lands. The
+    # second press must carry only what the first did not: variance NOW minus the
+    # variance already applied (`calibrated_qty`). Adding the whole variance again would
+    # double-count everything before Friday.
+    already = float(this.get("calibrated_qty") or 0)
+    variance = None
+    if this.get("actual_qty") is not None:
+        variance = float(this.get("planned_qty") or 0) - float(this["actual_qty"])
+    if override_qty is not None and override_qty != "":
+        new_qty = float(override_qty)
+        basis = "override"
+        delta = None
+    else:
+        if variance is None:
+            return {"error": "no actual typed for this week, so there is no variance "
+                             "to apply — type an actual or use the override"}
+        delta = variance - already
+        new_qty = float(nxt.get("planned_qty") or 0) + delta
+        basis = "variance"
+
+    parent = _parent_of(route_id, nm, discipline, section_id)
+    db.execute(
+        "UPDATE forecast_weeks SET planned_qty = ?, status = ?, parent_qty = ?, "
+        "updated_at = ? WHERE tenant_id = ? AND route_id = ? AND month_index = ? "
+        "AND discipline = ? AND section_id = ? AND week_index = ?",
+        (new_qty, "edited",
+         float(parent["quantity"]) if parent else nxt.get("parent_qty"),
+         _now(), db.current_tenant(), route_id, int(nm), discipline or "",
+         section_id or "", int(nw)))
+    # stamp the SOURCE week: when, and how much of its variance is now carried. An
+    # override is taken to account for the whole variance as it stood.
+    db.execute(
+        "UPDATE forecast_weeks SET calibrated_at = ?, calibrated_qty = ?, updated_at = ? "
+        "WHERE tenant_id = ? AND route_id = ? AND month_index = ? AND discipline = ? "
+        "AND section_id = ? AND week_index = ?",
+        (_now(), variance, _now(), db.current_tenant(), route_id, int(month_index),
+         discipline or "", section_id or "", int(week_index)))
+    return {
+        "from": {"month_index": int(month_index), "week_index": int(week_index)},
+        "to": {"month_index": int(nm), "week_index": int(nw)},
+        "basis": basis,
+        # the amount actually added this press (None on an override)
+        "delta": (round(delta, 6) if delta is not None else None),
+        "already_carried": already,
+        "week": get_week(route_id, nm, discipline, section_id, nw),
+    }
+
+
+def reopen_week(route_id, month_index, discipline, section_id, week_index, by=None):
+    """
+    Look-ahead v2 (2026-09-09): take a confirmed week back to `edited` so its plan can
+    change and calibrate can reach it again. The mocks' footer promises it: "Re-open
+    the week in Look-ahead to change the plan." Nothing is deleted — the actual, the
+    notes, the confirmation stamp all stay; confirmed_by/at are kept as the record of
+    the last confirmation and `status` is what changes.
+    """
+    cur = get_week(route_id, month_index, discipline, section_id, week_index)
+    if not cur:
+        return {"error": "no such week — the parent month is not approved"}
+    if cur["status"] != "confirmed":
+        return {"error": f"week {week_index} is not confirmed"}
+    db.execute(
+        "UPDATE forecast_weeks SET status = ?, updated_at = ? WHERE tenant_id = ? "
+        "AND route_id = ? AND month_index = ? AND discipline = ? AND section_id = ? "
+        "AND week_index = ?",
+        ("edited", _now(), db.current_tenant(), route_id, int(month_index),
+         discipline or "", section_id or "", int(week_index)))
+    return {"week": get_week(route_id, month_index, discipline, section_id, week_index),
+            "reopened_by": by}
+
+
+def summary():
+    n = db.query("SELECT COUNT(*) AS n FROM forecast_weeks WHERE tenant_id = ?",
+                 (db.current_tenant(),))[0]["n"]
+    by_status = db.query(
+        "SELECT status, COUNT(*) AS n FROM forecast_weeks WHERE tenant_id = ? "
+        "GROUP BY status", (db.current_tenant(),))
+    return {"weeks": n, "by_status": {r["status"]: r["n"] for r in by_status}}

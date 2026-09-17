@@ -1,0 +1,2690 @@
+"""
+Modus — backend.
+
+Serves three things from one process:
+  1. The forecasting API under /api/*
+  2. The React forecasting app at /
+  3. The Mapbox route map at /map/
+
+The Public Route Map reads /api/public/route-forecasts, so the map and the
+forecasting app are always in sync — no CSV files to keep up to date.
+"""
+import json
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+import conversions
+import db
+import network
+import here_routing
+import taxonomy
+import zones
+import haul          # Phase 4 — temporary haul roads
+import restrictions  # Phase 2.5a — Tark Tee restriction layers (proxied, reprojected)
+import streetview    # Phase 2.5a — Google Street View proxy (key stays server-side)
+import gates         # Phase 5a — multiple gates per location, with a direction on each
+import weeks         # Week 1 — the 4-week look-ahead and typed actuals (Tasks C, D)
+import days         # Look-ahead v2 slice 1 (2026-09-09) — the commit week by day
+import derived      # Look-ahead v2 slice 2 (2026-09-09) — trips / vehicles / km / t·km on read
+import lookahead    # Look-ahead v2 slices 3-6 — the page's read model, clashes, account, horizon
+import export       # Look-ahead v2 slice 4 — XLSX + PDF of the commit week
+import stockpiles    # Week 1 — stockpile capacity and typed consumption (Task D2)
+import access        # 2026-09-02 — IPT access codes (Task F)
+import gate          # 2026-09-14 — the /map/ password and the /help/ staff gate
+import config        # 2.5b — the editable copy of factors.json; G2 — the tenant settings block
+import tenant_package  # G2, 16 Sep — a tenant as one JSON document; the map overlay
+import costing       # 10 Sep evening — target rates + fuel settings (config key 'costing'), BAF
+import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
+import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
+
+ROOT = Path(__file__).resolve().parent.parent          # repo root
+HERE = Path(__file__).resolve().parent                 # backend/
+
+START_YEAR = 2026          # month_index 1 == Jan 2026
+MONTH_COUNT = 60           # 5-year horizon
+
+# One definition of the epoch, not two. stockpiles.py needs it for the public-map
+# popup and cannot import main (circular), so it carries a default that this
+# overwrites at import time — and test_week1.py asserts the two agree.
+stockpiles.START_YEAR = START_YEAR
+days.START_YEAR = START_YEAR        # Look-ahead v2 slice 1: the day layer reads the same origin
+weeks.START_YEAR = START_YEAR       # 10 Sep: calendar weeks need the month's year to count them
+
+
+# ------------------------------------------------------------------ startup
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    # NOTE: forecast seeding is gone, and since G2 (16 Sep) so is every other seed of
+    # project data — the product boots an EMPTY tenant and a tenant arrives as a package
+    # (tenant_package.py). Only the generic disciplines and the factors row are seeded.
+    try:
+        db.init_network_db()
+        db.init_taxonomy_db()
+        db.init_zones_db()          # Phase 3. No seed — zones are drawn, never shipped.
+        db.init_gates_db()          # Phase 5a. Table + the two gate columns on routes.
+        # Week 1. forecast_weeks + stockpile_weeks, and the three capacity columns on
+        # locations. Must sit HERE — after init_network_db(), which creates the table
+        # those columns are ALTERed onto, and before init_tenant(), which rebuilds it.
+        db.init_weeks_db()
+        db.init_lookahead_db()      # Look-ahead v2 slices 3-5. ALTERs only; after weeks, before tenant.
+        db.init_config_db()         # 2.5b. No ALTERs, so its position only needs to precede the seed.
+        db.init_costing_db()        # 10 Sep evening. The GLOBAL fuel_index table (untenanted, by design).
+        # Phase 4.5. Must sit exactly here: init_tenant() migrates a pre-4.5 database by
+        # rebuilding each table, copying the columns the table actually has — several of
+        # which the init_* calls above add by ALTER. Run it before them and those columns
+        # are silently dropped; run it after the seeds below and the seeds write rows into
+        # a table that has not got its tenant key yet.
+        db.init_tenant()
+        # Phase 5a. AFTER init_tenant(), because it inserts rows and every insert
+        # filters on the tenant key the migration has just put in place. Idempotent:
+        # a location that already has a gate row is skipped, so a restart cannot mint
+        # a second 'Main gate'.
+        try:
+            gates.migrate_legacy_gates()
+        except Exception as e:
+            print("⚠️  Phase 5a: legacy gate migration failed:", e)
+        # G2, 16 Sep: the product boots to an EMPTY tenant. No network, no teams, no
+        # sections are seeded here — a tenant package is imported instead
+        # (POST /api/admin/tenant/import). The backfills below are idempotent and
+        # touch only rows that exist, so on an empty tenant they do nothing.
+        network.backfill_location_roles()
+        filled = network.backfill_supplies_receives().get("filled", 0)
+        if filled:
+            print(f"Backfilled supplies/receives on {filled} location(s) from the route network.")
+        counts = taxonomy.seed_taxonomy()
+        if any(counts.values()):
+            print("Seeded taxonomy:", counts)
+        # 2.5b: factors.json becomes the seed of the config row. From this boot on, the
+        # ROW is what every payload, density and cycle time reads.
+        if config.seed_from_file(conversions).get("seeded"):
+            print("2.5b: config.factors seeded from backend/factors.json — the file is now the "
+                  "seed, not the live copy. Edit on the Config page.")
+        # Task F: lines written before `ipt` existed. Filled ONLY where the route names
+        # exactly one team ("IPT5"); a shared route ("IPT3 / IPT6") tells us nothing
+        # about which of the two a line belongs to, and those stay NULL for a planner
+        # to set. Idempotent — touches only NULLs.
+        back = network.backfill_forecast_ipt()
+        if back.get("filled"):
+            print(f"Task F: ipt filled on {back['filled']} line(s) from single-IPT routes; "
+                  f"{back.get('left', 0)} left NULL (shared or unknown route IPT).")
+    except Exception as e:
+        print("Network seed skipped:", e)
+    yield
+
+
+app = FastAPI(title="Modus", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"],
+)
+
+
+# ------------------------------------------------------------------ gate pages (2026-09-14)
+# Served when the gate refuses. They are string constants rather than files under map/
+# or frontend/help/ ON PURPOSE: anything inside those directories is itself behind the
+# gate, so a password page living there could never be shown to the person who needs it.
+_GATE_CSS = """
+  :root { color-scheme: light; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#0A1446; color:#fff;
+         font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  .box { width:min(92vw,380px); background:#fff; color:#1B2430; border-radius:10px;
+         padding:28px 26px; box-shadow:0 10px 40px rgba(0,0,0,.35); }
+  h1 { margin:0 0 6px; font-size:19px; color:#003787; }
+  p  { margin:0 0 18px; font-size:13.5px; color:#5A6572; }
+  label { display:block; font-size:12px; font-weight:600; color:#003787; margin-bottom:6px; }
+  input { width:100%; box-sizing:border-box; padding:10px 12px; font-size:15px;
+          border:1px solid #DCE3EC; border-radius:6px; }
+  input:focus { outline:2px solid #3398DB; outline-offset:1px; border-color:#3398DB; }
+  button { margin-top:14px; width:100%; padding:11px; font-size:15px; font-weight:600;
+           color:#fff; background:#003787; border:0; border-radius:6px; cursor:pointer; }
+  button:hover { background:#0A1446; }
+  .err { display:none; margin-top:12px; font-size:13px; color:#BF2E55; }
+  .foot { margin-top:16px; font-size:12px; color:#8A97A6; }
+  a { color:#003787; }
+"""
+
+_MAP_PASSWORD_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modus — map access</title><style>%s</style>
+<div class="box">
+  <h1>Corridor map</h1>
+  <p>This map is not public. Enter the access password you were given.</p>
+  <form id="f" autocomplete="off">
+    <label for="p">Password</label>
+    <input id="p" name="p" type="password" autofocus>
+    <button type="submit">Open the map</button>
+    <div class="err" id="e">That password was not recognised.</div>
+  </form>
+  <div class="foot">Alliance staff: sign in to the app at <a href="/">the main page</a> and
+  the map opens with it.</div>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  var e = document.getElementById('e'); e.style.display = 'none';
+  var r = await fetch('/api/map-auth', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: document.getElementById('p').value })
+  });
+  if (r.ok) { location.reload(); } else { e.style.display = 'block'; }
+});
+</script></html>""" % _GATE_CSS
+
+_HELP_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modus — user guide</title><style>%s</style>
+<div class="box">
+  <h1>The user guide is for signed-in staff</h1>
+  <p>It documents every staff screen, so it sits behind the same sign-in.</p>
+  <button onclick="location.href='/'">Go to the app and sign in</button>
+  <div class="foot">Once you are signed in, come back to <code>/help/</code> — or use the
+  Help link in the app.</div>
+</div></html>""" % _GATE_CSS
+
+_MAP_UNCONFIGURED_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modus — map closed</title><style>%s</style>
+<div class="box">
+  <h1>The map is closed</h1>
+  <p>No map password has been configured on this deployment, so the map cannot be opened
+  to anyone outside the alliance. This is the safe state, not a fault.</p>
+  <div class="foot">Set <code>MAP_PASSWORD</code> in the environment to open it. Staff can
+  still see the map by signing in at <a href="/">the main page</a>.</div>
+</div></html>""" % _GATE_CSS
+
+
+# ------------------------------------------------------------------ access (Task F)
+# The X-Access-Code header is resolved ONCE per request into a contextvar, the same
+# shape the tenant uses, so no endpoint takes a code argument — each one asks
+# access.current(). Registered only when the real FastAPI is present: the test
+# harnesses stub the app class, run endpoint bodies directly, and set the contextvar
+# themselves. That is the "HTTP layer is stubbed" caveat every test file carries, and
+# it now covers this too — nothing here proves the header is actually read.
+try:
+    from fastapi import Request as _Request
+except Exception:      # stubbed fastapi in the sandbox harnesses
+    _Request = None
+
+if _Request is not None and hasattr(app, "middleware"):
+    from fastapi.responses import HTMLResponse as _HTML, JSONResponse as _JSON
+
+    # 2026-09-14 — the gate for /map/ and /help/. The policy lives in gate.decide(),
+    # which is pure and fully asserted in the sandbox; everything here is the wiring
+    # that turns a decision into a response, and the wiring is what the harness cannot
+    # run. Registered on the SAME middleware as the access contextvar so the gate can
+    # see whether the X-Access-Code resolved.
+    def _gate_refusal(decision, path):
+        doc = gate.is_document(path)
+        if decision == gate.NEED_MAP_PASSWORD:
+            return _HTML(_MAP_PASSWORD_PAGE, status_code=401) if doc else _JSON(
+                {"detail": "the map is password protected"}, status_code=401)
+        if decision == gate.NEED_STAFF:
+            return _HTML(_HELP_SIGNIN_PAGE, status_code=401) if doc else _JSON(
+                {"detail": "sign in to the app to read the guide"}, status_code=401)
+        # UNCONFIGURED — nobody set MAP_PASSWORD. Closed, and says why. Staff are
+        # unaffected: a valid code or a staff cookie never reaches this branch.
+        return _HTML(_MAP_UNCONFIGURED_PAGE, status_code=503) if doc else _JSON(
+            {"detail": "map access is not configured"}, status_code=503)
+
+    @app.middleware("http")
+    async def _access_middleware(request, call_next):
+        token = access.set_current(request.headers.get(access.HEADER))
+        try:
+            path = request.url.path
+            decision = gate.decide(
+                path,
+                has_valid_code=bool(access.current()),
+                cookie=request.cookies.get(gate.COOKIE),
+            )
+            if decision != gate.ALLOW:
+                return _gate_refusal(decision, path)
+
+            response = await call_next(request)
+
+            # The cookie is set HERE rather than in the endpoint so that auth() and
+            # map_auth() stay plain functions the harness can call directly. A staff
+            # sign-in opens the map as well, which is what keeps the iframe on the
+            # staff dashboard working without a second credential.
+            if getattr(response, "status_code", None) == 200:
+                if path == "/api/auth":
+                    response.set_cookie(**gate.cookie_kwargs(gate.LEVEL_STAFF))
+                elif path == "/api/map-auth":
+                    response.set_cookie(**gate.cookie_kwargs(gate.LEVEL_MAP))
+            return response
+        finally:
+            access.reset_current(token)
+
+
+def _require_access():
+    """Any valid code. 401 otherwise."""
+    acc = access.current()
+    if not acc:
+        raise HTTPException(401, "sign in — a valid access code is required")
+    return acc
+
+
+def _require_approver():
+    acc = _require_access()
+    if not access.can_approve(acc):
+        raise HTTPException(403, f"{acc['label']} cannot approve or reject")
+    return acc
+
+
+def _require_line(route_id, month_index, discipline, section_id):
+    """The line must exist AND be visible to this code. 404 either way — an IPT code
+    must not learn that another IPT's line exists."""
+    acc = _require_access()
+    row = {"ipt": access.line_ipt(route_id, month_index, discipline, section_id)}
+    if not access.line_visible(row, acc):
+        raise HTTPException(404, "no such forecast line")
+    return acc
+
+
+class AuthIn(BaseModel):
+    code: str
+
+
+@app.post("/api/auth")
+def auth(body: AuthIn):
+    """
+    Turn a code into a role. The frontend keeps the code and sends it on every
+    request; this only tells it what it got. Nothing is stored server-side.
+    """
+    acc = access.resolve(body.code)
+    if not acc:
+        raise HTTPException(401, "unknown access code")
+    return access.describe(acc)
+
+
+class MapAuthIn(BaseModel):
+    password: str
+
+
+@app.post("/api/map-auth")
+def map_auth(body: MapAuthIn):
+    """
+    The shared password for the public map. On 200 the middleware attaches the `map`
+    cookie; this returns nothing but the fact that it worked.
+
+    Deliberately says the same thing on a wrong password as on an unset one — an
+    unconfigured map is not a map whose password is empty.
+    """
+    if not gate.password_ok(body.password):
+        raise HTTPException(401, "wrong password")
+    return {"ok": True, "opens": "/map/"}
+
+
+@app.post("/api/gate-signout")
+def gate_signout():
+    """Drop the gate cookie — for testing the gate, and for a shared machine."""
+    from fastapi.responses import JSONResponse as _J
+    r = _J({"ok": True})
+    r.delete_cookie(gate.COOKIE, path="/")
+    return r
+
+
+# ------------------------------------------------------------------ schemas
+class Cell(BaseModel):
+    month_index: int                # 1..60
+    quantity: float
+
+
+class MatrixRow(BaseModel):
+    """
+    One forecast LINE: a route, a discipline, a section, one material, ONE vehicle.
+
+    vehicle_type_2 and split_pct are gone. A load split across two vehicles is now two
+    lines, which the widened key makes storable and which keeps each line's cycle time
+    honest -- an Artic Flatbed turns round in 45 minutes against a Tipper's 24, and
+    blending them into one payload figure hid that.
+
+    discipline and section_id join the UNIQUE key, so they are never None on the way in:
+    '' is the unassigned sentinel. A NULL here would leave the row unconstrained and
+    ON CONFLICT would silently stop firing.
+
+    Phase 4.5 widened that UNIQUE key again, to
+    (tenant_id, route_id, month_index, discipline, section_id). The same failure mode
+    applies to the new column: the ON CONFLICT target in save_matrix_row() must name
+    tenant_id too, or it no longer matches any constraint, the upsert stops firing, and
+    re-saving a matrix row inserts a duplicate instead of updating the row already there.
+    """
+    route_id: str
+    discipline: str = ""                       # '' = unassigned
+    section_id: str = ""                       # '' = unassigned
+    material_type: str                         # category, e.g. "Small aggregate"
+    material_description: Optional[str] = None # free-text detail
+    vehicle_type: str
+    submitted_by: Optional[str] = None         # lightweight submitter identity
+    unit: str                                  # 'm3' | 't' | 'vehicles'
+    cells: List[Cell]
+    status: str = "Pending"
+    # Task F: which IPT this line belongs to. Forced to the caller's IPT for an IPT
+    # code; required from a planner; see access.ipt_for_save().
+    ipt: Optional[str] = None
+
+
+class StatusUpdate(BaseModel):
+    status: str                     # 'Approved' | 'Rejected' | 'Pending'
+    reject_reason: Optional[str] = None
+
+
+# ------------------------------------------------------------------ helpers
+# --- _load_routes() removed in Phase 2 ---
+# It read seed_data/routes.json: 69 legacy routes with no distance_km key on any row, so
+# /api/meta handed the UI routes with no distance and the dashboard's km, truck-km, CO2
+# and intensity all read zero. Routes now come from the live network via
+# network.meta_routes(). Nothing else in the codebase reads that file.
+
+
+def _material_list(factors):
+    return conversions.material_names(factors)
+
+
+def _vehicle_list(factors):
+    return conversions.vehicle_names(factors)
+
+
+# ------------------------------------------------------------------ meta
+@app.get("/api/health")
+def health():
+    return {"ok": True, "backend": "postgres" if db.IS_PG else "sqlite"}
+
+
+@app.get("/api/meta")
+def meta():
+    """Everything the UI needs to build its dropdowns — kept in sync with factors.json."""
+    factors = conversions.load_factors()
+    strip = lambda d: {k: v for k, v in d.items() if not k.startswith("_")}
+    return {
+        "units": conversions.UNITS,
+        "materials": conversions.material_names(factors),
+        # every vehicle, unchanged. The four EU-named planning vehicles added on
+        # 2026-09-01 are IN this list, not instead of it: baked geometry is keyed on
+        # vehicle_profile and every existing route names one of the older six, so a
+        # picker that could not offer them would strand those routes.
+        "vehicles": conversions.vehicle_names(factors),
+        # ...and which of them are the four to lead with. A NAME LIST, not a re-ordering
+        # of `vehicles` — the map, the dashboard and every saved forecast index into
+        # `vehicles` and `factors.vehicle_payload_t` by name, so the full set has to stay
+        # complete and in its existing order.
+        "planning_vehicles": conversions.planning_vehicle_names(factors),
+        # 2026-09-02: the EN / EU / EE label toggle. Labels only — vehicle_type on a
+        # forecast line stays the canonical key. Every slot is filled, a missing one
+        # with the key itself, and `fallbacks` says which.
+        "vehicle_labels": conversions.vehicle_labels(factors),
+        # rich taxonomy for the new submission matrix (Commit 2)
+        "material_categories": strip(factors.get("material_categories", {})),
+        "vehicle_details": strip(factors.get("vehicles", {})),
+        # live network, not the retired legacy file — carries real distances
+        "routes": network.meta_routes(),
+        # Phase 2 taxonomy for the discipline / section pickers.
+        # work_sections is empty until the tenant's package or admin supplies rows;
+        # the UI must cope with an empty list rather than assume rows exist.
+        "disciplines": taxonomy.list_disciplines(),
+        "work_sections": taxonomy.list_work_sections(in_scope_only=True),
+        "ipts": taxonomy.list_ipts(),
+        # G2: the tenant's own words and units — name, team_label, currency (+ symbol),
+        # country, and which country-specific providers that switches on. Read BEFORE
+        # sign-in by the app, so the sign-in screen already carries the tenant's name.
+        "tenant": config.tenant_settings(conversions),
+        "months": {
+            "start_year": START_YEAR,
+            "count": MONTH_COUNT,
+            "years": [START_YEAR + i for i in range(MONTH_COUNT // 12)],
+        },
+        # flat maps kept for the map + dashboard, derived from the taxonomy
+        "factors": conversions.flat_factors(factors),
+        "seasonal_restrictions": factors.get("seasonal_restrictions", []),
+        "mapbox_token": config.mapbox_token(),
+    }
+
+
+@app.get("/api/convert")
+def convert(quantity: float, from_unit: str, to_unit: str,
+            material: str = "", vehicle: str = ""):
+    try:
+        val = conversions.convert(quantity, from_unit, to_unit, material, vehicle)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"value": conversions.round_for_unit(val, to_unit), "unit": to_unit}
+
+
+# ------------------------------------------------------------------ forecasts (staff)
+@app.get("/api/forecasts")
+def list_forecasts(submitted_by: Optional[str] = None, route_id: Optional[str] = None):
+    """
+    Forecast rows, optionally scoped.
+
+    route_id was added because the submission matrix reloads its cells whenever the
+    route, year, discipline OR section changes, and it was pulling the entire forecasts
+    table each time to find twelve of them. Four times the reload frequency on a
+    whole-table read is not a shape that ages well.
+    """
+    clauses, params = [], []
+    if submitted_by:
+        clauses.append("submitted_by = ?"); params.append(submitted_by)
+    if route_id:
+        clauses.append("route_id = ?"); params.append(route_id)
+    # tenant_id is written into the literal rather than pushed through `clauses`, so the
+    # filter is in the SQL text on every branch (there is no longer a no-WHERE branch) and
+    # its ? is always first — which is why db.current_tenant() leads the params tuple.
+    where = "".join(" AND " + c for c in clauses)
+    acc = _require_access()
+    return access.filter_lines(db.query(
+        f"SELECT * FROM forecasts WHERE tenant_id = ?{where} ORDER BY route_id, month_index",
+        tuple([db.current_tenant()] + params)), acc)
+
+
+@app.delete("/api/forecasts/{route_id}")
+def withdraw_route(route_id: str, submitted_by: Optional[str] = None,
+                   from_: Optional[int] = Query(None, alias="from"),
+                   to: Optional[int] = None,
+                   discipline: Optional[str] = None,
+                   section_id: Optional[str] = None):
+    """
+    Withdraw a forecast, optionally scoped to a month range, a submitter, and a line.
+
+    Pass discipline and section_id to withdraw ONE line. Without them this deletes every
+    line on the route in range -- which, now that a route can carry several disciplines,
+    means withdrawing a substructure forecast would take a superstructure one with it.
+    The My-submissions view sends the line keys.
+    """
+    clauses, params = ["route_id = ?"], [route_id]
+    # Task F: an IPT code can only withdraw its own lines. Added as a predicate rather
+    # than checked afterwards, so the DELETE itself cannot reach another IPT's rows.
+    acc = _require_access()
+    if access.ipt_scope(acc):
+        clauses.append("ipt = ?"); params.append(access.ipt_scope(acc))
+    if submitted_by:
+        clauses.append("submitted_by = ?"); params.append(submitted_by)
+    if from_ is not None and to is not None:
+        clauses.append("month_index BETWEEN ? AND ?"); params += [min(from_, to), max(from_, to)]
+    if discipline is not None:
+        clauses.append("discipline = ?"); params.append(discipline or "")
+    if section_id is not None:
+        clauses.append("section_id = ?"); params.append(section_id or "")
+    where = " AND ".join(clauses)
+    # tenant_id leads the literal WHERE on both statements, so db.current_tenant() leads
+    # the params tuple ahead of everything `clauses` accumulated.
+    n = db.query(f"SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ? AND {where}",
+                 tuple([db.current_tenant()] + params))[0]["n"]
+    db.execute(f"DELETE FROM forecasts WHERE tenant_id = ? AND {where}",
+               tuple([db.current_tenant()] + params))
+    return {"status": "success", "route_id": route_id, "deleted": n,
+            "scoped_to_line": discipline is not None or section_id is not None}
+
+
+@app.get("/api/forecasts/summary")
+def forecasts_summary():
+    """One row per route: status, span, and window total in vehicles — for the ledger/approvals view."""
+    rows = access.filter_lines(
+        db.query("SELECT * FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),)),
+        _require_access())
+    factors = conversions.load_factors()
+    by_line = {}
+    for r in rows:
+        # grouped per LINE, not per route. Grouping on route_id alone would merge a
+        # substructure line and a superstructure line on the same route into one ledger
+        # row, silently summing two disciplines' traffic under one material and vehicle.
+        key = (r["route_id"], r.get("discipline") or "", r.get("section_id") or "")
+        g = by_line.setdefault(key, {
+            "route_id": r["route_id"],
+            "discipline": r.get("discipline") or "",
+            "section_id": r.get("section_id") or "",
+            "months": [], "statuses": set(),
+            "unit": r["unit"], "material_type": r["material_type"],
+            "vehicle_type": r["vehicle_type"], "submitted_by": r.get("submitted_by"),
+            "ipt": r.get("ipt"),
+            # the rejection reason was being written and then never read by anything,
+            # so a submitter saw "Rejected" and no explanation
+            "reject_reason": None,
+            "total_vehicles": 0.0,
+        })
+        g["months"].append(r["month_index"])
+        g["statuses"].add(r["status"])
+        if r.get("reject_reason") and not g["reject_reason"]:
+            g["reject_reason"] = r["reject_reason"]
+        g["total_vehicles"] += conversions.convert_row(r, "vehicles", factors)
+
+    out = []
+    for g in by_line.values():
+        statuses = g.pop("statuses")
+        g["status"] = next(iter(statuses)) if len(statuses) == 1 else "Mixed"
+        months = sorted(g["months"])
+        g["span"] = f"M{months[0]}\u2013M{months[-1]}" if months else "-"
+        g["month_count"] = len(months)
+        g.pop("months")
+        g["total_vehicles"] = int(round(g["total_vehicles"]))
+        out.append(g)
+    out.sort(key=lambda x: (x["route_id"], x["discipline"], x["section_id"]))
+    return out
+
+
+def _line_id(route_id, month_index, discipline, section_id):
+    """
+    Primary key for one forecast line.
+
+    Every part is non-empty-or-'' rather than None. The old form was
+    f"{route_id}::{month_index}"; adding nullable parts would have produced
+    'route::3::None::None' for two different rows and collided them.
+    """
+    return f"{route_id}::{month_index}::{discipline or ''}::{section_id or ''}"
+
+
+@app.post("/api/forecasts/bulk")
+def save_matrix_row(row: MatrixRow):
+    """
+    Upsert one forecast line across a year. Cells at 0 are cleared.
+
+    Both the conflict target and the delete clause carry the full widened key. The delete
+    matters as much as the insert: scoped to (route_id, month_index) alone, a submitter
+    typing 0 into the superstructure line would have deleted the substructure line for
+    that month too.
+    """
+    if row.unit not in conversions.UNITS:
+        raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+
+    disc = row.discipline or ""
+    sect = row.section_id or ""
+    # Task F. The IPT written on the line is decided HERE, not trusted from the body:
+    # an IPT code's own IPT, or a planner's explicit choice, never a silent default.
+    acc = _require_access()
+    ipt, err = access.ipt_for_save(row.ipt, acc)
+    if err:
+        raise HTTPException(400, err)
+    # ...and an IPT code cannot overwrite a line that belongs to another IPT. The line
+    # key is (route, discipline, section) across the cells; one check covers them all.
+    if access.ipt_scope(acc):
+        owner = db.query(
+            "SELECT DISTINCT ipt FROM forecasts WHERE tenant_id = ? AND route_id = ? "
+            "AND discipline = ? AND section_id = ?",
+            (db.current_tenant(), row.route_id, disc, sect))
+        foreign = [o["ipt"] for o in owner if access.canonical_ipt(o["ipt"]) != ipt]
+        if foreign:
+            raise HTTPException(404, "no such forecast line")
+    touched = 0
+
+    for c in row.cells:
+        if not (1 <= c.month_index <= MONTH_COUNT):
+            continue
+        rid = _line_id(row.route_id, c.month_index, disc, sect)
+        if c.quantity and c.quantity > 0:
+            db.execute(
+                """
+                INSERT INTO forecasts
+                    (tenant_id, id, route_id, month_index, discipline, section_id,
+                     quantity, unit,
+                     material_type, material_description, vehicle_type, submitted_by,
+                     status, reject_reason, ipt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                -- must match the widened UNIQUE key exactly; see MatrixRow's docstring
+                ON CONFLICT (tenant_id, route_id, month_index, discipline, section_id)
+                DO UPDATE SET
+                    quantity             = EXCLUDED.quantity,
+                    unit                 = EXCLUDED.unit,
+                    material_type        = EXCLUDED.material_type,
+                    material_description = EXCLUDED.material_description,
+                    vehicle_type         = EXCLUDED.vehicle_type,
+                    submitted_by         = EXCLUDED.submitted_by,
+                    status               = EXCLUDED.status,
+                    reject_reason        = NULL,
+                    ipt                  = COALESCE(EXCLUDED.ipt, forecasts.ipt)
+                """,
+                (db.current_tenant(),
+                 rid, row.route_id, c.month_index, disc, sect, float(c.quantity), row.unit,
+                 row.material_type, row.material_description, row.vehicle_type,
+                 row.submitted_by, row.status, None, ipt),
+            )
+            touched += 1
+        else:
+            db.execute(
+                "DELETE FROM forecasts WHERE tenant_id = ? AND route_id = ? "
+                "AND month_index = ? AND discipline = ? AND section_id = ?",
+                (db.current_tenant(), row.route_id, c.month_index, disc, sect),
+            )
+
+    return {"status": "success", "route_id": row.route_id,
+            "discipline": disc, "section_id": sect, "months_saved": touched,
+            "caution": _coexisting_lines(row.route_id, disc, sect)}
+
+
+def _coexisting_lines(route_id, discipline, section_id):
+    """
+    Other disciplines already forecasting on this route in the same months.
+
+    Not an error -- ballast and fill to one destination in one month under different
+    disciplines is the case the whole taxonomy exists for. But two people filling in the
+    matrix independently can double-count the same lorry movements without ever seeing
+    each other's line, so the save says so.
+    """
+    rows = db.query(
+        "SELECT DISTINCT discipline, section_id, submitted_by, COUNT(*) AS months "
+        "FROM forecasts WHERE tenant_id = ? AND route_id = ? "
+        "AND NOT (discipline = ? AND section_id = ?) "
+        "GROUP BY discipline, section_id, submitted_by",
+        (db.current_tenant(), route_id, discipline or "", section_id or ""),
+    )
+    if not rows:
+        return None
+    others = [{"discipline": r["discipline"] or "(unassigned)",
+               "section_id": r["section_id"] or "(unassigned)",
+               "submitted_by": r.get("submitted_by"),
+               "months": r["months"]} for r in rows]
+    return {
+        "message": (f"{len(others)} other forecast line(s) already exist on {route_id}. "
+                    "Check you are not double-counting the same vehicle movements."),
+        "lines": others,
+    }
+
+
+@app.put("/api/routes/{route_id}/status")
+def set_route_status(route_id: str, req: StatusUpdate,
+                     discipline: Optional[str] = None,
+                     section_id: Optional[str] = None):
+    """
+    Approve / reject / reopen a forecast.
+
+    Pass discipline and section_id to act on ONE line. Omit them and every line on the
+    route is updated -- which is the old behaviour, kept so nothing breaks, but it now
+    means approving another discipline's forecast as a side effect. The Approvals view
+    should send the line keys.
+    """
+    _require_approver()
+    clauses, params = ["route_id = ?"], [route_id]
+    scoped = discipline is not None or section_id is not None
+    if scoped:
+        clauses.append("discipline = ?"); params.append(discipline or "")
+        clauses.append("section_id = ?"); params.append(section_id or "")
+    where = " AND ".join(clauses)
+
+    existing = db.query(f"SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ? AND {where}",
+                        tuple([db.current_tenant()] + params))
+    if existing[0]["n"] == 0:
+        raise HTTPException(404, "No forecast for that route.")
+    # tenant_id goes in the WHERE, never the SET — an UPDATE with no tenant predicate
+    # rewrites every tenant's rows. The two SET placeholders come first in the params,
+    # then the tenant, then whatever `clauses` accumulated.
+    db.execute(f"UPDATE forecasts SET status = ?, reject_reason = ? "
+               f"WHERE tenant_id = ? AND {where}",
+               tuple([req.status, req.reject_reason, db.current_tenant()] + params))
+
+    # Week 1, Task C: approving a month line is what materialises its four weeks.
+    #
+    # Driven off the rows that are now Approved rather than off the request, because
+    # an unscoped call updates every line on the route and each of them needs its own
+    # four weeks. A re-approval refreshes the `derived` weeks and leaves `edited` and
+    # `confirmed` ones alone — see weeks.materialise_line().
+    #
+    # ⚠️ Rejecting or reopening deletes NOTHING. A confirmed week with an actual typed
+    # against it is a record of what happened on site; dropping it because a planner
+    # reopened the month would destroy that.
+    materialised = None
+    if req.status == "Approved":
+        try:
+            done = {"created": 0, "refreshed": 0, "kept": 0}
+            lines = db.query(
+                "SELECT DISTINCT discipline, section_id FROM forecasts "
+                "WHERE tenant_id = ? AND route_id = ? AND status = 'Approved'",
+                (db.current_tenant(), route_id))
+            for l in lines:
+                r = weeks.materialise_line(route_id, l["discipline"], l["section_id"])
+                for k in done:
+                    done[k] += r[k]
+            materialised = done
+        except Exception as e:
+            # a failure here must not undo an approval that has already committed
+            print("⚠️  Week 1: week materialisation failed for", route_id, e)
+
+    return {"status": "success", "route_id": route_id, "new_status": req.status,
+            "scoped_to_line": scoped, "rows": existing[0]["n"],
+            "weeks": materialised}
+
+
+# ------------------------------------------------ look-ahead (Week 1, Tasks C + D)
+#
+# NOT under /api/admin. Until Task F lands, visibility is exactly the same as
+# /api/forecasts — everyone on staff sees every line — and these endpoints inherit
+# that rather than inventing a narrower rule that Task F would then have to undo.
+# ⚠️ That means anyone who can reach the staff app can confirm a week and type an
+# actual. Task F is what scopes it; do not describe this as access-controlled.
+class WeekKey(BaseModel):
+    """The forecast LINE plus a week. Same shape every write below takes."""
+    route_id: str
+    month_index: int
+    discipline: str = ""
+    section_id: str = ""
+    week_index: int
+
+
+class WeekEdit(WeekKey):
+    planned_qty: Optional[float] = None
+    # the four flags are free text and every one may be empty
+    weather: Optional[str] = None
+    wetness: Optional[str] = None
+    traffic: Optional[str] = None
+    other: Optional[str] = None
+    edited_by: Optional[str] = None
+
+
+class WeekConfirm(WeekEdit):
+    confirmed_by: Optional[str] = None
+
+
+class WeekActual(WeekKey):
+    actual_qty: Optional[float] = None
+    actual_note: Optional[str] = None
+    actual_by: Optional[str] = None
+    # Look-ahead v2 slices 3-5: the confirmed cost of the week, typed beside the actual.
+    # Written only when the field is SENT; an absent field leaves the stored cost alone.
+    actual_cost_eur: Optional[float] = None
+
+
+class WeekReopen(WeekKey):
+    reopened_by: Optional[str] = None
+
+
+class WeekCalibrate(WeekKey):
+    # a typed figure INSTEAD of the variance formula, not on top of it
+    override_qty: Optional[float] = None
+    by: Optional[str] = None
+    # Look-ahead v2: opt-in, default OFF. Spread the applied delta over the commit
+    # week's remaining weekdays. spread_from is an ISO date; today when omitted.
+    spread: bool = False
+    spread_from: Optional[str] = None
+
+
+def _flags_of(body):
+    """Only the flag fields the client actually sent — an absent one is not a blank."""
+    sent = set(_fields_set(body))
+    return {k: getattr(body, k) for k in weeks.FLAG_FIELDS if k in sent}
+
+
+@app.get("/api/forecast-weeks")
+def list_forecast_weeks(from_month: int = Query(1, ge=1, le=MONTH_COUNT),
+                        to_month: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT),
+                        route_id: Optional[str] = None):
+    """
+    The week rows in a month window, plus what the UI needs to label them.
+
+    Reading materialises: a line approved before this shipped has no week rows, and an
+    empty Look-ahead for an approved line reads as a broken feature rather than a
+    missing migration. See weeks.list_weeks().
+    """
+    acc = _require_access()
+    rows = access.filter_lines(weeks.list_weeks(from_month, to_month, route_id=route_id), acc)
+    nm, nw = weeks.editable_week(START_YEAR)
+    return {"from": min(from_month, to_month), "to": max(from_month, to_month),
+            "weeks": rows,
+            # which cell the UI lets you edit and confirm. Computed server-side so the
+            # browser's clock and time zone cannot move it.
+            "next_week": {"month_index": nm, "week_index": nw},
+            # Look-ahead v2: the same bucket under the name the UI now uses. The brief
+            # says keep `next_week` rather than churn the backend name — so both.
+            "commit_week": {"month_index": nm, "week_index": nw},
+            "statuses": list(weeks.WEEK_STATUSES),
+            "flag_fields": list(weeks.FLAG_FIELDS),
+            "summary": weeks.summary()}
+
+
+@app.put("/api/forecast-weeks")
+def edit_forecast_week(body: WeekEdit):
+    """Edit one week's planned quantity and/or flags. Sets status `edited`."""
+    _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
+    res = weeks.set_week(body.route_id, body.month_index, body.discipline,
+                         body.section_id, body.week_index,
+                         planned_qty=body.planned_qty, flags=_flags_of(body),
+                         by=body.edited_by)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+@app.post("/api/forecast-weeks/confirm")
+def confirm_forecast_week(body: WeekConfirm):
+    """Confirm one week, with the four optional flags. Sets status `confirmed`."""
+    _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
+    # Look-ahead v2 (L6): confirm is whole-week and ONE act. days.confirm_week() calls
+    # weeks.confirm_week() and then stamps every day in the bucket `confirmed`; a week
+    # outside the commit bucket has no days and confirms exactly as before.
+    res = days.confirm_week(body.route_id, body.month_index, body.discipline,
+                            body.section_id, body.week_index,
+                            by=body.confirmed_by, flags=_flags_of(body))
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+@app.put("/api/forecast-weeks/actual")
+def set_forecast_week_actual(body: WeekActual):
+    """
+    Type what actually moved in one week.
+
+    ⭐ Does NOT calibrate. Variance appears immediately; next week's plan does not
+    move until /api/forecast-weeks/calibrate is called.
+    """
+    _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
+    res = weeks.set_actual(body.route_id, body.month_index, body.discipline,
+                           body.section_id, body.week_index,
+                           actual_qty=body.actual_qty, actual_note=body.actual_note,
+                           by=body.actual_by, actual_cost_eur=body.actual_cost_eur,
+                           cost_given=("actual_cost_eur" in set(_fields_set(body))))
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+@app.post("/api/forecast-weeks/reopen")
+def reopen_forecast_week(body: WeekReopen):
+    """
+    Look-ahead v2: take a confirmed week back to `edited`. Its days follow. Nothing is
+    deleted — the mocks' footer promises "re-open the week in Look-ahead to change the
+    plan", and this is that.
+    """
+    _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
+    res = days.reopen_week(body.route_id, body.month_index, body.discipline,
+                           body.section_id, body.week_index, by=body.reopened_by)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+@app.post("/api/forecast-weeks/calibrate")
+def calibrate_forecast_week(body: WeekCalibrate):
+    """
+    Carry this week's variance into next week — and only next week.
+
+    400 when next week is already confirmed. The response's `blocked_by` says so, so
+    the UI can disable the button rather than discovering it on click.
+    """
+    _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
+    res = days.calibrate(body.route_id, body.month_index, body.discipline,
+                         body.section_id, body.week_index,
+                         override_qty=body.override_qty, by=body.by,
+                         spread=bool(body.spread), spread_from=body.spread_from)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+# --------------------------------------------- forecast days (Look-ahead v2, slice 1)
+#
+# The commit week — the bucket that contains today — day by day. Days exist for that
+# bucket only and for Approved lines only; see days.py's rules. Visibility is the parent
+# line's ipt, exactly as the week endpoints. No CSV import, no file body.
+class DayKey(BaseModel):
+    route_id: str
+    month_index: int
+    discipline: str = ""
+    section_id: str = ""
+    day_date: str                          # ISO date, YYYY-MM-DD
+
+
+class DayEdit(DayKey):
+    planned_qty: float
+    edited_by: Optional[str] = None
+
+
+class DayActual(DayKey):
+    actual_qty: Optional[float] = None
+    actual_note: Optional[str] = None
+    actual_by: Optional[str] = None
+
+
+@app.get("/api/forecast-days")
+def list_forecast_days(from_date: Optional[str] = Query(None, alias="from"),
+                       to_date: Optional[str] = Query(None, alias="to"),
+                       route_id: Optional[str] = None,
+                       bucket: str = "commit"):
+    """
+    The commit week's days, grouped by forecast line, with the sum-rule flag per line.
+
+    `from` / `to` (ISO dates) clip what is returned; the default is the whole bucket.
+    They never widen it — there are no days outside the commit week. Reading
+    materialises, as the week endpoint does.
+
+    Slice 2: every line also carries `context` (origin→dest, IPT, WS, material,
+    vehicle, payload, baked state, cycle, flags) and `week_derived`; every day carries
+    `derived` (tonnes, trips, vehicles, km_day, km_per_vehicle, tonne_km); the response
+    carries `totals` for the KPI strip. See derived.py for the formulas (brief §4).
+    """
+    acc = _require_access()
+    # `bucket=next` reads (and materialises) the week AFTER the commit week — the
+    # Thursday process: next week's look-ahead confirmed for next week's deliveries.
+    res = days.list_days(from_date, to_date, route_id=route_id,
+                         bucket=("next" if bucket == "next" else "commit"))
+    res["lines"] = access.filter_lines(res["lines"], acc)
+    # Look-ahead v2 slice 2: context chips and the derived columns, computed on read
+    # from the SAME route_analysis() path analysis-batch and month-kpis use. After the
+    # access filter, so `totals` is for the lines this caller can see. Unbaked lines
+    # get trips and tonnes only, and the UNBAKED flag — no distance is invented.
+    derived.decorate(res)
+    res["statuses"] = list(days.DAY_STATUSES)
+    res["summary"] = days.summary()
+    return res
+
+
+@app.get("/api/lookahead")
+def lookahead_page(bucket: str = "commit", route_id: Optional[str] = None,
+                   tark_tee: int = 1):
+    """
+    Look-ahead v2 slices 3-6: everything the page's three views need in one read —
+    commit (days + derived + totals), account (last week), horizon (roles), stock and
+    the clash rail. `bucket=next` is the Thursday process.
+
+    🔴 Tark Tee here is the STORED per-route check (a DB read), never the live fetch —
+    the live fetch froze the page on 09 Sep. `sources.tark_tee` says how current it is;
+    POST /api/forecast-weeks/tark-tee/refresh re-checks in the background.
+    """
+    acc = _require_access()
+    return lookahead.page(bucket=("next" if bucket == "next" else "commit"),
+                          route_id=route_id, acc=acc, with_tark_tee=bool(tark_tee))
+
+
+@app.get("/api/lookahead/geometry")
+def lookahead_geometry(ids: str = "", vehicles: str = ""):
+    """
+    10 Sep — the Commit view's week map. `ids` = comma-separated route ids (the lines the
+    caller already sees), `vehicles` = the matching vehicle types, aligned by position and
+    optional. Returns each route's baked loaded geometry and both ends with coordinates;
+    an unbaked route comes back with geometry null. Any staff code. Deliberately NOT a
+    page read — the map must never make the grid slower.
+    """
+    _require_access()
+    id_list = [x.strip() for x in ids.split(",") if x.strip()]
+    veh_list = [x.strip() for x in vehicles.split(",")] if vehicles else []
+    veh = {rid: v for rid, v in zip(id_list, veh_list) if v}
+    return {"routes": lookahead.week_geometry(id_list, veh)}
+
+
+@app.get("/api/forecast-weeks/tark-tee")
+def forecast_week_tark_tee(bucket: str = "commit", route_id: Optional[str] = None):
+    """
+    The STORED Tark Tee flags for the page's routes, how old they are, which routes
+    have never been checked, and whether a refresh is running. Instant — a DB read.
+    The page polls this while a refresh runs.
+    """
+    acc = _require_access()
+    return lookahead.tark_tee_status(bucket=("next" if bucket == "next" else "commit"),
+                                     route_id=route_id, acc=acc)
+
+
+@app.post("/api/forecast-weeks/tark-tee/refresh")
+def forecast_week_tark_tee_refresh(sync: int = 0):
+    """
+    Re-check every baked route against live Tark Tee and store the result. Runs in a
+    background thread (30 s+ on a cold cache); returns at once with the refresh state.
+    `sync=1` waits. Any signed-in staff code may call it — it reads public road data
+    and writes only the stored check.
+    """
+    _require_access()
+    return restrictions.refresh_async(sync=bool(sync))
+
+
+@app.get("/api/forecast-weeks/clashes")
+def forecast_week_clashes(bucket: str = "commit", route_id: Optional[str] = None,
+                          tark_tee: int = 0):
+    """The rail alone (brief §6), for a caller that already has the grid."""
+    acc = _require_access()
+    pg = lookahead.page(bucket=("next" if bucket == "next" else "commit"),
+                        route_id=route_id, acc=acc, with_tark_tee=bool(tark_tee))
+    out = dict(pg["clashes"])
+    out["stock"] = pg["stock"]
+    out["commit_week"] = pg["commit_week"]
+    return out
+
+
+@app.get("/api/forecast-weeks/export")
+def forecast_week_export(format: str = "xlsx", bucket: str = "commit",
+                         route_id: Optional[str] = None, tark_tee: int = 1):
+    # the export reads the same STORED restriction check the page does — instant
+    """
+    Browser download of the commit week — xlsx (day × line, stock, clashes) or the PDF
+    one-pager. No email, no upload. Built from the same read the page shows.
+    """
+    from fastapi.responses import Response       # not in the test stub; imported here
+    acc = _require_access()
+    pg = lookahead.page(bucket=("next" if bucket == "next" else "commit"),
+                        route_id=route_id, acc=acc, with_tark_tee=bool(tark_tee))
+    cw = pg.get("commit_week") or {}
+    stem = f"lookahead-{cw.get('from', 'week')}"
+    try:
+        if format == "pdf":
+            data, mime, ext = export.build_pdf(pg), "application/pdf", "pdf"
+        else:
+            data, mime, ext = (export.build_xlsx(pg),
+                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                               "xlsx")
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type=mime,
+                    headers={"Content-Disposition": f'attachment; filename="{stem}.{ext}"'})
+
+
+@app.put("/api/forecast-days")
+def edit_forecast_day(body: DayEdit):
+    """Type one day's planned quantity. The day and (if it was derived) its week go `edited`."""
+    _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
+    res = days.set_day(body.route_id, body.month_index, body.discipline,
+                       body.section_id, body.day_date, body.planned_qty, by=body.edited_by)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+@app.put("/api/forecast-days/actual")
+def set_forecast_day_actual(body: DayActual):
+    """
+    Type what actually moved on one day.
+
+    ⭐ Does NOT calibrate. The week actual becomes the running sum of the day actuals
+    ONLY while no clerk has typed a week figure — a typed week actual is never overwritten.
+    """
+    _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
+    res = days.set_day_actual(body.route_id, body.month_index, body.discipline,
+                              body.section_id, body.day_date,
+                              actual_qty=body.actual_qty, actual_note=body.actual_note,
+                              by=body.actual_by)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+# --------------------------------------------- stockpiles (Week 1, Task D2)
+class CapacityIn(BaseModel):
+    # None CLEARS the capacity — "we do not know how big this stockpile is" is a real state
+    # and is not zero. See stockpiles.set_capacity().
+    capacity_qty: Optional[float] = None
+    capacity_unit: Optional[str] = None
+    opening_qty: Optional[float] = None
+
+
+class ConsumeIn(BaseModel):
+    location_id: str
+    month_index: int
+    week_index: int
+    consumed_qty: Optional[float] = None
+    unit: Optional[str] = None
+    note: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
+@app.put("/api/locations/{location_id}/capacity")
+def set_location_capacity(location_id: str, body: CapacityIn,
+                          token: Optional[str] = None):
+    """Max live stock, its unit, and the opening figure. Admin-gated like every other
+    write to master data."""
+    _check_admin(token)
+    res = stockpiles.set_capacity(location_id, capacity_qty=body.capacity_qty,
+                                  capacity_unit=body.capacity_unit,
+                                  opening_qty=body.opening_qty)
+    if res.get("error"):
+        raise HTTPException(404, res["error"])
+    return res
+
+
+@app.get("/api/stockpiles")
+def list_stockpiles(from_month: int = Query(1, ge=1, le=MONTH_COUNT),
+                    to_month: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT),
+                    location_id: Optional[str] = None):
+    """
+    Per-week stock for every location that can hold it.
+
+    A read model — nothing here is stored. Inbound comes from typed week ACTUALS, so a
+    week nobody has reported shows inbound 0 rather than a quarter of the forecast.
+    """
+    # Task F: any valid code. ⚠️ NOT filtered by IPT — a stockpile has no IPT, and inferring
+    # one from the routes that feed it would be a guess. An IPT code sees every stockpile.
+    _require_access()
+    out = stockpiles.balances(from_month, to_month, location_id=location_id)
+    out["storage_types"] = list(stockpiles.STORAGE_TYPES)
+    out["capacity_units"] = list(stockpiles.CAPACITY_UNITS)
+    return out
+
+
+@app.put("/api/stockpiles/consume")
+def consume_stockpile(body: ConsumeIn):
+    """One week's typed consumption. There is no file and no importer."""
+    _require_access()
+    res = stockpiles.consume(body.location_id, body.month_index, body.week_index,
+                             consumed_qty=body.consumed_qty, unit=body.unit,
+                             note=body.note, by=body.updated_by)
+    if res.get("error"):
+        raise HTTPException(404, res["error"])
+    return res
+
+
+# ------------------------------------------------------- config (2.5b)
+class FactorsIn(BaseModel):
+    doc: dict
+    updated_by: Optional[str] = None
+
+
+@app.get("/api/config/factors")
+def get_factors_config():
+    """The live document, where it came from, and whether the file has drifted.
+    Readable by any signed-in user; only admins write."""
+    _require_access()
+    return {"doc": conversions.load_factors(), "status": config.status(conversions),
+            "file": conversions.load_factors_file()}
+
+
+@app.put("/api/admin/config/factors")
+def put_factors_config(body: FactorsIn, token: Optional[str] = None):
+    """
+    Replace the live document. Refused with the list of problems if it fails
+    config.validate() — a bad document here changes every number in the system.
+    """
+    _check_admin(token)
+    res = config.save(body.doc, by=body.updated_by, network=network)
+    if not res["ok"]:
+        raise HTTPException(400, "; ".join(res["problems"]))
+    return {"ok": True, "status": config.status(conversions)}
+
+
+@app.post("/api/admin/config/factors/reset")
+def reset_factors_config(updated_by: Optional[str] = None, token: Optional[str] = None):
+    """Overwrite the live document with backend/factors.json."""
+    _check_admin(token)
+    res = config.reset_to_file(conversions, by=updated_by)
+    if not res["ok"]:
+        raise HTTPException(400, "; ".join(res["problems"]))
+    return {"ok": True, "status": config.status(conversions)}
+
+
+# ------------------------------------------------- costing + fuel index (10 Sep evening)
+class TargetRatesIn(BaseModel):
+    rate_eur_per_load: Optional[float] = None
+    rate_eur_per_t: Optional[float] = None
+    rate_eur_per_km: Optional[float] = None
+    updated_by: Optional[str] = None
+
+
+class FuelSettingsIn(BaseModel):
+    yard_eur_per_l: Optional[float] = None
+    share_pct: Optional[float] = None
+    country: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
+class ManualIndexIn(BaseModel):
+    eur_per_l: float
+    bulletin_date: str
+    updated_by: Optional[str] = None
+
+
+def _costing_payload():
+    s = costing.settings(use_cache=False)
+    country = s["fuel"].get("country") or fuel.DEFAULT_COUNTRY
+    idx = fuel.get_index(country)
+    out = {"target": s["target"], "fuel": s["fuel"], "index": fuel.state(country),
+           "summary": costing.summary(idx)}
+    return out
+
+
+@app.get("/api/costing")
+def get_costing():
+    """The tenant's target rates, fuel settings, the stored diesel index and the BAF
+    they give. Any signed-in code. Never fetches."""
+    _require_access()
+    return _costing_payload()
+
+
+@app.put("/api/admin/costing/target")
+def put_costing_target(body: TargetRatesIn, token: Optional[str] = None):
+    """
+    Type the TARGET rates (€/load, €/t, €/km) — the Planned € for every route that has
+    no rate of its own. Only the fields sent are written; a sent null clears one.
+    Admin token: a target changes every unpriced line's € at once. Nothing is seeded.
+    """
+    _check_admin(token)
+    fields = {k: getattr(body, k) for k in costing.TARGET_FIELDS if k in _fields_set(body)}
+    res = costing.set_target(fields, by=body.updated_by)
+    if not res["ok"]:
+        raise HTTPException(400, "; ".join(res["problems"]))
+    return _costing_payload()
+
+
+@app.get("/api/fuel-index")
+def get_fuel_index(lazy: int = 1, sync: int = 0):
+    """
+    The widget's read: the stored EE diesel row (EU Weekly Oil Bulletin via EuroOilWatch),
+    its staleness, the tenant's fuel settings and the BAF. Returns the STORED row at
+    once; when the last attempt is older than 12 h it starts one background refresh
+    (`lazy=0` to suppress; `sync=1` waits — tests and diagnostics). Never on the page
+    read's path: /api/lookahead reads the row only.
+    """
+    _require_access()
+    if lazy:
+        s = costing.settings()
+        fuel.ensure_fresh(s["fuel"].get("country") or fuel.DEFAULT_COUNTRY, sync=bool(sync))
+    return _costing_payload()
+
+
+@app.post("/api/admin/fuel-index/refresh")
+def refresh_fuel_index(sync: int = 0, token: Optional[str] = None):
+    """Fetch the feed now (admin). `sync=1` waits for the outcome."""
+    _check_admin(token)
+    s = costing.settings()
+    fuel.refresh(s["fuel"].get("country") or fuel.DEFAULT_COUNTRY, sync=bool(sync))
+    return _costing_payload()
+
+
+@app.put("/api/fuel-index/settings")
+def put_fuel_settings(body: FuelSettingsIn):
+    """
+    Type the yard €/L (optional, cost-plus later) and the fuel share % (empty = no BAF
+    line). Planner or admin. Never touches the bulletin row or the locked base.
+    """
+    _require_approver()
+    fields = {k: getattr(body, k) for k in costing.FUEL_FIELDS if k in _fields_set(body)}
+    res = costing.set_fuel(fields, by=body.updated_by)
+    if not res["ok"]:
+        raise HTTPException(400, "; ".join(res["problems"]))
+    return _costing_payload()
+
+
+@app.put("/api/admin/fuel-index/manual")
+def put_fuel_manual(body: ManualIndexIn, token: Optional[str] = None):
+    """Type the index when the feed is down (admin). Writes the same row, source 'manual'."""
+    _check_admin(token)
+    s = costing.settings()
+    res = fuel.set_manual(body.eur_per_l, body.bulletin_date, by=body.updated_by,
+                          country=s["fuel"].get("country") or fuel.DEFAULT_COUNTRY)
+    if not res["ok"]:
+        raise HTTPException(400, "; ".join(res["problems"]))
+    return _costing_payload()
+
+
+@app.post("/api/admin/fuel-index/reset-base")
+def reset_fuel_base(updated_by: Optional[str] = None, token: Optional[str] = None):
+    """Clear the locked BAF base (admin). The next Confirm week locks a fresh one."""
+    _check_admin(token)
+    costing.reset_baf_base(by=updated_by)
+    return _costing_payload()
+
+
+class CostPreview(BaseModel):
+    route_id: str
+    vehicle_type: str
+    material_type: Optional[str] = None
+    unit: str = "t"
+    cells: List[Cell] = []
+
+
+@app.post("/api/costing/preview")
+def costing_preview(body: CostPreview):
+    """
+    11 Sep pm — the Submit-forecast matrix's price while typing: the body's cells priced
+    as the saved line will be (same functions as /api/costing/lines). A read that takes a
+    body; it stores nothing. Any signed-in code.
+    """
+    _require_access()
+    return costlines.preview(body.route_id, body.vehicle_type, body.material_type, body.unit,
+                             [c.model_dump() if hasattr(c, "model_dump") else c.dict() for c in body.cells])
+
+
+@app.get("/api/costing/lines")
+def costing_lines(from_: Optional[int] = Query(None, alias="from"), to: Optional[int] = None,
+                  status: Optional[str] = None):
+    """
+    11 Sep — every visible forecast line × month with volume, haul, carbon and the three
+    prices (planned / fair) each in € · €/t · €/trip · €/km, from the Look-ahead's own
+    functions. The Dashboard and the Forecasts page read THIS and derive nothing.
+    `status` = Approved | Pending | Rejected | All (default All). Any signed-in code;
+    the access filter is the same as /api/forecasts.
+    """
+    acc = _require_access()
+    return costlines.lines(acc, from_month=from_, to_month=to, status=status)
+
+
+# ------------------------------------------------------------------ public feed (map)
+def _working_days(factors):
+    """
+    Working days in a planning month, from factors.json.
+
+    ⭐ 2026-09-15 — ONE reader for this figure. It was read inline in
+    `public_month_kpis` and nowhere else; the map's route label now needs it too, and
+    lesson 25 ("one config value, one reader") is in the notes precisely because a
+    second inline read of MAPBOX_TOKEN hid a missing Render variable for a month.
+    Every public endpoint that divides by a day count divides by THIS.
+    """
+    plan = (factors or {}).get("planning", {}) or {}
+    try:
+        wd = float(plan.get("working_days_per_month") or 22)
+    except (TypeError, ValueError):
+        wd = 22.0
+    # a zero or negative in a hand-edited factors.json must not produce a division by
+    # zero on a public endpoint
+    return wd if wd > 0 else 22.0
+
+
+@app.get("/api/public/route-forecasts")
+def public_route_forecasts(
+    from_: int = Query(1, alias="from", ge=1, le=MONTH_COUNT),
+    to: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT),
+    unit: str = Query("vehicles"),
+):
+    """
+    Approved forecasts only, aggregated per route over [from, to], returned in
+    the requested unit. This is what the map paints. Shape:
+        { "hr-ew-...": {"avg": .., "per_day": .., "peak": .., "total": ..,
+                        "unit": .., "working_days": ..}, ... }
+
+    ⭐ 2026-09-15 — `per_day` is new and it is what the route label on the map now
+    prints. `avg` is a MONTHLY average over the window; the label read as a rate and
+    was one, just the wrong one — "2221 Two-way" on a route doing about a hundred
+    movements a day. Divided here rather than in the map so the divisor has ONE reader
+    (lesson 25, and the same reason the Dashboard's client arithmetic was retired):
+    `working_days_per_month` from factors.json, the same figure `/api/public/month-kpis`
+    already hands the KPI cards.
+    """
+    if unit not in conversions.UNITS:
+        raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+    lo, hi = min(from_, to), max(from_, to)
+    rows = db.query(
+        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+        "AND month_index BETWEEN ? AND ?",
+        (db.current_tenant(), lo, hi),
+    )
+    factors = conversions.load_factors()
+    agg = {}
+    for r in rows:
+        v = conversions.convert_row(r, unit, factors)
+        a = agg.setdefault(r["route_id"], {"total": 0.0, "peak": 0.0, "months": 0})
+        a["total"] += v
+        a["peak"] = max(a["peak"], v)
+        a["months"] += 1
+
+    wd = _working_days(factors)
+    out = {}
+    for rid, a in agg.items():
+        months = a["months"] or 1
+        out[rid] = {
+            "avg": conversions.round_for_unit(a["total"] / months, unit),
+            # the rate a reader of the map label is actually after: one month's worth
+            # spread over that month's working days
+            "per_day": conversions.round_for_unit(a["total"] / months / wd, unit),
+            "peak": conversions.round_for_unit(a["peak"], unit),
+            "peak_per_day": conversions.round_for_unit(a["peak"] / wd, unit),
+            "total": conversions.round_for_unit(a["total"], unit),
+            "unit": unit,
+            "working_days": wd,
+        }
+    return out
+
+
+@app.get("/api/public/month-kpis")
+def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
+                      unit: str = Query("vehicles")):
+    """
+    2026-09-02 (§9). One month of APPROVED forecast, per LINE, with every figure the
+    map's KPI cards need already converted — so the map aggregates after its own
+    filters and never guesses a payload.
+
+    Per line: the typed quantity in the map unit, in tonnes, and in vehicle-loads.
+    Vehicle-loads = tonnes ÷ that line's payload; a vehicle_type factors.json does not
+    know falls back to the first PLANNING vehicle (V07, 18 t) and says so in
+    `payload_fallback`, rather than to _default's 20 t.
+
+    ⭐ 2026-09-03, the human's correction: vehicles and movements are DIFFERENT
+    numbers. A MOVEMENT (trip) is one load carried one way. How many movements one
+    VEHICLE can make in a day is a property of the ROUTE — the baked HERE cycle time
+    for that vehicle profile, `route_analysis()`'s `trips_per_day` — so the vehicles
+    needed are movements/day ÷ that figure, rounded UP. That figure rides along here as
+    `trips_per_vehicle_day`; it is None where the route is not baked for that vehicle,
+    and the map must show "not baked" rather than a fleet size.
+
+    Approved only. Never actuals — those stay off the public map.
+    """
+    if unit not in conversions.UNITS:
+        raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+    factors = conversions.load_factors()
+    wd = _working_days(factors)          # 15 Sep: shared with the two forecast feeds
+    vs = factors.get("vehicles", {}) or {}
+    planning = conversions.planning_vehicle_names(factors)
+    fb_name = planning[0] if planning else None
+    fb_payload = float((vs.get(fb_name) or {}).get("payload_t") or 18.0)
+    rows = db.query(
+        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+        "AND month_index = ? ORDER BY route_id, discipline, section_id",
+        (db.current_tenant(), int(month)))
+    # one route_analysis() per (route, vehicle) rather than per line
+    _tpv_cache = {}
+
+    def trips_per_vehicle_day(route_id, vehicle):
+        key = (route_id, vehicle)
+        if key not in _tpv_cache:
+            tpv = None
+            try:
+                res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None)
+                for row in res.get("rows", []):
+                    if row.get("alt_index") == 0 and (not vehicle or row.get("profile") == vehicle):
+                        tpv = row.get("trips_per_day")
+                        break
+            except Exception:
+                tpv = None
+            _tpv_cache[key] = tpv
+        return _tpv_cache[key]
+
+    lines = []
+    for r in rows:
+        v = r.get("vehicle_type")
+        known = bool(v and vs.get(v) and (vs.get(v) or {}).get("payload_t"))
+        payload = float(vs[v]["payload_t"]) if known else fb_payload
+        t = conversions.to_tonnes(r["quantity"], r["unit"], r.get("material_type"), v, factors)
+        lines.append({
+            "route_id": r["route_id"], "discipline": r.get("discipline") or "",
+            "section_id": r.get("section_id") or "", "ipt": r.get("ipt"),
+            "material_type": r.get("material_type") or "",
+            "vehicle_type": v, "unit": r["unit"],
+            "qty_unit": conversions.round_for_unit(conversions.convert_row(r, unit, factors), unit),
+            "qty_t": round(t, 3),
+            "vehicle_loads": round(t / payload, 3) if payload else 0.0,
+            "payload_t": payload, "payload_fallback": (None if known else fb_name),
+            # movements one vehicle can make per day on THIS route, or None if unbaked
+            "trips_per_vehicle_day": trips_per_vehicle_day(r["route_id"], v),
+        })
+    return {"month": int(month), "unit": unit, "working_days": wd,
+            "payload_fallback_vehicle": fb_name, "lines": lines}
+
+
+@app.get("/api/public/stockpile-timeline")
+def public_stockpile_timeline(from_: int = Query(1, alias="from", ge=1, le=MONTH_COUNT),
+                              to: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT)):
+    """
+    2026-09-02 (§8). Per location, per month: is the stockpile over capacity at the END of
+    that month, and by how much. Read from the same balance read model the Look-ahead
+    uses; nothing stored, nothing new computed. Only stockpiles with a recorded capacity can
+    be over, so only those appear. No week detail — the public map stays monthly.
+    """
+    lo, hi = min(from_, to), max(from_, to)
+    out = []
+    for sp in stockpiles.balances(lo, hi)["stockpiles"]:
+        if sp["capacity_qty"] is None:
+            continue
+        months = {}
+        for w in sp["weeks"]:
+            months[w["month_index"]] = w      # the last week of each month wins
+        out.append({
+            "location_id": sp["location_id"], "name": sp["name"],
+            "capacity_qty": sp["capacity_qty"], "unit": sp["capacity_unit"],
+            "months": {str(m): {"balance_end": w["balance_end"], "over": w["over"],
+                                "remaining": w["remaining"]}
+                       for m, w in months.items()},
+        })
+    return {"from": lo, "to": hi, "stockpiles": out}
+
+
+@app.get("/api/public/forecast-matrix")
+def public_forecast_matrix(
+    from_: int = Query(1, alias="from", ge=1, le=MONTH_COUNT),
+    to: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT),
+    unit: str = Query("vehicles"),
+):
+    """
+    Approved forecasts as a month-by-month grid (for the map's detail table).
+    Returns a list, one entry per route, each with a {month_index: quantity} map
+    in the requested unit, plus the route's material and vehicle.
+    """
+    if unit not in conversions.UNITS:
+        raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+    lo, hi = min(from_, to), max(from_, to)
+    rows = db.query(
+        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+        "AND month_index BETWEEN ? AND ? ORDER BY route_id, month_index",
+        (db.current_tenant(), lo, hi),
+    )
+    factors = conversions.load_factors()
+    by_line = {}
+    for r in rows:
+        # one entry per LINE — a route carrying two disciplines is two rows in the
+        # detail table, not one row with both disciplines' tonnage silently added up
+        key = (r["route_id"], r.get("discipline") or "", r.get("section_id") or "")
+        g = by_line.setdefault(key, {
+            "route_id": r["route_id"],
+            "discipline": r.get("discipline") or "",
+            "section_id": r.get("section_id") or "",
+            "material_type": r["material_type"],
+            "material_description": r.get("material_description"),
+            "vehicle_type": r["vehicle_type"],
+            "monthly": {}, "total": 0.0,
+        })
+        v = conversions.convert_row(r, unit, factors)
+        g["monthly"][str(r["month_index"])] = conversions.round_for_unit(v, unit)
+        g["total"] += v
+    out = list(by_line.values())
+    for g in out:
+        g["total"] = conversions.round_for_unit(g["total"], unit)
+    out.sort(key=lambda x: x["total"], reverse=True)
+    # ⭐ 2026-09-15 — `working_days` rides along so the timeline can print a DAILY rate on
+    # the route label instead of the month's total. One divisor, one source: factors.json.
+    return {"unit": unit, "from": lo, "to": hi, "working_days": _working_days(factors),
+            "routes": out}
+
+
+# ------------------------------------------------------------------ routing network (Phase 0)
+@app.get("/api/routes/status")
+def routes_status():
+    return network.routes_status()
+
+
+@app.get("/api/routes/summary")
+def routes_summary():
+    return network.summary()
+
+
+@app.get("/api/public/route-alternatives")
+def public_route_alternatives(profile: Optional[str] = None):
+    """Every non-primary baked option, for the public map's grey underlay.
+
+    A SEPARATE endpoint from /api/public/map-data on purpose — see the docstring
+    on network.route_alternatives_geojson() for the five things that walk that
+    FeatureCollection and would be corrupted by alternatives appearing in it."""
+    return network.route_alternatives_geojson(profile)
+
+
+@app.get("/api/routes/geojson")
+def routes_geojson(profile: str = network.DEFAULT_PROFILE,
+                   leg: str = "loaded", alt_index: int = 0):
+    """
+    Map source. A route holds several geometries per profile after Step B (laden and
+    unladen legs, each with HERE alternatives), so the caller picks which one to draw.
+    """
+    return network.routes_geojson(profile, leg=leg, alt_index=alt_index)
+
+
+@app.get("/api/routes/{route_id}/geometries")
+def route_geometries(route_id: str, profile: Optional[str] = None,
+                     leg: Optional[str] = None):
+    """
+    Every cached geometry for one route, one feature per (profile, leg, alternative).
+    Used to draw a selected route's alternatives alongside the chosen line.
+    """
+    return network.route_geometries(route_id, profile=profile, leg=leg)
+
+
+@app.post("/api/admin/routes/{route_id}/promote-alt")
+def promote_alt(route_id: str, profile: str = network.DEFAULT_PROFILE,
+                alt_index: int = Query(..., ge=1, le=10),
+                leg: str = "loaded", token: Optional[str] = None):
+    """
+    Make one of HERE's alternatives the primary route for this vehicle and direction —
+    a planner overruling the router's ranking. Swaps with the current primary, which
+    stays available. Re-baking the route restores HERE's own ordering.
+    """
+    _check_admin(token)
+    if leg not in network.LEGS:
+        raise HTTPException(400, f"leg must be one of {list(network.LEGS)}")
+    return network.promote_alternative(route_id, profile, alt_index, leg=leg)
+
+
+@app.get("/api/routes/{route_id}/analysis")
+def route_analysis(route_id: str, profile: Optional[str] = None):
+    """
+    Haul-cycle analysis for one route: cycle time, trips/day, tonnes and CO2 per vehicle
+    profile x alternative. Derived from cached geometry plus factors.json planning
+    constants — no HERE calls, so it is cheap to open per row.
+    """
+    return network.route_analysis(route_id, profiles=[profile] if profile else None)
+
+
+@app.get("/api/public/map-data")
+def public_map_data(profile: Optional[str] = None):
+    """
+    Everything the public route map draws: route lines both directions, plus location
+    markers. Replaces the 4 MB static map/data/a1_data.js.
+
+    Unbaked routes are omitted rather than drawn as straight lines. On the admin map a
+    dashed straight line usefully says 'HERE could not route this'; on a public map it
+    would just look like a road that isn't there.
+    """
+    return network.public_map_data(profile=profile)
+
+
+# --------------------------------------------------------------------------- #
+#  G2, 16 Sep 2026 — the overlay and the tenant package                        #
+# --------------------------------------------------------------------------- #
+@app.get("/api/public/alignment")
+def public_alignment(request: Request):
+    """
+    The map's overlay package: alignment, chainage, package bands, boundaries, an
+    existing railway, the opening view — plus the tenant's words (name, team_label,
+    country, currency) so the map can label itself. Stored as the config row `overlay`;
+    tenants without one get an empty object and the map draws no alignment.
+
+    Same gate as the rest of /api/public/ (the map password or a staff session). The
+    row can be large (a surveyed 200 km alignment is ~9 MB), so it carries an ETag from
+    its updated_at and answers 304 to a matching If-None-Match.
+    """
+    row = tenant_package.get_overlay_row()
+    tag = '"' + str((row or {}).get("updated_at") or "none") + '"'
+    if request.headers.get("if-none-match") == tag:
+        return Response(status_code=304, headers={"ETag": tag})
+    doc = {}
+    if row:
+        try:
+            doc = json.loads(row["value"])
+        except Exception:
+            doc = {}
+    doc["tenant"] = config.tenant_settings(conversions)
+    # the tenant's names for its team slots, so the map shows "North Team", not an id
+    doc["teams"] = [{"id": r["id"], "label": r.get("label") or r["id"]}
+                    for r in taxonomy.list_ipts(active_only=False)]
+    return Response(content=json.dumps(doc, ensure_ascii=False), media_type="application/json",
+                    headers={"ETag": tag, "Cache-Control": "no-cache"})
+
+
+@app.put("/api/admin/overlay")
+def put_overlay(body: dict, token: Optional[str] = None):
+    """Store (or replace) the tenant's map overlay. See map/overlay.js for the shape."""
+    _check_admin(token)
+    res = tenant_package.set_overlay(body, by="admin")
+    if not res["ok"]:
+        raise HTTPException(400, "; ".join(res["problems"]))
+    return {"ok": True}
+
+
+@app.get("/api/admin/tenant/status")
+def tenant_status(token: Optional[str] = None):
+    """Is this tenant empty (importable), and how many rows does each table hold?"""
+    _check_admin(token)
+    counts = {}
+    for t in tenant_package.ORDER:
+        try:
+            counts[t] = db.query(f"SELECT COUNT(*) AS n FROM {t} WHERE tenant_id = ?",
+                                 (db.current_tenant(),))[0]["n"]
+        except Exception:
+            counts[t] = None
+    return {"tenant_id": db.current_tenant(), "empty": tenant_package.is_empty(),
+            "counts": counts, "tenant": config.tenant_settings(conversions)}
+
+
+@app.get("/api/admin/tenant/export")
+def tenant_export(token: Optional[str] = None):
+    """
+    The whole current tenant as one JSON document — every tenanted table including
+    baked geometry, and the config rows (factors, costing, overlay). Download it, keep
+    it, import it into an empty tenant elsewhere. tenant_package.py has the format.
+    """
+    _check_admin(token)
+    pkg = tenant_package.export_tenant(app_version="modus-g2")
+    name = f"modus-tenant-{db.current_tenant()}-{pkg['exported_at'][:10]}.json"
+    return Response(content=json.dumps(pkg, ensure_ascii=False), media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.post("/api/admin/tenant/import")
+def tenant_import(body: dict, replace: int = 0, token: Optional[str] = None):
+    """
+    Import a package into the CURRENT tenant. Refused unless the tenant is empty —
+    pass replace=1 to wipe it first. Whole-tenant, not a merge. Baked geometry in the
+    package is kept, so the routes need no re-bake; routes without geometry read
+    UNBAKED until the network is baked here.
+    """
+    _check_admin(token)
+    try:
+        res = tenant_package.import_tenant(body, replace=bool(replace))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    config.invalidate()
+    return res
+
+
+@app.get("/api/routes/analysis-batch")
+def routes_analysis_batch(route_ids: Optional[str] = None, profile: Optional[str] = None):
+    """
+    Primary-option haul-cycle figures for many routes at once, keyed route_id -> profile.
+
+    This exists so the dashboard can stop computing its own cycle time. It had
+    `round / 45 km/h + (12 + 8) / 60` against the backend's real HERE leg durations and
+    per-vehicle turnaround, and the two disagreed by up to 47% on speed alone and 125% on
+    turnaround for an Artic Flatbed. Converging them by making the dashboard call the
+    backend is the point; a per-route request for every route on screen was the only
+    reason not to, and this removes it.
+
+    Only alt_index 0 is returned — the primary route, which is what a forecast's distance
+    follows. Routes with no baked geometry are simply absent from the result rather than
+    present with zeros; a caller must show that as 'not baked', not as nothing moving.
+    """
+    ids = [r.strip() for r in (route_ids or "").split(",") if r.strip()]
+    if not ids:
+        ids = [r["id"] for r in db.query(
+            "SELECT id FROM routes WHERE tenant_id = ? ORDER BY id",
+            (db.current_tenant(),))]
+
+    profs = [profile] if profile else None
+    out, missing = {}, []
+    for rid in ids:
+        res = network.route_analysis(rid, profiles=profs)
+        rows = [r for r in res.get("rows", []) if r.get("alt_index") == 0]
+        if not rows:
+            missing.append(rid)
+            continue
+        out[rid] = {r["profile"]: r for r in rows}
+
+    return {"analysis": out, "not_baked": missing,
+            "planning": conversions.load_factors().get("planning", {}),
+            "count": len(out)}
+
+
+@app.get("/api/locations/geojson")
+def locations_geojson():
+    return network.locations_geojson()
+
+
+@app.post("/api/admin/bake-routes")
+def bake_routes(profile: str = network.DEFAULT_PROFILE,
+                limit: int = Query(25, ge=1, le=60),
+                legs: Optional[str] = None,
+                token: Optional[str] = None):
+    """
+    Compute + cache HERE truck geometry for a batch of routes. Call repeatedly
+    until 'remaining' is 0. Protected by ADMIN_TOKEN if that env var is set.
+
+    'limit' counts legs rather than routes — each leg is one HERE call. Pass
+    legs='loaded' to skip the unladen return and halve the call count.
+    """
+    admin_token = os.getenv("ADMIN_TOKEN", "").strip()
+    if admin_token and token != admin_token:
+        raise HTTPException(403, "bad or missing admin token")
+    want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else network.LEGS
+    return network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS)
+
+
+@app.post("/api/admin/clear-geometry")
+def clear_geometry(profile: Optional[str] = None, leg: Optional[str] = None,
+                   route_id: Optional[str] = None, token: Optional[str] = None):
+    """
+    Clear cached geometry (a profile and/or leg and/or route, or all) for re-baking.
+
+    ⚠️ `route_id` narrows this to one route and is what makes "drop this vehicle from
+    this route" possible; without it the only delete was network-wide. Every parameter
+    is optional and omitting all three still means ALL geometry for the tenant, which is
+    what "Clear all routes" wants -- so a caller that means one route must say so.
+    """
+    admin_token = os.getenv("ADMIN_TOKEN", "").strip()
+    if admin_token and token != admin_token:
+        raise HTTPException(403, "bad or missing admin token")
+    network.clear_geometry(profile, leg=leg, route_id=route_id)
+    return {"status": "cleared", "profile": profile or "all", "leg": leg or "all",
+            "route_id": route_id or "all"}
+
+
+class LocationIn(BaseModel):
+    name: str
+    role: str = "both"                     # 'origin' | 'destination' | 'both'
+    materials: List[str] = []              # legacy: kept in sync with supplies
+    supplies: List[str] = []               # categories an origin/both can provide
+    receives: List[str] = []               # categories a destination/both can accept
+    lat: float
+    lon: float
+    loc_type: Optional[str] = None
+    # access/egress gate — the point HERE actually routes to when it differs from the
+    # marker. Null (or omitted) means no gate surveyed yet; routing uses lat/lon.
+    gate_lat: Optional[float] = None
+    gate_lon: Optional[float] = None
+    # operator / free-text detail. Salvaged out of a1_data.js, where the quarry operator
+    # was the only copy anywhere, and editable in the Locations panel since.
+    vendor: Optional[str] = None
+    detail: Optional[str] = None
+
+
+def _fields_set(model):
+    """Which fields the client actually sent (pydantic v1 and v2 spell this differently)."""
+    return getattr(model, "model_fields_set", None) or getattr(model, "__fields_set__", set())
+
+
+def _check_admin(token):
+    admin_token = os.getenv("ADMIN_TOKEN", "").strip()
+    if admin_token and token != admin_token:
+        raise HTTPException(403, "bad or missing admin token")
+
+
+@app.post("/api/admin/locations")
+def create_location(body: LocationIn, token: Optional[str] = None):
+    _check_admin(token)
+    return network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
+                                   body.loc_type, supplies=body.supplies, receives=body.receives,
+                                   gate_lat=body.gate_lat, gate_lon=body.gate_lon,
+                                   vendor=body.vendor, detail=body.detail)
+
+
+@app.put("/api/admin/locations/{location_id}")
+def update_location(location_id: str, body: LocationIn, token: Optional[str] = None):
+    _check_admin(token)
+    # only touch the gate if the client mentioned it — otherwise a caller that doesn't
+    # know about gates (or an older client) would silently wipe one that was set
+    gate_given = bool({"gate_lat", "gate_lon"} & set(_fields_set(body)))
+    meta_given = bool({"vendor", "detail"} & set(_fields_set(body)))
+    return network.update_location(location_id, body.name, body.role, body.materials,
+                                   body.lat, body.lon, body.loc_type,
+                                   supplies=body.supplies, receives=body.receives,
+                                   gate_lat=body.gate_lat, gate_lon=body.gate_lon,
+                                   gate_given=gate_given,
+                                   vendor=body.vendor, detail=body.detail,
+                                   meta_given=meta_given)
+
+
+@app.delete("/api/admin/locations/{location_id}")
+def delete_location(location_id: str, token: Optional[str] = None):
+    _check_admin(token)
+    return network.delete_location(location_id)
+
+
+# ------------------------------------------------------------------ Phase 5a: gates
+#
+# The gate endpoints are admin-only for the same reason Locations and Zones are: a gate
+# moves where HERE routes to, so writing one invalidates cached geometry and spends
+# calls on the re-bake. ⚠️ ADMIN_TOKEN is set on Render (verified 2026-08-28), but the
+# LOGINS dict in the frontend is still client-side with plaintext passwords, so this is
+# an API boundary and not yet a user-permission one. Phase 6.
+class GateIn(BaseModel):
+    location_id: str
+    name: str
+    lat: float
+    lon: float
+    direction: str = "both"                 # 'access' | 'egress' | 'both'
+    # B3: induction is per gate and applies to whatever arrives. No per-vehicle
+    # override — offered and declined; the fix if it ever matters is a nullable
+    # column plus a COALESCE, not a rebuild.
+    safety_minutes: Optional[float] = None
+    # B5(c): the FLAT fallback, used only where no drawn haul road already carries
+    # these minutes in route_geometry.duration_hr. See network.INTERNAL_TRAVEL_SOURCES.
+    internal_travel_minutes: Optional[float] = None
+    is_default: bool = False
+    active: bool = True
+    note: Optional[str] = None
+    gate_id: Optional[str] = None
+
+
+class GatePatch(BaseModel):
+    name: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    direction: Optional[str] = None
+    safety_minutes: Optional[float] = None
+    internal_travel_minutes: Optional[float] = None
+    is_default: Optional[bool] = None
+    active: Optional[bool] = None
+    note: Optional[str] = None
+
+
+class RouteGatesIn(BaseModel):
+    origin_gate_id: Optional[str] = None
+    dest_gate_id: Optional[str] = None
+
+
+@app.get("/api/gates")
+def list_gates(location_id: Optional[str] = None, include_inactive: bool = True):
+    """Readable without a token — the map and the route panels need it, and a gate
+    coordinate is no more sensitive than the location marker already published."""
+    return {"gates": gates.list_gates(location_id, include_inactive=include_inactive)}
+
+
+@app.post("/api/admin/gates")
+def create_gate(body: GateIn, token: Optional[str] = None):
+    _check_admin(token)
+    return gates.create_gate(body.location_id, body.name, body.lat, body.lon,
+                             direction=body.direction,
+                             safety_minutes=body.safety_minutes,
+                             internal_travel_minutes=body.internal_travel_minutes,
+                             is_default=body.is_default, active=body.active,
+                             note=body.note, gate_id=body.gate_id)
+
+
+@app.patch("/api/admin/gates/{gate_id}")
+def update_gate(gate_id: str, body: GatePatch, token: Optional[str] = None):
+    _check_admin(token)
+    # only the fields the client actually sent are written. A PATCH that toggles
+    # `active` must not blank a safety time it knows nothing about — the same trap the
+    # Locations PUT hit when a node drag started wiping salvaged vendor names.
+    sent = set(_fields_set(body))
+    fields = {k: getattr(body, k) for k in sent}
+    out = gates.update_gate(gate_id, **fields)
+    if not out.get("error"):
+        # moving a gate moves the point HERE routed to, so any cached geometry on a
+        # route that uses it is stale. The re-bake is NOT run here — its cost is quoted
+        # in the UI first, as zone and haul-road writes already do.
+        moved = bool({"lat", "lon", "direction", "active"} & sent)
+        out["rebake_needed"] = moved
+        out["routes_affected"] = gates.routes_using(gate_id) if moved else []
+    return out
+
+
+@app.delete("/api/admin/gates/{gate_id}")
+def delete_gate(gate_id: str, token: Optional[str] = None):
+    _check_admin(token)
+    return gates.delete_gate(gate_id)
+
+
+@app.put("/api/admin/routes/{route_id}/gates")
+def set_route_gates(route_id: str, body: RouteGatesIn, token: Optional[str] = None):
+    _check_admin(token)
+    sent = set(_fields_set(body))
+    return gates.set_route_gates(route_id,
+                                 origin_gate_id=body.origin_gate_id,
+                                 dest_gate_id=body.dest_gate_id,
+                                 origin_given="origin_gate_id" in sent,
+                                 dest_given="dest_gate_id" in sent)
+
+
+class RouteIn(BaseModel):
+    origin_id: str
+    dest_id: str
+    material_category: Optional[str] = None
+    route_id: Optional[str] = None          # optional manual id; auto R00n if blank
+    ipt: Optional[str] = None
+
+
+@app.post("/api/admin/routes")
+def create_route(body: RouteIn, token: Optional[str] = None):
+    _check_admin(token)
+    return network.create_route(body.origin_id, body.dest_id, body.material_category,
+                                route_id=body.route_id, ipt=body.ipt)
+
+
+class RoutePatch(BaseModel):
+    origin_id: Optional[str] = None
+    dest_id: Optional[str] = None
+    material_category: Optional[str] = None
+    ipt: Optional[str] = None
+
+
+@app.get("/api/admin/routes/{route_id}/impact")
+def route_impact(route_id: str, token: Optional[str] = None):
+    """What an endpoint edit would touch — forecasts, weeks, baked profiles, haul
+    roads. Read before the edit so the UI can say it."""
+    _check_admin(token)
+    if not db.query("SELECT id FROM routes WHERE tenant_id = ? AND id = ?",
+                    (db.current_tenant(), route_id)):
+        raise HTTPException(404, "route not found")
+    return network.route_edit_impact(route_id)
+
+
+@app.patch("/api/admin/routes/{route_id}")
+def update_route(route_id: str, body: RoutePatch, token: Optional[str] = None):
+    """
+    2.5b: edit a route in place. Only the fields the client actually sent are written.
+    Moving an endpoint clears the baked geometry (profiles returned for the re-bake)
+    and that end's gate selection; forecasts, weeks and haul links are left alone.
+    """
+    _check_admin(token)
+    sent = set(_fields_set(body))
+    res = network.update_route(route_id, origin_id=body.origin_id, dest_id=body.dest_id,
+                               material_category=body.material_category, ipt=body.ipt,
+                               given=sent)
+    if res.get("error"):
+        raise HTTPException(404 if res["error"] == "route not found" else 400, res["error"])
+    return res
+
+
+class RoutePlanning(BaseModel):
+    max_vehicles_per_day: Optional[int] = None
+    rate_eur_per_load: Optional[float] = None
+    rate_eur_per_t: Optional[float] = None
+    rate_eur_per_km: Optional[float] = None
+    km_basis: Optional[str] = None
+
+
+@app.put("/api/admin/routes/{route_id}/planning")
+def set_route_planning(route_id: str, body: RoutePlanning, token: Optional[str] = None):
+    """
+    Look-ahead v2 slices 3-5: the typed planning cap and the three contract rates on one
+    route, plus the km basis they use. Only sent fields are written; a null clears.
+    Never seeded. The cap is a flag on the Look-ahead, never a block.
+    """
+    _check_admin(token)
+    sent = set(_fields_set(body))
+    res = network.set_route_planning(route_id, sent, **{k: getattr(body, k) for k in sent})
+    if res.get("error"):
+        raise HTTPException(404 if res["error"] == "route not found" else 400, res["error"])
+    return res
+
+
+@app.delete("/api/admin/routes/{route_id}")
+def delete_route(route_id: str, token: Optional[str] = None):
+    _check_admin(token)
+    return network.delete_route(route_id)
+
+
+@app.post("/api/admin/clear-routes")
+def clear_routes(token: Optional[str] = None):
+    _check_admin(token)
+    return network.clear_routes()
+
+
+# ------------------------------------------------------------------ diagnostics
+@app.get("/api/admin/diagnostics/factors")
+def diagnostics_factors(token: Optional[str] = None):
+    """
+    How each vehicle profile resolves against factors.json. Read this first when the
+    analysis table reports the same payload or CO2 for different vehicles — a profile
+    with in_factors=false has fallen through to _default and every such profile will
+    report identical figures.
+    """
+    _check_admin(token)
+    return network.factors_diagnostics()
+
+
+@app.get("/api/admin/diagnostics/route/{route_id}")
+def diagnostics_route(route_id: str, profile: str = network.DEFAULT_PROFILE,
+                      probe: bool = False, token: Optional[str] = None):
+    """
+    What is cached for a route, which coordinates it routes to (gate or marker), and
+    optionally a live HERE call showing exactly what was sent and returned.
+
+    probe=true spends two HERE requests. It is the only way to see whether HERE
+    declined an alternatives request or whether truck dimensions reached it at all.
+    """
+    _check_admin(token)
+    return network.route_diagnostics(route_id, profile, probe=probe)
+
+
+@app.get("/api/admin/diagnostics/departure/{route_id}")
+def diagnostics_departure(route_id: str, profile: str = network.DEFAULT_PROFILE,
+                          leg: str = "loaded", times: Optional[str] = None,
+                          token: Optional[str] = None):
+    """
+    Does HERE's answer for this leg depend on a departure time we never send?
+
+    Replays the identical request across several `departureTime` values, bracketed by two
+    controls that send none at all, and reports distance, duration, section count and a
+    geometry FINGERPRINT for each — because two different roads can come back the same
+    length, and distance alone would read that as "no change".
+
+    `times` is an optional comma-separated list of ISO-8601 timestamps (or the literal
+    `any`). Omit it and four default times on the next weekday are used; the response says
+    which timezone source produced them.
+
+    ⚠️ Costs one HERE request per time plus two controls — six by default. Writes nothing,
+    and does NOT pin anything: no bake sends a departureTime. Read `experiment.reads_as`
+    last, not first.
+    """
+    _check_admin(token)
+    want = [t.strip() for t in times.split(",") if t.strip()] if times else None
+    return network.departure_diagnostics(route_id, profile=profile, leg=leg, times=want)
+
+
+@app.get("/api/admin/diagnostics/compare/{route_id}")
+def diagnostics_compare(route_id: str, probe: bool = False, token: Optional[str] = None):
+    """
+    Route one pair for every vehicle profile and report whether anything differs.
+    Distinguishes 'the network offers no alternative' from 'the vehicle never reached
+    HERE'. probe=true spends one HERE request per profile.
+    """
+    _check_admin(token)
+    return network.compare_profiles(route_id, probe=probe)
+
+
+@app.post("/api/admin/bake-route")
+def bake_route(route_id: str, profile: str = network.DEFAULT_PROFILE,
+               legs: Optional[str] = None, token: Optional[str] = None):
+    """Bake one route. Both legs by default; pass legs='loaded' for the outbound only."""
+    _check_admin(token)
+    want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else None
+    return network.bake_route(route_id, profile, legs=want)
+
+
+@app.get("/api/admin/diagnostics/zones")
+def diagnostics_zones(route_id: Optional[str] = None,
+                      profile: str = network.DEFAULT_PROFILE,
+                      probe: bool = False, token: Optional[str] = None):
+    """
+    What the zone layer sends HERE, and with probe=true what HERE does with it.
+
+    Read this before believing anything about how many avoid[areas] the API tolerates —
+    that limit is not enforced in this codebase and has never been checked against the
+    live service. probe=true spends two HERE requests: the same route with and without
+    the current zone set, so a difference is attributable.
+    """
+    _check_admin(token)
+    return network.zones_diagnostics(route_id=route_id, profile=profile, probe=probe)
+
+
+# ------------------------------------------------------------------ zones (Phase 3)
+class ZoneIn(BaseModel):
+    """
+    A drawn zone. Geometry is a GeoJSON *geometry* (Polygon or LineString), not a
+    Feature — Mapbox Draw hands back Features, so the client sends feature.geometry.
+
+    affects_routing is the whole point of merging Phases 3 and 3.5 into one table:
+    TRUE and the bbox goes to HERE and baked routes crossing it are re-routed; FALSE and
+    it is drawn on the maps and the router never hears about it.
+    """
+    name: str
+    geometry: dict
+    kind: Optional[str] = "other"
+    affects_routing: bool = True
+    starts_on: Optional[str] = None          # 'YYYY-MM-DD' or null for open-ended
+    ends_on: Optional[str] = None
+    note: Optional[str] = None
+    active: bool = True
+    # Phase 4, haul roads only. speed_kph null means "no assigned speed" and leaves
+    # HERE's own timing alone — it is NOT a default speed. haul_mode null means the
+    # module default, which is 'splice'; see haul.py for why that is the safe one.
+    speed_kph: Optional[float] = None
+    haul_mode: Optional[str] = None
+
+
+def _zone_write_result(zone, inval):
+    """Shape shared by create/update/delete: the zone, plus what it just invalidated."""
+    return {"zone": zone, "invalidated": inval,
+            "rebake_required": inval.get("leg_count", 0) > 0,
+            "here_calls": inval.get("here_calls", 0)}
+
+
+@app.get("/api/zones")
+def list_zones(on: Optional[str] = None, include_inactive: bool = True):
+    """
+    Every zone, for the admin table and both maps.
+
+    Deliberately NOT under /api/admin: the public map draws disruptions and has no
+    token. Nothing here is sensitive — a zone is a shape, a name and a date range.
+    Pass on='YYYY-MM-DD' to get only those in force that day, which is how the public
+    map's timeline filters them.
+    """
+    return {"zones": zones.list_zones(include_inactive=include_inactive, on=on),
+            "summary": zones.summary(),
+            "kinds": list(zones.KINDS),
+            # Phase 4: the zone table needs to show which routes use each haul road, and
+            # a haul road attached to nothing is the commonest reason one "does nothing"
+            "haul_modes": list(haul.MODES),
+            "haul_default_mode": haul.DEFAULT_MODE,
+            "haul_kind": zones.HAUL_KIND,
+            "haul_links": haul.link_counts()}
+
+
+@app.get("/api/zones/{zone_id}")
+def get_zone(zone_id: str):
+    z = zones.get_zone(zone_id)
+    if not z:
+        raise HTTPException(404, "zone not found")
+    return z
+
+
+@app.post("/api/admin/zones")
+def create_zone(body: ZoneIn, token: Optional[str] = None):
+    """
+    Create a zone and immediately clear the baked geometry it invalidates.
+
+    Clearing is not the same as re-baking. This endpoint does NOT call HERE: it reports
+    how many legs must be re-routed and the client drives /api/admin/bake-routes until
+    'remaining' is 0, the same loop the bulk-bake button already uses. Doing the HERE
+    calls inline would block one HTTP request on dozens of round trips and time out on
+    Render long before it finished.
+    """
+    _check_admin(token)
+    z = zones.create_zone(
+        body.name, body.geometry, kind=body.kind, affects_routing=body.affects_routing,
+        starts_on=body.starts_on, ends_on=body.ends_on, note=body.note, active=body.active,
+        speed_kph=body.speed_kph, haul_mode=body.haul_mode)
+    if z.get("error"):
+        raise HTTPException(400, z["error"])
+    if z["kind"] == zones.HAUL_KIND:
+        # A brand-new haul road is attached to nothing, so it invalidates nothing — it
+        # cannot change a route until someone puts it on one. That is the whole reason
+        # attachment is explicit: drawing a road near a route does not silently re-bake
+        # it. Routing zones invalidate on creation; haul roads invalidate on attach.
+        return _zone_write_result(z, haul.invalidate_for_zone(z["id"]))
+    # a zone that does not affect routing invalidates nothing — it is drawn, not routed
+    inval = (zones.invalidate(new_geometry=z["geometry"])
+             if (z["affects_routing"] and z["active"] and zones.applies_on(z))
+             else zones.invalidate(dry_run=True))
+    return _zone_write_result(z, inval)
+
+
+@app.put("/api/admin/zones/{zone_id}")
+def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
+    """
+    Edit a zone and clear what the edit makes wrong.
+
+    An edit is two invalidations at once — routes that now cross the new shape, and
+    routes that were baked while the OLD shape was avoided. Both are passed to
+    zones.invalidate(), which is why the previous geometry is read before the write.
+
+    Only fields the client actually sent are written; see zones.update_zone().
+    """
+    _check_admin(token)
+    before = zones.get_zone(zone_id)
+    if not before:
+        raise HTTPException(404, "zone not found")
+
+    sent = set(_fields_set(body))
+    fields = {k: getattr(body, k) for k in
+              ("name", "geometry", "kind", "affects_routing", "starts_on", "ends_on",
+               "note", "active", "speed_kph", "haul_mode") if k in sent}
+    z = zones.update_zone(zone_id, **fields)
+    if z.get("error"):
+        raise HTTPException(400, z["error"])
+
+    # A haul road edit is exact — see haul.invalidate_for_zone(). It covers the case
+    # where a zone was a haul road and has just stopped being one, because the legs baked
+    # through it still carry its id in haul_zones and are cleared on that record, not on
+    # what the zone happens to be now.
+    if z["kind"] == zones.HAUL_KIND or before["kind"] == zones.HAUL_KIND:
+        inval = haul.invalidate_for_zone(zone_id)
+        haul.refresh_origin_temp_km()
+        return _zone_write_result(z, inval)
+
+    now_routes = z["affects_routing"] and z["active"] and zones.applies_on(z)
+    was_routes = (before["affects_routing"] and before["active"]
+                  and zones.applies_on(before))
+    inval = zones.invalidate(
+        zone_id=zone_id,
+        new_geometry=(z["geometry"] if now_routes else None),
+        # the old shape only matters if it was actually steering the router before
+        old_geometry=(before["geometry"] if was_routes else None),
+    )
+    return _zone_write_result(z, inval)
+
+
+@app.delete("/api/admin/zones/{zone_id}")
+def delete_zone(zone_id: str, token: Optional[str] = None):
+    """
+    Delete a zone and clear geometry that was routed around it.
+
+    Consider deactivating instead (PUT with active=false). A deleted zone takes with it
+    the record of why a past bake went the way it did; a deactivated one stops steering
+    the router and stays explainable.
+    """
+    _check_admin(token)
+    before = zones.get_zone(zone_id)
+    if not before:
+        raise HTTPException(404, "zone not found")
+
+    if before["kind"] == zones.HAUL_KIND:
+        # Order matters: work out what to clear while the links still exist, then drop
+        # them, then delete the zone. Deleting first would leave invalidate_for_zone()
+        # with nothing to find and the affected legs baked through a road that is gone.
+        inval = haul.invalidate_for_zone(zone_id)
+        detached = haul.clear_links_for_zone(zone_id)
+        res = zones.delete_zone(zone_id)
+        if res.get("error"):
+            raise HTTPException(404, res["error"])
+        haul.refresh_origin_temp_km()
+        out = _zone_write_result({"deleted": zone_id, "was": before}, inval)
+        out["detached_from_routes"] = detached
+        return out
+
+    was_routes = (before["affects_routing"] and before["active"]
+                  and zones.applies_on(before))
+    res = zones.delete_zone(zone_id)
+    if res.get("error"):
+        raise HTTPException(404, res["error"])
+    inval = zones.invalidate(
+        zone_id=zone_id,
+        old_geometry=(before["geometry"] if was_routes else None),
+    )
+    return _zone_write_result({"deleted": zone_id, "was": before}, inval)
+
+
+@app.get("/api/admin/zones/{zone_id}/impact")
+def zone_impact(zone_id: str, token: Optional[str] = None):
+    """
+    Dry run: what deleting or moving this zone would invalidate, without touching
+    anything. Use it to see the HERE bill before agreeing to it.
+    """
+    _check_admin(token)
+    z = zones.get_zone(zone_id)
+    if not z:
+        raise HTTPException(404, "zone not found")
+    if z["kind"] == zones.HAUL_KIND:
+        return {"zone": z,
+                "routes_attached": haul.routes_for_zone(zone_id),
+                "would_invalidate": haul.invalidate_for_zone(zone_id, dry_run=True)}
+    return {"zone": z,
+            "would_invalidate": zones.invalidate(
+                zone_id=zone_id, new_geometry=z["geometry"],
+                old_geometry=z["geometry"], dry_run=True)}
+
+
+# ------------------------------------------------------- haul roads (Phase 4)
+class HaulLinkIn(BaseModel):
+    """Attach a haul road to a route. seq null appends to the end of the order."""
+    zone_id: str
+    seq: Optional[int] = None
+
+
+class HaulOrderIn(BaseModel):
+    """The full traversal order for one route's haul roads, loaded-leg direction."""
+    zone_ids: List[str]
+
+
+def _haul_write_result(route_id, inval, extra=None):
+    """
+    Same shape the zone writes return, so the frontend's existing re-bake loop drives
+    this too. The one difference worth reading is here_calls: a spliced leg is more than
+    one HERE request, and this counts the splices — see haul._here_calls_for().
+    """
+    out = {"route_id": route_id, "invalidated": inval,
+           "rebake_required": inval.get("leg_count", 0) > 0,
+           "here_calls": inval.get("here_calls", 0),
+           "haul_roads": haul.links_for_route(route_id)}
+    out.update(extra or {})
+    return out
+
+
+@app.get("/api/haul-roads")
+def list_haul_roads(on: Optional[str] = None):
+    """
+    Haul roads and their route links, for the admin table and the public map.
+
+    Not under /api/admin for the same reason /api/zones is not: the public map draws
+    these, has no token, and a drawn road with a speed on it is not sensitive.
+    """
+    return {"haul_roads": zones.haul_roads(on=on, include_inactive=True,
+                                           require_geometry=False),
+            "links": db.query("SELECT * FROM route_haul_roads WHERE tenant_id = ? "
+                              "ORDER BY route_id, seq", (db.current_tenant(),)),
+            "summary": haul.summary()}
+
+
+@app.get("/api/routes/{route_id}/haul-roads")
+def route_haul_roads(route_id: str):
+    """
+    The haul roads on one route, plus the plan for each leg — entry and exit points,
+    traversal direction, drawn length and the duration the assigned speed implies.
+
+    No HERE calls. This is what the route panel shows before anything is baked, so a
+    planner can see that the loaded leg enters a road at one end and the return leg at
+    the other without spending a request to find out.
+    """
+    if not db.query("SELECT id FROM routes WHERE tenant_id = ? AND id = ?",
+                    (db.current_tenant(), route_id)):
+        raise HTTPException(404, "route not found")
+    return haul.diagnostics(route_id=route_id, probe=False)
+
+
+@app.post("/api/admin/routes/{route_id}/haul-roads")
+def attach_haul_road(route_id: str, body: HaulLinkIn, token: Optional[str] = None):
+    """
+    Put a haul road on a route — the Phase 4 requirement that this is edited ON the
+    route, not as a free-floating drawing.
+
+    Clears the route's baked geometry, because every leg of it now routes differently.
+    Does NOT call HERE: the client drives /api/admin/bake-routes afterwards, the same
+    loop the zone writes use.
+    """
+    _check_admin(token)
+    res = haul.attach(route_id, body.zone_id, seq=body.seq)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    inval = haul.invalidate_for_route(route_id)
+    haul.refresh_origin_temp_km(route_id)
+    return _haul_write_result(route_id, inval, {"attached": res["attached"]})
+
+
+@app.delete("/api/admin/routes/{route_id}/haul-roads/{zone_id}")
+def detach_haul_road(route_id: str, zone_id: str, token: Optional[str] = None):
+    """Take a haul road off a route and clear the geometry baked through it."""
+    _check_admin(token)
+    res = haul.detach(route_id, zone_id)
+    if res.get("error"):
+        raise HTTPException(404, res["error"])
+    inval = haul.invalidate_for_route(route_id)
+    haul.refresh_origin_temp_km(route_id)
+    return _haul_write_result(route_id, inval, {"detached": res["detached"]})
+
+
+@app.put("/api/admin/routes/{route_id}/haul-roads/order")
+def order_haul_roads(route_id: str, body: HaulOrderIn, token: Optional[str] = None):
+    """
+    Set the order a route enters its haul roads in, going out. The return leg reverses
+    it. Order changes the spliced geometry, so this clears and re-bakes like any other
+    haul change.
+    """
+    _check_admin(token)
+    res = haul.reorder(route_id, body.zone_ids)
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    inval = haul.invalidate_for_route(route_id)
+    haul.refresh_origin_temp_km(route_id)
+    return _haul_write_result(route_id, inval, {"order": res["order"]})
+
+
+@app.post("/api/admin/haul-roads/refresh-temp-km")
+def refresh_temp_km(route_id: Optional[str] = None, token: Optional[str] = None):
+    """
+    Recompute routes.origin_temp_km from the drawn haul roads.
+
+    Phase 4 made that column derived — it was seeded from V2 and computed with nowhere.
+    Every attach, detach, reorder and haul-road edit refreshes it already; this is the
+    manual backstop for a database whose links predate the change.
+    """
+    _check_admin(token)
+    return haul.refresh_origin_temp_km(route_id)
+
+
+@app.get("/api/admin/diagnostics/haul-roads")
+def diagnostics_haul_roads(route_id: Optional[str] = None,
+                           zone_id: Optional[str] = None,
+                           profile: Optional[str] = None,
+                           probe: bool = False, token: Optional[str] = None):
+    """
+    What Phase 4 would send HERE, and with probe=true what HERE does with it.
+
+    ⚠️ Read this before believing either of the two claims Phase 4 was designed around.
+    Both are inherited from a code comment and neither has been checked against the live
+    service from this codebase:
+
+      * that HERE ignores 'alternatives' when via-waypoints are present
+      * that a stopover via splits the response into per-leg sections
+
+    The second is load-bearing: 'via' mode's assigned-speed substitution only works if
+    HERE isolates the haul stretch as its own section. If it does not, via mode silently
+    falls back to HERE's own timing and says so in the response.
+
+    probe=true needs route_id and spends up to three HERE calls on one route.
+    """
+    _check_admin(token)
+    return haul.diagnostics(zone_id=zone_id, route_id=route_id,
+                            profile=profile, probe=probe)
+
+
+# ------------------------------------- Tark Tee restrictions (Phase 2.5a)
+@app.get("/api/restrictions")
+def get_restrictions(layers: Optional[str] = None, include_expired: bool = False):
+    """
+    Estonian Transport Administration restriction layers as WGS84 GeoJSON.
+
+    Proxied rather than fetched from the browser for three reasons, in order: it is
+    somebody else's public service and this caches it to one request per layer per half
+    hour however many people are looking; **the coordinates have to be corrected before
+    anything can draw them** (the service declares WKID 4326 and returns L-EST97 metres);
+    and CORS then never matters.
+
+    Not under /api/admin — the public map draws these and has no token, and a bridge
+    weight limit is not sensitive.
+
+    ⚠️ Expired records are excluded by default. The live layers carry roadworks from 2017,
+    and drawing those as current would be worse than not having the layer. Pass
+    include_expired=true to see everything; the response always reports how many were
+    dropped.
+    """
+    keys = [k.strip() for k in (layers or "").split(",") if k.strip()] or None
+    return restrictions.fetch_all(keys, current_only=not include_expired)
+
+
+@app.get("/api/restrictions/layers")
+def restriction_layers():
+    """
+    The layer catalogue — label, severity, colour and which vehicle dimension (if any) a
+    limit on that layer can be compared against.
+
+    The COLOUR is served from here so the map's legend and its layers cannot drift apart.
+    That has already had to be fixed once on this map.
+    """
+    prov = restrictions.provider()
+    if not prov:
+        # a tenant outside the provider's country: nothing to list, and the map hides
+        # the panel on `provider: null` rather than showing an empty one
+        return {"layers": [], "match_m": restrictions.MATCH_M, "provider": None,
+                "attribution": None, "note": restrictions.NO_PROVIDER_NOTE}
+    return {"layers": [dict(v, key=k) for k, v in restrictions.LAYERS.items()],
+            "match_m": restrictions.MATCH_M,
+            "provider": prov,
+            "attribution": prov["attribution"]}
+
+
+@app.get("/api/routes/{route_id}/restrictions")
+def route_restrictions(route_id: str, profile: Optional[str] = None):
+    """
+    Which restrictions the baked geometry of one route passes through.
+
+    ⚠️ Reports, never blocks, and makes **no tonnage judgement** about a weak bridge:
+    `nominal_load` is a class like 'N-13/NG-60', not tonnes, and the mapping has never
+    been established here. The class and the vehicle's gross weight are both returned and
+    `needs_interpretation` is set. See restrictions.check_route().
+    """
+    if not db.query("SELECT id FROM routes WHERE tenant_id = ? AND id = ?",
+                    (db.current_tenant(), route_id)):
+        raise HTTPException(404, "route not found")
+    return restrictions.check_route(route_id, profile=profile)
+
+
+@app.get("/api/routes/restrictions")
+def all_route_restrictions(profile: Optional[str] = None):
+    """
+    Every baked route checked in one pass, sharing a single fetch. Only routes with a hit
+    are returned — a clean route is the normal case and listing all 107 buries the ones
+    that matter.
+    """
+    return restrictions.check_all(profile=profile)
+
+
+@app.get("/api/admin/diagnostics/restrictions")
+def diagnostics_restrictions(layer: Optional[str] = None, probe: bool = False,
+                             token: Optional[str] = None):
+    """
+    What this asks Tark Tee for, and with probe=true what comes back — including the raw
+    coordinate next to the converted one, so the WKID mislabelling is visible rather than
+    taken on trust. Spends no HERE calls and no Google quota.
+    """
+    _check_admin(token)
+    return restrictions.diagnostics(layer=layer, probe=probe)
+
+
+@app.post("/api/admin/restrictions/refresh")
+def refresh_restrictions(token: Optional[str] = None):
+    """Drop the cache so the next request re-fetches from Tark Tee."""
+    _check_admin(token)
+    return restrictions.clear_cache()
+
+
+# ------------------------------------------ Street View (Phase 2.5a)
+@app.get("/api/streetview/meta")
+def streetview_meta(lat: float, lon: float, radius: int = streetview.DEFAULT_RADIUS_M):
+    """
+    Does Google have street-level imagery near this point? **Free** — Google consumes no
+    quota for metadata, only for images. The UI calls this first and asks for a picture
+    only when the answer is yes, so a quarry down a private track costs nothing and shows
+    nothing instead of spending a billable request on a grey tile.
+
+    Also returns `offset_m`: how far Google had to move to find a panorama. A large offset
+    means the picture is of somewhere else, which matters for a gate on a long approach.
+    """
+    return streetview.metadata(lat, lon, radius)
+
+
+@app.get("/api/streetview")
+def streetview_image(lat: float, lon: float, size: str = "480x300",
+                     heading: Optional[int] = None, pitch: int = 0, fov: int = 80,
+                     radius: int = streetview.DEFAULT_RADIUS_M):
+    """
+    A Street View still, proxied so the Google key never reaches the browser.
+
+    ⚠️ **This costs a billable Google request.** It checks the free metadata endpoint
+    first and returns 404 rather than spending one when there is no imagery. Nothing is
+    written to disk or to the database — Google's terms restrict storing Maps content.
+    """
+    from fastapi.responses import Response
+    data, ctype = streetview.fetch_image(lat, lon, size=size, heading=heading,
+                                         pitch=pitch, fov=fov, radius=radius)
+    if data is None:
+        raise HTTPException(404, ctype)
+    # short cache only: enough to stop a re-render costing a second request, not storage
+    return Response(content=data, media_type=ctype,
+                    headers={"Cache-Control": "private, max-age=900"})
+
+
+@app.get("/api/admin/diagnostics/streetview")
+def diagnostics_streetview(lat: Optional[float] = None, lon: Optional[float] = None,
+                           probe: bool = False, token: Optional[str] = None):
+    """
+    Whether Street View is wired up and how many billable requests this process has made.
+    probe=true calls metadata only, which is free.
+    """
+    _check_admin(token)
+    return streetview.diagnostics(lat=lat, lon=lon, probe=probe)
+
+
+# ------------------------------------------------------------------ static
+class NoCacheStatic(StaticFiles):
+    """StaticFiles that revalidates instead of trusting the browser's guess.
+
+    Same fault as GET / had, and the same fix. Starlette sends an ETag and no
+    Cache-Control, so Chrome applies its own freshness heuristic and can serve a
+    stale map/index.html or overlay.js straight through a hard refresh —
+    which once looked exactly like a failed deploy for an hour, and on the map
+    specifically produced a HALF-upgraded pair: new index.html, old JS.
+
+    `no-cache`, NOT `no-store`. The browser still revalidates with its ETag and
+    still gets a 304 when nothing changed, so a large static file is re-downloaded
+    only when it has actually changed. no-store would re-fetch it on every page load.
+    (The alignment itself is no longer a static file: /api/public/alignment carries
+    its own ETag.)
+
+    ⚠️ This does NOT replace the ?v= cache-buster on overlay.js. That guards the
+    same failure one layer up and costs nothing; belt and braces is the right
+    number of mechanisms for a bug that has bitten twice.
+    """
+
+    # get_response() is the documented override point and has been stable across
+    # Starlette versions. `file_response()` is the more obvious hook and is the
+    # WRONG one to use here: it is internal, its signature has changed, and a
+    # subclass that overrides a method the installed version no longer calls adds
+    # no header and raises no error — it fails exactly as silently as the bug it
+    # is meant to fix.
+    async def get_response(self, path, scope):
+        resp = await super().get_response(path, scope)
+        try:
+            resp.headers["Cache-Control"] = "no-cache"
+        except Exception:
+            pass          # never let a header failure 500 the map
+        return resp
+
+
+# Map (Mapbox app) at /map/ ; must be mounted before the catch-all "/".
+app.mount("/map", NoCacheStatic(directory=str(ROOT / "map"), html=True), name="map")
+# The user guide at /help/ (frontend/help/, landed on the repo on 10 Sep afternoon by
+# another session; its main.py mount had been lost under the costing zip). Same
+# no-cache static class, after /map, before the catch-all "/". test_help.py pins it.
+app.mount("/help", NoCacheStatic(directory=str(ROOT / "frontend" / "help"), html=True), name="help")
+
+
+@app.get("/")
+def frontend_index():
+    # no-cache, NOT no-store: the browser still revalidates with its ETag and still gets
+    # a 304 when nothing has changed, so a normal load costs the same as before. Without
+    # it Starlette sends an ETag with no Cache-Control, Chrome applies its own freshness
+    # heuristic, and a deployed index.html can stay invisible behind a cached copy that
+    # survives Ctrl+Shift+R. That cost an hour on 2026-08-30 and looked exactly like a
+    # failed deploy: the new API answered, the new page did not appear, and the repo,
+    # the build and the commit were all correct.
+    return FileResponse(str(ROOT / "frontend" / "index.html"),
+                        headers={"Cache-Control": "no-cache"})
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

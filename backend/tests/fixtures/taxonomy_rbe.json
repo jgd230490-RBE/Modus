@@ -1,0 +1,307 @@
+{
+ "_note": "TEST FIXTURE. One project's taxonomy (six teams, three design sections, fifteen work sections) as it was seeded by the product until 16 Sep 2026. Used by tests that assert taxonomy behaviour; the product ships no teams or sections. Delete this file and rework test_phase2.py / test_week1.py to scrub the last project-specific names from the repository.",
+ "disciplines": [
+  [
+   "utilities",
+   "Utilities",
+   10,
+   true,
+   "Third-party diversions and protections - HV, telecom, water, gas. Standalone because lead times run 2-3 years and it gates everything downstream."
+  ],
+  [
+   "temporary_works",
+   "Temporary Works",
+   20,
+   true,
+   "Construction bases, hardstanding, access roads, site facilities."
+  ],
+  [
+   "earthworks",
+   "Earthworks",
+   30,
+   true,
+   "Bulk fill, cut, soil improvement, slope stabilisation. Kept separate from substructure by user decision."
+  ],
+  [
+   "substructure",
+   "Substructure",
+   40,
+   true,
+   "Formation beneath the ballast, drainage, culverts, cable channels, ducts and chambers. Drainage is civils here, not MEP."
+  ],
+  [
+   "structures",
+   "Structures",
+   50,
+   true,
+   "Bridges, viaducts, retaining walls, noise barriers."
+  ],
+  [
+   "superstructure",
+   "Superstructure",
+   60,
+   true,
+   "Ballast, sleepers, rails, fastenings, switches and crossings, earthing and bonding. The project's own defined term for trackwork."
+  ],
+  [
+   "stations",
+   "Stations",
+   70,
+   true,
+   "Terminals, platforms, depots, IMF buildings, architectural - and station MEP, until the mep discipline is switched on."
+  ],
+  [
+   "mep",
+   "MEP",
+   80,
+   false,
+   "Station buildings are design-yes, construct-no today. May come into scope in a future segment - switching it on also means migrating the `stations` rows that were really MEP."
+  ],
+  [
+   "ene",
+   "Energy / Electrification",
+   90,
+   false,
+   "OCS, substations, SCADA. Procured separately by RB Rail. A1 builds only the containment, which is substructure."
+  ],
+  [
+   "ccs",
+   "Control, Command & Signalling",
+   100,
+   false,
+   "ETCS L2, interlocking, FRMCS. Procured separately by RB Rail."
+  ]
+ ],
+ "discipline_materials": {
+  "earthworks": [
+   "Earthworks / soil",
+   "Small aggregate"
+  ],
+  "substructure": [
+   "Small aggregate",
+   "Large aggregate / ballast",
+   "Precast / concrete",
+   "General / imported"
+  ],
+  "utilities": [
+   "General / imported",
+   "Precast / concrete"
+  ],
+  "structures": [
+   "Precast / concrete",
+   "Steel / rail",
+   "General / imported"
+  ],
+  "superstructure": [
+   "Large aggregate / ballast",
+   "Steel / rail",
+   "Precast / concrete"
+  ],
+  "stations": [
+   "Precast / concrete",
+   "Steel / rail",
+   "General / imported"
+  ],
+  "temporary_works": [
+   "Small aggregate",
+   "Large aggregate / ballast",
+   "General / imported"
+  ]
+ },
+ "ipts": [
+  [
+   "IPT1",
+   "IPT 1"
+  ],
+  [
+   "IPT2",
+   "IPT 2"
+  ],
+  [
+   "IPT3",
+   "IPT 3"
+  ],
+  [
+   "IPT4",
+   "IPT 4"
+  ],
+  [
+   "IPT5",
+   "IPT 5"
+  ],
+  [
+   "IPT6",
+   "IPT 6"
+  ]
+ ],
+ "design_sections": [
+  [
+   "DS2",
+   "Design Section 2",
+   "Mainline is superstructure-only. Contains WS 8 (Ulemiste Terminal), WS 9 (RSMD depot) and WS 10/11 (Soodevahe IMF and base), where A1's scope is fuller."
+  ],
+  [
+   "DS1",
+   "Design Section 1",
+   "Mainline is superstructure-only. A1 depends on other contractors for formation handover before track can be laid."
+  ],
+  [
+   "DS3",
+   "Design Section 3",
+   "Full scope - A1 designs and builds substructure and superstructure."
+  ]
+ ],
+ "work_sections": [
+  [
+   "WS1",
+   "Tootsi to Timmermanni",
+   "IPT1",
+   "DS3",
+   0.0,
+   11.7978,
+   null,
+   "Mainline band. Phase 1 construct yes."
+  ],
+  [
+   "WS2",
+   "Timmermanni to Orasselja Viaduct",
+   "IPT2",
+   "DS3",
+   11.7978,
+   24.546,
+   null,
+   "Mainline band."
+  ],
+  [
+   "WS3",
+   "Timmermanni to Parnu Papiniidu Bridge BR2032",
+   "IPT3",
+   "DS3",
+   24.546,
+   29.9094,
+   null,
+   "Official name from Scope v1.2, kept verbatim. Note the name begins 'Timmermanni' while the band begins at the Orasselja Viaduct (24.546) where WS2 ends -- that is the official name, not a transcription error."
+  ],
+  [
+   "WS4",
+   "Parnu Papiniidu Bridge BR2032",
+   "IPT4",
+   "DS3",
+   29.9094,
+   30.2656,
+   null,
+   ""
+  ],
+  [
+   "WS5",
+   "Parnu Passenger Terminal area",
+   "IPT5",
+   "DS3",
+   30.2656,
+   32.35,
+   null,
+   "Phase 1 construct yes unless the programme reinstates 31+507. 31+507 is NOT seeded as a map tick."
+  ],
+  [
+   "WS6",
+   "Pedestrian underpass BR2236 to A1/A2 boundary",
+   "IPT4",
+   "DS3",
+   32.35,
+   36.663,
+   null,
+   "Full scope in Scope v1.2. Construct-in-Phase-1 is OPEN -- in_scope stays true because scope and phasing are different questions and there is no phasing column."
+  ],
+  [
+   "WS7",
+   "Superstructure - full route",
+   "IPT6",
+   null,
+   null,
+   null,
+   null,
+   "Corridor-wide underlay, one row. Extent is GLOBAL 0+000-142+130 -- a different datum from the local DS3 chainage on WS1-WS6, which is why km_from/km_to are NULL here rather than 0 and 142.130. The scope diagram subdivides this into 7.1-7.4; that subdivision is not modelled."
+  ],
+  [
+   "WS8",
+   "Ulemiste Terminal",
+   "IPT6",
+   "DS2",
+   null,
+   null,
+   null,
+   "Site. The terminal has its own datum, -2+061 to 0+000 -- a THIRD 0+000. Do not add it to DS3 chainage; km left NULL deliberately."
+  ],
+  [
+   "WS9",
+   "Ulemiste RSMD",
+   "IPT6",
+   "DS2",
+   null,
+   null,
+   null,
+   "Site. A1's scope here is partial."
+  ],
+  [
+   "WS10",
+   "Soodevahe Construction Base",
+   "IPT6",
+   "DS2",
+   null,
+   null,
+   null,
+   "Temporary compound. Its own row -- NOT merged with WS11 as 'WS10/11'."
+  ],
+  [
+   "WS11",
+   "Soodevahe IMF",
+   "IPT6",
+   "DS2",
+   null,
+   null,
+   null,
+   "IMF, partial scope. Its own row -- NOT merged with WS10."
+  ],
+  [
+   "WS12",
+   "Tootsi Local Stop",
+   "IPT1",
+   "DS3",
+   null,
+   null,
+   "WS1",
+   "A point inside WS1, not a band of its own."
+  ],
+  [
+   "WS13",
+   "Urge Halt",
+   "IPT2",
+   "DS3",
+   null,
+   null,
+   "WS2",
+   "A point inside WS2. IPT 2, not IPT 1 -- an earlier version of this fact shipped to the client-visible map as IPT 1 on 2026-08-28 and was corrected in overlay v5."
+  ],
+  [
+   "WS14",
+   "Parnu Construction Base",
+   "IPT6",
+   "DS3",
+   null,
+   null,
+   null,
+   "Temporary compound. Its own row -- NOT merged with WS15."
+  ],
+  [
+   "WS15",
+   "Parnu IMF",
+   "IPT6",
+   "DS3",
+   null,
+   null,
+   null,
+   "Ownership is SPLIT and this column cannot hold it: track = IPT 6 (stored), ditch and gas = IPT 3, the rest RBE PTO. IPT 6 is what the build list says; the split is recorded here so it is visible rather than lost."
+  ]
+ ],
+ "ds3_datum": "km_from/km_to are LOCAL DS3 chainage, 0+000 = Tootsi. The public-map IPT/WS overlay still ticks GLOBAL GIS chainage; the two datums do not reconcile and must not be mixed in one column."
+}

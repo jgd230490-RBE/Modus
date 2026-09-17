@@ -1,0 +1,321 @@
+"""
+2.5b, 2026-09-03 — the editable copy of factors.json.
+
+WHAT CHANGED AND WHY IT MATTERS
+-------------------------------
+Until now `backend/factors.json` was the single source of truth for materials, vehicles
+and planning constants, and editing it meant a commit and a redeploy. The Config page
+needs those numbers editable in the app, and Render's filesystem does not persist, so
+the document now lives in the `config` table (key `factors`) and the file is the SEED.
+
+    conversions.load_factors()  -> the config row if there is one, else the file
+
+⚠️ Consequence: once the row exists, EDITING factors.json DOES NOTHING until somebody
+presses "Reset to file" on the Config page (or the row is deleted). The file is where
+a fresh database starts, not where the live numbers live. The Config page says so.
+
+VALIDATION
+----------
+A bad document here would silently change every payload, density and cycle time in the
+system, so a write is refused unless it passes validate(). The checks are structural
+and physical (a payload must be a positive number; a vehicle the network is baked for
+must still exist; the planning vehicles must exist) — they are not a judgement about
+whether 18 t is the right payload. That stays with the person editing.
+"""
+import datetime
+import json
+import os
+
+import db
+
+# The Mapbox PUBLIC token (pk.…). Public by design — it is in every browser's
+# view-source — and read from MAPBOX_TOKEN on Render when set. ONE place for it since
+# 10 Sep: the browser map, the Commit week map and the PDF's static map all use
+# mapbox_token(); the PDF used to read only the env var and fell back to a schematic
+# on Render, where the env var was never set.
+MAPBOX_TOKEN_DEFAULT = ("pk.eyJ1IjoiamdkMjMwNDE5OTAiLCJhIjoiY21xbnJzaTRrMDYyOTJxcXowczRxNTlxdyJ9"
+                        ".xujuSc3O8RcgKIitWNGIWg")
+
+
+def mapbox_token():
+    return (os.getenv("MAPBOX_TOKEN") or "").strip() or MAPBOX_TOKEN_DEFAULT
+
+
+KEY = "factors"
+
+# --------------------------------------------------------------------------- #
+#  Tenant settings — G2, 2026-09-16                                            #
+# --------------------------------------------------------------------------- #
+# The words and units a tenant sees. Kept INSIDE the factors document (key
+# `tenant`) so it travels with the config row, is edited on the Config page, and
+# is exported in the tenant package like everything else. Defaults apply when a
+# document predates the block — a live row seeded before 16 Sep has none.
+#
+#   name         the project's own name, shown in the header and on exports
+#   team_label   the word for a delivery team ("Team", "IPT", "Package", "JV partner").
+#                LABEL ONLY: the `ipt` column, the roles and the env vars keep their
+#                names — see claude/gtm-0916.md, decision 2.
+#   currency     ISO code; symbol and formatting only, no conversion. Every stored
+#                figure stays in the tenant's own currency.
+#   country      ISO-3166 alpha-2, or null. Chooses the providers that are country-
+#                specific: the road-restriction layer (EE only today), the diesel index
+#                auto-fetch (EU Weekly Oil Bulletin countries), the orthophoto basemap.
+TENANT_DEFAULTS = {"name": "Modus", "team_label": "Team", "currency": "EUR", "country": None}
+
+CURRENCIES = {
+    "EUR": {"symbol": "€", "name": "euro"},
+    "GBP": {"symbol": "£", "name": "pound sterling"},
+    "SEK": {"symbol": "kr", "name": "Swedish krona"},
+    "NOK": {"symbol": "kr", "name": "Norwegian krone"},
+    "DKK": {"symbol": "kr", "name": "Danish krone"},
+    "PLN": {"symbol": "zł", "name": "Polish złoty"},
+    "CHF": {"symbol": "CHF", "name": "Swiss franc"},
+    "USD": {"symbol": "$", "name": "US dollar"},
+}
+
+
+# Which country's road authority has a live restriction layer wired in restrictions.py.
+RESTRICTION_PROVIDERS = {"EE"}
+
+
+def tenant_settings(conversions=None, doc=None):
+    """The tenant block with defaults applied, plus the derived currency symbol."""
+    if doc is None:
+        doc = load(conversions) if conversions is not None else {}
+    t = dict(TENANT_DEFAULTS)
+    block = doc.get("tenant") if isinstance(doc, dict) else None
+    if isinstance(block, dict):
+        for k in TENANT_DEFAULTS:
+            if block.get(k) not in (None, ""):
+                t[k] = block[k]
+    cur = str(t.get("currency") or "EUR").upper()
+    t["currency"] = cur
+    t["currency_symbol"] = CURRENCIES.get(cur, {}).get("symbol", cur)
+    c = (t.get("country") or None)
+    t["country"] = c.upper() if isinstance(c, str) and c else None
+    try:
+        import fuel as _fuel
+        t["fuel_index_auto"] = _fuel.auto_available(t["country"])
+    except Exception:
+        t["fuel_index_auto"] = False
+    t["restrictions_provider"] = t["country"] in RESTRICTION_PROVIDERS
+    return t
+# a small in-process cache so the many load_factors() calls inside one request do not
+# each hit the database. Invalidated on every write through this module; a write made
+# by another process (another Render instance) shows up within TTL seconds.
+_CACHE = {"doc": None, "at": 0.0}
+CACHE_TTL_S = 5.0
+
+
+def _now():
+    return datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _file_doc(conversions):
+    with open(conversions._FACTORS_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_row():
+    """The stored document plus its stamp, or None when the row does not exist."""
+    try:
+        rows = db.query("SELECT value, updated_by, updated_at FROM config "
+                        "WHERE tenant_id = ? AND key = ?", (db.current_tenant(), KEY))
+    except Exception:
+        return None          # table not created yet (a cold database, or a test)
+    if not rows:
+        return None
+    try:
+        return {"doc": json.loads(rows[0]["value"]), "updated_by": rows[0]["updated_by"],
+                "updated_at": rows[0]["updated_at"]}
+    except Exception:
+        return None          # a corrupt row must not take the app down; fall back
+
+
+def load(conversions, use_cache=True):
+    """The live factors document: the config row, else the file."""
+    import time
+    if use_cache and _CACHE["doc"] is not None and time.time() - _CACHE["at"] < CACHE_TTL_S:
+        return _CACHE["doc"]
+    row = get_row()
+    doc = row["doc"] if row else _file_doc(conversions)
+    _CACHE["doc"], _CACHE["at"] = doc, time.time()
+    return doc
+
+
+def invalidate():
+    _CACHE["doc"], _CACHE["at"] = None, 0.0
+
+
+def seed_from_file(conversions):
+    """First boot: copy the file into the table. Does nothing if the row exists."""
+    if get_row():
+        return {"seeded": False}
+    doc = _file_doc(conversions)
+    db.execute("INSERT INTO config (tenant_id, key, value, updated_by, updated_at) "
+               "VALUES (?, ?, ?, ?, ?)",
+               (db.current_tenant(), KEY, json.dumps(doc, ensure_ascii=False),
+                "seed:factors.json", _now()))
+    invalidate()
+    return {"seeded": True}
+
+
+def validate(doc, network=None):
+    """Problems with a candidate document, as a list of sentences. Empty = fine."""
+    p = []
+    if not isinstance(doc, dict):
+        return ["the document must be a JSON object"]
+    cats = doc.get("material_categories")
+    vs = doc.get("vehicles")
+    plan = doc.get("planning")
+    if not isinstance(cats, dict) or not any(not k.startswith("_") for k in cats):
+        p.append("material_categories must be an object with at least one category")
+    if not isinstance(vs, dict) or not any(not k.startswith("_") for k in vs):
+        p.append("vehicles must be an object with at least one vehicle")
+    if not isinstance(plan, dict):
+        p.append("planning must be an object")
+
+    def num(x):
+        return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+    if isinstance(cats, dict):
+        for k, c in cats.items():
+            if k.startswith("_") or not isinstance(c, dict):
+                continue
+            d = c.get("density_t_per_m3")
+            if not num(d) or d <= 0:
+                p.append(f"material '{k}': density_t_per_m3 must be a positive number")
+            if c.get("default_unit") not in (None, "m3", "t", "vehicles"):
+                p.append(f"material '{k}': default_unit must be m3, t or vehicles")
+            for v in c.get("vehicles") or []:
+                if isinstance(vs, dict) and v not in vs:
+                    p.append(f"material '{k}' lists vehicle '{v}', which does not exist")
+    if isinstance(vs, dict):
+        for k, v in vs.items():
+            if k.startswith("_") or not isinstance(v, dict):
+                continue
+            pl = v.get("payload_t")
+            if not num(pl) or pl <= 0:
+                p.append(f"vehicle '{k}': payload_t must be a positive number")
+            em = v.get("emissions_kg_co2e_per_km")
+            if em is not None and (not num(em) or em < 0):
+                p.append(f"vehicle '{k}': emissions_kg_co2e_per_km must be a number >= 0")
+            for f in ("load_minutes", "unload_minutes", "gvw_t"):
+                if v.get(f) is not None and (not num(v[f]) or v[f] < 0):
+                    p.append(f"vehicle '{k}': {f} must be a number >= 0")
+            if v.get("gvw_t") is not None and num(v.get("gvw_t")) and num(pl) and v["gvw_t"] < pl:
+                p.append(f"vehicle '{k}': gvw_t is less than payload_t")
+        for name in doc.get("planning_vehicles") or []:
+            if name not in vs:
+                p.append(f"planning_vehicles names '{name}', which does not exist")
+        # a vehicle the network is baked for cannot be deleted — its geometry rows are
+        # keyed on the name and every figure on those routes would fall to _default
+        if network is not None:
+            try:
+                baked = {g["vehicle_profile"] for g in db.query(
+                    "SELECT DISTINCT vehicle_profile FROM route_geometry WHERE tenant_id = ?",
+                    (db.current_tenant(),))}
+                for b in sorted(baked - set(vs)):
+                    p.append(f"vehicle '{b}' has baked route geometry and cannot be removed")
+            except Exception:
+                pass
+            if getattr(network, "DEFAULT_PROFILE", None) and network.DEFAULT_PROFILE not in vs:
+                p.append(f"the default routing profile '{network.DEFAULT_PROFILE}' must exist")
+    if isinstance(plan, dict):
+        for f in ("working_days_per_month", "shift_hours_per_day", "avg_haul_speed_kmh",
+                  "load_minutes", "unload_minutes"):
+            x = plan.get(f)
+            if not num(x) or x <= 0:
+                p.append(f"planning.{f} must be a positive number")
+    # 10 Sep night: the fair-price block, when present — numbers >= 0, months 1-12
+    fp = doc.get("fair_price")
+    if fp is not None:
+        if not isinstance(fp, dict):
+            p.append("fair_price must be an object")
+        else:
+            for f in ("driver_eur_per_h", "vehicle_standing_eur_per_h", "running_eur_per_km",
+                      "margin_pct", "vehicle_new_price_eur"):
+                x = fp.get(f)
+                if x is not None and (not num(x) or x < 0):
+                    p.append(f"fair_price.{f} must be a number >= 0")
+            cons = fp.get("consumption") or {}
+            if isinstance(cons, dict):
+                x = cons.get("l_per_100km_per_tonne")
+                if x is not None and (not num(x) or x < 0):
+                    p.append("fair_price.consumption.l_per_100km_per_tonne must be a number >= 0")
+                for cls in ("rigid", "artic"):
+                    y = (cons.get(cls) or {}).get("l_per_100km_empty") if isinstance(cons.get(cls), dict) else None
+                    if y is not None and (not num(y) or y <= 0):
+                        p.append(f"fair_price.consumption.{cls}.l_per_100km_empty must be a positive number")
+            se = fp.get("season") or {}
+            if isinstance(se, dict):
+                for f in ("winter_months", "thaw_months"):
+                    ms = se.get(f) or []
+                    if not all(isinstance(m, int) and 1 <= m <= 12 for m in ms):
+                        p.append(f"fair_price.season.{f} must be integers 1-12")
+                u = se.get("winter_consumption_uplift_pct")
+                if u is not None and (not num(u) or u < 0):
+                    p.append("fair_price.season.winter_consumption_uplift_pct must be a number >= 0")
+    # G2: the tenant block, when present
+    tb = doc.get("tenant")
+    if tb is not None:
+        if not isinstance(tb, dict):
+            p.append("tenant must be an object")
+        else:
+            for f in ("name", "team_label"):
+                if tb.get(f) is not None and (not isinstance(tb[f], str) or not tb[f].strip()):
+                    p.append(f"tenant.{f} must be a non-empty string")
+            if tb.get("currency") is not None and str(tb["currency"]).upper() not in CURRENCIES:
+                p.append(f"tenant.currency must be one of {', '.join(sorted(CURRENCIES))}")
+            c = tb.get("country")
+            if c is not None and c != "" and not (isinstance(c, str) and len(c) == 2 and c.isalpha()):
+                p.append("tenant.country must be a two-letter ISO code or null")
+    for w in doc.get("seasonal_restrictions") or []:
+        if not isinstance(w, dict) or not w.get("name"):
+            p.append("every seasonal restriction needs a name")
+            continue
+        ms = w.get("months") or []
+        if not all(isinstance(m, int) and 1 <= m <= 12 for m in ms):
+            p.append(f"seasonal '{w['name']}': months must be integers 1-12")
+        for v in w.get("restricted_vehicles") or []:
+            if isinstance(vs, dict) and v not in vs:
+                p.append(f"seasonal '{w['name']}' names vehicle '{v}', which does not exist")
+    return p
+
+
+def save(doc, by=None, network=None):
+    """Validate and store. Returns {ok, problems}."""
+    problems = validate(doc, network=network)
+    if problems:
+        return {"ok": False, "problems": problems}
+    if get_row():
+        db.execute("UPDATE config SET value = ?, updated_by = ?, updated_at = ? "
+                   "WHERE tenant_id = ? AND key = ?",
+                   (json.dumps(doc, ensure_ascii=False), by, _now(), db.current_tenant(), KEY))
+    else:
+        db.execute("INSERT INTO config (tenant_id, key, value, updated_by, updated_at) "
+                   "VALUES (?, ?, ?, ?, ?)",
+                   (db.current_tenant(), KEY, json.dumps(doc, ensure_ascii=False), by, _now()))
+    invalidate()
+    return {"ok": True, "problems": []}
+
+
+def reset_to_file(conversions, by=None):
+    """Overwrite the stored document with the file. The one way the file wins again."""
+    doc = _file_doc(conversions)
+    res = save(doc, by=f"reset:factors.json ({by or 'unknown'})")
+    return {"ok": res["ok"], "problems": res["problems"], "doc": doc}
+
+
+def status(conversions):
+    """What the Config page shows at the top: where the live numbers come from."""
+    row = get_row()
+    file_doc = _file_doc(conversions)
+    live = row["doc"] if row else file_doc
+    return {
+        "source": "database" if row else "file",
+        "updated_by": row["updated_by"] if row else None,
+        "updated_at": row["updated_at"] if row else None,
+        # a cheap "has the file drifted from the live copy" signal
+        "differs_from_file": bool(row) and json.dumps(live, sort_keys=True) != json.dumps(file_doc, sort_keys=True),
+    }
