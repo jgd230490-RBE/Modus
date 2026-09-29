@@ -1,6 +1,6 @@
 /*
  * tools/make_guide_images.js — the user guide's explanatory figures and its screenshot
- * placeholders, drawn in the Modus theme. Modus G2, 16 Sep 2026.
+ * placeholders, drawn in the Wayscope theme. G2, 16 Sep 2026; rebranded 29 Sep 2026.
  *
  *     NODE_PATH=$(npm root -g) node backend/tools/make_guide_images.js          # both sets
  *     NODE_PATH=$(npm root -g) node backend/tools/make_guide_images.js figures  # only fig-*.png
@@ -26,9 +26,9 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const MEDIA = path.join(ROOT, "frontend", "help", "media");
 const which = process.argv[2] || "all";
 
-// ---- the Modus theme (frontend :root tokens) ------------------------------------------
+// ---- the Wayscope theme (frontend :root tokens) ------------------------------------------
 const T = {
-  ink: "#0F172A", body: "#334155", muted: "#64748B", line: "#E2E8F0", panel: "#F8FAFC",
+  ink: "#1F2024", body: "#334155", muted: "#64748B", line: "#E2E8F0", panel: "#F8FAFC",
   accent: "#2563EB", accentSoft: "#EFF6FF", ok: "#059669", okSoft: "#ECFDF5",
   warn: "#D97706", warnSoft: "#FFFBEB", clash: "#DC2626", clashSoft: "#FEF2F2",
 };
@@ -230,7 +230,7 @@ const HOLDERS = {
 
 function holder(code, [caption, where, kind]) {
   const chrome = kind === "app"
-    ? `<div class="hdr"><span class="brand">Modus</span><span class="pill"></span><span class="pill"></span></div>
+    ? `<div class="hdr"><span class="brand">Wayscope</span><span class="pill"></span><span class="pill"></span></div>
        <div class="rail">${"<i></i>".repeat(9)}</div>`
     : kind === "map"
       ? `<div class="side">${"<i></i>".repeat(12)}</div><div class="mapbg"></div>`

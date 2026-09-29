@@ -1,6 +1,6 @@
 /*
  * tools/capture_guide.js — the user guide's real screenshots, captured from a running
- * deployment. Modus G2, 16 Sep 2026.
+ * deployment. Wayscope (G2, 16 Sep 2026).
  *
  *   1. Deploy, import demo/uk-corridor.package.json into an EMPTY tenant
  *      (POST /api/admin/tenant/import?token=…), and bake the network (Routes → Bake all).

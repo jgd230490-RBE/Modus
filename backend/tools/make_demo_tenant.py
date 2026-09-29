@@ -1,5 +1,5 @@
 """
-tools/make_demo_tenant.py — the synthetic UK demo tenant, as a package. Modus G2, 16 Sep 2026.
+tools/make_demo_tenant.py — the synthetic UK demo tenant, as a package. Wayscope (G2, 16 Sep 2026).
 
     python3 backend/tools/make_demo_tenant.py            # writes demo/uk-corridor.package.json
 
