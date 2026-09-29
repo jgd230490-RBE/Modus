@@ -60,7 +60,7 @@ KEY = "factors"
 #   country      ISO-3166 alpha-2, or null. Chooses the providers that are country-
 #                specific: the road-restriction layer (EE only today), the diesel index
 #                auto-fetch (EU Weekly Oil Bulletin countries), the orthophoto basemap.
-TENANT_DEFAULTS = {"name": "Modus", "team_label": "Team", "currency": "EUR", "country": None}
+TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", "country": None}
 
 CURRENCIES = {
     "EUR": {"symbol": "€", "name": "euro"},

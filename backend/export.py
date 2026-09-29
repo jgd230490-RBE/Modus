@@ -61,9 +61,9 @@ except Exception as e:                                   # pragma: no cover
 
 import config
 
-# Modus theme (G2, 16 Sep): ink for headings, the accent red for over/short, grey for notes.
-NAVY = "0F172A"
-NAVY_RGB = (0x0F / 255, 0x17 / 255, 0x2A / 255)
+# Wayscope theme (29 Sep): ink #1F2024 for headings, the accent red for over/short, grey for notes.
+NAVY = "1F2024"
+NAVY_RGB = (0x1F / 255, 0x20 / 255, 0x24 / 255)
 RED_RGB = (0xDC / 255, 0x26 / 255, 0x26 / 255)
 BLUE_RGB = (0x25 / 255, 0x63 / 255, 0xEB / 255)
 GREY = (0x64 / 255, 0x74 / 255, 0x8B / 255)
@@ -80,7 +80,7 @@ def _tenant():
 
 
 def _tenant_name():
-    return _tenant().get("name") or "Modus"
+    return _tenant().get("name") or "Wayscope"
 
 
 def _cur():
@@ -343,18 +343,18 @@ def mapbox_static_png(routes, size="1200x600", timeout=12, token=None):
     overlays = []
     for i, (rid, o, d, coords) in enumerate(routes):
         thin = _thin(coords)
-        overlays.append("path-3+0B1B45-0.9(" + urllib.parse.quote(_encode_polyline(thin), safe="") + ")")
-        overlays.append(f"pin-s-{chr(97 + (i % 26))}+0B1B45({thin[0][0]:.5f},{thin[0][1]:.5f})")
-        overlays.append(f"pin-s-{chr(97 + (i % 26))}+BF2E55({thin[-1][0]:.5f},{thin[-1][1]:.5f})")
+        overlays.append("path-3+1F2024-0.9(" + urllib.parse.quote(_encode_polyline(thin), safe="") + ")")
+        overlays.append(f"pin-s-{chr(97 + (i % 26))}+1F2024({thin[0][0]:.5f},{thin[0][1]:.5f})")
+        overlays.append(f"pin-s-{chr(97 + (i % 26))}+DC2626({thin[-1][0]:.5f},{thin[-1][1]:.5f})")
     url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays)
            + f"/auto/{size}@2x?padding=40&access_token=" + urllib.parse.quote(token))
     if len(url) > 8000:                       # the API's URL limit; drop pins, thin harder
-        overlays = ["path-3+0B1B45-0.9(" + urllib.parse.quote(_encode_polyline(_thin(c, 60)), safe="") + ")"
+        overlays = ["path-3+1F2024-0.9(" + urllib.parse.quote(_encode_polyline(_thin(c, 60)), safe="") + ")"
                     for (_, _, _, c) in routes]
         url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays)
                + f"/auto/{size}@2x?padding=40&access_token=" + urllib.parse.quote(token))
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Modus/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "Wayscope/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = resp.read()
         return data if data[:8] == b"\x89PNG\r\n\x1a\n" else None

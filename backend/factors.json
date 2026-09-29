@@ -2,7 +2,7 @@
   "_README": "The SEED of a tenant's configuration: materials, vehicles, planning numbers, the fair-price model and the tenant's own settings. On first boot it is copied into the config table and from then on the Config page is the live copy; editing this file changes nothing until 'Reset to file'. A tenant package carries its own copy.",
   "_tenant_note": "name / team_label / currency / country — what a tenant calls itself and its delivery teams, the currency SYMBOL every figure is shown in (no conversion), and the ISO country that picks the country-specific providers (road restrictions, diesel index, orthophoto). Null country = none.",
   "tenant": {
-    "name": "Modus",
+    "name": "Wayscope",
     "team_label": "Team",
     "currency": "EUR",
     "country": null

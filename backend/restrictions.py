@@ -240,7 +240,7 @@ def in_force(props, on=None):
 
 
 def _get(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "Modus/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Wayscope/1.0"})
     with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
         return json.load(resp)
 

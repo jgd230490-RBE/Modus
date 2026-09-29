@@ -1,5 +1,5 @@
 """
-Server-side HERE truck routing for Modus.
+Server-side HERE truck routing for Wayscope.
 
 Given an origin, destination and a vehicle profile, calls HERE's Routing API v8
 with the vehicle's HGV dimensions and returns decoded geometry + distance + time.

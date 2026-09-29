@@ -1,5 +1,5 @@
 """
-tenant_package.py — a tenant as one JSON document. Modus G2, 2026-09-16.
+tenant_package.py — a tenant as one JSON document. Wayscope (G2, 2026-09-16).
 
 WHY THIS EXISTS
 ---------------

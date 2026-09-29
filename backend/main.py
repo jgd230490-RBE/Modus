@@ -1,5 +1,5 @@
 """
-Modus — backend.
+Wayscope — backend.
 
 Serves three things from one process:
   1. The forecasting API under /api/*
@@ -121,7 +121,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Modus", lifespan=lifespan)
+app = FastAPI(title="Wayscope", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
@@ -132,30 +132,39 @@ app.add_middleware(
 # Served when the gate refuses. They are string constants rather than files under map/
 # or frontend/help/ ON PURPOSE: anything inside those directories is itself behind the
 # gate, so a password page living there could never be shown to the person who needs it.
+# Wayscope theme (29 Sep 2026): ink background, white box, blue for the control, the
+# stacked logo above the box. Orange appears only in the logo itself.
 _GATE_CSS = """
   :root { color-scheme: light; }
-  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-         background:#0A1446; color:#fff;
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+         justify-content:center; gap:22px; background:#1F2024; color:#fff;
          font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
-  .box { width:min(92vw,380px); background:#fff; color:#1B2430; border-radius:10px;
-         padding:28px 26px; box-shadow:0 10px 40px rgba(0,0,0,.35); }
-  h1 { margin:0 0 6px; font-size:19px; color:#003787; }
-  p  { margin:0 0 18px; font-size:13.5px; color:#5A6572; }
-  label { display:block; font-size:12px; font-weight:600; color:#003787; margin-bottom:6px; }
+  .logo { width:min(60vw,150px); height:auto; display:block; }
+  .box { width:min(92vw,380px); background:#fff; color:#1F2024; border-radius:10px;
+         padding:28px 26px; box-shadow:0 10px 40px rgba(0,0,0,.45); }
+  h1 { margin:0 0 6px; font-size:19px; color:#1F2024; }
+  p  { margin:0 0 18px; font-size:13.5px; color:#64748B; }
+  label { display:block; font-size:12px; font-weight:600; color:#1F2024; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px 12px; font-size:15px;
-          border:1px solid #DCE3EC; border-radius:6px; }
-  input:focus { outline:2px solid #3398DB; outline-offset:1px; border-color:#3398DB; }
+          border:1px solid #E2E8F0; border-radius:6px; }
+  input:focus { outline:2px solid #2563EB; outline-offset:1px; border-color:#2563EB; }
   button { margin-top:14px; width:100%; padding:11px; font-size:15px; font-weight:600;
-           color:#fff; background:#003787; border:0; border-radius:6px; cursor:pointer; }
-  button:hover { background:#0A1446; }
-  .err { display:none; margin-top:12px; font-size:13px; color:#BF2E55; }
-  .foot { margin-top:16px; font-size:12px; color:#8A97A6; }
-  a { color:#003787; }
+           color:#fff; background:#2563EB; border:0; border-radius:6px; cursor:pointer; }
+  button:hover { background:#1D4ED8; }
+  .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
+  .foot { margin-top:16px; font-size:12px; color:#64748B; }
+  a { color:#2563EB; }
 """
+_GATE_HEAD = """<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#1F2024">"""
+_GATE_LOGO = """<img class="logo" src="/brand/logo-stacked-on-dark.svg" alt="Wayscope" draggable="false">"""
 
 _MAP_PASSWORD_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Modus — map access</title><style>%s</style>
+<title>Wayscope — map access</title>%s<style>%s</style>
+%s
 <div class="box">
   <h1>Corridor map</h1>
   <p>This map is not public. Enter the access password you were given.</p>
@@ -165,7 +174,7 @@ _MAP_PASSWORD_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
     <button type="submit">Open the map</button>
     <div class="err" id="e">That password was not recognised.</div>
   </form>
-  <div class="foot">Alliance staff: sign in to the app at <a href="/">the main page</a> and
+  <div class="foot">Staff: sign in to the app at <a href="/">the main page</a> and
   the map opens with it.</div>
 </div>
 <script>
@@ -178,29 +187,31 @@ document.getElementById('f').addEventListener('submit', async function (ev) {
   });
   if (r.ok) { location.reload(); } else { e.style.display = 'block'; }
 });
-</script></html>""" % _GATE_CSS
+</script></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
 
 _HELP_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Modus — user guide</title><style>%s</style>
+<title>Wayscope — user guide</title>%s<style>%s</style>
+%s
 <div class="box">
   <h1>The user guide is for signed-in staff</h1>
   <p>It documents every staff screen, so it sits behind the same sign-in.</p>
   <button onclick="location.href='/'">Go to the app and sign in</button>
   <div class="foot">Once you are signed in, come back to <code>/help/</code> — or use the
   Help link in the app.</div>
-</div></html>""" % _GATE_CSS
+</div></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
 
 _MAP_UNCONFIGURED_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Modus — map closed</title><style>%s</style>
+<title>Wayscope — map closed</title>%s<style>%s</style>
+%s
 <div class="box">
   <h1>The map is closed</h1>
   <p>No map password has been configured on this deployment, so the map cannot be opened
-  to anyone outside the alliance. This is the safe state, not a fault.</p>
+  to anyone without a staff sign-in. This is the safe state, not a fault.</p>
   <div class="foot">Set <code>MAP_PASSWORD</code> in the environment to open it. Staff can
   still see the map by signing in at <a href="/">the main page</a>.</div>
-</div></html>""" % _GATE_CSS
+</div></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
 
 
 # ------------------------------------------------------------------ access (Task F)
@@ -2663,6 +2674,14 @@ class NoCacheStatic(StaticFiles):
             pass          # never let a header failure 500 the map
         return resp
 
+    async def check_config(self):
+        # 29 Sep 2026: Starlette's check raises on the FIRST REQUEST when the mounted
+        # folder is missing (a 500, forever). A missing folder must be a 404 instead —
+        # the brand folder could arrive in a later delivery than this file.
+        if self.directory is not None and not os.path.isdir(str(self.directory)):
+            return
+        await super().check_config()
+
 
 # Map (Mapbox app) at /map/ ; must be mounted before the catch-all "/".
 app.mount("/map", NoCacheStatic(directory=str(ROOT / "map"), html=True), name="map")
@@ -2670,6 +2689,39 @@ app.mount("/map", NoCacheStatic(directory=str(ROOT / "map"), html=True), name="m
 # another session; its main.py mount had been lost under the costing zip). Same
 # no-cache static class, after /map, before the catch-all "/". test_help.py pins it.
 app.mount("/help", NoCacheStatic(directory=str(ROOT / "frontend" / "help"), html=True), name="help")
+# 29 Sep 2026 — the Wayscope brand files (logos, favicon set, theme tokens) at /brand/.
+# Not gated: gate.scope_for() polices /map, /help and the map's data prefixes only, so a
+# refused visitor still sees the logo on the password page. Mounted before the "/" route.
+# check_dir=False: Starlette otherwise REFUSES TO BOOT when the folder is missing, which
+# would take the whole deployment down if the brand files were ever deployed separately
+# from this file. Without the folder the brand paths 404 and nothing else changes.
+BRAND_DIR = ROOT / "frontend" / "brand"
+app.mount("/brand", NoCacheStatic(directory=str(BRAND_DIR), check_dir=False), name="brand")
+
+# Browsers and iOS request these at the ROOT, whatever the page says, and the manifest's
+# icon paths are root-relative — so each one is a root route onto the brand folder.
+ROOT_BRAND_FILES = {
+    "favicon.ico": "image/x-icon",
+    "favicon.svg": "image/svg+xml",
+    "apple-touch-icon.png": "image/png",
+    "site.webmanifest": "application/manifest+json",
+    "icon-192.png": "image/png",
+    "icon-512.png": "image/png",
+    "icon-512-maskable.png": "image/png",
+}
+
+
+def _brand_file(name):
+    path = BRAND_DIR / name
+    if name not in ROOT_BRAND_FILES or not path.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(str(path), media_type=ROOT_BRAND_FILES[name],
+                        headers={"Cache-Control": "no-cache"})
+
+
+for _name in list(ROOT_BRAND_FILES):
+    app.get("/" + _name, include_in_schema=False)(
+        (lambda n: (lambda: _brand_file(n)))(_name))
 
 
 @app.get("/")

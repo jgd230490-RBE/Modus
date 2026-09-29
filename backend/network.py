@@ -1,5 +1,5 @@
 """
-Dynamic routing network for Modus (Phase 0).
+Dynamic routing network for Wayscope (Phase 0).
 
 Seeds the V2 master (locations + route pairs) into the DB, bakes truck-legal
 geometry for a vehicle profile via HERE (cached, route-on-change), and serves
