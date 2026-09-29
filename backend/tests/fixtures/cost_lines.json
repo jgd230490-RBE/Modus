@@ -25,7 +25,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 12060.0,
    "tonne_km": 240600.0,
-   "co2_t": 11.457,
+   "co2_t": 12.033,
    "planned": {
     "eur": 27135.0,
     "per_t": 6.77,
@@ -74,7 +74,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 12060.0,
    "tonne_km": 240600.0,
-   "co2_t": 11.457,
+   "co2_t": 12.033,
    "planned": {
     "eur": 27135.0,
     "per_t": 6.77,
@@ -123,7 +123,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 12060.0,
    "tonne_km": 240600.0,
-   "co2_t": 11.457,
+   "co2_t": 12.033,
    "planned": {
     "eur": 27135.0,
     "per_t": 6.77,
@@ -174,7 +174,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 6000.0,
    "tonne_km": 156000.0,
-   "co2_t": 5.34,
+   "co2_t": 5.636,
    "planned": {
     "eur": 7800.0,
     "per_t": 3.0,
@@ -223,7 +223,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 6000.0,
    "tonne_km": 156000.0,
-   "co2_t": 5.34,
+   "co2_t": 5.636,
    "planned": {
     "eur": 7800.0,
     "per_t": 3.0,
@@ -272,7 +272,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 6000.0,
    "tonne_km": 156000.0,
-   "co2_t": 5.34,
+   "co2_t": 5.636,
    "planned": {
     "eur": 7800.0,
     "per_t": 3.0,
@@ -476,7 +476,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 3000.0,
    "tonne_km": 60000.0,
-   "co2_t": 2.85,
+   "co2_t": 2.993,
    "planned": {
     "eur": 6750.0,
     "per_t": 6.75,
@@ -525,7 +525,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 3000.0,
    "tonne_km": 60000.0,
-   "co2_t": 2.85,
+   "co2_t": 2.993,
    "planned": {
     "eur": 6750.0,
     "per_t": 6.75,
@@ -574,7 +574,7 @@
    "cycles_per_vehicle_day": 5,
    "km": 3000.0,
    "tonne_km": 60000.0,
-   "co2_t": 2.85,
+   "co2_t": 2.993,
    "planned": {
     "eur": 6750.0,
     "per_t": 6.75,
@@ -609,8 +609,8 @@
   "trips": 1188,
   "km": 63180.0,
   "tonne_km": 1369800.0,
-  "co2_t": 58.941,
-  "co2_kg_per_t": 2.58,
+  "co2_t": 61.986,
+  "co2_kg_per_t": 2.72,
   "planned": {
    "eur": 131130.0,
    "per_t": 5.14,
@@ -654,32 +654,32 @@
   "baf_reason": "no base",
   "fair_params": {
    "margin_pct": 8.0,
+   "consumption": {
+    "l_per_100km_per_tonne": 0.4,
+    "rigid": {
+     "l_per_100km_empty": 27.0
+    },
+    "artic": {
+     "l_per_100km_empty": 23.6
+    }
+   },
    "running_eur_per_km": 0.12,
    "season": {
     "winter_consumption_uplift_pct": 8.0,
+    "thaw_months": [
+     3,
+     4
+    ],
     "winter_months": [
      11,
      12,
      1,
      2,
      3
-    ],
-    "thaw_months": [
-     3,
-     4
     ]
    },
-   "driver_eur_per_h": 20.0,
-   "consumption": {
-    "artic": {
-     "l_per_100km_empty": 23.6
-    },
-    "l_per_100km_per_tonne": 0.4,
-    "rigid": {
-     "l_per_100km_empty": 27.0
-    }
-   },
    "vehicle_new_price_eur": 190000,
+   "driver_eur_per_h": 20.0,
    "vehicle_standing_eur_per_h": 16.0
   },
   "fair": {
