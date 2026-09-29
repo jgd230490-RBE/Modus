@@ -184,12 +184,58 @@ def build():
 
     # --- the tenant block, GBP, UK --------------------------------------------------
     doc = json.loads(json.dumps(config.load(conversions, use_cache=False)))
-    doc["tenant"] = {"name": TENANT_NAME, "team_label": "Team", "currency": "GBP", "country": "GB"}
+    # H1 (29 Sep 2026): GB, GBP, and the tenant READS MILES (HU5, per tenant; km is stored)
+    doc["tenant"] = {"name": TENANT_NAME, "team_label": "Team", "currency": "GBP", "country": "GB",
+                     "distance_unit": "mi"}
     doc["seasonal_restrictions"] = []
-    doc["fair_price"]["season"]["thaw_months"] = []
-    doc["fair_price"]["_demo_note"] = ("Demo tenant: the seeded fair-price coefficients are EUR-based public "
-                                       "benchmarks read as £ for the demo. Replace with UK figures before "
-                                       "quoting a fair price to anyone.")
+    # H1: a GB coefficient set with its sources, in GBP. The three ASSUMPTIONS are labelled
+    # as such, exactly as the EE seed's are; the rest carry a public source.
+    fp = doc["fair_price"]
+    fp["_demo_note"] = ("Demo tenant (GB): a GBP coefficient set with sources, written 29 Sep 2026 (H1). "
+                        "vehicle_new_price_eur, running_eur_per_km and margin_pct are ASSUMPTIONS to replace "
+                        "with the fleet's own figures; the driver rate is derived from public statistics. "
+                        "Field names keep their _eur_ suffix — every figure is in the tenant's currency, £.")
+    fp["_driver_source"] = ("ONS Annual Survey of Hours and Earnings 2025 (provisional), as quoted in DfT Road "
+                            "Freight Statistics 2025 'HGV driver vacancies in the UK': median hourly pay for HGV "
+                            "drivers £16.25 (RHA Pay Report 2026, survey Oct–Nov 2025: C+E median £15.05/h, C median "
+                            "£14.50/h). Taken as £16.25 × 1.28 employer on-costs (employer NI ≈ 13 % effective at this "
+                            "pay, 3 % pension, ≈ 12 % holiday accrual — ASSUMED multiplier) / 0.85 productive = £24.5/h, "
+                            "rounded to £24.")
+    fp["driver_eur_per_h"] = 24.0
+    fp["_vehicle_standing_source"] = ("ASSUMPTION — no public UK source for a tipper fleet's standing cost. "
+                                      "vehicle_new_price_eur £150,000 (a 44 t artic tipper outfit or an 8-wheeler "
+                                      "tipper at the upper end) over 7 years to a 20 % residual = £17,143/yr; insurance "
+                                      "3 % of price = £4,500/yr; VED + HGV road user levy ≈ £1,300/yr (check against the "
+                                      "current VED tables); / 1,800 operating h/yr = £12.7/h, rounded to £13. Only the "
+                                      "derivation is shown; the price is the number to replace.")
+    fp["vehicle_new_price_eur"] = 150000
+    fp["vehicle_standing_eur_per_h"] = 13.0
+    fp["_running_source"] = ("ASSUMPTION — tyres, maintenance and repairs per km, EXCLUDING fuel (fuel comes from the "
+                             "DESNZ index). £0.12/km ≈ 19 p/mile. The RHA Cost Tables 2026 running figure for a 44 t "
+                             "artic (78.21 p/mile, members only, cited second-hand) INCLUDES fuel and is not used "
+                             "directly. Replace with the fleet's own figure.")
+    fp["running_eur_per_km"] = 0.12
+    fp["_margin_source"] = "ASSUMPTION — a haulier's margin on top of cost. Replace with the figure the client considers fair."
+    fp["margin_pct"] = 8.0
+    fp["consumption"]["_source"] = ("artic laden ~34 L/100 km: ICCT 'Fuel efficiency technology in European heavy-duty "
+                                    "vehicles' (2018), regional delivery cycle; +0.4 L/100 km per tonne of payload (low end): "
+                                    "UK DfT 'Effects of payload on the fuel consumption of trucks' — both via lkw-control.com "
+                                    "(read 2026-09-10). Empty = laden − 0.4 × payload: artic 34 − 0.4 × 26 = 23.6. Rigid 32 t "
+                                    "average-laden 38.6 L/100 km DERIVED from the DESNZ 2026 factors in this file (rigid >17 t "
+                                    "0.99773 kg CO2e/km ÷ 2.58354 kg CO2e/L diesel), then 38.6 − 0.4 × 20 = 30.6, rounded to 31 "
+                                    "empty. The rigid figure is the weakest number in this block.")
+    fp["consumption"]["rigid"]["l_per_100km_empty"] = 31.0
+    fp["_README"] = ("The FAIR PRICE model's coefficients (backend/fairprice.py) for this demo tenant, in £, each "
+                     "with its source; three are ASSUMPTIONS to replace. Edit on Config → Costing · fuel. The diesel "
+                     "price is NOT here: it is the live national index row (fuel.py — DESNZ weekly road fuel prices "
+                     "for a GB tenant).")
+    fp["_sanity_source"] = ("IRU (2025): goods transport in Europe costs EUR 0.50–2.00 per km all-in — a check on the "
+                            "model's output, not an input. In £ at £1.955/L diesel the fixture trip (60 km round trip, "
+                            "20 t) lands inside that band; a figure outside it means a coefficient is wrong.")
+    fp["season"]["thaw_months"] = []            # no spring axle-load season on UK roads
+    fp["season"]["_source"] = ("Winter: US DOE fueleconomy.gov/feg/coldweather.shtml — cars ~15 % worse at −7 °C in city "
+                               "driving; HGVs at road speed with warm engines suffer less, so +8 % Nov–Mar is an assumption "
+                               "inside a sourced range. Thaw: none — Great Britain has no spring axle-load season.")
     res = config.save(doc, by="tools/make_demo_tenant.py", network=network)
     assert res["ok"], res
     config.invalidate()
@@ -387,10 +433,14 @@ def build():
     pkg["_readme"] = ("Synthetic demo tenant — the Wolds Link, a fictional ~32 km rail corridor in the East "
                       "Midlands. Nothing in it is anyone's data. Import into an EMPTY tenant "
                       "(POST /api/admin/tenant/import), then bake the network (HERE) — routes read "
-                      "UNBAKED until then. Diesel index: type the DESNZ weekly price on Config "
-                      "(fuel_index below is applied on import if the GB row is empty).")
-    pkg["fuel_index"] = [{"country": "GB", "eur_per_l": 1.43, "bulletin_date": "2026-09-14",
-                          "note": "typed placeholder — replace with the current DESNZ weekly average"}]
+                      "UNBAKED until then. Diesel index: fetched automatically from DESNZ weekly road fuel "
+                      "prices (H1); fuel_index below is a typed placeholder applied on import if the GB row is empty. "
+                      "Distances read in miles (tenant.distance_unit); km is what is stored.")
+    # H1: a typed placeholder at the research's second-hand reading of the DESNZ series (≈195.5 p/L,
+    # w/c 21 Sep 2026, pump price incl. VAT). The DESNZ fetch replaces it on the first refresh.
+    pkg["fuel_index"] = [{"country": "GB", "eur_per_l": 1.955, "bulletin_date": "2026-09-21",
+                          "note": "typed placeholder from a second-hand reading of the DESNZ weekly road fuel "
+                                  "prices (ULSD pump price incl. VAT); the automatic DESNZ fetch replaces it"}]
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(pkg, f, ensure_ascii=False, indent=1)
