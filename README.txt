@@ -1,191 +1,138 @@
-MODUS — G2 DELIVERY · 16 September 2026
-========================================
+WAYSCOPE — REBRAND DELIVERY · 29 September 2026
+================================================
 
-This zip IS the whole new repository. Unpack it into an EMPTY folder and upload
-everything to a new PRIVATE GitHub repository called "modus". It starts a fresh
-history: nothing from RBE_Alliance1 comes across except the product code, with every
-piece of alliance data taken out.
+The product is Wayscope on every screen, export and page: "Modus" no longer appears in
+any shipped file (asserted), the theme is the Wayscope one (ink #1F2024, orange as the
+brand accent only, blue for controls, amber still means WARNING), the header is the
+lockup + a thin rule + the tenant's name, the three gate pages carry the stacked logo,
+the favicon set is served at the root, and the user guide's synthetic figures are
+regenerated with the new header. Branch `claude/wayscope-rebrand` in the sandbox; a push
+was refused (repo not a source for the session), so this is the zip + Codespace routine.
 
-README.txt (this file) is the delivery note. Commit it with the rest: it is how a later
-session checks which delivery is at HEAD. README.md is the product's own readme.
-
-A second zip, rbe-tenant-offline.zip, holds the first tenant's data that left the code.
-It is NOT part of the repository. Keep it offline, with your database backup.
+README.txt (this file) is the delivery note. Commit it with the rest. It starts
+"WAYSCOPE — " and the harness (test_modus.py) now requires that prefix.
 
 
 ACTIONS — IN THIS ORDER
 -----------------------
-1. BACK UP THE OLD DATABASE FIRST. Render → the database rbe-a1-db → Backups (or
-   Export) → download it. That database is the ONLY full copy of the first tenant's forecasts,
-   weeks, actuals and baked routes. Nothing in either zip replaces it.
+1. APPLY THE BRAND ASSETS FIRST. This delivery REFERENCES `frontend/brand/` (18 files:
+   the header and stacked logos, the favicon set, site.webmanifest, theme-tokens.css)
+   but does NOT contain them — they were delivered separately this morning as
+   `wayscope-brand-assets-0929.zip` and were not at HEAD (830c153) when this was cut.
+   Upload that zip to the Codespace and unzip it first (its own README has the commands).
+   Without the folder the app still boots and works (that was made safe on purpose —
+   a missing folder is a 404, not a crash), but every logo and favicon is a broken image
+   and three assertions in test_modus.py and eight in http_smoke.py stay red.
 
-2. MAKE THE OLD REPOSITORY PRIVATE NOW. Your old repository, RBE_Alliance1, is
-   public and still contains the alliance's network, alignment, screenshots and the
-   claude/ project notes. Settings → Danger Zone → Change visibility → Private.
-   Delete it later, only once you are happy with step 1 and the offline zip.
+2. Upload THIS zip as ONE file to the Codespace, then the commands at the end.
 
-3. CREATE THE NEW REPOSITORY. github.com → New → name "modus" → PRIVATE → Create.
-   Upload the unpacked files, keeping the folders. ⚠️ Check that the two files whose
-   names start with a dot went up: .gitignore and .github/workflows/suite.yml
-   (Windows Explorer shows them; macOS Finder hides them until Cmd+Shift+.). If the
-   uploader skipped one, create it on github.com with "Add file → Create new file" and
-   paste its contents. Without suite.yml there are no automatic test runs.
+3. Delete the stray root file `download` (it is the G2 `.gitignore`, renamed by the web
+   uploader): this delivery ships a real `.gitignore` with the same content. A zip never
+   deletes, so:  git rm download
+   (Do it before the commit in step 2's commands, or as a second commit.)
 
-4. DEPLOY. Render → New → Blueprint → the modus repository. render.yaml creates a NEW
-   web service (modus-web) and a NEW database (modus-db); it does not touch
-   rbe-a1-logistics or rbe-a1-db. Check the two plan lines first (starter,
-   basic-256mb — paid plans), then Apply.
+4. Push. If GitHub's push protection flags the Mapbox `pk.` token in map/config.js again,
+   allow it through the unblock link — the token line itself is unchanged in this zip.
 
-5. SET THE SECRETS on modus-web → Environment (see env.example for each):
-     ADMIN_TOKEN     a NEW value — paste what this PRINTS, never the command itself:
-                       Git Bash:    openssl rand -hex 24
-                       PowerShell:  $b = New-Object byte[] 24
-                                    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
-                                    ($b | ForEach-Object { $_.ToString('x2') }) -join ''
-     PLANNER_CODE, ADMIN_CODE, and IPT1_CODE… for the teams you create
-     MAP_PASSWORD    only if outsiders should open the map
-     HERE_API_KEY    use a key from a NEW HERE App ID for Modus — HERE's terms want one
-                     App ID per application, not the one the old service uses
-     MAPBOX_TOKEN    your public pk. token (see "Mapbox" below)
-   Do NOT set ALLOW_DEMO_CODES.
-
-6. LOAD THE DEMO (the service boots EMPTY — that is correct). From the unpacked
-   folder, in PowerShell (curl.exe ships with Windows 10 and 11 — type the .exe):
-     curl.exe -X POST "https://<modus-web>/api/admin/tenant/import?token=<ADMIN_TOKEN>" -H "Content-Type: application/json" --data-binary "@demo/uk-corridor.package.json"
-   It answers {"ok":true,...} with the rows it inserted.
-   Then sign in with PLANNER_CODE → Routes → Bake all. Eighteen routes × the vehicles
-   each carries × two legs is a few hundred HERE calls. Until baked, the demo reads
-   "not baked" everywhere — by design.
-
-7. TYPE A CURRENT UK DIESEL PRICE. The demo carries a typed placeholder of £1.43/L
-   dated 14 Sep 2026. Config → the diesel widget → type the latest weekly UK figure
-   (the government's weekly road fuel prices). There is no automatic feed outside
-   the EU, deliberately.
-
-8. REPLACE THE GUIDE'S PLACEHOLDER SCREENSHOTS. The 22 screenshots in the user guide
-   are clearly marked placeholders. Once step 6 is baked, on your laptop (Node.js
-   installed), from the unpacked folder, in PowerShell:
-     npm i -g playwright
-     npx playwright install chromium
-     $env:MODUS_URL = "https://<modus-web>"
-     $env:MODUS_PLANNER_CODE = "<code>"
-     $env:NODE_PATH = (npm root -g)
-     node backend/tools/capture_guide.js
-   then upload frontend/help/media/*.png. It never confirms or saves anything.
-   M05 (road restrictions) stays a placeholder on the UK demo: no provider there.
-   S15 (the PDF) needs poppler's pdftoppm on the PATH; without it that one shot is
-   skipped with a message and its placeholder stays.
-
-9. RETIRE THE OLD RENDER SERVICE AND DATABASE when you are ready — they bill monthly.
-   Only after step 1.
-
-10. BEFORE SHOWING A PAYING CLIENT: write to HERE about the Base Plan's excluded use
-    cases ("Asset Management") — the open question from earlier today.
-
-
-MAPBOX
-------
-The public token in map/config.js and backend/config.py belongs to your personal
-Mapbox account. It is safe to expose (pk. tokens are public by design) but restrict it
-to your Modus domain(s) in the Mapbox account, or create a Modus-specific token and set
-it as MAPBOX_TOKEN and in map/config.js.
+5. Render deploys main. FIRST LOOK, in this order:
+   a. The browser tab: the Wayscope favicon (hard-refresh; icons are cached aggressively).
+   b. The staff app header: the orange-and-white lockup on ink, a thin rule, then the
+      tenant's name (hidden below 640 px). The default tenant shows the lockup alone.
+   c. Sign out → /map/ in a private window: the password page, ink background, the
+      stacked logo above the white box.
+   d. Sign in → User guide: the nav says "Wayscope · User guide" (text — see item 5 under
+      NOT TESTED), the intro says "Wayscope is…", the figures say Wayscope in their header.
+   e. Look-ahead → Export PDF: the heading ink is #1F2024; the route map's pins are ink
+      and the theme red.
 
 
 WHAT CHANGED
 ------------
-No alliance data ships.
-  * No seed network, no seed taxonomy, no static alignment/chainage/rail files, no
-    project screenshots. A fresh deployment boots EMPTY (only the generic disciplines
-    and the default configuration).
-  * A source-level sweep (backend/tests/test_modus.py) fails the suite if a shipped
-    file names the alliance, its partners or its places.
-  * Names and figures from that project were also taken out of code comments.
-
-A tenant is one file.
-  * backend/tenant_package.py: export/import a whole tenant (every table, the
-    configuration, the map overlay, baked geometry) — GET /api/admin/tenant/export,
-    POST /api/admin/tenant/import (empty tenant, or replace=1), GET .../status.
-  * The map alignment is tenant data: PUT /api/admin/overlay, served to the map by
-    GET /api/public/alignment (gated like the map, with an ETag). map/overlay.js is
-    product code with empty defaults. Uploads are refused when a band runs backwards,
-    a boundary is off a band edge, or a colour is not #RRGGBB.
-
-The tenant's own words.
-  * Settings (Config → Everything): name, team_label, currency (symbol only — no
-    exchange rates), country. Country switches the Estonian road restrictions,
-    orthophoto and vehicle labels on for EE only, and the automatic EU diesel price
-    for EU-27 only.
-  * Team ids stay IPT1…IPT6 (your decision). Every place a person reads a team — the
-    app, the map, the XLSX and PDF, sign-in labels, the clash rail — now shows the
-    tenant's name for it ("North Team"), never the id. Flag codes are shown by name.
-  * The route-timing diagnostic probes in the tenant's own time zone (from its
-    country); a country it does not know runs on UTC and says so.
-
-The Modus look.
-  * Name and theme (ink #0F172A, accent #2563EB, clash #DC2626, warning #D97706,
-    confirmed #059669). "Public route map" is now "Route map" (it is gated). Long KPI
-    values shrink instead of being cut off. A typed diesel price is dated "typed".
-
-The demo.
-  * demo/uk-corridor.package.json — the Wolds Link, a FICTIONAL 31.8 km corridor in the
-    East Midlands; rebuilt by backend/tools/make_demo_tenant.py. Fixed today: its work
-    sections now fit the line (the last one used to start past the end of it), its
-    chainage markers sit on exact 100 m values (the map's 10 km / 5 km / 1 km ticks
-    had nothing to draw), and one boundary is marked provisional to show the feature.
-
-The guide.
-  * frontend/help rewritten in product terms; the stale "Stock held" description now
-    matches the Stockpile capacity panel; the five diagrams redrawn in the Modus theme
-    (backend/tools/make_guide_images.js); 22 honest placeholders; the capture tool.
-
-Repository.
-  * README.md, env.example, render.yaml (new blueprint), .gitignore,
-    .github/workflows/suite.yml (every harness on every push).
+* Name: every "Modus" in shipped files → Wayscope (titles, the default tenant name in
+  factors.json / config.py / index.html / map, FastAPI title, exports' default name and
+  User-Agent, the guide, the tools, comments and docstrings). test_modus.py now scans
+  every shipped file for \bModus\b and fails on a hit. Deliberately NOT renamed: the
+  Render service names `modus-web` / `modus-db` (a rename changes the URL), the `modus_*`
+  localStorage / cookie keys (invisible; renaming the cookie would sign everyone out once),
+  env var names, the GitHub repo, the demo tenant "Wolds Link — demo corridor".
+* Theme: `--navy-deep` #0F172A → #1F2024 everywhere (app tokens, map brandDark and
+  forecast casing, overlay.js's reserved hexes, the canvas marks, the PDF ink, the guide,
+  the guide-image tool). #0F172A is on the retired list now. Orange tokens added to :root
+  (`--brand-orange` #FF8C14 and friends) and used ONLY for the 2 px rule under the header;
+  the guide's nav has the same rule on its right edge. `--gold` #D97706 (amber) is untouched:
+  unbaked routes, missing index, capacity from 90 %, edited/thaw marks keep it. Forecast
+  routes on the map stay blue (your decision: orange would blur with amber warnings).
+* Header: the old gold bar + bold name + "Modus · Forecasting & Route Map" caption is gone;
+  `/brand/logo-header-on-dark.svg` at 38 px + rule + tenant name in white/70, click-to-home
+  kept (your decision: logo + rule + name).
+* Gate pages (map password, guide sign-in, map closed): Wayscope titles, the stacked logo,
+  the Wayscope palette (they still carried the pre-G2 navy/blue/red), and "Alliance staff" /
+  "outside the alliance" wording replaced with "Staff" / "without a staff sign-in".
+* Static: `app.mount("/brand", …)` (no-cache, not gated) and root routes for favicon.ico,
+  favicon.svg, apple-touch-icon.png, site.webmanifest, icon-192.png, icon-512.png,
+  icon-512-maskable.png (browsers and iOS ask at the root). A name outside that set is a
+  404 — `../factors.json` cannot escape. NoCacheStatic now tolerates a missing directory
+  (Starlette otherwise refuses to boot, or 500s on the first request).
+* <head>: favicon links + theme-color on the app, the map, the guide and the gate pages.
+* document.title: "<tenant> · Wayscope", plain "Wayscope" for the default tenant.
+* Guide: nav brand text "Wayscope", intro sentence, and all 27 synthetic figures
+  regenerated (backend/tools/make_guide_images.js, headless Chromium) — they now read
+  "Wayscope" in the header and use the new ink. They are still placeholders and say so.
+* Also in this zip, found at plain HEAD: test_lookahead.py was 240/2 — two assertions
+  that only fail in the FIRST WEEK OF A MONTH (the commit week is Oct W1 today: `(MI, 2)`
+  is the next-week day bucket, and the account week Sep W4 is off the two-month horizon
+  grid). Narrowed with the reason written in; the code behaviour was correct.
+* `.gitignore` (the G2 one, see action 3).
 
 
-TESTS — COUNTS
---------------
-  Stubbed suite (15 Python + 4 JS harnesses)    3,258 passed, 0 failed
-      baseline at RBE_Alliance1 1c5ac11:         3,063 passed, 1 failed
-  backend/tests/http_smoke.py (NEW, real FastAPI, TestClient, pinned requirements)
-                                                    65 passed, 0 failed
-      gate and cookie, sign-in, empty boot, import/export/replace over HTTP, the
-      overlay and its ETag/304, team scoping, real XLSX (openpyxl) and PDF (reportlab)
-      read back: team names, £, the tenant's name, no team ids.
-  The same Python harnesses in a CI-like venv without FastAPI: all green.
-  Off-repo equivalence check: the ORIGINAL 140 overlay assertions, run against the
-      new map/overlay.js with the first tenant's overlay from the offline zip: 140 passed.
-  The staff app, rendered in headless Chromium against a local server (libraries
-      served from disk): all 15 staff screens load and capture; no page crash.
-
-Assertions were narrowed or reversed, never deleted: every project-specific fact the
-map harness used to pin is now a REVERSED assertion that the fact is NOT in product code.
+TESTS (sandbox, stubbed suite; counts are before → after)
+---------------------------------------------------------
+Plain HEAD 830c153: 3,256 passed / 2 failed (the two date bombs above).
+This zip over a clean HEAD, WITHOUT frontend/brand/: 3,294 passed / 1 failed — the one is
+"frontend/brand/ ships every file the pages reference" (action 1).
+With the brand assets applied: expected 3,295 / 0.
+  test_modus 148 → 171 (+31 rebrand assertions, incl. the \bModus\b scan, the manifest's
+  icon paths, the gate pages, the header, the tokens, the map ink, the exports)
+  parse_frontend 378 → 386 · parse_map 514 → 518 · test_lookahead 240/2 → 244/0
+  http_smoke (real FastAPI in a venv): 65 → 78 with the brand files present (favicon/brand
+  200s without a cookie, content types, no-cache, the manifest's icons, the branded
+  password page, the mount cannot be walked out of); WITHOUT the folder the 8 brand checks
+  fail as designed and the app still serves everything else.
 
 
-NOT VERIFIED
-------------
-  * PostgreSQL — every run here is SQLite.
-  * HERE — no key in the sandbox; nothing was baked.
-  * Mapbox — no map ever drew here (tiles unreachable), so no map rendering, and the
-    map half of capture_guide.js has never run.
-  * The GitHub Actions workflow — written and its steps reproduced locally, but not
-    run on GitHub.
-  * The Render blueprint — not applied. A 9.8 MB overlay upload works locally in about
-    a second; Render's own request limits were not tested.
-  * Street View.
-
-
-KNOWN GAPS
+NOT TESTED
 ----------
-  * A tenant with NO country set still falls back to the Estonian diesel index. Set
-    the country. (Queued as a G3 fix — it touches four harnesses.)
-  * Test fixtures still carry alliance place names (your decision: leave them). If
-    this repository is ever shared outside, strip backend/tests/fixtures and the
-    browser-check scripts first.
-  * The fair-price model's default coefficients come from Estonian public sources
-    (driver wages, the spring-thaw limit). The demo reads them as £ and says so in its
-    configuration. Replace them with UK figures before quoting a fair price to anyone.
-  * The demo's two granite quarries sit near real quarry sites in Leicestershire under
-    invented names.
-  * Six team slots per tenant; one tenant per deployment (TENANT_ID).
-  * Access is still shared codes per role — do not describe a deployment as secure.
+1. The live favicon on Render and the iOS home-screen icon (only headless Chromium here).
+2. The lockup's real rendering in the header (Mapbox/CDNs are blocked in the sandbox;
+   the SVG files themselves were not in the sandbox — see action 1).
+3. The guide's nav still names the product as TEXT. The plan was the on-dark lockup
+   inlined as SVG (the guide fetches nothing by design; test_help pins that). It needs the
+   SVG file in hand; it lands in the next delivery once frontend/brand/ is at HEAD.
+4. The PDF header mark (rebrand brief §2, "optional"): not done — the PNG mark is in the
+   full kit, not in the assets zip. Left for later; the PDF is otherwise rebranded.
+5. Push protection behaviour on this push (item 4 above).
+
+
+AFTER IT LANDS — PROJECT INSTRUCTIONS TO CHANGE (only you can edit them)
+-------------------------------------------------------------------------
+* "**Modus** is a haulage forecasting…" → Wayscope (the service names stay modus-*).
+* The delivery-note rule: README.txt starts "WAYSCOPE — " (was "MODUS — ").
+* "CI: .github/workflows/suite.yml runs every harness on push; keep it green" — that file
+  is NOT in the repo any more (commit 2c9e9a5 "Delete .github directory"). There is no CI
+  on push today. Say whether you want it back (it was a one-file workflow).
+* "Public-facing wording: the product name needs a qualifier" — resolved: Wayscope.
+
+
+CODESPACE COMMANDS
+------------------
+Upload wayscope-brand-assets-0929.zip first (if not already applied), then this zip, as
+single files. Then, in the Codespace terminal (check the names with `ls *.zip` first):
+
+  unzip -o wayscope-brand-assets-0929.zip && rm wayscope-brand-assets-0929.zip
+  unzip -o wayscope-rebrand-0929.zip && rm wayscope-rebrand-0929.zip
+  git rm -q download
+  git add -A && git commit -m "Wayscope rebrand: name, theme, header, gate pages, brand files, favicon" && git push
+
+If the push is rejected as non-fast-forward:
+  git pull origin main --no-rebase --no-edit
+  git push

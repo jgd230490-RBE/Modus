@@ -1,4 +1,5 @@
-# Render Blueprint for Modus.
+# Render Blueprint for Wayscope. The service names modus-web / modus-db are kept on
+# purpose: renaming a Render service changes its URL and breaks nothing useful.
 #
 # This creates a NEW web service (modus-web) and a NEW database (modus-db). It does not
 # touch any service or database that already exists in the Render account — including

@@ -1,10 +1,10 @@
-# Modus
+# Wayscope
 
 Haulage forecasting, a weekly look-ahead and a corridor route map for construction
 programmes on linear infrastructure — rail, road and utility corridors.
 
 Delivery teams forecast their material movements month by month; planners approve them;
-Modus turns the approved plan into a day-by-day commitment sheet for hauliers, sized in
+Wayscope turns the approved plan into a day-by-day commitment sheet for hauliers, sized in
 trucks rather than trips, with routed distances, cycle times, carbon and cost — and shows
 the whole programme on one map.
 
@@ -23,7 +23,7 @@ Routing v8 for truck geometry. SQLite is used automatically when `DATABASE_URL` 
 
 ## A fresh deployment boots EMPTY
 
-Modus ships no customer data. A new deployment has the generic disciplines and the
+Wayscope ships no customer data. A new deployment has the generic disciplines and the
 default configuration — no locations, routes, teams, sections, forecasts or map
 alignment. An organisation (a *tenant*) arrives as **one package file**:
 
