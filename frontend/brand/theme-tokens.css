@@ -1,0 +1,13 @@
+/* Wayscope brand tokens — 29 Sep 2026.
+   Orange is the BRAND accent (logo, header rule, marketing). It is not a status colour:
+   amber keeps meaning "warning" inside the app, blue keeps meaning "control / link". */
+:root {
+  --ws-ink: #1F2024;          /* header, dark surfaces (was --navy-deep #0F172A) */
+  --ws-ink-2: #17181C;      /* darker band for gradients / footers */
+  --ws-orange: #FF8C14;     /* solid brand orange */
+  --ws-orange-l: #FF8312;   /* gradient start */
+  --ws-orange-r: #FFA10A;   /* gradient end */
+  --ws-gold: #D2931F;        /* the mark's dots */
+  --ws-paper: #FFFFFF;
+  --ws-orange-text: #C75F06; /* orange as TEXT on white (the bright orange fails contrast) */
+}
