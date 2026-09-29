@@ -2,7 +2,12 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Modus — corridor map</title>
+    <title>Wayscope — corridor map</title>
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="theme-color" content="#1F2024">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
@@ -16,7 +21,7 @@
     <script src="overlay.js?v=1"></script>
     <style>
         :root{
-            --navy:#2563EB; --navy-deep:#0F172A; --ink:#1E293B; --muted:#64748B;
+            --navy:#2563EB; --navy-deep:#1F2024; --ink:#1E293B; --muted:#64748B;
             --line:#E2E8F0; --bg:#F8FAFC; --accent:#DC2626; --green:#059669;
         }
         *{ box-sizing:border-box; }
@@ -396,7 +401,7 @@
     let chainage_global_data = EMPTY_FC;
     // The tenant's vocabulary and country, from the same response as the overlay.
     let TEAM = 'Team';
-    let TENANT = { name: 'Modus', team_label: 'Team', country: null, currency: 'EUR' };
+    let TENANT = { name: 'Wayscope', team_label: 'Team', country: null, currency: 'EUR' };
     // The tenant's names for its team slots ("IPT3" -> "North Team"), from the overlay
     // response. Ids never reach the screen: every team value shown goes through teamText().
     const TEAM_LABELS = {};
@@ -658,7 +663,7 @@
     // ===== Week 1, Task E - the railhead highlight =============================
     // #0F766E is the build list's reserved rail colour. It is NOT reused anywhere
     // else on this map: the reserved set is inbound #059669, outbound #f59e0b, temp
-    // #C2790B, forecast #3B82F6, selection #DC2626, brand #2563EB/#0F172A and the six
+    // #C2790B, forecast #3B82F6, selection #DC2626, brand #2563EB/#1F2024 and the six
     // IPT band colours. parse_map.js asserts that.
     // 2026-09-08 (§F1). The forecast route label read "412 vehicles", which is the same
     // confusion the 04 Sep correction was about: 412 is not 412 lorries, it is 412 loads
@@ -893,7 +898,7 @@
         g.fillStyle = fill; g.fill();
         // a dark edge on every mark, so a white limestone circle still reads on a light
         // basemap and a dark one still reads on satellite
-        g.lineWidth = 3; g.strokeStyle = '#0F172A'; g.stroke();
+        g.lineWidth = 3; g.strokeStyle = '#1F2024'; g.stroke();
 
         g.save();
         if (kind === 'Railhead') {
@@ -946,13 +951,13 @@
                 // height is legible at every size the ramp produces. Not drawn when the pile
                 // is over (the whole pile is red) or full (the line would sit on the edge).
                 if (stock !== 'over' && pct < 1 && pct > 0) {
-                    g.strokeStyle = '#0F172A'; g.lineWidth = 2.2;
+                    g.strokeStyle = '#1F2024'; g.lineWidth = 2.2;
                     g.beginPath(); g.moveTo(x0, y0 + H * (1 - pct)); g.lineTo(x0 + W, y0 + H * (1 - pct)); g.stroke();
                 }
             }
             g.restore();
             stockPilePath(g, cx, cy, r);
-            g.lineWidth = 2.6; g.strokeStyle = '#0F172A';
+            g.lineWidth = 2.6; g.strokeStyle = '#1F2024';
             // ⚠️ A pile with NO recorded capacity is drawn with a DASHED outline. Without
             // it, 'na' and a 90-100% full pile are the same picture — both solid to the
             // top — and the map would be claiming a reading it does not have.
@@ -973,7 +978,7 @@
             // The head has to be PERPENDICULAR TO THE HANDLE and it has to stop where the
             // handle stops. Built from the handle vector rather than hand-picked angles,
             // so the two can no longer drift apart.
-            g.strokeStyle = '#0F172A'; g.lineCap = 'round'; g.lineWidth = Math.max(2.6, r * 0.15);
+            g.strokeStyle = '#1F2024'; g.lineCap = 'round'; g.lineWidth = Math.max(2.6, r * 0.15);
             const t = r * 0.56;
             const ax = cx - t * 0.78, ay = cy + t * 0.88;      // butt of the handle
             const bx = cx + t * 0.46, by = cy - t * 0.56;      // where the head sits
@@ -1093,7 +1098,7 @@
             const fill = kind === 'Quarry' ? QUARRY_DEFAULT_FILL : LOC_FILL[kind];
             locShapePath(g, kind, S / 2, S / 2, kind === 'Other' ? 6 : 13);
             g.fillStyle = fill; g.fill();
-            g.lineWidth = 2; g.strokeStyle = '#0F172A'; g.stroke();
+            g.lineWidth = 2; g.strokeStyle = '#1F2024'; g.stroke();
             return c.toDataURL();
         };
         // Quarry says what its fill means, because its fill is the only one that varies
@@ -2728,7 +2733,7 @@
         if (!map.getLayer('zone-label')) map.addLayer({
             id: 'zone-label', type: 'symbol', source: 'zones-source', minzoom: 9,
             layout: { visibility: vis, 'text-field': ['get', 'name'], 'text-size': 11 },
-            paint: { 'text-color': '#0F172A', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
+            paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
         });
         applyZoneMonth((typeof TL !== 'undefined' && TL.on) ? TL.month : null);
         raiseMarks();

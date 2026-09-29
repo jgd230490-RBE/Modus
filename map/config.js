@@ -1,5 +1,5 @@
 // ============================================================
-//  Modus — corridor map configuration
+//  Wayscope — corridor map configuration
 //  Edit values here; no need to touch index.html.
 // ============================================================
 window.CONFIG = {
@@ -17,12 +17,13 @@ window.CONFIG = {
   // Unit the map paints forecasts in: "vehicles" | "t" | "m3"
   FORECAST_UNIT: "vehicles",
 
-  // Theme (Modus). Change a hex here to restyle the map.
+  // Theme (Wayscope, 29 Sep 2026): ink #1F2024, blue for routes/controls, orange is the
+  // brand accent and is NOT used on the map (it would blur with amber warnings).
   COLORS: {
     brand:             "#2563EB",  // the accent blue
-    brandDark:         "#0F172A",  // ink (headings, casing)
+    brandDark:         "#1F2024",  // ink (headings, casing)
     forecast:          "#3B82F6",  // forecast route highlight (core)
-    forecastCasing:    "#0F172A",  // darker outline behind forecast routes
+    forecastCasing:    "#1F2024",  // darker outline behind forecast routes
     forecastLabelHalo: "#2563EB",  // halo behind forecast labels
     selection:         "#DC2626",  // a clicked/selected route
     peak:              "#DC2626",  // alerts / peak values (theme red)

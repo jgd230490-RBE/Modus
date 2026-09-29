@@ -2,7 +2,7 @@
 // Public map — package colouring of a linear alignment (the overlay module)
 // ===========================================================================
 //
-// Modus, 16 Sep 2026. This file is PRODUCT CODE and carries NO project data. It
+// Wayscope, 16 Sep 2026 (rebranded 29 Sep). This file is PRODUCT CODE and carries NO project data. It
 // used to be map/ipt_segments.js, which mixed the band table, the work-section
 // names and the boundary chainages of one project into the functions that draw
 // them. Those now arrive from the tenant package through
@@ -94,9 +94,9 @@ window.applyOverlayPackage = function (o) {
 //    could not tell "this stretch is package 6" from "this route is laden" — and
 //    the route layers are the ones that carry money. Asserted in
 //    backend/tests/parse_map.js against the demo package, so a future palette
-//    edit cannot quietly reintroduce one. Re-hexed for the Modus theme, 16 Sep.
+//    edit cannot quietly reintroduce one. Re-hexed for the product theme, 16 Sep; ink #1F2024 since 29 Sep.
 window.IPT_RESERVED_COLOURS = [
-  '#059669', '#f59e0b', '#C2790B', '#3B82F6', '#DC2626', '#2563EB', '#0F172A',
+  '#059669', '#f59e0b', '#C2790B', '#3B82F6', '#DC2626', '#2563EB', '#1F2024',
 ];
 window.wsLabel = function (code) {
   var w = (window.WS_NAMES || {})[code];
