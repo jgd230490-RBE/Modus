@@ -434,11 +434,16 @@ r = main.set_forecast_day_actual(main.DayActual(route_id="R1", month_index=MI, d
                                                 section_id="WS1", day_date=second_wd, actual_qty=12.0))
 ok("⭐ ...but actuals are still typeable on a confirmed week", r.get("error") is None
    and float(_by_date(_line_days())[second_wd]["actual_qty"]) == 12.0)
-# a week that is NOT the commit bucket confirms as it always did, with no days
-om, ow = (MI, 1) if WI != 1 else (MI, 2)
+# a week that is NOT a day bucket confirms as it always did, with no days.
+# NARROWED 29 Sep: `day_buckets()` holds TWO weeks (commit + next, the 09 Sep "next week"
+# bucket), so in the first week of a month `(MI, 2)` IS a day bucket and this failed on
+# 29 Sep 2026 (commit = Oct W1). Pick the first week of the month outside both buckets.
+_dbk = [(int(a), int(b)) for a, b in days.day_buckets()]
+om, ow = next((MI, w) for w in range(1, weeks.weeks_in_month(MI) + 1) if (MI, w) not in _dbk)
 r = days.confirm_week("R1", om, "earthworks", "WS1", ow)
-ok("a week outside the commit bucket confirms with zero days stamped — Task C unchanged",
+ok("a week outside the day buckets confirms with zero days stamped — Task C unchanged",
    r["week"]["status"] == "confirmed" and r["days_confirmed"] == 0)
+ok("...and the chosen week is outside BOTH day buckets (commit and next)", (om, ow) not in _dbk and len(_dbk) == 2)
 
 # =========================================================================== #
 #  6. Calibrate — next week only, and the opt-in spread                       #
@@ -1119,11 +1124,18 @@ ok("the render fixture is written with three lines, a rail, a stockpile and an a
 # ---- horizon roles
 hz = pg["horizon"]
 roles = {(r["month_index"], r["week_index"]): r["role"] for r in hz["rows"]}
+# NARROWED 29 Sep: the horizon grid covers the commit month and the next, so when the
+# commit week is a month's FIRST week the account week lies in the previous month and has
+# no row on the grid (failed 29 Sep 2026: commit = Oct W1, account = Sep W4). The role
+# map still names it; the row assertion applies only when the account week is on-grid.
 ok("horizon rows carry account / commit / make-ready / early-warning relative to the commit bucket",
    roles.get((MI, WI)) == "commit" and roles.get(tuple(weeks.next_week(MI, WI))) == "make-ready"
    and roles.get(tuple(weeks.next_week(*weeks.next_week(MI, WI)))) == "early-warning"
-   and (pm < 1 or roles.get((pm, pw)) == "account")
+   and (pm < 1 or pm < MI or roles.get((pm, pw)) == "account")
    and hz["from_month"] == MI and hz["to_month"] == MI + 1)
+ok("...and the horizon's role map names the account week even when it is off-grid",
+   pm < 1 or (list(hz["roles"]["account"]) == [pm, pw]
+              and ((pm < MI) == ((pm, pw) not in roles))))
 
 # ---- confirm, then reopen — days follow both ways
 main.confirm_forecast_week(main.WeekConfirm(route_id="R3", month_index=MI, discipline="substructure", section_id="WS3", week_index=WI))

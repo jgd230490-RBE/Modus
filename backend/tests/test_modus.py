@@ -1,12 +1,13 @@
 """
-G2, 2026-09-16 — Modus: a product with no project data in it, and a tenant package.
+G2, 2026-09-16 — Wayscope (Modus until 29 Sep 2026): a product with no project data in it,
+and a tenant package.
 
 WHAT IS ASSERTED
 ----------------
   1. The tree ships NOTHING of the first project's: no seed data, no static alignment,
      no project names in any shipped file (source-level, every file outside tests/).
   2. A fresh tenant boots EMPTY — generic disciplines and the factors row only.
-  3. /api/meta carries the tenant block; the defaults are Modus / Team / EUR / no country.
+  3. /api/meta carries the tenant block; the defaults are Wayscope / Team / EUR / no country.
   4. The tenant package: export → import into an empty tenant round-trips every row;
      a non-empty tenant refuses without replace; a bad package is refused; an unknown
      column is dropped and reported; the boot seeds are superseded by the package's.
@@ -17,7 +18,11 @@ WHAT IS ASSERTED
      index; an EE tenant has both. The map's restriction panel is provider-driven.
   7. The overlay endpoint: a tenant with no overlay gets {} + tenant; one with an
      overlay gets it back with an ETag, and a matching If-None-Match gets 304.
-  8. Theme tokens: the three shipped pages carry the Modus palette and none of the old.
+  8. Theme tokens: the shipped pages carry the Wayscope palette (ink #1F2024, blue
+     #2563EB) and none of the old RBE palette, nor the retired G2 ink #0F172A.
+  9. Rebrand (29 Sep 2026): the word "Modus" appears in NO shipped file; the brand files
+     the pages reference exist under frontend/brand/; the favicon set is served at the
+     root; the header carries the lockup and no longer the old caption.
 
 WHAT THIS DOES NOT PROVE
 ------------------------
@@ -184,10 +189,11 @@ for stale in ("main.py", "db.py", "network.py", "config.py", "conversions.py",
               "README-DIAGNOSTICS.txt", "README-STEP-B-C.txt"):
     ok(f"no stale root-level {stale}", not os.path.exists(os.path.join(ROOT, stale)))
 # NARROWED: README.txt is the delivery note a session checks HEAD against (project
-# instructions), so one may exist — but only a Modus delivery note, never the old one.
+# instructions), so one may exist — but only a Wayscope delivery note, never an older one
+# (the prefix changed from "MODUS — " to "WAYSCOPE — " with the 29 Sep rebrand).
 _rt = os.path.join(ROOT, "README.txt")
-ok("no stale root-level README.txt — if present it is a Modus delivery note",
-   not os.path.exists(_rt) or open(_rt, encoding="utf-8").read().startswith("MODUS — "))
+ok("no stale root-level README.txt — if present it is a Wayscope delivery note",
+   not os.path.exists(_rt) or open(_rt, encoding="utf-8").read().startswith("WAYSCOPE — "))
 ok("the guide's placeholder.pl orphan is gone",
    not os.path.exists(os.path.join(ROOT, "frontend", "help", "media", "placeholder.pl")))
 
@@ -261,8 +267,8 @@ ok("main.py imports no seed module", "import seed" not in main_code)
 meta = main.meta()
 t = meta.get("tenant") or {}
 ok("meta carries the tenant block", bool(t))
-ok("defaults: Modus / Team / EUR / no country",
-   t.get("name") == "Modus" and t.get("team_label") == "Team" and t.get("currency") == "EUR"
+ok("defaults: Wayscope / Team / EUR / no country",
+   t.get("name") == "Wayscope" and t.get("team_label") == "Team" and t.get("currency") == "EUR"
    and t.get("country") is None, str(t))
 ok("the currency symbol is derived", t.get("currency_symbol") == "€")
 ok("no country → no restriction provider, no automatic fuel index",
@@ -606,16 +612,128 @@ ok("overlay.js computes the grid scale from the data's latitude, not a constant"
 # =========================================================================== #
 #  8. Theme tokens                                                             #
 # =========================================================================== #
-OLD = ("#003787", "#0A1446", "#3398DB", "#BF2E55", "#039E86", "#FFC101")
-NEW = ("#0F172A", "#2563EB")
+# 29 Sep 2026: the G2 ink #0F172A is RETIRED with the rebrand (ink is #1F2024 now) — it
+# joins the old list because a grep showed it gone from every shipped file.
+OLD = ("#003787", "#0A1446", "#3398DB", "#BF2E55", "#039E86", "#FFC101", "#0F172A")
+NEW = ("#1F2024", "#2563EB")
 for rel in ("frontend/index.html", "map/index.html", "map/config.js", "frontend/help/index.html"):
     src = read(rel)
     ok(f"{rel}: none of the old palette", not any(h.lower() in src.lower() for h in OLD),
        str([h for h in OLD if h.lower() in src.lower()]))
-    ok(f"{rel}: the Modus ink and accent", all(h.lower() in src.lower() for h in NEW))
+    ok(f"{rel}: the Wayscope ink and accent", all(h.lower() in src.lower() for h in NEW))
 for rel in ("backend/export.py",):
     src = read(rel)
     ok(f"{rel}: none of the old palette", not any(h.lower() in src.lower() for h in OLD))
+
+# =========================================================================== #
+#  9. The rebrand (29 Sep 2026): Modus → Wayscope, everywhere a person can read it  #
+# =========================================================================== #
+# The "references are gone" assertion, same shape as PROJECT_TERMS: the old product name
+# must not appear in ANY shipped file — code, comments and docstrings included — so that
+# `grep -rn Modus` on the tree returns nothing. Test files are excluded by the walker
+# (they may quote the history), and so is the root README.txt: it is the delivery note,
+# which has to SAY what was renamed. Its own rule (the WAYSCOPE — prefix) is asserted above.
+# The Render service names `modus-web` / `modus-db` and the `modus_*` cookie/storage
+# keys are lower-case identifiers, kept on purpose, and do not match \bModus\b.
+_modus_hits = {}
+for dirpath, dirs, files in os.walk(ROOT):
+    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules")]
+    for fn in files:
+        if not fn.endswith(SHIPPED_EXT + (".css", ".webmanifest", ".svg")):
+            continue
+        p = os.path.join(dirpath, fn)
+        if os.path.relpath(p, ROOT) == "README.txt":
+            continue
+        try:
+            txt = open(p, encoding="utf-8", errors="ignore").read()
+        except Exception:
+            continue
+        n = len(re.findall(r"\bModus\b", txt))
+        if n:
+            _modus_hits[os.path.relpath(p, ROOT)] = n
+ok("🔴 REBRAND: the word \"Modus\" appears in no shipped file (code, comments, docstrings)",
+   not _modus_hits, str(_modus_hits))
+
+# the brand files the pages and main.py reference must ship
+BRAND = os.path.join(ROOT, "frontend", "brand")
+BRAND_REFERENCED = ("logo-header-on-dark.svg", "logo-stacked-on-dark.svg", "theme-tokens.css",
+                    "favicon.ico", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
+                    "icon-192.png", "icon-512.png", "icon-512-maskable.png")
+_missing_brand = [f for f in BRAND_REFERENCED if not os.path.isfile(os.path.join(BRAND, f))]
+ok("frontend/brand/ ships every file the pages reference (%d)" % len(BRAND_REFERENCED),
+   os.path.isdir(BRAND) and not _missing_brand, str(_missing_brand))
+if os.path.isfile(os.path.join(BRAND, "site.webmanifest")):
+    _man = json.load(open(os.path.join(BRAND, "site.webmanifest"), encoding="utf-8"))
+    _icon_srcs = [i.get("src", "") for i in _man.get("icons", [])]
+    ok("the web manifest's icon paths are root-relative and every one has a root route in main.py",
+       _icon_srcs and all(s.startswith("/") and s.lstrip("/") in main.ROOT_BRAND_FILES for s in _icon_srcs),
+       str(_icon_srcs))
+    ok("...and the manifest names Wayscope with the ink theme colour",
+       "Wayscope" in (_man.get("name") or "") and (_man.get("theme_color") or "").upper() == "#1F2024", str(_man))
+
+# main.py: the mount and the root routes
+ok("main.py mounts /brand with the no-cache static class, before the \"/\" route",
+   'app.mount("/brand", NoCacheStatic(directory=str(BRAND_DIR), check_dir=False)' in main_code
+   and main_code.index('app.mount("/brand"') < main_code.index('@app.get("/")\ndef frontend_index'))
+ok("main.py serves the favicon set and the manifest at the ROOT (browsers and iOS ask there)",
+   set(main.ROOT_BRAND_FILES) == {"favicon.ico", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
+                                   "icon-192.png", "icon-512.png", "icon-512-maskable.png"}
+   and 'for _name in list(ROOT_BRAND_FILES):' in main_code and 'app.get("/" + _name' in main_code)
+try:
+    main._brand_file("../factors.json"); _esc = False
+except Exception as e:
+    _esc = getattr(e, "status_code", None) == 404
+ok("a root brand route refuses a name outside the set with 404 ('../factors.json' cannot escape)", _esc)
+import gate as _gate
+ok("the gate does not police /brand/ or the root favicon paths (a refused visitor still sees the logo)",
+   all(_gate.scope_for(p) is None for p in ("/brand/logo-header-on-dark.svg", "/favicon.ico", "/favicon.svg",
+                                             "/site.webmanifest", "/apple-touch-icon.png")))
+ok("the three gate pages are titled Wayscope, carry the stacked logo, and no RBE-era wording",
+   all(("<title>Wayscope — " in pg and 'src="/brand/logo-stacked-on-dark.svg"' in pg
+        and "alliance" not in pg.lower() and "Modus" not in pg)
+       for pg in (main._MAP_PASSWORD_PAGE, main._HELP_SIGNIN_PAGE, main._MAP_UNCONFIGURED_PAGE)))
+ok("...and the gate pages use the Wayscope ink, not the RBE navy",
+   "background:#1F2024" in main._GATE_CSS and not any(h.lower() in main._GATE_CSS.lower() for h in OLD))
+ok("FastAPI's app title is Wayscope", 'FastAPI(title="Wayscope"' in main_code)
+
+# the staff app: head links, tokens, the header
+_ICON_LINKS = ('<link rel="icon" href="/favicon.ico" sizes="32x32">',
+               '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
+               '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
+               '<link rel="manifest" href="/site.webmanifest">')
+for rel in ("frontend/index.html", "map/index.html", "frontend/help/index.html"):
+    src = read(rel)
+    ok(f"{rel}: <head> carries the favicon links and the ink theme-color",
+       all(l in src for l in _ICON_LINKS) and '<meta name="theme-color" content="#1F2024">' in src)
+ok("the staff app's :root carries the ink and the brand orange tokens (orange = brand accent only)",
+   "--navy-deep:#1F2024" in fe_src and "--brand-orange:#FF8C14" in fe_src and "--brand-gold:#D2931F" in fe_src)
+ok("...amber is still the warning colour (--gold #D97706 untouched)", "--gold:#D97706" in fe_src)
+ok("the header carries the lockup image and the 2 px orange rule, and the old gold bar + caption are gone",
+   'src="/brand/logo-header-on-dark.svg"' in fe_src and "border-bottom:2px solid var(--brand-orange)" in fe_src
+   and "Forecasting &amp; Route Map" not in fe_src and 'style={{background:"var(--gold)"}}' not in fe_src)
+ok("the header shows the tenant's name beside the rule only when it is not the default",
+   'TENANT.name && TENANT.name !== "Wayscope" && (' in fe_src and 'className="brand-rule hidden sm:block"' in fe_src)
+ok("document.title: the tenant's name · Wayscope, plain Wayscope for the default tenant",
+   'document.title = (TENANT.name && TENANT.name !== "Wayscope") ? TENANT.name + " · Wayscope" : "Wayscope";' in fe_src)
+ok("the map's brand ink is #1F2024 and overlay.js reserves it (no band may reuse it)",
+   'brandDark:         "#1F2024"' in read("map/config.js") and "'#1F2024'," in ov_src and "#0F172A" not in ov_src)
+ok("the map's forecast routes stay BLUE (decision 29 Sep: orange would blur with amber warnings)",
+   'brand:             "#2563EB"' in read("map/config.js") and 'forecast:          "#3B82F6"' in read("map/config.js")
+   and "#FF8C14" not in read("map/config.js"))
+_help = read("frontend/help/index.html")
+# NARROWED (29 Sep): the nav names the product as TEXT until the brand SVG is in the repo
+# (frontend/brand/logo-header-on-dark.svg — delivered separately, not yet applied); then it
+# is inlined (data-brand="svg"), never fetched, so the guide keeps pulling in nothing.
+_navb = _help.split('<div class="brand"', 1)[1][:6000] if '<div class="brand"' in _help else ""
+ok("the guide's nav names Wayscope — the inline lockup (no new fetch) or, until the SVG ships, the word — and the intro says Wayscope",
+   '<div class="brand"' in _help and ("<svg" in _navb or _navb.startswith(' data-brand="text">Wayscope'))
+   and "Wayscope is a shared planning platform" in _help and "Modus" not in _help)
+ok("exports: the default tenant name and the User-Agent are Wayscope, the PDF ink is #1F2024",
+   'or "Wayscope"' in _exp_src and '"User-Agent": "Wayscope/1.0"' in _exp_src and 'NAVY = "1F2024"' in _exp_src)
+ok("restrictions: the User-Agent is Wayscope", '"User-Agent": "Wayscope/1.0"' in read("backend/restrictions.py"))
+ok("the seed's tenant name and config.TENANT_DEFAULTS are Wayscope",
+   json.load(open(os.path.join(ROOT, "backend", "factors.json"), encoding="utf-8"))["tenant"]["name"] == "Wayscope"
+   and config.TENANT_DEFAULTS["name"] == "Wayscope")
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

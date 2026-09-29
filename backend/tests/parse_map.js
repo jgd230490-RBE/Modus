@@ -311,6 +311,8 @@ ok("no hard-coded offset ramp survives inside a layer definition",
 const IPTF = path.join(ROOT, "map", "overlay.js");
 ok("map/overlay.js exists", fs.existsSync(IPTF));
 const iptSrc = fs.existsSync(IPTF) ? fs.readFileSync(IPTF, "utf8") : "";
+// 29 Sep: the theme lives in map/config.js; read it for the rebrand assertions below.
+const cfgSrc = fs.readFileSync(path.join(ROOT, "map", "config.js"), "utf8");
 ok("map/ipt_segments.js is gone", !fs.existsSync(path.join(ROOT, "map", "ipt_segments.js")));
 const demoPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "demo", "uk-corridor.package.json"), "utf8"));
 const demoOv = JSON.parse(demoPkg.tables.config.find(r => r.key === "overlay").value);
@@ -429,10 +431,22 @@ ok("and it names the two sections in full, not just their codes",
 // forecast, a selection or temporary haul — otherwise "this stretch is IPT 6"
 // and "this route is laden" become the same colour, and the route layers are
 // the ones carrying money. Checked against the real source both ways.
-// G2: the Modus theme's route / forecast / selection hexes, as overlay.js reserves them
-const RESERVED = ["#059669", "#f59e0b", "#C2790B", "#3B82F6", "#DC2626", "#2563EB", "#0F172A"];
+// G2: the product theme's route / forecast / selection hexes, as overlay.js reserves them.
+// 29 Sep 2026: the ink is #1F2024 (Wayscope); #0F172A is retired and must not come back.
+const RESERVED = ["#059669", "#f59e0b", "#C2790B", "#3B82F6", "#DC2626", "#2563EB", "#1F2024"];
 ok("the reserved list in overlay.js is exactly the theme's route colours",
   RESERVED.every(r => iptSrc.toLowerCase().includes(r.toLowerCase())));
+ok("REBRAND (29 Sep): the retired G2 ink #0F172A is gone from the map, its config and overlay.js",
+  !/#0F172A/i.test(code) && !/#0F172A/i.test(iptSrc) && !/#0F172A/i.test(cfgSrc));
+ok("REBRAND: the map's brand ink is #1F2024 and its forecast routes stay blue (no orange on the map)",
+  /brandDark:\s+"#1F2024"/.test(cfgSrc) && /forecastCasing:\s+"#1F2024"/.test(cfgSrc)
+  && /brand:\s+"#2563EB"/.test(cfgSrc) && /forecast:\s+"#3B82F6"/.test(cfgSrc) && !/#FF8C14/i.test(cfgSrc));
+ok("REBRAND: the map is titled Wayscope, defaults its tenant to Wayscope, and never says Modus",
+  /<title>Wayscope — corridor map<\/title>/.test(html) && /let TENANT = \{ name: 'Wayscope',/.test(code)
+  && !/\bModus\b/.test(html) && !/\bModus\b/.test(iptSrc) && !/\bModus\b/.test(cfgSrc));
+ok("REBRAND: the map's head carries the favicon links and the ink theme-color",
+  /<link rel="icon" href="\/favicon\.ico" sizes="32x32">/.test(html) && /<link rel="manifest" href="\/site\.webmanifest">/.test(html)
+  && /<meta name="theme-color" content="#1F2024">/.test(html));
 // the band colours come from the DEMO package now
 const bandHexes = demoOv.bands.map(b => String(b.colour || "").toLowerCase());
 ok("the demo band table declares a colour for every band", bandHexes.length === 6 && bandHexes.every(h => /^#[0-9a-f]{6}$/.test(h)),
@@ -1139,7 +1153,7 @@ ok("⭐ ...and a pile with NO recorded capacity is dashed, never drawn as a meas
 // cream on cream is a few percent of luminance apart; the boundary has to be a LINE
 ok("⭐ ...with an ink rule at the fill height, which is the readable part",
   /if \(stock !== 'over' && pct < 1 && pct > 0\)/.test(code)
-  && /g\.strokeStyle = '#0F172A'; g\.lineWidth = 2\.2;/.test(code));
+  && /g\.strokeStyle = '#1F2024'; g\.lineWidth = 2\.2;/.test(code));
 ok("the level reaches the image key, so one bucket is one image",
   /else if \(kind === 'Stockpile'\) suffix = '-' \+ stockBucket\(props\);/.test(code));
 ok("over capacity uses the same red as the Clash level",

@@ -1,5 +1,5 @@
 """
-http_smoke.py — the REAL HTTP layer, end to end. Modus G2, 16 Sep 2026.
+http_smoke.py — the REAL HTTP layer, end to end. Wayscope (G2, 16 Sep 2026; rebrand 29 Sep).
 
     pip install -r backend/requirements.txt httpx      # a venv, or CI
     python3 backend/tests/http_smoke.py
@@ -86,11 +86,38 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/health")
     ok("health answers 200 on SQLite", r.status_code == 200 and r.json().get("backend") == "sqlite", r.text[:120])
     r = c.get("/")
-    ok("the app page is served, named Modus, with no-cache", r.status_code == 200 and "Modus" in r.text
+    ok("the app page is served, named Wayscope, with no-cache", r.status_code == 200 and "Wayscope" in r.text
        and r.headers.get("cache-control") == "no-cache", str(r.status_code))
+    ok("...and its <head> carries the favicon links and the manifest",
+       '<link rel="icon" href="/favicon.ico" sizes="32x32">' in r.text and '<link rel="manifest" href="/site.webmanifest">' in r.text
+       and '<link rel="icon" href="/favicon.svg" type="image/svg+xml">' in r.text)
+    # 29 Sep: the brand files are served without any cookie — a refused visitor sees the logo.
+    for path, ctype in (("/favicon.ico", "image/x-icon"), ("/favicon.svg", "image/svg+xml"),
+                        ("/site.webmanifest", "application/manifest+json"),
+                        ("/apple-touch-icon.png", "image/png"), ("/icon-192.png", "image/png"),
+                        ("/brand/logo-header-on-dark.svg", "image/svg+xml"),
+                        ("/brand/logo-stacked-on-dark.svg", "image/svg+xml"),
+                        ("/brand/theme-tokens.css", "text/css")):
+        r = c.get(path)
+        ok(f"{path} is served without a cookie, {ctype}, no-cache",
+           r.status_code == 200 and r.headers.get("content-type", "").startswith(ctype)
+           and r.headers.get("cache-control") == "no-cache" and len(r.content) > 0,
+           f"{r.status_code} {r.headers.get('content-type')}")
+    r = c.get("/favicon.svg")
+    ok("the SVG favicon is a real SVG", r.status_code == 200 and b"<svg" in r.content[:400])
+    r = c.get("/brand/../backend/factors.json")
+    ok("🔴 the brand mount cannot be walked out of", r.status_code in (404, 400), str(r.status_code))
+    r = c.get("/site.webmanifest")
+    _man = r.json()
+    ok("the manifest names Wayscope and its icons all answer 200 at the root",
+       "Wayscope" in _man.get("name", "") and _man.get("icons")
+       and all(c.get(i["src"]).status_code == 200 for i in _man["icons"]), str(_man.get("icons")))
     r = c.get("/map/")
     ok("🔴 the map is closed without a credential — the password page, 401",
        r.status_code == 401 and "password" in r.text.lower(), str(r.status_code))
+    ok("...and the password page is branded: Wayscope title, the stacked logo, no RBE-era wording",
+       "<title>Wayscope — map access</title>" in r.text and 'src="/brand/logo-stacked-on-dark.svg"' in r.text
+       and "alliance" not in r.text.lower() and "Modus" not in r.text)
     r = c.get("/help/")
     ok("🔴 the guide is closed without a staff sign-in — 401", r.status_code == 401, str(r.status_code))
     r = c.get("/api/public/alignment")
@@ -102,8 +129,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("meta is readable before sign-in (the sign-in screen needs it)", r.status_code == 200)
     ok("a fresh tenant is EMPTY: no routes, teams or sections",
        m["routes"] == [] and m["ipts"] == [] and m["work_sections"] == [], str({k: len(m[k]) for k in ("routes", "ipts", "work_sections")}))
-    ok("...and carries the default tenant words: Modus, Team, EUR, no country",
-       m["tenant"]["name"] == "Modus" and m["tenant"]["team_label"] == "Team"
+    ok("...and carries the default tenant words: Wayscope, Team, EUR, no country",
+       m["tenant"]["name"] == "Wayscope" and m["tenant"]["team_label"] == "Team"
        and m["tenant"]["currency"] == "EUR" and m["tenant"]["country"] is None, str(m["tenant"]))
 
     r = c.post("/api/auth", json={"code": "wrong"})
@@ -119,13 +146,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
 
     r = c.get("/map/")
     ok("with the staff cookie the map opens and loads the overlay module",
-       r.status_code == 200 and "overlay.js" in r.text and "Modus" in r.text, str(r.status_code))
+       r.status_code == 200 and "overlay.js" in r.text and "Wayscope" in r.text, str(r.status_code))
     r = c.get("/map/overlay.js")
     ok("the overlay module is served", r.status_code == 200 and "applyOverlayPackage" in r.text)
     r = c.get("/map/data/alignment.js")
     ok("🔴 no static alignment file is served — 404", r.status_code == 404, str(r.status_code))
     r = c.get("/help/")
-    ok("with the staff cookie the guide opens, as Modus", r.status_code == 200 and "Modus — User guide" in r.text,
+    ok("with the staff cookie the guide opens, as Wayscope", r.status_code == 200 and "Wayscope — User guide" in r.text,
        str(r.status_code))
 
     r = c.get("/api/public/alignment")

@@ -198,8 +198,33 @@ ok("the header carries the control", /VEH_LANGS\.filter\(\(\[k\]\) => vehLangSho
 ok("G2: the Estonian label option is shown to an Estonian tenant only, and a stored 'ee' falls back to EU elsewhere",
   /const vehLangShown = \(k\) => k !== "ee" \|\| String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) === "EE";/.test(code)
   && /if\(!vehLangShown\(VEH\.lang\)\)\{ VEH\.lang = "eu"; setVehLangState\("eu"\); \}/.test(code));
-ok("G2: the page title is the tenant's name, and plain 'Modus' for the default tenant",
-  /document\.title = \(TENANT\.name && TENANT\.name !== "Modus"\) \? TENANT\.name \+ " · Modus" : "Modus"/.test(code));
+ok("G2/29 Sep: the page title is the tenant's name · Wayscope, and plain 'Wayscope' for the default tenant",
+  /document\.title = \(TENANT\.name && TENANT\.name !== "Wayscope"\) \? TENANT\.name \+ " · Wayscope" : "Wayscope"/.test(code));
+// ---- 29 Sep 2026: the rebrand. The header is the lockup + a rule + the tenant's name;
+// the gold bar and the "Modus · Forecasting & Route Map" caption are GONE (asserted at
+// source level, the "references are gone" rule), and the default tenant is Wayscope.
+ok("REBRAND: the header renders the Wayscope lockup image with alt text",
+  /<img src="\/brand\/logo-header-on-dark\.svg" alt="Wayscope" className="brand-lockup" draggable="false" \/>/.test(code));
+ok("REBRAND: the tenant's name sits after a rule, only when it is not the default, hidden below sm",
+  /TENANT\.name && TENANT\.name !== "Wayscope" && \(/.test(code)
+  && /className="brand-rule hidden sm:block"/.test(code)
+  && /className="hidden sm:block text-\[14px\] font-medium text-white\/70 truncate max-w-\[36vw\]">\{TENANT\.name\}/.test(code));
+ok("REBRAND: the old header is gone — no gold bar, no caption, no bold tenant-name block",
+  !/Forecasting &amp; Route Map/.test(html) && !/style=\{\{background:"var\(--gold\)"\}\}/.test(code)
+  && !/font-extrabold tracking-tight leading-none text-\[17px\]/.test(code));
+ok("REBRAND: the default tenant is Wayscope in both the module constant and the meta fallback",
+  /const TENANT = \{ name: "Wayscope",/.test(code) && /name: tn\.name \|\| "Wayscope",/.test(code));
+ok("REBRAND: the word Modus appears nowhere in the staff app", !/\bModus\b/.test(html));
+ok("REBRAND: the ink token is #1F2024, the brand orange tokens exist, amber stays the warning colour",
+  /--navy-deep:#1F2024;/.test(html) && /--brand-orange:#FF8C14;/.test(html) && /--gold:#D97706;/.test(html)
+  && !/#0F172A/i.test(html));
+ok("REBRAND: the header bar carries the 2 px orange rule and nothing else is orange",
+  /\.brand-bar\{background:var\(--navy-deep\);border-bottom:2px solid var\(--brand-orange\);\}/.test(html)
+  && (html.match(/var\(--brand-orange\)/g) || []).length === 1);
+ok("REBRAND: the head carries the favicon links, the manifest and the ink theme-color",
+  /<link rel="icon" href="\/favicon\.ico" sizes="32x32">/.test(html) && /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/.test(html)
+  && /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png">/.test(html) && /<link rel="manifest" href="\/site\.webmanifest">/.test(html)
+  && /<meta name="theme-color" content="#1F2024">/.test(html));
 
 // ---- 4c. Task B — the multi-year matrix ---------------------------------------
 // The single-year state has to be GONE, not shadowed. A surviving setYear would be a
