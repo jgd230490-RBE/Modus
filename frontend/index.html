@@ -77,9 +77,29 @@
 // a delivery team. Both read at call time, so a component that renders before /api/meta
 // lands shows the defaults and re-renders with the tenant's once App sets meta.
 const TENANT = { name: "Wayscope", team_label: "Team", currency: "EUR", symbol: "€", country: null,
-                 fuel_index_auto: false, restrictions_provider: false };
+                 fuel_index_auto: false, fuel_provider: null, restrictions_provider: false, restrictions: null,
+                 distance_unit: "km" };
 const CUR = () => TENANT.symbol || "€";
 const TEAM = () => TENANT.team_label || "Team";
+// H1 (29 Sep 2026): the vehicle names the pickers do not offer this tenant (its country's
+// `vehicle_sets[..].hide` — the EU N-category names for GB). They stay in `vehicles`, so a
+// saved line or a baked route on one still resolves; a picker keeps such a value visible
+// when it is the CURRENT one (`keep`) rather than silently swapping it.
+const HIDDEN_VEHICLES = [];
+const vehShown = (v, keep) => !HIDDEN_VEHICLES.includes(v) || v === keep;
+// H1 (29 Sep 2026, HU5): the distance unit the TENANT reads. Everything is stored and
+// computed in km; these convert at the display boundary only. A per-distance RATE
+// (currency per km) is converted the other way (£/km × 1.609 = £/mile), and a rate the
+// person TYPES in miles is converted back to per-km before it is saved (distInRate).
+const KM_PER_MI = 1.609344;
+const DU = () => (TENANT.distance_unit === "mi" ? "mi" : "km");
+const TKM = () => (DU() === "mi" ? "t·mi" : "t·km");
+const SPD = () => (DU() === "mi" ? "mph" : "km/h");
+const dist = (km) => (km == null || km === "" ? km : (DU() === "mi" ? +km / KM_PER_MI : +km));
+const distRate = (perKm) => (perKm == null || perKm === "" ? perKm : (DU() === "mi" ? +perKm * KM_PER_MI : +perKm));
+const distInRate = (perUnit) => (perUnit == null || perUnit === "" ? perUnit : (DU() === "mi" ? +perUnit / KM_PER_MI : +perUnit));
+const speed = (kph) => (kph == null || kph === "" ? kph : (DU() === "mi" ? +kph / KM_PER_MI : +kph));
+const fmtDist = (km, dp) => (km == null ? "—" : (+dist(km)).toFixed(dp == null ? 1 : dp));
 const TEAMS = () => TEAM() + "s";
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -181,7 +201,7 @@ const unitTriple = (u, opts) => {
   const parts = [];
   if(u.per_t != null) parts.push(`${CUR()} ${(+u.per_t).toFixed(2)}/t`);
   if(u.per_trip != null) parts.push(`${CUR()} ${grp(u.per_trip, 0)}/trip`);
-  if(u.per_km != null) parts.push(`${CUR()} ${(+u.per_km).toFixed(2)}/km`);
+  if(u.per_km != null) parts.push(`${CUR()} ${(+distRate(u.per_km)).toFixed(2)}/${DU()}`);
   return parts.length ? parts.join(o.sep || " · ") : null;
 };
 const REFRESH_MS = 5 * 60 * 1000;
@@ -300,7 +320,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   useEffect(() => {
     if(initialWeek) return;
     let live = true;
-    fetch(`${API}/lookahead?bucket=commit&tark_tee=0`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+    fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
       if(live){ setWeek(j); setWeekErr(""); }
     }).catch(e => { if(live) setWeekErr(`Couldn't load this week (${e}).`); });
     return () => { live = false; };
@@ -507,7 +527,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
           <select className={sel} value={discipline} onChange={e => setDiscipline(e.target.value)} title="Discipline"><option value="All">All disciplines</option>{discs.map(d => <option key={d} value={d}>{d}</option>)}</select>
           <select className={sel} value={unit} onChange={e => setUnit(e.target.value)}>{units.map(u => <option key={u} value={u}>{u === "t" ? "tonnes" : u === "m3" ? "m³" : "vehicles"}</option>)}</select>
           <select className={sel} value={material} onChange={e => setMaterial(e.target.value)}><option>All</option>{materials.map(m => <option key={m}>{m}</option>)}</select>
-          <select className={sel} value={vehicle} onChange={e => setVehicle(e.target.value)}><option>All</option>{vehicles.map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}</select>
+          <select className={sel} value={vehicle} onChange={e => setVehicle(e.target.value)}><option>All</option>{vehicles.filter(v => vehShown(v, vehicle)).map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}</select>
           <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)}>{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
           <span className="self-center text-slate-400 text-sm">→</span>
           <select className={sel} value={toM} onChange={e => setToM(+e.target.value)}>{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
@@ -556,7 +576,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
         <Group title="Volume">
           <Fig value={bigNum(K.totT)} label="tonnes" sub="all lines in view" title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion (m³ and vehicle loads included)`} />
           <Fig value={bigNum(K.totTrips)} label="trips" sub="loaded runs, rounded up per month" title={`${grp(K.totTrips)} loaded trips — ceil(tonnes ÷ payload) per line-month, the Look-ahead's figure`} />
-          <Fig value={bigNum(K.totKm)} label="truck-km" sub="round trips · baked lines" title={`${grp(K.totKm)} km — trips × the baked route distance (both legs) for the line's vehicle; an unbaked line adds nothing`} />
+          <Fig value={bigNum(dist(K.totKm))} label={`truck-${DU()}`} sub="round trips · baked lines" title={`${grp(dist(K.totKm))} ${DU()} — trips × the baked route distance (both legs) for the line's vehicle; an unbaked line adds nothing`} />
           <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs baked routes"} title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view: trips ÷ (working days × what one vehicle does in a shift)` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
         </Group>
         <Group title="Cost" tone="var(--navy)">
@@ -566,13 +586,13 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
                title={K.fair ? `${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)} — the cost model (Config → Costing · fuel): fuel at the live diesel index, driver and vehicle time over the baked cycle, running cost per km, margin; winter months +${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel. A floor for negotiation, never a quote.` : (cost.index_eur_per_l == null ? "The fair price needs the diesel index — Config → Costing · fuel" : "The fair price needs a baked route for the line's vehicle")} />
           <Fig value={K.fair && K.fair.per_t != null ? `${CUR()} ` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()} ${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
                title={K.fair && K.fair.per_t != null ? `${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = fair ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t on the lines the model prices${K.planned && K.planned.per_t != null ? ` · planned ${CUR()} ${(+K.planned.per_t).toFixed(2)}/t the same way` : ""}` : `Fair ${CUR()} per tonne, once the model has a priced line`} />
-          <Fig value={K.fair && K.fair.per_km != null ? `${CUR()} ` + (+K.fair.per_km).toFixed(2) : "—"} label={`fair ${CUR()} / km`} sub={K.fair && K.fair.per_trip != null ? `${CUR()} ${grp(K.fair.per_trip)} / trip` : "on the route basis km"}
-               title={K.fair && K.fair.per_km != null ? `${CUR()} ${(+K.fair.per_km).toFixed(2)} per km = fair ${CUR()} ÷ the km the trips run on each route's basis (round trip unless the route says loaded) · ${CUR()} ${grp(K.fair.per_trip)} per loaded trip${K.planned && K.planned.per_km != null ? ` · planned ${CUR()} ${(+K.planned.per_km).toFixed(2)}/km, ${CUR()} ${grp(K.planned.per_trip)}/trip` : ""}` : `Fair ${CUR()} per km, once the model has a priced line`} />
+          <Fig value={K.fair && K.fair.per_km != null ? `${CUR()} ` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()} ${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
+               title={K.fair && K.fair.per_km != null ? `${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()} = fair ${CUR()} ÷ the ${DU()} the trips run on each route's basis (round trip unless the route says loaded) · ${CUR()} ${grp(K.fair.per_trip)} per loaded trip${K.planned && K.planned.per_km != null ? ` · planned ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)}/${DU()}, ${CUR()} ${grp(K.planned.per_trip)}/trip` : ""}` : `Fair ${CUR()} per km, once the model has a priced line`} />
         </Group>
         <Group title="Carbon" tone="var(--green)">
           <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="baked lines" tone="var(--green)" title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DEFRA-based kg CO₂e/km (factors.json), on the baked lines only`} />
           <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over baked tonnes" title={K.intensity == null ? "Needs a baked line" : `${K.intensity.toFixed(2)} kg CO₂e per tonne moved — tCO₂e ÷ the tonnes on baked lines (the unbaked ones have no km)`} />
-          <Fig value={bigNum(K.totTkm)} label="t·km" sub="route basis" title={`${grp(K.totTkm)} tonne-kilometres — tonnes × the route's basis km, baked lines`} />
+          <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" title={`${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"} — tonnes × the route's basis ${DU()}, baked lines`} />
           <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} title={K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned — the busiest month in view` : "The month with the most planned tonnes"} />
         </Group>
       </div>
@@ -630,12 +650,12 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
                 <th className="px-3 py-2 text-left font-semibold cursor-pointer select-none" onClick={() => setSort("route_id")}>Route{arrow("route_id")}</th>
                 <th className="px-3 py-2 text-left font-semibold cursor-pointer select-none" onClick={() => setSort("discipline")}>Discipline{arrow("discipline")}</th>
                 <th className="px-3 py-2 text-left font-semibold">{TEAM()}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("dist")} title="km per trip on the route's basis (round trip unless the route says loaded)">km/trip{arrow("dist")}</th>
+                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("dist")} title={`${DU()} per trip on the route's basis (round trip unless the route says loaded)`}>{DU()}/trip{arrow("dist")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("cycleH")}>Cycle h{arrow("cycleH")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("t")}>Tonnes{arrow("t")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("deliveredPct")} title="Reported week actuals ÷ planned, over the months in view">Delivered{arrow("deliveredPct")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("trips")}>Trips{arrow("trips")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("km")}>Truck-km{arrow("km")}</th>
+                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("km")}>Truck-{DU()}{arrow("km")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("co2")}>tCO₂e{arrow("co2")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("peakVeh")} title="The most vehicles any one month needs on this line">Peak veh{arrow("peakVeh")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("planned")} title="The route's typed rates, or the target rate from Config where it has none">Planned {CUR()}{arrow("planned")}</th>
@@ -654,12 +674,12 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
                   </td>
                   <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{teamText(r.ipt)}</td>
                   {/* an unbaked route has NO distance, which is not the same as zero */}
-                  <td className={numTd}>{r.dist == null ? <span className="text-slate-300" title="No cached geometry for this vehicle — bake this route">—</span> : (+r.dist).toFixed(1)}</td>
+                  <td className={numTd}>{r.dist == null ? <span className="text-slate-300" title="No cached geometry for this vehicle — bake this route">—</span> : (+dist(r.dist)).toFixed(1)}</td>
                   <td className={numTd}>{r.cycleH == null ? <span className="text-slate-300" title="Cycle time needs baked geometry for this vehicle">not baked</span> : r.cycleH.toFixed(2)}</td>
                   <td className={numTd}>{grp(r.t)}</td>
                   <td className={numTd} title={r.actualT == null ? "No week actual reported on this line in the months in view" : `${grp(r.actualT)} t reported of ${grp(r.t)} t planned`}>{r.deliveredPct == null ? <span className="text-slate-300">—</span> : <span style={{ color: "var(--green)" }}>{r.deliveredPct.toFixed(0)} %</span>}</td>
                   <td className={numTd}>{grp(r.trips)}</td>
-                  <td className={numTd}>{r.baked ? grp(r.km) : <span className="text-slate-300">—</span>}</td>
+                  <td className={numTd}>{r.baked ? grp(dist(r.km)) : <span className="text-slate-300">—</span>}</td>
                   <td className={numTd}>{r.baked ? r.co2.toFixed(1) : <span className="text-slate-300">—</span>}</td>
                   <td className={numTd} title={r.capacityPerDay ? `${r.capacityPerDay} trips/day per vehicle` : undefined}>{r.peakVeh == null ? <span className="text-slate-300">—</span> : r.peakVeh}</td>
                   <td className={numTd} title={r.plannedU ? unitTriple(r.plannedU) : "no rate typed on the route, no target set"}>{r.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(r.planned)}{srcChip(r.source)}</>}</td>
@@ -747,7 +767,7 @@ function DashboardToday({ meta, week, err, wall }){
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3 mt-3">
             <Big value={T.lines ? bigNum(T.t) : "—"} label="tonnes" sub={T.lines ? `today · ${T.lines} line${T.lines === 1 ? "" : "s"} · ${T.confirmed} confirmed` : (lines.length ? "nothing planned today" : "no lines this week")}
                  title={T.lines ? `${grp(T.t)} t planned for today across ${T.lines} lines — each day's planned quantity through the line's payload, from the Look-ahead` : "No line has a planned quantity on today's date in the commit week"} />
-            <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(T.km)} km` : "—"} title={T.lines ? `${grp(T.trips)} loaded trips today (ceil of tonnes ÷ payload per line) · ${grp(T.km)} truck-km on the baked lines` : "—"} />
+            <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(dist(T.km))} ${DU()}` : "—"} title={T.lines ? `${grp(T.trips)} loaded trips today (ceil of tonnes ÷ payload per line) · ${grp(dist(T.km))} truck-${DU()} on the baked lines` : "—"} />
             <Big value={T.lines ? grp(T.veh) : "—"} label="vehicles" sub={T.lines ? "on the road today" : "—"} tone="var(--navy)" title={T.lines ? `${grp(T.veh)} vehicles needed today — per line, trips ÷ what one vehicle does in a shift on that route, summed (an unbaked line needs an unknown number)` : "—"} />
             <Big value={T.lines ? `${T.reported} / ${T.lines}` : "—"} label="reported" sub="day actuals typed today" title="Lines with a day actual typed for today on the Look-ahead" />
           </div>
@@ -899,11 +919,15 @@ function App(){
     fetch(`${API}/meta`).then(r => r.json()).then(m => {
       const vl = m && m.vehicle_labels;
       if(vl){ VEH.labels = vl.labels || {}; VEH.fallbacks = vl.fallbacks || {}; }
+      HIDDEN_VEHICLES.length = 0; (m && m.hidden_vehicles || []).forEach(v => HIDDEN_VEHICLES.push(v));
       const tn = m && m.tenant;
       if(tn){ Object.assign(TENANT, { name: tn.name || "Wayscope", team_label: tn.team_label || "Team",
                                       currency: tn.currency || "EUR", symbol: tn.currency_symbol || "€",
                                       country: tn.country || null, fuel_index_auto: !!tn.fuel_index_auto,
-                                      restrictions_provider: !!tn.restrictions_provider });
+                                      fuel_provider: tn.fuel_provider || null,
+                                      restrictions_provider: !!tn.restrictions_provider,
+                                      restrictions: tn.restrictions || null,
+                                      distance_unit: (tn.distance_unit === "mi" ? "mi" : "km") });
               try { document.title = (TENANT.name && TENANT.name !== "Wayscope") ? TENANT.name + " · Wayscope" : "Wayscope"; } catch(e){}
               if(!vehLangShown(VEH.lang)){ VEH.lang = "eu"; setVehLangState("eu"); } }
       (m && m.ipts || []).forEach(i => { if(i && i.id) TEAM_LABELS[iptKey(i.id)] = i.label || i.id; });
@@ -1689,7 +1713,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
           <p className="text-xs text-slate-400 -mt-1">
             {teamText(route.ipt) || "—"}
             {route.distance_km != null
-              ? <> · {route.distance_km} km one-way{route.distance_profile ? ` (${vehShort(route.distance_profile)})` : ""}</>
+              ? <> · {fmtDist(route.distance_km, 1)} {DU()} one-way{route.distance_profile ? ` (${vehShort(route.distance_profile)})` : ""}</>
               : <span style={{color:"var(--red)"}}> · not baked — no routed distance yet</span>}
           </p>
         ) : null}
@@ -1776,14 +1800,14 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
             <select value={vehicle} onChange={e => setVehicle(e.target.value)} className={selCls}>
               {planning_vehicles.length > 0 && (
                 <optgroup label="Planning vehicles">
-                  {planning_vehicles.map(v => vehOption(v, suggestedVehicles, vehicle))}
+                  {planning_vehicles.filter(v => vehShown(v, vehicle)).map(v => vehOption(v, suggestedVehicles, vehicle))}
                 </optgroup>
               )}
               {planning_vehicles.length > 0 ? (
                 <optgroup label="Other vehicles">
-                  {legacyVehicles.map(v => vehOption(v, suggestedVehicles, vehicle))}
+                  {legacyVehicles.filter(v => vehShown(v, vehicle)).map(v => vehOption(v, suggestedVehicles, vehicle))}
                 </optgroup>
-              ) : vehicles.map(v => vehOption(v, suggestedVehicles, vehicle))}
+              ) : vehicles.filter(v => vehShown(v, vehicle)).map(v => vehOption(v, suggestedVehicles, vehicle))}
             </select>
           </Field>
           <Field label="Input unit">
@@ -1908,7 +1932,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
               <Stat label={`Fair ${CUR()} (model) · range`} value={`${CUR()} ` + grp(cost.totals.fair.eur)} tone="var(--navy)" />
               <Stat label={`fair ${CUR()} / t`} value={`${CUR()} ` + (+cost.totals.fair.per_t).toFixed(2)} />
               <Stat label={`fair ${CUR()} / trip`} value={cost.totals.fair.per_trip == null ? "—" : `${CUR()} ` + grp(cost.totals.fair.per_trip)} />
-              <Stat label={`fair ${CUR()} / km`} value={cost.totals.fair.per_km == null ? "—" : `${CUR()} ` + (+cost.totals.fair.per_km).toFixed(2)} />
+              <Stat label={`fair ${CUR()} / ${DU()}`} value={cost.totals.fair.per_km == null ? "—" : `${CUR()} ` + (+distRate(cost.totals.fair.per_km)).toFixed(2)} />
             </> : <Stat label={`Fair ${CUR()} (model)`} value="—" />}
             {cost && cost.totals && cost.totals.planned && cost.totals.planned.eur != null
               ? <Stat label={`Planned ${CUR()} · ${cost.totals.planned_source === "target" ? "target rate" : "route quote"}`} value={`${CUR()} ` + grp(cost.totals.planned.eur)} />
@@ -2080,7 +2104,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   const exportCsv = () => {
     const cols = ["Route", "From", "To", "Years", TEAM(), "Discipline", "Section", "Material", "Description",
                   "Vehicle", "Unit", "Quantity", "Months", "Status", "Submitted by", "Rejection reason",
-                  "Tonnes", "Trips", `Planned ${CUR()}`, "Planned source", `Planned ${CUR()}/t`, `Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/km`];
+                  "Tonnes", "Trips", `Planned ${CUR()}`, "Planned source", `Planned ${CUR()}/t`, `Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/${DU()}`];
     const esc = (v) => { const s = (v == null ? "" : String(v)); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const lines = [cols.join(",")];
     shown.forEach(g => {
@@ -2091,7 +2115,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
         g.material || "", g.material_description || "", g.vehicle || "", g.unit || "",
         Math.round(g.quantity * 10) / 10, g.months, g.status, g.submittedBy, g.rejectReason || "",
         r2(c.t), c.trips ?? "", r2(c.planned), c.source || "", r2(c.plannedU && c.plannedU.per_t),
-        r2(c.fair), r2(c.fairU && c.fairU.per_t), r2(c.fairU && c.fairU.per_trip), r2(c.fairU && c.fairU.per_km)].map(esc).join(","));
+        r2(c.fair), r2(c.fairU && c.fairU.per_t), r2(c.fairU && c.fairU.per_trip), r2(c.fairU && distRate(c.fairU.per_km))].map(esc).join(","));
     });
     const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -2276,7 +2300,7 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
     ["rate_eur_per_load", "rate_eur_per_t", "rate_eur_per_km"].forEach(k => {
       if(draft[k] === undefined) return;
       if(draft[k] === ""){ body[k] = null; return; }
-      const n = numOr(draft[k], null); if(n === null){ bad = k; } else body[k] = n;
+      const n = numOr(draft[k], null); if(n === null){ bad = k; } else body[k] = (k === "rate_eur_per_km" ? +(+distInRate(n)).toFixed(6) : n);
     });
     if(bad){ setMsg({ ok: false, text: "A target rate must be a number." }); return; }
     try { localStorage.setItem("modus_admin_token", token); } catch(e){}
@@ -2297,13 +2321,14 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
       {msg && <div className="rounded-lg border p-2.5 text-sm" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--green)" : "var(--red)" }}>{msg.text}</div>}
       <div>
         <div className="text-sm font-semibold text-slate-700">Target rate — the planned price where a route has no rate</div>
-        <p className="text-[11px] text-slate-400 mt-0.5 mb-2">Summed like the route rates ({CUR()} per load + {CUR()} per tonne + {CUR()} per km on the route's km basis). Used ONLY for routes with no rate typed on the route form; a route with any rate of its own is priced from that alone. Every figure it produces is marked "target" on the Look-ahead and the exports. Typed, never seeded. Admin token to save.</p>
+        <p className="text-[11px] text-slate-400 mt-0.5 mb-2">Summed like the route rates ({CUR()} per load + {CUR()} per tonne + {CUR()} per {DU()} on the route's distance basis). Used ONLY for routes with no rate typed on the route form; a route with any rate of its own is priced from that alone. Every figure it produces is marked "target" on the Look-ahead and the exports. Typed, never seeded. Admin token to save.</p>
         {!data ? <div className="text-slate-400 text-sm">Loading…</div> : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl items-end">
-            {[["rate_eur_per_load", `${CUR()} per load`], ["rate_eur_per_t", `${CUR()} per tonne`], ["rate_eur_per_km", `${CUR()} per km`]].map(([k, l]) => (
+            {[["rate_eur_per_load", `${CUR()} per load`], ["rate_eur_per_t", `${CUR()} per tonne`], ["rate_eur_per_km", `${CUR()} per ${DU()}`]].map(([k, l]) => (
               <label key={k} className="block">
                 <span className="text-[11px] uppercase tracking-wide text-slate-400">{l}</span>
-                <input className={inp + " mt-1"} inputMode="decimal" placeholder="—" value={draft[k] ?? (tg[k] ?? "")} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} />
+                {/* the per-distance rate is shown and typed in the tenant's unit; stored per km */}
+                <input className={inp + " mt-1"} inputMode="decimal" placeholder="—" value={draft[k] ?? (tg[k] == null ? "" : (k === "rate_eur_per_km" ? +(+distRate(tg[k])).toFixed(4) : tg[k]))} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} />
               </label>
             ))}
             <button onClick={save} disabled={busy || !dirty} className="px-4 py-1.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy ? "Saving…" : "Save target rate"}</button>
@@ -2325,9 +2350,10 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
 // Save button (admin token) carries them. A config row saved before the block existed has
 // no fair_price: the server prices from the file's block until this is saved once, and the
 // inputs below show the file's values until the first edit copies the block in.
-const FAIR_FIELDS = [["driver_eur_per_h", `Driver ${CUR()} / h`, "Statistics Estonia Q2 2026 + employer taxes — see the file"],
-                     ["vehicle_standing_eur_per_h", `Vehicle standing ${CUR()} / h`, `ASSUMPTION — from a ${CUR()}190k vehicle, 7 years, insurance, vignette`],
-                     ["running_eur_per_km", `Running ${CUR()} / km`, "ASSUMPTION — tyres, maintenance, repairs"],
+// a function, not a constant: CUR() and DU() are the tenant's and land with /api/meta
+const FAIR_FIELDS_FOR = () => [["driver_eur_per_h", `Driver ${CUR()} / h`, "public benchmark — see the file for the source"],
+                     ["vehicle_standing_eur_per_h", `Vehicle standing ${CUR()} / h`, `ASSUMPTION — from the vehicle price in the file, 7 years, insurance, road charge`],
+                     ["running_eur_per_km", `Running ${CUR()} / ${DU()}`, "ASSUMPTION — tyres, maintenance, repairs"],
                      ["margin_pct", "Margin %", "ASSUMPTION"]];
 function FairPriceSection({ doc, upd, fileDoc, summary }){
   const fileFp = (fileDoc && fileDoc.fair_price) || {};
@@ -2358,10 +2384,13 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
       <div className="text-sm font-semibold text-slate-700">Fair price — the model</div>
       <p className="text-[11px] text-slate-400 mt-0.5 mb-2">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + km × running, × (1 + margin). Shown on every baked line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl">
-        {FAIR_FIELDS.map(([k, l, help]) => (
+        {FAIR_FIELDS_FOR().map(([k, l, help]) => (
           <label key={k} className="block">
             <span className="text-[11px] uppercase tracking-wide text-slate-400">{l}</span>
-            <input className={inp + " mt-1"} inputMode="decimal" value={fp[k] ?? ""} onChange={e => set(f => { f[k] = num(e.target.value); })} />
+            {/* running_eur_per_km is stored per km and shown / typed in the tenant's unit (H1) */}
+            <input className={inp + " mt-1"} inputMode="decimal"
+              value={k === "running_eur_per_km" ? (fp[k] == null ? "" : +(+distRate(fp[k])).toFixed(4)) : (fp[k] ?? "")}
+              onChange={e => set(f => { const n = num(e.target.value); f[k] = (k === "running_eur_per_km" && typeof n === "number") ? +(+distInRate(n)).toFixed(6) : n; })} />
             <span className="block text-[11px] text-slate-400 mt-1">{help}</span>
           </label>
         ))}
@@ -2388,7 +2417,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         {monthsBox("winter_months", "Winter months (uplift applies)")}
         {monthsBox("thaw_months", "Thaw months (flag: 8 t road limits may apply)")}
       </div>
-      {summary && <p className="text-[11px] text-slate-400 mt-2">In force on the server now: driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km}/km · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "missing — no fair price until the bulletin is fetched" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
+      {summary && <p className="text-[11px] text-slate-400 mt-2">In force on the server now: driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "missing — no fair price until the bulletin is fetched" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
     </div>
   );
 }
@@ -2722,19 +2751,23 @@ function LaKpi({ value, caption, tone }){
 // the status pill column between the line and the days — sparse by design
 // the clash rail's names for each code — the same words as the user guide's §10.1
 const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKPILE_OVER: "STOCKPILE OVER",
-                     ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", TARK_TEE: "TARK TEE",
+                     ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
                      UNBAKED: "UNBAKED", PARENT_CHANGED: "PARENT CHANGED" };
+// H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
+// Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
+const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
 function LineFlags({ flags }){
   const codes = Array.from(new Set((flags || []).map(f => f.code)));
   const label = { UNBAKED: "NOT BAKED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
-                  STOCKPILE_OVER: "STOCKPILE OVER", TARK_TEE: "TARK TEE", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
+                  STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
+  const wordFor = (code) => { const f = (flags || []).find(x => x.code === code); return f ? flagWord(f, label) : (label[code] || code); };
   return (
     <span className="inline-flex flex-col gap-1 items-start">
       {codes.map(c => (
         <span key={c} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
           style={{ color: c === "UNBAKED" ? "#B45309" : "var(--red)",
                    background: c === "UNBAKED" ? "rgba(217,119,6,.14)" : "rgba(191,46,85,.10)" }}>
-          {label[c] || c}
+          {wordFor(c)}
         </span>
       ))}
     </span>
@@ -2803,14 +2836,19 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
   };
   const hasIndex = idx.eur_per_l != null;
   const price = hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)} / L` : null;
-  const country = fuelS.country || "EE";
+  // H1 (29 Sep 2026): no fallback to Estonia. The index country is the tenant's own
+  // (or the one typed on Config); "--" means the tenant has no country — typed only.
+  const rawCountry = fuelS.country || (idx.country || "") || TENANT.country || "--";
+  const noCountry = rawCountry === "--" || !!idx.no_country;
+  const country = noCountry ? "no country" : rawCountry;
+  const exVat = hasIndex && idx.ex_vat_per_l != null ? `${CUR()}${(+idx.ex_vat_per_l).toFixed(3)} / L ex-VAT` : null;
   const bafTxt = sum.baf_pct != null
     ? `BAF ${sum.baf_pct >= 0 ? "+" : ""}${(sum.baf_pct * 100).toFixed(2)} % of quote`
     : sum.baf_reason === "no base" ? "BAF: set a base on Confirm week"
     : sum.baf_reason === "no share" ? "BAF: type a fuel share"
     : "BAF: no index";
   const baseTxt = fuelS.baf_base_eur_per_l != null ? `base ${CUR()}${(+fuelS.baf_base_eur_per_l).toFixed(3)} · ${fuelDate(fuelS.baf_base_bulletin_date)}` : "no base locked";
-  const staleChip = hasIndex && idx.stale ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "#B45309", background: "rgba(217,119,6,.14)" }} title="The last good bulletin is older than 8 days">stale</span> : null;
+  const staleChip = hasIndex && idx.stale ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "#B45309", background: "rgba(217,119,6,.14)" }} title="The last good published price is older than 8 days">stale</span> : null;
   const inputCls = "border border-slate-300 rounded px-1.5 py-0.5 text-xs text-right tabular-nums w-20";
   const setting = (k, label, placeholder, title) => (
     <label className="inline-flex items-center gap-1 text-[11px] text-slate-600" title={title}>
@@ -2823,11 +2861,18 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
       ) : <span className="tabular-nums">{fuelS[k] ?? "—"}</span>}
     </label>
   );
-  // The series the index belongs to: the EU bulletin (fetched or typed) for a country the
-  // bulletin covers; a typed national figure for one it does not (the UK, Norway…).
-  const autoIdx = idx.auto_available != null ? !!idx.auto_available : (TENANT.country ? TENANT.fuel_index_auto : true);
-  const attribution = <span className="text-[10px] text-slate-400" title={!autoIdx ? "no bulletin series for this country — typed by an admin on Config" : (idx.source === "manual" ? "typed by an admin on Config" : `EU Weekly Oil Bulletin, ${idx.country || TENANT.country || ""}, automotive diesel, price with taxes — via EuroOilWatch`)}>
-    {!autoIdx ? "typed index · no bulletin for " + (idx.country || TENANT.country || "this country") : (idx.source === "manual" ? "typed index" : "EU Weekly Oil Bulletin via EuroOilWatch")}</span>;
+  // The series the index belongs to — the provider the API names (the EU bulletin for
+  // EU-27, DESNZ weekly road fuel prices for GB), or a typed national figure where there
+  // is none (Norway…) and for a tenant with no country. Nothing here names a country.
+  const prov = idx.provider || (idx.auto_available ? TENANT.fuel_provider : null);
+  const autoIdx = idx.auto_available != null ? !!idx.auto_available : !!TENANT.fuel_index_auto;
+  const provTitle = prov ? `${prov.label} — ${prov.series || ""}${prov.unit ? ` (${prov.unit})` : ""}` : "";
+  const attribution = <span className="text-[10px] text-slate-400"
+    title={!autoIdx ? (noCountry ? "no country set on Config → Tenant — the index is typed by an admin" : "no automatic diesel series for this country — typed by an admin on Config")
+                    : (idx.source === "manual" ? `typed by an admin on Config (the automatic series is ${provTitle})` : provTitle)}>
+    {!autoIdx ? "typed index · " + (noCountry ? "no country set" : "no automatic series for " + country)
+              : (idx.source === "manual" ? "typed index" : (prov ? prov.label : "automatic index"))}
+    {exVat ? <span className="ml-1" title="the published pump price includes VAT; this is the same figure with VAT removed">· {exVat}</span> : null}</span>;
 
   if(mode === "compact"){
     return (
@@ -2836,7 +2881,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
           {hasIndex ? price : <span className="text-base text-amber-700">Index unavailable</span>}{staleChip}
         </div>
         <div className="text-[10px] uppercase tracking-wide text-slate-400 mt-0.5 truncate" title={bafTxt}>
-          diesel {country} · {hasIndex ? `${autoIdx && idx.source !== "manual" ? "bulletin" : "typed"} ${fuelDate(idx.bulletin_date)}` : "type a price on Config"}{rf.running ? " · updating…" : ""}
+          diesel {country} · {hasIndex ? `${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}` : "type a price on Config"}{rf.running ? " · updating…" : ""}
         </div>
         <div className="text-[10px] text-slate-500 mt-0.5 truncate">{bafTxt}</div>
       </div>
@@ -2854,7 +2899,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
           {rf.running && <span className="text-[11px] text-slate-400">updating…</span>}
           {!rf.running && idx.last_error && hasIndex && <span className="text-[11px]" style={{ color: "var(--red)" }} title={idx.last_error}>· last fetch failed {String(idx.last_attempt_at || "").replace("T", " ").slice(0, 16)}; the stored bulletin stands</span>}
         </div>
-        {setting("yard_eur_per_l", `Yard ${CUR()}/L`, "—", "What the haulier actually pays at the yard. Optional; for cost-plus later. Never replaces the bulletin index.")}
+        {setting("yard_eur_per_l", `Yard ${CUR()}/L`, "—", "What the haulier actually pays at the yard. Optional; for cost-plus later. Never replaces the published index.")}
         {setting("share_pct", "Fuel share %", "—", "Fuel's share of the haulage price, 0–100. Empty = no BAF line.")}
         <span className="text-[11px] font-semibold tabular-nums" style={{ color: sum.baf_pct != null ? "var(--navy)" : "#64748b" }} title={baseTxt}>{bafTxt}</span>
         <span className="text-[10px] text-slate-400">{baseTxt}</span>
@@ -2865,7 +2910,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
           <span className="text-[10px] uppercase tracking-wide text-slate-400">Admin</span>
           <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" className="border border-slate-200 rounded px-2 py-0.5 text-xs w-32" />
           {autoIdx && <button onClick={() => put("/admin/fuel-index/refresh?sync=1", null, "POST", true)} disabled={busy || rf.running}
-            className="font-semibold px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Fetch the bulletin now</button>}
+            className="font-semibold px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40">{prov && prov.key === "desnz" ? "Fetch this week's DESNZ price now" : "Fetch the bulletin now"}</button>}
           <label className="inline-flex items-center gap-1">
             <span>Manual index {CUR()}/L</span>
             <input className={inputCls} inputMode="decimal" placeholder="—" value={draft.manual_eur ?? ""} onChange={e => setDraft(d => ({ ...d, manual_eur: e.target.value }))} />
@@ -2904,7 +2949,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const [flags, setFlags] = useState({ weather: "", wetness: "", traffic: "", other: "" });
   const pick = (v) => { setView(v); try { localStorage.setItem("modus_la_view", v); } catch(e){} };
 
-  // Tark Tee road restrictions — the page carries the STORED per-route check (a DB read).
+  // Road restrictions (Tark Tee for EE, National Highways closures for GB — H1) — the page
+  // carries the STORED per-route check (a DB read).
   // The live check (six services + a geometry loop) froze the page on 09 Sep and took
   // 30 s+ off the path; it now runs on demand in the background, and this polls its
   // state while it runs. A route never checked is named, never shown clean.
@@ -2912,7 +2958,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const [ttPolling, setTtPolling] = useState(false);
   const refreshTarkTee = async () => {
     try {
-      const r = await fetch(`${API}/forecast-weeks/tark-tee/refresh`, { method: "POST" });
+      const r = await fetch(`${API}/forecast-weeks/restrictions/refresh`, { method: "POST" });
       if(!r.ok) throw new Error(`${r.status}`);
       setTtPolling(true);
     } catch(e){ setErr("Couldn't start the road-restriction check: " + e.message); }
@@ -2929,7 +2975,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   useEffect(() => {
     if(!ttPolling || initialPage) return;
     let live = true;
-    const tickPoll = () => fetch(`${API}/forecast-weeks/tark-tee?bucket=${bucket}`)
+    const tickPoll = () => fetch(`${API}/forecast-weeks/restrictions?bucket=${bucket}`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(j => {
         if(!live) return;
@@ -2960,7 +3006,11 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const horizon = (page && page.horizon) || { rows: [] };
   const rail = (page && page.clashes) || { flags: [], count: 0, sources: {} };
   const ttSrc = rail.sources || {};
-  const ttRunning = ttPolling || !!(ttSrc.tark_tee_refresh && ttSrc.tark_tee_refresh.running);
+  const ttRunning = ttPolling || !!(ttSrc.restrictions_refresh && ttSrc.restrictions_refresh.running);
+  // the provider's own words for the status line — "Road restrictions (Tark Tee)" /
+  // "Road closures (National Highways)"; a tenant with no provider never sees the line
+  const ttName = ttSrc.restrictions_ui_label || "Road restrictions";
+  const ttShort = (ttName.includes("(") ? ttName.slice(ttName.indexOf("(") + 1, -1) : ttName);
   const today = page ? page.today : null;
   // Mon–Fri only (10 Sep, the human). The weekend days still exist at 0 in the database
   // — the sum rule and the export see them — but the grid does not show them.
@@ -3103,7 +3153,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             <LaKpi value={`${grp(totals.planned_t)} t`} caption="planned this week" />
             <LaKpi value={grp(totals.trips)} caption="trips" />
             <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles / day peak" + (totals.excludes_unbaked ? " · unbaked lines excluded" : "")} />
-            <LaKpi value={grp(totals.tonne_km)} caption="t·km · route basis" />
+            <LaKpi value={grp(dist(totals.tonne_km))} caption={`${TKM()} · route basis`} />
             {/* 10 Sep evening: the diesel index, right of t·km — the same widget as Account and Config */}
             <FuelWidget mode="compact" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
             <LaKpi value={totals.eur == null ? "—" : `${CUR()} ` + grp(totals.eur)}
@@ -3120,7 +3170,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               <span className="mt-1 inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--red)" }} />
               <span className="min-w-0 flex-1 leading-5">
                 {(railOpen ? rail.flags : rail.flags.slice(0, 3)).map((f, i) => (
-                  <span key={i}>{i > 0 && <span className="text-slate-400"> · </span>}<span className="font-semibold">{RAIL_LABEL[f.code] || f.code}</span> {teamText(f.text)}</span>
+                  <span key={i}>{i > 0 && <span className="text-slate-400"> · </span>}<span className="font-semibold">{flagWord(f)}</span> {teamText(f.text)}</span>
                 ))}
               </span>
               {rail.count > 3 && (
@@ -3130,22 +3180,24 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               )}
             </div>
           )}
-          {lines.length > 0 && ttSrc.tark_tee !== "skipped" && (
+          {/* H1: the line reads the provider's words from the page; a tenant with no
+              provider (status "off"/"skipped" with no provider) sees nothing here. */}
+          {lines.length > 0 && ttSrc.restrictions !== "skipped" && ttSrc.restrictions !== "off" && ttSrc.restrictions_provider && (
             <div className="text-[11px] mb-3 flex flex-wrap items-center gap-2"
-              style={{ color: ttSrc.tark_tee === "ok" ? "#64748b" : "#B45309" }}>
+              style={{ color: ttSrc.restrictions === "ok" ? "#64748b" : "#B45309" }}>
               <span>
-                {ttRunning ? "checking road restrictions (Tark Tee) — this takes a minute; the page will refresh when it finishes…"
-                 : ttSrc.tark_tee === "ok" ? `Road restrictions (Tark Tee): checked ${(ttSrc.tark_tee_checked_at || "").replace("T", " ").slice(0, 16)} UTC`
-                 : ttSrc.tark_tee === "partial" ? `Road restrictions: ${(ttSrc.tark_tee_unchecked || []).join(", ")} not checked since baking — the rest as of ${(ttSrc.tark_tee_checked_at || "").slice(0, 10)}`
-                 : "Road restrictions (Tark Tee): NOT checked for these routes — that is not the same as \"no restrictions\"."}
+                {ttRunning ? `checking ${ttName.toLowerCase()} — this takes a minute; the page will refresh when it finishes…`
+                 : ttSrc.restrictions === "ok" ? `${ttName}: checked ${(ttSrc.restrictions_checked_at || "").replace("T", " ").slice(0, 16)} UTC${ttSrc.restrictions_week ? ` · flags shown for the week ${ttSrc.restrictions_week[0]} → ${ttSrc.restrictions_week[1]}` : ""}`
+                 : ttSrc.restrictions === "partial" ? `${ttName}: ${(ttSrc.restrictions_unchecked || []).join(", ")} not checked since baking — the rest as of ${(ttSrc.restrictions_checked_at || "").slice(0, 10)}`
+                 : `${ttName}: NOT checked for these routes — that is not the same as "no restrictions".`}
               </span>
               {!ttRunning && (
                 <button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline">
-                  {ttSrc.tark_tee === "ok" ? "re-check" : "check now"}
+                  {ttSrc.restrictions === "ok" ? "re-check" : "check now"}
                 </button>
               )}
-              {ttSrc.tark_tee_refresh && ttSrc.tark_tee_refresh.status === "unavailable" && !ttRunning && (
-                <span style={{ color: "var(--red)" }}>· the last check could not reach Tark Tee; the stored result stands</span>
+              {ttSrc.restrictions_refresh && ttSrc.restrictions_refresh.status === "unavailable" && !ttRunning && (
+                <span style={{ color: "var(--red)" }}>· the last check could not reach {ttShort}; the stored result stands</span>
               )}
             </div>
           )}
@@ -3190,7 +3242,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               <div className="flex items-start gap-1.5">
                                 <button onClick={() => setOpen(o => ({ ...o, [lk]: !o[lk] }))}
                                   className="text-slate-400 hover:text-slate-700 text-xs mt-0.5 w-4 shrink-0"
-                                  title={isOpen ? `Hide km, t·km, cycle and ${CUR()}` : `Show km, t·km, cycle and ${CUR()}`}>{isOpen ? "▼" : "▶"}</button>
+                                  title={isOpen ? `Hide ${DU()}, ${TKM()}, cycle and ${CUR()}` : `Show ${DU()}, ${TKM()}, cycle and ${CUR()}`}>{isOpen ? "▼" : "▶"}</button>
                                 <div className="min-w-0">
                                   <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">
                                     {c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}
@@ -3240,13 +3292,13 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               <td colSpan={2 + dates.length} className="px-3 py-1.5 text-[11px] text-slate-600 tabular-nums">
                                 {c.baked ? (
                                   <>
-                                    {grp(c.km_trip)} km/trip{c.return_baked ? "" : " (outbound only — return not baked)"} · {grp(wd.km)} km/week
-                                    · {grp(wd.vehicles_peak)} veh peak · {grp(wd.tonne_km)} t·km ({c.km_basis === "loaded" ? "loaded leg" : "round trip"})
+                                    {grp(dist(c.km_trip))} {DU()}/trip{c.return_baked ? "" : " (outbound only — return not baked)"} · {grp(dist(wd.km))} {DU()}/week
+                                    · {grp(wd.vehicles_peak)} veh peak · {grp(dist(wd.tonne_km))} {TKM()} ({c.km_basis === "loaded" ? "loaded leg" : "round trip"})
                                     · cycle {grp(c.cycle_min)} min {c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"}
-                                    · {c.cycles_per_vehicle_day} cycles/veh/day · {wd.eur == null ? "rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? " (per-km term missing)" : ""} this week${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}`}{wd.fair_eur != null && c.fair && <span title={`fair (model): ${grp(c.fair.litres_trip, 1)} L / trip at ${CUR()}${c.fair.index_eur_per_l} · fuel ${grp(c.fair.fuel_share_pct)} % of cost${c.fair.flags.length ? " · " + c.fair.flags.join(", ") : ""}`}> · <span className="text-[color:var(--navy)] font-semibold">fair {CUR()} {grp(wd.fair_eur)}</span> (model{c.fair.flags.includes("WINTER") ? ", winter" : ""}{c.fair.flags.includes("THAW") ? ", thaw restrictions may apply" : ""}){wd.fair_units && wd.fair_units.per_t != null ? ` = ${unitTriple(wd.fair_units)}` : ""}</span>}{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null && <span className="text-slate-500"> · {c.rate_source === "target" ? "target" : "quote"} = {unitTriple(wd.eur_units)}</span>}
+                                    · {c.cycles_per_vehicle_day} cycles/veh/day · {wd.eur == null ? "rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? ` (per-${DU()} term missing)` : ""} this week${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}`}{wd.fair_eur != null && c.fair && <span title={`fair (model): ${grp(c.fair.litres_trip, 1)} L / trip at ${CUR()}${c.fair.index_eur_per_l} · fuel ${grp(c.fair.fuel_share_pct)} % of cost${c.fair.flags.length ? " · " + c.fair.flags.join(", ") : ""}`}> · <span className="text-[color:var(--navy)] font-semibold">fair {CUR()} {grp(wd.fair_eur)}</span> (model{c.fair.flags.includes("WINTER") ? ", winter" : ""}{c.fair.flags.includes("THAW") ? ", thaw restrictions may apply" : ""}){wd.fair_units && wd.fair_units.per_t != null ? ` = ${unitTriple(wd.fair_units)}` : ""}</span>}{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null && <span className="text-slate-500"> · {c.rate_source === "target" ? "target" : "quote"} = {unitTriple(wd.eur_units)}</span>}
                                   </>
                                 ) : (
-                                  <span className="text-amber-700">km — until the route is baked · trips still from {grp(c.payload_t, 1)} t planning payload{c.payload_fallback ? ` (${c.payload_fallback} fallback)` : ""}{wd.eur != null ? ` · ${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? " without the per-km term" : ""}${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}` : ""}</span>
+                                  <span className="text-amber-700">{DU()} — until the route is baked · trips still from {grp(c.payload_t, 1)} t planning payload{c.payload_fallback ? ` (${c.payload_fallback} fallback)` : ""}{wd.eur != null ? ` · ${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? ` without the per-${DU()} term` : ""}${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}` : ""}</span>
                                 )}
                               </td>
                             </tr>
@@ -3675,7 +3727,7 @@ function RoutePlanning({ route, token, onSaved }){
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setV({ max_vehicles_per_day: route.max_vehicles_per_day ?? "", rate_eur_per_load: route.rate_eur_per_load ?? "",
-           rate_eur_per_t: route.rate_eur_per_t ?? "", rate_eur_per_km: route.rate_eur_per_km ?? "",
+           rate_eur_per_t: route.rate_eur_per_t ?? "", rate_eur_per_km: route.rate_eur_per_km == null ? "" : +(+distRate(route.rate_eur_per_km)).toFixed(4),
            km_basis: route.km_basis || "round_trip" });
     setMsg("");
   }, [route.id]);
@@ -3686,7 +3738,7 @@ function RoutePlanning({ route, token, onSaved }){
     try {
       const body = {};
       ["max_vehicles_per_day", "rate_eur_per_load", "rate_eur_per_t", "rate_eur_per_km"].forEach(k => {
-        body[k] = (v[k] === "" || v[k] == null) ? null : +v[k];
+        body[k] = (v[k] === "" || v[k] == null) ? null : (k === "rate_eur_per_km" ? +(+distInRate(+v[k])).toFixed(6) : +v[k]);
       });
       body.km_basis = v.km_basis;
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(route.id)}/planning${qs}`, {
@@ -3699,7 +3751,9 @@ function RoutePlanning({ route, token, onSaved }){
     setBusy(false);
   };
   const inp = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
-  const F = ({ k, label, step }) => (
+  // `rate`: a per-distance rate, shown and typed in the tenant's unit (stored per km —
+  // the conversion happens in save() and in the initial state below)
+  const F = ({ k, label, step, rate }) => (
     <label className="block">
       <span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
       <input className={inp} inputMode="decimal" placeholder="—" value={v[k]}
@@ -3713,7 +3767,7 @@ function RoutePlanning({ route, token, onSaved }){
       <div className="grid grid-cols-2 gap-2">
         <F k="max_vehicles_per_day" label="Max vehicles / day (flag only)" />
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">km basis · {CUR()}/km and t·km</span>
+          <span className="text-[11px] uppercase tracking-wide text-slate-400">distance basis · {CUR()}/{DU()} and {TKM()}</span>
           <select className={inp} value={v.km_basis} onChange={e => setV(x => ({ ...x, km_basis: e.target.value }))}>
             <option value="round_trip">round trip (loaded + return)</option>
             <option value="loaded">loaded leg only</option>
@@ -3721,7 +3775,7 @@ function RoutePlanning({ route, token, onSaved }){
         </label>
         <F k="rate_eur_per_load" label={`${CUR()} per load`} />
         <F k="rate_eur_per_t" label={`${CUR()} per tonne`} />
-        <F k="rate_eur_per_km" label={`${CUR()} per km`} />
+        <F k="rate_eur_per_km" label={`${CUR()} per ${DU()}`} rate />
       </div>
       <button onClick={save} disabled={busy}
         className="w-full py-2 rounded-lg text-sm font-semibold border disabled:opacity-50"
@@ -3798,7 +3852,11 @@ function nodeExpr(){
   return e;
 }
 
-const BASEMAPS = [
+// H1 (29 Sep 2026): the list is BY COUNTRY. The Estonian Land Board orthophoto is offered
+// to an Estonian tenant only (until H1 every tenant saw it); for a British tenant Mapbox
+// Satellite is the named "Aerial" option (the research: APGB cannot be licensed for a
+// SaaS, OS OpenData has no aerial). Nothing Estonian reaches a GB page.
+const BASEMAPS_ALL = [
   ["Light", "mapbox://styles/mapbox/light-v11"],
   ["Streets", "mapbox://styles/mapbox/streets-v12"],
   ["Outdoors", "mapbox://styles/mapbox/outdoors-v12"],
@@ -3809,6 +3867,14 @@ const BASEMAPS = [
   ["Navigation Night", "mapbox://styles/mapbox/navigation-night-v1"],
   ["Estonia ortho (Maa-amet)", "maaamet-ortho"],
 ];
+const BASEMAPS = BASEMAPS_ALL;   // the full table; pickers call basemapsFor()
+const GB_BASEMAP_LABELS = { "Satellite": "Aerial (Mapbox Satellite)", "Satellite Streets": "Aerial with roads" };
+function basemapsFor(country){
+  const c = String(country || "").toUpperCase();
+  return BASEMAPS_ALL
+    .filter(([, val]) => val !== "maaamet-ortho" || c === "EE")
+    .map(([label, val]) => [c === "GB" ? (GB_BASEMAP_LABELS[label] || label) : label, val]);
+}
 function maaametStyle(){
   return { version: 8, glyphs: "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
     sources: { "maaamet-ortho": { type: "raster", tileSize: 256, scheme: "tms", maxzoom: 18,
@@ -3846,7 +3912,10 @@ const VEH = { lang: "eu", labels: {}, fallbacks: {} };
 try { const l = localStorage.getItem("modus_veh_lang"); if(["en","eu","ee"].includes(l)) VEH.lang = l; } catch(e){}
 const VEH_LANGS = [["en", "English"], ["eu", "European"], ["ee", "Estonian"]];
 // G2: the local-language option is offered only where it is local — a tenant in Estonia.
-const vehLangShown = (k) => k !== "ee" || String(TENANT.country || "").toUpperCase() === "EE";
+// H1: the EU-string option is pointless for a GB tenant (its EU-named vehicles are hidden)
+const vehLangShown = (k) => k === "en"
+  || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE")
+  || (k === "eu" && String(TENANT.country || "").toUpperCase() !== "GB");
 const vehLabel = (v, lang) => ((VEH.labels[v] || {})[lang || VEH.lang]) || v || "";
 const vehIsFallback = (v, lang) => ((VEH.fallbacks[v] || []).includes(lang || VEH.lang));
 // short form for tables: the label, minus the leading 'Artic'/'Rigid' of the trade names
@@ -3871,7 +3940,7 @@ function VehChips({ profiles }){
         const alts = p.alt_count > 1 ? ` · ${p.alt_count} options` : "";
         const tip = p.error ? `${k} — ${p.error}`
                   : !p.baked ? `${k} · not baked`
-                  : `${k} · ${p.distance_km} km out` +
+                  : `${k} · ${fmtDist(p.distance_km, 1)} ${DU()} out` +
                     (p.return_baked ? ", return baked" : ", return NOT baked") + alts;
         return (
           <span key={k} title={tip}
@@ -3992,7 +4061,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
             <tr>
               <th className="px-1 py-0.5 text-left font-semibold">Order</th>
               <th className="px-1 py-0.5 text-left font-semibold">Road</th>
-              <th className="px-1 py-0.5 text-right font-semibold">Drawn km</th>
+              <th className="px-1 py-0.5 text-right font-semibold">Drawn {DU()}</th>
               <th className="px-1 py-0.5 text-right font-semibold">Speed</th>
               <th className="px-1 py-0.5 text-right font-semibold">Adds</th>
               <th className="px-1 py-0.5 text-left font-semibold">Mode</th>
@@ -4024,9 +4093,9 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
                       </span>
                     )}
                   </td>
-                  <td className="px-1 py-1 text-right tabular-nums">{z.length_km != null ? z.length_km.toFixed(2) : "—"}</td>
+                  <td className="px-1 py-1 text-right tabular-nums">{z.length_km != null ? fmtDist(z.length_km, 2) : "—"}</td>
                   <td className="px-1 py-1 text-right tabular-nums">
-                    {z.speed_kph ? `${z.speed_kph} km/h`
+                    {z.speed_kph ? `${(+speed(z.speed_kph)).toFixed(0)} ${SPD()}`
                                  : <span style={{ color: "var(--red)" }}>not set</span>}
                   </td>
                   <td className="px-1 py-1 text-right tabular-nums">
@@ -4055,7 +4124,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
           <option value="">{available.length ? "Add a haul road…" : "No other haul roads drawn"}</option>
           {available.map(z => (
             <option key={z.id} value={z.id}>
-              {z.name} · {z.length_km != null ? `${z.length_km.toFixed(1)} km` : "—"}{z.speed_kph ? ` @ ${z.speed_kph} km/h` : " (no speed)"}
+              {z.name} · {z.length_km != null ? `${fmtDist(z.length_km, 1)} ${DU()}` : "—"}{z.speed_kph ? ` @ ${(+speed(z.speed_kph)).toFixed(0)} ${SPD()}` : " (no speed)"}
             </option>
           ))}
         </select>
@@ -4088,7 +4157,9 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
   );
 }
 
-// Phase 2.5a — Tark Tee restrictions on one route.
+// Phase 2.5a — road restrictions on one route (Tark Tee for EE; H1: National Highways
+// planned closures for GB — the provider, its words and its match distance come from
+// the API, so nothing here names either authority).
 //
 // Advisory, never a block: the router is not given this data. HERE has its own
 // restriction model and returns its own notices, and two systems arguing about the same
@@ -4113,13 +4184,16 @@ function RouteRestrictions({ routeId }){
     return () => { live = false; };
   }, [routeId]);
 
+  const prov = (TENANT.restrictions && TENANT.restrictions.short) || "the road authority";
+  if(!TENANT.restrictions) return null;          // no provider for this tenant's country
   if(err) return (
     <p className="text-[11px] text-slate-400 mb-3">
-      Road restrictions unavailable — Tark Tee could not be reached ({err}).
+      Road restrictions unavailable — {prov} could not be reached ({err}).
     </p>
   );
   if(!data) return <p className="text-[11px] text-slate-400 mb-3">Checking road restrictions…</p>;
   if(!data.baked) return null;
+  const dated = !!(TENANT.restrictions && TENANT.restrictions.dated);
 
   const hits = data.hits || [];
   const breaches = hits.filter(h => h.severity === "breach");
@@ -4132,7 +4206,8 @@ function RouteRestrictions({ routeId }){
 
   if(!hits.length) return (
     <p className="text-[11px] text-slate-400 mb-3">
-      No Tark Tee restrictions in force within {data.match_m} m of this route.{expired}{incomplete}
+      {dated ? `No ${prov} planned closures (current or future) within ${data.match_m} m of this route.`
+             : `No ${prov} restrictions in force within ${data.match_m} m of this route.`}{expired}{incomplete}
     </p>
   );
 
@@ -4147,7 +4222,7 @@ function RouteRestrictions({ routeId }){
       <button onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between gap-2 text-left">
         <span className="text-[11px] uppercase tracking-wide" style={{ color: tone.head }}>
-          Road restrictions on this route
+          {dated ? "Planned closures on this route" : "Road restrictions on this route"}
           {breaches.length ? ` · ${breaches.length} EXCEEDED` : ""}
           {warns.length ? ` · ${warns.length} to check` : ""}
           {!breaches.length && !warns.length ? ` · ${hits.length} note(s)` : ""}
@@ -4181,6 +4256,9 @@ function RouteRestrictions({ routeId }){
                   </span>
                   {h.extra_info && (
                     <span className="block text-[10px] text-slate-500 mt-0.5">{h.extra_info}</span>
+                  )}
+                  {h.description && !(h.headline || "").includes(h.description) && (
+                    <span className="block text-[10px] text-slate-500 mt-0.5">{h.description}{h.event_number ? ` [${h.event_number}]` : ""}</span>
                   )}
                 </td>
                 <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
@@ -4217,10 +4295,11 @@ function RouteRestrictions({ routeId }){
 
       <p className="text-[10px] text-slate-400 mt-1.5">
         Advisory only. The router is never given this data, and a match means the
-        restriction sits within {data.match_m} m of the baked line — not that it is
-        necessarily on your carriageway. Mass, height and width are compared for real;
-        a weak bridge's load class is not a tonnage and is left for a human.
-        Source: Estonian Transport Administration (Tark Tee).{expired}{incomplete}
+        {dated ? "closure" : "restriction"} sits within {data.match_m} m of the baked line — not that it is
+        necessarily on your carriageway.{dated
+          ? " A planned closure counts on the Look-ahead only in the weeks its dates overlap."
+          : " Mass, height and width are compared for real; a weak bridge's load class is not a tonnage and is left for a human."}
+        {" "}Source: {data.attribution || (TENANT.restrictions && TENANT.restrictions.attribution) || prov}.{expired}{incomplete}
       </p>
     </div>
   );
@@ -4353,8 +4432,8 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                 <tr>
                   <th className="px-2 py-1 text-left font-semibold">Vehicle</th>
                   <th className="px-2 py-1 text-left font-semibold">Option</th>
-                  <th className={head}>Out km</th>
-                  <th className={head}>Back km</th>
+                  <th className={head}>Out {DU()}</th>
+                  <th className={head}>Back {DU()}</th>
                   <th className={head}>Turn</th>
                   <th className={head}>Cycle</th>
                   <th className={head}>Trips/day</th>
@@ -4385,9 +4464,9 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                         ? <span className="font-semibold" style={{ color: "var(--navy)" }}>Primary</span>
                         : `Alt ${r.alt_index}`}
                     </td>
-                    <td className={cell}>{r.loaded_km}</td>
+                    <td className={cell}>{fmtDist(r.loaded_km, 1)}</td>
                     <td className={cell} title={r.return_estimated ? "Return leg not baked — assumed same as outbound" : undefined}>
-                      {r.return_km}{r.return_estimated ? "*" : ""}
+                      {fmtDist(r.return_km, 1)}{r.return_estimated ? "*" : ""}
                     </td>
                     <td className={cell} title={(() => {
                       // B4: the total is the backend's, and the tooltip explains it from
@@ -4410,7 +4489,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                     </td>
                     <td className={cell}
                       title={r.haul_speed_applied
-                        ? `Includes an assigned haul speed over ${r.haul_km} km (${(r.haul_zones || []).join(", ")}). On HERE's own timing this cycle would be ${r.cycle_hr_here} h.`
+                        ? `Includes an assigned haul speed over ${fmtDist(r.haul_km, 1)} ${DU()} (${(r.haul_zones || []).join(", ")}). On HERE's own timing this cycle would be ${r.cycle_hr_here} h.`
                         : undefined}>
                       {r.cycle_hr} h{r.haul_speed_applied ? <span style={{ color: ZONE_HAUL }}>†</span> : null}
                     </td>
@@ -5976,11 +6055,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         actions={<>
           <span className="text-xs text-slate-400">Basemap</span>
           <select value={basemap} onChange={e => changeStyle(e.target.value)} className={sel}>
-            {BASEMAPS.map(([label, val]) => <option key={val} value={val}>{label}</option>)}
+            {basemapsFor(TENANT.country).map(([label, val]) => <option key={val} value={val}>{label}</option>)}
           </select>
           <span className="text-xs text-slate-400 ml-1">Show</span>
           <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel}>
-            {vehicles.map(v => <option key={v}>{v}</option>)}
+            {vehicles.filter(v => vehShown(v, showProfile)).map(v => <option key={v}>{v}</option>)}
           </select>
           {/* the map can only draw one of the baked geometries at a time */}
           <select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw">
@@ -6519,9 +6598,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     }
                     const sp = Number(zoneForm.speed_kph);
                     return <p className="text-[11px] text-slate-500">
-                      Drawn length <span className="font-mono">{km.toFixed(2)} km</span>
+                      Drawn length <span className="font-mono">{fmtDist(km, 2)} {DU()}</span>
                       {sp > 0
-                        ? <> · at {sp} km/h that is <span className="font-mono">{(km / sp * 60).toFixed(0)} min</span> each way</>
+                        ? <> · at {(+speed(sp)).toFixed(0)} {SPD()} that is <span className="font-mono">{(km / sp * 60).toFixed(0)} min</span> each way</>
                         : <> · no speed set, so this stretch adds no time to the cycle</>}
                     </p>;
                   })()}
@@ -6619,7 +6698,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   {editingRoute ? "Vehicle(s) · tick to bake, untick to remove" : "Vehicle(s) · baked on create"}
                 </span>
                 <div className="mt-1 space-y-1">
-                  {vehicles.map(v => {
+                  {vehicles.filter(v => vehShown(v) || (editingRoute ? (eVehicles.includes(v) || editHad.includes(v)) : rVehicles.includes(v))).map(v => {
                     const on = editingRoute ? eVehicles.includes(v) : rVehicles.includes(v);
                     const has = editingRoute && editHad.includes(v);
                     const tag = !editingRoute ? null
@@ -6717,7 +6796,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               outbound is, which is enough to draw but not to work out a cycle time. Open a route
               row (▶) for the haul-cycle figures.
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">Tip: switch the basemap to Satellite or Estonia ortho to see routes sit exactly on the roads.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia ortho" : "Satellite"} to see routes sit exactly on the roads.</p>
           </div>
         </div>
       </div>
@@ -6815,7 +6894,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <th className={th}>Route</th>
                 <th className={th}>From → to</th>
                 <th className={th}>{TEAM()}</th>
-                <th className="px-3 py-2 text-right font-semibold">km ({vehShort(showProfile)})</th>
+                <th className="px-3 py-2 text-right font-semibold">{DU()} ({vehShort(showProfile)})</th>
                 <th className={th}>Vehicles</th>
                 <th className="px-3 py-2 text-right font-semibold">Actions</th>
               </tr>
@@ -6858,7 +6937,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     </td>
                     <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.origin} → {r.dest}</td>
                     <td className="px-3 py-2 text-slate-500">{teamText(r.ipt) || "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{pinfo && pinfo.distance_km != null ? pinfo.distance_km : "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{pinfo && pinfo.distance_km != null ? fmtDist(pinfo.distance_km, 1) : "—"}</td>
                     <td className="px-3 py-2"><VehChips profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       <button onClick={(e) => { e.stopPropagation(); rebakeRoute(r.id, Object.keys(r.profiles || {})); }}
