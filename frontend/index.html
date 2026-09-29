@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Modus</title>
+<title>Wayscope</title>
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1F2024">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -15,15 +20,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    /* Modus theme (G2, 16 Sep 2026): ink for authority, one blue accent, slate structure.
-       The variable NAMES are kept so nothing else had to change. */
-    --navy:#2563EB; --navy-deep:#0F172A; --blue:#3B82F6;
+    /* Wayscope theme (29 Sep 2026): ink #1F2024 for the header and headings, blue for
+       controls and links, ORANGE AS THE BRAND ACCENT ONLY (the logo and the 2 px rule
+       under the header). Amber (--gold) keeps meaning WARNING — unbaked routes, a missing
+       diesel index, capacity from 90 %, edited/thaw marks — and is never the brand orange.
+       The variable NAMES are kept so nothing else had to change. The brand tokens mirror
+       frontend/brand/theme-tokens.css. */
+    --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6;
     --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E2E8F0;
     --ink:#1E293B; --muted:#64748B; --line:#E2E8F0; --bg:#F8FAFC;
+    --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
+    --brand-orange-text:#C75F06; --brand-gold:#D2931F; --brand-ink:#1F2024; --brand-paper:#FFFFFF;
   }
   html,body,#root{height:100%;}
   body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;}
-  .brand-bar{background:var(--navy-deep);}
+  .brand-bar{background:var(--navy-deep);border-bottom:2px solid var(--brand-orange);}
+  .brand-lockup{height:38px;width:auto;display:block;}
+  .brand-rule{width:1px;height:28px;background:rgba(255,255,255,.28);}
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;}
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */
@@ -63,7 +76,7 @@
 // figure is shown with (presentation only — nothing is converted); TEAM() is the word for
 // a delivery team. Both read at call time, so a component that renders before /api/meta
 // lands shows the defaults and re-renders with the tenant's once App sets meta.
-const TENANT = { name: "Modus", team_label: "Team", currency: "EUR", symbol: "€", country: null,
+const TENANT = { name: "Wayscope", team_label: "Team", currency: "EUR", symbol: "€", country: null,
                  fuel_index_auto: false, restrictions_provider: false };
 const CUR = () => TENANT.symbol || "€";
 const TEAM = () => TENANT.team_label || "Team";
@@ -887,11 +900,11 @@ function App(){
       const vl = m && m.vehicle_labels;
       if(vl){ VEH.labels = vl.labels || {}; VEH.fallbacks = vl.fallbacks || {}; }
       const tn = m && m.tenant;
-      if(tn){ Object.assign(TENANT, { name: tn.name || "Modus", team_label: tn.team_label || "Team",
+      if(tn){ Object.assign(TENANT, { name: tn.name || "Wayscope", team_label: tn.team_label || "Team",
                                       currency: tn.currency || "EUR", symbol: tn.currency_symbol || "€",
                                       country: tn.country || null, fuel_index_auto: !!tn.fuel_index_auto,
                                       restrictions_provider: !!tn.restrictions_provider });
-              try { document.title = (TENANT.name && TENANT.name !== "Modus") ? TENANT.name + " · Modus" : "Modus"; } catch(e){}
+              try { document.title = (TENANT.name && TENANT.name !== "Wayscope") ? TENANT.name + " · Wayscope" : "Wayscope"; } catch(e){}
               if(!vehLangShown(VEH.lang)){ VEH.lang = "eu"; setVehLangState("eu"); } }
       (m && m.ipts || []).forEach(i => { if(i && i.id) TEAM_LABELS[iptKey(i.id)] = i.label || i.id; });
       setMeta(m);
@@ -934,12 +947,19 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
   return (
     <header className="brand-bar text-white shrink-0">
       <div className="px-5 h-16 flex items-center justify-between">
-        <button onClick={() => setView(role ? "portal" : "public")} className="flex items-center gap-3 text-left">
-          <span className="inline-block w-2.5 h-7 rounded-sm" style={{background:"var(--gold)"}}></span>
-          <span>
-            <span className="block font-extrabold tracking-tight leading-none text-[17px]">{TENANT.name}</span>
-            <span className="block text-[11px] uppercase tracking-[0.18em] text-white/60">Modus · Forecasting &amp; Route Map</span>
-          </span>
+        {/* 29 Sep 2026: the Wayscope lockup, a thin rule, then the tenant's name in
+            white/70 (hidden below the sm breakpoint, 640 px). The default tenant is
+            named "Wayscope" too, so the name is shown only when it is the tenant's own.
+            Click-to-home kept. */}
+        <button onClick={() => setView(role ? "portal" : "public")} className="flex items-center gap-3 text-left min-w-0"
+          title={TENANT.name && TENANT.name !== "Wayscope" ? TENANT.name + " · Wayscope" : "Wayscope"}>
+          <img src="/brand/logo-header-on-dark.svg" alt="Wayscope" className="brand-lockup" draggable="false" />
+          {TENANT.name && TENANT.name !== "Wayscope" && (
+            <>
+              <span className="brand-rule hidden sm:block"></span>
+              <span className="hidden sm:block text-[14px] font-medium text-white/70 truncate max-w-[36vw]">{TENANT.name}</span>
+            </>
+          )}
         </button>
         <div className="flex items-center gap-2 text-sm">
           {view === "public" && (
@@ -3605,14 +3625,14 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush }){
     const feats = [], ends = [], b = new window.mapboxgl.LngLatBounds();
     (geo.routes || []).forEach(r => {
       const ls = byRoute[r.route_id] || [];
-      const color = IPT_PALETTE_C[iptKey(r.ipt || (ls[0] || {}).ipt)] || "#0F172A";
+      const color = IPT_PALETTE_C[iptKey(r.ipt || (ls[0] || {}).ipt)] || "#1F2024";
       const wk = ls.map(l => `${grp((l.week || {}).planned_qty, 0)} ${unitLbl(l.unit)} · ${grp((l.week_derived || {}).trips)} trips`).join("<br>");
       const label = `<div style="font:12px system-ui"><b>${r.route_id}</b> · ${r.origin.name} → ${r.dest.name}<br>${wk}${r.vehicle_as_planned === false ? `<br><i>drawn for ${r.vehicle_profile}, not the planned vehicle</i>` : ""}</div>`;
       if(r.geometry && r.geometry.length > 1){
         feats.push({ type: "Feature", properties: { route_id: r.route_id, color, label }, geometry: { type: "LineString", coordinates: r.geometry } });
         r.geometry.forEach(c => b.extend(c));
       }
-      [["origin", "#0F172A"], ["dest", "#DC2626"]].forEach(([k, c]) => {
+      [["origin", "#1F2024"], ["dest", "#DC2626"]].forEach(([k, c]) => {
         const e = r[k];
         if(e && e.lon != null && e.lat != null){
           ends.push({ type: "Feature", properties: { color: c, name: e.name }, geometry: { type: "Point", coordinates: [e.lon, e.lat] } });
