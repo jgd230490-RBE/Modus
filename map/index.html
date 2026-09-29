@@ -223,7 +223,7 @@
             <option value="mapbox://styles/mapbox/light-v11" selected>Light</option>
             <option value="mapbox://styles/mapbox/standard">Standard (3D)</option>
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
-            <option value="mapbox://styles/mapbox/satellite-streets-v12">Satellite (Mapbox)</option>
+            <option value="mapbox://styles/mapbox/satellite-streets-v12" id="basemap-satellite">Satellite (Mapbox)</option>
             <option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia orthophoto (Maa-amet)</option>
         </select>
     </div>
@@ -296,14 +296,15 @@
     </div>
 
     <!-- Phase 2.5a — road-restriction layers from the tenant country's road authority
-         (today only Estonia's is wired), proxied and reprojected by the backend. See
+         (Estonia's Tark Tee; since H1 also National Highways' planned closures for
+         Great Britain), proxied and reprojected by the backend. See
          backend/restrictions.py: that source declares WKID 4326 and returns L-EST97
          metres, so nothing here may draw a raw coordinate. Hidden unless the API names
          a provider for the tenant's country.
          Toggles are built from /api/restrictions/layers so the catalogue lives in one
          place rather than being copied into this file. -->
     <div class="control-group" id="restrictions-group" hidden>
-        <h3>Road restrictions <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
+        <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:11px;color:#8a9099;">Loading…</span></div></div>
         <div class="control-item" style="padding-left:2px;margin-top:-2px;">
             <span id="restriction-source" style="font-size:10px;color:#8a9099;">Advisory — the router is not given this data.</span>
@@ -401,7 +402,13 @@
     let chainage_global_data = EMPTY_FC;
     // The tenant's vocabulary and country, from the same response as the overlay.
     let TEAM = 'Team';
-    let TENANT = { name: 'Wayscope', team_label: 'Team', country: null, currency: 'EUR' };
+    let TENANT = { name: 'Wayscope', team_label: 'Team', country: null, currency: 'EUR', distance_unit: 'km' };
+    // H1 (29 Sep 2026, HU5): the distance unit the tenant reads — km stored, converted here
+    const KM_PER_MI = 1.609344;
+    const DU = () => (TENANT.distance_unit === 'mi' ? 'mi' : 'km');
+    const SPD = () => (DU() === 'mi' ? 'mph' : 'km/h');
+    const distU = (km) => (DU() === 'mi' ? km / KM_PER_MI : km);
+    const fmtDist = (km, dp) => (km == null ? '—' : distU(Number(km)).toFixed(dp == null ? 1 : dp));
     // The tenant's names for its team slots ("IPT3" -> "North Team"), from the overlay
     // response. Ids never reach the screen: every team value shown goes through teamText().
     const TEAM_LABELS = {};
@@ -448,6 +455,9 @@
         if (ipt) ipt.textContent = 'All ' + TEAM.toLowerCase() + 's';
         const bm = document.getElementById('basemap-maaamet');
         if (bm) bm.hidden = (TENANT.country || '').toUpperCase() !== 'EE';
+        // H1 (29 Sep 2026): a British tenant reads Mapbox Satellite as its "Aerial" basemap
+        const sat = document.getElementById('basemap-satellite');
+        if (sat) sat.textContent = (TENANT.country || '').toUpperCase() === 'GB' ? 'Aerial (Mapbox Satellite)' : 'Satellite (Mapbox)';
         const v = document.getElementById('overlay-version');
         if (v) v.textContent = window.OVERLAY_VERSION ? ('overlay ' + window.OVERLAY_VERSION) : 'no alignment in this tenant';
         if (typeof KPI_BY !== 'undefined') KPI_BY[1][1] = TEAM;
@@ -2841,6 +2851,11 @@
             RESTR.provider = cat.provider;
             const pv = document.getElementById('restriction-provider');
             if (pv) pv.textContent = cat.provider.short || cat.provider.name || '';
+            // H1: the heading is the provider's own word for what it publishes —
+            // "Road restrictions" (Tark Tee) or "Road closures" (National Highways)
+            const hd = document.getElementById('restriction-heading');
+            const ui = cat.provider.ui_label || '';
+            if (hd) hd.textContent = ui.includes('(') ? ui.slice(0, ui.indexOf('(')).trim() : (ui || 'Road restrictions');
             const sv = document.getElementById('restriction-source');
             if (sv && cat.provider.name) sv.textContent = 'Source: ' + cat.provider.name + (cat.provider.site ? ' (' + cat.provider.site + ')' : '') + '. Advisory — the router is not given this data.';
             RESTR.layers = cat.layers || [];
@@ -3029,7 +3044,7 @@
                 `${p.name || 'Rail line'}</h3>` +
                 `<p style='margin:4px 0;'><b>Operator:</b> ${p.operator || '—'}</p>`;
         if (heads && heads.length) h += `<p style='margin:4px 0;'><b>Serves:</b> ${heads.join(' · ')}</p>`;
-        if (p.length_km) h += `<p style='margin:4px 0;'><b>Length:</b> ${p.length_km} km</p>`;
+        if (p.length_km) h += `<p style='margin:4px 0;'><b>Length:</b> ${fmtDist(p.length_km, 2)} ${DU()}</p>`;
         if (provisional) {
             h += `<p style='margin:6px 0 4px 0;padding:5px 6px;background:rgba(191,46,85,.08);` +
                  `border-left:3px solid #DC2626;font-size:11.5px;line-height:1.45;'>` +
@@ -3073,9 +3088,9 @@
             ? (p.starts_on || 'open') + ' → ' + (p.ends_on || 'open')
             : 'no dates set';
         let body = '<div style="font-size:11.5px;color:#6b7280;">Temporary haul road · ' + when + '</div>';
-        if (km !== null) body += '<div style="font-size:11.5px;margin-top:6px;"><b>' + km.toFixed(2) + ' km</b> as drawn</div>';
+        if (km !== null) body += '<div style="font-size:11.5px;margin-top:6px;"><b>' + fmtDist(km, 2) + ' ' + DU() + '</b> as drawn</div>';
         body += speed
-            ? '<div style="font-size:11.5px;margin-top:2px;">Assigned speed <b>' + speed + ' km/h</b>'
+            ? '<div style="font-size:11.5px;margin-top:2px;">Assigned speed <b>' + Math.round(distU(speed)) + ' ' + SPD() + '</b>'
               + (km !== null ? ' — ' + Math.round(km / speed * 60) + ' min each way' : '') + '</div>'
               // the honest caveat: this is not a measured speed and the geometry is a drawing
               + '<div style="font-size:10.5px;margin-top:4px;color:#92400e;">'
@@ -3489,10 +3504,10 @@
             '<div class="an-title">'+routeId+'</div>'+
             '<div class="an-route">'+(info.origin||'—')+' → '+(info.dest||'—')+dirLink+'</div>'+
             '<div class="an-grid">'+
-                card(dist.toFixed(1)+' km','One-way distance','Routed road geometry')+
-                card(round.toFixed(1)+' km','Round trip','Loaded out, empty back')+
+                card(fmtDist(dist, 1)+' '+DU(),'One-way distance','Routed road geometry')+
+                card(fmtDist(round, 1)+' '+DU(),'Round trip','Loaded out, empty back')+
                 card(cycleH.toFixed(2)+' h','Est. haul cycle','Drive + '+(P.load_minutes+P.unload_minutes)+' min handling')+
-                card(tripsPerDay.toFixed(1),'Trips / day / truck','@ '+P.shift_hours_per_day+' h shift, '+P.avg_haul_speed_kmh+' km/h')+
+                card(tripsPerDay.toFixed(1),'Trips / day / truck','@ '+P.shift_hours_per_day+' h shift, '+Math.round(distU(P.avg_haul_speed_kmh))+' '+SPD())+
             '</div>'+
             '<div id="an-fc-slot" class="an-sub" style="margin-top:12px;">Loading forecast…</div>';
         try{
@@ -3864,7 +3879,7 @@
                 const safe=(rid||'').toString().replace(/\\/g,'\\\\').replace(/'/g,"\\'");
                 const html='<div style="min-width:210px;">'+
                     '<h4 style="margin:0 0 4px;color:'+CONFIG.COLORS.brandDark+';font-size:13px;">'+rid+'</h4>'+
-                    '<div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">'+(info.origin||'—')+' → '+(info.dest||'—')+(info.distance_km?(' · '+info.distance_km.toFixed(1)+' km'):'')+'</div>'+
+                    '<div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">'+(info.origin||'—')+' → '+(info.dest||'—')+(info.distance_km?(' · '+fmtDist(info.distance_km, 1)+' '+DU()):'')+'</div>'+
                     '<button class="rb-popup-btn" onclick="openRouteAnalysis(\''+safe+'\')">Full route analysis →</button></div>';
                 new mapboxgl.Popup({offset:10}).setLngLat(e.lngLat).setHTML(html).addTo(map);
             });
