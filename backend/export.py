@@ -22,7 +22,7 @@ sheet is for the supplier; stock belongs on a look-ahead dashboard, not built), 
 **route map** on the PDF in the stock section's place. The map is Mapbox's Static
 Images API when MAPBOX_TOKEN is set and the fetch succeeds (never tested from the
 sandbox, which is offline), otherwise a schematic drawn from the baked geometry —
-the PDF says which it is. Tark Tee flags come from the STORED per-route check, so the
+the PDF says which it is. Road-restriction flags come from the STORED per-route check, so the
 export is as fast as the page.
 
 openpyxl and reportlab are runtime dependencies of these two functions ONLY — added to
@@ -89,6 +89,42 @@ def _cur():
     return _tenant().get("currency_symbol") or "€"
 
 
+# H1 (29 Sep 2026, HU5): the distance unit the tenant READS on its sheets. Everything the
+# page hands over is in km; these convert at the sheet boundary and nowhere else.
+KM_PER_MI = 1.609344
+
+
+def _du():
+    """'km' or 'mi'."""
+    return "mi" if (_tenant().get("distance_unit") or "km") == "mi" else "km"
+
+
+def _dist(km):
+    """A km figure in the tenant's unit (None stays None)."""
+    if km is None:
+        return None
+    try:
+        v = float(km)
+    except (TypeError, ValueError):
+        return km
+    return v / KM_PER_MI if _du() == "mi" else v
+
+
+def _dist_rate(per_km):
+    """A per-km rate in the tenant's unit (currency per mile = per km × 1.609)."""
+    if per_km is None:
+        return None
+    try:
+        v = float(per_km)
+    except (TypeError, ValueError):
+        return per_km
+    return v * KM_PER_MI if _du() == "mi" else v
+
+
+def _tkm():
+    return "t·mi" if _du() == "mi" else "t·km"
+
+
 def footer_lines():
     cur = _cur()
     return (f"{cur} from the contract rate typed on the route, or the target rate on Config where the "
@@ -151,7 +187,7 @@ def _line_rows(page, weekdays_only=True):
                 "material": c.get("material_type") or "", "vehicle": c.get("vehicle_short") or c.get("vehicle_type") or "",
                 "qty": d.get("planned_qty"), "unit": c.get("unit"),
                 "tonnes": f.get("tonnes"), "trips": f.get("trips"), "veh": f.get("vehicles"),
-                "km_trip": c.get("km_trip"), "km_day": f.get("km_day"), "tonne_km": f.get("tonne_km"),
+                "km_trip": _dist(c.get("km_trip")), "km_day": _dist(f.get("km_day")), "tonne_km": _dist(f.get("tonne_km")),
                 "eur": f.get("eur"), "rate_source": c.get("rate_source") or "",
                 "eur_adj": f.get("eur_adj"), "fair_eur": f.get("fair_eur"),
                 "fair_eur_per_t": ((c.get("fair") or {}).get("eur_per_t")),
@@ -191,14 +227,44 @@ def _team_namer():
 
 # What a person reads for each clash code — the same names the user guide's §10.1 uses.
 FLAG_LABEL = {"SHORTAGE": "SHORTAGE", "DAYS_NE_WEEK": "DAYS ≠ WEEK", "STOCKPILE_OVER": "STOCKPILE OVER",
-              "ROUTE_CAP": "ROUTE CAP", "IPT_SHARE": "SHARE", "TARK_TEE": "TARK TEE",
+              "ROUTE_CAP": "ROUTE CAP", "IPT_SHARE": "SHARE",
+              # H1: the restriction flag reads the provider's word (TARK TEE / ROADWORKS);
+              # see _flag_label(), which reads it off the flag itself
+              "RESTRICTION": "RESTRICTION",
               "UNBAKED": "UNBAKED", "PARENT_CHANGED": "PARENT CHANGED"}
 
 
+def _flag_label(f):
+    """The word a person reads for a flag: the provider's own for RESTRICTION (the flag
+    carries `label` — "TARK TEE" for Tark Tee, "ROADWORKS" for National Highways)."""
+    code = (f or {}).get("code")
+    if code == "RESTRICTION" and (f or {}).get("label"):
+        return str(f["label"])
+    return FLAG_LABEL.get(code, code)
+
+
+def _src_word(page):
+    """The provider's short name for the sheet's source rows ("Tark Tee", "National
+    Highways"), or a neutral word when the page names none."""
+    src = ((page.get("clashes") or {}).get("sources") or {})
+    ui = src.get("restrictions_ui_label")
+    if ui and "(" in ui and ui.endswith(")"):
+        return ui[ui.index("(") + 1:-1]
+    return "Road restrictions"
+
+
 def xlsx_cols():
-    """XLSX_COLS_EUR with the tenant's currency symbol and team label in the headers."""
-    cur, team = _cur(), _tenant().get("team_label") or "Team"
-    return [((team if h == "IPT" else h.replace("€", cur)), k) for h, k in XLSX_COLS_EUR]
+    """XLSX_COLS_EUR with the tenant's currency symbol, team label and distance unit in
+    the headers (km/trip → mi/trip, t·km → t·mi for a tenant that reads miles)."""
+    cur, team, du = _cur(), _tenant().get("team_label") or "Team", _du()
+    def hd(h):
+        if h == "IPT":
+            return team
+        h = h.replace("€", cur)
+        if du == "mi":
+            h = {"km/trip": "mi/trip", "km/day": "mi/day", "t·km": "t·mi"}.get(h, h)
+        return h
+    return [(hd(h), k) for h, k in XLSX_COLS_EUR]
 
 
 XLSX_COLS = XLSX_COLS_EUR   # the EUR-labelled reference set (tests read it); sheets use xlsx_cols()
@@ -251,7 +317,7 @@ def build_xlsx(page):
             ("Fair price (model) — total this week", (page.get("commit", {}).get("totals") or {}).get("fair_eur")),
             (f"Fair price: driver {_cur()}/h", (cost.get("fair") or {}).get("driver_eur_per_h")),
             (f"Fair price: vehicle standing {_cur()}/h", (cost.get("fair") or {}).get("vehicle_standing_eur_per_h")),
-            (f"Fair price: running {_cur()}/km", (cost.get("fair") or {}).get("running_eur_per_km")),
+            (f"Fair price: running {_cur()}/{_du()}", _dist_rate((cost.get("fair") or {}).get("running_eur_per_km"))),
             ("Fair price: margin %", (cost.get("fair") or {}).get("margin_pct")),
             ("Fair price: L/100 km per tonne · rigid empty · artic empty",
              " · ".join(str((cost.get("fair") or {}).get(k)) for k in ("l_per_100km_per_tonne", "rigid_l_per_100km_empty", "artic_l_per_100km_empty"))),
@@ -265,7 +331,7 @@ def build_xlsx(page):
     _nm = _team_namer()
     sheet(ws3, [("Code", "code"), ("Route", "route_id"), (_tenant().get("team_label") or "Team", "ipt"),
                 ("WS", "section_id"), ("Day", "day_date"), ("Detail", "text")],
-          [dict(f, code=FLAG_LABEL.get(f.get("code"), f.get("code")), ipt=_nm(f.get("ipt")), text=_nm(f.get("text")))
+          [dict(f, code=_flag_label(f), ipt=_nm(f.get("ipt")), text=_nm(f.get("text")))
            for f in ((page.get("clashes") or {}).get("flags") or [])])
     ws4 = wb.create_sheet("About")
     about = [
@@ -274,8 +340,8 @@ def build_xlsx(page):
         ("Bucket", page.get("bucket")),
         ("Lines", (page.get("commit", {}).get("totals") or {}).get("lines")),
         ("Unbaked lines", (page.get("commit", {}).get("totals") or {}).get("unbaked_lines")),
-        ("Tark Tee", ((page.get("clashes") or {}).get("sources") or {}).get("tark_tee")),
-        ("Tark Tee checked", ((page.get("clashes") or {}).get("sources") or {}).get("tark_tee_checked_at")),
+        (_src_word(page), ((page.get("clashes") or {}).get("sources") or {}).get("restrictions")),
+        (_src_word(page) + " checked", ((page.get("clashes") or {}).get("sources") or {}).get("restrictions_checked_at")),
         ("Days", "Mon–Fri only; Sat/Sun are 0 and not listed"),
     ] + [("Note", f) for f in footer_lines()]
     for i, (k, v) in enumerate(about, 1):
@@ -527,7 +593,7 @@ def build_pdf(page):
         d = datetime.date.fromisoformat(iso)
         head.append(P(f"{d.strftime('%a %-d %b').upper()}{' · TODAY' if iso == today else ''}"
                       f"<br/><font size=6>qty / trips · veh</font>", st_hc))
-    head += [P("WEEK<br/><font size=6>qty · trips · t·km</font>", st_hc), P("KM/TRIP", st_hc)]
+    head += [P(f"WEEK<br/><font size=6>qty · trips · {_tkm()}</font>", st_hc), P(f"{_du().upper()}/TRIP", st_hc)]
     if priced:
         head.append(P(f"{_cur()} WEEK", st_hc))
     data = [head]
@@ -556,8 +622,8 @@ def build_pdf(page):
             row.append(P(f"<b>{qty}</b>{mark}<br/><font size=6.5 color='#64748B'>{sub}</font>", st_c))
         wq = (l.get("week") or {}).get("planned_qty")
         row.append(P(f"<b>{_n(wq)} {c.get('unit') or ''}</b><br/><font size=6.5 color='#64748B'>{_n(wk.get('trips'))} tr · "
-                     f"{_n(wk.get('tonne_km')) if c.get('baked') else '—'} t·km</font>", st_c))
-        row.append(P((_n(c.get("km_trip")) + (c.get("cycle_mark") or "")) if c.get("baked") else "—", st_c))
+                     f"{_n(_dist(wk.get('tonne_km'))) if c.get('baked') else '—'} {_tkm()}</font>", st_c))
+        row.append(P((_n(_dist(c.get("km_trip"))) + (c.get("cycle_mark") or "")) if c.get("baked") else "—", st_c))
         if priced:
             if wk.get("eur") is None:
                 row.append(P("—", st_c))
@@ -569,7 +635,7 @@ def build_pdf(page):
         data.append(row)
         tot["t"] += float(wk.get("tonnes") or 0)
         tot["trips"] += int(wk.get("trips") or 0)
-        tot["tkm"] += float(wk.get("tonne_km") or 0)
+        tot["tkm"] += float(_dist(wk.get("tonne_km")) or 0)
         if wk.get("eur") is not None:
             tot["eur"] += float(wk["eur"]); tot["eur_any"] = True
         if wk.get("eur_adj") is not None:
@@ -587,7 +653,7 @@ def build_pdf(page):
         spare = usable - sum(widths)
         widths[1] += spare / 2; widths[2] += spare / 2
         total_row = [P("<b>TOTAL</b>", st), P(f"{len(rows)} line(s)", st), "", "", "", ""] + [""] * ndays + [
-            P(f"<b>{_n(tot['t'])} t</b><br/><font size=6.5 color='#64748B'>{_n(tot['trips'])} tr · {_n(tot['tkm'])} t·km</font>", st_c), ""]
+            P(f"<b>{_n(tot['t'])} t</b><br/><font size=6.5 color='#64748B'>{_n(tot['trips'])} tr · {_n(tot['tkm'])} {_tkm()}</font>", st_c), ""]
         if priced:
             adj = (f"<br/><font size=6.5 color='#64748B'>+BAF {_n(tot['eur_adj'])}</font>"
                    if tot.get("eur_adj") is not None else "")
@@ -619,12 +685,12 @@ def build_pdf(page):
     fl = [P("Flags (not a stop)", st_navy)]
     if flags:
         for f in flags[:12]:
-            fl.append(P(E(f"{FLAG_LABEL.get(f['code'], f['code'])}: {_nm(f['text'])}"[:160]), st_red))
+            fl.append(P(E(f"{_flag_label(f)}: {_nm(f['text'])}"[:160]), st_red))
         if len(flags) > 12:
             fl.append(P(f"+{len(flags) - 12} more on the XLSX", st_red))
     else:
-        tt = ((page.get("clashes") or {}).get("sources") or {}).get("tark_tee")
-        fl.append(P("none" + (" · Tark Tee unavailable, restrictions not checked" if tt == "unavailable" else ""), st_grey))
+        tt = ((page.get("clashes") or {}).get("sources") or {}).get("restrictions")
+        fl.append(P("none" + (f" · {_src_word(page)} unavailable, restrictions not checked" if tt == "unavailable" else ""), st_grey))
     story.append(KeepTogether(fl))
     story.append(Spacer(1, 3 * mm))
 
@@ -642,20 +708,21 @@ def build_pdf(page):
 
 
 def _index_attribution(cost):
-    """What the diesel index IS: the EU bulletin series (typed or fetched) for a country
-    the bulletin covers; a typed national figure for one it does not."""
+    """What the diesel index IS: the country's provider series (typed or fetched) — the EU
+    bulletin for EU-27, DESNZ weekly road fuel prices for GB — or a typed national figure
+    for a country with no series (and for a tenant with no country)."""
     if not cost.get("index_source"):
         return ""
     country = (cost.get("fuel") or {}).get("country") or ""
     typed = cost.get("index_source") == "manual"
     try:
         import fuel as _fuel
-        covered = _fuel.auto_available(country)
+        prov = _fuel.provider_public(country)
     except Exception:
-        covered = True
-    if covered:
-        return "EU Weekly Oil Bulletin via EuroOilWatch" + (" — typed" if typed else "")
-    return "typed — no bulletin series for this country"
+        prov = None
+    if prov:
+        return prov["label"] + (" — typed" if typed else "")
+    return "typed — no automatic diesel series for this country"
 
 
 def _fuel_line(page):
@@ -663,10 +730,11 @@ def _fuel_line(page):
     cost = page.get("costing") or {}
     fu = cost.get("fuel") or {}
     if cost.get("index_eur_per_l") is None:
-        return "Diesel index: not available (no bulletin row for this country and nothing typed)."
+        return "Diesel index: not available (no index row for this country and nothing typed)."
     cur = _cur()
-    s = (f"Diesel {cost.get('fuel', {}).get('country') or '—'} {cur}{cost['index_eur_per_l']:.3f}/L, "
-         f"bulletin {cost.get('index_bulletin_date') or '—'} ({_index_attribution(cost)}).")
+    _c = cost.get('fuel', {}).get('country') or '—'
+    s = (f"Diesel {'(no country)' if _c == '--' else _c} {cur}{cost['index_eur_per_l']:.3f}/L, "
+         f"dated {cost.get('index_bulletin_date') or '—'} ({_index_attribution(cost)}).")
     if cost.get("baf_pct") is not None:
         s += (f" BAF {cost['baf_pct'] * 100:+.2f} % = (index / base {cur}{fu.get('baf_base_eur_per_l'):.3f} of "
               f"{fu.get('baf_base_bulletin_date') or '—'} − 1) × {fu.get('share_pct'):g} % fuel share.")

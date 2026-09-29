@@ -184,7 +184,7 @@ def costing_context():
     fetch: the index is whatever fuel.py last stored.
     """
     s = costing.settings()
-    out = costing.summary(fuel.get_index(s["fuel"].get("country") or fuel.DEFAULT_COUNTRY))
+    out = costing.summary(fuel.get_index(fuel.norm_country(s["fuel"].get("country"))))
     # 10 Sep night: the fair-price model's coefficients, from the live factors document
     # (falling back to factors.json's seeded block key by key)
     p = fairprice.params(conversions.load_factors())

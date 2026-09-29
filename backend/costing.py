@@ -18,7 +18,8 @@ top of that, in this order:
 
   2. A fuel surcharge (BAF — bunker adjustment factor, the haulage word for it) on
      whatever quote is there, from the diesel index for the tenant's country — the EU
-     Weekly Oil Bulletin for EU countries, a typed price elsewhere (fuel.py). Two typed settings and one locked base:
+     Weekly Oil Bulletin for EU countries, DESNZ weekly road fuel prices for GB (H1, 29 Sep 2026),
+     a typed price elsewhere (fuel.py). Two typed settings and one locked base:
         share_pct           fuel's share of the haulage price, 0–100. Empty ⇒ no BAF.
         yard_eur_per_l      optional — what the haulier actually pays at the yard. For a
                             later cost-plus slice; it NEVER replaces the bulletin index.
@@ -42,7 +43,7 @@ STORAGE
 -------
 One tenanted row in the existing `config` table, key 'costing' (beside 'factors'):
     {"target": {"rate_eur_per_load", "rate_eur_per_t", "rate_eur_per_km"},
-     "fuel":   {"country", "yard_eur_per_l", "share_pct",
+     "fuel":   {"country" (the index country: the tenant's own unless typed over; fuel.NO_COUNTRY when none), "yard_eur_per_l", "share_pct",
                 "baf_base_eur_per_l", "baf_base_bulletin_date", "baf_base_set_at",
                 "baf_base_set_by"}}
 No new tenanted table (and so no new registration). The index row itself is global —
@@ -56,7 +57,6 @@ import db
 KEY = "costing"
 TARGET_FIELDS = ("rate_eur_per_load", "rate_eur_per_t", "rate_eur_per_km")
 FUEL_FIELDS = ("country", "yard_eur_per_l", "share_pct")
-DEFAULT_COUNTRY = "EE"
 
 _CACHE = {"doc": None, "at": 0.0, "tenant": None}
 CACHE_TTL_S = 5.0
@@ -74,14 +74,16 @@ def _num(v):
 
 
 def _tenant_country():
-    """The tenant's own country (config.tenant), else the historical default."""
+    """The tenant's own country (config.tenant), else fuel.NO_COUNTRY. H1 (29 Sep 2026):
+    the historical fallback to Estonia is GONE — a tenant with no country has no
+    automatic index and types its own (the G3-prep item from g2-modus-0916.md)."""
+    import fuel as _fuel
     try:
         import config as _config
         import conversions as _conversions
-        c = _config.tenant_settings(_conversions).get("country")
-        return c or DEFAULT_COUNTRY
+        return _fuel.norm_country(_config.tenant_settings(_conversions).get("country"))
     except Exception:
-        return DEFAULT_COUNTRY
+        return _fuel.NO_COUNTRY
 
 
 def empty_doc():
@@ -98,7 +100,8 @@ def _normalise(doc):
         for k in TARGET_FIELDS:
             out["target"][k] = _num((doc.get("target") or {}).get(k))
         f = doc.get("fuel") or {}
-        out["fuel"]["country"] = (f.get("country") or _tenant_country()).strip().upper()[:2]
+        import fuel as _fuel
+        out["fuel"]["country"] = _fuel.norm_country(f.get("country")) if f.get("country") else _tenant_country()
         for k in ("yard_eur_per_l", "share_pct", "baf_base_eur_per_l"):
             out["fuel"][k] = _num(f.get(k))
         for k in ("baf_base_bulletin_date", "baf_base_set_at", "baf_base_set_by"):

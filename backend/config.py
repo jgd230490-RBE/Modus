@@ -33,8 +33,11 @@ import db
 # 10 Sep: the browser map, the Commit week map and the PDF's static map all use
 # mapbox_token(); the PDF used to read only the env var and fell back to a schematic
 # on Render, where the env var was never set.
-MAPBOX_TOKEN_DEFAULT = ("pk.eyJ1IjoiamdkMjMwNDE5OTAiLCJhIjoiY21xbnJzaTRrMDYyOTJxcXowczRxNTlxdyJ9"
-                        ".xujuSc3O8RcgKIitWNGIWg")
+# H1 (29 Sep 2026): the value below is the token rotated on 25 Sep — the SAME one
+# map/config.js carries (test_h1_uk.py asserts the two are equal). The pre-rotation
+# token that sat here until H1 is revoked and gone.
+MAPBOX_TOKEN_DEFAULT = ("pk.eyJ1IjoiamdkMjMwNDE5OTAiLCJhIjoiY211aDB1YTJtMHF3YzJ4cnpodTlsb2czOSJ9"
+                        ".B1oY8QnGB2YRBz0rV1klfg")
 
 
 def mapbox_token():
@@ -57,10 +60,14 @@ KEY = "factors"
 #                names — see claude/gtm-0916.md, decision 2.
 #   currency     ISO code; symbol and formatting only, no conversion. Every stored
 #                figure stays in the tenant's own currency.
+#   distance_unit "km" (default) or "mi" — H1. What the tenant READS; km is what is stored.
 #   country      ISO-3166 alpha-2, or null. Chooses the providers that are country-
-#                specific: the road-restriction layer (EE only today), the diesel index
-#                auto-fetch (EU Weekly Oil Bulletin countries), the orthophoto basemap.
-TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", "country": None}
+#                specific: the road-restriction layer (EE: Tark Tee; GB: National
+#                Highways planned closures — H1), the diesel index auto-fetch (EU-27:
+#                the Weekly Oil Bulletin; GB: DESNZ — H1), the orthophoto basemap (EE).
+#                Null = none of them; the diesel index is then typed only.
+TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", "country": None,
+                   "distance_unit": "km"}     # H1: km stored always; "mi" = read in miles
 
 CURRENCIES = {
     "EUR": {"symbol": "€", "name": "euro"},
@@ -74,8 +81,19 @@ CURRENCIES = {
 }
 
 
-# Which country's road authority has a live restriction layer wired in restrictions.py.
-RESTRICTION_PROVIDERS = {"EE"}
+# Which countries have a road-restriction provider wired in restrictions.py (EE: Tark
+# Tee; GB: National Highways planned closures — H1). Read from that module so the two
+# cannot drift; the literal fallback is for a partial import in a stubbed harness.
+try:
+    from restrictions import PROVIDERS as _RX_PROVIDERS
+    RESTRICTION_PROVIDERS = set(_RX_PROVIDERS)
+except Exception:                                   # pragma: no cover
+    RESTRICTION_PROVIDERS = {"EE", "GB"}
+
+# H1: which distance unit the tenant READS. Everything is stored in km; "mi" converts on
+# display and on the exports only. Per tenant (HU5, decided 29 Sep) until G3 exists.
+DISTANCE_UNITS = ("km", "mi")
+KM_PER_MILE = 1.609344
 
 
 def tenant_settings(conversions=None, doc=None):
@@ -96,9 +114,21 @@ def tenant_settings(conversions=None, doc=None):
     try:
         import fuel as _fuel
         t["fuel_index_auto"] = _fuel.auto_available(t["country"])
+        t["fuel_provider"] = _fuel.provider_public(t["country"])     # H1: which series, or None
     except Exception:
         t["fuel_index_auto"] = False
+        t["fuel_provider"] = None
     t["restrictions_provider"] = t["country"] in RESTRICTION_PROVIDERS
+    try:
+        import restrictions as _rx
+        t["restrictions"] = ({k: v for k, v in (_rx.provider_for(t["country"]) or {}).items()}
+                             if t["country"] in RESTRICTION_PROVIDERS else None)
+    except Exception:
+        t["restrictions"] = None
+    # H1: the distance unit the tenant reads (km stored; mi shown). Defaults to km; the
+    # tenant block may say "mi" (validated in validate()).
+    du = str((block or {}).get("distance_unit") or "").strip().lower() if isinstance(block, dict) else ""
+    t["distance_unit"] = du if du in DISTANCE_UNITS else "km"
     return t
 # a small in-process cache so the many load_factors() calls inside one request do not
 # each hit the database. Invalidated on every write through this module; a write made
@@ -208,6 +238,23 @@ def validate(doc, network=None):
         for name in doc.get("planning_vehicles") or []:
             if name not in vs:
                 p.append(f"planning_vehicles names '{name}', which does not exist")
+        # H1: per-country vehicle sets name real vehicles, and a name is not both led and hidden
+        sets = doc.get("vehicle_sets")
+        if sets is not None:
+            if not isinstance(sets, dict):
+                p.append("vehicle_sets must be an object keyed by country code")
+            else:
+                for cc, cs in sets.items():
+                    if not (isinstance(cc, str) and len(cc) == 2 and cc.isalpha()) or not isinstance(cs, dict):
+                        p.append(f"vehicle_sets.{cc}: key must be a two-letter country code and the value an object")
+                        continue
+                    lead, hide = cs.get("lead") or [], cs.get("hide") or []
+                    for name in list(lead) + list(hide):
+                        if name not in vs:
+                            p.append(f"vehicle_sets.{cc} names '{name}', which does not exist")
+                    both = sorted(set(lead) & set(hide))
+                    if both:
+                        p.append(f"vehicle_sets.{cc}: {both} cannot be both lead and hidden")
         # a vehicle the network is baked for cannot be deleted — its geometry rows are
         # keyed on the name and every figure on those routes would fall to _default
         if network is not None:
@@ -270,6 +317,9 @@ def validate(doc, network=None):
             c = tb.get("country")
             if c is not None and c != "" and not (isinstance(c, str) and len(c) == 2 and c.isalpha()):
                 p.append("tenant.country must be a two-letter ISO code or null")
+            du = tb.get("distance_unit")
+            if du is not None and du != "" and str(du).strip().lower() not in DISTANCE_UNITS:
+                p.append("tenant.distance_unit must be 'km' or 'mi'")
     for w in doc.get("seasonal_restrictions") or []:
         if not isinstance(w, dict) or not w.get("name"):
             p.append("every seasonal restriction needs a name")

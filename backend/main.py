@@ -28,7 +28,7 @@ import here_routing
 import taxonomy
 import zones
 import haul          # Phase 4 — temporary haul roads
-import restrictions  # Phase 2.5a — Tark Tee restriction layers (proxied, reprojected)
+import restrictions  # Phase 2.5a Tark Tee; H1 (29 Sep) a provider per country (NH closures for GB)
 import streetview    # Phase 2.5a — Google Street View proxy (key stays server-side)
 import gates         # Phase 5a — multiple gates per location, with a direction on each
 import weeks         # Week 1 — the 4-week look-ahead and typed actuals (Tasks C, D)
@@ -429,6 +429,9 @@ def meta():
         # `vehicles` and `factors.vehicle_payload_t` by name, so the full set has to stay
         # complete and in its existing order.
         "planning_vehicles": conversions.planning_vehicle_names(factors),
+        # H1 (29 Sep 2026): the names the pickers do NOT offer this tenant (its country's
+        # `vehicle_sets[..].hide` — the EU N-category names for GB). Still in `vehicles`.
+        "hidden_vehicles": conversions.hidden_vehicle_names(factors),
         # 2026-09-02: the EN / EU / EE label toggle. Labels only — vehicle_type on a
         # forecast line stays the canonical key. Every slot is filled, a missing one
         # with the key itself, and `fallbacks` says which.
@@ -986,19 +989,21 @@ def list_forecast_days(from_date: Optional[str] = Query(None, alias="from"),
 
 @app.get("/api/lookahead")
 def lookahead_page(bucket: str = "commit", route_id: Optional[str] = None,
-                   tark_tee: int = 1):
+                   restrictions_on: int = 1, tark_tee: Optional[int] = None):
     """
     Look-ahead v2 slices 3-6: everything the page's three views need in one read —
     commit (days + derived + totals), account (last week), horizon (roles), stock and
     the clash rail. `bucket=next` is the Thursday process.
 
-    🔴 Tark Tee here is the STORED per-route check (a DB read), never the live fetch —
-    the live fetch froze the page on 09 Sep. `sources.tark_tee` says how current it is;
-    POST /api/forecast-weeks/tark-tee/refresh re-checks in the background.
+    🔴 The road-restriction source here is the STORED per-route check (a DB read), never
+    the live fetch — the live fetch froze the page on 09 Sep. `sources.restrictions` says
+    how current it is; POST /api/forecast-weeks/restrictions/refresh re-checks in the
+    background. `tark_tee=` is the pre-H1 name of `restrictions_on=` and still works.
     """
     acc = _require_access()
+    on = bool(restrictions_on) if tark_tee is None else bool(tark_tee)
     return lookahead.page(bucket=("next" if bucket == "next" else "commit"),
-                          route_id=route_id, acc=acc, with_tark_tee=bool(tark_tee))
+                          route_id=route_id, acc=acc, with_restrictions=on)
 
 
 @app.get("/api/lookahead/geometry")
@@ -1017,25 +1022,28 @@ def lookahead_geometry(ids: str = "", vehicles: str = ""):
     return {"routes": lookahead.week_geometry(id_list, veh)}
 
 
-@app.get("/api/forecast-weeks/tark-tee")
-def forecast_week_tark_tee(bucket: str = "commit", route_id: Optional[str] = None):
+@app.get("/api/forecast-weeks/restrictions")
+@app.get("/api/forecast-weeks/tark-tee", include_in_schema=False)     # pre-H1 path
+def forecast_week_restrictions(bucket: str = "commit", route_id: Optional[str] = None):
     """
-    The STORED Tark Tee flags for the page's routes, how old they are, which routes
-    have never been checked, and whether a refresh is running. Instant — a DB read.
-    The page polls this while a refresh runs.
+    The STORED road-restriction flags for the page's routes in this bucket's week, how
+    old they are, which routes have never been checked, and whether a refresh is
+    running. Instant — a DB read. The page polls this while a refresh runs. The provider
+    (Tark Tee / National Highways) and its flag word come back with it.
     """
     acc = _require_access()
-    return lookahead.tark_tee_status(bucket=("next" if bucket == "next" else "commit"),
-                                     route_id=route_id, acc=acc)
+    return lookahead.restriction_status(bucket=("next" if bucket == "next" else "commit"),
+                                        route_id=route_id, acc=acc)
 
 
-@app.post("/api/forecast-weeks/tark-tee/refresh")
-def forecast_week_tark_tee_refresh(sync: int = 0):
+@app.post("/api/forecast-weeks/restrictions/refresh")
+@app.post("/api/forecast-weeks/tark-tee/refresh", include_in_schema=False)   # pre-H1 path
+def forecast_week_restrictions_refresh(sync: int = 0):
     """
-    Re-check every baked route against live Tark Tee and store the result. Runs in a
-    background thread (30 s+ on a cold cache); returns at once with the refresh state.
-    `sync=1` waits. Any signed-in staff code may call it — it reads public road data
-    and writes only the stored check.
+    Re-check every baked route against the country's live provider and store the result.
+    Runs in a background thread (30 s+ on a cold cache); returns at once with the refresh
+    state. `sync=1` waits. Any signed-in staff code may call it — it reads public road
+    data and writes only the stored check.
     """
     _require_access()
     return restrictions.refresh_async(sync=bool(sync))
@@ -1043,11 +1051,12 @@ def forecast_week_tark_tee_refresh(sync: int = 0):
 
 @app.get("/api/forecast-weeks/clashes")
 def forecast_week_clashes(bucket: str = "commit", route_id: Optional[str] = None,
-                          tark_tee: int = 0):
+                          restrictions_on: int = 0, tark_tee: Optional[int] = None):
     """The rail alone (brief §6), for a caller that already has the grid."""
     acc = _require_access()
+    on = bool(restrictions_on) if tark_tee is None else bool(tark_tee)
     pg = lookahead.page(bucket=("next" if bucket == "next" else "commit"),
-                        route_id=route_id, acc=acc, with_tark_tee=bool(tark_tee))
+                        route_id=route_id, acc=acc, with_restrictions=on)
     out = dict(pg["clashes"])
     out["stock"] = pg["stock"]
     out["commit_week"] = pg["commit_week"]
@@ -1056,7 +1065,8 @@ def forecast_week_clashes(bucket: str = "commit", route_id: Optional[str] = None
 
 @app.get("/api/forecast-weeks/export")
 def forecast_week_export(format: str = "xlsx", bucket: str = "commit",
-                         route_id: Optional[str] = None, tark_tee: int = 1):
+                         route_id: Optional[str] = None, restrictions_on: int = 1,
+                         tark_tee: Optional[int] = None):
     # the export reads the same STORED restriction check the page does — instant
     """
     Browser download of the commit week — xlsx (day × line, stock, clashes) or the PDF
@@ -1064,8 +1074,9 @@ def forecast_week_export(format: str = "xlsx", bucket: str = "commit",
     """
     from fastapi.responses import Response       # not in the test stub; imported here
     acc = _require_access()
+    on = bool(restrictions_on) if tark_tee is None else bool(tark_tee)
     pg = lookahead.page(bucket=("next" if bucket == "next" else "commit"),
-                        route_id=route_id, acc=acc, with_tark_tee=bool(tark_tee))
+                        route_id=route_id, acc=acc, with_restrictions=on)
     cw = pg.get("commit_week") or {}
     stem = f"lookahead-{cw.get('from', 'week')}"
     try:
@@ -1235,7 +1246,7 @@ class ManualIndexIn(BaseModel):
 
 def _costing_payload():
     s = costing.settings(use_cache=False)
-    country = s["fuel"].get("country") or fuel.DEFAULT_COUNTRY
+    country = fuel.norm_country(s["fuel"].get("country"))
     idx = fuel.get_index(country)
     out = {"target": s["target"], "fuel": s["fuel"], "index": fuel.state(country),
            "summary": costing.summary(idx)}
@@ -1268,7 +1279,8 @@ def put_costing_target(body: TargetRatesIn, token: Optional[str] = None):
 @app.get("/api/fuel-index")
 def get_fuel_index(lazy: int = 1, sync: int = 0):
     """
-    The widget's read: the stored EE diesel row (EU Weekly Oil Bulletin via EuroOilWatch),
+    The widget's read: the stored diesel row for the tenant's country (the EU Weekly Oil
+    Bulletin for EU-27, DESNZ weekly road fuel prices for GB, a typed row elsewhere),
     its staleness, the tenant's fuel settings and the BAF. Returns the STORED row at
     once; when the last attempt is older than 12 h it starts one background refresh
     (`lazy=0` to suppress; `sync=1` waits — tests and diagnostics). Never on the page
@@ -1277,7 +1289,7 @@ def get_fuel_index(lazy: int = 1, sync: int = 0):
     _require_access()
     if lazy:
         s = costing.settings()
-        fuel.ensure_fresh(s["fuel"].get("country") or fuel.DEFAULT_COUNTRY, sync=bool(sync))
+        fuel.ensure_fresh(fuel.norm_country(s["fuel"].get("country")), sync=bool(sync))
     return _costing_payload()
 
 
@@ -1286,7 +1298,7 @@ def refresh_fuel_index(sync: int = 0, token: Optional[str] = None):
     """Fetch the feed now (admin). `sync=1` waits for the outcome."""
     _check_admin(token)
     s = costing.settings()
-    fuel.refresh(s["fuel"].get("country") or fuel.DEFAULT_COUNTRY, sync=bool(sync))
+    fuel.refresh(fuel.norm_country(s["fuel"].get("country")), sync=bool(sync))
     return _costing_payload()
 
 
@@ -1310,7 +1322,7 @@ def put_fuel_manual(body: ManualIndexIn, token: Optional[str] = None):
     _check_admin(token)
     s = costing.settings()
     res = fuel.set_manual(body.eur_per_l, body.bulletin_date, by=body.updated_by,
-                          country=s["fuel"].get("country") or fuel.DEFAULT_COUNTRY)
+                          country=fuel.norm_country(s["fuel"].get("country")))
     if not res["ok"]:
         raise HTTPException(400, "; ".join(res["problems"]))
     return _costing_payload()
@@ -2075,6 +2087,43 @@ def clear_routes(token: Optional[str] = None):
 
 
 # ------------------------------------------------------------------ diagnostics
+@app.get("/api/admin/diagnostics/fuel-index")
+def diagnostics_fuel_index(probe: bool = False, country: Optional[str] = None,
+                           token: Optional[str] = None):
+    """
+    H1 (29 Sep 2026). What the diesel-index provider for the tenant's country (or
+    `country=`) would fetch, and with probe=true what the live source actually returns:
+    for GB the gov.uk content API document → the resolved CSV URL → the CSV's head and
+    tail → the parsed row; for EU-27 the EuroOilWatch payload's bulletin date and label.
+    ⚠️ gov.uk is not reachable from the build sandbox, so the DESNZ path has only ever
+    run against fixtures — this endpoint is how the first real run is seen. Runs inline
+    (15 s timeout), writes NOTHING: the stored row is untouched whatever comes back.
+    """
+    _check_admin(token)
+    s = costing.settings(use_cache=False)
+    c = fuel.norm_country(country or s["fuel"].get("country"))
+    out = {"country": c, "no_country": c == fuel.NO_COUNTRY,
+           "provider": fuel.provider_public(c), "stored": fuel.state(c),
+           "urls": ([fuel.DESNZ_CONTENT_API] if (fuel.provider_for(c) or {}).get("key") == "desnz"
+                    else [fuel.FEED_URL] if fuel.provider_for(c) else []),
+           "probe": None,
+           "unverified": ["gov.uk (DESNZ) has never been called from the build sandbox — "
+                          "the CSV column names are matched by header TEXT and may need adjusting "
+                          "after the first real run; read `probe.detail.csv_head`"]}
+    if not probe:
+        return out
+    if not fuel.provider_for(c):
+        out["probe"] = {"skipped": "no automatic series for this country — typed only"}
+        return out
+    try:
+        res = fuel.fetch_and_parse(c, timeout=15)
+        out["probe"] = {"ok": not res.get("error"), "parsed": {k: v for k, v in res.items() if k != "detail"},
+                        "detail": res.get("detail")}
+    except Exception as e:
+        out["probe"] = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:300]}"}
+    return out
+
+
 @app.get("/api/admin/diagnostics/factors")
 def diagnostics_factors(token: Optional[str] = None):
     """
@@ -2502,11 +2551,13 @@ def diagnostics_haul_roads(route_id: Optional[str] = None,
                             profile=profile, probe=probe)
 
 
-# ------------------------------------- Tark Tee restrictions (Phase 2.5a)
+# ------------------------------------- Road restrictions (Phase 2.5a Tark Tee; H1 a provider per country)
 @app.get("/api/restrictions")
 def get_restrictions(layers: Optional[str] = None, include_expired: bool = False):
     """
-    Estonian Transport Administration restriction layers as WGS84 GeoJSON.
+    The tenant's country's road-restriction layers as WGS84 GeoJSON — Tark Tee's six
+    for EE, National Highways' planned closures for GB, an empty collection with a note
+    for a country without a provider. The rest of this docstring is Tark Tee's.
 
     Proxied rather than fetched from the browser for three reasons, in order: it is
     somebody else's public service and this caches it to one request per layer per half
@@ -2537,12 +2588,12 @@ def restriction_layers():
     """
     prov = restrictions.provider()
     if not prov:
-        # a tenant outside the provider's country: nothing to list, and the map hides
-        # the panel on `provider: null` rather than showing an empty one
-        return {"layers": [], "match_m": restrictions.MATCH_M, "provider": None,
+        # a tenant without a provider: nothing to list, and the map hides the panel on
+        # `provider: null` rather than showing an empty one
+        return {"layers": [], "match_m": restrictions.match_m(), "provider": None,
                 "attribution": None, "note": restrictions.NO_PROVIDER_NOTE}
-    return {"layers": [dict(v, key=k) for k, v in restrictions.LAYERS.items()],
-            "match_m": restrictions.MATCH_M,
+    return {"layers": [dict(v, key=k) for k, v in restrictions.layers().items()],
+            "match_m": restrictions.match_m(),
             "provider": prov,
             "attribution": prov["attribution"]}
 
@@ -2577,7 +2628,8 @@ def all_route_restrictions(profile: Optional[str] = None):
 def diagnostics_restrictions(layer: Optional[str] = None, probe: bool = False,
                              token: Optional[str] = None):
     """
-    What this asks Tark Tee for, and with probe=true what comes back — including the raw
+    What this asks the tenant's provider (Tark Tee / National Highways) for, and with
+    probe=true what comes back — for Tark Tee including the raw
     coordinate next to the converted one, so the WKID mislabelling is visible rather than
     taken on trust. Spends no HERE calls and no Google quota.
     """
@@ -2587,7 +2639,7 @@ def diagnostics_restrictions(layer: Optional[str] = None, probe: bool = False,
 
 @app.post("/api/admin/restrictions/refresh")
 def refresh_restrictions(token: Optional[str] = None):
-    """Drop the cache so the next request re-fetches from Tark Tee."""
+    """Drop the cache so the next request re-fetches from the provider."""
     _check_admin(token)
     return restrictions.clear_cache()
 

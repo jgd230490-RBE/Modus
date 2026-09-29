@@ -223,9 +223,9 @@ def horizon_rows(commit_mi, commit_wi, route_id=None):
                       "make-ready": list(following), "early-warning": list(after)}}
 
 
-def tark_tee_status(bucket="commit", route_id=None, acc=None, today=None):
+def restriction_status(bucket="commit", route_id=None, acc=None, today=None):
     """
-    The stored TARK_TEE flags for the caller's lines, plus how current they are and
+    The stored RESTRICTION flags for the caller's lines (in this bucket's week), plus how current they are and
     whether a refresh is running — the page polls this while a refresh runs.
     """
     acc = acc if acc is not None else access.current()
@@ -233,16 +233,19 @@ def tark_tee_status(bucket="commit", route_id=None, acc=None, today=None):
     derived.decorate(full)
     visible = access.filter_lines(list(full["lines"]), acc)
     vis_keys = {clashes.line_key(l) for l in visible}
-    flags, source = clashes.tark_tee(full["lines"])
+    cw = full.get("commit_week") or {}
+    flags, source = clashes.restriction(full["lines"], cw.get("month_index"), cw.get("week_index"))
     vis = [f for f in flags
            if (f["route_id"], int(f["month_index"]), f["discipline"], f["section_id"]) in vis_keys]
     return {"flags": vis, "count": len(vis), "status": source["status"],
             "checked_at": source["checked_at"], "unchecked": source["unchecked"],
             "routes": source["routes"], "refresh": restrictions.refresh_state(),
-            "commit_week": full.get("commit_week")}
+            "provider": source.get("provider"), "flag_label": source.get("flag_label"),
+            "ui_label": (restrictions.provider() or {}).get("ui_label"),
+            "week": source.get("week"), "commit_week": full.get("commit_week")}
 
 
-def page(bucket="commit", route_id=None, acc=None, with_tark_tee=True, today=None):
+def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today=None):
     acc = acc if acc is not None else access.current()
     factors = None
     # the commit bucket's days, for EVERY line (clash sums), then filtered
@@ -333,7 +336,7 @@ def page(bucket="commit", route_id=None, acc=None, with_tark_tee=True, today=Non
 
     # the rail, on the unfiltered lines, returned for the visible ones
     cl = clashes.compute(all_lines, vis_keys, acct_all["rows"], mi, wi,
-                         with_tark_tee=with_tark_tee)
+                         with_restrictions=with_restrictions)
     out["stock"] = cl.pop("stock")
     out["clashes"] = cl
     return out

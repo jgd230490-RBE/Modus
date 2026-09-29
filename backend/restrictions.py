@@ -1,5 +1,30 @@
 """
-Phase 2.5a — Estonian Transport Administration (Tark Tee) restriction layers.
+Road restrictions — ONE interface, a provider per country (H1, 29 Sep 2026).
+
+    EE  Tark Tee (Phase 2.5a): the Estonian Transport Administration's ArcGIS REST server
+        at tarktee.ee — mass, height and width limits, weak bridges, traffic restrictions
+        and diversions. Mostly UNDATED, standing limits; a hit is a fact about the road.
+    GB  National Highways — Public Scheduled Road Closures (H1): a keyless ArcGIS
+        FeatureServer (OGL v3, refreshed daily) of PLANNED closures on the strategic road
+        network, each with a scheduled start and end. DATED events, not limits: a hit only
+        matters in the weeks it overlaps, which is what the Look-ahead's clash rail tests
+        (clashes.restriction — HU4, decided 29 Sep: route overlap within 100 m, in the
+        week). Local roads (Street Manager) need a push receiver and are deferred; height
+        and weight limits on GB roads are HERE's job at bake time, not this feed's.
+    —   any other country: no provider. Endpoints answer "none", the map hides the panel,
+        the clash rail has no restriction source. (Unchanged from G2.)
+
+`PROVIDERS` is the registry; `provider()` is the tenant's provider as the API shows it
+(labels, attribution, the match distance, the flag word — "TARK TEE" or "ROADWORKS");
+`fetch_all()` dispatches. Everything below the fetch — the matching maths, the stored
+per-route check, the refresh thread — is shared, and a hit carries `from` / `to` dates
+whichever provider it came from (NULL = open-ended, exactly as before).
+
+⚠️ NEITHER SOURCE IS REACHABLE FROM THE BUILD SANDBOX. The NH feed's field names come
+from its published layer schema (26 Sep research) and are matched case-insensitively;
+`/api/admin/diagnostics/restrictions?probe=true` on the deployment shows the raw record.
+
+The rest of this docstring is Tark Tee's, unchanged.
 
 Tark Tee publishes an ArcGIS REST server at tarktee.ee carrying exactly the data this
 project has been recording by hand: mass, height and width restrictions, weak bridges,
@@ -68,16 +93,56 @@ BASE = "https://tarktee.ee/tarktee/rest/services"
 # ---------------------------------------------------------------------------- #
 #  The provider, and which tenants get it — G2, 16 Sep 2026                     #
 # ---------------------------------------------------------------------------- #
-# This module wraps ONE country's road authority. A tenant whose country is not that
-# one has no restriction provider: the endpoints answer "none" at once, the map hides
-# the panel, and the clash rail's restriction source is simply absent. A second
-# country's authority is a second module behind the same functions — not a flag here.
-PROVIDER = {
+# A tenant whose country has no entry here has no restriction provider: the endpoints
+# answer "none" at once, the map hides the panel, and the clash rail's restriction
+# source is simply absent. H1 added GB beside EE behind the same functions.
+TARK_TEE = {
+    "key": "tark_tee",
     "country": "EE",
     "short": "Tark Tee",
     "name": "Estonian Transport Administration",
     "site": "tarktee.ee",
     "attribution": "Estonian Transport Administration — Tark Tee (tarktee.ee)",
+    "licence": None,
+    "ui_label": "Road restrictions (Tark Tee)",
+    "flag_label": "TARK TEE",
+    "kind_word": "restriction",
+    "match_m": 30.0,        # see MATCH_M below
+    "dated": False,         # standing limits; a hit applies until its date_to, if any
+}
+NATIONAL_HIGHWAYS = {
+    "key": "nh_closures",
+    "country": "GB",
+    "short": "National Highways",
+    "name": "National Highways — Public Scheduled Road Closures",
+    "site": "nationalhighways.co.uk",
+    "attribution": "National Highways — Public Scheduled Road Closures (Open Government Licence v3)",
+    "licence": "OGL v3",
+    "ui_label": "Road closures (National Highways)",
+    "flag_label": "ROADWORKS",
+    "kind_word": "planned closure",
+    # HU4 (decided 29 Sep): a closure counts when its extent runs within 100 m of the
+    # baked route — wider than Tark Tee's 30 m because a closure's polyline is the
+    # authority's own road geometry, not HERE's, and the two differ by a lane or two.
+    "match_m": 100.0,
+    "dated": True,          # a planned event with a start and an end
+}
+PROVIDERS = {"EE": TARK_TEE, "GB": NATIONAL_HIGHWAYS}
+PROVIDER = TARK_TEE         # the pre-H1 name: Tark Tee's block (test_modus, test_phase25a)
+
+# National Highways — the layer and its published field names (case-insensitive match).
+NH_QUERY_URL = ("https://services-eu1.arcgis.com/mZXeBXkkZpekxjXT/arcgis/rest/services/"
+                "PublicScheduledRoadClosures/FeatureServer/0/query")
+NH_PAGE = 1000               # the service's maxRecordCount per the published schema
+NH_MAX_PAGES = 20            # 20,000 records: far above the feed's size; a guard, not a limit
+NH_FIELDS = {                # published name → the property name the rest of this module reads
+    "scheduledplannedstartdate": "date_from",
+    "scheduledplannedenddate": "date_to",
+    "description": "description",
+    "road_number": "road_nr",
+    "eventtype": "event_type",
+    "natureofworks": "nature",
+    "formattedeventnumber": "event_number",
 }
 
 
@@ -97,14 +162,38 @@ def tenant_country():
         return None
 
 
+def provider_for(country):
+    """The provider block for a country code, or None."""
+    return PROVIDERS.get(str(country or "").strip().upper())
+
+
+def current():
+    """The tenant's provider block, or None."""
+    return provider_for(tenant_country())
+
+
 def enabled():
-    """Is the tenant in the provider's country? A null country means no provider."""
-    return (tenant_country() or "").upper() == PROVIDER["country"]
+    """Does the tenant's country have a provider? A null country means no provider."""
+    return current() is not None
 
 
 def provider():
     """The provider block for API responses, or None when the tenant has none."""
-    return dict(PROVIDER) if enabled() else None
+    return dict(current()) if enabled() else None
+
+
+def match_m():
+    """The matching distance the tenant's provider uses (Tark Tee 30 m, NH 100 m)."""
+    p = current()
+    return float(p["match_m"]) if p else MATCH_M
+
+
+def layers():
+    """The tenant's provider's layer table (Tark Tee's six, or NH's one)."""
+    p = current()
+    if not p:
+        return {}
+    return NH_LAYERS if p["key"] == "nh_closures" else LAYERS
 
 
 def _none_fc(note):
@@ -160,6 +249,16 @@ LAYERS = {
         "dimension": None, "unit": None, "colour": "#EA580C"},
 }
 
+#: National Highways: one layer. `colour` is the stop red — a closure is the road being
+#: shut on a date, which is the strongest thing either provider can say.
+NH_LAYERS = {
+    "nh_closures": {
+        "service": "PublicScheduledRoadClosures", "label": "Planned road closures",
+        "severity": "warn", "dimension": None, "unit": None, "colour": "#DC2626"},
+}
+#: Every kind either provider can stamp on a feature, for the shared display helpers.
+ALL_LAYERS = dict(LAYERS, **NH_LAYERS)
+
 #: Estonian enum values that appear in `cause` and `effect` on the traffic layer, so the
 #: UI shows "Complete closure" rather than "COMPLETE_CLOSURE". Anything not listed is
 #: title-cased rather than hidden — an unknown cause is still worth reading.
@@ -203,9 +302,19 @@ _cache = {}          # key -> (fetched_at, payload)
 # dropped are reported rather than hidden, because "312 records, 4 in force" is useful and
 # an unexplained near-empty layer looks broken.
 def _epoch_ms(v):
-    """Tark Tee dates are epoch milliseconds. Returns a date, or None."""
+    """Tark Tee and NH dates are epoch milliseconds. Returns a date, or None. H1: an ISO
+    date or datetime string is accepted too, in case a feed is ever switched to f=json
+    with date formatting — a guess about the live NH service would otherwise read as
+    'no dates', which the probe would show but the rail would silently miss."""
     if v in (None, ""):
         return None
+    if isinstance(v, str):
+        t = v.strip()
+        if not t.replace(".", "", 1).lstrip("-").isdigit():
+            try:
+                return datetime.fromisoformat(t.replace("Z", "+00:00")).date()
+            except ValueError:
+                return None
     try:
         return datetime.fromtimestamp(float(v) / 1000.0, tz=timezone.utc).date()
     except (TypeError, ValueError, OSError, OverflowError):
@@ -316,7 +425,7 @@ def _limit(props):
     ArcGIS hands back float32 widened to double, so 4.15 arrives as 4.150000095367432;
     rounded here once rather than in three display paths.
     """
-    spec = LAYERS.get(props.get("_kind")) or {}
+    spec = ALL_LAYERS.get(props.get("_kind")) or {}
     if not spec.get("dimension"):
         return None, None
     v = props.get("restriction_limit")
@@ -340,6 +449,12 @@ def _headline(props):
     val, unit = _limit(props)
     if val is not None:
         return f"{val:g} {unit} {LAYERS[kind]['label'].replace(' limits', '').lower()} limit"
+    if kind == "nh_closures":
+        bits = [b for b in (props.get("road_nr"), props.get("event_type"), props.get("nature")) if b]
+        head = "Planned closure" + (f" · {' · '.join(str(b) for b in bits)}" if bits else "")
+        if props.get("_from") or props.get("_to"):
+            head += f" ({props.get('_from') or '…'} → {props.get('_to') or '…'})"
+        return head
     if kind == "bridges_weak":
         nl = props.get("nominal_load")
         return f"Weak bridge · load class {nl}" if nl else "Weak bridge · no load class recorded"
@@ -350,7 +465,7 @@ def _headline(props):
                 _CAUSES.get(cause, (cause or "").replace("_", " ").capitalize() or None)]
         bits = [b for b in bits if b]
         return " · ".join(bits) if bits else (LAYERS[kind]["label"])
-    return LAYERS.get(kind, {}).get("label") or "Restriction"
+    return ALL_LAYERS.get(kind, {}).get("label") or "Restriction"
 
 
 def _enrich(props, key, spec, layer_name):
@@ -363,9 +478,9 @@ def _enrich(props, key, spec, layer_name):
     val, unit = _limit(props)
     props["_limit"] = val
     props["_unit"] = unit
-    props["_headline"] = _headline(props)
     props["_from"] = _iso(props.get("date_from"))
     props["_to"] = _iso(props.get("date_to"))
+    props["_headline"] = _headline(props)         # after the dates: a closure's names them
     props["_in_force"] = in_force(props)
     # km_from/km_to are chainage along the numbered road, and they arrive as float32 noise
     for k in ("km_from", "km_to"):
@@ -417,7 +532,7 @@ def fetch_layer(key, current_only=True):
         return {"type": "FeatureCollection", "features": feats,
                 "layer": key, "label": spec["label"], "severity": spec["severity"],
                 "colour": spec["colour"],
-                "source": "Estonian Transport Administration — Tark Tee",
+                "source": TARK_TEE["attribution"],
                 "fetched_layers": len(_service_layers(service)),
                 "errors": errors}
 
@@ -432,9 +547,100 @@ def fetch_layer(key, current_only=True):
     return out
 
 
+def _nh_props(raw):
+    """NH's published field names → this module's property names, case-insensitively,
+    with the published name kept beside it so nothing is lost. Dates are epoch ms as
+    published (the shared date helpers read them)."""
+    props = {}
+    low = {str(k).lower(): v for k, v in (raw or {}).items()}
+    for src, dst in NH_FIELDS.items():
+        if src in low:
+            props[dst] = low[src]
+    # the published record is NOT carried on the served feature (thousands of closures ×
+    # every field would double the map's payload); the probe shows it instead
+    return props
+
+
+def _nh_page(offset, count=NH_PAGE, timeout=None):
+    q = urllib.parse.urlencode({
+        "where": "1=1", "outFields": "*", "f": "geojson", "returnGeometry": "true",
+        "outSR": "4326", "resultOffset": int(offset), "resultRecordCount": int(count),
+    })
+    return _get(f"{NH_QUERY_URL}?{q}")
+
+
+def fetch_nh_closures(current_only=True):
+    """
+    Every planned closure on the strategic road network as one WGS84 FeatureCollection,
+    paged through the FeatureServer (1000 per call, `resultOffset`). `current_only`
+    drops closures that have already ENDED — future ones are the point of the feed and
+    are kept; the clash rail decides per week. Cached like a Tark Tee layer.
+    """
+    spec = NH_LAYERS["nh_closures"]
+
+    def build():
+        feats, errors, pages = [], [], 0
+        offset = 0
+        while pages < NH_MAX_PAGES:
+            try:
+                raw = _nh_page(offset)
+            except Exception as e:
+                errors.append(f"page {pages} (offset {offset}): {str(e)[:160]}")
+                break
+            got = raw.get("features") or []
+            for f in got:
+                geom = _fix_geometry(f.get("geometry"))
+                if not geom:
+                    continue
+                props = _enrich(_nh_props(f.get("properties")), "nh_closures", spec,
+                                "PublicScheduledRoadClosures")
+                feats.append({"type": "Feature", "properties": props, "geometry": geom})
+            pages += 1
+            more = bool(raw.get("exceededTransferLimit")
+                        or (isinstance(raw.get("properties"), dict)
+                            and raw["properties"].get("exceededTransferLimit")))
+            if not more and len(got) < NH_PAGE:
+                break
+            if not got:
+                break
+            offset += len(got)
+        return {"type": "FeatureCollection", "features": feats,
+                "layer": "nh_closures", "label": spec["label"], "severity": spec["severity"],
+                "colour": spec["colour"], "source": NATIONAL_HIGHWAYS["attribution"],
+                "fetched_layers": 1, "pages": pages, "errors": errors}
+
+    fc = _cached("lyr:nh_closures", CACHE_TTL_S, build)
+    if fc.get("error") or not current_only:
+        return fc
+    today = datetime.now(timezone.utc).date()
+    live = []
+    for f in fc["features"]:
+        b = _epoch_ms((f["properties"] or {}).get("date_to"))
+        if b and today > b:
+            continue                      # ended — the only thing current_only drops here
+        live.append(f)
+    out = dict(fc)
+    out["features"] = live
+    out["total_records"] = len(fc["features"])
+    out["expired_or_future"] = len(fc["features"]) - len(live)   # here: ENDED only
+    return out
+
+
 def fetch_all(keys=None, current_only=True):
     if not enabled():
         return _none_fc(NO_PROVIDER_NOTE)
+    p = current()
+    if p["key"] == "nh_closures":
+        fc = fetch_nh_closures(current_only=current_only)
+        return {"type": "FeatureCollection", "features": fc.get("features") or [],
+                "layers": ["nh_closures"],
+                "errors": ({"nh_closures": fc["errors"]} if fc.get("errors") else {}),
+                "counts": {"nh_closures": len(fc.get("features") or [])},
+                "current_only": current_only,
+                "total_records": fc.get("total_records", len(fc.get("features") or [])),
+                "expired_or_future": fc.get("expired_or_future", 0),
+                "pages": fc.get("pages"),
+                "attribution": p["attribution"], "provider": p["key"]}
     keys = [k for k in (keys or list(LAYERS)) if k in LAYERS]
     out, errors, counts = [], {}, {}
     total, dropped = 0, 0
@@ -458,7 +664,7 @@ def fetch_all(keys=None, current_only=True):
             "total_records": total,
             # surfaced, not swallowed: the layers carry a lot of 2017
             "expired_or_future": dropped,
-            "attribution": "Estonian Transport Administration — Tark Tee (tarktee.ee)"}
+            "attribution": TARK_TEE["attribution"], "provider": TARK_TEE["key"]}
 
 
 # --------------------------------------------------------------------------- #
@@ -569,11 +775,17 @@ def assess(props, profile):
     on a bridge a 44 t artic cannot cross.
     """
     kind = props.get("_kind")
-    spec = LAYERS.get(kind) or {}
+    spec = ALL_LAYERS.get(kind) or {}
     dim = spec.get("dimension")
     limit, unit = _limit(props)
     dims = vehicle_dimensions(profile)
     have = dims.get(dim) if dim else None
+
+    if kind == "nh_closures":
+        return {"verdict": "unknown", "dimension": None, "limit": None, "unit": None,
+                "vehicle": None, "margin": None,
+                "note": "a dated planned closure, not a dimension limit — read the description; "
+                        "the Look-ahead flags it only in the weeks it overlaps"}
 
     if dim and limit is not None and have is not None:
         return {"verdict": "exceeds" if have > limit else "within",
@@ -615,6 +827,11 @@ def _describe(props):
     road = props.get("road_name") or (f"road {props['road_nr']}" if props.get("road_nr") else None)
     if road and str(road) not in base:
         base = f"{base} — {road}"
+    if props.get("_kind") == "nh_closures":
+        if props.get("description") and str(props["description"]) not in base:
+            base = f"{base} — {str(props['description'])[:160]}"
+        if props.get("event_number"):
+            base += f" [{props['event_number']}]"
     a, b = props.get("km_from"), props.get("km_to")
     if isinstance(a, (int, float)) and isinstance(b, (int, float)) and (a or b):
         base += f" (km {a:g}–{b:g})"
@@ -648,6 +865,7 @@ def check_route(route_id, profile=None, layers=None, _fc=None):
 
     fc = _fc if _fc is not None else fetch_all(layers)
     feats = fc.get("features") or []
+    mm = match_m()
 
     hits, seen = [], set()
     for g in rows:
@@ -658,11 +876,11 @@ def check_route(route_id, profile=None, layers=None, _fc=None):
         gross_t = vehicle_dimensions(g["vehicle_profile"]).get("mass_t")
         for f in feats:
             d = _min_distance_km(f.get("geometry"), line)
-            if d is None or d * 1000.0 > MATCH_M:
+            if d is None or d * 1000.0 > mm:
                 continue
             p = f.get("properties") or {}
             key = (g["vehicle_profile"], g["leg"], p.get("_kind"),
-                   p.get("objectid"), _describe(p))
+                   p.get("objectid") or p.get("event_number"), _describe(p))
             if key in seen:
                 continue
             seen.add(key)
@@ -693,6 +911,12 @@ def check_route(route_id, profile=None, layers=None, _fc=None):
             if p.get("_kind") == "bridges_weak":
                 hit["nominal_load"] = p.get("nominal_load") or None
                 hit["construction_year"] = p.get("construction_year")
+            if p.get("_kind") == "nh_closures":
+                hit["description"] = p.get("description") or None
+                hit["event_type"] = p.get("event_type") or None
+                hit["nature"] = p.get("nature") or None
+                hit["event_number"] = p.get("event_number") or None
+                hit["provider"] = "nh_closures"
             if p.get("_kind") in ("restrictions_traffic", "detours"):
                 hit["cause"] = _CAUSES.get(p.get("cause"), p.get("cause"))
                 hit["effect"] = _EFFECTS.get(p.get("effect"), p.get("effect"))
@@ -715,7 +939,9 @@ def check_route(route_id, profile=None, layers=None, _fc=None):
         "warn_count": len([h for h in hits if h["severity"] == "warn"]),
         "note_count": len([h for h in hits if h["severity"] == "note"]),
         "unjudged_count": len([h for h in hits if h["verdict"] == "unknown"]),
-        "match_m": MATCH_M,
+        "match_m": mm,
+        "provider": (current() or {}).get("key"),
+        "flag_label": (current() or {}).get("flag_label"),
         "layers_checked": fc.get("layers"),
         "current_only": fc.get("current_only", True),
         "expired_or_future_excluded": fc.get("expired_or_future", 0),
@@ -871,7 +1097,7 @@ def refresh_async(route_ids=None, sync=False):
     if sync:
         run()
     else:
-        threading.Thread(target=run, name="tarktee-refresh", daemon=True).start()
+        threading.Thread(target=run, name="restrictions-refresh", daemon=True).start()
     return refresh_state()
 
 
@@ -887,10 +1113,14 @@ def diagnostics(layer=None, probe=False):
     as it arrived and `sample_converted` shows it after `projection.normalise()`, so the
     mislabelling is visible rather than asserted.
     """
+    p_cur = current()
+    if p_cur and p_cur["key"] == "nh_closures":
+        return _nh_diagnostics(probe)
     out = {
+        "provider": provider(),
         "base": BASE,
         "layers": {k: dict(v, key=k) for k, v in LAYERS.items()},
-        "match_m": MATCH_M,
+        "match_m": match_m(),
         "cache_ttl_s": CACHE_TTL_S,
         "cache": cache_state(),
         "probe": None,
@@ -937,5 +1167,69 @@ def diagnostics(layer=None, probe=False):
     return out
 
 
+def _nh_diagnostics(probe=False):
+    """What this module asks National Highways for, and with probe=true what comes back:
+    the raw property names of the first record (the field mapping is by published name
+    and has never been checked against the live service from a session), the declared
+    CRS, a sample geometry before and after normalisation, and the paging flag."""
+    out = {
+        "provider": provider(),
+        "base": NH_QUERY_URL,
+        "layers": {k: dict(v, key=k) for k, v in NH_LAYERS.items()},
+        "field_map": dict(NH_FIELDS),
+        "match_m": match_m(),
+        "cache_ttl_s": CACHE_TTL_S,
+        "cache": cache_state(),
+        "probe": None,
+        "unverified": [
+            "the NH FeatureServer has never been called from the build sandbox — the field "
+            "names in field_map come from its published schema (26 Sep) and are matched "
+            "case-insensitively; a rename at source would show as empty dates here",
+            "whether outSR=4326 is honoured (projection.normalise() converts only when a "
+            "coordinate looks projected, so either way is drawn correctly)",
+            "whether exceededTransferLimit is reported at the top level or under properties "
+            "in f=geojson output (both are read)",
+            f"whether {match_m():g} m is the right matching distance against HERE's polylines",
+        ],
+    }
+    if not probe:
+        return out
+    p = {}
+    try:
+        q = urllib.parse.urlencode({"where": "1=1", "outFields": "*", "f": "geojson", "returnGeometry": "true",
+                                    "outSR": "4326", "resultOffset": 0, "resultRecordCount": 3})
+        p["url"] = f"{NH_QUERY_URL}?{q}"
+        raw = _nh_page(0, count=3)          # the production path, three records
+        p["declared_crs"] = raw.get("crs") or raw.get("spatialReference")
+        p["exceeded_transfer_limit"] = raw.get("exceededTransferLimit", (raw.get("properties") or {}).get("exceededTransferLimit") if isinstance(raw.get("properties"), dict) else None)
+        feats = raw.get("features") or []
+        p["records_returned"] = len(feats)
+        sample = feats[0] if feats else {}
+        p["sample_property_names"] = sorted((sample.get("properties") or {}).keys())
+        p["sample_properties"] = sample.get("properties")
+        p["sample_mapped"] = dict(_nh_props(sample.get("properties")))
+        mapped = _nh_props(sample.get("properties"))
+        p["sample_dates"] = {"from": _iso(mapped.get("date_from")), "to": _iso(mapped.get("date_to"))}
+        geom = sample.get("geometry") or {}
+        p["sample_geometry_type"] = geom.get("type")
+        c = geom.get("coordinates")
+        first = c
+        while isinstance(first, list) and first and isinstance(first[0], list):
+            first = first[0]
+        p["sample_raw_first_coordinate"] = first
+        fixed = _fix_geometry(geom)
+        f2 = (fixed or {}).get("coordinates")
+        while isinstance(f2, list) and f2 and isinstance(f2[0], list):
+            f2 = f2[0]
+        p["sample_converted_first_coordinate"] = f2
+        p["reading"] = ("field map found start and end dates" if p["sample_dates"]["from"] or p["sample_dates"]["to"]
+                        else "⚠️ no start/end date found through the field map — read sample_property_names and fix NH_FIELDS")
+    except Exception as e:
+        p["error"] = str(e)[:400]
+    out["probe"] = p
+    return out
+
+
 def summary():
-    return {"layers": sorted(LAYERS), "cache": cache_state(), "match_m": MATCH_M}
+    return {"provider": (current() or {}).get("key"), "layers": sorted(layers()),
+            "cache": cache_state(), "match_m": match_m()}

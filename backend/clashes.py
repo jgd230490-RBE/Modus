@@ -12,7 +12,11 @@ be reached — Tark Tee. Nothing here is stored, nothing here refuses a confirm.
                     on that route_id — across EVERY IPT — exceed it
     IPT_SHARE       two or more IPTs with quantity the same day on the same route_id,
                     or the same origin+dest, or the same haul-road id
-    TARK_TEE        a Tark Tee restriction intersects the route's baked geometry
+    RESTRICTION     the country's road-restriction provider has a hit on the route's
+                    baked geometry — a Tark Tee limit (EE), or a National Highways
+                    planned closure (GB) whose dates overlap THIS week (HU4, 29 Sep).
+                    Shown with the provider's word: "TARK TEE" / "ROADWORKS". Until H1
+                    the code was TARK_TEE.
     UNBAKED         quantity on a route not baked for the line's vehicle (slice 2)
     PARENT_CHANGED  the month moved under a set week (Task C's flag, surfaced)
 
@@ -24,9 +28,10 @@ Rules that are the module, not details:
   the whole tenant's decorated lines and the flags are then filtered to what the
   caller may see by `line_key` — the other IPT's quantity is never in the response,
   only the fact that it exists.
-* **A source that cannot be reached says so.** Tark Tee is live data; when it is down
-  the rail must not read "no restrictions" — `sources.tark_tee` is 'unavailable' and no
-  TARK_TEE flag is raised or suppressed. Never cache a failure (warning-stack lesson).
+* **A source that cannot be reached says so.** The restriction provider is live data;
+  when it is down the rail must not read "no restrictions" — `sources.restrictions` is
+  'unavailable' and no RESTRICTION flag is raised or suppressed. Never cache a failure
+  (warning-stack lesson).
   🔴 **And the LIVE check is never on a page read.** The page reads the STORED per-route
   check (restrictions.store_checks, run on demand or after a bake) and reports its age;
   a route never checked is listed as such, not shown clean.
@@ -40,7 +45,7 @@ import restrictions
 import stockpiles
 import weeks
 
-CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "IPT_SHARE", "TARK_TEE",
+CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "IPT_SHARE", "RESTRICTION",
          "UNBAKED", "PARENT_CHANGED")
 
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
@@ -187,7 +192,7 @@ def ipt_share(lines):
 
 
 # --------------------------------------------------------------------------- #
-#  Stock and Tark Tee                                                          #
+#  Stock and road restrictions                                                 #
 # --------------------------------------------------------------------------- #
 def stock_forecast(lines, month_index, week_index):
     """
@@ -248,11 +253,35 @@ def stockpile_over(lines, stock):
     return out
 
 
-def tark_tee(lines):
+def _overlaps_week(hit, week_from, week_to):
     """
-    TARK_TEE from the STORED per-route check (restrictions.store_checks) — a DB read,
-    instant, always part of the page. Returns (flags, source) where source says how
-    current the stored result is:
+    HU4 (decided 29 Sep 2026): a DATED hit counts only in the weeks it overlaps. `from`
+    and `to` are ISO dates on the stored hit (NULL = open-ended, as in restrictions.
+    in_force). An undated hit — a Tark Tee mass or height limit — always counts. With
+    no week given (a caller without a bucket) every hit counts, as before H1.
+    """
+    if week_from is None or week_to is None:
+        return True
+    a, b = hit.get("from"), hit.get("to")
+    try:
+        a = datetime.date.fromisoformat(str(a)[:10]) if a else None
+        b = datetime.date.fromisoformat(str(b)[:10]) if b else None
+    except ValueError:
+        return True                       # an unreadable date must not hide a hit
+    if a and a > week_to:
+        return False
+    if b and b < week_from:
+        return False
+    return True
+
+
+def restriction(lines, month_index=None, week_index=None):
+    """
+    RESTRICTION from the STORED per-route check (restrictions.store_checks) — a DB read,
+    instant, always part of the page. `month_index` / `week_index` name the bucket the
+    lines belong to, so a dated hit (a planned closure) is raised only when its dates
+    overlap that week. Returns (flags, source) where source says how current the stored
+    result is:
 
         status      'ok' every route on the page has a stored check
                     'partial' some have, some never checked (or re-baked since)
@@ -267,32 +296,46 @@ def tark_tee(lines):
     A stored result is never a silent clean: the source block carries its age.
     """
     routes = sorted({l["route_id"] for l in lines if (l.get("context") or {}).get("baked")})
+    prov = restrictions.provider() or {}
     if not routes:
-        return [], {"status": "skipped", "checked_at": None, "unchecked": [], "routes": []}
+        return [], {"status": "skipped", "checked_at": None, "unchecked": [], "routes": [],
+                    "provider": prov.get("key"), "flag_label": prov.get("flag_label")}
+    wf = wt = None
+    if month_index is not None and week_index is not None:
+        try:
+            wf, wt = weeks.week_span(int(month_index), int(week_index))
+        except Exception:
+            wf = wt = None
     stored = restrictions.stored_checks(routes)
     unchecked = [r for r in routes if not (stored.get(r) or {}).get("checked_at")]
     checked = [stored[r]["checked_at"] for r in routes if (stored.get(r) or {}).get("checked_at")]
     status = ("unchecked" if len(unchecked) == len(routes)
               else "partial" if unchecked else "ok")
     out = []
+    word = prov.get("kind_word") or "restriction"
     for l in lines:
         st = stored.get(l["route_id"]) or {}
-        hits = st.get("hits") or []
+        hits = [h for h in (st.get("hits") or []) if isinstance(h, dict) and _overlaps_week(h, wf, wt)]
         if hits:
-            first = hits[0] if isinstance(hits[0], dict) else {}
-            what = first.get("headline") or first.get("layer") or "a restriction"
-            out.append(_flag("TARK_TEE", l,
+            first = hits[0]
+            what = first.get("headline") or first.get("layer") or f"a {word}"
+            extra = {"from": first.get("from"), "to": first.get("to")} if prov.get("dated") else {}
+            out.append(_flag("RESTRICTION", l,
                              f"{_label(l)} crosses {what}" + (f" (+{len(hits) - 1} more)" if len(hits) > 1 else ""),
-                             hits=len(hits), checked_at=st.get("checked_at")))
+                             hits=len(hits), checked_at=st.get("checked_at"),
+                             label=prov.get("flag_label") or "RESTRICTION",
+                             provider=prov.get("key"), **extra))
     return out, {"status": status, "checked_at": (min(checked) if checked else None),
-                 "unchecked": unchecked, "routes": routes}
+                 "unchecked": unchecked, "routes": routes,
+                 "provider": prov.get("key"), "flag_label": prov.get("flag_label"),
+                 "week": ([wf.isoformat(), wt.isoformat()] if wf and wt else None)}
 
 
 # --------------------------------------------------------------------------- #
 #  The rail                                                                    #
 # --------------------------------------------------------------------------- #
 def compute(all_lines, visible_keys, account_rows, month_index, week_index,
-            with_tark_tee=True):
+            with_restrictions=True):
     """
     Every flag for the visible lines. `all_lines` is the WHOLE tenant's decorated lines
     (cross-IPT sums need them); `visible_keys` is the set of line_key() the caller may
@@ -304,11 +347,13 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     flags += route_cap(all_lines)
     flags += ipt_share(all_lines)
     flags += stockpile_over(all_lines, stock)
-    # the STORED check — a DB read, so it is always on. `with_tark_tee=False` is for a
+    # the STORED check — a DB read, so it is always on. `with_restrictions=False` is for a
     # caller that wants the rail without it (none today).
-    tt_source = {"status": "off", "checked_at": None, "unchecked": [], "routes": []}
-    if with_tark_tee:
-        tt, tt_source = tark_tee(all_lines)
+    prov = restrictions.provider() or {}
+    tt_source = {"status": "off", "checked_at": None, "unchecked": [], "routes": [],
+                 "provider": prov.get("key"), "flag_label": prov.get("flag_label")}
+    if with_restrictions:
+        tt, tt_source = restriction(all_lines, month_index, week_index)
         flags += tt
     vis = [f for f in flags
            if (f["route_id"], int(f["month_index"]), f["discipline"], f["section_id"]) in visible_keys]
@@ -319,7 +364,11 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
         by_code[f["code"]] = by_code.get(f["code"], 0) + 1
     return {"flags": vis, "count": len(vis), "by_code": by_code,
             "codes": list(CODES), "hold_band": HOLD_BAND,
-            "sources": {"tark_tee": tt_source["status"], "tark_tee_checked_at": tt_source["checked_at"],
-                        "tark_tee_unchecked": tt_source["unchecked"],
-                        "tark_tee_refresh": restrictions.refresh_state()},
+            "sources": {"restrictions": tt_source["status"], "restrictions_checked_at": tt_source["checked_at"],
+                        "restrictions_unchecked": tt_source["unchecked"],
+                        "restrictions_refresh": restrictions.refresh_state(),
+                        "restrictions_provider": tt_source.get("provider"),
+                        "restrictions_label": tt_source.get("flag_label"),
+                        "restrictions_ui_label": prov.get("ui_label"),
+                        "restrictions_week": tt_source.get("week")},
             "stock": stock}

@@ -67,9 +67,11 @@ def vehicle_names(factors):
     return [k for k in factors.get("vehicles", {}) if not k.startswith("_")]
 
 
-def planning_vehicle_names(factors):
+def planning_vehicle_names(factors, country=None):
     """
-    The four EU-named planning vehicles, in the order factors.json lists them.
+    The vehicles that LEAD every picker, in order: the country's `vehicle_sets[..].lead`
+    when the tenant's country has one (H1: GB's UK trade names), else the four EU-named
+    planning vehicles in the order factors.json lists them.
 
     Two sources on purpose, and they have to agree: the top-level `planning_vehicles`
     array carries the ORDER, and `planning_vehicle: true` on the entry itself is the
@@ -81,11 +83,47 @@ def planning_vehicle_names(factors):
     """
     vs = factors.get("vehicles", {}) or {}
     known = [k for k in vs if not k.startswith("_")]
+    # H1 (29 Sep 2026): a country with its own `vehicle_sets` entry leads with THAT list
+    # (GB: the UK trade names) and never with the EU N-category names it hides.
+    cs = _country_set(factors, country)
+    if cs and cs.get("lead"):
+        return [n for n in cs["lead"] if n in known]
     out = [n for n in (factors.get("planning_vehicles") or []) if n in known]
     for k in known:
         if k not in out and (vs.get(k) or {}).get("planning_vehicle"):
             out.append(k)
     return out
+
+
+def _tenant_country_of(factors):
+    """The tenant's country from the factors document's own tenant block (no DB read)."""
+    t = factors.get("tenant") if isinstance(factors, dict) else None
+    c = (t or {}).get("country") if isinstance(t, dict) else None
+    return str(c).strip().upper() if isinstance(c, str) and c.strip() else None
+
+
+def _country_set(factors, country=None):
+    """The `vehicle_sets` entry for a country (default: the document's own tenant country)."""
+    c = (str(country).strip().upper() if country else None) or _tenant_country_of(factors)
+    sets = factors.get("vehicle_sets") if isinstance(factors, dict) else None
+    if not c or not isinstance(sets, dict):
+        return None
+    cs = sets.get(c)
+    return cs if isinstance(cs, dict) else None
+
+
+def hidden_vehicle_names(factors, country=None):
+    """
+    H1: the vehicle names the PICKERS do not offer this tenant (its country's `hide`
+    list). They stay in `vehicles` and resolve everywhere else — an existing line or a
+    baked route on one of them keeps its payload, CO2 and geometry. Never renamed,
+    never removed (the validator refuses deleting a baked profile).
+    """
+    vs = factors.get("vehicles", {}) or {}
+    cs = _country_set(factors, country)
+    if not cs:
+        return []
+    return [n for n in (cs.get("hide") or []) if n in vs]
 
 
 VEHICLE_LANGS = ("en", "eu", "ee")

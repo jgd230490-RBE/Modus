@@ -798,6 +798,19 @@ def init_costing_db():
             )
         """)
         conn.commit()
+        # H1 (29 Sep 2026): which provider wrote the row, the figure as published (DESNZ
+        # publishes pence/litre) and the VAT % its series includes. Self-healing guard,
+        # the same shape as the locations columns: a row written before H1 keeps NULLs.
+        for col, typ in (("provider", "TEXT"), ("native_price", "REAL"),
+                         ("native_unit", "TEXT"), ("vat_pct", "REAL")):
+            try:
+                if IS_PG:
+                    cur.execute(f"ALTER TABLE fuel_index ADD COLUMN IF NOT EXISTS {col} {typ}")
+                else:
+                    cur.execute(f"ALTER TABLE fuel_index ADD COLUMN {col} {typ}")
+                conn.commit()
+            except Exception:
+                conn.rollback()  # column already present — fine
     finally:
         conn.close()
 
