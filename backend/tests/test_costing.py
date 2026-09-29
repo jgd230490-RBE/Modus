@@ -189,6 +189,18 @@ def reset_db():
     import config as _cfg
     _cfg.invalidate()
     costing.invalidate()
+    # NARROWED (H1, 29 Sep 2026): this harness models an ESTONIAN tenant. Until H1 a
+    # tenant with no country silently fell back to the EE bulletin (the G3-prep gap in
+    # g2-modus-0916.md); now a no-country tenant has NO automatic index and every EE
+    # assertion below needs the country set. The no-country rule is asserted in §0b.
+    import conversions as _conv
+    _cfg.seed_from_file(_conv)
+    _doc = json.loads(json.dumps(_cfg.load(_conv, use_cache=False)))
+    _doc["tenant"] = dict(_doc.get("tenant") or {}, country="EE")
+    _r = _cfg.save(_doc, by="test_costing")
+    assert _r["ok"], _r
+    _cfg.invalidate()
+    costing.invalidate()
 
 
 # The real payload shape, captured from https://eurooilwatch.com/api/v1/prices on
@@ -221,6 +233,71 @@ ok("nothing is seeded: no target rate, no share, no base, no yard, no index row"
    and costing.settings()["fuel"]["share_pct"] is None and costing.settings()["fuel"]["baf_base_eur_per_l"] is None
    and costing.settings()["fuel"]["yard_eur_per_l"] is None and fuel.get_index("EE") is None)
 _src = {f: open(os.path.join(BACKEND, f), encoding="utf-8").read() for f in ("fuel.py", "costing.py", "derived.py", "main.py", "weeks.py")}
+
+# =========================================================================== #
+#  0b. H1 (29 Sep 2026): no country → no automatic index; providers per country #
+# =========================================================================== #
+ok("🔴 H1: the EE fallback is GONE — no DEFAULT_COUNTRY in fuel.py, costing.py, derived.py or main.py",
+   all("DEFAULT_COUNTRY" not in _src[f] for f in ("fuel.py", "costing.py", "derived.py", "main.py")))
+ok("a tenant with no country keys its index under fuel.NO_COUNTRY and has no provider",
+   fuel.norm_country(None) == fuel.NO_COUNTRY == "--" and fuel.norm_country("") == "--"
+   and fuel.provider_for(None) is None and fuel.auto_available(None) is False
+   and fuel.state(None)["no_country"] is True and fuel.state(None)["auto_available"] is False)
+ok("...and refresh() for it declines with 'no country set', never fetching",
+   fuel.refresh(None, sync=True)["status"] == "manual_only" and "no country" in fuel.refresh(None, sync=True)["error"])
+ok("the providers: EU-27 → the bulletin (EUR/L), GB → DESNZ (GBP/L, VAT 20 % by default), NO → nothing",
+   fuel.provider_for("EE")["key"] == "eu_bulletin" and fuel.provider_for("ee")["unit"] == "EUR/L"
+   and fuel.provider_for("GB")["key"] == "desnz" and fuel.provider_for("GB")["unit"] == "GBP/L"
+   and fuel.provider_for("GB")["vat_pct"] == 20.0 and fuel.provider_for("NO") is None
+   and fuel.auto_available("GB") is True and fuel.auto_available("NO") is False)
+ok("costing._tenant_country() reads the tenant block (EE here) — and NO_COUNTRY when unset",
+   costing._tenant_country() == "EE")
+ok("the state names the provider for the widget", fuel.state("GB")["provider"]["label"].startswith("DESNZ")
+   and fuel.state("EE")["provider"]["label"].startswith("EU Weekly Oil Bulletin")
+   and fuel.state("NO")["provider"] is None and "typed" in fuel.state("NO")["attribution"])
+# the DESNZ resolver + parser, against fixtures shaped like the gov.uk content API and CSV
+_CONTENT = {"title": "Weekly road fuel prices", "details": {"attachments": [
+    {"attachment_type": "file", "title": "Weekly road fuel prices: 29 September 2026 (ODS)", "url": "https://assets.publishing.service.gov.uk/media/x/weekly_road_fuel_prices_290926.ods", "file_extension": "ods", "content_type": "application/vnd.oasis.opendocument.spreadsheet"},
+    {"attachment_type": "file", "title": "Weekly road fuel prices: 29 September 2026 (CSV)", "url": "https://assets.publishing.service.gov.uk/media/x/weekly_road_fuel_prices_290926.csv", "file_extension": "csv", "content_type": "text/csv"}]}}
+_att = fuel.resolve_desnz_csv(_CONTENT)
+ok("DESNZ: the CSV attachment is resolved from the content API by extension and title",
+   _att.get("url", "").endswith(".csv") and "CSV" in _att.get("title", ""), str(_att))
+ok("...no attachments → an error, never a guessed URL", "error" in fuel.resolve_desnz_csv({"details": {}})
+   and "error" in fuel.resolve_desnz_csv("<html>"))
+_CSV = ("Date,ULSP:  Pump price in pence/litre,ULSD:  Pump price in pence/litre,ULSP:  Diesel duty rate in pence/litre,"
+        "ULSD:  Diesel duty rate in pence/litre,ULSP:  VAT (%) rate applicable,ULSD:  VAT (%) rate applicable\n"
+        "14/09/2026,135.20,194.80,52.95,52.95,20,20\n"
+        "21/09/2026,135.60,195.50,52.95,52.95,20,20\n")
+_pd = fuel.parse_desnz_csv(_CSV)
+ok("DESNZ: the LAST row's ULSD pump price is parsed — 195.50 p/L on 21 Sep 2026 → £1.955/L",
+   _pd.get("eur_per_l") == 1.955 and _pd.get("bulletin_date") == "2026-09-21" and _pd.get("native_price") == 195.5
+   and _pd.get("native_unit") == "p/L", str(_pd))
+ok("...the VAT % comes from the row (20) and the label says incl. duty and VAT",
+   _pd.get("vat_pct") == 20.0 and "incl. duty and VAT" in _pd.get("raw_source_label", ""))
+ok("...ISO dates and a missing VAT column still parse (VAT defaults to 20)",
+   fuel.parse_desnz_csv("Date,ULSD pump price (pence/litre)\n2026-09-21,195.5\n").get("vat_pct") == 20.0
+   and fuel.parse_desnz_csv("Date,ULSD pump price (pence/litre)\n2026-09-21,195.5\n").get("bulletin_date") == "2026-09-21")
+ok("...an empty CSV, no ULSD column, or no numeric row is an error, never a zero",
+   "error" in fuel.parse_desnz_csv("") and "error" in fuel.parse_desnz_csv("Date,ULSP\n21/09/2026,135\n")
+   and "error" in fuel.parse_desnz_csv("Date,ULSD pump price\n21/09/2026,n/a\n"))
+# the stored GB row and its derived ex-VAT figure, through a stubbed fetch
+_real_fap = fuel.fetch_desnz
+fuel.fetch_desnz = lambda timeout=None: {"csv": _CSV, "csv_url": "https://assets.publishing.service.gov.uk/x.csv", "csv_title": "t"}
+_st = fuel.refresh("GB", sync=True)
+_gb = fuel.get_index("GB") or {}
+ok("⭐ GB refresh stores £1.955/L from DESNZ with provider, native pence and VAT on the row",
+   _st["status"] == "ok" and _gb.get("eur_per_l") == 1.955 and _gb.get("provider") == "desnz"
+   and _gb.get("native_price") == 195.5 and _gb.get("native_unit") == "p/L" and _gb.get("vat_pct") == 20.0
+   and _gb.get("source") == fuel.SOURCE_DESNZ, str((_st, _gb)))
+_gs = fuel.state("GB", today=datetime.date(2026, 9, 25))
+ok("...and the GB state derives the ex-VAT price (1.955 / 1.20 = 1.629) in GBP/L, not stale",
+   _gs["ex_vat_per_l"] == 1.629 and _gs["unit"] == "GBP/L" and _gs["stale"] is False and _gs["vat_pct"] == 20.0, str(_gs))
+fuel.fetch_desnz = _real_fap
+ok("the EE state has no ex-VAT figure (the bulletin's VAT share is not published per row)",
+   fuel.state("EE").get("ex_vat_per_l") is None)
+# leave the table as the sections below expect it: one row at most, and it is EE's
+db.execute("DELETE FROM fuel_index WHERE country = ?", ("GB",))
+ok("(cleanup) the GB row is removed before the EE sections", fuel.get_index("GB") is None)
 
 
 def _code_tokens(src):
@@ -353,7 +430,7 @@ try:
     ok("...and DOES when it is older than 12 h", _calls["n"] == 1)
 
     # manual
-    r = fuel.set_manual(1.85, "2026-09-14", by="admin")
+    r = fuel.set_manual(1.85, "2026-09-14", by="admin", country="EE")  # NARROWED H1: the country is explicit now
     row3 = fuel.get_index("EE")
     ok("⭐ a manual index writes the SAME row with source 'manual'",
        r["ok"] and row3["source"] == "manual" and row3["eur_per_l"] == 1.85 and row3["bulletin_date"] == "2026-09-14"
@@ -557,7 +634,7 @@ c1b = main.confirm_forecast_week(main.WeekConfirm(route_id="R1", month_index=mi,
 ok("...and confirming that edited week locks it (1.922 again)",
    c1b.get("baf_base", {}).get("locked") is True and costing.settings()["fuel"]["baf_base_eur_per_l"] == 1.922)
 # move the index, confirm ANOTHER line: the base must not follow
-fuel.set_manual(2.018, "2026-09-14", by="admin")
+fuel.set_manual(2.018, "2026-09-14", by="admin", country="EE")  # NARROWED H1: the country is explicit now
 c2 = main.confirm_forecast_week(main.WeekConfirm(route_id="R2", month_index=mi, discipline="earthworks",
                                                    section_id="WS2", week_index=wi, confirmed_by="planner"))
 ok("🔴 a SECOND Confirm does not move the base, though the index has moved to 2.018",

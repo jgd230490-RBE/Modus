@@ -1184,7 +1184,10 @@ const _railFn = (() => {
   const body = j > i ? code.slice(i, j) : null;
   if (!body) return null;
   try {
-    return new Function("RAIL_COLOR", body + "\nreturn railPopupHTML;")("#0F766E");
+    // H1: the popup prints the length in the tenant's unit through fmtDist()/DU(); the
+    // isolated function is given km versions of them (what a km tenant sees)
+    return new Function("RAIL_COLOR", "fmtDist", "DU", body + "\nreturn railPopupHTML;")(
+      "#0F766E", (km, dp) => (km == null ? "—" : Number(km).toFixed(dp == null ? 1 : dp)), () => "km");
   } catch (e) { return null; }
 })();
 ok("railPopupHTML can be isolated and run", typeof _railFn === "function");
@@ -1198,6 +1201,9 @@ ok("⭐ the rendered popup SAYS the geometry is provisional",
   _railHtml.includes("Provisional geometry"));
 ok("⭐ ...and renders the feature's own accuracy note",
   _railHtml.includes("6.4 km"));
+ok("H1 (HU5): the rail popup prints the length in the tenant's unit (16.60 km here)",
+  _railHtml.includes("16.60 km") && /const DU = \(\) => \(TENANT\.distance_unit === 'mi' \? 'mi' : 'km'\);/.test(code)
+  && (code.match(/fmtDist\(/g) || []).length >= 5 && /distance_unit: 'km'/.test(code));
 ok("⭐ ...and names the source", _railHtml.includes("Natural Earth"));
 ok("⭐ ...and parses the stringified heads array rather than printing JSON",
   _railHtml.includes("Rapla · Lelle") && !_railHtml.includes('["Rapla"'));

@@ -182,6 +182,23 @@ def reset_db():
     db.init_config_db()
     db.init_costing_db()
     db.init_tenant()
+    # NARROWED (H1, 29 Sep 2026): this harness models an ESTONIAN tenant — its EE diesel
+    # index and Tark Tee assertions need tenant.country = "EE" now that a tenant with no
+    # country has NO automatic index (no more silent fallback to Estonia).
+    import config as _h1cfg
+    import conversions as _h1conv
+    _h1cfg.invalidate()
+    _h1cfg.seed_from_file(_h1conv)
+    _h1doc = json.loads(json.dumps(_h1cfg.load(_h1conv, use_cache=False)))
+    _h1doc["tenant"] = dict(_h1doc.get("tenant") or {}, country="EE")
+    _h1r = _h1cfg.save(_h1doc, by="harness-h1")
+    assert _h1r["ok"], _h1r
+    _h1cfg.invalidate()
+    try:
+        import costing as _h1cst
+        _h1cst.invalidate()
+    except Exception:
+        pass
     import config as _cfg
     _cfg.invalidate()
     costing.invalidate()
@@ -243,7 +260,7 @@ _line("R1", "WS1", 4010.0, V8, "IPT1")            # rigid, baked; 4010 t does NO
 _line("R2", "WS2", 2600.0, V12, "IPT1")           # artic, baked
 _line("R3", "WS3", 900.0, V8, "IPT1")             # UNBAKED
 _line("R4", "WS4", 1000.0, V8, "IPT2", status="Pending")   # another IPT, still Pending
-fuel.set_manual(1.922, "2026-09-07", by="admin")
+fuel.set_manual(1.922, "2026-09-07", by="admin", country="EE")  # NARROWED H1: the country is explicit now
 network.set_route_planning("R2", {"rate_eur_per_t"}, rate_eur_per_t=3.0)
 costing.set_target({"rate_eur_per_load": 45.0, "rate_eur_per_km": 1.5}, by="admin")
 
@@ -262,8 +279,10 @@ ok("...the same figure derived.py gives for that quantity (one source)",
         "week": {"planned_qty": 4010.0}}, conversions.load_factors()), conversions.load_factors())["trips"])
 ok("km = trips × km/trip (60 km round trip) on a baked line; t·km on the route basis",
    r1["baked"] is True and r1["km_trip"] == 60.0 and abs(r1["km"] - 201 * 60.0) < 0.01 and abs(r1["tonne_km"] - 4010.0 * 60.0) < 0.1)
-ok("CO₂ = km × the vehicle's kg CO₂e/km ÷ 1000 (0.95 for the 32 t rigid)",
-   abs(r1["co2_t"] - round(201 * 60.0 * 0.95 / 1000.0, 3)) < 0.002)
+# NARROWED (H1, 29 Sep 2026): the 32 t rigid's factor is the DESNZ 2026 rigid >17 t average-
+# laden figure 0.99773 (was the 2025-basis 0.95); the arithmetic is unchanged.
+ok("CO₂ = km × the vehicle's kg CO₂e/km ÷ 1000 (0.99773 for the 32 t rigid, DESNZ 2026)",
+   abs(r1["co2_t"] - round(201 * 60.0 * 0.99773 / 1000.0, 3)) < 0.002)
 ok("vehicles = trips ÷ (working days × cycles per vehicle-day), rounded up: 201 ÷ (22 × 5) → 2",
    r1["cycles_per_vehicle_day"] == 5 and r1["vehicles"] == 2)
 ok("🔴 the UNBAKED line has no km, t·km, CO₂, vehicles or fair € — and is flagged, not estimated",
@@ -432,7 +451,7 @@ ok("🔴 the Submit matrix reads POST /costing/preview (debounced) and prices NO
    and "rate_eur" not in _mx and "l_per_100km" not in _mx and "margin_pct" not in _mx and "costCell[mi].fair.eur" in _mx)
 # NARROWED (G2): the currency is the tenant's, so the labels carry ${CUR()} where they said €
 ok("...the strip shows fair € in four units, planned € with its source, and the REASON when there is no fair price",
-   'data-cost-strip="1"' in _mx and "fair ${CUR()} / t" in _mx and "fair ${CUR()} / trip" in _mx and "fair ${CUR()} / km" in _mx
+   'data-cost-strip="1"' in _mx and "fair ${CUR()} / t" in _mx and "fair ${CUR()} / trip" in _mx and "fair ${CUR()} / ${DU()}" in _mx   # NARROWED H1: the tenant's unit
    and "fair € / t" not in _mx
    and 'cost.fair_reason === "not baked"' in _mx and 'cost.fair_reason === "no diesel index"' in _mx and "rate not set" in _mx)
 
@@ -454,7 +473,7 @@ _fc = _fe[_fe.index("function Forecasts("):_fe.index("function CostingTab(")]
 ok("the Forecasts page reads /costing/lines (its own fetch, so a failure never hides the list) and joins per line",
    "fetch(`${API}/costing/lines?status=All`)" in _fc and "costByLine[g.key]" in _fc and "if(!c) return" in _fc)
 ok("...with a Cost column (planned + fair, €/t beside fair) and nine cost columns in the CSV",
-   'data-cost-cell="1"' in _fc and '`Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/km`' in _fc
+   'data-cost-cell="1"' in _fc and '`Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/${DU()}`' in _fc   # NARROWED H1
    and '"Fair € (model)"' not in _fc)
 ok("the Look-ahead prints the unit triple (€/t · €/trip · €/km) under planned and fair on Account and in the expanded row",
    "unitTriple(r.planned_units)" in _fe and "unitTriple(r.fair_units)" in _fe and "unitTriple(wd.fair_units)" in _fe and "unitTriple(wd.eur_units)" in _fe)

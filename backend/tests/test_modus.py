@@ -14,8 +14,10 @@ WHAT IS ASSERTED
   5. The demo package (demo/uk-corridor.package.json) validates, imports, and is what
      it says: GBP, GB, invented names, 18 routes, four approved months, an overlay
      whose bands are contiguous and whose boundaries sit on band edges.
-  6. Country gating: a GB tenant has no restriction provider and no automatic diesel
-     index; an EE tenant has both. The map's restriction panel is provider-driven.
+  6. Country gating (REVERSED for GB by H1, 29 Sep 2026): a GB tenant has National
+     Highways' planned closures and the DESNZ diesel index; an EE tenant has Tark Tee and
+     the EU bulletin; a tenant with NO country has neither. The map's restriction panel
+     is provider-driven.
   7. The overlay endpoint: a tenant with no overlay gets {} + tenant; one with an
      overlay gets it back with an ETag, and a matching If-None-Match gets 304.
   8. Theme tokens: the shipped pages carry the Wayscope palette (ink #1F2024, blue
@@ -512,10 +514,15 @@ ok("clashes: the shared-route flag keeps the ids (text and `ipts`) — naming th
 _nm = export._team_namer()
 ok("export: one bound read names the ids in a flag's text for the sheets",
    _nm(_share[0]["text"]).startswith("North Team + Central Team ") and _nm(None) is None, _nm(_share[0]["text"]))
+# NARROWED (H1, 29 Sep): the code word comes from _flag_label(f), which reads the
+# provider's word off a RESTRICTION flag (TARK TEE / ROADWORKS) and FLAG_LABEL otherwise.
 ok("export: the Clashes sheet and the PDF name the codes and the teams",
-   "code=FLAG_LABEL.get(f.get(\"code\"), f.get(\"code\")), ipt=_nm(f.get(\"ipt\")), text=_nm(f.get(\"text\"))" in read("backend/export.py")
-   and "{FLAG_LABEL.get(f['code'], f['code'])}: {_nm(f['text'])}" in read("backend/export.py")
-   and export.FLAG_LABEL["IPT_SHARE"] == "SHARE")
+   "code=_flag_label(f), ipt=_nm(f.get(\"ipt\")), text=_nm(f.get(\"text\"))" in read("backend/export.py")
+   and "{_flag_label(f)}: {_nm(f['text'])}" in read("backend/export.py")
+   and export.FLAG_LABEL["IPT_SHARE"] == "SHARE"
+   and export._flag_label({"code": "RESTRICTION", "label": "ROADWORKS"}) == "ROADWORKS"
+   and export._flag_label({"code": "RESTRICTION", "label": "TARK TEE"}) == "TARK TEE"
+   and export._flag_label({"code": "IPT_SHARE"}) == "SHARE" and "TARK_TEE" not in export.FLAG_LABEL)
 ok("export: the team namer is built once per sheet, not per row",
    read("backend/export.py").count("= _team_namer()") == 4)   # day rows, Clashes sheet, PDF rows, PDF flags
 _page = {"commit": {"lines": [{"route_id": "R9", "context": {"ipt": "IPT3", "origin_name": "A", "dest_name": "B"},
@@ -538,16 +545,20 @@ ok("frontend: the submit picker has no hard-coded six-team fallback",
    '["IPT1","IPT2","IPT3","IPT4","IPT5","IPT6"]' not in fe_src and "Object.keys(TEAM_LABELS)" in fe_src)
 ok("frontend: signed-in role text shows the team's name",
    fe_src.count("{role.ipt ? teamName(role.ipt) : role.label}") == 2 and "` · ${role.ipt}`" not in fe_src)
-ok("frontend: the clash rail shows the code's name and the teams' names",
-   "{RAIL_LABEL[f.code] || f.code}</span> {teamText(f.text)}" in fe_src and 'IPT_SHARE: "SHARE"' in fe_src
-   and "{f.code}</span> {f.text}" not in fe_src)
+# NARROWED (H1, 29 Sep): the word comes from flagWord(f) — RAIL_LABEL, or the provider's own
+# word off a RESTRICTION flag ("TARK TEE" / "ROADWORKS")
+ok("frontend: the clash rail shows the code's name (the provider's for a restriction) and the teams' names",
+   "{flagWord(f)}</span> {teamText(f.text)}" in fe_src and 'IPT_SHARE: "SHARE"' in fe_src
+   and 'const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);' in fe_src
+   and "{f.code}</span> {f.text}" not in fe_src and 'TARK_TEE: "TARK TEE"' not in fe_src)
 ok("frontend: the map entry is not called public — the map is behind the gate",
    '{ id: "map", label: "Route map"' in fe_src and "Back to public map" not in fe_src and 'label: "Public route map"' not in fe_src)
 ok("frontend: a long KPI value steps its size down rather than being cut off, and says itself on hover",
    '(len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 7 ? "text-lg" : "text-2xl")' in fe_src
    and 'data-fuel-widget="compact" title={hasIndex ? String(price) : ""}' in fe_src)
-ok("frontend: a typed diesel price is dated as typed, a fetched one as the bulletin",
-   '${autoIdx && idx.source !== "manual" ? "bulletin" : "typed"} ${fuelDate(idx.bulletin_date)}' in fe_src)
+# NARROWED (H1): "published" rather than "bulletin" — the GB series is not a bulletin
+ok("frontend: a typed diesel price is dated as typed, a fetched one as published",
+   '${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}' in fe_src)
 ok("frontend: no team value is rendered raw in a cell or an option",
    "{r.ipt}</td>" not in fe_src and "{r.ipt || \"—\"}</td>" not in fe_src
    and "value={i}>{i}</option>" not in fe_src and "{route.ipt || \"—\"}" not in fe_src
@@ -557,17 +568,101 @@ ok("frontend: no team value is rendered raw in a cell or an option",
 #  6. Country gating                                                           #
 # =========================================================================== #
 restrictions.COUNTRY_OVERRIDE = None
-ok("GB: no restriction provider", restrictions.enabled() is False and restrictions.provider() is None)
+# REVERSED (H1, 29 Sep 2026): under G2 a GB tenant had NO restriction provider and NO
+# automatic diesel index. H1 gives GB National Highways' planned closures and the DESNZ
+# weekly price. The no-country case keeps the G2 behaviour (asserted in §3 above).
+ok("GB (H1): the restriction provider is National Highways, flag word ROADWORKS, 100 m match",
+   restrictions.enabled() is True and restrictions.provider()["key"] == "nh_closures"
+   and restrictions.provider()["short"] == "National Highways" and restrictions.provider()["flag_label"] == "ROADWORKS"
+   and restrictions.match_m() == 100.0 and restrictions.provider()["dated"] is True)
 lay = main.restriction_layers()
-ok("GB: /api/restrictions/layers answers provider: null and no layers", lay["provider"] is None and lay["layers"] == [])
-fa = restrictions.fetch_all()
-ok("GB: fetch_all() returns an empty collection with a note, and calls nothing",
-   fa["features"] == [] and fa.get("note") == restrictions.NO_PROVIDER_NOTE)
-sc = restrictions.store_checks()
-ok("GB: stored checks record no_provider, not unavailable", sc["status"] == "no_provider" and sc["routes"] == 18, str(sc))
-ok("GB: no automatic diesel index", fuel.auto_available("GB") is False and m3["tenant"]["fuel_index_auto"] is False)
+ok("GB (H1): /api/restrictions/layers names the provider and ONE layer, planned road closures",
+   lay["provider"]["key"] == "nh_closures" and [l["key"] for l in lay["layers"]] == ["nh_closures"]
+   and lay["match_m"] == 100.0 and "Open Government Licence" in lay["attribution"], str(lay)[:200])
+ok("GB (H1): the tenant block on /api/meta carries the provider block and the distance unit",
+   m3["tenant"]["restrictions_provider"] is True and m3["tenant"]["restrictions"]["key"] == "nh_closures"
+   and m3["tenant"]["distance_unit"] in ("km", "mi"))
+# the NH feed, stubbed: two pages, an ended closure, a live one and a future one
+_nh_calls = []
+def _fake_nh_page(offset, count=restrictions.NH_PAGE, timeout=None):
+    _nh_calls.append(offset)
+    import time as _t
+    day = 86400000
+    now_ms = int(_t.time() * 1000)
+    feats = []
+    if offset == 0:
+        feats = [
+            {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.9, 52.5], [-0.89, 52.51]]},
+             "properties": {"OBJECTID": 1, "description": "Carriageway closure for resurfacing", "road_number": "A46",
+                            "eventtype": "Carriageway closure", "natureofworks": "Resurfacing", "formattedeventnumber": "NH-0001",
+                            "scheduledplannedstartdate": now_ms - 40 * day, "scheduledplannedenddate": now_ms - 30 * day}},
+            {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.9, 52.5], [-0.89, 52.51]]},
+             "properties": {"OBJECTID": 2, "description": "Lane closure", "road_number": "A46",
+                            "eventtype": "Lane closure", "natureofworks": "Barrier works", "formattedeventnumber": "NH-0002",
+                            "scheduledplannedstartdate": now_ms - 2 * day, "scheduledplannedenddate": now_ms + 5 * day}},
+        ]
+        return {"type": "FeatureCollection", "features": feats, "exceededTransferLimit": True}
+    feats = [
+        {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-1.2, 52.7], [-1.19, 52.71]]]},
+         "properties": {"OBJECTID": 3, "description": "Full closure", "road_number": "M1",
+                        "eventtype": "Full closure", "natureofworks": "Bridge works", "formattedeventnumber": "NH-0003",
+                        "scheduledplannedstartdate": now_ms + 20 * day, "scheduledplannedenddate": now_ms + 22 * day}},
+    ]
+    return {"type": "FeatureCollection", "features": feats}
+_orig_nh_page = restrictions._nh_page
+restrictions._nh_page = _fake_nh_page
+restrictions.clear_cache()
+try:
+    fa = restrictions.fetch_all()
+    ok("GB (H1): fetch_all() pages the FeatureServer (offset 0, then 2) and reads exceededTransferLimit",
+       _nh_calls == [0, 2] and fa.get("pages") == 2 and fa["provider"] == "nh_closures", str(_nh_calls))
+    ok("GB (H1): an ENDED closure is dropped, a live and a FUTURE one are kept (the look-ahead needs the future)",
+       fa["total_records"] == 3 and len(fa["features"]) == 2 and fa["expired_or_future"] == 1
+       and {f["properties"]["event_number"] for f in fa["features"]} == {"NH-0002", "NH-0003"})
+    _p2 = next(f["properties"] for f in fa["features"] if f["properties"]["event_number"] == "NH-0002")
+    ok("GB (H1): the published field names map to this module's (dates as ISO, road number, kind nh_closures)",
+       _p2["_kind"] == "nh_closures" and _p2["road_nr"] == "A46" and _p2["_from"] and _p2["_to"]
+       and _p2["_from"] < _p2["_to"] and _p2["_label"] == "Planned road closures" and _p2["_colour"] == "#DC2626"
+       and _p2["_in_force"] is True and "_raw" not in _p2)     # the raw record is the probe's, not the map's
+    ok("GB (H1): the headline leads with 'Planned closure', the road and the dates",
+       _p2["_headline"].startswith("Planned closure · A46") and _p2["_from"] in _p2["_headline"])
+    ok("GB (H1): a closure is never judged as a dimension limit — verdict unknown with the closure note",
+       restrictions.assess(_p2, "Rigid 8-wheeler (32t)")["verdict"] == "unknown"
+       and "planned closure" in restrictions.assess(_p2, "Rigid 8-wheeler (32t)")["note"])
+    # a baked route along the A46 closure (within 100 m) and one far away
+    db.execute("DELETE FROM route_geometry WHERE tenant_id = ?", (db.current_tenant(),))
+    _rid = db.query("SELECT id FROM routes WHERE tenant_id = ? ORDER BY id", (db.current_tenant(),))
+    _r1, _r2 = _rid[0]["id"], _rid[1]["id"]
+    network._upsert_geom(_r1, "Rigid 8-wheeler (32t)", "[[-0.905,52.499],[-0.8955,52.5052],[-0.885,52.515]]", 2.0, 0.1, None, leg="loaded", alt_index=0)
+    network._upsert_geom(_r2, "Rigid 8-wheeler (32t)", "[[-1.5,52.9],[-1.45,52.95]]", 5.0, 0.2, None, leg="loaded", alt_index=0)
+    cr = restrictions.check_route(_r1, _fc=fa)
+    ok("GB (H1): a route running along the closure gets the hit within 100 m, with its dates and event number",
+       cr["baked"] and len(cr["hits"]) == 1 and cr["hits"][0]["event_number"] == "NH-0002"
+       and cr["hits"][0]["from"] and cr["hits"][0]["to"] and cr["hits"][0]["distance_m"] <= 100
+       and cr["match_m"] == 100.0 and cr["flag_label"] == "ROADWORKS" and cr["hits"][0]["severity"] == "warn", str(cr["hits"])[:300])
+    ok("GB (H1): a route far from every closure has no hit", restrictions.check_route(_r2, _fc=fa)["hits"] == [])
+    sc = restrictions.store_checks()
+    ok("GB (H1): store_checks() runs against National Highways and stores ONE hit",
+       sc["status"] == "ok" and sc["hits"] == 1 and sc["features_checked"] == 2, str(sc))
+    ok("GB (H1): the stored hit keeps its from/to for the rail's week test",
+       restrictions.stored_checks([_r1])[_r1]["hits"][0].get("from") is not None)
+    dg = restrictions.diagnostics(probe=True)
+    ok("GB (H1): the probe shows the raw property names, the mapped dates and the paging flag",
+       dg["provider"]["key"] == "nh_closures" and dg["probe"]["records_returned"] == 2
+       and "scheduledplannedstartdate" in dg["probe"]["sample_property_names"] and dg["probe"]["sample_dates"]["from"]
+       and dg["probe"]["reading"].startswith("field map found") and dg["field_map"]["scheduledplannedenddate"] == "date_to")
+finally:
+    restrictions._nh_page = _orig_nh_page
+    restrictions.clear_cache()
+ok("GB (H1): the automatic diesel index is DESNZ", fuel.auto_available("GB") is True and m3["tenant"]["fuel_index_auto"] is True
+   and m3["tenant"]["fuel_provider"]["key"] == "desnz")
+_orig_desnz = fuel.fetch_desnz
+fuel.fetch_desnz = lambda timeout=None: (_ for _ in ()).throw(OSError("gov.uk unreachable from the sandbox"))
 rs = fuel.refresh("GB", sync=True)
-ok("GB: refresh() declines to fetch and says so", rs["status"] == "manual_only", str(rs))
+fuel.fetch_desnz = _orig_desnz
+ok("GB (H1): a failed DESNZ fetch keeps the typed row and says why (never a 500, never a zero)",
+   rs["status"] == "unavailable" and "unreachable" in (rs.get("error") or "")
+   and (fuel.get_index("GB") or {}).get("last_error"), str(rs))
 ok("GB: the typed index from the package is readable", (fuel.get_index("GB") or {}).get("source") == fuel.SOURCE_MANUAL)
 ok("EE: the provider exists and the bulletin covers it",
    fuel.auto_available("EE") is True and restrictions.PROVIDER["country"] == "EE")

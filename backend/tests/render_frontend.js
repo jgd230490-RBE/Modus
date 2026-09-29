@@ -360,7 +360,9 @@ if (loaded) {
         h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {} }));
       ok("...with the target-rate copy and the config widget's admin controls",
         fCfg.includes("Target rate") && fCfg.includes('data-fuel-widget="config"') && fCfg.includes("Reset the BAF base")
-        && fCfg.includes("Fetch the bulletin now") && fCfg.includes("Use this index") && !/undefined|NaN/.test(fCfg));
+        // NARROWED (H1, 29 Sep): with no data and no tenant country there is no automatic
+        // series, so the fetch button is correctly ABSENT here; the manual index stays.
+        && !fCfg.includes("Fetch the bulletin now") && !fCfg.includes("DESNZ price now") && fCfg.includes("Use this index") && !/undefined|NaN/.test(fCfg));
       // 10 Sep night: the fair price on the Account view, and the coefficients section on Config
       const nFair = fuelFix.account.rows.filter(r => r.planned_fair_eur != null).length;
       ok("...the Account view has a 'Fair € (model)' column with a figure on every baked row and — on the unbaked one",

@@ -195,9 +195,19 @@ ok("tables show the label with the stored id in the title",
 // NARROWED (G2): the header still carries the control, but offers the local-language
 // option only to a tenant whose country it is local to.
 ok("the header carries the control", /VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.map\(\(\[k, l\]\) =>/.test(code));
-ok("G2: the Estonian label option is shown to an Estonian tenant only, and a stored 'ee' falls back to EU elsewhere",
-  /const vehLangShown = \(k\) => k !== "ee" \|\| String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) === "EE";/.test(code)
+// NARROWED (H1, 29 Sep): EN always; EE only for an Estonian tenant; EU for everyone EXCEPT a
+// British tenant, whose EU-named vehicles are hidden, so the option would label nothing.
+ok("G2/H1: the Estonian label option is shown to an Estonian tenant only, the EU option not to a British one, and a stored 'ee' falls back to EU elsewhere",
+  /const vehLangShown = \(k\) => k === "en"\s*\|\| \(k === "ee" && String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) === "EE"\)\s*\|\| \(k === "eu" && String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) !== "GB"\);/.test(code)
   && /if\(!vehLangShown\(VEH\.lang\)\)\{ VEH\.lang = "eu"; setVehLangState\("eu"\); \}/.test(code));
+ok("H1: the pickers hide the tenant's hidden vehicles (its country's set) but keep a current value visible",
+  /const HIDDEN_VEHICLES = \[\];/.test(code) && /const vehShown = \(v, keep\) => !HIDDEN_VEHICLES\.includes\(v\) \|\| v === keep;/.test(code)
+  && /HIDDEN_VEHICLES\.length = 0; \(m && m\.hidden_vehicles \|\| \[\]\)\.forEach\(v => HIDDEN_VEHICLES\.push\(v\)\);/.test(code)
+  && (code.match(/\.filter\(v => vehShown\(v/g) || []).length >= 5);
+ok("H1: the basemap list is by country — the Estonian orthophoto for EE only, 'Aerial' wording for GB",
+  /function basemapsFor\(country\)/.test(code) && /val !== "maaamet-ortho" \|\| c === "EE"/.test(code)
+  && /"Aerial \(Mapbox Satellite\)"/.test(code) && /basemapsFor\(TENANT\.country\)\.map/.test(code)
+  && !/\{BASEMAPS\.map\(/.test(code));
 ok("G2/29 Sep: the page title is the tenant's name · Wayscope, and plain 'Wayscope' for the default tenant",
   /document\.title = \(TENANT\.name && TENANT\.name !== "Wayscope"\) \? TENANT\.name \+ " · Wayscope" : "Wayscope"/.test(code));
 // ---- 29 Sep 2026: the rebrand. The header is the lockup + a rule + the tenant's name;
@@ -405,9 +415,20 @@ ok("three pills, in the mock's order, and the page lands on Commit",
   && /localStorage\.getItem\("modus_la_view"\) \|\| "commit"/.test(_laBody));
 ok("the pills sit under PageHeader — the left rail stays (C18's unsettled point, decided)",
   /<PageHeader title="Look-ahead"/.test(_laBody) && !_laBody.includes("Dashboard · Submit Forecast"));
-ok("the Commit KPI strip carries the mock's cards: planned, trips, vehicles peak, t·km, last-week shortage, last-week delivered — and planned €",
-  ["planned this week", "trips", "vehicles / day peak", "t·km", "last week shortage", "last week delivered", "planned ${CUR()}"]
+// NARROWED (H1, 29 Sep): the t·km card reads TKM() — "t·km", or "t·mi" for a tenant that
+// reads miles (HU5: per tenant). The card and its position are unchanged.
+ok("the Commit KPI strip carries the mock's cards: planned, trips, vehicles peak, t·km (TKM()), last-week shortage, last-week delivered — and planned €",
+  ["planned this week", "trips", "vehicles / day peak", "caption={`${TKM()} · route basis`}", "last week shortage", "last week delivered", "planned ${CUR()}"]
     .every(t => _laBody.includes(t)));
+ok("H1 (HU5): distances are shown in the tenant's unit — helpers convert at the display boundary only, km stays stored",
+  /const DU = \(\) => \(TENANT\.distance_unit === "mi" \? "mi" : "km"\);/.test(code)
+  && /const dist = \(km\) =>/.test(code) && /const distRate = \(perKm\) =>/.test(code) && /const distInRate = \(perUnit\) =>/.test(code)
+  && /const KM_PER_MI = 1\.609344;/.test(code) && (code.match(/\bdist\(/g) || []).length >= 12
+  && (code.match(/\bDU\(\)/g) || []).length >= 25);
+ok("H1 (HU5): a per-distance RATE is typed and shown in the tenant's unit and stored per km (route form + target rate)",
+  _laBody.length > 0 && code.includes('body[k] = (v[k] === "" || v[k] == null) ? null : (k === "rate_eur_per_km" ? +(+distInRate(+v[k])).toFixed(6) : +v[k]);')
+  && code.includes('else body[k] = (k === "rate_eur_per_km" ? +(+distInRate(n)).toFixed(6) : n);')
+  && code.includes('rate_eur_per_km: route.rate_eur_per_km == null ? "" : +(+distRate(route.rate_eur_per_km)).toFixed(4),'));
 ok("🔴 the word PPC is printed nowhere (L5)", !/\bPPC\b/.test(code));
 ok("⭐ the clash rail is ONE row with '+N more', not a stack",
   _laBody.includes("rail.flags.slice(0, 3)") && _laBody.includes("more`") && !_laBody.includes("dismiss"));
@@ -415,14 +436,21 @@ ok("⭐ the clash rail is ONE row with '+N more', not a stack",
 // it still took 30 s+. 10 Sep: the page reads the STORED per-route check (the rail carries
 // it), and the live check runs on demand in the background — a "check now / re-check"
 // button that polls until it finishes. A route never checked is named, never shown clean.
-ok("🔴 the page never fetches live Tark Tee — the refresh is a POST the person triggers, then a poll",
-  !/lookahead\?bucket=\$\{bucket\}&tark_tee=0/.test(_laBody)
-  && _laBody.includes('fetch(`${API}/forecast-weeks/tark-tee/refresh`, { method: "POST" })')
-  && /fetch\(`\$\{API\}\/forecast-weeks\/tark-tee\?bucket=\$\{bucket\}`\)/.test(_laBody)
-  && _laBody.includes("setTimeout(tickPoll, 4000)"));
-ok("...the status line says checked-when, partial-with-names, or NOT checked — never a silent clean",
-  _laBody.includes("Road restrictions (Tark Tee): checked") && _laBody.includes("not checked since baking")
-  && _laBody.includes("NOT checked for these routes") && _laBody.includes("check now"));
+// NARROWED (H1, 29 Sep): the paths are /forecast-weeks/restrictions[/refresh] and the
+// words come from the page (`restrictions_ui_label`), so the same line reads "Road
+// restrictions (Tark Tee)" for EE and "Road closures (National Highways)" for GB.
+ok("🔴 the page never fetches the live provider — the refresh is a POST the person triggers, then a poll",
+  !/lookahead\?bucket=\$\{bucket\}&(tark_tee|restrictions_on)=0/.test(_laBody)
+  && _laBody.includes('fetch(`${API}/forecast-weeks/restrictions/refresh`, { method: "POST" })')
+  && /fetch\(`\$\{API\}\/forecast-weeks\/restrictions\?bucket=\$\{bucket\}`\)/.test(_laBody)
+  && _laBody.includes("setTimeout(tickPoll, 4000)") && !_laBody.includes("forecast-weeks/tark-tee"));
+ok("...the status line says checked-when, partial-with-names, or NOT checked — never a silent clean — in the provider's words",
+  _laBody.includes("${ttName}: checked") && _laBody.includes("not checked since baking")
+  && _laBody.includes("NOT checked for these routes") && _laBody.includes("check now")
+  && _laBody.includes('const ttName = ttSrc.restrictions_ui_label || "Road restrictions";')
+  && !_laBody.includes("Tark Tee)") && _laBody.includes("could not reach {ttShort}"));
+ok("H1: the status line names the week the flags are filtered to, and shows only when the tenant has a provider",
+  _laBody.includes("flags shown for the week ${ttSrc.restrictions_week[0]}") && _laBody.includes("&& ttSrc.restrictions_provider && ("));
 ok("...and the rail's flags come from the page read alone (no second rail, no client-side merge)",
   /const rail = \(page && page\.clashes\) \|\| \{ flags: \[\], count: 0, sources: \{\} \};/.test(_laBody)
   && !_laBody.includes("...(tt.flags || [])"));
@@ -447,11 +475,12 @@ ok("...colours lines by IPT from palette C, and is not rendered under the render
   _cmBody.includes("IPT_PALETTE_C[iptKey(") && _laBody.includes("!initialPage && <CommitMap"));
 ok("today's column carries the wash and the '· today' suffix",
   _laBody.includes('" · today"') && _laBody.includes('#eff6ff'));
-ok("the expanded row prints km/trip, km/week, t·km, cycle and € or 'rate not set'",
-  _laBody.includes("km/trip") && _laBody.includes("t·km (") && _laBody.includes("cycle {grp(c.cycle_min)} min")
+// NARROWED (H1): the unit word is DU() — km, or mi for a tenant that reads miles
+ok("the expanded row prints km/trip, km/week, t·km, cycle and € or 'rate not set' — in the tenant's unit",
+  _laBody.includes("{grp(dist(c.km_trip))} {DU()}/trip") && _laBody.includes("{grp(dist(wd.tonne_km))} {TKM()} (") && _laBody.includes("cycle {grp(c.cycle_min)} min")
   && _laBody.includes('"rate not set"'));
 ok("⭐ the honest-gap sentence for an unbaked line ships as written",
-  _laBody.includes("km — until the route is baked · trips still from"));
+  _laBody.includes("{DU()} — until the route is baked · trips still from"));
 ok("an unbaked line shows trips and NO vehicle count (the human's rule), never a 1",
   _laBody.includes("veh —") && _laBody.includes("Vehicles need a baked route"));
 ok("the expand trigger is the Routes table's ▶ toggle, reused",
@@ -720,10 +749,16 @@ ok("the panel says it is advisory and not fed to the router",
   src.includes("The router is never given this data"));
 ok("a partial fetch is declared rather than passing as a clean check",
   code.includes("fetch_errors") && src.includes("not a complete check"));
+// NARROWED (H1): the provider's short name comes from TENANT.restrictions, never a literal.
 ok("an unreachable service degrades to a note, not an error banner",
-  src.includes("Tark Tee could not be reached"));
-ok("a route with no hits says so explicitly rather than rendering nothing",
-  src.includes("No Tark Tee restrictions in force within"));
+  src.includes("Road restrictions unavailable — {prov} could not be reached") && !src.includes("Tark Tee could not be reached"));
+ok("a route with no hits says so explicitly rather than rendering nothing — closures or restrictions by provider",
+  src.includes("`No ${prov} restrictions in force within ${data.match_m} m of this route.`")
+  && src.includes("`No ${prov} planned closures (current or future) within ${data.match_m} m of this route.`")
+  && !src.includes("No Tark Tee restrictions"));
+ok("H1: the panel's source line is the API's attribution, and the panel is absent for a tenant with no provider",
+  src.includes("Source: {data.attribution || (TENANT.restrictions && TENANT.restrictions.attribution) || prov}.")
+  && src.includes("if(!TENANT.restrictions) return null;") && !src.includes("Estonian Transport Administration"));
 ok("expired records are declared as excluded, not silently dropped",
   code.includes("expired_or_future_excluded"));
 
@@ -939,9 +974,17 @@ const _ctBody = code.slice(code.indexOf("function CostingTab("), code.indexOf("f
 ok("⭐ ONE FuelWidget component, mounted THREE times: Commit (compact), Account (strip), Config (config)",
   (code.match(/function FuelWidget\(/g) || []).length === 1 && (code.match(/<FuelWidget\b/g) || []).length === 3
   && /<FuelWidget mode="compact"/.test(_laBody) && /<FuelWidget mode="strip"/.test(_laBody) && /<FuelWidget mode="config"/.test(_ctBody));
-ok("...the widget reads /fuel-index and never the feed host; it names the bulletin in its attribution",
+// NARROWED (H1): the attribution is the provider the API names (idx.provider.label) — the
+// bulletin for EU-27, DESNZ for GB — and the widget carries no country fallback of its own.
+ok("...the widget reads /fuel-index and never the feed host; it names the provider the API gives it",
   _fwBody.includes("fetch(`${API}/fuel-index?lazy=") && !/eurooilwatch\.com/i.test(code)
-  && _fwBody.includes("EU Weekly Oil Bulletin via EuroOilWatch"));
+  && _fwBody.includes("const prov = idx.provider || (idx.auto_available ? TENANT.fuel_provider : null);")
+  && _fwBody.includes("(prov ? prov.label : \"automatic index\")") && !_fwBody.includes("EU Weekly Oil Bulletin via EuroOilWatch"));
+ok("H1: no fallback to Estonia in the widget — a tenant with no country reads 'no country'",
+  !_fwBody.includes('fuelS.country || "EE"') && _fwBody.includes('const country = noCountry ? "no country" : rawCountry;')
+  && _fwBody.includes("no country set"));
+ok("H1: the widget shows the ex-VAT figure when the API derives one (DESNZ pump prices include VAT)",
+  _fwBody.includes("idx.ex_vat_per_l") && _fwBody.includes("ex-VAT"));
 ok("...settings go to PUT /fuel-index/settings; manual index, refresh and reset-base are ADMIN calls with the token",
   _fwBody.includes('put("/fuel-index/settings"') && _fwBody.includes('"/admin/fuel-index/manual"')
   && _fwBody.includes('"/admin/fuel-index/refresh?sync=1"') && _fwBody.includes("/admin/fuel-index/reset-base?")
@@ -956,7 +999,7 @@ ok("...and it polls `refresh` while the server's background fetch runs — never
 ok("🔴 nothing is seeded in the page: no 25 % share and no €1.9x price as a default",
   !/share_pct[^\n]{0,40}25\b/.test(_fwBody) && !/1\.9\d/.test(_fwBody) && !/1\.9\d/.test(_ctBody));
 ok("the Commit KPI strip is eight cards with the widget right of t·km, and the planned € caption counts target lines and shows + BAF",
-  _laBody.includes("xl:grid-cols-8") && _laBody.indexOf('caption="t·km · route basis"') < _laBody.indexOf('<FuelWidget mode="compact"')
+  _laBody.includes("xl:grid-cols-8") && _laBody.indexOf('caption={`${TKM()} · route basis`}') < _laBody.indexOf('<FuelWidget mode="compact"')
   && _laBody.indexOf('<FuelWidget mode="compact"') < _laBody.indexOf("planned ${CUR()} · no rate typed")
   && _laBody.includes("at target") && _laBody.includes("+ BAF ${CUR()} ${grp(totals.eur_adj)}"));
 ok("...the expanded Commit row and the Account cell print '+ BAF' as a SECOND figure and mark a target-priced line",
@@ -980,7 +1023,9 @@ ok("🔴 no fuel on the public map: map/index.html has no widget, no fuel-index,
   !/FuelWidget|fuel-index|\bBAF\b/.test(fs.readFileSync(path.join(__dirname, "..", "..", "map", "index.html"), "utf8")));
 
 // ---- 4g. 10 Sep night — the fair-price model on the page -------------------------------
-const _fpBody = code.slice(code.indexOf("const FAIR_FIELDS = "), code.indexOf("function ConfigPage("));   // the field list sits just above the component
+// NARROWED (H1): the field list is FAIR_FIELDS_FOR(), a function — CUR() and DU() are the
+// tenant's and land with /api/meta, so a module constant would print the defaults.
+const _fpBody = code.slice(code.indexOf("const FAIR_FIELDS_FOR = "), code.indexOf("function ConfigPage("));   // the field list sits just above the component
 ok("⭐ ONE FairPriceSection, mounted once inside the Costing tab, editing doc.fair_price through the page's upd()",
   (code.match(/function FairPriceSection\(/g) || []).length === 1 && (code.match(/<FairPriceSection\b/g) || []).length === 1
   && _ctBody.includes("<FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc}") && _fpBody.includes("d.fair_price = JSON.parse(JSON.stringify(fileFp))"));
@@ -1017,8 +1062,8 @@ ok("the four KPI groups: Delivered to date · Volume · Cost · Carbon",
 ok("🔴 delivered to date is the SERVER's actual_tonnes summed — never a share of the forecast, None until reported",
   _dbBody.includes("if(r.actual_tonnes != null){ T.actualT = (T.actualT || 0) + r.actual_tonnes;") && _dbBody.includes('K.actualT == null ? "—"')
   && !_dbBody.includes("actual_qty *") );
-ok("the Today strip reads /api/lookahead (commit bucket, Tark Tee OFF) in its own fetch, and a failure never hides the programme figures",
-  _dbBody.includes("fetch(`${API}/lookahead?bucket=commit&tark_tee=0`)") && _dbBody.includes("setWeekErr(") && _dbBody.includes("<DashboardToday meta={meta} week={week} err={weekErr}"));
+ok("the Today strip reads /api/lookahead (commit bucket, restrictions OFF) in its own fetch, and a failure never hides the programme figures",
+  _dbBody.includes("fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`)") && _dbBody.includes("setWeekErr(") && _dbBody.includes("<DashboardToday meta={meta} week={week} err={weekErr}"));
 ok("...today's rows are the day rows whose date is the server's `today` — the server's tonnes, trips, vehicles per day, nothing derived",
   _tdBody.includes("d.day_date !== today") && _tdBody.includes("tonnes: dv.tonnes, trips: dv.trips, vehicles: dv.vehicles")
   && !_tdBody.includes("/ payload") && !_tdBody.includes("payload_t *"));

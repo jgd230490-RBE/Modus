@@ -228,14 +228,30 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.put("/api/admin/overlay", json=b)
     ok("🔴 overlay upload without the token — 403", r.status_code == 403)
 
+    # REVERSED (H1, 29 Sep 2026): a GB tenant now HAS a restriction provider (National
+    # Highways planned closures) and an automatic diesel series (DESNZ). The demo's typed
+    # placeholder is the index until the first DESNZ fetch replaces it. lazy=0: this must
+    # never start a background fetch of gov.uk from the harness.
     r = c.get("/api/restrictions/layers")
-    ok("GB → still no restriction provider", r.json().get("provider") is None)
-    r = c.get("/api/fuel-index", headers=PLAN)
+    ok("GB (H1) → the restriction provider is National Highways, one layer, 100 m",
+       r.json().get("provider", {}).get("key") == "nh_closures" and r.json().get("match_m") == 100.0
+       and [l["key"] for l in r.json().get("layers", [])] == ["nh_closures"], r.text[:200])
+    r = c.get("/api/fuel-index?lazy=0", headers=PLAN)
     fi = r.json() if r.status_code == 200 else {}
     idx = fi.get("index") or {}
-    ok("GB → no automatic fuel bulletin, and the demo's typed GB price is the index",
-       r.status_code == 200 and idx.get("country") == "GB" and idx.get("auto_available") is False
-       and idx.get("eur_per_l") == 1.43, str(idx)[:200])
+    ok("GB (H1) → the automatic series is DESNZ, and the demo's typed GB placeholder is the index until it is fetched",
+       r.status_code == 200 and idx.get("country") == "GB" and idx.get("auto_available") is True
+       and (idx.get("provider") or {}).get("key") == "desnz" and idx.get("eur_per_l") == 1.955
+       and idx.get("source") == "manual", str(idx)[:200])
+    r = c.get("/api/forecast-weeks/restrictions?bucket=commit", headers=PLAN)
+    ok("GB (H1) → the look-ahead's restriction status names the provider and the ROADWORKS word",
+       r.status_code == 200 and r.json().get("provider") == "nh_closures" and r.json().get("flag_label") == "ROADWORKS", r.text[:200])
+    r = c.get("/api/forecast-weeks/tark-tee?bucket=commit", headers=PLAN)
+    ok("...and the pre-H1 path still answers (an alias, hidden from the schema)", r.status_code == 200)
+    r = c.get("/api/meta")
+    ok("GB (H1) → /api/meta carries hidden_vehicles (the EU names) and the tenant's distance unit (miles)",
+       r.json().get("hidden_vehicles") and all(v.startswith("N3 ") or v == "Rigid 7.5t" for v in r.json()["hidden_vehicles"])
+       and r.json()["tenant"].get("distance_unit") == "mi", str(r.json().get("hidden_vehicles"))[:200])
 
     # ------------------------------------------------------- 3. the data, as people read it
     r = c.get("/api/forecasts", headers=PLAN)

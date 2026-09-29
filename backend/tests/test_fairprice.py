@@ -184,6 +184,23 @@ def reset_db():
     db.init_config_db()
     db.init_costing_db()
     db.init_tenant()
+    # NARROWED (H1, 29 Sep 2026): this harness models an ESTONIAN tenant — its EE diesel
+    # index and Tark Tee assertions need tenant.country = "EE" now that a tenant with no
+    # country has NO automatic index (no more silent fallback to Estonia).
+    import config as _h1cfg
+    import conversions as _h1conv
+    _h1cfg.invalidate()
+    _h1cfg.seed_from_file(_h1conv)
+    _h1doc = json.loads(json.dumps(_h1cfg.load(_h1conv, use_cache=False)))
+    _h1doc["tenant"] = dict(_h1doc.get("tenant") or {}, country="EE")
+    _h1r = _h1cfg.save(_h1doc, by="harness-h1")
+    assert _h1r["ok"], _h1r
+    _h1cfg.invalidate()
+    try:
+        import costing as _h1cst
+        _h1cst.invalidate()
+    except Exception:
+        pass
     import config as _cfg
     _cfg.invalidate()
     costing.invalidate()
@@ -332,7 +349,7 @@ L = {l["section_id"]: l for l in res["lines"]}
 ok("🔴 with NO index row there is no fair price anywhere — the model needs the live diesel price",
    all(d["derived"]["fair_eur"] is None for l in res["lines"] for d in l["days"]) and res["totals"]["fair_eur"] is None
    and res["costing"]["fair"]["complete"] is False and L["WS1"]["context"]["fair"] is None)
-fuel.set_manual(1.922, "2026-09-07", by="admin")
+fuel.set_manual(1.922, "2026-09-07", by="admin", country="EE")  # NARROWED H1: the country is explicit now
 res = main.list_forecast_days()
 L = {l["section_id"]: l for l in res["lines"]}
 c1 = L["WS1"]["context"]

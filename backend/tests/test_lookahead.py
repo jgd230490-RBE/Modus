@@ -176,6 +176,23 @@ def reset_db():
     db.init_config_db()
     db.init_costing_db()
     db.init_tenant()
+    # NARROWED (H1, 29 Sep 2026): this harness models an ESTONIAN tenant — its EE diesel
+    # index and Tark Tee assertions need tenant.country = "EE" now that a tenant with no
+    # country has NO automatic index (no more silent fallback to Estonia).
+    import config as _h1cfg
+    import conversions as _h1conv
+    _h1cfg.invalidate()
+    _h1cfg.seed_from_file(_h1conv)
+    _h1doc = json.loads(json.dumps(_h1cfg.load(_h1conv, use_cache=False)))
+    _h1doc["tenant"] = dict(_h1doc.get("tenant") or {}, country="EE")
+    _h1r = _h1cfg.save(_h1doc, by="harness-h1")
+    assert _h1r["ok"], _h1r
+    _h1cfg.invalidate()
+    try:
+        import costing as _h1cst
+        _h1cst.invalidate()
+    except Exception:
+        pass
     import config as _cfg
     _cfg.invalidate()
     import costing as _cst
@@ -971,9 +988,9 @@ try:
     _pg_page = lookahead.page(bucket="commit")
     ok("🔴 the page read never touches live Tark Tee — before any refresh the rail says 'unchecked', no flag",
        _calls["fetch"] == 0 and _calls["check"] == []
-       and _pg_page["clashes"]["sources"]["tark_tee"] == "unchecked"
-       and set(_pg_page["clashes"]["sources"]["tark_tee_unchecked"]) == {"R1", "R3"}
-       and _pg_page["clashes"]["by_code"].get("TARK_TEE") is None)
+       and _pg_page["clashes"]["sources"]["restrictions"] == "unchecked"
+       and set(_pg_page["clashes"]["sources"]["restrictions_unchecked"]) == {"R1", "R3"}
+       and _pg_page["clashes"]["by_code"].get("RESTRICTION") is None)
     _st = _rx.refresh_async(sync=True)
     ok("⭐ a refresh fetches Tark Tee ONCE, checks every route, and stores the result on each",
        _calls["fetch"] == 1 and sorted(set(_calls["check"])) == ["R1", "R2", "R3"] and _st["running"] is False
@@ -981,27 +998,27 @@ try:
        and all(x["checked_at"] for x in _rx.stored_checks(["R1", "R3"]).values()))
     _pg_page = lookahead.page(bucket="commit")
     ok("⭐ ...after which the page carries TARK_TEE from the STORE — instantly, no fetch, with the headline and its age",
-       _calls["fetch"] == 1 and _pg_page["clashes"]["by_code"].get("TARK_TEE") == 1
-       and _pg_page["clashes"]["sources"]["tark_tee"] == "ok" and _pg_page["clashes"]["sources"]["tark_tee_checked_at"]
+       _calls["fetch"] == 1 and _pg_page["clashes"]["by_code"].get("RESTRICTION") == 1
+       and _pg_page["clashes"]["sources"]["restrictions"] == "ok" and _pg_page["clashes"]["sources"]["restrictions_checked_at"]
        and any("3.5 m limit" in f["text"] and f["route_id"] == "R3" for f in _pg_page["clashes"]["flags"]))
-    _tt = lookahead.tark_tee_status(bucket="commit")
+    _tt = lookahead.restriction_status(bucket="commit")
     ok("...and the status read agrees, and reports the refresh state",
        _tt["status"] == "ok" and _tt["count"] == 1 and _tt["refresh"]["running"] is False and _tt["routes"] == ["R1", "R3"])
     # a re-bake clears the stored check for THAT route only
     network._upsert_geom("R3", V8, "[[24,58.5],[24.4,58.6]]", 31.0, 0.7, None, leg="loaded", alt_index=0)
     _pg_page = lookahead.page(bucket="commit")
     ok("🔴 re-baking a route CLEARS its stored check — the page says 'partial' and names R3, and R3's flag is gone",
-       _pg_page["clashes"]["sources"]["tark_tee"] == "partial"
-       and _pg_page["clashes"]["sources"]["tark_tee_unchecked"] == ["R3"]
-       and _pg_page["clashes"]["by_code"].get("TARK_TEE") is None
+       _pg_page["clashes"]["sources"]["restrictions"] == "partial"
+       and _pg_page["clashes"]["sources"]["restrictions_unchecked"] == ["R3"]
+       and _pg_page["clashes"]["by_code"].get("RESTRICTION") is None
        and _rx.stored_checks(["R1"])["R1"]["checked_at"])
     _rx.refresh_async(sync=True)
-    ok("...and a refresh fills it again", lookahead.page(bucket="commit")["clashes"]["sources"]["tark_tee"] == "ok")
+    ok("...and a refresh fills it again", lookahead.page(bucket="commit")["clashes"]["sources"]["restrictions"] == "ok")
     _calls["fetch"] = 0
     _rx.fetch_all = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down"))
     _st2 = _rx.refresh_async(sync=True)
     ok("🔴 a Tark Tee outage during a refresh writes NOTHING — the stored checks stay, status says unavailable",
-       _st2["status"] == "unavailable" and lookahead.page(bucket="commit")["clashes"]["sources"]["tark_tee"] == "ok")
+       _st2["status"] == "unavailable" and lookahead.page(bucket="commit")["clashes"]["sources"]["restrictions"] == "ok")
     # the other failure shape: every layer errored, so fetch_all returns no features and an errors dict
     _before = _rx.stored_checks(["R1", "R3"])
     _rx.fetch_all = lambda *a, **k: {"type": "FeatureCollection", "features": [], "errors": {"restrictions_mass": "timeout"}}
@@ -1012,10 +1029,40 @@ try:
 finally:
     _rx.fetch_all, _rx.check_route = _orig_fetch, _orig_check
 main_src2 = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
+# NARROWED (H1, 29 Sep): the endpoint is /api/forecast-weeks/restrictions/refresh (the
+# pre-H1 tark-tee path is kept as an alias) and the page flag is `restrictions_on`
+# (`tark_tee=` still accepted). The code is RESTRICTION, labelled with the provider's word.
 ok("🔴 the refresh has its own POST endpoint and the page read defaults to the store",
-   '"/api/forecast-weeks/tark-tee/refresh"' in main_src2
-   and re.search(r'def lookahead_page\([^)]*tark_tee: int = 1', main_src2) is not None
+   '"/api/forecast-weeks/restrictions/refresh"' in main_src2
+   and '"/api/forecast-weeks/tark-tee/refresh", include_in_schema=False' in main_src2
+   and re.search(r'def lookahead_page\([^)]*restrictions_on: int = 1, tark_tee: Optional\[int\] = None', main_src2) is not None
    and "restrictions.refresh_async" in main_src2)
+ok("H1: the RESTRICTION flag carries the provider's word — TARK TEE for an Estonian tenant — and the source names the provider",
+   all(f.get("label") == "TARK TEE" and f.get("provider") == "tark_tee"
+       for f in lookahead.page(bucket="commit")["clashes"]["flags"] if f["code"] == "RESTRICTION")
+   and lookahead.page(bucket="commit")["clashes"]["sources"]["restrictions_provider"] == "tark_tee"
+   and lookahead.page(bucket="commit")["clashes"]["sources"]["restrictions_label"] == "TARK TEE"
+   and lookahead.page(bucket="commit")["clashes"]["sources"]["restrictions_ui_label"] == "Road restrictions (Tark Tee)")
+ok("H1: TARK_TEE is no longer a clash code (renamed RESTRICTION, provider-neutral)",
+   "TARK_TEE" not in clashes.CODES and "RESTRICTION" in clashes.CODES)
+# HU4: a DATED hit counts only in the weeks it overlaps; an undated one always does
+_wf, _wt = weeks.week_span(MI, WI)
+_undated = {"headline": "3.5 m limit"}
+_in = {"headline": "closure", "from": _wf.isoformat(), "to": _wt.isoformat()}
+_before_wk = {"headline": "closure", "from": (_wf - datetime.timedelta(days=14)).isoformat(), "to": (_wf - datetime.timedelta(days=8)).isoformat()}
+_after_wk = {"headline": "closure", "from": (_wt + datetime.timedelta(days=1)).isoformat(), "to": (_wt + datetime.timedelta(days=9)).isoformat()}
+_straddle = {"headline": "closure", "from": (_wf - datetime.timedelta(days=3)).isoformat(), "to": (_wf + datetime.timedelta(days=1)).isoformat()}
+_open_from = {"headline": "closure", "from": (_wf - datetime.timedelta(days=3)).isoformat(), "to": None}
+_open_to = {"headline": "closure", "from": None, "to": (_wt + datetime.timedelta(days=30)).isoformat()}
+_ended_open = {"headline": "closure", "from": None, "to": (_wf - datetime.timedelta(days=1)).isoformat()}
+ok("⭐ HU4: a closure overlapping the week counts; one entirely before or after it does not; undated always counts",
+   clashes._overlaps_week(_undated, _wf, _wt) and clashes._overlaps_week(_in, _wf, _wt)
+   and not clashes._overlaps_week(_before_wk, _wf, _wt) and not clashes._overlaps_week(_after_wk, _wf, _wt)
+   and clashes._overlaps_week(_straddle, _wf, _wt) and clashes._overlaps_week(_open_from, _wf, _wt)
+   and clashes._overlaps_week(_open_to, _wf, _wt) and not clashes._overlaps_week(_ended_open, _wf, _wt))
+ok("...with no week given every hit counts (the pre-H1 behaviour for a caller without a bucket)",
+   clashes._overlaps_week(_after_wk, None, None) and clashes._overlaps_week(_before_wk, None, None))
+ok("...and an unreadable date never hides a hit", clashes._overlaps_week({"from": "soon", "to": "later"}, _wf, _wt))
 ok("no UNBAKED, no DAYS_NE_WEEK, no SHORTAGE on a fresh derived week",
    not any(c in codes for c in ("UNBAKED", "DAYS_NE_WEEK", "SHORTAGE")))
 ok("flags are ordered by the brief's code order", [f["code"] for f in flags] == sorted([f["code"] for f in flags], key=lambda c: clashes.CODES.index(c)))
