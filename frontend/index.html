@@ -514,8 +514,8 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
         </div>}>
         {/* coverage: what the totals include and exclude — the old amber box, moved to where the numbers are read */}
         <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> line-months on a baked route{D.lines > D.baked ? <span className="text-amber-700"> · km, CO₂e and fair {CUR()} exclude the {D.lines - D.baked} unbaked ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}) — bake them on the Routes page</span> : null}</span>
-          <span>· diesel {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (bulletin ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
+          <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> line-months on a baked route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} exclude the {D.lines - D.baked} unbaked ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}) — bake them on the Routes page</span> : null}</span>
+          <span>· diesel {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
           {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "rgba(37,99,235,.1)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
@@ -642,7 +642,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
       </WallSection>
 
       {!wall && <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 text-sm font-semibold text-slate-700">Route planning detail <span className="text-slate-400 font-normal">· click a row to focus the charts on that line · click a column to sort · {CUR()} as total, and {CUR()}/t · {CUR()}/trip · {CUR()}/km on hover</span></div>
+        <div className="px-4 py-3 border-b border-slate-100 text-sm font-semibold text-slate-700">Route planning detail <span className="text-slate-400 font-normal">· click a row to focus the charts on that line · click a column to sort · {CUR()} as total, and {CUR()}/t · {CUR()}/trip · {CUR()}/{DU()} on hover</span></div>
         <div className="overflow-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
@@ -693,7 +693,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
         </div>
       </div>}
 
-      {!wall && <p className="text-xs text-slate-400 px-1">Planning estimates and typed actuals — no live tracking. Every planning figure on this page comes from <code>/api/costing/lines</code>, the same functions the Look-ahead uses: trips = tonnes ÷ planning payload rounded up per line-month; km, cycle and vehicles from the baked HERE route for the line's vehicle (an unbaked line has none and is excluded from those totals, never estimated); CO₂e = km × the vehicle's DEFRA-based factor. Planned {CUR()} = the route`s typed rates (summed), or the Config target rate where the route has none. Fair ${CUR()} = the cost model on Config → Costing · fuel — a floor for negotiation, never a quote. Peak fleet = the largest same-month sum of vehicles needed (trips ÷ working days ÷ what one vehicle does in a shift). Delivered = the week actuals typed on Look-ahead → Account (a day actual rolls into its week); a week nobody reported counts as nothing. Today and this week come from the Look-ahead`s own read.</p>}
+      {!wall && <p className="text-xs text-slate-400 px-1">Planning estimates and typed actuals — no live tracking. Every planning figure on this page comes from <code>/api/costing/lines</code>, the same functions the Look-ahead uses: trips = tonnes ÷ planning payload rounded up per line-month; {DU()}, cycle and vehicles from the baked HERE route for the line's vehicle (an unbaked line has none and is excluded from those totals, never estimated); CO₂e = km × the vehicle's per-km factor on Config → Vehicles (stored per km whatever the tenant reads). Planned {CUR()} = the route`s typed rates (summed), or the Config target rate where the route has none. Fair {CUR()} = the cost model on Config → Costing · fuel — a floor for negotiation, never a quote. Peak fleet = the largest same-month sum of vehicles needed (trips ÷ working days ÷ what one vehicle does in a shift). Delivered = the week actuals typed on Look-ahead → Account (a day actual rolls into its week); a week nobody reported counts as nothing. Today and this week come from the Look-ahead`s own read.</p>}
     </div>
   );
 }
@@ -1402,7 +1402,12 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
   const [caution, setCaution] = useState(null);   // returned by the save
 
   // ---- vehicle (exactly one per line) ----
-  const [vehicle, setVehicle] = useState(vehicles[0] || "");
+  // 29 Sep 2026 first look (GB demo): the material categories list the EU N-category
+  // entries FIRST, so the form defaulted to a vehicle the tenant hides — and the picker
+  // then showed it as "current". A hidden vehicle is never a default: take the first one
+  // the tenant shows; a saved line's own value is still kept (vehShown keeps `current`).
+  const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v)) || (list || [])[0] || "";
+  const [vehicle, setVehicle] = useState(firstShown(vehicles));
   const [unit, setUnit] = useState(units[0] || "m3");
 
   // ---- year RANGE, not a single year ----------------------------------------
@@ -1463,7 +1468,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
   // category change -> sensible default unit + primary vehicle
   useEffect(() => {
     setUnit(u => (u === "m3" && !volumeOk) ? (cat.default_unit || "t") : u);
-    setVehicle(v => suggestedVehicles.includes(v) ? v : (suggestedVehicles[0] || v));
+    setVehicle(v => suggestedVehicles.includes(v) ? v : (firstShown(suggestedVehicles) || v));
   }, [material]);
 
   // Material categories the chosen discipline actually moves. Advisory, not enforced --
@@ -2233,7 +2238,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmt(g.quantity, g.unit)} <span className="text-slate-400 text-xs">{g.unit === "m3" ? "m³" : g.unit}</span></td>
                       {/* 11 Sep: what the line costs — planned (typed) and fair (the model), each with
-                          {CUR()}/t · {CUR()}/trip · {CUR()}/km on hover, over every month the line covers */}
+                          {CUR()}/t · {CUR()}/trip · {CUR()}/{DU()} on hover, over every month the line covers */}
                       <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-xs" data-cost-cell="1">
                         {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
                           <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[9px] font-semibold px-1 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
@@ -2382,7 +2387,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
   return (
     <div data-fair-price-section="1">
       <div className="text-sm font-semibold text-slate-700">Fair price — the model</div>
-      <p className="text-[11px] text-slate-400 mt-0.5 mb-2">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + km × running, × (1 + margin). Shown on every baked line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
+      <p className="text-[11px] text-slate-400 mt-0.5 mb-2">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + {DU()} × running, × (1 + margin). Shown on every baked line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl">
         {FAIR_FIELDS_FOR().map(([k, l, help]) => (
           <label key={k} className="block">
@@ -2514,7 +2519,7 @@ function ConfigPage({ meta, who, access }){
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-xs">
                   <tr>
-                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}
+                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangShown("ee")).map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -2522,7 +2527,7 @@ function ConfigPage({ meta, who, access }){
                     <tr key={k} className="border-t border-slate-100 align-top">
                       <td className="px-2 py-1.5 whitespace-nowrap"><div className="font-medium text-slate-800">{k}</div>{v.code && <div className="text-[10px] text-slate-400">{v.code}</div>}</td>
                       <td className="px-2 py-1.5 min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={k} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
-                      <td className="px-2 py-1.5 min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder="falls back to EU" onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>
+                      {vehLangShown("ee") && <td className="px-2 py-1.5 min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder="falls back to EU" onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
                       <td className="px-2 py-1.5 w-24"><input className={inp} value={v.payload_t ?? ""} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
                       <td className="px-2 py-1.5 w-24"><input className={inp} value={v.gvw_t ?? ""} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
                       <td className="px-2 py-1.5 w-28"><input className={inp} value={v.emissions_kg_co2e_per_km ?? ""} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
@@ -2895,7 +2900,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
           {hasIndex ? <span className="text-lg font-bold tabular-nums" style={{ color: "var(--navy-deep)" }}>{price}</span>
                     : <span className="text-sm font-semibold text-amber-700">Index unavailable — {canType ? "type a price" : "not set"}</span>}
           {staleChip}
-          <span className="text-[11px] text-slate-500">{hasIndex ? `bulletin ${fuelDate(idx.bulletin_date)}` : (idx.last_error ? `feed: ${String(idx.last_error).slice(0, 60)}` : "")}</span>
+          <span className="text-[11px] text-slate-500">{hasIndex ? `${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}` : (idx.last_error ? `feed: ${String(idx.last_error).slice(0, 60)}` : "")}</span>
           {rf.running && <span className="text-[11px] text-slate-400">updating…</span>}
           {!rf.running && idx.last_error && hasIndex && <span className="text-[11px]" style={{ color: "var(--red)" }} title={idx.last_error}>· last fetch failed {String(idx.last_attempt_at || "").replace("T", " ").slice(0, 16)}; the stored bulletin stands</span>}
         </div>
@@ -3763,7 +3768,7 @@ function RoutePlanning({ route, token, onSaved }){
   return (
     <div className="border-t border-slate-200 pt-3 mt-3 space-y-2">
       <div className="text-sm font-semibold text-slate-700">Planning · Look-ahead</div>
-      <p className="text-[11px] text-slate-400">Typed, never seeded. Rates are SUMMED where filled (a base per load plus a per-km rate is the usual Estonian quote). Blank = no rate on this route: the Look-ahead then prices it at the target rate from Config (marked "target") — or prints "rate not set" when none is set either. A typed rate here is used ALONE; it is never mixed with the target.</p>
+      <p className="text-[11px] text-slate-400">Typed, never seeded. Rates are SUMMED where filled (a base per load plus a per-{DU()} rate is a common haulage quote). Blank = no rate on this route: the Look-ahead then prices it at the target rate from Config (marked "target") — or prints "rate not set" when none is set either. A typed rate here is used ALONE; it is never mixed with the target.</p>
       <div className="grid grid-cols-2 gap-2">
         <F k="max_vehicles_per_day" label="Max vehicles / day (flag only)" />
         <label className="block">
