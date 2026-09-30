@@ -1268,6 +1268,32 @@ def _columns_of(cur, table):
         return []
 
 
+def _column_types_of(cur, table):
+    """
+    {column: DECLARED TYPE, upper-cased} for a table as it is right now — "BOOLEAN",
+    "INTEGER", "REAL", "TEXT" on SQLite; "boolean", "integer", "double precision", "text"
+    from information_schema on Postgres, upper-cased the same way.
+
+    Added 29 Sep 2026 for tenant_package: a package exported from a SQLite deployment
+    carries its BOOLEAN columns as 0/1 (that is how SQLite hands them back), and Postgres
+    refuses an integer in a boolean column ("column "in_scope" is of type boolean but
+    expression is of type integer" — the first demo import on Render). The importer
+    coerces by the LIVE column type, so the same package imports into either backend.
+    """
+    try:
+        if IS_PG:
+            cur.execute(
+                "SELECT column_name, data_type FROM information_schema.columns "
+                "WHERE table_name = %s ORDER BY ordinal_position",
+                (table,),
+            )
+            return {r[0]: (r[1] or "").upper() for r in cur.fetchall()}
+        cur.execute(f"PRAGMA table_info({table})")
+        return {r[1]: (r[2] or "").upper() for r in cur.fetchall()}
+    except Exception:
+        return {}
+
+
 def _ddl_columns(ddl):
     """
     The column names declared in one of the _TENANT_DDL blocks.

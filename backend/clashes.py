@@ -71,6 +71,17 @@ def _label(line):
     return f"{o} → {d}" if d else str(o)
 
 
+def _dist_word():
+    """'km' or 'mi' — the tenant's reading unit (HU5). 29 Sep 2026 first look: the
+    UNBAKED text said "km omitted" on a miles tenant's Look-ahead, XLSX and PDF."""
+    try:
+        import config as _config
+        import conversions as _conversions
+        return "mi" if (_config.tenant_settings(_conversions).get("distance_unit") or "km") == "mi" else "km"
+    except Exception:
+        return "km"
+
+
 # --------------------------------------------------------------------------- #
 #  Per-line flags                                                              #
 # --------------------------------------------------------------------------- #
@@ -98,7 +109,7 @@ def per_line(lines, account_rows):
         c = l.get("context") or {}
         if derived.FLAG_UNBAKED in (c.get("flags") or []):
             out.append(_flag("UNBAKED", l,
-                             f"{_label(l)} is not baked for {c.get('vehicle_short') or c.get('vehicle_type') or 'its vehicle'} — km omitted on that line"))
+                             f"{_label(l)} is not baked for {c.get('vehicle_short') or c.get('vehicle_type') or 'its vehicle'} — {_dist_word()} omitted on that line"))
         if l.get("days_ne_week"):
             out.append(_flag("DAYS_NE_WEEK", l,
                              f"days ≠ week on {_label(l)} — days sum {l.get('days_sum')} against week {(l.get('week') or {}).get('planned_qty')}",

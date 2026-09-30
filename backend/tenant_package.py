@@ -89,6 +89,55 @@ def _columns(cur, table):
     return db._columns_of(cur, table)
 
 
+def _column_types(cur, table):
+    return db._column_types_of(cur, table)
+
+
+_TRUE_WORDS = {"true", "t", "yes", "y", "1"}
+_FALSE_WORDS = {"false", "f", "no", "n", "0", ""}
+
+
+def _coerce(v, col_type):
+    """
+    One package value -> what the LIVE column accepts.
+
+    29 Sep 2026: the first demo import on Render failed with
+    `psycopg2.errors.DatatypeMismatch: column "in_scope" is of type boolean but
+    expression is of type integer`. A package exported from (or generated for) a SQLite
+    deployment carries every BOOLEAN column as 0/1, because that is what SQLite hands
+    back; SQLite also accepts them again, so nothing caught it until Postgres. The rule:
+    a value bound to a BOOLEAN column is always a Python bool (or None) — ints, floats
+    and the usual words are read; anything else is refused loudly rather than guessed.
+    Every other column goes through _to_db() as before.
+    """
+    if v is None:
+        return None
+    if (col_type or "").startswith("BOOL"):
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return bool(v)
+        if isinstance(v, str):
+            w = v.strip().lower()
+            if w in _TRUE_WORDS:
+                return True
+            if w in _FALSE_WORDS:
+                return False
+        raise ValueError(f"{v!r} is not a boolean")
+    return _to_db(v)
+
+
+def _bind(row, cols, types):
+    """The parameter list for one INSERT: cols in order, each coerced to its column."""
+    out = []
+    for c in cols:
+        try:
+            out.append(_coerce(row[c], types.get(c, "")))
+        except ValueError as e:
+            raise ValueError(f"column {c}: {e}")
+    return out
+
+
 def table_rows(table):
     """Every row of one tenanted table for the current tenant, tenant_id stripped."""
     rows = db.query(f"SELECT * FROM {table} WHERE tenant_id = ?", (db.current_tenant(),))
@@ -202,6 +251,7 @@ def import_tenant(pkg, replace=False):
             live = _columns(cur, t)
             if not live:
                 raise ValueError(f"table {t} does not exist in this database")
+            types = _column_types(cur, t)
             # A package is the WHOLE tenant: a table it carries replaces that table's
             # rows for this tenant. On an empty tenant that only ever means the boot
             # seeds — the generic disciplines and the factors config row — which the
@@ -213,7 +263,10 @@ def import_tenant(pkg, replace=False):
             for r in rows:
                 cols = [c for c in r.keys() if c in live_set and c != "tenant_id"]
                 gone |= {c for c in r.keys() if c not in live_set and c != "tenant_id"}
-                vals = [_to_db(r[c]) for c in cols]
+                try:
+                    vals = _bind(r, cols, types)
+                except ValueError as e:
+                    raise ValueError(f"table {t}, row {n + 1}: {e}")
                 sql = (f"INSERT INTO {t} (tenant_id, {', '.join(cols)}) "
                        f"VALUES (?, {', '.join('?' for _ in cols)})")
                 cur.execute(db._adapt(sql), [tenant] + vals)
@@ -267,11 +320,12 @@ def import_rows(table, rows):
     try:
         cur = conn.cursor()
         live = set(_columns(cur, table))
+        types = _column_types(cur, table)
         for r in rows:
             cols = [c for c in r.keys() if c in live and c != "tenant_id"]
             sql = (f"INSERT INTO {table} (tenant_id, {', '.join(cols)}) "
                    f"VALUES (?, {', '.join('?' for _ in cols)})")
-            cur.execute(db._adapt(sql), [tenant] + [_to_db(r[c]) for c in cols])
+            cur.execute(db._adapt(sql), [tenant] + _bind(r, cols, types))
             n += 1
         conn.commit()
     finally:

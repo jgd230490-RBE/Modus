@@ -1759,6 +1759,15 @@ def tenant_import(body: dict, replace: int = 0, token: Optional[str] = None):
         res = tenant_package.import_tenant(body, replace=bool(replace))
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        # 29 Sep 2026: the first import on Render died inside the transaction (a
+        # Postgres type mismatch) and the caller saw a bare "Internal Server Error";
+        # the reason was only in the Render log. The import is rolled back whole, so
+        # name the error here — the admin who holds the token is the one who has to
+        # fix the package or the schema.
+        raise HTTPException(500, f"import failed and was rolled back: {type(e).__name__}: {e}")
     config.invalidate()
     return res
 

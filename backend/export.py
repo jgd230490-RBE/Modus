@@ -132,7 +132,7 @@ def footer_lines():
             "fuel surcharge (the diesel index vs the locked base × fuel share) and never "
             "replaces the quote.",
             "Road-user charges are not on this sheet. Payloads are planning "
-            "figures, not plated. Km from the baked HERE route unless marked ‡.",
+            f"figures, not plated. {'Miles' if _du() == 'mi' else 'Km'} from the baked HERE route unless marked ‡.",
           "Mon–Fri only, one row per line; each day cell is qty / trips · vehicles; † = a typed day "
           "that no longer follows the week ÷ 5. Coordinates are "
           "the location's own (WGS84). Road restrictions are the road authority's stored check as of its own "
@@ -303,11 +303,11 @@ def build_xlsx(page):
     fu = cost.get("fuel") or {}
     for i, (k, v) in enumerate((
             (f"Diesel index {_cur()}/L", cost.get("index_eur_per_l")),
-            ("Bulletin date", cost.get("index_bulletin_date")),
+            (_index_date_label(cost), cost.get("index_bulletin_date")),
             ("Index source", cost.get("index_source")),
             ("Attribution", _index_attribution(cost)),
             (f"BAF base {_cur()}/L", fu.get("baf_base_eur_per_l")),
-            ("BAF base bulletin date", fu.get("baf_base_bulletin_date")),
+            (f"BAF base {_index_date_label(cost).lower()}", fu.get("baf_base_bulletin_date")),
             ("Fuel share %", fu.get("share_pct")),
             ("BAF %", (round(cost["baf_pct"] * 100, 2) if cost.get("baf_pct") is not None else None)),
             ("BAF not applied because", cost.get("baf_reason") or ""),
@@ -465,10 +465,11 @@ def _draw_schematic(c, routes, x, y, w, h):
         c.drawString(ex + 2, ey - 6, f"{d} ({rid})"[:30])
 
 
-def draw_route_map(c, page, x, y, w, h):
+def draw_route_map(c, page, x, y, w, h, routes=None):
     """The map block: Mapbox static when it can be had, else the schematic. Returns
-    which one was drawn, so the caption can say so."""
-    routes = route_geometries(page)
+    which one was drawn, so the caption can say so. `routes` may be passed in when the
+    caller has already read them (one DB read, not two)."""
+    routes = route_geometries(page) if routes is None else routes
     png = mapbox_static_png(routes)
     if png:
         try:
@@ -495,7 +496,11 @@ class _MapFlowable(Flowable):
         return self.width, self.height
 
     def draw(self):
-        self.kind = draw_route_map(self.canv, self.page, 0, 0, self.width, self.height)
+        # 29 Sep 2026 first look: with nothing baked the caption blamed Mapbox. Remember
+        # whether there was anything to draw, so the caption can tell the two apart.
+        routes = route_geometries(self.page)
+        self.n_drawn = len(routes)
+        self.kind = draw_route_map(self.canv, self.page, 0, 0, self.width, self.height, routes=routes)
 
 
 def _coord(lat, lon):
@@ -707,6 +712,24 @@ def build_pdf(page):
     return buf.getvalue()
 
 
+def _index_date_label(cost):
+    """The word for the index's date: "Bulletin date" only where the series IS a bulletin
+    (the EU Weekly Oil Bulletin); "Published" for DESNZ; "Index date" for a typed figure
+    or an unknown provider. 29 Sep 2026 first look: the GB XLSX said "Bulletin date"."""
+    country = (cost.get("fuel") or {}).get("country") or ""
+    try:
+        import fuel as _fuel
+        prov = _fuel.provider_public(country)
+    except Exception:
+        prov = None
+    key = (prov or {}).get("key") or ""
+    if key == "eu_bulletin":
+        return "Bulletin date"
+    if key == "desnz":
+        return "Published (week ending)"
+    return "Index date"
+
+
 def _index_attribution(cost):
     """What the diesel index IS: the country's provider series (typed or fetched) — the EU
     bulletin for EU-27, DESNZ weekly road fuel prices for GB — or a typed national figure
@@ -758,9 +781,13 @@ class _Caption(Flowable):
     def draw(self):
         n_routes = len({l.get("route_id") for l in self.page.get("commit", {}).get("lines", [])})
         kind = self.mp.kind
-        txt = f"Routes this week: {n_routes}" + (
-            " · schematic from the baked geometry (no map tiles — Mapbox could not be reached)"
-            if kind == "schematic" else " · map © Mapbox © OpenStreetMap")
+        if kind == "schematic" and not getattr(self.mp, "n_drawn", 1):
+            tail = " · no baked route to draw — bake the network for the map"
+        elif kind == "schematic":
+            tail = " · schematic from the baked geometry (no map tiles — Mapbox could not be reached)"
+        else:
+            tail = " · map © Mapbox © OpenStreetMap"
+        txt = f"Routes this week: {n_routes}" + tail
         self.canv.setFont("Helvetica", 7.5)
         self.canv.setFillColorRGB(*GREY)
         self.canv.drawString(0, 1 * mm, txt)
