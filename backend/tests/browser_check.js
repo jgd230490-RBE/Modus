@@ -33,7 +33,9 @@
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
-const G = "/home/claude/.npm-global/lib/node_modules/";
+// 29 Sep 2026: resolve the global packages through NODE_PATH or a node_modules on the
+// path first (CI, Codespace, any sandbox); the old sandbox's fixed folder is the fallback.
+const G = (() => { try { require.resolve("playwright"); return ""; } catch (e) { return "/home/claude/.npm-global/lib/node_modules/"; } })();
 const { chromium } = require(G + "playwright");
 
 const FRONT = require("path").resolve(__dirname, "..", "..", "frontend");

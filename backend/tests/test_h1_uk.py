@@ -371,6 +371,61 @@ except ImportError:
     for _ in range(2):
         ok("(PDF skipped — reportlab not installed here)", True)
 
+# 29 Sep 2026 first look on the LIVE demo tenant (miles, DESNZ): three wording leaks in the
+# exports and one misleading caption. "km omitted" on every UNBAKED line, "Km from the baked
+# HERE route" in the footer, "Bulletin date" on the Fuel sheet of a DESNZ tenant, and a PDF
+# with nothing baked said "Mapbox could not be reached". Pinned here on the same GB page.
+_KM_OK = re.compile(r"L/100\s?km")          # consumption stays per 100 km on purpose (README)
+try:
+    import openpyxl
+    _xt = []
+    for ws in openpyxl.load_workbook(io.BytesIO(export.build_xlsx(_la)), read_only=True).worksheets:
+        for row in ws.iter_rows(values_only=True):
+            _xt.extend(str(c) for c in row if c is not None)
+    _km_leaks = [t for t in _xt if re.search(r"\b[Kk]m\b", _KM_OK.sub("", t))]
+    ok("🔴 GB XLSX (miles): no 'km' word reaches a sheet except the L/100 km consumption line",
+       not _km_leaks, str(_km_leaks)[:240])
+    ok("GB XLSX (miles): an UNBAKED line says 'mi omitted', the footer says 'Miles from the baked HERE route'",
+       any("mi omitted on that line" in t for t in _xt) and any("Miles from the baked HERE route" in t for t in _xt))
+    ok("🔴 GB XLSX (DESNZ): the Fuel sheet never says 'bulletin' — the date row reads 'Published (week ending)'",
+       not any(re.search(r"bulletin", t, re.IGNORECASE) for t in _xt)
+       and "Published (week ending)" in _xt and "BAF base published (week ending)" in _xt, str([t for t in _xt if "ulletin" in t])[:200])
+    _ee_cost = {"index_source": "eu_weekly_oil_bulletin", "fuel": {"country": "EE"}}
+    ok("…while an Estonian tenant's sheet keeps 'Bulletin date' (the series IS a bulletin), a typed one 'Index date'",
+       export._index_date_label(_ee_cost) == "Bulletin date"
+       and export._index_date_label({"index_source": "manual", "fuel": {"country": "--"}}) == "Index date"
+       and export._index_date_label({"index_source": "manual", "fuel": {"country": "GB"}}) == "Published (week ending)")
+except ImportError:
+    for _ in range(4):
+        ok("(XLSX wording read-back skipped — openpyxl not installed here)", True)
+try:
+    import reportlab  # noqa: F401
+    if shutil.which("pdftotext"):
+        _pt = subprocess.run(["pdftotext", "-layout", "-", "-"], input=export.build_pdf(_la), capture_output=True).stdout.decode("utf-8")
+        ok("🔴 GB PDF (miles): no 'km' word in the rendered text except the L/100 km line",
+           not re.search(r"\b[Kk]m\b", _KM_OK.sub("", _pt)), str(re.findall(r".{0,40}\b[Kk]m\b.{0,40}", _KM_OK.sub("", _pt)))[:240])
+        _rg = export.route_geometries
+        try:
+            export.route_geometries = lambda page: []          # nothing baked at all
+            _pt0 = subprocess.run(["pdftotext", "-layout", "-", "-"], input=export.build_pdf(_la), capture_output=True).stdout.decode("utf-8")
+        finally:
+            export.route_geometries = _rg
+        ok("🔴 PDF with nothing baked: the caption says so and does not blame Mapbox",
+           "no baked route to draw" in _pt0 and "Mapbox could not be reached" not in _pt0, _pt0[:300])
+        ok("…and with a baked route but no Mapbox, the schematic caption still names Mapbox (the branch the sandbox takes)",
+           "schematic from the baked geometry" in _pt and "Mapbox could not be reached" in _pt)
+    else:
+        for _ in range(3):
+            ok("(PDF wording skipped — pdftotext missing)", True)
+except ImportError:
+    for _ in range(3):
+        ok("(PDF wording skipped — reportlab not installed here)", True)
+_mp_src = read("map/index.html")
+ok("🔴 the map's legend carries no first-tenant figure ('~60 km' unsurveyed, '7 package edges') — the words are generic",
+   "~60" not in _mp_src and "7 package edges" not in _mp_src
+   and "Where the alignment file has no surveyed main track the line is interpolated" in _mp_src
+   and "Package edges · ticks from zoom 11" in _mp_src)
+
 # =========================================================================== #
 #  3. Source level: Estonian things are gated                                   #
 # =========================================================================== #
@@ -384,6 +439,32 @@ ok("the staff app offers the Estonian orthophoto to an Estonian tenant only",
 ok("the staff app hides the tenant's hidden vehicles in its pickers and the EU label option for GB",
    "const vehShown = (v, keep) => !HIDDEN_VEHICLES.includes(v) || v === keep;" in fe
    and fe.count(".filter(v => vehShown(v") >= 4 and '(k === "eu" && String(TENANT.country || "").toUpperCase() !== "GB")' in fe)
+# 29 Sep 2026 first look on the LIVE GB demo: the staff app still said "bulletin" (Dashboard
+# status line, Config fuel widget), "km" on a miles tenant (Dashboard status line, hover hint,
+# the model notes, the route form's help text), "the usual Estonian quote" on the route form,
+# an "Estonian" label column on Config → Vehicles, a literal "Fair $£" in the Dashboard note,
+# and the Submit form DEFAULTED to a hidden EU vehicle because the material categories list
+# the N-category entries first. Pinned at source; the render harness covers the JSX.
+ok("🔴 the Dashboard status line reads the tenant's unit word and dates the index 'published' / 'typed', never 'bulletin'",
+   "· {DU()}, CO₂e and fair {CUR()} exclude the" in fe and "· km, CO₂e and fair" not in fe
+   and '(${cost.index_source === "manual" ? "typed" : "published"} ${longDate(' in fe and "(bulletin ${" not in fe)
+ok("🔴 the Config fuel widget dates the index 'published' / 'typed' like the compact card — no 'bulletin' word on a DESNZ screen",
+   "`bulletin ${fuelDate(" not in fe and fe.count('? "published" : "typed"') >= 2)
+ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the currency symbol",
+   "{CUR()}/{DU()} on hover" in fe and "{CUR()}/km on hover" not in fe
+   and "{DU()}, cycle and vehicles from the baked HERE route" in fe
+   and "Fair {CUR()} = the cost model on Config" in fe and "Fair ${CUR()} = the cost model on Config" not in fe
+   and "+ {DU()} × running" in fe and "+ km × running" not in fe)
+ok("🔴 the route form's rate help names no country and reads the tenant's unit",
+   "usual Estonian quote" not in fe and "per-{DU()} rate is a common haulage quote" in fe)
+ok("🔴 Config → Vehicles shows the Estonian label column to an Estonian tenant only",
+   '.filter(h => h !== "Estonian" || vehLangShown("ee"))' in fe and '{vehLangShown("ee") && <td' in fe)
+ok("🔴 the Submit form never defaults to a hidden vehicle (first SHOWN of the category's list)",
+   "const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v))" in fe
+   and "useState(firstShown(vehicles))" in fe and "(firstShown(suggestedVehicles) || v)" in fe
+   and "useState(vehicles[0] || \"\")" not in fe and "(suggestedVehicles[0] || v)" not in fe)
+ok("🔴 the Look-ahead's UNBAKED text reads the tenant's unit (clashes._dist_word), never a fixed 'km'",
+   "km omitted on that line" not in read("backend/clashes.py") and "{_dist_word()} omitted on that line" in read("backend/clashes.py"))
 mp = read("map/index.html")
 ok("the map hides the Estonian orthophoto unless the tenant is Estonian and labels Satellite as Aerial for GB",
    "bm.hidden = (TENANT.country || '').toUpperCase() !== 'EE';" in mp

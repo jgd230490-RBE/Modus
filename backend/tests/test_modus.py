@@ -478,6 +478,68 @@ ok("demo: the pickers see three teams and eight sections",
 ok("demo: the routes reach /api/meta with no distance (unbaked)",
    len(m3["routes"]) == 18 and all(not r.get("distance_km") for r in m3["routes"]))
 
+# --- 5a-bis. Postgres booleans (29 Sep 2026: the first demo import on Render) ---------
+# `psycopg2.errors.DatatypeMismatch: column "in_scope" is of type boolean but expression
+# is of type integer`. SQLite hands BOOLEAN columns back as 0/1 and accepts them again,
+# so every harness passed while Postgres refused the package. The importer now binds by
+# the LIVE column type; these pin that, on the shipped demo package itself.
+_cur = db.get_conn().cursor()
+_types = db._column_types_of(_cur, "disciplines")
+ok("🔴 db._column_types_of reads the declared types (BOOLEAN on SQLite)",
+   _types.get("in_scope", "").startswith("BOOL") and _types.get("active", "").startswith("BOOL")
+   and _types.get("sort_order", "").startswith("INT") and _types.get("label", "") == "TEXT", str(_types))
+ok("🔴 the demo package still carries its booleans as 0/1 — the regression fixture",
+   all(isinstance(r["in_scope"], int) and not isinstance(r["in_scope"], bool) for r in demo["tables"]["disciplines"]))
+_bool_cols = {"disciplines": ("in_scope", "active"), "ipts": ("active",), "work_sections": ("in_scope", "active"),
+              "zones": ("affects_routing", "active"), "location_gates": ("is_default", "active")}
+_bad = []
+for _t, _cols in _bool_cols.items():
+    _tt = db._column_types_of(_cur, _t)
+    for _c in _cols:
+        if not _tt.get(_c, "").startswith("BOOL"):
+            _bad.append(f"{_t}.{_c}={_tt.get(_c)}")
+ok("🔴 every boolean column the schema declares is seen as BOOLEAN", not _bad, str(_bad))
+_bound = []
+for _t, _cols in _bool_cols.items():
+    _tt = db._column_types_of(_cur, _t)
+    for _r in demo["tables"].get(_t) or []:
+        _cs = [c for c in _r.keys() if c in _tt and c != "tenant_id"]
+        _vals = dict(zip(_cs, tenant_package._bind(_r, _cs, _tt)))
+        _bound += [(_t, _c, _vals[_c]) for _c in _cols if _c in _vals and not (_vals[_c] is None or isinstance(_vals[_c], bool))]
+ok("🔴 every 0/1 in the demo's boolean columns is bound as a Python bool", not _bound, str(_bound[:5]))
+ok("_coerce: ints, floats, words and bools all read as bool; None stays None",
+   tenant_package._coerce(1, "BOOLEAN") is True and tenant_package._coerce(0, "BOOLEAN") is False
+   and tenant_package._coerce(1.0, "boolean".upper()) is True and tenant_package._coerce("false", "BOOLEAN") is False
+   and tenant_package._coerce("t", "BOOLEAN") is True and tenant_package._coerce(True, "BOOLEAN") is True
+   and tenant_package._coerce(None, "BOOLEAN") is None)
+ok("_coerce: a non-boolean column is untouched (1 stays an int, a dict becomes JSON text)",
+   tenant_package._coerce(1, "INTEGER") == 1 and not isinstance(tenant_package._coerce(1, "INTEGER"), bool)
+   and tenant_package._coerce({"a": 1}, "TEXT") == '{"a": 1}' and tenant_package._coerce("x", "") == "x")
+try:
+    tenant_package._coerce("maybe", "BOOLEAN")
+    ok("_coerce: a word that is not a boolean is refused, not guessed", False)
+except ValueError as e:
+    ok("_coerce: a word that is not a boolean is refused, not guessed", "not a boolean" in str(e), str(e))
+_pkg_bad = json.loads(json.dumps(demo))
+_pkg_bad["tables"]["disciplines"][0]["in_scope"] = "maybe"
+try:
+    boot(); tenant_package.import_tenant(_pkg_bad)
+    ok("import_tenant: a bad boolean names the table, row and column", False)
+except ValueError as e:
+    ok("import_tenant: a bad boolean names the table, row and column",
+       "table disciplines, row 1: column in_scope" in str(e), str(e))
+_after = db.query("SELECT COUNT(*) AS n FROM locations WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
+ok("import_tenant: …and the refused import wrote nothing (rolled back whole)", _after == 0, str(_after))
+_src_main = read("backend/main.py")
+ok("🔴 POST /api/admin/tenant/import turns a database error into a 500 WITH the reason, not a bare Internal Server Error",
+   "import failed and was rolled back" in _src_main
+   and _src_main.index("except Exception as e:\n        # 29 Sep 2026: the first import on Render") > _src_main.index("def tenant_import("))
+boot()
+out3 = tenant_package.import_tenant(demo)
+ok("demo: imports again after the refused package (the tenant was left clean)", out3["ok"], str(out3)[:200])
+config.invalidate()
+m3 = main.meta()
+
 # --- 5b. Team ids never reach a person (G2 label-only decision) --------------------
 import clashes  # noqa: E402
 import export  # noqa: E402

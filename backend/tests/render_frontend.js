@@ -27,7 +27,9 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const G = "/home/claude/.npm-global/lib/node_modules/";
+// 29 Sep 2026: resolve the global packages through NODE_PATH or a node_modules on the
+// path first (CI, Codespace, any sandbox); the old sandbox's fixed folder is the fallback.
+const G = (() => { try { require.resolve("typescript"); return ""; } catch (e) { return "/home/claude/.npm-global/lib/node_modules/"; } })();
 const ts = require(G + "typescript");
 const React = require(G + "react");
 const ReactDOMServer = require(G + "react-dom/server");

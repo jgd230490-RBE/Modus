@@ -411,8 +411,12 @@ ok("the reason for that order is written down next to it",
 // the three parts of the IPT view move together
 ok("toggling the IPT view hides both legend blocks",
   /function toggleAlignment[\s\S]{0,500}'ipt-legend-note'/.test(code));
+// NARROWED 29 Sep 2026: the note used to quote the first tenant's figure ("~60 km has no
+// surveyed Main Track"); a tenant-neutral map explains the rule, not one alignment's number.
 ok("the legend explains what a fainter segment means",
-  /id="ipt-legend-note"/.test(html) && /no surveyed Main Track in the alignment file/.test(html));
+  /id="ipt-legend-note"/.test(html) && /no surveyed main track/i.test(html) && /interpolated/.test(html));
+ok("🔴 …and carries no first-tenant figure (no '~60 km', no '7 package edges')",
+  !/~60/.test(html) && !/7 package edges/.test(html));
 
 // clicking a bridge must explain itself
 ok("⭐ the boundary ticks answer a click too — a mark with no line under it is "
