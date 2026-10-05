@@ -2583,7 +2583,14 @@ def get_restrictions(layers: Optional[str] = None, include_expired: bool = False
     dropped.
     """
     keys = [k.strip() for k in (layers or "").split(",") if k.strip()] or None
-    return restrictions.fetch_all(keys, current_only=not include_expired)
+    fc = restrictions.fetch_all(keys, current_only=not include_expired)
+    # 30 Sep 2026: serialised here, not by FastAPI's encoder. The National Highways feed
+    # is ~8 MB of GeoJSON (2,920 closures, 170,000 vertices); jsonable_encoder walks
+    # every vertex in Python (~4 s of the starter's half CPU per map load) before
+    # json.dumps runs. One dumps is a fifth of that. The body is cached beside the
+    # feature collection so a second map load costs nothing.
+    return Response(content=restrictions.serialised(fc, keys, not include_expired),
+                    media_type="application/json")
 
 
 @app.get("/api/restrictions/layers")

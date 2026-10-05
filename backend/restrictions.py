@@ -626,6 +626,24 @@ def fetch_nh_closures(current_only=True):
     return out
 
 
+_SERIALISED = {}     # (keys, current_only) -> (id(fc), body)
+
+
+def serialised(fc, keys=None, current_only=True):
+    """
+    The feature collection as a JSON string, cached against the object identity of the
+    collection fetch_all() returned (it lives CACHE_TTL_S; a new fetch is a new object,
+    so the body follows it). See main.get_restrictions for why.
+    """
+    k = (tuple(keys) if keys else None, bool(current_only))
+    hit = _SERIALISED.get(k)
+    if hit and hit[0] == id(fc):
+        return hit[1]
+    body = json.dumps(fc, ensure_ascii=False, separators=(",", ":"))
+    _SERIALISED[k] = (id(fc), body)
+    return body
+
+
 def fetch_all(keys=None, current_only=True):
     if not enabled():
         return _none_fc(NO_PROVIDER_NOTE)
@@ -695,25 +713,71 @@ def _point_to_segment_km(p, a, b):
     return zones.haversine_km([px, py], [cx / k, cy])
 
 
-def _min_distance_km(feature_geom, line):
-    """Closest approach between a restriction geometry and a route polyline, in km."""
-    pts = []
-    g = feature_geom or {}
+def _geom_points(geom):
+    """Every vertex of a GeoJSON geometry as a flat list of [lon, lat]."""
+    g = geom or {}
     t, c = g.get("type"), g.get("coordinates") or []
     if t == "Point":
-        pts = [c]
-    elif t == "MultiPoint":
-        pts = list(c)
-    elif t == "LineString":
-        pts = list(c)
-    elif t == "MultiLineString":
-        pts = [p for part in c for p in part]
-    elif t == "Polygon":
-        pts = [p for ring in c for p in ring]
-    elif t == "MultiPolygon":
-        pts = [p for poly in c for ring in poly for p in ring]
+        return [c]
+    if t in ("MultiPoint", "LineString"):
+        return list(c)
+    if t == "MultiLineString":
+        return [p for part in c for p in part]
+    if t == "Polygon":
+        return [p for ring in c for p in ring]
+    if t == "MultiPolygon":
+        return [p for poly in c for ring in poly for p in ring]
+    return []
+
+
+def _bbox(pts):
+    """(min_lon, min_lat, max_lon, max_lat) of a point list, or None."""
+    lons = [p[0] for p in pts if isinstance(p, (list, tuple)) and len(p) >= 2]
+    lats = [p[1] for p in pts if isinstance(p, (list, tuple)) and len(p) >= 2]
+    if not lons:
+        return None
+    return (min(lons), min(lats), max(lons), max(lats))
+
+
+def _bbox_apart_km(a, b):
+    """
+    A LOWER BOUND on the distance between anything inside box a and anything inside
+    box b, in km (0 when they overlap). Degrees → km with the cosine of the mean
+    latitude; a bound, so it only ever lets a pair through, never hides one.
+    """
+    import math
+    dlon = max(0.0, max(a[0], b[0]) - min(a[2], b[2]))
+    dlat = max(0.0, max(a[1], b[1]) - min(a[3], b[3]))
+    # the HIGHEST latitude either box reaches gives the smallest km per degree east, so
+    # the bound stays below the true distance; 0.97 covers the flat-earth error of the
+    # exact test (zones.haversine_km, R = 6371) over any span the feed can contain
+    lat = min(89.0, max(abs(a[1]), abs(a[3]), abs(b[1]), abs(b[3])))
+    kx = 111.19 * max(0.05, math.cos(math.radians(lat)))
+    return 0.97 * math.hypot(dlon * kx, dlat * 111.19)
+
+
+def _min_distance_km(feature_geom, line, max_km=None, line_bbox=None):
+    """
+    Closest approach between a restriction geometry and a route polyline, in km.
+
+    30 Sep 2026: with `max_km` the pair is first tried by bounding box — a restriction
+    whose box is already further from the route's box than max_km cannot be a hit, so
+    the vertex-by-segment loop is skipped and None returned. The first GB run made this
+    necessary: the National Highways feed is national (2,920 closures, 170,000 vertices)
+    and 18 baked routes × 4 legs against all of it was ~6 billion point-to-segment
+    operations — the live service sat at 100 % CPU for hours and every page read waited
+    behind it. Tark Tee's Estonian layers were small enough never to show this.
+    """
+    pts = _geom_points(feature_geom)
     if not pts or len(line) < 2:
         return None
+    if max_km is not None:
+        fb = _bbox(pts)
+        lb = line_bbox if line_bbox is not None else _bbox(line)
+        if fb is None or lb is None:
+            return None
+        if _bbox_apart_km(fb, lb) > max_km:
+            return None
     best = None
     for p in pts:
         if not isinstance(p, (list, tuple)) or len(p) < 2:
@@ -868,14 +932,17 @@ def check_route(route_id, profile=None, layers=None, _fc=None):
     mm = match_m()
 
     hits, seen = [], set()
+    max_km = mm / 1000.0
     for g in rows:
         try:
             line = json.loads(g["geometry"])
         except Exception:
             continue
         gross_t = vehicle_dimensions(g["vehicle_profile"]).get("mass_t")
+        line_bbox = _bbox(line)
         for f in feats:
-            d = _min_distance_km(f.get("geometry"), line)
+            # bounding boxes first (30 Sep 2026): a national feed against a 30 km route
+            d = _min_distance_km(f.get("geometry"), line, max_km=max_km, line_bbox=line_bbox)
             if d is None or d * 1000.0 > mm:
                 continue
             p = f.get("properties") or {}
