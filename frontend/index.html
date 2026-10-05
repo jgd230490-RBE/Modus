@@ -403,6 +403,9 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const [wall, setWall] = useState(false);           // big-screen mode
   const [tick, setTick] = useState(0);               // bumps every 5 min in big-screen mode
   const [stamp, setStamp] = useState(null);
+  const [theme] = useTheme();          // 5 Oct 2026: chart colours are tokens; re-render on a change.
+                                       // ⚠️ Hooks before the early returns below — on 5 Oct this hook
+                                       // sat after them and React #310 blanked the whole app.
   // --- 15 Sep: how the big screen is divided ---------------------------------------
   const pinned = screenFromHash(DASH_SECTIONS.length);   // "#dashboard/3" → 3
   const [wallLayout, setWallLayout] = useState(() => {
@@ -580,7 +583,6 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const pick = (key) => setLineKey(k => k === key ? null : key);
 
   const tf = { size: wall ? 13 : 11 };
-  const [theme] = useTheme();          // 5 Oct 2026: the chart colours below are tokens
   const C1 = tok("--chart-1", "#2563EB"), C1S = tok("--chart-1-soft", "rgba(37,99,235,.18)"), C2 = tok("--chart-2", "#3B82F6");
   const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()} ${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
