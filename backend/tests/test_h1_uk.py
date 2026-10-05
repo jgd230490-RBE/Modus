@@ -310,9 +310,19 @@ ok("H2: every route names its origin and destination gate",
 ok("H2: two haul roads, spliced (HERE does not know them), attached to the routes that use them",
    [(z["id"], z["haul_mode"]) for z in _T["zones"] if z["kind"] == "haul_road"] == [("Z001", "splice"), ("Z002", "splice")]
    and sorted((l["route_id"], l["zone_id"]) for l in _T["route_haul_roads"]) == [("R004", "Z001"), ("R005", "Z001"), ("R006", "Z001"), ("R014", "Z001"), ("R016", "Z002"), ("R018", "Z002")])
-ok("H2: three geofences — a dated closure that re-routes (Tilton, from the show week), an advisory 7.5 t village limit, an advisory works area",
+ok("H2: three geofences — a closure that re-routes (Tilton, in force before the show), an advisory 7.5 t village limit, an advisory works area",
    [(z["kind"], z["affects_routing"], z["starts_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
-   == [("closure", 1, "2026-10-12"), ("weight_limit", 0, "2026-09-01"), ("works", 0, "2026-10-01")])
+   == [("closure", 1, "2026-10-05"), ("weight_limit", 0, "2026-09-01"), ("works", 0, "2026-10-01")])
+def _bbox(g):
+    xs = [c[0] for c in g["coordinates"][0]]; ys = [c[1] for c in g["coordinates"][0]]
+    return min(xs), min(ys), max(xs), max(ys)
+_Z = {z["id"]: _bbox(json.loads(z["geometry"]) if isinstance(z["geometry"], str) else z["geometry"]) for z in _T["zones"] if z["kind"] != "haul_road"}
+ok("H2: the Tilton closure box straddles the A47 as HERE baked it (52.620–52.622 N, west of the -0.922 turn) and is in force on the day of the bake, "
+   "because a zone only steers routing while it applies today (zones.applies_on) — the 5 Oct live bake moved nothing with a 12 Oct start",
+   _Z["Z003"][1] < 52.6208 < _Z["Z003"][3] and _Z["Z003"][0] < -0.949 < _Z["Z003"][2] and _Z["Z003"][3] < 52.6225
+   and [z for z in _T["zones"] if z["id"] == "Z003"][0]["starts_on"] <= "2026-10-05")
+ok("H2: the Burrough 7.5 t box straddles the lane the Stockpile North routes were baked along (-0.8879, 52.6993)",
+   _Z["Z004"][0] < -0.8879 < _Z["Z004"][2] and _Z["Z004"][1] < 52.6993 < _Z["Z004"][3])
 ok("H2: daily vehicle caps on the two village routes, so ROUTE_CAP has something to fire on",
    {r["id"]: r["max_vehicles_per_day"] for r in _T["routes"] if r["max_vehicles_per_day"]} == {"R016": 20, "R018": 30})
 ok("H2: the show week (12–18 Oct = Oct W3) and the week after are populated for every approved line, and October W1/W2 carry typed actuals",
