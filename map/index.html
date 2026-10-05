@@ -197,7 +197,8 @@
         #tl-label{ font-size:12px; font-weight:600; color:var(--navy-deep); min-width:190px; white-space:nowrap; flex:0 0 auto; }
         /* and the select was far bigger than five two-character options need */
         #tl-speed{ border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
-    </style>
+            #demo-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:30;background:#1F2024;color:#FBBF24;border:1px solid #D97706;border-radius:999px;padding:4px 12px;font:700 10.5px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;}
+</style>
 </head>
 <body>
 <div id="menu-toggle" onclick="toggleSidebar()">☰ Control Panel</div>
@@ -458,6 +459,19 @@
         // H1 (29 Sep 2026): a British tenant reads Mapbox Satellite as its "Aerial" basemap
         const sat = document.getElementById('basemap-satellite');
         if (sat) sat.textContent = (TENANT.country || '').toUpperCase() === 'GB' ? 'Aerial (Mapbox Satellite)' : 'Satellite (Mapbox)';
+        // H2 (5 Oct 2026): a tenant whose overlay carries no existing railway has no use for
+        // the rail layer — hide its control instead of showing an empty, ticked layer. The
+        // demo scheme is a road; the first tenant's corridor had a railway under it.
+        const railCb = document.getElementById('layer-rail');
+        const railItem = railCb && railCb.closest('.control-item');
+        const hasRail = !!(window.evr_rail_data && window.evr_rail_data.features && window.evr_rail_data.features.length);
+        if (railItem) railItem.hidden = !hasRail;
+        // H2: the tenant's demo notice, on the map like every other screen
+        let dn = document.getElementById('demo-notice');
+        if (TENANT.demo_notice) {
+            if (!dn) { dn = document.createElement('div'); dn.id = 'demo-notice'; document.body.appendChild(dn); }
+            dn.textContent = TENANT.demo_notice;
+        } else if (dn) { dn.remove(); }
         const v = document.getElementById('overlay-version');
         if (v) v.textContent = window.OVERLAY_VERSION ? ('overlay ' + window.OVERLAY_VERSION) : 'no alignment in this tenant';
         if (typeof KPI_BY !== 'undefined') KPI_BY[1][1] = TEAM;
