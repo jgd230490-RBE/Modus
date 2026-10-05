@@ -293,6 +293,45 @@ def _fake_nh_page(offset, count=restrictions.NH_PAGE, timeout=None):
                         "scheduledplannedstartdate": _now_ms - 2 * _day, "scheduledplannedenddate": _now_ms + 400 * _day}}]}
 
 
+# --- 30 Sep 2026: the national feed against baked routes must be pre-filtered by box -----
+# The first GB run with baked routes put the live service at 100 % CPU for hours: 2,920
+# closures × 170,000 vertices against 18 routes × 4 legs, vertex by segment. These pin the
+# bounding-box short cut in _min_distance_km and that it never hides a real hit.
+import random as _random
+import time as _time
+_random.seed(30)
+_line = [[-0.905 + i * 0.0001, 52.499 + i * 0.00004] for i in range(500)]          # a 500-vertex HERE-like leg
+_far = [{"type": "Feature", "geometry": {"type": "MultiLineString",
+                                          "coordinates": [[[-0.23 + _random.random() * 0.01, 51.68 + _random.random() * 0.01] for _ in range(58)]]},
+         "properties": {}} for _ in range(3000)]                                       # M25-sized, 90 km south
+_near = {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.9, 52.5], [-0.89, 52.51]]}, "properties": {}}
+_calls = {"n": 0}
+_orig_pts = restrictions._point_to_segment_km
+def _counting(p, a, b):
+    _calls["n"] += 1
+    return _orig_pts(p, a, b)
+restrictions._point_to_segment_km = _counting
+try:
+    _lb = restrictions._bbox(_line)
+    _t0 = _time.time()
+    _skipped = sum(1 for f in _far if restrictions._min_distance_km(f["geometry"], _line, max_km=0.1, line_bbox=_lb) is None)
+    _dt = _time.time() - _t0
+    ok("🔴 a closure whose box is further than the match distance is skipped without a single segment test",
+       _skipped == 3000 and _calls["n"] == 0, f"skipped {_skipped}, segment tests {_calls['n']}")
+    ok("🔴 …and 3,000 of them against a 500-vertex leg take well under a second, not hours", _dt < 1.0, f"{_dt:.2f}s")
+    _calls["n"] = 0
+    _d = restrictions._min_distance_km(_near["geometry"], [[-0.905, 52.499], [-0.8955, 52.5052], [-0.885, 52.515]], max_km=0.1)
+    ok("🔴 a closure inside the box still goes through the exact test and is a hit", _d is not None and _d * 1000 <= 100 and _calls["n"] > 0, str(_d))
+    ok("the box test is a lower bound on the exact distance (never hides a pair): 2,000 random pairs",
+       all(restrictions._bbox_apart_km(restrictions._bbox([p]), restrictions._bbox([q])) <= _orig_pts(p, q, q) + 1e-9
+           for p, q in (([-1 + _random.random() * 2, 51 + _random.random() * 4], [-1 + _random.random() * 2, 51 + _random.random() * 4]) for _ in range(2000))))
+    ok("without max_km the old exact behaviour is unchanged (a far feature still gets a distance)",
+       restrictions._min_distance_km(_far[0]["geometry"], _line) is not None)
+    ok("check_route passes the match distance and the leg's box (source)",
+       "max_km=max_km, line_bbox=line_bbox" in read("backend/restrictions.py") and "max_km = mm / 1000.0" in read("backend/restrictions.py"))
+finally:
+    restrictions._point_to_segment_km = _orig_pts
+
 restrictions._nh_page = _fake_nh_page
 fuel.refresh("GB", sync=True)
 restrictions.refresh_async(sync=True)
@@ -305,7 +344,7 @@ PAGES = {
     "/api/costing": main.get_costing(),
     "/api/fuel-index": main.get_fuel_index(lazy=0),
     "/api/restrictions/layers": main.restriction_layers(),
-    "/api/restrictions": main.get_restrictions(),
+    "/api/restrictions": json.loads(main.get_restrictions().body),     # NARROWED 30 Sep: a pre-serialised Response
     "/api/lookahead": main.lookahead_page(bucket="commit"),
     "/api/forecast-weeks/restrictions": main.forecast_week_restrictions(bucket="commit"),
     "/api/forecast-weeks/clashes": main.forecast_week_clashes(bucket="commit", restrictions_on=1),
@@ -329,6 +368,12 @@ ok("GB fuel index: provider DESNZ, unit GBP/L, attribution names gov.uk, VAT 20,
 ok("GB restrictions catalogue: one layer, planned road closures, 100 m, OGL attribution",
    [l["key"] for l in PAGES["/api/restrictions/layers"]["layers"]] == ["nh_closures"]
    and PAGES["/api/restrictions/layers"]["match_m"] == 100.0 and "Open Government Licence" in PAGES["/api/restrictions/layers"]["attribution"])
+_r_ = main.get_restrictions()
+_fc_ = restrictions.fetch_all(None, current_only=True)
+ok("🔴 GET /api/restrictions is a pre-serialised JSON Response (not walked by FastAPI's encoder), cached per collection",
+   getattr(_r_, "media_type", "") == "application/json" and isinstance(_r_.body, str)
+   and json.loads(_r_.body)["type"] == "FeatureCollection"
+   and restrictions.serialised(_fc_) is restrictions.serialised(_fc_))
 _rr = PAGES["/api/routes/{id}/restrictions"]
 ok("GB route check: the hit carries its dates, event number and the ROADWORKS word; verdict unknown (a closure, not a limit)",
    _rr["hits"] and _rr["hits"][0]["event_number"] == "NH-0002" and _rr["hits"][0]["from"] and _rr["hits"][0]["to"]
@@ -445,6 +490,42 @@ ok("the staff app hides the tenant's hidden vehicles in its pickers and the EU l
 # an "Estonian" label column on Config → Vehicles, a literal "Fair $£" in the Dashboard note,
 # and the Submit form DEFAULTED to a hidden EU vehicle because the material categories list
 # the N-category entries first. Pinned at source; the render harness covers the JSX.
+import re as _re2
+_fits = [m.start() for m in _re2.finditer(r"\.fitBounds\(", fe)]
+ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the Look-ahead map white-screened the whole app)",
+   len(_fits) == 3 and all("try {" in fe[max(0, i - 60):i] for i in _fits), str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
+# --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
+_PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
+_SKIP = re.compile(r'^(?:\w+:)?(?:text-white|bg-white/\d+|border-white/\d+|text-white/\d+|bg-black/\d+|\w+-transparent|\w+-current|(?:bg|text|border|ring)-\[color:var|ring-\[)')
+_dark = fe[fe.index("/* DARK-REMAP-START"):fe.index("/* DARK-REMAP-END */")]
+def _esc(u):
+    for a, b in ((":", "\\:"), ("/", "\\/"), ("[", "\\["), ("]", "\\]"), ("(", "\\("), (")", "\\)"), (",", "\\,"), (".", "\\.")):
+        u = u.replace(a, b)
+    return u
+_fe_wo = fe.replace(_dark, "")          # the utilities in the app markup, not the remap block itself
+_uncovered = sorted({u for u in set(_PAL.findall(_fe_wo)) if not _SKIP.match(u) and ("." + _esc(u)) not in _dark})
+ok("🔴 APPEARANCE: every Tailwind colour utility the app uses has a dark remap (generated block, html[data-theme=\"dark\"])",
+   not _uncovered and _dark.count('html[data-theme="dark"]') >= 40, str(_uncovered)[:300])
+ok("APPEARANCE: three looks as tokens — ink on :root, light = header tokens only, dark = a full palette with orange controls and color-scheme dark",
+   '--hdr-logo:url("/brand/logo-header-on-dark.svg")' in fe and 'html[data-theme="light"]{' in fe and '--hdr-logo:url("/brand/logo-header-on-light.svg")' in fe
+   and 'html[data-theme="dark"]{' in fe and "--navy:#FF8C14; --navy-deep:#F3F4F6; --blue:#FFA10A;" in fe and fe.count("color-scheme:dark;") == 1)
+ok("APPEARANCE: the header reads header tokens, never a white literal — bar, lockup, rule, muted text, buttons, the language segment",
+   ".brand-bar{background:var(--hdr-bg);color:var(--hdr-fg);" in fe and "content:var(--hdr-logo);" in fe and ".brand-rule{width:1px;height:28px;background:var(--hdr-rule);}" in fe
+   and 'className="brand-bar shrink-0"' in fe and "bg-white/10" not in fe and "text-white/70" not in fe and "border-white/20" not in fe and "bg-white/25" not in fe)
+ok("APPEARANCE: the picker is a 32 px button at the right of the header with a popover of menuitemradio items, closing on outside click and Escape",
+   "function AppearancePicker()" in fe and "<AppearancePicker />" in fe and 'role="menuitemradio"' in fe and 'aria-haspopup="menu"' in fe
+   and 'e.key === "Escape"' in fe and '.appearance-btn{width:32px;height:32px;' in fe and fe.index("<AppearancePicker />") < fe.index("Sign out\n"))
+ok("APPEARANCE: the choice is per browser (localStorage modus_theme), applied before React mounts, an unknown value falls back to ink",
+   'key: "modus_theme"' in fe and 'applyTheme(localStorage.getItem(THEME.key) || "ink", false)' in fe
+   and 'if(!THEMES.some(([k]) => k === name)) name = "ink";' in fe and fe.index("applyTheme(localStorage.getItem") < fe.index("ReactDOM.createRoot"))
+ok("APPEARANCE: charts rebuild on a change and read token colours — no literal blue left in the Dashboard's series",
+   "}, [JSON.stringify(config), theme]);" in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
+   and 'backgroundColor: "#2563EB"' not in fe and 'backgroundColor: "#3B82F6"' not in fe and 'borderColor: "#2563EB"' not in fe and 'tok("--chart-1"' in fe)
+ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons read surface tokens — no literal white surface left in component CSS",
+   ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
+   and 'background: "white"' not in fe and "background:#fff;" not in fe)
+ok("APPEARANCE: the map's dark basemap and the exports are untouched — the exports keep the print palette (export.py has no theme code)",
+   "data-theme" not in read("backend/export.py") and '["Dark", "mapbox://styles/mapbox/dark-v11"]' in fe)
 ok("🔴 the Dashboard status line reads the tenant's unit word and dates the index 'published' / 'typed', never 'bulletin'",
    "· {DU()}, CO₂e and fair {CUR()} exclude the" in fe and "· km, CO₂e and fair" not in fe
    and '(${cost.index_source === "manual" ? "typed" : "published"} ${longDate(' in fe and "(bulletin ${" not in fe)

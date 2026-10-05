@@ -220,7 +220,8 @@ ok("REBRAND: the header renders the Wayscope lockup image with alt text",
 ok("REBRAND: the tenant's name sits after a rule, only when it is not the default, hidden below sm",
   /TENANT\.name && TENANT\.name !== "Wayscope" && \(/.test(code)
   && /className="brand-rule hidden sm:block"/.test(code)
-  && /className="hidden sm:block text-\[14px\] font-medium text-white\/70 truncate max-w-\[36vw\]">\{TENANT\.name\}/.test(code));
+  // NARROWED 5 Oct 2026: the name's colour is the header token (.hdr-muted), not text-white/70
+  && /className="hidden sm:block text-\[14px\] font-medium hdr-muted truncate max-w-\[36vw\]">\{TENANT\.name\}/.test(code));
 ok("REBRAND: the old header is gone — no gold bar, no caption, no bold tenant-name block",
   !/Forecasting &amp; Route Map/.test(html) && !/style=\{\{background:"var\(--gold\)"\}\}/.test(code)
   && !/font-extrabold tracking-tight leading-none text-\[17px\]/.test(code));
@@ -230,9 +231,12 @@ ok("REBRAND: the word Modus appears nowhere in the staff app", !/\bModus\b/.test
 ok("REBRAND: the ink token is #1F2024, the brand orange tokens exist, amber stays the warning colour",
   /--navy-deep:#1F2024;/.test(html) && /--brand-orange:#FF8C14;/.test(html) && /--gold:#D97706;/.test(html)
   && !/#0F172A/i.test(html));
-ok("REBRAND: the header bar carries the 2 px orange rule and nothing else is orange",
-  /\.brand-bar\{background:var\(--navy-deep\);border-bottom:2px solid var\(--brand-orange\);\}/.test(html)
-  && (html.match(/var\(--brand-orange\)/g) || []).length === 1);
+// NARROWED 5 Oct 2026 (Appearance): the bar's background is a header token now, and the
+// picker's tick is the second brand-orange use. Orange as a CONTROL colour exists only
+// inside html[data-theme="dark"] — the user's decision for the dark look.
+ok("REBRAND: the header bar carries the 2 px orange rule; brand orange is used twice at most (the rule, the picker's tick)",
+  /\.brand-bar\{background:var\(--hdr-bg\);color:var\(--hdr-fg\);border-bottom:2px solid var\(--brand-orange\);\}/.test(html)
+  && (html.match(/var\(--brand-orange\)/g) || []).length <= 2);
 ok("REBRAND: the head carries the favicon links, the manifest and the ink theme-color",
   /<link rel="icon" href="\/favicon\.ico" sizes="32x32">/.test(html) && /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/.test(html)
   && /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png">/.test(html) && /<link rel="manifest" href="\/site\.webmanifest">/.test(html)
