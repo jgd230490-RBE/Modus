@@ -129,6 +129,7 @@
   .appearance-item .tick{opacity:0;color:var(--brand-orange);} .appearance-item.is-on .tick{opacity:1;}
   .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
   .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
+  .demo-badge{margin-left:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;align-items:center;}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;}
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */
@@ -1059,7 +1060,8 @@ function App(){
                                       fuel_provider: tn.fuel_provider || null,
                                       restrictions_provider: !!tn.restrictions_provider,
                                       restrictions: tn.restrictions || null,
-                                      distance_unit: (tn.distance_unit === "mi" ? "mi" : "km") });
+                                      distance_unit: (tn.distance_unit === "mi" ? "mi" : "km"),
+                                      demo_notice: (tn.demo_notice || null) });   // H2: the demo label
               try { document.title = (TENANT.name && TENANT.name !== "Wayscope") ? TENANT.name + " · Wayscope" : "Wayscope"; } catch(e){}
               if(!vehLangShown(VEH.lang)){ VEH.lang = "eu"; setVehLangState("eu"); } }
       (m && m.ipts || []).forEach(i => { if(i && i.id) TEAM_LABELS[iptKey(i.id)] = i.label || i.id; });
@@ -1115,6 +1117,11 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
               <span className="brand-rule hidden sm:block"></span>
               <span className="hidden sm:block text-[14px] font-medium hdr-muted truncate max-w-[36vw]">{TENANT.name}</span>
             </>
+          )}
+          {TENANT.demo_notice && (
+            /* H2 (5 Oct 2026): a tenant with a demo notice carries it on every screen — the
+               header is on every screen. The map and both exports print it too. */
+            <span className="demo-badge hidden sm:inline-flex" title={TENANT.demo_notice}>{TENANT.demo_notice}</span>
           )}
         </button>
         <div className="flex items-center gap-2 text-sm">
