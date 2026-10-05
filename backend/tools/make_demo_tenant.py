@@ -456,21 +456,28 @@ def build():
     def box(lon, lat, w_m, h_m):
         a = offset([lon, lat], -w_m / 2, -h_m / 2); b = offset([lon, lat], w_m / 2, h_m / 2)
         return {"type": "Polygon", "coordinates": [[[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]], [a[0], a[1]]]]}
-    # (a) a realignment works closure on the A47 west of Tilton, from the show week for six
-    #     weeks, AFFECTS ROUTING: the routes into Tilton Compound and Stockpile Tilton re-bake
-    #     around it (longer, dearer, more CO2 — the before/after on the Dashboard)
-    z_a = zones.create_zone("A47 Tilton realignment works", box(-0.945, 52.632, 320, 260), kind="closure",
-                            affects_routing=True, starts_on="2026-10-12", ends_on="2026-11-20",
+    # (a) a realignment works closure on the A47 west of Tilton, IN FORCE NOW and for the
+    #     show, AFFECTS ROUTING: the routes into Tilton Compound and Stockpile Tilton re-bake
+    #     around it (longer, dearer, more CO2 — the before/after on the Dashboard).
+    #     Two lessons from the first live bake (5 Oct): a zone only steers HERE while it is in
+    #     force on the day of the bake (zones.applies_on — one geometry per route, not per
+    #     date), so a closure dated from the show week moved nothing; and the box has to sit on
+    #     the line HERE actually drew. The baked A47 runs along 52.620–52.622 N here and the
+    #     routes turn north at Tilton (-0.922); the box straddles it 1.8 km west of that turn.
+    z_a = zones.create_zone("A47 Tilton realignment works", box(-0.9490, 52.6208, 360, 240), kind="closure",
+                            affects_routing=True, starts_on="2026-10-05", ends_on="2026-11-20",
                             note="Carriageway realignment at the new junction tie-in: A47 closed to through traffic, signed diversion (fictional).")
     assert "error" not in z_a, z_a
     # (b) a village 7.5 t limit on the lane to Stockpile North — ADVISORY (the router is not
     #     told): the routes keep using it and the flag says so; paired with the daily caps below
-    z_b = zones.create_zone("Burrough village 7.5 t limit", box(-0.883, 52.700, 420, 360), kind="weight_limit",
+    #     (centred on the lane the two routes were baked along — 5 Oct check)
+    z_b = zones.create_zone("Burrough village 7.5 t limit", box(-0.8879, 52.6993, 420, 360), kind="weight_limit",
                             affects_routing=False, starts_on="2026-09-01", ends_on="2026-12-31",
                             note="Community liaison agreement: 7.5 t except for access, 20 vehicles a day, no deliveries before 07:30 (fictional).")
     assert "error" not in z_b, z_b
     # (c) an advisory works area at the Melton end — drawn grey, changes nothing
-    z_c = zones.create_zone("Melton junction works area", box(-0.8810, 52.7470, 380, 300), kind="works",
+    #     (straddles the baked Melton approach so grey-over-a-route is what is on screen)
+    z_c = zones.create_zone("Melton junction works area", box(-0.8695, 52.7482, 380, 300), kind="works",
                             affects_routing=False, starts_on="2026-10-01", ends_on="2026-12-18",
                             note="Earthworks compound and crane standing for the junction structure (fictional).")
     assert "error" not in z_c, z_c
