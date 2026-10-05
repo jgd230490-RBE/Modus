@@ -293,6 +293,40 @@ def _fake_nh_page(offset, count=restrictions.NH_PAGE, timeout=None):
                         "scheduledplannedstartdate": _now_ms - 2 * _day, "scheduledplannedenddate": _now_ms + 400 * _day}}]}
 
 
+# --- 5 Oct 2026, H2: demo v2 — what the stand needs is IN the data ------------------------
+_T = DEMO["tables"]
+ok("H2: the scheme is a road — tenant name, overlay note, discipline words; no railway term reaches a reader",
+   "dualling" in _T["config"][0]["value"] or any("dualling" in c["value"] for c in _T["config"])
+   and not re.search(r"track ballast|rail corridor|Melton South station|Rail and sleepers", json.dumps(_T, ensure_ascii=False))
+   and [d["label"] for d in _T["disciplines"] if d["id"] == "superstructure"] == ["Pavement"]
+   and [d["in_scope"] for d in _T["disciplines"] if d["id"] == "stations"] == [0])
+ok("H2: every site has a gate at its own coordinates; the quarries and the town compound enter and leave by different gates",
+   len(_T["location_gates"]) == 14 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
+   and all(g["lat"] and g["lon"] for g in _T["location_gates"])
+   and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L001") == ["access", "egress"]
+   and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
+ok("H2: every route names its origin and destination gate",
+   all(r["origin_gate_id"] and r["dest_gate_id"] for r in _T["routes"]))
+ok("H2: two haul roads, spliced (HERE does not know them), attached to the routes that use them",
+   [(z["id"], z["haul_mode"]) for z in _T["zones"] if z["kind"] == "haul_road"] == [("Z001", "splice"), ("Z002", "splice")]
+   and sorted((l["route_id"], l["zone_id"]) for l in _T["route_haul_roads"]) == [("R004", "Z001"), ("R005", "Z001"), ("R006", "Z001"), ("R014", "Z001"), ("R016", "Z002"), ("R018", "Z002")])
+ok("H2: three geofences — a dated closure that re-routes (Tilton, from the show week), an advisory 7.5 t village limit, an advisory works area",
+   [(z["kind"], z["affects_routing"], z["starts_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
+   == [("closure", 1, "2026-10-12"), ("weight_limit", 0, "2026-09-01"), ("works", 0, "2026-10-01")])
+ok("H2: daily vehicle caps on the two village routes, so ROUTE_CAP has something to fire on",
+   {r["id"]: r["max_vehicles_per_day"] for r in _T["routes"] if r["max_vehicles_per_day"]} == {"R016": 20, "R018": 30})
+ok("H2: the show week (12–18 Oct = Oct W3) and the week after are populated for every approved line, and October W1/W2 carry typed actuals",
+   sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 3)) == 18
+   and sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 4)) == 18
+   and sum(1 for w in _T["forecast_weeks"] if w["month_index"] == 10 and w["week_index"] in (1, 2) and w.get("actual_qty") is not None) == 36)
+ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validates as short text or null",
+   main.meta()["tenant"]["demo_notice"] == "Fictional demo scheme · nothing here is real"
+   and config.validate(dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]), tenant={"name": "x", "demo_notice": "y" * 121})) != []
+   and "demo_notice" in config.TENANT_DEFAULTS)
+ok("H2: the notice is on both exports (XLSX About row, PDF footer) and the app's header, and the map hides an empty rail layer",
+   '("Notice", _demo_notice() or "")' in read("backend/export.py") and 'ft.insert(0, P("<b>" + E(_demo_notice()) + "</b>", st_grey))' in read("backend/export.py")
+   and 'className="demo-badge' in read("frontend/index.html") and "demo_notice: (tn.demo_notice || null)" in read("frontend/index.html")
+   and "railItem.hidden = !hasRail" in read("map/index.html") and "dn.textContent = TENANT.demo_notice" in read("map/index.html"))
 # --- 30 Sep 2026: the national feed against baked routes must be pre-filtered by box -----
 # The first GB run with baked routes put the live service at 100 % CPU for hours: 2,920
 # closures × 170,000 vertices against 18 routes × 4 legs, vertex by segment. These pin the

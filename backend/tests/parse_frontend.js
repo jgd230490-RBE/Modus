@@ -231,6 +231,27 @@ ok("REBRAND: the word Modus appears nowhere in the staff app", !/\bModus\b/.test
 ok("REBRAND: the ink token is #1F2024, the brand orange tokens exist, amber stays the warning colour",
   /--navy-deep:#1F2024;/.test(html) && /--brand-orange:#FF8C14;/.test(html) && /--gold:#D97706;/.test(html)
   && !/#0F172A/i.test(html));
+// 5 Oct 2026, from the live site: a hook placed after a component's early `return`
+// (useTheme() in Dashboard, after "if(!data || !D) return …") raised React #310 ("rendered
+// more hooks than during the previous render") once the data arrived, and the WHOLE app
+// unmounted to a blank page. Neither SSR nor jsdom-with-no-data renders twice, so no
+// harness saw it. This reads the rule statically, for every top-level component:
+// no hook call at the component's top level after its first top-level early return.
+(function hooksBeforeReturns() {
+  const lines = code.split("\n");
+  const bad = [];
+  let fn = null, sawReturn = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const m = l.match(/^function ([A-Z]\w*)\(/);
+    if (m) { fn = m[1]; sawReturn = false; continue; }
+    if (!fn) continue;
+    if (/^}/.test(l)) { fn = null; continue; }
+    if (/^  if\s*\(.*\breturn\b/.test(l) || /^  if\s*\(.*\)\s*{\s*$/.test(l) && /^\s+return\b/.test(lines[i + 1] || "")) sawReturn = true;
+    if (sawReturn && /^  (?:const|let|var)?\s*(?:\[[^\]]*\]|\w+)?\s*=?\s*use[A-Z]\w*\(/.test(l)) bad.push(`${fn} line ${i + 1}: ${l.trim().slice(0, 70)}`);
+  }
+  ok("🔴 no component calls a hook after its first top-level early return (React #310 — the 5 Oct blank page)", bad.length === 0, bad.join(" · "));
+})();
 // NARROWED 5 Oct 2026 (Appearance): the bar's background is a header token now, and the
 // picker's tick is the second brand-orange use. Orange as a CONTROL colour exists only
 // inside html[data-theme="dark"] — the user's decision for the dark look.

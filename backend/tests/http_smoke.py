@@ -182,9 +182,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.post("/api/admin/tenant/import", params=TOKEN, json=DEMO)
     res = r.json()
     ok("⭐ the demo package imports over HTTP", r.status_code == 200 and res.get("ok") is True, r.text[:200])
+    # NARROWED 5 Oct 2026 (demo v2): 74 forecasts (72 approved + Pending + Rejected), 14 gates,
+    # 5 zones, 6 haul-road links travel with the package too
     ok("...with every table's rows inserted",
-       res.get("inserted", {}).get("routes") == 18 and res["inserted"].get("forecasts") == 72
-       and res["inserted"].get("forecast_weeks") == 324, str(res.get("inserted")))
+       res.get("inserted", {}).get("routes") == 18 and res["inserted"].get("forecasts") == 74
+       and res["inserted"].get("forecast_weeks") == 324 and res["inserted"].get("location_gates") == 14
+       and res["inserted"].get("zones") == 5 and res["inserted"].get("route_haul_roads") == 6, str(res.get("inserted")))
     ok("...and the GB diesel price applied", res.get("fuel_index_applied") == ["GB"], str(res.get("fuel_index_applied")))
     r = c.post("/api/admin/tenant/import", params=TOKEN, json=DEMO)
     ok("🔴 a second import into a non-empty tenant is refused — 400",
@@ -208,7 +211,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/public/alignment")
     b = r.json()
     ok("⭐ the map overlay arrives: version, six bands, five boundaries, the view",
-       b.get("version") == "wolds-link-demo-1" and len(b.get("bands", [])) == 6
+       b.get("version") == "wolds-link-demo-2" and len(b.get("bands", [])) == 6
        and len(b.get("boundaries", [])) == 5 and b.get("view", {}).get("zoom"), str(list(b))[:160])
     ok("...with the team names the map shows",
        {t["id"]: t["label"] for t in b["teams"]} == {"IPT1": "North Team", "IPT2": "Central Team", "IPT3": "South Team"},
@@ -256,7 +259,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # ------------------------------------------------------- 3. the data, as people read it
     r = c.get("/api/forecasts", headers=PLAN)
     rows = r.json() if r.status_code == 200 else []
-    ok("a planner sees all 72 forecast rows", r.status_code == 200 and len(rows) == 72, f"{r.status_code} {len(rows)}")
+    ok("a planner sees all 74 forecast rows (72 approved, 1 pending, 1 rejected — demo v2)", r.status_code == 200 and len(rows) == 74, f"{r.status_code} {len(rows)}")
     r = c.get("/api/forecasts", headers=NORTH)
     nrows = r.json() if r.status_code == 200 else []
     ok("⭐ the North Team code sees ONLY North Team's rows",
@@ -347,14 +350,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and "attachment" in r.headers.get("content-disposition", ""), str(r.status_code))
     pkg = r.json() if r.status_code == 200 else {}
     ok("...a valid package of the same size", pkg.get("modus_package") == 1
-       and len(pkg["tables"]["routes"]) == 18 and len(pkg["tables"]["forecasts"]) == 72
-       and len(pkg["tables"]["forecast_weeks"]) == 324)
+       and len(pkg["tables"]["routes"]) == 18 and len(pkg["tables"]["forecasts"]) == 74
+       and len(pkg["tables"]["forecast_weeks"]) == 324 and len(pkg["tables"]["location_gates"]) == 14)
     r = c.post("/api/admin/tenant/import", params=dict(TOKEN, replace=1), json=pkg)
     ok("⭐ replace=1 re-imports the exported tenant over itself", r.status_code == 200 and r.json().get("replaced") is True,
        r.text[:160])
     m2 = c.get("/api/meta").json()
     ok("...and nothing is lost or doubled", len(m2["routes"]) == 18 and len(m2["ipts"]) == 3
-       and len(c.get("/api/forecasts", headers=PLAN).json()) == 72)
+       and len(c.get("/api/forecasts", headers=PLAN).json()) == 74)
 
     r = c.post("/api/gate-signout")
     c.cookies.clear()

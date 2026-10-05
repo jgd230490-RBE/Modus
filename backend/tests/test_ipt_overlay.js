@@ -476,7 +476,8 @@ ok("the builder reports what it built against what it was asked for",
 // --- the version -----------------------------------------------------------------
 // The static file pair (index.html + a data script) that could be half-upgraded is gone;
 // the package carries one version string and the module records it.
-ok("⭐ the package stamps its version", window.OVERLAY_VERSION === "wolds-link-demo-1",
+// NARROWED 5 Oct 2026: demo v2 (the road-scheme re-frame) stamps -2
+ok("⭐ the package stamps its version", window.OVERLAY_VERSION === "wolds-link-demo-2",
   String(window.OVERLAY_VERSION));
 
 // ⭐ The invariant that matters: a tick marks a colour change, so every tick chainage MUST

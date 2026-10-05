@@ -395,9 +395,15 @@ ok("the demo package exists", os.path.exists(DEMO))
 demo = json.load(open(DEMO, encoding="utf-8"))
 ok("the demo package validates", tenant_package.validate(demo) == [], str(tenant_package.validate(demo))[:300])
 dc = tenant_package.counts(demo)
-ok("demo: 11 locations, 18 routes, 3 teams, 8 sections, 72 approved forecasts",
-   dc["locations"] == 11 and dc["routes"] == 18 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 72, str(dc))
-ok("demo: every forecast is Approved", all(r["status"] == "Approved" for r in demo["tables"]["forecasts"]))
+# NARROWED 5 Oct 2026 (demo v2, H2): 74 lines — 72 Approved plus one Pending and one Rejected
+# so the approval step can be shown live; 14 gates, 5 zones, 6 haul-road links are new.
+ok("demo: 11 locations, 18 routes, 3 teams, 8 sections, 74 forecasts (72 approved + 1 pending + 1 rejected), 14 gates, 5 zones, 6 haul links",
+   dc["locations"] == 11 and dc["routes"] == 18 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 74
+   and dc["location_gates"] == 14 and dc["zones"] == 5 and dc["route_haul_roads"] == 6, str(dc))
+_st = {s_: sum(1 for r in demo["tables"]["forecasts"] if r["status"] == s_) for s_ in ("Approved", "Pending", "Rejected")}
+ok("demo: 72 Approved, exactly one Pending and one Rejected (with a reason)",
+   _st == {"Approved": 72, "Pending": 1, "Rejected": 1}
+   and all(r["reject_reason"] for r in demo["tables"]["forecasts"] if r["status"] == "Rejected"), str(_st))
 ok("demo: weeks are materialised and some actuals typed",
    dc["forecast_weeks"] > 0 and any(r.get("actual_qty") for r in demo["tables"]["forecast_weeks"]))
 ok("demo: the commit week is confirmed for every September line",
