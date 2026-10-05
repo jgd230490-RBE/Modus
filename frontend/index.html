@@ -31,13 +31,105 @@
     --ink:#1E293B; --muted:#64748B; --line:#E2E8F0; --bg:#F8FAFC;
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
     --brand-orange-text:#C75F06; --brand-gold:#D2931F; --brand-ink:#1F2024; --brand-paper:#FFFFFF;
+    /* 5 Oct 2026 — APPEARANCE (the picker at the right of the header, html[data-theme]).
+       Three looks share one token set: "ink" (this block — the 29 Sep rebrand, the
+       default), "light" (the same with a white header bar) and "dark" (every surface
+       dark, orange as the control colour). Components read these tokens; the Tailwind
+       colour utilities the app uses are remapped for dark in the DARK-REMAP block below
+       (generated from the utilities actually present in this file and asserted in
+       test_h1_uk). Exports (XLSX, PDF) are documents and keep the print palette. */
+    --surface:#FFFFFF; --surface-2:#F8FAFC; --surface-3:#F3F4F6; --control-fg:#FFFFFF;
+    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#3B82F6; --chart-grid:rgba(100,116,139,.18);
+    --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
+    --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
+    --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9AA1AB; --popover-line:rgba(255,255,255,.12);
+    color-scheme:light;
   }
+  html[data-theme="light"]{
+    --hdr-bg:#FFFFFF; --hdr-fg:#1F2024; --hdr-muted:rgba(31,32,36,.65); --hdr-rule:rgba(31,32,36,.22);
+    --hdr-btn:rgba(31,32,36,.06); --hdr-btn-hover:rgba(31,32,36,.12); --hdr-on:rgba(255,140,20,.18); --hdr-border:rgba(31,32,36,.2);
+    --hdr-logo:url("/brand/logo-header-on-light.svg");
+  }
+  html[data-theme="dark"]{
+    --navy:#FF8C14; --navy-deep:#F3F4F6; --blue:#FFA10A;
+    --red:#F87171; --green:#34D399; --gold:#FBBF24; --grey:#33363D;
+    --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518;
+    --surface:#1F2024; --surface-2:#1B1D21; --surface-3:#26282D; --control-fg:#1F2024;
+    --chart-1:#FF8C14; --chart-1-soft:rgba(255,140,20,.22); --chart-2:#FFB454; --chart-grid:rgba(154,161,171,.16);
+    color-scheme:dark;
+  }
+  /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage */
+  html[data-theme="dark"] .bg-\[rgba\(37\,99\,235\,\.06\)\]{background-color:rgba(255,140,20,.08)}
+  html[data-theme="dark"] .bg-amber-50{background-color:rgba(251,191,36,.12)}
+  html[data-theme="dark"] .bg-amber-50\/60{background-color:rgba(251,191,36,.10)}
+  html[data-theme="dark"] .bg-blue-50{background-color:rgba(255,140,20,.12)}
+  html[data-theme="dark"] .bg-red-50\/70{background-color:rgba(239,68,68,.14)}
+  html[data-theme="dark"] .bg-slate-100{background-color:var(--surface-3)}
+  html[data-theme="dark"] .bg-slate-200{background-color:#2F3238}
+  html[data-theme="dark"] .bg-slate-50{background-color:var(--surface-2)}
+  html[data-theme="dark"] .bg-slate-50\/60{background-color:rgba(27,29,33,.6)}
+  html[data-theme="dark"] .bg-slate-50\/70{background-color:rgba(27,29,33,.7)}
+  html[data-theme="dark"] .bg-slate-800{background-color:#3A3D45}
+  html[data-theme="dark"] .bg-white{background-color:var(--surface)}
+  html[data-theme="dark"] .border-amber-200{border-color:rgba(251,191,36,.35)}
+  html[data-theme="dark"] .border-amber-300{border-color:rgba(251,191,36,.45)}
+  html[data-theme="dark"] .border-blue-200{border-color:rgba(255,140,20,.35)}
+  html[data-theme="dark"] .border-blue-300{border-color:rgba(255,140,20,.45)}
+  html[data-theme="dark"] .border-red-300{border-color:rgba(248,113,113,.5)}
+  html[data-theme="dark"] .border-slate-100{border-color:#2A2D33}
+  html[data-theme="dark"] .border-slate-200{border-color:#33363D}
+  html[data-theme="dark"] .border-slate-200\/70{border-color:rgba(51,54,61,.7)}
+  html[data-theme="dark"] .border-slate-300{border-color:#3D414A}
+  html[data-theme="dark"] .border-slate-800{border-color:#3A3D45}
+  html[data-theme="dark"] .disabled\:bg-slate-50:disabled{background-color:var(--surface-2)}
+  html[data-theme="dark"] .disabled\:text-slate-500:disabled{color:#A9AFB8}
+  html[data-theme="dark"] .divide-slate-100{--tw-divide-opacity:1;border-color:#2A2D33}
+  html[data-theme="dark"] .divide-slate-200{--tw-divide-opacity:1;border-color:#33363D}
+  html[data-theme="dark"] .hover\:bg-red-50:hover{background-color:rgba(239,68,68,.14)}
+  html[data-theme="dark"] .hover\:bg-slate-100:hover{background-color:var(--surface-3)}
+  html[data-theme="dark"] .hover\:bg-slate-200:hover{background-color:#2F3238}
+  html[data-theme="dark"] .hover\:bg-slate-50:hover{background-color:var(--surface-2)}
+  html[data-theme="dark"] .hover\:bg-white:hover{background-color:var(--surface)}
+  html[data-theme="dark"] .hover\:text-slate-700:hover{color:#E6E7EA}
+  html[data-theme="dark"] .hover\:text-slate-800:hover{color:#F3F4F6}
+  html[data-theme="dark"] .hover\:text-slate-900:hover{color:#F9FAFB}
+  html[data-theme="dark"] .text-amber-700{color:#FBBF24}
+  html[data-theme="dark"] .text-amber-800{color:#FCD34D}
+  html[data-theme="dark"] .text-blue-700{color:#FFB454}
+  html[data-theme="dark"] .text-blue-800{color:#FFC77A}
+  html[data-theme="dark"] .text-emerald-600{color:#34D399}
+  html[data-theme="dark"] .text-slate-300{color:#5C6270}
+  html[data-theme="dark"] .text-slate-400{color:#9AA1AB}
+  html[data-theme="dark"] .text-slate-500{color:#A9AFB8}
+  html[data-theme="dark"] .text-slate-600{color:#D5D8DE}
+  html[data-theme="dark"] .text-slate-700{color:#E6E7EA}
+  html[data-theme="dark"] .text-slate-800{color:#F3F4F6}
+  html[data-theme="dark"] .bg-\[color\:var\(--navy\)\].text-white,html[data-theme="dark"] .bg-\[color\:var\(--navy\)\] .text-white{color:var(--control-fg)}
+  html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background-color:var(--surface-3);color:var(--ink);border-color:var(--grey)}
+  html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::placeholder{color:#6B7280}
+  html[data-theme="dark"] .mapboxgl-ctrl-group{background:var(--surface-3)} html[data-theme="dark"] .mapboxgl-ctrl-group button span{filter:invert(1)}
+  /* DARK-REMAP-END */
   html,body,#root{height:100%;}
   body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;}
-  .brand-bar{background:var(--navy-deep);border-bottom:2px solid var(--brand-orange);}
-  .brand-lockup{height:38px;width:auto;display:block;}
-  .brand-rule{width:1px;height:28px;background:rgba(255,255,255,.28);}
-  .card{background:#fff;border:1px solid var(--line);border-radius:12px;}
+  .brand-bar{background:var(--hdr-bg);color:var(--hdr-fg);border-bottom:2px solid var(--brand-orange);}
+  .brand-lockup{height:38px;width:auto;display:block;content:var(--hdr-logo);}
+  .brand-rule{width:1px;height:28px;background:var(--hdr-rule);}
+  .hdr-muted{color:var(--hdr-muted);}
+  .hdr-btn{background:var(--hdr-btn);color:var(--hdr-fg);} .hdr-btn:hover{background:var(--hdr-btn-hover);}
+  .hdr-seg{border:1px solid var(--hdr-border);} .hdr-seg button{color:var(--hdr-muted);} .hdr-seg button:hover{background:var(--hdr-btn);}
+  .hdr-seg button.is-on{background:var(--hdr-on);color:var(--hdr-fg);font-weight:600;}
+  /* the Appearance picker: a 32 px icon button, a small popover (5 Oct 2026) */
+  .appearance{position:relative;display:inline-flex;align-items:center;}
+  .appearance-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
+  .appearance-btn:hover,.appearance-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
+  .appearance-menu{position:absolute;right:0;top:40px;min-width:200px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-size:12.5px;line-height:1.4;z-index:60;}
+  .appearance-menu h6{margin:0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--popover-muted);padding:6px 10px 4px;font-weight:600;}
+  .appearance-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
+  .appearance-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on{background:rgba(255,140,20,.12);}
+  .appearance-item .tick{opacity:0;color:var(--brand-orange);} .appearance-item.is-on .tick{opacity:1;}
+  .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
+  .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;}
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */
   .dash-wall .fig-label{font-size:13px;} .dash-wall .fig-sub{font-size:12px;} .dash-wall .fig-group{font-size:12px;}
@@ -48,22 +140,22 @@
      display:none on [hidden], but a utility class on the same element would win, so it
      is forced here. */
   [hidden]{display:none !important;}
-  .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;}
+  .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;}
   .dash-wallbar-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#9aa1ac;}
-  .dash-wallbar-btn{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:#f3f4f6;border:1px solid transparent;border-radius:8px;padding:5px 11px;cursor:pointer;}
-  .dash-wallbar-btn:hover{background:#e8eaed;}
-  .dash-wallbar-btn.is-on{background:var(--navy);color:#fff;}
-  .dash-wallbar-sel{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:#fff;border:1px solid var(--line);border-radius:8px;padding:4px 7px;cursor:pointer;}
+  .dash-wallbar-btn{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:var(--surface-3);border:1px solid transparent;border-radius:8px;padding:5px 11px;cursor:pointer;}
+  .dash-wallbar-btn:hover{background:var(--grey);}
+  .dash-wallbar-btn.is-on{background:var(--navy);color:var(--control-fg);}
+  .dash-wallbar-sel{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 7px;cursor:pointer;}
   .dash-wallbar-sep{width:1px;height:20px;background:var(--line);margin:0 3px;}
   .dash-wallbar-note{font-size:12px;color:var(--muted);}
-  .dash-wallbar-note code{background:#f3f4f6;border-radius:4px;padding:1px 5px;font-size:11.5px;}
+  .dash-wallbar-note code{background:var(--surface-3);border-radius:4px;padding:1px 5px;font-size:11.5px;}
   .dash-divider{font:700 12px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:#9aa1ac;
                 border-top:2px solid var(--line);padding-top:9px;margin-bottom:10px;}
   .dash-wall .dash-divider{font-size:14px;}
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   input[type=number]{-moz-appearance:textfield;}
-  ::-webkit-scrollbar{height:9px;width:9px;} ::-webkit-scrollbar-thumb{background:#d5d8dd;border-radius:6px;}
+  ::-webkit-scrollbar{height:9px;width:9px;} ::-webkit-scrollbar-thumb{background:var(--grey);border-radius:6px;}
 </style>
 </head>
 <body>
@@ -103,6 +195,11 @@ const fmtDist = (km, dp) => (km == null ? "—" : (+dist(km)).toFixed(dp == null
 const TEAMS = () => TEAM() + "s";
 
 const { useState, useEffect, useRef, useMemo } = React;
+function useTheme(){
+  const [t, setT] = useState(THEME.current);
+  useEffect(() => { const f = (n) => setT(n); THEME.subs.add(f); return () => THEME.subs.delete(f); }, []);
+  return [t, applyTheme];
+}
 
 const API = "/api";
 const MAP_URL = "/map/?v=" + Date.now();  // per-load cache-buster so the iframe never serves a stale map
@@ -130,6 +227,34 @@ window.fetch = (url, opts) => {
   return _rawFetch(url, opts);
 };
 
+// ---- Appearance (5 Oct 2026) ----------------------------------------------------
+// Three looks — "ink" (the 29 Sep rebrand, default), "light" (white header bar), "dark"
+// (dark surfaces, orange controls) — set as html[data-theme] and read as CSS tokens (see
+// the <style> block). Per browser, like the vehicle-name language: localStorage, never
+// the server. Applied before React mounts so nothing flashes. Components that build
+// colours in JS (the charts) subscribe through useTheme() and rebuild on a change.
+const THEMES = [
+  ["ink",   "Ink",   { bar: "#1F2024", page: "#F8FAFC", dot: "#2563EB" }],
+  ["light", "Light", { bar: "#FFFFFF", page: "#F8FAFC", dot: "#2563EB" }],
+  ["dark",  "Dark",  { bar: "#1F2024", page: "#141518", dot: "#FF8C14" }],
+];
+const THEME = { key: "modus_theme", current: "ink", subs: new Set() };
+function applyTheme(name, persist = true){
+  if(!THEMES.some(([k]) => k === name)) name = "ink";
+  THEME.current = name;
+  const root = typeof document !== "undefined" && document.documentElement;
+  if(root && root.setAttribute) root.setAttribute("data-theme", name);
+  const mc = (typeof document !== "undefined" && document.querySelector) ? document.querySelector('meta[name="theme-color"]') : null;
+  if(mc) mc.setAttribute("content", name === "light" ? "#FFFFFF" : "#1F2024");
+  if(persist){ try { localStorage.setItem(THEME.key, name); } catch(e){} }
+  THEME.subs.forEach(f => { try { f(name); } catch(e){} });
+}
+try { applyTheme(localStorage.getItem(THEME.key) || "ink", false); } catch(e){ applyTheme("ink", false); }
+// a computed token, for the few colours that are built in JS (Chart.js)
+const tok = (name, fallback) => {
+  try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; } catch(e){ return fallback; }
+};
+
 // ---- client-side conversion preview (mirrors backend factors.json) ----
 const density = (f, m) => (f.material_density_t_per_m3[m] ?? f.material_density_t_per_m3._default);
 const payload = (f, v) => (f.vehicle_payload_t[v] ?? f.vehicle_payload_t._default);
@@ -148,12 +273,15 @@ const colorOf = (i) => PALETTE[i % PALETTE.length];
 function ChartCanvas({ config, height=260 }){
   const ref = useRef(null);
   const inst = useRef(null);
+  const [theme] = useTheme();          // 5 Oct 2026: axes, grid and legend follow the look
   useEffect(() => {
     if(!ref.current || !window.Chart) return;
     if(inst.current) inst.current.destroy();
+    window.Chart.defaults.color = tok("--muted", "#64748B");
+    window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
     inst.current = new window.Chart(ref.current, config);
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
-  }, [JSON.stringify(config)]);
+  }, [JSON.stringify(config), theme]);
   return <div style={{height}}><canvas ref={ref}></canvas></div>;
 }
 
@@ -452,6 +580,8 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const pick = (key) => setLineKey(k => k === key ? null : key);
 
   const tf = { size: wall ? 13 : 11 };
+  const [theme] = useTheme();          // 5 Oct 2026: the chart colours below are tokens
+  const C1 = tok("--chart-1", "#2563EB"), C1S = tok("--chart-1-soft", "rgba(37,99,235,.18)"), C2 = tok("--chart-2", "#3B82F6");
   const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()} ${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
   const barScales = { scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
@@ -460,17 +590,17 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
 
   const demandCfg = { type: "bar", data: { labels: D.labels, datasets: D.mats.map((m, i) => ({ label: m, data: D.demand[m], backgroundColor: colorOf(i), stack: "s", borderWidth: 0 })) }, options: stackedOpts };
   // planned tonnes as bars, what has been reported delivered as a line over them
-  const tripsCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Trips", data: D.tripsM, backgroundColor: "#2563EB", borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
+  const tripsCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Trips", data: D.tripsM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const progressCfg = { type: "bar", data: { labels: D.labels, datasets: [
-    { type: "bar", label: "Planned t", data: D.tonnesM, backgroundColor: "rgba(37,99,235,.18)", borderColor: "#2563EB", borderWidth: 1, order: 2 },
+    { type: "bar", label: "Planned t", data: D.tonnesM, backgroundColor: C1S, borderColor: C1, borderWidth: 1, order: 2 },
     { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: "#059669", borderWidth: 0, order: 1 }] },
     options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
   const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: "#0E7490", borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: "#059669", backgroundColor: "rgba(3,158,134,.12)", fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
   const costCfg   = { type: "bar", data: { labels: D.labels, datasets: [
-    { label: `Planned ${CUR()} (quote / target)`, data: D.plannedM, backgroundColor: "#2563EB", borderWidth: 0 },
-    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: "#3B82F6", borderWidth: 0 }] }, options: legendOpts };
-  const splitCfg  = { type: "doughnut", data: { labels: D.mats, datasets: [{ data: D.mats.map(m => D.split[m]), backgroundColor: D.mats.map((m, i) => colorOf(i)), borderWidth: 2, borderColor: "#fff" }] }, options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 10, font: tf } } } } };
+    { label: `Planned ${CUR()} (quote / target)`, data: D.plannedM, backgroundColor: C1, borderWidth: 0 },
+    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C2, borderWidth: 0 }] }, options: legendOpts };
+  const splitCfg  = { type: "doughnut", data: { labels: D.mats, datasets: [{ data: D.mats.map(m => D.split[m]), backgroundColor: D.mats.map((m, i) => colorOf(i)), borderWidth: 2, borderColor: tok("--surface", "#fff") }] }, options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 10, font: tf } } } } };
   const topN = [...D.routeRows].sort((a, b) => b.t - a.t).slice(0, 10);
   const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => r.key === lineKey ? "#2563EB" : "#3B82F6"), borderWidth: 0 }] },
     options: { indexAxis: "y", ...commonOpts, onClick: (evt, els) => { if(els && els.length) pick(topN[els[0].index].key); },
@@ -969,7 +1099,7 @@ function App(){
 // ================================================================= Header
 function Header({ view, role, setView, signOut, vehLang, setVehLang }){
   return (
-    <header className="brand-bar text-white shrink-0">
+    <header className="brand-bar shrink-0">
       <div className="px-5 h-16 flex items-center justify-between">
         {/* 29 Sep 2026: the Wayscope lockup, a thin rule, then the tenant's name in
             white/70 (hidden below the sm breakpoint, 640 px). The default tenant is
@@ -981,32 +1111,33 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
           {TENANT.name && TENANT.name !== "Wayscope" && (
             <>
               <span className="brand-rule hidden sm:block"></span>
-              <span className="hidden sm:block text-[14px] font-medium text-white/70 truncate max-w-[36vw]">{TENANT.name}</span>
+              <span className="hidden sm:block text-[14px] font-medium hdr-muted truncate max-w-[36vw]">{TENANT.name}</span>
             </>
           )}
         </button>
         <div className="flex items-center gap-2 text-sm">
           {view === "public" && (
             <button onClick={() => setView("login")}
-              className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 font-medium transition">
+              className="px-4 py-2 rounded-md hdr-btn font-medium transition">
               Staff sign in
             </button>
           )}
           {role && (
             <>
               {/* Vehicle names: EN / EU / EE. Label only — see vehLabel(). */}
-              <span className="hidden md:inline-flex rounded-md overflow-hidden border border-white/20 text-[11px] mr-2"
+              <span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg text-[11px] mr-2"
                 title="How vehicle names are shown. Changes the label only; nothing stored changes.">
                 {VEH_LANGS.filter(([k]) => vehLangShown(k)).map(([k, l]) => (
                   <button key={k} onClick={() => setVehLang(k)}
-                    className={"px-2 py-1 " + (vehLang === k ? "bg-white/25 font-semibold" : "hover:bg-white/10 text-white/70")}>
+                    className={"px-2 py-1 " + (vehLang === k ? "is-on" : "")}>
                     {l}
                   </button>
                 ))}
               </span>
-              <span className="hidden sm:inline text-white/70 mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>
+              <span className="hidden sm:inline hdr-muted mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>
+              <AppearancePicker />
               <button onClick={signOut}
-                className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 font-medium transition">
+                className="px-4 py-2 rounded-md hdr-btn font-medium transition">
                 Sign out
               </button>
             </>
@@ -1014,6 +1145,47 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
         </div>
       </div>
     </header>
+  );
+}
+
+// ================================================================= Appearance picker
+// A 32 px half-circle button at the right of the header; a small popover with the three
+// looks, a swatch each, a tick on the current one. Closes on a choice, a click outside,
+// or Escape. Keyboard: the button is a real button; the items are menuitemradio.
+function AppearancePicker(){
+  const [theme, setTheme] = useTheme();
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  useEffect(() => {
+    if(!open) return;
+    const away = (e) => { if(box.current && !box.current.contains(e.target)) setOpen(false); };
+    const key = (e) => { if(e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", key); };
+  }, [open]);
+  return (
+    <span className="appearance" ref={box}>
+      <button type="button" className="appearance-btn" title="Appearance" aria-label="Appearance"
+        aria-haspopup="menu" aria-expanded={open ? "true" : "false"} onClick={() => setOpen(o => !o)}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <circle cx="8" cy="8" r="6"></circle><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor" stroke="none"></path>
+        </svg>
+      </button>
+      {open && (
+        <div className="appearance-menu" role="menu" aria-label="Appearance">
+          <h6>Appearance</h6>
+          {THEMES.map(([k, label, sw]) => (
+            <button key={k} type="button" role="menuitemradio" aria-checked={theme === k ? "true" : "false"}
+              className={"appearance-item" + (theme === k ? " is-on" : "")}
+              onClick={() => { setTheme(k); setOpen(false); }}>
+              <span className="swatch" style={{ "--sw-dot": sw.dot }} aria-hidden="true"><i style={{ background: sw.bar }}></i><b style={{ background: sw.page }}></b></span>
+              <span className="flex-1">{label}</span>
+              <span className="tick" aria-hidden="true">✓</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -3100,7 +3272,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
     <button key={id} onClick={() => pick(id)}
       className="px-4 py-2 rounded-lg text-sm font-semibold border"
       style={view === id ? { background: "var(--navy)", color: "white", borderColor: "var(--navy)" }
-                         : { background: "white", color: "#475569", borderColor: "#cbd5e1" }}>{label}</button>
+                         : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--line)" }}>{label}</button>
   );
   const subtitle = view === "account"
     ? `Account is last week only · ${spanLabel(account.week && account.week.from, account.week && account.week.to)} · type what actually moved`
@@ -3128,15 +3300,15 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           <span className="ml-auto flex items-center gap-2">
             <button onClick={() => download("xlsx")} disabled={!!busy || !lines.length}
               className="px-4 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
-              style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "white" }}>Export XLSX</button>
+              style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)" }}>Export XLSX</button>
             <button onClick={() => download("pdf")} disabled={!!busy || !lines.length}
               className="px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
               title="The one-page commitment sheet, grouped by origin"
-              style={{ borderColor: "#cbd5e1", color: "#475569", background: "white" }}>PDF</button>
+              style={{ borderColor: "var(--line)", color: "var(--muted)", background: "var(--surface)" }}>PDF</button>
             {allConfirmed ? (
               <button onClick={doReopen} disabled={!!busy}
                 className="px-4 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
-                style={{ borderColor: "var(--red)", color: "var(--red)", background: "white" }}>Re-open week</button>
+                style={{ borderColor: "var(--red)", color: "var(--red)", background: "var(--surface)" }}>Re-open week</button>
             ) : (
               <button onClick={() => setConfirming(true)} disabled={!!busy || !lines.length}
                 className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
@@ -3699,7 +3871,11 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush }){
     });
     m.getSource("la-routes").setData({ type: "FeatureCollection", features: feats });
     m.getSource("la-ends").setData({ type: "FeatureCollection", features: ends });
-    if(!b.isEmpty()) m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 });
+    // 30 Sep 2026: fitBounds throws "Invalid LngLat object: (NaN, NaN)" when the map's
+    // container has no size yet (a page switch or a viewport change mid-render); uncaught
+    // in an effect it unmounted the WHOLE app to a white page on the live site. Never let
+    // a camera move take the page down.
+    if(!b.isEmpty()) { try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); } catch(e){} }
   }, [geo, ready, byRoute]);
 
   const unbaked = (geo && geo.routes || []).filter(r => !r.geometry).map(r => r.route_id);
@@ -3784,7 +3960,7 @@ function RoutePlanning({ route, token, onSaved }){
       </div>
       <button onClick={save} disabled={busy}
         className="w-full py-2 rounded-lg text-sm font-semibold border disabled:opacity-50"
-        style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "white" }}>{busy ? "Saving…" : "Save planning figures"}</button>
+        style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)" }}>{busy ? "Saving…" : "Save planning figures"}</button>
       {msg && <p className="text-xs text-slate-500">{msg}</p>}
     </div>
   );
@@ -5042,7 +5218,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     setSelGeoms(null);
     const m = mapObj.current;
     const coords = geoCache.current[id];
-    if(coords && m) m.fitBounds(boundsOf(coords), { padding: 60, maxZoom: 13, duration: 700 });
+    if(coords && m) { try { m.fitBounds(boundsOf(coords), { padding: 60, maxZoom: 13, duration: 700 }); } catch(e){} }
     fetch(`${API}/routes/${encodeURIComponent(id)}/geometries`)
       .then(r => r.json())
       .then(gj => setSelGeoms(gj))
