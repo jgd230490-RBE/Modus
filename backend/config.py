@@ -67,7 +67,11 @@ KEY = "factors"
 #                the Weekly Oil Bulletin; GB: DESNZ — H1), the orthophoto basemap (EE).
 #                Null = none of them; the diesel index is then typed only.
 TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", "country": None,
-                   "distance_unit": "km"}     # H1: km stored always; "mi" = read in miles
+                   "distance_unit": "km",     # H1: km stored always; "mi" = read in miles
+                   # H2 (5 Oct 2026): a short notice every screen and export carries when set —
+                   # the demo tenant says "Fictional demo scheme · nothing here is real". A real
+                   # tenant leaves it null and nothing is shown. Validated as text or null.
+                   "demo_notice": None}
 
 CURRENCIES = {
     "EUR": {"symbol": "€", "name": "euro"},
@@ -129,6 +133,8 @@ def tenant_settings(conversions=None, doc=None):
     # tenant block may say "mi" (validated in validate()).
     du = str((block or {}).get("distance_unit") or "").strip().lower() if isinstance(block, dict) else ""
     t["distance_unit"] = du if du in DISTANCE_UNITS else "km"
+    dn = (block or {}).get("demo_notice") if isinstance(block, dict) else None
+    t["demo_notice"] = dn.strip() if isinstance(dn, str) and dn.strip() else None
     return t
 # a small in-process cache so the many load_factors() calls inside one request do not
 # each hit the database. Invalidated on every write through this module; a write made
@@ -320,6 +326,9 @@ def validate(doc, network=None):
             du = tb.get("distance_unit")
             if du is not None and du != "" and str(du).strip().lower() not in DISTANCE_UNITS:
                 p.append("tenant.distance_unit must be 'km' or 'mi'")
+            dn = tb.get("demo_notice")
+            if dn is not None and (not isinstance(dn, str) or len(dn) > 120):
+                p.append("tenant.demo_notice must be text of at most 120 characters, or null")
     for w in doc.get("seasonal_restrictions") or []:
         if not isinstance(w, dict) or not w.get("name"):
             p.append("every seasonal restriction needs a name")

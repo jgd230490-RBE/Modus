@@ -83,6 +83,12 @@ def _tenant_name():
     return _tenant().get("name") or "Wayscope"
 
 
+def _demo_notice():
+    """The tenant's notice ("Fictional demo scheme …"), or None — H2, 5 Oct 2026. Printed
+    on both exports whenever it is set, so no demo sheet leaves the stand unlabelled."""
+    return _tenant().get("demo_notice") or None
+
+
 def _cur():
     """The tenant's currency SYMBOL. Every figure on a sheet is in the tenant's own
     currency; the symbol is presentation, never a conversion."""
@@ -336,6 +342,7 @@ def build_xlsx(page):
     ws4 = wb.create_sheet("About")
     about = [
         ("Sheet", f"{_tenant_name()} · {_week_title(page)} · commit week"),
+        ("Notice", _demo_notice() or ""),
         ("Generated", datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"),
         ("Bucket", page.get("bucket")),
         ("Lines", (page.get("commit", {}).get("totals") or {}).get("lines")),
@@ -705,6 +712,8 @@ def build_pdf(page):
         if (l.get("week") or {}).get("confirmed_at"):
             stamp = l["week"]["confirmed_at"]
     ft = [P(E(f), st_grey) for f in footer_lines()]
+    if _demo_notice():                       # H2: the demo label is on the PDF too
+        ft.insert(0, P("<b>" + E(_demo_notice()) + "</b>", st_grey))
     ft.append(P(E(_fuel_line(page)), st_grey))
     ft.append(P((f"Confirmed {stamp}. " if stamp else "Not yet confirmed. ") + "Re-open the week in Look-ahead to change the plan.", st_grey))
     story.append(KeepTogether(ft))
