@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayscope — heavy haulage planning for construction programmes</title>
+<meta name="description" content="A weekly look-ahead that commits HGV movements by route and by day, with haul routes, fleet, cost and carbon, in one plan the client, the contractor and the community can read.">
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="./assets/favicon.ico">
+<link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+<meta property="og:title" content="Wayscope — Every load in scope.">
+<meta property="og:description" content="Next week's lorries, planned seven days out. Haul routes, fleet, cost and carbon for construction programmes.">
+<meta property="og:image" content="./assets/og-image-1200x630.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Wayscope landing — 6 Oct 2026. Built from the approved Design canvas. Self-contained:
+     this folder deploys as a Render static site on its own, or mounts under the app at
+     /landing/ for preview. No script, no tracking, no cookies. */
+  :root{
+    --ink:#1F2024; --ink-2:#3D4552; --muted:#5B6470; --line:#E3E6EA; --line-2:#EEF0F2;
+    --paper:#FFFFFF; --stone:#FAFAF8; --ground:#E9ECEF;
+    --orange:#FF8C14; --orange-text:#C75F06; --orange-deep:#8A4A05; --orange-tint:#FFF3E3;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,"Segoe UI",sans-serif;
+    --display:Sora,var(--sans);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  a:hover{color:var(--orange-text)}
+  img{max-width:100%;display:block}
+  h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:-.02em;margin:0;line-height:1.1}
+  p{margin:0}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 32px}
+  @media (max-width:600px){.wrap{padding:0 20px}}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;border-radius:999px;padding:14px 24px;font-weight:500;font-size:15px;min-height:48px;border:1px solid transparent}
+  .btn-ink{background:var(--ink);color:#fff}
+  .btn-ink:hover{background:#000;color:#fff}
+  .btn-line{border-color:#D5D9DE;color:var(--ink)}
+  .btn-orange{background:var(--orange);color:var(--ink)}
+  .btn-orange:hover{background:#FF9A33;color:var(--ink)}
+
+  /* nav */
+  .nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:22px 0}
+  .nav .brand{display:flex;align-items:center;gap:14px;text-decoration:none}
+  .nav .brand img{height:30px;width:auto}
+  .nav .tag{font-size:13px;color:var(--muted)}
+  .nav .links{display:flex;flex-wrap:wrap;align-items:center;gap:24px;font-size:14px}
+  .nav .links a{text-decoration:none}
+  .nav .links .btn{padding:10px 18px;min-height:40px;font-size:14px}
+  @media (max-width:600px){.nav .tag{display:none}}
+
+  /* hero */
+  .hero{display:flex;flex-wrap:wrap;gap:48px;align-items:center;padding:56px 0}
+  .hero .copy{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;gap:24px}
+  .hero .pill{display:inline-flex;align-self:flex-start;font-size:13px;font-weight:500;color:var(--orange-deep);background:var(--orange-tint);border-radius:999px;padding:6px 12px}
+  .hero h1{font-size:clamp(38px,5.2vw,58px);line-height:1.04;letter-spacing:-.03em}
+  .hero .lede{font-size:19px;line-height:1.55;color:var(--ink-2);max-width:560px}
+  .hero .ctas{display:flex;flex-wrap:wrap;gap:12px;padding-top:4px}
+  .hero .fine{font-size:13px;color:var(--muted)}
+  .frame{flex:1 1 480px;min-width:0;background:var(--ground);border:1px solid var(--line);border-radius:16px;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--muted);font-size:14px}
+  .frame video,.frame img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+
+  /* promise band */
+  .band{border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);background:var(--stone)}
+  .band .wrap{display:flex;flex-wrap:wrap;gap:24px 48px;align-items:baseline;padding:40px 32px}
+  .band .big{font-family:var(--display);font-weight:500;font-size:22px;letter-spacing:-.01em;flex:1 1 320px}
+  .band .body{font-size:16px;line-height:1.6;color:var(--ink-2);flex:2 1 480px}
+
+  /* sections */
+  section{scroll-margin-top:16px}
+  .sec{padding:72px 0 40px}
+  .sec h2{font-size:clamp(28px,3.4vw,36px)}
+  .sec .intro{font-size:17px;color:var(--ink-2);line-height:1.55;max-width:640px;margin-top:8px}
+
+  /* readers */
+  .readers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px}
+  @media (max-width:900px){.readers{grid-template-columns:1fr}}
+  .reader{border:1px solid var(--line);border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .reader svg{width:28px;height:28px;stroke:var(--orange-text);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .reader h3{font-weight:500;font-size:20px;letter-spacing:-.01em}
+  .reader .who{font-size:13px;color:var(--muted)}
+  .reader .what{font-size:15px;line-height:1.6;color:var(--ink-2)}
+  .reader .more{font-size:14px;font-weight:500;text-decoration:none;margin-top:auto;padding-top:8px}
+
+  /* problems */
+  .problem{display:flex;flex-wrap:wrap;gap:32px 48px;align-items:center;padding:40px 0;border-top:1px solid var(--line-2)}
+  .problem.flip{flex-wrap:wrap-reverse}
+  .problem:last-child{border-bottom:1px solid var(--line-2)}
+  .problem .text{flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:12px}
+  .problem .kicker{font-size:13px;font-weight:500;color:var(--orange-deep)}
+  .problem h3{font-weight:500;font-size:clamp(24px,2.6vw,28px);line-height:1.15}
+  .problem .body{font-size:16px;line-height:1.6;color:var(--ink-2)}
+  .problem .frame{flex:1 1 420px;border-radius:12px;font-size:13px}
+
+  /* beside */
+  .beside .wrap{display:flex;flex-wrap:wrap;gap:24px 48px;align-items:baseline;padding:48px 32px}
+  .beside h2{font-weight:500;font-size:24px;letter-spacing:-.01em;flex:1 1 320px}
+  .beside p{font-size:16px;line-height:1.6;color:var(--ink-2);flex:2 1 480px}
+
+  /* demo */
+  .demo{background:var(--ink);color:#fff}
+  .demo .wrap{display:flex;flex-wrap:wrap;gap:40px 64px;align-items:center;padding:72px 32px}
+  .demo .copy{flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:16px}
+  .demo .copy p{font-size:17px;line-height:1.6;color:#C9CED6}
+  .demo .copy .btn{align-self:flex-start}
+  .demo .tiles{flex:1 1 360px;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  @media (max-width:460px){.demo .tiles{grid-template-columns:1fr}}
+  .tile{border:1px solid #3D4552;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:6px}
+  .tile .k{font-size:13px;color:#C9CED6}
+  .tile .v{font-family:var(--display);font-size:22px;font-weight:500;letter-spacing:.04em}
+  .tile .v.small{font-family:var(--sans);font-size:15px;font-weight:400;letter-spacing:0;line-height:1.5}
+  .demo a:hover{color:var(--orange)}
+  .demo .btn-orange:hover{color:var(--ink)}
+
+  /* footer */
+  footer .wrap{padding:40px 32px 56px;display:flex;flex-direction:column;gap:20px;font-size:13px;color:var(--muted);line-height:1.6}
+  footer .row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px 32px;align-items:baseline}
+  footer .row img{height:24px;width:auto}
+  footer .row .links{display:flex;flex-wrap:wrap;gap:24px}
+  footer .row .links a{text-decoration:none}
+  footer p{max-width:900px}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="nav" aria-label="Site">
+    <a class="brand" href="#top"><img src="./assets/logo-header-on-light.svg" alt="Wayscope" width="158" height="30"><span class="tag">Every load in scope.</span></a>
+    <div class="links">
+      <a href="#readers">Who it's for</a>
+      <a href="#problems">What it does</a>
+      <a href="#demo">Demo</a>
+      <a class="btn btn-ink" href="#demo">Open the demo scheme</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <section id="top" class="wrap hero">
+    <div class="copy">
+      <span class="pill">Highways UK · NEC Birmingham · 14–15 October</span>
+      <h1>Next week's lorries, planned seven days out.</h1>
+      <p class="lede">A weekly look-ahead that commits HGV movements by route and by day. The same seven-day horizon RIS3 measures roadworks accuracy on.</p>
+      <div class="ctas">
+        <a class="btn btn-ink" href="#demo">Open the demo scheme</a>
+        <a class="btn btn-line" href="#readers">See how it works</a>
+      </div>
+      <p class="fine">Fictional demo scheme. No sign-up. Codes are printed on this page.</p>
+    </div>
+    <!-- H5: replace the placeholder with the screen recording of the public map playing
+         through a month (the user records it; captions only, "fictional demo scheme" on screen). -->
+    <div class="frame" id="hero-media">[SCREEN RECORDING: the public map playing through a month, KPI bar on top]</div>
+  </section>
+
+  <section class="band" aria-label="What Wayscope is">
+    <div class="wrap">
+      <p class="big">Serious modelling underneath. Plain screens on top.</p>
+      <p class="body">Quantities and a delivery programme in. Next week's lorry movements, the roads they take, what they cost and the carbon they carry out. One plan the client, the contractor and the community can all read.</p>
+    </div>
+  </section>
+
+  <section id="readers" class="wrap sec">
+    <h2>One plan. Three readers.</h2>
+    <p class="intro">The same corridor map, read three ways.</p>
+    <div class="readers">
+      <article class="reader">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+        <h3>You deliver the programme</h3>
+        <p class="who">Tier 1 contractors and logistics leads</p>
+        <p class="what">Quantities and dates in; next week's lorries by route and by day out. Fleet by vehicle class, a fair-price floor from the diesel index, every haul route checked for HGV restrictions.</p>
+        <a class="more" href="#p-week">Commit the week, then hit it →</a>
+      </article>
+      <article class="reader">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6v2H9zM7 5H5v15h14V5h-2"/><path d="M9 13l2 2 4-4"/></svg>
+        <h3>You need the evidence</h3>
+        <p class="who">Clients, highway authorities, carbon leads</p>
+        <p class="what">HGV numbers for the TMP and CLP, routed distances and trips for the monthly carbon return, and a seven-day plan you can hold the contractor to.</p>
+        <a class="more" href="#p-carbon">Carbon from the numbers you planned with →</a>
+      </article>
+      <article class="reader">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        <h3>You live along the route</h3>
+        <p class="who">Parish councils, residents, liaison officers</p>
+        <p class="what">A read-only map of which roads carry the lorries and when. No account, no training, nothing to install.</p>
+        <a class="more" href="#demo">See the haul coming →</a>
+      </article>
+    </div>
+  </section>
+
+  <section id="problems" class="wrap sec">
+    <h2>Five problems it takes off the desk</h2>
+    <div style="margin-top:24px">
+
+      <div class="problem" id="p-week">
+        <div class="text">
+          <p class="kicker">Seven-day roadworks accuracy</p>
+          <h3>Commit the week, then hit it.</h3>
+          <p class="body">The look-ahead commits next week's movements by day and records what actually happened, so the disruption declared is the disruption that occurs. RIS3 measures roadworks planned seven days ahead against what happens on the ground.</p>
+        </div>
+        <div class="frame">[EXPLAINER 1: look-ahead week, movements committed by day]</div>
+      </div>
+
+      <div class="problem flip" id="p-routes">
+        <div class="frame">[EXPLAINER 2: haul route with a weight limit flagged]</div>
+        <div class="text">
+          <p class="kicker">Haul routes, TMPs and CLPs</p>
+          <h3>Every haul route mapped, every restriction checked.</h3>
+          <p class="body">HGV-legal routing with the vehicle's real dimensions and weight. Planned closures from National Highways' public feed. A read-only corridor map for the client and the community, without giving them an account.</p>
+        </div>
+      </div>
+
+      <div class="problem" id="p-carbon">
+        <div class="text">
+          <p class="kicker">Monthly carbon returns</p>
+          <h3>Carbon from the numbers you planned with.</h3>
+          <p class="body">The Carbon Tool wants transport as quantity and one-way distance. Wayscope holds both per origin and destination, with routed kilometres, trips and CO₂e per trip, on 2026 DESNZ factors. Daily and to-date carbon sit on the map.</p>
+        </div>
+        <div class="frame">[EXPLAINER 3: carbon per route and the export]</div>
+      </div>
+
+      <div class="problem flip" id="p-fleet">
+        <div class="frame">[EXPLAINER 4: vehicles from cycle time, artic against 8-wheeler]</div>
+        <div class="text">
+          <p class="kicker">Fleet sizing</p>
+          <h3>How many lorries, not how many loads.</h3>
+          <p class="body">Vehicles come from the movements and the trips one vehicle can make on that route's cycle, per vehicle class. An artic instead of an 8-wheeler changes the answer.</p>
+        </div>
+      </div>
+
+      <div class="problem" id="p-cost">
+        <div class="text">
+          <p class="kicker">Haulage cost</p>
+          <h3>A fair price before the negotiation.</h3>
+          <p class="body">A modelled floor per trip from the weekly diesel index, distance, tonnes and cycle time. Typed quotes and target rates sit beside it. It is never called the cost.</p>
+        </div>
+        <div class="frame">[EXPLAINER 5: fair-price floor beside a quote]</div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="beside" aria-label="What it sits beside">
+    <div class="wrap">
+      <h2>Sits beside what you already run.</h2>
+      <p>Takes quantities from your bill of quantities and dates from your programme export, as a spreadsheet. Puts movements, routes, cost and carbon back the same way. It is not a project-management suite and does not try to be one.</p>
+    </div>
+  </section>
+
+  <section id="demo" class="demo">
+    <div class="wrap">
+      <div class="copy">
+        <h2>Open the demo scheme</h2>
+        <p>A fictional UK highways scheme with a year of movements, routes, closures and carbon. Everything on it is invented. The codes below are published on purpose.</p>
+        <a class="btn btn-orange" href="https://demo.wayscope.co.uk">demo.wayscope.co.uk</a>
+      </div>
+      <div class="tiles">
+        <div class="tile"><span class="k">Corridor map</span><span class="v">[MAP CODE]</span></div>
+        <div class="tile"><span class="k">Planner</span><span class="v">[PLANNER CODE]</span></div>
+        <div class="tile"><span class="k">Team view</span><span class="v">[TEAM CODE]</span></div>
+        <div class="tile"><span class="k">At the stand</span><span class="v small">Highways UK, NEC Birmingham, 14–15 October. [STAND NUMBER]</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <img src="./assets/logo-header-on-light.svg" alt="Wayscope" width="126" height="24">
+      <div class="links"><a href="mailto:[EMAIL]">[EMAIL]</a><span>[COMPANY NAME AND NUMBER]</span></div>
+    </div>
+    <p>Sources. Seven-day roadworks accuracy: RIS3 performance specification, National Highways. Carbon factors: DESNZ greenhouse gas conversion factors 2026. Diesel index: DESNZ weekly road fuel prices. Closures: National Highways planned road closures, public feed. Routing by HERE; maps by Mapbox.</p>
+    <p>The demo is a fictional scheme. Nothing on this site describes a real project, client or contract.</p>
+  </div>
+</footer>
+
+</body>
+</html>
