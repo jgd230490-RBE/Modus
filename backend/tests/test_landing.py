@@ -17,6 +17,9 @@ import re
 import sys
 from html.parser import HTMLParser
 
+# Where the demo scheme runs today. demo.wayscope.co.uk does not resolve yet (6 Oct);
+# change this and the page together when it does.
+DEMO_URL = "https://modus-web.onrender.com/"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MAIN = os.path.join(ROOT, "backend", "main.py")
 PAGE = os.path.join(ROOT, "landing", "index.html")
@@ -111,7 +114,7 @@ ok("page has og:image and og:title", 'property="og:image"' in src and 'property=
 for h in p.hrefs:
     if h.startswith("#"):
         ok(f"anchor {h} exists on the page", h[1:] in p.ids)
-for needed in ("readers", "problems", "demo"):
+for needed in ("overview", "readers", "problems", "demo"):
     ok(f"section #{needed} exists", needed in p.ids)
 
 # --- local assets exist ----------------------------------------------------------
@@ -124,7 +127,46 @@ ok("no absolute /brand/ paths (the page must work as a standalone static site)",
 ok("only Google Fonts is loaded from the network",
    all(u.startswith(("https://fonts.googleapis.com", "https://fonts.gstatic.com"))
        for u in re.findall(r'href="(https://[^"]+)"', src)
-       if "wayscope.co.uk" not in u))
+       if "wayscope.co.uk" not in u and u != DEMO_URL))
+
+# --- the two placeholder videos (6 Oct) -------------------------------------------
+# Hero: the silent animated explainer, muted autoplay loop (browsers refuse autoplay with
+# sound), playsinline for iOS, controls as the pause button. Overview: the product tour,
+# which has a sound track, click to play. Neither is repeated elsewhere on the page.
+MEDIA = os.path.join(ROOT, "landing", "media")
+videos = re.findall(r"<video\b[^>]*>", src)
+ok("page has two videos", len(videos) == 2)
+def video_in(frame_id):
+    m = re.search(r'id="%s"[^>]*>\s*(<video\b[^>]*>)' % frame_id, src)
+    return m.group(1) if m else ""
+hv = video_in("hero-media")
+ok("hero frame holds the explainer", "./media/explainer-overview.mp4" in hv)
+for attr in ("autoplay", "muted", "loop", "playsinline", "controls"):
+    ok(f"hero video is {attr}", re.search(r"\b%s\b" % attr, hv) is not None)
+ov = video_in("overview-media")
+ok("overview frame holds the product tour", "./media/hero-overview.mp4" in ov)
+ok("overview video does not autoplay (it has sound)", "autoplay" not in ov)
+ok("overview video has controls", "controls" in ov)
+ok("overview comes before the readers and problems sections",
+   0 < src.find('id="overview"') < src.find('id="readers"') < src.find('id="problems"'))
+ok("'See how it works' goes to the overview", 'href="#overview">See how it works' in src)
+ok("each video file is used once", len(set(re.findall(r'src="\./media/([^"]+\.mp4)"', src))) == 2)
+for v in videos:
+    ok("every video has an aria-label", 'aria-label="' in v)
+    ok("every video has a poster", 'poster="./media/' in v)
+    ok("every video says fictional in its label", "fictional" in v)
+    for ref in re.findall(r'(?:src|poster)="\./([^"]+)"', v):
+        ok(f"media file present: {ref}", os.path.exists(os.path.join(ROOT, "landing", ref)))
+for name in ("hero-overview.mp4", "explainer-overview.mp4"):
+    path = os.path.join(MEDIA, name)
+    head = open(path, "rb").read(65536) if os.path.exists(path) else b""
+    # moov before mdat = "faststart": the browser can start playing before the whole file lands.
+    ok(f"{name} is an MP4 with faststart", head[4:8] == b"ftyp" and 0 < head.find(b"moov") < (head.find(b"mdat") if b"mdat" in head else 1 << 30))
+    ok(f"{name} is under 10 MB", os.path.exists(path) and os.path.getsize(path) < 10 * 1024 * 1024)
+_body = " ".join(p.text)
+ok("no media placeholder text left in the hero", "[SCREEN RECORDING" not in _body)
+ok("explainers 1-5 still marked as placeholders",
+   all(f"[EXPLAINER {n}" in _body for n in (1, 2, 3, 4, 5)))
 
 # --- wording rules (claude/messaging-0929.md §7) -----------------------------------
 body = " ".join(p.text)
@@ -144,7 +186,9 @@ BANNED = [
 for pat, name in BANNED:
     ok(f"no banned word: {name}", not re.search(pat, body, re.I))
 ok("page says the demo is fictional", re.search(r"fictional", body, re.I) is not None)
-ok("page links to the demo host", any("demo.wayscope.co.uk" in h for h in p.hrefs))
+ok("page links to the demo host", DEMO_URL in p.hrefs)
+ok("page does not link to the demo domain before it resolves",
+   not any("demo.wayscope.co.uk" in h for h in p.hrefs))
 ok("page carries the sources paragraph", "DESNZ" in body and "RIS3" in body)
 ok("page uses British spelling (programme)", "programme" in body and "program " not in body)
 
