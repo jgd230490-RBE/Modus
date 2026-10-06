@@ -2757,6 +2757,11 @@ app.mount("/map", NoCacheStatic(directory=str(ROOT / "map"), html=True), name="m
 # another session; its main.py mount had been lost under the costing zip). Same
 # no-cache static class, after /map, before the catch-all "/". test_help.py pins it.
 app.mount("/help", NoCacheStatic(directory=str(ROOT / "frontend" / "help"), html=True), name="help")
+# 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
+# page lives in landing/ at the repo root so the same folder deploys as a Render static
+# site on the root domain once the app has moved to app. (H0's open decision). Not gated:
+# it is the public page. check_dir=False for the same reason as /brand below.
+app.mount("/landing", NoCacheStatic(directory=str(ROOT / "landing"), html=True, check_dir=False), name="landing")
 # 29 Sep 2026 — the Wayscope brand files (logos, favicon set, theme tokens) at /brand/.
 # Not gated: gate.scope_for() polices /map, /help and the map's data prefixes only, so a
 # refused visitor still sees the logo on the password page. Mounted before the "/" route.
