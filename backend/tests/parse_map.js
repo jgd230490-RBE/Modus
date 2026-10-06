@@ -213,11 +213,29 @@ ok("and are positioned over the map canvas", /#kpi-hud\{[^}]*position:absolute/.
 // top:112px right:10px, which was exactly the "tucked under the zoom stack" position the
 // move exists to leave, so it is REVERSED rather than deleted — it now pins the new
 // corner and refuses the old one.
-ok("the KPI panel sits top-left of the map pane, beside the sidebar",
-  /#kpi-hud\{[^}]*top:14px[^}]*left:312px/.test(html)
-  && !/#kpi-hud\{[^}]*right:10px/.test(html));
-ok("...and moves in when the sidebar is closed",
-  /body\.sidebar-closed #kpi-hud\{[^}]*left:14px/.test(html));
+// ⚠️ 2026-10-06 — REVERSED again, not deleted (map redesign, claude/map-redesign-1006.md).
+// The 07 Sep floating card (top:14px left:312px, 272px wide, blur + shadow) became a flat
+// BAR docked to the top of the map pane, full pane width, 72px tall. The assertion now
+// pins the bar and refuses the card.
+ok("the KPI bar is docked to the top of the map pane, full width, beside the sidebar",
+  /#kpi-hud\{[^}]*top:0;[^}]*left:300px;[^}]*right:0;/.test(html)
+  && /#kpi-hud\{[^}]*height:72px/.test(html)
+  && !/#kpi-hud\{[^}]*width:272px/.test(html)
+  && !/#kpi-hud\{[^}]*backdrop-filter/.test(html)
+  && !/#kpi-hud\{[^}]*box-shadow/.test(html));
+ok("...and reaches the edge when the sidebar is closed, clearing #menu-toggle",
+  /body\.sidebar-closed #kpi-hud\{[^}]*left:0;[^}]*padding-left:176px/.test(html));
+ok("the Mapbox zoom stack is pushed below the bar", /\.mapboxgl-ctrl-top-right\{ top:72px; \}/.test(html));
+ok("⭐ 2026-10-06: six numbers, the last two CO2e a day and to date",
+  /id="kpi-co2-day"/.test(html) && /id="kpi-co2-total"/.test(html)
+  && /set\('kpi-co2-day', /.test(code) && /set\('kpi-co2-total', fmtN\(co2ToDate, 0\) \+ ' t'\)/.test(code));
+ok("⭐ CO2e sums per line AFTER the same filters, and unbaked lines are named, not zeroed",
+  /if \(l\.co2_t != null\) co2 \+= l\.co2_t; else co2Unbaked\+\+;/.test(code)
+  && /excl\. \$\{co2Unbaked\} unbaked/.test(code));
+ok("⭐ CO2e to date follows the sidebar filters through the route's props",
+  /\(last\.co2_to_date \|\| \[\]\)\.forEach\(c => \{[\s\S]{0,400}discFilter !== 'ALL' && c\.discipline !== discFilter/.test(code));
+ok("no label in the bar is uppercase microtext", !/\.kpi-label\{[^}]*text-transform:uppercase/.test(html)
+  && !/\.kpi-label\{[^}]*font-size:9/.test(html));
 ok("the KPI block is outside the sidebar element",
   html.indexOf('id="kpi-hud"') > html.indexOf('id="timeline-bar"') ||
   html.indexOf('id="kpi-hud"') > html.lastIndexOf('class="control-group"'));
@@ -236,8 +254,9 @@ ok("§9: vehicles/day = vehicle-loads over months with volume, per working day",
 // ⭐ 2026-09-03: movements and vehicles are different. Movements/day = loads per working
 // day; vehicles needed = Σ per line ceil(movements/day ÷ trips one vehicle can make on
 // that route), busiest month, with unbaked lines counted as unknown rather than zero.
+// 2026-10-06: the label reads "Movements a day" (sentence case, no slash) — NARROWED
 ok("§9: movements/day is the loads-per-working-day figure", /set\('kpi-trips', fmtN\(vehDay, 1\)\)/.test(code)
-  && />Movements \/ day</.test(html));
+  && />Movements a day</.test(html));
 ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per line, from the route's cycle",
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
 ok("§9: ⭐ an unbaked line is counted as unknown, never as zero vehicles",
@@ -249,11 +268,17 @@ ok("§9: filters apply - origin/dest/IPT on the route, discipline on the LINE",
   /discFilter !== 'ALL' && l\.discipline !== discFilter/.test(code));
 ok("§9: an empty month says so and hides the breakdown, no zeros",
   code.includes("No approved forecast in this month.")
-  && /if \(!mVeh\.length\) \{[\s\S]{0,400}setHTML\('kpi-breakdown', ''\)/.test(code));
+  && /if \(!mVeh\.length\) \{[\s\S]{0,600}setHTML\('kpi-breakdown', ''\)/.test(code));
 // §D: and the SWITCHER goes with them — a switcher over nothing invites a click that
 // changes nothing
 ok("§D: an empty month hides the switcher too",
-  /if \(!mVeh\.length\) \{[\s\S]{0,400}setHTML\('kpi-switch', ''\)/.test(code));
+  /if \(!mVeh\.length\) \{[\s\S]{0,600}setHTML\('kpi-switch', ''\)/.test(code));
+// 2026-10-06: the breakdown is in the SIDEBAR (#kpi-moving), shown only while a month
+// is on screen; the rows keep the .kpi-chip name the browser check reads
+ok("⭐ 2026-10-06: the breakdown lives in the sidebar, hidden when no month is on screen",
+  html.indexOf('id="kpi-moving"') < html.indexOf('id="restrictions-group"')
+  && html.indexOf('id="kpi-breakdown"') < html.indexOf('id="kpi-hud"')
+  && (code.match(/showMoving\(false\)/g) || []).length >= 2 && /showMoving\(true\)/.test(code));
 // 🔴 REPLACED 2026-09-08 (§D). Two stacked chip rows (discipline, then material when
 // the month mixed materials) became ONE row with a three-way switcher. Stacking every
 // answer made the card a column; the human asked for one card.
@@ -1233,8 +1258,25 @@ ok("actuals are not painted on the public map", !/actual_qty/.test(code));
 // =============================================================================
 //  2026-09-02 §8 — timeline warnings
 // =============================================================================
-ok("§8: a warning stack exists above the timeline", /id="tl-warnings"/.test(html)
-  && /#tl-warnings\{[^}]*bottom:74px/.test(html) && /#timeline-bar\{[^}]*bottom:18px/.test(html));
+// ⚠️ 2026-10-06 — REVERSED, not deleted. The stack above the timeline became a PANEL
+// docked under the bar, top-right. The timeline bar itself stays where it was.
+ok("§8: the conditions panel is docked under the bar, top-right, not above the timeline", /id="tl-warnings"/.test(html)
+  && /#tl-warnings\{[^}]*top:84px;[^}]*right:12px/.test(html) && !/#tl-warnings\{[^}]*bottom:74px/.test(html)
+  && /#timeline-bar\{[^}]*bottom:18px/.test(html));
+ok("§8 (2026-10-06): the panel is opened from a pill in the bar that counts the levels",
+  /id="kpi-conditions"/.test(html) && /function toggleConditions\(\)/.test(code)
+  && /function renderConditionsPill\(live\)/.test(code) && /over capacity/.test(code) && /route limit/.test(code));
+ok("§8 (2026-10-06): a month with a red condition opens the panel once by itself",
+  /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened/.test(code));
+ok("§8 (2026-10-06): an over-capacity pile is ringed on the map so map and number agree",
+  /id: 'cond-ring', type: 'circle'/.test(code) && /setCondRing\(live\.filter\(i => i\.kind === 's'\)\.map\(i => i\.id\)\)/.test(code));
+// 🔴 a Node's id property is `id` (network.py), not `location_id`; the first cut filtered
+// on the wrong key and would have ringed nothing. Pinned.
+ok("§8 (2026-10-06): the ring and the fly-to key on the Node's `id` property",
+  /\['in', \['get', 'id'\], \['literal', ids\]\]/.test(code) && /x\.properties\.id === id\)/.test(code)
+  && !/\['get', 'location_id'\]/.test(code));
+ok("§8 (2026-10-06): every row has Show on map", /class="show" onclick="showCondition\(/.test(code)
+  && /function showCondition\(kind, id\)/.test(code));
 ok("§8: rebuilt on every tick and cleared when the timeline closes",
   /applyFilters\(\);\s*renderTimelineWarnings\(m\);/.test(code) && /TL\.on=false;\s*renderTimelineWarnings\(null\)/.test(code));
 ok("§8: three sources and no new ones — Tark Tee, stockpile over, seasonal",
@@ -1243,12 +1285,17 @@ ok("§8: three sources and no new ones — Tark Tee, stockpile over, seasonal",
 ok("§8: only routes carrying volume THIS month, inside the filter",
   /if \(!f\.properties\.is_forecast \|\| !routePassesFilters\(f\.properties\)\) return;/.test(code));
 ok("§8: a stale month cannot paint over the current one", /if \(TL\.month !== month \|\| !TL\.on\) return;/.test(code));
-ok("§8: at most three, then +N more", /live\.slice\(0, 3\)/.test(code) && code.includes("more</div>"));
+// 2026-10-06 — REVERSED: the panel scrolls (max-height) instead of truncating to three
+ok("§8: no +N more truncation; the panel scrolls", !/live\.slice\(0, 3\)/.test(code) && !code.includes("more</div>")
+  && /#tl-warnings\{[^}]*max-height:[^}]*overflow:auto/.test(html));
 ok("§8: dismissible, per month", /function dismissWarning\(key\)/.test(code) && /\|\$\{month\}`/.test(code));
 ok("§8: seasonal windows fold the absolute month to a calendar month", /const cal = \(\(month - 1\) % 12\) \+ 1;/.test(code));
 ok("§8: the seasonal check honours restricted_vehicles", /rv\.length === 0 \|\| \[\.\.\.vs\]\.some\(v => rv\.includes\(v\)\)/.test(code));
-ok("§8: each line reads route/pile · what · month",
-  /<b>\$\{esc\(i\.who\)\}<\/b> · \$\{esc\(i\.what\)\} · \$\{esc\(monthLabel\(month\)\)\}/.test(code));
+// 2026-10-06 — REVERSED: a row is a dot, a plain NOUN and one sentence; the month is in
+// the panel's title, once, not on every row
+ok("§8: each row reads noun + sentence, with the month in the panel title",
+  /<b>\$\{esc\(i\.noun\)\}<\/b><span class="what">\$\{esc\(i\.what\)\}<\/span>/.test(code)
+  && /<b>Conditions in \$\{esc\(monthLabel\(month\)\)\}<\/b>/.test(code));
 ok("§8: fetch failures degrade to no warnings, not a broken map",
   /\.catch\(\(\) => \{ WARN\.restr = \{\}; return WARN\.restr; \}\)/.test(code));
 
@@ -1342,17 +1389,22 @@ ok("...and it says which month is empty",
 // timeline left that caveat sitting under a dash, about a month no longer on screen.
 ok("⭐ both empty branches reset the vehicles LABEL, not just the value",
   (code.match(/set\('kpi-vehicles-label', 'Vehicles needed'\)/g) || []).length >= 2);
-ok("on a phone the panel is a bar above the timeline with the note hidden",
-  /@media \(max-width:700px\)\{[\s\S]{0,1000}#kpi-hud[\s\S]{0,260}bottom:74px/.test(html)
+// ⚠️ 2026-10-06 — REVERSED: on a phone the bar stays at the TOP as a 3x2 grid, the note
+// hidden (it is a tooltip everywhere now)
+ok("on a phone the bar stays at the top as a 3x2 grid with the note hidden",
+  /@media \(max-width:700px\)\{[\s\S]{0,1200}#kpi-hud[\s\S]{0,300}top:0;/.test(html)
+  && /#kpi-cards\{ display:grid; grid-template-columns:repeat\(3, minmax\(0, 1fr\)\)/.test(html)
   && /#kpi-hud \.kpi-note\{ display:none; \}/.test(html));
 // 🔴 both used to sit at bottom:74px. 07 Sep moved the stack to a FIXED bottom:190px,
 // which is not enough — the stack is as tall as its contents, and a month with three
 // warnings landed back on the bar. Found by giving the browser check a month that has
 // warnings. It is measured now; 190px is only the floor.
-ok("⭐ the phone warning stack clears the KPI bar, by measuring it",
-  /@media \(max-width:700px\)\{[\s\S]{0,1900}#tl-warnings\{ bottom:190px; \}/.test(html)
+// ⚠️ 2026-10-06 — REVERSED: the panel sits UNDER the bar, so it is the TOP that is
+// measured; 190px is the CSS floor
+ok("⭐ the phone conditions panel clears the KPI bar, by measuring it",
+  /@media \(max-width:700px\)\{[\s\S]{0,2200}#tl-warnings\{ top:190px;/.test(html)
   && /function positionWarnStack\(\)/.test(code)
-  && /box\.style\.bottom = \(74 \+ Math\.round\(h\) \+ 8\) \+ 'px'/.test(code));
+  && /box\.style\.top = \(Math\.round\(h\) \+ 8\) \+ 'px'/.test(code));
 ok("...and it re-measures when the card changes height or the window resizes",
   /setHTML\('kpi-breakdown', chips\);\s*positionWarnStack\(\);/.test(code)
   && /window\.addEventListener\('resize', positionWarnStack\)/.test(code));
@@ -1427,9 +1479,13 @@ ok("§B: applyRailHighlight re-applies the flow rule, so a filter change lands o
   /if \(note\) note\.innerHTML =[\s\S]{0,260}applyRailFlow\(\);/.test(code));
 
 // ---- §E, 2026-09-08: the warning stack has three NAMED levels ---------------------
-ok("§E: the three levels are named on screen, not just coloured",
-  /const LVL_NAME = \{ clash: 'Clash', warn: 'Warning', caution: 'Caution' \}/.test(code)
-  && /class="lvl"/.test(code));
+// ⚠️ 2026-10-06 — REVERSED: the level WORD is gone. The dot's colour plus a plain noun
+// ("Over capacity", "Exceeds a mass limit", "Seasonal window") carry the level; the
+// three level CLASSES stay so the dots and the sort agree.
+ok("§E: the levels are a coloured dot plus a plain noun, never an uppercase level word",
+  !/LVL_NAME/.test(code) && !/class="lvl"/.test(code)
+  && /\.tl-warn\.clash \.cond-dot\{ background:#C2321C; \}/.test(html)
+  && /noun: 'Over capacity'/.test(code) && /noun: 'Seasonal window'/.test(code));
 ok("§E: a stockpile past capacity is a CLASH",
   /lvl: 'clash', who: sp\.name/.test(code));
 // ⚠️ a Tark Tee 'breach' is a vehicle-versus-limit verdict on a drivable road, not an
@@ -1439,9 +1495,9 @@ ok("§E: a Tark Tee exceed is a WARNING, even when its own severity says breach"
   /lvl: 'warn', who: p\.route_id/.test(code) && !/sev: 'breach'/.test(code));
 ok("§E: a seasonal window is a CAUTION", /lvl: 'caution', who: p\.route_id/.test(code));
 ok("§E: clash sorts above warning sorts above caution",
-  /lvl: 'clash'[\s\S]{0,260}sort: 0 \}/.test(code)
-  && /lvl: 'warn', who: p\.route_id[\s\S]{0,300}sort: worst\.severity === 'breach' \? 1 : 2/.test(code)
-  && /lvl: 'caution'[\s\S]{0,200}sort: 3 \}/.test(code));
+  /lvl: 'clash'[\s\S]{0,400}sort: 0 \}/.test(code)
+  && /lvl: 'warn', who: p\.route_id[\s\S]{0,900}sort: worst\.severity === 'breach' \? 1 : 2/.test(code)
+  && /lvl: 'caution'[\s\S]{0,300}sort: 3 \}/.test(code));
 // 🔴 the second Clash source the brief names has NO PRODUCER anywhere in the product.
 // Inventing what "two conflicting movements" means is the human's call, not mine.
 ok("⭐ §E: the missing Clash source is written down, not invented",
