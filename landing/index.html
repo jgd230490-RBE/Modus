@@ -65,12 +65,21 @@
   .hero .fine{font-size:13px;color:var(--muted)}
   .frame{flex:1 1 480px;min-width:0;background:var(--ground);border:1px solid var(--line);border-radius:16px;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--muted);font-size:14px}
   .frame video,.frame img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+  .frame.media{padding:0;aspect-ratio:16/9;background:#0f0f10;overflow:hidden}
+  .frame.media video{object-fit:contain;display:block}
 
-  /* promise band */
-  .band{border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);background:var(--stone)}
-  .band .wrap{display:flex;flex-wrap:wrap;gap:24px 48px;align-items:baseline;padding:40px 32px}
-  .band .big{font-family:var(--display);font-weight:500;font-size:22px;letter-spacing:-.01em;flex:1 1 320px}
-  .band .body{font-size:16px;line-height:1.6;color:var(--ink-2);flex:2 1 480px}
+  /* overview: the product tour beside the three steps (6 Oct) */
+  .overview{border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);background:var(--stone)}
+  .overview .wrap{padding:64px 32px}
+  .overview h2{font-size:clamp(26px,3vw,32px);max-width:760px}
+  .overview .intro{font-size:17px;line-height:1.6;color:var(--ink-2);max-width:720px;margin-top:12px}
+  .overview .ov{display:flex;flex-wrap:wrap;gap:32px 48px;align-items:center;margin-top:32px}
+  .overview .frame{flex:3 1 520px}
+  .overview .steps{flex:2 1 300px;min-width:0;list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:20px;counter-reset:s}
+  .overview .steps li{counter-increment:s;display:grid;grid-template-columns:36px 1fr;gap:4px 14px;font-size:15px;line-height:1.55;color:var(--ink-2)}
+  .overview .steps li::before{content:counter(s);grid-row:span 2;width:32px;height:32px;border-radius:999px;background:var(--orange-tint);color:var(--orange-deep);font-weight:600;display:flex;align-items:center;justify-content:center}
+  .overview .steps b{font-family:var(--display);font-weight:500;font-size:18px;color:var(--ink)}
+  .overview .note{font-size:13px;color:var(--muted);margin-top:16px}
 
   /* sections */
   section{scroll-margin-top:16px}
@@ -149,19 +158,31 @@
       <p class="lede">A weekly look-ahead that commits HGV movements by route and by day. The same seven-day horizon RIS3 measures roadworks accuracy on.</p>
       <div class="ctas">
         <a class="btn btn-ink" href="#demo">Open the demo scheme</a>
-        <a class="btn btn-line" href="#readers">See how it works</a>
+        <a class="btn btn-line" href="#overview">See how it works</a>
       </div>
       <p class="fine">Fictional demo scheme. No sign-up. Codes are printed on this page.</p>
     </div>
-    <!-- H5: replace the placeholder with the screen recording of the public map playing
-         through a month (the user records it; captions only, "fictional demo scheme" on screen). -->
-    <div class="frame" id="hero-media">[SCREEN RECORDING: the public map playing through a month, KPI bar on top]</div>
+    <!-- H5 (6 Oct): PLACEHOLDER. The animated explainer (64 s, no sound track) as a muted
+         autoplay loop; controls give a pause button (moving content over 5 s needs one).
+         Replace landing/media/explainer-overview.mp4 + .jpg with the final cut, same names. -->
+    <div class="frame media" id="hero-media"><video src="./media/explainer-overview.mp4" poster="./media/explainer-overview.jpg" autoplay muted loop playsinline controls preload="metadata" aria-label="Animated explainer on a fictional demo scheme: monthly plan, next week approved by route and day, one corridor map shared"></video></div>
   </section>
 
-  <section class="band" aria-label="What Wayscope is">
+  <section id="overview" class="overview" aria-label="Overview">
     <div class="wrap">
-      <p class="big">Serious modelling underneath. Plain screens on top.</p>
-      <p class="body">Quantities and a delivery programme in. Next week's lorry movements, the roads they take, what they cost and the carbon they carry out. One plan the client, the contractor and the community can all read.</p>
+      <h2>Serious modelling underneath. Plain screens on top.</h2>
+      <p class="intro">Quantities and a delivery programme in. Next week's lorry movements, the roads they take, what they cost and the carbon they carry out. One plan the client, the contractor and the community can all read.</p>
+      <div class="ov">
+        <!-- H5 (6 Oct): PLACEHOLDER product tour (36 s, captioned, with sound). Click to play.
+             Replace landing/media/hero-overview.mp4 + .jpg with the final recording, same names. -->
+        <div class="frame media" id="overview-media"><video src="./media/hero-overview.mp4" poster="./media/hero-overview.jpg" controls playsinline preload="metadata" aria-label="Wayscope product tour on a fictional demo scheme: dashboard, forecasts, look-ahead and corridor map"></video></div>
+        <ol class="steps">
+          <li><b>Plan</b><span>The contractor forecasts every movement, month by month, by route, material and vehicle.</span></li>
+          <li><b>Approve</b><span>A planner approves. Next week is committed by route and by day, with closures and route caps flagged.</span></li>
+          <li><b>Share</b><span>One read-only corridor map for the local authority, the client and the community.</span></li>
+        </ol>
+      </div>
+      <p class="note">Both films are recorded on the fictional demo scheme. Nothing in them is a real project.</p>
     </div>
   </section>
 
@@ -257,7 +278,9 @@
       <div class="copy">
         <h2>Open the demo scheme</h2>
         <p>A fictional UK highways scheme with a year of movements, routes, closures and carbon. Everything on it is invented. The codes below are published on purpose.</p>
-        <a class="btn btn-orange" href="https://demo.wayscope.co.uk">demo.wayscope.co.uk</a>
+        <!-- 6 Oct: demo.wayscope.co.uk does not resolve yet (H0/H4). The demo scheme runs on
+             modus-web. Change DEMO_URL here (and in test_landing.py) when the domain is live. -->
+        <a class="btn btn-orange" href="https://modus-web.onrender.com/">Open the demo</a>
       </div>
       <div class="tiles">
         <div class="tile"><span class="k">Corridor map</span><span class="v">[MAP CODE]</span></div>
