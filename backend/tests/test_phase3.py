@@ -129,6 +129,7 @@ _static.StaticFiles = _StaticFiles
 sys.modules.setdefault("fastapi.staticfiles", _static)
 
 TMP = tempfile.mkdtemp(prefix="rbe_phase3_")
+from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
 
 import db  # noqa: E402
@@ -153,8 +154,7 @@ def ok(label, cond, extra=""):
 
 
 def reset_db():
-    if os.path.exists(db._SQLITE_PATH):
-        os.remove(db._SQLITE_PATH)
+    remove_scratch_db(db, TMP)
     db.init_network_db()
     db.init_zones_db()
     db.init_gates_db()     # Phase 5a

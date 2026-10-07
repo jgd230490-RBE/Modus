@@ -128,6 +128,7 @@ _static.StaticFiles = _StaticFiles
 sys.modules.setdefault("fastapi.staticfiles", _static)
 
 TMP = tempfile.mkdtemp(prefix="rbe_costing_")
+from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
 os.environ.pop("ADMIN_TOKEN", None)
 
@@ -174,8 +175,7 @@ def _raises(fn):
 
 
 def reset_db():
-    if os.path.exists(db._SQLITE_PATH):
-        os.remove(db._SQLITE_PATH)
+    remove_scratch_db(db, TMP)
     db.init_db()
     db.init_network_db()
     db.init_taxonomy_db()
@@ -796,7 +796,9 @@ pb = export.build_pdf(pg)
 if os.environ.get("RBE_PDF_OUT"):            # look at it (lesson 24): RBE_PDF_OUT=/path python3 …
     with open(os.environ["RBE_PDF_OUT"], "wb") as _pf:
         _pf.write(pb)
-_txt = subprocess.run(["pdftotext", "-layout", "-", "-"], input=pb, capture_output=True).stdout.decode("utf-8") if shutil.which("pdftotext") else pb.decode("latin-1")
+from portable import pdf_text, offline
+offline(export)   # never a live Mapbox call from a harness
+_txt = pdf_text(pb)
 ok("the PDF names the diesel index, its bulletin and the BAF formula in the footer",
    "Diesel EE" in _txt and "1.950/L" in _txt and "BAF" in _txt and "fuel share" in _txt)
 ok("...and marks a target-priced line and prints +BAF under the quote", "target" in _txt and "+BAF" in _txt)
@@ -813,7 +815,7 @@ ok("🔴 no quote anywhere ⇒ the export still has the € + BAF column and the
    and all(ws0.cell(row=i, column=col_adj).value is None for i in range(2, ws0.max_row + 1))
    and pg0["commit"]["totals"]["eur"] is None and pg0["commit"]["totals"]["eur_adj"] is None)
 pb0 = export.build_pdf(pg0)
-_txt0 = subprocess.run(["pdftotext", "-layout", "-", "-"], input=pb0, capture_output=True).stdout.decode("utf-8") if shutil.which("pdftotext") else pb0.decode("latin-1")
+_txt0 = pdf_text(pb0)
 ok("...and the PDF still names the diesel index with no € column", "Diesel EE" in _txt0 and "€ WEEK" not in _txt0)
 
 # =========================================================================== #

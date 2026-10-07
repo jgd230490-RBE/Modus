@@ -126,6 +126,7 @@ _static.StaticFiles = _StaticFiles
 sys.modules.setdefault("fastapi.staticfiles", _static)
 
 TMP = tempfile.mkdtemp(prefix="wayscope_h1_")
+from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
 os.environ.pop("TENANT_ID", None)
 for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT6_CODE",
@@ -168,8 +169,7 @@ def read(rel):
 
 
 def reset_db():
-    if os.path.exists(db._SQLITE_PATH):
-        os.remove(db._SQLITE_PATH)
+    remove_scratch_db(db, TMP)
     db.init_db(); db.init_network_db(); db.init_taxonomy_db(); db.init_zones_db()
     db.init_gates_db(); db.init_weeks_db(); db.init_lookahead_db(); db.init_config_db()
     db.init_costing_db(); db.init_tenant()
@@ -446,8 +446,8 @@ except ImportError:
 try:
     import reportlab  # noqa: F401
     pb = export.build_pdf(_la)
-    _ptxt = (subprocess.run(["pdftotext", "-layout", "-", "-"], input=pb, capture_output=True).stdout.decode("utf-8")
-             if shutil.which("pdftotext") else "")
+    from portable import pdf_text
+    _ptxt = pdf_text(pb, "") if shutil.which("pdftotext") else ""
     if _ptxt:
         ok("GB PDF: no Estonian term, no EU-bulletin term, no € in the rendered text",
            not FORBIDDEN_RX.search(_ptxt), str(FORBIDDEN_RX.findall(_ptxt))[:200])
@@ -490,13 +490,15 @@ except ImportError:
 try:
     import reportlab  # noqa: F401
     if shutil.which("pdftotext"):
-        _pt = subprocess.run(["pdftotext", "-layout", "-", "-"], input=export.build_pdf(_la), capture_output=True).stdout.decode("utf-8")
+        from portable import pdf_text, offline
+        offline(export)   # the schematic branch everywhere: no live Mapbox call from a harness
+        _pt = pdf_text(export.build_pdf(_la))
         ok("🔴 GB PDF (miles): no 'km' word in the rendered text except the L/100 km line",
            not re.search(r"\b[Kk]m\b", _KM_OK.sub("", _pt)), str(re.findall(r".{0,40}\b[Kk]m\b.{0,40}", _KM_OK.sub("", _pt)))[:240])
         _rg = export.route_geometries
         try:
             export.route_geometries = lambda page: []          # nothing baked at all
-            _pt0 = subprocess.run(["pdftotext", "-layout", "-", "-"], input=export.build_pdf(_la), capture_output=True).stdout.decode("utf-8")
+            _pt0 = pdf_text(export.build_pdf(_la))
         finally:
             export.route_geometries = _rg
         ok("🔴 PDF with nothing baked: the caption says so and does not blame Mapbox",

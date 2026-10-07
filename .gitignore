@@ -25,3 +25,6 @@ Thumbs.db
 
 # tenant exports downloaded while testing — a tenant package is customer data
 modus-tenant-*.json
+
+# local test environments (CLAUDE.md: keep them out of git)
+.venv-*/

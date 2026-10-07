@@ -128,6 +128,7 @@ _static.StaticFiles = _StaticFiles
 sys.modules.setdefault("fastapi.staticfiles", _static)
 
 TMP = tempfile.mkdtemp(prefix="rbe_lookahead_")
+from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
 
 import db  # noqa: E402
@@ -165,8 +166,7 @@ def ok(label, cond, extra=""):
 
 
 def reset_db():
-    if os.path.exists(db._SQLITE_PATH):
-        os.remove(db._SQLITE_PATH)
+    remove_scratch_db(db, TMP)
     db.init_db()
     db.init_network_db()
     db.init_taxonomy_db()
@@ -1225,11 +1225,13 @@ ok("...the Clashes sheet has every flag the rail has",
    _sh("Clashes") is not None and _sh("Clashes").max_row - 1 == pg["clashes"]["count"])
 ok("...the About sheet says Mon–Fri only",
    _sh("About") is not None and any("Mon–Fri only" in str(_sh("About").cell(row=i, column=2).value or "") for i in range(1, _sh("About").max_row + 1)))
+from portable import pdf_text, offline   # tests/pdf_text.py: portable pdftotext, no live Mapbox
+_real_open = offline(export)
 pb = export.build_pdf(pg)
 ok("the PDF builds", isinstance(pb, bytes) and pb[:5] == b"%PDF-")
 ptxt = pb.decode("latin-1")
 ok("🔴 the PDF is LANDSCAPE A4 (10 Sep, the human)", re.search(r"/MediaBox \[ 0 0 841\.\d+ 595\.\d+ \]", ptxt) is not None, ptxt[ptxt.find("/MediaBox"):ptxt.find("/MediaBox") + 40])
-_txt = subprocess.run(["pdftotext", "-layout", "-", "-"], input=pb, capture_output=True).stdout.decode("utf-8") if shutil.which("pdftotext") else ptxt
+_txt = pdf_text(pb, ptxt)
 ok("...and carries the disclaimer, the flags heading, the footer lines and a page number",
    # G2: the road-user-charge line is country-neutral now ("Road-user charges are not on this sheet")
    "not a delivery note" in _txt and "not a stop" in _txt and "Road-user charges are not on this sheet" in _txt
@@ -1241,7 +1243,7 @@ ok("...and carries the disclaimer, the flags heading, the footer lines and a pag
 # still asserts five distinct Mon-Fri columns and no collapse, in any week.
 _pdf_days = sorted({datetime.date.fromisoformat(str(ws.cell(row=i, column=1).value)[:10])
                     for i in range(2, ws.max_row + 1)})
-_pdf_heads = [d.strftime("%a %-d %b").upper() for d in _pdf_days]
+_pdf_heads = [f"{d:%a} {d.day} {d:%b}".upper() for d in _pdf_days]
 ok("⭐ one row per LINE with Mon…Fri as five separate columns — no collapse rule",
    "FRI EACH DAY" not in _txt and len(_pdf_heads) == 5 and all(k in _txt for k in _pdf_heads)
    and _txt.count("Small aggregate") == 3,
@@ -1266,11 +1268,11 @@ class _Resp:
     def read(self): return self.b
     def __enter__(self): return self
     def __exit__(self, *a): return False
-_orig_open = export.urllib.request.urlopen
+_orig_open = _real_open
 export.urllib.request.urlopen = lambda req, timeout=0: _Resp(_png)
 try:
     pb2 = export.build_pdf(pg)
-    _txt2 = subprocess.run(["pdftotext", "-layout", "-", "-"], input=pb2, capture_output=True).stdout.decode("utf-8") if shutil.which("pdftotext") else pb2.decode("latin-1")
+    _txt2 = pdf_text(pb2)
     ok("⭐ when Mapbox answers, the PDF carries the image and the caption says so — the branch Render will take",
        "map © Mapbox" in _txt2 and "schematic" not in _txt2 and b"/Subtype /Image" in pb2)
     ok("...and the request carries the SAME public token the browser map uses when MAPBOX_TOKEN is unset",
@@ -1285,12 +1287,13 @@ try:
     ok("🔴 a non-PNG answer is not drawn as a map — None, and the schematic takes over", export.mapbox_static_png(export.route_geometries(pg)) is None)
 finally:
     export.urllib.request.urlopen = _orig_open
+    offline(export)   # back to the refusing stub for the builds below
 # many lines: several pages, the header row on each
 import copy as _copy
 _big = _copy.deepcopy(pg)
 _big["commit"]["lines"] = [_copy.deepcopy(pg["commit"]["lines"][i % 3]) for i in range(40)]
 pb3 = export.build_pdf(_big)
-_txt3 = subprocess.run(["pdftotext", "-layout", "-", "-"], input=pb3, capture_output=True).stdout.decode("utf-8") if shutil.which("pdftotext") else pb3.decode("latin-1")
+_txt3 = pdf_text(pb3)
 _npages = pb3.count(b"/Type /Page\n")
 ok("⭐ forty lines run over several pages, and the column headers repeat on every page",
    _npages >= 3 and _npages - 1 <= _txt3.count("DESTINATION") <= _npages and "40 line(s)" in _txt3,   # the last page may hold only the flags + footer
