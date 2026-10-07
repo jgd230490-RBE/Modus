@@ -318,10 +318,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
         with open(os.path.join(TMP, "week.pdf"), "wb") as f:
             f.write(pdf_bytes)
         txt = ""
-        try:  # poppler's pdftotext, when the machine has it (CI installs poppler-utils)
+        try:  # pdftotext, when the machine has it: poppler's (CI installs poppler-utils) or
+            # Xpdf's (Git for Windows ships one). Ask both for UTF-8 — Xpdf defaults to Latin-1,
+            # which fails a UTF-8 decode and silently emptied this block on Windows (7 Oct 2026).
             import subprocess
-            txt = subprocess.run(["pdftotext", "-layout", os.path.join(TMP, "week.pdf"), "-"],
-                                 capture_output=True, text=True, timeout=60).stdout
+            txt = subprocess.run(["pdftotext", "-layout", "-enc", "UTF-8", "-eol", "unix",
+                                  os.path.join(TMP, "week.pdf"), "-"],
+                                 capture_output=True, timeout=60).stdout.decode("utf-8", errors="replace")
         except Exception:
             txt = ""
         if txt:

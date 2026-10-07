@@ -124,6 +124,7 @@ _static.StaticFiles = _StaticFiles
 sys.modules.setdefault("fastapi.staticfiles", _static)
 
 TMP = tempfile.mkdtemp(prefix="rbe_fairprice_")
+from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
 os.environ.pop("ADMIN_TOKEN", None)
 
@@ -172,8 +173,7 @@ def _raises(fn):
 
 
 def reset_db():
-    if os.path.exists(db._SQLITE_PATH):
-        os.remove(db._SQLITE_PATH)
+    remove_scratch_db(db, TMP)
     db.init_db()
     db.init_network_db()
     db.init_taxonomy_db()
@@ -419,8 +419,10 @@ ok("...baked rows carry a fair figure and the unbaked rows are blank", sum(1 for
 wf = wb["Fuel"]
 ftxt = " ".join(str(wf.cell(row=i, column=j).value or "") for i in range(1, wf.max_row + 1) for j in (1, 2))
 ok("...the Fuel sheet states the coefficients the fair figures used", "Fair price: driver" in ftxt and "Fair price: margin" in ftxt and "winter months" in ftxt)
+from portable import pdf_text, offline
+offline(export)   # never a live Mapbox call from a harness
 pb = export.build_pdf(pg)
-_txt = subprocess.run(["pdftotext", "-layout", "-", "-"], input=pb, capture_output=True).stdout.decode("utf-8") if shutil.which("pdftotext") else pb.decode("latin-1")
+_txt = pdf_text(pb)
 ok("🔴 the supplier's PDF does NOT carry the fair price — it is the planner's negotiating figure",
    "fair" not in _txt.lower() and "model" not in _txt.lower())
 _fe = open(os.path.join(ROOT, "frontend", "index.html"), encoding="utf-8").read()

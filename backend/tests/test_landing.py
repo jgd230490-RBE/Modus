@@ -193,6 +193,17 @@ ok("page does not link to demo.wayscope.co.uk (no DNS record)",
 ok("page carries the sources paragraph", "DESNZ" in body and "RIS3" in body)
 ok("page uses British spelling (programme)", "programme" in body and "program " not in body)
 
+# --- footer and demo codes (7 Oct decisions) ---------------------------------------
+ok("contact email is JDavis@wayscope.co.uk, as a mailto link and as visible text",
+   "mailto:JDavis@wayscope.co.uk" in p.hrefs and "JDavis@wayscope.co.uk" in body)
+ok("no [EMAIL] or [COMPANY NAME AND NUMBER] placeholder left", "[EMAIL]" not in body and "[COMPANY NAME" not in body)
+ok("company line is plain Wayscope: no company number, no Ltd / Limited",
+   re.search(r"[Cc]ompany (No|no|number)", body) is None and " Ltd" not in body and "Limited" not in body)
+ok("the planner code is NOT published (it stays with the user for the stand)",
+   "[PLANNER CODE]" not in body and "PLANNER_CODE" not in body and "Not published" in body)
+ok("the map and team code tiles are still on the page (published on purpose)",
+   "Corridor map" in body and "Team view" in body)
+
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
 print("placeholders still on the page:", ", ".join(placeholders) or "none")

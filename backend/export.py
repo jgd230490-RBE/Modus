@@ -160,7 +160,12 @@ def _n(v, nd=0):
 
 def _day_label(iso):
     d = datetime.date.fromisoformat(iso)
-    return d.strftime("%a %-d") if hasattr(d, "strftime") else iso
+    return f"{d:%a} {d.day}" if hasattr(d, "strftime") else iso
+
+
+def _day_month(d):
+    """'MON 7 SEP' — no %-d: that strftime flag is glibc-only and raises on Windows."""
+    return f"{d:%a} {d.day} {d:%b}".upper()
 
 
 def _week_title(page):
@@ -603,7 +608,7 @@ def build_pdf(page):
             P("MATERIAL", st_h), P("VEHICLE", st_h)]
     for iso in dates:
         d = datetime.date.fromisoformat(iso)
-        head.append(P(f"{d.strftime('%a %-d %b').upper()}{' · TODAY' if iso == today else ''}"
+        head.append(P(f"{_day_month(d)}{' · TODAY' if iso == today else ''}"
                       f"<br/><font size=6>qty / trips · veh</font>", st_hc))
     head += [P(f"WEEK<br/><font size=6>qty · trips · {_tkm()}</font>", st_hc), P(f"{_du().upper()}/TRIP", st_hc)]
     if priced:

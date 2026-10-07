@@ -124,6 +124,7 @@ _static.StaticFiles = _StaticFiles
 sys.modules.setdefault("fastapi.staticfiles", _static)
 
 TMP = tempfile.mkdtemp(prefix="modus_g2_")
+from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
 os.environ.pop("TENANT_ID", None)
 for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT6_CODE",
@@ -157,8 +158,7 @@ def ok(label, cond, extra=""):
 
 
 def reset_db():
-    if os.path.exists(db._SQLITE_PATH):
-        os.remove(db._SQLITE_PATH)
+    remove_scratch_db(db, TMP)
     db.init_db(); db.init_network_db(); db.init_taxonomy_db(); db.init_zones_db()
     db.init_gates_db(); db.init_weeks_db(); db.init_lookahead_db(); db.init_config_db()
     db.init_costing_db(); db.init_tenant()
@@ -213,7 +213,7 @@ for dirpath, dirs, files in os.walk(ROOT):
         if not fn.endswith(SHIPPED_EXT):
             continue
         p = os.path.join(dirpath, fn)
-        rel = os.path.relpath(p, ROOT)
+        rel = os.path.relpath(p, ROOT).replace(os.sep, "/")   # the allow-lists below are written with /
         try:
             txt = open(p, encoding="utf-8", errors="ignore").read()
         except Exception:
@@ -513,6 +513,7 @@ for _t, _cols in _bool_cols.items():
         _vals = dict(zip(_cs, tenant_package._bind(_r, _cs, _tt)))
         _bound += [(_t, _c, _vals[_c]) for _c in _cols if _c in _vals and not (_vals[_c] is None or isinstance(_vals[_c], bool))]
 ok("🔴 every 0/1 in the demo's boolean columns is bound as a Python bool", not _bound, str(_bound[:5]))
+_cur.connection.close()  # release the scratch file (Windows cannot unlink an open SQLite db)
 ok("_coerce: ints, floats, words and bools all read as bool; None stays None",
    tenant_package._coerce(1, "BOOLEAN") is True and tenant_package._coerce(0, "BOOLEAN") is False
    and tenant_package._coerce(1.0, "boolean".upper()) is True and tenant_package._coerce("false", "BOOLEAN") is False

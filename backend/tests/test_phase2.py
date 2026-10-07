@@ -125,6 +125,7 @@ sys.modules.setdefault("fastapi.staticfiles", _static)
 #  Scratch DB                                                                  #
 # --------------------------------------------------------------------------- #
 TMP = tempfile.mkdtemp(prefix="rbe_phase2_")
+from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
 
 import db  # noqa: E402
@@ -168,8 +169,7 @@ def ok(label, cond, extra=""):
 
 
 def reset_db():
-    if os.path.exists(db._SQLITE_PATH):
-        os.remove(db._SQLITE_PATH)
+    remove_scratch_db(db, TMP)
 
 
 def cols(table):
