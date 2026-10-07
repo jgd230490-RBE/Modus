@@ -17,9 +17,9 @@ import re
 import sys
 from html.parser import HTMLParser
 
-# Where the demo scheme runs today. demo.wayscope.co.uk does not resolve yet (6 Oct);
-# change this and the page together when it does.
-DEMO_URL = "https://modus-web.onrender.com/"
+# Where the demo scheme runs (7 Oct): the app on app.wayscope.co.uk. wayscope.co.uk itself
+# is this landing page; demo.wayscope.co.uk has no DNS record. Change page and test together.
+DEMO_URL = "https://app.wayscope.co.uk/"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MAIN = os.path.join(ROOT, "backend", "main.py")
 PAGE = os.path.join(ROOT, "landing", "index.html")
@@ -187,7 +187,8 @@ for pat, name in BANNED:
     ok(f"no banned word: {name}", not re.search(pat, body, re.I))
 ok("page says the demo is fictional", re.search(r"fictional", body, re.I) is not None)
 ok("page links to the demo host", DEMO_URL in p.hrefs)
-ok("page does not link to the demo domain before it resolves",
+ok("page does not link to a raw onrender.com host", not any("onrender.com" in h for h in p.hrefs))
+ok("page does not link to demo.wayscope.co.uk (no DNS record)",
    not any("demo.wayscope.co.uk" in h for h in p.hrefs))
 ok("page carries the sources paragraph", "DESNZ" in body and "RIS3" in body)
 ok("page uses British spelling (programme)", "programme" in body and "program " not in body)
