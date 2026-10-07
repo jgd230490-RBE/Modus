@@ -147,6 +147,7 @@ import taxonomy  # noqa: E402
 import network  # noqa: E402
 import weeks  # noqa: E402
 import stockpiles  # noqa: E402
+import costlines   # noqa: E402  (2026-10-06: the map's CO2e must match it)
 import main  # noqa: E402
 
 # G2, 16 Sep 2026: the product ships no network, teams or sections. These tests keep
@@ -1042,6 +1043,12 @@ ok("§9: never actuals", not any("actual" in k for l in _k["lines"] for k in l))
 # None here because nothing is baked in this harness, and the map must then say so
 ok("§9: ⭐ every line carries trips_per_vehicle_day, None when the route is not baked",
    all("trips_per_vehicle_day" in l and l["trips_per_vehicle_day"] is None for l in _k["lines"]))
+# 2026-10-06 (map redesign): CO2e per line, None when unbaked (no km, no carbon), and the
+# programme-to-date list is empty while nothing is baked — never a zero dressed as a figure
+ok("2026-10-06: every line carries co2_t, None when the route is not baked",
+   all("co2_t" in l and l["co2_t"] is None for l in _k["lines"]))
+ok("2026-10-06: co2_to_date is a list and counts the unbaked lines it excludes",
+   _k["co2_to_date"] == [] and _k["co2_to_date_unbaked_lines"] >= 3)
 # bake R1 for the tipper (geometry only, no HERE) and the figure appears
 db.execute("INSERT INTO route_geometry (tenant_id, route_id, vehicle_profile, leg, alt_index, geometry, "
            "distance_km, duration_hr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -1055,6 +1062,19 @@ ok("§9: ⭐ a baked route reports how many movements one vehicle can make per d
    _k2["WS1"]["trips_per_vehicle_day"] == 5, str(_k2["WS1"]["trips_per_vehicle_day"]))
 ok("§9: ...and the same route on an UNBAKED vehicle still reads None",
    _k2["WS2"]["trips_per_vehicle_day"] is None)
+# the baked line now carries carbon: km x the vehicle's kg CO2e/km, the Dashboard's figure
+_kp = main.public_month_kpis(month=9, unit="vehicles")
+ok("2026-10-06: ⭐ a baked line carries co2_t > 0 and the unbaked one still None",
+   _k2["WS1"]["co2_t"] is not None and _k2["WS1"]["co2_t"] > 0 and _k2["WS2"]["co2_t"] is None,
+   str(_k2["WS1"]["co2_t"]))
+ok("2026-10-06: co2_t matches costlines exactly, so the map and the Dashboard agree",
+   abs(_k2["WS1"]["co2_t"] - [l for l in costlines.lines(acc={"role": "planner"}, from_month=9, to_month=9, status="Approved")["lines"]
+                              if l["section_id"] == "WS1"][0]["co2_t"]) < 1e-9)
+_td = {(c["route_id"], c["discipline"], c["section_id"]): c["co2_t"] for c in _kp["co2_to_date"]}
+ok("2026-10-06: co2_to_date is keyed (route, discipline, section) and covers the baked line",
+   ("R1", "earthworks", "WS1") in _td and _td[("R1", "earthworks", "WS1")] >= _k2["WS1"]["co2_t"] - 1e-9)
+ok("2026-10-06: an unbaked line never enters co2_to_date",
+   ("R1", "substructure", "WS2") not in _td and ("R1", "structures", "WS3") not in _td)
 ok("§9: ...matching route_analysis exactly, so the dashboard, the form and the map agree",
    [r for r in network.route_analysis("R1", profiles=["Rigid 8-wheeler (32t)"])["rows"]
     if r["alt_index"] == 0][0]["trips_per_day"] == 5)

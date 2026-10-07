@@ -248,7 +248,7 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
   const chipText = () => page.evaluate(() =>
     Array.from(document.querySelectorAll("#kpi-breakdown .kpi-chip")).map(e => e.textContent));
   const chips = await chipText();
-  ok("⭐ the disciplines of THAT month render as chips", chips.length >= 2, JSON.stringify(chips));
+  ok("⭐ the disciplines of THAT month render as rows (.kpi-chip) in the sidebar", chips.length >= 2, JSON.stringify(chips));
   ok("⭐ ...each carrying vehicles, trips AND tonnes, all three non-zero",
     chips.every(c => /[1-9][\d.,]* veh\/d/.test(c) && /[1-9][\d.,]* trips\/d/.test(c)
                   && /[1-9][\d.,]* t\/d/.test(c)), JSON.stringify(chips));
@@ -562,12 +562,15 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
   await page.evaluate(() => setTimelineMonth(7));
   await page.waitForTimeout(1200);
   const kp = await vis("#kpi-hud"), tb = await vis("#timeline-bar"), tw = await vis("#tl-warnings");
-  ok("on a phone the panel is a bar above the timeline",
-    !!kp && !!tb && kp.y + kp.h <= tb.y + 4 && kp.w > 300, JSON.stringify({ kp, tb }));
+  // 2026-10-06 — NARROWED: the bar is still clear of the timeline and full width, and it
+  // now sits at the TOP of the screen (the toast stack became a panel under it)
+  ok("on a phone the bar is full width at the top, clear of the timeline",
+    !!kp && !!tb && kp.y + kp.h <= tb.y + 4 && kp.w > 300 && kp.y <= 4, JSON.stringify({ kp, tb }));
   ok("...with the note hidden",
     await page.evaluate(() => getComputedStyle(document.querySelector("#kpi-hud .kpi-note")).display) === "none");
-  ok("...and the warning stack does not sit on top of it",
-    !tw || !tw.visible || tw.y + tw.h <= kp.y + 4, JSON.stringify({ kp, tw }));
+  // 2026-10-06 — REVERSED: the conditions panel docks UNDER the bar, not above it
+  ok("...and the conditions panel does not sit on top of it",
+    !tw || !tw.visible || tw.y >= kp.y + kp.h - 4, JSON.stringify({ kp, tw }));
   await shot("07-phone");
 
   console.log();

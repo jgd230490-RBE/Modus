@@ -52,93 +52,101 @@
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
         .control-item input[type=checkbox]{ accent-color:var(--navy); width:14px; height:14px; }
         .color-dot { width:11px; height:11px; border-radius:50%; display:inline-block; margin-left:auto; }
-        /* 2026-09-07 — the KPI panel moved to the TOP-LEFT of the map pane.
-           It sat at top:112px right:10px, tucked under Mapbox's zoom + compass stack. That
-           put the one block on screen that changes every tick in the corner the eye reaches
-           last, wedged against the controls, and left it 232px wide. Top-left it sits
-           beside the sidebar, reads first, has room for a title and chips, and leaves the
-           whole right-hand column to zoom and compass.
-           `left` tracks the 300px sidebar; body.sidebar-closed pulls it in. */
-        #kpi-hud{ position:absolute; top:14px; left:312px; right:auto; z-index:15; width:272px;
-                  background:rgba(255,255,255,.94); backdrop-filter:blur(6px);
-                  border:1px solid var(--line); border-radius:11px; padding:11px 12px;
-                  box-shadow:0 6px 22px rgba(16,24,40,.14); pointer-events:auto; }
-        /* clear of #menu-toggle, which is 14px from the left and about 150px wide */
-        body.sidebar-closed #kpi-hud{ left:14px; top:58px; }
-        .kpi-title{ font-size:11.5px; font-weight:700; color:var(--navy-deep); line-height:1.3;
-                    margin:0 0 8px; letter-spacing:-.005em; }
+        /* 2026-10-06 — THE KPI BAR. The floating glass card (blur, shadow, 9.5 px uppercase
+           labels) is gone. The glance layer is a flat white strip docked to the TOP of the
+           map pane, full pane width: month on the left, six numbers, and the month's standing
+           conditions as one pill on the right. Nothing under 12 px, no blur, no shadow — see
+           claude/map-redesign-1006.md. `left` tracks the 300px sidebar; body.sidebar-closed
+           pulls it to the edge and pads past #menu-toggle. Mapbox's zoom stack is pushed
+           below it (.mapboxgl-ctrl-top-right). */
+        #kpi-hud{ position:absolute; top:0; left:300px; right:0; z-index:15; height:72px;
+                  background:#fff; border-bottom:1px solid var(--line); padding:0 24px;
+                  display:flex; align-items:center; gap:28px; pointer-events:auto;
+                  transition:left .25s ease; }
+        body.sidebar-closed #kpi-hud{ left:0; padding-left:176px; }
+        .mapboxgl-ctrl-top-right{ top:72px; }
+        .kpi-title{ font-size:16px; font-weight:600; color:var(--navy-deep); line-height:1.2;
+                    letter-spacing:-.01em; min-width:120px; white-space:nowrap; }
         .kpi-title:empty{ display:none; }
-        .kpi-row{ display:flex; gap:9px; }
-        .kpi-row-2{ margin-top:7px; }
-        .kpi-card{ flex:1; min-width:0; }
-        .kpi-value{ font-size:22px; font-weight:700; letter-spacing:-.025em; color:var(--navy-deep); line-height:1.05; font-variant-numeric:tabular-nums; }
-        .kpi-label{ font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-top:3px; line-height:1.25; }
-        .kpi-note{ font-size:10px; color:var(--muted); margin-top:8px; line-height:1.45;
-                   border-top:1px solid var(--line); padding-top:7px; }
-        /* the discipline / material breakdown was a faint run-on line of "Earthworks 12.4
-           loads/d · Track 3.1 loads/d" that read as a footnote. Chips make each discipline
-           a thing you can pick out at a glance, which is what "what is moving this month"
-           actually asks. */
-        .kpi-chips{ display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
+        .kpi-sub{ display:block; font-size:12px; font-weight:400; color:var(--muted); margin-top:2px; }
+        #kpi-cards{ display:flex; gap:28px; flex:1; min-width:0; align-items:center; }
+        .kpi-row{ display:flex; gap:28px; }
+        .kpi-row-2{ margin-top:0; }
+        .kpi-card{ min-width:0; }
+        .kpi-sep{ width:1px; align-self:stretch; background:var(--line); margin:14px 0; }
+        .kpi-value{ font-size:26px; font-weight:500; letter-spacing:-.02em; color:var(--navy-deep); line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .kpi-label{ font-size:12px; font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted); margin-top:4px; line-height:1.25; white-space:nowrap; }
+        /* the method note is a tooltip on the title, not a paragraph in the bar */
+        .kpi-note{ display:none; }
+        /* the conditions pill: dots and counts; opens #tl-warnings */
+        #kpi-conditions{ margin-left:auto; display:none; align-items:center; gap:8px; border:1px solid var(--line);
+                         background:#fff; border-radius:999px; padding:8px 14px 8px 12px; font:inherit; font-size:13px;
+                         color:var(--navy-deep); cursor:pointer; white-space:nowrap; }
+        #kpi-conditions:hover{ border-color:#cbd5e1; }
+        #kpi-conditions.on{ display:flex; }
+        .cond-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+        .cond-dot.clash{ background:#C2321C; } .cond-dot.warn{ background:#D98A17; } .cond-dot.caution{ background:#8A94A3; }
+        /* 2026-10-06 — the breakdown ("what is moving") lives in the SIDEBAR now, as plain
+           rows, not chips over the map. The .kpi-chips / .kpi-chip names are kept: the
+           browser check reads them and the figures per row are unchanged. */
+        #kpi-moving{ display:none; }
+        #kpi-moving.on{ display:flex; }
+        .kpi-chips{ display:flex; flex-direction:column; }
         .kpi-chips:empty{ display:none; }
-        .kpi-chip{ font-size:10px; font-weight:600; line-height:1.25; padding:3px 7px;
-                   border-radius:999px; background:#eef2f7; border:1px solid #e2e8f0;
-                   color:var(--navy-deep); font-variant-numeric:tabular-nums; white-space:nowrap; }
-        .kpi-chip.mat{ background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
-        .kpi-switch{ display:flex; gap:2px; margin-top:9px; padding:2px; border-radius:7px;
+        .kpi-chip{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; line-height:1.35; padding:7px 2px;
+                   border-top:1px solid var(--line); color:var(--navy-deep); font-variant-numeric:tabular-nums; }
+        .kpi-chip .chip-n{ color:var(--muted); white-space:nowrap; text-align:right; }
+        .kpi-switch{ display:flex; gap:2px; margin:0 0 8px; padding:2px; border-radius:7px;
                      background:#eef2f7; border:1px solid #e2e8f0; }
         .kpi-switch:empty{ display:none; }
-        /* mixed case, not uppercase: "WORK SECTION" wraps to two lines in a third of a
-           272 px card and makes the switcher taller than the chips it controls */
-        .kpi-switch button{ flex:1; border:none; background:none; cursor:pointer; padding:4px 3px;
-                     font-size:10px; font-weight:600; white-space:nowrap;
+        .kpi-switch button{ flex:1; border:none; background:none; cursor:pointer; padding:5px 3px;
+                     font-size:12px; font-weight:600; white-space:nowrap;
                      color:var(--muted); border-radius:5px; font-family:inherit; }
         .kpi-switch button.on{ background:#fff; color:var(--navy-deep); box-shadow:0 1px 2px rgba(16,24,40,.10); }
         /* 2026-09-08 (§C): the 07 Sep name plates are gone. The ends of live routes
            are marked by the location ICON growing 2 px with a 1 px halo — a data-driven
            icon-image on the one locations layer, drawn inside the canvas, with no DOM at
            all. Nothing here to style. */
-        #tl-warnings{ display:none; position:absolute; left:calc(50% + 150px); transform:translateX(-50%);
-                      bottom:74px; z-index:24; width:min(560px, 92vw); flex-direction:column; gap:5px;
-                      pointer-events:none; }
-        body.sidebar-closed #tl-warnings{ left:50%; }
-        .tl-warn{ pointer-events:auto; background:rgba(255,255,255,.96); border:1px solid var(--line);
-                  border-left:4px solid #DC2626; border-radius:9px; padding:7px 10px; font-size:11.5px;
-                  line-height:1.35; box-shadow:0 6px 20px rgba(16,24,40,.14); display:flex; gap:9px; align-items:flex-start; }
-        /* 2026-09-08 (§E): three NAMED levels, so the stripe and the word agree.
-           clash   red    — a physical impossibility: a pile past its capacity
-           warn    amber  — a vehicle that exceeds a real limit on a route being driven
-           caution slate  — a seasonal window that applies to this month and vehicle */
-        .tl-warn.warn{ border-left-color:#f59e0b; }
-        .tl-warn.caution{ border-left-color:#64748B; }
-        .tl-warn .lvl{ font-size:8.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
-                       color:var(--muted); display:block; margin-bottom:1px; }
-        .tl-warn.clash .lvl{ color:#DC2626; }
-        .tl-warn.warn .lvl{ color:#B45309; }
-        .tl-warn b{ color:var(--navy-deep); }
-        .tl-warn .x{ margin-left:auto; border:none; background:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; }
-        .tl-warn.more{ justify-content:center; color:var(--muted); font-weight:600; cursor:pointer; border-left-color:var(--line); }
+        /* 2026-10-06 — CONDITIONS PANEL. The toast stack above the timeline is gone: a toast
+           says "something just happened", and these are STANDING conditions for the month.
+           They are a docked panel under the bar, top-right, opened from the pill in the bar
+           (and opened by itself when the month has a red condition). One row per condition:
+           a coloured dot, a plain noun, one sentence, "Show on map". No uppercase level
+           labels, no coloured left stripes — the dot and the noun carry the level. */
+        #tl-warnings{ display:none; position:absolute; top:84px; right:12px; z-index:24; width:min(360px, calc(100vw - 24px));
+                      max-height:min(60vh, 520px); overflow:auto; background:#fff; border:1px solid var(--line);
+                      border-radius:12px; padding:14px 18px 6px; flex-direction:column; pointer-events:auto; }
+        .tl-head{ display:flex; align-items:baseline; justify-content:space-between; padding-bottom:10px; }
+        .tl-head b{ font-size:14px; font-weight:600; color:var(--navy-deep); }
+        .tl-head .x{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; padding:2px 4px; }
+        .tl-warn{ display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-top:1px solid var(--line); font-size:13px; line-height:1.45; }
+        .tl-warn .cond-dot{ flex:0 0 9px; margin-top:5px; }
+        .tl-warn .body{ flex:1; min-width:0; }
+        .tl-warn b{ display:block; font-size:14px; font-weight:500; color:var(--navy-deep); margin-bottom:2px; }
+        .tl-warn .what{ color:var(--muted); }
+        .tl-warn .show{ display:inline-block; margin-top:4px; font-size:13px; font-weight:500; color:var(--navy-deep); background:none; border:none; padding:0; cursor:pointer; font-family:inherit; }
+        .tl-warn .show:hover{ text-decoration:underline; }
+        .tl-warn .x{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
+        /* kept as level classes so the sort and the dots agree: clash red, warn amber, caution slate */
+        .tl-warn.clash .cond-dot{ background:#C2321C; } .tl-warn.warn .cond-dot{ background:#D98A17; } .tl-warn.caution .cond-dot{ background:#8A94A3; }
         /* on a phone the note is the first thing to go, then the panel shrinks to the
            two numbers — see claude/mobile-analysis.md */
         @media (max-width:700px){
-            /* a compact bar sitting on top of the timeline: four cards in ONE row (the two
-               .kpi-row blocks laid side by side), the note gone, the chips scrolling
-               sideways rather than stacking the panel up the screen. */
-            #kpi-hud, body.sidebar-closed #kpi-hud{ width:auto; top:auto; bottom:74px; right:8px; left:8px; padding:8px 10px; }
+            /* 2026-10-06 — on a phone the bar stays at the TOP, full width, with the six numbers
+               as a 3x2 grid under the month. #menu-toggle floats in its top-left corner, so
+               the bar starts below it. The conditions panel docks under the bar; its top is
+               MEASURED by positionWarnStack() because the bar is as tall as its grid. */
+            #kpi-hud, body.sidebar-closed #kpi-hud{ left:0; right:0; top:0; height:auto; padding:56px 12px 10px;
+                                                     display:flex; flex-direction:column; align-items:stretch; gap:8px; }
             #kpi-hud .kpi-note{ display:none; }
-            #kpi-hud .kpi-title{ font-size:10.5px; margin-bottom:6px; }
-            #kpi-cards{ display:flex; gap:9px; }
-            #kpi-cards .kpi-row{ flex:1; }
-            #kpi-cards .kpi-row-2{ margin-top:0; }
-            .kpi-value{ font-size:17px; }
-            .kpi-label{ font-size:8.5px; }
-            .kpi-chips{ flex-wrap:nowrap; overflow-x:auto; margin-top:6px; }
-            /* 🔴 the warning stack has to clear the KPI bar, and 07 Sep tried to do that
-               with a fixed bottom:190px. It does not work: the stack is as tall as its
-               contents, so a month with three warnings still landed on top of the bar —
-               found the first time the browser check was given a month that HAS warnings.
-               positionWarnStack() measures the bar instead. This is the floor. */
-            #tl-warnings{ bottom:190px; }
+            #kpi-hud .kpi-title{ font-size:15px; }
+            #kpi-cards{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px 12px; }
+            #kpi-cards .kpi-row{ display:contents; }
+            .kpi-sep{ display:none; }
+            .kpi-value{ font-size:22px; }
+            #kpi-conditions{ margin-left:0; justify-content:flex-start; border:none; border-top:1px solid var(--line); border-radius:0; padding:10px 0 0; }
+            .mapboxgl-ctrl-top-right{ top:180px; }
+            #tl-warnings{ top:190px; right:12px; left:12px; width:auto; }
         }
         .restr-warn{ font-size:11px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
 
@@ -304,6 +312,14 @@
          a provider for the tenant's country.
          Toggles are built from /api/restrictions/layers so the catalogue lives in one
          place rather than being copied into this file. -->
+    <!-- 2026-10-06 — "what is moving": the breakdown moved here from the KPI card over the
+         map. Shown only while a month is on screen. -->
+    <div class="control-group" id="kpi-moving">
+        <h3 id="kpi-moving-title">What's moving</h3>
+        <div class="kpi-switch" id="kpi-switch"></div>
+        <div class="kpi-chips" id="kpi-breakdown"></div>
+    </div>
+
     <div class="control-group" id="restrictions-group" hidden>
         <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:11px;color:#8a9099;">Loading…</span></div></div>
@@ -314,51 +330,50 @@
 
 </div>
 
-<!-- Phase 2.5a — KPI readout ON THE MAP, not in the sidebar.
-     Sits under the Mapbox navigation control at top-right, so it is visible with the
-     sidebar collapsed and while the timeline is playing — which is when the numbers are
-     actually changing and worth watching. Collapses to a single line on a narrow screen.
-     (These cards previously existed only inside calculateKPIs(), which wrote to element
-     ids that had been deleted from the page and so updated nothing.) -->
-<!-- 2026-09-02 (§9): four cards that follow the MONTH ON THE PLAYHEAD - the same month
-     Show forecast / Play / scrub are painting - recomputed on every tick, on the
-     forecast toggle and on every filter. Source: /api/public/month-kpis, Approved only,
-     never actuals. Empty month -> one sentence, no zeros. -->
+<!-- 2026-10-06 — the KPI BAR, docked to the top of the map pane (see the CSS note). Six
+     numbers that follow the MONTH ON THE PLAYHEAD — the same month Show forecast / Play /
+     scrub are painting — recomputed on every tick, on the forecast toggle and on every
+     filter. Source: /api/public/month-kpis, Approved only, never actuals. Empty month ->
+     one sentence, no zeros. The breakdown rows live in the sidebar (#kpi-moving). -->
 <div id="kpi-hud">
-    <div class="kpi-title" id="kpi-title"></div>
+    <div class="kpi-title" id="kpi-title" title=""></div>
     <div id="kpi-cards">
         <div class="kpi-row">
             <div class="kpi-card">
                 <div class="kpi-value" id="kpi-trips">—</div>
-                <div class="kpi-label">Movements / day</div>
+                <div class="kpi-label">Movements a day</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-value" id="kpi-vehicles">—</div>
                 <div class="kpi-label" id="kpi-vehicles-label">Vehicles needed</div>
             </div>
-        </div>
-        <div class="kpi-row kpi-row-2">
             <div class="kpi-card">
                 <div class="kpi-value" id="kpi-material">—</div>
-                <div class="kpi-label" id="kpi-material-label">Material / day</div>
+                <div class="kpi-label" id="kpi-material-label">Material a day</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-value" id="kpi-routes">—</div>
                 <div class="kpi-label" id="kpi-routes-label">Active routes</div>
             </div>
         </div>
+        <div class="kpi-sep"></div>
+        <div class="kpi-row kpi-row-2">
+            <div class="kpi-card">
+                <div class="kpi-value" id="kpi-co2-day">—</div>
+                <div class="kpi-label" id="kpi-co2-day-label">CO₂e a day</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value" id="kpi-co2-total">—</div>
+                <div class="kpi-label" id="kpi-co2-total-label">CO₂e to date</div>
+            </div>
+        </div>
     </div>
-    <!-- 2026-09-08 (§D). ONE chip row with a switcher, not three stacked rows. The
-         question "who is moving this" has three equally good answers — discipline, IPT,
-         work section — and stacking them made the card a column. -->
-    <div class="kpi-switch" id="kpi-switch"></div>
-    <div class="kpi-chips" id="kpi-breakdown"></div>
+    <button type="button" id="kpi-conditions" onclick="toggleConditions()" title="Conditions this month"></button>
     <div class="kpi-note" id="kpi-note"></div>
 </div>
 
-<!-- 2026-09-02 (§8): warnings for the month on the playhead. A short stack above the
-     timeline: at most three, then "+N more". Rebuilt on every tick, so a January
-     warning cannot sit on screen in June. -->
+<!-- 2026-10-06 — the CONDITIONS PANEL for the month on the playhead (was the toast stack).
+     Rebuilt on every tick, so a January condition cannot sit on screen in June. -->
 <div id="tl-warnings"></div>
 
 <div id="timeline-bar">
@@ -1477,6 +1492,10 @@
         // with the four figures above them, and those are recomputed from the filters.
         applyFilters();
     }
+    function showMoving(on) {
+        const el = document.getElementById('kpi-moving');
+        if (el) el.classList.toggle('on', !!on);
+    }
     function renderKpiSwitch() {
         const el = document.getElementById('kpi-switch');
         if (!el) return;
@@ -1532,6 +1551,9 @@
             });
             set('kpi-title', 'No month on screen');
             set('kpi-vehicles', '—'); set('kpi-trips', '—'); set('kpi-material', '—');
+            set('kpi-co2-day', '—'); set('kpi-co2-total', '—');
+            set('kpi-co2-day-label', 'CO\u2082e a day'); set('kpi-co2-total-label', 'CO\u2082e to date');
+            showMoving(false);
             // 🔴 the vehicles LABEL has to be reset too. It carries "(1 line unbaked)" from
             // whichever month was last on screen, and nothing here used to clear it — so
             // closing the timeline left a dash under a caveat about a month that was no
@@ -1571,6 +1593,9 @@
             // of the network, while forecasts.ipt is per line — but the map's own IPT
             // filter has always been the route's, so the chip and the filter agree.
             let mVeh = [], mQty = [], mFleet = [], mRoutes = new Set(), fellBack = 0, unbakedLines = 0;
+            // 2026-10-06 — CO2e. Per line for the month (None where unbaked: no km, no
+            // carbon), summed after the same filters; to-date from the LAST month on screen.
+            let mCo2 = [], co2Unbaked = 0;
             const groups = {};                 // key -> {veh, t, fleet, months:Set}
             const add = (key, l, wdv) => {
                 const g = groups[key] || (groups[key] = { veh: 0, t: 0, fleet: 0, months: new Set() });
@@ -1578,7 +1603,7 @@
                 if (l.trips_per_vehicle_day > 0) g.fleet += Math.ceil((l.vehicle_loads / wdv) / l.trips_per_vehicle_day);
             };
             payloads.forEach((p, pi) => {
-                let veh = 0, qty = 0, fleet = 0, any = false;
+                let veh = 0, qty = 0, fleet = 0, any = false, co2 = 0;
                 p.lines.forEach(l => {
                     const rp = routes[l.route_id];
                     if (!rp) return;                       // unbaked: not drawn, not counted
@@ -1586,6 +1611,7 @@
                         || (iFilter !== 'ALL' && rp.ipt !== iFilter)
                         || (discFilter !== 'ALL' && l.discipline !== discFilter)) return;
                     any = true; veh += l.vehicle_loads; qty += l.qty_unit; mRoutes.add(l.route_id);
+                    if (l.co2_t != null) co2 += l.co2_t; else co2Unbaked++;
                     if (l.trips_per_vehicle_day > 0) fleet += Math.ceil((l.vehicle_loads / wd) / l.trips_per_vehicle_day);
                     else unbakedLines++;
                     if (l.payload_fallback) fellBack++;
@@ -1595,21 +1621,37 @@
                     add(key, l, wd);
                     if (groups[key]) groups[key].months.add(p.month != null ? p.month : pi);
                 });
-                if (any) { mVeh.push(veh); mQty.push(qty); mFleet.push(fleet); }
+                if (any) { mVeh.push(veh); mQty.push(qty); mFleet.push(fleet); mCo2.push(co2); }
+            });
+            // to date: the last month on screen carries the programme-to-date list, keyed
+            // (route, discipline, section); filtered on the route's props like the lines
+            const last = payloads[payloads.length - 1];
+            let co2ToDate = 0;
+            (last.co2_to_date || []).forEach(c => {
+                const rp = routes[c.route_id];
+                if (!rp) return;
+                if ((oFilter !== 'ALL' && rp.origin !== oFilter) || (dFilter !== 'ALL' && rp.dest !== dFilter)
+                    || (iFilter !== 'ALL' && rp.ipt !== iFilter)
+                    || (discFilter !== 'ALL' && c.discipline !== discFilter)) return;
+                co2ToDate += c.co2_t || 0;
             });
             const label = months.length === 1 ? monthLabel(months[0]) : `${monthLabel(months[0])}–${monthLabel(months[months.length - 1])}`;
             if (!mVeh.length) {
                 set('kpi-title', label + ' \u00b7 nothing approved');
                 set('kpi-vehicles', '—'); set('kpi-trips', '—'); set('kpi-material', '—'); set('kpi-routes', '—');
-                // §D: an empty month hides the chips AND the switcher — a switcher over
+                set('kpi-co2-day', '—'); set('kpi-co2-total', '—');
+                set('kpi-co2-day-label', 'CO\u2082e a day'); set('kpi-co2-total-label', 'CO\u2082e to date');
+                // §D: an empty month hides the rows AND the switcher — a switcher over
                 // nothing invites a click that changes nothing
-                setHTML('kpi-breakdown', ''); setHTML('kpi-switch', '');
+                setHTML('kpi-breakdown', ''); setHTML('kpi-switch', ''); showMoving(false);
                 set('kpi-vehicles-label', 'Vehicles needed');
                 set('kpi-routes-label', 'Routes in ' + label);
                 set('kpi-note', 'No approved forecast in this month.');
                 return;
             }
             const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+            // names come from the API and are written with innerHTML, so escape them.
+            const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
             const n = mVeh.length;                         // months with volume
             const vehDay = avg(mVeh) / wd, qtyDay = avg(mQty) / wd;
             set('kpi-trips', fmtN(vehDay, 1));
@@ -1620,11 +1662,19 @@
             set('kpi-vehicles-label', unbakedLines ? `Vehicles needed (${unbakedLines} line${unbakedLines === 1 ? '' : 's'} unbaked)` : 'Vehicles needed');
             set('kpi-material', fmtN(qtyDay, unitLbl === 'vehicles' ? 1 : 0));
             set('kpi-routes', mRoutes.size); set('kpi-routes-label', 'Routes in ' + label);
-            // 2026-09-07 — the title says which month these numbers are, so the panel is
+            // CO2e: tonnes a day for the month(s), and the programme to the end of the last
+            // month on screen. Unbaked lines carry no km and are named, never zeroed.
+            const co2Day = avg(mCo2) / wd;
+            set('kpi-co2-day', co2Day >= 100 ? fmtN(co2Day, 0) + ' t' : fmtN(co2Day, 1) + ' t');
+            set('kpi-co2-total', fmtN(co2ToDate, 0) + ' t');
+            set('kpi-co2-day-label', co2Unbaked ? `CO\u2082e a day (excl. ${co2Unbaked} unbaked)` : 'CO\u2082e a day');
+            set('kpi-co2-total-label', (last.co2_to_date_unbaked_lines ? `CO\u2082e to date (excl. ${last.co2_to_date_unbaked_lines} unbaked)` : 'CO\u2082e to date'));
+            // 2026-09-07 — the title says which month these numbers are, so the bar is
             // readable without also reading the timeline label at the bottom of the screen.
+            // 2026-10-06 — month on the first line, "Approved plan · forecast" under it.
             set('kpi-title', label + ' \u00b7 what is moving');
-            // names come from the API and are written with innerHTML, so escape them.
-            const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            setHTML('kpi-title', `${esc(label)}<span class="kpi-sub">Approved plan \u00b7 forecast</span>`);
+            showMoving(true); set('kpi-moving-title', 'What\u2019s moving in ' + label);
             renderKpiSwitch();
             // ⚠️ TONNES, not the map unit, for the third figure. The map unit is
             // 'vehicles' by default, and in that unit "material / day" and "movements /
@@ -1637,15 +1687,17 @@
             const chips = Object.entries(groups).sort((a, b) => b[1].t - a[1].t)
                 .map(([k, g]) => {
                     const gm = Math.max(1, g.months.size);
-                    return `<span class="kpi-chip">${esc(k)} ` +
+                    return `<span class="kpi-chip"><span>${esc(k)}</span><span class="chip-n">` +
                            `${fmtN(g.fleet / gm, 0)} veh/d \u00b7 ` +
                            `${fmtN(g.veh / gm / wd, 1)} trips/d \u00b7 ` +
-                           `${fmtN(g.t / gm / wd, 0)} t/d</span>`;
+                           `${fmtN(g.t / gm / wd, 0)} t/d</span></span>`;
                 }).join('');
             setHTML('kpi-breakdown', chips);
             positionWarnStack();          // the card just changed height
-            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, averaged over ${n} months with volume` : ''}. Movements = loads per working day (${wd}/month). Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle), rounded up per line${n > 1 ? ', busiest month' : ''}.`
+            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, averaged over ${n} months with volume` : ''}. Movements = loads per working day (${wd}/month). Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle), rounded up per line${n > 1 ? ', busiest month' : ''}. CO\u2082e = routed km × the vehicle's kg CO\u2082e/km, approved plan only.`
                 + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload because their vehicle is not in factors.json.` : ''));
+            // the method note reads as a tooltip on the month, not as a paragraph in the bar
+            const tt = document.getElementById('kpi-title'); if (tt) tt.title = document.getElementById('kpi-note').innerText;
         }).catch(() => {
             if (seq !== KPI.seq) return;
             set('kpi-vehicles', '—'); set('kpi-trips', '—'); set('kpi-material', '—');
@@ -3787,22 +3839,60 @@
         return out;
     }
     function dismissWarning(key) { WARN.dismissed[key] = true; renderTimelineWarnings(TL.month); }
-    // 🔴 On a phone the KPI bar and the warning stack are both anchored to the bottom, and
-    // the stack is as tall as its contents — so no fixed offset can clear it. Measure.
-    // On the desktop both are free-standing and the CSS is left alone.
+    // 2026-10-06 — the panel is opened from the pill in the bar, and opens by itself the
+    // first time a month with a CLASH (red) is on screen. `open` is remembered across
+    // ticks so scrubbing does not slam it shut; `autoOpened` makes the auto-open happen once.
+    WARN.open = false; WARN.autoOpened = false; WARN.counts = { clash: 0, warn: 0, caution: 0 };
+    function toggleConditions() { WARN.open = !WARN.open; renderTimelineWarnings(TL.month); }
+    // "Show on map": a route is selected (its own glow layer); a stockpile is flown to and
+    // ringed. Both already exist as map concepts; nothing new is drawn for a route.
+    function showCondition(kind, id) {
+        if (kind === 'r') { if (typeof selectRoute === 'function') selectRoute(id); return; }
+        const f = a1_data.features.find(x => x.geometry && x.geometry.type === 'Point'
+                                             && x.properties && x.properties.type === 'Node' && x.properties.id === id);
+        if (f) map.flyTo({ center: f.geometry.coordinates, zoom: Math.max(map.getZoom(), 13), duration: 700 });
+    }
+    // the red ring on an over-capacity stockpile: a circle layer on the same source as the
+    // location icons, filtered to the ids over this month (a Node's id IS the location
+    // id — network.py writes `id`, not `location_id`). The map and the number agree.
+    function ensureCondRing() {
+        if (!map.getSource('routes-source') || map.getLayer('cond-ring')) return;
+        map.addLayer({ id: 'cond-ring', type: 'circle', source: 'routes-source',
+            filter: ['all', ['==', ['get', 'type'], 'Node'], ['in', ['get', 'id'], ['literal', []]]],
+            paint: { 'circle-radius': 16, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#C2321C', 'circle-stroke-width': 3 } });
+    }
+    function setCondRing(ids) {
+        ensureCondRing();
+        if (map.getLayer('cond-ring')) map.setFilter('cond-ring', ['all', ['==', ['get', 'type'], 'Node'], ['in', ['get', 'id'], ['literal', ids]]]);
+    }
+    // 🔴 On a phone the bar is as tall as its 3x2 grid, so the panel's top cannot be a
+    // fixed number; measure the bar. On the desktop the bar is 72px and the CSS is left alone.
     function positionWarnStack() {
         const box = document.getElementById('tl-warnings');
         if (!box) return;
         const kpi = document.getElementById('kpi-hud');
-        if (window.innerWidth > 700 || !kpi || box.style.display === 'none') { box.style.bottom = ''; return; }
+        if (window.innerWidth > 700 || !kpi || box.style.display === 'none') { box.style.top = ''; return; }
         const h = kpi.getBoundingClientRect().height || 0;
-        box.style.bottom = (74 + Math.round(h) + 8) + 'px';
+        box.style.top = (Math.round(h) + 8) + 'px';
     }
     window.addEventListener('resize', positionWarnStack);
+    function renderConditionsPill(live) {
+        const pill = document.getElementById('kpi-conditions');
+        if (!pill) return;
+        const c = { clash: 0, warn: 0, caution: 0 };
+        live.forEach(i => { c[i.lvl] = (c[i.lvl] || 0) + 1; });
+        WARN.counts = c;
+        if (!live.length) { pill.classList.remove('on'); pill.innerHTML = ''; return; }
+        const part = (lvl, n, noun) => (n ? `<span class="cond-dot ${lvl}"></span><span>${n} ${noun}${n === 1 ? '' : 's'}</span>` : '');
+        pill.innerHTML = part('clash', c.clash, 'over capacity').replace(/capacitys/, 'capacity')
+            + part('warn', c.warn, 'route limit') + part('caution', c.caution, 'seasonal window')
+            + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6470" stroke-width="2" aria-hidden="true"><path d="${WARN.open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}"></path></svg>`;
+        pill.classList.add('on');
+    }
     function renderTimelineWarnings(m) {
         const box = document.getElementById('tl-warnings');
         if (!box) return;
-        if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
+        if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; renderConditionsPill([]); setCondRing([]); positionWarnStack(); return; }
         const month = m;
         Promise.all([warnRestrictions(), warnPiles(), kpiFetchMonth(month).catch(() => null)]).then(([restr, piles, kp]) => {
             if (TL.month !== month || !TL.on) return;     // the playhead moved on
@@ -3815,6 +3905,9 @@
             //   WARNING a vehicle exceeding a real limit on a route being driven.
             //   CAUTION a seasonal window that applies to this month and this vehicle.
             //
+            // 2026-10-06: the level WORD is no longer printed. The dot's colour and a plain
+            // noun ("Over capacity", the limit's own label, "Seasonal window") carry it.
+            //
             // 🔴 THE SECOND CLASH SOURCE THE BRIEF NAMES DOES NOT EXIST AND IS NOT BEING
             // INVENTED. "Two Approved movements the product already flags as conflicting
             // on a shared gate/head" — nothing in this product flags that. There is no
@@ -3824,7 +3917,7 @@
             // to bake, not two movements colliding. Building it would mean inventing what
             // "conflicting" means, and that is the human's decision, not mine.
             //
-            // 1. Tark Tee: a real limit exceeded on a visible baked route -> WARNING
+            // 1. Tark Tee / National Highways: a real limit exceeded on a visible baked route -> WARNING
             routes.forEach(p => {
                 const hit = restr[p.route_id];
                 if (!hit || !hit.hits) return;
@@ -3835,8 +3928,13 @@
                     // vehicle-versus-limit verdict on a drivable road, not an impossibility
                     // — and the weak-bridge class it cannot judge at all (§A2) means this
                     // source must never be the loudest thing on screen.
-                    lvl: 'warn', who: p.route_id,
-                    what: (worst.label || worst.kind || 'restriction') + (worst.what ? ' — ' + worst.what : '') + (n > 1 ? ` (+${n - 1})` : ''),
+                    lvl: 'warn', who: p.route_id, kind: 'r', id: p.route_id,
+                    // "Mass limits" + breach -> "Exceeds a mass limit"; a non-breach hit
+                    // on a layer ("Planned road closures") keeps the layer's own noun
+                    noun: (worst.severity === 'breach'
+                        ? 'Exceeds a ' + String(worst.label || 'restriction').toLowerCase().replace(/s$/, '')
+                        : String(worst.label || 'Restriction on the route')),
+                    what: `${p.route_id}${worst.what ? ' \u2014 ' + worst.what : ''}${n > 1 ? ` (+${n - 1} more on this route)` : ''}`,
                     sort: worst.severity === 'breach' ? 1 : 2 });
             });
             // 2. stockpiles over at the end of this month -> CLASH
@@ -3844,8 +3942,9 @@
                 const mm = sp.months && sp.months[String(month)];
                 if (!mm || !mm.over) return;
                 const u = sp.unit === 'm3' ? 'm³' : (sp.unit || 't');
-                items.push({ key: `s|${sp.location_id}|${month}`, lvl: 'clash', who: sp.name,
-                    what: `over capacity — ${Math.round(mm.balance_end).toLocaleString()} / ${Math.round(sp.capacity_qty).toLocaleString()} ${u}`, sort: 0 });
+                items.push({ key: `s|${sp.location_id}|${month}`, lvl: 'clash', who: sp.name, kind: 's', id: sp.location_id,
+                    noun: 'Over capacity',
+                    what: `${sp.name} holds ${Math.round(sp.capacity_qty).toLocaleString()} ${u}. The plan puts ${Math.round(mm.balance_end).toLocaleString()} ${u} in it by the end of ${monthLabel(month)}.`, sort: 0 });
             });
             // 3. seasonal windows, per visible line's vehicle
             const vehByRoute = {};
@@ -3859,22 +3958,25 @@
                     const applies = rv.length === 0 || [...vs].some(v => rv.includes(v));
                     if (!applies) return;
                     // 3. a seasonal window matching this month and this vehicle -> CAUTION
-                    items.push({ key: `w|${w.name}|${p.route_id}|${month}`, lvl: 'caution', who: p.route_id,
-                        what: `${w.name}: ${(w.message || '').split(/[.—]/)[0]}`, sort: 3 });
+                    items.push({ key: `w|${w.name}|${p.route_id}|${month}`, lvl: 'caution', who: p.route_id, kind: 'r', id: p.route_id,
+                        noun: 'Seasonal window',
+                        what: `${w.name}: ${(w.message || '').split(/[.—]/)[0]}. ${p.route_id}.`, sort: 3 });
                 });
             });
             const live = items.filter(i => !WARN.dismissed[i.key]).sort((a, b) => a.sort - b.sort);
-            if (!live.length) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
-            const show = box.dataset.expanded === '1' ? live : live.slice(0, 3);
-            const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-            const LVL_NAME = { clash: 'Clash', warn: 'Warning', caution: 'Caution' };
-            box.innerHTML = show.map(i =>
-                `<div class="tl-warn ${i.lvl}"><span><span class="lvl">${LVL_NAME[i.lvl]}</span>` +
-                `<b>${esc(i.who)}</b> · ${esc(i.what)} · ${esc(monthLabel(month))}</span>` +
-                `<button class="x" title="Dismiss for this month" onclick="dismissWarning('${esc(i.key).replace(/'/g, '')}')">&times;</button></div>`).join('')
-                + (live.length > show.length
-                    ? `<div class="tl-warn more" onclick="this.parentNode.dataset.expanded='1';renderTimelineWarnings(${month})">+${live.length - show.length} more</div>`
-                    : (box.dataset.expanded === '1' && live.length > 3 ? `<div class="tl-warn more" onclick="this.parentNode.dataset.expanded='';renderTimelineWarnings(${month})">show fewer</div>` : ''));
+            renderConditionsPill(live);
+            setCondRing(live.filter(i => i.kind === 's').map(i => i.id));
+            // a month with a red condition opens the panel once, by itself
+            if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
+            if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            box.innerHTML = `<div class="tl-head"><b>Conditions in ${esc(monthLabel(month))}</b>` +
+                `<button class="x" title="Close" onclick="toggleConditions()">&times;</button></div>` +
+                live.map(i =>
+                `<div class="tl-warn ${i.lvl}"><span class="cond-dot"></span><span class="body">` +
+                `<b>${esc(i.noun)}</b><span class="what">${esc(i.what)}</span><br>` +
+                `<button class="show" onclick="showCondition('${i.kind}','${esc(i.id).replace(/'/g, '')}')">Show on map</button></span>` +
+                `<button class="x" title="Dismiss for this month" onclick="dismissWarning('${esc(i.key).replace(/'/g, '')}')">&times;</button></div>`).join('');
             box.style.display = 'flex';
             positionWarnStack();
         });

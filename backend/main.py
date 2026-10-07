@@ -1517,8 +1517,33 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
             # movements one vehicle can make per day on THIS route, or None if unbaked
             "trips_per_vehicle_day": trips_per_vehicle_day(r["route_id"], v),
         })
+    # 6 Oct 2026 (map redesign) — CO2e, the same figure the costlines read gives the
+    # Dashboard: km x the vehicle's kg CO2e/km from factors.json, per line, for the month.
+    # `co2_t` rides on each line (None where the route is not baked for that vehicle: no
+    # km, no carbon, and the map says "excludes N unbaked" rather than counting zero).
+    # `co2_to_date` is the same per-line figure summed over months 1..month, keyed the way
+    # the map filters (route, discipline, section), so "CO2e to date" follows the sidebar
+    # filters exactly as the month figures do. Approved only; never actuals.
+    co2_by_key, to_date, unbaked_to_date = {}, {}, 0
+    try:
+        for cl in costlines.lines(acc={"role": "planner"}, from_month=1, to_month=int(month),
+                                  status="Approved", factors=factors)["lines"]:
+            k = (cl["route_id"], cl["discipline"] or "", cl["section_id"] or "")
+            if int(cl["month_index"]) == int(month):
+                co2_by_key[k] = cl["co2_t"]
+            if cl["co2_t"] is None:
+                unbaked_to_date += 1
+                continue
+            to_date[k] = to_date.get(k, 0.0) + float(cl["co2_t"])
+    except Exception:
+        co2_by_key, to_date = {}, {}
+    for l in lines:
+        l["co2_t"] = co2_by_key.get((l["route_id"], l["discipline"], l["section_id"]))
+    co2_to_date = [{"route_id": k[0], "discipline": k[1], "section_id": k[2], "co2_t": round(v, 3)}
+                   for k, v in sorted(to_date.items())]
     return {"month": int(month), "unit": unit, "working_days": wd,
-            "payload_fallback_vehicle": fb_name, "lines": lines}
+            "payload_fallback_vehicle": fb_name, "lines": lines,
+            "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
 
 
 @app.get("/api/public/stockpile-timeline")
