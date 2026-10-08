@@ -1124,6 +1124,7 @@ function Guide({ page, groups }){
     const measure = () => {
       let el = document.querySelector(`[data-guide="${step.anchor}"]`);
       if(!el || !(el.offsetWidth || el.offsetHeight)) el = document.querySelector('[data-guide="page-header"]');
+      if(el){ try { el.scrollIntoView({ block: "nearest" }); } catch(e){} }   // a rendered anchor below the fold
       const r = el ? el.getBoundingClientRect() : null;
       setBox(r ? { top: r.top, left: r.left, width: r.width, height: r.height } : null);
     };
@@ -1146,6 +1147,7 @@ function Guide({ page, groups }){
       if(top + 220 > vh) top = Math.max(12, box.top - 232);
     }
   }
+  top = Math.min(Math.max(12, top), Math.max(12, vh - 232));   // never off the window, whatever the anchor did
   return (
     <>
       {box && <div className="guide-ring" style={{ top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8 }} />}
