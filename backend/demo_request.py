@@ -304,13 +304,51 @@ def deliver(request_id):
         send(build_message(row["email"], row["name"], codes(), settings), settings)
     except Exception as e:  # noqa: BLE001 — recorded, never raised into the request
         set_status(request_id, STATUS_FAILED + e.__class__.__name__, str(e))
+        print(f"demo_request: {request_id} visitor email FAILED {e.__class__.__name__}: {str(e)[:200]}")
         return "failed"
     set_status(request_id, STATUS_SENT)
+    print(f"demo_request: {request_id} visitor email sent")
     try:
         send(notify_message(row, settings), settings)
+        print(f"demo_request: {request_id} notification sent")
     except Exception as e:  # noqa: BLE001 — the visitor has theirs; note the miss
         set_status(request_id, STATUS_SENT + "; notification failed: " + e.__class__.__name__, str(e))
+        print(f"demo_request: {request_id} notification FAILED {e.__class__.__name__}: {str(e)[:200]}")
     return "sent"
+
+
+# --------------------------------------------------------------------------- the probe
+
+def smtp_probe():
+    """
+    GET /api/admin/diagnostics/smtp: one SMTP session to the configured host — connect,
+    STARTTLS, login — and nothing sent. Says which step failed and the server's words, so a
+    bad app password (535), a blocked port or a slow route is visible without a lead. Never
+    returns the password or a code; the user name is shown because it is the From address.
+    """
+    import time
+    s = smtp_settings()
+    out = {"configured": s is not None, "host": SMTP_HOST, "port": SMTP_PORT,
+           "user": (os.getenv("SMTP_USER") or "").strip() or None,
+           "missing": [k for k in ("SMTP_USER", "SMTP_PASSWORD", "DEMO_FROM", "DEMO_NOTIFY") if not (os.getenv(k) or "").strip()],
+           "step": None, "ok": False, "error_class": None, "error": None, "elapsed_ms": None}
+    if s is None:
+        out["step"] = "settings"
+        out["error"] = "not configured: " + ", ".join(out["missing"])
+        return out
+    t0 = time.time()
+    try:
+        out["step"] = "connect"
+        with smtplib.SMTP(s["host"], s["port"], timeout=20) as c:
+            out["step"] = "ehlo"; c.ehlo()
+            out["step"] = "starttls"; c.starttls(); c.ehlo()
+            out["step"] = "login"; c.login(s["SMTP_USER"], s["SMTP_PASSWORD"])
+            out["step"] = "done"; out["ok"] = True
+    except Exception as e:  # noqa: BLE001 — the whole point is to report it
+        out["error_class"] = e.__class__.__name__
+        out["error"] = str(e)[:300]
+    out["elapsed_ms"] = int((time.time() - t0) * 1000)
+    return out
 
 
 # --------------------------------------------------------------------------- the on-screen page

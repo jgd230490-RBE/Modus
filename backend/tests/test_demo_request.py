@@ -261,6 +261,34 @@ try:
 finally:
     dr.smtplib.SMTP = _real_smtp
 
+# --- the probe (SMTP stubbed)
+os.environ["SMTP_PASSWORD"] = ""
+pr = dr.smtp_probe()
+ok("probe with a variable missing: not configured, names the missing one, no session attempted",
+   pr["configured"] is False and pr["missing"] == ["SMTP_PASSWORD"] and pr["step"] == "settings" and pr["ok"] is False)
+os.environ["SMTP_PASSWORD"] = "abcd efgh ijkl mnop"
+dr.smtplib.SMTP = _SMTP
+try:
+    SENT.clear()
+    pr = dr.smtp_probe()
+    ok("⭐ probe with a working server: connect → ehlo → starttls → login, ok, nothing sent",
+       pr["ok"] is True and pr["step"] == "done" and pr["error"] is None and len(SENT) == 1
+       and not any(isinstance(c, tuple) and c[0] == "send" for c in SENT[0].calls) and pr["user"] == "sender@wayscope.co.uk")
+    dr.smtplib.SMTP = _Boom
+    pr = dr.smtp_probe()
+    ok("🔴 probe with a refused login: step 'login', the exception class and the server's words, never the password",
+       pr["ok"] is False and pr["step"] == "login" and pr["error_class"] == "SMTPAuthenticationError"
+       and "bad app password" in pr["error"] and "abcd efgh" not in str(pr) and isinstance(pr["elapsed_ms"], int))
+finally:
+    dr.smtplib.SMTP = _real_smtp
+_dr_src = open(os.path.join(BACKEND, "demo_request.py"), encoding="utf-8").read()
+_main_src = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
+ok("main.py serves the probe at /api/admin/diagnostics/smtp behind _check_admin",
+   re.search(r'@app\.get\("/api/admin/diagnostics/smtp"\)\ndef demo_smtp_probe\(token: Optional\[str\] = None\):\n(?:    .*\n)*?    _check_admin\(token\)\n    return demo_request\.smtp_probe\(\)', _main_src) is not None)
+ok("deliver() writes the outcome to the service log by request id, never an address or a code",
+   all(('print(f"demo_request: {request_id} ' + w) in _dr_src for w in ("visitor email FAILED", "visitor email sent", "notification sent", "notification FAILED"))
+   and not any(("email" in m and "row[" in m) for m in re.findall(r'print\(f"demo_request:[^\n]*', _dr_src)))
+
 # =========================================================================== #
 #  5. the CSV                                                                  #
 # =========================================================================== #

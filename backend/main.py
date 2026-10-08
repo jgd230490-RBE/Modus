@@ -2819,6 +2819,13 @@ async def demo_request_submit(request: Request):
     return _DRRedirect(lu + "/thanks.html", status_code=303)
 
 
+@app.get("/api/admin/diagnostics/smtp")
+def demo_smtp_probe(token: Optional[str] = None):
+    """H9 probe: connect + STARTTLS + login to the configured sender, send nothing, report the step that failed."""
+    _check_admin(token)
+    return demo_request.smtp_probe()
+
+
 @app.get("/api/admin/demo-requests.csv")
 def demo_requests_csv(token: Optional[str] = None):
     """The leads, newest first. Behind ADMIN_TOKEN like every /api/admin/* call."""
