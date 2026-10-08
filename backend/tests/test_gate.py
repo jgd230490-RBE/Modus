@@ -79,6 +79,16 @@ ok("🔴 /api/meta is NOT gated — the staff app fetches it on mount, before si
    "gating it would empty the login screen",
    gate.scope_for("/api/meta") is None)
 ok("🔴 /api/health is NOT gated — Render polls it", gate.scope_for("/api/health") is None)
+# 8 Oct 2026 (H9): the demo-request form on wayscope.co.uk posts here from a visitor who
+# has no password yet. Exactly this path is open; the rest of /api/public/ stays the map's.
+ok("🔴 /api/public/demo-request is NOT gated — the form posts from a visitor with no password",
+   gate.scope_for("/api/public/demo-request") is None and "/api/public/demo-request" in gate.OPEN_PATHS)
+ok("...with a query string too", gate.scope_for("/api/public/demo-request?x=1") is None)
+ok("...and decide() ALLOWs it with no cookie and no code",
+   gate.decide("/api/public/demo-request", has_valid_code=False, cookie=None) == gate.ALLOW)
+ok("...while its neighbours under /api/public/ are still the map's data",
+   gate.scope_for("/api/public/demo-requests") == "map" and gate.scope_for("/api/public/demo-request/x") == "map"
+   and gate.scope_for("/api/public/route-forecasts") == "map")
 for p in ("/", "/api/auth", "/api/map-auth", "/api/forecasts", "/api/costing/lines",
           "/api/lookahead", "/mapping", "/helper", "/api/metadata"):
     ok(f"scope_for({p!r}) is ungated", gate.scope_for(p) is None,

@@ -57,6 +57,21 @@ services:
         sync: false
       - key: GOOGLE_MAPS_URL_SIGNING_SECRET   # optional, recommended with the key above
         sync: false
+      # H9 (8 Oct 2026) — demo requests from the landing page. With all four set the app
+      # emails the access details through Google Workspace SMTP; with any missing it shows
+      # them on screen after the form instead. env.example explains each one.
+      - key: SMTP_USER              # the Google account that sends, e.g. JDavis@wayscope.co.uk
+        sync: false
+      - key: SMTP_PASSWORD          # that account's 16-character Google APP password
+        sync: false
+      - key: DEMO_FROM              # e.g. "Wayscope <JDavis@wayscope.co.uk>"
+        sync: false
+      - key: DEMO_NOTIFY            # where the one-line notification of each request goes
+        sync: false
+      - key: LANDING_URL            # optional — defaults to https://wayscope.co.uk
+        sync: false
+      - key: DEMO_TEAM_CODE_VAR     # optional — which team code the email carries; default IPT1_CODE
+        sync: false
       - key: TENANT_ID              # optional — defaults to "default"
         sync: false
 

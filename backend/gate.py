@@ -85,6 +85,12 @@ UNCONFIGURED = "unconfigured"
 # no forecast, nothing about the project.
 #
 # /api/health is deliberately NOT here: Render polls it.
+# 8 Oct 2026 (H9): the ONE path under /api/public/ an OUTSIDER must reach without the map
+# password — the demo-request form on wayscope.co.uk posts here, and the whole point is that
+# the visitor does not have the password yet. Exact path, checked before the prefixes. It
+# serves no data: it stores a lead and answers with a redirect or the access page.
+OPEN_PATHS = ("/api/public/demo-request",)
+
 MAP_DATA_PREFIXES = (
     "/api/public/",
     "/api/zones",
@@ -195,6 +201,8 @@ def scope_for(path):
         return "map"
     if p == "/help" or p.startswith("/help/"):
         return "help"
+    if p in OPEN_PATHS:
+        return None
     for pref in MAP_DATA_PREFIXES:
         if p == pref.rstrip("/") or p.startswith(pref):
             return "map"
