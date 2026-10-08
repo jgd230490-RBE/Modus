@@ -1124,6 +1124,7 @@ function Guide({ page, groups }){
     const measure = () => {
       let el = document.querySelector(`[data-guide="${step.anchor}"]`);
       if(!el || !(el.offsetWidth || el.offsetHeight)) el = document.querySelector('[data-guide="page-header"]');
+      if(el){ try { el.scrollIntoView({ block: "nearest" }); } catch(e){} }   // a rendered anchor below the fold
       const r = el ? el.getBoundingClientRect() : null;
       setBox(r ? { top: r.top, left: r.left, width: r.width, height: r.height } : null);
     };
@@ -1137,10 +1138,16 @@ function Guide({ page, groups }){
   const vw = window.innerWidth, vh = window.innerHeight, W = Math.min(340, vw - 24);
   let top = 80, left = Math.max(12, (vw - W) / 2);
   if(box){
-    left = Math.min(Math.max(12, box.left), Math.max(12, vw - W - 12));
-    top = box.top + box.height + 12;
-    if(top + 220 > vh) top = Math.max(12, box.top - 232);
+    if(box.height > vh * 0.5 && box.left + box.width + W + 24 <= vw){
+      // a TALL anchor (the rail): beside it, level with its top, so the card never covers it
+      left = box.left + box.width + 12; top = Math.max(12, box.top + 12);
+    } else {
+      left = Math.min(Math.max(12, box.left), Math.max(12, vw - W - 12));
+      top = box.top + box.height + 12;
+      if(top + 220 > vh) top = Math.max(12, box.top - 232);
+    }
   }
+  top = Math.min(Math.max(12, top), Math.max(12, vh - 232));   // never off the window, whatever the anchor did
   return (
     <>
       {box && <div className="guide-ring" style={{ top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8 }} />}

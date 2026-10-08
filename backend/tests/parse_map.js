@@ -1603,6 +1603,8 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 the guide is set up ONLY when the tenant carries a demo notice",
      /function setupGuide\(\)\{\n\s+if \(!TENANT\.demo_notice\) return;/.test(code)
      && /\} else if \(dn\) \{ dn\.remove\(\); \}\n\s+setupGuide\(\);/.test(code));
+  ok("...and placed just right of the demo notice by measurement, re-placed on resize (a fixed offset overlapped the notice)",
+     /btn\.style\.left = \(dn\.getBoundingClientRect\(\)\.right \+ 8\) \+ 'px';/.test(code) && /window\.addEventListener\('resize', placeBtn\);/.test(code));
   ok("...the Guide button is created inside setupGuide and nowhere else",
      (code.match(/guideEl\('guide-btn', 'button'\)/g) || []).length === 1 && !html.includes('id="guide-btn"'));
   ok("remembered per visitor under wayscope_guide_map, every read and write in try/catch",
@@ -1621,6 +1623,8 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 no new script tag: the guide is in-page (three script src tags, as before)", (html.match(/<script src=/g) || []).length === 3);
   ok("the card and ring are fixed overlays over the map, not inside it",
      /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
+  ok("the anchor is scrolled into view before measuring, and the card is clamped into the window (seen live: an off-screen card)",
+     /el\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(code) && /top = Math\.min\(Math\.max\(12, top\), Math\.max\(12, vh - 232\)\);/.test(code));
   ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = step\.title;/.test(code)
      && /card\.querySelector\('p'\)\.textContent = step\.body;/.test(code));
   ok("🔴 no team id in the map guide's copy", !/IPT/.test(gs ? gs[0] : "x"));

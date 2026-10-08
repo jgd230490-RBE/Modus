@@ -538,6 +538,9 @@
         const step = MAP_GUIDE_STEPS[guideIndex];
         if (!step) return;
         const el = guideAnchor(step);
+        // an anchor inside the scrolling sidebar can be rendered but below the fold (seen live:
+        // the Play step's card landed off-screen); bring it into view before measuring
+        if (el) { try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
         const r = el ? el.getBoundingClientRect() : null;
         const ring = guideEl('guide-ring');
         if (r) { ring.hidden = false; ring.style.top = (r.top - 4) + 'px'; ring.style.left = (r.left - 4) + 'px';
@@ -546,6 +549,7 @@
         const vw = window.innerWidth, vh = window.innerHeight, W = Math.min(340, vw - 24);
         let top = 80, left = Math.max(12, (vw - W) / 2);
         if (r) { left = Math.min(Math.max(12, r.left), Math.max(12, vw - W - 12)); top = r.bottom + 12; if (top + 220 > vh) top = Math.max(12, r.top - 232); }
+        top = Math.min(Math.max(12, top), Math.max(12, vh - 232));   // never off the window, whatever the anchor did
         const card = guideEl('guide-card');
         card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', 'Guide');
         card.style.top = top + 'px'; card.style.left = left + 'px'; card.style.width = W + 'px';
@@ -567,6 +571,14 @@
         if (!TENANT.demo_notice) return;
         const btn = guideEl('guide-btn', 'button');
         btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
+        // Beside the demo notice, measured — the notice is centred and its width depends on
+        // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
+        const placeBtn = () => {
+            const dn = document.getElementById('demo-notice');
+            if (dn) { btn.style.left = (dn.getBoundingClientRect().right + 8) + 'px'; }
+        };
+        placeBtn();
+        window.addEventListener('resize', placeBtn);
         if (!guideRead()) setTimeout(guideStart, 900);
     }
     window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });
