@@ -319,34 +319,62 @@ def deliver(request_id):
 
 # --------------------------------------------------------------------------- the probe
 
+def _probe_session(s, mech):
+    """One session: connect, EHLO, STARTTLS, EHLO, then ONE auth mechanism. Records the step,
+    the EHLO capabilities after TLS, and the server's reply code and words. Nothing is sent."""
+    r = {"mech": mech, "step": "connect", "ok": False, "code": None, "reply": None, "error_class": None, "ehlo": None}
+    try:
+        with smtplib.SMTP(s["host"], s["port"], timeout=20) as c:
+            r["step"] = "ehlo"; c.ehlo()
+            r["step"] = "starttls"; c.starttls(); c.ehlo()
+            r["ehlo"] = (getattr(c, "ehlo_resp", b"") or b"").decode("utf-8", "replace")[:400]
+            r["step"] = "auth"
+            code, reply = c.auth(mech, getattr(c, "auth_" + mech.lower()), initial_response_ok=True)
+            r["code"], r["reply"] = code, (reply or b"").decode("utf-8", "replace")[:300]
+            r["ok"], r["step"] = True, "done"
+    except smtplib.SMTPAuthenticationError as e:
+        r["error_class"] = "SMTPAuthenticationError"
+        r["code"] = e.smtp_code
+        r["reply"] = (e.smtp_error if isinstance(e.smtp_error, bytes) else str(e.smtp_error).encode()).decode("utf-8", "replace")[:300]
+    except Exception as e:  # noqa: BLE001 — the whole point is to report it
+        r["error_class"] = e.__class__.__name__
+        r["reply"] = str(e)[:300]
+    return r
+
+
 def smtp_probe():
     """
-    GET /api/admin/diagnostics/smtp: one SMTP session to the configured host — connect,
-    STARTTLS, login — and nothing sent. Says which step failed and the server's words, so a
-    bad app password (535), a blocked port or a slow route is visible without a lead. Never
-    returns the password or a code; the user name is shown because it is the From address.
+    GET /api/admin/diagnostics/smtp: sessions to the configured host that go as far as the
+    login and send nothing — one per auth mechanism (PLAIN, then LOGIN) — so a bad app
+    password (535), a blocked port, a server that hangs up at AUTH, or a slow route is
+    visible without a lead. Never returns the password or a code: only its length and
+    whether it contains spaces (Google shows app passwords in four groups; both forms work).
+    The user name is shown because it is the From address.
     """
     import time
     s = smtp_settings()
+    pw = (os.getenv("SMTP_PASSWORD") or "").strip()
     out = {"configured": s is not None, "host": SMTP_HOST, "port": SMTP_PORT,
            "user": (os.getenv("SMTP_USER") or "").strip() or None,
+           "password_len": len(pw), "password_has_spaces": " " in pw,
            "missing": [k for k in ("SMTP_USER", "SMTP_PASSWORD", "DEMO_FROM", "DEMO_NOTIFY") if not (os.getenv(k) or "").strip()],
-           "step": None, "ok": False, "error_class": None, "error": None, "elapsed_ms": None}
+           "step": None, "ok": False, "error_class": None, "error": None, "elapsed_ms": None, "attempts": []}
     if s is None:
         out["step"] = "settings"
         out["error"] = "not configured: " + ", ".join(out["missing"])
         return out
     t0 = time.time()
-    try:
-        out["step"] = "connect"
-        with smtplib.SMTP(s["host"], s["port"], timeout=20) as c:
-            out["step"] = "ehlo"; c.ehlo()
-            out["step"] = "starttls"; c.starttls(); c.ehlo()
-            out["step"] = "login"; c.login(s["SMTP_USER"], s["SMTP_PASSWORD"])
-            out["step"] = "done"; out["ok"] = True
-    except Exception as e:  # noqa: BLE001 — the whole point is to report it
-        out["error_class"] = e.__class__.__name__
-        out["error"] = str(e)[:300]
+    for mech in ("PLAIN", "LOGIN"):
+        r = _probe_session(s, mech)
+        out["attempts"].append(r)
+        if r["ok"]:
+            break
+    first = out["attempts"][0]
+    out["ok"] = any(r["ok"] for r in out["attempts"])
+    out["step"] = "done" if out["ok"] else first["step"]
+    if not out["ok"]:
+        out["error_class"] = first["error_class"]
+        out["error"] = (f"{first['code']} " if first["code"] else "") + (first["reply"] or "")
     out["elapsed_ms"] = int((time.time() - t0) * 1000)
     return out
 

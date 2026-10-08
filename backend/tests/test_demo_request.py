@@ -206,6 +206,11 @@ class _SMTP:
     def starttls(self): self.calls.append("starttls")
     def login(self, u, p): self.calls.append(("login", u, p))
     def send_message(self, msg): self.calls.append(("send", msg))
+    ehlo_resp = b"250-smtp.gmail.com at your service\n250-AUTH LOGIN PLAIN XOAUTH2"
+    def auth_plain(self, challenge=None): return ""
+    def auth_login(self, challenge=None): return ""
+    def auth(self, mech, authobject, initial_response_ok=True):
+        self.calls.append(("auth", mech)); return (235, b"2.7.0 Accepted")
 
 
 _real_smtp = dr.smtplib.SMTP
@@ -247,6 +252,7 @@ try:
     # a failing send
     class _Boom(_SMTP):
         def login(self, u, p): raise dr.smtplib.SMTPAuthenticationError(535, b"bad app password")
+        def auth(self, mech, authobject, initial_response_ok=True): raise dr.smtplib.SMTPAuthenticationError(535, b"bad app password")
     dr.smtplib.SMTP = _Boom
     r4 = dr.handle(dict(GOOD, email="new@example.org"), "203.0.113.9", T0)
     res = dr.deliver(r4["request_id"])
@@ -271,14 +277,25 @@ dr.smtplib.SMTP = _SMTP
 try:
     SENT.clear()
     pr = dr.smtp_probe()
-    ok("⭐ probe with a working server: connect → ehlo → starttls → login, ok, nothing sent",
+    ok("⭐ probe with a working server: connect → ehlo → starttls → AUTH PLAIN accepted, ok, nothing sent, one session",
        pr["ok"] is True and pr["step"] == "done" and pr["error"] is None and len(SENT) == 1
-       and not any(isinstance(c, tuple) and c[0] == "send" for c in SENT[0].calls) and pr["user"] == "sender@wayscope.co.uk")
+       and not any(isinstance(c, tuple) and c[0] == "send" for c in SENT[0].calls) and pr["user"] == "sender@wayscope.co.uk"
+       and pr["attempts"][0]["mech"] == "PLAIN" and pr["attempts"][0]["code"] == 235 and "AUTH LOGIN PLAIN" in pr["attempts"][0]["ehlo"])
+    ok("...it reports the password's length and spacing, never the password",
+       pr["password_len"] == 19 and pr["password_has_spaces"] is True and "abcd" not in str(pr))
     dr.smtplib.SMTP = _Boom
+    SENT.clear()
     pr = dr.smtp_probe()
-    ok("🔴 probe with a refused login: step 'login', the exception class and the server's words, never the password",
-       pr["ok"] is False and pr["step"] == "login" and pr["error_class"] == "SMTPAuthenticationError"
-       and "bad app password" in pr["error"] and "abcd efgh" not in str(pr) and isinstance(pr["elapsed_ms"], int))
+    ok("🔴 probe with a refused login: both mechanisms tried, step 'auth', 535 and the server's words, never the password",
+       pr["ok"] is False and pr["step"] == "auth" and pr["error_class"] == "SMTPAuthenticationError"
+       and pr["error"] == "535 bad app password" and [a["mech"] for a in pr["attempts"]] == ["PLAIN", "LOGIN"]
+       and "abcd efgh" not in str(pr) and isinstance(pr["elapsed_ms"], int) and len(SENT) == 2)
+    class _Hangup(_SMTP):
+        def auth(self, mech, authobject, initial_response_ok=True): raise dr.smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+    dr.smtplib.SMTP = _Hangup
+    pr = dr.smtp_probe()
+    ok("a server that hangs up at AUTH: the class and the EHLO capabilities are reported for each mechanism",
+       pr["ok"] is False and pr["error_class"] == "SMTPServerDisconnected" and all(a["ehlo"] and a["step"] == "auth" for a in pr["attempts"]))
 finally:
     dr.smtplib.SMTP = _real_smtp
 _dr_src = open(os.path.join(BACKEND, "demo_request.py"), encoding="utf-8").read()
