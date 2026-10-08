@@ -402,6 +402,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
            and "north-code-xyz" in _sent[0].get_body(preferencelist=("plain",)).get_content())
         ok("🔴 /api/public/route-forecasts is still closed to the same signed-out visitor",
            c.get("/api/public/route-forecasts").status_code == 401)
+        r = c.get("/api/admin/diagnostics/smtp")
+        ok("the SMTP probe is refused without the admin token", r.status_code == 403, str(r.status_code))
+        r = c.get("/api/admin/diagnostics/smtp", params=TOKEN)
+        ok("...and with it reports a login (stubbed) as ok at step 'done'", r.status_code == 200 and r.json().get("ok") is True
+           and r.json().get("step") == "done" and r.json().get("user") == "sender@wayscope.co.uk", r.text[:200])
         r = c.get("/api/admin/demo-requests.csv")
         ok("the CSV is refused without the admin token", r.status_code == 403, str(r.status_code))
         r = c.get("/api/admin/demo-requests.csv", params=TOKEN)
