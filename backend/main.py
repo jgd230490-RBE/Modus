@@ -44,6 +44,7 @@ import tenant_package  # G2, 16 Sep — a tenant as one JSON document; the map o
 import costing       # 10 Sep evening — target rates + fuel settings (config key 'costing'), BAF
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
+import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -78,6 +79,7 @@ async def lifespan(app: FastAPI):
         db.init_lookahead_db()      # Look-ahead v2 slices 3-5. ALTERs only; after weeks, before tenant.
         db.init_config_db()         # 2.5b. No ALTERs, so its position only needs to precede the seed.
         db.init_costing_db()        # 10 Sep evening. The GLOBAL fuel_index table (untenanted, by design).
+        db.init_demo_requests_db()  # H9, 8 Oct. The GLOBAL demo_requests table (untenanted, by design).
         # Phase 4.5. Must sit exactly here: init_tenant() migrates a pre-4.5 database by
         # rebuilding each table, copying the columns the table actually has — several of
         # which the init_* calls above add by ALTER. Run it before them and those columns
@@ -2782,6 +2784,50 @@ app.mount("/map", NoCacheStatic(directory=str(ROOT / "map"), html=True), name="m
 # another session; its main.py mount had been lost under the costing zip). Same
 # no-cache static class, after /map, before the catch-all "/". test_help.py pins it.
 app.mount("/help", NoCacheStatic(directory=str(ROOT / "frontend" / "help"), html=True), name="help")
+# --------------------------------------------------------------------------- #
+#  H9 (8 Oct 2026) — demo requests from the landing page                       #
+# --------------------------------------------------------------------------- #
+# The form on wayscope.co.uk is plain HTML (no script) and posts form-encoded data here.
+# gate.OPEN_PATHS lets an outsider reach exactly this path. The body is parsed by hand
+# (urllib) so no form-parsing dependency is added. Every outcome is a 303 to a page on the
+# landing site, except the on-screen access page when no sender is configured — see
+# demo_request.handle(). The send runs AFTER the redirect, as a background task.
+import urllib.parse as _urlparse
+try:
+    from fastapi.responses import HTMLResponse as _DRHtml, RedirectResponse as _DRRedirect
+    from starlette.background import BackgroundTask as _DRTask
+except Exception:      # the stubbed fastapi of the sandbox harnesses has neither; the endpoint never runs there
+    _DRHtml = _DRRedirect = _DRTask = None
+
+
+@app.post("/api/public/demo-request")
+async def demo_request_submit(request: Request):
+    raw = (await request.body()).decode("utf-8", "replace")
+    form = {k: v[0] for k, v in _urlparse.parse_qs(raw, keep_blank_values=True).items()}
+    ip = demo_request.client_ip(request.headers.get("x-forwarded-for"),
+                                request.client.host if request.client else "")
+    result = demo_request.handle(form, ip)
+    lu = demo_request.landing_url()
+    if result["outcome"] == "screen":
+        return _DRHtml(demo_request.access_page(result["name"], result["codes"]),
+                       headers={"Cache-Control": "no-store"})
+    if result["outcome"] == "error":
+        return _DRRedirect(lu + "/error.html", status_code=303)
+    if result["outcome"] == "queued":
+        return _DRRedirect(lu + "/thanks.html", status_code=303,
+                           background=_DRTask(demo_request.deliver, result["request_id"]))
+    return _DRRedirect(lu + "/thanks.html", status_code=303)
+
+
+@app.get("/api/admin/demo-requests.csv")
+def demo_requests_csv(token: Optional[str] = None):
+    """The leads, newest first. Behind ADMIN_TOKEN like every /api/admin/* call."""
+    _check_admin(token)
+    return Response(demo_request.csv_export(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="demo-requests.csv"',
+                             "Cache-Control": "no-store"})
+
+
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
 # page lives in landing/ at the repo root so the same folder deploys as a Render static
 # site on the root domain once the app has moved to app. (H0's open decision). Not gated:

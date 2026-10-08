@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayscope — that didn't go through</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="./assets/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Wayscope landing — a demo request that failed (8 Oct 2026, H5c). The app answers 303 here. No script. */
+  :root{--ink:#1F2024;--ink-2:#3D4552;--muted:#5B6470;--line:#E3E6EA;--paper:#FFFFFF;--orange-text:#C75F06;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,"Segoe UI",sans-serif;--display:Sora,var(--sans)}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit}a:hover{color:var(--orange-text)}
+  img{max-width:100%;display:block}
+  h1{font-family:var(--display);font-weight:600;letter-spacing:-.02em;margin:0;line-height:1.15;font-size:clamp(30px,4vw,40px)}
+  .wrap{max-width:640px;margin:0 auto;padding:0 32px}
+  @media (max-width:600px){.wrap{padding:0 20px}}
+  header{padding:22px 0}
+  header a{display:inline-block}
+  header img{height:30px;width:auto}
+  main{padding:48px 0 96px}
+  p{font-size:17px;color:var(--ink-2);margin:16px 0 0}
+  .back{display:inline-block;margin-top:32px;font-weight:500;text-decoration:none}
+</style>
+</head>
+<body>
+<header class="wrap"><a href="./"><img src="./assets/logo-header-on-light.svg" alt="Wayscope" width="158" height="30"></a></header>
+<main class="wrap">
+  <h1>That didn't go through.</h1>
+  <p>Please try again, or email <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a> and we'll send the access details by hand.</p>
+  <a class="back" href="./#demo">← Back to the request form</a>
+</main>
+</body>
+</html>

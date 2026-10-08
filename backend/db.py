@@ -815,6 +815,39 @@ def init_costing_db():
         conn.close()
 
 
+def init_demo_requests_db():
+    """
+    H9 (8 Oct 2026) — demo requests from the landing page. ONE table, deliberately NOT
+    tenanted: a lead belongs to the company running the deployment, not to the tenant
+    whose data the demo shows. Not in TENANTED_TABLES, no _TENANT_DDL entry, listed as
+    untenanted (with this reason) in test_tenant_audit.py. The IP is stored only as a
+    salted hash; the codes sent are never stored. Text id (uuid hex) so SQLite and
+    Postgres agree without an autoincrement.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS demo_requests (
+                id              TEXT PRIMARY KEY,
+                created_at      TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                email           TEXT NOT NULL,
+                organisation    TEXT,
+                role            TEXT,
+                wants           TEXT,
+                updates_opt_in  INTEGER DEFAULT 0,
+                ip_hash         TEXT,
+                email_status    TEXT,
+                email_error     TEXT
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS ix_demo_requests_created ON demo_requests (created_at)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def count_forecast_weeks():
     return query("SELECT COUNT(*) AS n FROM forecast_weeks WHERE tenant_id = ?",
                  (current_tenant(),))[0]["n"]

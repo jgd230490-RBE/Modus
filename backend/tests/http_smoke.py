@@ -362,8 +362,58 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("...and nothing is lost or doubled", len(m2["routes"]) == 18 and len(m2["ipts"]) == 3
        and len(c.get("/api/forecasts", headers=PLAN).json()) == 74)
 
+    # ------------------------------------------------------------ 5. H9: demo requests (8 Oct)
+    # Signed out, no cookie, no code: the landing page's visitor. SMTP stubbed at the module.
     r = c.post("/api/gate-signout")
     c.cookies.clear()
+    import demo_request as _dr
+    _sent = []
+    class _SMTPStub:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def ehlo(self): pass
+        def starttls(self): pass
+        def login(self, u, p): pass
+        def send_message(self, m): _sent.append(m)
+    _real = _dr.smtplib.SMTP
+    _dr.smtplib.SMTP = _SMTPStub
+    try:
+        for v in ("SMTP_USER", "SMTP_PASSWORD", "DEMO_FROM", "DEMO_NOTIFY"):
+            os.environ.pop(v, None)
+        form = {"name": "Ada Example", "email": "ada@example.org", "organisation": "Example Civils",
+                "role": "Principal contractor", "wants": "the look-ahead", "updates": "yes", "website": ""}
+        r = c.post("/api/public/demo-request", follow_redirects=False, data=form)
+        ok("⭐ no sender configured: the form POST (signed out) answers 200 with the access page", r.status_code == 200
+           and "map-pass-xyz" in r.text and "north-code-xyz" in r.text and "fictional" in r.text, str(r.status_code))
+        ok("...no-store, and it never carries the planner or admin code", r.headers.get("cache-control") == "no-store"
+           and "plan-code-xyz" not in r.text and "admin-code-xyz" not in r.text)
+        r = c.post("/api/public/demo-request", follow_redirects=False, data=dict(form, website="bot"))
+        ok("a honeypot hit is a 303 to thanks.html", r.status_code == 303 and r.headers["location"] == "https://wayscope.co.uk/thanks.html")
+        r = c.post("/api/public/demo-request", follow_redirects=False, data=dict(form, email="nope"))
+        ok("an invalid form is a 303 to error.html", r.status_code == 303 and r.headers["location"] == "https://wayscope.co.uk/error.html")
+        os.environ.update({"SMTP_USER": "sender@wayscope.co.uk", "SMTP_PASSWORD": "app-pass", "DEMO_FROM": "Wayscope <sender@wayscope.co.uk>",
+                           "DEMO_NOTIFY": "notify@wayscope.co.uk"})
+        r = c.post("/api/public/demo-request", follow_redirects=False, data=dict(form, email="bea@example.org"))
+        ok("⭐ sender configured: the POST is a 303 to thanks.html and the background task sent two emails",
+           r.status_code == 303 and r.headers["location"] == "https://wayscope.co.uk/thanks.html" and len(_sent) == 2
+           and _sent[0]["To"] == "bea@example.org" and _sent[1]["To"] == "notify@wayscope.co.uk", f"{r.status_code} {len(_sent)}")
+        ok("...the email carries both codes", "map-pass-xyz" in _sent[0].get_body(preferencelist=("plain",)).get_content()
+           and "north-code-xyz" in _sent[0].get_body(preferencelist=("plain",)).get_content())
+        ok("🔴 /api/public/route-forecasts is still closed to the same signed-out visitor",
+           c.get("/api/public/route-forecasts").status_code == 401)
+        r = c.get("/api/admin/demo-requests.csv")
+        ok("the CSV is refused without the admin token", r.status_code == 403, str(r.status_code))
+        r = c.get("/api/admin/demo-requests.csv", params=TOKEN)
+        ok("...and served with it: text/csv, three stored rows (the honeypot and the invalid one are not rows)",
+           r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+           and r.text.count(chr(10)) == 3 and "ada@example.org" in r.text and "bea@example.org" in r.text
+           and "shown on screen" in r.text and ",sent," in r.text, r.text[:300])
+    finally:
+        _dr.smtplib.SMTP = _real
+        for v in ("SMTP_USER", "SMTP_PASSWORD", "DEMO_FROM", "DEMO_NOTIFY"):
+            os.environ.pop(v, None)
+
     r = c.get("/map/")
     ok("after sign-out the map is closed again", r.status_code == 401, str(r.status_code))
     r = c.post("/api/map-auth", json={"password": "map-pass-xyz"})
