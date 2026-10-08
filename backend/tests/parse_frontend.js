@@ -1182,6 +1182,57 @@ ok("0915: the three layouts are all offered, and every localStorage read is guar
 ok("...and it collapses with the rail like every other item (label behind railOpen)",
    /\/help\/\?role=[\s\S]{0,460}?\{railOpen && <span className="truncate">User guide<\/span>\}/.test(src));
 
+// ---- H10 (8 Oct 2026): the in-app guide ----------------------------------------
+// Demo tenant only; steps per page anchored to data-guide elements; Back/Next/Done and
+// "Don't show again"; the header replays it; localStorage in try/catch; no new library;
+// the Mapbox iframe untouched. Copy from notes/landing-copy-v2-1008.md §5.
+{
+  const gs = src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/);
+  ok("GUIDE_STEPS is declared", !!gs);
+  const steps = gs ? gs[1] : "";
+  for (const k of ["welcome", "dashboard", "submit", "forecasts", "lookahead", "data"])
+    ok(`GUIDE_STEPS has steps for '${k}'`, new RegExp(`\\n  ${k}: `).test(steps));
+  ok("the three data pages share one 'data' set (guidePageKey)",
+     /const guidePageKey = \(page\) => DATA_PAGES\.includes\(page\) \? "data" : page;/.test(src));
+  ok("Submit forecast and Forecasts share the forecast steps", /submit: GUIDE_FORECAST_STEPS,\n  forecasts: GUIDE_FORECAST_STEPS,/.test(steps));
+  const anchors = [...new Set([...(gs ? gs[0] : "").matchAll(/anchor: "([a-z-]+)"/g), ...(src.match(/const GUIDE_FORECAST_STEPS = \[[\s\S]*?\];/) || [""])[0].matchAll(/anchor: "([a-z-]+)"/g)].map(m => m[1]))];
+  ok("the steps name anchors", anchors.length >= 6, anchors.join(","));
+  for (const a of anchors)
+    ok(`⭐ every anchor a step names exists in the markup: data-guide="${a}"`, src.includes(`data-guide="${a}"`));
+  ok("the page header is the universal anchor (every page renders one)", /<div className="flex flex-wrap items-start justify-between gap-3 mb-5" data-guide="page-header">/.test(src));
+  ok("a missing or hidden anchor falls back to the page header, never to nothing",
+     /if\(!el \|\| !\(el\.offsetWidth \|\| el\.offsetHeight\)\) el = document\.querySelector\('\[data-guide="page-header"\]'\);/.test(src));
+  const guideFn = (src.match(/function Guide\(\{ page, groups \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+  ok("Guide is a component", guideFn.length > 500);
+  ok("🔴 the guide shows ONLY on a demo tenant (TENANT.demo_notice), so a real client never sees it",
+     /useEffect\(\(\) => \{\n    if\(!TENANT\.demo_notice\) return;/.test(guideFn));
+  ok("...and renders nothing when there is no step", guideFn.includes("if(!step) return null;"));
+  ok("the welcome's menu line is built from the groups the ROLE can see (not from NAV)",
+     guideFn.includes("(groups || []).map(g => `${g.group} (${g.items.map(it => it.label.toLowerCase()).join(\", \")})`)")
+     && /<Guide page=\{page\} groups=\{visible\} \/>/.test(src));
+  ok("...and the welcome names the tenant, never a project", guideFn.includes("This is ${TENANT.name || \"the demo scheme\"}. Everything you see is invented") && !/Wolds Link/.test(src));
+  ok("remembered per visitor under wayscope_guide_<page>", /const GUIDE_KEY = "wayscope_guide_";/.test(src));
+  ok("every storage read and write is in try/catch (no storage → shows once per load)",
+     /function guideRead\(k\)\{ try \{ return localStorage\.getItem\(GUIDE_KEY \+ k\); \} catch\(e\)\{ return null; \} \}/.test(src)
+     && /function guideWrite\(k, v\)\{ try \{ localStorage\.setItem\(GUIDE_KEY \+ k, v\); \} catch\(e\)\{\} \}/.test(src)
+     && !/localStorage\.(get|set)Item\(GUIDE_KEY/.test(guideFn));
+  ok("Back / Next / Done and 'Don't show again'", />Back<\/button>/.test(guideFn) && />Next<\/button>/.test(guideFn)
+     && />Done<\/button>/.test(guideFn) && />Don't show again<\/button>/.test(guideFn));
+  ok("Done marks the page (and the welcome) seen; 'Don't show again' switches every page off",
+     guideFn.includes('guideWrite(key, "done"); guideWrite("welcome", "done");') && guideFn.includes('guideWrite("all", "off");'));
+  ok("the header has a Guide button, demo tenant only, that replays through one event name",
+     /\{TENANT\.demo_notice && \(\n\s+\/\* H10[\s\S]{0,200}window\.dispatchEvent\(new Event\(GUIDE_EVENT\)\)[\s\S]{0,200}Guide\n/.test(src)
+     && guideFn.includes("window.addEventListener(GUIDE_EVENT, on)") && /const GUIDE_EVENT = "wayscope-guide";/.test(src));
+  ok("🔴 the guide never renders a team id: no IPT in its copy", !/IPT/.test(gs ? gs[0] : "x"));
+  ok("🔴 no 'truck' in its copy (UK: lorry / HGV)", !/truck/i.test(gs ? gs[0] : "x"));
+  ok("🔴 no new script tag: the guide is in-page (six script src tags, as before)", (html.match(/<script src=/g) || []).length === 6);
+  ok("🔴 the route map stays an iframe of /map/ — the staff app never mounts Mapbox for it",
+     /<iframe src=\{MAP_URL\} title="Public Route Map" className="w-full h-full border-0" \/>/.test(src)
+     && !/new mapboxgl\.Map\(/.test(guideFn));
+  ok("the card and ring are fixed overlays with their own z-index (nothing in the page is re-laid-out)",
+     /\.guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /\.guide-card\{position:fixed;z-index:9001;/.test(html));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

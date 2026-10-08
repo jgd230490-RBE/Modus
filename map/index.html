@@ -205,6 +205,18 @@
         #tl-label{ font-size:12px; font-weight:600; color:var(--navy-deep); min-width:190px; white-space:nowrap; flex:0 0 auto; }
         /* and the select was far bigger than five two-character options need */
         #tl-speed{ border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
+            /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
+            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
+            #guide-btn:hover{background:#eff6ff;}
+            #guide-ring{position:fixed;z-index:9000;pointer-events:none;border:2px solid var(--navy);border-radius:10px;box-shadow:0 0 0 4px rgba(37,99,235,.18);}
+            #guide-card{position:fixed;z-index:9001;width:min(340px,calc(100vw - 24px));background:#1F2024;color:#E6E7EA;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.28);padding:14px 16px 12px;font:13.5px/1.5 system-ui,sans-serif;}
+            #guide-card h4{margin:0 0 4px;font-size:14px;font-weight:600;color:#fff;}
+            #guide-card p{margin:0;}
+            #guide-card .guide-foot{display:flex;align-items:center;gap:8px;margin-top:12px;}
+            #guide-card .guide-step{font-size:11px;color:#9AA1AB;margin-right:auto;}
+            #guide-card .guide-foot button{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 11px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#fff;cursor:pointer;}
+            #guide-card .guide-foot button.guide-next{background:var(--navy);color:#fff;border-color:transparent;}
+            #guide-card .guide-off{display:block;margin-top:8px;font:inherit;font-size:11.5px;color:#9AA1AB;background:none;border:none;padding:0;text-decoration:underline;cursor:pointer;}
             #demo-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:30;background:#1F2024;color:#FBBF24;border:1px solid #D97706;border-radius:999px;padding:4px 12px;font:700 10.5px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;}
 </style>
 </head>
@@ -487,10 +499,77 @@
             if (!dn) { dn = document.createElement('div'); dn.id = 'demo-notice'; document.body.appendChild(dn); }
             dn.textContent = TENANT.demo_notice;
         } else if (dn) { dn.remove(); }
+        setupGuide();   // H10: the map's guide, only when the tenant carries a demo notice
         const v = document.getElementById('overlay-version');
         if (v) v.textContent = window.OVERLAY_VERSION ? ('overlay ' + window.OVERLAY_VERSION) : 'no alignment in this tenant';
         if (typeof KPI_BY !== 'undefined') KPI_BY[1][1] = TEAM;
     }
+
+    // ------------------------------------------------------------------ H10 (8 Oct 2026)
+    // The map's guide: four coach-mark cards for the DEMO tenant only (TENANT.demo_notice,
+    // known once the overlay has answered). Anchored to elements by id; the Play step takes
+    // the timeline's button when the bar is open, else the sidebar's "Play forecast timeline".
+    // Remembered per visitor in localStorage (wayscope_guide_map), in try/catch. A Guide
+    // button beside the demo notice replays it. In-page, no library; the Mapbox instance is
+    // never touched — the cards are plain fixed divs over it.
+    const MAP_GUIDE_KEY = "wayscope_guide_map";
+    const MAP_GUIDE_STEPS = [
+        { anchor: "kpi-hud", title: "The bar along the top", body: "shows the month in view: movements, vehicles, material, routes in use and CO₂e." },
+        { anchor: "tl-play", alt: "tl-open", title: "Press Play", body: "to step through the programme month by month." },
+        { anchor: "kpi-conditions", title: "Conditions", body: "lists anything that needs attention this month, such as an over-capacity stockpile or a route over a mass limit. Use \"Show on map\" to jump to it." },
+        { anchor: "kpi-moving", title: "The side panel", body: "shows what's moving this month by discipline and team." },
+    ];
+    let guideIndex = -1;
+    function guideRead(){ try { return localStorage.getItem(MAP_GUIDE_KEY); } catch (e) { return null; } }
+    function guideWrite(v){ try { localStorage.setItem(MAP_GUIDE_KEY, v); } catch (e) {} }
+    function guideAnchor(step){
+        for (const id of [step.anchor, step.alt]) {
+            const el = id && document.getElementById(id);
+            if (el && (el.offsetWidth || el.offsetHeight)) return el;
+        }
+        return null;
+    }
+    function guideEl(id, tag){
+        let el = document.getElementById(id);
+        if (!el) { el = document.createElement(tag || 'div'); el.id = id; document.body.appendChild(el); }
+        return el;
+    }
+    function guideRender(){
+        const step = MAP_GUIDE_STEPS[guideIndex];
+        if (!step) return;
+        const el = guideAnchor(step);
+        const r = el ? el.getBoundingClientRect() : null;
+        const ring = guideEl('guide-ring');
+        if (r) { ring.hidden = false; ring.style.top = (r.top - 4) + 'px'; ring.style.left = (r.left - 4) + 'px';
+                 ring.style.width = (r.width + 8) + 'px'; ring.style.height = (r.height + 8) + 'px'; }
+        else ring.hidden = true;
+        const vw = window.innerWidth, vh = window.innerHeight, W = Math.min(340, vw - 24);
+        let top = 80, left = Math.max(12, (vw - W) / 2);
+        if (r) { left = Math.min(Math.max(12, r.left), Math.max(12, vw - W - 12)); top = r.bottom + 12; if (top + 220 > vh) top = Math.max(12, r.top - 232); }
+        const card = guideEl('guide-card');
+        card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', 'Guide');
+        card.style.top = top + 'px'; card.style.left = left + 'px'; card.style.width = W + 'px';
+        const last = guideIndex === MAP_GUIDE_STEPS.length - 1;
+        card.innerHTML = '<h4></h4><p></p><div class="guide-foot"><span class="guide-step"></span>'
+            + (guideIndex > 0 ? '<button type="button" onclick="guideStep(-1)">Back</button>' : '')
+            + (last ? '<button type="button" class="guide-next" onclick="guideEnd()">Done</button>'
+                    : '<button type="button" class="guide-next" onclick="guideStep(1)">Next</button>')
+            + '</div><button type="button" class="guide-off" onclick="guideOff()">Don\'t show again</button>';
+        card.querySelector('h4').textContent = step.title;
+        card.querySelector('p').textContent = step.body;
+        card.querySelector('.guide-step').textContent = (guideIndex + 1) + ' of ' + MAP_GUIDE_STEPS.length;
+    }
+    function guideStart(){ guideIndex = 0; guideRender(); }
+    function guideStep(d){ guideIndex += d; if (guideIndex < 0) guideIndex = 0; if (guideIndex >= MAP_GUIDE_STEPS.length) { guideEnd(); return; } guideRender(); }
+    function guideEnd(){ guideWrite('done'); guideIndex = -1; for (const id of ['guide-ring', 'guide-card']) { const el = document.getElementById(id); if (el) el.remove(); } }
+    function guideOff(){ guideWrite('off'); guideEnd(); }
+    function setupGuide(){
+        if (!TENANT.demo_notice) return;
+        const btn = guideEl('guide-btn', 'button');
+        btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
+        if (!guideRead()) setTimeout(guideStart, 900);
+    }
+    window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });
 
     // Where the map opens: the package's view if it has one, else the network's
     // extent once it has loaded (see initNetwork), else the neutral default.
@@ -3219,7 +3298,7 @@
                     </div>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
                     <button class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
-                    <button class="btn btn-ghost" onclick="openTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
+                    <button class="btn btn-ghost" id="tl-open" onclick="openTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
                     <div id="forecast-status">Approved forecasts only.</div>
                 </div>`;
                 sidebar.insertAdjacentHTML('beforeend', pluginUI);

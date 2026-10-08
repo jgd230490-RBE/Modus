@@ -1585,6 +1585,47 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   code.includes("localStorage.getItem('modus_tl_speed')") && code.includes("localStorage.setItem('modus_tl_speed'") && code.includes("if(!(sp > 0)) return;")
   && code.includes("sel.value=String(TL.speed)"));
 
+// ---- H10 (8 Oct 2026): the map's guide -------------------------------------------
+// Four coach-mark cards for the demo tenant only, anchored by id; localStorage in
+// try/catch; a Guide button beside the demo notice; in-page; the Mapbox instance untouched.
+{
+  const gs = code.match(/const MAP_GUIDE_STEPS = \[([\s\S]*?)\n\s*\];/);
+  ok("MAP_GUIDE_STEPS is declared with four steps", !!gs && (gs[1].match(/\{ anchor:/g) || []).length === 4);
+  const ids = [...new Set([...(gs ? gs[1] : "").matchAll(/(?:anchor|alt): "([a-z-]+)"/g)].map(m => m[1]))];
+  for (const id of ids)
+    ok(`⭐ every anchor the map's guide names exists as an id: ${id}`, html.includes(`id="${id}"`));
+  ok("the Play step has a fallback: the timeline's button when the bar is open, else the sidebar's Play forecast timeline",
+     /anchor: "tl-play", alt: "tl-open"/.test(code) && /id="tl-open" onclick="openTimeline\(\)"/.test(code)
+     && /for \(const id of \[step\.anchor, step\.alt\]\)/.test(code));
+  ok("the copy is §5's: the bar, Press Play, Conditions with Show on map, the side panel",
+     /title: "The bar along the top"/.test(code) && /title: "Press Play"/.test(code)
+     && /title: "Conditions"[^\n]*Show on map/.test(code) && /title: "The side panel"/.test(code));
+  ok("🔴 the guide is set up ONLY when the tenant carries a demo notice",
+     /function setupGuide\(\)\{\n\s+if \(!TENANT\.demo_notice\) return;/.test(code)
+     && /\} else if \(dn\) \{ dn\.remove\(\); \}\n\s+setupGuide\(\);/.test(code));
+  ok("...the Guide button is created inside setupGuide and nowhere else",
+     (code.match(/guideEl\('guide-btn', 'button'\)/g) || []).length === 1 && !html.includes('id="guide-btn"'));
+  ok("remembered per visitor under wayscope_guide_map, every read and write in try/catch",
+     /const MAP_GUIDE_KEY = "wayscope_guide_map";/.test(code)
+     && /function guideRead\(\)\{ try \{ return localStorage\.getItem\(MAP_GUIDE_KEY\); \} catch \(e\) \{ return null; \} \}/.test(code)
+     && /function guideWrite\(v\)\{ try \{ localStorage\.setItem\(MAP_GUIDE_KEY, v\); \} catch \(e\) \{\} \}/.test(code)
+     && (code.match(/localStorage\.(get|set)Item\(MAP_GUIDE_KEY/g) || []).length === 2);
+  ok("first visit: it starts by itself only when nothing is remembered; the button always replays",
+     /if \(!guideRead\(\)\) setTimeout\(guideStart, 900\);/.test(code) && /btn\.onclick = guideStart;/.test(code));
+  ok("Back / Next / Done and 'Don't show again'; Done remembers, 'Don't show again' switches off",
+     /onclick="guideStep\(-1\)">Back</.test(code) && /onclick="guideStep\(1\)">Next</.test(code)
+     && /onclick="guideEnd\(\)">Done</.test(code) && /onclick="guideOff\(\)">Don\\'t show again</.test(code)
+     && /function guideEnd\(\)\{ guideWrite\('done'\);/.test(code) && /function guideOff\(\)\{ guideWrite\('off'\); guideEnd\(\); \}/.test(code));
+  ok("🔴 ONE Mapbox instance, never removed: the guide adds no map and no map.remove()",
+     (code.match(/new mapboxgl\.Map\(/g) || []).length === 1 && !/map\.remove\(\)/.test(code));
+  ok("🔴 no new script tag: the guide is in-page (three script src tags, as before)", (html.match(/<script src=/g) || []).length === 3);
+  ok("the card and ring are fixed overlays over the map, not inside it",
+     /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
+  ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = step\.title;/.test(code)
+     && /card\.querySelector\('p'\)\.textContent = step\.body;/.test(code));
+  ok("🔴 no team id in the map guide's copy", !/IPT/.test(gs ? gs[0] : "x"));
+}
+
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 console.log(`\n${pass} passed, ${fail.length} failed`);
