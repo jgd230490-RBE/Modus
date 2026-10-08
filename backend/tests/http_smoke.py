@@ -376,6 +376,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
         def starttls(self): pass
         def login(self, u, p): pass
         def send_message(self, m): _sent.append(m)
+        ehlo_resp = b"250-AUTH LOGIN PLAIN"
+        def auth_plain(self, challenge=None): return ""
+        def auth_login(self, challenge=None): return ""
+        def auth(self, mech, authobject, initial_response_ok=True): return (235, b"Accepted")
     _real = _dr.smtplib.SMTP
     _dr.smtplib.SMTP = _SMTPStub
     try:
