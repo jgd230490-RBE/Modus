@@ -1229,6 +1229,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("🔴 the route map stays an iframe of /map/ — the staff app never mounts Mapbox for it",
      /<iframe src=\{MAP_URL\} title="Public Route Map" className="w-full h-full border-0" \/>/.test(src)
      && !/new mapboxgl\.Map\(/.test(guideFn));
+  ok("a tall anchor (the rail) gets the card BESIDE it, never on top of it",
+     guideFn.includes("if(box.height > vh * 0.5 && box.left + box.width + W + 24 <= vw){") && guideFn.includes("left = box.left + box.width + 12; top = Math.max(12, box.top + 12);"));
   ok("the card and ring are fixed overlays with their own z-index (nothing in the page is re-laid-out)",
      /\.guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /\.guide-card\{position:fixed;z-index:9001;/.test(html));
 }
