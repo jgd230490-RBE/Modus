@@ -567,6 +567,14 @@
         if (!TENANT.demo_notice) return;
         const btn = guideEl('guide-btn', 'button');
         btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
+        // Beside the demo notice, measured — the notice is centred and its width depends on
+        // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
+        const placeBtn = () => {
+            const dn = document.getElementById('demo-notice');
+            if (dn) { btn.style.left = (dn.getBoundingClientRect().right + 8) + 'px'; }
+        };
+        placeBtn();
+        window.addEventListener('resize', placeBtn);
         if (!guideRead()) setTimeout(guideStart, 900);
     }
     window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });

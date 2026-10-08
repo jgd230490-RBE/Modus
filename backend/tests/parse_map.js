@@ -1603,6 +1603,8 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 the guide is set up ONLY when the tenant carries a demo notice",
      /function setupGuide\(\)\{\n\s+if \(!TENANT\.demo_notice\) return;/.test(code)
      && /\} else if \(dn\) \{ dn\.remove\(\); \}\n\s+setupGuide\(\);/.test(code));
+  ok("...and placed just right of the demo notice by measurement, re-placed on resize (a fixed offset overlapped the notice)",
+     /btn\.style\.left = \(dn\.getBoundingClientRect\(\)\.right \+ 8\) \+ 'px';/.test(code) && /window\.addEventListener\('resize', placeBtn\);/.test(code));
   ok("...the Guide button is created inside setupGuide and nowhere else",
      (code.match(/guideEl\('guide-btn', 'button'\)/g) || []).length === 1 && !html.includes('id="guide-btn"'));
   ok("remembered per visitor under wayscope_guide_map, every read and write in try/catch",
