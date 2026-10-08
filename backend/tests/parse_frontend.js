@@ -1210,7 +1210,7 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("the welcome's menu line is built from the groups the ROLE can see (not from NAV)",
      guideFn.includes("(groups || []).map(g => `${g.group} (${g.items.map(it => it.label.toLowerCase()).join(\", \")})`)")
      && /<Guide page=\{page\} groups=\{visible\} \/>/.test(src));
-  ok("...and the welcome names the tenant, never a project", guideFn.includes("This is ${TENANT.name || \"the demo scheme\"}, a fictional scheme.") && !/Wolds Link/.test(src));
+  ok("...and the welcome names the tenant, never a project", guideFn.includes("This is ${TENANT.name || \"the demo scheme\"}. Everything you see is invented") && !/Wolds Link/.test(src));
   ok("remembered per visitor under wayscope_guide_<page>", /const GUIDE_KEY = "wayscope_guide_";/.test(src));
   ok("every storage read and write is in try/catch (no storage → shows once per load)",
      /function guideRead\(k\)\{ try \{ return localStorage\.getItem\(GUIDE_KEY \+ k\); \} catch\(e\)\{ return null; \} \}/.test(src)

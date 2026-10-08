@@ -1100,7 +1100,7 @@ function Guide({ page, groups }){
     if(!withWelcome) return own;
     const menu = (groups || []).map(g => `${g.group} (${g.items.map(it => it.label.toLowerCase()).join(", ")})`).join(" · ");
     const welcome = GUIDE_STEPS.welcome.map((s, n) => n === 0
-      ? { ...s, body: `This is ${TENANT.name || "the demo scheme"}, a fictional scheme. Everything you see is invented, so click anything.` }
+      ? { ...s, body: `This is ${TENANT.name || "the demo scheme"}. Everything you see is invented, so click anything.` }
       : { ...s, body: `The menu on the left follows the work: ${menu}.` });
     return [...welcome, ...own];
   };
