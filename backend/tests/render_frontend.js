@@ -35,7 +35,7 @@ const React = require(G + "react");
 const ReactDOMServer = require(G + "react-dom/server");
 
 const ROOT = path.resolve(__dirname, "..", "..");
-const html = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8");
+const html = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 
 let pass = 0;
 const fail = [];

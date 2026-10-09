@@ -1,0 +1,14 @@
+# 9 Oct 2026: every text file is checked out with LF. Git for Windows defaults to core.autocrlf=true,
+# which rewrote the HTML/JS/Python files with CRLF on a branch switch; the JS harnesses read the
+# files raw and their multi-line regexes expect LF, so 31 assertions failed on a clean tree.
+# Render runs Linux and there is no build step: LF everywhere is the only sane state.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.mp4 binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.db binary
