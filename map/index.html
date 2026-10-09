@@ -139,6 +139,15 @@
             #kpi-hud, body.sidebar-closed #kpi-hud{ left:0; right:0; top:0; height:auto; padding:56px 12px 10px;
                                                      display:flex; flex-direction:column; align-items:stretch; gap:8px; }
             #kpi-hud .kpi-note{ display:none; }
+            /* 9 Oct 2026: on a phone the centred notice overlapped #menu-toggle (measured at 375px: menu
+               14-141, notice 94-281). It becomes a full-width strip along the very top; the menu button,
+               the Guide button and the bar's title move down by its height (body.has-demo-notice is set
+               by the overlay code only when the tenant carries a notice, so a real tenant loses nothing). */
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; white-space:normal; text-align:center; font-size:9.5px; line-height:1.4; letter-spacing:.05em; padding:4px 10px; }   /* body-scoped: outranks the generic rule below */
+            body.has-demo-notice #menu-toggle{ top:40px; }
+            body.has-demo-notice #kpi-hud, body.has-demo-notice.sidebar-closed #kpi-hud{ padding-top:84px; }
+            #guide-btn{ left:auto !important; right:12px; top:9px; }
+            body.has-demo-notice #guide-btn{ top:36px; }
             #kpi-hud .kpi-title{ font-size:15px; }
             #kpi-cards{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px 12px; }
             #kpi-cards .kpi-row{ display:contents; }
@@ -495,6 +504,7 @@
         if (railItem) railItem.hidden = !hasRail;
         // H2: the tenant's demo notice, on the map like every other screen
         let dn = document.getElementById('demo-notice');
+        document.body.classList.toggle('has-demo-notice', !!TENANT.demo_notice);   // the phone layout keys on it
         if (TENANT.demo_notice) {
             if (!dn) { dn = document.createElement('div'); dn.id = 'demo-notice'; document.body.appendChild(dn); }
             dn.textContent = TENANT.demo_notice;
@@ -574,6 +584,7 @@
         // Beside the demo notice, measured — the notice is centred and its width depends on
         // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
         const placeBtn = () => {
+            if (window.innerWidth <= 700) { btn.style.left = ''; return; }   // phone: the CSS rule places it at the right edge
             const dn = document.getElementById('demo-notice');
             if (dn) { btn.style.left = (dn.getBoundingClientRect().right + 8) + 'px'; }
         };

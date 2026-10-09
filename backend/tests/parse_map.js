@@ -1605,6 +1605,10 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      && /\} else if \(dn\) \{ dn\.remove\(\); \}\n\s+setupGuide\(\);/.test(code));
   ok("...and placed just right of the demo notice by measurement, re-placed on resize (a fixed offset overlapped the notice)",
      /btn\.style\.left = \(dn\.getBoundingClientRect\(\)\.right \+ 8\) \+ 'px';/.test(code) && /window\.addEventListener\('resize', placeBtn\);/.test(code));
+  ok("9 Oct: on a phone (the 700px block) the notice is a full-width strip at the top and the menu, the bar and the Guide button move down under it",
+     /@media \(max-width:700px\)\{[\s\S]*?body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[\s\S]*?body\.has-demo-notice #menu-toggle\{ top:40px; \}[\s\S]*?body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:84px; \}[\s\S]*?#guide-btn\{ left:auto !important; right:12px; top:9px; \}[\s\S]*?body\.has-demo-notice #guide-btn\{ top:36px; \}/.test(html)
+     && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice\);/.test(code)
+     && /if \(window\.innerWidth <= 700\) \{ btn\.style\.left = ''; return; \}/.test(code));
   ok("...the Guide button is created inside setupGuide and nowhere else",
      (code.match(/guideEl\('guide-btn', 'button'\)/g) || []).length === 1 && !html.includes('id="guide-btn"'));
   ok("remembered per visitor under wayscope_guide_map, every read and write in try/catch",
