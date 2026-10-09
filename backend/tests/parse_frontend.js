@@ -1242,6 +1242,19 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      /\.guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /\.guide-card\{position:fixed;z-index:9001;/.test(html));
 }
 
+// ---- 9 Oct 2026: UK wording in the staff app's own copy ------------------------------
+// The Dashboard figure said 'truck-mi', the Routes table 'Truck-mi', the bake table 'Truck
+// params', and two tooltips 'truck'. Vehicle NAMES ('Truck mixer 8 m³') come from the tenant's
+// factors and are not this file's copy; identifiers (truck_params_present) and comments are not copy.
+{
+  const strings = (src.match(/'[^'\r\n]*'|"[^"\r\n]*"|`[^`\r\n]*`/g) || []);   // single-line literals only: a span across lines would swallow JSX comments
+  const jsxText = (src.match(/>[^<>{}]*truck[^<>{}]*</gi) || []);
+  const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s)).concat(jsxText);
+  ok("🔴 no 'truck' in any string or JSX text the staff app prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
+  ok("the Dashboard figure and the Routes table say lorry-<unit>, the bake table says HGV params",
+     /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && />Lorry-\{DU\(\)\}\{arrow\("km"\)\}<\/th>/.test(src) && />HGV params<\/th>/.test(src));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
