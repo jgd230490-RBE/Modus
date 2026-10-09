@@ -1392,7 +1392,7 @@ ok("⭐ both empty branches reset the vehicles LABEL, not just the value",
 // ⚠️ 2026-10-06 — REVERSED: on a phone the bar stays at the TOP as a 3x2 grid, the note
 // hidden (it is a tooltip everywhere now)
 ok("on a phone the bar stays at the top as a 3x2 grid with the note hidden",
-  /@media \(max-width:700px\)\{[\s\S]{0,1200}#kpi-hud[\s\S]{0,300}top:0;/.test(html)
+  /@media \(max-width:1023px\)\{[\s\S]{0,1200}#kpi-hud[\s\S]{0,300}top:0;/.test(html)
   && /#kpi-cards\{ display:grid; grid-template-columns:repeat\(3, minmax\(0, 1fr\)\)/.test(html)
   && /#kpi-hud \.kpi-note\{ display:none; \}/.test(html));
 // 🔴 both used to sit at bottom:74px. 07 Sep moved the stack to a FIXED bottom:190px,
@@ -1402,8 +1402,9 @@ ok("on a phone the bar stays at the top as a 3x2 grid with the note hidden",
 // ⚠️ 2026-10-06 — REVERSED: the panel sits UNDER the bar, so it is the TOP that is
 // measured; 190px is the CSS floor
 ok("⭐ the phone conditions panel clears the KPI bar, by measuring it",
-  /@media \(max-width:700px\)\{[\s\S]{0,2200}#tl-warnings\{ top:190px;/.test(html)
+  /@media \(max-width:1023px\)\{[\s\S]{0,3400}#tl-warnings\{ top:190px;/.test(html)   // 9 Oct: the block grew (notice strip, tablet)
   && /function positionWarnStack\(\)/.test(code)
+  && /window\.innerWidth > 1023 \|\| !kpi/.test(code)   // 9 Oct: measured below 1024, the stacked-bar range
   && /box\.style\.top = \(Math\.round\(h\) \+ 8\) \+ 'px'/.test(code));
 ok("...and it re-measures when the card changes height or the window resizes",
   /setHTML\('kpi-breakdown', chips\);\s*positionWarnStack\(\);/.test(code)
@@ -1605,10 +1606,12 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      && /\} else if \(dn\) \{ dn\.remove\(\); \}\n\s+setupGuide\(\);/.test(code));
   ok("...and placed just right of the demo notice by measurement, re-placed on resize (a fixed offset overlapped the notice)",
      /btn\.style\.left = \(dn\.getBoundingClientRect\(\)\.right \+ 8\) \+ 'px';/.test(code) && /window\.addEventListener\('resize', placeBtn\);/.test(code));
-  ok("9 Oct: on a phone (the 700px block) the notice is a full-width strip at the top and the menu, the bar and the Guide button move down under it",
-     /@media \(max-width:700px\)\{[\s\S]*?body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[\s\S]*?body\.has-demo-notice #menu-toggle\{ top:40px; \}[\s\S]*?body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:84px; \}[\s\S]*?#guide-btn\{ left:auto !important; right:12px; top:9px; \}[\s\S]*?body\.has-demo-notice #guide-btn\{ top:36px; \}/.test(html)
+  ok("9 Oct: tablets get one row of six KPI cards under the month (701-1023px), the phone keeps its 3x2 grid",
+     /@media \(min-width:701px\) and \(max-width:1023px\)\{\s*#kpi-cards\{ grid-template-columns:repeat\(6, minmax\(0, 1fr\)\); \}/.test(html));
+  ok("9 Oct: below 1024px (phone AND tablet) the notice is a full-width strip at the top and the menu, the bar and the Guide button move down under it",
+     /@media \(max-width:1023px\)\{[\s\S]*?body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[\s\S]*?body\.has-demo-notice #menu-toggle\{ top:40px; \}[\s\S]*?body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:84px; \}[\s\S]*?#guide-btn\{ left:auto !important; right:12px; top:9px; \}[\s\S]*?body\.has-demo-notice #guide-btn\{ top:36px; \}/.test(html)
      && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice\);/.test(code)
-     && /if \(window\.innerWidth <= 700\) \{ btn\.style\.left = ''; return; \}/.test(code));
+     && /if \(window\.innerWidth <= 1023\) \{ btn\.style\.left = ''; return; \}/.test(code));
   ok("...the Guide button is created inside setupGuide and nowhere else",
      (code.match(/guideEl\('guide-btn', 'button'\)/g) || []).length === 1 && !html.includes('id="guide-btn"'));
   ok("remembered per visitor under wayscope_guide_map, every read and write in try/catch",
@@ -1632,6 +1635,17 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = step\.title;/.test(code)
      && /card\.querySelector\('p'\)\.textContent = step\.body;/.test(code));
   ok("🔴 no team id in the map guide's copy", !/IPT/.test(gs ? gs[0] : "x"));
+}
+// ---- 9 Oct 2026: UK wording on the public map's visible copy -------------------------
+// The route drawer said 'Trips / day / truck', 'Trucks for peak' and 'DEFRA-2025-based'. UK copy says
+// lorry / HGV (CLAUDE.md), and the factors are DESNZ 2026. Asserted on every string literal the map
+// prints; identifiers and comments are not copy. Vehicle NAMES come from the tenant's factors, not here.
+{
+  const strings = (code.match(/'[^'\r\n]*'|"[^"\r\n]*"|`[^`]*`/g) || []).filter(s => !/^['"`]\s*$/.test(s));
+  const trucks = strings.filter(s => /trucks?/i.test(s) && !/Truck mixer/.test(s));
+  ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
+  ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
+  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025", /DESNZ 2026/.test(code) && !/DEFRA-2025/.test(code));
 }
 
 console.log();

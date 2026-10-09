@@ -131,7 +131,10 @@
         .tl-warn.clash .cond-dot{ background:#C2321C; } .tl-warn.warn .cond-dot{ background:#D98A17; } .tl-warn.caution .cond-dot{ background:#8A94A3; }
         /* on a phone the note is the first thing to go, then the panel shrinks to the
            two numbers — see claude/mobile-analysis.md */
-        @media (max-width:700px){
+        @media (max-width:1023px){
+            /* 9 Oct 2026: the breakpoint moved from 700 to 1023 px — at 768 (a tablet, portrait) the desktop
+               bar overflowed the window by 227 px and the demo notice sat over the title; at 1024 it fits.
+               Tablets get one row of six under the month (the block after this one). */
             /* 2026-10-06 — on a phone the bar stays at the TOP, full width, with the six numbers
                as a 3x2 grid under the month. #menu-toggle floats in its top-left corner, so
                the bar starts below it. The conditions panel docks under the bar; its top is
@@ -156,6 +159,9 @@
             #kpi-conditions{ margin-left:0; justify-content:flex-start; border:none; border-top:1px solid var(--line); border-radius:0; padding:10px 0 0; }
             .mapboxgl-ctrl-top-right{ top:180px; }
             #tl-warnings{ top:190px; right:12px; left:12px; width:auto; }
+        }
+        @media (min-width:701px) and (max-width:1023px){
+            #kpi-cards{ grid-template-columns:repeat(6, minmax(0, 1fr)); }   /* a tablet: one row of six under the month */
         }
         .restr-warn{ font-size:11px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
 
@@ -584,7 +590,7 @@
         // Beside the demo notice, measured — the notice is centred and its width depends on
         // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
         const placeBtn = () => {
-            if (window.innerWidth <= 700) { btn.style.left = ''; return; }   // phone: the CSS rule places it at the right edge
+            if (window.innerWidth <= 1023) { btn.style.left = ''; return; }   // phone or tablet: the CSS rule places it at the right edge
             const dn = document.getElementById('demo-notice');
             if (dn) { btn.style.left = (dn.getBoundingClientRect().right + 8) + 'px'; }
         };
@@ -3675,7 +3681,7 @@
                 card(fmtDist(dist, 1)+' '+DU(),'One-way distance','Routed road geometry')+
                 card(fmtDist(round, 1)+' '+DU(),'Round trip','Loaded out, empty back')+
                 card(cycleH.toFixed(2)+' h','Est. haul cycle','Drive + '+(P.load_minutes+P.unload_minutes)+' min handling')+
-                card(tripsPerDay.toFixed(1),'Trips / day / truck','@ '+P.shift_hours_per_day+' h shift, '+Math.round(distU(P.avg_haul_speed_kmh))+' '+SPD())+
+                card(tripsPerDay.toFixed(1),'Trips / day / lorry','@ '+P.shift_hours_per_day+' h shift, '+Math.round(distU(P.avg_haul_speed_kmh))+' '+SPD())+
             '</div>'+
             '<div id="an-fc-slot" class="an-sub" style="margin-top:12px;">Loading forecast…</div>';
         try{
@@ -3702,9 +3708,9 @@
                         card(co2t.toFixed(1)+' t','CO₂e (est.)','round-trip diesel')+
                         card(intensity.toFixed(1)+' kg/t','Carbon intensity','per tonne delivered')+
                         card(Math.round(peakT).toLocaleString()+' t','Peak month','busiest month in window')+
-                        card(trucksPeak,'Trucks for peak','to clear peak month')+
+                        card(trucksPeak,'Lorries for peak','to clear peak month')+
                     '</div>'+
-                    '<div class="an-sub" style="margin-top:10px;">Carbon uses DEFRA-2025-based factors — edit backend/factors.json.</div>';
+                    '<div class="an-sub" style="margin-top:10px;">Carbon uses the DESNZ 2026 factors in factors.json.</div>';
             } else {
                 extra='<div class="an-sub" style="margin-top:12px;">No approved forecast for this route in the selected window, so tonnage &amp; carbon are hidden. Distance and cycle time above come from the road geometry.</div>';
             }
@@ -3973,7 +3979,7 @@
         const box = document.getElementById('tl-warnings');
         if (!box) return;
         const kpi = document.getElementById('kpi-hud');
-        if (window.innerWidth > 700 || !kpi || box.style.display === 'none') { box.style.top = ''; return; }
+        if (window.innerWidth > 1023 || !kpi || box.style.display === 'none') { box.style.top = ''; return; }   // 9 Oct: tablets stack the bar too
         const h = kpi.getBoundingClientRect().height || 0;
         box.style.top = (Math.round(h) + 8) + 'px';
     }
