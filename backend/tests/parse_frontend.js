@@ -24,7 +24,7 @@ const ts = require(G + "typescript");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const FILE = path.join(ROOT, "frontend", "index.html");
-const html = fs.readFileSync(FILE, "utf8");
+const html = fs.readFileSync(FILE, "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 
 let pass = 0;
 const fail = [];
@@ -544,7 +544,7 @@ ok("🔴 no default rate anywhere in the page — blank means 'rate not set'",
 // old "pills equal the band table" check has nothing static to compare against. What
 // still holds: the six pill hexes are a product palette and must never reuse a colour the
 // map spends on a route, a forecast or a selection — overlay.js's reserved list.
-const _ovl = fs.readFileSync(path.join(ROOT, "map", "overlay.js"), "utf8");
+const _ovl = fs.readFileSync(path.join(ROOT, "map", "overlay.js"), "utf8").replace(/\r\n?/g, "\n");
 const _reserved = (() => { const m = _ovl.match(/IPT_RESERVED_COLOURS = \[([^\]]*)\]/); return m ? [...m[1].matchAll(/'(#[0-9A-Fa-f]{6})'/g)].map(x => x[1].toUpperCase()) : []; })();
 const _pageHex = (() => { const m = code.match(/const IPT_PALETTE_C = \{([^}]*)\}/); const o = {};
   if (m) for (const x of m[1].matchAll(/(IPT\d): "(#[0-9A-Fa-f]{6})"/g)) o[x[1]] = x[2]; return o; })();
@@ -1052,7 +1052,7 @@ ok("the route form says a typed rate is used alone and never mixed with the targ
   code.includes("A typed rate here is used ALONE; it is never mixed with the target."));
 ok("LookAhead now receives the role (for the widget's typeable boxes)", /<LookAhead meta=\{meta\} who=\{who\} access=\{role\} \/>/.test(code));
 ok("🔴 no fuel on the public map: map/index.html has no widget, no fuel-index, no BAF",
-  !/FuelWidget|fuel-index|\bBAF\b/.test(fs.readFileSync(path.join(__dirname, "..", "..", "map", "index.html"), "utf8")));
+  !/FuelWidget|fuel-index|\bBAF\b/.test(fs.readFileSync(path.join(__dirname, "..", "..", "map", "index.html"), "utf8").replace(/\r\n?/g, "\n")));
 
 // ---- 4g. 10 Sep night — the fair-price model on the page -------------------------------
 // NARROWED (H1): the field list is FAIR_FIELDS_FOR(), a function — CUR() and DU() are the

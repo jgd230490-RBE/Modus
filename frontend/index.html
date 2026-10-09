@@ -719,7 +719,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
         <Group title="Volume">
           <Fig value={bigNum(K.totT)} label="tonnes" sub="all lines in view" title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion (m³ and vehicle loads included)`} />
           <Fig value={bigNum(K.totTrips)} label="trips" sub="loaded runs, rounded up per month" title={`${grp(K.totTrips)} loaded trips — ceil(tonnes ÷ payload) per line-month, the Look-ahead's figure`} />
-          <Fig value={bigNum(dist(K.totKm))} label={`truck-${DU()}`} sub="round trips · baked lines" title={`${grp(dist(K.totKm))} ${DU()} — trips × the baked route distance (both legs) for the line's vehicle; an unbaked line adds nothing`} />
+          <Fig value={bigNum(dist(K.totKm))} label={`lorry-${DU()}`} sub="round trips · baked lines" title={`${grp(dist(K.totKm))} ${DU()} — trips × the baked route distance (both legs) for the line's vehicle; an unbaked line adds nothing`} />
           <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs baked routes"} title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view: trips ÷ (working days × what one vehicle does in a shift)` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
         </Group>
         <Group title="Cost" tone="var(--navy)">
@@ -798,7 +798,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("t")}>Tonnes{arrow("t")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("deliveredPct")} title="Reported week actuals ÷ planned, over the months in view">Delivered{arrow("deliveredPct")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("trips")}>Trips{arrow("trips")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("km")}>Truck-{DU()}{arrow("km")}</th>
+                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("km")}>Lorry-{DU()}{arrow("km")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("co2")}>tCO₂e{arrow("co2")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("peakVeh")} title="The most vehicles any one month needs on this line">Peak veh{arrow("peakVeh")}</th>
                 <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("planned")} title="The route's typed rates, or the target rate from Config where it has none">Planned {CUR()}{arrow("planned")}</th>
@@ -910,7 +910,7 @@ function DashboardToday({ meta, week, err, wall }){
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3 mt-3">
             <Big value={T.lines ? bigNum(T.t) : "—"} label="tonnes" sub={T.lines ? `today · ${T.lines} line${T.lines === 1 ? "" : "s"} · ${T.confirmed} confirmed` : (lines.length ? "nothing planned today" : "no lines this week")}
                  title={T.lines ? `${grp(T.t)} t planned for today across ${T.lines} lines — each day's planned quantity through the line's payload, from the Look-ahead` : "No line has a planned quantity on today's date in the commit week"} />
-            <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(dist(T.km))} ${DU()}` : "—"} title={T.lines ? `${grp(T.trips)} loaded trips today (ceil of tonnes ÷ payload per line) · ${grp(dist(T.km))} truck-${DU()} on the baked lines` : "—"} />
+            <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(dist(T.km))} ${DU()}` : "—"} title={T.lines ? `${grp(T.trips)} loaded trips today (ceil of tonnes ÷ payload per line) · ${grp(dist(T.km))} lorry-${DU()} on the baked lines` : "—"} />
             <Big value={T.lines ? grp(T.veh) : "—"} label="vehicles" sub={T.lines ? "on the road today" : "—"} tone="var(--navy)" title={T.lines ? `${grp(T.veh)} vehicles needed today — per line, trips ÷ what one vehicle does in a shift on that route, summed (an unbaked line needs an unknown number)` : "—"} />
             <Big value={T.lines ? `${T.reported} / ${T.lines}` : "—"} label="reported" sub="day actuals typed today" title="Lines with a day actual typed for today on the Look-ahead" />
           </div>
@@ -5007,7 +5007,7 @@ function Diagnostics({ token, routeId }){
                   <th className="text-right font-semibold px-1">Gross</th>
                   <th className="text-right font-semibold px-1">Live km</th>
                   <th className="text-right font-semibold px-1">Options</th>
-                  <th className="text-center font-semibold px-1">Truck params</th>
+                  <th className="text-center font-semibold px-1">HGV params</th>
                 </tr>
               </thead>
               <tbody>
@@ -5020,7 +5020,7 @@ function Diagnostics({ token, routeId }){
                     <td className="text-center px-1">
                       {r.truck_params_present === undefined ? "—"
                         : r.truck_params_present ? <span style={{ color: "var(--green)" }}>✓</span>
-                        : <span style={{ color: "var(--red)" }} title="No vehicle[...] params were sent — HERE routed this as a generic truck">✗</span>}
+                        : <span style={{ color: "var(--red)" }} title="No vehicle[...] params were sent — HERE routed this as a generic HGV">✗</span>}
                     </td>
                   </tr>
                 ))}
@@ -6384,7 +6384,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         subtitle={onLoc
           ? "Every site the network hauls from and to. Click the map to place one, drag a marker to move it; a site that a route uses cannot be deleted."
           : onRoutes
-          ? "Origin → destination pairs, baked against HERE for real truck geometry in both directions. Editing a route keeps its forecasts; moving an end clears the geometry until it is re-baked."
+          ? "Origin → destination pairs, baked against HERE for real HGV geometry in both directions. Editing a route keeps its forecasts; moving an end clears the geometry until it is re-baked."
           : "Haul roads, restricted areas and the other polygons routing is aware of. A haul road is a zone a route can be told to use."}
         actions={<>
           <span className="text-xs text-slate-400">Basemap</span>
@@ -7124,7 +7124,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             </div>
             <p className="text-[11px] text-slate-400 mt-2">Routes are drawn one colour here — this view is about the shape of the network. Material colouring lives on the forecasting dashboard and the public route map.</p>
             <p className="text-[11px] text-slate-400 mt-1">
-              Every route is routed twice: laden out, empty back — the empty truck is lighter,
+              Every route is routed twice: laden out, empty back — the empty lorry is lighter,
               so it can use roads the loaded one legally can't. A green vehicle chip means both
               directions are cached; <span className="font-semibold">amber ↦</span> means only the
               outbound is, which is enough to draw but not to work out a cycle time. Open a route

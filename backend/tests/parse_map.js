@@ -15,7 +15,7 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const FILE = path.join(ROOT, "map", "index.html");
-const html = fs.readFileSync(FILE, "utf8");
+const html = fs.readFileSync(FILE, "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 
 let pass = 0;
 const fail = [];
@@ -335,9 +335,9 @@ ok("no hard-coded offset ramp survives inside a layer definition",
 // reads them from the DEMO package so the data-shaped assertions still have data.
 const IPTF = path.join(ROOT, "map", "overlay.js");
 ok("map/overlay.js exists", fs.existsSync(IPTF));
-const iptSrc = fs.existsSync(IPTF) ? fs.readFileSync(IPTF, "utf8") : "";
+const iptSrc = fs.existsSync(IPTF) ? fs.readFileSync(IPTF, "utf8").replace(/\r\n?/g, "\n") : "";
 // 29 Sep: the theme lives in map/config.js; read it for the rebrand assertions below.
-const cfgSrc = fs.readFileSync(path.join(ROOT, "map", "config.js"), "utf8");
+const cfgSrc = fs.readFileSync(path.join(ROOT, "map", "config.js"), "utf8").replace(/\r\n?/g, "\n");
 ok("map/ipt_segments.js is gone", !fs.existsSync(path.join(ROOT, "map", "ipt_segments.js")));
 const demoPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "demo", "uk-corridor.package.json"), "utf8"));
 const demoOv = JSON.parse(demoPkg.tables.config.find(r => r.key === "overlay").value);
