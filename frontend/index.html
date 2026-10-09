@@ -1056,6 +1056,10 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
 // steps never show, and the welcome's menu line is built from the groups the role can see.
 // Copy: notes landing-copy-v2-1008.md §5. The route map (an iframe of /map/) has its own
 // guide in map/index.html, so the one Mapbox instance is never touched from here.
+// 9 Oct 2026 (user): on a DEMO tenant the header says where a client's name would go, instead of
+// the fictional scheme's name. Header only — the tab title, the map, the exports and the guide's
+// welcome keep the tenant's real name, because those are the places a client reads it.
+const HEADER_DEMO_NAME = "Your organisation's name appears here";
 const GUIDE_KEY = "wayscope_guide_";
 const GUIDE_EVENT = "wayscope-guide";
 const GUIDE_FORECAST_STEPS = [
@@ -1246,7 +1250,7 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
           {TENANT.name && TENANT.name !== "Wayscope" && (
             <>
               <span className="brand-rule hidden sm:block"></span>
-              <span className="hidden sm:block text-[14px] font-medium hdr-muted truncate max-w-[36vw]">{TENANT.name}</span>
+              <span className="hidden sm:block text-[14px] font-medium hdr-muted truncate max-w-[36vw]">{TENANT.demo_notice ? HEADER_DEMO_NAME : TENANT.name}</span>
             </>
           )}
           {TENANT.demo_notice && (

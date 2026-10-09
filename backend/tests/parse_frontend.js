@@ -221,7 +221,12 @@ ok("REBRAND: the tenant's name sits after a rule, only when it is not the defaul
   /TENANT\.name && TENANT\.name !== "Wayscope" && \(/.test(code)
   && /className="brand-rule hidden sm:block"/.test(code)
   // NARROWED 5 Oct 2026: the name's colour is the header token (.hdr-muted), not text-white/70
-  && /className="hidden sm:block text-\[14px\] font-medium hdr-muted truncate max-w-\[36vw\]">\{TENANT\.name\}/.test(code));
+  // NARROWED 9 Oct 2026: on a demo tenant the slot shows the placeholder, not the scheme's name
+  && /className="hidden sm:block text-\[14px\] font-medium hdr-muted truncate max-w-\[36vw\]">\{TENANT\.demo_notice \? HEADER_DEMO_NAME : TENANT\.name\}/.test(code));
+ok("9 Oct: a DEMO tenant's header shows where a client's name goes, in plain words, and ONLY the header changes",
+  /const HEADER_DEMO_NAME = "Your organisation's name appears here";/.test(code)
+  && (code.match(/HEADER_DEMO_NAME/g) || []).length === 2          // the constant and its one use
+  && /document\.title = \(TENANT\.name && TENANT\.name !== "Wayscope"\) \? TENANT\.name \+ " · Wayscope" : "Wayscope"/.test(code));
 ok("REBRAND: the old header is gone — no gold bar, no caption, no bold tenant-name block",
   !/Forecasting &amp; Route Map/.test(html) && !/style=\{\{background:"var\(--gold\)"\}\}/.test(code)
   && !/font-extrabold tracking-tight leading-none text-\[17px\]/.test(code));
