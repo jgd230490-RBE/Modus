@@ -1250,8 +1250,15 @@ ok("⭐ one row per LINE with Mon…Fri as five separate columns — no collapse
    f"expected {_pdf_heads}")
 ok("⭐ origin and destination carry their coordinates from the locations table",
    "58.50000, 24.00000" in _txt and "58.60000, 24.40000" in _txt and "ORIGIN" in _txt and "DESTINATION" in _txt)
-ok("...today's column is named, the week column totals, and a TOTAL row closes the table",
-   "TODAY" in _txt and "WEEK" in _txt and "TOTAL" in _txt and "3 line(s)" in _txt)
+# 2026-10-10: a second date bomb in the same block — the PDF prints Mon–Fri only (10 Sep,
+# asserted below), so " · TODAY" can only appear when today is one of those five dates. Run
+# on Saturday 10 Oct the assertion failed on correct output. NARROWED, not deleted: it now
+# asserts the word exactly when today is a printed day, and its absence otherwise.
+_today_iso = datetime.date.today().isoformat()
+_today_printed = _today_iso in {d.isoformat() for d in _pdf_days}
+ok("...today's column is named exactly when today is one of the five printed days (never on a weekend), the week column totals, and a TOTAL row closes the table",
+   (("TODAY" in _txt) == _today_printed) and "WEEK" in _txt and "TOTAL" in _txt and "3 line(s)" in _txt,
+   f"today {_today_iso} · printed {[d.isoformat() for d in _pdf_days]} · TODAY in text: {'TODAY' in _txt}")
 ok("...a draft week says so, never CONFIRMED", "not confirmed" in _txt and "CONFIRMED" not in _txt.replace("not confirmed", ""))
 ok("🔴 the PDF has NO stock section and NO weekend column (10 Sep)",
    "Stock at week end" not in _txt and re.search(r"\b(SAT|SUN) \d", _txt) is None)
