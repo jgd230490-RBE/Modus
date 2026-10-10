@@ -293,9 +293,12 @@ if (loaded) {
     ok("...with the KPI strip, the clash rail and one row per line",
       commitOut.includes("planned this week") && commitOut.includes("+" + (fixture.clashes.count - 3) + " more")
       && (commitOut.match(/▶/g) || []).length === fixture.commit.lines.length);
+    // 10 Oct 2026 NARROWED: the 9 px "qty · tr · veh" sub-label went with the one-off styles; the five
+    // day columns are counted by their headers (a day name and number), and the caption says the rest
     ok("...the day headers name today, and there are exactly five day columns — Mon–Fri only (10 Sep)",
       commitOut.includes("· today") && !commitOut.includes("0 default")
-      && (commitOut.match(/qty · tr · veh/gi) || []).length === 5);
+      && (commitOut.match(/<th class="num"[^>]*><span[^>]*>(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+/g) || []).length === 5
+      && commitOut.includes("Planned quantity by day"));
     ok("...every weekday cell carries trips and vehicles (baked fixture)",
       (commitOut.match(/ tr · /g) || []).length >= fixture.commit.lines.length * 5);
     ok("...no stock card on Commit any more (10 Sep) — and no map either under the render harness (initialPage)",

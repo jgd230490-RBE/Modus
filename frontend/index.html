@@ -234,6 +234,14 @@
   .dash-filters select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
   .dash-filters select option{color:#1F2024;}
   .tbl tr.is-picked td{background:var(--chart-1-soft);}
+  /* 10 Oct 2026 — the Look-ahead grid (mockup 3): sticky first column, click-to-edit cells, a totals row */
+  .tbl .la-stick{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
+  .tbl th.la-stick{background:var(--surface-2);z-index:3;}
+  .tbl tbody tr:hover td.la-stick{background:var(--surface-2);}
+  .la-cell{font:inherit;font-size:14px;font-weight:600;color:var(--ink);background:none;border:0;border-bottom:1px dashed transparent;padding:0;cursor:text;font-variant-numeric:tabular-nums;line-height:1.2;}
+  .la-cell:hover{border-bottom-color:var(--muted);}
+  .tbl tr.la-total td{font-weight:600;background:var(--surface-2);border-top:1px solid var(--grey);}
+  .tbl.compact tr.la-total td,.tbl.compact td.num{height:auto;padding-top:4px;padding-bottom:4px;}
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */
   .dash-wall .fig-label{font-size:13px;} .dash-wall .fig-sub{font-size:12px;} .dash-wall .fig-group{font-size:12px;}
@@ -3346,20 +3354,16 @@ const spanLabel = (a, b) => {
 };
 
 function StatusChip({ s, parentChanged }){
-  const map = { derived: ["#64748b", "rgba(100,116,139,.12)"],
-                edited:  ["#B45309", "rgba(217,119,6,.14)"],
-                confirmed: ["var(--green)", "rgba(3,158,134,.14)"] };
-  const [c, bg] = map[s] || map.derived;
+  // 10 Oct 2026: a word with a dot (StatusWord), the same colours as everywhere else
   return (
-    <span className="inline-flex flex-wrap justify-end gap-1">
-      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ color: c, background: bg }}>{s}</span>
+    <span className="inline-flex flex-wrap gap-2">
+      <StatusWord status={s} label={s === "derived" ? "Derived" : s === "edited" ? "Edited" : s === "confirmed" ? "Confirmed" : s} />
       {/* The parent month's quantity moved after this week was set. Only ever shown on
           an edited or confirmed week — a derived one is refreshed instead of flagged. */}
       {parentChanged && (
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-          style={{ color: "var(--red)", background: "rgba(191,46,85,.12)" }}
+        <span className="chip-st" style={{ color: "var(--red)" }}
           title="The parent month's quantity changed after this week was set. This week was deliberately not refreshed.">
-          parent month changed
+          <i style={{ background: "var(--red)" }} aria-hidden="true"></i>parent month changed
         </span>
       )}
     </span>
@@ -3381,10 +3385,10 @@ function LaKpi({ value, caption, tone }){
   // a long value steps its size down before it would be cut off ("£1.43…" read as a price)
   const len = String(value == null ? "" : value).length;
   return (
-    <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
-      <div className={"font-bold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 7 ? "text-lg" : "text-2xl")}
+    <div className="card px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
+      <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 7 ? "text-lg" : "text-2xl")}
         style={{ color: tone === "red" ? "var(--red)" : "var(--navy-deep)" }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-400 mt-0.5">{caption}</div>
+      <div className="text-[13px] text-slate-500 mt-0.5 leading-tight">{caption}</div>
     </div>
   );
 }
@@ -3402,12 +3406,10 @@ function LineFlags({ flags }){
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
   const wordFor = (code) => { const f = (flags || []).find(x => x.code === code); return f ? flagWord(f, label) : (label[code] || code); };
   return (
-    <span className="inline-flex flex-col gap-1 items-start">
+    <span className="inline-flex flex-col gap-0.5 items-start">
       {codes.map(c => (
-        <span key={c} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-          style={{ color: c === "UNBAKED" ? "#B45309" : "var(--red)",
-                   background: c === "UNBAKED" ? "rgba(217,119,6,.14)" : "rgba(191,46,85,.10)" }}>
-          {wordFor(c)}
+        <span key={c} className="chip-st whitespace-nowrap" style={{ color: c === "UNBAKED" ? "var(--brand-orange-text)" : "var(--red)" }}>
+          <i style={{ background: c === "UNBAKED" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>{wordFor(c)}
         </span>
       ))}
     </span>
@@ -3582,6 +3584,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState("");
+  const [editing, setEditing] = useState(null);   // 10 Oct: the one day cell that is an input (mockup 3)
   const [draft, setDraft] = useState({});                // key -> unsaved input
   const [open, setOpen] = useState({});                  // line key -> expanded
   const [railOpen, setRailOpen] = useState(false);
@@ -3730,7 +3733,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
     setBusy("");
   };
 
-  const fld = "w-full border border-slate-300 rounded px-1.5 py-1 text-xs text-right tabular-nums outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
+  const fld = "w-24 border border-slate-300 rounded px-1.5 py-0.5 text-sm text-right tabular-nums outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
   const pill = (id, label) => (
     <button key={id} onClick={() => pick(id)}
       className="px-4 py-2 rounded-lg text-sm font-semibold border"
@@ -3805,12 +3808,11 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 
           {/* the clash rail — ONE row, flags run together, +N more */}
           {rail.count > 0 && (
-            <div className="rounded-lg border px-3 py-2 mb-3 text-xs flex items-start gap-2" data-guide="lookahead-flags"
-              style={{ borderColor: "rgba(191,46,85,.35)", background: "rgba(191,46,85,.06)", color: "var(--red)" }}>
-              <span className="mt-1 inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--red)" }} />
-              <span className="min-w-0 flex-1 leading-5">
+            <div className="card px-4 py-3 mb-3 text-sm flex items-start gap-4 flex-wrap" data-guide="lookahead-flags">
+              <span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>
+              <span className="min-w-0 flex-1 leading-6 flex flex-wrap gap-x-4 gap-y-1">
                 {(railOpen ? rail.flags : rail.flags.slice(0, 3)).map((f, i) => (
-                  <span key={i}>{i > 0 && <span className="text-slate-400"> · </span>}<span className="font-semibold">{flagWord(f)}</span> {teamText(f.text)}</span>
+                  <span key={i} className="chip-st"><i style={{ background: f.code === "UNBAKED" || f.code === "RESTRICTION" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i><span className="font-semibold">{flagWord(f)}</span>&nbsp;{teamText(f.text)}</span>
                 ))}
               </span>
               {rail.count > 3 && (
@@ -3846,24 +3848,24 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             <EmptyState title={`No approved forecast line in the commit week (${spanLabel(cw.from, cw.to)}).`}
               body="Days exist only for Approved month lines. Approve a line for this month, or switch to next week." />
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="card overflow-hidden">
               <div className="overflow-auto">
-                <table className="text-sm" style={{ minWidth: `${420 + dates.length * 118}px` }}>
-                  <thead className="bg-slate-50 text-slate-500 text-xs">
+                <table className="tbl compact" style={{ minWidth: `${520 + dates.length * 112}px` }}>
+                  <caption><b>Planned quantity by day</b> · loads and vehicles in grey · Monday to Friday · click a day to type its plan while the week is not confirmed</caption>
+                  <thead>
                     <tr>
-                      <th className="px-3 py-2 text-left font-semibold border-r border-slate-200 sticky left-0 bg-slate-50 z-10" style={{ minWidth: 260 }}>Line</th>
-                      <th className="px-2 py-2 text-left font-semibold border-r border-slate-200"></th>
+                      <th className="la-stick" style={{ minWidth: 330 }}>Route · {TEAM().toLowerCase()} · section</th>
+                      <th>Flags</th>
                       {dates.map(iso => {
                         const t = iso === today, we = isWeekend(iso);
                         return (
-                          <th key={iso} className="px-2 py-1.5 text-right border-r border-slate-100"
-                            style={t ? { background: "#eff6ff" } : {}}>
-                            <div className={"font-semibold " + (we ? "text-slate-400" : (t ? "" : "text-slate-700"))}
-                              style={t ? { color: "var(--navy)" } : {}}>{dayName(iso)} {dayNum(iso)}{t ? " · today" : ""}</div>
-                            <div className="text-[9px] uppercase tracking-wide text-slate-400 font-medium">{we ? "0 default" : "qty · tr · veh"}</div>
+                          <th key={iso} className="num" style={t ? { background: "#eff6ff" } : {}}>
+                            <span className={we ? "text-slate-400" : (t ? "" : "")} style={t ? { color: "var(--navy)" } : {}}>{dayName(iso)} {dayNum(iso)}{t ? " · today" : ""}</span>
                           </th>
                         );
                       })}
+                      <th className="num">Week</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3877,47 +3879,46 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       const isOpen = !!open[lk];
                       return (
                         <React.Fragment key={lk}>
-                          <tr className="border-t border-slate-100 align-top">
-                            <td className="px-3 py-2 border-r border-slate-100 sticky left-0 bg-white z-10" style={{ minWidth: 260 }}>
-                              <div className="flex items-start gap-1.5">
+                          <tr>
+                            <td className="la-stick" style={{ minWidth: 330 }}>
+                              <div className="flex items-center gap-1.5">
                                 <button onClick={() => setOpen(o => ({ ...o, [lk]: !o[lk] }))}
-                                  className="text-slate-400 hover:text-slate-700 text-xs mt-0.5 w-4 shrink-0"
+                                  className="text-slate-400 hover:text-slate-700 text-xs w-4 shrink-0"
                                   title={isOpen ? `Hide ${DU()}, ${TKM()}, cycle and ${CUR()}` : `Show ${DU()}, ${TKM()}, cycle and ${CUR()}`}>{isOpen ? "▼" : "▶"}</button>
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">
+                                <div className="min-w-0 leading-tight">
+                                  <div className="font-medium text-[color:var(--navy-deep)] whitespace-nowrap">
                                     {c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[11px] text-slate-500">
-                                    <IptPill ipt={c.ipt} /><WsPill ws={c.section_id} />
-                                    <span>{c.material_type || "—"} · <span title={c.vehicle_type}>{c.vehicle_short || vehLabel(c.vehicle_type) || "—"}</span></span>
-                                    <StatusChip s={w.status} parentChanged={w.parent_changed} />
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 mt-0.5">{line.route_id} · {line.discipline || "unassigned"} · {unitLbl(line.unit)} · week {grp(w.planned_qty, 1)} {unitLbl(line.unit)}{line.days_ne_week ? <span style={{ color: "var(--red)" }}> · days sum {grp(line.days_sum, 1)} ≠ week</span> : null}</div>
+                                  <div className="text-[13px] text-slate-500 whitespace-nowrap">{line.route_id} · {iptKey(c.ipt) ? teamName(iptKey(c.ipt)) : `no ${TEAM().toLowerCase()}`}{c.section_id ? ` · ${c.section_id}` : ""} · {c.material_type || "—"} · <span title={c.vehicle_type}>{c.vehicle_short || vehLabel(c.vehicle_type) || "—"}</span>{line.days_ne_week ? <span style={{ color: "var(--red)" }}> · days sum {grp(line.days_sum, 1)} ≠ week</span> : null}</div>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-2 py-2 border-r border-slate-100"><LineFlags flags={lf} /></td>
+                            <td><LineFlags flags={lf} /></td>
                             {weekdaysOf(line).map(d => {
                               const k = `${lk}|${d.day_date}|p`;
                               const t = d.day_date === today, we = isWeekend(d.day_date);
                               const f = d.derived || {};
                               return (
-                                <td key={d.day_date} className="px-2 py-2 text-right border-r border-slate-100"
-                                  style={t ? { background: "#eff6ff" } : {}}>
+                                <td key={d.day_date} className="num" style={t ? { background: "#eff6ff" } : {}}>
                                   {/* ⭐ Editable while the week is not confirmed — this week or next,
                                       whichever bucket is open. A confirmed week's plan is read-only
-                                      (L6); re-open it to change it. Sat/Sun are typeable: 0 is a
-                                      default, not a rule. */}
-                                  {!locked ? (
-                                    <input className={fld + (we && !(draft[k] ?? d.planned_qty) ? " text-slate-300" : " font-semibold")} inputMode="decimal"
+                                      (L6); re-open it to change it. 10 Oct: the cell reads as a figure
+                                      and becomes an input when clicked (mockup 3), so the grid reads
+                                      as a table until someone types. */}
+                                  {!locked && editing === k ? (
+                                    <input autoFocus className={fld + " font-semibold"} inputMode="decimal"
                                       value={draft[k] ?? (d.planned_qty ?? "")}
                                       onChange={e => setDraft(x => ({ ...x, [k]: e.target.value }))}
-                                      onBlur={() => saveDay(line, d)} />
+                                      onKeyDown={e => { if(e.key === "Enter" || e.key === "Escape") e.currentTarget.blur(); }}
+                                      onBlur={() => { saveDay(line, d); setEditing(null); }} />
+                                  ) : !locked ? (
+                                    <button type="button" className={"la-cell" + (we && !(draft[k] ?? d.planned_qty) ? " text-slate-300" : "")} onClick={() => setEditing(k)}
+                                      title={`Click to type ${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}>{grp(draft[k] ?? d.planned_qty, 1)}</button>
                                   ) : (
                                     <span className={"tabular-nums " + (we ? "text-slate-300" : "font-semibold text-slate-700")}
-                                      title="Confirmed — reopen it to change the plan">{grp(d.planned_qty, 1)}{we ? "" : ` ${unitLbl(line.unit)}`}</span>
+                                      title="Confirmed — reopen it to change the plan">{grp(d.planned_qty, 1)}</span>
                                   )}
-                                  <div className="text-[10px] text-slate-500 mt-0.5 tabular-nums whitespace-nowrap">
+                                  <div className="text-[13px] text-slate-500 tabular-nums whitespace-nowrap leading-tight">
                                     {we && !(+d.planned_qty) ? "" : c.baked
                                       ? `${grp(f.trips)} tr · ${grp(f.vehicles)} veh`
                                       : <span title="Vehicles need a baked route for this vehicle">{grp(f.trips)} tr · <span className="text-amber-700">veh —</span></span>}
@@ -3926,10 +3927,12 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                                 </td>
                               );
                             })}
+                            <td className="num font-semibold" title={`${grp(w.planned_qty, 1)} ${unitLbl(line.unit)} planned this week on this line`}>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></td>
+                            <td><StatusChip s={w.status} parentChanged={w.parent_changed} /></td>
                           </tr>
                           {isOpen && (
-                            <tr className="bg-slate-50 border-t border-slate-100">
-                              <td colSpan={2 + dates.length} className="px-3 py-1.5 text-[11px] text-slate-600 tabular-nums">
+                            <tr className="bg-slate-50">
+                              <td colSpan={4 + dates.length} className="px-3 py-1.5 text-[13px] text-slate-600 tabular-nums" style={{ height: "auto", whiteSpace: "normal" }}>
                                 {c.baked ? (
                                   <>
                                     {grp(dist(c.km_trip))} {DU()}/trip{c.return_baked ? "" : " (outbound only — return not baked)"} · {grp(dist(wd.km))} {DU()}/week
@@ -3946,11 +3949,22 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                         </React.Fragment>
                       );
                     })}
+                    <tr className="la-total">
+                      <td className="la-stick">{lines.length} line{lines.length === 1 ? "" : "s"}</td>
+                      <td></td>
+                      {dates.map(iso => {
+                        let tt = 0, tr = 0;
+                        lines.forEach(l => (l.days || []).forEach(d => { if(d.day_date === iso){ tt += (d.derived || {}).tonnes || 0; tr += (d.derived || {}).trips || 0; } }));
+                        return <td key={iso} className="num" style={iso === today ? { background: "#eff6ff" } : {}}>{grp(tt)} t<div className="text-[13px] text-slate-500 font-normal leading-tight">{grp(tr)} tr</div></td>;
+                      })}
+                      <td className="num">{grp(totals.planned_t)} t</td>
+                      <td></td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
-              <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100">
-                Editable cells = this week, while status is not confirmed. Confirm locks the week as the haulier sheet.
+              <div className="px-4 py-2 text-[13px] text-slate-500 border-t border-slate-100">
+                Click a day to type its plan while the week is not confirmed. Confirm locks the week as the haulier sheet.
                 Mon–Fri only — Sat/Sun are held at 0 and not shown. Figures are planning, not plated. ✎ = a typed day that no longer follows the week ÷ 5.
                 {busy && <span className="ml-2 text-slate-500">saving…</span>}
               </div>

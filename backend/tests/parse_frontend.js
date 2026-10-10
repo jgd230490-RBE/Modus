@@ -387,8 +387,11 @@ ok("⭐ the commit week comes from the server's commit_week, through /lookahead?
   && !_laBody.includes("payload.next_week"));
 ok("...and the bucket switch offers exactly this week and next week — the Thursday process",
   /\[\["commit", "this week"\], \["next", "next week"\]\]/.test(_laBody));
+// 10 Oct 2026 NARROWED: the day cell reads as a figure and is an input only once clicked (mockup 3) —
+// still editable exactly while the week is not confirmed, in this bucket or next
 ok("a planned day is editable while its week is not confirmed, this bucket or next",
-  /const locked = w\.status === "confirmed"/.test(_laBody) && /\{!locked \? \(/.test(_laBody));
+  /const locked = w\.status === "confirmed"/.test(_laBody) && /\{!locked && editing === k \? \(/.test(_laBody) && /\) : !locked \? \(/.test(_laBody)
+  && _laBody.includes('onClick={() => setEditing(k)}'));
 ok("a confirmed week's plan is read-only", code.includes("Confirmed — reopen it to change the plan"));
 ok("⭐ Confirm week is ONE button for the whole week, separate from editing (L6)",
   _laBody.includes(">Confirm week<") && _laBody.includes("/forecast-weeks/confirm")
