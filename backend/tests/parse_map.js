@@ -1645,7 +1645,8 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const trucks = strings.filter(s => /trucks?/i.test(s) && !/Truck mixer/.test(s));
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
   ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
-  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025", /DESNZ 2026/.test(code) && !/DEFRA-2025/.test(code));
+  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (average laden, both legs, tailpipe only, set on Config)",
+     /Carbon: DESNZ 2026 kg CO₂e per vehicle-km, average laden, applied to both legs, tailpipe only; set per vehicle on the Config page\./.test(code) && !/DEFRA/.test(code));
 }
 
 console.log();

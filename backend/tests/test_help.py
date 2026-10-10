@@ -124,8 +124,10 @@ ok("\U0001f534 the technical appendix is ADMIN ONLY, and so is every heading ins
    and 'id="appendix-d-technical-reference" data-role="admin"' in src)
 ok("...and it is honest that it is a summary of the full technical guide, not a replacement",
    "not the full technical guide" in src)
-ok("...it keeps the sourcing distinction: what is measured vs assumed vs unaudited",
-   "Planning assumption" in src and "Unaudited" in src and "Measured" in src)
+# NARROWED 9 Oct 2026: the one 'Unaudited' row (emission factors) was checked against gov.uk that
+# day, so the distinction is now measured / planning assumption / checked-and-dated.
+ok("...it keeps the sourcing distinction: what is measured vs assumed vs checked",
+   "Planning assumption" in src and "Measured" in src and "Checked 9 Oct 2026" in src)
 ok("\U0001f534 ...and it repeats that the deployment must not be called secure",
    "Do not describe the deployment as secure" in src)
 ok("...and names what leaves the platform to third parties",
@@ -140,6 +142,16 @@ ok("...it leads with the one that caught us: an empty map is usually no month se
    "No month on screen" in src)
 ok("...and it covers the unbaked route, the missing rate and the low carbon figure",
    "has not been baked" in src and "rate not set" in src and "Only baked routes contribute" in src)
+
+# 9 Oct 2026: the carbon factors were checked against gov.uk; the guide says so and no longer calls them untraced
+ok("\U0001f534 the guide no longer says the carbon factors are untraced or unaudited",
+   "not yet traced" not in text and "have not been traced" not in text and "have not checked" not in text
+   and "Unaudited" not in text and "DEFRA/BEIS 2025" not in text)
+ok("...it names the 2026 factors, the check date and the method (average laden, both legs, tailpipe only)",
+   "DESNZ 2026" in text and "9 Oct 2026" in text and "average laden" in text and "both legs" in text and "tailpipe only" in text)
+ok("...and quotes the verified figures, not the pre-H1 ones", "0.99773" in text and "0.93939" in text and "0.75" not in text and "0.85" not in text)
+ok("\U0001f534 the guide says lorry / HGV, never truck (UK wording; the Dashboard tile is lorry-km / lorry-mi now)",
+   re.search(r"\btrucks?\b", text, re.I) is None and "Lorry-km" in text)
 
 # the map is no longer public
 ok("\U0001f534 the guide no longer says the public map needs no sign-in",

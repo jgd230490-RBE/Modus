@@ -1251,6 +1251,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   const jsxText = (src.match(/>[^<>{}]*truck[^<>{}]*</gi) || []);
   const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s)).concat(jsxText);
   ok("🔴 no 'truck' in any string or JSX text the staff app prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
+  ok("the carbon tooltip and the Config sub-line say DESNZ 2026, not DEFRA (checked against gov.uk 9 Oct 2026)",
+     !/DEFRA/.test(src) && /DESNZ 2026 kg CO₂e per vehicle-km \(average laden, both legs, from Config\)/.test(src));
   ok("the Dashboard figure and the Routes table say lorry-<unit>, the bake table says HGV params",
      /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && />Lorry-\{DU\(\)\}\{arrow\("km"\)\}<\/th>/.test(src) && />HGV params<\/th>/.test(src));
 }

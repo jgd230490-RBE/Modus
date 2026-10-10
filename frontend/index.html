@@ -733,7 +733,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
                title={K.fair && K.fair.per_km != null ? `${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()} = fair ${CUR()} ÷ the ${DU()} the trips run on each route's basis (round trip unless the route says loaded) · ${CUR()} ${grp(K.fair.per_trip)} per loaded trip${K.planned && K.planned.per_km != null ? ` · planned ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)}/${DU()}, ${CUR()} ${grp(K.planned.per_trip)}/trip` : ""}` : `Fair ${CUR()} per km, once the model has a priced line`} />
         </Group>
         <Group title="Carbon" tone="var(--green)">
-          <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="baked lines" tone="var(--green)" title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DEFRA-based kg CO₂e/km (factors.json), on the baked lines only`} />
+          <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="baked lines" tone="var(--green)" title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
           <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over baked tonnes" title={K.intensity == null ? "Needs a baked line" : `${K.intensity.toFixed(2)} kg CO₂e per tonne moved — tCO₂e ÷ the tonnes on baked lines (the unbaked ones have no km)`} />
           <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" title={`${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"} — tonnes × the route's basis ${DU()}, baked lines`} />
           <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} title={K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned — the busiest month in view` : "The month with the most planned tonnes"} />
@@ -2732,7 +2732,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         <label className="block">
           <span className="text-[11px] uppercase tracking-wide text-slate-400">Rigid, empty L/100 km</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={(cons.rigid || {}).l_per_100km_empty ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.rigid = f.consumption.rigid || {}; f.consumption.rigid.l_per_100km_empty = num(e.target.value); })} />
-          <span className="block text-[11px] text-slate-400 mt-1">Derived from the DEFRA factor in this file — the weakest number</span>
+          <span className="block text-[11px] text-slate-400 mt-1">Derived from the DESNZ 2026 factor in this document (checked against gov.uk, 9 Oct 2026)</span>
         </label>
         <label className="block">
           <span className="text-[11px] uppercase tracking-wide text-slate-400">Artic, empty L/100 km</span>
