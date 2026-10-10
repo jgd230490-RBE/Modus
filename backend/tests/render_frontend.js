@@ -396,7 +396,8 @@ if (loaded) {
                     horizon: { rows: [], from_month: 9, to_month: 10, roles: {} }, clashes: { flags: [], count: 0, sources: {} }, stock: [] };
     for (const v of ["commit", "account", "horizon"]) {
       const o = render(`the ${v} view renders its empty state`, h(LookAhead, { meta: laMeta, who: "t", initialPage: empty, initialView: v }));
-      ok(`...${v}: an EmptyState, and nothing undefined`, o.includes("border-dashed") && !/undefined|NaN/.test(o));
+      // 10 Oct 2026: NARROWED — the family card is marked data-empty; the dashed border went with the one-off styles
+      ok(`...${v}: an EmptyState, and nothing undefined`, o.includes('data-empty="') && !/undefined|NaN/.test(o));
     }
   }
 }

@@ -27,8 +27,8 @@
        The variable NAMES are kept so nothing else had to change. The brand tokens mirror
        frontend/brand/theme-tokens.css. */
     --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6;
-    --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E2E8F0;
-    --ink:#1E293B; --muted:#64748B; --line:#E2E8F0; --bg:#F8FAFC;
+    --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E7E5E4;
+    --ink:#1E293B; --muted:#64748B; --line:#E7E5E4; --bg:#F7F6F3;
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
     --brand-orange-text:#C75F06; --brand-gold:#D2931F; --brand-ink:#1F2024; --brand-paper:#FFFFFF;
     /* 5 Oct 2026 — APPEARANCE (the picker at the right of the header, html[data-theme]).
@@ -38,8 +38,15 @@
        colour utilities the app uses are remapped for dark in the DARK-REMAP block below
        (generated from the utilities actually present in this file and asserted in
        test_h1_uk). Exports (XLSX, PDF) are documents and keep the print palette. */
-    --surface:#FFFFFF; --surface-2:#F8FAFC; --surface-3:#F3F4F6; --control-fg:#FFFFFF;
-    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#3B82F6; --chart-grid:rgba(100,116,139,.18);
+    --surface:#FFFFFF; --surface-2:#FAFAF9; --surface-3:#F3F2EF; --control-fg:#FFFFFF;
+    --rail-bg:#F3F2EF; --rail-on:#1F2024;
+    /* 10 Oct 2026 — THE DATA PALETTE (notes/colour-system-1010.md). Colour on a chart does
+       one job: slot 1 is always the PLAN (blue), slot 2 always DELIVERED (the brand orange,
+       deepened to 3:1), slot 4 the fair-price MODEL (the brand gold), slots 3 and 5 further
+       categories, in fixed order, never cycled; --chart-none is "not yet". Validated for
+       colour-blind separation and 3:1 contrast on white and on the dark surface. Status
+       (--green/--gold/--red) is a separate, reserved scale and never a series colour. */
+    --chart-1:#4A72C9; --chart-1-soft:rgba(74,114,201,.18); --chart-2:#C97A2E; --chart-3:#0A9396; --chart-4:#A07D34; --chart-5:#7F6BBE; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
     --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
     --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
     --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9AA1AB; --popover-line:rgba(255,255,255,.12);
@@ -55,7 +62,8 @@
     --red:#F87171; --green:#34D399; --gold:#FBBF24; --grey:#33363D;
     --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518;
     --surface:#1F2024; --surface-2:#1B1D21; --surface-3:#26282D; --control-fg:#1F2024;
-    --chart-1:#FF8C14; --chart-1-soft:rgba(255,140,20,.22); --chart-2:#FFB454; --chart-grid:rgba(154,161,171,.16);
+    --rail-bg:#1B1D21; --rail-on:#F3F4F6;
+    --chart-1:#6A8FE0; --chart-1-soft:rgba(106,143,224,.22); --chart-2:#D07F2E; --chart-3:#179AA4; --chart-4:#B48E3E; --chart-5:#9080D4; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     color-scheme:dark;
   }
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage */
@@ -140,7 +148,55 @@
   .guide-card .guide-foot button.guide-next{background:var(--navy);color:var(--control-fg);border-color:transparent}
   .guide-card .guide-off{display:block;margin-top:8px;font:inherit;font-size:11.5px;color:var(--popover-muted);background:none;border:none;padding:0;text-decoration:underline;cursor:pointer}
   .demo-badge{margin-left:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;align-items:center;}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
+  /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
+     ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
+  .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
+  .rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);opacity:.85;}
+  .rail-item{border-left:3px solid transparent;color:var(--muted);}
+  .rail-item:hover{background:var(--surface);color:var(--ink);}
+  .rail-item.is-on{border-left-color:var(--rail-on);background:var(--surface);color:var(--rail-on);font-weight:600;}
+  .rail-count{font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
+  /* 10 Oct 2026 — the UI pass (ui-review-1009, mockups 2, 4 and 5): tables at 14 px in 40 px
+     rows with a caption, a sticky header and the sort shown once; the filter row and its
+     applied-filter chips; buttons; status as a word with a dot; the empty-state family;
+     skeleton rows while a table loads; the row menu for secondary actions. Tokens only, so the
+     three looks need no remap. */
+  .tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.25;}
+  .tbl caption{caption-side:top;text-align:left;font-size:14px;color:var(--muted);padding:12px 16px 8px;}
+  .tbl caption b{color:var(--ink);font-weight:600;}
+  .tbl th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--muted);font-weight:600;font-size:13px;text-align:left;padding:0 12px;height:40px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .tbl td{padding:0 12px;height:40px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;}
+  .tbl tbody tr:hover td{background:var(--surface-2);}
+  .tbl .num{text-align:right;}
+  .tbl th.sortable{cursor:pointer;user-select:none;}
+  .tbl th.sorted{color:var(--ink);} .tbl th.sorted::after{content:" ▾";} .tbl th.sorted.asc::after{content:" ▴";}
+  .tbl.compact th,.tbl.compact td{height:32px;}
+  .filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;}
+  .ctl{border:1px solid var(--grey);border-radius:6px;background:var(--surface);color:var(--ink);padding:7px 10px;font-size:14px;line-height:1.3;}
+  .applied-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;min-height:28px;}
+  .fchip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--grey);border-radius:999px;padding:3px 8px 3px 12px;font-size:13px;color:var(--ink);}
+  .fchip button{color:var(--muted);font-weight:600;background:none;border:0;cursor:pointer;font:inherit;padding:0 2px;line-height:1;}
+  .link-btn{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--ink);text-decoration:underline;cursor:pointer;}
+  .btn-pri{display:inline-block;padding:7px 14px;border-radius:6px;background:var(--navy);color:var(--control-fg);font-size:14px;font-weight:600;line-height:1.3;border:0;cursor:pointer;white-space:nowrap;}
+  .btn-pri:disabled{opacity:.5;}
+  .btn-sec{display:inline-block;padding:7px 12px;border-radius:6px;background:var(--surface);color:var(--ink);border:1px solid var(--grey);font-size:14px;font-weight:500;line-height:1.3;cursor:pointer;white-space:nowrap;}
+  .btn-sec:hover{background:var(--surface-2);}
+  .btn-sm{padding:4px 10px;font-size:13px;}
+  .chip-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;}
+  .chip-st i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;}
+  .empty-ic{width:40px;height:40px;border-radius:50%;background:var(--surface-3);margin:0 auto 12px;}
+  .empty-ic.error{background:rgba(220,38,38,.12);}
+  .skel{display:inline-block;height:14px;border-radius:4px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}
+  @keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .row-menu{display:inline-block;position:relative;}
+  .row-menu summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;border-radius:6px;border:1px solid var(--grey);background:var(--surface);color:var(--muted);font-weight:700;}
+  .row-menu summary::-webkit-details-marker{display:none;}
+  .row-menu[open] summary{background:var(--surface-2);color:var(--ink);}
+  .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
+  .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
+  .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
+  .row-menu-note{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;border-top:1px solid var(--popover-line);margin-top:4px;}
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */
   .dash-wall .fig-label{font-size:13px;} .dash-wall .fig-sub{font-size:12px;} .dash-wall .fig-group{font-size:12px;}
@@ -277,8 +333,10 @@ const fmt = (n, unit) => unit==="vehicles" ? Math.round(n).toLocaleString() : (M
 // (emisFactor and planningOf were the Dashboard's own CO₂ and planning constants; gone
 //  11 Sep — the server's /api/costing/lines carries CO₂e and the working-day figure.)
 const monthLabelAbs = (idx, startYear) => MONTHS[(idx-1)%12] + " " + String(startYear + Math.floor((idx-1)/12)).slice(2);
-const PALETTE = ["#2563EB","#059669","#DC2626","#C6841D","#6D28D9","#0E7490","#3B82F6","#9AA7B4","#DB6D33","#1B7F5E"];
-const colorOf = (i) => PALETTE[i % PALETTE.length];
+// 10 Oct 2026 — the data palette, read from the tokens so the look (ink / light / dark) picks the
+// step. Fixed order, never cycled: a sixth series is "not yet" grey, never a new hue.
+const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];
+const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");
 
 // Chart.js wrapper — recreates the chart when its serialised config changes.
 function ChartCanvas({ config, height=260 }){
@@ -594,7 +652,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const pick = (key) => setLineKey(k => k === key ? null : key);
 
   const tf = { size: wall ? 13 : 11 };
-  const C1 = tok("--chart-1", "#2563EB"), C1S = tok("--chart-1-soft", "rgba(37,99,235,.18)"), C2 = tok("--chart-2", "#3B82F6");
+  const C1 = tok("--chart-1", "#4A72C9"), C1S = tok("--chart-1-soft", "rgba(74,114,201,.18)"), C2 = tok("--chart-2", "#C97A2E"), C4 = tok("--chart-4", "#A07D34");
   const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()} ${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
   const barScales = { scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
@@ -606,16 +664,16 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const tripsCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Trips", data: D.tripsM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const progressCfg = { type: "bar", data: { labels: D.labels, datasets: [
     { type: "bar", label: "Planned t", data: D.tonnesM, backgroundColor: C1S, borderColor: C1, borderWidth: 1, order: 2 },
-    { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: "#059669", borderWidth: 0, order: 1 }] },
+    { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: C2, borderWidth: 0, order: 1 }] },
     options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
-  const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: "#0E7490", borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
-  const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: "#059669", backgroundColor: "rgba(3,158,134,.12)", fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
+  const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
+  const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: C1, backgroundColor: C1S, fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
   const costCfg   = { type: "bar", data: { labels: D.labels, datasets: [
     { label: `Planned ${CUR()} (quote / target)`, data: D.plannedM, backgroundColor: C1, borderWidth: 0 },
-    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C2, borderWidth: 0 }] }, options: legendOpts };
+    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C4, borderWidth: 0 }] }, options: legendOpts };
   const splitCfg  = { type: "doughnut", data: { labels: D.mats, datasets: [{ data: D.mats.map(m => D.split[m]), backgroundColor: D.mats.map((m, i) => colorOf(i)), borderWidth: 2, borderColor: tok("--surface", "#fff") }] }, options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 10, font: tf } } } } };
   const topN = [...D.routeRows].sort((a, b) => b.t - a.t).slice(0, 10);
-  const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => r.key === lineKey ? "#2563EB" : "#3B82F6"), borderWidth: 0 }] },
+  const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => (lineKey && r.key !== lineKey) ? C1S : C1), borderWidth: 0 }] },
     options: { indexAxis: "y", ...commonOpts, onClick: (evt, els) => { if(els && els.length) pick(topN[els[0].index].key); },
                scales: { x: { grid: { display: false }, ticks: { font: { size: wall ? 12 : 10 } } }, y: { ticks: { font: { size: wall ? 12 : 9 } } } } } };
 
@@ -741,7 +799,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
       </div>
       </WallSection>
 
-      {D.empty && <div className="card p-6 text-center text-slate-500 text-sm">No forecasts match these filters.</div>}
+      {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
 
       <WallSection show={sectionShown(2)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[2].title}>
       <div className="grid lg:grid-cols-3 gap-4">
@@ -1486,7 +1544,7 @@ function PageHeader({ title, subtitle, actions, children }){
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 mb-5" data-guide="page-header">
       <div className="min-w-0">
-        <h2 className="text-xl font-bold text-[color:var(--navy-deep)] tracking-tight">{title}</h2>
+        <h2 className="text-[22px] font-bold text-[color:var(--navy-deep)] tracking-tight">{title}</h2>
         {subtitle && <p className="text-sm text-slate-500 mt-0.5 max-w-3xl">{subtitle}</p>}
         {children}
       </div>
@@ -1495,13 +1553,55 @@ function PageHeader({ title, subtitle, actions, children }){
   );
 }
 
-// One empty state for every page: what is missing, and the one thing to do about it.
-function EmptyState({ title, body, action }){
+// One empty state for every page, in three kinds (10 Oct 2026, ui-review-1009 mockup 5):
+// "none" (nothing yet), "nomatch" (the filters hide everything) and "error" (a read
+// failed). Same card, same type sizes; the action names the way out.
+function EmptyState({ title, body, action, kind }){
+  const k = kind || "none";
   return (
-    <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center">
-      <div className="text-sm font-semibold text-slate-700">{title}</div>
+    <div className="card p-8 text-center" data-empty={k} role={k === "error" ? "alert" : undefined}>
+      <div className={"empty-ic " + k} aria-hidden="true"></div>
+      <div className="text-base font-semibold text-slate-700">{title}</div>
       {body && <div className="text-sm text-slate-500 mt-1 max-w-md mx-auto">{body}</div>}
       {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+// While a table loads it keeps its shape: header, then grey rows in the column widths.
+function SkeletonTable({ cols, rows, caption }){
+  const widths = [48, 220, 90, 140, 110, 60, 80, 90, 70, 60];
+  return (
+    <div className="card overflow-hidden" aria-busy="true" aria-label={caption || "Loading"}>
+      <table className="tbl">
+        {caption && <caption><b>{caption.split(" · ")[0]}</b>{caption.includes(" · ") ? " · " + caption.split(" · ").slice(1).join(" · ") : ""}</caption>}
+        <thead><tr>{(cols || []).map((c, i) => <th key={i} scope="col">{c}</th>)}</tr></thead>
+        <tbody>
+          {Array.from({ length: rows || 5 }).map((_, r) => (
+            <tr key={r}>{(cols || []).map((_, i) => <td key={i}><span className="skel" style={{ width: widths[i % widths.length] * (0.7 + ((r * 7 + i * 3) % 4) / 10) }}></span></td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+// Status as a word with a dot beside it — the same four colours everywhere, never colour
+// alone (10 Oct 2026, mockups 2 and 3; the chart palette is a different scale).
+const STATUS_DOT = { Approved: "var(--green)", confirmed: "var(--green)", held: "var(--green)",
+                     Pending: "var(--gold)", edited: "var(--gold)", Rejected: "var(--red)" };
+function StatusWord({ status, label }){
+  return <span className="chip-st"><i style={{ background: STATUS_DOT[status] || "var(--chart-none)" }} aria-hidden="true"></i>{label || status}</span>;
+}
+// The applied-filter chips under a filter row: one chip per filter in force, each removable,
+// one "Clear all", and the count beside them (mockup 4, the Carbon filtering pattern).
+function AppliedChips({ chips, onClear, onClearAll, count }){
+  if(!chips.length && !count) return null;
+  return (
+    <div className="applied-row">
+      {chips.map(c => (
+        <span key={c.k} className="fchip">{c.label}<button type="button" onClick={() => onClear(c.k)} aria-label={`Remove filter ${c.label}`}>×</button></span>
+      ))}
+      {chips.length > 0 && <button type="button" onClick={onClearAll} className="link-btn">Clear all</button>}
+      {count && <span className="ml-auto text-sm text-slate-500 tabular-nums">{count}</span>}
     </div>
   );
 }
@@ -1565,26 +1665,23 @@ function Portal({ role, who, meta, metaErr, vehLang }){
 
   return (
     <div className="flex-1 min-h-0 flex">
-      <aside data-guide="rail" className={"shrink-0 bg-white border-r border-slate-200 flex flex-col transition-[width] duration-150 " + (railOpen ? "w-56" : "w-14")}>
+      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railOpen ? "w-56" : "w-14")}>
         <div className="flex-1 overflow-y-auto py-3">
           {visible.map(g => (
             // collapsed, the group HEADINGS go but the grouping must not: a plain
             // column of nine icons reads as one undifferentiated list.
             <div key={g.group} className={"mb-3 " + (railOpen ? "" : "pt-3 mt-3 border-t border-slate-100 first:border-0 first:mt-0 first:pt-0")}>
-              {railOpen && <div className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{g.group}</div>}
+              {railOpen && <div className="rail-group px-4 pb-1">{g.group}</div>}
               {g.items.map(it => {
                 const active = page === it.id;
                 const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending : null;
                 return (
                   <button key={it.id} onClick={() => setPage(it.id)} title={railOpen ? undefined : it.label}
-                    className={"w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition border-l-[3px] " +
-                      (active ? "border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold"
-                              : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900")}>
+                    className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
                     <span className="w-4 text-center text-base leading-none opacity-80">{it.glyph}</span>
                     {railOpen && <span className="truncate flex-1">{it.label}</span>}
                     {badge != null && railOpen && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: "var(--gold)", color: "var(--navy-deep)" }}
-                        title={`${badge} line(s) waiting for approval`}>{badge}</span>
+                      <span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>
                     )}
                   </button>
                 );
@@ -2336,6 +2433,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState("");
   const [f, setF] = useState({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
+  const [sort, setSort] = useState({ key: "quantity", dir: "desc" });   // 10 Oct: the one visible sort
 
   useEffect(() => {
     let live = true;
@@ -2454,13 +2552,38 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
-  const badge = (s) => {
-    const map = { Approved: ["var(--green)", "rgba(3,158,134,.12)"], Rejected: ["var(--red)", "rgba(191,46,85,.12)"],
-                  Pending: ["#B45309", "rgba(217,119,6,.12)"], Mixed: ["#475569", "rgba(71,85,105,.12)"] };
-    const [c, bg] = map[s] || map.Mixed;
-    return <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color: c, background: bg }}>{s}</span>;
-  };
-  const chip = (t, title) => <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title={title}>{t}</span>;
+  // 10 Oct 2026 — the UI pass (ui-review-1009, mockups 2, 4 and 5): one figure per column at
+  // 14 px in 40 px rows, numbers right-aligned with the unit in the header, a caption, a sticky
+  // header, the sort shown once, a filter row with applied-filter chips above the table, and
+  // the shared empty-state family. The cost column stays (one compact cell per line, the 13 px
+  // allowance) until the Routes page carries the figures. Approve is the one visible action;
+  // Reject, Edit and Withdraw sit behind the row menu.
+  const units = new Set(shown.map(g => g.unit));
+  const unitLabel = (u) => u === "m3" ? "m³" : (u || "");
+  const sorted = [...shown].sort((a, b) => {
+    const pend = (a.status === "Pending" ? -1 : 1) - (b.status === "Pending" ? -1 : 1);
+    if(pend) return pend;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const av = a[sort.key], bv = b[sort.key];
+    if(av == null && bv == null) return 0; if(av == null) return 1; if(bv == null) return -1;
+    return (av > bv ? 1 : av < bv ? -1 : 0) * dir || a.routeId.localeCompare(b.routeId);
+  });
+  const sortBy = (k) => setSort(s => s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: k === "routeId" ? "asc" : "desc" });
+  const th = (label, key, num) => (
+    <th scope="col" className={(num ? "num " : "") + (key ? "sortable " : "") + (sort.key === key ? "sorted " + sort.dir : "")}
+      onClick={key ? () => sortBy(key) : undefined} aria-sort={sort.key === key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>{label}</th>
+  );
+  const applied = [
+    f.status !== "ALL" && { k: "status", label: `Status: ${f.status}` },
+    f.ipt !== "ALL" && { k: "ipt", label: `${TEAM()}: ${f.ipt === "none" ? "none set" : teamText(f.ipt)}` },
+    f.discipline !== "ALL" && { k: "discipline", label: `Discipline: ${f.discipline}` },
+    f.mine && { k: "mine", label: "Mine only" },
+    f.q && { k: "q", label: `Search: ${f.q}` },
+  ].filter(Boolean);
+  const clearOne = (k) => setF(x => ({ ...x, [k]: k === "mine" ? false : k === "q" ? "" : "ALL" }));
+  const clearAll = () => setF({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
+  const chip = (t, title) => <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title={title}>{t}</span>;
+  const sortCaption = `sorted by ${sort.key === "quantity" ? "total" : sort.key === "months" ? "months" : "route"}, ${sort.dir === "desc" ? "largest first" : "smallest first"}`;
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -2469,134 +2592,116 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
           ? "Every forecast line you can see, across every year it covers. Approve or reject each line here; approved lines feed the route map, the look-ahead and the KPI cards."
           : `Your ${TEAM().toLowerCase()}'s forecast lines, across every year each one covers. Edit reopens a line in Submit forecast; a revised line goes back for approval.`}
         actions={<>
-          <button onClick={() => setTick(t => t + 1)} className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">Refresh</button>
-          {shown.length > 0 && <button onClick={exportCsv} className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">Export CSV</button>}
-        </>}>
-        {groups.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2 text-xs" data-guide="forecast-status">
-            {["Pending", "Approved", "Rejected", "Mixed"].filter(s => counts[s]).map(s => (
-              <button key={s} onClick={() => setF(x => ({ ...x, status: x.status === s ? "ALL" : s }))}
-                className={"px-2 py-1 rounded-md border " + (f.status === s ? "border-[color:var(--navy)] bg-slate-50" : "border-slate-200 hover:bg-slate-50")}>
-                {badge(s)} <span className="ml-1 tabular-nums text-slate-600">{counts[s]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </PageHeader>
+          <button onClick={() => setTick(t => t + 1)} className="btn-sec">Refresh</button>
+          {shown.length > 0 && <button onClick={exportCsv} className="btn-sec">Export CSV</button>}
+          {!canApprove && <button onClick={() => onEdit({})} className="btn-pri">Submit a forecast</button>}
+        </>} />
 
-      {err ? <EmptyState title="Couldn't load forecasts" body="Refresh the page; if it persists the server may still be starting." />
-       : !rows ? <div className="p-8 text-center text-slate-400">Loading…</div>
+      {err ? <EmptyState kind="error" title="Forecasts did not load" body="The server did not answer in time. Nothing you typed is lost."
+               action={<button onClick={() => setTick(t => t + 1)} className="btn-sec">Try again</button>} />
+       : !rows ? <SkeletonTable cols={["Route", "From → to", TEAM(), "Material", "Vehicle", "Months", "Total", "Status"]} rows={6} caption="Forecast lines · loading" />
        : groups.length === 0 ? (
         <EmptyState title="No forecast lines yet"
           body={canApprove ? "Nothing has been submitted that you can see. Lines appear here the moment a submitter saves one." : "Head to Submit forecast to add your first line."}
-          action={!canApprove && <button onClick={() => onEdit({})} className="px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: "var(--navy)" }}>Submit a forecast</button>} />
+          action={!canApprove && <button onClick={() => onEdit({})} className="btn-pri">Submit a forecast</button>} />
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50/60 text-xs">
-            <input value={f.q} onChange={e => setF(x => ({ ...x, q: e.target.value }))} placeholder="Search route, site, material, submitter…"
-              className="border border-slate-200 rounded-md px-2 py-1 w-56 bg-white" />
+        <>
+          <div className="filter-row" data-guide="forecast-status">
+            <input value={f.q} onChange={e => setF(x => ({ ...x, q: e.target.value }))} placeholder="Search routes, places, materials, submitters" aria-label="Search forecast lines" className="ctl w-64" />
+            <select value={f.status} onChange={e => setF(x => ({ ...x, status: e.target.value }))} className="ctl" aria-label="Status">
+              <option value="ALL">Status</option>
+              {["Pending", "Approved", "Rejected", "Mixed"].filter(s => counts[s]).map(s => <option key={s} value={s}>{s} ({counts[s]})</option>)}
+            </select>
             {ipts.length > 0 && (
-              <select value={f.ipt} onChange={e => setF(x => ({ ...x, ipt: e.target.value }))} className="border border-slate-200 rounded-md px-2 py-1 bg-white">
-                <option value="ALL">All {TEAMS()}</option>
+              <select value={f.ipt} onChange={e => setF(x => ({ ...x, ipt: e.target.value }))} className="ctl" aria-label={TEAM()}>
+                <option value="ALL">{TEAM()}</option>
                 {ipts.map(i => <option key={i} value={i}>{teamText(i)}</option>)}
                 {groups.some(g => !g.ipt) && <option value="none">No {TEAM().toLowerCase()} set</option>}
               </select>
             )}
             {discs.length > 0 && (
-              <select value={f.discipline} onChange={e => setF(x => ({ ...x, discipline: e.target.value }))} className="border border-slate-200 rounded-md px-2 py-1 bg-white">
-                <option value="ALL">All disciplines</option>
+              <select value={f.discipline} onChange={e => setF(x => ({ ...x, discipline: e.target.value }))} className="ctl" aria-label="Discipline">
+                <option value="ALL">Discipline</option>
                 {discs.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
-            <label className="flex items-center gap-1.5 text-slate-600"><input type="checkbox" checked={f.mine} onChange={e => setF(x => ({ ...x, mine: e.target.checked }))} /> Mine only</label>
-            <span className="ml-auto text-slate-400 tabular-nums">{shown.length} of {groups.length} line{groups.length === 1 ? "" : "s"}</span>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={f.mine} onChange={e => setF(x => ({ ...x, mine: e.target.checked }))} /> Mine only</label>
           </div>
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-xs">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold">Route</th>
-                  <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Line · submitted by</th>
-                  <th className="px-3 py-2 text-left font-semibold">Years</th>
-                  <th className="px-3 py-2 text-left font-semibold">Material · vehicle</th>
-                  <th className="px-3 py-2 text-right font-semibold">Total</th>
-                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap" title={`Planned ${CUR()} = the route's typed rates or the Config target; Fair ${CUR()} = the cost model (vehicle, distance, tonnage, month, diesel index). Hover a figure for ${CUR()}/t · ${CUR()}/trip · ${CUR()}/km.`}>Cost</th>
-                  <th className="px-3 py-2 text-left font-semibold">Status</th>
-                  <th className="px-3 py-2 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map(g => {
-                  const r = routeById[g.routeId] || {};
-                  const own = g.submittedBy === who;
-                  return (
-                    <tr key={g.key} className="border-t border-slate-100 hover:bg-slate-50 align-top">
-                      {/* route id, the pair it runs between and the IPT in ONE column: nine
-                          columns pushed Actions off the right edge at 1440px, and a row
-                          whose buttons you have to scroll sideways to reach is the whole
-                          page failing at the one thing it is for. */}
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="font-medium text-slate-800">{g.routeId}
-                          <span className="ml-1.5">{g.ipt ? chip(teamText(g.ipt)) : chip("no " + TEAM().toLowerCase(), `No ${TEAM().toLowerCase()} on this line — only planners can see it until one is set. Edit and re-save it from Submit forecast.`)}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{r.origin || "—"} → {r.dest || "—"}</div>
-                      </td>
-                      {/* discipline, section and submitter in one column. Eight columns
-                          still pushed the Withdraw link off the right edge at 1440px; who
-                          submitted a line is secondary to what the line IS, so it rides
-                          under it rather than taking a column of its own. */}
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div>
-                          {g.discipline
-                            ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background:"rgba(37,99,235,.08)", color:"var(--navy)" }}>{g.discipline}</span>
-                            : <span className="text-slate-300">unassigned</span>}
-                          {g.sectionId && <span className="ml-1 text-[11px] text-slate-500">{g.sectionId}</span>}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{g.submittedBy || "—"}{own ? " · you" : ""}</div>
-                      </td>
-                      <td className="px-3 py-2 tabular-nums whitespace-nowrap">{g.yearLabel} <span className="text-slate-400 text-xs">· {g.months} mo</span></td>
-                      <td className="px-3 py-2 text-slate-600 max-w-[220px]">
-                        <div className="truncate" title={`${g.material || ""}${g.material_description ? " · " + g.material_description : ""}`}>
-                          {g.material}{g.material_description ? <span className="text-slate-400"> · {g.material_description}</span> : null}
-                        </div>
-                        <div className="text-[11px] text-slate-500 truncate" title={g.vehicle}>{vehLabel(g.vehicle)}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmt(g.quantity, g.unit)} <span className="text-slate-400 text-xs">{g.unit === "m3" ? "m³" : g.unit}</span></td>
-                      {/* 11 Sep: what the line costs — planned (typed) and fair (the model), each with
-                          {CUR()}/t · {CUR()}/trip · {CUR()}/{DU()} on hover, over every month the line covers */}
-                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-xs" data-cost-cell="1">
-                        {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
-                          <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[9px] font-semibold px-1 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
-                          <div style={{ color: "var(--navy)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not baked for this vehicle — no distance, no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
-                        </>); })()}
-                      </td>
-                      <td className="px-3 py-2">
-                        {badge(g.status)}
-                        {g.rejectReason && <div className="text-[11px] mt-1 max-w-[180px]" style={{ color: "var(--red)" }}>{g.rejectReason}</div>}
-                      </td>
-                      <td className="px-3 py-2 pl-1 text-right whitespace-nowrap">
-                        {canApprove && g.status !== "Approved" && (
-                          <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")}
-                            className="px-2 py-1 rounded-md text-white text-xs font-semibold mr-1 disabled:opacity-50" style={{ background: "var(--green)" }}>Approve</button>
-                        )}
-                        {canApprove && g.status !== "Rejected" && (
-                          <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")}
-                            className="px-2 py-1 rounded-md text-white text-xs font-semibold mr-1.5 disabled:opacity-50" style={{ background: "var(--red)" }}>Reject</button>
-                        )}
-                        <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}
-                          className="text-[color:var(--navy)] font-semibold hover:underline text-xs mr-1.5">Edit</button>
-                        {(own || canApprove) && (
-                          <button disabled={busy === g.key} onClick={() => withdraw(g)} className="text-[color:var(--red)] hover:underline text-xs disabled:opacity-50">Withdraw</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {shown.length === 0 && <tr><td colSpan="8" className="px-3 py-8 text-center text-slate-400">Nothing matches these filters.</td></tr>}
-              </tbody>
-            </table>
+          <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}
+            count={`${shown.length} of ${groups.length} line${groups.length === 1 ? "" : "s"}`} />
+
+          <div className="card overflow-hidden">
+            <div className="max-h-[72vh] overflow-auto">
+              <table className="tbl">
+                <caption><b>Forecast lines</b> · {sortCaption}{counts.Pending ? ` · ${counts.Pending} pending approval` : ""}</caption>
+                <thead>
+                  <tr>
+                    {th("Route", "routeId")}
+                    <th scope="col">From → to</th>
+                    <th scope="col">{TEAM()}</th>
+                    <th scope="col">Material</th>
+                    <th scope="col">Vehicle</th>
+                    {th("Months", "months", true)}
+                    {th(units.size === 1 ? `Total (${unitLabel([...units][0])})` : "Total", "quantity", true)}
+                    <th scope="col" className="num" title={`Planned ${CUR()} = the route's typed rates or the Config target; fair ${CUR()} = the cost model (vehicle, distance, tonnage, month, diesel index). Hover a figure for ${CUR()}/t · ${CUR()}/trip · ${CUR()}/${DU()}.`}>Cost ({CUR()})</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="num"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map(g => {
+                    const r = routeById[g.routeId] || {};
+                    const own = g.submittedBy === who;
+                    const line = [g.discipline || null, g.sectionId || null].filter(Boolean).join(" · ");
+                    return (
+                      <tr key={g.key} title={`Submitted by ${g.submittedBy || "—"}${own ? " (you)" : ""} · ${g.yearLabel}`}>
+                        <td>
+                          <div className="font-medium text-slate-800 leading-tight">{g.routeId}{!g.ipt && <span className="ml-1.5">{chip("no " + TEAM().toLowerCase(), `No ${TEAM().toLowerCase()} on this line — only planners can see it until one is set. Edit and re-save it from Submit forecast.`)}</span>}</div>
+                          {line && <div className="text-[13px] text-slate-500 leading-tight">{line}</div>}
+                        </td>
+                        <td className="max-w-[240px] truncate" title={`${r.origin || "—"} → ${r.dest || "—"}`}>{r.origin || "—"} → {r.dest || "—"}</td>
+                        <td>{g.ipt ? teamText(g.ipt) : <span className="text-slate-400">—</span>}</td>
+                        <td className="max-w-[160px] truncate text-slate-700" title={`${g.material || ""}${g.material_description ? " · " + g.material_description : ""}`}>{g.material || "—"}</td>
+                        <td className="max-w-[140px] truncate text-slate-700" title={g.vehicle}>{vehLabel(g.vehicle)}</td>
+                        <td className="num" title={g.yearLabel}>{g.months}</td>
+                        <td className="num">{fmt(g.quantity, g.unit)}{units.size > 1 && <span className="text-slate-400 text-[13px]"> {unitLabel(g.unit)}</span>}</td>
+                        <td className="num text-[13px] leading-tight" data-cost-cell="1">
+                          {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
+                            <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[11px] font-semibold px-1 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
+                            <div style={{ color: "var(--chart-4)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not baked for this vehicle — no distance, no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
+                          </>); })()}
+                        </td>
+                        <td>
+                          <StatusWord status={g.status} />
+                          {g.rejectReason && <div className="text-[13px] leading-tight max-w-[200px] truncate" style={{ color: "var(--red)" }} title={g.rejectReason}>{g.rejectReason}</div>}
+                        </td>
+                        <td className="num whitespace-nowrap">
+                          {canApprove && g.status !== "Approved" && (
+                            <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")} className="btn-pri btn-sm mr-1">Approve</button>
+                          )}
+                          <details className="row-menu">
+                            <summary aria-label={`More actions for ${g.routeId}`} title="More actions">⋯</summary>
+                            <div className="row-menu-list">
+                              {canApprove && g.status !== "Rejected" && (
+                                <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
+                              )}
+                              <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
+                              {(own || canApprove) && (
+                                <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
+                              )}
+                              <div className="row-menu-note">Submitted by {g.submittedBy || "—"}{own ? " (you)" : ""} · {g.yearLabel}</div>
+                            </div>
+                          </details>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {sorted.length === 0 && <tr><td colSpan="10" className="!p-0 !h-auto"><EmptyState kind="nomatch" title="No lines match these filters" body={applied.map(a => a.label).join(" · ")} action={<button onClick={clearAll} className="btn-sec">Clear filters</button>} /></td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
