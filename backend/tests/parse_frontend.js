@@ -1108,7 +1108,10 @@ ok("🔴 cost never reaches the map: no €, eur, fair or rate anywhere in Commi
   !/€|\beur\b|_eur|fair|rate_|\brates?\b|planned_units|eur_units/i.test(_cmBody) && _cmBody.includes("trips`).join"));
 ok("big-screen mode: fullscreen requested (never required), filters and the table hidden, both reads refreshed every 5 minutes, Esc leaves",
   _dbBody.includes("requestFullscreen") && _dbBody.includes("REFRESH_MS") && src.includes("const REFRESH_MS = 5 * 60 * 1000")
-  && _dbBody.includes("{!wall && <div className=\"flex flex-wrap gap-2 items-center -mt-2\">") && _dbBody.includes("{!wall && <div className=\"card overflow-hidden\">")
+  // 10 Oct 2026 NARROWED: the filters sit in the header (three that matter) with the rest behind "More filters",
+  // and the route table is a collapsed section of the working view — both are still gated on !wall
+  && _dbBody.includes("{!wall && <>") && _dbBody.includes("More filters ▾") && _dbBody.includes("{!wall && <AppliedChips")
+  && _dbBody.includes('data-dash-table="1"') && _dbBody.indexOf('data-dash-table="1"') < _dbBody.indexOf("      ) : (\n        <>\n")
   && _dbBody.includes('e.key === "Escape"') && _dbBody.includes("fullscreenchange"));
 ok("interactive: a route row (or a Top-routes bar) narrows the charts and figures to that line; the table stays whole; a chip clears it",
   _dbBody.includes("const narrowed = lineKey ? filtered.filter(r => keyOf(r) === lineKey) : filtered;")
