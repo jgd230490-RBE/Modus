@@ -2858,7 +2858,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                         <td className="num">{fmt(g.quantity, g.unit)}{units.size > 1 && <span className="text-slate-400 text-[13px]"> {unitLabel(g.unit)}</span>}</td>
                         <td className="num text-[13px] leading-tight" data-cost-cell="1">
                           {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
-                            <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[11px] font-semibold px-1 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
+                            <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[13px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
                             <div style={{ color: "var(--chart-4)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not baked for this vehicle — no distance, no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
                           </>); })()}
                         </td>
@@ -5029,7 +5029,7 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
 
   return (
     <div className="mb-3 rounded-lg border border-slate-200 bg-white p-2.5">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1.5">Gates</div>
+      <div className="text-sm font-medium text-slate-700 mb-1.5">Gates</div>
       {!!(blockers || []).length && (
         <p className="text-xs mb-2 font-semibold" style={{ color: "var(--red)" }}>
           This route will not bake: {(blockers || []).join("; ")}.
@@ -6778,7 +6778,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
             {form && (
               <div className="space-y-3">
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">{form.id ? `Editing ${form.id}` : "New location"}</div>
+                <div className="text-sm font-medium text-slate-700">{form.id ? `Editing ${form.id}` : "New location"}</div>
                 <label className="block">
                   <span className="block text-sm font-medium text-slate-700 mb-1">Name</span>
                   <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="e.g. Väo quarry"
@@ -7009,14 +7009,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block">
-                          <span className="text-[11px] uppercase tracking-wide text-slate-400" title="Safety / briefing at this gate. Once per arrival.">Induction (min)</span>
+                          <span className="text-sm font-medium text-slate-700" title="Safety / briefing at this gate. Once per arrival.">Induction (min)</span>
                           <input value={gateForm.safety_minutes}
                             onChange={e => setGateForm(g => ({ ...g, safety_minutes: e.target.value }))}
                             inputMode="decimal" placeholder="0"
                             className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
                         </label>
                         <label className="block">
-                          <span className="text-[11px] uppercase tracking-wide text-slate-400" title="Drive from this gate to the face. Ignored if the route uses a drawn haul road.">Gate → face (min)</span>
+                          <span className="text-sm font-medium text-slate-700" title="Drive from this gate to the face. Ignored if the route uses a drawn haul road.">Gate → face (min)</span>
                           <input value={gateForm.internal_travel_minutes}
                             onChange={e => setGateForm(g => ({ ...g, internal_travel_minutes: e.target.value }))}
                             inputMode="decimal" placeholder="0"
