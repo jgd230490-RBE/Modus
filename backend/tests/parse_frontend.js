@@ -387,8 +387,11 @@ ok("⭐ the commit week comes from the server's commit_week, through /lookahead?
   && !_laBody.includes("payload.next_week"));
 ok("...and the bucket switch offers exactly this week and next week — the Thursday process",
   /\[\["commit", "this week"\], \["next", "next week"\]\]/.test(_laBody));
+// 10 Oct 2026 NARROWED: the day cell reads as a figure and is an input only once clicked (mockup 3) —
+// still editable exactly while the week is not confirmed, in this bucket or next
 ok("a planned day is editable while its week is not confirmed, this bucket or next",
-  /const locked = w\.status === "confirmed"/.test(_laBody) && /\{!locked \? \(/.test(_laBody));
+  /const locked = w\.status === "confirmed"/.test(_laBody) && /\{!locked && editing === k \? \(/.test(_laBody) && /\) : !locked \? \(/.test(_laBody)
+  && _laBody.includes('onClick={() => setEditing(k)}'));
 ok("a confirmed week's plan is read-only", code.includes("Confirmed — reopen it to change the plan"));
 ok("⭐ Confirm week is ONE button for the whole week, separate from editing (L6)",
   _laBody.includes(">Confirm week<") && _laBody.includes("/forecast-weeks/confirm")
@@ -1108,7 +1111,10 @@ ok("🔴 cost never reaches the map: no €, eur, fair or rate anywhere in Commi
   !/€|\beur\b|_eur|fair|rate_|\brates?\b|planned_units|eur_units/i.test(_cmBody) && _cmBody.includes("trips`).join"));
 ok("big-screen mode: fullscreen requested (never required), filters and the table hidden, both reads refreshed every 5 minutes, Esc leaves",
   _dbBody.includes("requestFullscreen") && _dbBody.includes("REFRESH_MS") && src.includes("const REFRESH_MS = 5 * 60 * 1000")
-  && _dbBody.includes("{!wall && <div className=\"flex flex-wrap gap-2 items-center -mt-2\">") && _dbBody.includes("{!wall && <div className=\"card overflow-hidden\">")
+  // 10 Oct 2026 NARROWED: the filters sit in the header (three that matter) with the rest behind "More filters",
+  // and the route table is a collapsed section of the working view — both are still gated on !wall
+  && _dbBody.includes("{!wall && <>") && _dbBody.includes("More filters ▾") && _dbBody.includes("{!wall && <AppliedChips")
+  && _dbBody.includes('data-dash-table="1"') && _dbBody.indexOf('data-dash-table="1"') < _dbBody.indexOf("      ) : (\n        <>\n")
   && _dbBody.includes('e.key === "Escape"') && _dbBody.includes("fullscreenchange"));
 ok("interactive: a route row (or a Top-routes bar) narrows the charts and figures to that line; the table stays whole; a chip clears it",
   _dbBody.includes("const narrowed = lineKey ? filtered.filter(r => keyOf(r) === lineKey) : filtered;")
@@ -1255,6 +1261,106 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      !/DEFRA/.test(src) && /DESNZ 2026 kg CO₂e per vehicle-km \(average laden, both legs, from Config\)/.test(src));
   ok("the Dashboard figure and the Routes table say lorry-<unit>, the bake table says HGV params",
      /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && />Lorry-\{DU\(\)\}\{arrow\("km"\)\}<\/th>/.test(src) && />HGV params<\/th>/.test(src));
+}
+
+// ---- 10 Oct 2026: the UI pass (notes/ui-review-1009, mockups 1-6, 8 and 8b; colour-system-1010.md) ----
+// Source-level, like everything above. What they prove: the tokens exist in both looks, the charts read
+// the palette in fixed order and carry no raw hex, the shell is neutral (ink active rail item), the shared
+// components exist and are used, the tables are 14 px in 40 / 32 px rows with a caption, and the four
+// rebuilt pages carry no 9-11 px product text. Not covered: anything visual (no browser here).
+{
+  // (code has its comments stripped, so the slices end on the next function, never on a comment marker)
+  const _fcBody = code.slice(code.indexOf("function Forecasts("), code.indexOf("function CostingTab("));
+  const _cfBody = code.slice(code.indexOf("function ConfigPage("), code.indexOf("const dayName = (iso) => [", code.indexOf("function ConfigPage(")));
+  const _dbWork = _dbBody.slice(_dbBody.indexOf("{!wall ? ("), _dbBody.indexOf("      ) : (\n        <>\n"));
+  const _dbWall = _dbBody.slice(_dbBody.indexOf("      ) : (\n        <>\n"));
+  const _laGrid = _laBody.slice(_laBody.indexOf('<table className="tbl compact"'), _laBody.indexOf("</table>", _laBody.indexOf('<table className="tbl compact"')));
+  // 8b. the data palette: six tokens, light and dark, read in fixed order, never a raw hex on a dataset
+  ok("the data palette is six tokens in the light look (plan blue, delivered orange, teal, model gold, purple, not-yet grey)",
+    /--chart-1:#4A72C9; --chart-1-soft:rgba\(74,114,201,\.18\); --chart-2:#C97A2E; --chart-3:#0A9396; --chart-4:#A07D34; --chart-5:#7F6BBE; --chart-none:#A8A29E;/.test(html));
+  ok("...and six dark steps on the dark surface (validated 10 Oct, colour-system-1010.md)",
+    /--chart-1:#6A8FE0; --chart-1-soft:rgba\(106,143,224,\.22\); --chart-2:#D07F2E; --chart-3:#179AA4; --chart-4:#B48E3E; --chart-5:#9080D4; --chart-none:#6B6965;/.test(html));
+  ok("⭐ the charts read the slots in FIXED order and a sixth series is grey, never a new hue (no cycled PALETTE)",
+    code.includes('const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];')
+    && code.includes('const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");') && !/const PALETTE = \[/.test(code));
+  ok("🔴 no Dashboard dataset carries a raw hex: planned is slot 1, delivered slot 2, the model slot 4 (status colours stay on the stockpile chart only)",
+    !/backgroundColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody) && !/borderColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody)
+    && _dbBody.includes('C2 = tok("--chart-2", "#C97A2E"), C4 = tok("--chart-4", "#A07D34")')
+    && _dbBody.includes("data: D.actualM, backgroundColor: C2") && _dbBody.includes("data: D.fairM, backgroundColor: C4")
+    && _dbBody.includes("data: D.co2M, borderColor: C1, backgroundColor: C1S"));
+  // 8. the shell: warm neutrals, a dimmed rail whose active item is ink
+  ok("the shell tokens are the warm neutrals and the rail has its own two tokens, light and dark",
+    /--line:#E7E5E4; --bg:#F7F6F3;/.test(html) && /--rail-bg:#F3F2EF; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
+  ok("⭐ the rail's active item is INK, not the action colour (one accent on a neutral shell)",
+    /\.rail-item\.is-on\{border-left-color:var\(--rail-on\);background:var\(--surface\);color:var\(--rail-on\);font-weight:600;\}/.test(html)
+    && code.includes('className={"rail shrink-0 flex flex-col transition-[width] duration-150 "')
+    && code.includes('className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}')
+    && !code.includes('border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold'));
+  ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>'));
+  // 5. the shared components
+  ok("the empty-state family: one EmptyState with a kind, marked data-empty, no dashed border; a SkeletonTable; StatusWord; AppliedChips",
+    code.includes("function EmptyState({ title, body, action, kind })") && code.includes('data-empty={k}') && !code.includes("border-dashed")
+    && code.includes("function SkeletonTable({ cols, rows, caption })") && code.includes("function StatusWord({ status, label })") && code.includes("function AppliedChips({ chips, onClear, onClearAll, count })"));
+  ok("...the three kinds are used: none (Forecasts), nomatch (Forecasts + Dashboard), error (Forecasts), and a skeleton while Forecasts and Config load",
+    _fcBody.includes('<EmptyState kind="error" title="Forecasts did not load"') && _fcBody.includes('<EmptyState kind="nomatch" title="No lines match these filters"')
+    && _fcBody.includes('<EmptyState title="No forecast lines yet"') && _dbBody.includes('<EmptyState kind="nomatch" title="No forecast lines match these filters"')
+    && _fcBody.includes("<SkeletonTable cols=") && _cfBody.includes("<SkeletonTable cols="));
+  // the table style: 14 px, 40 px rows (32 compact), a sticky header, numbers right-aligned, the sort shown once
+  ok("the shared table style: 14 px, 40 px rows, 32 px compact, a sticky header, .num right-aligned, one sorted header",
+    /\.tbl\{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;font-variant-numeric:tabular-nums;/.test(html)
+    && /\.tbl th\{position:sticky;top:0;z-index:1;/.test(html) && /\.tbl td\{padding:0 12px;height:40px;/.test(html)
+    && /\.tbl\.compact th,\.tbl\.compact td\{height:32px;\}/.test(html) && /\.tbl \.num\{text-align:right;\}/.test(html) && /\.tbl th\.sorted::after\{content:" ▾";\}/.test(html));
+  // 2 + 4. Forecasts
+  ok("Forecasts: one .tbl with a caption, the unit in the header, numbers in .num cells, the one visible sort",
+    _fcBody.includes('<table className="tbl">') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
+    && _fcBody.includes('th(units.size === 1 ? `Total (${unitLabel([...units][0])})` : "Total", "quantity", true)')
+    && _fcBody.includes('<td className="num">{fmt(g.quantity, g.unit)}') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
+  ok("...a filter row with applied-filter chips and Clear all above the table; the status chips left the page header",
+    _fcBody.includes('<div className="filter-row" data-guide="forecast-status">') && _fcBody.includes("<AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}")
+    && _fcBody.includes("const clearAll = () => setF({ status: \"ALL\", ipt: \"ALL\", discipline: \"ALL\", mine: false, q: \"\" });")
+    && !_fcBody.includes("badge(s)"));
+  ok("...Approve is the one visible action; Reject, Edit and Withdraw sit behind the row menu; status is a word with a dot",
+    _fcBody.includes('<details className="row-menu">') && _fcBody.includes(">Reject…</button>") && _fcBody.includes(">Edit in Submit forecast</button>") && _fcBody.includes(">Withdraw…</button>")
+    && _fcBody.includes("<StatusWord status={g.status} />") && _fcBody.includes('className="btn-pri btn-sm mr-1">Approve</button>'));
+  ok("🔴 no 9, 10 or 11 px product text on the Forecasts page (the 13 px allowance only)",
+    !/text-\[(9|10|11)px\]/.test(_fcBody));
+  // 6. Configuration as a form
+  ok("Config: a section list, a two-thirds form, labels above inputs, one Save bar, the token and Reset behind More",
+    _cfBody.includes('<div className="cfg-grid">') && _cfBody.includes('<nav className="cfg-nav" aria-label="Configuration sections">')
+    && _cfBody.includes('<div className="savebar" data-cfg-savebar="1">') && _cfBody.includes('<details className="row-menu" data-cfg-more="1">')
+    && _cfBody.includes(">Reset to file…</button>") && _cfBody.includes('<label htmlFor={"cfg-" + k}>{l}</label>') && _cfBody.includes('<div className="hint">{help}</div>')
+    && /\.cfg-grid\{display:grid;grid-template-columns:200px minmax\(0,800px\);/.test(html) && /\.savebar\{position:sticky;bottom:0;/.test(html));
+  ok("...every form label in the file is 14 px above its input; the 11 px uppercase label is gone",
+    (code.match(/<span className="block text-sm font-medium text-slate-700 mb-1">/g) || []).length >= 40
+    && !code.includes('text-[11px] uppercase tracking-wide text-slate-400') && !/text-\[(9|10|11)px\]/.test(_cfBody));
+  ok("...one Discard beside Save, both in the bar; Reset keeps its confirm", _cfBody.includes(">Discard</button>") && _cfBody.includes('if(!confirm("Replace the live configuration with backend/factors.json?'));
+  // 1. the one-screen Dashboard
+  ok("Dashboard: the working view is six cards, four charts, and five collapsed sections; the big screen keeps its four WallSections",
+    (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
+    && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
+    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8);
+  ok("...the six cards: material, loads a day (working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
+    ['label="Material in view"', 'label="Loads a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
+    && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
+  ok("...a collapsed section re-measures what it holds when opened (Mapbox and Chart.js measure zero while hidden)",
+    _dbBody.includes('const onMore = (e) => { if(e.target.open) requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(err){} }); };')
+    && (_dbWork.match(/onToggle=\{onMore\}/g) || []).length === 5);
+  ok("...three filters in the header, the rest behind More filters, applied chips with Clear all",
+    _dbBody.includes(">More filters ▾</summary>") && _dbBody.includes('<div className="row-menu-list dash-filters">') && _dbBody.includes("{!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}"));
+  // 3. the Look-ahead grid
+  ok("Look-ahead: the commit grid is a compact .tbl with a caption, the row named in words, a Week column, a Status column and a totals row",
+    _laGrid.includes("<caption><b>Planned quantity by day</b>") && _laGrid.includes("Route · {TEAM().toLowerCase()} · section</th>")
+    && _laGrid.includes('<th className="num">Week</th>') && _laGrid.includes("<th>Status</th>") && _laGrid.includes('<tr className="la-total">')
+    && _laGrid.includes("<td><StatusChip s={w.status} parentChanged={w.parent_changed} /></td>"));
+  ok("...the day cell is a figure until clicked, then an input that saves on blur, Enter or Escape",
+    _laGrid.includes('<button type="button" className={"la-cell"') && _laGrid.includes('onBlur={() => { saveDay(line, d); setEditing(null); }}')
+    && _laGrid.includes('onKeyDown={e => { if(e.key === "Enter" || e.key === "Escape") e.currentTarget.blur(); }}'));
+  ok("🔴 no 9, 10 or 11 px text in the commit grid; status and flags are words with dots",
+    !/text-\[(9|10|11)px\]/.test(_laGrid) && code.includes('<StatusWord status={s} label={s === "derived" ? "Derived"')
+    && /function LineFlags\(\{ flags \}\)\{[\s\S]*?className="chip-st whitespace-nowrap"/.test(code));
+  ok("...the clash rail is a card that says how many flags, each a word with a dot; +N more kept",
+    _laBody.includes('<span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>')
+    && _laBody.includes("rail.flags.slice(0, 3)") && _laBody.includes("more`"));
 }
 
 // ---- report ------------------------------------------------------------------

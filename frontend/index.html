@@ -27,8 +27,8 @@
        The variable NAMES are kept so nothing else had to change. The brand tokens mirror
        frontend/brand/theme-tokens.css. */
     --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6;
-    --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E2E8F0;
-    --ink:#1E293B; --muted:#64748B; --line:#E2E8F0; --bg:#F8FAFC;
+    --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E7E5E4;
+    --ink:#1E293B; --muted:#64748B; --line:#E7E5E4; --bg:#F7F6F3;
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
     --brand-orange-text:#C75F06; --brand-gold:#D2931F; --brand-ink:#1F2024; --brand-paper:#FFFFFF;
     /* 5 Oct 2026 — APPEARANCE (the picker at the right of the header, html[data-theme]).
@@ -38,8 +38,15 @@
        colour utilities the app uses are remapped for dark in the DARK-REMAP block below
        (generated from the utilities actually present in this file and asserted in
        test_h1_uk). Exports (XLSX, PDF) are documents and keep the print palette. */
-    --surface:#FFFFFF; --surface-2:#F8FAFC; --surface-3:#F3F4F6; --control-fg:#FFFFFF;
-    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#3B82F6; --chart-grid:rgba(100,116,139,.18);
+    --surface:#FFFFFF; --surface-2:#FAFAF9; --surface-3:#F3F2EF; --control-fg:#FFFFFF;
+    --rail-bg:#F3F2EF; --rail-on:#1F2024;
+    /* 10 Oct 2026 — THE DATA PALETTE (notes/colour-system-1010.md). Colour on a chart does
+       one job: slot 1 is always the PLAN (blue), slot 2 always DELIVERED (the brand orange,
+       deepened to 3:1), slot 4 the fair-price MODEL (the brand gold), slots 3 and 5 further
+       categories, in fixed order, never cycled; --chart-none is "not yet". Validated for
+       colour-blind separation and 3:1 contrast on white and on the dark surface. Status
+       (--green/--gold/--red) is a separate, reserved scale and never a series colour. */
+    --chart-1:#4A72C9; --chart-1-soft:rgba(74,114,201,.18); --chart-2:#C97A2E; --chart-3:#0A9396; --chart-4:#A07D34; --chart-5:#7F6BBE; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
     --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
     --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
     --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9AA1AB; --popover-line:rgba(255,255,255,.12);
@@ -55,7 +62,8 @@
     --red:#F87171; --green:#34D399; --gold:#FBBF24; --grey:#33363D;
     --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518;
     --surface:#1F2024; --surface-2:#1B1D21; --surface-3:#26282D; --control-fg:#1F2024;
-    --chart-1:#FF8C14; --chart-1-soft:rgba(255,140,20,.22); --chart-2:#FFB454; --chart-grid:rgba(154,161,171,.16);
+    --rail-bg:#1B1D21; --rail-on:#F3F4F6;
+    --chart-1:#6A8FE0; --chart-1-soft:rgba(106,143,224,.22); --chart-2:#D07F2E; --chart-3:#179AA4; --chart-4:#B48E3E; --chart-5:#9080D4; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     color-scheme:dark;
   }
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage */
@@ -140,7 +148,100 @@
   .guide-card .guide-foot button.guide-next{background:var(--navy);color:var(--control-fg);border-color:transparent}
   .guide-card .guide-off{display:block;margin-top:8px;font:inherit;font-size:11.5px;color:var(--popover-muted);background:none;border:none;padding:0;text-decoration:underline;cursor:pointer}
   .demo-badge{margin-left:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;align-items:center;}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
+  /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
+     ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
+  .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
+  .rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);opacity:.85;}
+  .rail-item{border-left:3px solid transparent;color:var(--muted);}
+  .rail-item:hover{background:var(--surface);color:var(--ink);}
+  .rail-item.is-on{border-left-color:var(--rail-on);background:var(--surface);color:var(--rail-on);font-weight:600;}
+  .rail-count{font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
+  /* 10 Oct 2026 — the UI pass (ui-review-1009, mockups 2, 4 and 5): tables at 14 px in 40 px
+     rows with a caption, a sticky header and the sort shown once; the filter row and its
+     applied-filter chips; buttons; status as a word with a dot; the empty-state family;
+     skeleton rows while a table loads; the row menu for secondary actions. Tokens only, so the
+     three looks need no remap. */
+  .tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.25;}
+  .tbl caption{caption-side:top;text-align:left;font-size:14px;color:var(--muted);padding:12px 16px 8px;}
+  .tbl caption b{color:var(--ink);font-weight:600;}
+  .tbl th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--muted);font-weight:600;font-size:13px;text-align:left;padding:0 12px;height:40px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .tbl td{padding:0 12px;height:40px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;}
+  .tbl tbody tr:hover td{background:var(--surface-2);}
+  .tbl .num{text-align:right;}
+  .tbl th.sortable{cursor:pointer;user-select:none;}
+  .tbl th.sorted{color:var(--ink);} .tbl th.sorted::after{content:" ▾";} .tbl th.sorted.asc::after{content:" ▴";}
+  .tbl.compact th,.tbl.compact td{height:32px;}
+  .filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;}
+  .ctl{border:1px solid var(--grey);border-radius:6px;background:var(--surface);color:var(--ink);padding:7px 10px;font-size:14px;line-height:1.3;}
+  .applied-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;min-height:28px;}
+  .fchip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--grey);border-radius:999px;padding:3px 8px 3px 12px;font-size:13px;color:var(--ink);}
+  .fchip button{color:var(--muted);font-weight:600;background:none;border:0;cursor:pointer;font:inherit;padding:0 2px;line-height:1;}
+  .link-btn{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--ink);text-decoration:underline;cursor:pointer;}
+  .btn-pri{display:inline-block;padding:7px 14px;border-radius:6px;background:var(--navy);color:var(--control-fg);font-size:14px;font-weight:600;line-height:1.3;border:0;cursor:pointer;white-space:nowrap;}
+  .btn-pri:disabled{opacity:.5;}
+  .btn-sec{display:inline-block;padding:7px 12px;border-radius:6px;background:var(--surface);color:var(--ink);border:1px solid var(--grey);font-size:14px;font-weight:500;line-height:1.3;cursor:pointer;white-space:nowrap;}
+  .btn-sec:hover{background:var(--surface-2);}
+  .btn-sm{padding:4px 10px;font-size:13px;}
+  .chip-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;}
+  .chip-st i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;}
+  .empty-ic{width:40px;height:40px;border-radius:50%;background:var(--surface-3);margin:0 auto 12px;}
+  .empty-ic.error{background:rgba(220,38,38,.12);}
+  .skel{display:inline-block;height:14px;border-radius:4px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}
+  @keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .row-menu{display:inline-block;position:relative;}
+  .row-menu summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;border-radius:6px;border:1px solid var(--grey);background:var(--surface);color:var(--muted);font-weight:700;}
+  .row-menu summary::-webkit-details-marker{display:none;}
+  .row-menu[open] summary{background:var(--surface-2);color:var(--ink);}
+  .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
+  .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
+  .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
+  .row-menu-note{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;border-top:1px solid var(--popover-line);margin-top:4px;white-space:normal;}
+  /* 10 Oct 2026 — Configuration as a form (mockup 6): the section list, the field, the one Save bar */
+  .cfg-grid{display:grid;grid-template-columns:200px minmax(0,800px);gap:32px;align-items:start;}
+  @media (max-width:900px){.cfg-grid{grid-template-columns:1fr;}}
+  .cfg-nav{position:sticky;top:0;display:flex;flex-direction:column;gap:2px;font-size:14px;}
+  .cfg-nav-item{text-align:left;padding:8px 12px;border-radius:6px;color:var(--muted);background:none;border:0;border-left:3px solid transparent;font:inherit;font-size:14px;cursor:pointer;}
+  .cfg-nav-item:hover{color:var(--ink);}
+  .cfg-nav-item.is-on{color:var(--ink);font-weight:600;border-left-color:var(--rail-on);background:var(--surface);}
+  .cfg-main{padding:0;overflow:hidden;}
+  .field{margin-bottom:18px;}
+  .field label{display:block;font-size:14px;font-weight:500;color:var(--ink);margin-bottom:6px;}
+  .field .hint{font-size:13px;color:var(--muted);margin-top:4px;}
+  .ctl-sm{padding:4px 8px;}
+  .savebar{position:sticky;bottom:0;margin:24px -24px 0;padding:12px 24px;background:var(--surface);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;font-size:14px;z-index:5;}
+  .row-menu-field{display:block;padding:6px 10px;}
+  .row-menu-field span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;white-space:normal;}
+  .row-menu-field input{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
+  /* 10 Oct 2026 — the one-screen Dashboard (mockups 1 and 8): six cards, collapsed detail sections */
+  .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+  @media (min-width:900px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
+  @media (min-width:1280px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));}}
+  .dash-card{padding:14px 16px;cursor:help;}
+  .dash-card-l{font-size:14px;color:var(--muted);font-weight:500;line-height:1.3;}
+  .dash-card-v{font-size:clamp(1.3rem,1.6vw,1.75rem);font-weight:600;color:var(--navy-deep);line-height:1.15;margin:6px 0 4px;white-space:nowrap;}
+  .dash-card-s{font-size:13px;color:var(--muted);line-height:1.3;}
+  .dash-more{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 16px;}
+  .dash-more>summary{cursor:pointer;list-style:none;padding:12px 0;font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  .dash-more>summary::-webkit-details-marker{display:none;}
+  .dash-more>summary::before{content:"›";display:inline-block;width:14px;color:var(--muted);transition:transform .15s;}
+  .dash-more[open]>summary::before{transform:rotate(90deg);}
+  .dash-more[open]>summary{border-bottom:1px solid var(--line);}
+  .dash-more>div{padding-bottom:16px;}
+  .dash-more .card.overflow-hidden{border:0;}
+  .dash-filters label{display:block;padding:6px 10px;}
+  .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
+  .dash-filters select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
+  .dash-filters select option{color:#1F2024;}
+  .tbl tr.is-picked td{background:var(--chart-1-soft);}
+  /* 10 Oct 2026 — the Look-ahead grid (mockup 3): sticky first column, click-to-edit cells, a totals row */
+  .tbl .la-stick{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
+  .tbl th.la-stick{background:var(--surface-2);z-index:3;}
+  .tbl tbody tr:hover td.la-stick{background:var(--surface-2);}
+  .la-cell{font:inherit;font-size:14px;font-weight:600;color:var(--ink);background:none;border:0;border-bottom:1px dashed transparent;padding:0;cursor:text;font-variant-numeric:tabular-nums;line-height:1.2;}
+  .la-cell:hover{border-bottom-color:var(--muted);}
+  .tbl tr.la-total td{font-weight:600;background:var(--surface-2);border-top:1px solid var(--grey);}
+  .tbl.compact tr.la-total td,.tbl.compact td.num{height:auto;padding-top:4px;padding-bottom:4px;}
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */
   .dash-wall .fig-label{font-size:13px;} .dash-wall .fig-sub{font-size:12px;} .dash-wall .fig-group{font-size:12px;}
@@ -277,8 +378,10 @@ const fmt = (n, unit) => unit==="vehicles" ? Math.round(n).toLocaleString() : (M
 // (emisFactor and planningOf were the Dashboard's own CO₂ and planning constants; gone
 //  11 Sep — the server's /api/costing/lines carries CO₂e and the working-day figure.)
 const monthLabelAbs = (idx, startYear) => MONTHS[(idx-1)%12] + " " + String(startYear + Math.floor((idx-1)/12)).slice(2);
-const PALETTE = ["#2563EB","#059669","#DC2626","#C6841D","#6D28D9","#0E7490","#3B82F6","#9AA7B4","#DB6D33","#1B7F5E"];
-const colorOf = (i) => PALETTE[i % PALETTE.length];
+// 10 Oct 2026 — the data palette, read from the tokens so the look (ink / light / dark) picks the
+// step. Fixed order, never cycled: a sixth series is "not yet" grey, never a new hue.
+const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];
+const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");
 
 // Chart.js wrapper — recreates the chart when its serialised config changes.
 function ChartCanvas({ config, height=260 }){
@@ -594,7 +697,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const pick = (key) => setLineKey(k => k === key ? null : key);
 
   const tf = { size: wall ? 13 : 11 };
-  const C1 = tok("--chart-1", "#2563EB"), C1S = tok("--chart-1-soft", "rgba(37,99,235,.18)"), C2 = tok("--chart-2", "#3B82F6");
+  const C1 = tok("--chart-1", "#4A72C9"), C1S = tok("--chart-1-soft", "rgba(74,114,201,.18)"), C2 = tok("--chart-2", "#C97A2E"), C4 = tok("--chart-4", "#A07D34");
   const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()} ${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
   const barScales = { scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
@@ -606,23 +709,23 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const tripsCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Trips", data: D.tripsM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const progressCfg = { type: "bar", data: { labels: D.labels, datasets: [
     { type: "bar", label: "Planned t", data: D.tonnesM, backgroundColor: C1S, borderColor: C1, borderWidth: 1, order: 2 },
-    { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: "#059669", borderWidth: 0, order: 1 }] },
+    { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: C2, borderWidth: 0, order: 1 }] },
     options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
-  const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: "#0E7490", borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
-  const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: "#059669", backgroundColor: "rgba(3,158,134,.12)", fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
+  const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
+  const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: C1, backgroundColor: C1S, fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
   const costCfg   = { type: "bar", data: { labels: D.labels, datasets: [
     { label: `Planned ${CUR()} (quote / target)`, data: D.plannedM, backgroundColor: C1, borderWidth: 0 },
-    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C2, borderWidth: 0 }] }, options: legendOpts };
+    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C4, borderWidth: 0 }] }, options: legendOpts };
   const splitCfg  = { type: "doughnut", data: { labels: D.mats, datasets: [{ data: D.mats.map(m => D.split[m]), backgroundColor: D.mats.map((m, i) => colorOf(i)), borderWidth: 2, borderColor: tok("--surface", "#fff") }] }, options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 10, font: tf } } } } };
   const topN = [...D.routeRows].sort((a, b) => b.t - a.t).slice(0, 10);
-  const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => r.key === lineKey ? "#2563EB" : "#3B82F6"), borderWidth: 0 }] },
+  const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => (lineKey && r.key !== lineKey) ? C1S : C1), borderWidth: 0 }] },
     options: { indexAxis: "y", ...commonOpts, onClick: (evt, els) => { if(els && els.length) pick(topN[els[0].index].key); },
                scales: { x: { grid: { display: false }, ticks: { font: { size: wall ? 12 : 10 } } }, y: { ticks: { font: { size: wall ? 12 : 9 } } } } } };
 
   // width-capped: a vehicle name is 50 characters, and an uncapped <select> pushed the
   // whole filter row off the right of a 1440 px screen (the 11 Sep screenshot)
-  const sel = "border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white max-w-[13rem] truncate";
-  const numTd = "px-3 py-2 text-right tabular-nums";
+  const sel = "ctl max-w-[13rem] truncate";
+  const numTd = "num";
   const cost = data.costing || {};
   const K = D.kpis;
   const srcChip = (s) => s === "target" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title="No rate on the route — the target rate from Config">target</span>
@@ -647,11 +750,57 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const plannedVsFair = (K.planned && K.fair && K.fair.eur > 0 && K.plannedN === K.fairN) ? (K.planned.eur - K.fair.eur) * 100 / K.fair.eur : null;
   const hhmm = (d) => d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "";
 
+  // 10 Oct 2026 — the UI pass (ui-review-1009, mockups 1 and 8): the working view is ONE screen —
+  // six cards, the four charts a planner reads first, and everything else a click away in
+  // collapsed sections (still mounted, so the big-screen sections and the harness pins are
+  // untouched). The big screen keeps its four sections exactly as before.
+  const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);
+  const nMonths = Math.max(1, D.hi - D.lo + 1);
+  const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);
+  const wkTot = (week && week.commit && week.commit.totals) || null;
+  const acct = (week && week.account) || null;
+  const Card = ({ label, value, sub, title, tone }) => (
+    <div className="card dash-card min-w-0" title={title}>
+      <div className="dash-card-l">{label}</div>
+      <div className="dash-card-v kpi-num" style={tone ? { color: tone } : undefined}>{value}</div>
+      {sub && <div className="dash-card-s">{sub}</div>}
+    </div>
+  );
+  const onMore = (e) => { if(e.target.open) requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(err){} }); };
+  const applied = [
+    status !== "Approved" && { k: "status", label: `Status: ${status}` },
+    ipt !== "All" && { k: "ipt", label: `${TEAM()}: ${ipt === "none" ? "none set" : teamText(ipt)}` },
+    discipline !== "All" && { k: "discipline", label: `Discipline: ${discipline}` },
+    unit !== "t" && { k: "unit", label: `Unit: ${unitLabel}` },
+    material !== "All" && { k: "material", label: `Material: ${material}` },
+    vehicle !== "All" && { k: "vehicle", label: `Vehicle: ${vehLabel(vehicle)}` },
+    selected && { k: "line", label: `${selected.route_id}${selected.discipline ? " · " + selected.discipline : ""} only` },
+  ].filter(Boolean);
+  const clearOne = (k) => ({ status: () => setStatus("Approved"), ipt: () => setIpt("All"), discipline: () => setDiscipline("All"), unit: () => setUnit("t"),
+                             material: () => setMaterial("All"), vehicle: () => setVehicle("All"), line: () => setLineKey(null) })[k]();
+  const clearAll = () => { setStatus("Approved"); setIpt("All"); setDiscipline("All"); setUnit("t"); setMaterial("All"); setVehicle("All"); setLineKey(null); };
+
   return (
     <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" : "max-w-7xl")}>
       <PageHeader title="Dashboard"
         subtitle={`Strategic planning view · ${rangeLabel} · ${scopeNote}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
+          {!wall && <>
+            <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
+            <span className="self-center text-slate-400 text-sm">→</span>
+            <select className={sel} value={toM} onChange={e => setToM(+e.target.value)} aria-label="To month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
+            <select className={sel} value={ipt} onChange={e => setIpt(e.target.value)} title={TEAM()} aria-label={TEAM()}><option value="All">All {TEAMS()}</option>{ipts.map(i => <option key={i} value={i}>{teamText(i)}</option>)}{rows.some(r => !r.ipt) && <option value="none">No {TEAM().toLowerCase()} set</option>}</select>
+            <select className={sel} value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">{["Approved", "Pending", "All"].map(s => <option key={s}>{s}</option>)}</select>
+            <details className="row-menu">
+              <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}>More filters ▾</summary>
+              <div className="row-menu-list dash-filters">
+                <label><span>Discipline</span><select value={discipline} onChange={e => setDiscipline(e.target.value)}><option value="All">All disciplines</option>{discs.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
+                <label><span>Unit</span><select value={unit} onChange={e => setUnit(e.target.value)}>{units.map(u => <option key={u} value={u}>{u === "t" ? "tonnes" : u === "m3" ? "m³" : "vehicles"}</option>)}</select></label>
+                <label><span>Material</span><select value={material} onChange={e => setMaterial(e.target.value)}><option>All</option>{materials.map(m => <option key={m}>{m}</option>)}</select></label>
+                <label><span>Vehicle</span><select value={vehicle} onChange={e => setVehicle(e.target.value)}><option>All</option>{vehicles.filter(v => vehShown(v, vehicle)).map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}</select></label>
+              </div>
+            </details>
+          </>}
           <button type="button" data-guide="dash-wall" onClick={toggleWall} className={"rounded-lg px-3 py-1.5 text-sm font-semibold " + (wall ? "bg-slate-200 text-slate-700" : "text-white")} style={wall ? undefined : { background: "var(--navy)" }}
                   title={wall ? "Back to the working view (Esc)" : "Fullscreen, larger type, filters and the table hidden, refreshed every 5 minutes"}>{wall ? "Exit big screen" : "Big screen"}</button>
         </div>}>
@@ -663,18 +812,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
           {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "rgba(37,99,235,.1)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
       </PageHeader>
-
-      {!wall && <div className="flex flex-wrap gap-2 items-center -mt-2">
-          <select className={sel} value={status} onChange={e => setStatus(e.target.value)}>{["Approved", "Pending", "All"].map(s => <option key={s}>{s}</option>)}</select>
-          <select className={sel} value={ipt} onChange={e => setIpt(e.target.value)} title={TEAM()}><option value="All">All {TEAMS()}</option>{ipts.map(i => <option key={i} value={i}>{teamText(i)}</option>)}{rows.some(r => !r.ipt) && <option value="none">No {TEAM().toLowerCase()} set</option>}</select>
-          <select className={sel} value={discipline} onChange={e => setDiscipline(e.target.value)} title="Discipline"><option value="All">All disciplines</option>{discs.map(d => <option key={d} value={d}>{d}</option>)}</select>
-          <select className={sel} value={unit} onChange={e => setUnit(e.target.value)}>{units.map(u => <option key={u} value={u}>{u === "t" ? "tonnes" : u === "m3" ? "m³" : "vehicles"}</option>)}</select>
-          <select className={sel} value={material} onChange={e => setMaterial(e.target.value)}><option>All</option>{materials.map(m => <option key={m}>{m}</option>)}</select>
-          <select className={sel} value={vehicle} onChange={e => setVehicle(e.target.value)}><option>All</option>{vehicles.filter(v => vehShown(v, vehicle)).map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}</select>
-          <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)}>{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
-          <span className="self-center text-slate-400 text-sm">→</span>
-          <select className={sel} value={toM} onChange={e => setToM(+e.target.value)}>{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
-                </div>}
+      {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} line-month${D.lines === 1 ? "" : "s"} in view`} />}
 
       {wall && <div className="dash-wallbar">
         <span className="dash-wallbar-lbl">Big screen</span>
@@ -700,12 +838,174 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
         {wallLayout === "single" && <span className="dash-wallbar-note">this screen is showing section {wallSection + 1} of {DASH_SECTIONS.length} · open <code>#dashboard/{wallSection + 1}</code> on another display to pin it there</span>}
       </div>}
 
+      {!wall ? (
+        <>
+          <div className="dash-cards" data-guide="dash-figures">
+            <Card label="Material in view" value={`${bigNum(K.totT)} t`} sub={`${D.lines} line-month${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`}
+                  title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion`} />
+            <Card label="Loads a day" value={grp(Math.round(loadsPerDay))} sub={`${grp(K.totTrips)} loads over ${grp(nMonths * wdPerMonth)} working days`}
+                  title={`${grp(K.totTrips)} loaded trips (ceil of tonnes ÷ payload per line-month) ÷ ${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days (Config → Planning)`} />
+            <Card label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"} sub={K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs baked routes"}
+                  title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
+            <Card label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} sub={wkTot ? `${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · last week ${acct.delivered} of ${acct.lines} lines held` : ""}` : (weekErr ? "this week did not load" : "loading this week")}
+                  title={wkTot ? "The commit week's planned tonnes and loads from the Look-ahead, and last week's account" : "The Look-ahead's commit week"} />
+            <Card label="Delivered against plan" value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} sub={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t of ${bigNum(K.totT)} t`}
+                  title={K.deliveredPct == null ? "Delivered ÷ planned, once a week actual is typed on Look-ahead → Account" : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned across every line-month in view`} />
+            <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`} sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`} · DESNZ 2026`}
+                  title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
+          </div>
+      {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
+          <div className="grid lg:grid-cols-5 gap-4">
+            <div className="card p-4 lg:col-span-3">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span></div>
+          <ChartCanvas config={demandCfg} height={wall ? 320 : 260} />
+        </div>
+            <div className="card p-4 lg:col-span-2">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span></div>
+          <ChartCanvas config={topCfg} height={wall ? 280 : 240} />
+        </div>
+            <div className="card p-4 lg:col-span-2">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span></div>
+          <ChartCanvas config={progressCfg} height={wall ? 320 : 260} />
+        </div>
+            <div className="card p-4 lg:col-span-3">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span></div>
+          <ChartCanvas config={costCfg} height={wall ? 280 : 220} />
+        </div>
+          </div>
+          <details className="dash-more" onToggle={onMore}>
+            <summary>This week and today, with the Look-ahead's map</summary>
+            <div className="pt-3"><DashboardToday meta={meta} week={week} err={weekErr} wall={wall} /></div>
+          </details>
+          <details className="dash-more" onToggle={onMore}>
+            <summary>All the figures: delivered to date, volume, cost, carbon</summary>
+            <div className="pt-3">
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-dash-figures="1">
+        <Group title="Delivered to date" tone="var(--green)">
+          <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `${K.reportedN} of ${D.lines} line-months reported`} tone="var(--green)"
+               title={K.actualT == null ? "No week actual has been typed against any line in view (Look-ahead → Account). Nothing is assumed delivered." : `${grp(K.actualT)} t reported delivered — the sum of the typed week actuals on ${K.reportedN} line-months, through each line's payload. Typed on Look-ahead → Account; a day actual rolls into its week.`} />
+          <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : `${bigNum(K.totT)} t planned in view`} tone="var(--green)"
+               title={K.deliveredPct == null ? "Delivered ÷ planned, once something is reported" : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned across every line-month in view (a month nobody has reported counts as not yet delivered)`} />
+          <Fig value={K.actualEur == null ? "—" : `${CUR()} ` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()} ${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
+               title={K.actualEur == null ? "The actual cost typed with a week actual (Look-ahead → Account) — none yet" : `${CUR()} ${grp(K.actualEur)} typed as actual cost on the account weeks in view`} />
+          <Fig value={K.reportedT > 0 && K.actualT != null ? (K.actualT * 100 / K.reportedT).toFixed(0) + " %" : "—"} label="on reported months" sub="delivered ÷ planned, reported only"
+               title={K.reportedT > 0 && K.actualT != null ? `${grp(K.actualT)} t delivered ÷ ${grp(K.reportedT)} t planned on the ${K.reportedN} line-months that carry an actual — how close to plan the reported months ran` : "Once a month is reported, its delivered ÷ planned"} />
+        </Group>
+        <Group title="Volume">
+          <Fig value={bigNum(K.totT)} label="tonnes" sub="all lines in view" title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion (m³ and vehicle loads included)`} />
+          <Fig value={bigNum(K.totTrips)} label="trips" sub="loaded runs, rounded up per month" title={`${grp(K.totTrips)} loaded trips — ceil(tonnes ÷ payload) per line-month, the Look-ahead's figure`} />
+          <Fig value={bigNum(dist(K.totKm))} label={`lorry-${DU()}`} sub="round trips · baked lines" title={`${grp(dist(K.totKm))} ${DU()} — trips × the baked route distance (both legs) for the line's vehicle; an unbaked line adds nothing`} />
+          <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs baked routes"} title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view: trips ÷ (working days × what one vehicle does in a shift)` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
+        </Group>
+        <Group title="Cost" tone="var(--navy)">
+          <Fig value={K.planned ? `${CUR()} ` + eurK(K.planned.eur) : "—"} label={`planned ${CUR()}`} sub={K.planned ? `${K.plannedN} of ${D.lines} priced${K.targetN ? ` · ${K.targetN} at target` : ""}` : "no rate typed, no target set"} tone="var(--navy)"
+               title={K.planned ? `${CUR()} ${grp(K.planned.eur)} = ${unitTriple(K.planned)} — the route's typed rates summed, or the Config target rate where the route has none (${K.targetN} line-months at target)` : "No route in view has typed rates and no target rate is set on Config → Costing"} />
+          <Fig value={K.fair ? `${CUR()} ` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no baked lines")} tone="var(--navy)"
+               title={K.fair ? `${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)} — the cost model (Config → Costing · fuel): fuel at the live diesel index, driver and vehicle time over the baked cycle, running cost per km, margin; winter months +${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel. A floor for negotiation, never a quote.` : (cost.index_eur_per_l == null ? "The fair price needs the diesel index — Config → Costing · fuel" : "The fair price needs a baked route for the line's vehicle")} />
+          <Fig value={K.fair && K.fair.per_t != null ? `${CUR()} ` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()} ${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
+               title={K.fair && K.fair.per_t != null ? `${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = fair ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t on the lines the model prices${K.planned && K.planned.per_t != null ? ` · planned ${CUR()} ${(+K.planned.per_t).toFixed(2)}/t the same way` : ""}` : `Fair ${CUR()} per tonne, once the model has a priced line`} />
+          <Fig value={K.fair && K.fair.per_km != null ? `${CUR()} ` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()} ${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
+               title={K.fair && K.fair.per_km != null ? `${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()} = fair ${CUR()} ÷ the ${DU()} the trips run on each route's basis (round trip unless the route says loaded) · ${CUR()} ${grp(K.fair.per_trip)} per loaded trip${K.planned && K.planned.per_km != null ? ` · planned ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)}/${DU()}, ${CUR()} ${grp(K.planned.per_trip)}/trip` : ""}` : `Fair ${CUR()} per km, once the model has a priced line`} />
+        </Group>
+        <Group title="Carbon" tone="var(--green)">
+          <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="baked lines" tone="var(--green)" title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
+          <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over baked tonnes" title={K.intensity == null ? "Needs a baked line" : `${K.intensity.toFixed(2)} kg CO₂e per tonne moved — tCO₂e ÷ the tonnes on baked lines (the unbaked ones have no km)`} />
+          <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" title={`${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"} — tonnes × the route's basis ${DU()}, baked lines`} />
+          <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} title={K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned — the busiest month in view` : "The month with the most planned tonnes"} />
+        </Group>
+      </div>
+            </div>
+          </details>
+          <details className="dash-more" onToggle={onMore}>
+            <summary>More charts: trips, vehicles needed, carbon over time, material split</summary>
+            <div className="pt-3 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="card p-4">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time</div>
+          <ChartCanvas config={tripsCfg} height={wall ? 280 : 220} />
+        </div>
+              <div className="card p-4">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(baked lines)</span></div>
+          <ChartCanvas config={fleetCfg} height={wall ? 280 : 220} />
+        </div>
+              <div className="card p-4">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span></div>
+          <ChartCanvas config={co2Cfg} height={wall ? 280 : 220} />
+        </div>
+              <div className="card p-4">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span></div>
+          <ChartCanvas config={splitCfg} height={wall ? 280 : 240} />
+        </div>
+            </div>
+          </details>
+          <details className="dash-more" onToggle={onMore}>
+            <summary>Stockpile capacity</summary>
+            <div className="pt-3"><DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} /></div>
+          </details>
+          <details className="dash-more" onToggle={onMore} data-dash-table="1">
+            <summary>Route planning detail</summary>
+            <div className="pt-3">
+      <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 text-sm font-semibold text-slate-700">Route planning detail <span className="text-slate-400 font-normal">· click a row to focus the charts on that line · click a column to sort · {CUR()} as total, and {CUR()}/t · {CUR()}/trip · {CUR()}/{DU()} on hover</span></div>
+        <div className="overflow-auto">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th className="cursor-pointer select-none" onClick={() => setSort("route_id")}>Route{arrow("route_id")}</th>
+                <th className="cursor-pointer select-none" onClick={() => setSort("discipline")}>Discipline{arrow("discipline")}</th>
+                <th>{TEAM()}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("dist")} title={`${DU()} per trip on the route's basis (round trip unless the route says loaded)`}>{DU()}/trip{arrow("dist")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("cycleH")}>Cycle h{arrow("cycleH")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("t")}>Tonnes{arrow("t")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("deliveredPct")} title="Reported week actuals ÷ planned, over the months in view">Delivered{arrow("deliveredPct")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("trips")}>Trips{arrow("trips")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("km")}>Lorry-{DU()}{arrow("km")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("co2")}>tCO₂e{arrow("co2")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("peakVeh")} title="The most vehicles any one month needs on this line">Peak veh{arrow("peakVeh")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("planned")} title="The route's typed rates, or the target rate from Config where it has none">Planned {CUR()}{arrow("planned")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("fair")} title="The fair-price model: vehicle, distance, tonnage, month, the live diesel index">Fair {CUR()} (model){arrow("fair")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("fairPerT")}>Fair {CUR()}/t{arrow("fairPerT")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRoutes.map(r => (
+                <tr key={r.key} onClick={() => pick(r.key)} className={"cursor-pointer " + (r.key === lineKey ? "is-picked" : "")} title={r.key === lineKey ? "Click to show every line again" : "Click to focus the charts and figures on this line"}>
+                  <td className="font-medium text-slate-800 whitespace-nowrap">{r.route_id}<div className="text-[13px] text-slate-500 font-normal leading-tight">{r.origin || "—"} → {r.dest || "—"} · {r.vehicle_short || vehLabel(r.vehicle)}</div></td>
+                  <td className="text-slate-500 whitespace-nowrap">
+                    {r.discipline
+                      ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: "rgba(37,99,235,.08)", color: "var(--navy)" }} title={r.section_id ? `Section ${r.section_id}` : "No section set"}>{r.discipline}</span>
+                      : <span className="text-slate-300" title="No discipline set on this forecast line">—</span>}
+                  </td>
+                  <td className="text-slate-500 whitespace-nowrap">{teamText(r.ipt)}</td>
+                  {/* an unbaked route has NO distance, which is not the same as zero */}
+                  <td className={numTd}>{r.dist == null ? <span className="text-slate-300" title="No cached geometry for this vehicle — bake this route">—</span> : (+dist(r.dist)).toFixed(1)}</td>
+                  <td className={numTd}>{r.cycleH == null ? <span className="text-slate-300" title="Cycle time needs baked geometry for this vehicle">not baked</span> : r.cycleH.toFixed(2)}</td>
+                  <td className={numTd}>{grp(r.t)}</td>
+                  <td className={numTd} title={r.actualT == null ? "No week actual reported on this line in the months in view" : `${grp(r.actualT)} t reported of ${grp(r.t)} t planned`}>{r.deliveredPct == null ? <span className="text-slate-300">—</span> : <span style={{ color: "var(--green)" }}>{r.deliveredPct.toFixed(0)} %</span>}</td>
+                  <td className={numTd}>{grp(r.trips)}</td>
+                  <td className={numTd}>{r.baked ? grp(dist(r.km)) : <span className="text-slate-300">—</span>}</td>
+                  <td className={numTd}>{r.baked ? r.co2.toFixed(1) : <span className="text-slate-300">—</span>}</td>
+                  <td className={numTd} title={r.capacityPerDay ? `${r.capacityPerDay} trips/day per vehicle` : undefined}>{r.peakVeh == null ? <span className="text-slate-300">—</span> : r.peakVeh}</td>
+                  <td className={numTd} title={r.plannedU ? unitTriple(r.plannedU) : "no rate typed on the route, no target set"}>{r.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(r.planned)}{srcChip(r.source)}</>}</td>
+                  <td className={numTd} style={{ color: "var(--navy)" }} title={r.fairU ? unitTriple(r.fairU) + (r.flags.length ? " · " + r.flags.join(", ") : "") : (r.baked ? "no diesel index" : "not baked — no distance")}>{r.fair == null ? <span className="text-slate-300">—</span> : <>{CUR()} {grp(r.fair)}{r.flags.includes("WINTER") && <span className="ml-1 text-[9px] text-slate-400">winter</span>}{r.flags.includes("THAW") && <span className="ml-1 text-[9px] text-amber-700">thaw</span>}</>}</td>
+                  <td className={numTd}>{r.fairPerT == null ? <span className="text-slate-300">—</span> : (+r.fairPerT).toFixed(2)}</td>
+                </tr>
+              ))}
+              {sortedRoutes.length === 0 && <tr><td colSpan="14" className="px-3 py-6 text-center text-slate-400">No routes in range.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+            </div>
+          </details>
+        </>
+      ) : (
+        <>
       <WallSection show={sectionShown(0)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[0].title}>
         <DashboardToday meta={meta} week={week} err={weekErr} wall={wall} />
       </WallSection>
 
       <WallSection show={sectionShown(1)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[1].title}>
-      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-guide="dash-figures">
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-wall-figures="1">
         <Group title="Delivered to date" tone="var(--green)">
           <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `${K.reportedN} of ${D.lines} line-months reported`} tone="var(--green)"
                title={K.actualT == null ? "No week actual has been typed against any line in view (Look-ahead → Account). Nothing is assumed delivered." : `${grp(K.actualT)} t reported delivered — the sum of the typed week actuals on ${K.reportedN} line-months, through each line's payload. Typed on Look-ahead → Account; a day actual rolls into its week.`} />
@@ -740,8 +1040,6 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
         </Group>
       </div>
       </WallSection>
-
-      {D.empty && <div className="card p-6 text-center text-slate-500 text-sm">No forecasts match these filters.</div>}
 
       <WallSection show={sectionShown(2)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[2].title}>
       <div className="grid lg:grid-cols-3 gap-4">
@@ -783,58 +1081,9 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
       <WallSection show={sectionShown(3)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[3].title}>
         <DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} />
       </WallSection>
+        </>
+      )}
 
-      {!wall && <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 text-sm font-semibold text-slate-700">Route planning detail <span className="text-slate-400 font-normal">· click a row to focus the charts on that line · click a column to sort · {CUR()} as total, and {CUR()}/t · {CUR()}/trip · {CUR()}/{DU()} on hover</span></div>
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-xs">
-              <tr>
-                <th className="px-3 py-2 text-left font-semibold cursor-pointer select-none" onClick={() => setSort("route_id")}>Route{arrow("route_id")}</th>
-                <th className="px-3 py-2 text-left font-semibold cursor-pointer select-none" onClick={() => setSort("discipline")}>Discipline{arrow("discipline")}</th>
-                <th className="px-3 py-2 text-left font-semibold">{TEAM()}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("dist")} title={`${DU()} per trip on the route's basis (round trip unless the route says loaded)`}>{DU()}/trip{arrow("dist")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("cycleH")}>Cycle h{arrow("cycleH")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("t")}>Tonnes{arrow("t")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("deliveredPct")} title="Reported week actuals ÷ planned, over the months in view">Delivered{arrow("deliveredPct")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("trips")}>Trips{arrow("trips")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("km")}>Lorry-{DU()}{arrow("km")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("co2")}>tCO₂e{arrow("co2")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("peakVeh")} title="The most vehicles any one month needs on this line">Peak veh{arrow("peakVeh")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("planned")} title="The route's typed rates, or the target rate from Config where it has none">Planned {CUR()}{arrow("planned")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("fair")} title="The fair-price model: vehicle, distance, tonnage, month, the live diesel index">Fair {CUR()} (model){arrow("fair")}</th>
-                <th className="px-3 py-2 text-right font-semibold cursor-pointer select-none" onClick={() => setSort("fairPerT")}>Fair {CUR()}/t{arrow("fairPerT")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRoutes.map(r => (
-                <tr key={r.key} onClick={() => pick(r.key)} className={"border-t border-slate-100 cursor-pointer " + (r.key === lineKey ? "bg-[rgba(37,99,235,.06)]" : "hover:bg-slate-50")} title={r.key === lineKey ? "Click to show every line again" : "Click to focus the charts and figures on this line"}>
-                  <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">{r.route_id}<div className="text-[10px] text-slate-400 font-normal">{r.origin || "—"} → {r.dest || "—"} · {r.vehicle_short || vehLabel(r.vehicle)}</div></td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
-                    {r.discipline
-                      ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: "rgba(37,99,235,.08)", color: "var(--navy)" }} title={r.section_id ? `Section ${r.section_id}` : "No section set"}>{r.discipline}</span>
-                      : <span className="text-slate-300" title="No discipline set on this forecast line">—</span>}
-                  </td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{teamText(r.ipt)}</td>
-                  {/* an unbaked route has NO distance, which is not the same as zero */}
-                  <td className={numTd}>{r.dist == null ? <span className="text-slate-300" title="No cached geometry for this vehicle — bake this route">—</span> : (+dist(r.dist)).toFixed(1)}</td>
-                  <td className={numTd}>{r.cycleH == null ? <span className="text-slate-300" title="Cycle time needs baked geometry for this vehicle">not baked</span> : r.cycleH.toFixed(2)}</td>
-                  <td className={numTd}>{grp(r.t)}</td>
-                  <td className={numTd} title={r.actualT == null ? "No week actual reported on this line in the months in view" : `${grp(r.actualT)} t reported of ${grp(r.t)} t planned`}>{r.deliveredPct == null ? <span className="text-slate-300">—</span> : <span style={{ color: "var(--green)" }}>{r.deliveredPct.toFixed(0)} %</span>}</td>
-                  <td className={numTd}>{grp(r.trips)}</td>
-                  <td className={numTd}>{r.baked ? grp(dist(r.km)) : <span className="text-slate-300">—</span>}</td>
-                  <td className={numTd}>{r.baked ? r.co2.toFixed(1) : <span className="text-slate-300">—</span>}</td>
-                  <td className={numTd} title={r.capacityPerDay ? `${r.capacityPerDay} trips/day per vehicle` : undefined}>{r.peakVeh == null ? <span className="text-slate-300">—</span> : r.peakVeh}</td>
-                  <td className={numTd} title={r.plannedU ? unitTriple(r.plannedU) : "no rate typed on the route, no target set"}>{r.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(r.planned)}{srcChip(r.source)}</>}</td>
-                  <td className={numTd} style={{ color: "var(--navy)" }} title={r.fairU ? unitTriple(r.fairU) + (r.flags.length ? " · " + r.flags.join(", ") : "") : (r.baked ? "no diesel index" : "not baked — no distance")}>{r.fair == null ? <span className="text-slate-300">—</span> : <>{CUR()} {grp(r.fair)}{r.flags.includes("WINTER") && <span className="ml-1 text-[9px] text-slate-400">winter</span>}{r.flags.includes("THAW") && <span className="ml-1 text-[9px] text-amber-700">thaw</span>}</>}</td>
-                  <td className={numTd}>{r.fairPerT == null ? <span className="text-slate-300">—</span> : (+r.fairPerT).toFixed(2)}</td>
-                </tr>
-              ))}
-              {sortedRoutes.length === 0 && <tr><td colSpan="14" className="px-3 py-6 text-center text-slate-400">No routes in range.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>}
 
       {!wall && <p className="text-xs text-slate-400 px-1">Planning estimates and typed actuals — no live tracking. Every planning figure on this page comes from <code>/api/costing/lines</code>, the same functions the Look-ahead uses: trips = tonnes ÷ planning payload rounded up per line-month; {DU()}, cycle and vehicles from the baked HERE route for the line's vehicle (an unbaked line has none and is excluded from those totals, never estimated); CO₂e = km × the vehicle's per-km factor on Config → Vehicles (stored per km whatever the tenant reads). Planned {CUR()} = the route`s typed rates (summed), or the Config target rate where the route has none. Fair {CUR()} = the cost model on Config → Costing · fuel — a floor for negotiation, never a quote. Peak fleet = the largest same-month sum of vehicles needed (trips ÷ working days ÷ what one vehicle does in a shift). Delivered = the week actuals typed on Look-ahead → Account (a day actual rolls into its week); a week nobody reported counts as nothing. Today and this week come from the Look-ahead`s own read.</p>}
     </div>
@@ -1486,7 +1735,7 @@ function PageHeader({ title, subtitle, actions, children }){
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 mb-5" data-guide="page-header">
       <div className="min-w-0">
-        <h2 className="text-xl font-bold text-[color:var(--navy-deep)] tracking-tight">{title}</h2>
+        <h2 className="text-[22px] font-bold text-[color:var(--navy-deep)] tracking-tight">{title}</h2>
         {subtitle && <p className="text-sm text-slate-500 mt-0.5 max-w-3xl">{subtitle}</p>}
         {children}
       </div>
@@ -1495,13 +1744,55 @@ function PageHeader({ title, subtitle, actions, children }){
   );
 }
 
-// One empty state for every page: what is missing, and the one thing to do about it.
-function EmptyState({ title, body, action }){
+// One empty state for every page, in three kinds (10 Oct 2026, ui-review-1009 mockup 5):
+// "none" (nothing yet), "nomatch" (the filters hide everything) and "error" (a read
+// failed). Same card, same type sizes; the action names the way out.
+function EmptyState({ title, body, action, kind }){
+  const k = kind || "none";
   return (
-    <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center">
-      <div className="text-sm font-semibold text-slate-700">{title}</div>
+    <div className="card p-8 text-center" data-empty={k} role={k === "error" ? "alert" : undefined}>
+      <div className={"empty-ic " + k} aria-hidden="true"></div>
+      <div className="text-base font-semibold text-slate-700">{title}</div>
       {body && <div className="text-sm text-slate-500 mt-1 max-w-md mx-auto">{body}</div>}
       {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+// While a table loads it keeps its shape: header, then grey rows in the column widths.
+function SkeletonTable({ cols, rows, caption }){
+  const widths = [48, 220, 90, 140, 110, 60, 80, 90, 70, 60];
+  return (
+    <div className="card overflow-hidden" aria-busy="true" aria-label={caption || "Loading"}>
+      <table className="tbl">
+        {caption && <caption><b>{caption.split(" · ")[0]}</b>{caption.includes(" · ") ? " · " + caption.split(" · ").slice(1).join(" · ") : ""}</caption>}
+        <thead><tr>{(cols || []).map((c, i) => <th key={i} scope="col">{c}</th>)}</tr></thead>
+        <tbody>
+          {Array.from({ length: rows || 5 }).map((_, r) => (
+            <tr key={r}>{(cols || []).map((_, i) => <td key={i}><span className="skel" style={{ width: widths[i % widths.length] * (0.7 + ((r * 7 + i * 3) % 4) / 10) }}></span></td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+// Status as a word with a dot beside it — the same four colours everywhere, never colour
+// alone (10 Oct 2026, mockups 2 and 3; the chart palette is a different scale).
+const STATUS_DOT = { Approved: "var(--green)", confirmed: "var(--green)", held: "var(--green)",
+                     Pending: "var(--gold)", edited: "var(--gold)", Rejected: "var(--red)" };
+function StatusWord({ status, label }){
+  return <span className="chip-st"><i style={{ background: STATUS_DOT[status] || "var(--chart-none)" }} aria-hidden="true"></i>{label || status}</span>;
+}
+// The applied-filter chips under a filter row: one chip per filter in force, each removable,
+// one "Clear all", and the count beside them (mockup 4, the Carbon filtering pattern).
+function AppliedChips({ chips, onClear, onClearAll, count }){
+  if(!chips.length && !count) return null;
+  return (
+    <div className="applied-row">
+      {chips.map(c => (
+        <span key={c.k} className="fchip">{c.label}<button type="button" onClick={() => onClear(c.k)} aria-label={`Remove filter ${c.label}`}>×</button></span>
+      ))}
+      {chips.length > 0 && <button type="button" onClick={onClearAll} className="link-btn">Clear all</button>}
+      {count && <span className="ml-auto text-sm text-slate-500 tabular-nums">{count}</span>}
     </div>
   );
 }
@@ -1565,26 +1856,23 @@ function Portal({ role, who, meta, metaErr, vehLang }){
 
   return (
     <div className="flex-1 min-h-0 flex">
-      <aside data-guide="rail" className={"shrink-0 bg-white border-r border-slate-200 flex flex-col transition-[width] duration-150 " + (railOpen ? "w-56" : "w-14")}>
+      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railOpen ? "w-56" : "w-14")}>
         <div className="flex-1 overflow-y-auto py-3">
           {visible.map(g => (
             // collapsed, the group HEADINGS go but the grouping must not: a plain
             // column of nine icons reads as one undifferentiated list.
             <div key={g.group} className={"mb-3 " + (railOpen ? "" : "pt-3 mt-3 border-t border-slate-100 first:border-0 first:mt-0 first:pt-0")}>
-              {railOpen && <div className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{g.group}</div>}
+              {railOpen && <div className="rail-group px-4 pb-1">{g.group}</div>}
               {g.items.map(it => {
                 const active = page === it.id;
                 const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending : null;
                 return (
                   <button key={it.id} onClick={() => setPage(it.id)} title={railOpen ? undefined : it.label}
-                    className={"w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition border-l-[3px] " +
-                      (active ? "border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold"
-                              : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900")}>
+                    className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
                     <span className="w-4 text-center text-base leading-none opacity-80">{it.glyph}</span>
                     {railOpen && <span className="truncate flex-1">{it.label}</span>}
                     {badge != null && railOpen && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: "var(--gold)", color: "var(--navy-deep)" }}
-                        title={`${badge} line(s) waiting for approval`}>{badge}</span>
+                      <span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>
                     )}
                   </button>
                 );
@@ -2191,7 +2479,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
                     const mi = base + i + 1;
                     return (
                       <label key={mn} className="block">
-                        <span className="text-[11px] uppercase tracking-wide text-slate-400">{mn}</span>
+                        <span className="block text-sm font-medium text-slate-700 mb-1">{mn}</span>
                         <input type="number" min="0" inputMode="decimal"
                           value={vals[mi] ?? ""} onChange={e => setMonth(mi, e.target.value)} placeholder="0"
                           className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
@@ -2336,6 +2624,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState("");
   const [f, setF] = useState({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
+  const [sort, setSort] = useState({ key: "quantity", dir: "desc" });   // 10 Oct: the one visible sort
 
   useEffect(() => {
     let live = true;
@@ -2454,13 +2743,38 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
-  const badge = (s) => {
-    const map = { Approved: ["var(--green)", "rgba(3,158,134,.12)"], Rejected: ["var(--red)", "rgba(191,46,85,.12)"],
-                  Pending: ["#B45309", "rgba(217,119,6,.12)"], Mixed: ["#475569", "rgba(71,85,105,.12)"] };
-    const [c, bg] = map[s] || map.Mixed;
-    return <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color: c, background: bg }}>{s}</span>;
-  };
-  const chip = (t, title) => <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title={title}>{t}</span>;
+  // 10 Oct 2026 — the UI pass (ui-review-1009, mockups 2, 4 and 5): one figure per column at
+  // 14 px in 40 px rows, numbers right-aligned with the unit in the header, a caption, a sticky
+  // header, the sort shown once, a filter row with applied-filter chips above the table, and
+  // the shared empty-state family. The cost column stays (one compact cell per line, the 13 px
+  // allowance) until the Routes page carries the figures. Approve is the one visible action;
+  // Reject, Edit and Withdraw sit behind the row menu.
+  const units = new Set(shown.map(g => g.unit));
+  const unitLabel = (u) => u === "m3" ? "m³" : (u || "");
+  const sorted = [...shown].sort((a, b) => {
+    const pend = (a.status === "Pending" ? -1 : 1) - (b.status === "Pending" ? -1 : 1);
+    if(pend) return pend;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const av = a[sort.key], bv = b[sort.key];
+    if(av == null && bv == null) return 0; if(av == null) return 1; if(bv == null) return -1;
+    return (av > bv ? 1 : av < bv ? -1 : 0) * dir || a.routeId.localeCompare(b.routeId);
+  });
+  const sortBy = (k) => setSort(s => s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: k === "routeId" ? "asc" : "desc" });
+  const th = (label, key, num) => (
+    <th scope="col" className={(num ? "num " : "") + (key ? "sortable " : "") + (sort.key === key ? "sorted " + sort.dir : "")}
+      onClick={key ? () => sortBy(key) : undefined} aria-sort={sort.key === key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>{label}</th>
+  );
+  const applied = [
+    f.status !== "ALL" && { k: "status", label: `Status: ${f.status}` },
+    f.ipt !== "ALL" && { k: "ipt", label: `${TEAM()}: ${f.ipt === "none" ? "none set" : teamText(f.ipt)}` },
+    f.discipline !== "ALL" && { k: "discipline", label: `Discipline: ${f.discipline}` },
+    f.mine && { k: "mine", label: "Mine only" },
+    f.q && { k: "q", label: `Search: ${f.q}` },
+  ].filter(Boolean);
+  const clearOne = (k) => setF(x => ({ ...x, [k]: k === "mine" ? false : k === "q" ? "" : "ALL" }));
+  const clearAll = () => setF({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
+  const chip = (t, title) => <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title={title}>{t}</span>;
+  const sortCaption = `sorted by ${sort.key === "quantity" ? "total" : sort.key === "months" ? "months" : "route"}, ${sort.dir === "desc" ? "largest first" : "smallest first"}`;
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -2469,134 +2783,116 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
           ? "Every forecast line you can see, across every year it covers. Approve or reject each line here; approved lines feed the route map, the look-ahead and the KPI cards."
           : `Your ${TEAM().toLowerCase()}'s forecast lines, across every year each one covers. Edit reopens a line in Submit forecast; a revised line goes back for approval.`}
         actions={<>
-          <button onClick={() => setTick(t => t + 1)} className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">Refresh</button>
-          {shown.length > 0 && <button onClick={exportCsv} className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">Export CSV</button>}
-        </>}>
-        {groups.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2 text-xs" data-guide="forecast-status">
-            {["Pending", "Approved", "Rejected", "Mixed"].filter(s => counts[s]).map(s => (
-              <button key={s} onClick={() => setF(x => ({ ...x, status: x.status === s ? "ALL" : s }))}
-                className={"px-2 py-1 rounded-md border " + (f.status === s ? "border-[color:var(--navy)] bg-slate-50" : "border-slate-200 hover:bg-slate-50")}>
-                {badge(s)} <span className="ml-1 tabular-nums text-slate-600">{counts[s]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </PageHeader>
+          <button onClick={() => setTick(t => t + 1)} className="btn-sec">Refresh</button>
+          {shown.length > 0 && <button onClick={exportCsv} className="btn-sec">Export CSV</button>}
+          {!canApprove && <button onClick={() => onEdit({})} className="btn-pri">Submit a forecast</button>}
+        </>} />
 
-      {err ? <EmptyState title="Couldn't load forecasts" body="Refresh the page; if it persists the server may still be starting." />
-       : !rows ? <div className="p-8 text-center text-slate-400">Loading…</div>
+      {err ? <EmptyState kind="error" title="Forecasts did not load" body="The server did not answer in time. Nothing you typed is lost."
+               action={<button onClick={() => setTick(t => t + 1)} className="btn-sec">Try again</button>} />
+       : !rows ? <SkeletonTable cols={["Route", "From → to", TEAM(), "Material", "Vehicle", "Months", "Total", "Status"]} rows={6} caption="Forecast lines · loading" />
        : groups.length === 0 ? (
         <EmptyState title="No forecast lines yet"
           body={canApprove ? "Nothing has been submitted that you can see. Lines appear here the moment a submitter saves one." : "Head to Submit forecast to add your first line."}
-          action={!canApprove && <button onClick={() => onEdit({})} className="px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: "var(--navy)" }}>Submit a forecast</button>} />
+          action={!canApprove && <button onClick={() => onEdit({})} className="btn-pri">Submit a forecast</button>} />
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50/60 text-xs">
-            <input value={f.q} onChange={e => setF(x => ({ ...x, q: e.target.value }))} placeholder="Search route, site, material, submitter…"
-              className="border border-slate-200 rounded-md px-2 py-1 w-56 bg-white" />
+        <>
+          <div className="filter-row" data-guide="forecast-status">
+            <input value={f.q} onChange={e => setF(x => ({ ...x, q: e.target.value }))} placeholder="Search routes, places, materials, submitters" aria-label="Search forecast lines" className="ctl w-64" />
+            <select value={f.status} onChange={e => setF(x => ({ ...x, status: e.target.value }))} className="ctl" aria-label="Status">
+              <option value="ALL">Status</option>
+              {["Pending", "Approved", "Rejected", "Mixed"].filter(s => counts[s]).map(s => <option key={s} value={s}>{s} ({counts[s]})</option>)}
+            </select>
             {ipts.length > 0 && (
-              <select value={f.ipt} onChange={e => setF(x => ({ ...x, ipt: e.target.value }))} className="border border-slate-200 rounded-md px-2 py-1 bg-white">
-                <option value="ALL">All {TEAMS()}</option>
+              <select value={f.ipt} onChange={e => setF(x => ({ ...x, ipt: e.target.value }))} className="ctl" aria-label={TEAM()}>
+                <option value="ALL">{TEAM()}</option>
                 {ipts.map(i => <option key={i} value={i}>{teamText(i)}</option>)}
                 {groups.some(g => !g.ipt) && <option value="none">No {TEAM().toLowerCase()} set</option>}
               </select>
             )}
             {discs.length > 0 && (
-              <select value={f.discipline} onChange={e => setF(x => ({ ...x, discipline: e.target.value }))} className="border border-slate-200 rounded-md px-2 py-1 bg-white">
-                <option value="ALL">All disciplines</option>
+              <select value={f.discipline} onChange={e => setF(x => ({ ...x, discipline: e.target.value }))} className="ctl" aria-label="Discipline">
+                <option value="ALL">Discipline</option>
                 {discs.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
-            <label className="flex items-center gap-1.5 text-slate-600"><input type="checkbox" checked={f.mine} onChange={e => setF(x => ({ ...x, mine: e.target.checked }))} /> Mine only</label>
-            <span className="ml-auto text-slate-400 tabular-nums">{shown.length} of {groups.length} line{groups.length === 1 ? "" : "s"}</span>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={f.mine} onChange={e => setF(x => ({ ...x, mine: e.target.checked }))} /> Mine only</label>
           </div>
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-xs">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold">Route</th>
-                  <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Line · submitted by</th>
-                  <th className="px-3 py-2 text-left font-semibold">Years</th>
-                  <th className="px-3 py-2 text-left font-semibold">Material · vehicle</th>
-                  <th className="px-3 py-2 text-right font-semibold">Total</th>
-                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap" title={`Planned ${CUR()} = the route's typed rates or the Config target; Fair ${CUR()} = the cost model (vehicle, distance, tonnage, month, diesel index). Hover a figure for ${CUR()}/t · ${CUR()}/trip · ${CUR()}/km.`}>Cost</th>
-                  <th className="px-3 py-2 text-left font-semibold">Status</th>
-                  <th className="px-3 py-2 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map(g => {
-                  const r = routeById[g.routeId] || {};
-                  const own = g.submittedBy === who;
-                  return (
-                    <tr key={g.key} className="border-t border-slate-100 hover:bg-slate-50 align-top">
-                      {/* route id, the pair it runs between and the IPT in ONE column: nine
-                          columns pushed Actions off the right edge at 1440px, and a row
-                          whose buttons you have to scroll sideways to reach is the whole
-                          page failing at the one thing it is for. */}
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="font-medium text-slate-800">{g.routeId}
-                          <span className="ml-1.5">{g.ipt ? chip(teamText(g.ipt)) : chip("no " + TEAM().toLowerCase(), `No ${TEAM().toLowerCase()} on this line — only planners can see it until one is set. Edit and re-save it from Submit forecast.`)}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{r.origin || "—"} → {r.dest || "—"}</div>
-                      </td>
-                      {/* discipline, section and submitter in one column. Eight columns
-                          still pushed the Withdraw link off the right edge at 1440px; who
-                          submitted a line is secondary to what the line IS, so it rides
-                          under it rather than taking a column of its own. */}
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div>
-                          {g.discipline
-                            ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background:"rgba(37,99,235,.08)", color:"var(--navy)" }}>{g.discipline}</span>
-                            : <span className="text-slate-300">unassigned</span>}
-                          {g.sectionId && <span className="ml-1 text-[11px] text-slate-500">{g.sectionId}</span>}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{g.submittedBy || "—"}{own ? " · you" : ""}</div>
-                      </td>
-                      <td className="px-3 py-2 tabular-nums whitespace-nowrap">{g.yearLabel} <span className="text-slate-400 text-xs">· {g.months} mo</span></td>
-                      <td className="px-3 py-2 text-slate-600 max-w-[220px]">
-                        <div className="truncate" title={`${g.material || ""}${g.material_description ? " · " + g.material_description : ""}`}>
-                          {g.material}{g.material_description ? <span className="text-slate-400"> · {g.material_description}</span> : null}
-                        </div>
-                        <div className="text-[11px] text-slate-500 truncate" title={g.vehicle}>{vehLabel(g.vehicle)}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmt(g.quantity, g.unit)} <span className="text-slate-400 text-xs">{g.unit === "m3" ? "m³" : g.unit}</span></td>
-                      {/* 11 Sep: what the line costs — planned (typed) and fair (the model), each with
-                          {CUR()}/t · {CUR()}/trip · {CUR()}/{DU()} on hover, over every month the line covers */}
-                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-xs" data-cost-cell="1">
-                        {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
-                          <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[9px] font-semibold px-1 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
-                          <div style={{ color: "var(--navy)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not baked for this vehicle — no distance, no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
-                        </>); })()}
-                      </td>
-                      <td className="px-3 py-2">
-                        {badge(g.status)}
-                        {g.rejectReason && <div className="text-[11px] mt-1 max-w-[180px]" style={{ color: "var(--red)" }}>{g.rejectReason}</div>}
-                      </td>
-                      <td className="px-3 py-2 pl-1 text-right whitespace-nowrap">
-                        {canApprove && g.status !== "Approved" && (
-                          <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")}
-                            className="px-2 py-1 rounded-md text-white text-xs font-semibold mr-1 disabled:opacity-50" style={{ background: "var(--green)" }}>Approve</button>
-                        )}
-                        {canApprove && g.status !== "Rejected" && (
-                          <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")}
-                            className="px-2 py-1 rounded-md text-white text-xs font-semibold mr-1.5 disabled:opacity-50" style={{ background: "var(--red)" }}>Reject</button>
-                        )}
-                        <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}
-                          className="text-[color:var(--navy)] font-semibold hover:underline text-xs mr-1.5">Edit</button>
-                        {(own || canApprove) && (
-                          <button disabled={busy === g.key} onClick={() => withdraw(g)} className="text-[color:var(--red)] hover:underline text-xs disabled:opacity-50">Withdraw</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {shown.length === 0 && <tr><td colSpan="8" className="px-3 py-8 text-center text-slate-400">Nothing matches these filters.</td></tr>}
-              </tbody>
-            </table>
+          <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}
+            count={`${shown.length} of ${groups.length} line${groups.length === 1 ? "" : "s"}`} />
+
+          <div className="card overflow-hidden">
+            <div className="max-h-[72vh] overflow-auto">
+              <table className="tbl">
+                <caption><b>Forecast lines</b> · {sortCaption}{counts.Pending ? ` · ${counts.Pending} pending approval` : ""}</caption>
+                <thead>
+                  <tr>
+                    {th("Route", "routeId")}
+                    <th scope="col">From → to</th>
+                    <th scope="col">{TEAM()}</th>
+                    <th scope="col">Material</th>
+                    <th scope="col">Vehicle</th>
+                    {th("Months", "months", true)}
+                    {th(units.size === 1 ? `Total (${unitLabel([...units][0])})` : "Total", "quantity", true)}
+                    <th scope="col" className="num" title={`Planned ${CUR()} = the route's typed rates or the Config target; fair ${CUR()} = the cost model (vehicle, distance, tonnage, month, diesel index). Hover a figure for ${CUR()}/t · ${CUR()}/trip · ${CUR()}/${DU()}.`}>Cost ({CUR()})</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="num"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map(g => {
+                    const r = routeById[g.routeId] || {};
+                    const own = g.submittedBy === who;
+                    const line = [g.discipline || null, g.sectionId || null].filter(Boolean).join(" · ");
+                    return (
+                      <tr key={g.key} title={`Submitted by ${g.submittedBy || "—"}${own ? " (you)" : ""} · ${g.yearLabel}`}>
+                        <td>
+                          <div className="font-medium text-slate-800 leading-tight">{g.routeId}{!g.ipt && <span className="ml-1.5">{chip("no " + TEAM().toLowerCase(), `No ${TEAM().toLowerCase()} on this line — only planners can see it until one is set. Edit and re-save it from Submit forecast.`)}</span>}</div>
+                          {line && <div className="text-[13px] text-slate-500 leading-tight">{line}</div>}
+                        </td>
+                        <td className="max-w-[240px] truncate" title={`${r.origin || "—"} → ${r.dest || "—"}`}>{r.origin || "—"} → {r.dest || "—"}</td>
+                        <td>{g.ipt ? teamText(g.ipt) : <span className="text-slate-400">—</span>}</td>
+                        <td className="max-w-[160px] truncate text-slate-700" title={`${g.material || ""}${g.material_description ? " · " + g.material_description : ""}`}>{g.material || "—"}</td>
+                        <td className="max-w-[140px] truncate text-slate-700" title={g.vehicle}>{vehLabel(g.vehicle)}</td>
+                        <td className="num" title={g.yearLabel}>{g.months}</td>
+                        <td className="num">{fmt(g.quantity, g.unit)}{units.size > 1 && <span className="text-slate-400 text-[13px]"> {unitLabel(g.unit)}</span>}</td>
+                        <td className="num text-[13px] leading-tight" data-cost-cell="1">
+                          {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
+                            <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[13px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
+                            <div style={{ color: "var(--chart-4)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not baked for this vehicle — no distance, no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
+                          </>); })()}
+                        </td>
+                        <td>
+                          <StatusWord status={g.status} />
+                          {g.rejectReason && <div className="text-[13px] leading-tight max-w-[200px] truncate" style={{ color: "var(--red)" }} title={g.rejectReason}>{g.rejectReason}</div>}
+                        </td>
+                        <td className="num whitespace-nowrap">
+                          {canApprove && g.status !== "Approved" && (
+                            <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")} className="btn-pri btn-sm mr-1">Approve</button>
+                          )}
+                          <details className="row-menu">
+                            <summary aria-label={`More actions for ${g.routeId}`} title="More actions">⋯</summary>
+                            <div className="row-menu-list">
+                              {canApprove && g.status !== "Rejected" && (
+                                <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
+                              )}
+                              <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
+                              {(own || canApprove) && (
+                                <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
+                              )}
+                              <div className="row-menu-note">Submitted by {g.submittedBy || "—"}{own ? " (you)" : ""} · {g.yearLabel}</div>
+                            </div>
+                          </details>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {sorted.length === 0 && <tr><td colSpan="10" className="!p-0 !h-auto"><EmptyState kind="nomatch" title="No lines match these filters" body={applied.map(a => a.label).join(" · ")} action={<button onClick={clearAll} className="btn-sec">Clear filters</button>} /></td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -2644,29 +2940,29 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
     } catch(e){ setMsg({ ok: false, text: "Not saved — " + e.message }); }
     setBusy(false);
   };
-  const inp = "border border-slate-300 rounded-md px-2 py-1 text-sm w-full tabular-nums";
+  const inp = "ctl ctl-sm w-full tabular-nums";
   const dirty = ["rate_eur_per_load", "rate_eur_per_t", "rate_eur_per_km"].some(k => draft[k] !== undefined);
   return (
-    <div className="p-4 space-y-4">
+    <div className="px-6 pb-6 space-y-6">
       {msg && <div className="rounded-lg border p-2.5 text-sm" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--green)" : "var(--red)" }}>{msg.text}</div>}
       <div>
-        <div className="text-sm font-semibold text-slate-700">Target rate — the planned price where a route has no rate</div>
-        <p className="text-[11px] text-slate-400 mt-0.5 mb-2">Summed like the route rates ({CUR()} per load + {CUR()} per tonne + {CUR()} per {DU()} on the route's distance basis). Used ONLY for routes with no rate typed on the route form; a route with any rate of its own is priced from that alone. Every figure it produces is marked "target" on the Look-ahead and the exports. Typed, never seeded. Admin token to save.</p>
+        <div className="text-[15px] font-semibold text-slate-800">Target rate — the planned price where a route has no rate</div>
+        <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">Summed like the route rates ({CUR()} per load + {CUR()} per tonne + {CUR()} per {DU()} on the route's distance basis). Used ONLY for routes with no rate typed on the route form; a route with any rate of its own is priced from that alone. Every figure it produces is marked "target" on the Look-ahead and the exports. Typed, never seeded. Admin token to save.</p>
         {!data ? <div className="text-slate-400 text-sm">Loading…</div> : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl items-end">
             {[["rate_eur_per_load", `${CUR()} per load`], ["rate_eur_per_t", `${CUR()} per tonne`], ["rate_eur_per_km", `${CUR()} per ${DU()}`]].map(([k, l]) => (
               <label key={k} className="block">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">{l}</span>
+                <span className="block text-sm font-medium text-slate-700 mb-1">{l}</span>
                 {/* the per-distance rate is shown and typed in the tenant's unit; stored per km */}
                 <input className={inp + " mt-1"} inputMode="decimal" placeholder="—" value={draft[k] ?? (tg[k] == null ? "" : (k === "rate_eur_per_km" ? +(+distRate(tg[k])).toFixed(4) : tg[k]))} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} />
               </label>
             ))}
-            <button onClick={save} disabled={busy || !dirty} className="px-4 py-1.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy ? "Saving…" : "Save target rate"}</button>
+            <button onClick={save} disabled={busy || !dirty} className="btn-pri" title="The target rate is stored on its own endpoint, separately from the configuration document">{busy ? "Saving…" : "Save target rate"}</button>
           </div>
         )}
       </div>
       <div>
-        <div className="text-sm font-semibold text-slate-700 mb-1">Diesel index and fuel surcharge (BAF)</div>
+        <div className="text-[15px] font-semibold text-slate-800 mb-1">Diesel index and fuel surcharge (BAF)</div>
         <FuelWidget mode="config" who={who} access={access} initial={data && data.summary} onChanged={load} />
       </div>
       <FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc} summary={data && data.summary && data.summary.fair} />
@@ -2690,13 +2986,13 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
   const fp = (doc && doc.fair_price) || fileFp;
   const cons = fp.consumption || {};
   const season = fp.season || {};
-  const inp = "border border-slate-300 rounded-md px-2 py-1 text-sm w-full tabular-nums";
+  const inp = "ctl ctl-sm w-full tabular-nums";
   const num = (v) => (v === "" || v == null ? null : (isNaN(+v) ? v : +v));
   // the first edit copies the whole seeded block into the document, sources included
   const set = (fn) => upd && upd(d => { if(!d.fair_price) d.fair_price = JSON.parse(JSON.stringify(fileFp)); fn(d.fair_price); });
   const monthsBox = (k, label) => (
     <label className="block">
-      <span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
       <div className="flex flex-wrap gap-1 mt-1">
         {MONTHS.map((m, mi) => (
           <label key={m} className={"text-[11px] px-1.5 py-0.5 rounded border cursor-pointer " + ((season[k] || []).includes(mi + 1) ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-600")}>
@@ -2711,38 +3007,38 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
   );
   return (
     <div data-fair-price-section="1">
-      <div className="text-sm font-semibold text-slate-700">Fair price — the model</div>
-      <p className="text-[11px] text-slate-400 mt-0.5 mb-2">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + {DU()} × running, × (1 + margin). Shown on every baked line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
+      <div className="text-[15px] font-semibold text-slate-800">Fair price — the model</div>
+      <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + {DU()} × running, × (1 + margin). Shown on every baked line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl">
         {FAIR_FIELDS_FOR().map(([k, l, help]) => (
           <label key={k} className="block">
-            <span className="text-[11px] uppercase tracking-wide text-slate-400">{l}</span>
+            <span className="block text-sm font-medium text-slate-700 mb-1">{l}</span>
             {/* running_eur_per_km is stored per km and shown / typed in the tenant's unit (H1) */}
             <input className={inp + " mt-1"} inputMode="decimal"
               value={k === "running_eur_per_km" ? (fp[k] == null ? "" : +(+distRate(fp[k])).toFixed(4)) : (fp[k] ?? "")}
               onChange={e => set(f => { const n = num(e.target.value); f[k] = (k === "running_eur_per_km" && typeof n === "number") ? +(+distInRate(n)).toFixed(6) : n; })} />
-            <span className="block text-[11px] text-slate-400 mt-1">{help}</span>
+            <span className="block text-[13px] text-slate-500 mt-1">{help}</span>
           </label>
         ))}
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">L/100 km per tonne carried</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">L/100 km per tonne carried</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={cons.l_per_100km_per_tonne ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.l_per_100km_per_tonne = num(e.target.value); })} />
-          <span className="block text-[11px] text-slate-400 mt-1">UK DfT payload study: 0.4–0.95; the low end is seeded</span>
+          <span className="block text-[13px] text-slate-500 mt-1">UK DfT payload study: 0.4–0.95; the low end is seeded</span>
         </label>
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">Rigid, empty L/100 km</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">Rigid, empty L/100 km</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={(cons.rigid || {}).l_per_100km_empty ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.rigid = f.consumption.rigid || {}; f.consumption.rigid.l_per_100km_empty = num(e.target.value); })} />
-          <span className="block text-[11px] text-slate-400 mt-1">Derived from the DESNZ 2026 factor in this document (checked against gov.uk, 9 Oct 2026)</span>
+          <span className="block text-[13px] text-slate-500 mt-1">Derived from the DESNZ 2026 factor in this document (checked against gov.uk, 9 Oct 2026)</span>
         </label>
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">Artic, empty L/100 km</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">Artic, empty L/100 km</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={(cons.artic || {}).l_per_100km_empty ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.artic = f.consumption.artic || {}; f.consumption.artic.l_per_100km_empty = num(e.target.value); })} />
-          <span className="block text-[11px] text-slate-400 mt-1">ICCT 34 laden − 0.4 × 26 t</span>
+          <span className="block text-[13px] text-slate-500 mt-1">ICCT 34 laden − 0.4 × 26 t</span>
         </label>
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">Winter consumption uplift %</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">Winter consumption uplift %</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={season.winter_consumption_uplift_pct ?? ""} onChange={e => set(f => { f.season = f.season || {}; f.season.winter_consumption_uplift_pct = num(e.target.value); })} />
-          <span className="block text-[11px] text-slate-400 mt-1">US DOE: cars ~15 % at −7 °C; HGVs less</span>
+          <span className="block text-[13px] text-slate-500 mt-1">US DOE: cars ~15 % at −7 °C; HGVs less</span>
         </label>
         {monthsBox("winter_months", "Winter months (uplift applies)")}
         {monthsBox("thaw_months", "Thaw months (flag: 8 t road limits may apply)")}
@@ -2806,90 +3102,103 @@ function ConfigPage({ meta, who, access }){
     setBusy(false);
   };
 
-  const inp = "border border-slate-300 rounded-md px-2 py-1 text-sm w-full tabular-nums";
+  // 10 Oct 2026 — the UI pass (ui-review-1009, mockup 6): Configuration as a form. A section
+  // list on the left, a two-thirds-width form on the right with each label above its input at
+  // 14 px and the help under it, one Save bar for the page, and the dangerous actions (the
+  // admin token, "Reset to file") behind More with their confirm step. The Vehicles and
+  // Materials sections keep a table because a grid is the right form for them.
+  const inp = "ctl ctl-sm w-full tabular-nums";
   const TABS = [["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["raw", "Everything (JSON)"]];
+  const discard = () => { if(!orig) return; const d = JSON.parse(orig); setDoc(d); setRaw(JSON.stringify(d, null, 2)); setRawErr(""); setMsg(null); };
+  const tabLabel = (TABS.find(([k]) => k === tab) || [])[1] || "";
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto p-6 pb-2">
       <PageHeader title="Configuration"
         subtitle="Vehicles, materials, planning constants and seasonal windows — the numbers every forecast, cycle time and map figure is computed from. Changes apply on save, everywhere, for everyone."
-        actions={<>
-          <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token"
-            title="Needed to save. Remembered in this browser." className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm w-36" />
-          <button onClick={reset} disabled={busy} className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50 disabled:opacity-50" title="Overwrite the live configuration with backend/factors.json">Reset to file</button>
-          <button onClick={save} disabled={busy || (!dirty && tab !== "raw")} className="px-4 py-1.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy ? "Saving…" : "Save"}</button>
-        </>}>
+        actions={
+          <details className="row-menu" data-cfg-more="1">
+            <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }} title="The admin token and the reset">More ▾</summary>
+            <div className="row-menu-list" style={{ minWidth: 300 }}>
+              <label className="row-menu-field"><span>Admin token · needed to save, remembered in this browser</span>
+                <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" /></label>
+              <button onClick={reset} disabled={busy} style={{ color: "var(--red)" }} title="Overwrite the live configuration with backend/factors.json">Reset to file…</button>
+              <div className="row-menu-note">Reset replaces every value on this page, including the tenant block, with the file in the repository. It asks first.</div>
+            </div>
+          </details>}>
         {status && (
-          <div className="text-xs text-slate-500 mt-2">
-            Live source: <strong>{status.source === "database" ? "the configuration table" : "backend/factors.json (not yet seeded)"}</strong>
-            {status.updated_at && <> · last saved {status.updated_at.replace("T", " ").replace("Z", " UTC")} by {status.updated_by || "—"}</>}
-            {status.differs_from_file && <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">differs from the file in the repo</span>}
-            {dirty && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">unsaved changes</span>}
+          <div className="text-sm text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Live source: <strong>{status.source === "database" ? "the configuration table" : "backend/factors.json (not yet seeded)"}</strong>
+            {status.updated_at && <> · last saved {status.updated_at.replace("T", " ").replace("Z", " UTC")} by {status.updated_by || "—"}</>}</span>
+            {status.differs_from_file && <StatusWord status="Pending" label="differs from the file in the repo" />}
+            {dirty && <StatusWord status="edited" label="unsaved changes" />}
           </div>
         )}
       </PageHeader>
 
       {msg && <div className="rounded-lg border p-3 text-sm mb-4 whitespace-pre-wrap" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--green)" : "var(--red)", background: msg.ok ? "rgba(3,158,134,.06)" : "rgba(191,46,85,.06)" }}>{msg.text}</div>}
 
-      {!doc ? <div className="p-8 text-center text-slate-400">Loading…</div> : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="flex gap-1 border-b border-slate-200 px-2">
+      {!doc ? <SkeletonTable cols={["Vehicle", "Payload t", "GVW t", "kg CO₂e / km"]} rows={5} caption="Configuration · loading" /> : (
+        <div className="cfg-grid">
+          <nav className="cfg-nav" aria-label="Configuration sections">
             {TABS.map(([k, l]) => (
-              <button key={k} onClick={() => setTab(k)} className={"px-3 py-2.5 text-sm font-medium border-b-2 -mb-px " + (tab === k ? "border-[color:var(--navy)] text-[color:var(--navy)]" : "border-transparent text-slate-500 hover:text-slate-800")}>{l}</button>
+              <button key={k} type="button" onClick={() => setTab(k)} className={"cfg-nav-item" + (tab === k ? " is-on" : "")} aria-current={tab === k ? "page" : undefined}>{l}</button>
             ))}
-          </div>
+          </nav>
+          <div className="card cfg-main">
+            <h3 className="text-[17px] font-semibold text-slate-800 px-6 pt-5 pb-3">{tabLabel}</h3>
 
           {tab === "vehicles" && (
             <div className="overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs">
+              <table className="tbl">
+                <thead>
                   <tr>
-                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangShown("ee")).map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}
+                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangShown("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {vehicles.map(k => { const v = doc.vehicles[k]; const lab = v.labels || {}; return (
-                    <tr key={k} className="border-t border-slate-100 align-top">
-                      <td className="px-2 py-1.5 whitespace-nowrap"><div className="font-medium text-slate-800">{k}</div>{v.code && <div className="text-[10px] text-slate-400">{v.code}</div>}</td>
-                      <td className="px-2 py-1.5 min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={k} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
-                      {vehLangShown("ee") && <td className="px-2 py-1.5 min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder="falls back to EU" onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
-                      <td className="px-2 py-1.5 w-24"><input className={inp} value={v.payload_t ?? ""} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
-                      <td className="px-2 py-1.5 w-24"><input className={inp} value={v.gvw_t ?? ""} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
-                      <td className="px-2 py-1.5 w-28"><input className={inp} value={v.emissions_kg_co2e_per_km ?? ""} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
-                      <td className="px-2 py-1.5 w-20"><input className={inp} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
-                      <td className="px-2 py-1.5 w-20"><input className={inp} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
-                      <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={!!v.planning_vehicle} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; d.planning_vehicles = Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle); })} /></td>
+                    <tr key={k}>
+                      <td><div className="font-medium text-slate-800 leading-tight">{k}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
+                      <td className="min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={k} aria-label={`${k} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
+                      {vehLangShown("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder="falls back to EU" onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
+                      <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${k} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
+                      <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${k} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
+                      <td className="num w-28"><input className={inp + " text-right"} value={v.emissions_kg_co2e_per_km ?? ""} aria-label={`${k} kg CO2e per km`} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
+                      <td className="num w-20"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${k} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
+                      <td className="num w-20"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${k} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
+                      <td className="text-center"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${k} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; d.planning_vehicles = Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle); })} /></td>
                     </tr>
                   ); })}
                 </tbody>
               </table>
-              <p className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100">
-                The id is what a forecast line stores and what baked routes are keyed on — it cannot be renamed here. A vehicle the network is baked for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions and aliases are on the JSON tab.
+              <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">
+                The id is what a forecast line stores and what baked routes are keyed on — it cannot be renamed here. A vehicle the network is baked for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions and aliases are on the JSON section.
               </p>
             </div>
           )}
 
           {tab === "materials" && (
             <div className="overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs">
-                  <tr>{["Material", "Density t/m³", "Default unit", "Volume ↔ weight", "Vehicles used"].map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr>
+              <table className="tbl">
+                <thead>
+                  <tr>{["Material", "Density t/m³", "Default unit", "Volume ↔ weight", "Vehicles used"].map(h => <th key={h} scope="col" className={h === "Density t/m³" ? "num" : ""}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {materials.map(k => { const c = doc.material_categories[k]; return (
-                    <tr key={k} className="border-t border-slate-100 align-top">
-                      <td className="px-2 py-1.5 font-medium text-slate-800 whitespace-nowrap">{k}</td>
-                      <td className="px-2 py-1.5 w-28"><input className={inp} value={c.density_t_per_m3 ?? ""} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
-                      <td className="px-2 py-1.5 w-28">
-                        <select className={inp} value={c.default_unit || "t"} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
+                    <tr key={k} className="align-top">
+                      <td className="font-medium text-slate-800">{k}</td>
+                      <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
+                      <td className="w-32">
+                        <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
                           <option value="m3">m³</option><option value="t">tonnes</option><option value="vehicles">vehicles</option>
                         </select>
                       </td>
-                      <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={c.volume_convertible !== false} onChange={e => upd(d => { d.material_categories[k].volume_convertible = e.target.checked; })} /></td>
-                      <td className="px-2 py-1.5">
+                      <td className="text-center"><input type="checkbox" checked={c.volume_convertible !== false} aria-label={`${k} converts volume to weight`} onChange={e => upd(d => { d.material_categories[k].volume_convertible = e.target.checked; })} /></td>
+                      <td style={{ whiteSpace: "normal", height: "auto", padding: "8px 12px" }}>
                         <div className="flex flex-wrap gap-x-3 gap-y-1">
                           {vehicles.map(v => (
-                            <label key={v} className="flex items-center gap-1 text-[11px] text-slate-600 whitespace-nowrap">
+                            <label key={v} className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">
                               <input type="checkbox" checked={(c.vehicles || []).includes(v)} onChange={e => upd(d => {
                                 const cur = d.material_categories[k].vehicles || [];
                                 d.material_categories[k].vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
@@ -2902,22 +3211,22 @@ function ConfigPage({ meta, who, access }){
                   ); })}
                 </tbody>
               </table>
-              <p className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100">Which vehicles a material lists is advisory in Submit forecast — an unlisted vehicle is shown but disabled, never hidden.</p>
+              <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">Which vehicles a material lists is advisory in Submit forecast — an unlisted vehicle is shown but disabled, never hidden.</p>
             </div>
           )}
 
           {tab === "planning" && (
-            <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-4 max-w-4xl">
-              {[["working_days_per_month", "Working days / month", "Every per-day figure in the app divides by this."],
-                ["shift_hours_per_day", "Shift hours / day", "Trips one vehicle can make = shift ÷ cycle time."],
-                ["avg_haul_speed_kmh", "Avg haul speed km/h", "Used only where HERE has no timing."],
-                ["load_minutes", "Load minutes (default)", "Per-vehicle values override this."],
-                ["unload_minutes", "Unload minutes (default)", "Per-vehicle values override this."]].map(([k, l, help]) => (
-                <label key={k} className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">{l}</span>
-                  <input className={inp + " mt-1"} value={(doc.planning || {})[k] ?? ""} onChange={e => upd(d => { d.planning = d.planning || {}; d.planning[k] = num(e.target.value); })} />
-                  <span className="block text-[11px] text-slate-400 mt-1">{help}</span>
-                </label>
+            <div className="px-6 pb-6 max-w-xl">
+              {[["working_days_per_month", "Working days a month", "Loads a day and vehicle counts divide by this. Every export prints it."],
+                ["shift_hours_per_day", "Shift hours a day", "Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time."],
+                ["avg_haul_speed_kmh", "Average haul speed, km/h", "Used only where HERE has no timing for a route. A stand-in until the route is routed."],
+                ["load_minutes", "Loading time, minutes (default)", "Used when a vehicle has no figure of its own."],
+                ["unload_minutes", "Unloading time, minutes (default)", "Likewise."]].map(([k, l, help]) => (
+                <div key={k} className="field">
+                  <label htmlFor={"cfg-" + k}>{l}</label>
+                  <input id={"cfg-" + k} className="ctl w-40 tabular-nums" inputMode="decimal" value={(doc.planning || {})[k] ?? ""} onChange={e => upd(d => { d.planning = d.planning || {}; d.planning[k] = num(e.target.value); })} />
+                  <div className="hint">{help}</div>
+                </div>
               ))}
             </div>
           )}
@@ -2925,14 +3234,14 @@ function ConfigPage({ meta, who, access }){
           {tab === "costing" && <CostingTab who={who} access={access} token={token} setToken={setToken} doc={doc} upd={upd} fileDoc={fileDoc} />}
 
           {tab === "seasonal" && (
-            <div className="p-4 space-y-3">
+            <div className="px-6 pb-6 space-y-3">
               {(doc.seasonal_restrictions || []).map((w, i) => (
-                <div key={i} className="rounded-lg border border-slate-200 p-3 grid md:grid-cols-[1fr_2fr] gap-3">
+                <div key={i} className="rounded-lg border border-slate-200 p-4 grid md:grid-cols-[1fr_2fr] gap-4">
                   <div className="space-y-2">
-                    <input className={inp} value={w.name || ""} placeholder="Name" onChange={e => upd(d => { d.seasonal_restrictions[i].name = e.target.value; })} />
+                    <div className="field" style={{ marginBottom: 8 }}><label>Name</label><input className="ctl w-full" value={w.name || ""} placeholder="Name" onChange={e => upd(d => { d.seasonal_restrictions[i].name = e.target.value; })} /></div>
                     <div className="flex flex-wrap gap-1">
                       {MONTHS.map((m, mi) => (
-                        <label key={m} className={"text-[11px] px-1.5 py-0.5 rounded border cursor-pointer " + ((w.months || []).includes(mi + 1) ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-600")}>
+                        <label key={m} className={"text-[13px] px-2 py-0.5 rounded border cursor-pointer " + ((w.months || []).includes(mi + 1) ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-600")}>
                           <input type="checkbox" className="hidden" checked={(w.months || []).includes(mi + 1)} onChange={e => upd(d => {
                             const cur = d.seasonal_restrictions[i].months || [];
                             d.seasonal_restrictions[i].months = e.target.checked ? [...cur, mi + 1].sort((a, b) => a - b) : cur.filter(x => x !== mi + 1);
@@ -2940,14 +3249,14 @@ function ConfigPage({ meta, who, access }){
                         </label>
                       ))}
                     </div>
-                    <button onClick={() => upd(d => { d.seasonal_restrictions.splice(i, 1); })} className="text-[11px] text-[color:var(--red)] hover:underline">Remove</button>
+                    <button onClick={() => upd(d => { d.seasonal_restrictions.splice(i, 1); })} className="text-[13px] text-[color:var(--red)] hover:underline">Remove this window</button>
                   </div>
                   <div className="space-y-2">
-                    <textarea className={inp + " h-16"} value={w.message || ""} placeholder="Message shown at submission and on the map timeline" onChange={e => upd(d => { d.seasonal_restrictions[i].message = e.target.value; })} />
+                    <div className="field" style={{ marginBottom: 8 }}><label>Message shown at submission and on the map timeline</label><textarea className="ctl w-full h-20" value={w.message || ""} onChange={e => upd(d => { d.seasonal_restrictions[i].message = e.target.value; })} /></div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      <span className="text-[11px] text-slate-400 w-full">Restricted vehicles (none = applies to every vehicle)</span>
+                      <span className="text-[13px] text-slate-500 w-full">Restricted vehicles (none = applies to every vehicle)</span>
                       {vehicles.map(v => (
-                        <label key={v} className="flex items-center gap-1 text-[11px] text-slate-600 whitespace-nowrap">
+                        <label key={v} className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">
                           <input type="checkbox" checked={(w.restricted_vehicles || []).includes(v)} onChange={e => upd(d => {
                             const cur = d.seasonal_restrictions[i].restricted_vehicles || [];
                             d.seasonal_restrictions[i].restricted_vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
@@ -2959,20 +3268,29 @@ function ConfigPage({ meta, who, access }){
                 </div>
               ))}
               <button onClick={() => upd(d => { d.seasonal_restrictions = [...(d.seasonal_restrictions || []), { name: "", months: [], restricted_vehicles: [], message: "" }]; })}
-                className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">+ Add a window</button>
+                className="btn-sec">+ Add a window</button>
             </div>
           )}
 
           {tab === "raw" && (
-            <div className="p-4">
-              <p className="text-xs text-slate-500 mb-2">The whole document. Anything the other tabs do not cover — routing dimensions, aliases, the notes — is here. Saving from this tab sends exactly this text.</p>
-              <textarea className="w-full h-[60vh] font-mono text-xs border border-slate-300 rounded-lg p-3" value={raw}
+            <div className="px-6 pb-6">
+              <p className="text-sm text-slate-500 mb-2">The whole document. Anything the other sections do not cover — routing dimensions, aliases, the notes — is here. Saving from this section sends exactly this text.</p>
+              <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw}
                 onChange={e => { setRaw(e.target.value); setRawErr(""); try { setDoc(JSON.parse(e.target.value)); } catch(err){} }} />
-              {rawErr && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{rawErr}</div>}
+              {rawErr && <div className="text-sm mt-1" style={{ color: "var(--red)" }}>{rawErr}</div>}
             </div>
           )}
+          </div>
         </div>
       )}
+
+      <div className="savebar" data-cfg-savebar="1">
+        <span className="text-slate-500">{!doc ? "" : dirty ? "Unsaved changes on this page" : tab === "raw" ? "Saving from the JSON section sends the text as typed" : "No unsaved changes"}</span>
+        <span className="flex items-center gap-2">
+          <button onClick={discard} disabled={busy || !dirty} className="btn-sec">Discard</button>
+          <button onClick={save} disabled={busy || !doc || (!dirty && tab !== "raw")} className="btn-pri">{busy ? "Saving…" : "Save"}</button>
+        </span>
+      </div>
     </div>
   );
 }
@@ -3036,20 +3354,16 @@ const spanLabel = (a, b) => {
 };
 
 function StatusChip({ s, parentChanged }){
-  const map = { derived: ["#64748b", "rgba(100,116,139,.12)"],
-                edited:  ["#B45309", "rgba(217,119,6,.14)"],
-                confirmed: ["var(--green)", "rgba(3,158,134,.14)"] };
-  const [c, bg] = map[s] || map.derived;
+  // 10 Oct 2026: a word with a dot (StatusWord), the same colours as everywhere else
   return (
-    <span className="inline-flex flex-wrap justify-end gap-1">
-      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ color: c, background: bg }}>{s}</span>
+    <span className="inline-flex flex-wrap gap-2">
+      <StatusWord status={s} label={s === "derived" ? "Derived" : s === "edited" ? "Edited" : s === "confirmed" ? "Confirmed" : s} />
       {/* The parent month's quantity moved after this week was set. Only ever shown on
           an edited or confirmed week — a derived one is refreshed instead of flagged. */}
       {parentChanged && (
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-          style={{ color: "var(--red)", background: "rgba(191,46,85,.12)" }}
+        <span className="chip-st" style={{ color: "var(--red)" }}
           title="The parent month's quantity changed after this week was set. This week was deliberately not refreshed.">
-          parent month changed
+          <i style={{ background: "var(--red)" }} aria-hidden="true"></i>parent month changed
         </span>
       )}
     </span>
@@ -3071,10 +3385,10 @@ function LaKpi({ value, caption, tone }){
   // a long value steps its size down before it would be cut off ("£1.43…" read as a price)
   const len = String(value == null ? "" : value).length;
   return (
-    <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
-      <div className={"font-bold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 7 ? "text-lg" : "text-2xl")}
+    <div className="card px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
+      <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 7 ? "text-lg" : "text-2xl")}
         style={{ color: tone === "red" ? "var(--red)" : "var(--navy-deep)" }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-400 mt-0.5">{caption}</div>
+      <div className="text-[13px] text-slate-500 mt-0.5 leading-tight">{caption}</div>
     </div>
   );
 }
@@ -3092,12 +3406,10 @@ function LineFlags({ flags }){
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
   const wordFor = (code) => { const f = (flags || []).find(x => x.code === code); return f ? flagWord(f, label) : (label[code] || code); };
   return (
-    <span className="inline-flex flex-col gap-1 items-start">
+    <span className="inline-flex flex-col gap-0.5 items-start">
       {codes.map(c => (
-        <span key={c} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-          style={{ color: c === "UNBAKED" ? "#B45309" : "var(--red)",
-                   background: c === "UNBAKED" ? "rgba(217,119,6,.14)" : "rgba(191,46,85,.10)" }}>
-          {wordFor(c)}
+        <span key={c} className="chip-st whitespace-nowrap" style={{ color: c === "UNBAKED" ? "var(--brand-orange-text)" : "var(--red)" }}>
+          <i style={{ background: c === "UNBAKED" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>{wordFor(c)}
         </span>
       ))}
     </span>
@@ -3272,6 +3584,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState("");
+  const [editing, setEditing] = useState(null);   // 10 Oct: the one day cell that is an input (mockup 3)
   const [draft, setDraft] = useState({});                // key -> unsaved input
   const [open, setOpen] = useState({});                  // line key -> expanded
   const [railOpen, setRailOpen] = useState(false);
@@ -3420,7 +3733,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
     setBusy("");
   };
 
-  const fld = "w-full border border-slate-300 rounded px-1.5 py-1 text-xs text-right tabular-nums outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
+  const fld = "w-24 border border-slate-300 rounded px-1.5 py-0.5 text-sm text-right tabular-nums outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
   const pill = (id, label) => (
     <button key={id} onClick={() => pick(id)}
       className="px-4 py-2 rounded-lg text-sm font-semibold border"
@@ -3495,12 +3808,11 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 
           {/* the clash rail — ONE row, flags run together, +N more */}
           {rail.count > 0 && (
-            <div className="rounded-lg border px-3 py-2 mb-3 text-xs flex items-start gap-2" data-guide="lookahead-flags"
-              style={{ borderColor: "rgba(191,46,85,.35)", background: "rgba(191,46,85,.06)", color: "var(--red)" }}>
-              <span className="mt-1 inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--red)" }} />
-              <span className="min-w-0 flex-1 leading-5">
+            <div className="card px-4 py-3 mb-3 text-sm flex items-start gap-4 flex-wrap" data-guide="lookahead-flags">
+              <span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>
+              <span className="min-w-0 flex-1 leading-6 flex flex-wrap gap-x-4 gap-y-1">
                 {(railOpen ? rail.flags : rail.flags.slice(0, 3)).map((f, i) => (
-                  <span key={i}>{i > 0 && <span className="text-slate-400"> · </span>}<span className="font-semibold">{flagWord(f)}</span> {teamText(f.text)}</span>
+                  <span key={i} className="chip-st"><i style={{ background: f.code === "UNBAKED" || f.code === "RESTRICTION" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i><span className="font-semibold">{flagWord(f)}</span>&nbsp;{teamText(f.text)}</span>
                 ))}
               </span>
               {rail.count > 3 && (
@@ -3536,24 +3848,24 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             <EmptyState title={`No approved forecast line in the commit week (${spanLabel(cw.from, cw.to)}).`}
               body="Days exist only for Approved month lines. Approve a line for this month, or switch to next week." />
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="card overflow-hidden">
               <div className="overflow-auto">
-                <table className="text-sm" style={{ minWidth: `${420 + dates.length * 118}px` }}>
-                  <thead className="bg-slate-50 text-slate-500 text-xs">
+                <table className="tbl compact" style={{ minWidth: `${520 + dates.length * 112}px` }}>
+                  <caption><b>Planned quantity by day</b> · loads and vehicles in grey · Monday to Friday · click a day to type its plan while the week is not confirmed</caption>
+                  <thead>
                     <tr>
-                      <th className="px-3 py-2 text-left font-semibold border-r border-slate-200 sticky left-0 bg-slate-50 z-10" style={{ minWidth: 260 }}>Line</th>
-                      <th className="px-2 py-2 text-left font-semibold border-r border-slate-200"></th>
+                      <th className="la-stick" style={{ minWidth: 330 }}>Route · {TEAM().toLowerCase()} · section</th>
+                      <th>Flags</th>
                       {dates.map(iso => {
                         const t = iso === today, we = isWeekend(iso);
                         return (
-                          <th key={iso} className="px-2 py-1.5 text-right border-r border-slate-100"
-                            style={t ? { background: "#eff6ff" } : {}}>
-                            <div className={"font-semibold " + (we ? "text-slate-400" : (t ? "" : "text-slate-700"))}
-                              style={t ? { color: "var(--navy)" } : {}}>{dayName(iso)} {dayNum(iso)}{t ? " · today" : ""}</div>
-                            <div className="text-[9px] uppercase tracking-wide text-slate-400 font-medium">{we ? "0 default" : "qty · tr · veh"}</div>
+                          <th key={iso} className="num" style={t ? { background: "#eff6ff" } : {}}>
+                            <span className={we ? "text-slate-400" : (t ? "" : "")} style={t ? { color: "var(--navy)" } : {}}>{dayName(iso)} {dayNum(iso)}{t ? " · today" : ""}</span>
                           </th>
                         );
                       })}
+                      <th className="num">Week</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3567,47 +3879,46 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       const isOpen = !!open[lk];
                       return (
                         <React.Fragment key={lk}>
-                          <tr className="border-t border-slate-100 align-top">
-                            <td className="px-3 py-2 border-r border-slate-100 sticky left-0 bg-white z-10" style={{ minWidth: 260 }}>
-                              <div className="flex items-start gap-1.5">
+                          <tr>
+                            <td className="la-stick" style={{ minWidth: 330 }}>
+                              <div className="flex items-center gap-1.5">
                                 <button onClick={() => setOpen(o => ({ ...o, [lk]: !o[lk] }))}
-                                  className="text-slate-400 hover:text-slate-700 text-xs mt-0.5 w-4 shrink-0"
+                                  className="text-slate-400 hover:text-slate-700 text-xs w-4 shrink-0"
                                   title={isOpen ? `Hide ${DU()}, ${TKM()}, cycle and ${CUR()}` : `Show ${DU()}, ${TKM()}, cycle and ${CUR()}`}>{isOpen ? "▼" : "▶"}</button>
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">
+                                <div className="min-w-0 leading-tight">
+                                  <div className="font-medium text-[color:var(--navy-deep)] whitespace-nowrap">
                                     {c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[11px] text-slate-500">
-                                    <IptPill ipt={c.ipt} /><WsPill ws={c.section_id} />
-                                    <span>{c.material_type || "—"} · <span title={c.vehicle_type}>{c.vehicle_short || vehLabel(c.vehicle_type) || "—"}</span></span>
-                                    <StatusChip s={w.status} parentChanged={w.parent_changed} />
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 mt-0.5">{line.route_id} · {line.discipline || "unassigned"} · {unitLbl(line.unit)} · week {grp(w.planned_qty, 1)} {unitLbl(line.unit)}{line.days_ne_week ? <span style={{ color: "var(--red)" }}> · days sum {grp(line.days_sum, 1)} ≠ week</span> : null}</div>
+                                  <div className="text-[13px] text-slate-500 whitespace-nowrap">{line.route_id} · {iptKey(c.ipt) ? teamName(iptKey(c.ipt)) : `no ${TEAM().toLowerCase()}`}{c.section_id ? ` · ${c.section_id}` : ""} · {c.material_type || "—"} · <span title={c.vehicle_type}>{c.vehicle_short || vehLabel(c.vehicle_type) || "—"}</span>{line.days_ne_week ? <span style={{ color: "var(--red)" }}> · days sum {grp(line.days_sum, 1)} ≠ week</span> : null}</div>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-2 py-2 border-r border-slate-100"><LineFlags flags={lf} /></td>
+                            <td><LineFlags flags={lf} /></td>
                             {weekdaysOf(line).map(d => {
                               const k = `${lk}|${d.day_date}|p`;
                               const t = d.day_date === today, we = isWeekend(d.day_date);
                               const f = d.derived || {};
                               return (
-                                <td key={d.day_date} className="px-2 py-2 text-right border-r border-slate-100"
-                                  style={t ? { background: "#eff6ff" } : {}}>
+                                <td key={d.day_date} className="num" style={t ? { background: "#eff6ff" } : {}}>
                                   {/* ⭐ Editable while the week is not confirmed — this week or next,
                                       whichever bucket is open. A confirmed week's plan is read-only
-                                      (L6); re-open it to change it. Sat/Sun are typeable: 0 is a
-                                      default, not a rule. */}
-                                  {!locked ? (
-                                    <input className={fld + (we && !(draft[k] ?? d.planned_qty) ? " text-slate-300" : " font-semibold")} inputMode="decimal"
+                                      (L6); re-open it to change it. 10 Oct: the cell reads as a figure
+                                      and becomes an input when clicked (mockup 3), so the grid reads
+                                      as a table until someone types. */}
+                                  {!locked && editing === k ? (
+                                    <input autoFocus className={fld + " font-semibold"} inputMode="decimal"
                                       value={draft[k] ?? (d.planned_qty ?? "")}
                                       onChange={e => setDraft(x => ({ ...x, [k]: e.target.value }))}
-                                      onBlur={() => saveDay(line, d)} />
+                                      onKeyDown={e => { if(e.key === "Enter" || e.key === "Escape") e.currentTarget.blur(); }}
+                                      onBlur={() => { saveDay(line, d); setEditing(null); }} />
+                                  ) : !locked ? (
+                                    <button type="button" className={"la-cell" + (we && !(draft[k] ?? d.planned_qty) ? " text-slate-300" : "")} onClick={() => setEditing(k)}
+                                      title={`Click to type ${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}>{grp(draft[k] ?? d.planned_qty, 1)}</button>
                                   ) : (
                                     <span className={"tabular-nums " + (we ? "text-slate-300" : "font-semibold text-slate-700")}
-                                      title="Confirmed — reopen it to change the plan">{grp(d.planned_qty, 1)}{we ? "" : ` ${unitLbl(line.unit)}`}</span>
+                                      title="Confirmed — reopen it to change the plan">{grp(d.planned_qty, 1)}</span>
                                   )}
-                                  <div className="text-[10px] text-slate-500 mt-0.5 tabular-nums whitespace-nowrap">
+                                  <div className="text-[13px] text-slate-500 tabular-nums whitespace-nowrap leading-tight">
                                     {we && !(+d.planned_qty) ? "" : c.baked
                                       ? `${grp(f.trips)} tr · ${grp(f.vehicles)} veh`
                                       : <span title="Vehicles need a baked route for this vehicle">{grp(f.trips)} tr · <span className="text-amber-700">veh —</span></span>}
@@ -3616,10 +3927,12 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                                 </td>
                               );
                             })}
+                            <td className="num font-semibold" title={`${grp(w.planned_qty, 1)} ${unitLbl(line.unit)} planned this week on this line`}>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></td>
+                            <td><StatusChip s={w.status} parentChanged={w.parent_changed} /></td>
                           </tr>
                           {isOpen && (
-                            <tr className="bg-slate-50 border-t border-slate-100">
-                              <td colSpan={2 + dates.length} className="px-3 py-1.5 text-[11px] text-slate-600 tabular-nums">
+                            <tr className="bg-slate-50">
+                              <td colSpan={4 + dates.length} className="px-3 py-1.5 text-[13px] text-slate-600 tabular-nums" style={{ height: "auto", whiteSpace: "normal" }}>
                                 {c.baked ? (
                                   <>
                                     {grp(dist(c.km_trip))} {DU()}/trip{c.return_baked ? "" : " (outbound only — return not baked)"} · {grp(dist(wd.km))} {DU()}/week
@@ -3636,11 +3949,22 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                         </React.Fragment>
                       );
                     })}
+                    <tr className="la-total">
+                      <td className="la-stick">{lines.length} line{lines.length === 1 ? "" : "s"}</td>
+                      <td></td>
+                      {dates.map(iso => {
+                        let tt = 0, tr = 0;
+                        lines.forEach(l => (l.days || []).forEach(d => { if(d.day_date === iso){ tt += (d.derived || {}).tonnes || 0; tr += (d.derived || {}).trips || 0; } }));
+                        return <td key={iso} className="num" style={iso === today ? { background: "#eff6ff" } : {}}>{grp(tt)} t<div className="text-[13px] text-slate-500 font-normal leading-tight">{grp(tr)} tr</div></td>;
+                      })}
+                      <td className="num">{grp(totals.planned_t)} t</td>
+                      <td></td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
-              <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100">
-                Editable cells = this week, while status is not confirmed. Confirm locks the week as the haulier sheet.
+              <div className="px-4 py-2 text-[13px] text-slate-500 border-t border-slate-100">
+                Click a day to type its plan while the week is not confirmed. Confirm locks the week as the haulier sheet.
                 Mon–Fri only — Sat/Sun are held at 0 and not shown. Figures are planning, not plated. ✎ = a typed day that no longer follows the week ÷ 5.
                 {busy && <span className="ml-2 text-slate-500">saving…</span>}
               </div>
@@ -3916,7 +4240,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             </p>
             {["weather", "wetness", "traffic", "other"].map(f => (
               <label key={f} className="block">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">{f}</span>
+                <span className="block text-sm font-medium text-slate-700 mb-1">{f}</span>
                 <input className={selCls} value={flags[f]}
                   onChange={e => setFlags(s => ({ ...s, [f]: e.target.value }))} />
               </label>
@@ -4089,7 +4413,7 @@ function RoutePlanning({ route, token, onSaved }){
   // the conversion happens in save() and in the initial state below)
   const F = ({ k, label, step, rate }) => (
     <label className="block">
-      <span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
       <input className={inp} inputMode="decimal" placeholder="—" value={v[k]}
         onChange={e => setV(x => ({ ...x, [k]: e.target.value }))} />
     </label>
@@ -4101,7 +4425,7 @@ function RoutePlanning({ route, token, onSaved }){
       <div className="grid grid-cols-2 gap-2">
         <F k="max_vehicles_per_day" label="Max vehicles / day (flag only)" />
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">distance basis · {CUR()}/{DU()} and {TKM()}</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">distance basis · {CUR()}/{DU()} and {TKM()}</span>
           <select className={inp} value={v.km_basis} onChange={e => setV(x => ({ ...x, km_basis: e.target.value }))}>
             <option value="round_trip">round trip (loaded + return)</option>
             <option value="loaded">loaded leg only</option>
@@ -4688,7 +5012,7 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
 
   const pick = (label, lid, key) => (
     <label className="block">
-      <span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
       <select value={sel[key] || ""} onChange={e => write(key, e.target.value)}
         className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white">
         <option value="">Default for this site</option>
@@ -4705,7 +5029,7 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
 
   return (
     <div className="mb-3 rounded-lg border border-slate-200 bg-white p-2.5">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1.5">Gates</div>
+      <div className="text-sm font-medium text-slate-700 mb-1.5">Gates</div>
       {!!(blockers || []).length && (
         <p className="text-xs mb-2 font-semibold" style={{ color: "var(--red)" }}>
           This route will not bake: {(blockers || []).join("; ")}.
@@ -6454,21 +6778,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
             {form && (
               <div className="space-y-3">
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">{form.id ? `Editing ${form.id}` : "New location"}</div>
+                <div className="text-sm font-medium text-slate-700">{form.id ? `Editing ${form.id}` : "New location"}</div>
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Name</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Name</span>
                   <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="e.g. Väo quarry"
                     className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Role</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Role</span>
                     <select value={form.role} onChange={e => setField("role", e.target.value)} className={"mt-1 w-full " + sel}>
                       {ROLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Type</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Type</span>
                     <select value={form.loc_type} onChange={e => setField("loc_type", e.target.value)} className={"mt-1 w-full " + sel}>
                       {[...new Set([form.loc_type, ...LOC_TYPES].filter(Boolean))].map(t => <option key={t}>{t}</option>)}
                     </select>
@@ -6477,7 +6801,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 {form.role !== "destination" && (
                   <div>
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Supplies · materials it provides</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Supplies · materials it provides</span>
                     <div className="mt-1 space-y-1">
                       {materials.map(cat => (
                         <label key={cat} className="flex items-center gap-2 text-xs text-slate-700">
@@ -6490,7 +6814,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 )}
                 {form.role !== "origin" && (
                   <div>
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Receives · materials it accepts</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Receives · materials it accepts</span>
                     <div className="mt-1 space-y-1">
                       {materials.map(cat => (
                         <label key={cat} className="flex items-center gap-2 text-xs text-slate-700">
@@ -6504,12 +6828,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Latitude</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Latitude</span>
                     <input value={form.lat} onChange={e => setField("lat", e.target.value)} inputMode="decimal" placeholder="58.5"
                       className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                   </label>
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Longitude</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Longitude</span>
                     <input value={form.lon} onChange={e => setField("lon", e.target.value)} inputMode="decimal" placeholder="24.7"
                       className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                   </label>
@@ -6521,7 +6845,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     actually receives material. */}
                 {showCapacity && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Stock held (optional)</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Stock held (optional)</span>
                   <div className="grid grid-cols-3 gap-2 mt-1">
                     <label className="block">
                       <span className="text-[10px] text-slate-400">Max capacity</span>
@@ -6557,13 +6881,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     system — and editable here so it stays current. */}
                 <div className="grid grid-cols-1 gap-2">
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Operator / company</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Operator / company</span>
                     <input value={form.vendor} onChange={e => setField("vendor", e.target.value)}
                       placeholder="e.g. OÜ Eesti Killustik"
                       className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                   </label>
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Detail / notes</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Detail / notes</span>
                     <input value={form.detail} onChange={e => setField("detail", e.target.value)}
                       placeholder="e.g. Limestone - rockfill"
                       className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
@@ -6575,7 +6899,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     blank, routing uses the coordinates above. */}
                 <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Access gate (optional)</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Access gate (optional)</span>
                     {(form.gate_lat !== "" || form.gate_lon !== "") && (
                       <button onClick={() => setForm(f => ({ ...f, gate_lat: "", gate_lon: "" }))}
                         className="text-[11px] text-slate-500 hover:underline">Clear</button>
@@ -6604,7 +6928,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 {form.id && (
                 <div className="rounded-lg border border-slate-200 p-2.5">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Gates</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Gates</span>
                     {!gateForm && (
                       <button onClick={newGate}
                         className="text-[11px] font-semibold text-[color:var(--blue)] hover:underline">
@@ -6685,14 +7009,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block">
-                          <span className="text-[11px] uppercase tracking-wide text-slate-400" title="Safety / briefing at this gate. Once per arrival.">Induction (min)</span>
+                          <span className="text-sm font-medium text-slate-700" title="Safety / briefing at this gate. Once per arrival.">Induction (min)</span>
                           <input value={gateForm.safety_minutes}
                             onChange={e => setGateForm(g => ({ ...g, safety_minutes: e.target.value }))}
                             inputMode="decimal" placeholder="0"
                             className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
                         </label>
                         <label className="block">
-                          <span className="text-[11px] uppercase tracking-wide text-slate-400" title="Drive from this gate to the face. Ignored if the route uses a drawn haul road.">Gate → face (min)</span>
+                          <span className="text-sm font-medium text-slate-700" title="Drive from this gate to the face. Ignored if the route uses a drawn haul road.">Gate → face (min)</span>
                           <input value={gateForm.internal_travel_minutes}
                             onChange={e => setGateForm(g => ({ ...g, internal_travel_minutes: e.target.value }))}
                             inputMode="decimal" placeholder="0"
@@ -6801,24 +7125,24 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             {zoneForm && (
               <div className="space-y-3">
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Name</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Name</span>
                   <input value={zoneForm.name} onChange={e => setZField("name", e.target.value)}
                     placeholder="e.g. bridge closure at 12+400"
                     className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Kind</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Kind</span>
                   <select value={zoneForm.kind} onChange={e => setZField("kind", e.target.value)} className={"mt-1 w-full " + sel}>
                     {ZONE_KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">From</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">From</span>
                     <input type="date" value={zoneForm.starts_on} onChange={e => setZField("starts_on", e.target.value)} className={"mt-1 w-full " + sel} />
                   </label>
                   <label className="block">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">To</span>
+                    <span className="block text-sm font-medium text-slate-700 mb-1">To</span>
                     <input type="date" value={zoneForm.ends_on} onChange={e => setZField("ends_on", e.target.value)} className={"mt-1 w-full " + sel} />
                   </label>
                 </div>
@@ -6828,7 +7152,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5 space-y-2.5">
                     <div className="text-[11px] uppercase tracking-wide" style={{ color: ZONE_HAUL }}>Haul road</div>
                     <label className="block">
-                      <span className="text-[11px] uppercase tracking-wide text-slate-400">Assigned speed (km/h)</span>
+                      <span className="block text-sm font-medium text-slate-700 mb-1">Assigned speed (km/h)</span>
                       <input type="number" min="1" step="1" value={zoneForm.speed_kph}
                         onChange={e => setZField("speed_kph", e.target.value)}
                         placeholder="e.g. 25"
@@ -6842,7 +7166,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </span>
                     </label>
                     <label className="block">
-                      <span className="text-[11px] uppercase tracking-wide text-slate-400">Mode</span>
+                      <span className="block text-sm font-medium text-slate-700 mb-1">Mode</span>
                       <select value={zoneForm.haul_mode} onChange={e => setZField("haul_mode", e.target.value)} className={"mt-1 w-full " + sel}>
                         <option value="">Default (splice)</option>
                         {HAUL_MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -6887,7 +7211,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </span>
                 </label>
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Note</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Note</span>
                   <textarea value={zoneForm.note} onChange={e => setZField("note", e.target.value)} rows="2"
                     placeholder="Why it is closed, who to ask, permit reference…"
                     className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
@@ -6895,7 +7219,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 <div className="rounded-lg border border-slate-200 p-2.5 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <span className="block text-sm font-medium text-slate-700 mb-1">
                       {isHaul(zoneForm) ? `Line · ${drawPts.length} point(s)` : `Shape · ${drawPts.length} corner(s)`}
                     </span>
                     <span className="flex items-center gap-2">
@@ -6982,14 +7306,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             </div>
             <div className="space-y-2.5">
               <label className="block">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">Origin (supplier)</span>
+                <span className="block text-sm font-medium text-slate-700 mb-1">Origin (supplier)</span>
                 <select value={rOrigin} onChange={e => setROrigin(e.target.value)} className={"mt-1 w-full " + sel}>
                   <option value="">— pick origin —</option>
                   {originOpts.map(l => <option key={l.id} value={l.id}>{l.name} ({l.id})</option>)}
                 </select>
               </label>
               <label className="block">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">Destination (site)</span>
+                <span className="block text-sm font-medium text-slate-700 mb-1">Destination (site)</span>
                 <select value={rDest} onChange={e => setRDest(e.target.value)} disabled={!rOrigin} className={"mt-1 w-full " + sel + (rOrigin ? "" : " opacity-50")}>
                   <option value="">— pick destination —</option>
                   {destOpts.map(l => {
@@ -7004,7 +7328,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               {/* a route is valid when the origin supplies something the destination receives */}
               {rOrigin && rDest && (
                 <div className="rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-2">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Shared materials</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Shared materials</span>
                   <div className="mt-1 text-xs">
                     {validMats.length
                       ? <CatChips list={validMats} />
@@ -7015,7 +7339,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
               {editingRoute && (
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Material category (optional)</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Material category (optional)</span>
                   <select value={rMaterial} onChange={e => setRMaterial(e.target.value)} className={"mt-1 w-full " + sel}>
                     <option value="">— any shared material —</option>
                     {validMats.map(m => <option key={m} value={m}>{m}</option>)}
@@ -7028,7 +7352,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   button re-bakes only what a route already has) or to remove one at all
                   (clear-geometry had no route filter). Both gaps are closed here. */}
               <div>
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                <span className="block text-sm font-medium text-slate-700 mb-1">
                   {editingRoute ? "Vehicle(s) · tick to bake, untick to remove" : "Vehicle(s) · baked on create"}
                 </span>
                 <div className="mt-1 space-y-1">
@@ -7059,12 +7383,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">Route id</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Route id</span>
                   <input value={rId} onChange={e => { setRId(e.target.value); setRIdTouched(true); }} disabled={!!editingRoute}
                     className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)] disabled:bg-slate-50 disabled:text-slate-500" />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] uppercase tracking-wide text-slate-400">{TEAM()} (optional)</span>
+                  <span className="block text-sm font-medium text-slate-700 mb-1">{TEAM()} (optional)</span>
                   <input value={rIpt} onChange={e => setRIpt(e.target.value)} placeholder="—"
                     className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                 </label>
@@ -7392,10 +7716,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 // ---- little presentational helpers ----
 const selCls = "w-full border border-slate-300 rounded-lg px-2.5 py-2 bg-white outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
 function Field({ label, children }){
-  return <label className="block"><span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span><div className="mt-1">{children}</div></label>;
+  return <label className="block"><span className="block text-sm font-medium text-slate-700 mb-1">{label}</span><div className="mt-1">{children}</div></label>;
 }
 function Stat({ label, value, tone }){
-  return <span className="flex flex-col"><span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span><span className="font-bold text-base" style={{color: tone || "var(--navy-deep)"}}>{value}</span></span>;
+  return <span className="flex flex-col"><span className="block text-sm font-medium text-slate-700 mb-1">{label}</span><span className="font-bold text-base" style={{color: tone || "var(--navy-deep)"}}>{value}</span></span>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);

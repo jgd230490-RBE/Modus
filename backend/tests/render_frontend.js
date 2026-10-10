@@ -293,9 +293,12 @@ if (loaded) {
     ok("...with the KPI strip, the clash rail and one row per line",
       commitOut.includes("planned this week") && commitOut.includes("+" + (fixture.clashes.count - 3) + " more")
       && (commitOut.match(/▶/g) || []).length === fixture.commit.lines.length);
+    // 10 Oct 2026 NARROWED: the 9 px "qty · tr · veh" sub-label went with the one-off styles; the five
+    // day columns are counted by their headers (a day name and number), and the caption says the rest
     ok("...the day headers name today, and there are exactly five day columns — Mon–Fri only (10 Sep)",
       commitOut.includes("· today") && !commitOut.includes("0 default")
-      && (commitOut.match(/qty · tr · veh/gi) || []).length === 5);
+      && (commitOut.match(/<th class="num"[^>]*><span[^>]*>(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+/g) || []).length === 5
+      && commitOut.includes("Planned quantity by day"));
     ok("...every weekday cell carries trips and vehicles (baked fixture)",
       (commitOut.match(/ tr · /g) || []).length >= fixture.commit.lines.length * 5);
     ok("...no stock card on Commit any more (10 Sep) — and no map either under the render harness (initialPage)",
@@ -396,7 +399,8 @@ if (loaded) {
                     horizon: { rows: [], from_month: 9, to_month: 10, roles: {} }, clashes: { flags: [], count: 0, sources: {} }, stock: [] };
     for (const v of ["commit", "account", "horizon"]) {
       const o = render(`the ${v} view renders its empty state`, h(LookAhead, { meta: laMeta, who: "t", initialPage: empty, initialView: v }));
-      ok(`...${v}: an EmptyState, and nothing undefined`, o.includes("border-dashed") && !/undefined|NaN/.test(o));
+      // 10 Oct 2026: NARROWED — the family card is marked data-empty; the dashed border went with the one-off styles
+      ok(`...${v}: an EmptyState, and nothing undefined`, o.includes('data-empty="') && !/undefined|NaN/.test(o));
     }
   }
 }
