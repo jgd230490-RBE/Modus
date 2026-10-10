@@ -616,8 +616,10 @@ ok("frontend: signed-in role text shows the team's name",
    fe_src.count("{role.ipt ? teamName(role.ipt) : role.label}") == 2 and "` · ${role.ipt}`" not in fe_src)
 # NARROWED (H1, 29 Sep): the word comes from flagWord(f) — RAIL_LABEL, or the provider's own
 # word off a RESTRICTION flag ("TARK TEE" / "ROADWORKS")
+# NARROWED (10 Oct, the UI pass): the rail is a card of words with dots; the word and the team text are
+# still flagWord(f) and teamText(f.text), now separated by a non-breaking space inside the chip
 ok("frontend: the clash rail shows the code's name (the provider's for a restriction) and the teams' names",
-   "{flagWord(f)}</span> {teamText(f.text)}" in fe_src and 'IPT_SHARE: "SHARE"' in fe_src
+   "{flagWord(f)}</span>&nbsp;{teamText(f.text)}" in fe_src and 'IPT_SHARE: "SHARE"' in fe_src
    and 'const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);' in fe_src
    and "{f.code}</span> {f.text}" not in fe_src and 'TARK_TEE: "TARK TEE"' not in fe_src)
 ok("frontend: the map entry is not called public — the map is behind the gate",
