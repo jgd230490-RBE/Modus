@@ -8,11 +8,18 @@
     "kg_co2e_per_t_delivered": 0.217,
     "kg_co2e_per_tkm": 0.01415,
     "laden_share_pct": 50.0,
-    "nh_kpi_t_co2e_per_gbp_m": {
-     "2023_24": 210,
-     "2024_25": 148
+    "nh_kpi": {
+     "checked": "2026-10-11",
+     "price_base": "2023 prices",
+     "series": {
+      "2024_25": 159,
+      "2025_26": 181
+     },
+     "source": "National Highways, Net Zero Highways annual progress report 2025-26, section 4 and footnote 1",
+     "status": "VERIFIED",
+     "url": "https://nationalhighways.co.uk/media/1oabu3i2/net-zero-highways-annual-progress-report-2025-26.pdf"
     },
-    "nh_target": "All HGVs delivering to National Highways sites electric or hydrogen by 2040 (Net Zero Highways plan, 2025 update)",
+    "nh_target": "National Highways commitment: \"100% electric or hydrogen heavy vehicles deliver to our sites by 2040\" (Net Zero Highways annual progress report 2025-26)",
     "t_co2e_per_gbp_m": 16.42,
     "vs_national_average_pct": -81.9,
     "zero_emission_share_pct": 100.0
@@ -79,19 +86,20 @@
    ],
    "delta_pct": -79.1,
    "delta_t": -124.153,
+   "delta_trips": 47,
    "drivers": [
     {
      "delta_pct": -71.4,
      "delta_t": -112.04,
      "driver": "disposal",
-     "label": "Disposal route",
+     "label": "Receiving site and disposal method",
      "lines_changed": 1
     },
     {
      "delta_pct": -6.5,
      "delta_t": -10.28,
      "driver": "fuel",
-     "label": "Diesel vs electric",
+     "label": "Battery electric lorries",
      "lines_changed": 2
     },
     {
@@ -175,11 +183,18 @@
    "kg_co2e_per_t_delivered": 1.512,
    "kg_co2e_per_tkm": 0.06479,
    "laden_share_pct": 50.0,
-   "nh_kpi_t_co2e_per_gbp_m": {
-    "2023_24": 210,
-    "2024_25": 148
+   "nh_kpi": {
+    "checked": "2026-10-11",
+    "price_base": "2023 prices",
+    "series": {
+     "2024_25": 159,
+     "2025_26": 181
+    },
+    "source": "National Highways, Net Zero Highways annual progress report 2025-26, section 4 and footnote 1",
+    "status": "VERIFIED",
+    "url": "https://nationalhighways.co.uk/media/1oabu3i2/net-zero-highways-annual-progress-report-2025-26.pdf"
    },
-   "nh_target": "All HGVs delivering to National Highways sites electric or hydrogen by 2040 (Net Zero Highways plan, 2025 update)",
+   "nh_target": "National Highways commitment: \"100% electric or hydrogen heavy vehicles deliver to our sites by 2040\" (Net Zero Highways annual progress report 2025-26)",
    "t_co2e_per_gbp_m": 78.5,
    "vs_national_average_pct": -17.3,
    "zero_emission_share_pct": 0.0
@@ -631,13 +646,13 @@
    "combustion"
   ],
   "drivers": {
-   "disposal": "Disposal route",
-   "fuel": "Diesel vs electric",
-   "material": "Material choice (supplier EPD or re-used)",
+   "disposal": "Receiving site and disposal method",
+   "fuel": "Battery electric lorries",
+   "material": "Custom carbon factor (supplier EPD) or reused material",
    "recycled": "Recycled content",
    "route": "Haul route",
-   "source": "Source distance / supplier",
-   "vehicle": "Vehicle"
+   "source": "Supplier and haul distance",
+   "vehicle": "Vehicle choice"
   },
   "materials": [
    {

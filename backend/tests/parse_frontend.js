@@ -1286,21 +1286,24 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("distances and per-distance figures go through the tenant's unit (fmtDist, distRate, DU, TKM)",
      cb.includes("fmtDist(") && cb.includes("distRate(") && cb.includes("DU()") && cb.includes("TKM()"));
   ok("⭐ it says what it is not: a National Highways Carbon Tool return", cb.includes("not a National Highways Carbon Tool return"));
-  ok("⭐ the ranked list, the three methods side by side, the fleet comparison, the Planned panel and the limits",
-     ["What moves carbon most", "Three ways to count the same haul", "Diesel or electric — the same tonnage",
-      "Planned — not built yet", "Known limits", "No figures are shown for these until each exists."].every(t => cb.includes(t)));
+  // NARROWED 11 Oct 2026 (plain-English pass, notes/carbon-ui-1011): the same five sections, in the new words
+  ok("⭐ the ranked list, the three methods side by side, the fleet comparison, the not-built panel and the limits",
+     ["Which decisions change carbon most", "Three ways to count the same haul", "Diesel or battery electric, same tonnage",
+      "Not built yet", "Known limits", "No figures are shown for these until each exists."].every(t => cb.includes(t)));
   ok("⭐ every factor's source, year and status on hover (title={prov(…)}) and as a status chip",
-     (cb.match(/title=\{prov\(/g) || []).length >= 5 && cb.includes("<Chip s={f.status} />") && cb.includes("Factors used — source, year and status")
+     (cb.match(/title=\{prov\(/g) || []).length >= 5 && cb.includes("<Chip s={f.status} />") && cb.includes("Factors used: source, year and status")
      && /const CARBON_TONE = \{ VERIFIED: [^}]*DERIVED: [^}]*ASSUMPTION: /.test(code));
   ok("the alternative's levers cover all seven drivers the brief names",
      ["recycled", "material", "vehicle", "fuel", "source", "route", "disposal"].every(d => cb.includes(`driver: "${d}"`)));
   ok("the recycled slider is disabled with the server's reason where the Government file has no closed-loop or primary row",
      cb.includes("disabled={!m.recycled_enabled || !!e.kg}") && cb.includes("Not available: {m.recycled_reason}."));
   ok("an EPD needs its reference (the field says so; the server refuses it otherwise)", cb.includes("EPD reference (required)"));
-  ok("the unbaked lines are named, never estimated", cb.includes("transport excludes the {B.totals.lines - B.totals.baked_lines} unbaked"));
+  // NARROWED 11 Oct 2026: "route distance", the Routes page's Bake named as the action
+  ok("the unbaked lines are named, never estimated", cb.includes("no route distance yet, so {unrouted === 1 ? \"its\" : \"their\"} transport is not counted: route them with Bake on the Routes page")
+     && cb.includes("const unrouted = (B.totals.lines || 0) - (B.totals.baked_lines || 0);"));
   ok("🔴 the electric figures carry their basis: no Government electric HGV factor; the +2 t allowance is draft, not applied",
      cb.includes("no Government electric HGV factor exists") && cb.includes("is a draft rule and is not applied")
-     && cb.includes("kWh per km × UK electricity") && !cb.includes("kWh per {DU()}"));
+     && cb.includes("kWh per km × UK electricity") && !cb.includes("kWh per {DU()}") && cb.includes("Where Config has an electric profile for that lorry"));
   const cbStrings = (cb.match(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g) || []).concat(cb.match(/>[^<>{}]+</g) || []);
   const banned = (x) => /\b(compliant|secure|NH-approved|real-time|predict\w*|optimi[sz]\w*|trucks?)\b/i.test(x) || /\bAI\b/.test(x);
   ok("🔴 none of the banned words on the page: compliant, secure, NH-approved, real-time, AI, predict, optimise, truck",
@@ -1314,7 +1317,7 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       "RETURN_STAND_IN", "ROUTE_SWAP_NOT_BAKED", "NO_DISPOSAL_FACTOR"].every(k => new RegExp(`\\b${k}: "`).test(code))
      && code.includes("left out, not counted as zero"));
   ok("review: a supplier or destination that is not baked is offered but cannot be picked", (cb.match(/disabled=\{!(s|x)\.baked\}/g) || []).length === 2
-     && cb.includes('" — not baked"'));
+     && (cb.match(/" — no route distance yet"/g) || []).length === 2);
   ok("review: the disposal choice lists only the routes the Government file publishes for the material", cb.includes("(r.disposal_routes || []).map(k =>")
      && !cb.includes('<option value="open_loop">'));
   ok("review: the electric range is the range on ONE charge, and an impossible trip is left out of both columns",
@@ -1325,6 +1328,37 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("after the UI pass (11 Oct): the Carbon planner has its own rail icon, the Plan kicker, and the error kind of the empty state",
      /\n  carbon: "M/.test(code) && (cb.match(/<PageHeader title="Carbon planner" kicker="Plan"/g) || []).length === 2
      && cb.includes('<EmptyState kind="error" title="Couldn\'t compute the carbon scenario"'));
+  // 11 Oct 2026 — the plain-English pass (notes/carbon-ui-1011, every item checked against its source)
+  ok("plain English: 'Approved plan', never 'Baseline' (National Highways uses baseline for its 2019/20 year)",
+     cb.includes('<Total title="Approved plan" sub="What the alternative is compared with"') && !/\bBaseline\b/.test(cb)
+     && cb.includes("than the approved plan (${pct(A.delta_pct)})") && !src.includes("What moves carbon most"));
+  ok("plain English: a change is said in words ('tCO2e lower' / 'higher' / 'no change'), never by colour alone",
+     cb.includes("tCO2e lower`") && cb.includes("tCO2e higher`") && cb.includes('"no change"') && cb.includes('<b style={{ color: tone(d.delta_t) }}>{moved(d.delta_t)}</b>'));
+  ok("plain English: tCO2e and CO2e with a normal 2, % with no space, empty cells say what they mean",
+     !cb.includes("CO₂e") && !/\} %/.test(cb) && cb.includes('"no data"') && cb.includes('>not applicable<') && cb.includes('"no alternative yet"'));
+  ok("plain English: sentence-case headings, no 12 px text and no capitals for emphasis on the page",
+     !cb.includes("uppercase") && !cb.includes("text-xs") && !/text-\[(9|10|11|12)px\]/.test(cb) && cb.includes('const h3 = "text-base font-semibold text-slate-800";'));
+  ok("the warning line says what the page is not, before anything else", cb.includes('role="note"')
+     && cb.includes("<strong className=\"text-base text-slate-800\">Planning estimates. Not a National Highways Carbon Tool return.</strong>"));
+  ok("on a phone the answer comes before the controls", cb.includes('className="lg:col-span-2 space-y-4 order-1 lg:order-2"') && cb.includes('className="space-y-4 order-2 lg:order-1" data-guide="carbon-levers"'));
+  ok("lorry loads beside the carbon on both cards, the change in loads from the server (no subtraction in the browser)",
+     cb.includes("Lorry loads (deliveries):") && cb.includes("lorries needed in the busiest month:") && cb.includes("A.delta_trips")
+     && !/fleet\.trips\s*-/.test(cb) && cb.includes("more lorry loads, because each lorry carries less") && !/two-way/i.test(cb));
+  ok("the total visibly adds up, and says it is rounded", cb.includes("Material {t1(sc.totals.material_t)} + Transport {t1(sc.totals.transport_t)} + Waste disposal {t1(sc.totals.disposal_t)}")
+     && cb.includes("Figures are rounded, so the parts may not add exactly to the total"));
+  ok("the controls speak NH, CLOCS and EA words, each with one hint",
+     ["Vehicle choice", "Haul distance: ", "Below 100% is a nearer supplier, above is farther", "Custom carbon factor (supplier EPD), kgCO2e per tonne",
+      "Receiving site", "Disposal method", "Battery electric lorries", "Reused material", "Programme spend, in {CUR()} million (optional)"].every(t => cb.includes(t))
+     && !cb.includes("Source distance") && !cb.includes("Send instead to"));
+  ok("🔴 the NH intensity is the restated 159 → 181 (2023 prices), read from its own key, and called context only",
+     cb.includes("const nhKpi = bm(B).nh_kpi || null;") && cb.includes("Context only: this page counts materials, haulage and waste disposal, not the same scope.")
+     && !cb.includes("nh_kpi_t_co2e_per_gbp_m") && !cb.includes("2023_24"));
+  ok("the methods are named in full: 'National Highways Carbon Tool method (for comparison)'; laden share says how it is counted",
+     cb.includes("National Highways Carbon Tool method (for comparison)") && cb.includes("Wayscope: per vehicle-km, both legs")
+     && cb.includes("Every return leg is counted empty: back-loads are not modelled") && !cb.includes("Laden share of km"));
+  ok("the tables use the app's .tbl style with a caption, and the NH category takes NH's own name for waste",
+     (cb.match(/<table className="tbl">/g) || []).length === 4 && (cb.match(/<caption><b>/g) || []).length === 4
+     && cb.includes('"Waste": "Waste + Waste Transport"'));
   const gs2 = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
   ok("the guide has steps for the Carbon page, on its own anchors", /\n  carbon: \[/.test(gs2)
      && ["carbon-compare", "carbon-levers", "carbon-drivers"].every(a => gs2.includes(`anchor: "${a}"`) && src.includes(`data-guide="${a}"`)));

@@ -87,14 +87,17 @@ SHEET_BULK, SHEET_EARTHWORKS, SHEET_WASTE = "Bulk Materials", "Earthworks", "Was
 ALLOCATION = ("Fencing", "Drainage", "Road Pavements", "Civils Structures", "Waste")
 NOT_ALLOCATED = "Not Allocated"
 DRIVERS = ("material", "recycled", "source", "route", "vehicle", "fuel", "disposal")
+# 11 Oct 2026: the words National Highways, CLOCS and the Environment Agency use (notes/carbon-ui-1011):
+# "custom carbon factor" and "disposal method" are NH Carbon Tool v2.7 terms, "vehicle choice" a CLOCS
+# planned measure, "receiving site" the EA's
 DRIVER_LABELS = {
-    "material": "Material choice (supplier EPD or re-used)",
+    "material": "Custom carbon factor (supplier EPD) or reused material",
     "recycled": "Recycled content",
-    "source": "Source distance / supplier",
+    "source": "Supplier and haul distance",
     "route": "Haul route",
-    "vehicle": "Vehicle",
-    "fuel": "Diesel vs electric",
-    "disposal": "Disposal route",
+    "vehicle": "Vehicle choice",
+    "fuel": "Battery electric lorries",
+    "disposal": "Receiving site and disposal method",
 }
 DISPOSAL_ROUTES = ("landfill", "closed_loop", "open_loop", "combustion")
 FLAG_UNBAKED = derived.FLAG_UNBAKED
@@ -918,7 +921,7 @@ def benchmarks(t, evals, cp, spend_m=None):
     limit (no 'per delivery' limit exists in any rule): kg CO2e per tonne delivered; kg CO2e per
     tonne-km against the DESNZ 2026 average-laden tonne-km figure for each line's size class;
     the laden share; the share of zero-emission deliveries (NH: all HGVs delivering to its sites
-    electric or hydrogen by 2040); tCO2e per £m where spend is typed (NH's own KPI 210 → 148
+    electric or hydrogen by 2040); tCO2e per £m where spend is typed (NH's own intensity 159 → 181
     t/£m). A line that counts its loaded leg only (return not baked) would read as an empty-free
     haul, so it is left out of the per-tonne, per-tonne-km and laden-share figures, and counted.
     """
@@ -932,7 +935,10 @@ def benchmarks(t, evals, cp, spend_m=None):
                   for e in use)
     ref = (ref_num / tkm) if tkm > 0 else None
     kg_tkm = (tr * 1000.0 / tkm) if tkm > 0 else None
-    kpi = ((cp.get("benchmarks") or {}).get("nh_kpi_t_co2e_per_gbp_m")) or {}
+    # 11 Oct 2026: NH restated its intensity at 2023 prices (annual progress report 2025-26): 159 → 181,
+    # a rise. Read from its OWN key only, so a document still carrying the superseded 210 → 148 key
+    # (the 2025 update) can never feed it
+    kpi = ((cp.get("benchmarks") or {}).get("nh_kpi_2023_prices")) or None
     spend = _num(spend_m)
     return {
         "kg_co2e_per_t_delivered": round(tr * 1000.0 / bt, 3) if bt > 0 else None,
@@ -944,7 +950,9 @@ def benchmarks(t, evals, cp, spend_m=None):
         "excluded_lines": sum(1 for e in evals if e["baked"]) - len(use),
         "zero_emission_share_pct": round(t["electric_trips"] * 100.0 / t["trips"], 1) if t["trips"] > 0 else None,
         "t_co2e_per_gbp_m": round(t["total_t"] / spend, 2) if spend and spend > 0 else None,
-        "nh_kpi_t_co2e_per_gbp_m": kpi,
+        "nh_kpi": ({"series": {k: v for k, v in kpi.items() if k[:2] == "20"}, "price_base": kpi.get("base_prices"),
+                    "source": kpi.get("source"), "url": kpi.get("url"), "status": kpi.get("status"),
+                    "checked": kpi.get("checked")} if isinstance(kpi, dict) else None),
         "nh_target": (cp.get("benchmarks") or {}).get("nh_target"),
     }
 
@@ -1026,6 +1034,8 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
         interaction = delta - singles
         out_alts.append(dict(tot, name=str(a.get("name") or "Alternative"), levers=lv,
                              delta_t=round(delta, 3), delta_pct=(round(delta * 100.0 / bt, 1) if bt else None),
+                             # 11 Oct 2026: the change in lorry loads, so the page never subtracts
+                             delta_trips=sum(e["trips"] for e in ev) - sum(e["trips"] for e in base_eval),
                              drivers=drivers, interaction_t=(0.0 if abs(interaction) < 5e-4 else round(interaction, 3)),
                              notes=sorted(a_notes), fleet=_fleet_summary(ev)))
 

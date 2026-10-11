@@ -217,6 +217,37 @@ same place as the carbon ones in `parse_frontend.js`. Resolved by merging `main`
 - **parse_map (a separate commit):** one map-panel assertion on `main` failed before this branch touched it (the
   map's CSS was scoped to `#kpi-cards .kpi-label` after the assertion was written). Narrowed to the real selector.
 
+## Plain-English pass (11 Oct, branch `claude/carbon-ui`, for before the freeze)
+Research and the decision are in the project notes (`carbon-ui-research-1011.md`, todo item A16). Every
+term was checked against its own source (NH Carbon Tool v2.7 guidance and annual progress report, CLOCS
+Standard v4, FORS, EA, GOV.UK style guide); nothing new is calculated in the browser.
+
+- **NH figure corrected.** The page showed NH's intensity as 210 → 148 tCO2e per £m (the plan 2025 update,
+  current prices). NH restated it at 2023 prices in its Net Zero Highways annual progress report 2025-26 (§4,
+  footnote 1): **159 (2024/25) → 181 (2025/26), a rise**. `factors.json` → `carbon.benchmarks`: the old
+  `nh_kpi_t_co2e_per_gbp_m` and `nh_kpi_source` are removed; `nh_kpi_2023_prices` is added (VERIFIED, checked
+  11 Oct, with the report's URL; the price level is under `base_prices`, because a key ending `price_` trips the
+  no-ICE guard). `nh_target` is now NH's own sentence, quoted. The API returns `benchmarks.nh_kpi` (series,
+  price_base, source, url, status, checked) and reads ONLY the new key, so a live Config still carrying the old
+  key can never show 210 → 148 (asserted). **factors.json changed: merge, do not overwrite.**
+- **Words.** "Approved plan" (never "Baseline": NH uses that for its 2019/20 year); "Which decisions change
+  carbon most"; changes said in words ("124.2 tCO2e lower than the approved plan (79.1%)"), never by colour
+  alone; the server's decision labels are NH / CLOCS / EA terms (`carbon.DRIVER_LABELS`: custom carbon factor
+  (supplier EPD), vehicle choice, battery electric lorries, receiving site and disposal method); "no route
+  distance yet … Bake on the Routes page" for unrouted lines; "National Highways Carbon Tool method (for
+  comparison)"; NH's own category name "Waste + Waste Transport"; tCO2e with a plain 2; "no data" / "not
+  applicable" / "no alternative yet" in empty cells; sentence case; no 12 px text.
+- **Lorry loads beside the carbon** on both cards, with the busiest month's lorry count. The change in loads is
+  a new server field, `alternatives[].delta_trips` (the "Greener" demo alternative is 47 MORE loads, because
+  electric lorries carry 3.5 t less), so the browser still does no arithmetic.
+- **Layout.** A warning line first ("Planning estimates. Not a National Highways Carbon Tool return."); on a
+  phone the answer comes before the controls; the four tables use the app's `.tbl` style with a caption; the
+  controls are grouped Materials / Lorries and routes / Surplus material and waste; NH's intensity is shown as
+  "context only", with the scope difference said.
+- **Tests:** test_carbon +5 (labels, delta_trips incl. the unrouted line's loads, the old key ignored, the file
+  no longer carries 210 → 148), one REVERSED (the NH series); parse_frontend +12, five NARROWED to the new words;
+  render_frontend +2, five NARROWED. The demo package is regenerated (benchmark block and timestamps only).
+
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
 supplier EPD); electric kWh/km is derived from a mixed-fleet programme; the 2 t ZEV allowance is

@@ -566,9 +566,12 @@ BM = S["baseline"]["benchmarks"]
 ok("benchmarks: 1.512 kg per tonne delivered; 0.06479 kg per t·km vs DESNZ artic 0.07835 → 17.3 % below the national average",
    near(BM["kg_co2e_per_t_delivered"], 1.512, 0.001) and near(BM["kg_co2e_per_tkm"], 0.06479, 0.00001)
    and BM["desnz_kg_co2e_per_tkm"] == 0.07835 and BM["vs_national_average_pct"] == -17.3, str(BM))
-ok("...laden share 50 %, zero-emission deliveries 0 %, 78.5 tCO2e per £m on £2m typed, NH's 210 → 148 beside it",
+ok("...laden share 50 %, zero-emission deliveries 0 %, 78.5 tCO2e per £m on £2m typed, NH's restated 159 → 181 beside it",
    BM["laden_share_pct"] == 50.0 and BM["zero_emission_share_pct"] == 0.0 and BM["t_co2e_per_gbp_m"] == 78.5
-   and BM["nh_kpi_t_co2e_per_gbp_m"] == {"2023_24": 210, "2024_25": 148})
+   # REVERSED 11 Oct 2026: NH restated its intensity at 2023 prices (annual progress report 2025-26, §4 fn 1):
+   # 159 (2024/25) → 181 (2025/26), a RISE — it replaces the superseded 210 → 148 of the 2025 update
+   and BM["nh_kpi"]["series"] == {"2024_25": 159, "2025_26": 181} and BM["nh_kpi"]["price_base"] == "2023 prices"
+   and "annual progress report 2025-26" in BM["nh_kpi"]["source"] and BM["nh_kpi"]["status"] == "VERIFIED")
 FB = S["baseline"]["fleet"]
 # R1 cycle 0.6 + 0.5 + 0.4 h turnaround = 1.5 h → 6 a day → ceil(100 / 132) = 1; R3 1.15 h → 8 → ceil(200 / 176) = 2
 ok("baseline fleet: 3 artics in the peak month (1 on R1, 2 on R3); the unbaked line is unsized, not zero",
@@ -769,6 +772,26 @@ finally:
     conversions.load_factors_file = _real_lff
 ok("review: on a tenant without the block (the live demo) factors.json is parsed ONCE per change, not once per line",
    _calls["n"] <= 1, str(_calls))
+
+# 11 Oct 2026 — the plain-English pass: the server's words, the lorry-load difference, the NH figure
+ok("the ranked decisions carry NH / CLOCS / EA words (custom carbon factor, vehicle choice, receiving site and disposal method)",
+   carbon.DRIVER_LABELS == {"material": "Custom carbon factor (supplier EPD) or reused material", "recycled": "Recycled content",
+                            "source": "Supplier and haul distance", "route": "Haul route", "vehicle": "Vehicle choice",
+                            "fuel": "Battery electric lorries", "disposal": "Receiving site and disposal method"}
+   and [d["label"] for d in G["drivers"]] == ["Receiving site and disposal method", "Battery electric lorries", "Recycled content"])
+# 335 approved loads (100 + 200 + ceil(1,000 / 29) = 35) against 382 (114 + 228 + 40 electric): 47 more, each lorry carries less
+ok("the change in lorry loads comes from the server: 'Greener' is 47 MORE loads (electric lorries carry less per load)",
+   G["delta_trips"] == 47 and sum(m["trips"] for m in G["by_month"]) - sum(m["trips"] for m in S["baseline"]["by_month"]) == 47
+   # Rigids: R1 145 − 100, and the unrouted line 1,000 t at 20 t (50) against 29 t (35): +15, loads count even with no km
+   and A["Rigids"]["delta_trips"] == (145 - 100) + (50 - 35), str((G.get("delta_trips"), A["Rigids"].get("delta_trips"))))
+ok("🔴 the file no longer carries the superseded NH 210 → 148; its commitment is quoted with the report named",
+   "nh_kpi_t_co2e_per_gbp_m" not in CB["benchmarks"] and CB["benchmarks"]["nh_kpi_2023_prices"]["2025_26"] == 181
+   and CB["benchmarks"]["nh_target"].startswith('National Highways commitment: "100% electric or hydrogen heavy vehicles deliver to our sites by 2040"'))
+_old_kpi = copy.deepcopy(FILE)
+_old_kpi["carbon"]["benchmarks"] = {"nh_kpi_t_co2e_per_gbp_m": {"2023_24": 210, "2024_25": 148}}
+ok("🔴 ...and a live document still carrying the old key can never feed it: the page reads only the restated series",
+   carbon.benchmarks({"total_t": 1.0, "tonnes": 1.0, "electric_trips": 0, "trips": 1}, [], carbon.params(_old_kpi))["nh_kpi"]["series"]
+   == {"2024_25": 159, "2025_26": 181})
 
 # the team filter: a team code sees only its own lines (the Dashboard's rule)
 os.environ["IPT2_CODE"] = "ipt2-secret"
