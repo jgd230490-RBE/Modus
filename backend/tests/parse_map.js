@@ -1869,6 +1869,19 @@ ok("11 Oct: a bar card never shrinks below its figure; the What's moving figures
   && /\.kpi-chip \.chip-n\{[^}]*white-space:normal;/.test(html) && !/\.kpi-chip \.chip-n\{[^}]*white-space:nowrap/.test(html));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
+// ---- 11 Oct 2026 — the guide update: the map tour's stale text -------------------------------------
+// The bar's Material a day card is hidden in the vehicles unit the map paints in (CONFIG.FORECAST_UNIT), and on a
+// British tenant a route condition is a planned closure, not a mass limit. Source-level only.
+{
+  const gsM = (code.match(/const MAP_GUIDE_STEPS = \[([\s\S]*?)\n\s*\];/) || ["", ""])[1];
+  ok("guide update: the bar step names what the bar shows (no material card in a vehicles unit)",
+     gsM.includes('body: "shows the month in view: two-way movements a day, vehicles needed, routes in use and CO₂e." }')
+     && !/movements, vehicles, material, routes/.test(gsM));
+  ok("...the Conditions step says it appears with the timeline and names a closure, not only a mass limit",
+     gsM.includes("appears while the timeline is open") && gsM.includes("a road closure or limit on a route")
+     && !/a route over a mass limit/.test(gsM));
+}
+
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 console.log(`\n${pass} passed, ${fail.length} failed`);

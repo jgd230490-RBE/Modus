@@ -224,7 +224,7 @@ Three things to try:
 2. Look-ahead: next week committed by route and by day, with closures and route caps flagged.
 3. Public map: press Play to watch a month of haul unfold.
 
-A short guide opens on each page the first time you visit. You can replay it any time from "Guide" in the corner.
+Nothing pops up by itself. Each page offers a short tour in a small "New here?" box, and orange dots mark its main features: point at one to read its tip. "Guide", at the right-hand end of the "Fictional demo scheme" bar at the top of the screen, starts the tour for the page you are on.
 
 If you'd like a walkthrough of approving a week as a planner, just reply to this email.
 
@@ -249,7 +249,7 @@ def email_html(name, c):
 <li><b>Look-ahead:</b> next week committed by route and by day, with closures and route caps flagged.</li>
 <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
 </ol>
-<p>A short guide opens on each page the first time you visit. You can replay it any time from "Guide" in the corner.</p>
+<p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box, and orange dots mark its main features: point at one to read its tip. "Guide", at the right-hand end of the "Fictional demo scheme" bar at the top of the screen, starts the tour for the page you are on.</p>
 <p>If you'd like a walkthrough of approving a week as a planner, just reply to this email.</p>
 <p>John Davis<br>Wayscope · <a href="{landing_url()}/">wayscope.co.uk</a></p>
 <p style="font-size:12px;color:#5B6470">You're receiving this because you requested a demo at wayscope.co.uk. <a href="{landing_url()}/privacy.html">Privacy notice</a></p>
@@ -428,6 +428,7 @@ def access_page(name, c):
     <li><b>Look-ahead:</b> next week committed by route and by day, with closures and route caps flagged.</li>
     <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
   </ol>
+  <p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box, and orange dots mark its main features: point at one to read its tip. "Guide", at the right-hand end of the "Fictional demo scheme" bar at the top of the screen, starts the tour for the page you are on.</p>
   <p>If you'd like a walkthrough of approving a week as a planner, email <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a>.</p>
   <p class="fine">You asked for this at wayscope.co.uk. <a href="{lu}/privacy.html">Privacy notice</a> · <a href="{lu}/">Back to Wayscope</a></p>
 </main>
