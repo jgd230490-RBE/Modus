@@ -28,7 +28,7 @@
        frontend/brand/theme-tokens.css. */
     --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6;
     --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E7E5E4;
-    --ink:#1E293B; --muted:#64748B; --line:#E7E5E4; --bg:#F7F6F3;
+    --ink:#1E293B; --muted:#64748B; --line:#E7E5E4; --bg:#FFFFFF;
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
     --brand-orange-text:#C75F06; --brand-gold:#D2931F; --brand-ink:#1F2024; --brand-paper:#FFFFFF;
     /* 5 Oct 2026 — APPEARANCE (the picker at the right of the header, html[data-theme]).
@@ -39,14 +39,14 @@
        (generated from the utilities actually present in this file and asserted in
        test_h1_uk). Exports (XLSX, PDF) are documents and keep the print palette. */
     --surface:#FFFFFF; --surface-2:#FAFAF9; --surface-3:#F3F2EF; --control-fg:#FFFFFF;
-    --rail-bg:#F3F2EF; --rail-on:#1F2024;
+    --rail-bg:#FAFAF9; --rail-on:#1F2024; --action:#C2410C; --action-fg:#FFFFFF;
     /* 10 Oct 2026 — THE DATA PALETTE (notes/colour-system-1010.md). Colour on a chart does
-       one job: slot 1 is always the PLAN (blue), slot 2 always DELIVERED (the brand orange,
-       deepened to 3:1), slot 4 the fair-price MODEL (the brand gold), slots 3 and 5 further
+       one job: slot 1 is always the PLAN (11 Oct: the brand orange, orange-led), slot 2 always
+       DELIVERED (blue), slot 4 the fair-price MODEL (violet), slots 3 and 5 further
        categories, in fixed order, never cycled; --chart-none is "not yet". Validated for
        colour-blind separation and 3:1 contrast on white and on the dark surface. Status
        (--green/--gold/--red) is a separate, reserved scale and never a series colour. */
-    --chart-1:#4A72C9; --chart-1-soft:rgba(74,114,201,.18); --chart-2:#C97A2E; --chart-3:#0A9396; --chart-4:#A07D34; --chart-5:#7F6BBE; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
+    --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#2563EB; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
     --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
     --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
     --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9AA1AB; --popover-line:rgba(255,255,255,.12);
@@ -62,8 +62,8 @@
     --red:#F87171; --green:#34D399; --gold:#FBBF24; --grey:#33363D;
     --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518;
     --surface:#1F2024; --surface-2:#1B1D21; --surface-3:#26282D; --control-fg:#1F2024;
-    --rail-bg:#1B1D21; --rail-on:#F3F4F6;
-    --chart-1:#6A8FE0; --chart-1-soft:rgba(106,143,224,.22); --chart-2:#D07F2E; --chart-3:#179AA4; --chart-4:#B48E3E; --chart-5:#9080D4; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
+    --rail-bg:#1B1D21; --rail-on:#F3F4F6; --action:#FF8C14; --action-fg:#1F2024;
+    --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     color-scheme:dark;
   }
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage */
@@ -153,9 +153,16 @@
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
   .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
   .rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);opacity:.85;}
-  .rail-item{border-left:3px solid transparent;color:var(--muted);}
+  /* 11 Oct 2026 — the fresher shell (fresh-directions.html: A, Clean, with B's orange button and kicker) */
+  .rail-item{color:var(--muted);border-radius:6px;margin:1px 8px;width:calc(100% - 16px) !important;padding-left:10px !important;}
   .rail-item:hover{background:var(--surface);color:var(--ink);}
-  .rail-item.is-on{border-left-color:var(--rail-on);background:var(--surface);color:var(--rail-on);font-weight:600;}
+  .rail-item.is-on{background:var(--surface);color:var(--rail-on);font-weight:600;box-shadow:0 0 0 1px var(--line);}
+  .rail-search{display:flex;align-items:center;gap:6px;margin:0 8px 12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
+  .rail-search input{border:0;outline:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);width:100%;min-width:0;}
+  .rail-search kbd{font:11px ui-monospace,Consolas,monospace;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
+  .nav-ic{width:18px;height:18px;flex:none;}
+  .kicker{font:600 12px ui-monospace,'SF Mono',Consolas,'Liberation Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--action);margin-bottom:4px;}
+  .kicker::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--action);margin-right:8px;vertical-align:1px;}
   .rail-count{font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
   /* 10 Oct 2026 — the UI pass (ui-review-1009, mockups 2, 4 and 5): tables at 14 px in 40 px
      rows with a caption, a sticky header and the sort shown once; the filter row and its
@@ -178,7 +185,7 @@
   .fchip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--grey);border-radius:999px;padding:3px 8px 3px 12px;font-size:13px;color:var(--ink);}
   .fchip button{color:var(--muted);font-weight:600;background:none;border:0;cursor:pointer;font:inherit;padding:0 2px;line-height:1;}
   .link-btn{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--ink);text-decoration:underline;cursor:pointer;}
-  .btn-pri{display:inline-block;padding:7px 14px;border-radius:6px;background:var(--navy);color:var(--control-fg);font-size:14px;font-weight:600;line-height:1.3;border:0;cursor:pointer;white-space:nowrap;}
+  .btn-pri{display:inline-block;padding:7px 14px;border-radius:6px;background:var(--action);color:var(--action-fg);font-size:14px;font-weight:600;line-height:1.3;border:0;cursor:pointer;white-space:nowrap;}
   .btn-pri:disabled{opacity:.5;}
   .btn-sec{display:inline-block;padding:7px 12px;border-radius:6px;background:var(--surface);color:var(--ink);border:1px solid var(--grey);font-size:14px;font-weight:500;line-height:1.3;cursor:pointer;white-space:nowrap;}
   .btn-sec:hover{background:var(--surface-2);}
@@ -214,7 +221,8 @@
   .row-menu-field span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;white-space:normal;}
   .row-menu-field input{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
   /* 10 Oct 2026 — the one-screen Dashboard (mockups 1 and 8): six cards, collapsed detail sections */
-  .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+  .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden;}
+  .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;}
   @media (min-width:900px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
   @media (min-width:1280px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));}}
   .dash-card{padding:14px 16px;cursor:help;}
@@ -616,7 +624,11 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
     const narrowed = lineKey ? filtered.filter(r => keyOf(r) === lineKey) : filtered;
     const n = hi - lo + 1;
     const labels = []; for(let i = lo; i <= hi; i++) labels.push(monthLabelAbs(i, months.start_year));
-    const mats = [...new Set(narrowed.map(r => r.material_type))];
+    // 11 Oct 2026 — orange-led: the material with the most tonnes over the WHOLE programme takes slot 1
+    // (the brand orange), the next slot 2, and so on. Ranked on every row, not the filtered ones, so a
+    // filter never repaints the materials that remain (colour follows the entity, not its rank in view).
+    const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });
+    const mats = [...new Set(narrowed.map(r => r.material_type))].sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0) || String(a).localeCompare(String(b)));
     const demand = {}; mats.forEach(m => demand[m] = new Array(n).fill(0));
     const Z = () => new Array(n).fill(0);
     const tripsM = Z(), co2M = Z(), tonnesM = Z(), plannedM = Z(), fairM = Z(), vehM = Z(), actualM = Z();
@@ -697,7 +709,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const pick = (key) => setLineKey(k => k === key ? null : key);
 
   const tf = { size: wall ? 13 : 11 };
-  const C1 = tok("--chart-1", "#4A72C9"), C1S = tok("--chart-1-soft", "rgba(74,114,201,.18)"), C2 = tok("--chart-2", "#C97A2E"), C4 = tok("--chart-4", "#A07D34");
+  const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)"), C2 = tok("--chart-2", "#2563EB"), C4 = tok("--chart-4", "#7C3AED");
   const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()} ${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
   const barScales = { scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
@@ -782,7 +794,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
 
   return (
     <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" : "max-w-7xl")}>
-      <PageHeader title="Dashboard"
+      <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
         subtitle={`Strategic planning view · ${rangeLabel} · ${scopeNote}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
@@ -801,7 +813,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
               </div>
             </details>
           </>}
-          <button type="button" data-guide="dash-wall" onClick={toggleWall} className={"rounded-lg px-3 py-1.5 text-sm font-semibold " + (wall ? "bg-slate-200 text-slate-700" : "text-white")} style={wall ? undefined : { background: "var(--navy)" }}
+          <button type="button" data-guide="dash-wall" onClick={toggleWall} className={wall ? "btn-sec" : "btn-pri"}
                   title={wall ? "Back to the working view (Esc)" : "Fullscreen, larger type, filters and the table hidden, refreshed every 5 minutes"}>{wall ? "Exit big screen" : "Big screen"}</button>
         </div>}>
         {/* coverage: what the totals include and exclude — the old amber box, moved to where the numbers are read */}
@@ -1703,6 +1715,21 @@ const NAV = [
   ]},
 ];
 const DATA_PAGES = ["locations", "routes", "zones"];
+// 11 Oct 2026 — line icons for the rail (fresh-directions, A). Inline SVG paths, no library.
+const NAV_ICON = {
+  dashboard: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
+  submit: "M5 19h4L19 9l-4-4L5 15zM13 7l4 4",
+  forecasts: "M5 6h14M5 12h14M5 18h9",
+  lookahead: "M4 7h16v13H4zM4 11h16M9 4v5M15 4v5",
+  locations: "M12 21s-6-6.2-6-11a6 6 0 0 1 12 0c0 4.8-6 11-6 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  routes: "M6 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 16h5a3 3 0 0 0 3-3v-3",
+  zones: "M12 3l8 4.5v9L12 21l-8-4.5v-9z",
+  config: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h2M3 12h2M12 3v2M12 19v2M17 7l1.4-1.4M5.6 18.4L7 17M17 17l1.4 1.4M5.6 5.6L7 7",
+  map: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
+};
+function NavIcon({ id }){
+  return <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={NAV_ICON[id] || NAV_ICON.forecasts} /></svg>;
+}
 // 2026-09-14 — deep links. Derived from NAV so a new page cannot be linkable-but-unknown
 // or known-but-unlinkable; the two lists cannot drift.
 const PAGE_IDS = new Set(NAV.flatMap(g => g.items.map(i => i.id)));
@@ -1731,11 +1758,12 @@ function screenFromHash(max){
 }
 
 // One header for every page: title, one line of purpose, actions on the right.
-function PageHeader({ title, subtitle, actions, children }){
+function PageHeader({ title, subtitle, actions, children, kicker }){
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 mb-5" data-guide="page-header">
       <div className="min-w-0">
-        <h2 className="text-[22px] font-bold text-[color:var(--navy-deep)] tracking-tight">{title}</h2>
+        {kicker && <div className="kicker">{kicker}</div>}
+        <h2 className="text-[26px] font-bold text-[color:var(--navy-deep)] tracking-tight leading-tight">{title}</h2>
         {subtitle && <p className="text-sm text-slate-500 mt-0.5 max-w-3xl">{subtitle}</p>}
         {children}
       </div>
@@ -1840,7 +1868,15 @@ function Portal({ role, who, meta, metaErr, vehLang }){
   useEffect(() => { refreshPending(); }, [canApprove, page]);
 
   // a page the role cannot see falls back to the dashboard rather than a blank
+  const [navQ, setNavQ] = useState("");
+  const navRef = useRef(null);
+  useEffect(() => {
+    const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
+    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const visible = NAV.filter(g => !g.admin || canApprove);
+  const navMatch = (it) => !navQ || it.label.toLowerCase().includes(navQ.toLowerCase());
+  const navFirst = visible.flatMap(g => g.items).find(navMatch);
   const allowed = new Set(visible.flatMap(g => g.items.map(i => i.id)));
   useEffect(() => { if(!allowed.has(page)) setPage("dashboard"); }, [canApprove]);
 
@@ -1858,18 +1894,25 @@ function Portal({ role, who, meta, metaErr, vehLang }){
     <div className="flex-1 min-h-0 flex">
       <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railOpen ? "w-56" : "w-14")}>
         <div className="flex-1 overflow-y-auto py-3">
-          {visible.map(g => (
+          {railOpen && (
+            <label className="rail-search" title="Find a page (Ctrl K)">
+              <input ref={navRef} value={navQ} onChange={e => setNavQ(e.target.value)} placeholder="Find a page…" aria-label="Find a page"
+                onKeyDown={e => { if(e.key === "Enter" && navFirst){ setPage(navFirst.id); setNavQ(""); } if(e.key === "Escape") setNavQ(""); }} />
+              <kbd>Ctrl K</kbd>
+            </label>
+          )}
+          {visible.filter(g => g.items.some(navMatch)).map(g => (
             // collapsed, the group HEADINGS go but the grouping must not: a plain
             // column of nine icons reads as one undifferentiated list.
             <div key={g.group} className={"mb-3 " + (railOpen ? "" : "pt-3 mt-3 border-t border-slate-100 first:border-0 first:mt-0 first:pt-0")}>
               {railOpen && <div className="rail-group px-4 pb-1">{g.group}</div>}
-              {g.items.map(it => {
+              {g.items.filter(navMatch).map(it => {
                 const active = page === it.id;
                 const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending : null;
                 return (
                   <button key={it.id} onClick={() => setPage(it.id)} title={railOpen ? undefined : it.label}
                     className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
-                    <span className="w-4 text-center text-base leading-none opacity-80">{it.glyph}</span>
+                    <NavIcon id={it.id} />
                     {railOpen && <span className="truncate flex-1">{it.label}</span>}
                     {badge != null && railOpen && (
                       <span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>
@@ -2778,7 +2821,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <PageHeader title="Forecasts"
+      <PageHeader title="Forecasts" kicker="Plan"
         subtitle={canApprove
           ? "Every forecast line you can see, across every year it covers. Approve or reject each line here; approved lines feed the route map, the look-ahead and the KPI cards."
           : `Your ${TEAM().toLowerCase()}'s forecast lines, across every year each one covers. Edit reopens a line in Submit forecast; a revised line goes back for approval.`}
@@ -3114,7 +3157,7 @@ function ConfigPage({ meta, who, access }){
 
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2">
-      <PageHeader title="Configuration"
+      <PageHeader title="Configuration" kicker="Data"
         subtitle="Vehicles, materials, planning constants and seasonal windows — the numbers every forecast, cycle time and map figure is computed from. Changes apply on save, everywhere, for everyone."
         actions={
           <details className="row-menu" data-cfg-more="1">
@@ -3748,7 +3791,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 
   return (
     <div className="max-w-[1500px] mx-auto p-5">
-      <PageHeader title="Look-ahead" subtitle={page ? subtitle : "Loading the commit week…"} />
+      <PageHeader title="Look-ahead" kicker={view === "commit" ? "Track · commit week" : view === "account" ? "Track · last week" : "Track · horizon"} subtitle={page ? subtitle : "Loading the commit week…"} />
 
       <div className="flex flex-wrap items-center gap-2 mb-4" data-guide="lookahead-tabs">
         {pill("account", "Account")}
