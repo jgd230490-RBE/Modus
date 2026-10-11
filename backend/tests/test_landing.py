@@ -202,6 +202,10 @@ for name in ("hero-overview.mp4", "explainer-overview.mp4"):
     ok(f"{name} is under 10 MB", os.path.exists(path) and os.path.getsize(path) < 10 * 1024 * 1024)
 _body = " ".join(p.text)
 ok("no media placeholder text left in the hero", "[SCREEN RECORDING" not in _body)
+# 11 Oct 2026 (the user): the map is the "public map" everywhere a person reads its name, landing page included
+ok("the landing page says 'public map', never 'corridor map' (copy and the video labels)",
+   "corridor map" not in src.lower() and "One read-only public map for the client" in src
+   and "It's the same public map, read four ways." in src)
 ok("explainers 1-5 still marked as placeholders",
    all(f"[EXPLAINER {n}" in _body for n in (1, 2, 3, 4, 5)))
 ok("the overview has four steps, Plan / Approve / Share / Record (8 Oct)",
