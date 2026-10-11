@@ -898,6 +898,7 @@ _ts = main.config.tenant_settings
 try:
     main.config.tenant_settings = lambda *a, **k: {"demo_notice": "Fictional demo scheme · <nothing> here is real"}
     _demo_pg = main._map_password_page()
+    _emb_pg = main._map_password_page(embedded=True)   # 11 Oct 2026 (the demo bar): the app's iframe
     main.config.tenant_settings = lambda *a, **k: {"demo_notice": None}
     _real_pg = main._map_password_page()
     def _boom(*a, **k): raise RuntimeError("no database")
@@ -913,9 +914,38 @@ ok("...a real tenant (no notice) gets no notice box and no leftover marker",
    and _real_pg.replace("\n", "") == main._MAP_PASSWORD_PAGE.replace("<!--demo-notice-->", "").replace("\n", ""))
 ok("...and a tenant read that fails still serves the password page, without a notice",
    'id="p" name="p" type="password"' in _err_pg and 'class="demo-notice"' not in _err_pg)
-ok("🔴 the gate serves the page through _map_password_page(), not the bare constant",
-   "_HTML(_map_password_page(), status_code=401)" in main_code
+# NARROWED 11 Oct 2026 (the demo bar): the gate now passes whether the request is the app's iframe, so the
+# call reads _map_password_page(embedded); it still never serves the bare constant
+ok("🔴 the gate serves the page through _map_password_page(embedded), not the bare constant",
+   "_HTML(_map_password_page(embedded), status_code=401)" in main_code
    and "_HTML(_MAP_PASSWORD_PAGE, status_code=401)" not in main_code)
+# 11 Oct 2026 (the demo bar, review): inside the app the bar above the iframe carries the notice, so the password
+# page in the iframe (/map/?embed=1) leaves its pill out — one notice on screen, not two. /map/ on its own keeps it.
+ok("⭐ embedded (the app's iframe), the demo tenant's password page has no notice pill and no leftover marker",
+   'class="demo-notice"' not in _emb_pg and "<!--demo-notice-->" not in _emb_pg
+   and "Fictional demo scheme" not in _emb_pg)
+ok("...but it is still the whole password page: the form, the eye, the logo, the posting script",
+   'id="p" name="p" type="password"' in _emb_pg and 'class="pw-eye"' in _emb_pg and 'class="logo"' in _emb_pg
+   and "'/api/map-auth'" in _emb_pg and "<h1>Public map</h1>" in _emb_pg
+   and _emb_pg.replace("\n", "") == main._MAP_PASSWORD_PAGE.replace("<!--demo-notice-->", "").replace("\n", ""))
+ok("...and the default (no flag) is the standalone page, pill kept: _map_password_page() is unchanged",
+   "def _map_password_page(embedded=False):" in main_code
+   and "if (dn and not embedded) else \"\"" in main_code)
+ok("🔴 the middleware decides 'embedded' from the request: the embed=1 flag the app's MAP_URL carries, and not a top-level page",
+   "return _gate_refusal(decision, path, embedded=_embedded_request(request))" in main_code
+   and 'request.query_params.get("embed") == "1"' in main_code
+   and '(request.headers.get("sec-fetch-dest") or "").lower() != "document"' in main_code
+   and "def _gate_refusal(decision, path, embedded=False):" in main_code)
+class _FakeReq:
+    def __init__(self, q, h):
+        self.query_params, self.headers = q, h
+ok("⭐ _embedded_request: the app's iframe (embed=1, Sec-Fetch-Dest iframe or absent) → embedded; typed into the tab, no flag, embed=0 → not",
+   main._embedded_request(_FakeReq({"embed": "1", "v": "1"}, {"sec-fetch-dest": "iframe"})) is True
+   and main._embedded_request(_FakeReq({"embed": "1"}, {})) is True
+   and main._embedded_request(_FakeReq({"embed": "1"}, {"sec-fetch-dest": "document"})) is False
+   and main._embedded_request(_FakeReq({"embed": "1"}, {"sec-fetch-dest": "Document"})) is False
+   and main._embedded_request(_FakeReq({"v": "1"}, {"sec-fetch-dest": "iframe"})) is False
+   and main._embedded_request(_FakeReq({"embed": "0"}, {"sec-fetch-dest": "iframe"})) is False)
 
 # the staff app: head links, tokens, the header
 _ICON_LINKS = ('<link rel="icon" href="/favicon.ico" sizes="32x32">',

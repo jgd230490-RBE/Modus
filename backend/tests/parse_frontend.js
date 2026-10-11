@@ -1457,8 +1457,12 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     ok("⭐ the bar sits in App between <Header/> and <main> (main is flex-1 min-h-0, so it gives up the 26 px and nothing overflows)",
       /<Header view=\{view\} role=\{role\} setView=\{setView\} signOut=\{signOut\} vehLang=\{vehLang\} setVehLang=\{setVehLang\} \/>\s*(?:\{\}\s*)?<DemoBar onGuide=\{barGuide\} \/>\s*<main className="flex-1 min-h-0 flex flex-col">/.test(appCode)
       && (code.match(/<DemoBar /g) || []).length === 1);
-    ok("⭐ ...so it is on every view: the public map (and its password page), sign-in, and every Portal page including Loading and the service error",
-      appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "public" && <PublicMap')
+    // NARROWED 11 Oct 2026 (review): the bar must be there at all (with no <DemoBar> indexOf is -1 and every "<" held,
+    // so this passed with the bar deleted), and the label claimed Loading and the service error, which it cannot
+    // cover: the notice is unknown until /api/meta answers. The embedded map keeps its own strip when the bar is absent.
+    ok("⭐ ...so it is on every view once /api/meta has answered: the public map (and its password page), sign-in, and every Portal page (not over Loading or the service error; the embedded map keeps its own strip when the bar is absent)",
+      appCode.indexOf("<DemoBar ") > 0
+      && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "public" && <PublicMap')
       && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "login" && <Login') && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "portal" && ('));
     ok("🔴 keyed on TENANT.demo_notice: a real tenant (no notice) gets no bar at all",
       barFn.startsWith("\n  if(!TENANT.demo_notice) return null;") && !/use[A-Z]\w*\(/.test(barFn));
@@ -1468,13 +1472,20 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       && barFn.includes('className={"demo-bar" + (onGuide ? " has-guide" : "")}') && !/HEADER_DEMO_NAME|IPT/.test(barFn));
     ok("🔴 nothing in the bar touches the document while rendering (render_frontend's stub has no querySelector), and App reads no body dataset",
       !/document\./.test(barFn) && !/document\.body|querySelector/.test(appCode));
-    ok("the bar is CSS classes in <style>: 26 px, ink with amber text from tokens, centred, uppercase, letter-spaced, an ellipsis, the Guide at the right end",
-      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:1px solid var\(--demo-rule\);font:700 13px\/1 Inter,system-ui,sans-serif;letter-spacing:\.06em;/.test(html)
+    // NARROWED 11 Oct 2026 (review): the notice is 14 px (the floor), not 13 px (the hint allowance): a required
+    // notice is not a hint
+    ok("the bar is CSS classes in <style>: 26 px, ink with amber text from tokens, centred, uppercase, letter-spaced, an ellipsis, the Guide at the right end, 14 px text",
+      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:1px solid var\(--demo-rule\);font:700 14px\/1 Inter,system-ui,sans-serif;letter-spacing:\.06em;/.test(html)
+      && !/\.demo-bar[^{]*\{[^}]*font:[^;]*\b1[0-3](?:\.\d+)?px/.test(html)
       && /\.demo-bar-text\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;\}/.test(html)
       && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;[^}]*font:600 14px\/21px /.test(html) && /\.demo-bar\.has-guide\{padding:0 84px;\}/.test(html)
       && /--demo-bg:#1F2024; --demo-fg:#FBBF24; --demo-rule:#D97706;/.test(html));
-    ok("...the Guide keeps its slot at every width, phones included (the text truncates, the button does not move)",
-      /@media \(max-width:639px\)\{ \.demo-bar\{letter-spacing:\.03em;\} \.demo-bar\.has-guide\{padding:0 76px 0 12px;\} \}/.test(html)
+    // REVERSED 11 Oct 2026 (review): on a phone the text no longer truncates. With the Guide beside it, 375 px cut the
+    // notice to "FICTIONAL DEMO SCHEME · NOTHING H…" on every Portal page; below 640 px it now wraps whole (the map's
+    // own phone strip wrapped too), the bar grows from its 26 px, and the Guide keeps its slot, vertically centred.
+    ok("...the Guide keeps its slot at every width, phones included (below 640 px the text WRAPS whole, the bar grows, the button is centred)",
+      /@media \(max-width:639px\)\{ \.demo-bar\{letter-spacing:\.03em;height:auto;min-height:26px;padding:4px 12px;line-height:1\.3;\} \.demo-bar\.has-guide\{padding:4px 76px 4px 12px;\} \.demo-bar-text\{white-space:normal;text-overflow:clip;text-align:center;\} \.demo-bar-guide\{top:50%;transform:translateY\(-50%\);\} \}/.test(html)
+      && !/@media \(max-width:639px\)\{[^\n]*\.demo-bar-text\{[^}]*white-space:nowrap/.test(html)
       && !/hidden sm:|sm:inline|md:/.test(barFn));
     ok("...no Tailwind colour utility in the bar (no DARK-REMAP needed) and no brand orange",
       !/\b(?:bg|text|border)-(?:slate|amber|gray|white|black|blue|red|\[)/.test(barFn) && !/brand-orange/.test(barFn));
@@ -1488,6 +1499,12 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       appFn.includes("if(e.origin === window.location.origin && e.data && e.data.type === MAP_TOUR_MSG) setMapTour(true);")
       && appFn.includes('window.addEventListener("message", on);') && appFn.includes('return () => window.removeEventListener("message", on);')
       && appFn.includes("useEffect(() => { setMapTour(false); }, [view, page]);") && /const MAP_TOUR_MSG = "wayscope-map-tour";/.test(src));
+    ok("(review) tellMapBarOn: outside App, posts BAR_ON_MSG into each map iframe, same origin only, guarded",
+      /function tellMapBarOn\(\)\{\n  try \{\n    document\.querySelectorAll\('iframe\[title="Public Route Map"\]'\)\.forEach\(f => \{\n      if\(f\.contentWindow\) f\.contentWindow\.postMessage\(\{ type: BAR_ON_MSG \}, window\.location\.origin\);\n    \}\);\n  \} catch\(e\)\{\}\n\}/.test(src)
+      && !/postMessage\([^)]*["']\*["']/.test(src) && !appFn.includes("function tellMapBarOn"));
+    ok("(review) App tells the map in an EFFECT on meta (after the bar is committed), demo tenant only; a hook, App has no early return",
+      appFn.includes("useEffect(() => { if(meta && TENANT.demo_notice) tellMapBarOn(); }, [meta]);")
+      && !/\n  if\([^\n]*\) return /.test(appFn));
     ok("...Portal reports its page up (a hook before its early returns), App passes setPage",
       portalFn.includes("useEffect(() => { if(onPage) onPage(page); }, [page]);")
       && portalFn.indexOf("useEffect(() => { if(onPage) onPage(page); }, [page]);") < portalFn.indexOf("if(metaErr){")
@@ -1501,6 +1518,11 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       && (src.match(/<iframe /g) || []).length === 2 && !/<iframe src="\/map/.test(src));
     {
       const mapHtml = fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+      // 11 Oct 2026 (review): the map hides its own notice only under a real .demo-bar, and the app tells it when the
+      // bar arrives after the map has loaded
+      ok("⭐ (review) the late-bar contract: the app posts 'wayscope-bar-on' that the map listens for, and the map looks for the .demo-bar the app renders",
+        /const BAR_ON_MSG = "wayscope-bar-on";/.test(src) && mapHtml.includes("e.data.type !== 'wayscope-bar-on'")
+        && mapHtml.includes("window.parent.document.querySelector('.demo-bar')") && /className=\{"demo-bar" \+ \(onGuide \? " has-guide" : ""\)\}/.test(src));
       ok("⭐ the contract with /map/: it posts the same message type, defines a global guideStart, and reads the same embed flag",
         mapHtml.includes("window.parent.postMessage({ type: 'wayscope-map-tour' }, location.origin);")
         && /\n    function guideStart\(\)\{/.test(mapHtml) && mapHtml.includes("new URLSearchParams(location.search).get('embed') === '1'"));

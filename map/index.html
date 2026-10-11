@@ -510,6 +510,9 @@
     // app, the app's bar under its header carries the demo notice and the Guide button, so this page draws neither
     // and sets no has-demo-notice (no 26 px gap); its tour, hint strip and dots stay, and the app's Guide calls
     // guideStart() in here. Both the flag AND a frame: /map/?embed=1 opened on its own keeps its own strip.
+    // 11 Oct 2026 (review): EMBED says only "inside the app". Whether the app's bar is really drawn above is
+    // barAbove() (by applyTenantVocabulary): the app draws its bar only once its /api/meta has answered, so if that
+    // fails this map keeps its own strip and Guide, and the fictional scheme is never on screen without the notice.
     const EMBED = (() => { try { return new URLSearchParams(location.search).get('embed') === '1' && window.self !== window.top; } catch (e) { return false; } })();
     // H1 (29 Sep 2026, HU5): the distance unit the tenant reads — km stored, converted here
     const KM_PER_MI = 1.609344;
@@ -574,10 +577,12 @@
         const hasRail = !!(window.evr_rail_data && window.evr_rail_data.features && window.evr_rail_data.features.length);
         if (railItem) railItem.hidden = !hasRail;
         // H2: the tenant's demo notice, on the map like every other screen
-        // 11 Oct 2026: not when embedded (EMBED) — the app's demo bar above the iframe carries it
+        // 11 Oct 2026: not when the app's demo bar is drawn above this iframe (barAbove) — the bar carries it.
+        // (review, 11 Oct: it said !EMBED, which hid the notice even when the app had drawn no bar)
         let dn = document.getElementById('demo-notice');
-        document.body.classList.toggle('has-demo-notice', !!TENANT.demo_notice && !EMBED);   // the phone layout keys on it
-        if (TENANT.demo_notice && !EMBED) {
+        const barOn = barAbove();
+        document.body.classList.toggle('has-demo-notice', !!TENANT.demo_notice && !barOn);   // the phone layout keys on it
+        if (TENANT.demo_notice && !barOn) {
             if (!dn) { dn = document.createElement('div'); dn.id = 'demo-notice'; document.body.appendChild(dn); }
             dn.textContent = TENANT.demo_notice;
         } else if (dn) { dn.remove(); }
@@ -585,6 +590,13 @@
         const v = document.getElementById('overlay-version');
         if (v) v.textContent = window.OVERLAY_VERSION ? ('overlay ' + window.OVERLAY_VERSION) : 'no alignment in this tenant';
         if (typeof KPI_BY !== 'undefined') KPI_BY[1][1] = TEAM;
+    }
+    // 11 Oct 2026 (review): is the app's demo bar drawn above this iframe? Embedded only (EMBED), and asked of the
+    // parent page itself (same origin): the bar is a .demo-bar element there. Any error (no parent document, a
+    // cross-origin parent) says no, so the map draws its own notice: a notice twice is safe, none is not.
+    function barAbove(){
+        if (!EMBED) return false;
+        try { return !!window.parent.document.querySelector('.demo-bar'); } catch (e) { return false; }
     }
 
     // ------------------------------------------------------------------ H10 (8 Oct 2026)
@@ -703,7 +715,10 @@
     }
     function setupGuide(){
         if (!TENANT.demo_notice) return;
-        if (EMBED) {
+        GUIDE_READY = true;
+        // 11 Oct 2026 (review): keyed on barAbove(), not EMBED — with no bar above (the app's /api/meta failed),
+        // this map keeps its own Guide button, as on /map/ opened directly
+        if (barAbove()) {
             // 11 Oct 2026 (the demo bar): inside the app there is no Guide button here (its base CSS would put it
             // on the figures bar). The app's bar has the Guide; tell the app this map's tour is ready, and it calls
             // guideStart() through the iframe. Same origin only.
@@ -723,6 +738,21 @@
         window.addEventListener('resize', placeGuideHints);
         setInterval(placeGuideHints, 1000);
     }
+    // 11 Oct 2026 (review): the app's bar can arrive AFTER this map has drawn its own notice (the app's /api/meta
+    // answered after this page's /public/alignment). The app then posts 'wayscope-bar-on' into this frame; from the
+    // parent, same origin, and only once the bar is really there, the map drops its strip, its class and its Guide
+    // button, and tells the app its tour is ready (if it is set up), so the bar's Guide runs it.
+    let GUIDE_READY = false;
+    window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin || e.source !== window.parent || !e.data || e.data.type !== 'wayscope-bar-on') return;
+        if (!barAbove()) return;
+        const dn = document.getElementById('demo-notice');
+        if (dn) dn.remove();
+        document.body.classList.toggle('has-demo-notice', false);
+        const btn = document.getElementById('guide-btn');
+        if (btn) btn.remove();
+        if (GUIDE_READY) { try { window.parent.postMessage({ type: 'wayscope-map-tour' }, location.origin); } catch (err) {} }
+    });
     window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });
 
     // Where the map opens: the package's view if it has one, else the network's

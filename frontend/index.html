@@ -172,14 +172,16 @@
      view and at every width, in the map strip's style: ink, amber uppercase text, letter-spaced, centred, the
      Guide at its right end. It replaces the header's gold badge (and PR #20's rules that hid it under the map);
      the embedded map no longer draws its own strip. A long notice ends in an ellipsis; the Guide keeps its slot.
-     The notice is 13 px, the hint allowance of the 14 px floor (the map's own strip is 10.5 px); the Guide is 14 px. */
-  .demo-bar{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var(--demo-bg);color:var(--demo-fg);border-bottom:1px solid var(--demo-rule);font:700 13px/1 Inter,system-ui,sans-serif;letter-spacing:.06em;overflow:hidden;}
+     Review, 11 Oct 2026: the notice is 14 px, the floor (it was 13 px, the hint allowance; a required notice is not
+     a hint), and the Guide is 14 px. Below 640 px the notice WRAPS instead of ending in an ellipsis: with the Guide
+     beside it a 375 px phone cut it to "FICTIONAL DEMO SCHEME · NOTHING H…" (the map's own phone strip wrapped). */
+  .demo-bar{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var(--demo-bg);color:var(--demo-fg);border-bottom:1px solid var(--demo-rule);font:700 14px/1 Inter,system-ui,sans-serif;letter-spacing:.06em;overflow:hidden;}
   .demo-bar.has-guide{padding:0 84px;}
   .demo-bar-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;}
   .demo-bar-guide{position:absolute;right:8px;top:2px;height:21px;padding:0 10px;border:0;border-radius:999px;background:var(--demo-btn-bg);color:var(--demo-btn-fg);font:600 14px/21px Inter,system-ui,sans-serif;letter-spacing:0;cursor:pointer;}
   .demo-bar-guide:hover{background:var(--demo-btn-hover);}
   .demo-bar-guide:focus-visible{outline:2px solid var(--demo-fg);outline-offset:0;}
-  @media (max-width:639px){ .demo-bar{letter-spacing:.03em;} .demo-bar.has-guide{padding:0 76px 0 12px;} }
+  @media (max-width:639px){ .demo-bar{letter-spacing:.03em;height:auto;min-height:26px;padding:4px 12px;line-height:1.3;} .demo-bar.has-guide{padding:4px 76px 4px 12px;} .demo-bar-text{white-space:normal;text-overflow:clip;text-align:center;} .demo-bar-guide{top:50%;transform:translateY(-50%);} }
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
@@ -1390,6 +1392,18 @@ function startMapTour(){
     if(w && typeof w.guideStart === "function") w.guideStart();
   } catch(e){}
 }
+// 11 Oct 2026 (review): the embedded map hides its own notice and Guide only when this app's bar is really drawn
+// above it (it looks for .demo-bar in this page). The bar appears once /api/meta has answered, which can be after the
+// map has loaded; then the map is told (BAR_ON_MSG) and steps aside. If /api/meta fails there is no bar and the map
+// keeps its own, so the fictional scheme is never on screen without the notice. Same origin only.
+const BAR_ON_MSG = "wayscope-bar-on";
+function tellMapBarOn(){
+  try {
+    document.querySelectorAll('iframe[title="Public Route Map"]').forEach(f => {
+      if(f.contentWindow) f.contentWindow.postMessage({ type: BAR_ON_MSG }, window.location.origin);
+    });
+  } catch(e){}
+}
 const GUIDE_FORECAST_STEPS = [
   { anchor: "page-header", title: "One line per haul.", body: "Each line is a route, a material, a vehicle class and the tonnes by month." },
   { anchor: "forecast-status", title: "Status.", body: "Lines go from submitted to approved. Only approved lines reach the look-ahead and the map." },
@@ -1583,6 +1597,9 @@ function App(){
   }, []);
   // a new screen: any map on it is a new iframe, which announces its tour again once it is ready
   useEffect(() => { setMapTour(false); }, [view, page]);
+  // 11 Oct 2026 (review): once /api/meta has answered and the bar is on screen (an effect runs after the commit),
+  // tell a map that loaded before it. A map that loads later finds the bar itself.
+  useEffect(() => { if(meta && TENANT.demo_notice) tellMapBarOn(); }, [meta]);
   const setVehLang = (l) => { VEH.lang = l; try { localStorage.setItem("modus_veh_lang", l); } catch(e){} setVehLangState(l); };
 
   useEffect(() => {
@@ -1705,10 +1722,12 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
 // ================================================================= Demo bar
 // 11 Oct 2026 (the user: "There is a bar with FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL and a guide button on
 // the public map. Lets have that on every page."). App puts it between the header and <main> on every view: the
-// public map, its password page, sign-in, and every Portal page. ONLY for a tenant with a demo notice: a real
-// tenant gets no bar. The text is the tenant's own (sentence case; the CSS uppercases it). `onGuide` is what the
-// Guide button runs, or null where there is no tour to replay (then the bar has no button). No hooks, and nothing
-// here touches the document while rendering.
+// public map, its password page, sign-in, and every Portal page. It shows once /api/meta has answered (the notice is
+// in it): not over Portal's "Loading…" or the service error. If /api/meta fails, the embedded map keeps its own notice;
+// the map's password page in the iframe has none then (it shows no scheme data) (review, 11 Oct 2026).
+// ONLY for a tenant with a demo notice: a real tenant gets no bar. The text is the tenant's own (sentence case; the
+// CSS uppercases it). `onGuide` is what the Guide button runs, or null where there is no tour to replay (then the bar
+// has no button). No hooks, and nothing here touches the document while rendering.
 function DemoBar({ onGuide }){
   if(!TENANT.demo_notice) return null;
   return (

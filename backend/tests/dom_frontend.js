@@ -183,9 +183,107 @@ async function demoBar(){
   await act(async () => { real.root.unmount(); });
 }
 
+// ---- 5. the embedded map with and without the bar above it (11 Oct 2026, review) -------------------------------
+// The map hides its own notice only when the app's bar is really drawn above it: barAbove() looks for .demo-bar in
+// the parent page. Here the map's REAL guide block (applyTenantVocabulary … the resize hook, sliced out of
+// map/index.html as parse_map.js does) runs in a second jsdom document, and its parent is THIS app window with App
+// mounted in it. So the class the map looks for is checked against what App really renders. The browser's
+// postMessage between the two windows is played by the harness (each side's message is handed to the other's
+// listener). NOT covered: a real iframe in a browser, and how either looks.
+const mapAll = fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+const mapMain = (mapAll.match(/\n<script>\n([\s\S]*?)\n<\/script>/) || ["", ""])[1];
+const gA = mapMain.indexOf("    function applyTenantVocabulary() {");
+const gEnd = "window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });";
+const gB = mapMain.indexOf(gEnd);
+function mapUnder(notice){
+  const md = new JSDOM(`<!doctype html><html><body><div id="kpi-hud"></div><button id="tl-play"></button><div id="kpi-conditions"></div><div id="kpi-moving"></div></body></html>`,
+                       { url: "https://wayscope.test/map/?embed=1&v=1" });
+  const mdoc = md.window.document, listeners = {}, toApp = [];
+  const parent = { document: w.document, postMessage: (m, o) => toApp.push([m, o]) };   // this app window, as the map sees it
+  const mwin = { innerWidth: 1280, innerHeight: 800, evr_rail_data: null, OVERLAY_VERSION: null, parent,
+                 addEventListener(t, fn){ (listeners[t] = listeners[t] || []).push(fn); } };
+  const location = { origin: "https://wayscope.test", search: "?embed=1&v=1" };
+  const TENANT = { name: "Wolds Link", team_label: "Team", demo_notice: notice };
+  const f = new Function("document", "window", "localStorage", "location", "setInterval", "TENANT", "TEAM", "EMBED",
+    mapMain.slice(gA, gB + gEnd.length) + "\nreturn { applyTenantVocabulary };");
+  const api = f(mdoc, mwin, md.window.localStorage, location, () => 0, TENANT, "Team", true);
+  api.applyTenantVocabulary();
+  return {
+    toApp,
+    strip: () => mdoc.getElementById("demo-notice"),
+    cls: () => mdoc.body.classList.contains("has-demo-notice"),
+    btn: () => mdoc.getElementById("guide-btn"),
+    // the browser delivering the app's message into the frame: from the parent, this origin
+    receive: (data) => (listeners.message || []).forEach(fn => fn({ data, origin: location.origin, source: parent })),
+  };
+}
+async function lateBar(){
+  ok("MAP UNDER THE BAR: the map's guide block is found in map/index.html", gA > 0 && gB > gA);
+  const post = (data) => act(() => { w.dispatchEvent(new w.MessageEvent("message", { data, origin: w.location.origin })); });
+  const mountApp = async () => {
+    const box = w.document.createElement("div"); w.document.body.appendChild(box);
+    const root = w.ReactDOM.createRoot(box);
+    await act(async () => { root.render(w.React.createElement(w.App)); });
+    return { box, root };
+  };
+  // (a) /api/meta fails (FastAPI's plain-text 500: json() throws) on a fresh load: no bar, so the map keeps its own
+  w.__TENANT.demo_notice = null; w.__TENANT.name = "Wayscope";
+  w.fetch = (url) => /\/api\/meta$/.test(String(url))
+    ? Promise.resolve({ ok: false, status: 500, json: () => Promise.reject(new SyntaxError("Unexpected token 'I'")) })
+    : new Promise(() => {});
+  const a = await mountApp(); await tick(); await tick();
+  const aFrame = a.box.querySelector('iframe[title="Public Route Map"]');
+  ok("MAP UNDER THE BAR: /api/meta fails → the app draws no bar, and the public map's iframe is still the embedded map",
+     !a.box.querySelector(".demo-bar") && !!aFrame && /^\/map\/\?embed=1&v=\d+$/.test(aFrame.getAttribute("src")));
+  const m1 = mapUnder("Fictional demo scheme · nothing here is real");
+  ok("⭐ MAP UNDER THE BAR: ...so the embedded map (its real code, its parent this app) keeps its own strip, the class and its own Guide button",
+     !!m1.strip() && m1.strip().textContent === "Fictional demo scheme · nothing here is real" && m1.cls() && !!m1.btn()
+     && m1.toApp.length === 0);
+  await act(async () => { a.root.unmount(); }); a.box.remove();
+
+  // (b) the bar arrives AFTER the map has loaded: /api/meta answers late
+  let release;
+  w.__TENANT.demo_notice = null;
+  w.fetch = (url) => /\/api\/meta$/.test(String(url)) ? new Promise(r => { release = () => r({ ok: true, status: 200, json: () => Promise.resolve(META) }); }) : new Promise(() => {});
+  const b = await mountApp();
+  const bFrame = b.box.querySelector('iframe[title="Public Route Map"]');
+  const sent = [];
+  bFrame.contentWindow.postMessage = (m, o) => sent.push([m, o, !!w.document.querySelector(".demo-bar")]);
+  const m2 = mapUnder(N);                 // the map loaded first: no bar above yet
+  ok("MAP UNDER THE BAR: before /api/meta answers there is no bar, and a map that loads now draws its own strip",
+     !b.box.querySelector(".demo-bar") && !!m2.strip() && m2.cls() && !!m2.btn());
+  await act(async () => { release(); }); await tick(); await tick();
+  ok("⭐ MAP UNDER THE BAR: /api/meta answers → the bar appears, and the app tells the map in the frame, once, same origin, with the bar already on screen",
+     !!b.box.querySelector(".demo-bar") && sent.length === 1 && sent[0][0].type === "wayscope-bar-on"
+     && sent[0][1] === w.location.origin && sent[0][2] === true);
+  m2.receive(sent[0][0]);
+  ok("⭐ MAP UNDER THE BAR: ...the map drops its strip, its class and its own Guide button, and tells the app its tour is ready",
+     !m2.strip() && !m2.cls() && !m2.btn() && m2.toApp.length === 1 && m2.toApp[0][0].type === "wayscope-map-tour" && m2.toApp[0][1] === "https://wayscope.test");
+  await post(m2.toApp[0][0]);
+  ok("MAP UNDER THE BAR: ...and the bar's Guide appears for the map's tour (one notice on screen, the bar's)",
+     !!b.box.querySelector(".demo-bar-guide"));
+  const m3 = mapUnder(N);                 // a map that loads after the bar finds it itself
+  ok("⭐ MAP UNDER THE BAR: a map that loads after the bar finds it in the app page: no strip, no class, no button; it says its tour is ready",
+     !m3.strip() && !m3.cls() && !m3.btn() && m3.toApp.length === 1 && m3.toApp[0][0].type === "wayscope-map-tour");
+  await act(async () => { b.root.unmount(); }); b.box.remove();
+
+  // (c) a real tenant: no bar, and nothing is posted into the frame
+  let releaseReal;
+  w.__TENANT.demo_notice = null;
+  w.fetch = (url) => /\/api\/meta$/.test(String(url)) ? new Promise(r => { releaseReal = () => r({ ok: true, status: 200, json: () => Promise.resolve({ ...META, tenant: { ...META.tenant, name: "Real Client", demo_notice: null } }) }); }) : new Promise(() => {});
+  const c = await mountApp();
+  const sentReal = [];
+  c.box.querySelector('iframe[title="Public Route Map"]').contentWindow.postMessage = (m, o) => sentReal.push([m, o]);
+  await act(async () => { releaseReal(); }); await tick(); await tick();
+  ok("🔴 MAP UNDER THE BAR: a real tenant: no bar, and nothing is posted into the map", !c.box.querySelector(".demo-bar") && sentReal.length === 0);
+  await act(async () => { c.root.unmount(); }); c.box.remove();
+}
+
 (async () => {
   try { await demoBar(); ok("DEMO BAR: the section ran to the end", true); }
   catch (e) { ok("DEMO BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await lateBar(); ok("MAP UNDER THE BAR: the section ran to the end", true); }
+  catch (e) { ok("MAP UNDER THE BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

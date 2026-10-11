@@ -1620,7 +1620,9 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      /@media \(max-width:1023px\)\{[\s\S]*?body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[\s\S]*?body\.has-demo-notice #menu-toggle\{ top:40px; \}[\s\S]*?body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:84px; \}[\s\S]*?#guide-btn\{ left:auto !important; right:12px; top:9px; \}[\s\S]*?body\.has-demo-notice #guide-btn\{ top:36px; \}/.test(html)
      // NARROWED 11 Oct 2026 (the demo bar): the class is set for a demo tenant on /map/ opened directly, not when
      // the map is embedded in the app (EMBED), whose bar above the iframe carries the notice
-     && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice && !EMBED\);/.test(code)
+     // NARROWED again 11 Oct 2026 (review): not when the app's bar is really drawn above (barAbove(), which needs
+     // EMBED too) — embedded with no bar (the app's /api/meta failed) the map keeps its strip and the class
+     && /const barOn = barAbove\(\);\n\s+document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice && !barOn\);/.test(code)
      && /const placeBtn = \(\) => \{ btn\.style\.left = ''; \};/.test(code));
   // 11 Oct 2026: and from 1024 px up too — the strip, the bar / panel / controls 26 px lower, the button in the strip
   ok("11 Oct: on the desktop the notice is a 26 px strip too, the bar, panel and map controls sit under it, the Guide button is in the strip",
@@ -1675,15 +1677,35 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
        ev("?embed=1&v=1", true) === true && ev("?embed=1&v=1", false) === false && ev("?v=1", true) === false
        && ev("", false) === false && ev("?embed=0", true) === false && ev("?embed=1", true, true) === false);
   }
-  ok("...the strip and the class are skipped when embedded; the notice is still set as text, never as HTML",
-     /if \(TENANT\.demo_notice && !EMBED\) \{\n\s+if \(!dn\) \{ dn = document\.createElement\('div'\); dn\.id = 'demo-notice'; document\.body\.appendChild\(dn\); \}\n\s+dn\.textContent = TENANT\.demo_notice;/.test(code));
+  // NARROWED 11 Oct 2026 (review): skipped when the app's bar is drawn above (barAbove()), not merely when embedded
+  ok("...the strip and the class are skipped when the app's bar is drawn above; the notice is still set as text, never as HTML",
+     /if \(TENANT\.demo_notice && !barOn\) \{\n\s+if \(!dn\) \{ dn = document\.createElement\('div'\); dn\.id = 'demo-notice'; document\.body\.appendChild\(dn\); \}\n\s+dn\.textContent = TENANT\.demo_notice;/.test(code));
+  ok("🔴 (review) barAbove(): false unless EMBED; then asks the parent page for a .demo-bar, in try/catch (any error → draw our own)",
+     /function barAbove\(\)\{\n\s+if \(!EMBED\) return false;\n\s+try \{ return !!window\.parent\.document\.querySelector\('\.demo-bar'\); \} catch \(e\) \{ return false; \}\n\s+\}/.test(code)
+     && !/!EMBED\)/.test(code.replace(/if \(!EMBED\) return false;/, "")));
+  {
+    const fh = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+    ok("⭐ (review) the class the map looks for is the class the app's bar carries (.demo-bar, on DemoBar's root div)",
+       fh.includes('<div className={"demo-bar" + (onGuide ? " has-guide" : "")} role="note">'));
+  }
   const sg = (code.match(/function setupGuide\(\)\{([\s\S]*?)\n    \}\n/) || ["", ""])[1];
-  ok("...setupGuide: embedded, no Guide button — it posts 'wayscope-map-tour' to the app (same origin only); standalone, the button as before",
-     /if \(EMBED\) \{\s*try \{ window\.parent\.postMessage\(\{ type: 'wayscope-map-tour' \}, location\.origin\); \} catch \(e\) \{\}\s*\} else \{\s*const btn = guideEl\('guide-btn', 'button'\);/.test(sg)
+  // NARROWED 11 Oct 2026 (review): keyed on barAbove() (the app's bar is really there), not on EMBED alone
+  ok("...setupGuide: under the app's bar, no Guide button — it posts 'wayscope-map-tour' to the app (same origin only); otherwise the button as before",
+     /if \(barAbove\(\)\) \{\s*try \{ window\.parent\.postMessage\(\{ type: 'wayscope-map-tour' \}, location\.origin\); \} catch \(e\) \{\}\s*\} else \{\s*const btn = guideEl\('guide-btn', 'button'\);/.test(sg)
      && (sg.match(/postMessage\(/g) || []).length === 1 && !/postMessage\([^)]*'\*'/.test(code));
   ok("...the tour, the hint strip and the dots are set up either way (after the if / else)",
      sg.indexOf("placeGuideHints();\n        window.addEventListener('resize', placeGuideHints);") > sg.indexOf("window.addEventListener('resize', placeBtn);\n        }")
      && sg.indexOf("window.addEventListener('resize', placeBtn);\n        }") > 0);
+  {
+    const lb = (code.match(/window\.addEventListener\('message', \(e\) => \{([\s\S]*?)\n    \}\);/) || ["", ""])[1];
+    ok("(review) a late bar: one 'message' listener, from the parent, same origin, type 'wayscope-bar-on', acted on only once the bar is really there",
+       lb.includes("if (e.origin !== location.origin || e.source !== window.parent || !e.data || e.data.type !== 'wayscope-bar-on') return;")
+       && lb.includes("if (!barAbove()) return;") && (code.match(/addEventListener\('message'/g) || []).length === 1);
+    ok("...it drops the strip, the class and the map's own Guide button, and tells the app the tour is ready only if it is set up (same origin)",
+       lb.includes("document.body.classList.toggle('has-demo-notice', false);") && lb.includes("const btn = document.getElementById('guide-btn');")
+       && lb.includes("if (GUIDE_READY) { try { window.parent.postMessage({ type: 'wayscope-map-tour' }, location.origin); } catch (err) {} }")
+       && /let GUIDE_READY = false;/.test(code) && /if \(!TENANT\.demo_notice\) return;\n\s+GUIDE_READY = true;/.test(code));
+  }
   ok("...the frontend's MAP_URL carries the flag, so both of the app's iframes are embedded",
      /const MAP_URL = "\/map\/\?embed=1&v=" \+ Date\.now\(\);/.test(fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8")));
 
@@ -1692,8 +1714,12 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const bEnd = "window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });";
   const b = src.indexOf(bEnd);
   ok("the guide's functions are one contiguous block (applyTenantVocabulary … the resize hook)", a > 0 && b > a);
-  const run = (embed, notice) => {
-    const byId = {}, posted = [], intervals = [];
+  // 11 Oct 2026 (review): `bar` is whether the parent page has the app's .demo-bar (default: embedded ⇒ yes, the
+  // normal case); the window records its listeners so a 'message' can be delivered (deliver)
+  const run = (embed, notice, bar) => {
+    if (bar === undefined) bar = embed;
+    const byId = {}, posted = [], intervals = [], listeners = {};
+    const parentDoc = { bar, querySelector(sel) { if (this.bar === "throw") throw new Error("cross-origin"); return sel === ".demo-bar" && this.bar ? {} : null; } };
     const mk = (tag) => {
       const el = { tagName: String(tag || "div").toUpperCase(), id: "", style: {}, dataset: {}, attrs: {}, hidden: false, className: "",
         textContent: "", innerHTML: "", offsetWidth: 600, offsetHeight: 72, onclick: null,
@@ -1712,8 +1738,9 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
     };
     const store = {};
     const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
-    const window = { innerWidth: 1280, innerHeight: 800, addEventListener() {}, evr_rail_data: null, OVERLAY_VERSION: null,
-                     parent: { postMessage: (msg, origin) => posted.push([msg, origin]) } };
+    const parent = { document: parentDoc, postMessage: (msg, origin) => posted.push([msg, origin]) };
+    const window = { innerWidth: 1280, innerHeight: 800, addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); },
+                     evr_rail_data: null, OVERLAY_VERSION: null, parent };
     const location = { origin: "https://app.wayscope.test", search: embed ? "?embed=1&v=1" : "" };
     const TENANT = { name: "Wolds Link", team_label: "Team", demo_notice: notice };
     const f = new Function("document", "window", "localStorage", "location", "setInterval", "TENANT", "TEAM", "EMBED",
@@ -1724,7 +1751,10 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
                      btn: byId["guide-btn"] || null, strip: !!byId["guide-strip"], dots: Object.keys(byId).filter(k => /^guide-dot-/.test(k)).length,
                      posted: posted.slice(), intervals: intervals.slice() };
     if (notice) api.guideStart();
-    return { ...before, card: !!byId["guide-card"], api };
+    const deliver = (data, origin, source) => (listeners.message || []).forEach(fn => fn({ data, origin: origin || location.origin, source: source === undefined ? parent : source }));
+    const now = () => ({ cls: cls.has("has-demo-notice"), notice: byId["demo-notice"] ? byId["demo-notice"].textContent : null,
+                         btn: byId["guide-btn"] || null, posted: posted.slice() });
+    return { ...before, card: !!byId["guide-card"], api, parentDoc, deliver, now, listeners };
   };
   if (a > 0 && b > a) {
     const N = "Fictional demo scheme · nothing here is real";
@@ -1743,6 +1773,41 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
          && alone.posted.length === 0 && alone.strip === true && alone.card === true);
       ok("🔴 a real tenant (no notice), embedded: no strip, no class, no button, no message, no hint strip",
          real.cls === false && real.notice === null && real.btn === null && real.posted.length === 0 && real.strip === false && real.dots === 0);
+    }
+    // ---- 11 Oct 2026 (review): embedded, but the app drew no bar (its /api/meta failed) -------------------------
+    let nobar = null, late = null, spoof = null, err2 = "";
+    try { nobar = run(true, N, false); late = run(true, N, false); spoof = run(true, N, false); } catch (e) { err2 = e.message; }
+    ok("the no-bar cases run", !!nobar && !!late && !!spoof, err2);
+    if (nobar && late && spoof) {
+      ok("⭐ (review) embedded with NO bar above (the app's /api/meta failed): the map keeps its own strip with the tenant's words, the class and its Guide button",
+         nobar.cls === true && nobar.notice === N && !!nobar.btn && nobar.btn.onclick === nobar.api.guideStart && nobar.posted.length === 0);
+      // a message that is not the app's bar-on, or arrives before the bar is in the parent page, changes nothing
+      spoof.deliver({ type: "wayscope-bar-on" }, "https://elsewhere.example");
+      spoof.deliver({ type: "wayscope-bar-on" }, undefined, {});
+      spoof.deliver({ type: "something-else" });
+      spoof.deliver({ type: "wayscope-bar-on" });           // from the parent, right type, but no .demo-bar there yet
+      const sp = spoof.now();
+      ok("🔴 (review) bar-on from another origin, from a window that is not the parent, of another type, or with no bar in the parent page: the strip stays",
+         sp.cls === true && sp.notice === N && !!sp.btn && sp.posted.length === 0);
+      // the bar arrives late: the parent now has .demo-bar and says so
+      late.parentDoc.bar = true;
+      late.deliver({ type: "wayscope-bar-on" });
+      const lt = late.now();
+      ok("⭐ (review) the bar arrives late (the app's /api/meta answered after the map's overlay): the map drops its strip, its class and its Guide button",
+         lt.cls === false && lt.notice === null && lt.btn === null);
+      ok("⭐ ...and tells the app, once, that its tour is ready — to this origin only — so the bar's Guide runs it",
+         lt.posted.length === 1 && lt.posted[0][0].type === "wayscope-map-tour" && lt.posted[0][1] === "https://app.wayscope.test");
+      late.deliver({ type: "wayscope-bar-on" });
+      ok("...a second bar-on changes nothing more (the tour message again, which the app treats the same)",
+         late.now().cls === false && late.now().notice === null && late.now().posted.length === 2);
+      // the bar-on before the overlay has answered (no notice known yet): nothing to drop, and no tour message
+      const early = run(true, null, true);
+      early.deliver({ type: "wayscope-bar-on" });
+      ok("🔴 (review) bar-on for a map with no tour set up (a real tenant, or the overlay not yet in): no tour message",
+         early.now().posted.length === 0 && early.now().cls === false);
+      let throwing = null; try { throwing = run(true, N, "throw"); } catch (e) { throwing = null; }
+      ok("🔴 (review) a parent page that cannot be read (the lookup throws) counts as no bar: no throw, and the strip is drawn",
+         !!throwing && throwing.cls === true && throwing.notice === N && !!throwing.btn);
     }
   }
 }

@@ -202,6 +202,27 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 a second import into a non-empty tenant is refused — 400",
        r.status_code == 400 and "already holds data" in r.text, r.text[:160])
 
+    # 11 Oct 2026 (the demo bar, review): with the demo tenant in, a visitor with no cookie. Inside the app (the
+    # iframe's /map/?embed=1, sent as a frame) the bar above carries the notice, so the password page leaves its pill
+    # out; /map/ on its own, and /map/?embed=1 typed into the tab (Sec-Fetch-Dest: document), keep it.
+    _jar = c.cookies
+    c.cookies = type(_jar)()
+    try:
+        r_emb = c.get("/map/?embed=1&v=1", headers={"Sec-Fetch-Dest": "iframe"})
+        r_emb_nohdr = c.get("/map/?embed=1&v=1")
+        r_alone = c.get("/map/")
+        r_typed = c.get("/map/?embed=1&v=1", headers={"Sec-Fetch-Dest": "document"})
+    finally:
+        c.cookies = _jar
+    ok("⭐ demo tenant, no cookie: the app's iframe (/map/?embed=1) gets the password page, 401, WITHOUT the notice pill (the bar has it)",
+       r_emb.status_code == 401 and 'id="p" name="p" type="password"' in r_emb.text and 'class="demo-notice"' not in r_emb.text
+       and r_emb_nohdr.status_code == 401 and 'class="demo-notice"' not in r_emb_nohdr.text, f"{r_emb.status_code} {r_emb_nohdr.status_code}")
+    ok("⭐ .../map/ on its own gets the password page WITH the notice pill (no bar above it)",
+       r_alone.status_code == 401 and '<div class="demo-notice">Fictional demo scheme · nothing here is real</div>' in r_alone.text,
+       str(r_alone.status_code))
+    ok("🔴 ...and /map/?embed=1 typed into the tab (a top-level page) keeps the pill too",
+       r_typed.status_code == 401 and 'class="demo-notice"' in r_typed.text, str(r_typed.status_code))
+
     m = c.get("/api/meta").json()
     ok("meta now reads the demo tenant: its name, £, GB",
        m["tenant"]["name"].startswith("Wolds Link") and m["tenant"]["currency_symbol"] == "£"
