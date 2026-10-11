@@ -1217,7 +1217,9 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("Guide is a component", guideFn.length > 500);
   ok("🔴 the guide shows ONLY on a demo tenant (TENANT.demo_notice), so a real client never sees it",
      /useEffect\(\(\) => \{\n    if\(!TENANT\.demo_notice\) return;/.test(guideFn));
-  ok("...and renders nothing when there is no step", guideFn.includes("if(!step) return null;"));
+  // 11 Oct 2026 NARROWED: with no tour running it renders only the hints (the strip and the dots), never a card
+  ok("...and renders only the hints when there is no step (no card)", guideFn.includes("if(!step) return hintsEl;")
+     && guideFn.includes("const hintsEl = (hints && !step) ? ("));
   ok("the welcome's menu line is built from the groups the ROLE can see (not from NAV)",
      guideFn.includes("(groups || []).map(g => `${g.group} (${g.items.map(it => it.label.toLowerCase()).join(\", \")})`)")
      && /<Guide page=\{page\} groups=\{visible\} \/>/.test(src));
@@ -1227,8 +1229,9 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      /function guideRead\(k\)\{ try \{ return localStorage\.getItem\(GUIDE_KEY \+ k\); \} catch\(e\)\{ return null; \} \}/.test(src)
      && /function guideWrite\(k, v\)\{ try \{ localStorage\.setItem\(GUIDE_KEY \+ k, v\); \} catch\(e\)\{\} \}/.test(src)
      && !/localStorage\.(get|set)Item\(GUIDE_KEY/.test(guideFn));
-  ok("Back / Next / Done and 'Don't show again'", />Back<\/button>/.test(guideFn) && />Next<\/button>/.test(guideFn)
-     && />Done<\/button>/.test(guideFn) && />Don't show again<\/button>/.test(guideFn));
+  // 11 Oct 2026 NARROWED: the last button says "Got it" (Google's wording)
+  ok("Back / Next / Got it and 'Don't show again'", />Back<\/button>/.test(guideFn) && />Next<\/button>/.test(guideFn)
+     && />Got it<\/button>/.test(guideFn) && />Don't show again<\/button>/.test(guideFn));
   ok("Done marks the page (and the welcome) seen; 'Don't show again' switches every page off",
      guideFn.includes('guideWrite(key, "done"); guideWrite("welcome", "done");') && guideFn.includes('guideWrite("all", "off");'));
   ok("the header has a Guide button, demo tenant only, that replays through one event name",
@@ -1318,9 +1321,19 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("orange-led means the largest material over the whole programme takes slot 1; ranked on every row, so a filter never repaints",
     _dbBody.includes("const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });")
     && _dbBody.includes(".sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0)"));
-  ok("11 Oct: the guide card is quiet — the page's surface, thin border, 13 px; no popover-dark card, no solid action-colour Next",
-    /\.guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:var\(--surface\);/.test(html)
-    && !/\.guide-card\{[^}]*background:var\(--popover-bg\)/.test(html) && !/button\.guide-next\{background:var\(--navy\)/.test(html));
+  // 11 Oct 2026 REVERSED (the user chose the Google style, options 4 + 1 + 2)
+  ok("11 Oct: the tour bubble is Google-style — dark, slightly transparent, an arrow on the side it points from, text buttons",
+    /\.guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:rgba\(32,33,36,\.88\);[^}]*backdrop-filter:blur\(8px\)/.test(html)
+    && /\.guide-card\[data-place="above"\]::before/.test(html) && code.includes("data-place={place}"));
+  {
+    const gf = (src.match(/function Guide\(\{ page, groups \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    ok("11 Oct: nothing pops up uninvited — the first visit shows the strip and the dots, not the tour",
+      gf.includes('setHints(true); setStrip(guideRead(key) !== "done");') && !/if\(s\.length\)\{ setSteps\(s\); setI\(0\); \}/.test(gf));
+    ok("11 Oct: the strip offers the tour and × switches every tip off; dots one per distinct anchor, re-placed every second, none during the tour",
+      gf.includes(">Take the tour</button>") && gf.includes("style={{ left: railRight + 16, bottom: 16 }}") && gf.includes('aria-label="Hide the tips"') && gf.includes("onClick={off}")
+      && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
+      && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
+  }
   // 5. the shared components
   ok("the empty-state family: one EmptyState with a kind, marked data-empty, no dashed border; a SkeletonTable; StatusWord; AppliedChips",
     code.includes("function EmptyState({ title, body, action, kind })") && code.includes('data-empty={k}') && !code.includes("border-dashed")

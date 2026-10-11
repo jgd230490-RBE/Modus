@@ -1630,12 +1630,17 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      && /function guideRead\(\)\{ try \{ return localStorage\.getItem\(MAP_GUIDE_KEY\); \} catch \(e\) \{ return null; \} \}/.test(code)
      && /function guideWrite\(v\)\{ try \{ localStorage\.setItem\(MAP_GUIDE_KEY, v\); \} catch \(e\) \{\} \}/.test(code)
      && (code.match(/localStorage\.(get|set)Item\(MAP_GUIDE_KEY/g) || []).length === 2);
-  ok("first visit: it starts by itself only when nothing is remembered; the button always replays",
-     /if \(!guideRead\(\)\) setTimeout\(guideStart, 900\);/.test(code) && /btn\.onclick = guideStart;/.test(code));
-  ok("Back / Next / Done and 'Don't show again'; Done remembers, 'Don't show again' switches off",
+  // 11 Oct 2026 REVERSED (the user, options 4 + 1 + 2): nothing starts by itself any more
+  ok("11 Oct: no tour starts by itself; the strip offers it, the dots mark the features, re-placed every second; the button replays",
+     !/setTimeout\(guideStart, 900\)/.test(code) && /btn\.onclick = guideStart;/.test(code)
+     && code.includes("placeGuideHints();\n        window.addEventListener('resize', placeGuideHints);\n        setInterval(placeGuideHints, 1000);"));
+  // 11 Oct 2026 NARROWED: the last button says "Got it" (Google's wording); it still remembers
+  ok("Back / Next / Got it and 'Don't show again'; Got it remembers, 'Don't show again' switches off",
      /onclick="guideStep\(-1\)">Back</.test(code) && /onclick="guideStep\(1\)">Next</.test(code)
-     && /onclick="guideEnd\(\)">Done</.test(code) && /onclick="guideOff\(\)">Don\\'t show again</.test(code)
-     && /function guideEnd\(\)\{ guideWrite\('done'\);/.test(code) && /function guideOff\(\)\{ guideWrite\('off'\); guideEnd\(\); \}/.test(code));
+     && /onclick="guideEnd\(\)">Got it</.test(code) && /onclick="guideOff\(\)">Don\\'t show again</.test(code)
+     && /function guideEnd\(keep\)\{ if \(!keep\) guideWrite\('done'\);/.test(code)
+     // 11 Oct 2026 NARROWED: 'off' must survive the card closing (it used to be overwritten with 'done')
+     && /function guideOff\(\)\{ guideWrite\('off'\); guideEnd\(true\); \}/.test(code));
   ok("🔴 ONE Mapbox instance, never removed: the guide adds no map and no map.remove()",
      (code.match(/new mapboxgl\.Map\(/g) || []).length === 1 && !/map\.remove\(\)/.test(code));
   ok("🔴 no new script tag: the guide is in-page (three script src tags, as before)", (html.match(/<script src=/g) || []).length === 3);
@@ -1678,9 +1683,18 @@ ok("busiest routes: the five largest by two-way movements a day (not doubled), e
 ok("11 Oct: below 1024 px the zoom buttons sit under the measured bar (a fixed 180 px overlapped it at 950 px), set on resize and whenever the bar changes height",
   code.includes("if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';")
   && code.includes("new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud'))"));
-ok("11 Oct: the guide card is quiet — white, thin border, soft shadow, 13 px; no dark card, no solid blue button, a faint ring",
-  /#guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:#fff;/.test(html) && !/#guide-card\{[^}]*background:#1F2024/.test(html)
-  && !/button\.guide-next\{background:var\(--navy\)/.test(html) && /#guide-ring\{[^}]*border:1\.5px solid rgba\(31,32,36,\.35\)/.test(html));
+// 11 Oct 2026 REVERSED (the user chose the Google style): the bubble is dark and slightly transparent, with an arrow
+ok("11 Oct: the tour bubble is Google-style — dark, slightly transparent (88 %, blurred), 13 px, an arrow, text buttons",
+  /#guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:rgba\(32,33,36,\.88\);[^}]*backdrop-filter:blur\(8px\)/.test(html)
+  && /#guide-card\[data-place="below"\]::before/.test(html) && /#guide-card \.guide-foot button\.guide-next\{color:#8AB4F8\}/.test(html)
+  && code.includes("card.dataset.place = place;"));
+ok("11 Oct: the strip sits just under the bar, offers the tour and hides everything with ×; shown until the tour is done",
+  code.includes("if (on && guideRead() !== 'done' && kpi) {") && code.includes("onclick=\"guideStart()\">Take the tour</button>")
+  && code.includes("onclick=\"guideOff()\">\\u00d7</button>") && code.includes("strip.style.top = (Math.round(k.bottom) + 10) + 'px';"));
+ok("11 Oct: one pulsing dot per visible feature, hover / focus / tap shows its line, none during the tour or once switched off",
+  code.includes("function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }") && code.includes("const on = guideHintsOn() && guideIndex < 0;")
+  && code.includes("dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;")
+  && /\.guide-dot\{position:fixed;z-index:9002;[^}]*animation:guide-pulse 2s infinite\}/.test(html) && /prefers-reduced-motion:reduce\)\{\.guide-dot\{animation:none/.test(html));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
 console.log();
