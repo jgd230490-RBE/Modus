@@ -902,6 +902,24 @@ ok("⭐ withdraw is scoped to the months the row shows, never 1..count",
   code.includes('from: String(g.minMonth), to: String(g.maxMonth)'));
 ok("⭐ a submitter withdraws only its own lines; an approver is not narrowed",
   code.includes('if(!canApprove) p.set("submitted_by", who)'));
+// 11 Oct 2026: the demo stores submitters as "IPT3 planner", and the Submit page printed it raw
+// ("…earthworks / WS1 (IPT3 planner)") — a team id on screen. Every place that SHOWS a submitter goes
+// through teamText(); the comparisons with `who` and the withdraw filter keep the stored value.
+ok("🔴 the route's other lines on Submit show the submitter through teamText (no IPTn on screen)",
+  code.includes('${s.submitted_by ? " (" + teamText(s.submitted_by) + ")" : ""}')
+  && !code.includes('" (" + s.submitted_by + ")"'));
+ok("🔴 the save caution, withdraw prompt, row title, row menu and CSV show teamText(submitter)",
+  code.includes(', submitted by ${teamText(l.submitted_by)}') && !code.includes(', submitted by ${l.submitted_by}')
+  && code.includes('(submitted by ${teamText(g.submittedBy)})') && !code.includes('(submitted by ${g.submittedBy})')
+  && code.includes('Submitted by ${teamText(g.submittedBy) || "—"}') && code.includes('Submitted by {teamText(g.submittedBy) || "—"}')
+  && !/Submitted by \$?\{g\.submittedBy/.test(code)
+  && code.includes('g.months, g.status, teamText(g.submittedBy),'));
+ok("...the Forecasts search finds a line by its team NAME as well as the stored value",
+  code.includes('${g.submittedBy} ${teamText(g.submittedBy)}`.toLowerCase()'));
+ok("...the signed-in name under the rail goes through teamText too",
+  code.includes('{teamText(who) || "—"}</span>'));
+ok("...and ownership still compares the STORED submitter (teamText is display only)",
+  code.includes('const own = g.submittedBy === who;') && code.includes('(!f.mine || g.submittedBy === who)'));
 ok("⭐ a rejection without a reason is refused, not stored blank",
   code.includes('A rejection needs a reason — nothing was changed.'));
 ok("edit hands back the whole year span, not one year",
