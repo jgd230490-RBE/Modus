@@ -1779,8 +1779,14 @@ function App(){
   useEffect(() => { if(meta && TENANT.demo_notice) tellMapBarOn(); }, [meta]);
   const setVehLang = (l) => { VEH.lang = l; try { localStorage.setItem("modus_veh_lang", l); } catch(e){} setVehLangState(l); };
 
-  useEffect(() => {
-    fetch(`${API}/meta`).then(r => r.json()).then(m => {
+  // 12 Oct 2026 (map review D31): /api/meta answers two shapes — the route list, the team list and the sections
+  // only to a valid code or a staff cookie. The mount fetch runs BEFORE a fresh sign-in (no header yet), so once
+  // the code is known it is fetched again (the fetch wrapper adds the header); a resume had the code at mount and
+  // is not fetched twice. Everything the sign-in screen needs is in both shapes.
+  const metaHadCode = useRef(false);
+  const loadMeta = () => {
+    metaHadCode.current = !!ACCESS.code;
+    return fetch(`${API}/meta`).then(r => r.json()).then(m => {
       const vl = m && m.vehicle_labels;
       // 11 Oct 2026: `langs` is what the server OFFERS this tenant (English, plus any label language one of its vehicles still carries)
       if(vl){ VEH.labels = vl.labels || {}; VEH.fallbacks = vl.fallbacks || {}; VEH.langs = (Array.isArray(vl.langs) && vl.langs.length) ? vl.langs : ["en"]; }
@@ -1804,7 +1810,9 @@ function App(){
       (m && m.ipts || []).forEach(i => { if(i && i.id) TEAM_LABELS[iptKey(i.id)] = i.label || i.id; });
       setMeta(m);
     }).catch(() => setMetaErr(true));
-  }, []);
+  };
+  useEffect(() => { loadMeta(); }, []);
+  useEffect(() => { if(role && !metaHadCode.current) loadMeta(); }, [role]);
 
   // `role` is now the /api/auth payload: {role, label, ipt, can_approve, ipt_locked,
   // ipt_required, demo, ipts}. Every permission the UI shows comes from it, not from a

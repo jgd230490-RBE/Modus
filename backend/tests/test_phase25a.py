@@ -149,6 +149,8 @@ sys.modules.setdefault("fastapi.staticfiles", _static)
 TMP = tempfile.mkdtemp(prefix="rbe_p25a_")
 from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
+# 12 Oct 2026 (C11 closed): the admin diagnostics REFUSE when ADMIN_TOKEN is unset, so the harness sets one
+os.environ["ADMIN_TOKEN"] = "p25a-admin-token"
 
 import db  # noqa: E402
 db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
@@ -352,6 +354,52 @@ try:
     allres = restrictions.check_all()
     ok("check_all returns only routes with hits — a clean route is the normal case",
        list(allres["routes"]) == ["R1"], str(list(allres["routes"])))
+    # 12 Oct 2026 (map review §2.2c (c)): check_all takes current_only; the default is unchanged and the
+    # answer says which it was. The fixture carries no dated record, so both answers list R1 alone — the
+    # ENDED-record case is pinned on the National Highways fixture in test_h1_uk.py.
+    ok("check_all reports current_only True by default", allres["current_only"] is True
+       and allres["expired_or_future_excluded"] == 0)
+    _all2 = restrictions.check_all(current_only=False)
+    ok("check_all(current_only=False) reaches the same routes here and says so",
+       list(_all2["routes"]) == ["R1"] and _all2["current_only"] is False)
+    ok("the endpoint passes include_expired through",
+       main.all_route_restrictions(include_expired=True)["current_only"] is False
+       and main.all_route_restrictions()["current_only"] is True)
+
+    # 12 Oct 2026 (map review §2.3): GET /api/restrictions?bbox=w,s,e,n keeps the features whose box meets
+    # the window and reports how many it clipped. Bridge 1 sits at (blon, blat); bridge 2 is 100 km away. One
+    # layer asked for: the fake service answers the same two-bridge fixture for every layer it is asked about.
+    _win = f"{blon - 0.01},{blat - 0.01},{blon + 0.01},{blat + 0.01}"
+    _rb = lambda r: json.loads(r.content if hasattr(r, "content") else r.body)   # this file's Response stub keeps `content`
+    _clip = _rb(main.get_restrictions(layers="bridges_weak", bbox=_win))
+    ok("bbox: a window round bridge 1 keeps it alone, clipped 1, the window echoed, counts recounted",
+       len(_clip["features"]) == 1 and _clip["features"][0]["properties"]["objectid"] == 1
+       and _clip["clipped"] == 1 and _clip["bbox"] == [float(x) for x in _win.split(",")]
+       and _clip["counts"] == {"bridges_weak": 1}, str({k: _clip[k] for k in ("clipped", "bbox", "counts")}))
+    _none = _rb(main.get_restrictions(layers="bridges_weak", bbox="10,10,11,11"))
+    ok("bbox: a window with nothing in it answers an empty collection with clipped 2",
+       _none["features"] == [] and _none["clipped"] == 2 and _none["counts"] == {}, str(_none.get("clipped")))
+    _whole = _rb(main.get_restrictions(layers="bridges_weak"))
+    ok("bbox: without a window nothing is clipped and the body carries no bbox (the cached whole collection)",
+       len(_whole["features"]) == 2 and "clipped" not in _whole and "bbox" not in _whole, str(len(_whole["features"])))
+    _all6 = _rb(main.get_restrictions(bbox="10,10,11,11"))
+    ok("bbox: with every layer asked for (six, two features each here) the clip counts all twelve",
+       _all6["features"] == [] and _all6["clipped"] == 12, str(_all6.get("clipped")))
+    for _bad in ("junk", "1,2,3", "1,2,3,4,5", "2,1,1,2", "-1,52,-0.5,91", "a,b,c,d", ""):
+        _got = None
+        try:
+            _got = main.get_restrictions(bbox=_bad)
+        except _HTTPException as e:
+            _got = e.status_code
+        if _bad == "":
+            ok("bbox: an empty bbox means no window", not isinstance(_got, int) and "clipped" not in _rb(_got))
+        else:
+            ok(f"bbox: {_bad!r} is refused with 400", _got == 400, str(_got)[:80])
+    ok("parse_bbox: four numbers, west < east, south < north; anything else None",
+       restrictions.parse_bbox("-1,52,-0.5,53") == (-1.0, 52.0, -0.5, 53.0)
+       and restrictions.parse_bbox(" -1 , 52 , -0.5 , 53 ") == (-1.0, 52.0, -0.5, 53.0)
+       and restrictions.parse_bbox("-0.5,52,-1,53") is None and restrictions.parse_bbox("nan,1,2,3") is None
+       and restrictions.parse_bbox(None) is None)
 
     # the distance threshold has to actually bite
     db.execute("DELETE FROM route_geometry WHERE route_id = 'R1'")
@@ -369,8 +417,13 @@ try:
     ok("every layer entry carries its key", all("key" in l for l in cat["layers"]))
     ok("the catalogue is attributed", "Tark Tee" in cat["attribution"])
 
-    diag = main.diagnostics_restrictions()
+    diag = main.diagnostics_restrictions(token=os.environ["ADMIN_TOKEN"])
     ok("the diagnostic names what it has NOT verified", len(diag["unverified"]) >= 3)
+    try:
+        main.diagnostics_restrictions()
+        ok("C11 (12 Oct 2026): the diagnostic without the admin token is refused", False)
+    except _HTTPException as e:
+        ok("C11 (12 Oct 2026): the diagnostic without the admin token is refused (403)", e.status_code == 403)
     ok("including the nominal_load question",
        any("nominal_load" in u for u in diag["unverified"]))
     ok("and that the live service is never called from the sandbox",

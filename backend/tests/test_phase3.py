@@ -131,6 +131,10 @@ sys.modules.setdefault("fastapi.staticfiles", _static)
 TMP = tempfile.mkdtemp(prefix="rbe_phase3_")
 from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
+# 12 Oct 2026 (C11 closed): the zone writes REFUSE when ADMIN_TOKEN is unset, so the harness configures one
+# and hands it to every admin call (they passed no token until then, and an unset token let them through)
+os.environ["ADMIN_TOKEN"] = "secret"
+TOK = "secret"
 
 import db  # noqa: E402
 db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
@@ -446,7 +450,7 @@ def zin(**kw):
 
 
 add_geom("R_CROSS", THROUGH)
-res = main.create_zone(zin(name="Bridge out"))
+res = main.create_zone(zin(name="Bridge out"), token=TOK)
 ok("POST returns the zone", res["zone"]["name"] == "Bridge out")
 ok("POST reports what it invalidated", res["invalidated"]["leg_count"] == 1)
 ok("POST flags that a re-bake is required", res["rebake_required"] is True)
@@ -455,7 +459,7 @@ ok("POST actually cleared the geometry",
    db.query("SELECT COUNT(*) AS n FROM route_geometry")[0]["n"] == 0)
 
 add_geom("R2", AWAY)
-res2 = main.create_zone(zin(name="Advisory only", geometry=FAR, affects_routing=False))
+res2 = main.create_zone(zin(name="Advisory only", geometry=FAR, affects_routing=False), token=TOK)
 ok("an advisory zone invalidates nothing", res2["invalidated"]["leg_count"] == 0)
 ok("an advisory zone needs no re-bake", res2["rebake_required"] is False)
 ok("an advisory zone leaves geometry alone",
@@ -476,44 +480,57 @@ try:
 except _HTTPException as e:
     ok("GET a missing zone 404s", e.status_code == 404)
 
-imp = main.zone_impact("Z001")
+imp = main.zone_impact("Z001", token=TOK)
 ok("the impact endpoint is a dry run", imp["would_invalidate"]["dry_run"] is True)
 ok("the impact endpoint reports the HERE bill",
    "here_calls" in imp["would_invalidate"])
 
-upd = main.update_zone("Z001", zin(name="Bridge reopened", ends_on="2026-01-01"))
+upd = main.update_zone("Z001", zin(name="Bridge reopened", ends_on="2026-01-01"), token=TOK)
 ok("PUT updates", upd["zone"]["name"] == "Bridge reopened")
 ok("PUT sets the end date", upd["zone"]["ends_on"] == "2026-01-01")
 ok("an out-of-window zone stops being sent to HERE",
    "Z001" not in network.active_avoid()[1])
 
-dl = main.delete_zone("Z002")
+dl = main.delete_zone("Z002", token=TOK)
 ok("DELETE removes the zone", zones.get_zone("Z002") is None)
 ok("DELETE reports the old zone for the record", dl["zone"]["was"]["id"] == "Z002")
 try:
-    main.delete_zone("Z002")
+    main.delete_zone("Z002", token=TOK)
     ok("DELETE a missing zone 404s", False)
 except _HTTPException as e:
     ok("DELETE a missing zone 404s", e.status_code == 404)
 
 try:
-    main.create_zone(zin(geometry={"type": "Point", "coordinates": [24, 58]}))
+    main.create_zone(zin(geometry={"type": "Point", "coordinates": [24, 58]}), token=TOK)
     ok("a bad geometry 400s", False)
 except _HTTPException as e:
     ok("a bad geometry 400s", e.status_code == 400)
 
-# admin token, when one is set
-os.environ["ADMIN_TOKEN"] = "secret"
+# admin token: a bad one is refused, the right one accepted — and (12 Oct 2026, C11 closed) a MISSING
+# one and an UNSET one are refused too, where an unset ADMIN_TOKEN used to let every write through
 try:
     main.create_zone(zin(name="Nope"), token="wrong")
     ok("a bad admin token is rejected on zone writes", False)
 except _HTTPException as e:
     ok("a bad admin token is rejected on zone writes", e.status_code == 403)
+try:
+    main.create_zone(zin(name="Nope"))
+    ok("C11: 🔴 no token at all is rejected on zone writes", False)
+except _HTTPException as e:
+    ok("C11: 🔴 no token at all is rejected on zone writes (403)", e.status_code == 403)
 ok("the right token is accepted",
    main.create_zone(zin(name="Allowed", geometry=FAR), token="secret")["zone"]["name"] == "Allowed")
 ok("reading zones needs no token — the public map has none",
    isinstance(main.list_zones()["zones"], list))
-os.environ.pop("ADMIN_TOKEN")
+_saved_tok = os.environ.pop("ADMIN_TOKEN")
+_n_zones = len(main.list_zones()["zones"])
+try:
+    main.create_zone(zin(name="Nope either", geometry=FAR), token=_saved_tok)
+    ok("C11: 🔴 with ADMIN_TOKEN unset a zone write is REFUSED, not open — even with the token it would have matched", False)
+except _HTTPException as e:
+    ok("C11: 🔴 with ADMIN_TOKEN unset a zone write is REFUSED, not open — even with the token it would have matched",
+       e.status_code == 403 and len(main.list_zones()["zones"]) == _n_zones)
+os.environ["ADMIN_TOKEN"] = _saved_tok
 
 # =========================================================================== #
 #  8. Diagnostics                                                              #
