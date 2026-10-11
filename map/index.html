@@ -8,7 +8,9 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#1F2024">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <!-- 12 Oct 2026 (review 2.8): no maximum-scale / user-scalable=no — a visitor may pinch-zoom the page (WCAG 1.4.4);
+         Mapbox's canvas keeps its own touch-action:none, so the map gestures are unchanged -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -34,6 +36,11 @@
 
         #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:#fff; color:var(--navy-deep); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
         #menu-toggle:hover{ border-color:#d0d3d8; }
+        /* 12 Oct 2026 (review 2.8): a tap on the chrome is a tap, never a double-tap zoom — the panel, the figures bar,
+           the conditions panel, the timeline bar and the route drawer */
+        .sidebar, #menu-toggle, #kpi-hud, #tl-warnings, #timeline-bar, #route-drawer{ touch-action:manipulation; }
+        /* 12 Oct 2026 — the panel's own close control, a 44 px target; shown below 1024 only (the phone block) */
+        .sidebar-close{ display:none; position:absolute; top:10px; left:10px; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; }
 
         .sidebar { position:absolute; top:0; bottom:0; left:0; width:300px; background:#fff; border-right:1px solid var(--line); padding:20px 18px 24px; z-index:10; display:flex; flex-direction:column; gap:22px; overflow-y:auto; transition:transform .25s ease; }
         .sidebar.closed { transform:translateX(-100%); }
@@ -182,11 +189,16 @@
                14-141, notice 94-281). It becomes a full-width strip along the very top; the menu button,
                the Guide button and the bar's title move down by its height (body.has-demo-notice is set
                by the overlay code only when the tenant carries a notice, so a real tenant loses nothing). */
-            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; white-space:normal; text-align:center; font-size:9.5px; line-height:1.4; letter-spacing:.05em; padding:4px 10px; }   /* body-scoped: outranks the generic rule below */
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; white-space:normal; text-align:center; font-size:14px; line-height:1.35; letter-spacing:.03em; padding:5px 12px; }   /* body-scoped: outranks the generic rule below. 12 Oct 2026: 14 px (the staff bar's floor; was 9.5), wrapping to two lines if needed */
             body.has-demo-notice #menu-toggle{ top:40px; }
             body.has-demo-notice #kpi-hud, body.has-demo-notice.sidebar-closed #kpi-hud{ padding-top:84px; }
             #guide-btn{ left:auto !important; right:12px; top:9px; }
             body.has-demo-notice #guide-btn{ top:36px; }
+            /* 12 Oct 2026 — the three offsets above are the floor for a one-line 26 px strip; at 14 px the strip may wrap, so
+               positionWarnStack() measures it into --notice-h on <body> and these take over (26 px when unset: the same numbers) */
+            body.has-demo-notice #menu-toggle{ top:calc(var(--notice-h, 26px) + 14px); }
+            body.has-demo-notice #kpi-hud, body.has-demo-notice.sidebar-closed #kpi-hud{ padding-top:calc(var(--notice-h, 26px) + 58px); }
+            body.has-demo-notice #guide-btn{ top:calc(var(--notice-h, 26px) + 10px); }
             #kpi-hud .kpi-title{ font-size:15px; }
             #kpi-cards{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px 12px; }
             #kpi-cards .kpi-row{ display:contents; }
@@ -195,9 +207,35 @@
             #kpi-conditions{ margin-left:0; justify-content:flex-start; border:none; border-top:1px solid var(--line); border-radius:0; padding:10px 0 0; }
             .mapboxgl-ctrl-top-right{ top:180px; }
             #tl-warnings{ top:190px; right:12px; left:12px; width:auto; }
+            /* 12 Oct 2026 (review 2.8, live A6) — below 1024 the panel is a DRAWER over the map, not a column beside it: the
+               map keeps the whole width, the drawer sits above the figures bar (15), the conditions panel (24) and the
+               timeline bar (25) but under the demo strip (30), starts under that strip, and carries its own close control
+               at the top-left where the menu button was (the menu button hides while the drawer is open). */
+            #map, .sidebar ~ #map{ left:0; }
+            .sidebar{ z-index:28; }
+            body.has-demo-notice .sidebar{ top:var(--notice-h, 26px); }
+            .sidebar-close{ display:flex; }
+            body:not(.sidebar-closed) #menu-toggle{ display:none; }
+            /* (the route drawer's left:0 is with the timeline bar's phone rules below: its base rule comes after this block) */
+            /* the bar's two lead labels ("Two-way movements a day", "Vehicles needed") ran into each other at 385 and 768 px:
+               a label wraps inside its card and a card can shrink to its column */
+            #kpi-cards .kpi-card{ min-width:0; }
+            #kpi-cards .kpi-label{ white-space:normal; }
+            /* (the timeline bar's phone rules sit AFTER its base rules below — same specificity, so order decides) */
         }
         @media (min-width:701px) and (max-width:1023px){
             #kpi-cards{ grid-template-columns:repeat(6, minmax(0, 1fr)); }   /* a tablet: one row of six under the month */
+        }
+        @media (max-width:700px){
+            /* 12 Oct 2026 — a phone: the drawer is the full width (the timeline bar's two-row rule is with the bar's CSS below) */
+            .sidebar{ width:100%; border-right:none; }
+        }
+        @media (max-width:1023px) and (max-height:480px){
+            /* 12 Oct 2026 — a phone on its side: the bar collapses to one row of the two lead figures */
+            #kpi-cards{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+            #kpi-cards .kpi-card:not(.lead){ display:none; }
+            #kpi-hud, body.sidebar-closed #kpi-hud{ padding-bottom:6px; gap:4px; }
+            #kpi-hud .kpi-value{ font-size:20px; }
         }
         .restr-warn{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
 
@@ -256,6 +294,27 @@
         #tl-label{ font-size:12px; font-weight:600; color:var(--navy-deep); min-width:190px; white-space:nowrap; flex:0 0 auto; }
         /* and the select was far bigger than five two-character options need */
         #tl-speed{ border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
+        /* 12 Oct 2026 (review 2.8, live A6) — the timeline bar below 1024: full width, 44 px targets, the label wraps instead
+           of holding 190 px, the speed select and the close button stay on screen (the bar wraps when it must). These
+           override the base rules above, so they come after them. */
+        @media (max-width:1023px){
+            #timeline-bar, body.sidebar-closed #timeline-bar{ left:12px; right:12px; transform:none; max-width:none; flex-wrap:wrap; gap:6px 8px; padding:8px 10px; }
+            #timeline-bar .tl-btn{ width:44px; height:44px; font-size:14px; }
+            #timeline-bar .tl-close{ width:44px; height:44px; font-size:22px; margin-left:auto; }
+            #tl-label{ min-width:0; white-space:normal; flex:1 1 120px; line-height:1.3; }
+            #timeline-bar input[type=range]{ min-width:60px; }
+            #route-drawer, body.sidebar-closed #route-drawer{ left:0; }   /* the drawer is not pushed by the panel either */
+        }
+        @media (max-width:700px){
+            /* a phone: two rows — the month label, the speed select and the close button above; the three buttons and
+               the slider below (the ::after item is a forced line break) */
+            #tl-label{ order:1; }
+            #tl-speed{ order:2; }
+            #timeline-bar .tl-close{ order:3; }
+            #timeline-bar::after{ content:""; flex:0 0 100%; height:0; order:4; }
+            #timeline-bar .tl-btn{ order:5; }
+            #timeline-bar input[type=range]{ order:6; flex:1 1 60px; width:auto; }
+        }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
@@ -289,8 +348,10 @@
 </style>
 </head>
 <body>
-<div id="menu-toggle" onclick="toggleSidebar()">☰ Control Panel</div>
+<!-- 12 Oct 2026 (review 2.8): a real button, named to its panel (was a div) -->
+<button type="button" id="menu-toggle" onclick="toggleSidebar()" aria-controls="main-sidebar" aria-expanded="true">☰ Control Panel</button>
 <div class="sidebar" id="main-sidebar">
+    <button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar()" aria-label="Close the control panel" title="Close the control panel">&times;</button>
     <div style="height:44px;flex:none"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button -->
 
     <div class="control-group">
@@ -464,22 +525,22 @@
 <div id="tl-warnings"></div>
 
 <div id="timeline-bar">
-  <button class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month">◀</button>
-  <button class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause">▶</button>
-  <button class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month">▶▶</button>
-  <input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub(this.value)">
+  <button type="button" class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month" aria-label="Previous month">◀</button>
+  <button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause" aria-label="Play or pause">▶</button>
+  <button type="button" class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month" aria-label="Next month">▶▶</button>
+  <input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub(this.value)" aria-label="Month">
   <span id="tl-label">Jan 2026</span>
-  <select id="tl-speed" onchange="setTimelineSpeed(this.value)" title="Play speed — months per second">
+  <select id="tl-speed" onchange="setTimelineSpeed(this.value)" title="Play speed — months per second" aria-label="Play speed, months per second">
     <option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
   </select>
-  <button class="tl-close" onclick="closeTimeline()" title="Close timeline">&times;</button>
+  <button type="button" class="tl-close" onclick="closeTimeline()" title="Close timeline" aria-label="Close the timeline">&times;</button>
 </div>
 
 <div id="route-drawer">
   <div class="drawer-head">
     <button class="drawer-tab active" id="tab-analysis" onclick="showDrawerTab('analysis')">Route analysis</button>
     <button class="drawer-tab" id="tab-detail" onclick="showDrawerTab('detail')">Forecast detail</button>
-    <button class="drawer-close" onclick="closeDrawer()" title="Close">&times;</button>
+    <button type="button" class="drawer-close" onclick="closeDrawer()" title="Close" aria-label="Close the route panel">&times;</button>
   </div>
   <div class="drawer-body" id="drawer-analysis"></div>
   <div class="drawer-body" id="drawer-detail" style="display:none;"></div>
@@ -587,6 +648,7 @@
             dn.textContent = TENANT.demo_notice;
         } else if (dn) { dn.remove(); }
         setupGuide();   // H10: the map's guide, only when the tenant carries a demo notice
+        if (typeof positionWarnStack === 'function') positionWarnStack();   // 12 Oct 2026: measure the strip into --notice-h (phone offsets)
         const v = document.getElementById('overlay-version');
         if (v) v.textContent = window.OVERLAY_VERSION ? ('overlay ' + window.OVERLAY_VERSION) : 'no alignment in this tenant';
         if (typeof KPI_BY !== 'undefined') KPI_BY[1][1] = TEAM;
@@ -749,6 +811,7 @@
         const dn = document.getElementById('demo-notice');
         if (dn) dn.remove();
         document.body.classList.toggle('has-demo-notice', false);
+        if (typeof positionWarnStack === 'function') positionWarnStack();   // 12 Oct 2026: the strip is gone, so is --notice-h
         const btn = document.getElementById('guide-btn');
         if (btn) btn.remove();
         if (GUIDE_READY) { try { window.parent.postMessage({ type: 'wayscope-map-tour' }, location.origin); } catch (err) {} }
@@ -1692,8 +1755,18 @@
         toggleLayer('buildings-3d', visible);
     }
 
-    function toggleSidebar() { document.getElementById('main-sidebar').classList.toggle('closed'); document.body.classList.toggle('sidebar-closed'); setTimeout(() => map.resize(), 300); }
-    if (window.innerWidth <= 768) toggleSidebar();
+    function sidebarIsOpen() { return !document.getElementById('main-sidebar').classList.contains('closed'); }
+    function toggleSidebar() {
+        document.getElementById('main-sidebar').classList.toggle('closed');
+        document.body.classList.toggle('sidebar-closed');
+        const mt = document.getElementById('menu-toggle');
+        if (mt) mt.setAttribute('aria-expanded', String(sidebarIsOpen()));   // 12 Oct 2026: the menu button says whether its panel is open
+        setTimeout(() => map.resize(), 300);
+    }
+    // 12 Oct 2026 (review 2.8): closes only an OPEN panel — toggleSidebar() on a closed one re-opened it (filterByNode on a phone)
+    function closeSidebar() { if (sidebarIsOpen()) toggleSidebar(); }
+    // 12 Oct 2026: 1023, the CSS breakpoint of the stacked bar (was 768: at 769-1023, an iPad portrait, the panel sat open under it)
+    if (window.innerWidth <= 1023) closeSidebar();
 
     function populateFilters() {
         const origins = new Set(); const dests = new Set();
@@ -2047,7 +2120,7 @@
         if (nodeType === 'Quarry' || nodeType === 'Hub' || nodeType === 'Port'
             || nodeType === 'Railhead' || nodeType === 'Rail head') { document.getElementById('filter-origin').value = nodeName; }
         else { document.getElementById('filter-dest').value = nodeName; }
-        applyFilters(); if(window.innerWidth <= 768) toggleSidebar();
+        applyFilters(); if(window.innerWidth <= 1023) closeSidebar();   // 12 Oct 2026: close, never re-open (the panel is usually closed already on a phone)
     }
 
     map.on('style.load', async () => {
@@ -3532,10 +3605,10 @@
                         this._container = document.createElement('div');
                         this._container.className = 'mapboxgl-ctrl custom-map-widget';
                         this._container.innerHTML = `
-                            <button class="widget-btn active" title="Light Theme" onclick="changeTheme(this, 'mapbox://styles/mapbox/light-v11')">☀️</button>
-                            <button class="widget-btn" title="Dark Theme" onclick="changeTheme(this, 'mapbox://styles/mapbox/dark-v11')">🌙</button>
-                            <button class="widget-btn" title="Satellite" onclick="changeTheme(this, 'mapbox://styles/mapbox/satellite-streets-v12')">🌍</button>
-                            <button class="widget-btn" title="Streets" onclick="changeTheme(this, 'mapbox://styles/mapbox/streets-v12')">🛣️</button>
+                            <button type="button" class="widget-btn active" title="Light Theme" aria-label="Light basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/light-v11')">☀️</button>
+                            <button type="button" class="widget-btn" title="Dark Theme" aria-label="Dark basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/dark-v11')">🌙</button>
+                            <button type="button" class="widget-btn" title="Satellite" aria-label="Satellite basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/satellite-streets-v12')">🌍</button>
+                            <button type="button" class="widget-btn" title="Streets" aria-label="Streets basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/streets-v12')">🛣️</button>
                         `;
                         return this._container;
                     }
@@ -3580,35 +3653,35 @@
 
                 applySolidColors();
                 
-                // Track mouse over any route layer
+                // Track mouse over any route layer: ONE mousemove handler that queries all three layers.
+                // (12 Oct 2026: a forEach registered the same handler three times, once per layer name it never used,
+                // so every mouse move ran three identical queryRenderedFeatures calls.)
                 const interactiveLayers = ['inbound-lines', 'outbound-lines', 'forecast-layer'];
-                interactiveLayers.forEach(layer => {
-                    // Check dynamically when mouse moves in case layer is added later
-                    map.on('mousemove', (e) => {
-                        let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });
-                        if (features.length > 0) {
-                            map.getCanvas().style.cursor = 'pointer';
-                            let p = features[0].properties;
-                            // Match using whatever ID field exists
-                            let idMatch = p.Route_ID || p.route_id || p.name || p.ID || p.id;
-                            
-                            if (map.getLayer('global-route-hover') && idMatch) {
-                                map.setFilter('global-route-hover', [
-                                    'any',
-                                    ['==', 'Route_ID', idMatch],
-                                    ['==', 'route_id', idMatch],
-                                    ['==', 'name', idMatch],
-                                    ['==', 'ID', idMatch],
-                                    ['==', 'id', idMatch]
-                                ]);
-                            }
-                        } else {
-                            map.getCanvas().style.cursor = '';
-                            if (map.getLayer('global-route-hover')) {
-                                map.setFilter('global-route-hover', ['==', 'name', 'IMPOSSIBLE_VALUE']);
-                            }
+                // the layer list is filtered at each move, in case a layer is added later
+                map.on('mousemove', (e) => {
+                    let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });
+                    if (features.length > 0) {
+                        map.getCanvas().style.cursor = 'pointer';
+                        let p = features[0].properties;
+                        // Match using whatever ID field exists
+                        let idMatch = p.Route_ID || p.route_id || p.name || p.ID || p.id;
+
+                        if (map.getLayer('global-route-hover') && idMatch) {
+                            map.setFilter('global-route-hover', [
+                                'any',
+                                ['==', 'Route_ID', idMatch],
+                                ['==', 'route_id', idMatch],
+                                ['==', 'name', idMatch],
+                                ['==', 'ID', idMatch],
+                                ['==', 'id', idMatch]
+                            ]);
                         }
-                    });
+                    } else {
+                        map.getCanvas().style.cursor = '';
+                        if (map.getLayer('global-route-hover')) {
+                            map.setFilter('global-route-hover', ['==', 'name', 'IMPOSSIBLE_VALUE']);
+                        }
+                    }
                 });
                 
                 map.on('style.load', () => {
@@ -4158,7 +4231,19 @@
     }
     // 🔴 On a phone the bar is as tall as its 3x2 grid, so the panel's top cannot be a
     // fixed number; measure the bar. On the desktop the bar is 72px and the CSS is left alone.
+    // 12 Oct 2026 — below 1024 the demo strip is 14 px and may wrap to two lines, so its height is MEASURED into
+    // --notice-h on <body>; the phone block's menu, bar and Guide offsets are calc() on it (26 px when unset, the
+    // one-line floor). Re-measured with the bar (positionWarnStack) and whenever the strip itself changes size.
+    function measureNotice() {
+        const dn = document.getElementById('demo-notice');
+        const on = dn && document.body.classList.contains('has-demo-notice') && window.innerWidth <= 1023;
+        if (!on) { document.body.style.removeProperty('--notice-h'); return; }
+        if (!dn._ro) { try { dn._ro = new ResizeObserver(() => positionWarnStack()); dn._ro.observe(dn); } catch (e) {} }
+        const nh = Math.round(dn.getBoundingClientRect().height);
+        if (nh) document.body.style.setProperty('--notice-h', nh + 'px');
+    }
     function positionWarnStack() {
+        measureNotice();
         const box = document.getElementById('tl-warnings');
         if (!box) return;
         const kpi = document.getElementById('kpi-hud');
@@ -4166,9 +4251,14 @@
         // tenant's words and the labels; a fixed 180 px put the buttons on the bar at 950 px (bar ended at 202).
         const ctrl = document.querySelector('.mapboxgl-ctrl-top-right');
         if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';
-        if (window.innerWidth > 1023 || !kpi || box.style.display === 'none') { box.style.top = ''; return; }   // 9 Oct: tablets stack the bar too
+        if (window.innerWidth > 1023 || !kpi || box.style.display === 'none') { box.style.top = ''; box.style.maxHeight = ''; return; }   // 9 Oct: tablets stack the bar too
         const h = kpi.getBoundingClientRect().height || 0;
         box.style.top = (Math.round(h) + 8) + 'px';
+        // 12 Oct 2026: and never taller than the room left under the bar — the panel's bottom fell off a 375x667 screen; it
+        // scrolls. The floor is the timeline bar's top while that is shown (it sits over the panel), else the viewport's edge.
+        const tb = document.getElementById('timeline-bar');
+        const floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;
+        box.style.maxHeight = Math.max(120, floor - (Math.round(kpi.getBoundingClientRect().bottom) + 8)) + 'px';
     }
     window.addEventListener('resize', positionWarnStack);
     // 11 Oct: and whenever the bar itself changes height (cards filling in, labels wrapping, the window narrowing)
@@ -4269,12 +4359,12 @@
             if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
             const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
             box.innerHTML = `<div class="tl-head"><b>Conditions in ${esc(monthLabel(month))}</b>` +
-                `<button class="x" title="Close" onclick="toggleConditions()">&times;</button></div>` +
+                `<button type="button" class="x" title="Close" aria-label="Close the conditions panel" onclick="toggleConditions()">&times;</button></div>` +
                 live.map(i =>
                 `<div class="tl-warn ${i.lvl}"><span class="cond-dot"></span><span class="body">` +
                 `<b>${esc(i.noun)}</b><span class="what">${esc(i.what)}</span><br>` +
                 `<button class="show" onclick="showCondition('${i.kind}','${esc(i.id).replace(/'/g, '')}')">Show on map</button></span>` +
-                `<button class="x" title="Dismiss for this month" onclick="dismissWarning('${esc(i.key).replace(/'/g, '')}')">&times;</button></div>`).join('');
+                `<button type="button" class="x" title="Dismiss for this month" aria-label="Dismiss for this month" onclick="dismissWarning('${esc(i.key).replace(/'/g, '')}')">&times;</button></div>`).join('');
             box.style.display = 'flex';
             positionWarnStack();
         });
