@@ -126,10 +126,20 @@ ok("the overlay does NOT ride on /public/map-data",
   !code.includes("zones-source', { type: 'geojson', data: a1_data"));
 ok("a zones source and fill layer exist",
   code.includes("zones-source") && code.includes("'zone-fill'"));
-ok("the sidebar has a zones toggle", html.includes('id="layer-zones"'));
-ok("the toggle is wired to a handler", code.includes("function toggleZones"));
-ok("routing zones and advisory zones are coloured differently",
-  code.includes("['case', ['get', 'affects_routing']"));
+// 12 Oct 2026 (D24) — REVERSED: the zones toggle is no longer ONE switch. The group master
+// keeps its id (layer-zones) and under it sits one checkbox per kind.
+ok("D24: the sidebar's zones toggle is the group master, with one checkbox per kind under it",
+  html.includes('id="layer-zones"')
+  && ["closure", "works", "weight_limit", "haul_road", "other"].every(k => html.includes(`id="layer-zone-${k}"`))
+  && (html.match(/onchange="toggleZoneKind\('/g) || []).length === 5);
+ok("the toggle is wired to a handler", code.includes("function toggleZones") && code.includes("function toggleZoneKind(kind, on)"));
+// 12 Oct 2026 (D24) — REVERSED: the colour says what KIND of zone it is, not whether the
+// router avoids it (that is still said in the popup). Amber #D97706 for a closure per
+// colour-system-1010.md line 24; red is kept for a cap breach or a clash.
+ok("D24: zones are coloured per KIND, not by affects_routing",
+  !code.includes("['case', ['get', 'affects_routing']")
+  && /const ZONE_FILL_COLOUR = \['match', \['get', 'kind'\], 'closure', ZONE_AMBER, 'works', ZONE_AMBER_LIGHT, 'weight_limit', ZONE_INK, ZONE_GREY\];/.test(code)
+  && code.includes("const ZONE_AMBER = '#D97706'"));
 ok("zones re-add after a basemap switch, like every other layer",
   code.includes("if (ZONES.loaded) ensureZoneLayers(); else loadZones();"));
 ok("the overlay follows the forecast timeline", code.includes("applyZoneMonth"));
@@ -292,9 +302,12 @@ ok("§D: ONE chip row, with a Discipline | IPT | Work section switcher",
 ok("§D: discipline is the default", /by: 'discipline'/.test(code));
 ok("§D: the switch recomputes rather than re-rendering a cached grouping",
   /function setKpiBy\(k\) \{[\s\S]{0,320}applyFilters\(\);/.test(code));
-ok("§D: IPT comes from the route, discipline and section from the line",
+// 12 Oct 2026 (review §3 row 3) — NARROWED: the section chip prints the work section's NAME
+// from WS_NAMES, and falls back to the code only when the package has not named it
+ok("§D: IPT comes from the route, discipline and section from the line (named via WS_NAMES, code as the fallback)",
   /KPI\.by === 'ipt' \? \(teamText\(rp\.ipt\) \|\| 'no ' \+ TEAM\.toLowerCase\(\)\)/.test(code)
-  && /KPI\.by === 'section' \? \(l\.section_id \|\| 'no work section'\)/.test(code));
+  && /KPI\.by === 'section' \? \(l\.section_id \? \(\(\(\(window\.WS_NAMES \|\| \{\}\)\[l\.section_id\]\) \|\| \{\}\)\.name \|\| l\.section_id\) : 'no work section'\)/.test(code)
+  && !/KPI\.by === 'section' \? \(l\.section_id \|\| 'no work section'\)/.test(code));
 ok("§9: a stale fetch cannot overwrite a newer month", /if \(seq !== KPI\.seq\) return;/.test(code));
 ok("§9: the forecast toggle recomputes the cards",
   /src\.setData\(currentData\);\s*applyRailHighlight\(\);\s*applyFilters\(\);/.test(code)
@@ -1282,9 +1295,13 @@ ok("§8 (2026-10-06): every row has Show on map", /class="show" onclick="showCon
   && /function showCondition\(kind, id\)/.test(code));
 ok("§8: rebuilt on every tick and cleared when the timeline closes",
   /applyFilters\(\);\s*renderTimelineWarnings\(m\);/.test(code) && /TL\.on=false;\s*renderTimelineWarnings\(null\)/.test(code));
-ok("§8: three sources and no new ones — Tark Tee, stockpile over, seasonal",
+// 12 Oct 2026 (D21/D33) — RENAMED: a fourth source, the route's planning flag, joined the three.
+// Still no weather API. (This pin asserts the endpoint strings, not a count — the count is
+// pinned by the cap-source block near the end of this file.)
+ok("§8: four sources and no others — Tark Tee / NH, stockpile over, seasonal, planning flag; no weather API",
   code.includes("/routes/restrictions") && code.includes("/public/stockpile-timeline")
-  && code.includes("META.seasonal") && !/weather|openweather|forecast\.io/i.test(code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"))));
+  && code.includes("META.seasonal") && code.includes("Number(p.max_vehicles_per_day)")
+  && !/weather|openweather|forecast\.io/i.test(code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"))));
 ok("§8: only routes carrying volume THIS month, inside the filter",
   /if \(!f\.properties\.is_forecast \|\| !routePassesFilters\(f\.properties\)\) return;/.test(code));
 ok("§8: a stale month cannot paint over the current one", /if \(TL\.month !== month \|\| !TL\.on\) return;/.test(code));
@@ -1509,9 +1526,10 @@ ok("⭐ §E: the missing Clash source is written down, not invented",
   src.includes("THE SECOND CLASH SOURCE THE BRIEF NAMES DOES NOT EXIST")
   && /TIME model, which is Phase 7/.test(src)
   && /gate_blockers` is a deactivated gate refusing/.test(src));
-ok("§E: still no new sources and no weather API",
+// 12 Oct 2026 — RENAMED (see the §8 twin above): the planning-flag source is the fourth and last
+ok("§E: four sources, the planning flag the fourth, and no weather API",
   code.includes("/routes/restrictions") && code.includes("/public/stockpile-timeline")
-  && code.includes("META.seasonal")
+  && code.includes("META.seasonal") && code.includes("noun: 'Over the planning cap'")
   && !/weather|openweather|forecast\.io/i.test(code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"))));
 // the brief's own test: the stack is NOT in the KPI card
 ok("⭐ §E: the stack is its own element, outside #kpi-hud",
@@ -2136,6 +2154,137 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       }
     }
   }
+}
+
+// ---- 12 Oct 2026 — public map review (notes/map-review-1011): conditions, closures, zones,
+// the forecast overlay. Each pin would fail on main 1cea4e3.
+{
+  const warnBlock = code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"));
+  // 1. live A1 — the restriction condition is month-aware, deduped, highlighted, flown to
+  ok("A1: the restriction check is asked for expired closures too (client filters by month)",
+     code.includes("fetch(CONFIG.API_BASE + '/routes/restrictions?include_expired=1')"));
+  ok("A1: a hit is in the month when its from/to window overlaps monthSpan (dnum; no dates = always)",
+     /function hitInMonth\(h, month\)/.test(code) && /const \[lo, hi\] = monthSpan\(month\);/.test(code)
+     && code.includes("return dnum(day(h.from), 0) <= hi && dnum(day(h.to), 99999999) >= lo;"));
+  ok("A1: the panel only lists hits in force this month, one row per closure per route",
+     code.includes("const inMonth = dedupeHits(hit.hits.filter(h => hitInMonth(h, month)));")
+     && /function dedupeHits\(hits\)/.test(code) && code.includes("const k = h.event_number ? 'e|' + h.event_number : 'd|' + [h.kind, h.what, h.from, h.to].join('|');")
+     && !code.includes("const worst = hit.hits[0];"));
+  ok("A1: the matched NH closure is drawn on its own amber layer, keyed by event_number",
+     /id:'restriction-hit', type:'line', source:'restrictions-source'/.test(code)
+     && /function restrictionHitFilter\(evs\)/.test(code)
+     && code.includes("['in', ['to-string', ['get','event_number']], ['literal', evs]]")
+     && /id:'restriction-hit'[\s\S]{0,400}'line-color':'#D97706'/.test(code));
+  ok("A1: ...shown whether or not the closures toggle is on (the toggle filter never touches it)",
+     /id:'restriction-hit'[\s\S]{0,300}visibility:'visible'/.test(code)
+     && !/\['restriction-hit', \[/.test(code)
+     && code.includes("applyRestrictionFilter();\n        applyRestrictionHits();"));
+  ok("A1: a row's Show on map flies to the closure's bounds (and selects its route), not the whole route",
+     code.includes("if (kind === 'h') { showRestrictionHit(id); return; }")
+     && /function showRestrictionHit\(ev\)/.test(code)
+     && /String\(x\.properties\.event_number\) === String\(ev\)/.test(code)
+     && /map\.fitBounds\(\[\[b\[0\], b\[1\]\], \[b\[2\], b\[3\]\]\], \{ padding: 90, maxZoom: 14/.test(code)
+     && code.includes("kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? String(worst.event_number) : p.route_id"));
+  ok("A1: the highlight follows the live rows and is cleared with the timeline",
+     code.includes("setRestrictionHits(hitEvents.filter(ev => live.some(i => i.kind === 'h' && WARN.hitRoute[ev] === i.who)));")
+     && /renderConditionsPill\(\[\]\); setCondRing\(\[\]\); setRestrictionHits\(\[\]\); setCapBadges\(\[\]\);/.test(code));
+
+  // 2. live A2 — a basemap switch brings the forecast overlay, the ring and the hit layer back
+  const styleLoad = code.slice(code.indexOf("map.on('style.load', async () => {"), code.indexOf("let ALIGNMENT_POPUP_WIRED"));
+  ok("A2: the style.load handler re-renders the open month and its conditions after the sources are back",
+     styleLoad.includes("if (typeof TL !== 'undefined' && TL.on && TL.matrix) { renderMonthFrame(TL.month); renderTimelineWarnings(TL.month); }")
+     && styleLoad.indexOf("renderMonthFrame(TL.month)") > styleLoad.indexOf("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();"));
+  ok("A2: the hit layer and the cap badge are re-added from their builders with the filter they had",
+     code.includes("const evs = (typeof WARN !== 'undefined' && WARN.hitEvents) || [];")
+     && code.includes("const ids = (typeof WARN !== 'undefined' && WARN.capRoutes) || [];")
+     && /function ensureCapBadgeLayer\(\)/.test(code) && code.includes("raiseMarks();\n        ensureCapBadgeLayer();"));
+
+  // 3. live A7 — the closures feed is asked for the tenant's bbox, clipped client-side as the fallback, not deferred
+  ok("A7: /api/restrictions is asked with ?bbox=w,s,e,n from the network's bounds plus 20 km",
+     code.includes("const RESTR_MARGIN_KM = 20;") && /async function restrictionBbox\(\)/.test(code)
+     && code.includes("const q = bb ? '?bbox=' + bb.map(v => v.toFixed(4)).join(',') : '';")
+     && code.includes("fetch(CONFIG.API_BASE + '/restrictions' + q)"));
+  ok("A7: the same box is applied client-side when the server returns the national set",
+     /function clipToBbox\(fc, bb\)/.test(code) && code.includes("RESTR.data = bb ? clipToBbox(fc, bb) : fc;")
+     && code.includes("return g && g[0] <= bb[2] && g[2] >= bb[0] && g[1] <= bb[3] && g[3] >= bb[1];"));
+  ok("A7: the network's bounds are settled once, on success AND failure, and waited on for at most 20 s",
+     (code.match(/settleNetworkBounds\(/g) || []).length >= 3
+     && code.includes("settleNetworkBounds(null);") && code.includes("fitToNetworkOnce(fc) {\n        settleNetworkBounds(fc);")
+     && /Promise\.race\(\[NETWORK_BOUNDS, new Promise\(res => setTimeout\(\(\) => res\(NET_BBOX\), 20000\)\)\]\)/.test(code));
+  ok("A7: the download is still NOT deferred to the first toggle (style.load loads it when there is no data)",
+     styleLoad.includes("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();")
+     && code.includes("if(!RESTR.data){ loadRestrictions(); return; }"));
+
+  // 4. D24 — zones per kind
+  ok("D24: the five kinds are a list, unknown kinds fold into 'other', haul roads stay excluded from the overlay",
+     code.includes("const ZONE_KINDS = ['closure', 'works', 'weight_limit', 'haul_road', 'other'];")
+     && code.includes("kind: ZONE_KINDS.includes(z.kind) ? z.kind : 'other'")
+     && code.includes("const kindsOn = ZONE_KINDS.filter(k => k !== 'haul_road' && zoneKindVisible(k));")
+     && code.includes("['in', ['get', 'kind'], ['literal', kindsOn]]"));
+  ok("D24: closure = amber 25% fill with a solid 2 px amber edge; works = lighter amber, dashed edge",
+     code.includes("const ZONE_FILL_OPACITY = ['match', ['get', 'kind'], 'closure', 0.25, 'works', 0.18, 'weight_limit', 0.06, 0.15];")
+     && code.includes("'line-width': ['match', ['get', 'kind'], 'closure', 2, 1.5]")
+     && /id: 'zone-outline-works', type: 'line', source: 'zones-source'[\s\S]{0,200}'line-color': ZONE_AMBER, 'line-width': 2, 'line-dasharray': \[2, 1\.5\]/.test(code)
+     && code.includes("['zone-outline-works', ['==', ['get', 'kind'], 'works']]"));
+  ok("D24: a weight/height limit is a boxed label carrying the limit text read from the name or note",
+     /function zoneLimitText\(z\)/.test(code) && code.includes("limit_text: zoneLimitText(z)")
+     && /id: 'zone-limit', type: 'symbol', source: 'zones-source'[\s\S]{0,300}'icon-image': 'zone-limit-badge', 'icon-text-fit': 'both'/.test(code)
+     && code.includes("['zone-limit', ['==', ['get', 'kind'], 'weight_limit']]")
+     && code.includes("if (!map.hasImage('zone-limit-badge')) map.addImage('zone-limit-badge', zoneBadgeImage()"));
+  ok("D24: advisory is grey, and the red that meant 'avoided by routing' is gone from the zone rows and the note",
+     code.includes("ZONE_GREY = '#64748B'") && !/id="layer-zones"[^\n]*#DC2626/.test(html)
+     && !html.includes("red = avoided by routing"));
+  ok("D24: the legend is month-aware — a kind's row dims when none of it is in force in the month on screen",
+     code.includes("row.classList.toggle('dim', !inForce[k]);")
+     && /\.zone-kind\.dim label, \.zone-kind\.dim \.color-dot \{ opacity:\.4; \}/.test(html)
+     && code.includes("if (!span || (p.start_n <= span[1] && p.end_n >= span[0])) inForce[p.kind] = (inForce[p.kind] || 0) + 1;"));
+  ok("D24: the Haul road row is the Temporary haul switch, kept in step both ways (never a second layer)",
+     code.includes("if (kind === 'haul_road') {\n            const t = document.getElementById('layer-temp');")
+     && code.includes("const z = document.getElementById('layer-zone-haul_road');"));
+  ok("D24: the group master still hides every zone layer, including the new ones",
+     code.includes("const ZONE_LAYERS = ['zone-fill', 'zone-outline', 'zone-outline-works', 'zone-label', 'zone-limit'];")
+     && code.includes("ZONE_LAYERS.forEach(l => toggleLayer(l, visible));"));
+
+  // 5. D21 / D33 — the planning-flag condition
+  const capWhat = (code.match(/what: `\$\{p\.route_id\} \$\{Math\.round\(perDay\)\} a day against a planning flag of \$\{cap\}`/) || [""])[0];
+  ok("D21: a fourth source compares the month's loaded-leg movements a day with max_vehicles_per_day",
+     code.includes("const cap = Number(p.max_vehicles_per_day);")
+     && code.includes("loadsByRoute[l.route_id] = (loadsByRoute[l.route_id] || 0) + (Number(l.vehicle_loads) || 0);")
+     && code.includes("const perDay = loadsByRoute[p.route_id] / wdm;") && code.includes("if (perDay <= cap) return;"));
+  ok("D21: working days come from the API (kp.working_days), never a literal 22, and the loaded leg only (linesOnScreen)",
+     code.includes("const wdm = (kp && kp.working_days > 0) ? kp.working_days : FORECAST_WORKING_DAYS;")
+     && !/\/\s*22\b/.test(warnBlock)
+     && /f\.properties\.type === 'Inbound Highway'\)\) return;/.test(code));
+  ok("D33: the row is warn level, says 'planning flag', and never 'limit'",
+     code.includes("noun: 'Over the planning cap'") && capWhat.length > 0 && !/limit/i.test(capWhat)
+     && /key: `c\|\$\{p\.route_id\}\|\$\{month\}`, lvl: 'warn', src: 'cap'/.test(code));
+  ok("D33: the pill counts it under its own noun, not as a route limit",
+     code.includes("const k = i.src === 'cap' ? 'cap' : i.lvl;")
+     && code.includes("part('warn', c.cap, 'over a planning flag')"));
+  ok("D33: a small badge sits on the route label of every route over its flag — loaded leg, amber, cleared on close",
+     /id:'forecast-cap-badge',type:'symbol',source:'routes-source'/.test(code)
+     && code.includes("['concat', 'over planning flag ', ['to-string', ['get', 'max_vehicles_per_day']]]")
+     && code.includes("return ['all', ['==', ['get', 'type'], 'Inbound Highway'], ['in', ['get', 'route_id'], ['literal', ids]]];")
+     && (code.match(/'forecast-flow','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2
+     && code.includes("setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));"));
+
+  // 6. review §3 row 3 — the overlay honours the filters; per-route roll-up; WS names; the stockpile sentence
+  ok("row 3: the four forecast overlay layers are filtered by the leg toggles and the routes passing routePassesFilters",
+     /function forecastLayerFilter\(\)/.test(code)
+     && code.includes("&& f.properties.route_id && routePassesFilters(f.properties)) rids.push(f.properties.route_id);")
+     && code.includes("['in', ['get', 'type'], ['literal', legs]],")
+     && code.includes("['in', ['get', 'route_id'], ['literal', rids]]];")
+     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','forecast-flow'];")
+     && !/filter:\['==','is_forecast',true\]/.test(code));
+  ok("row 3: applyFilters() re-applies it, and so do both overlay adders",
+     code.includes("if (typeof applyForecastFilter === 'function') applyForecastFilter();")
+     && (code.match(/applyForecastFilter\(\);/g) || []).length >= 2
+     && code.includes("ensureFlowLayer();\n                applyForecastFilter();"));
+  ok("row 3: the timeline matrix sums the monthly figures per route across its per-line entries",
+     code.includes("acc.monthly[k] = (acc.monthly[k]||0) + (Number(rt.monthly[k])||0);")
+     && !code.includes("byR[(rt.route_id||'').toString().trim().toLowerCase()]=rt;"));
+  ok("row 3 / D23: the stockpile sentence says what is recorded at month end, not what 'the plan puts'",
+     code.includes("recorded in it at the end of ${monthLabel(month)}.") && !code.includes("The plan puts"));
 }
 
 console.log();
