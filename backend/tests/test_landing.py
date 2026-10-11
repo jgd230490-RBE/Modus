@@ -206,8 +206,26 @@ ok("no media placeholder text left in the hero", "[SCREEN RECORDING" not in _bod
 ok("the landing page says 'public map', never 'corridor map' (copy and the video labels)",
    "corridor map" not in src.lower() and "One read-only public map for the client" in src
    and "It's the same public map, read four ways." in src)
-ok("explainers 1-5 still marked as placeholders",
-   all(f"[EXPLAINER {n}" in _body for n in (1, 2, 3, 4, 5)))
+# 11 Oct: reversed. The five explainer placeholders were replaced by stills of the live fictional demo.
+ok("🔴 no explainer placeholder left on the page (11 Oct: stills of the live demo)",
+   "[EXPLAINER" not in _body and "[EXPLAINER" not in src)
+import pathlib
+_still_path = lambda n: pathlib.Path(ROOT, "landing", "media", n + ".jpg")
+_STILLS = ("still-lookahead", "still-routes", "still-carbon", "still-fleet", "still-fairprice")
+_still_tags = re.findall(r'<div class="frame still"><a href="\./media/([\w-]+)\.jpg"[^>]*><img ([^>]*)></a></div>', src)
+ok("each still links to its own full-size image", len(_still_tags) == 5
+   and all('src="./media/%s.jpg"' % href in tag for href, tag in _still_tags))
+_still_tags = [tag for _, tag in _still_tags]
+ok("five stills, one per problem, in page order",
+   len(_still_tags) == 5 and [re.search(r'src="\./media/([\w-]+)\.jpg"', t).group(1) for t in _still_tags] == list(_STILLS))
+ok("⭐ every still's alt text says it is the fictional demo scheme",
+   all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
+ok("every still has width, height (no layout jump) and lazy loading",
+   all('width="' in t and 'height="' in t and 'loading="lazy"' in t for t in _still_tags))
+ok("each still exists as a JPEG under 200 KB",
+   all((_still_path(n)).is_file()
+       and (_still_path(n)).read_bytes()[:3] == b"\xff\xd8\xff"
+       and (_still_path(n)).stat().st_size < 200 * 1024 for n in _STILLS))
 ok("the overview has four steps, Plan / Approve / Share / Record (8 Oct)",
    all(f"<b>{s}</b>" in src for s in ("Plan", "Approve", "Share", "Record")) and src.count('class="steps"') == 1)
 

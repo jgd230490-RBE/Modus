@@ -120,6 +120,11 @@
   .problem h3{font-weight:500;font-size:clamp(24px,2.6vw,28px);line-height:1.15}
   .problem .body{font-size:16px;line-height:1.6;color:var(--ink-2)}
   .problem .frame{flex:1 1 420px;border-radius:12px;font-size:13px}
+  /* 11 Oct: the five explainer placeholders became stills of the live fictional demo. The screens are
+     wider than the frame's 16:10, so the still frame takes the image's own shape instead of cropping it. */
+  .problem .frame.still{padding:0;aspect-ratio:auto;background:var(--paper);overflow:hidden;box-shadow:0 1px 2px rgba(31,32,36,.06)}
+  .problem .frame.still a{display:block;cursor:zoom-in}
+  .problem .frame.still img{height:auto;object-fit:contain;border-radius:0}
 
   /* what it is not */
   .beside .wrap{display:flex;flex-wrap:wrap;gap:24px 48px;align-items:baseline;padding:48px 32px}
@@ -296,11 +301,11 @@
           <h3>Commit the week, then hit it.</h3>
           <p class="body">The look-ahead commits next week's movements by day, then records what actually happened, so the record shows how closely the week matched what was declared. RIS3 measures roadworks planned seven days ahead against what happens on the ground.</p>
         </div>
-        <div class="frame">[EXPLAINER 1: look-ahead week, movements committed by day]</div>
+        <div class="frame still"><a href="./media/still-lookahead.jpg" title="Open the full-size screen"><img src="./media/still-lookahead.jpg" alt="The Look-ahead page on the fictional demo scheme: next week's movements committed by day, with trips and vehicles per route and shortage flags" width="1240" height="609" loading="lazy"></a></div>
       </div>
 
       <div class="problem flip" id="p-routes">
-        <div class="frame">[EXPLAINER 2: haul route with a weight limit flagged]</div>
+        <div class="frame still"><a href="./media/still-routes.jpg" title="Open the full-size screen"><img src="./media/still-routes.jpg" alt="The route map on the fictional demo scheme in October: two-way movements, vehicles needed and carbon for the month, with a stockpile over capacity and planned road closures flagged" width="1240" height="609" loading="lazy"></a></div>
         <div class="text">
           <p class="kicker">Routes, CTMPs and CLPs</p>
           <h3>Every haul route mapped, every restriction checked.</h3>
@@ -314,11 +319,11 @@
           <h3>Carbon from the numbers you planned with.</h3>
           <p class="body">Each origin and destination carries its quantity and one-way distance, with routed kilometres, trips and CO₂e per trip on the 2026 DESNZ factors. Daily and to-date carbon sit on the map. The Carbon planner sets the approved plan beside the alternatives (supplier, vehicle, route, diesel or electric, disposal site), each ranked by the tonnes of CO₂e it moves. These are planning estimates: your Carbon Tool return stays your own.</p>
         </div>
-        <div class="frame">[EXPLAINER 3: carbon per route and the Carbon planner]</div>
+        <div class="frame still"><a href="./media/still-carbon.jpg" title="Open the full-size screen"><img src="./media/still-carbon.jpg" alt="The Carbon planner on the fictional demo scheme: the approved plan beside an alternative with battery electric lorries, and the decision ranked by the carbon it moves" width="1240" height="609" loading="lazy"></a></div>
       </div>
 
       <div class="problem flip" id="p-fleet">
-        <div class="frame">[EXPLAINER 4: vehicles from cycle time, artic against 8-wheeler]</div>
+        <div class="frame still"><a href="./media/still-fleet.jpg" title="Open the full-size screen"><img src="./media/still-fleet.jpg" alt="A forecast being entered on the fictional demo scheme: movements a day and vehicles needed from the route's cycle time for a rigid 8-wheeler" width="1240" height="609" loading="lazy"></a></div>
         <div class="text">
           <p class="kicker">Fleet sizing</p>
           <h3>How many lorries, not how many loads.</h3>
@@ -332,7 +337,7 @@
           <h3>A fair price before the negotiation.</h3>
           <p class="body">A modelled floor per trip, worked out from the weekly diesel index, distance, tonnes and cycle time. Typed quotes and target rates sit beside it. It is never called the cost.</p>
         </div>
-        <div class="frame">[EXPLAINER 5: fair-price floor beside a quote]</div>
+        <div class="frame still"><a href="./media/still-fairprice.jpg" title="Open the full-size screen"><img src="./media/still-fairprice.jpg" alt="The Forecasts page on the fictional demo scheme: each line's planned cost with the modelled fair price beneath it" width="1240" height="609" loading="lazy"></a></div>
       </div>
 
     </div>
