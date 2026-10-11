@@ -71,6 +71,7 @@ ORDER = [
     "locations", "location_gates",
     "zones",
     "routes", "route_haul_roads", "route_geometry",
+    "route_sections",       # 12 Oct 2026 (§2.2d): derived from route_geometry, so after it
     "forecasts", "forecast_weeks", "forecast_days",
     "stockpile_weeks",
 ]
@@ -293,6 +294,14 @@ def import_tenant(pkg, replace=False):
         _carbon_target.invalidate()
     except Exception:
         pass
+    # 12 Oct 2026 (§2.2d): the shared-section index is rebuilt from the geometry that
+    # just arrived, so a package written before the table existed indexes on import and
+    # a package that carries the table cannot disagree with its own geometry.
+    try:
+        import road_sections as _road_sections
+        _road_sections._rebuild_quietly("tenant import")
+    except Exception as e:
+        print("tenant_package: road sections not rebuilt:", e)
     # An optional national fuel-index price the package suggests (a typed placeholder
     # for a country the bulletin does not cover). fuel_index is GLOBAL, one row per
     # country, so it is applied only where that country has no row yet — never over a

@@ -578,6 +578,33 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/public/map-data")
     ok("the public map data reads (staff cookie)", r.status_code == 200, str(r.status_code))
 
+    # ------------------------------------------------- 3b. 12 Oct 2026 (§2.2d): shared road sections
+    # The demo package ships 0 geometry rows, so the index is empty here: the endpoint must
+    # still answer, say so, and never invent a section.
+    r = c.get("/api/public/road-load", params={"month": 10})
+    ok("⭐ /api/public/road-load answers 200 on the unbaked demo", r.status_code == 200, f"{r.status_code} {r.text[:120]}")
+    rl = r.json() if r.status_code == 200 else {}
+    ok("...empty runs, the month, the loaded leg, the planning block's working days and a note",
+       rl.get("runs") == [] and rl.get("month") == 10 and rl.get("leg") == "loaded" and (rl.get("working_days") or 0) > 0
+       and rl.get("totals", {}).get("runs") == 0 and rl.get("totals", {}).get("lines", 0) > 0
+       and any("not baked" in n for n in rl.get("notes", [])), str(rl.get("notes")))
+    ok("...and the October demo volume is counted per route in the totals (78 lines, 20 routes: Sep-Dec)",
+       rl.get("totals", {}).get("routes_with_volume", 0) > 0 and rl.get("totals", {}).get("trips", 0) > 0
+       and rl.get("totals", {}).get("unbaked_lines", 0) == rl.get("totals", {}).get("lines", -1), str(rl.get("totals")))
+    ok("...the return leg answers too, with its 'never added' note",
+       c.get("/api/public/road-load", params={"month": 10, "leg": "return"}).json().get("notes", [None])[-1].startswith("Return leg"))
+    ok("an unknown leg is a 400", c.get("/api/public/road-load", params={"month": 10, "leg": "x"}).status_code == 400)
+    ok("a month out of range is a 422", c.get("/api/public/road-load", params={"month": 99}).status_code == 422)
+    r = c.post("/api/admin/road-sections/rebuild")
+    ok("🔴 the admin rebuild is 403 without the token", r.status_code == 403, str(r.status_code))
+    ok("🔴 ...so are status and the diagnostic", c.get("/api/admin/road-sections/status").status_code == 403
+       and c.get("/api/admin/diagnostics/road-sections").status_code == 403)
+    r = c.post("/api/admin/road-sections/rebuild", params=TOKEN)
+    ok("with the token the rebuild answers: 0 routes indexed, 0 runs, not stale", r.status_code == 200
+       and r.json().get("routes_indexed") == 0 and r.json().get("runs") == 0 and r.json().get("stale") is False, r.text[:200])
+    r = c.get("/api/admin/diagnostics/road-sections", params=TOKEN)
+    ok("the diagnostic prints the status text", r.status_code == 200 and "0 routes indexed" in r.json().get("text", ""), r.text[:200])
+
     # ------------------------------------------------------------ 4. export and replace
     r = c.get("/api/admin/tenant/export", params=TOKEN)
     ok("⭐ the tenant exports as a JSON attachment", r.status_code == 200
@@ -587,6 +614,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("...a valid package of the same size", pkg.get("modus_package") == 1
        and len(pkg["tables"]["routes"]) == 20 and len(pkg["tables"]["forecasts"]) == 78
        and len(pkg["tables"]["forecast_weeks"]) == 342 and len(pkg["tables"]["location_gates"]) == 16)
+    ok("...and it carries the route_sections table (empty: nothing is baked here)",
+       "route_sections" in pkg.get("tables", {}) and pkg["tables"]["route_sections"] == [])
     r = c.post("/api/admin/tenant/import", params=dict(TOKEN, replace=1), json=pkg)
     ok("⭐ replace=1 re-imports the exported tenant over itself", r.status_code == 200 and r.json().get("replaced") is True,
        r.text[:160])
@@ -638,6 +667,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
            and "north-code-xyz" in _sent[0].get_body(preferencelist=("plain",)).get_content())
         ok("🔴 /api/public/route-forecasts is still closed to the same signed-out visitor",
            c.get("/api/public/route-forecasts").status_code == 401)
+        ok("🔴 ...and so is /api/public/road-load (12 Oct 2026, §2.2d)",
+           c.get("/api/public/road-load", params={"month": 10}).status_code == 401)
         r = c.get("/api/admin/diagnostics/smtp")
         ok("the SMTP probe is refused without the admin token", r.status_code == 403, str(r.status_code))
         r = c.get("/api/admin/diagnostics/smtp", params=TOKEN)
