@@ -13,7 +13,10 @@ same fallback they always had — which only satisfies assertions on uncompresse
 
 Also here: remove_scratch_db — every harness deletes its scratch SQLite file before a fresh
 schema, and Windows refuses to unlink a file another handle still has open (WinError 32).
+
+And fixture_today — the date the week render fixtures are written for (11 Oct 2026).
 """
+import datetime
 import os
 import shutil
 import subprocess
@@ -71,3 +74,20 @@ def remove_scratch_db(db, tmp_dir):
     except PermissionError:
         n = sum(1 for f in os.listdir(tmp_dir) if f.endswith(".db")) + 1
         db._SQLITE_PATH = os.path.join(tmp_dir, f"scratch_{n}.db")
+
+
+def fixture_today(today=None):
+    """
+    The `today` the week render fixtures (lookahead_page.json, lookahead_page_fuel.json) are
+    written for: today itself Monday to Friday, else the Friday of the same Monday-to-Sunday
+    week. The commit week is the bucket containing today, so the pin never moves the week,
+    its lines or its days; it only moves `today` back onto one of the five printed columns.
+
+    Why (11 Oct 2026, a Sunday): the harnesses wrote the fixtures with the clock's date, and
+    render_frontend.js asserts the populated "today" (the Commit view's "· today" header, the
+    Dashboard's Today strip). On a Saturday or Sunday today is no printed column and has 0
+    planned, so 2 checks failed on correct output. render_frontend.js now renders the weekend
+    case on purpose, from the same fixture with `today` moved to the week's Sunday.
+    """
+    d = today or datetime.date.today()
+    return d - datetime.timedelta(days=d.weekday() - 4) if d.weekday() > 4 else d
