@@ -1695,6 +1695,12 @@ ok("11 Oct: one pulsing dot per visible feature, hover / focus / tap shows its l
   code.includes("function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }") && code.includes("const on = guideHintsOn() && guideIndex < 0;")
   && code.includes("dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;")
   && /\.guide-dot\{position:fixed;z-index:9002;[^}]*animation:guide-pulse 2s infinite\}/.test(html) && /prefers-reduced-motion:reduce\)\{\.guide-dot\{animation:none/.test(html));
+ok("11 Oct: the map takes the app's shell — warm neutrals, sentence-case 13 px headings, 14 px controls, orange primary buttons, routes still blue",
+  /--line:#E7E5E4; --bg:#FFFFFF;/.test(html) && /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--navy:#2563EB;/.test(html)
+  && /\.sidebar h3 \{ margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var\(--navy-deep\); text-transform:none; \}/.test(html)
+  && /select \{ width:100%;[^}]*font-size:14px;/.test(html) && /\.btn \{[^}]*background:var\(--action\); color:var\(--action-fg\); \}/.test(html)
+  && !/font-size:1(0|0\.5|1)px;\s*color:#8a9099/.test(html) && html.includes('<div style="height:44px;flex:none"></div>')
+  && /\.fc-row label\{ font-size:12\.5px;/.test(html) && /\.an-lbl\{ font-size:12px; font-weight:500; letter-spacing:0; text-transform:none;/.test(html));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
 console.log();

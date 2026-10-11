@@ -22,14 +22,17 @@
     <style>
         :root{
             --navy:#2563EB; --navy-deep:#1F2024; --ink:#1E293B; --muted:#64748B;
-            --line:#E2E8F0; --bg:#F8FAFC; --accent:#DC2626; --green:#059669;
+            --line:#E7E5E4; --bg:#FFFFFF; --accent:#DC2626; --green:#059669;
+            /* 11 Oct 2026 — the map takes the staff app's shell: warm neutrals, orange primary buttons. --navy
+               stays blue: it is the route colour and the link colour (the user: routes stay blue). */
+            --action:#C2410C; --action-fg:#FFFFFF; --surface-2:#FAFAF9; --note:#78716C;
         }
         *{ box-sizing:border-box; }
         body { margin:0; padding:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink); overflow:hidden; -webkit-font-smoothing:antialiased; }
         #map { position:absolute; top:0; bottom:0; right:0; left:300px; transition:left .25s ease; }
         body.sidebar-closed #map, .sidebar.closed ~ #map { left:0; }
 
-        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:#fff; color:var(--navy); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:#fff; color:var(--navy-deep); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
         #menu-toggle:hover{ border-color:#d0d3d8; }
 
         .sidebar { position:absolute; top:0; bottom:0; left:0; width:300px; background:#fff; border-right:1px solid var(--line); padding:20px 18px 24px; z-index:10; display:flex; flex-direction:column; gap:22px; overflow-y:auto; transition:transform .25s ease; }
@@ -37,17 +40,17 @@
         .sidebar h2 { margin:0; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--navy-deep); padding-top:42px; display:flex; align-items:center; gap:9px; }
         .sidebar h2::before{ content:""; width:8px; height:22px; background:var(--navy); border-radius:2px; }
         .sidebar h2 small{ display:block; font-size:9.5px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
-        .sidebar h3 { margin:0 0 9px; font-size:10.5px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+        .sidebar h3 { margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var(--navy-deep); text-transform:none; }
 
         select, button, input { font-family:inherit; }
-        select { width:100%; background:#fff; border:1px solid var(--line); border-radius:7px; padding:8px 9px; color:var(--ink); font-size:12.5px; outline:none; margin-bottom:6px; transition:border-color .15s; }
+        select { width:100%; background:#fff; border:1px solid #D6D3D1; border-radius:6px; padding:8px 10px; color:var(--ink); font-size:14px; outline:none; margin-bottom:6px; transition:border-color .15s; }
         select:focus { border-color:var(--navy); }
-        .btn { width:100%; border:none; border-radius:7px; padding:8px; font-size:12.5px; font-weight:600; cursor:pointer; background:var(--navy); color:#fff; }
-        .btn-ghost { background:#f3f4f6; color:var(--ink); }
-        .btn-ghost:hover{ background:#eceef1; }
+        .btn { width:100%; border:none; border-radius:6px; padding:8px; font-size:14px; font-weight:600; cursor:pointer; background:var(--action); color:var(--action-fg); }
+        .btn-ghost { background:#fff; color:var(--ink); border:1px solid #D6D3D1; font-weight:500; }
+        .btn-ghost:hover{ background:var(--surface-2); }
 
         .control-group { display:flex; flex-direction:column; }
-        .control-item { display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:7px 2px; }
+        .control-item { display:flex; align-items:center; justify-content:space-between; font-size:13.5px; padding:7px 2px; }
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
         .control-item input[type=checkbox]{ accent-color:var(--navy); width:14px; height:14px; }
@@ -93,12 +96,12 @@
         @media (min-width:1024px){ #kpi-cards, .kpi-row{ gap:18px; } #kpi-cards .kpi-label{ white-space:normal; max-width:104px; } }
         .kpi-card.lead .kpi-label{ color:var(--ink); font-weight:500; }
         .layers-box{ border-top:1px solid var(--line); padding-top:12px; }
-        .layers-box > summary{ cursor:pointer; list-style:none; font-size:13px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
+        .layers-box > summary{ cursor:pointer; list-style:none; font-size:14px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
         .layers-box > summary::-webkit-details-marker{ display:none; }
         .layers-box > summary::before{ content:'\203A'; display:inline-block; width:14px; color:var(--muted); transition:transform .15s; }
         .layers-box[open] > summary::before{ transform:rotate(90deg); }
         .layers-box > .control-group{ margin-bottom:18px; }
-        .busy-row{ display:flex; justify-content:space-between; gap:10px; width:100%; background:none; border:0; border-top:1px solid var(--line); padding:7px 2px; font:inherit; font-size:12.5px; color:var(--ink); cursor:pointer; text-align:left; }
+        .busy-row{ display:flex; justify-content:space-between; gap:10px; width:100%; background:none; border:0; border-top:1px solid var(--line); padding:7px 2px; font:inherit; font-size:13.5px; color:var(--ink); cursor:pointer; text-align:left; }
         .busy-row:hover{ color:var(--navy); }
         .busy-row .chip-n{ color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
         .kpi-sep{ width:1px; align-self:stretch; background:var(--line); margin:14px 0; }
@@ -121,7 +124,7 @@
         #kpi-moving.on{ display:flex; }
         .kpi-chips{ display:flex; flex-direction:column; }
         .kpi-chips:empty{ display:none; }
-        .kpi-chip{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; line-height:1.35; padding:7px 2px;
+        .kpi-chip{ display:flex; justify-content:space-between; gap:10px; font-size:13.5px; line-height:1.35; padding:7px 2px;
                    border-top:1px solid var(--line); color:var(--navy-deep); font-variant-numeric:tabular-nums; }
         .kpi-chip .chip-n{ color:var(--muted); white-space:nowrap; text-align:right; }
         .kpi-switch{ display:flex; gap:2px; margin:0 0 8px; padding:2px; border-radius:7px;
@@ -191,15 +194,15 @@
         @media (min-width:701px) and (max-width:1023px){
             #kpi-cards{ grid-template-columns:repeat(6, minmax(0, 1fr)); }   /* a tablet: one row of six under the month */
         }
-        .restr-warn{ font-size:11px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
+        .restr-warn{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
 
         .fc-box h3{ border:none; }
         .fc-row{ display:flex; gap:10px; margin-bottom:10px; }
         .fc-row > div{ flex:1; }
-        .fc-row label{ font-size:10.5px; font-weight:600; color:var(--muted); display:block; margin-bottom:3px; }
-        .fc-toggle{ font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:9px; font-weight:600; background:#f6f8fb; border:1px solid var(--line); padding:9px 11px; border-radius:8px; }
+        .fc-row label{ font-size:12.5px; font-weight:500; color:var(--muted); display:block; margin-bottom:3px; }
+        .fc-toggle{ font-size:13.5px; cursor:pointer; display:flex; align-items:center; gap:9px; font-weight:500; background:var(--surface-2); border:1px solid var(--line); padding:9px 11px; border-radius:6px; }
         .fc-toggle input{ accent-color:var(--navy); }
-        #forecast-status{ margin-top:9px; font-size:11px; font-weight:500; color:var(--muted); line-height:1.5; }
+        #forecast-status{ margin-top:9px; font-size:12.5px; font-weight:500; color:var(--muted); line-height:1.5; }
         #btn-detail{ margin-top:8px; display:none; }
 
         .mapboxgl-popup-content { border-radius:10px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:'Inter',sans-serif !important; }
@@ -218,8 +221,8 @@
         .an-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; }
         .an-card{ border:1px solid var(--line); border-radius:9px; padding:11px 13px; }
         .an-val{ font-size:19px; font-weight:700; color:var(--navy-deep); letter-spacing:-.02em; }
-        .an-lbl{ font-size:10.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
-        .an-sub{ font-size:11px; color:var(--muted); margin-top:1px; }
+        .an-lbl{ font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted); margin-top:3px; }
+        .an-sub{ font-size:12.5px; color:var(--muted); margin-top:1px; }
         .an-title{ font-size:14px; font-weight:700; color:var(--navy-deep); }
         .an-route{ font-size:12px; color:var(--muted); margin:2px 0 14px; }
         table.fc-matrix{ border-collapse:collapse; font-size:11.5px; width:100%; }
@@ -283,7 +286,7 @@
 <body>
 <div id="menu-toggle" onclick="toggleSidebar()">☰ Control Panel</div>
 <div class="sidebar" id="main-sidebar">
-    <div style="height:26px"></div>
+    <div style="height:44px;flex:none"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button -->
 
     <div class="control-group">
         <h3>Route filtering</h3>
@@ -321,9 +324,9 @@
              colours are defined. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alignment" checked onchange="toggleAlignment(this.checked)"> Alignment (by package)</label><span class="color-dot" id="ipt-alignment-swatch" style="background:#94a3b8; border-radius:0; width:13px; height:3px;"></span></div>
         <div id="ipt-legend" style="padding-left:23px;margin:-2px 0 4px;"></div>
-        <div id="ipt-legend-note" style="padding-left:23px;margin:-2px 0 6px;font-size:10.5px;color:#8a9099;line-height:1.45;">Drawn continuously. Where the alignment file has no surveyed main track the line is interpolated &mdash; click it to see whether a stretch is measured.</div>
+        <div id="ipt-legend-note" style="padding-left:23px;margin:-2px 0 6px;font-size:12px;color:var(--note);line-height:1.45;">Drawn continuously. Where the alignment file has no surveyed main track the line is interpolated &mdash; click it to see whether a stretch is measured.</div>
         <div class="control-item"><label><input type="checkbox" id="layer-ws-bounds" checked onchange="toggleWsBounds(this.checked)"> Work section boundaries</label><span class="color-dot" style="background:#334155; border-radius:0; width:3px; height:13px;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">Package edges · ticks from zoom 11, labels from 13</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">Package edges · ticks from zoom 11, labels from 13</span></div>
         <!-- The alignment as it was drawn before the IPT overlay: every track type, one
              dark line, nothing cut. Kept as its own layer because the IPT view answers
              "which package" and this one answers "where is the railway" — and the gap
@@ -331,7 +334,7 @@
              view is the one that carries information. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alignment-survey" onchange="toggleLayer('rail-alignment-survey', this.checked)"> Alignment (survey, continuous)</label><span class="color-dot" style="background:#000000; border-radius:0; width:13px; height:2px;"></span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-chainage" onchange="toggleLayer('chainage-global', this.checked); toggleLayer('chainage-labels', this.checked);"> Chainage markers</label><span class="color-dot" style="background:#94a3b8;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">10 km ticks at corridor zoom · denser and labelled as you zoom in</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">10 km ticks at corridor zoom · denser and labelled as you zoom in</span></div>
         <!-- 2026-09-08 (§A). ONE type, ONE symbol, and the legend IS the filter — seven
              boxes that each hide their own type and nothing else. Previously the only
              location control was this master switch, and a railhead was hidden by the
@@ -347,19 +350,19 @@
              it should stay that way: this is a 200 km corridor and the buildings only
              mean anything at site zoom. Not an ortho mesh — the brief is explicit. -->
         <div class="control-item"><label><input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label><span class="color-dot" style="background:#cbd5e1;"></span></div>
-        <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">from zoom 14 · Mapbox basemaps only</span></div>
+        <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 14 · Mapbox basemaps only</span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-gates" checked onchange="toggleGates(this.checked)"> Site gates</label><span class="color-dot" style="background:#64748B;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">from zoom 10 · hollow = deactivated</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 10 · hollow = deactivated</span></div>
         <!-- Phase 3. Two colours, one meaning each: red = the router is steered around
              this area, grey = drawn for information and HERE never hears about it. With
              the forecast timeline open these follow the month on screen, so a closure
              that ends in March is gone by April. -->
         <div class="control-item"><label><input type="checkbox" id="layer-zones" checked onchange="toggleZones(this.checked)"> Disruption zones</label><span class="color-dot" style="background:#DC2626;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">red = avoided by routing · grey = advisory</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">red = avoided by routing · grey = advisory</span></div>
         <!-- The EXISTING railway (the package's `rail`), not the alignment being built.
              Dim until an origin filter picks a Railhead, then bold. Default ON. -->
         <div class="control-item"><label><input type="checkbox" id="layer-rail" checked onchange="toggleRail(this.checked)"> Existing rail network</label><span class="color-dot" style="background:repeating-linear-gradient(90deg,#64748B 0 2px,transparent 2px 6px); border-radius:0; width:13px; height:3px;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;" id="rail-note">provisional geometry · bolds when a railhead is the origin</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);" id="rail-note">provisional geometry · bolds when a railhead is the origin</span></div>
     </div>
 
     <div class="control-group">
@@ -377,7 +380,7 @@
              legs is a lot of line, and this answers a question nobody asks
              continuously. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes</label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:10.5px;color:#8a9099;">loading…</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:12px;color:var(--note);">loading…</span></div>
     </div>
     </details>
 
@@ -401,9 +404,9 @@
 
     <div class="control-group" id="restrictions-group" hidden>
         <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
-        <div id="restriction-toggles"><div class="control-item"><span style="font-size:11px;color:#8a9099;">Loading…</span></div></div>
+        <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
         <div class="control-item" style="padding-left:2px;margin-top:-2px;">
-            <span id="restriction-source" style="font-size:10px;color:#8a9099;">Advisory — the router is not given this data.</span>
+            <span id="restriction-source" style="font-size:12px;color:var(--note);">Advisory — the router is not given this data.</span>
         </div>
     </div>
 
@@ -825,7 +828,7 @@
                 ? `<b style="color:#5b6270;">${r.ipt}</b> · ${(window.IPT_UNDERLAY || {}).label || 'corridor underlay'}`
                 : `<b style="color:#5b6270;">${r.ipt}</b>${r.ws.length ? ' · ' + r.ws.join(', ') : ''}`;
             const handler = under ? 'toggleUnderlay(this.checked)' : 'applyIptFilter()';
-            return `<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;line-height:1.7;${r.muted ? 'opacity:.7;' : ''}" title="${r.labels.join(' · ').replace(/"/g, '&quot;')}">`
+            return `<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.7;${r.muted ? 'opacity:.7;' : ''}" title="${r.labels.join(' · ').replace(/"/g, '&quot;')}">`
                 + `<input type="checkbox" id="${iptCheckboxId(r.ipt)}" checked onchange="${handler}" style="margin:0;">`
                 + `<span style="flex:0 0 14px;height:${under ? 4 : 3}px;background:${colour};border-radius:0;"></span>`
                 + `<span style="color:#8a9099;">${label}</span></div>`;
@@ -1355,7 +1358,7 @@
         const note = { Quarry: 'fill = material' };
         box.innerHTML = LOC_KINDS.map(k =>
             `<div class="control-item" style="padding:3px 2px;border:0;">` +
-            `<label style="font-size:10.5px;color:#6b7280;font-weight:500;">` +
+            `<label style="font-size:12.5px;color:#57534E;font-weight:500;">` +
             `<input type="checkbox" id="loc-kind-${k.toLowerCase()}" checked onchange="toggleLocKind()"> ` +
             `${k}${note[k] ? ` <span style="color:#a2a8b0">· ${note[k]}</span>` : ''}</label>` +
             `<img alt="" src="${swatch(k)}" style="width:15px;height:15px;margin-left:auto;">` +
@@ -2751,9 +2754,9 @@
                               + `and awaits the design drawings.</div>`
                             : '')
                         + (wsMeta.note
-                            ? `<div style="margin-top:5px;font-size:10.5px;color:#8a9099;">⚠ ${wsMeta.note}.</div>`
+                            ? `<div style="margin-top:5px;font-size:12px;color:var(--note);">⚠ ${wsMeta.note}.</div>`
                             : '')
-                        + `<div style="margin-top:6px;font-size:10.5px;color:#8a9099;">Reference geometry. Band boundaries from the scope diagram.</div>`
+                        + `<div style="margin-top:6px;font-size:12px;color:var(--note);">Reference geometry. Band boundaries from the scope diagram.</div>`
                         + `</div>`
                     )
                     .addTo(map);
@@ -2795,7 +2798,7 @@
                             ? `<div style="margin-top:6px;padding:5px 7px;background:#fef3c7;border-radius:3px;font-size:11.5px;color:#7c5e10;">`
                               + `<b>Provisional.</b> This boundary is approximate and awaits the design drawings.</div>`
                             : '')
-                        + (p.note ? `<div style="margin-top:6px;font-size:10.5px;color:#8a9099;">⚠ ${p.note}.</div>` : '')
+                        + (p.note ? `<div style="margin-top:6px;font-size:12px;color:var(--note);">⚠ ${p.note}.</div>` : '')
                         + `</div>`
                     )
                     .addTo(map);
@@ -3091,7 +3094,7 @@
             // failure, still shows nothing at all: neither is a fact about the place.
             // No image request is made in any of these cases.
             if(meta && !meta.available && meta.status === 'ZERO_RESULTS'){
-                box.innerHTML = '<div style="font-size:10px;color:#8a9099;">No Street View here</div>';
+                box.innerHTML = '<div style="font-size:12px;color:var(--note);">No Street View here</div>';
                 return;
             }
             if(!meta || !meta.available) return;   // no key / fetch failed: show nothing
@@ -3101,7 +3104,7 @@
             // letting the image imply it is the gate.
             const off = (meta.offset_m != null && meta.offset_m > 25)
                 ? '<div style="font-size:10px;color:#92400e;">nearest imagery is ' + Math.round(meta.offset_m) + ' m away</div>' : '';
-            const when = meta.date ? '<div style="font-size:10px;color:#8a9099;">Google Street View · ' + meta.date + '</div>' : '';
+            const when = meta.date ? '<div style="font-size:12px;color:var(--note);">Google Street View · ' + meta.date + '</div>' : '';
             box.innerHTML = '<img src="' + src + '" alt="Street View near ' + (name || '') +
                 '" style="width:100%;border-radius:6px;display:block;" loading="lazy">' + off + when;
         }catch(e){ /* imagery is a nicety — a failure leaves the popup as it was */ }
@@ -3157,7 +3160,7 @@
             // a map with no restriction overlay is degraded, not broken — say so quietly
             // in the panel rather than throwing a banner over a working map
             const box = document.getElementById('restriction-toggles');
-            if(box) box.innerHTML = '<div class="control-item"><span style="font-size:11px;color:#8a9099;">Restrictions unavailable</span></div>';
+            if(box) box.innerHTML = '<div class="control-item"><span style="font-size:12px;color:var(--note);">Restrictions unavailable</span></div>';
             console.warn('restrictions unavailable', e);
         }
         RESTR.loading = false;
@@ -3284,7 +3287,7 @@
         // attribution names the provider the API named — never a hard-coded authority
         const pvd = RESTR.provider || {};
         const attrib = [pvd.name, pvd.short].filter(Boolean).join(' · ');
-        if (attrib) body += '<div style="font-size:10px;color:#8a9099;margin-top:7px;">' + attrib + '</div>';
+        if (attrib) body += '<div style="font-size:12px;color:var(--note);margin-top:7px;">' + attrib + '</div>';
         return '<div style="min-width:220px;"><h4 style="margin:0 0 4px;color:' + colour +
                ';font-size:13.5px;">' + title + '</h4>' + body + '</div>';
     }
@@ -3338,7 +3341,7 @@
                  `border-left:3px solid #DC2626;font-size:11.5px;line-height:1.45;'>` +
                  `<b>Provisional geometry.</b> ${p.accuracy_note || ''}</p>`;
         }
-        h += `<p style='margin:4px 0;font-size:10.5px;color:#8a9099;line-height:1.4;'>` +
+        h += `<p style='margin:4px 0;font-size:12px;color:var(--note);line-height:1.4;'>` +
              `Source: ${p.source || 'unknown'}</p></div>`;
         return h;
     }
@@ -3359,7 +3362,7 @@
         if (p.safety_minutes) h += `<p style='margin:4px 0;'><b>Induction:</b> ${p.safety_minutes} min</p>`;
         if (p.internal_travel_minutes) h += `<p style='margin:4px 0;'><b>Gate to face:</b> ` +
                                             `${p.internal_travel_minutes} min</p>`;
-        h += `<p style='margin:6px 0 0 0;font-size:11px;color:#8a9099;'>${p.gate_id} · ` +
+        h += `<p style='margin:6px 0 0 0;font-size:12px;color:var(--note);'>${p.gate_id} · ` +
              `access point, not the site itself</p></div>`;
         return h;
     }
