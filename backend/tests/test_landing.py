@@ -220,6 +220,9 @@ ok("five stills, one per problem, in page order",
    len(_still_tags) == 5 and [re.search(r'src="\./media/([\w-]+)\.jpg"', t).group(1) for t in _still_tags] == list(_STILLS))
 ok("⭐ every still's alt text says it is the fictional demo scheme",
    all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
+# 11 Oct 2026 (late, guide v2.1 review): the map still's alt text was the last "route map" a person reads here
+ok("...and the map still's alt text calls it the public map, not the route map",
+   'alt="The public map on the fictional demo scheme' in src and not re.search(r'alt="[^"]*route map', src, re.I))
 ok("every still has width, height (no layout jump) and lazy loading",
    all('width="' in t and 'height="' in t and 'loading="lazy"' in t for t in _still_tags))
 ok("each still exists as a JPEG under 200 KB",

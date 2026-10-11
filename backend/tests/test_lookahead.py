@@ -1161,12 +1161,32 @@ def _scrub(o):
     if isinstance(o, list):
         return [_scrub(x) for x in o]
     return o
-_fix = _scrub(lookahead.page(bucket="commit"))
+# 2026-10-11: `today` is PINNED to a weekday of the commit week (portable.fixture_today).
+# Written on Sunday 11 Oct with the clock's date, today was no printed column and
+# render_frontend.js failed 2 checks on correct output. The pin moves `today` only: the
+# assertion after the write proves the rest is the page the clock gives.
+from portable import fixture_today
+_d0 = datetime.date(2026, 1, 1)
+_span = [_d0 + datetime.timedelta(days=i) for i in range(731)]
+ok("the fixture pin never moves the commit week: every date of 2026-27 maps to a weekday of its own week (Sat and Sun to that Friday)",
+   all(fixture_today(d).weekday() <= 4 and weeks.week_of_date(fixture_today(d)) == weeks.week_of_date(d)
+       and (fixture_today(d) == d) == (d.weekday() <= 4) for d in _span)
+   and fixture_today(datetime.date(2026, 10, 11)) == datetime.date(2026, 10, 9)
+   and fixture_today(datetime.date(2026, 11, 1)) == datetime.date(2026, 10, 30))
+_fx_today = fixture_today()
+_fix = _scrub(lookahead.page(bucket="commit", today=_fx_today))
+_clock = _scrub(lookahead.page(bucket="commit"))
 with open(os.path.join(_fix_dir, "lookahead_page.json"), "w", encoding="utf-8") as _fh:
     _fh.write(_json.dumps(_fix, indent=1, ensure_ascii=False))
 ok("the render fixture is written with three lines, a rail, a stockpile and an account week",
    len(_fix["commit"]["lines"]) == 3 and _fix["clashes"]["count"] > 3 and len(_fix["stock"]) == 1
    and len(_fix["account"]["rows"]) == (3 if pm >= 1 else 0))
+ok("...its today is a weekday inside the commit week (pinned on a weekend), and nothing else differs from the clock's page",
+   _fix["today"] == _fx_today.isoformat() and _fx_today.weekday() <= 4
+   and _fix["commit_week"]["from"] <= _fix["today"] <= _fix["commit_week"]["to"]
+   and {k: v for k, v in _fix.items() if k != "today"} == {k: v for k, v in _clock.items() if k != "today"},
+   f"fixture today {_fix['today']} · clock {_clock['today']} · week {_fix['commit_week'].get('from')}..{_fix['commit_week'].get('to')}"
+   f" · keys that differ: {[k for k in _fix if _fix.get(k) != _clock.get(k)]}")
 
 # ---- horizon roles
 hz = pg["horizon"]

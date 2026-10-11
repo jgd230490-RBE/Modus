@@ -257,8 +257,8 @@ _HELP_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
   <h1>The user guide is for signed-in staff</h1>
   <p>It documents every staff screen, so it sits behind the same sign-in.</p>
   <button onclick="location.href='/'">Go to the app and sign in</button>
-  <div class="foot">Once you are signed in, come back to <code>/help/</code> — or use the
-  Help link in the app.</div>
+  <div class="foot">Once you are signed in, come back to <code>/help/</code> — or use
+  User guide at the foot of the app's menu on the left.</div>
 </div></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
 
 _MAP_UNCONFIGURED_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">

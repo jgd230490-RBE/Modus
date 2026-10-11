@@ -220,13 +220,13 @@ Team access code: {c['team']}
 The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.
 
 Three things to try:
-1. Dashboard: today's tonnes, trips and vehicles, and this week against plan.
-2. Look-ahead: next week committed by route and by day, with closures and route caps flagged.
+1. Dashboard: the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.
+2. Look-ahead: this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.
 3. Public map: press Play to watch a month of haul unfold.
 
-A short guide opens on each page the first time you visit. You can replay it any time from "Guide" in the corner.
+Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the "Fictional demo scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.
 
-If you'd like a walkthrough of approving a week as a planner, just reply to this email.
+If you'd like a walkthrough of the planner's side, approving forecasts and confirming the week, just reply to this email.
 
 John Davis
 Wayscope · wayscope.co.uk
@@ -245,12 +245,12 @@ def email_html(name, c):
 <p>The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.</p>
 <p>Three things to try:</p>
 <ol>
-<li><b>Dashboard:</b> today's tonnes, trips and vehicles, and this week against plan.</li>
-<li><b>Look-ahead:</b> next week committed by route and by day, with closures and route caps flagged.</li>
+<li><b>Dashboard:</b> the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.</li>
+<li><b>Look-ahead:</b> this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.</li>
 <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
 </ol>
-<p>A short guide opens on each page the first time you visit. You can replay it any time from "Guide" in the corner.</p>
-<p>If you'd like a walkthrough of approving a week as a planner, just reply to this email.</p>
+<p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the "Fictional demo scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>
+<p>If you'd like a walkthrough of the planner's side, approving forecasts and confirming the week, just reply to this email.</p>
 <p>John Davis<br>Wayscope · <a href="{landing_url()}/">wayscope.co.uk</a></p>
 <p style="font-size:12px;color:#5B6470">You're receiving this because you requested a demo at wayscope.co.uk. <a href="{landing_url()}/privacy.html">Privacy notice</a></p>
 </body></html>"""
@@ -424,11 +424,12 @@ def access_page(name, c):
   <p>The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.</p>
   <p>Three things to try:</p>
   <ol>
-    <li><b>Dashboard:</b> today's tonnes, trips and vehicles, and this week against plan.</li>
-    <li><b>Look-ahead:</b> next week committed by route and by day, with closures and route caps flagged.</li>
+    <li><b>Dashboard:</b> the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.</li>
+    <li><b>Look-ahead:</b> this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.</li>
     <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
   </ol>
-  <p>If you'd like a walkthrough of approving a week as a planner, email <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a>.</p>
+  <p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the "Fictional demo scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>
+  <p>If you'd like a walkthrough of the planner's side, approving forecasts and confirming the week, email <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a>.</p>
   <p class="fine">You asked for this at wayscope.co.uk. <a href="{lu}/privacy.html">Privacy notice</a> · <a href="{lu}/">Back to Wayscope</a></p>
 </main>
 </body>

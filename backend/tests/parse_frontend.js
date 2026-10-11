@@ -1673,7 +1673,16 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       && /<AppearancePicker \/>/.test(hdrFn) && /Sign out/.test(hdrFn) && /Staff sign in/.test(hdrFn));
     ok("the bar's Guide: none on sign-in; the embedded map's tour on a map view once the map says it is ready; the app's guide on other Portal pages",
       appFn.includes('const onMap = view === "public" || (view === "portal" && page === "map");')
-      && appFn.includes('const barGuide = view === "login" ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
+      // 11 Oct: "resume" (signing back in after a reload) has no guide either, like the sign-in view
+      && appFn.includes('const barGuide = (view === "login" || view === "resume") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
+    ok("🔴 a reload with a stored code starts on resume and re-checks it with /api/auth, never trusting it unchecked",
+      appFn.includes('const [view, setView] = useState(() => ACCESS.code ? "resume" : "public");')
+      && appFn.includes('body: JSON.stringify({ code: ACCESS.code }) })')
+      && appFn.includes('.then(info => { ACCESS.info = info; setRole(info); setView("portal"); })')
+      && (appFn.match(/setView\("portal"\)/g) || []).length === 2);   // signIn() and the checked resume, nowhere else
+    ok("...a 401 / 403 forgets the stored code; the public map is the fallback either way",
+      appFn.includes('if(e === 401 || e === 403){ ACCESS.code = ""; try { sessionStorage.removeItem("modus_access_code"); } catch(x){} }')
+      && /\.catch\(e => \{[\s\S]{0,400}setView\("public"\);\s*\}\);/.test(appFn));
     ok("...the map's readiness comes from a same-origin message of one type, and resets on every new screen (a new iframe announces itself again)",
       appFn.includes("if(e.origin === window.location.origin && e.data && e.data.type === MAP_TOUR_MSG) setMapTour(true);")
       && appFn.includes('window.addEventListener("message", on);') && appFn.includes('return () => window.removeEventListener("message", on);')
@@ -2000,6 +2009,61 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
+}
+
+// ---- 11 Oct 2026 — the guide update: the tour text that was wrong or stale ------------------------
+// Source-level. What they prove: the dashboard, look-ahead, data and forecast steps say what the pages show
+// today, on the same anchors; the old promises are gone. Not covered: how a card reads on screen (dom_frontend.js
+// walks the welcome and the dashboard tour in a DOM).
+{
+  const gsU = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
+  const gfU = (src.match(/const GUIDE_FORECAST_STEPS = \[[\s\S]*?\];/) || [""])[0];
+  const stepsOf = (k) => (gsU.match(new RegExp(`\\n  ${k}: \\[([\\s\\S]*?)\\n  \\],`)) || ["", ""])[1];
+  const dashU = stepsOf("dashboard"), laU = stepsOf("lookahead"), dataU = stepsOf("data");
+  // NARROWED 11 Oct 2026 (guide v2.1 review): "everything below follows" was not true (this week's plan and the
+  // carbon target read their own, unfiltered data), so step 1 now names the two exceptions
+  ok("guide update: the dashboard tour starts on the filters and points to today's folded section, on the same anchors plus the gate step",
+     dashU.includes('{ anchor: "page-header", title: "The plan at a glance.", body: "Pick the months, team and status here; the cards and charts follow, except this week\'s plan and the carbon target. Today\'s figures are under This week and today, further down." }')
+     // NARROWED 11 Oct 2026 (gate arrivals): a fifth step, anchor dash-gates, sits before Big screen
+     && (dashU.match(/anchor: "/g) || []).length === 5 && dashU.includes('anchor: "dash-gates"') && dashU.includes('anchor: "dash-wall"'));
+  // NARROWED 11 Oct 2026 (guide v2.1 review): the step titled "Six cards." named five; it names all six now, and says
+  // which one is the Look-ahead's rather than "for the lines in view"
+  ok("...the cards step names the six cards; the carbon step says transport only and points to the target strip; cost is in its chart",
+     dashU.includes('title: "Six cards."') && dashU.includes("Material in view, deliveries a day, vehicles needed, delivered against plan and transport carbon for the lines in view, and this week's plan from the Look-ahead.")
+     && dashU.includes('title: "Carbon."') && dashU.includes("Transport carbon counts transport only.") && dashU.includes("Cost is in the Cost over time chart."));
+  ok("🔴 ...and the old dashboard promises are gone (today in the header, the seven-day number, cost on the cards)",
+     !/title: "Today\."|seven-day|Cost and carbon\.|Planned cost, the modelled fair price/.test(dashU));
+  ok("the look-ahead tour: this week by day with the next week switch; flags without seasonal windows; actuals on Account",
+     laU.includes('title: "This week, by day."') && laU.includes("Use the next week switch to plan ahead")
+     && laU.includes("Flags never block anything.") && laU.includes("On Account, type what really moved last week.")
+     && (laU.match(/anchor: "lookahead-(tabs|flags)"/g) || []).length === 3);
+  ok("🔴 ...and the old look-ahead claims are gone (next week by default, seasonal windows and mass limits as flags, the seven-day accuracy)",
+     !/Next week, by day|seasonal windows|mass limits|seven-day/.test(laU));
+  ok("the data tour: routes are routed for the lorry, not 'HGV-legal'; zones are areas, caps and windows live elsewhere",
+     dataU.includes('title: "Routes", body: "are routed for a lorry of the vehicle\'s weight and size, out laden and back empty, and drawn on the map."')
+     && dataU.includes("Lorry caps are set on each route, seasonal windows in Config.") && !/HGV-legal|carry the rules/.test(dataU));
+  ok("the forecast steps: a quantity in m³, tonnes or vehicles; Pending until approved; the public map",
+     gfU.includes("with a quantity for each month in m³, tonnes or vehicles.") && gfU.includes("A new line is Pending until a planner approves it.")
+     && gfU.includes("the Look-ahead and the public map.") && !/the tonnes by month|from submitted to approved/.test(gfU));
+  ok("🔴 the changed tour copy keeps the house words: lorry, never truck; no team id",
+     !/\btrucks?\b/i.test(gsU + gfU) && !/IPT/.test(gsU + gfU));
+  // 11 Oct 2026 (late, guide v2.1 review) — the corrected statements
+  ok("🔴 guide v2.1 review: the dashboard tour no longer says everything follows the filters",
+     !/everything below follows/.test(dashU) && /except this week's plan and the carbon target/.test(dashU));
+  ok("🔴 ...the actuals step says a line that REACHES 98% of its plan is delivered (clashes.HOLD_BAND: actual >= 0.98 x plan), not 'within'",
+     laU.includes("A line that reaches 98% of its plan counts as delivered.") && !/within 98%/.test(laU));
+}
+
+// ---- 11 Oct 2026 (late) — guide v2.1 review: the on-screen text that contradicted the guide -------------
+{
+  ok("🔴 the Locations subtitle says deleting a site deletes its routes (network.delete_location), as the confirm does",
+     src.includes("drag a marker to move it; deleting a site also deletes every route that uses it.")
+     && !src.includes("a site that a route uses cannot be deleted")
+     && src.includes("This also removes any routes that use it."));
+  ok("🔴 ...the planner's Forecasts subtitle and the Data legend call the map the public map, and the Dashboard by its name",
+     src.includes("approved lines feed the public map, the Look-ahead and the Dashboard.")
+     && src.includes("Material colouring lives on the Dashboard and the public map.")
+     && !/approved lines feed the route map|the KPI cards\."|forecasting dashboard and the public route map/.test(src));
 }
 
 // ---- report ------------------------------------------------------------------

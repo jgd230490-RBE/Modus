@@ -41,7 +41,7 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__TENANT = TENANT;");   // consts in the script scope; THEME for §3, TENANT for §4
+w.eval(js + "\nwindow.__T = THEME; window.__TENANT = TENANT; window.__ACCESS = ACCESS;");   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
@@ -469,6 +469,9 @@ async function lateBar(){
     await act(async () => { root.render(w.React.createElement(w.App)); });
     return { box, root };
   };
+  // a fresh load is a SIGNED-OUT visitor: the DEMO BAR section signed in, and since 11 Oct a stored code resumes
+  // the staff app on load, so forget it here (the public map is what these cases are about)
+  w.__ACCESS.code = ""; w.__ACCESS.info = null; w.sessionStorage.removeItem("modus_access_code");
   // (a) /api/meta fails (FastAPI's plain-text 500: json() throws) on a fresh load: no bar, so the map keeps its own
   w.__TENANT.demo_notice = null; w.__TENANT.name = "Wayscope";
   w.fetch = (url) => /\/api\/meta$/.test(String(url))
@@ -522,6 +525,60 @@ async function lateBar(){
   await act(async () => { c.root.unmount(); }); c.box.remove();
 }
 
+// 11 Oct 2026: a reload no longer signs you out. A stored code is checked with /api/auth on load and the app
+// returns to the staff view; a refused code is forgotten; a network failure keeps it for the next reload.
+async function reloadResume(){
+  const mountApp = async () => {
+    const box = w.document.createElement("div"); w.document.body.appendChild(box);
+    const root = w.ReactDOM.createRoot(box);
+    await act(async () => { root.render(w.React.createElement(w.App)); });
+    return { box, root };
+  };
+  const btn = (box, t) => [...box.querySelectorAll("button")].some(b => b.textContent.trim() === t);
+  const store = (c) => { w.__ACCESS.code = c; w.__ACCESS.info = null; w.sessionStorage.setItem("modus_access_code", c); };
+  const isMeta = (u) => /\/api\/meta$/.test(String(u)), isAuth = (u) => /\/api\/auth$/.test(String(u));
+  w.__TENANT.demo_notice = N;
+  // (a) the server accepts the stored code
+  let authBody = null, release;
+  store("demo-planner");
+  w.fetch = (url, o) => isMeta(url) ? respond(META)
+    : isAuth(url) ? (authBody = o && o.body, new Promise(r => { release = () => r({ ok: true, status: 200, json: () => Promise.resolve(PLANNER) }); }))
+    : new Promise(() => {});
+  const a = await mountApp(); await tick();
+  ok("RELOAD: with a stored code the app says it is signing you back in, not the public map or Staff sign in",
+     /Signing you back in/.test(a.box.textContent) && !btn(a.box, "Staff sign in") && !a.box.querySelector('iframe[title="Public Route Map"]'));
+  ok("...and asks /api/auth what that code grants (the same call the sign-in form makes)",
+     authBody === JSON.stringify({ code: "demo-planner" }));
+  await act(async () => { release(); }); await tick(); await tick();
+  ok("⭐ RELOAD: an accepted code returns to the staff app (Sign out on screen, no Staff sign in, code kept)",
+     btn(a.box, "Sign out") && !btn(a.box, "Staff sign in") && !/Signing you back in/.test(a.box.textContent)
+     && w.sessionStorage.getItem("modus_access_code") === "demo-planner" && w.__ACCESS.info === PLANNER);
+  await act(async () => { a.root.unmount(); }); a.box.remove();
+  // (b) the server refuses it (the code was changed): public map, and the code is forgotten
+  store("old-code");
+  w.fetch = (url) => isMeta(url) ? respond(META)
+    : isAuth(url) ? Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }) : new Promise(() => {});
+  const b = await mountApp(); await tick(); await tick();
+  ok("🔴 RELOAD: a refused code lands on the public map with Staff sign in, and is removed from the tab",
+     btn(b.box, "Staff sign in") && !btn(b.box, "Sign out") && w.sessionStorage.getItem("modus_access_code") === null && w.__ACCESS.code === "");
+  await act(async () => { b.root.unmount(); }); b.box.remove();
+  // (c) the network fails: public map now, but the code is kept so the next reload tries again
+  store("demo-planner");
+  w.fetch = (url) => isMeta(url) ? respond(META) : isAuth(url) ? Promise.reject(new TypeError("Failed to fetch")) : new Promise(() => {});
+  const c = await mountApp(); await tick(); await tick();
+  ok("RELOAD: a network failure shows the public map but keeps the code for the next reload",
+     btn(c.box, "Staff sign in") && w.sessionStorage.getItem("modus_access_code") === "demo-planner");
+  await act(async () => { c.root.unmount(); }); c.box.remove();
+  // (d) no stored code: the public map at once, and /api/auth is never called
+  w.__ACCESS.code = ""; w.sessionStorage.removeItem("modus_access_code");
+  let authCalls = 0;
+  w.fetch = (url) => { if(isAuth(url)) authCalls++; return isMeta(url) ? respond(META) : new Promise(() => {}); };
+  const d = await mountApp(); await tick();
+  ok("RELOAD: with no stored code the public map shows at once and /api/auth is not called",
+     btn(d.box, "Staff sign in") && authCalls === 0 && !/Signing you back in/.test(d.box.textContent));
+  await act(async () => { d.root.unmount(); }); d.box.remove();
+}
+
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
 (async () => {
@@ -529,6 +586,8 @@ async function lateBar(){
   catch (e) { ok("DEMO BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await lateBar(); ok("MAP UNDER THE BAR: the section ran to the end", true); }
   catch (e) { ok("MAP UNDER THE BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await reloadResume(); ok("RELOAD: the section ran to the end", true); }
+  catch (e) { ok("RELOAD: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
   try { await gateArrivalsDom(); ok("GATE DOM: the section ran to the end", true); }
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }

@@ -1869,6 +1869,53 @@ ok("11 Oct: a bar card never shrinks below its figure; the What's moving figures
   && /\.kpi-chip \.chip-n\{[^}]*white-space:normal;/.test(html) && !/\.kpi-chip \.chip-n\{[^}]*white-space:nowrap/.test(html));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
+// ---- 11 Oct 2026 — the guide update: the map tour's stale text -------------------------------------
+// The bar's Material a day card is hidden in the vehicles unit the map paints in (CONFIG.FORECAST_UNIT), and on a
+// British tenant a route condition is a planned closure, not a mass limit. Source-level only.
+{
+  const gsM = (code.match(/const MAP_GUIDE_STEPS = \[([\s\S]*?)\n\s*\];/) || ["", ""])[1];
+  ok("guide update: the bar step names what the bar shows (no material card in a vehicles unit)",
+     gsM.includes('body: "shows the month in view: two-way movements a day, vehicles needed, routes in use and CO₂e." }')
+     && !/movements, vehicles, material, routes/.test(gsM));
+  ok("...the Conditions step says it appears with the timeline and names a closure, not only a mass limit",
+     gsM.includes("appears while the timeline is open") && gsM.includes("a road closure or limit on a route")
+     && !/a route over a mass limit/.test(gsM));
+}
+
+// ---- 11 Oct 2026 — three public-map bugs found by the guide's dry run (claude/map-popup-layers) ------
+// (1) a package with no underlay (the demo) has no underlay key, and iptCheckboxId(null) threw: the
+// alignment click opened no popup, and ticking the alignment back on left its band legend hidden.
+// (2)/(3) the zone and closure layers deferred to map.once('style.load') while tiles were loading,
+// i.e. to an event that had already fired, so they were never added. Checked in a real browser on
+// 11 Oct (Playwright, 3 loads, demo tenant); these assertions are source-level only.
+{
+  ok("map bugs: iptCheckboxId is never handed underlayKey() directly (it is null with no underlay)",
+     !/iptCheckboxId\(\s*underlayKey\(\)\s*\)/.test(code));
+  const args = [...code.matchAll(/iptCheckboxId\(([^)]*)\)/g)].map(x => x[1].trim());
+  ok("...every argument it is handed is a legend row's band, or the underlay key behind a null guard",
+     args.length >= 4 && args.every(a => a === "ipt" || a === "r.ipt" || a === "uk"),
+     JSON.stringify(args));
+  const ukCalls = code.split("\n").filter(l => l.includes("iptCheckboxId(uk)"));
+  ok("...and every underlay-key call is guarded on the same line (uk ? ... : null)",
+     ukCalls.length === 2 && ukCalls.every(l => /\buk \? document\.getElementById\(iptCheckboxId\(uk\)\) : null;/.test(l)),
+     JSON.stringify(ukCalls));
+  ok("...the alignment popup's underlay note needs an underlay to exist, not just a missing checkbox",
+     code.includes("const undOn = !!uk && (!undBox || undBox.checked) &&"));
+  ok("map bugs: nothing defers to map.once('style.load') (it has usually already fired)",
+     !/\.once\(\s*['"]style\.load['"]/.test(code));
+  ok("...the zone layers wait for idle", code.includes("if (!map.isStyleLoaded()) { map.once('idle', ensureZoneLayers); return; }")
+     && !code.includes("map.once('style.load', ensureZoneLayers)"));
+  ok("...the restriction (closure) layers wait for idle",
+     code.includes("if(!map.isStyleLoaded()){ map.once('idle', ensureRestrictionLayers); return; }")
+     && !code.includes("map.once('style.load', ensureRestrictionLayers)"));
+  const defers = [...code.matchAll(/if\s*\(\s*!map\.isStyleLoaded\(\)\s*\)\s*\{\s*map\.once\(\s*'([^']+)'/g)].map(x => x[1]);
+  ok("...and every isStyleLoaded() deferral in the file waits for 'idle'",
+     defers.length >= 2 && defers.every(e => e === "idle"), JSON.stringify(defers));
+  ok("...the style.load handler still re-adds both on a basemap switch",
+     code.includes("if (ZONES.loaded) ensureZoneLayers(); else loadZones();")
+     && code.includes("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();"));
+}
+
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 console.log(`\n${pass} passed, ${fail.length} failed`);

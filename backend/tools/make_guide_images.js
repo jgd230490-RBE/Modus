@@ -13,10 +13,17 @@
  * is an edit to this file, not to a picture.
  *
  * PLACEHOLDERS (S01–S15, M01–M08 except M04) stand where the guide's screenshots go.
- * Each says, on the image itself, that it is NOT a capture and how to make the real one:
- * import the demo package on a deployment, bake the network, then run
- * backend/tools/capture_guide.js. A placeholder that looked like a screenshot would be a
- * false caption — the previous guide had exactly that bug inside its PNGs.
+ * Each says, on the image itself, that it is NOT a capture. A placeholder that looked like a
+ * screenshot would be a false caption — the previous guide had exactly that bug inside its PNGs.
+ * The real screens come from backend/tools/capture_guide.js (import the demo package on a
+ * deployment, bake the network, then run it); the second field of each HOLDERS entry says what
+ * to capture.
+ *
+ * 11 Oct 2026 (guide v2.1): each placeholder's title IS its figure caption in
+ * frontend/help/index.html (test_help.py asserts they match), so the picture a reader sees
+ * first cannot contradict the text under it. The developer instructions (file paths, the
+ * capture script) are no longer printed on the images: staff and demo visitors read them.
+ * The figures say lorry / HGV, never truck (UK house style).
  */
 const fs = require("fs");
 const path = require("path");
@@ -56,24 +63,24 @@ function page(title, inner, extraCss = "") {
 <body><h1>${title}</h1>${inner}</body></html>`;
 }
 
-// ---- figure 1: from a typed quantity to trucks on the road ---------------------------
+// ---- figure 1: from a typed quantity to lorries on the road ---------------------------
 function figNumbers() {
   const steps = [
     ["Quantity", "what you typed:<br>m³, tonnes or vehicles<br>per month", ""],
     ["Tonnes", "m³ × density of the<br>material category<br><span class=muted>(Config › Materials)</span>", ""],
     ["Trips", "tonnes ÷ payload of<br>the vehicle<br><span class=muted>(Config › Vehicles)</span>", ""],
     ["Trips per day", "÷ working days (22 per month), or week ÷ 5 on the Look-ahead", ""],
-    ["Vehicles", "trips per day ÷ what one truck can do in a 10 h shift on that route's baked cycle", "accent"],
+    ["Vehicles", "trips per day ÷ what one lorry can do in a 10 h shift on that route's baked cycle", "accent"],
     ["km · t·km · CO₂e · cost", "trips × routed km; tonnes × km basis; km × kg CO₂e/km; typed route rates", "ok"],
   ];
   const boxes = steps.map(([h, p, cls], i) =>
     `<div class="card ${cls}" style="flex:1;text-align:center"><h3>${h}</h3><p>${p}</p></div>` +
     (i < steps.length - 1 ? `<div class="arrow">›</div>` : "")).join("");
-  return page("From a forecast to trucks on the road — how each number is derived",
+  return page("From a typed quantity to lorries on the road — how each number is derived",
     `<div class="row">${boxes}</div>
      <div class="card warn" style="margin-top:26px">
        <h3>What this means when you read a figure</h3>
-       <p>Payloads are planning figures, not weighbridge values. Distances and drive times come from truck routing for that
+       <p>Payloads are planning figures, not weighbridge values. Distances and drive times come from HGV routing for that
        vehicle, both legs; the cycle includes load, unload and gate induction minutes. A route not baked for the vehicle
        shows “not baked” or “—”, never an estimate. Carbon uses the emission factor per vehicle type in Config; treat it as a
        planning figure. Money is in your organisation's currency — no exchange rate is ever applied.</p>
@@ -91,17 +98,18 @@ function figAppMap() {
   return page("The staff app — pages in the left rail",
     `<div class="row">
       ${col("Plan", "all roles", [
-        ["Dashboard", "KPIs, charts, per-route table, stockpile capacity by week"],
+        ["Dashboard", "six cards, the carbon target, charts, stockpile capacity by week"],
         ["Submit forecast", "one line: route, discipline, work section, material, vehicle, unit, months"],
-        ["Forecasts", "every line you may see; approve / reject / edit / withdraw; CSV"]])}
+        ["Forecasts", "every line you may see; approve / reject / edit / withdraw; CSV"],
+        ["Carbon planner", "the approved plan's carbon, decisions that lower it, the carbon target"]])}
       ${col("Track", "all roles — filtered per team on the server", [
         ["Look-ahead", "Account (last week) · Commit (this / next week) · Horizon"]])}
       ${col("Data", "planners and admins only", [
         ["Locations", "sites, gates, stockpile capacity"],
         ["Routes", "bake per vehicle, alternatives, planning rates, road-restriction check where connected"],
         ["Zones", "disruption zones and temporary haul roads"],
-        ["Config", "vehicles, materials, planning constants, seasonal windows, organisation settings"]], "accent")}
-      ${col("Map", "all roles", [["Route map", "the corridor map inside the app"]])}
+        ["Config", "vehicles, materials, planning, costing and fuel, seasonal windows, everything else"]], "accent")}
+      ${col("Map", "all roles", [["Route map", "the public map inside the app"]])}
     </div>
     <p class="muted" style="margin-top:20px;font-style:italic;font-size:18px">Sign-in: name + access code. The rail remembers the last page; a page the role cannot see falls back to the Dashboard.</p>`,
     `.item{background:#fff;border:1.5px solid ${T.line};border-radius:10px;padding:12px 16px;margin-bottom:12px}
@@ -114,9 +122,9 @@ function figHaulCycle() {
     `<div class="row" style="align-items:center;gap:0">
        <div class="card ok" style="width:380px;text-align:center"><h3>Origin</h3><p>quarry / port / railhead<br>exit gate (or default gate,<br>or the site marker)</p></div>
        <div style="flex:1;padding:0 18px">
-         <div class="leg"><span class="lab">LADEN leg — truck routing at gross weight → distance, drive time</span><div class="bar laden"></div></div>
+         <div class="leg"><span class="lab">LADEN leg — HGV routing at gross weight → distance, drive time</span><div class="bar laden"></div></div>
          <p class="muted" style="text-align:center;font-style:italic;margin:14px 0">both legs stored per vehicle profile (alternative 0 = primary)</p>
-         <div class="leg"><div class="bar empty"></div><span class="lab">RETURN leg — routed separately at empty weight → may use roads the laden truck cannot</span></div>
+         <div class="leg"><div class="bar empty"></div><span class="lab">RETURN leg — routed separately at empty weight → may use roads the laden lorry cannot</span></div>
        </div>
        <div class="card accent" style="width:380px;text-align:center"><h3>Destination</h3><p>site / stockpile / compound<br>entry gate<br>induction minutes here</p></div>
      </div>
@@ -162,7 +170,7 @@ function figRhythm() {
      </div>
      <div class="card" style="margin-top:22px"><h3>Horizon</h3>
        <p>Week totals for this month and next — 4 or 5 columns per month, each headed with its Monday–Sunday dates; the commit week is highlighted. Nothing is confirmed here.<br>
-       The Dashboard's Stockpile capacity panel reads the balances you typed on Account; the route map shows the same month's traffic.</p></div>`);
+       The Dashboard's Stockpile capacity section reads the balances you typed on Account; the public map shows the same month's traffic.</p></div>`);
 }
 
 // ---- figure 8: calendar weeks --------------------------------------------------------------
@@ -190,7 +198,7 @@ function figWeeks() {
      <p style="text-align:center;margin:10px 0 0 -300px;color:${T.clash};font-style:italic;font-size:18px">Thursday decides the month (ISO 8601)</p>
      <div class="card" style="margin-top:20px;background:#fff;border-color:${T.ink}"><h3>Rules</h3>
        <p>A week is Monday–Sunday and belongs to the month that holds its Thursday. A month has 4 or 5 weeks (September 2026: 4; October and December 2026: 5).<br>
-       The approved month quantity splits equally over its weeks (÷ 4 or ÷ 5); each week splits equally over Monday–Friday; Saturday and Sunday default to 0.<br>
+       The approved month quantity splits equally over its weeks (÷ 4 or ÷ 5); each week splits equally over Monday–Friday; Saturday and Sunday are held at 0.<br>
        Derived weeks and days refresh when the parent changes; anything typed (edited) or confirmed holds and is flagged instead. “Today” is Thu 10 Sep in this picture.</p></div>`,
     `.grid{display:grid;grid-template-columns:150px repeat(7,165px) 1fr;gap:10px;align-items:center}
      .hd{text-align:center;font-weight:700;color:${T.muted};font-size:19px}.hd.thu{color:${T.clash}}
@@ -204,31 +212,32 @@ function figWeeks() {
 
 // ---- placeholders ----------------------------------------------------------------------
 const HOLDERS = {
+  // [the figure caption in frontend/help/index.html, word for word; what to capture; the chrome drawn]
   S01: ["The sign-in screen", "the site address, before signing in", "app"],
-  S02: ["The Dashboard — KPI tiles and charts", "Dashboard, Approved, the demo's four months", "app"],
-  S03: ["The Stockpile capacity panel on the Dashboard", "Dashboard, scrolled to Stockpile capacity", "app"],
+  S02: ["The Dashboard — the six cards, the carbon target and the charts", "Dashboard, Approved, the demo's four months", "app"],
+  S03: ["The Stockpile capacity section on the Dashboard", "Dashboard, Stockpile capacity opened", "app"],
   S04: ["Submit forecast — one line across a year, with the totals strip", "Submit forecast, a demo route picked", "app"],
-  S05: ["Forecasts — the ledger with status chips and actions (planner view)", "Forecasts, as the planner", "app"],
+  S05: ["Forecasts — the list with its filters, cost and status (planner view)", "Forecasts, as the planner", "app"],
   S06: ["Commit view — KPI strip, clash rail and the Monday–Friday grid", "Look-ahead › Commit", "app"],
   S07: ["A row expanded, and the map of this week's lines under the grid", "Look-ahead › Commit, first row expanded", "app"],
   S08: ["Account view — planned, actual, variance, cost, and the Stockpiles block", "Look-ahead › Account", "app"],
   S09: ["Horizon — week totals for this month and next", "Look-ahead › Horizon", "app"],
   S10: ["The Confirm week dialog", "Look-ahead › Commit next week › Confirm week", "app"],
-  S11: ["Locations — the map and the edit form with gates and stockpile capacity", "Locations, a stockpile selected", "app"],
-  S12: ["Routes — a route expanded: bake status, analysis, alternatives, vehicles, planning block", "Routes, a baked route expanded", "app"],
+  S11: ["Locations — the map and the edit form with gates and stock held", "Locations, a stockpile selected", "app"],
+  S12: ["Routes — a route expanded: bake status, analysis, alternatives, planning block", "Routes, a baked route expanded", "app"],
   S13: ["Zones — a disruption zone and a haul road with speed and mode", "Zones, the demo haul road selected", "app"],
-  S14: ["Config — the Vehicles tab", "Config › Vehicles", "app"],
+  S14: ["Configuration — the Vehicles section", "Configuration › Vehicles", "app"],
   S15: ["The supplier PDF — one row per line, Monday to Friday, coordinates, route map", "Look-ahead › PDF, first page", "pdf"],
-  M01: ["The route map — corridor view with the control panel open", "/map/, corridor zoom", "map"],
+  M01: ["The public map with the Control Panel open", "/map/, corridor zoom", "map"],
   M02: ["The alignment popup — team, work section and chainage", "/map/, a band clicked", "map"],
   M03: ["Sites and assets — the stockpile gauge and its popup", "/map/, a stockpile clicked", "map"],
-  M05: ["A road restriction and its verdict for the vehicle", "/map/ on a tenant with a restriction provider", "map"],
-  M06: ["The timeline playing — the KPI panel, callouts and in-use marks", "/map/, timeline on October", "map"],
+  M05: ["A road closure or restriction and its popup", "/map/ with a road-restriction provider connected, a closure clicked", "map"],
+  M06: ["Playing the months — the figures bar, What's moving and Conditions", "/map/, timeline on October", "map"],
   M07: ["The satellite basemap under routes and alignment", "/map/, Basemap › Satellite", "map"],
-  M08: ["Street View from a site popup", "/map/, a quarry clicked, Street View", "map"],
+  M08: ["A site popup with its Street View picture", "/map/, a quarry clicked", "map"],
 };
 
-function holder(code, [caption, where, kind]) {
+function holder(code, [caption, , kind]) {
   const chrome = kind === "app"
     ? `<div class="hdr"><span class="brand">Wayscope</span><span class="pill"></span><span class="pill"></span></div>
        <div class="rail">${"<i></i>".repeat(9)}</div>`
@@ -262,9 +271,7 @@ function holder(code, [caption, where, kind]) {
   <div class="card">
     <span class="tag">Placeholder — not a screenshot</span>
     <h2>${caption}</h2>
-    <p><b>Capture:</b> ${where}.</p>
-    <p>Import <code>demo/uk-corridor.package.json</code> on a deployment, bake the network, then run
-       <code>backend/tools/capture_guide.js</code> — it replaces this file with the real screen.</p>
+    <p>A picture of the screen itself will replace this one. The guide's text describes the screen as it is now.</p>
   </div>
   <div class="id">${code}.png</div>
   </body></html>`;

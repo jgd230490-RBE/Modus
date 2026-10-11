@@ -89,6 +89,12 @@ try {
   ok("the whole script block evaluates", false, e.message);
 }
 
+// 11 Oct 2026: day of the week of an ISO date (0 Sunday … 6 Saturday), for the week fixtures' "today"
+const isoDow = (iso) => new Date(iso + "T00:00:00Z").getUTCDay();
+const weekdayInWeek = (fx) => !!(fx && fx.today && fx.commit_week && fx.commit_week.from <= fx.today
+  && fx.today <= fx.commit_week.to && isoDow(fx.today) >= 1 && isoDow(fx.today) <= 5);
+const TODAY_HEADER = /(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+ · today/;
+
 // ---- the fixture ---------------------------------------------------------------
 // Deliberately minimal and deliberately EMPTY of routes: a first-boot database is the
 // state most likely to throw, and it is the state a new empty-state branch is written
@@ -349,6 +355,11 @@ if (loaded) {
     const wkPath = path.join(__dirname, "fixtures", "lookahead_page_fuel.json");
     const wk = fs.existsSync(wkPath) ? JSON.parse(fs.readFileSync(wkPath, "utf8")) : null;
     if (wk) {
+      // 2026-10-11 (a Sunday): written on a weekend with the clock's date, this fixture's today had no
+      // planned line and the check below failed on correct output. test_costing.py now pins today to a
+      // weekday of the commit week (portable.fixture_today); this says so first, so a lost pin reads as itself.
+      ok(`the week fixture's today (${wk.today}) is a weekday inside its commit week (pinned by test_costing.py on a weekend)`,
+        weekdayInWeek(wk), `week ${(wk.commit_week || {}).from}..${(wk.commit_week || {}).to}`);
       const wOut = render("the Dashboard renders POPULATED with the week too (initialWeek)", h(Dashboard, { meta: dMeta, initialData: cl, initialWeek: wk }));
       const todayRows = [];
       wk.commit.lines.forEach(l => (l.days || []).forEach(d => { if (d.day_date === wk.today && ((d.planned_qty || 0) > 0 || d.actual_qty != null)) todayRows.push({ l, d }); }));
@@ -364,6 +375,17 @@ if (loaded) {
       ok("...the map card carries the Look-ahead's CommitMap with the Dashboard's title, and no € anywhere in the Today strip",
         wOut.includes("This week&#x27;s lines on the map") && !/€/.test(wOut.slice(wOut.indexOf("Today · "), wOut.indexOf("Delivered to date"))));
       ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(wOut));
+      ok("...and a weekday's strip never says \"nothing planned today\"", !wOut.includes("nothing planned today"));
+      // 2026-10-11: the weekend, rendered on purpose every day rather than only when the harness happens
+      // to run on one: the same week with the server's today on its Sunday (the week's days already carry
+      // Sat and Sun at 0 planned). Today has no line; the week's figures are still there.
+      const sun = (wk.commit_week || {}).to;
+      const sunRows = wk.commit.lines.reduce((n, l) => n + (l.days || []).filter(d => d.day_date === sun && ((d.planned_qty || 0) > 0 || d.actual_qty != null)).length, 0);
+      const sOut = render("the Dashboard renders the same week on its Sunday (a weekend today)", h(Dashboard, { meta: dMeta, initialData: cl, initialWeek: { ...wk, today: sun } }));
+      ok(`...on Sunday (${sun}) today lists no line: tonnes, trips, vehicles and reported read —, the strip says "nothing planned today", the week's figures stay`,
+        isoDow(sun) === 0 && sunRows === 0 && sOut.includes("Today · Sunday") && sOut.includes("nothing planned today")
+        && (sOut.match(/kpi-num[^>]*>—</g) || []).length >= 4 && sOut.includes("This week to date") && sOut.includes("trips planned this week")
+        && !/undefined|NaN/.test(sOut), `${sunRows} rows on ${sun}`);
     }
     // Approved-only default: the Pending IPT2 line is not in the default view
     ok("...the default view is Approved only (the Pending line is filtered out; the status select says so)",
@@ -670,6 +692,11 @@ if (loaded) {
   const fixture = fs.existsSync(fixPath) ? JSON.parse(fs.readFileSync(fixPath, "utf8")) : null;
   const laMeta = { ...meta, months: { start_year: 2026, count: 60 } };
   if (fixture) {
+    // 2026-10-11 (a Sunday): written on a weekend with the clock's date, today was no printed column and
+    // the "day headers name today" check below failed on correct output. test_lookahead.py now pins today
+    // to a weekday of the commit week (portable.fixture_today); this says so first.
+    ok(`the Look-ahead page fixture's today (${fixture.today}) is a weekday inside its commit week (pinned by test_lookahead.py on a weekend)`,
+      weekdayInWeek(fixture), `week ${(fixture.commit_week || {}).from}..${(fixture.commit_week || {}).to}`);
     const commitOut = render("the Commit view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "commit" }));
     ok("...with the KPI strip, the clash rail and one row per line",
@@ -681,6 +708,14 @@ if (loaded) {
       commitOut.includes("· today") && !commitOut.includes("0 default")
       && (commitOut.match(/<th class="num"[^>]*><span[^>]*>(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+/g) || []).length === 5
       && commitOut.includes("Planned quantity by day"));
+    // 2026-10-11: the weekend, rendered on purpose: the same page with the server's today on the week's
+    // Sunday. No header says today, and the five Mon–Fri columns and one row per line stay.
+    const sunOut = render("the Commit view renders the same week on its Sunday (a weekend today)",
+      h(LookAhead, { meta: laMeta, who: "t", initialPage: { ...fixture, today: (fixture.commit_week || {}).to }, initialView: "commit" }));
+    ok("...on a weekend no day header says today, and there are still exactly five day columns (Mon–Fri) and one row per line",
+      isoDow((fixture.commit_week || {}).to) === 0 && TODAY_HEADER.test(commitOut) && !TODAY_HEADER.test(sunOut)
+      && (sunOut.match(/<th class="num"[^>]*><span[^>]*>(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+/g) || []).length === 5
+      && (sunOut.match(/▶/g) || []).length === fixture.commit.lines.length && !/undefined|NaN/.test(sunOut));
     ok("...every weekday cell carries trips and vehicles (baked fixture)",
       (commitOut.match(/ tr · /g) || []).length >= fixture.commit.lines.length * 5);
     ok("...no stock card on Commit any more (10 Sep) — and no map either under the render harness (initialPage)",
