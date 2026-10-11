@@ -41,7 +41,7 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__TENANT = TENANT; window.__ACCESS = ACCESS;");   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
+w.eval(js + "\nwindow.__T = THEME; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
@@ -83,6 +83,38 @@ let seen = [];
 w.__T.subs.add((n) => seen.push(n));
 act(() => { w.applyTheme("dark"); w.applyTheme("light"); });
 ok("APPEARANCE: subscribers (the charts) hear every change in order", seen.join("|") === "dark|light");
+
+// ---- 3b. the vehicle-name buttons (11 Oct 2026, the EU type-approval vehicles removed) ------------------
+// /api/meta's vehicle_labels.langs is what the server OFFERS: English, plus any label language a vehicle the
+// tenant is offered still carries. The seed and the GB demo carry English alone; a document saved before
+// 11 Oct with the EU entries still carries 'eu'. The header draws buttons only when there is a choice, and
+// the country rules (G2/H1) still apply on top. NOT covered: the md: breakpoint that hides them on a phone.
+function headerWith(langs, country, lang){
+  w.__VEH.langs = langs; w.__TENANT.country = country; w.__VEH.lang = lang || "en";
+  const box = w.document.createElement("div"); w.document.body.appendChild(box);
+  const root = w.ReactDOM.createRoot(box);
+  act(() => { root.render(w.React.createElement(w.Header, { view: "portal", role: { label: "Planner", ipt: null }, setView(){}, signOut(){}, vehLang: lang || "en", setVehLang(){} })); });
+  const names = [...box.querySelectorAll("header .hdr-seg button")].map(b => b.textContent.trim());
+  const on = [...box.querySelectorAll("header .hdr-seg button.is-on")].map(b => b.textContent.trim());
+  const seg = !!box.querySelector("header .hdr-seg");
+  act(() => { root.unmount(); }); box.remove();
+  return { names, on, seg };
+}
+const vh1 = headerWith(["en"], "GB");
+ok("VEHICLE NAMES: English alone offered (the seed, the GB demo) → no buttons at all in the header (it showed a lone English)",
+   vh1.names.length === 0 && !vh1.seg, JSON.stringify(vh1));
+const vh2 = headerWith(["en", "eu"], null);
+ok("VEHICLE NAMES: a document still carrying the EU entries, no country set → English and European, English lit (the new default)",
+   vh2.names.join("|") === "English|European" && vh2.on.join("|") === "English", JSON.stringify(vh2));
+const vh3 = headerWith(["en", "eu"], "GB");
+ok("VEHICLE NAMES: ...the same offer to a GB tenant still shows no European button (H1), so no buttons at all",
+   vh3.names.length === 0 && !vh3.seg, JSON.stringify(vh3));
+const vh4 = headerWith(["en", "eu", "ee"], "EE", "ee");
+ok("VEHICLE NAMES: an Estonian tenant whose vehicles carry Estonian names gets all three, its stored choice lit (G2)",
+   vh4.names.join("|") === "English|European|Estonian" && vh4.on.join("|") === "Estonian", JSON.stringify(vh4));
+const vh5 = headerWith(["en", "ee"], "GB");
+ok("VEHICLE NAMES: an Estonian label offered to a non-Estonian tenant is still not shown (G2)", vh5.names.length === 0, JSON.stringify(vh5));
+w.__VEH.langs = ["en"]; w.__TENANT.country = null; w.__VEH.lang = "en";
 
 // ---- 4. the carbon target in a real DOM (11 Oct 2026) ---------------------------------------
 // What the static harnesses cannot see: the reads themselves, a failed read, the buttons' clicks,
@@ -257,7 +289,9 @@ const N = "Fictional demo scheme · nothing here is real";
 const META = { routes: [], materials: ["Aggregate"], vehicles: ["Artic Tipper (44t)"], units: ["m3", "t", "vehicles"],
   months: { start_year: 2026, count: 60 }, factors: { material_density_t_per_m3: {}, vehicle_payload_t: {},
   vehicle_emissions_kg_co2e_per_km: {}, planning: { working_days_per_month: 21 } }, mapbox_token: "",
-  vehicle_labels: { labels: {}, fallbacks: {}, langs: ["en", "eu", "ee"] }, disciplines: [], sections: [], ipts: [],
+  // NARROWED 11 Oct 2026 (EU vehicles removed): the server now sends the languages it OFFERS — English alone for the
+  // GB demo (it sent every slot, ["en", "eu", "ee"], and the client gated them by country)
+  vehicle_labels: { labels: {}, fallbacks: {}, langs: ["en"] }, disciplines: [], sections: [], ipts: [],
   tenant: { name: "Wolds Link", team_label: "Team", currency: "GBP", currency_symbol: "£", country: "GB", distance_unit: "mi", demo_notice: N } };
 const PLANNER = { role: "planner", label: "Planner", ipt: null, can_approve: true, ipt_locked: false, ipt_required: true, demo: true, ipts: [] };
 const respond = (data) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
@@ -273,7 +307,10 @@ async function demoBar(){
     await tick(); await tick();
     return { box, root };
   };
+  w.__VEH.lang = "eu";      // 11 Oct 2026: a visitor whose browser stored "eu" before the EU vehicles left
   const { box, root } = await mount();
+  ok("VEHICLE NAMES: a stored 'eu' the GB demo is not offered falls back to English once /api/meta answers (it was set back to 'eu')",
+     w.__VEH.lang === "en" && w.__VEH.langs.join("|") === "en");
   const bar = () => box.querySelector(".demo-bar");
   const guideBtn = () => box.querySelector(".demo-bar-guide");
   const order = () => { const kids = [...box.firstElementChild.children].map(e => e.tagName.toLowerCase() + (e.classList.contains("demo-bar") ? ".demo-bar" : "")); return kids.join(">"); };

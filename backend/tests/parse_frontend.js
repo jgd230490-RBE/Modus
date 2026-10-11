@@ -160,7 +160,8 @@ ok("my-submissions groups per line, across every year the line covers",
 ok("edit carries the line keys back into the matrix",
   code.includes("editTarget.discipline") && code.includes("editTarget.sectionId"));
 
-// ---- 4b. Task A — the four planning vehicles lead the picker -------------------
+// ---- 4b. Task A — the planning vehicles lead the picker --------------------------
+// (the four EU-named ones until 11 Oct 2026; the tenant's own lead list since — UK trade names in the seed)
 ok("the matrix reads planning_vehicles off /api/meta",
   code.includes("planning_vehicles"));
 ok("...and defaults it to [] so an older meta payload still renders one flat list",
@@ -180,16 +181,26 @@ ok("...and the currently-selected vehicle is never disabled",
   /disabled=\{!fits && v !== current\}/.test(code));
 
 // ---- 4b2. 2026-09-02 — one vehicle, three labels -------------------------------
+// NARROWED 11 Oct 2026 (EU vehicles removed): VEH_LANGS still NAMES the three label slots (a document saved
+// before then carries labels.eu and keeps that option), but which are OFFERED is the server's list, VEH.langs.
 ok("there is a label language toggle with exactly EN / EU / EE",
   /const VEH_LANGS = \[\["en", "English"\], \["eu", "European"\], \["ee", "Estonian"\]\]/.test(code));
-ok("the default is European", /const VEH = \{ lang: "eu"/.test(code));
+// REVERSED 11 Oct 2026 (EU vehicles removed): the default is English (it was European), and the offered list
+// starts as English alone until /api/meta answers.
+ok("the default is English, offering English alone until /api/meta answers",
+  /const VEH = \{ lang: "en", langs: \["en"\], labels: \{\}, fallbacks: \{\} \};/.test(code) && !/const VEH = \{ lang: "eu"/.test(code));
+ok("11 Oct 2026: the offered languages come off /api/meta (vehicle_labels.langs), English if it sends none",
+  code.includes('VEH.langs = (Array.isArray(vl.langs) && vl.langs.length) ? vl.langs : ["en"];'));
 ok("labels come off /api/meta, not a second list in the client",
   code.includes("m.vehicle_labels") && code.includes("VEH.labels = vl.labels"));
 // ⭐ THE INVARIANT. The <option value> is the canonical id; only the text changes.
 ok("⭐ the picker's option VALUE is the canonical id, the text is the label",
   /<option key=\{v\} value=\{v\} disabled=[\s\S]{0,160}\{vehLabel\(v\)\}/.test(code));
+// NARROWED 11 Oct 2026 (EU vehicles removed): English is the default, and an id IS a name in English (and in the
+// European slot, as before), so only another language's fallback is starred — no star under English now.
 ok("a fallback slot is marked, not passed off as a translation",
-  /vehIsFallback\(v\) && VEH\.lang !== "eu" \? " \*"/.test(code));
+  /vehIsFallback\(v\) && !\["en", "eu"\]\.includes\(VEH\.lang\) \? " \*"/.test(code)
+  && !/vehIsFallback\(v\) && VEH\.lang !== "eu" \? " \*"/.test(code));
 ok("vehLabel falls back to the id itself", /\|\| v \|\| ""/.test(code));
 ok("the save still posts the stored id", code.includes("vehicle_type: vehicle,"));
 ok("tables show the label with the stored id in the title",
@@ -197,11 +208,34 @@ ok("tables show the label with the stored id in the title",
 // NARROWED (G2): the header still carries the control, but offers the local-language
 // option only to a tenant whose country it is local to.
 ok("the header carries the control", /VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.map\(\(\[k, l\]\) =>/.test(code));
+// 11 Oct 2026: ...but only when there is a CHOICE — one offered language draws no buttons (the GB demo showed a
+// lone "English" button until then)
+ok("11 Oct 2026: the header draws the vehicle-name buttons only when more than one language is shown",
+  /\{VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.length > 1 && \(\s*<span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg/.test(code));
 // NARROWED (H1, 29 Sep): EN always; EE only for an Estonian tenant; EU for everyone EXCEPT a
 // British tenant, whose EU-named vehicles are hidden, so the option would label nothing.
-ok("G2/H1: the Estonian label option is shown to an Estonian tenant only, the EU option not to a British one, and a stored 'ee' falls back to EU elsewhere",
-  /const vehLangShown = \(k\) => k === "en"\s*\|\| \(k === "ee" && String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) === "EE"\)\s*\|\| \(k === "eu" && String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) !== "GB"\);/.test(code)
-  && /if\(!vehLangShown\(VEH\.lang\)\)\{ VEH\.lang = "eu"; setVehLangState\("eu"\); \}/.test(code));
+// NARROWED 11 Oct 2026 (EU vehicles removed): both country rules stand, AND a language is shown only when the
+// server offers it (a vehicle the tenant is offered carries it). REVERSED in its second half: a stored or default
+// language that is not shown falls back to ENGLISH (it fell back to "eu", which GB is not shown either).
+ok("G2/H1: the Estonian label option is shown to an Estonian tenant only, the EU option not to a British one, each only when offered, and a stored language not shown falls back to English",
+  /const vehLangShown = \(k\) => k === "en" \|\| \(\(VEH\.langs \|\| \[\]\)\.includes\(k\) && \(\s*\(k === "ee" && String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) === "EE"\)\s*\|\| \(k === "eu" && String\(TENANT\.country \|\| ""\)\.toUpperCase\(\) !== "GB"\)\)\);/.test(code)
+  && /if\(!vehLangShown\(VEH\.lang\)\)\{ VEH\.lang = "en"; setVehLangState\("en"\); \}/.test(code)
+  && !/VEH\.lang = "eu"; setVehLangState\("eu"\)/.test(code));
+// 11 Oct 2026: the fallback runs whether or not /api/meta sent a tenant block (it sat inside `if(tn)` until then)
+ok("11 Oct 2026: the English fallback sits after the tenant block, not inside it",
+  /catch\(e\)\{\} \}\n\s*\/\/ 11 Oct 2026: a stored or default label language[^\n]*\n[^\n]*\n\s*if\(!vehLangShown\(VEH\.lang\)\)\{ VEH\.lang = "en"/.test(src));
+// 11 Oct 2026 (EU vehicles removed): the Config page's Planning tick keeps the list's ORDER (its first name is
+// the payload fallback) and appends a newly ticked vehicle; it rebuilt the list in file order until then
+ok("11 Oct 2026: Config → Vehicles' Planning tick keeps the planning list's order and appends a new tick",
+  code.includes("const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith(\"_\") && d.vehicles[x].planning_vehicle && !kept.includes(x))];")
+  && !code.includes("d.planning_vehicles = Object.keys(d.vehicles).filter("));
+ok("11 Oct 2026: Config → Vehicles' Estonian column (shown only when offered) shows the id as its placeholder, not 'falls back to EU'",
+  !src.includes('placeholder="falls back to EU"') && code.includes('value={lab.ee || ""} placeholder={k}'));
+// 11 Oct 2026: ⭐ the four EU type-approval vehicles are gone from the app's source — no name, no code, no 'aliases'
+// note (only those entries carried aliases), and no comment that describes them as present
+ok("11 Oct 2026: ⭐ the staff app names none of the four EU type-approval vehicles or their codes",
+  !["N3 lorry", "N3 tractor", "TPMLM", "O4 semi", "O4 tipping", "V07", "V10", "V11", "V12", "EU-named", "EU N-category", "four EU"].some(t => src.includes(t))
+  && !src.includes("Routing dimensions and aliases"), ["N3 lorry", "V07", "V12", "EU-named", "EU N-category", "four EU"].filter(t => src.includes(t)).join(", "));
 ok("H1: the pickers hide the tenant's hidden vehicles (its country's set) but keep a current value visible",
   /const HIDDEN_VEHICLES = \[\];/.test(code) && /const vehShown = \(v, keep\) => !HIDDEN_VEHICLES\.includes\(v\) \|\| v === keep;/.test(code)
   && /HIDDEN_VEHICLES\.length = 0; \(m && m\.hidden_vehicles \|\| \[\]\)\.forEach\(v => HIDDEN_VEHICLES\.push\(v\)\);/.test(code)

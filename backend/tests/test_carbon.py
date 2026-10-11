@@ -267,8 +267,10 @@ ok("the rigid >17 t and artic >33 t figures are unchanged (0.99773 / 0.93939)",
 EF, FLB = "Artic Flatbed (44t) — electric", "Artic Flatbed (44t)"
 # NARROWED (10 Oct 2026, review): a third electric variant, for the artic flatbed — the demo's
 # steel, precast and general lines run on it and could not switch to electric without one
-ok("⭐ fuel on every profile: diesel on all twelve existing, electric on the three new haulage variants",
+# NARROWED 11 Oct 2026 (EU vehicles removed): eight diesel entries now (the four EU type-approval ones left the seed)
+ok("⭐ fuel on every profile: diesel on all eight others, electric on the three new haulage variants",
    all(V[k]["fuel"] == "diesel" for k in V if not k.startswith("_") and k not in (EA, ER, EF))
+   and sum(1 for k in V if not k.startswith("_") and k not in (EA, ER, EF)) == 8
    and V[EA]["fuel"] == "electric" and V[ER]["fuel"] == "electric" and V[EF]["fuel"] == "electric"
    and V[EF]["geometry_twin"] == FLB and V[EF]["payload_t"] == V[FLB]["payload_t"] - 3.5 and V[EF]["scenario_only"] is True)
 ok("the electric variants are NEW keys beside the baked profiles (nothing renamed), scenario-only, twinned",

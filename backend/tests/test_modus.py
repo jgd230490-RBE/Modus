@@ -431,6 +431,40 @@ fac = json.loads([r for r in demo["tables"]["config"] if r["key"] == "factors"][
 ok("demo: GBP and GB", fac["tenant"]["currency"] == "GBP" and fac["tenant"]["country"] == "GB", str(fac["tenant"]))
 ok("demo: no thaw season, no seasonal restrictions",
    fac["fair_price"]["season"]["thaw_months"] == [] and fac["seasonal_restrictions"] == [])
+# 11 Oct 2026: the user removed the four EU type-approval vehicles from the product. Gone from the seed every new
+# organisation gets (backend/factors.json), from the demo package, and from the source a person reads. Test
+# fixtures and the tests themselves may still name them (a test rebuilds an old document on purpose), and so may
+# a LIVE document saved before then — the code keeps working with it (test_week1 A3), so no validator rule
+# refuses the names.
+_EU4 = ("N3 lorry (BA) 4-axle TPMLM 32 t tipper", "N3 lorry (BA) 4-axle mixer 32 t",
+        "N3 tractor (BC) + O4 semi (DA) GCW 40 t", "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t")
+_EU_TOKENS = ("N3 lorry", "N3 tractor", "TPMLM", "O4 semi", "O4 tipping")
+_seed_txt = read("backend/factors.json")
+_seed = json.loads(_seed_txt)
+_demo_txt = read("demo/uk-corridor.package.json")
+ok("11 Oct 2026: ⭐ factors.json (the seed) and the demo package name none of the four EU vehicles, in any form",
+   not any(t in _seed_txt or t in _demo_txt for t in _EU4 + _EU_TOKENS)
+   and not any(f'"{c}"' in _seed_txt or f'"{c}"' in _demo_txt for c in ("V07", "V10", "V11", "V12")))
+ok("11 Oct 2026: ...nor does any vehicle in either carry a code, an alias or an 'eu' / 'ee' label (only the four did)",
+   not any(isinstance(v, dict) and (v.get("code") or v.get("aliases") or {"eu", "ee"} & set(v.get("labels") or {}))
+           for doc in (_seed, fac) for v in doc["vehicles"].values()))
+_src_files = ["frontend/index.html", "frontend/help/index.html", "map/index.html", "README.md", "env.example"] + \
+    sorted("backend/" + f for f in os.listdir(os.path.join(ROOT, "backend")) if f.endswith(".py")) + \
+    sorted("backend/tools/" + f for f in os.listdir(os.path.join(ROOT, "backend", "tools")) if f.endswith((".py", ".js")))
+_hits = [f for f in _src_files if any(t in read(f) for t in _EU_TOKENS + ("V07", "V10", "V11", "V12"))]
+ok("11 Oct 2026: ⭐ no product source (the app, the guide, the map, the backend, the tools, README, env.example) names them or their codes",
+   not _hits, str(_hits))
+_lead = conversions.planning_vehicle_names(_seed)
+ok("11 Oct 2026: ⭐ the seed's lead list (every new organisation, every country without a vehicle set) is NOT empty, "
+   "holds no scenario-only or hidden profile, and every name in it is listed by a material category",
+   len(_lead) == 6 and _lead[0] == "Rigid 8-wheeler (32t)"
+   and not any(_seed["vehicles"][n].get("scenario_only") for n in _lead)
+   and set(_lead) <= {v for k, c in _seed["material_categories"].items() if not k.startswith("_") for v in c["vehicles"]}
+   and conversions.planning_vehicle_names(_seed, "EE") == _lead and conversions.planning_vehicle_names(_seed, "NO") == _lead, str(_lead))
+ok("11 Oct 2026: ...the language switch offers only languages a vehicle uses — English alone, for the seed and the demo",
+   conversions.vehicle_labels(_seed)["langs"] == ["en"] and conversions.vehicle_labels(fac)["langs"] == ["en"]
+   and all(any((v.get("labels") or {}).get(l) for v in d["vehicles"].values() if isinstance(v, dict))
+           for d in (_seed, fac) for l in conversions.vehicle_labels(d)["langs"]))
 cst = json.loads([r for r in demo["tables"]["config"] if r["key"] == "costing"][0]["value"])
 ok("demo: the fuel country is GB and a share is typed", cst["fuel"]["country"] == "GB" and cst["fuel"]["share_pct"] == 30.0, str(cst["fuel"]))
 ovl = json.loads([r for r in demo["tables"]["config"] if r["key"] == "overlay"][0]["value"])

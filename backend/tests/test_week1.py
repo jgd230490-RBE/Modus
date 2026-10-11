@@ -1,7 +1,9 @@
 """
 Week-1 backend assertions — the 2026-09-01 build list, Tasks A–E.
 
-  A   work_sections seeded (15 rows) + the four EU-named planning vehicles
+  A   work_sections seeded (15 rows) + the planning vehicles (the four EU-named ones until
+      11 Oct 2026; since then the six UK haulage trade names) — and A3, a document that
+      still carries the four EU entries keeps loading and working
   B   multi-year Submit Forecast — one bulk POST across two years
   C   forecast_weeks: materialise on approve, edit, confirm
   D   typed actuals, variance, calibrate
@@ -229,7 +231,7 @@ def seed_line(route_id="R1", disc="earthworks", sect="WS1", months=(1, 2, 3),
 
 
 # =========================================================================== #
-#  A. work_sections + the four planning vehicles                               #
+#  A. work_sections + the planning vehicles (UK trade names since 11 Oct 2026)  #
 # =========================================================================== #
 reset_db()
 taxonomy.seed_taxonomy(taxonomy.load_bundle(FIX_TAX))
@@ -241,7 +243,16 @@ ok("A: they reach /api/meta's picker payload",
 
 F = conversions.load_factors()
 PLANNING = conversions.planning_vehicle_names(F)
-ok("A: exactly four planning vehicles", len(PLANNING) == 4, str(PLANNING))
+# NARROWED 11 Oct 2026 (EU vehicles removed): the user removed the four EU type-approval
+# entries from the product. The seed now leads with six UK haulage trade names, flagged
+# planning_vehicle: true, Rigid 8-wheeler first (it is also the payload fallback).
+ok("A: exactly six planning vehicles — the UK haulage trade names, Rigid 8-wheeler first",
+   len(PLANNING) == 6 and PLANNING == ["Rigid 8-wheeler (32t)", "Rigid 6-wheeler (26t)", "Artic Tipper (44t)",
+                                       "Truck mixer 8 m³ (32t)", "Truck mixer 6 m³ (26t)", "Artic Flatbed (44t)"],
+   str(PLANNING))
+ok("A (11 Oct 2026): the array and the flags agree — every planning vehicle is flagged, and nothing else is",
+   F["planning_vehicles"] == PLANNING
+   and sorted(k for k in conversions.vehicle_names(F) if F["vehicles"][k].get("planning_vehicle")) == sorted(PLANNING))
 ok("A: /api/meta ships them as their own list",
    main.meta().get("planning_vehicles") == PLANNING)
 # ⭐ THE POINT OF 'add four, keep six'. Every baked route_geometry row is keyed on
@@ -254,14 +265,18 @@ ALL_V = conversions.vehicle_names(F)
 # truck mixers added for GB tenants. Nothing was removed (the point of this assertion).
 # NARROWED again (10 Oct 2026, carbon planner): fifteen — three battery-electric variants
 # added BESIDE the baked artic tipper, artic flatbed and 8-wheeler (new keys; nothing renamed, nothing removed).
-ok("A: fifteen vehicles in total — four added, six kept, two GB mixers (H1), three electric variants (carbon)",
-   len(ALL_V) == 15, str(len(ALL_V)))
+# NARROWED 11 Oct 2026 (EU vehicles removed): eleven. The four EU type-approval entries added on
+# 1 Sep were REMOVED on purpose (the user's decision) — the one deliberate removal; the six kept,
+# the two GB mixers and the three electric variants are all still here.
+ok("A: eleven vehicles in total — six kept, two GB mixers (H1), three electric variants (carbon); the four EU entries removed",
+   len(ALL_V) == 11, str(len(ALL_V)))
 ok("A: the three electric variants are the only additions since H1, each twinned to a profile that is still present",
    sorted(v for v in ALL_V if F["vehicles"][v].get("fuel") == "electric")
    == ["Artic Flatbed (44t) — electric", "Artic Tipper (44t) — electric", "Rigid 8-wheeler (32t) — electric"]
    and all(F["vehicles"][v]["geometry_twin"] in ALL_V for v in ALL_V if F["vehicles"][v].get("fuel") == "electric"))
-ok("H1: the two GB truck mixers are present and the EU mixer is untouched",
-   "Truck mixer 8 m³ (32t)" in ALL_V and "Truck mixer 6 m³ (26t)" in ALL_V and "N3 lorry (BA) 4-axle mixer 32 t" in ALL_V)
+# REVERSED 11 Oct 2026 (EU vehicles removed): the EU mixer is now GONE, with the other three.
+ok("H1: the two GB truck mixers are present and the EU mixer is gone (11 Oct 2026)",
+   "Truck mixer 8 m³ (32t)" in ALL_V and "Truck mixer 6 m³ (26t)" in ALL_V and "N3 lorry (BA) 4-axle mixer 32 t" not in ALL_V)
 for legacy in ("Rigid 7.5t", "Rigid 4-wheeler (18t)", "Rigid 6-wheeler (26t)",
                "Rigid 8-wheeler (32t)", "Artic Tipper (44t)", "Artic Flatbed (44t)"):
     ok(f"A: legacy vehicle {legacy!r} is still present", legacy in ALL_V)
@@ -271,35 +286,50 @@ ok("A: ...and does NOT fall through to _default",
    conversions._payload(F, network.DEFAULT_PROFILE)
    != conversions._payload(F, "__no_such_vehicle__"))
 # the payloads the build list gives, verbatim
-for name, want in ((PLANNING[0], 18.0), (PLANNING[2], 25.5), (PLANNING[3], 26.0)):
+# NARROWED 11 Oct 2026 (EU vehicles removed): those were the EU entries' build-list payloads
+# (18 / 25.5 / 26 t). The lead list's payloads are the file's own UK figures.
+for name, want in ((PLANNING[0], 20.0), (PLANNING[2], 29.0), (PLANNING[3], 18.0)):
     ok(f"A: {name[:28]}… carries its given payload {want} t",
        conversions._payload(F, name) == want)
 # V10 is the one whose tonnage is DERIVED, and the file has to say so
-v10 = F["vehicles"][PLANNING[1]]
-ok("A: V10 keeps the 8 m3 figure the build list actually gave",
-   v10.get("payload_m3") == 8)
-ok("A: V10's payload_t is derived from the concrete density in the same file",
-   abs(v10["payload_t"] - 8 * F["material_categories"]["Precast / concrete"]
+# NARROWED 11 Oct 2026 (EU vehicles removed): V10 is gone; the lead list's drum mixer is the
+# one whose tonnage is derived from a volume — 7.5 m³ (the drum's legal fill) × 2.4 t/m³.
+v10 = F["vehicles"][PLANNING[3]]
+ok("A: the lead mixer (Truck mixer 8 m³) keeps its m³ figure, the drum's legal fill (7.5)",
+   v10.get("payload_m3") == 7.5)
+ok("A: the lead mixer's payload_t is its m³ × the concrete density in the same file (7.5 × 2.4 = 18 t)",
+   abs(v10["payload_t"] - 7.5 * F["material_categories"]["Precast / concrete"]
        ["density_t_per_m3"]) < 1e-9)
-ok("A: ⭐ and every figure not given in the build list declares its basis",
-   all("_payload_basis" in F["vehicles"][v] and "_emissions_basis" in F["vehicles"][v]
-       for v in PLANNING))
+# NARROWED 11 Oct 2026 (EU vehicles removed): every planning vehicle declares its emissions
+# basis; a payload basis is declared where the payload is a stated ASSUMPTION (the mixers).
+ok("A: ⭐ and every figure not given in a source declares its basis",
+   all("_emissions_basis" in F["vehicles"][v] for v in PLANNING)
+   and all("ASSUMPTION" in F["vehicles"][v].get("_payload_basis", "") for v in PLANNING if F["vehicles"][v].get("payload_m3")))
 # 2026-09-02: one vehicle, three labels. The key is the id; a label only changes the text.
 _VL = conversions.vehicle_labels(F)
 ok("A2: /api/meta ships vehicle_labels", main.meta().get("vehicle_labels") == _VL)
-ok("A2: every vehicle has all three slots filled",
-   all(set(v) == {"en", "eu", "ee"} for v in _VL["labels"].values())
+# NARROWED 11 Oct 2026 (EU vehicles removed): every OFFERED slot is filled, and the seed is
+# offered English alone — no vehicle carries another language now.
+ok("A2: every vehicle has every offered slot filled — English only in the seed",
+   _VL["langs"] == ["en"] and all(set(v) == set(_VL["langs"]) for v in _VL["labels"].values())
    and set(_VL["labels"]) == set(ALL_V))
 ok("A2: ⭐ a missing slot falls back to the KEY, not another language",
    all(_VL["labels"][k][l] == k for k, ls in _VL["fallbacks"].items() for l in ls))
-ok("A2: the EU label of a planning vehicle IS its key",
-   all(_VL["labels"][k]["eu"] == k for k in PLANNING))
-ok("A2: ⭐ no Estonian label was invented — every ee slot fell back",
-   all("ee" in _VL["fallbacks"].get(k, []) for k in ALL_V))
+# REVERSED 11 Oct 2026 (EU vehicles removed): no vehicle carries an EU label, so the EU option is
+# not offered at all (it was offered with the planning vehicles' keys as its strings).
+ok("A2: no vehicle carries an EU label any more, and the EU option is not offered",
+   all("eu" not in (F["vehicles"][k].get("labels") or {}) for k in ALL_V)
+   and "eu" not in _VL["langs"] and all("eu" not in v for v in _VL["labels"].values()))
+# NARROWED 11 Oct 2026 (EU vehicles removed): still none invented — and the slot is not offered.
+ok("A2: ⭐ no Estonian label was invented — no vehicle carries one, so the option is not offered",
+   all("ee" not in (F["vehicles"][k].get("labels") or {}) for k in ALL_V)
+   and "ee" not in _VL["langs"] and _VL["fallbacks"] == {})
 ok("A2: the six legacy keys are their own English label",
    all(_VL["labels"][k]["en"] == k for k in ALL_V if k not in PLANNING))
-ok("A2: V07's English label is the trade name the build list gave",
-   "8x4" in _VL["labels"][PLANNING[0]]["en"] and "tipper" in _VL["labels"][PLANNING[0]]["en"])
+# NARROWED 11 Oct 2026 (EU vehicles removed): V07 is gone; the first planning vehicle's English
+# label is its UK trade name, which is also its key.
+ok("A2: the first planning vehicle's English label is its UK trade name",
+   _VL["labels"][PLANNING[0]]["en"] == "Rigid 8-wheeler (32t)" == PLANNING[0])
 
 # a planning vehicle nobody can select is a planning vehicle that does not exist
 selectable = {v for c in conversions.material_names(F)
@@ -309,11 +339,26 @@ ok("A: every planning vehicle is offered by at least one material category",
 # absent dimensions must stay absent — borrowing another vehicle's would change which
 # roads HERE allows, silently
 import here_routing  # noqa: E402
+# NARROWED 11 Oct 2026 (EU vehicles removed): the EU entries were the only seed vehicles with
+# no dimensions, so "sends NO dimensions" was the absent-is-not-invented proof. The UK lead
+# vehicles carry all three, so each must send EXACTLY its own (none borrowed, none dropped),
+# and a SYNTHETIC vehicle with a weight and no dimensions carries the absent case below.
+_DIMS = {"vehicle[height]": "height_cm", "vehicle[width]": "width_cm", "vehicle[length]": "length_cm"}
 for name in PLANNING:
     p = here_routing._truck_params(name, F, laden=True)
     ok(f"A: {name[:24]}… sends a gross weight to HERE", "vehicle[grossWeight]" in p)
-    ok(f"A: {name[:24]}… sends NO invented dimensions",
-       not ({"vehicle[height]", "vehicle[width]", "vehicle[length]"} & set(p)))
+    ok(f"A: {name[:24]}… sends exactly the dimensions its own entry carries — none invented",
+       {k for k in _DIMS if k in p} == {k for k, f in _DIMS.items() if (F["vehicles"][name].get("routing") or {}).get(f)}
+       and all(p[k] == int(F["vehicles"][name]["routing"][f]) for k, f in _DIMS.items() if k in p))
+SYN = "Synthetic 4-axle, weight only"
+_FS = json.loads(json.dumps(F))
+_FS["vehicles"][SYN] = {"gvw_t": 32, "payload_t": 18, "routing": {"gross_weight_kg": 32000}}
+_ps = here_routing._truck_params(SYN, _FS, laden=True)
+ok("A (11 Oct 2026): ⭐ a vehicle with a weight and NO dimensions sends the weight and NO invented dimensions or axles",
+   _ps.get("vehicle[grossWeight]") == 32000
+   and not ({"vehicle[height]", "vehicle[width]", "vehicle[length]", "vehicle[axleCount]"} & set(_ps)))
+ok("A (11 Oct 2026): ...its unladen return leg is routed at the tare (gvw − payload = 14 t)",
+   here_routing._truck_params(SYN, _FS, laden=False).get("vehicle[grossWeight]") == 14000)
 # B4's turnaround split must still reproduce load+unload for the NEW profiles too
 for name in PLANNING:
     load, unload = network._turnaround_minutes(name, F)
@@ -321,6 +366,113 @@ for name in PLANNING:
     ok(f"A: {name[:24]}… turnaround is still exactly load + unload",
        abs(parts["total_minutes"] - (load + unload)) < 1e-9,
        f"{parts['total_minutes']} vs {load + unload}")
+# 11 Oct 2026: the EU entries were the only seed vehicles without their own load/unload minutes,
+# so they were the only proof of the fallback; the synthetic vehicle carries it now
+ok("A (11 Oct 2026): a vehicle without its own load/unload minutes falls back to _default's 12 + 8",
+   network._turnaround_minutes(SYN, _FS) == (12.0, 8.0)
+   and abs(network._turnaround_parts(SYN, _FS)["total_minutes"] - 20.0) < 1e-9)
+
+# --------------------------------------------------------------------------- #
+#  A3. 11 Oct 2026 — the EU vehicles removed: what replaced them, and a        #
+#      document that STILL carries them keeps loading and working             #
+# --------------------------------------------------------------------------- #
+# The user removed the four EU type-approval vehicles from the product (factors.json, the demo
+# package). A live Config row saved before then (the live demo's) and any older tenant package
+# still carry them, so they are rebuilt here as they were in the seed until 11 Oct 2026 (the
+# fields the code reads) and pushed through the same paths.
+import config  # noqa: E402
+import derived  # noqa: E402
+import fairprice  # noqa: E402
+EU_OLD = {
+    "N3 lorry (BA) 4-axle TPMLM 32 t tipper": {
+        "code": "V07", "planning_vehicle": True, "eu_category": "N3", "body_code": "BA", "licence": "C",
+        "gvw_t": 32, "payload_t": 18, "emissions_kg_co2e_per_km": 0.99773, "aliases": ["8x4 tipper"],
+        "routing": {"gross_weight_kg": 32000, "axle_count": 4},
+        "labels": {"en": "8x4 rigid tipper (32 t)", "eu": "N3 lorry (BA) 4-axle TPMLM 32 t tipper"}, "fuel": "diesel"},
+    "N3 lorry (BA) 4-axle mixer 32 t": {
+        "code": "V10", "planning_vehicle": True, "eu_category": "N3", "body_code": "BA", "licence": "C",
+        "gvw_t": 32, "payload_m3": 8, "payload_t": 19.2, "emissions_kg_co2e_per_km": 0.99773, "aliases": ["8x4 mixer"],
+        "routing": {"gross_weight_kg": 32000, "axle_count": 4},
+        "labels": {"en": "8x4 rigid mixer (32 t)", "eu": "N3 lorry (BA) 4-axle mixer 32 t"}, "fuel": "diesel"},
+    "N3 tractor (BC) + O4 semi (DA) GCW 40 t": {
+        "code": "V11", "planning_vehicle": True, "eu_category": "N3 + O4", "body_code": "BC + DA", "licence": "C+E",
+        "gvw_t": 40, "payload_t": 25.5, "emissions_kg_co2e_per_km": 0.93939, "aliases": ["40 t artic"],
+        "routing": {"gross_weight_kg": 40000},
+        "labels": {"en": "Artic (40 t)", "eu": "N3 tractor (BC) + O4 semi (DA) GCW 40 t"}, "fuel": "diesel"},
+    "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t": {
+        "code": "V12", "planning_vehicle": True, "eu_category": "N3 + O4", "body_code": "BC + DA", "licence": "C+E",
+        "gvw_t": 40, "payload_t": 26, "emissions_kg_co2e_per_km": 0.93939, "aliases": ["artic tipper"],
+        "routing": {"gross_weight_kg": 40000},
+        "labels": {"en": "Artic tipper (40/44 t)", "eu": "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t"}, "fuel": "diesel"},
+}
+V07, V10, V11, V12 = list(EU_OLD)
+OLD = json.loads(json.dumps(F))
+OLD["vehicles"].update(json.loads(json.dumps(EU_OLD)))
+for _k in PLANNING:                 # until 11 Oct the UK entries carried no flag
+    OLD["vehicles"][_k].pop("planning_vehicle", None)
+OLD["planning_vehicles"] = [V07, V10, V11, V12]
+for _c, _add in (("Earthworks / soil", [V07, V12]), ("Small aggregate", [V07, V12]), ("Large aggregate / ballast", [V07, V12]),
+                 ("Precast / concrete", [V10, V11]), ("Steel / rail", [V11]), ("General / imported", [V11, V12]), ("_default", [V07])):
+    OLD["material_categories"][_c]["vehicles"] = _add + OLD["material_categories"][_c]["vehicles"]
+OLD["vehicle_sets"]["GB"]["hide"] = [V07, V10, V11, V12, "Rigid 7.5t"]
+ok("A3: ⭐ a document still carrying the four EU entries passes validation — no rule refuses them (the live row must keep saving)",
+   config.validate(OLD) == [] and config.validate(OLD, network=network) == [], str(config.validate(OLD, network=network))[:300])
+_sv = config.save(OLD, by="test_week1 A3", network=network)
+config.invalidate()
+_m = main.meta()
+ok("A3: ...it saves as the live document and /api/meta serves it: all fifteen vehicles, the four lead (no country set)",
+   _sv.get("ok") is True and len(_m["vehicles"]) == 15 and _m["planning_vehicles"] == [V07, V10, V11, V12]
+   and _m["hidden_vehicles"] == [], str(_sv)[:200])
+_ovl = _m["vehicle_labels"]
+ok("A3: ⭐ its EU strings keep resolving — 'eu' is OFFERED because its vehicles carry it, with English first",
+   _ovl["langs"] == ["en", "eu"] and _ovl["labels"][V12]["eu"] == V12 and _ovl["labels"][V12]["en"] == "Artic tipper (40/44 t)"
+   and _ovl["labels"]["Artic Tipper (44t)"]["eu"] == "Artic Tipper (44t)" and "eu" in _ovl["fallbacks"]["Artic Tipper (44t)"])
+ok("A3: ...and the language list is only languages a vehicle uses — no 'ee' (no vehicle carries one)",
+   "ee" not in _ovl["langs"] and all(set(v) == {"en", "eu"} for v in _ovl["labels"].values()))
+ok("A3: its fallback payload is still its own first planning vehicle's (V07, 18 t), named",
+   derived.payload_for("Ghost lorry", OLD) == (18.0, V07) and derived.payload_for(V12, OLD) == (26.0, None))
+ok("A3: its chips still print the vehicle's own code, its artics still price as artics",
+   derived.vehicle_short(V12, OLD) == "V12" and fairprice.vehicle_class(V11, OLD) == "artic" and fairprice.vehicle_class(V07, OLD) == "rigid")
+ok("A3: its weight-only artic still routes on weight alone — no dimensions or axles invented",
+   set(here_routing._truck_params(V11, OLD)) == {"transportMode", "vehicle[grossWeight]"})
+_OGB = json.loads(json.dumps(OLD)); _OGB["tenant"]["country"] = "GB"
+ok("A3: the same document for a GB tenant (the live demo's case): GB's lead list, the four + Rigid 7.5t hidden, English only offered",
+   conversions.planning_vehicle_names(_OGB)[0] == "Rigid 8-wheeler (32t)"
+   and conversions.hidden_vehicle_names(_OGB) == [V07, V10, V11, V12, "Rigid 7.5t"]
+   and conversions.vehicle_labels(_OGB)["langs"] == ["en"] and derived.payload_for("Ghost lorry", _OGB) == (20.0, "Rigid 8-wheeler (32t)"))
+config.reset_to_file(conversions, by="test_week1 A3")
+config.invalidate()
+ok("A3: Reset to file brings back the seed: the six UK lead names, no EU entry",
+   main.meta()["planning_vehicles"] == PLANNING and not set(EU_OLD) & set(main.meta()["vehicles"]))
+
+# the never-empty lead list (conversions.planning_vehicle_names, 11 Oct 2026)
+_NOPL = json.loads(json.dumps(F)); _NOPL["planning_vehicles"] = []
+for _k in _NOPL["vehicles"]:
+    if not _k.startswith("_"):
+        _NOPL["vehicles"][_k].pop("planning_vehicle", None)
+_fb = conversions.planning_vehicle_names(_NOPL)
+_scen = {k for k in ALL_V if F["vehicles"][k].get("scenario_only")}
+ok("A3: ⭐ with no planning array and no flag (no country set) the lead list is NOT empty: the vehicles the categories list, Rigid 8-wheeler first",
+   _fb and _fb[0] == "Rigid 8-wheeler (32t)" and set(_fb) <= selectable, str(_fb))
+ok("A3: ⭐ ...and it holds no scenario-only (electric) profile and no hidden one — a picker never offers those",
+   not (set(_fb) & _scen) and "Rigid 7.5t" not in conversions.planning_vehicle_names({**_NOPL, "tenant": {**_NOPL["tenant"], "country": "NO"}})
+   and not set(conversions.planning_vehicle_names(_NOPL, "GB")) & set(conversions.hidden_vehicle_names(_NOPL, "GB")))
+_NOPL2 = json.loads(json.dumps(_NOPL)); _NOPL2["vehicle_sets"] = {}
+ok("A3: ...a country with no vehicle set gets the same fallback, and the seed's own list for every such country is non-empty",
+   conversions.planning_vehicle_names(_NOPL2, "NO") == _fb and conversions.planning_vehicle_names(F, "NO") == PLANNING
+   and conversions.planning_vehicle_names(F, "EE") == PLANNING)
+_NOCAT = json.loads(json.dumps(_NOPL))
+for _c in _NOCAT["material_categories"].values():
+    if isinstance(_c, dict):
+        _c["vehicles"] = []
+ok("A3: ...and with no category listing a vehicle either, every usable vehicle in file order (still no electric one)",
+   conversions.planning_vehicle_names(_NOCAT) == [k for k in ALL_V if k not in _scen])
+ok("A3: the payload fallback is a NAMED vehicle in every case above — never None while a vehicle is usable",
+   derived.payload_for("Ghost lorry", _NOPL)[1] == "Rigid 8-wheeler (32t)" and derived.payload_for("Ghost lorry", _NOCAT)[1] == "Rigid 7.5t"
+   and derived.payload_for("Ghost lorry", F) == (20.0, "Rigid 8-wheeler (32t)"))
+ok("A3: a document with no usable vehicle at all falls back to its own _default payload, unnamed — not the old 18 t literal",
+   derived.payload_for("Ghost lorry", {"vehicles": {"_default": {"payload_t": 20}}}) == (20.0, None)
+   and derived.payload_for("Ghost lorry", {"vehicles": {}}) == (20.0, None))
 
 
 # =========================================================================== #
@@ -1040,9 +1192,13 @@ ok("§9: working days come from factors.planning", _k["working_days"] == 22)
 ok("§9: a tonnes line -> vehicle-loads = t / payload", abs(_by["WS1"]["vehicle_loads"] - 200 / 20) < 1e-9)
 ok("§9: an m3 line converts through density THEN payload",
    abs(_by["WS2"]["qty_t"] - 160.0) < 1e-6 and abs(_by["WS2"]["vehicle_loads"] - 160 / 29) < 1e-3)
-ok("§9: ⭐ an unknown vehicle falls back to V07 (18 t), NOT _default (20 t), and says so",
-   _by["WS3"]["payload_t"] == 18.0 and abs(_by["WS3"]["vehicle_loads"] - 2.0) < 1e-9
-   and _by["WS3"]["payload_fallback"] == PLANNING[0] and _by["WS1"]["payload_fallback"] is None)
+# NARROWED 11 Oct 2026 (EU vehicles removed): the first planning vehicle is Rigid 8-wheeler (32t),
+# 20 t — the same figure as _default's 20 t, so the payload can no longer tell the two apart.
+# The NAME can: the fallback is the named planning vehicle, and month-kpis says so.
+ok("§9: ⭐ an unknown vehicle falls back to the first planning vehicle (Rigid 8-wheeler, 20 t), named, and says so",
+   _by["WS3"]["payload_t"] == 20.0 and abs(_by["WS3"]["vehicle_loads"] - 36.0 / 20.0) < 1e-9
+   and _by["WS3"]["payload_fallback"] == PLANNING[0] == "Rigid 8-wheeler (32t)" and _by["WS1"]["payload_fallback"] is None
+   and _k["payload_fallback_vehicle"] == PLANNING[0])
 ok("§9: qty_unit is in the requested map unit",
    _by["WS1"]["qty_unit"] == 10 and main.public_month_kpis(month=9, unit="t")["lines"][0]["qty_t"] == 200.0)
 ok("§9: never actuals", not any("actual" in k for l in _k["lines"] for k in l))

@@ -478,22 +478,24 @@ def meta():
     return {
         "units": conversions.UNITS,
         "materials": conversions.material_names(factors),
-        # every vehicle, unchanged. The four EU-named planning vehicles added on
-        # 2026-09-01 are IN this list, not instead of it: baked geometry is keyed on
-        # vehicle_profile and every existing route names one of the older six, so a
-        # picker that could not offer them would strand those routes.
+        # every vehicle in the live document, unchanged and in its own order: baked
+        # geometry is keyed on vehicle_profile and every saved line names a vehicle, so a
+        # list that dropped one would strand those routes and lines.
         "vehicles": conversions.vehicle_names(factors),
-        # ...and which of them are the four to lead with. A NAME LIST, not a re-ordering
-        # of `vehicles` — the map, the dashboard and every saved forecast index into
-        # `vehicles` and `factors.vehicle_payload_t` by name, so the full set has to stay
-        # complete and in its existing order.
+        # ...and which of them to lead with (the country's lead list, else the document's
+        # planning vehicles; never empty while a vehicle is usable — 11 Oct 2026). A NAME
+        # LIST, not a re-ordering of `vehicles` — the map, the dashboard and every saved
+        # forecast index into `vehicles` and `factors.vehicle_payload_t` by name, so the
+        # full set has to stay complete and in its existing order.
         "planning_vehicles": conversions.planning_vehicle_names(factors),
         # H1 (29 Sep 2026): the names the pickers do NOT offer this tenant (its country's
-        # `vehicle_sets[..].hide` — the EU N-category names for GB). Still in `vehicles`.
+        # `vehicle_sets[..].hide` — Rigid 7.5t for GB). Still in `vehicles`.
         "hidden_vehicles": conversions.hidden_vehicle_names(factors),
-        # 2026-09-02: the EN / EU / EE label toggle. Labels only — vehicle_type on a
-        # forecast line stays the canonical key. Every slot is filled, a missing one
-        # with the key itself, and `fallbacks` says which.
+        # 2026-09-02: the vehicle-name labels. Labels only — vehicle_type on a forecast
+        # line stays the canonical key. `langs` (11 Oct 2026) is the languages offered
+        # to this tenant: English, plus any other label language a vehicle it is offered
+        # still carries. Every offered slot is filled, a missing one with the key itself,
+        # and `fallbacks` says which.
         "vehicle_labels": conversions.vehicle_labels(factors),
         # rich taxonomy for the new submission matrix (Commit 2)
         "material_categories": strip(factors.get("material_categories", {})),
@@ -1650,8 +1652,10 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
 
     Per line: the typed quantity in the map unit, in tonnes, and in vehicle-loads.
     Vehicle-loads = tonnes ÷ that line's payload; a vehicle_type factors.json does not
-    know falls back to the first PLANNING vehicle (V07, 18 t) and says so in
-    `payload_fallback`, rather than to _default's 20 t.
+    know falls back to the first PLANNING vehicle (in the seed, Rigid 8-wheeler (32t),
+    20 t, since 11 Oct 2026) and says so in `payload_fallback`, rather than to the
+    anonymous _default. The pair comes from derived.payload_for(), the Look-ahead's own
+    rule, so the two cannot drift.
 
     ⭐ 2026-09-03, the human's correction: vehicles and movements are DIFFERENT
     numbers. A MOVEMENT (trip) is one load carried one way. How many movements one
@@ -1668,9 +1672,9 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
     factors = conversions.load_factors()
     wd = _working_days(factors)          # 15 Sep: shared with the two forecast feeds
     vs = factors.get("vehicles", {}) or {}
-    planning = conversions.planning_vehicle_names(factors)
-    fb_name = planning[0] if planning else None
-    fb_payload = float((vs.get(fb_name) or {}).get("payload_t") or 18.0)
+    # 11 Oct 2026: one rule for the fallback — the Look-ahead's (it was a copy of it here,
+    # with its own literal 18 t, the payload of a vehicle the seed no longer carries)
+    fb_payload, fb_name = derived.payload_for(None, factors)
     rows = db.query(
         "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
         "AND month_index = ? ORDER BY route_id, discipline, section_id",

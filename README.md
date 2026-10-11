@@ -74,7 +74,7 @@ Country-specific services:
 | Service | Switched on for |
 |---|---|
 | Road restrictions (Tark Tee, Estonian Transport Administration) | `EE` |
-| National orthophoto basemap (Maa-amet) and Estonian vehicle labels | `EE` |
+| National orthophoto basemap (Maa-amet) | `EE` |
 | Automatic diesel price (EU Weekly Oil Bulletin) | EU-27 countries. Elsewhere an admin types the weekly price on Config |
 
 ---

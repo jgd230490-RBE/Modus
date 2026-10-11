@@ -55,10 +55,12 @@ THE RULES THAT MATTER
    marked ‡ and km_trip excludes the return, per the brief's `if return_baked`.
 
 4. **Payload is the planning figure, and the fallback is month-kpis' fallback.** A
-   vehicle factors.json does not know falls back to the first PLANNING vehicle (V07,
-   18 t), never to _default's 20 t, and says so in `payload_fallback` — the same rule
-   /api/public/month-kpis applies, asserted equal in the tests. Tonnes for a line typed
-   in vehicles are qty × that same payload, so trips and tonnes never disagree.
+   vehicle factors.json does not know falls back to the first PLANNING vehicle — a named
+   vehicle (in the seed since 11 Oct 2026, Rigid 8-wheeler (32t), 20 t; until then an EU
+   type-approval 8x4 tipper at 18 t), never the anonymous _default — and says so in
+   `payload_fallback`. /api/public/month-kpis calls payload_for() itself, so the two
+   cannot drift (and the tests assert them equal). Tonnes for a line typed in vehicles
+   are qty × that same payload, so trips and tonnes never disagree.
 
 5. **Totals are computed AFTER the access filter**, on whatever lines the caller may
    see. `vehicles_peak` is the largest same-day SUM of vehicles across lines — the
@@ -98,7 +100,14 @@ def payload_for(vehicle, factors):
 
     A vehicle factors.json knows: its own payload, no fallback. Anything else — an
     unknown name, a vehicle without a payload, a blank — the first planning vehicle's
-    payload, and its name, so the caller can say so.
+    payload, and its name, so the caller can say so. payload_for(None, factors) is the
+    fallback pair itself; /api/public/month-kpis reads it that way.
+
+    11 Oct 2026: planning_vehicle_names() no longer comes back empty while the document
+    has a usable vehicle, so the name is only None for a document with none. The last
+    resort was a literal 18.0 — the payload of the EU 8x4 tipper that led the seed until
+    then, a figure that no longer belongs to any vehicle. It is now the document's own
+    `_default` payload (20 t in the seed), then 20.0.
     """
     vs = factors.get("vehicles", {}) or {}
     known = bool(vehicle and vs.get(vehicle) and (vs.get(vehicle) or {}).get("payload_t"))
@@ -106,15 +115,19 @@ def payload_for(vehicle, factors):
         return float(vs[vehicle]["payload_t"]), None
     planning = conversions.planning_vehicle_names(factors)
     fb_name = planning[0] if planning else None
-    fb_payload = float((vs.get(fb_name) or {}).get("payload_t") or 18.0)
+    fb_payload = float((vs.get(fb_name) or {}).get("payload_t")
+                       or (vs.get("_default") or {}).get("payload_t") or 20.0)
     return fb_payload, fb_name
 
 
 def vehicle_short(vehicle, factors):
     """
-    The short label the chips print: the EU code (V12) when factors.json carries one,
-    otherwise the legacy name without its Artic/Rigid prefix — the same rule the
-    Routes table's chips already use (`vehShort` in frontend/index.html).
+    The short label the chips print: the vehicle's own short `code` when its entry
+    carries one, otherwise the name without its Artic/Rigid prefix — the same rule the
+    Routes table's chips already use (`vehShort` in frontend/index.html). 11 Oct 2026: no
+    vehicle in the seed carries a code any more (only the four EU type-approval entries
+    did, until they were removed), so the seed's chips print "8-wheeler (32t)" and so on;
+    the code branch stays for a tenant package whose vehicles carry one.
     """
     if not vehicle:
         return None

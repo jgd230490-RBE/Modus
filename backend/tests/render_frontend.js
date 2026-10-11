@@ -103,7 +103,9 @@ const meta = {
   routes: [], materials: ["Aggregate"], vehicles: ["Artic Tipper (44t)"], units: ["m3", "t", "vehicles"],
   months: { start_year: 2026, count: 60 }, factors: { material_density_t_per_m3: {}, vehicle_payload_t: {},
   vehicle_emissions_kg_co2e_per_km: {}, planning: { working_days_per_month: 21 } },
-  mapbox_token: "", vehicle_labels: { labels: {}, fallbacks: {}, langs: ["en", "eu", "ee"] },
+  // NARROWED 11 Oct 2026 (EU vehicles removed): the languages the server OFFERS — English alone for the seed
+  // (it sent every slot, ["en", "eu", "ee"], until then)
+  mapbox_token: "", vehicle_labels: { labels: {}, fallbacks: {}, langs: ["en"] },
   disciplines: [], sections: [],
 };
 const planner = { role: "planner", label: "Planner", ipt: null, can_approve: true,
