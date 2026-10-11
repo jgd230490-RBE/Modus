@@ -1403,6 +1403,13 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && code.includes("document.body.dataset.view = view;") && code.includes('document.body.dataset.mapOpen = page === "map" ? "1" : "";')
     && code.includes('return () => { document.body.dataset.mapOpen = ""; };')
     && /className="demo-badge hidden sm:inline-flex"/.test(code));
+  {
+    const pm = (src.match(/function PublicMap\(\{ onLogin \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    ok("11 Oct: the public map page is only the map — no strip above it, no 'Submit a forecast' link; the header keeps Staff sign in",
+      pm.includes('<iframe src={MAP_URL} title="Public Route Map" className="flex-1 w-full border-0" />')
+      && !/Toggle <span|Approved haul-route forecasts|Submit a forecast/.test(pm.replace(/\/\/.*$/gm, ""))
+      && code.includes('onClick={() => setView("login")}'));
+  }
   // 5. the shared components
   ok("the empty-state family: one EmptyState with a kind, marked data-empty, no dashed border; a SkeletonTable; StatusWord; AppliedChips",
     code.includes("function EmptyState({ title, body, action, kind })") && code.includes('data-empty={k}') && !code.includes("border-dashed")
