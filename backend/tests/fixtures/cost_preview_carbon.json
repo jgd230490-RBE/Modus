@@ -1,0 +1,60 @@
+{
+ "baked": true,
+ "carbon": {
+  "basis": "Making the material at the UK Government 2026 factor for aggregates; transport there and back on the routed distance.",
+  "disposal_t": null,
+  "material_t": 22.629,
+  "total_t": 28.265,
+  "transport_t": 5.636,
+  "unrouted": false
+ },
+ "cells": [
+  {
+   "fair": {
+    "eur": null,
+    "flags": [],
+    "per_km": null,
+    "per_t": null,
+    "per_trip": null
+   },
+   "month_index": 10,
+   "planned": {
+    "eur": null,
+    "partial": false,
+    "per_km": null,
+    "per_t": null,
+    "per_trip": null,
+    "source": null
+   },
+   "quantity": 2900.0,
+   "tonnes": 2900.0,
+   "trips": 100
+  }
+ ],
+ "fair_reason": "no diesel index",
+ "index_bulletin_date": null,
+ "index_eur_per_l": null,
+ "route_id": "R1",
+ "totals": {
+  "cells": 1,
+  "fair": {
+   "eur": null,
+   "per_km": null,
+   "per_t": null,
+   "per_trip": null
+  },
+  "fair_flags": [],
+  "planned": {
+   "eur": null,
+   "per_km": null,
+   "per_t": null,
+   "per_trip": null
+  },
+  "planned_source": null,
+  "planned_target_cells": 0,
+  "tonnes": 2900.0,
+  "trips": 100
+ },
+ "vehicle_class": "artic",
+ "vehicle_type": "Artic Tipper (44t)"
+}

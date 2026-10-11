@@ -46,6 +46,7 @@ import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel inde
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
+import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -1455,6 +1456,54 @@ def carbon_summary_pdf(body: CarbonSummaryIn):
         raise HTTPException(503, str(e))
     return Response(content=data, media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="carbon-summary.pdf"'})
+
+
+# ------------------------------------------------------------------ carbon target (11 Oct 2026)
+class CarbonTargetIn(BaseModel):
+    mode: Optional[str] = None                # "pct" (% below the approved plan) or "cap" (a fixed tCO2e cap)
+    levers: Optional[List[dict]] = None       # the agreed decisions; absent = switch how the target is held
+    ui_state: Optional[dict] = None           # the Carbon page's own state, stored as sent (at most 20 000 characters)
+    updated_by: Optional[str] = None          # the name typed at sign-in, as for the costing target (no identity until G3)
+
+
+@app.get("/api/carbon/target")
+def get_carbon_target():
+    """
+    11 Oct 2026 — the programme's carbon target and the progress against it, ALL-IN tCO2e (making the
+    material, transport and waste disposal). Any signed-in code. `status` is measured on the lines the
+    code can see: scope "scheme" for planner, admin and the demo submitter, "team" for a team code (a
+    fixed cap has no team share, so its target_t is null there). Both are null when no target is set.
+    Stored decisions that no longer apply give status.invalid, never an error.
+    """
+    acc = _require_access()
+    return carbon_target.payload(acc)
+
+
+@app.put("/api/carbon/target")
+def put_carbon_target(body: CarbonTargetIn):
+    """
+    Set the carbon target (planner or admin). With `levers`, the server runs carbon.scenario over the
+    approved plan with them as the one alternative and stores what that gives; the browser sends no
+    figure. Without `levers`, `mode` switches how an existing target is held, keeping every number.
+    400 with a plain sentence when the rules refuse it. Returns the same payload as GET.
+    """
+    acc = _require_approver()
+    try:
+        if body.levers is not None:
+            carbon_target.set_from_levers(acc, body.mode, body.levers, body.ui_state, by=body.updated_by)
+        else:
+            carbon_target.set_mode(body.mode, by=body.updated_by)
+    except carbon_target.TargetError as e:
+        raise HTTPException(400, str(e))
+    return carbon_target.payload(acc)
+
+
+@app.delete("/api/carbon/target")
+def delete_carbon_target():
+    """Clear the carbon target (planner or admin). Returns the GET payload, target null."""
+    acc = _require_approver()
+    carbon_target.clear()
+    return carbon_target.payload(acc)
 
 
 # ------------------------------------------------------------------ public feed (map)

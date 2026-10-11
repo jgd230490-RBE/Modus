@@ -288,6 +288,11 @@ def import_tenant(pkg, replace=False):
         _config.invalidate()
     except Exception:
         pass
+    try:                                          # 11 Oct 2026: the carbon target row came (or went) with the package
+        import carbon_target as _carbon_target
+        _carbon_target.invalidate()
+    except Exception:
+        pass
     # An optional national fuel-index price the package suggests (a typed placeholder
     # for a country the bulletin does not cover). fuel_index is GLOBAL, one row per
     # country, so it is applied only where that country has no row yet — never over a

@@ -364,6 +364,75 @@ with TestClient(main.app, base_url="https://testserver") as c:
         db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?",
                    ("default", "R001", "Artic Tipper (44t)"))
 
+    # ------------------------------------------- 3c. the carbon target (11 Oct 2026, before the freeze)
+    # The demo network is unbaked again here, so the figures are material + waste disposal. The one
+    # decision is phase 4's: the surplus cut to the soil-recycling hub instead of the landfill, −515.406 t.
+    _reuse = [{"driver": "disposal", "scope": {"route_id": "R019"}, "to_route": "R020"}]
+    r = c.put("/api/carbon/target", json={"mode": "pct", "levers": _reuse})
+    ok("🔴 the carbon target without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.put("/api/carbon/target", headers=NORTH, json={"mode": "pct", "levers": _reuse})
+    ok("🔴 a team code cannot set the carbon target — 403", r.status_code == 403, str(r.status_code))
+    r = c.get("/api/carbon/target", headers=PLAN)
+    ok("the demo ships with no carbon target: target and status null",
+       r.status_code == 200 and r.json() == {"target": None, "status": None}, r.text[:160])
+    r = c.put("/api/carbon/target", headers=PLAN, json={"mode": "pct", "levers": _reuse, "ui_state": {"disposal": {"R019": {"to_route": "R020"}}},
+                                                        "updated_by": "Smoke planner"})
+    ct = r.json() if r.status_code == 200 else {}
+    tg, st = ct.get("target") or {}, ct.get("status") or {}
+    ok("⭐ a planner sets a % target over HTTP: stored with who set it, the decisions in words",
+       r.status_code == 200 and tg.get("mode") == "pct" and tg.get("updated_by") == "Smoke planner" and tg.get("levers") == _reuse
+       and tg.get("lever_words") and "Soil" in tg["lever_words"][0], r.text[:300])
+    ok("⭐ ...the server's own figures read back consistently: the cut is phase 4's 515.406 t, the % is that over the plan",
+       st.get("scope") == "scheme" and abs((st.get("approved_t", 0) - st.get("with_decisions_t", 0)) - 515.406) < 0.002
+       and tg.get("set_at_approved_t") == st.get("approved_t") and tg.get("cap_t") == st.get("with_decisions_t")
+       and abs(tg.get("pct_below", 0) - 515.406 * 100 / st.get("approved_t", 1)) < 0.06, str(st)[:300])
+    ok("⭐ ...target = approved × (1 − %) to 0.01, and the gaps are the differences",
+       abs(st.get("target_t", 0) - st.get("approved_t", 0) * (1 - tg.get("pct_below", 0) / 100)) < 0.01
+       and abs(st.get("gap_as_forecast_t", 0) - (st.get("approved_t", 0) - st.get("target_t", 0))) < 0.002
+       and abs(st.get("gap_with_decisions_t", 9) - (st.get("with_decisions_t", 0) - st.get("target_t", 0))) < 0.002, str(st)[:300])
+    # the one Pending demo line is R013's soil to a compound: soils have no primary factor and the route is
+    # unbaked, so it adds 0.0 all-in — counted as 0, not left out
+    ok("...the pending line adds 0.0 (soil to a compound, unrouted), transport 0 (nothing routed), months listed, nothing invalid",
+       st.get("pending_t") == 0.0 and st.get("approved_transport_t") == 0.0 and st.get("invalid") is None
+       and len(st.get("by_month") or []) >= 4
+       and abs(sum(m["approved_t"] for m in st["by_month"]) - st.get("approved_t", 0)) < 0.02, str(st)[:300])
+    r = c.get("/api/carbon/target", headers=NORTH)
+    sn = (r.json() or {}).get("status") or {} if r.status_code == 200 else {}
+    ok("⭐ the North Team code reads it: scope team, its own lines, the same % applied (the cut is Central's line, so none here)",
+       r.status_code == 200 and sn.get("scope") == "team" and 0 < sn.get("approved_t", 0) < st.get("approved_t", 0)
+       and sn.get("with_decisions_t") == sn.get("approved_t")
+       and abs(sn.get("target_t", 0) - sn.get("approved_t", 0) * (1 - tg.get("pct_below", 0) / 100)) < 0.01, str(sn)[:300])
+    r = c.put("/api/carbon/target", headers=PLAN, json={"mode": "cap", "updated_by": "Smoke planner"})
+    cc = r.json() if r.status_code == 200 else {}
+    ok("⭐ switch to a fixed cap: every number kept, the target is the cap",
+       r.status_code == 200 and cc["target"]["mode"] == "cap" and cc["target"]["cap_t"] == tg.get("cap_t")
+       and cc["target"]["pct_below"] == tg.get("pct_below") and cc["status"]["target_t"] == tg.get("cap_t"), r.text[:300])
+    r = c.get("/api/carbon/target", headers=NORTH)
+    ok("🔴 ...and a team code sees no share of a fixed cap (target_t null)", r.status_code == 200 and r.json()["status"]["target_t"] is None
+       and r.json()["status"]["gap_as_forecast_t"] is None, r.text[:200])
+    r = c.put("/api/carbon/target", headers=PLAN, json={"mode": "pct", "levers": []})
+    ok("🔴 no decisions — 400 with the sentence", r.status_code == 400 and "Choose at least one decision" in r.text, r.text[:160])
+    r = c.delete("/api/carbon/target", headers=NORTH)
+    ok("🔴 a team code cannot clear it — 403", r.status_code == 403, str(r.status_code))
+    r = c.delete("/api/carbon/target", headers=PLAN)
+    ok("⭐ a planner clears it: target null, and GET agrees", r.status_code == 200 and r.json()["target"] is None
+       and c.get("/api/carbon/target", headers=PLAN).json() == {"target": None, "status": None}, r.text[:160])
+    # the Submit forecast preview's all-in carbon, over HTTP: 1,000 t of cut to the landfill = 1000 × 19.55376
+    r = c.post("/api/costing/preview", headers=PLAN, json={"route_id": "R019", "vehicle_type": "Artic Tipper (44t)",
+                                                          "material_type": "Earthworks / soil", "unit": "t",
+                                                          "cells": [{"month_index": 10, "quantity": 1000}]})
+    pc = (r.json() or {}).get("carbon") or {} if r.status_code == 200 else {}
+    ok("⭐ the preview carries its carbon: 1,000 t to the landfill = 19.554 tCO2e disposal, transport unrouted (never estimated)",
+       r.status_code == 200 and pc.get("disposal_t") == 19.554 and pc.get("material_t") is None and pc.get("transport_t") is None
+       and pc.get("unrouted") is True and pc.get("total_t") == 19.554 and "landfill" in (pc.get("basis") or ""), str(pc))
+    r = c.post("/api/costing/preview", headers=PLAN, json={"route_id": "R002", "vehicle_type": "Artic Tipper (44t)",
+                                                          "material_type": "Small aggregate", "unit": "t",
+                                                          "cells": [{"month_index": 10, "quantity": 2900}]})
+    pc = (r.json() or {}).get("carbon") or {} if r.status_code == 200 else {}
+    ok("...and a delivery: 2,900 t of aggregate = 22.629 tCO2e to make (2900 × 7.80307), transport not counted until routed",
+       r.status_code == 200 and pc.get("material_t") == 22.629 and pc.get("total_t") == 22.629 and pc.get("unrouted") is True
+       and "not counted until the route has a distance" in (pc.get("basis") or ""), str(pc))
+
     r = c.get("/api/lookahead", headers=PLAN)
     la = r.json() if r.status_code == 200 else {}
     ok("the Look-ahead page reads over HTTP", r.status_code == 200 and "commit" in la, r.text[:200])

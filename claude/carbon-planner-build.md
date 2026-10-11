@@ -291,6 +291,48 @@ scenarios, so it waits for G3; it is listed under "Not built yet". Every figure 
   effect and the summary card; the PDF opened in the browser's viewer (rows aligned, one page). The waste
   hierarchy controls were checked through the fixture render only: the local copy has no muck-away routes.
 
+## Carbon target (11 Oct, before the freeze; branch `claude/carbon-process`)
+The server side of "set the agreed decisions as the programme's carbon target". The page (step 6), the
+Dashboard and Forecasts strips and the Submit forecast line are built by the frontend against this API.
+
+- **Stored:** one tenanted `config` row, key `carbon_target` (`backend/carbon_target.py`, the costing row
+  pattern: 5 s cache keyed by tenant, UPDATE or INSERT stamping `updated_by` / `updated_at`, cleared on write and
+  on a tenant import). Document: `mode` ("pct" = % below the approved plan, "cap" = fixed tCO2e cap),
+  `pct_below` (1 dp), `cap_t`, `set_at_approved_t`, `set_at_alternative_t`, `levers`, `lever_words`, `ui_state`
+  (the page's own state, at most 20 000 characters). No new table. It travels in the tenant package like every
+  config row; the demo package has none. `carbon.py` still writes nothing.
+- **All-in:** every figure is making the material + transport (both legs) + waste disposal, the Carbon page's
+  headline. `approved_transport_t` is the transport part only, for the Dashboard's transport card to tie to.
+- **Who:** `GET /api/carbon/target` any signed-in code; `PUT` and `DELETE` planner or admin code only
+  (`_require_approver`: a team code gets 403, no code 401). `updated_by` is the name typed at sign-in, sent by
+  the browser and not checked: there is no per-person identity until G3.
+- **PUT with `levers`:** the server runs `carbon.scenario` over the approved plan with the decisions as the one
+  alternative and stores what it gives; the browser sends no figure. Refused (400, one plain sentence, nothing
+  written): no decisions; decisions that do not lower carbon, or by under 0.1 %; a bad mode; a page state over
+  20 000 characters; decisions the rules refuse. **PUT without `levers`:** `mode` switches pct ↔ cap and keeps
+  every number (400 when there is no target). **DELETE** clears it.
+- **Progress (`status`):** measured on the lines the code can see, scope "scheme" (planner, admin, demo
+  submitter) or "team" (a team code: the same % on its own lines; a fixed cap has no team share, so `target_t`
+  is null). `approved_t` as forecast, `with_decisions_t` (the stored decisions re-run every read, because they are
+  not recorded on the forecast lines), `target_t`, both gaps, `pending_t` (what the lines waiting for approval
+  would add), `by_month`, and `invalid`: when a stored decision no longer applies (a route or a vehicle gone) the
+  plan with the decisions is null and `invalid` says why; never an error. Two scenario runs per read.
+- **Submit forecast preview:** `POST /api/costing/preview` gains `carbon` {material_t, transport_t, disposal_t,
+  total_t, unrouted, basis}: transport by the saved lines' own co2_t formula (null and `unrouted` when the route
+  has no distance), material at the Government primary factor, or disposal at the site's disposal factor when the
+  destination is a tip or recycling site, and one sentence saying what is counted. Stores nothing.
+- **Rounding, seen on the demo:** `pct_below` is held to 1 dp, so straight after a % target is set the plan with
+  the decisions reads a little over it (demo: 5 753.1 against 5 750.0, 3.1 over, because 11.25 % is held as
+  11.3 %). The page should call a gap inside that rounding "on target", or the contract should hold the % to
+  more places. A cap has no such gap.
+- **Tests:** new `test_carbon_target.py` (every figure hand-worked from a three-line network plus one pending
+  line; it writes `fixtures/carbon_target.json`, the planner's GET for a % target, and
+  `fixtures/cost_preview_carbon.json`); `http_smoke.py` +15 (401 / 403 / 200, a set-read-switch-clear round trip
+  on the demo package, the preview's carbon).
+- **Not built:** the frontend (step 6, the strips, the Submit line), a history of past targets, a per-team
+  target, the target on the map or the printed summary, and anything that records which decisions were actually
+  taken on the forecast lines.
+
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
 supplier EPD); electric kWh/km is derived from a mixed-fleet programme; the 2 t ZEV allowance is

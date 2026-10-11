@@ -1,0 +1,71 @@
+{
+ "status": {
+  "approved_t": 161.446,
+  "approved_transport_t": 14.091,
+  "by_month": [
+   {
+    "approved_t": 149.192,
+    "month_index": 10,
+    "with_decisions_t": 33.169
+   },
+   {
+    "approved_t": 12.254,
+    "month_index": 11,
+    "with_decisions_t": 10.262
+   }
+  ],
+  "gap_as_forecast_t": 118.017,
+  "gap_with_decisions_t": 0.002,
+  "invalid": null,
+  "pending_t": 5.653,
+  "scope": "scheme",
+  "target_t": 43.429,
+  "with_decisions_t": 43.431
+ },
+ "target": {
+  "cap_t": 43.431,
+  "lever_words": [
+   "Recycled content 30% — Small aggregate",
+   "Receiving site: Soil hub (route R4) — route R3: Compound → Tip"
+  ],
+  "levers": [
+   {
+    "driver": "recycled",
+    "pct": 30,
+    "scope": {
+     "category": "Small aggregate"
+    }
+   },
+   {
+    "driver": "disposal",
+    "scope": {
+     "route_id": "R3"
+    },
+    "to_route": "R4"
+   }
+  ],
+  "mode": "pct",
+  "pct_below": 73.1,
+  "set_at_alternative_t": 43.431,
+  "set_at_approved_t": 161.446,
+  "ui_state": {
+   "alt": {},
+   "disposal": {
+    "R3": {
+     "to_route": "R4"
+    }
+   },
+   "distance": {},
+   "electric": false,
+   "epd": {},
+   "recycled": {
+    "Small aggregate": 30
+   },
+   "reused": {},
+   "supplier": {},
+   "vehicle": {}
+  },
+  "updated_at": "<ts>",
+  "updated_by": "Sam (planner)"
+ }
+}
