@@ -153,6 +153,11 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
             "origin_name": ctx.get("origin_name"), "dest_name": ctx.get("dest_name"),
             "tonnes": f["tonnes"], "trips": f["trips"], "vehicles": vehicles,
             "baked": baked, "km_trip": ctx.get("km_trip"), "basis_km": ctx.get("basis_km"),
+            # 10 Oct 2026 (carbon planner): the one-way loaded km, the return km (None when the
+            # return leg is not baked) and the payload the trips divide by — read by carbon.py so
+            # the Carbon page and the Dashboard share one distance and one trip count
+            "distance_km": ctx.get("distance_km"), "return_km": ctx.get("return_km"),
+            "payload_t": ctx.get("payload_t"), "dest_id": ctx.get("dest_id"), "origin_id": ctx.get("origin_id"),
             "cycle_min": ctx.get("cycle_min"), "cycles_per_vehicle_day": (cycles if baked else None),
             "km": km, "tonne_km": f.get("tonne_km"), "co2_t": co2_t,
             "planned": planned, "fair": fair,

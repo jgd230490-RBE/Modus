@@ -97,6 +97,8 @@ except Exception:                                   # pragma: no cover
 # H1: which distance unit the tenant READS. Everything is stored in km; "mi" converts on
 # display and on the exports only. Per tenant (HU5, decided 29 Sep) until G3 exists.
 DISTANCE_UNITS = ("km", "mi")
+# 10 Oct 2026, carbon planner: what a vehicle runs on. Absent = diesel (every entry before 10 Oct).
+FUELS = ("diesel", "electric")
 KM_PER_MILE = 1.609344
 
 
@@ -241,6 +243,20 @@ def validate(doc, network=None):
                     p.append(f"vehicle '{k}': {f} must be a number >= 0")
             if v.get("gvw_t") is not None and num(v.get("gvw_t")) and num(pl) and v["gvw_t"] < pl:
                 p.append(f"vehicle '{k}': gvw_t is less than payload_t")
+            # 10 Oct 2026, carbon planner: the fuel and the electric figures
+            fu = v.get("fuel")
+            if fu is not None and fu not in FUELS:
+                p.append(f"vehicle '{k}': fuel must be one of {', '.join(FUELS)}")
+            if fu == "electric":
+                kw = v.get("kwh_per_km")
+                if not num(kw) or kw <= 0:
+                    p.append(f"vehicle '{k}': an electric vehicle needs kwh_per_km, a positive number")
+            for f in ("kwh_per_km", "battery_kwh_usable", "charge_kw"):
+                if v.get(f) is not None and (not num(v[f]) or v[f] < 0):
+                    p.append(f"vehicle '{k}': {f} must be a number >= 0")
+            tw = v.get("geometry_twin")
+            if tw is not None and (not isinstance(tw, str) or tw not in vs or tw == k):
+                p.append(f"vehicle '{k}': geometry_twin must name another vehicle")
         for name in doc.get("planning_vehicles") or []:
             if name not in vs:
                 p.append(f"planning_vehicles names '{name}', which does not exist")
@@ -280,6 +296,38 @@ def validate(doc, network=None):
             x = plan.get(f)
             if not num(x) or x <= 0:
                 p.append(f"planning.{f} must be a positive number")
+    # 10 Oct 2026: the carbon block, when present — every factor a number >= 0 or null, and a
+    # material category's carbon_material must name a class the block (or the file's) carries
+    cb = doc.get("carbon")
+    if cb is not None and not isinstance(cb, dict):
+        p.append("carbon must be an object")
+        cb = None
+    mats = (cb or {}).get("materials") if isinstance(cb, dict) else None
+    if isinstance(mats, dict):
+        for mk, m in mats.items():
+            if mk.startswith("_") or not isinstance(m, dict):
+                continue
+            for grp in ("kg_co2e_per_t", "disposal_kg_co2e_per_t"):
+                for kk, x in ((m.get(grp) or {}) if isinstance(m.get(grp), dict) else {}).items():
+                    if x is not None and (not num(x) or x < 0):
+                        p.append(f"carbon.materials.{mk}.{grp}.{kk} must be a number >= 0 or null")
+    el = (cb or {}).get("electricity") if isinstance(cb, dict) else None
+    if isinstance(el, dict):
+        for kk, x in el.items():
+            if kk.endswith("_per_kwh") and (not num(x) or x < 0):
+                p.append(f"carbon.electricity.{kk} must be a number >= 0")
+    if isinstance(cats, dict):
+        known = set(k for k in (mats or {}) if not k.startswith("_"))
+        if not known:
+            try:
+                with open(os.path.join(os.path.dirname(__file__), "factors.json"), encoding="utf-8") as fh:
+                    known = set(k for k in ((json.load(fh).get("carbon") or {}).get("materials") or {}) if not k.startswith("_"))
+            except Exception:
+                known = set()
+        for k, c in cats.items():
+            cm = c.get("carbon_material") if isinstance(c, dict) else None
+            if cm is not None and known and cm not in known:
+                p.append(f"material '{k}': carbon_material '{cm}' is not a carbon material ({', '.join(sorted(known))})")
     # 10 Sep night: the fair-price block, when present — numbers >= 0, months 1-12
     fp = doc.get("fair_price")
     if fp is not None:

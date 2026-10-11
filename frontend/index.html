@@ -1188,6 +1188,9 @@ function App(){
       const vl = m && m.vehicle_labels;
       if(vl){ VEH.labels = vl.labels || {}; VEH.fallbacks = vl.fallbacks || {}; }
       HIDDEN_VEHICLES.length = 0; (m && m.hidden_vehicles || []).forEach(v => HIDDEN_VEHICLES.push(v));
+      // 10 Oct 2026 (carbon planner): a scenario-only profile (the electric variants) is tested on
+      // the Carbon page and never offered on a forecast — it has no baked geometry of its own
+      Object.entries((m && m.vehicle_details) || {}).forEach(([k, v]) => { if(v && v.scenario_only && !HIDDEN_VEHICLES.includes(k)) HIDDEN_VEHICLES.push(k); });
       const tn = m && m.tenant;
       if(tn){ Object.assign(TENANT, { name: tn.name || "Wayscope", team_label: tn.team_label || "Team",
                                       currency: tn.currency || "EUR", symbol: tn.currency_symbol || "€",

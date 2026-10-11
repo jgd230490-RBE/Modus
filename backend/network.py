@@ -2271,8 +2271,9 @@ def route_analysis(route_id, profiles=None):
         loaded, ret = legs.get("loaded", {}), legs.get("return", {})
         v = veh.get(prof, {}) or {}
         payload_t = float(v.get("payload_t") or default_veh.get("payload_t") or 0)
-        co2_per_km = float(v.get("emissions_kg_co2e_per_km")
-                           or default_veh.get("emissions_kg_co2e_per_km") or 0)
+        co2_per_km = (conversions._emissions(factors, prof) if v.get("fuel") == "electric"   # 10 Oct: derived, one place
+                      else float(v.get("emissions_kg_co2e_per_km")
+                                 or default_veh.get("emissions_kg_co2e_per_km") or 0))
         # turnaround varies by vehicle — a flatbed strapping a load is not a tipper
         load_m, unload_m = _turnaround_minutes(prof, factors)
         for alt in sorted(loaded):

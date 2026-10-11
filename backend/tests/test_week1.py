@@ -252,7 +252,14 @@ ok("A: /api/meta ships them as their own list",
 ALL_V = conversions.vehicle_names(F)
 # NARROWED (H1, 29 Sep 2026): twelve — the four added on 1 Sep, the six kept, and two UK
 # truck mixers added for GB tenants. Nothing was removed (the point of this assertion).
-ok("A: twelve vehicles in total — four added, six kept, two GB mixers (H1)", len(ALL_V) == 12, str(len(ALL_V)))
+# NARROWED again (10 Oct 2026, carbon planner): fourteen — two battery-electric variants
+# added BESIDE the baked artic and 8-wheeler (new keys; nothing renamed, nothing removed).
+ok("A: fourteen vehicles in total — four added, six kept, two GB mixers (H1), two electric variants (carbon)",
+   len(ALL_V) == 14, str(len(ALL_V)))
+ok("A: the two electric variants are the only additions since H1, each twinned to a profile that is still present",
+   sorted(v for v in ALL_V if F["vehicles"][v].get("fuel") == "electric")
+   == ["Artic Tipper (44t) — electric", "Rigid 8-wheeler (32t) — electric"]
+   and all(F["vehicles"][v]["geometry_twin"] in ALL_V for v in ALL_V if F["vehicles"][v].get("fuel") == "electric"))
 ok("H1: the two GB truck mixers are present and the EU mixer is untouched",
    "Truck mixer 8 m³ (32t)" in ALL_V and "Truck mixer 6 m³ (26t)" in ALL_V and "N3 lorry (BA) 4-axle mixer 32 t" in ALL_V)
 for legacy in ("Rigid 7.5t", "Rigid 4-wheeler (18t)", "Rigid 6-wheeler (26t)",
