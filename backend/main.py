@@ -48,6 +48,7 @@ import costlines     # 11 Sep — one read of every forecast line's volume, haul
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
+import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -1566,6 +1567,24 @@ def delete_carbon_target():
     acc = _require_approver()
     carbon_target.clear()
     return carbon_target.payload(acc)
+
+
+# ------------------------------------------------------------------ the monthly bulletin (B4, 12 Oct 2026)
+@app.get("/api/bulletin/month")
+def bulletin_month(month: int = Query(..., ge=1, le=MONTH_COUNT)):
+    """
+    The monthly bulletin's figures as JSON (review §2.6; the HTML / PDF composition is another
+    track). Staff only — any valid code. `rollup` is the public map bar's month roll-up
+    reproduced on the server from the same per-line payload `/api/public/month-kpis` serves,
+    whole scheme, no map filters (bulletin.rollup_payloads carries the bar's eleven rules);
+    `conditions` is what the map's Conditions panel assembles, read from what is STORED:
+    restriction hits overlapping the calendar month ("never checked" where no check is stored),
+    stockpiles over at month end, the seasonal windows for the month, and typed caps exceeded
+    (a "planning flag", never a block). A team code gets the scheme's figures (they are the
+    public map's) with the per-team rows limited to its own team.
+    """
+    acc = _require_access()
+    return bulletin.month_page(month, acc)
 
 
 # ------------------------------------------------------------------ public feed (map)

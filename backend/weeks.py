@@ -108,6 +108,19 @@ def weeks_in_month(month_index, start_year=None):
     return len(iso_weeks_of_month(*_month_of(month_index, start_year)))
 
 
+def month_span(month_index, start_year=None):
+    """
+    (first day, last day) of the CALENDAR month an absolute month_index names. The
+    bulletin (12 Oct 2026) tests stored restriction hits against this span, the way the
+    Look-ahead tests them against week_span(): a dated closure counts in the month it
+    overlaps, not in every month that carries volume.
+    """
+    y, m = _month_of(month_index, start_year)
+    first = datetime.date(y, m, 1)
+    nxt = datetime.date(y + 1, 1, 1) if m == 12 else datetime.date(y, m + 1, 1)
+    return first, nxt - datetime.timedelta(days=1)
+
+
 def week_span(month_index, week_index, start_year=None):
     """(monday, sunday) of the k-th week of a month. Raises on a week the month lacks."""
     ws = iso_weeks_of_month(*_month_of(month_index, start_year))

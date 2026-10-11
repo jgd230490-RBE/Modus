@@ -346,6 +346,18 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ …and sending it to the fictional soil-recycling hub moves 515.406 t, ranked as the disposal decision",
        (_a.get("drivers") or [{}])[0].get("driver") == "disposal" and abs(_a.get("delta_t", 0) + 515.406) < 0.002, str(_a.get("drivers"))[:200])
 
+    # B4 (12 Oct 2026): with NO geometry the map draws nothing, so the bulletin's roll-up is EMPTY and names every
+    # line as not drawn — it never presents zeros as figures. The baked case is 3c below.
+    r = c.get("/api/bulletin/month?month=10", headers=PLAN)
+    _pe = r.json() if r.status_code == 200 else {}
+    ok("⭐ the bulletin on the unbaked demo: empty (four headline figures null), all 19 October lines named as on routes the map does not draw",
+       r.status_code == 200 and _pe["rollup"]["empty"] is True and _pe["rollup"]["headline"]["two_way_a_day"] is None
+       and _pe["rollup"]["headline"]["routes_in_use"] == 0 and _pe["rollup"]["routes_not_drawn"]["lines"] == 19
+       and len(_pe["rollup"]["routes_not_drawn"]["routes"]) == 19
+       and _pe["rollup"]["note"] == ("No approved forecast on a route the map draws in this month: 19 lines on 19 routes "
+                                     "not yet baked, listed below and not counted.")
+       and _pe["conditions"]["route_caps"]["wording"] == "planning flag", f"{r.status_code} {str(_pe)[:300]}")
+
     _r001 = [x for x in rows if x["route_id"] == "R001" and x["status"] == "Approved"]
     db.execute("INSERT INTO route_geometry (tenant_id, route_id, vehicle_profile, leg, alt_index, geometry, distance_km, "
                "duration_hr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ("default", "R001", "Artic Tipper (44t)", "loaded", 0, "[[-1.2,52.5],[-1.1,52.6]]", 18.4, 0.42))
@@ -395,6 +407,59 @@ with TestClient(main.app, base_url="https://testserver") as c:
            f"{r.status_code} {_st[:300]}")
         r = c.post("/api/carbon/summary.pdf", headers=PLAN, json={"commentary": "x" * 1501})
         ok("🔴 a commentary over 1,500 characters is refused — 400", r.status_code == 400 and "1500" in r.text, r.text[:160])
+
+        # --------------------------------------- 3c. the monthly bulletin (B4, 12 Oct 2026), while R001 is baked
+        r = c.get("/api/bulletin/month?month=10")
+        ok("🔴 the bulletin without a code — 401", r.status_code == 401, str(r.status_code))
+        ok("🔴 a month outside the horizon is refused — 422", c.get("/api/bulletin/month?month=0", headers=PLAN).status_code == 422)
+        r = c.get("/api/bulletin/month?month=10", headers=PLAN)
+        pg = r.json() if r.status_code == 200 else {}
+        hl = (pg.get("rollup") or {}).get("headline") or {}
+        _wd = pg.get("working_days")
+        ok("⭐ the bulletin answers a planner for Oct 2026: the four headline figures present, working days stated, the demo notice on it",
+           r.status_code == 200 and pg["month"] == {"index": 10, "label": "Oct 2026", "label_long": "October 2026",
+                                                     "from": "2026-10-01", "to": "2026-10-31"}
+           and all(hl.get(k) is not None for k in ("two_way_a_day", "movements_in_month", "routes_in_use", "tonnes"))
+           and _wd and hl["working_days"] == _wd and pg["demo_notice"] == "Fictional demo scheme · nothing here is real"
+           and pg["plan_only"] is True, f"{r.status_code} {str(pg)[:300]}")
+        _kp = c.get("/api/public/month-kpis?month=10", headers=PLAN).json()
+        _r001 = [l for l in _kp["lines"] if l["route_id"] == "R001"]
+        ok("⭐ …the figures are the map bar's rules over the map's own payload: R001 is the ONE drawn route — 16,900 t ÷ 29 t "
+           "= 582.759 loads ÷ working days; vehicles = ceil per line from the same trips_per_vehicle_day; the 18 undrawn routes named",
+           hl["routes_in_use"] == 1 and abs(hl["tonnes"] - 16900) < 1e-6 and abs(hl["movements_in_month"] - 16900 / 29) < 1e-3
+           and abs(hl["two_way_a_day"] - 16900 / 29 / _wd) < 1e-3 and len(_r001) == 1 and _r001[0]["trips_per_vehicle_day"]
+           and pg["rollup"]["vehicles"]["fleet"] == -(-(16900 / 29 / _wd) // _r001[0]["trips_per_vehicle_day"])
+           and pg["rollup"]["routes_not_drawn"]["lines"] == 18 and len(pg["rollup"]["routes_not_drawn"]["routes"]) == 18
+           and "R001" not in pg["rollup"]["routes_not_drawn"]["routes"], f"{hl} {pg['rollup'].get('vehicles')} {_r001}")
+        _cl10 = sum(x["co2_t"] for x in cl["lines"] if x["route_id"] == "R001" and x["month_index"] == 10 and x["co2_t"] is not None)
+        ok("⭐ …carbon is the costlines figure the Dashboard reads (R001, October), stamped as the Carbon page stamps it",
+           abs(pg["rollup"]["carbon"]["co2_t_in_month"] - _cl10) < 0.002 and _cl10 > 0
+           and pg["rollup"]["carbon"]["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures",
+           f"{pg['rollup']['carbon']} vs {_cl10}")
+        _b = pg["rollup"]["busiest_routes"]
+        ok("…the busiest route is R001 by its places, with \"no planning cap typed\"; the team row reads the tenant's name, never an id",
+           len(_b) == 1 and _b[0]["label"] == "Kilby Ridge Quarry → Harborough Compound" and _b[0]["cap_wording"] == "no planning cap typed"
+           and [t["key"] for t in pg["rollup"]["breakdown"]["team"]] == ["South Team"] and "IPT" not in r.text, str(_b)[:200])
+        _cn = pg["conditions"]
+        ok("⭐ …conditions of the month from what is STORED: no stored check, so \"never checked\" on all 19 routes (National Highways provider)",
+           _cn["restrictions"]["status"] == "never checked" and len(_cn["restrictions"]["never_checked_routes"]) == 19
+           and _cn["restrictions"]["hits"] == [] and _cn["restrictions"]["provider"] == "nh_closures", str(_cn["restrictions"])[:200])
+        ok("⭐ …Stockpile Tilton over at the end of October by 510 t (40,510 against 40,000 — the figure the live map showed on 11 Oct)",
+           [(p["name"], p["capacity_qty"], p["balance_end"], p["over_by"]) for p in _cn["stockpiles_over"]]
+           == [("Stockpile Tilton", 40000.0, 40510.0, 510.0)], str(_cn["stockpiles_over"]))
+        _cap = _cn["route_caps"]
+        ok("⭐ …the typed cap on R016 (20 a day) is exceeded by October's loaded trips a day and reads \"planning flag\", never a block",
+           _cap["wording"] == "planning flag" and _cap["routes_with_cap"] == 2 and [e["route_id"] for e in _cap["exceeded"]] == ["R016"]
+           and _cap["exceeded"][0]["cap"] == 20 and _cap["exceeded"][0]["two_way_a_day"] > 20
+           and "never a block" in _cap["note"] and "planning flag" in r.text, str(_cap)[:300])
+        ok("…no seasonal window on the demo (the seed has none)", _cn["seasonal"] == [])
+        r2 = c.get("/api/bulletin/month?month=10", headers=NORTH)
+        pn = r2.json() if r2.status_code == 200 else {}
+        ok("⭐ the North Team code gets the SCHEME's figures (the public map's) with the per-team rows limited to its own team — "
+           "none here, the one drawn route is South Team's",
+           r2.status_code == 200 and pn["rollup"]["headline"] == hl and pn["rollup"]["busiest_routes"] == _b
+           and pn["rollup"]["breakdown"]["team"] == [] and pn["scope"]["team"] == "North Team"
+           and pn["rollup"]["breakdown"]["discipline"] == pg["rollup"]["breakdown"]["discipline"], f"{r2.status_code} {str(pn.get('scope'))}")
     finally:
         db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?",
                    ("default", "R001", "Artic Tipper (44t)"))

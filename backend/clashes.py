@@ -264,14 +264,18 @@ def stockpile_over(lines, stock):
     return out
 
 
-def _overlaps_week(hit, week_from, week_to):
+def _overlaps_span(hit, span_from, span_to):
     """
-    HU4 (decided 29 Sep 2026): a DATED hit counts only in the weeks it overlaps. `from`
+    HU4 (decided 29 Sep 2026): a DATED hit counts only in the span it overlaps. `from`
     and `to` are ISO dates on the stored hit (NULL = open-ended, as in restrictions.
     in_force). An undated hit — a Tark Tee mass or height limit — always counts. With
-    no week given (a caller without a bucket) every hit counts, as before H1.
+    no span given (a caller without a bucket) every hit counts, as before H1.
+
+    12 Oct 2026: generalised from the week so the bulletin can ask the same question of a
+    calendar month (weeks.month_span). One rule, two callers; `_overlaps_week` is kept
+    as the week-shaped name the Look-ahead and its harness use.
     """
-    if week_from is None or week_to is None:
+    if span_from is None or span_to is None:
         return True
     a, b = hit.get("from"), hit.get("to")
     try:
@@ -279,11 +283,16 @@ def _overlaps_week(hit, week_from, week_to):
         b = datetime.date.fromisoformat(str(b)[:10]) if b else None
     except ValueError:
         return True                       # an unreadable date must not hide a hit
-    if a and a > week_to:
+    if a and a > span_to:
         return False
-    if b and b < week_from:
+    if b and b < span_from:
         return False
     return True
+
+
+def _overlaps_week(hit, week_from, week_to):
+    """The week-shaped name: see _overlaps_span."""
+    return _overlaps_span(hit, week_from, week_to)
 
 
 def restriction(lines, month_index=None, week_index=None):
