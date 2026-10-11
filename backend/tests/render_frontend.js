@@ -185,9 +185,11 @@ if (loaded) {
     ok("⭐ ...the approved plan 157.0 t and the alternative 32.8 t, 124.2 tCO2e lower (79.1%)",
       cOut.includes(">Approved plan<") && cOut.includes("157.0") && cOut.includes("32.8")
       && cOut.includes("124.2 tCO2e lower than the approved plan (79.1%)") && !cOut.includes("Baseline"));
-    const iD = cOut.indexOf("Receiving site and disposal method"), iF = cOut.indexOf(">Battery electric lorries<");
+    // NARROWED 11 Oct 2026 (the process layout: step 3's "Battery electric lorries" control now comes before the ranking in
+    // step 5, so the order is read inside the ranking, from its heading on)
+    const iW = cOut.indexOf("Which decisions change carbon most"), iD = cOut.indexOf("Receiving site and disposal method", iW), iF = cOut.indexOf(">Battery electric lorries<", iD);
     ok("⭐ ...the drivers in the server's order: receiving site and disposal method, then battery electric lorries, then recycled content",
-      cOut.includes("Which decisions change carbon most") && iD > 0 && iF > iD && cOut.lastIndexOf("Recycled content") > iF);
+      iW > 0 && iD > iW && iF > iD && cOut.indexOf("Recycled content", iF) > iF);
     ok("...lorry loads beside the carbon: 335 on the approved plan, 382 on the alternative, 47 more because each lorry carries less",
       cOut.includes(">335<") && cOut.includes(">382<") && cOut.includes("47 more lorry loads, because each lorry carries less"));
     ok("...the NH intensity is the restated 159 to 181 at 2023 prices, context only",
@@ -202,8 +204,9 @@ if (loaded) {
       cOut.includes("Not available: no primary-production factor is published for Soils.") && cOut.includes("EPD reference (required)")
       && cOut.includes("Battery electric lorries") && cOut.includes("Where Config has an electric profile for that lorry"));
     // after the show (11 Oct 2026, items 8, 9, 11–15) — the figures test_carbon.py hand-works
+    // NARROWED 11 Oct 2026 (the process layout: "What this page counts" is now the "What this counts" details in step 1)
     ok("...item 8 what the page counts, and the one unrouted line named as left out",
-      cOut.includes("What this page counts") && cOut.includes("Making the material (A1–A3); transport to site and back, both legs (A4)")
+      cOut.includes("<summary>What this counts</summary>") && cOut.includes("Making the material (A1–A3); transport to site and back, both legs (A4)")
       && cOut.includes("1 plan line has no route distance yet: transport not counted"));
     ok("...item 14 the life-cycle modules on both cards: 30.4 · 5.6 · 120.9 and 25.1 · 1.2 · 6.5",
       cOut.includes("By life-cycle module: A1–A3 30.4 · A4 5.6 · A5 120.9") && cOut.includes("By life-cycle module: A1–A3 25.1 · A4 1.2 · A5 6.5"));
@@ -216,11 +219,60 @@ if (loaded) {
     ok("...item 13 the waste hierarchy on the muck-away route (landfill: disposal) and on each method offered",
       cOut.includes("Waste hierarchy: disposal") && cOut.includes("Recycled (closed-loop) · waste hierarchy: recycling")
       && cOut.includes("Wayscope does not replace these or the duty of care"));
+    // NARROWED 11 Oct 2026 (the process layout: the summary is step 5's second action, its commentary in a details;
+    // "Using these results" is "Who acts on these results" under About these figures)
     ok("...item 11 the summary card and item 15 who acts",
-      cOut.includes("Summary for the file") && cOut.includes("Download the summary (PDF)") && cOut.includes("Using these results")
+      cOut.includes("<summary>Add a commentary (optional)</summary>") && cOut.includes("Download the summary (PDF)") && cOut.includes("Who acts on these results")
       && cOut.includes("Principal contractor") && cOut.includes("Roles as CLOCS names them."));
     ok("...the Planned panel and the known limits, and nothing renders as undefined or NaN",
       cOut.includes("Not built yet") && cOut.includes("Known limits") && !/undefined|NaN/.test(cOut));
+
+    // ---- 11 Oct 2026: the process layout and step 6, the carbon target (fixtures/carbon_target.json from
+    // test_carbon_target.py: a 73.1% target, approved 161.446, with the decisions 43.431, target 43.429, gaps
+    // 118.017 and 0.002, pending 5.653). The other states are the same GET with the fields the server would send.
+    ok("⭐ ...the six steps render in order, with the result strip at the foot pointing to step 5",
+      [1, 2, 3, 4, 5, 6].every(n => cOut.indexOf(`id="carbon-step-${n}"`) > 0 && (n === 1 || cOut.indexOf(`id="carbon-step-${n - 1}"`) < cOut.indexOf(`id="carbon-step-${n}"`)))
+      && ["Your approved plan", "Materials", "Lorries and routes", "Surplus material", "Result", "Carbon target"].every(t => cOut.includes(`<span>${t}</span>`))
+      && cOut.includes("Result: <b>32.8 tCO2e</b>, 124.2 tCO2e lower (79.1%)") && cOut.includes(">See step 5</button>")
+      && cOut.indexOf(">See step 5</button>") > cOut.indexOf('id="carbon-step-6"'));
+    const ct6Path = path.join(__dirname, "fixtures", "carbon_target.json");
+    ok("the carbon-target fixture exists for the Carbon page's step 6 (written by test_carbon_target.py)", fs.existsSync(ct6Path));
+    if (fs.existsSync(ct6Path)) {
+      const CT6 = JSON.parse(fs.readFileSync(ct6Path, "utf8"));
+      const with6 = (s, t) => ({ target: { ...CT6.target, ...(t || {}) }, status: { ...CT6.status, ...s } });
+      const step6 = (o) => { const i = o.indexOf('id="carbon-step-6"'); return i < 0 ? "" : o.slice(i, o.indexOf("About these figures", i)); };
+      const cp = (ct, acc) => render("the Carbon page renders a carbon target state", h(sandbox.CarbonPage, { meta, access: acc || planner, who: "Sam", initialData: cs, initialTarget: ct }));
+      const pSet = cp(CT6), p6 = step6(pSet);
+      ok("⭐ ...step 6, a planner and a set target: the target; as forecast 118.0 tCO2e over; with the agreed decisions on target (0.002 is inside the stored 73.1%'s rounding); what the pending lines would add; who set it",
+        p6.includes("Target: 73.1% below the approved plan, which is 43.4 tCO2e today") && p6.includes("As forecast: <b>161.4 tCO2e</b>, 118.0 tCO2e over the target")
+        && p6.includes("With the agreed decisions: <b>43.4 tCO2e</b>, on target") && p6.includes("Lines waiting for approval would add 5.7 tCO2e.")
+        && p6.includes(">Set by Sam (planner)<") && p6.includes("<li>Recycled content 30% — Small aggregate</li>") && !/undefined|NaN/.test(pSet));
+      ok("...the planner's controls: the stored mode pressed and ticked, Set waiting for a choice (and saying so), Open the agreed decisions, Clear the target",
+        p6.includes('aria-pressed="true"') && p6.includes("✓ % below the approved plan") && p6.includes(">Fixed tCO2e cap</button>")
+        && /<button type="button" class="btn-pri" disabled="">Set as the scheme&#x27;s carbon target<\/button>/.test(p6) && p6.includes("Make a choice in steps 2 to 4 first.")
+        && p6.includes(">Open the agreed decisions</button>") && p6.includes(">Clear the target</button>"));
+      ok("...and step 1 says there is a target, pointing to step 6",
+        pSet.slice(0, pSet.indexOf('id="carbon-step-2"')).includes("Carbon target: 73.1% below the approved plan, which is 43.4 tCO2e today (step 6)"));
+      const pNone = step6(cp({ target: null, status: null }));
+      ok("...no target: says so, the % mode picked for the next one, nothing to open or clear",
+        pNone.includes("No carbon target is set yet.") && pNone.includes("✓ % below the approved plan") && !pNone.includes("Clear the target") && !pNone.includes("Open the agreed decisions"));
+      const pCap = step6(cp(with6({ target_t: 43.431, gap_as_forecast_t: 118.015, gap_with_decisions_t: -12.34 }, { mode: "cap" })));
+      ok("...a cap reads as a fixed cap, ticked; a gap below it reads 12.3 tCO2e under the target",
+        pCap.includes("Target: a fixed cap of 43.4 tCO2e") && pCap.includes("✓ Fixed tCO2e cap")
+        && pCap.includes("With the agreed decisions: <b>43.4 tCO2e</b>, 12.3 tCO2e under the target") && !/undefined|NaN/.test(pCap));
+      const pTeam = step6(cp(with6({ scope: "team" }), submitter));
+      const pTeamCap = step6(cp(with6({ scope: "team", target_t: null, gap_as_forecast_t: null, gap_with_decisions_t: null }, { mode: "cap" }), submitter));
+      ok("⭐ ...a team code: its own lines in the tenant's word, no controls, told who sets it; a cap is the whole scheme's; no team id",
+        pTeam.includes("Target: 73.1% below the approved plan; on your team&#x27;s lines that is 43.4 tCO2e") && pTeam.includes("Your planner sets the scheme&#x27;s carbon target.")
+        && !pTeam.includes("Set as the scheme") && !pTeam.includes("Clear the target") && !pTeam.includes("aria-pressed")
+        && pTeamCap.includes("for the whole scheme (a cap has no share per team)") && !pTeamCap.includes("over the target")
+        && !/IPT\d/.test(pTeam + pTeamCap) && !/undefined|NaN/.test(pTeam + pTeamCap));
+      const pBad = step6(cp(with6({ with_decisions_t: null, gap_with_decisions_t: null,
+        invalid: "The agreed decisions no longer fit the plan (route 'R4' does not exist), so the plan with them cannot be worked out. Set the target again on the Carbon page." })));
+      ok("...decisions that no longer apply: the server's sentence in place of the second line, the as-forecast line kept",
+        pBad.includes("The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist)") && !pBad.includes("With the agreed decisions:")
+        && pBad.includes("As forecast: <b>161.4 tCO2e</b>, 118.0 tCO2e over the target"));
+    }
   } else {
     ok("CarbonPage is defined", false);
   }

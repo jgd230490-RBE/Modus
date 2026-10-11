@@ -1279,11 +1279,15 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("⭐ the Carbon planner is a Plan-group page after Forecasts (not admin-gated: a team code sees its own lines)",
      /\{ id: "forecasts", label: "Forecasts", glyph: "☰" \},\n    \{ id: "carbon", label: "Carbon planner", glyph: "◐" \},\n  \]\},/.test(code)
      && !/group: "Plan", admin/.test(code));
-  ok("...and the page switch renders CarbonPage", /page === "carbon" && <CarbonPage meta=\{meta\} access=\{role\} \/>/.test(code));
+  // NARROWED 11 Oct 2026 (the process layout: the page switch also hands the Carbon page the typed sign-in name, the "set by" of a target)
+  ok("...and the page switch renders CarbonPage", /page === "carbon" && <CarbonPage meta=\{meta\} access=\{role\} who=\{who\} \/>/.test(code));
   // NARROWED 11 Oct 2026 (after the show, item 11): + the one summary download, which the server draws from the same read
-  ok("🔴 ONE read: POST /api/carbon/scenario, and no other fetch on the page but the summary PDF download",
-     cb.length > 5000 && (cb.match(/fetch\(/g) || []).length === 2 && cb.includes('fetch(`${API}/carbon/scenario`, { method: "POST"')
-     && cb.includes('fetch(`${API}/carbon/summary.pdf`, { method: "POST"'));
+  // NARROWED 11 Oct 2026 (the process layout, step 6): + ONE call to /api/carbon/target, whose three verbs (GET, PUT, DELETE)
+  // go through one helper; the scenario is still the page's only read of carbon figures
+  ok("🔴 ONE read: POST /api/carbon/scenario, and no other fetch on the page but the summary PDF download and the target's one call",
+     cb.length > 5000 && (cb.match(/fetch\(/g) || []).length === 3 && cb.includes('fetch(`${API}/carbon/scenario`, { method: "POST"')
+     && cb.includes('fetch(`${API}/carbon/summary.pdf`, { method: "POST"')
+     && cb.includes('fetch(`${API}/carbon/target`, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined })'));
   ok("🔴 no carbon arithmetic in the browser: no emission key, no factor literal, no km/mile constant",
      !/emissions_kg_co2e_per_km|kwh_per_km \*|0\.93939|0\.99773|7\.80307|0\.14395|0\.13096|1\.609344|19\.55376/.test(cb));
   ok("distances and per-distance figures go through the tenant's unit (fmtDist, distRate, DU, TKM)",
@@ -1302,8 +1306,12 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      cb.includes("disabled={!m.recycled_enabled || !!e.kg}") && cb.includes("Not available: {m.recycled_reason}."));
   ok("an EPD needs its reference (the field says so; the server refuses it otherwise)", cb.includes("EPD reference (required)"));
   // NARROWED 11 Oct 2026: "route distance", the Routes page's Bake named as the action
-  ok("the unbaked lines are named, never estimated", cb.includes("no route distance yet, so {unrouted === 1 ? \"its\" : \"their\"} transport is not counted: route them with Bake on the Routes page")
-     && cb.includes("const unrouted = (B.totals.lines || 0) - (B.totals.baked_lines || 0);"));
+  // NARROWED 11 Oct 2026 (the process layout: the header's line moved into step 1, as the first of the server-counted
+  // left-out lines, in the words of the "Left out here" list)
+  ok("the unbaked lines are named, never estimated",
+     cb.includes('unrouted > 0 ? `${unrouted} plan line${unrouted === 1 ? " has" : "s have"} no route distance yet: transport not counted (Bake on the Routes page)` : ""')
+     && cb.includes("const unrouted = (B.totals.lines || 0) - (B.totals.baked_lines || 0);")
+     && cb.includes('{leftOut.length > 0 && <p className="text-sm text-amber-700 mt-2">{leftOut[0]}'));
   ok("🔴 the electric figures carry their basis: no Government electric HGV factor; the +2 t allowance is draft, not applied",
      cb.includes("no Government electric HGV factor exists") && cb.includes("is a draft rule and is not applied")
      && cb.includes("kWh per km × UK electricity") && !cb.includes("kWh per {DU()}") && cb.includes("Where Config has an electric profile for that lorry"));
@@ -1332,8 +1340,9 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      /\n  carbon: "M/.test(code) && (cb.match(/<PageHeader title="Carbon planner" kicker="Plan"/g) || []).length === 2
      && cb.includes('<EmptyState kind="error" title="Couldn\'t compute the carbon scenario"'));
   // 11 Oct 2026 — the plain-English pass (notes/carbon-ui-1011, every item checked against its source)
+  // NARROWED 11 Oct 2026 (the process layout: the "Approved plan" card is now step 1, "Your approved plan", from the step titles)
   ok("plain English: 'Approved plan', never 'Baseline' (National Highways uses baseline for its 2019/20 year)",
-     cb.includes('<Total title="Approved plan" sub="What the alternative is compared with"') && !/\bBaseline\b/.test(cb)
+     cb.includes('const CARBON_STEP_TITLES = ["Your approved plan", ') && cb.includes('<CarbonStep n={1} data-guide="carbon-compare">') && !/\bBaseline\b/.test(cb)
      && cb.includes("than the approved plan (${pct(A.delta_pct)})") && !src.includes("What moves carbon most"));
   ok("plain English: a change is said in words ('tCO2e lower' / 'higher' / 'no change'), never by colour alone",
      cb.includes("tCO2e lower`") && cb.includes("tCO2e higher`") && cb.includes('"no change"') && cb.includes('<b style={{ color: tone(d.delta_t) }}>{moved(d.delta_t)}</b>'));
@@ -1343,7 +1352,12 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      !cb.includes("uppercase") && !cb.includes("text-xs") && !/text-\[(9|10|11|12)px\]/.test(cb) && cb.includes('const h3 = "text-base font-semibold text-slate-800";'));
   ok("the warning line says what the page is not, before anything else", cb.includes('role="note"')
      && cb.includes("<strong className=\"text-base text-slate-800\">Planning estimates. Not a National Highways Carbon Tool return.</strong>"));
-  ok("on a phone the answer comes before the controls", cb.includes('className="lg:col-span-2 space-y-4 order-1 lg:order-2"') && cb.includes('className="space-y-4 order-2 lg:order-1" data-guide="carbon-levers"'));
+  // REVERSED 11 Oct 2026 (the user: "make it like a process, with a final target at the end": the six steps run top to
+  // bottom on every screen, so the answer no longer jumps above the controls on a phone; a strip at the foot keeps it in view)
+  ok("on a phone the steps run in order (the answer is not moved above the controls) and a strip at the foot keeps the result in view",
+     !/\border-[12]\b|\blg:order-/.test(cb) && cb.includes('<div className="sticky bottom-0 z-10 mt-4">')
+     && cb.includes('<button type="button" className="link-btn" onClick={toResult}>See step 5</button>')
+     && cb.includes('document.getElementById("carbon-step-5")'));
   ok("lorry loads beside the carbon on both cards, the change in loads from the server (no subtraction in the browser)",
      cb.includes("Lorry loads (deliveries):") && cb.includes("lorries needed in the busiest month:") && cb.includes("A.delta_trips")
      && !/fleet\.trips\s*-/.test(cb) && cb.includes("more lorry loads, because each lorry carries less") && !/two-way/i.test(cb));
@@ -1359,14 +1373,20 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("the methods are named in full: 'National Highways Carbon Tool method (for comparison)'; laden share says how it is counted",
      cb.includes("National Highways Carbon Tool method (for comparison)") && cb.includes("Wayscope: per vehicle-km, both legs")
      && cb.includes("Every return leg is counted empty: back-loads are not modelled") && !cb.includes("Laden share of km"));
+  // NARROWED 11 Oct 2026 (the process layout: the "By material" table became step 2's one row per category, with the NH
+  // category on the name's hover; three tables remain, each inside a closed details)
   ok("the tables use the app's .tbl style with a caption, and the NH category takes NH's own name for waste",
-     (cb.match(/<table className="tbl">/g) || []).length === 4 && (cb.match(/<caption><b>/g) || []).length === 4
-     && cb.includes('"Waste": "Waste + Waste Transport"'));
+     (cb.match(/<table className="tbl">/g) || []).length === 3 && (cb.match(/<table\b/g) || []).length === 3 && (cb.match(/<caption><b>/g) || []).length === 3
+     && cb.includes('"Waste": "Waste + Waste Transport"')
+     && cb.includes('title={`National Highways Carbon Tool category: ${bc ? (CARBON_NH_CATEGORY[bc.sheet] || bc.sheet || "no category") : "no category"}`}'));
   // after the show (11 Oct 2026, notes/carbon-ui-1011 items 8, 9, 11–15): every figure from the server
+  // NARROWED 11 Oct 2026 (the process layout: "What this page counts" is now "What this counts", a closed details in step 1,
+  // still above the result in step 5)
   ok("item 8 'What this page counts' sits above the answer, in the server's words, with what is left out from the server's counts",
-     cb.includes('data-guide="carbon-counts"') && cb.includes("What this page counts") && cb.includes("const sw = data.scope_words || {};")
+     cb.includes('<details className="dash-more mt-3" data-guide="carbon-counts">') && cb.includes("<summary>What this counts</summary>") && cb.includes("const sw = data.scope_words || {};")
      && ["{sw.counts", "{sw.not_counted", "{sw.factors"].every(t => cb.includes(t)) && cb.includes("Nothing: every plan line is counted in full.")
-     && cb.indexOf('data-guide="carbon-counts"') < cb.indexOf('<div className="grid lg:grid-cols-3 gap-5">')
+     && cb.indexOf('data-guide="carbon-counts"') > cb.indexOf("<CarbonStep n={1}") && cb.indexOf('data-guide="carbon-counts"') < cb.indexOf("<CarbonStep n={2}")
+     && cb.indexOf('data-guide="carbon-counts"') < cb.indexOf("<CarbonStep n={5}")
      && ["B.totals.material_excluded_tonnes", "fl0.RETURN_NOT_BAKED", "fl0.NO_DISPOSAL_FACTOR", "B.totals.wtw_lines_out"].every(t => cb.includes(t)));
   ok("item 9 each decision's lorry effect from the server (delta_trips, delta_vkm_km), the distance in the tenant's unit",
      cb.includes("const lorryEffect = (d) => [loadsWord(d.delta_trips), kmWord(d.delta_vkm_km)]") && cb.includes("dist(km)") && cb.includes("lorry-${DU()}")
@@ -1398,6 +1418,64 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   const gs2 = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
   ok("the guide has steps for the Carbon page, on its own anchors", /\n  carbon: \[/.test(gs2)
      && ["carbon-compare", "carbon-levers", "carbon-drivers"].every(a => gs2.includes(`anchor: "${a}"`) && src.includes(`data-guide="${a}"`)));
+
+  // ---- 11 Oct 2026: the Carbon page as a process ending in the target (six steps; step 6 reads and sets it) --------
+  // Source-level. What they prove: the six steps in order, top to bottom; the guide on the same six anchors; the
+  // explanations in closed <details>; the target read and written only through /api/carbon/target with no figure in
+  // the body (the server works every number out); planner or admin only; the hooks before the early returns; and
+  // the merge's one way of saying a gap and a team across the four pages. Not covered here: the rendered states
+  // (render_frontend.js). Not covered anywhere: the PUT / DELETE round trip from a browser, confirm(),
+  // scrollIntoView and the sticky strip's look.
+  const _cp = cb.slice(cb.indexOf("function CarbonPage("));
+  ok("⭐ PROCESS: six numbered steps, in order, top to bottom: approved plan, materials, lorries and routes, surplus material, result, carbon target",
+     cb.includes('const CARBON_STEP_TITLES = ["Your approved plan", "Materials", "Lorries and routes", "Surplus material", "Result", "Carbon target"];')
+     && [1, 2, 3, 4, 5, 6].every(n => _cp.indexOf(`<CarbonStep n={${n}}`) > 0 && (n === 1 || _cp.indexOf(`<CarbonStep n={${n - 1}}`) < _cp.indexOf(`<CarbonStep n={${n}}`)))
+     && (_cp.match(/<CarbonStep n=\{/g) || []).length === 6 && _cp.includes('<ol className="space-y-4" aria-label="The six steps">'));
+  ok("...the step card is top level, never defined inside CarbonPage (inputs keep their focus, a details keeps its open state)",
+     cb.indexOf("function CarbonStep(") > 0 && cb.indexOf("function CarbonStep(") < cb.indexOf("function CarbonPage(")
+     && !/function CarbonStep\(|const CarbonStep =/.test(_cp));
+  ok("...each step is a section named by its number and heading",
+     cb.includes('aria-labelledby={"carbon-step-" + n + "-h"}') && cb.includes("<span>{CARBON_STEP_TITLES[n - 1]}</span>"));
+  const gsC = (gs2.match(/\n  carbon: \[([\s\S]*?)\n  \],/) || ["", ""])[1];
+  ok("⭐ the guide walks the same six steps, each on an anchor the page carries",
+     (gsC.match(/anchor: "/g) || []).length === 6
+     && ["carbon-compare", "carbon-levers", "carbon-lorries", "carbon-surplus", "carbon-drivers", "carbon-target"].every((a, i) =>
+        gsC.includes(`anchor: "${a}", title: "${i + 1}. `) && _cp.includes(`<CarbonStep n={${i + 1}} data-guide="${a}">`)));
+  ok("every explanation, table and list sits in a native details, closed (it stays in the markup the render harness reads)",
+     (_cp.match(/<details className="dash-more/g) || []).length >= 10 && !/<details[^>]*\bopen\b/.test(_cp)
+     && ["What this counts", "Use a supplier EPD", "Supplier and route, route by route", "Diesel or battery electric, same tonnage", "Transfer notes",
+         "The result in full", "How the plan compares", "Three ways to count the same haul", "Add a commentary (optional)", "About these figures"].every(t => _cp.includes(`<summary>${t}`)));
+  ok("🔴 step 6: the target goes only through /api/carbon/target; Set sends the decisions, the mode, the page state and the typed name, never a figure",
+     cb.includes('targetCall("PUT", { mode, levers, ui_state: st, updated_by: who || null }, "Target set.")')
+     && cb.includes('targetCall("PUT", { mode: k, updated_by: who || null }')
+     && cb.includes('targetCall("DELETE", null, "Target cleared.")') && cb.includes('targetCall("GET", null, null)')
+     && (cb.match(/targetCall\("/g) || []).length === 4 && !/\b(target_t|cap_t|pct_below|approved_t|with_decisions_t)\s*:/.test(cb));
+  ok("...a planner or admin code sets, switches or clears it; any other code reads it and is told who sets it",
+     cb.includes("const canSet = !!(access && access.can_approve);") && cb.includes("{canSet ? (")
+     && cb.includes("Your planner sets the scheme's carbon target.") && cb.includes("if(canSet && T.mode !== k) targetCall("));
+  ok("...the two ways a target is held are the server's own words (carbon_target.MODE_WORDS), the picked one ticked as well as filled",
+     cb.includes('const CARBON_TARGET_MODES = [["pct", "% below the approved plan"], ["cap", "Fixed tCO2e cap"]];')
+     && /MODE_WORDS = \{"pct": "% below the approved plan", "cap": "Fixed tCO2e cap"\}/.test(fs.readFileSync(path.join(ROOT, "backend", "carbon_target.py"), "utf8"))
+     && cb.includes("aria-pressed={mode === k}") && cb.includes('{mode === k ? "✓ " : ""}{w}'));
+  ok("...Set waits for a choice that lowers carbon and says why when it cannot; replacing or clearing asks first",
+     cb.includes('"Make a choice in steps 2 to 4 first."') && cb.includes('"These decisions do not lower carbon, so they cannot be the target."')
+     && cb.includes("disabled={!!setWhy || tBusy}") && cb.includes(`confirm("Replace the scheme's carbon target with these decisions?")`)
+     && cb.includes(`confirm("Clear the scheme's carbon target?")`));
+  ok("...a refusal reads as a sentence: the server's own words for a 400, plain words for 401, 403 and anything else",
+     cb.includes('if(status === 401) return "Sign in again to see the carbon target.";') && cb.includes('if(status === 403) return "Only a planner or admin code can change the carbon target.";')
+     && cb.includes('typeof j.detail === "string"') && cb.includes('role="alert"'));
+  ok("...the stored page state comes back into the controls only key by key (an object stays an object, electric a yes or no)",
+     cb.includes("function carbonStateFrom(u){") && cb.includes('if(k === "electric") o[k] = !!v;') && cb.includes("setSt(carbonStateFrom(T.ui_state))"));
+  ok("🔴 the new hooks sit before the page's early returns (React #310 blanked the app on 5 Oct)",
+     _cp.indexOf("const [tg, setTg]") > 0 && _cp.indexOf("const alive = useRef(true);") > 0 && _cp.indexOf('targetCall("GET", null, null)') > 0
+     && Math.max(_cp.indexOf("const [tg, setTg]"), _cp.indexOf("const alive = useRef(true);"), _cp.indexOf('targetCall("GET", null, null)')) < _cp.indexOf("if(!data && err) return"));
+  ok("...step 6 only compares the server's gaps with the rounding of a stored % (half of 0.1% of the approved plan); no figure is worked out",
+     cb.includes('const tol = (T && T.mode === "pct" && S ? Math.abs(S.approved_t || 0) * 0.0005 : 0) + 0.0005;')
+     && cb.includes("gapWord(S.gap_as_forecast_t)") && cb.includes("gapWord(S.gap_with_decisions_t)") && !/S\.\w+_t\s*[-+*/]\s*S\./.test(cb));
+  ok("🔴 the merge: the Carbon page says a gap as the other three pages do ('over' or 'under' the target) and a team in the tenant's word",
+     cb.includes("tCO2e under the target`") && !cb.includes("below the target") && !/your team's lines|per team\)/.test(cb)
+     && cb.includes("; on ${ctYour()} that is ") && cb.includes("(a cap has no share per ${TEAM().toLowerCase()})")
+     && code.includes('${gap > 0 ? "over" : "under"} the target'));
 }
 
 // ---- 10 Oct 2026: the UI pass (notes/ui-review-1009, mockups 1-6, 8 and 8b; colour-system-1010.md) ----

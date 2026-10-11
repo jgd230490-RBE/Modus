@@ -3871,10 +3871,11 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
   // decisions can read up to 0.05% of the approved plan over it (demo: 3.1 tCO2e on 6 482.5). A gap inside
   // that rounding, or inside the 3 dp of a cap, reads "on target". A comparison only: no figure is made here.
   const tol = (T && T.mode === "pct" && S ? Math.abs(S.approved_t || 0) * 0.0005 : 0) + 0.0005;
-  const gapWord = (g) => (g == null ? "" : Math.abs(g) <= tol ? "on target" : g > 0 ? `${grp(g, 1)} tCO2e over the target` : `${grp(-g, 1)} tCO2e below the target`);
+  // 11 Oct 2026 (the merge): "under", as the Dashboard, Forecasts and Submit forecast say it (ctGap)
+  const gapWord = (g) => (g == null ? "" : Math.abs(g) <= tol ? "on target" : g > 0 ? `${grp(g, 1)} tCO2e over the target` : `${grp(-g, 1)} tCO2e under the target`);
   const targetWords = !T ? "" : T.mode === "cap"
-    ? `a fixed cap of ${t1(T.cap_t)} tCO2e${team ? " for the whole scheme (a cap has no share per team)" : ""}`
-    : `${Number(T.pct_below).toFixed(1)}% below the approved plan${S && S.target_t != null ? (team ? `; on your team's lines that is ${t1(S.target_t)} tCO2e` : `, which is ${t1(S.target_t)} tCO2e today`) : ""}`;
+    ? `a fixed cap of ${t1(T.cap_t)} tCO2e${team ? ` for the whole scheme (a cap has no share per ${TEAM().toLowerCase()})` : ""}`
+    : `${Number(T.pct_below).toFixed(1)}% below the approved plan${S && S.target_t != null ? (team ? `; on ${ctYour()} that is ${t1(S.target_t)} tCO2e` : `, which is ${t1(S.target_t)} tCO2e today`) : ""}`;
   const setWhy = !levers.length || !A ? "Make a choice in steps 2 to 4 first."
     : busy ? "Wait for the result to update."
     : !(A.delta_t < -0.0005) ? "These decisions do not lower carbon, so they cannot be the target." : "";
