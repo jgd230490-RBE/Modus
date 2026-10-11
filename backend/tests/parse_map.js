@@ -1599,8 +1599,11 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const ids = [...new Set([...(gs ? gs[1] : "").matchAll(/(?:anchor|alt): "([a-z-]+)"/g)].map(m => m[1]))];
   for (const id of ids)
     ok(`⭐ every anchor the map's guide names exists as an id: ${id}`, html.includes(`id="${id}"`));
-  ok("the Play step has a fallback: the timeline's button when the bar is open, else the sidebar's Play forecast timeline",
-     /anchor: "tl-play", alt: "tl-open"/.test(code) && /id="tl-open" onclick="openTimeline\(\)"/.test(code)
+  // ⚠️ 12 Oct 2026 — REVERSED (live A4): the sidebar button said Play and only OPENED the bar at an empty
+  // January. It now calls startTimeline(), which opens the bar and plays; openTimeline() stays for the bar.
+  ok("the Play step has a fallback: the timeline's button when the bar is open, else the sidebar's Play forecast timeline — and that button PLAYS",
+     /anchor: "tl-play", alt: "tl-open"/.test(code) && /id="tl-open" onclick="startTimeline\(\)"/.test(code)
+     && !/id="tl-open" onclick="openTimeline\(\)"/.test(code)
      && /for \(const id of \[step\.anchor, step\.alt\]\)/.test(code));
   ok("the copy is §5's: the bar, Press Play, Conditions with Show on map, the side panel",
      /title: "The bar along the top"/.test(code) && /title: "Press Play"/.test(code)
@@ -1914,6 +1917,225 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("...the style.load handler still re-adds both on a basemap switch",
      code.includes("if (ZONES.loaded) ensureZoneLayers(); else loadZones();")
      && code.includes("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();"));
+}
+
+// ---- 12 Oct 2026 — Play and the timeline (review §2.4 / D22, live A4 A5 A8; branch claude/mr1-play) ----------
+// Source-level pins for each of the seven items, then the timeline block run against a fake DOM and a
+// hand-built matrix so the loop, the pause flag, the setData guard and the keys are exercised, not just grepped.
+{
+  // (1) A4 — the sidebar button plays (the reversed guide pin above carries the id/onclick); openTimeline stays
+  ok("A4: startTimeline() still opens the bar when it is shut, and openTimeline() is still its own function",
+     /function startTimeline\(\)\{[\s\S]{0,400}if\(!TL\.on\) openTimeline\(\);/.test(code) && /function openTimeline\(\)\{/.test(code));
+  ok("A4: a second press while playing is a no-op (no second interval)",
+     /if\(!TL\.on\) openTimeline\(\);\s*if\(TL\.playing\) return;/.test(code));
+  // (2) A5 / D22 — start month, loop within the span, full-horizon switch, once-per-loop pause, empty label
+  ok("D22: the matrix carries the months with volume and their span, built from EVERY line the API returned",
+     /const volMonths = new Set\(\);/.test(code) && /\(j\.routes\|\|\[\]\)\.forEach\(rt=>\{ Object\.keys\(rt\.monthly\|\|\{\}\)\.forEach\(k=>\{[^\n]*volMonths\.add\(mm\)/.test(code)
+     && /const span = volMonths\.size \? \[Math\.min\(\.\.\.volMonths\), Math\.max\(\.\.\.volMonths\)\] : null;/.test(code)
+     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span \};/.test(code));
+  ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
+     /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
+     && /return span \? span\[0\] : 1;/.test(code)
+     && /ensureTimelineMatrix\(\)\.then\(\(\)=>\{\s*if\(!monthHasVolume\(TL\.month\)\) TL\.month = tlStartMonth\(\);\s*setTimelineMonth\(TL\.month\);/.test(code)
+     && /return \(d\.getFullYear\(\) - CONFIG\.START_YEAR\) \* 12 \+ d\.getMonth\(\) \+ 1;/.test(code));
+  ok("D22: the loop runs within the span with volume; the old 1..MONTH_COUNT wrap is gone from tickTimeline",
+     /function tickTimeline\(\)\{\s*const \[lo, hi\] = tlLoopBounds\(\);\s*const wrap = TL\.month >= hi \|\| TL\.month < lo;/.test(code)
+     && !/TL\.month = TL\.month>=CONFIG\.MONTH_COUNT \? 1 : TL\.month\+1;/.test(code));
+  ok("D22: the planners' Full horizon switch restores 1..MONTH_COUNT, and it is a checkbox in the bar",
+     /function tlLoopBounds\(\)\{[\s\S]{0,200}if\(TL\.full \|\| !span\) return \[1, CONFIG\.MONTH_COUNT \|\| 60\];/.test(code)
+     && /<label class="tl-full"[^>]*><input type="checkbox" id="tl-full" onchange="setTimelineFull\(this\.checked\)"> Full horizon<\/label>/.test(html)
+     && /function setTimelineFull\(on\)\{\s*TL\.full = !!on;/.test(code)
+     && /const fl=document\.getElementById\('tl-full'\); if\(fl\) fl\.checked=TL\.full;/.test(code));
+  ok("D22: playback stops once per loop on the first red month it TICKS into, panel open; the wrap re-arms it",
+     /if \(TL\.playing && TL\.ticked === month && !TL\.clashPaused && live\.some\(i => i\.lvl === 'clash'\)\) \{\s*TL\.clashPaused = true; WARN\.open = true;\s*stopTimeline\(\);/.test(code)
+     && /if\(wrap\) TL\.clashPaused = false;/.test(code) && /TL\.ticked = TL\.month;\s*setTimelineMonth\(TL\.month\);/.test(code)
+     // resuming on a red month counts as this loop's pause; the month Play was pressed on can never stop it
+     && /if\(WARN\.countsMonth === TL\.month && WARN\.counts\.clash > 0\) TL\.clashPaused = true;\s*TL\.ticked = null;/.test(code)
+     && /WARN\.countsMonth = month;/.test(code));
+  ok("D22: the auto-open-once rule and the pill are untouched by the pause",
+     /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened/.test(code) && /function renderConditionsPill\(live\)/.test(code));
+  ok("D22: an empty month reads '<Month> · nothing approved', never '0 routes · 0 trips'",
+     /if\(lbl\) lbl\.textContent = count===0 \? monthLabel\(m\)\+' · nothing approved' : monthLabel\(m\)\+' · '\+count\+' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\);/.test(code)
+     && !/' · '\+count\+' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\);\s*\}/.test(code.replace(/count===0 \?[^\n]*/, "")));
+  // (3) A8 — the loaded leg only
+  ok("⭐ A8: the timeline label counts the LOADED leg only (one load = one two-way movement, never doubled)",
+     /if\(f\.properties\.type==='Inbound Highway'\)\{ count\+\+; sum\+=vol; \}/.test(code)
+     && !/f_time=monthLabel\(m\); count\+\+; sum\+=vol;/.test(code));
+  ok("⭐ A8: 'Showing N route(s)' counts the loaded leg only",
+     /if \(f\.properties\.type === 'Inbound Highway'\) matchCount\+\+;/.test(code)
+     && (code.match(/matchCount\+\+/g) || []).length === 1
+     && /status\.innerHTML = `Showing \$\{matchCount\} route\(s\) with approved forecasts\.`;/.test(code));
+  // (4) the changed-guard on the per-month setData; markRouteEnds' own guard untouched
+  ok("⭐ renderMonthFrame re-sends the source only when a feature's is_forecast / f_avg / f_month_total changed",
+     /const wasForecast=f\.properties\.is_forecast, wasAvg=f\.properties\.f_avg, wasTotal=f\.properties\.f_month_total;/.test(code)
+     && /if\(f\.properties\.is_forecast!==wasForecast \|\| f\.properties\.f_avg!==wasAvg \|\| f\.properties\.f_month_total!==wasTotal\) changed=true;/.test(code)
+     && /if\(changed\) src\.setData\(data\);\s*ensureForecastLayers\(\); ensureFlowLayer\(\);/.test(code)
+     && !/src\.setData\(data\); ensureForecastLayers\(\);/.test(code));
+  ok("...and markRouteEnds' second setData keeps its own guard, exactly once",
+     (code.match(/if \(changed\) src\.setData\(a1_data\);/g) || []).length === 1);
+  // (5) prefers-reduced-motion
+  ok("reduced motion: one helper reads the media query, in a try/catch",
+     /function reducedMotion\(\)\{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\); \} catch\(e\)\{ return false; \}/.test(code));
+  ok("reduced motion: the dash march stays DASH_SOLID while playing when it matches",
+     /function startFlowAnimation\(\)\{\s*applyRailFlow\(\);\s*if\(reducedMotion\(\)\)\{ setFlowDash\(DASH_SOLID\); setRailFlowDash\(DASH_SOLID\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
+  ok("reduced motion: Show on map jumps instead of flying when it matches",
+     /if \(reducedMotion\(\)\) map\.jumpTo\(cam\); else map\.flyTo\(\{ \.\.\.cam, duration: 700 \}\);/.test(code)
+     && !/map\.flyTo\(\{ center: f\.geometry\.coordinates/.test(code));
+  // (6) KPI prefetch
+  ok("KPI prefetch: kicked off when the matrix lands, never awaited, through the existing cache, one month at a time",
+     /TL\.matrix = \{ byRoute:byR[^\n]*\};\s*prefetchSpanKpis\(\);\s*return TL\.matrix;/.test(code)
+     && /function prefetchSpanKpis\(\)\{\s*setTimeout\(async \(\)=>\{\s*const \[lo, hi\] = tlLoopBounds\(\);\s*for\(let m=lo; m<=hi; m\+\+\)\{\s*if\(KPI\.cache\[m\]\) continue;\s*try \{ await kpiFetchMonth\(m\); \} catch\(e\)\{\}/.test(code)
+     && !/Promise\.all\([^)]*kpiFetchMonth/.test(code.slice(code.indexOf("function prefetchSpanKpis"), code.indexOf("function renderMonthFrame"))));
+  // (7) keyboard and ARIA
+  ok("keyboard: Space toggles Play, the arrows step a month — on the bar or the map, never inside an input or select",
+     /document\.addEventListener\('keydown', function\(e\)\{\s*if\(!TL\.on \|\| e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey\) return;/.test(code)
+     && /if\(tag === 'INPUT' \|\| tag === 'SELECT' \|\| tag === 'TEXTAREA'\) return;/.test(code)
+     && /if\(!inBar && !inMap\) return;/.test(code)
+     && /if\(e\.key === ' ' \|\| e\.key === 'Spacebar'\)\{ if\(tag === 'BUTTON' && inBar\) return; e\.preventDefault\(\); toggleTimeline\(\); \}/.test(code)
+     && /else if\(e\.key === 'ArrowLeft'\)\{ e\.preventDefault\(\); stepTimeline\(-1\); \}/.test(code)
+     && /else if\(e\.key === 'ArrowRight'\)\{ e\.preventDefault\(\); stepTimeline\(1\); \}/.test(code));
+  ok("ARIA: the bar is a focusable named group; Play carries aria-pressed; the slider is named Month and speaks the month",
+     /<div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">/.test(html)
+     && /<button class="tl-btn" id="tl-play" onclick="toggleTimeline\(\)" title="Play \/ pause" aria-label="Play or pause" aria-pressed="false">/.test(html)
+     && /<input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub\(this\.value\)" aria-label="Month" aria-valuetext="Jan 2026">/.test(html)
+     && /b\.setAttribute\('aria-pressed', 'true'\)/.test(code) && /b\.setAttribute\('aria-pressed', 'false'\)/.test(code)
+     && /r\.setAttribute\('aria-valuetext', monthLabel\(m\)\)/.test(code));
+  ok("ARIA: a polite live region announces the month when playback stops (and the reason when it is a clash)",
+     /<div id="tl-live" class="sr-only" aria-live="polite" aria-atomic="true"><\/div>/.test(html)
+     && /\.sr-only\{ position:absolute; width:1px; height:1px;/.test(html)
+     && /function announceTimeline\(text\)\{\s*const el=document\.getElementById\('tl-live'\); if\(el\) el\.textContent = text;/.test(code)
+     && /const was = TL\.playing;[\s\S]{0,400}if\(was\) announceTimeline\(monthLabel\(TL\.month\)\);/.test(code)
+     && /announceTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code));
+  ok("wording: nothing a person reads in the new strings says truck, real-time, live tracking, AI, optimise, predict or secure",
+     !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b|\bAI\b/i.test(
+       (html.match(/<div id="timeline-bar"[\s\S]*?<\/div>\n<\/div>/) || [""])[0] + " Full horizon nothing approved playback paused over capacity"));
+
+  // ---- run the timeline block against a fake DOM ------------------------------------------------------------
+  const tStart = src.indexOf("const TL_UNIT_WORD = { vehicles: 'trips'");
+  const tEnd = src.indexOf("// ===== 2026-09-02 (§8)");
+  ok("the timeline block is one contiguous slice (TL_UNIT_WORD … the keydown listener)", tStart > 0 && tEnd > tStart);
+  if (tStart > 0 && tEnd > tStart) {
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const CONFIG = { MONTH_COUNT: 60, START_YEAR: 2026, FORECAST_UNIT: 'vehicles', API_BASE: '' };
+    const monthLabel = i => names[(i - 1) % 12] + ' ' + (CONFIG.START_YEAR + Math.floor((i - 1) / 12));
+    const mkEl = (tag) => ({ tagName: tag, attrs: {}, style: {}, textContent: "", value: "", checked: false, children: [],
+      setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
+      contains(x) { return x === this || this.children.includes(x); } });
+    const byId = {};
+    for (const [id, tag] of [["timeline-bar", "DIV"], ["tl-play", "BUTTON"], ["tl-range", "INPUT"], ["tl-label", "SPAN"], ["tl-speed", "SELECT"],
+                             ["tl-full", "INPUT"], ["tl-live", "DIV"], ["map", "DIV"], ["toggle-forecast", "INPUT"]]) { byId[id] = mkEl(tag); byId[id].id = id; }
+    for (const id of ["tl-play", "tl-range", "tl-speed", "tl-full"]) byId["timeline-bar"].children.push(byId[id]);
+    const canvas = mkEl("CANVAS"); byId["map"].children.push(canvas);
+    const listeners = {};
+    const document = { getElementById: id => byId[id] || null, addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); } };
+    const calls = { setInterval: 0, clearInterval: 0, setData: 0, months: [], warnings: [] };
+    const features = [];
+    for (const [rid, type] of [["R1", "Inbound Highway"], ["R1", "Outbound Highway"], ["R2", "Inbound Highway"], ["R2", "Outbound Highway"], ["R3", "Inbound Highway"], ["R3", "Outbound Highway"]])
+      features.push({ geometry: { type: "LineString" }, properties: { route_id: rid, type } });
+    features.push({ geometry: { type: "Point" }, properties: { type: "Node", id: "N1" } });
+    const map = { getSource: () => ({ _data: { features }, setData() { calls.setData++; } }) };
+    const WARN = { counts: { clash: 0, warn: 0, caution: 0 }, countsMonth: null, open: false };
+    const KPI = { cache: {} };
+    const f = new Function("document", "window", "localStorage", "setInterval", "clearInterval", "setTimeout", "CONFIG", "map",
+      "perWorkingDay", "monthLabel", "ensureForecastLayers", "ensureFlowLayer", "applyZoneMonth", "applyFilters", "renderTimelineWarnings",
+      "startFlowAnimation", "stopFlowAnimation", "WARN", "KPI", "kpiFetchMonth", "fetch", "FORECAST_WORKING_DAYS",
+      src.slice(tStart, tEnd) + "\nreturn { TL, tickTimeline, tlLoopBounds, setTimelineFull, tlStartMonth, monthHasVolume, renderMonthFrame, startTimeline, stopTimeline, setTimelineMonth, toggleTimeline, stepTimeline };");
+    let api = null, err = "";
+    try {
+      api = f(document, { matchMedia: null }, { getItem: () => null, setItem() {} }, () => { calls.setInterval++; return 7; }, () => { calls.clearInterval++; }, () => {},
+              CONFIG, map, v => Math.round(v / 22), monthLabel, () => {}, () => {}, () => {}, () => {}, m => { calls.warnings.push(m); },
+              () => {}, () => {}, WARN, KPI, () => Promise.resolve({}), () => { throw new Error("fetch must not be called"); }, 22);
+    } catch (e) { err = e.message; }
+    ok("⭐ the timeline block runs against a fake DOM", !!api, err);
+    if (api) {
+      const TL = api.TL;
+      const cur = (new Date().getFullYear() - 2026) * 12 + new Date().getMonth() + 1;
+      const matrix = (months) => {
+        const monthly = {}; months.forEach(([m, v]) => { monthly[String(m)] = v; });
+        return { byRoute: { r1: { monthly }, r2: { monthly: { "10": 30 } } }, unit: "vehicles", working_days: 22,
+                 volMonths: new Set(months.map(x => x[0]).concat([10])), span: [Math.min(...months.map(x => x[0]), 10), Math.max(...months.map(x => x[0]), 10)] };
+      };
+      ok("TL starts on the full-horizon switch OFF, unpaused, month 1", TL.full === false && TL.clashPaused === false && TL.month === 1 && TL.ticked === null);
+      TL.matrix = matrix([[9, 100], [10, 200], [12, 50]]);
+      ok("the loop bounds are the span with volume [9, 12]; Full horizon makes them [1, 60]; off again restores the span",
+         JSON.stringify(api.tlLoopBounds()) === "[9,12]"
+         && (api.setTimelineFull(true), JSON.stringify(api.tlLoopBounds()) === "[1,60]" && byId["tl-full"].checked === true)
+         && (api.setTimelineFull(false), JSON.stringify(api.tlLoopBounds()) === "[9,12]"));
+      ok("the start month is the first month with volume when today's month has none",
+         (TL.matrix.volMonths.has(cur) ? true : api.tlStartMonth() === 9));
+      { const m2 = matrix([[cur, 5], [9, 100], [12, 50]]); const keep = TL.matrix; TL.matrix = m2;
+        ok("...and today's calendar month when it carries volume", api.tlStartMonth() === cur && api.monthHasVolume(cur));
+        TL.matrix = keep; }
+      // the loop: 10 -> 11 (empty month inside the span keeps its dwell) -> 12 -> wraps to 9 and re-arms the pause
+      TL.month = 10; TL.clashPaused = true; calls.warnings.length = 0;
+      api.tickTimeline(); const a = TL.month; api.tickTimeline(); const b = TL.month; api.tickTimeline(); const c = TL.month;
+      ok("⭐ ticks run 10 → 11 → 12 → 9: within the span, the empty November is shown, the wrap re-arms the clash pause and marks the month as ticked",
+         a === 11 && b === 12 && c === 9 && TL.clashPaused === false && TL.ticked === 9 && calls.warnings.join(",") === "11,12,9");
+      TL.month = 3; api.tickTimeline();
+      ok("a month outside the span (scrubbed there) goes back to the first month with volume", TL.month === 9);
+      TL.month = 59; api.setTimelineFull(true); api.tickTimeline(); const d = TL.month; api.tickTimeline(); const e2 = TL.month; api.setTimelineFull(false);
+      ok("with Full horizon on the loop is 1..60 again", d === 60 && e2 === 1);
+      // renderMonthFrame: loaded leg only, the empty label, and the setData guard
+      calls.setData = 0; TL.full = false;
+      api.renderMonthFrame(10);
+      ok("⭐ A8: Oct 2026 labels 2 routes · 230 trips — the two return legs are not counted — and the source is sent once",
+         byId["tl-label"].textContent === "Oct 2026 · 2 routes · 230 trips" && calls.setData === 1
+         && features.filter(x => x.properties.is_forecast).length === 4);
+      api.renderMonthFrame(10);
+      ok("⭐ the same month again does not re-send the source", calls.setData === 1);
+      api.renderMonthFrame(11);
+      ok("⭐ an empty month reads 'Nov 2026 · nothing approved' and sends the source once (the lines flipped off)",
+         byId["tl-label"].textContent === "Nov 2026 · nothing approved" && calls.setData === 2);
+      api.renderMonthFrame(1);
+      ok("⭐ a second empty month in a row does NOT re-send the source", calls.setData === 2 && byId["tl-label"].textContent === "Jan 2026 · nothing approved");
+      api.renderMonthFrame(12);
+      ok("...and a month with volume after it does (R1 only: 1 route · 50 trips)", calls.setData === 3 && byId["tl-label"].textContent === "Dec 2026 · 1 routes · 50 trips");
+      // play / stop: aria-pressed, the announcer, the resume-on-a-red-month rule, the slider's valuetext
+      TL.on = true; TL.month = 10; api.setTimelineMonth(10);
+      ok("the slider speaks the month", byId["tl-range"].attrs["aria-valuetext"] === "Oct 2026" && byId["tl-range"].value === 10);
+      WARN.countsMonth = 10; WARN.counts.clash = 1; calls.setInterval = 0;
+      api.startTimeline();
+      ok("⭐ Play on a red month: aria-pressed true, one interval, the clash pause already spent for this loop, nothing ticked yet",
+         TL.playing === true && byId["tl-play"].attrs["aria-pressed"] === "true" && calls.setInterval === 1 && TL.clashPaused === true && TL.ticked === null);
+      api.startTimeline();
+      ok("a second Play while playing starts no second interval", calls.setInterval === 1);
+      byId["tl-live"].textContent = "";
+      api.stopTimeline();
+      ok("⭐ stopping announces the month and drops aria-pressed", TL.playing === false && byId["tl-play"].attrs["aria-pressed"] === "false" && byId["tl-live"].textContent === "Oct 2026");
+      byId["tl-live"].textContent = ""; api.stopTimeline();
+      ok("stopping an already-stopped timeline announces nothing (scrubbing does not chatter)", byId["tl-live"].textContent === "");
+      WARN.counts.clash = 0; TL.clashPaused = false; api.startTimeline();
+      ok("Play on a month with no red condition leaves the pause armed", TL.clashPaused === false && TL.playing === true);
+      api.stopTimeline();
+      // keyboard
+      const kd = (listeners.keydown || [])[0];
+      ok("one keydown listener is registered on the document", (listeners.keydown || []).length === 1);
+      if (kd) {
+        const ev = (key, target, mods) => { const e = Object.assign({ key, target, altKey: false, ctrlKey: false, metaKey: false, prevented: false, preventDefault() { this.prevented = true; } }, mods || {}); kd(e); return e; };
+        TL.on = true; TL.month = 10; TL.playing = false;
+        const e1 = ev(" ", byId["timeline-bar"]);
+        ok("⭐ Space on the bar starts playback and is swallowed", TL.playing === true && e1.prevented === true);
+        const e2b = ev(" ", byId["timeline-bar"]);
+        ok("...Space again pauses it", TL.playing === false && e2b.prevented === true);
+        const e3 = ev(" ", byId["tl-play"]);
+        ok("Space on the Play BUTTON is left to the button's own click (no double toggle)", TL.playing === false && e3.prevented === false);
+        const e4 = ev("ArrowRight", canvas);
+        ok("⭐ ArrowRight with the map focused steps to the next month", TL.month === 11 && e4.prevented === true);
+        const e5 = ev("ArrowLeft", byId["timeline-bar"]);
+        ok("ArrowLeft on the bar steps back", TL.month === 10 && e5.prevented === true);
+        const e6 = ev("ArrowRight", byId["tl-range"]);
+        ok("the slider keeps its own arrow keys", TL.month === 10 && e6.prevented === false);
+        const e7 = ev("ArrowRight", byId["tl-speed"]);
+        ok("...and so does the speed select", TL.month === 10 && e7.prevented === false);
+        const e8 = ev("ArrowRight", byId["timeline-bar"], { ctrlKey: true });
+        ok("a modified key is ignored", TL.month === 10 && e8.prevented === false);
+        TL.on = false; const e9 = ev(" ", byId["timeline-bar"]);
+        ok("with the bar shut the keys do nothing", TL.playing === false && e9.prevented === false);
+        const e10 = ev("ArrowRight", mkEl("DIV"));
+        ok("a key elsewhere on the page is ignored", TL.month === 10 && e10.prevented === false);
+      }
+    }
+  }
 }
 
 console.log();

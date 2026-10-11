@@ -256,6 +256,12 @@
         #tl-label{ font-size:12px; font-weight:600; color:var(--navy-deep); min-width:190px; white-space:nowrap; flex:0 0 auto; }
         /* and the select was far bigger than five two-character options need */
         #tl-speed{ border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
+        /* 12 Oct 2026 (D22): the "full horizon" switch — Play loops within the months that carry volume
+           unless this is ticked; the announcer is visually hidden but read by a screen reader */
+        #timeline-bar .tl-full{ flex:0 0 auto; display:flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap; cursor:pointer; }
+        #timeline-bar .tl-full input{ margin:0; accent-color:var(--navy); }
+        #timeline-bar:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+        .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
@@ -463,16 +469,21 @@
      Rebuilt on every tick, so a January condition cannot sit on screen in June. -->
 <div id="tl-warnings"></div>
 
-<div id="timeline-bar">
-  <button class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month">◀</button>
-  <button class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause">▶</button>
-  <button class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month">▶▶</button>
-  <input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub(this.value)">
+<!-- 12 Oct 2026 (review §2.4 / D22): the bar is a focusable group so Space / ArrowLeft / ArrowRight work
+     on it; the Play button carries aria-pressed; the slider is named "Month" and speaks the month name
+     (aria-valuetext); #tl-live is the polite announcer for "playback stopped at <month>". -->
+<div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">
+  <button class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month" aria-label="Previous month">◀</button>
+  <button class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause" aria-label="Play or pause" aria-pressed="false">▶</button>
+  <button class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month" aria-label="Next month">▶▶</button>
+  <input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub(this.value)" aria-label="Month" aria-valuetext="Jan 2026">
   <span id="tl-label">Jan 2026</span>
-  <select id="tl-speed" onchange="setTimelineSpeed(this.value)" title="Play speed — months per second">
+  <select id="tl-speed" onchange="setTimelineSpeed(this.value)" title="Play speed — months per second" aria-label="Play speed">
     <option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
   </select>
-  <button class="tl-close" onclick="closeTimeline()" title="Close timeline">&times;</button>
+  <label class="tl-full" title="Play every month of the horizon, including the months with nothing approved"><input type="checkbox" id="tl-full" onchange="setTimelineFull(this.checked)"> Full horizon</label>
+  <button class="tl-close" onclick="closeTimeline()" title="Close timeline" aria-label="Close timeline">&times;</button>
+  <div id="tl-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 </div>
 
 <div id="route-drawer">
@@ -3510,7 +3521,7 @@
                     </div>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
                     <button class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
-                    <button class="btn btn-ghost" id="tl-open" onclick="openTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
+                    <button class="btn btn-ghost" id="tl-open" onclick="startTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
                     <div id="forecast-status">Approved forecasts only.</div>
                 </div>`;
                 sidebar.insertAdjacentHTML('beforeend', pluginUI);
@@ -3690,7 +3701,9 @@
                             f.properties.f_total = m.total;
                             f.properties.f_unit = m.unit;
                             f.properties.f_time = `M${fromM}\u2013M${toM}`;
-                            matchCount++;
+                            // 12 Oct (A8): "Showing N route(s)" counts the loaded leg only \u2014 the return
+                            // leg of the same route is the same load coming back, never a second route
+                            if (f.properties.type === 'Inbound Highway') matchCount++;
                         } else {
                             f.properties.is_forecast = false;
                         }
@@ -3976,7 +3989,17 @@
         }
         _flowRAF=requestAnimationFrame(animateFlow);
     }
-    function startFlowAnimation(){ applyRailFlow(); if(_flowRAF==null) _flowRAF=requestAnimationFrame(animateFlow); }
+    // 12 Oct 2026 (review §2.4, WCAG 2.3.3): reduced motion is a PAINT property here, not CSS. When the
+    // visitor's system asks for less motion the dashes stay DASH_SOLID while playing (the month still
+    // steps) and "Show on map" jumps instead of flying. GL JS 2.14.1 has no respectPrefersReducedMotion.
+    function reducedMotion(){
+        try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){ return false; }
+    }
+    function startFlowAnimation(){
+        applyRailFlow();
+        if(reducedMotion()){ setFlowDash(DASH_SOLID); setRailFlowDash(DASH_SOLID); return; }   // no dash march
+        if(_flowRAF==null) _flowRAF=requestAnimationFrame(animateFlow);
+    }
     function stopFlowAnimation(){
         if(_flowRAF!=null){ cancelAnimationFrame(_flowRAF); _flowRAF=null; }
         setFlowDash(DASH_SOLID);
@@ -3997,15 +4020,56 @@
     function unitWord(u){ return TL_UNIT_WORD[u] || u; }
 
     const TL_STEP_MS = 750;
-    const TL = { on:false, playing:false, month:1, timer:null, matrix:null, speed:1 };
+    // 12 Oct 2026 (review §2.4 / D22). `full` = play every month of the horizon (the planners' switch);
+    // otherwise Play loops within the span of months that carry volume. `clashPaused` = this loop has
+    // already stopped on a red month; reset when the loop wraps. `ticked` = the month on screen was
+    // reached by a tick (only those can pause — never the month Play was pressed on).
+    const TL = { on:false, playing:false, month:1, timer:null, matrix:null, speed:1, full:false, clashPaused:false, ticked:null };
     try { const sp = parseFloat(localStorage.getItem('modus_tl_speed')); if(sp > 0){ TL.speed = sp; } } catch(e){}
+    function setTimelineFull(on){
+        TL.full = !!on;
+        const cb=document.getElementById('tl-full'); if(cb && cb.checked !== TL.full) cb.checked = TL.full;
+    }
+    // the first and last month with any route volume, from the matrix; [1, MONTH_COUNT] when the
+    // tenant has nothing approved or the planner asked for the full horizon
+    function tlLoopBounds(){
+        const span = TL.matrix && TL.matrix.span;
+        if(TL.full || !span) return [1, CONFIG.MONTH_COUNT || 60];
+        return span;
+    }
+    function monthHasVolume(m){ return !!(TL.matrix && TL.matrix.volMonths && TL.matrix.volMonths.has(m)); }
+    // month index of today's calendar month (1 = Jan of START_YEAR); may fall outside the horizon
+    function currentMonthIndex(){
+        const d = new Date();
+        return (d.getFullYear() - CONFIG.START_YEAR) * 12 + d.getMonth() + 1;
+    }
+    // D22: open on the current calendar month if it carries volume, else the first month that does
+    function tlStartMonth(){
+        const cur = currentMonthIndex();
+        if(monthHasVolume(cur)) return cur;
+        const span = TL.matrix && TL.matrix.span;
+        return span ? span[0] : 1;
+    }
+    function announceTimeline(text){
+        const el=document.getElementById('tl-live'); if(el) el.textContent = text;
+    }
     function setTimelineSpeed(v){
         const sp = parseFloat(v); if(!(sp > 0)) return;
         TL.speed = sp; try { localStorage.setItem('modus_tl_speed', String(sp)); } catch(e){}
         const sel=document.getElementById('tl-speed'); if(sel && sel.value !== String(sp)) sel.value = String(sp);
         if(TL.playing){ clearInterval(TL.timer); TL.timer = setInterval(tickTimeline, TL_STEP_MS / TL.speed); }
     }
-    function tickTimeline(){ TL.month = TL.month>=CONFIG.MONTH_COUNT ? 1 : TL.month+1; setTimelineMonth(TL.month); }
+    // D22: the loop runs within tlLoopBounds(); a month outside them (the visitor scrubbed there, or the
+    // horizon switch was just turned off) goes back to the first month of the span. Wrapping resets the
+    // once-per-loop clash pause. A month inside the span with no volume keeps the normal dwell.
+    function tickTimeline(){
+        const [lo, hi] = tlLoopBounds();
+        const wrap = TL.month >= hi || TL.month < lo;
+        if(wrap) TL.clashPaused = false;
+        TL.month = wrap ? lo : TL.month+1;
+        TL.ticked = TL.month;
+        setTimelineMonth(TL.month);
+    }
     async function ensureTimelineMatrix(){
         if(TL.matrix) return TL.matrix;
         const unit = CONFIG.FORECAST_UNIT || 'vehicles';
@@ -4014,28 +4078,56 @@
         const j = await r.json();
         const byR={}; (j.routes||[]).forEach(rt=>{ byR[(rt.route_id||'').toString().trim().toLowerCase()]=rt; });
         if(j.working_days > 0) FORECAST_WORKING_DAYS = j.working_days;   // 15 Sep — the label's divisor
-        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days }; return TL.matrix;
+        // D22: the months that carry ANY volume, over every line the API returned (not the collapsed
+        // byRoute, which keeps one line per route), and the span they cover
+        const volMonths = new Set();
+        (j.routes||[]).forEach(rt=>{ Object.keys(rt.monthly||{}).forEach(k=>{ const mm=parseInt(k); if(mm>=1 && mm<=(CONFIG.MONTH_COUNT||60) && (rt.monthly[k]||0)>0) volMonths.add(mm); }); });
+        const span = volMonths.size ? [Math.min(...volMonths), Math.max(...volMonths)] : null;
+        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span };
+        prefetchSpanKpis();     // in the background, one month at a time; never awaited
+        return TL.matrix;
+    }
+    // 12 Oct 2026 (review §2.4): Play used to fire one month-kpis GET on each month's first tick. Once the
+    // matrix is here the months in the loop are warmed sequentially through the existing cache
+    // (kpiFetchMonth dedupes against an in-flight fetch), after the first paint has been scheduled.
+    function prefetchSpanKpis(){
+        setTimeout(async ()=>{
+            const [lo, hi] = tlLoopBounds();
+            for(let m=lo; m<=hi; m++){
+                if(KPI.cache[m]) continue;
+                try { await kpiFetchMonth(m); } catch(e){}
+            }
+        }, 0);
     }
     function renderMonthFrame(m){
         const src=map.getSource('routes-source'); if(!src||!TL.matrix) return;
-        const data=src._data, byR=TL.matrix.byRoute, unit=TL.matrix.unit; let count=0, sum=0;
+        const data=src._data, byR=TL.matrix.byRoute, unit=TL.matrix.unit; let count=0, sum=0, changed=false;
         data.features.forEach(f=>{
             if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString'){
                 const rid=(f.properties.route_id||'').toString().trim().toLowerCase();
                 const rt=rid&&byR[rid]; const vol=rt?((rt.monthly||{})[m]||0):0;
+                const wasForecast=f.properties.is_forecast, wasAvg=f.properties.f_avg, wasTotal=f.properties.f_month_total;
                 // 15 Sep: f_avg is the DAILY rate for this month, not the month's total.
                 // f_month_total keeps the month figure for the popup and detail table.
-                if(vol>0){ f.properties.is_forecast=true; f.properties.f_avg=perWorkingDay(vol); f.properties.f_month_total=Math.round(vol); f.properties.f_unit=unit; f.properties.f_time=monthLabel(m); count++; sum+=vol; }
+                // 12 Oct (A8): the label counts the LOADED leg only — one load = one two-way movement,
+                // never doubled. Both legs still get the properties so both carriageways draw.
+                if(vol>0){ f.properties.is_forecast=true; f.properties.f_avg=perWorkingDay(vol); f.properties.f_month_total=Math.round(vol); f.properties.f_unit=unit; f.properties.f_time=monthLabel(m); if(f.properties.type==='Inbound Highway'){ count++; sum+=vol; } }
                 else f.properties.is_forecast=false;
+                if(f.properties.is_forecast!==wasForecast || f.properties.f_avg!==wasAvg || f.properties.f_month_total!==wasTotal) changed=true;
             }
         });
-        src.setData(data); ensureForecastLayers(); ensureFlowLayer();
+        // 12 Oct (review §2.4): re-send the source only when a feature's forecast state actually
+        // changed — two empty months in a row must not push the whole network to GL again
+        if(changed) src.setData(data);
+        ensureForecastLayers(); ensureFlowLayer();
         // 15 Sep (the human): "the text vehicles needs to be replaced with deliveries or
         // trips". 🔴 Not a blind string swap — `unit` comes from the API and can be t or
         // m³, and "4 444 trips" over a tonnage would be a lie. Only the vehicle-loads
         // unit is renamed, and it is renamed to the word the rest of the product already
         // uses (the Dashboard's TRIPS card, the KPI card's "101 trips/d").
-        const lbl=document.getElementById('tl-label'); if(lbl) lbl.textContent = monthLabel(m)+' · '+count+' routes · '+Math.round(sum)+' '+unitWord(unit);
+        // 12 Oct (D22): an empty month says so, instead of "0 routes · 0 trips".
+        const lbl=document.getElementById('tl-label');
+        if(lbl) lbl.textContent = count===0 ? monthLabel(m)+' · nothing approved' : monthLabel(m)+' · '+count+' routes · '+Math.round(sum)+' '+unitWord(unit);
     }
     function openTimeline(){
         TL.on=true;
@@ -4043,8 +4135,13 @@
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='flex';
         const rng=document.getElementById('tl-range'); if(rng) rng.max=CONFIG.MONTH_COUNT;
         const sel=document.getElementById('tl-speed'); if(sel) sel.value=String(TL.speed);
+        const fl=document.getElementById('tl-full'); if(fl) fl.checked=TL.full;
         const lbl=document.getElementById('tl-label'); if(lbl) lbl.textContent='Loading\u2026';
-        ensureTimelineMatrix().then(()=>{ setTimelineMonth(TL.month); }).catch(()=>{ if(lbl) lbl.textContent='No forecast data'; });
+        ensureTimelineMatrix().then(()=>{
+            // D22: never open on an empty January \u2014 the current month if it carries volume, else the first that does
+            if(!monthHasVolume(TL.month)) TL.month = tlStartMonth();
+            setTimelineMonth(TL.month);
+        }).catch(()=>{ if(lbl) lbl.textContent='No forecast data'; });
     }
     function closeTimeline(){
         stopTimeline(); TL.on=false;
@@ -4057,20 +4154,27 @@
         applyFilters();         // KPI cards and the rail rule follow the timeline closing
     }
     function toggleTimeline(){ if(TL.playing) stopTimeline(); else startTimeline(); }
+    // 12 Oct (A4): the sidebar's "Play forecast timeline" calls THIS, so a press opens the bar AND plays.
     function startTimeline(){
         if(!TL.matrix){ ensureTimelineMatrix().then(()=>startTimeline()).catch(()=>{}); return; }
         if(!TL.on) openTimeline();
-        TL.playing=true; const b=document.getElementById('tl-play'); if(b) b.textContent='\u23F8';
+        if(TL.playing) return;
+        // D22: resuming on a red month counts as this loop's pause \u2014 it does not stop again until the loop wraps
+        if(WARN.countsMonth === TL.month && WARN.counts.clash > 0) TL.clashPaused = true;
+        TL.ticked = null;
+        TL.playing=true; const b=document.getElementById('tl-play'); if(b){ b.textContent='\u23F8'; b.setAttribute('aria-pressed', 'true'); }
         startFlowAnimation();          // dashes march only while playing
         TL.timer=setInterval(tickTimeline, TL_STEP_MS / TL.speed);
     }
     function stopTimeline(){
-        TL.playing=false; const b=document.getElementById('tl-play'); if(b) b.textContent='\u25B6';
+        const was = TL.playing;
+        TL.playing=false; const b=document.getElementById('tl-play'); if(b){ b.textContent='\u25B6'; b.setAttribute('aria-pressed', 'false'); }
         if(TL.timer){ clearInterval(TL.timer); TL.timer=null; }
         stopFlowAnimation();           // and go solid the moment it stops
+        if(was) announceTimeline(monthLabel(TL.month));   // a screen reader hears where playback stopped
     }
     function setTimelineMonth(m){
-        TL.month=m; const r=document.getElementById('tl-range'); if(r) r.value=m;
+        TL.month=m; const r=document.getElementById('tl-range'); if(r){ r.value=m; r.setAttribute('aria-valuetext', monthLabel(m)); }
         renderMonthFrame(m);
         // the zone overlay follows the month too: a closure that ended in March must not
         // still be sitting over the map in April while the routes beneath it have moved on
@@ -4090,6 +4194,20 @@
         const max = CONFIG.MONTH_COUNT || 60;
         setTimelineMonth(Math.min(max, Math.max(1, (TL.month || 1) + delta)));
     }
+    // 12 Oct 2026 (review §2.4, WCAG 2.1.1): keyboard. With the bar open, Space toggles Play and the arrow
+    // keys step a month when the focus is on the bar itself, one of its buttons, or the map — not inside
+    // an input or a select (the slider and the speed select keep their own keys).
+    document.addEventListener('keydown', function(e){
+        if(!TL.on || e.altKey || e.ctrlKey || e.metaKey) return;
+        const t = e.target, tag = t && t.tagName;
+        if(tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+        const bar = document.getElementById('timeline-bar'), mapEl = document.getElementById('map');
+        const inBar = !!(bar && t && bar.contains(t)), inMap = !!(mapEl && t && mapEl.contains(t));
+        if(!inBar && !inMap) return;
+        if(e.key === ' ' || e.key === 'Spacebar'){ if(tag === 'BUTTON' && inBar) return; e.preventDefault(); toggleTimeline(); }
+        else if(e.key === 'ArrowLeft'){ e.preventDefault(); stepTimeline(-1); }
+        else if(e.key === 'ArrowRight'){ e.preventDefault(); stepTimeline(1); }
+    });
 
     // ===== 2026-09-02 (§8) — warnings for the month on the playhead ==================
     //
@@ -4133,7 +4251,7 @@
     // 2026-10-06 — the panel is opened from the pill in the bar, and opens by itself the
     // first time a month with a CLASH (red) is on screen. `open` is remembered across
     // ticks so scrubbing does not slam it shut; `autoOpened` makes the auto-open happen once.
-    WARN.open = false; WARN.autoOpened = false; WARN.counts = { clash: 0, warn: 0, caution: 0 };
+    WARN.open = false; WARN.autoOpened = false; WARN.counts = { clash: 0, warn: 0, caution: 0 }; WARN.countsMonth = null;
     function toggleConditions() { WARN.open = !WARN.open; renderTimelineWarnings(TL.month); }
     // "Show on map": a route is selected (its own glow layer); a stockpile is flown to and
     // ringed. Both already exist as map concepts; nothing new is drawn for a route.
@@ -4141,7 +4259,10 @@
         if (kind === 'r') { if (typeof selectRoute === 'function') selectRoute(id); return; }
         const f = a1_data.features.find(x => x.geometry && x.geometry.type === 'Point'
                                              && x.properties && x.properties.type === 'Node' && x.properties.id === id);
-        if (f) map.flyTo({ center: f.geometry.coordinates, zoom: Math.max(map.getZoom(), 13), duration: 700 });
+        if (!f) return;
+        const cam = { center: f.geometry.coordinates, zoom: Math.max(map.getZoom(), 13) };
+        // 12 Oct (WCAG 2.3.3): a visitor who asked the system for less motion is not flown across the map
+        if (reducedMotion()) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 700 });
     }
     // the red ring on an over-capacity stockpile: a circle layer on the same source as the
     // location icons, filtered to the ids over this month (a Node's id IS the location
@@ -4263,9 +4384,19 @@
             });
             const live = items.filter(i => !WARN.dismissed[i.key]).sort((a, b) => a.sort - b.sort);
             renderConditionsPill(live);
+            WARN.countsMonth = month;      // which month the pill's counts describe (startTimeline reads it)
             setCondRing(live.filter(i => i.kind === 's').map(i => i.id));
             // a month with a red condition opens the panel once, by itself
             if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
+            // 12 Oct 2026 (D22): playback stops ONCE PER LOOP on the first red month it ticks into, with the
+            // panel open; the next press of Play carries on and does not stop again until the loop wraps.
+            // Only a month reached by a tick can stop it — never the month Play was pressed on.
+            if (TL.playing && TL.ticked === month && !TL.clashPaused && live.some(i => i.lvl === 'clash')) {
+                TL.clashPaused = true; WARN.open = true;
+                stopTimeline();
+                announceTimeline(monthLabel(month) + ' · playback paused: ' + live.filter(i => i.lvl === 'clash').length + ' over capacity');
+                renderConditionsPill(live);
+            }
             if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
             const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
             box.innerHTML = `<div class="tl-head"><b>Conditions in ${esc(monthLabel(month))}</b>` +
