@@ -322,6 +322,116 @@ if (loaded) {
     ok("...which says why there is no fair price and where to fix it", mUnb.includes("not baked for") && mUnb.includes("bake it on the Routes page"));
   }
 
+  // ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast, from the fixtures
+  // test_carbon_target.py writes: carbon_target.json (the planner's GET of a 73.1% target: approved 161.446,
+  // with the decisions 43.431, target 43.429, gaps 118.017 and 0.002, pending 5.653, transport 14.091)
+  // and cost_preview_carbon.json (R1, 2900 t: material 22.629 + transport 5.636 = 28.265). The other
+  // states (cap, team, under, no longer applies) are the same GET with the fields the server would send.
+  const ctPath = path.join(__dirname, "fixtures", "carbon_target.json");
+  const pcPath = path.join(__dirname, "fixtures", "cost_preview_carbon.json");
+  ok("the carbon-target and preview-with-carbon fixtures exist (written by test_carbon_target.py)", fs.existsSync(ctPath) && fs.existsSync(pcPath));
+  if (fs.existsSync(ctPath) && fs.existsSync(pcPath) && cl) {
+    const CT = JSON.parse(fs.readFileSync(ctPath, "utf8"));
+    const PC = JSON.parse(fs.readFileSync(pcPath, "utf8"));
+    const NONE = { target: null, status: null };
+    // the part of a page the target owns (a page's own team filter carries ids in its option values)
+    const seg = (out, a, b) => { const i = out.indexOf(a); return i < 0 ? "" : out.slice(i, out.indexOf(b, i) < 0 ? undefined : out.indexOf(b, i)); };
+    const withS = (s, t) => ({ target: { ...CT.target, ...(t || {}) }, status: { ...CT.status, ...s } });
+    const CAP = withS({ target_t: 43.431, gap_as_forecast_t: 118.015, gap_with_decisions_t: 0 }, { mode: "cap" });
+    const TEAMP = withS({ scope: "team" });
+    const TEAMC = withS({ scope: "team", target_t: null, gap_as_forecast_t: null, gap_with_decisions_t: null }, { mode: "cap" });
+    const UNDER = withS({ gap_with_decisions_t: -12.34 });
+    const BAD = withS({ with_decisions_t: null, gap_with_decisions_t: null,
+      invalid: "The agreed decisions no longer fit the plan (route 'R4' does not exist), so the plan with them cannot be worked out. Set the target again on the Carbon page." });
+    const ctMeta = { ...meta, months: { start_year: 2026, count: 24 }, materials: ["Small aggregate"], vehicles: ["Rigid 8-wheeler (32t)"],
+                     factors: { ...meta.factors, material_density_t_per_m3: { "Small aggregate": 1.6 }, vehicle_payload_t: { "Rigid 8-wheeler (32t)": 20 } } };
+    const dash = (ct, extra) => render("the Dashboard renders with a carbon target state", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: ct, ...(extra || {}) }));
+    const dSet = dash(CT, { onOpen(){} });
+    ok("⭐ Dashboard: the strip reads the contract's words — 73.1% below the approved plan = 43.4 tCO2e; as forecast 161.4, 118.0 over; with the agreed decisions 43.4, on target",
+      dSet.includes('data-carbon-target="set"') && dSet.includes("<b>Target: 73.1% below the approved plan = 43.4 tCO2e</b>")
+      && dSet.includes(">As forecast: 161.4 tCO2e, 118.0 over the target<") && dSet.includes(">With the agreed decisions: 43.4 tCO2e, on target<"));
+    ok("...a 0.002 t gap is inside the rounding of the stored 73.1% (161.446 × 0.0005 = 0.081), so it reads on target, not 0.0 over",
+      !dSet.includes("0.0 over") && !dSet.includes("0.0 under"));
+    ok("...says once that it is all-in beside the transport-only card, with the transport part (14.1) on hover; who set it, with no date for a scrubbed one",
+      dSet.includes("All-in: making the material, transport and waste disposal, on the whole approved plan. The Transport carbon card above counts transport only.")
+      && dSet.includes('title="Transport is 14.1 tCO2e of the approved plan as forecast: the Transport carbon card&#x27;s figure with no filters."')
+      && dSet.includes(">Set by Sam (planner)<"));
+    ok("...the 2 agreed decisions, collapsed, in the server's words",
+      dSet.includes("<summary>The 2 agreed decisions</summary>") && dSet.includes("<li>Recycled content 30% — Small aggregate</li>"));
+    ok("🔴 ...under the six cards (still six), above the charts; nothing undefined or NaN",
+      (dSet.match(/class="card dash-card min-w-0"/g) || []).length === 6 && dSet.indexOf(">Transport carbon<") < dSet.indexOf('data-carbon-target="set"')
+      && dSet.indexOf('data-carbon-target="set"') < dSet.indexOf("Material demand over time") && !/undefined|NaN/.test(dSet));
+    const dNone = dash(NONE, { onOpen(){} }), dNoNav = dash(NONE);
+    ok("⭐ ...no target: says so and who sets it, with a button to the Carbon planner (only when the page can switch)",
+      dNone.includes('data-carbon-target="none"') && dNone.includes("No carbon target set yet. A planner sets it in the Carbon planner.")
+      && dNone.includes(">Open the Carbon planner</button>") && dNoNav.includes("No carbon target set yet.") && !dNoNav.includes("Open the Carbon planner"));
+    const dCap = dash(CAP), dUnder = dash(UNDER), dBad = dash(BAD);
+    ok("...a cap: 43.4 tCO2e cap (73.1% below the approved plan when it was set); a gap below the target reads 12.3 under",
+      dCap.includes("<b>Target: 43.4 tCO2e cap (73.1% below the approved plan when it was set)</b>") && dCap.includes("tCO2e, on target<")
+      && dUnder.includes(">With the agreed decisions: 43.4 tCO2e, 12.3 under the target<"));
+    ok("...decisions that no longer apply: the server's sentence in place of the second line, the as-forecast line kept",
+      dBad.includes(">The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist), so the plan with them cannot be worked out. Set the target again on the Carbon page.<")
+      && !dBad.includes("With the agreed decisions:") && dBad.includes(">As forecast: 161.4 tCO2e, 118.0 over the target<") && !/undefined|NaN/.test(dBad));
+    const dTp = dash(TEAMP), dTc = dash(TEAMC);
+    ok("⭐ ...a team code: its own lines in the tenant's word, the scheme's cut applied; a cap is not compared; no decisions listed; no team id",
+      dTp.includes("These figures are for your team&#x27;s lines only, with the scheme&#x27;s cut applied to them.") && !dTp.includes("agreed decisions</summary>")
+      && dTc.includes("The cap is for the whole scheme, so they are not compared with it.") && dTc.includes(">As forecast: 161.4 tCO2e<")
+      && !dTc.includes("over the target") && !/IPT\d/.test(seg(dTp, "data-carbon-target", "Material demand") + seg(dTc, "data-carbon-target", "Material demand"))
+      && !/undefined|NaN/.test(dTp + dTc));
+
+    const rowsCt = cl.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
+      quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: null,
+      vehicle_type: l.vehicle_type, submitted_by: "tester", reject_reason: null }));
+    const pendN = new Set(cl.lines.filter(l => l.status === "Pending").map(l => `${l.route_id}|${l.discipline}|${l.section_id}`)).size;
+    const fc = (ct, extra) => render("the Forecasts page renders with a carbon target state",
+      h(Forecasts, { meta: ctMeta, who: "t", access: planner, onEdit(){}, onChanged(){}, initialRows: rowsCt, initialCost: cl, initialTarget: ct, ...(extra || {}) }));
+    const fSet = fc(CT);
+    ok(`⭐ Forecasts: under the header, approved plan as forecast 161.4 tCO2e · with the agreed decisions 43.4 · target 43.4, and the ${pendN} pending line(s) would add 5.7`,
+      pendN >= 1 && fSet.includes("<b>Carbon (all-in):</b> approved plan as forecast 161.4 tCO2e · with the agreed decisions 43.4 · target 43.4<")
+      && fSet.includes(`>The ${pendN} pending line${pendN === 1 ? "" : "s"} would add 5.7 tCO2e.<`)
+      && fSet.indexOf('data-carbon-target="set"') > fSet.indexOf(">Forecasts<") && fSet.indexOf('data-carbon-target="set"') < fSet.indexOf("<table")
+      && !/undefined|NaN/.test(fSet));
+    const fNone = fc(NONE), fLoading = render("the Forecasts page renders a target while the list is still loading",
+      h(Forecasts, { meta: ctMeta, who: "t", access: planner, onEdit(){}, onChanged(){}, initialTarget: CT }));
+    const fTp = fc(TEAMP, { access: submitter }), fTc = fc(TEAMC, { access: submitter }), fBad = fc(BAD);
+    ok("...no target: one line that says so; while the list loads, no pending sentence (the count is the page's own)",
+      fNone.includes(">No carbon target set yet. A planner sets it in the Carbon planner.<") && !fNone.includes("Open the Carbon planner")
+      && fLoading.includes("approved plan as forecast 161.4") && !fLoading.includes("pending line") && !fLoading.includes("waiting for approval"));
+    ok("...a team code: its own lines and the scheme's cut; a cap reads as the scheme's, not split by team; decisions that no longer apply say so",
+      fTp.includes("<b>Carbon (all-in), your team&#x27;s lines:</b>") && fTp.includes("target 43.4 (the scheme&#x27;s 73.1% cut)")
+      && fTc.includes("scheme cap 43.4, not split by team") && fBad.includes("with the agreed decisions —") && fBad.includes("Set the target again on the Carbon page.")
+      && !/IPT\d/.test([fTp, fTc, fBad].map(o => seg(o, "data-carbon-target", "<table")).join("")) && !/undefined|NaN/.test(fTp + fTc + fBad));
+
+    const pcMeta = { ...meta, months: { start_year: 2026, count: 24 }, routes: [{ route_id: "R1", origin: "Pit", dest: "Site", distance_km: 30 }],
+                     materials: ["Small aggregate"], vehicles: [PC.vehicle_type], planning_vehicles: [PC.vehicle_type],
+                     factors: { ...meta.factors, material_density_t_per_m3: { "Small aggregate": 1.6, _default: 1.6 }, vehicle_payload_t: { [PC.vehicle_type]: 29, _default: 29 } } };
+    const mx = (pv, ct, acc) => render("the Submit matrix renders with the preview's carbon",
+      h(Matrix, { meta: pcMeta, who: "t", editTarget: null, vehLang: "en", access: acc || planner, initialCost: pv, initialTarget: ct }));
+    const mSet = mx(PC, CT);
+    ok("⭐ Submit forecast: Carbon of these cells 28.3 tCO2e (material 22.6 · transport 5.6), the server's basis on hover, in the price strip",
+      mSet.includes('data-carbon-cells="1"') && mSet.includes("Carbon of these cells: <b>28.3 tCO2e</b> (material 22.6 · transport 5.6)<")
+      && mSet.includes('title="Making the material at the UK Government 2026 factor for aggregates; transport there and back on the routed distance."')
+      && !mSet.includes("no route distance yet") && mSet.indexOf('data-cost-strip="1"') < mSet.indexOf('data-carbon-cells="1"')
+      && mSet.indexOf('data-carbon-cells="1"') < mSet.indexOf("Movements = loads per working day"));
+    ok("...and the scheme target beside it: 43.4 tCO2e · approved plan now 161.4 tCO2e; nothing undefined or NaN",
+      mSet.includes(">Scheme target: 43.4 tCO2e · approved plan now 161.4 tCO2e<") && !/undefined|NaN/.test(mSet));
+    const mUnr = mx({ ...PC, carbon: { material_t: 22.629, transport_t: null, disposal_t: null, total_t: 22.629, unrouted: true,
+      basis: "Making the material at the UK Government 2026 factor for aggregates; transport is not counted until the route has a distance." } }, CT);
+    const mTip = mx({ ...PC, carbon: { material_t: null, transport_t: null, disposal_t: 19.554, total_t: 19.554, unrouted: true,
+      basis: "Transport is not counted until the route has a distance; disposal by landfill at the UK Government 2026 factor for soils." } }, NONE);
+    ok("...an unrouted line says transport is not counted (never estimated); a tip line shows waste disposal only; no target says so",
+      mUnr.includes("Carbon of these cells: <b>22.6 tCO2e</b> (material 22.6) · no route distance yet, so transport is not counted<")
+      && mTip.includes("Carbon of these cells: <b>19.6 tCO2e</b> (waste disposal 19.6) · no route distance yet") && mTip.includes(">No scheme carbon target set yet.<"));
+    const mTp = mx(PC, TEAMP, submitter), mTc = mx(PC, TEAMC, submitter);
+    const pcNo = { ...PC }; delete pcNo.carbon;
+    const mNo = mx(pcNo, null);
+    ok("...a team code: the target for its own lines, or the scheme's cap not split by team; no carbon block and no target read yet: neither line",
+      mTp.includes(">Target for your team&#x27;s lines: 43.4 tCO2e · their approved plan now 161.4 tCO2e<")
+      && mTc.includes(">Scheme cap: 43.4 tCO2e, not split by team · approved plan on your team&#x27;s lines now 161.4 tCO2e<")
+      && !mNo.includes("data-carbon-cells") && !mNo.includes("data-carbon-target")
+      && !/IPT\d/.test([mTp, mTc].map(o => seg(o, 'data-cost-strip="1"', "Movements = loads per working day")).join("")) && !/undefined|NaN/.test(mTp + mTc + mNo));
+  }
+
   // ---- the shared furniture -----------------------------------------------------
   ok("PageHeader renders a title, a subtitle and actions",
     (() => { const o = ReactDOMServer.renderToStaticMarkup(

@@ -890,8 +890,9 @@ ok("...and a page change from the rail is mirrored inward",
   /if\(propSubTab && propSubTab !== subTab\) setSubTabState\(propSubTab\)/.test(code));
 
 // 8c. Forecasts — My submissions and Approvals, merged
+// NARROWED 11 Oct 2026 (the carbon target line: the render harness hands it in as initialTarget)
 ok("there is one Forecasts page, not two lists",
-  code.includes("function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialRows })")
+  code.includes("function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialRows, initialTarget })")
   && !code.includes("function MySubmissions") && !code.includes("function Approvals("));
 ok("lines group per route + discipline + section, not per month",
   code.includes('const key = [r.route_id, disc, sect].join("|")'));
@@ -1543,6 +1544,94 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("...the clash rail is a card that says how many flags, each a word with a dot; +N more kept",
     _laBody.includes('<span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>')
     && _laBody.includes("rail.flags.slice(0, 3)") && _laBody.includes("more`"));
+}
+
+// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast -------------
+// Source-level. What they prove: each surface reads GET /api/carbon/target in its OWN read (or, on
+// Submit forecast, the preview's carbon block), nothing works carbon out in the browser, the
+// six-card pin still holds, and the words are the contract's. Not covered here: the loaded
+// states (render_frontend.js, from fixtures/carbon_target.json) and the read itself, the button
+// and the error state (dom_frontend.js). Not covered anywhere: a browser, the live server.
+{
+  const c0 = src.indexOf("// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast");
+  const c1 = src.indexOf("function Dashboard(");
+  const ctSrc = c0 > 0 && c1 > c0 ? src.slice(c0, c1) : "";
+  const ctc = ctSrc.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  const _dbc = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
+  const _dbW = _dbc.slice(_dbc.indexOf("{!wall ? ("), _dbc.indexOf("      ) : (\n        <>\n"));
+  const _dbWl = _dbc.slice(_dbc.indexOf("      ) : (\n        <>\n"));
+  const _fcc = code.slice(code.indexOf("function Forecasts("), code.indexOf("function CostingTab("));
+  const _mxc = code.slice(code.indexOf("function Matrix("), code.indexOf("function Forecasts("));
+  const mxCt = _mxc.slice(_mxc.indexOf("{cost && cost.carbon && (() => {"), _mxc.indexOf("{ctCellsTarget(ct)}</div>}") + 26);
+  const GETS = /fetch\(`\$\{API\}\/carbon\/target`\)/g;
+  ok("⭐ CARBON TARGET: one block of helpers before the Dashboard — the strip, the Forecasts line and the word helpers",
+    ctSrc.length > 3000 && ctc.includes("function CarbonTargetStrip({ ct, err, onOpen })") && ctc.includes("function CarbonTargetLine({ ct, err, pendingN })")
+    && ["ctGap", "ctTargetLine", "ctProgress", "ctScopeNote", "ctSetBy", "ctCellsTarget", "ctFig"].every(f => ctc.includes(`function ${f}(`)));
+  ok("🔴 ...each of the three surfaces reads it in its OWN read, a GET with no method: nothing on them writes the target",
+    [_dbc, _fcc, _mxc].every(b => (b.match(GETS) || []).length === 1 && !/carbon\/target`,/.test(b))
+    && (ctc.match(GETS) || []).length === 0 && !/fetch\(/.test(ctc));
+  ok("...guarded by initialTarget (the render harness); Dashboard and Forecasts read it again on tick (big-screen refresh; Refresh, Approve, Reject, Withdraw), Submit forecast once",
+    [_dbc, _fcc, _mxc].every(b => b.includes("const [ct, setCt] = useState(initialTarget || null);") && b.includes("if(initialTarget) return;"))
+    && /fetch\(`\$\{API\}\/carbon\/target`\)[\s\S]{0,220}\}, \[tick\]\);/.test(_dbc) && /fetch\(`\$\{API\}\/carbon\/target`\)[\s\S]{0,220}\}, \[tick\]\);/.test(_fcc)
+    && /fetch\(`\$\{API\}\/carbon\/target`\)[\s\S]{0,160}\}, \[\]\);/.test(_mxc)
+    && _dbc.includes("{ if(live) setCtErr(true); }") && _fcc.includes("{ if(live) setCtErr(true); }"));
+  ok("🔴 ...the Dashboard's new hooks sit before its early returns (React #310 blanked the app on 5 Oct)",
+    _dbc.indexOf("const [ct, setCt]") > 0 && _dbc.indexOf("const [ct, setCt]") < _dbc.indexOf("if(err) return")
+    && _dbc.indexOf("fetch(`${API}/carbon/target`)") < _dbc.indexOf("if(err) return"));
+  ok("⭐ Dashboard: a strip under the six cards, NOT a seventh card; with no target, a button opens the Carbon planner through the Portal's page switch",
+    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />") && (_dbW.match(/<Card label=/g) || []).length === 6
+    && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
+    && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
+    && code.includes("<Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} onOpen={setPage} />")
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOpen })")
+    && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
+  ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
+    (_dbWl.match(/<Fig value=\{ctW\.value\} label="tCO2e target, all-in" sub=\{ctW\.sub\} title=\{ctW\.title\} \/>/g) || []).length === 1
+    && !_dbW.includes("ctW.") && _dbc.includes("const ctW = ctFig(ct, ctErr);"));
+  ok("⭐ Forecasts: the line sits under the PageHeader, before the list in every state; the pending count is the page's own (lines with a Pending month)",
+    _fcc.includes("<CarbonTargetLine ct={ct} err={ctErr} pendingN={rows ? pendingN : null} />")
+    && _fcc.indexOf('<PageHeader title="Forecasts"') < _fcc.indexOf("<CarbonTargetLine") && _fcc.indexOf("<CarbonTargetLine") < _fcc.indexOf("{err ? <EmptyState")
+    && _fcc.includes('const pendingN = useMemo(() => groups.filter(g => g.statuses.has("Pending")).length, [groups]);')
+    && ctc.includes("`The ${pendingN} pending line${pendingN === 1 ? \"\" : \"s\"} would add ${ctT(s.pending_t)} tCO2e.`"));
+  ok("⭐ Submit forecast: the cells' carbon is the preview's own block (total and parts as sent, the unrouted words), inside the price strip, with the target beside it",
+    mxCt.length > 300 && _mxc.indexOf('data-cost-strip="1"') < _mxc.indexOf("{cost && cost.carbon && (() => {")
+    && _mxc.indexOf("{ctCellsTarget(ct)}</div>}") < _mxc.indexOf("Movements = loads per working day")
+    && mxCt.includes("Carbon of these cells: <b>{ctT(c.total_t)} tCO2e</b>")
+    && mxCt.includes('[["material", c.material_t], ["transport", c.transport_t], ["waste disposal", c.disposal_t]]')
+    && mxCt.includes('{c.unrouted ? " · no route distance yet, so transport is not counted" : ""}') && mxCt.includes("title={c.basis || undefined}")
+    && code.includes("function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTarget })"));
+  ok("🔴 no carbon arithmetic in the browser: no factor, no × or ÷ 1000, no sum or difference of the server's tCO2e fields; the gaps are the server's",
+    !/emissions_kg_co2e_per_km|kg_per_km|_factor|\* ?1000|\/ ?1000|0\.93939|7\.80307|19\.55376|1\.01398/.test(ctc + mxCt)
+    && !/_t\s*[-+*/]\s*[\w(+]/.test(ctc + mxCt) && !/[-+*/]\s*(?:s|c|t|ct\.status|ct\.target)\.\w+_t\b/.test(ctc + mxCt)
+    && ctc.includes("ctGap(s.gap_as_forecast_t, s.approved_t)") && ctc.includes("ctGap(s.gap_with_decisions_t, s.approved_t)"));
+  ok("...the one comparison the page makes: a gap inside the rounding of the stored % (half of 0.1% of the approved plan) reads 'on target'",
+    ctc.includes("const CT_ROUND = 0.0005;") && (ctc.match(/CT_ROUND/g) || []).length === 2
+    && ctc.includes("if(Math.abs(gap) <= Math.abs(+approved || 0) * CT_ROUND) return \"on target\";"));
+  ok("⭐ the contract's words: the two modes, as forecast and with the agreed decisions, on / over / under the target",
+    ctc.includes("`Target: ${pct} below the approved plan = ${ctT(s.target_t)} tCO2e`")
+    && ctc.includes("`Target: ${ctT(t.cap_t)} tCO2e cap (${pct} below the approved plan when it was set)`")
+    && ctc.includes("`As forecast: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
+    && ctc.includes("s.invalid || `With the agreed decisions: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
+    && ctc.includes('${gap > 0 ? "over" : "under"} the target') && ctc.includes("pct = `${(+t.pct_below).toFixed(1)}%`"));
+  ok("...all-in said once where transport-only figures sit: the strip names the Transport carbon card, the big-screen figure the group it joins",
+    ctc.includes('const CT_ALLIN = "All-in: making the material, transport and waste disposal";')
+    && ctc.includes("{CT_ALLIN}, on the whole approved plan. The Transport carbon card above counts transport only.")
+    && ctc.includes('CT_ALLIN + ". The other carbon figures here are transport only"') && ctc.includes("s.approved_transport_t"));
+  ok("...no target says who sets it; a team code reads its own lines in the tenant's word (a cap is not compared), never a team id",
+    (ctc.match(/No carbon target set yet\. A planner sets it in the Carbon planner\./g) || []).length === 3
+    && ctc.includes("const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;") && ctc.includes('ct.status.scope === "team"')
+    && ctc.includes("The cap is for the whole scheme, so they are not compared with it.") && ctc.includes("with the scheme's cut applied to them.")
+    && ctc.includes("not split by team") && !/\.ipt\b|IPT ?[1-6]|teamName\(|teamText\(/.test(ctc + mxCt));
+  ok("...the agreed decisions are listed for a scheme code only, collapsed (a team code's GET still carries them: this is wording, not a lock)",
+    ctc.includes("{!ctTeam(ct) && words.length > 0 && (") && ctc.includes('<details className="ct-more">') && ctc.includes("const words = t.lever_words || [];"));
+  ok("🔴 the target's words: tCO2e with a plain 2, none of the banned words, no small, uppercase or colour-only text",
+    !/CO₂/.test(ctc + mxCt) && /tCO2e/.test(ctc) && /tCO2e/.test(mxCt)
+    && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?)\b/i.test(ctc + mxCt)
+    && !/\bAI\b/.test(ctc + mxCt) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(ctc + mxCt) && !/style=\{\{ ?color/.test(ctc + mxCt));
+  ok("...its colours and sizes are tokens in <style>: 14 px lines, 13 px notes, no new Tailwind colour utility to remap for the dark look",
+    /\.ct-strip\{background:var\(--surface\);border:1px solid var\(--line\);/.test(html) && /\.ct-line\{font-size:14px;[^}]*color:var\(--ink\)/.test(html)
+    && /\.ct-note\{font-size:13px;[^}]*color:var\(--muted\)/.test(html)
+    && !/\b(?:bg|text|border)-(?:white|black|slate|gray|red|amber|green|emerald|blue)\b/.test(ctc + mxCt) && !/\b(?:bg|text|border)-\[/.test(ctc + mxCt));
 }
 
 // ---- report ------------------------------------------------------------------
