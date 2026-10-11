@@ -130,7 +130,7 @@ if (loaded) {
   // Portal keeps the page in localStorage, so each page is selected by seeding it and
   // rendering fresh. That also proves the persistence path parses a value it did not
   // write itself.
-  const PAGES = ["dashboard", "submit", "forecasts", "lookahead", "locations", "routes",
+  const PAGES = ["dashboard", "submit", "forecasts", "carbon", "lookahead", "locations", "routes",
                  "zones", "config", "map"];
   for (const page of PAGES) {
     sandbox.localStorage.setItem("modus_page", page);
@@ -138,6 +138,7 @@ if (loaded) {
       h(Portal, { role: planner, who: "tester", meta, metaErr: false, vehLang: "en" }));
     if (page === "map") ok("...the map page is an iframe", out.includes("<iframe"));
     if (page === "config") ok("...the config page asks for the admin token", out.includes("Admin token"));
+    if (page === "carbon") ok("...the carbon page waits for its one read (no figures before the server answers)", out.includes("Loading the carbon planner"));
   }
 
   // ---- the submitter sees the same shell minus the Data group -------------------
@@ -172,6 +173,34 @@ if (loaded) {
     fPlanner !== fSubmitter && fPlanner.includes("Approve or reject each line here")
     && fSubmitter.includes("across every year each one covers")
     && !fPlanner.includes("across every year each one covers"));
+
+  // ---- 10 Oct 2026: the Carbon planner POPULATED from the scenario test_carbon.py writes
+  // (156.995 t baseline; 'Greener' −124.153 t; drivers disposal, fuel, recycled — hand-worked there)
+  const cbPath = path.join(__dirname, "fixtures", "carbon_scenario.json");
+  ok("the carbon-scenario fixture exists (written by test_carbon.py)", fs.existsSync(cbPath));
+  if (fs.existsSync(cbPath) && typeof sandbox.CarbonPage === "function") {
+    const cs = JSON.parse(fs.readFileSync(cbPath, "utf8"));
+    const cOut = render("the Carbon page renders POPULATED from the scenario fixture", h(sandbox.CarbonPage, { meta, access: planner, initialData: cs }));
+    ok("⭐ ...baseline 157.0 t and the alternative 32.8 t, 124.2 t (79.1 %) under it",
+      cOut.includes("Baseline — the approved plan") && cOut.includes("157.0") && cOut.includes("32.8")
+      && cOut.includes("−124.2 t (−79.1 %) under the baseline"));
+    const iD = cOut.indexOf("Disposal route"), iF = cOut.indexOf("Diesel vs electric");
+    ok("⭐ ...the drivers in the server's order: disposal, then diesel vs electric, then recycled content",
+      cOut.includes("What moves carbon most") && iD > 0 && iF > iD && cOut.lastIndexOf("Recycled content") > iF);
+    ok("...the three methods side by side, the NH Carbon Tool basis labelled for comparison",
+      cOut.includes("Wayscope — per vehicle-km (the headline)") && cOut.includes("National Highways Carbon Tool basis (shown for comparison)")
+      && cOut.includes("46.2"));
+    ok("...the diesel-or-electric table: 300 diesel trips, 342 electric, 19 950 kWh",
+      cOut.includes("Electric variant") && cOut.includes(">300<") && cOut.includes(">342<") && cOut.includes("19 950")
+      && cOut.includes("no charge needed inside a shift") && !cOut.includes("up to 0 charge"));
+    ok("...the controls: a disabled recycled slider for soil with the reason, the EPD fields, the electric switch",
+      cOut.includes("Not available: no primary-production factor is published for Soils.") && cOut.includes("EPD reference (required)")
+      && cOut.includes("Electric lorries where a variant exists"));
+    ok("...the Planned panel and the known limits, and nothing renders as undefined or NaN",
+      cOut.includes("Planned — not built yet") && cOut.includes("Known limits") && !/undefined|NaN/.test(cOut));
+  } else {
+    ok("CarbonPage is defined", false);
+  }
 
   // ---- 11 Sep: the Dashboard and the Forecasts page POPULATED from the server's cost lines
   // (test_costlines.py writes the fixture through costlines.lines() on its scratch database)

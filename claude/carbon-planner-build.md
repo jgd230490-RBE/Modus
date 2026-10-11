@@ -1,7 +1,7 @@
 # Carbon planner — build note (10–11 Oct 2026, branch `claude/carbon-planner`)
 
 Built from `carbon-build-brief-1010.md`. Copy this file into the Claude project's notes.
-**Status: phases 1–2 (engine, scenario API) on the branch. Phases 3–4 follow; phase 5 is after the show.**
+**Status: phases 1–3 (engine, scenario API, Carbon page) on the branch. Phase 4 follows; phase 5 is after the show.**
 
 ## What it is for
 Carbon forecasting for strategic planning, to REDUCE carbon: which planning decisions move the
@@ -104,6 +104,46 @@ the four 400s, the answer unchanged, and a source check that `_require_access()`
 network excluded from transport; the North Team code sees only its lines; the 400s; then R001
 baked BY HAND with the note's illustrative 18.4 + 19.1 km gives **75.99 t** (the note's worked
 example) and the same figure as `/api/costing/lines`, with the tool basis 261.82 t beside it.
+
+## Phase 3 — the Carbon page (`frontend/index.html`, Plan → **Carbon planner**)
+- **Left: the alternative's controls.** Per material category: recycled content (slider; disabled with
+  the Government file's reason where no closed-loop or primary row exists), a supplier EPD (value +
+  reference, both required), the published re-used row where one exists, the vehicle, and a typed
+  source distance (50–150 % of the baked distance, flagged as typed). Electric lorries where a variant
+  exists. Programme spend in £m (for tCO2e per £m). Per route, folded away: another supplier to the
+  same destination, a baked HERE alternative route, another destination (tip vs recycling site) and
+  the disposal route.
+- **Right: the answer.** Baseline (the approved plan) beside the alternative, split into material,
+  transport and disposal, with the delta and the %. **What moves carbon most**: each decision ranked
+  by the tonnes it moves on its own, with the interaction and any flag in words. Benchmarks (kg per
+  tonne delivered; kg per t·km against the DESNZ 2026 class average, "X % below the national
+  average"; laden share; zero-emission deliveries with NH's 2040 target; t per £m with NH's 210 → 148).
+  **Three ways to count the same haul**: Wayscope's per-vehicle-km headline, the NH Carbon Tool basis
+  "shown for comparison", and DESNZ tonne-km, with the stand line under it. **Diesel or electric — the
+  same tonnage**: lorries at the peak month, trips, kWh, tCO2e, payload, battery, charger, range,
+  charges. By material with the NH sheet. **Factors used**: each with its status chip, value, source,
+  year and gov.uk row ID; every figure carries the same text on hover.
+- **Bottom:** the **Planned — not built yet** panel (electricity price index, charging-site map, charger
+  sizing, battery degradation, plant fuel, the .rct export) with no figures, and the known limits.
+- One read only (`POST /api/carbon/scenario`), debounced; the page does no carbon arithmetic.
+  Distances and per-distance figures go through the tenant's unit (the demo reads miles).
+- Guide: three steps for the page (demo tenant only). Config → Vehicles shows "derived: kWh × UK grid"
+  in an electric profile's kg CO2e/km cell. Electric profiles never reach the forecast pickers.
+- **Side effect:** `frontend/index.html` grows from 492 KB to 525 KB, past in-browser Babel's 500 KB
+  mark, so the browser console prints "[BABEL] Note: The code generator has deoptimised the styling…".
+  It is a notice, not an error: Babel only switches to compact output. The page works. (The
+  single-file rule and the six-script-tag assertion rule out moving the page into its own file.)
+
+**Tests:** `parse_frontend.js` 435 → 456 (nav and switch, one POST read, no carbon arithmetic or
+factor literal, the tenant's unit, the Planned panel and limits, provenance on hover, all seven
+drivers, the banned words, no team id, the electric wording, the guide anchors). `render_frontend.js`
+104 → 114 (the page in the rail, and POPULATED from `fixtures/carbon_scenario.json`: 157.0 t vs 32.8 t,
+the drivers in order, the three methods, 300 → 342 trips, no undefined/NaN).
+
+**Checked in a real browser (local, 11 Oct):** the app on this branch with the demo package imported
+(its config row has no carbon block, like the live demo) and route distances seeded by hand (straight
+line × 1.3; HERE was not called). Signed in as a planner: the page loads, electric + 30 % recycled small
+aggregate moves the plan −1,294.5 t (−17.6 %), ranked electric first; miles shown correctly.
 
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
