@@ -296,37 +296,74 @@ def validate(doc, network=None):
             x = plan.get(f)
             if not num(x) or x <= 0:
                 p.append(f"planning.{f} must be a positive number")
-    # 10 Oct 2026: the carbon block, when present — every factor a number >= 0 or null, and a
-    # material category's carbon_material must name a class the block (or the file's) carries
+    # 10 Oct 2026: the carbon block, when present. Every shape the carbon planner reads is
+    # checked, so a Config save can never leave a document that makes every scenario fail:
+    # the sub-blocks are objects, every factor a number >= 0 (null switches a figure off), a
+    # disposal site type maps to a published route, and a category's carbon_material names a
+    # class the live block OR the file carries (the planner merges the two key by key).
     cb = doc.get("carbon")
     if cb is not None and not isinstance(cb, dict):
         p.append("carbon must be an object")
         cb = None
-    mats = (cb or {}).get("materials") if isinstance(cb, dict) else None
-    if isinstance(mats, dict):
-        for mk, m in mats.items():
-            if mk.startswith("_") or not isinstance(m, dict):
+    cb = cb or {}
+    for blk in ("materials", "transport", "electricity", "electric_hgv", "disposal_loc_types", "benchmarks", "planned", "source"):
+        if cb.get(blk) is not None and not isinstance(cb.get(blk), dict):
+            p.append(f"carbon.{blk} must be an object")
+    mats = cb.get("materials") if isinstance(cb.get("materials"), dict) else {}
+    for mk, m in mats.items():
+        if str(mk).startswith("_"):
+            continue
+        if not isinstance(m, dict):
+            p.append(f"carbon.materials.{mk} must be an object")
+            continue
+        for grp in ("kg_co2e_per_t", "disposal_kg_co2e_per_t"):
+            g = m.get(grp)
+            if g is not None and not isinstance(g, dict):
+                p.append(f"carbon.materials.{mk}.{grp} must be an object of figures")
                 continue
-            for grp in ("kg_co2e_per_t", "disposal_kg_co2e_per_t"):
-                for kk, x in ((m.get(grp) or {}) if isinstance(m.get(grp), dict) else {}).items():
-                    if x is not None and (not num(x) or x < 0):
-                        p.append(f"carbon.materials.{mk}.{grp}.{kk} must be a number >= 0 or null")
-    el = (cb or {}).get("electricity") if isinstance(cb, dict) else None
-    if isinstance(el, dict):
-        for kk, x in el.items():
-            if kk.endswith("_per_kwh") and (not num(x) or x < 0):
-                p.append(f"carbon.electricity.{kk} must be a number >= 0")
+            for kk, x in (g or {}).items():
+                if x is not None and (not num(x) or x < 0):
+                    p.append(f"carbon.materials.{mk}.{grp}.{kk} must be a number >= 0 or null")
+    tr = cb.get("transport") if isinstance(cb.get("transport"), dict) else {}
+    for blk, field in (("tonne_km_2026", "kg_co2e_per_tkm"), ("vehicle_km_2026", "kg_co2e_per_vkm")):
+        rows = tr.get(blk)
+        if rows is not None and not isinstance(rows, dict):
+            p.append(f"carbon.transport.{blk} must be an object")
+            continue
+        for rk, r in (rows or {}).items():
+            if str(rk).startswith("_") or not isinstance(r, dict) or field not in r:
+                continue
+            if r[field] is not None and (not num(r[field]) or r[field] < 0):
+                p.append(f"carbon.transport.{blk}.{rk}.{field} must be a number >= 0")
+    nh = tr.get("nh_carbon_tool_v27")
+    if nh is not None:
+        if not isinstance(nh, dict):
+            p.append("carbon.transport.nh_carbon_tool_v27 must be an object")
+        else:
+            for f in ("laden_t_co2e_per_tkm", "unladen_t_co2e_per_tkm"):
+                if nh.get(f) is not None and (not num(nh[f]) or nh[f] < 0):
+                    p.append(f"carbon.transport.nh_carbon_tool_v27.{f} must be a number >= 0")
+    el = cb.get("electricity") if isinstance(cb.get("electricity"), dict) else {}
+    for kk, x in el.items():
+        if str(kk).endswith("_per_kwh") and x is not None and (not num(x) or x < 0):
+            p.append(f"carbon.electricity.{kk} must be a number >= 0")
+    dl = cb.get("disposal_loc_types") if isinstance(cb.get("disposal_loc_types"), dict) else {}
+    for kk, x in dl.items():
+        if not str(kk).startswith("_") and x not in ("landfill", "closed_loop", "open_loop", "combustion"):
+            p.append(f"carbon.disposal_loc_types.{kk} must be landfill, closed_loop, open_loop or combustion")
     if isinstance(cats, dict):
-        known = set(k for k in (mats or {}) if not k.startswith("_"))
-        if not known:
-            try:
-                with open(os.path.join(os.path.dirname(__file__), "factors.json"), encoding="utf-8") as fh:
-                    known = set(k for k in ((json.load(fh).get("carbon") or {}).get("materials") or {}) if not k.startswith("_"))
-            except Exception:
-                known = set()
+        known = set(k for k in mats if not str(k).startswith("_"))
+        try:
+            with open(os.path.join(os.path.dirname(__file__), "factors.json"), encoding="utf-8") as fh:
+                fm = (json.load(fh).get("carbon") or {}).get("materials") or {}
+            known |= set(k for k in fm if not str(k).startswith("_"))
+        except Exception:
+            pass
         for k, c in cats.items():
             cm = c.get("carbon_material") if isinstance(c, dict) else None
-            if cm is not None and known and cm not in known:
+            if cm is not None and not isinstance(cm, str):
+                p.append(f"material '{k}': carbon_material must be a class name or null")
+            elif cm is not None and known and cm not in known:
                 p.append(f"material '{k}': carbon_material '{cm}' is not a carbon material ({', '.join(sorted(known))})")
     # 10 Sep night: the fair-price block, when present — numbers >= 0, months 1-12
     fp = doc.get("fair_price")

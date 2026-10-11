@@ -263,9 +263,13 @@ ok("Rigid 7.5t: 0.55 → the 2026 class figure 0.49944 (5_304_3112_4_1), pair 0.
    and V["Rigid 7.5t"]["emissions_kg_co2e_per_km_laden"] == 0.54675 and "5_304_3112_4_1" in V["Rigid 7.5t"]["_emissions_basis"])
 ok("the rigid >17 t and artic >33 t figures are unchanged (0.99773 / 0.93939)",
    all(V[k]["emissions_kg_co2e_per_km"] == 0.99773 for k in _rig) and V[ART]["emissions_kg_co2e_per_km"] == 0.93939)
-ok("⭐ fuel on every profile: diesel on all twelve existing, electric on the two new",
-   all(V[k]["fuel"] == "diesel" for k in V if not k.startswith("_") and k not in (EA, ER))
-   and V[EA]["fuel"] == "electric" and V[ER]["fuel"] == "electric")
+EF, FLB = "Artic Flatbed (44t) — electric", "Artic Flatbed (44t)"
+# NARROWED (10 Oct 2026, review): a third electric variant, for the artic flatbed — the demo's
+# steel, precast and general lines run on it and could not switch to electric without one
+ok("⭐ fuel on every profile: diesel on all twelve existing, electric on the three new haulage variants",
+   all(V[k]["fuel"] == "diesel" for k in V if not k.startswith("_") and k not in (EA, ER, EF))
+   and V[EA]["fuel"] == "electric" and V[ER]["fuel"] == "electric" and V[EF]["fuel"] == "electric"
+   and V[EF]["geometry_twin"] == FLB and V[EF]["payload_t"] == V[FLB]["payload_t"] - 3.5 and V[EF]["scenario_only"] is True)
 ok("the electric variants are NEW keys beside the baked profiles (nothing renamed), scenario-only, twinned",
    ART in V and R8 in V and V[EA]["geometry_twin"] == ART and V[ER]["geometry_twin"] == R8
    and V[EA]["scenario_only"] is True and V[ER]["scenario_only"] is True)
@@ -308,8 +312,11 @@ ok("average construction 74.9958, recycled disabled (no closed-loop row)", f["kg
 ok("recycled share outside 0–100 % is refused", isinstance(_raises(lambda: carbon.material_factor(CP, "aggregates", recycled_pct=101)), carbon.CarbonError)
    and isinstance(_raises(lambda: carbon.material_factor(CP, "aggregates", recycled_pct=-1)), carbon.CarbonError))
 f = carbon.material_factor(CP, "concrete", epd={"kg_per_t": 95.0, "source": "EPD-0001 (fictional)"})
-ok("⭐ the EPD override replaces the generic concrete figure: 95.0 with its source",
-   f["kg_per_t"] == 95.0 and f["method"] == "epd" and f["epd_source"] == "EPD-0001 (fictional)" and f["status"] == "EPD (supplier)")
+# REVERSED (10 Oct 2026, review): an EPD is TYPED, not checked by Wayscope, so it carries the
+# brief's ASSUMPTION status (one of the three), with its reference as the source
+ok("⭐ the EPD override replaces the generic concrete figure: 95.0, an ASSUMPTION typed with its reference",
+   f["kg_per_t"] == 95.0 and f["method"] == "epd" and f["epd_source"] == "EPD-0001 (fictional)" and f["status"] == "ASSUMPTION"
+   and "EPD-0001 (fictional)" in f["source"] and "not checked" in f["source"])
 ok("...an EPD without its source is refused", isinstance(_raises(lambda: carbon.material_factor(CP, "concrete", epd={"kg_per_t": 95.0})), carbon.CarbonError))
 ok("...a negative EPD is refused", isinstance(_raises(lambda: carbon.material_factor(CP, "concrete", epd={"kg_per_t": -1, "source": "x"})), carbon.CarbonError))
 ok("re-used aggregates = the published Re-used row 2.21; re-used concrete (none published) refused",
@@ -357,6 +364,9 @@ sh = carbon.split_sheets([{"id": 1, "carbon_material": "soils", "t": 5.0}, {"id"
                           {"id": 3, "carbon_material": "aggregates", "t": 2.0}])
 ok("...earthworks excludes the bulk rows: Earthworks 5, Bulk 5, and the two sheets add up to the whole",
    near(sh["Earthworks"], 5.0) and near(sh["Bulk Materials"], 5.0) and near(sh["Earthworks"] + sh["Bulk Materials"], 10.0))
+sh = carbon.split_sheets([{"id": 1, "carbon_material": "soils", "t": 5.0}, {"id": 2, "carbon_material": "soils", "t": 4.0, "disposal": True}])
+ok("...and soil LEAVING site for a tip or a recycling site sits on Waste (the tool's 'exported off-site' rows), not Earthworks",
+   near(sh["Earthworks"], 5.0) and near(sh["Waste"], 4.0) and carbon.sheet_of("soils", disposal=True) == "Waste")
 ok("...a row counted twice is refused",
    isinstance(_raises(lambda: carbon.split_sheets([{"id": 1, "carbon_material": "soils", "t": 1}, {"id": 1, "carbon_material": "aggregates", "t": 1}])), carbon.CarbonError))
 
@@ -393,7 +403,7 @@ d = carbon.ev_day(75, 80, 10, 1.25, 500, 350)
 # 100 kWh a trip; 8 cycles need 300 kWh more = 51.4 min → 651 > 600; 7 need 200 kWh = 34.3 min → 559 ≤ 600
 ok("⭐ electric shift: 75-min cycle, 80 km a trip, 500 kWh, 350 kW → 7 cycles (not 8), one charge of 34.3 min",
    d["cycles"] == 7 and d["charges"] == 1 and near(d["charge_minutes"], 200 / 350 * 60) and d["feasible"]
-   and near(d["daily_range_km"], 400.0) and near(d["kwh_per_trip"], 100.0), str(d))
+   and near(d["range_per_charge_km"], 400.0) and near(d["kwh_per_trip"], 100.0), str(d))
 d = carbon.ev_day(60, 40, 10, 1.25, 500, 350)
 ok("...10 cycles of 50 kWh fit one 500 kWh battery: no charge, the diesel day", d["cycles"] == 10 and d["charges"] == 0)
 d = carbon.ev_day(30, 100, 10, 1.25, 500, 350)
@@ -466,10 +476,11 @@ reset_db()
 access.set_current("planner123")
 SA, SOIL = "Small aggregate", "Earthworks / soil"
 for _id, _name, _type in (("L1", "Pit A", "Quarry"), ("L2", "Compound", "Compound"), ("L3", "Tip", "Landfill"),
-                          ("L4", "Soil hub", "Soil recycling"), ("L5", "Pit B", "Quarry"), ("L6", "Pit C", "Quarry")):
+                          ("L4", "Soil hub", "Soil recycling"), ("L5", "Pit B", "Quarry"), ("L6", "Pit C", "Quarry"),
+                          ("L7", "Pit D", "Quarry")):
     db.execute("INSERT INTO locations (id, name, lat, lon, loc_type) VALUES (?, ?, ?, ?, ?)", (_id, _name, 52.5, -1.0, _type))
 for _rid, _o, _d, _m in (("R1", "L1", "L2", SA), ("R2", "L5", "L2", SA), ("R3", "L2", "L3", SOIL),
-                         ("R4", "L2", "L4", SOIL), ("R5", "L6", "L2", SA)):
+                         ("R4", "L2", "L4", SOIL), ("R5", "L6", "L2", SA), ("R6", "L7", "L2", SA)):
     db.execute("INSERT INTO routes (id, origin_id, dest_id, material_category, ipt) VALUES (?, ?, ?, ?, ?)", (_rid, _o, _d, _m, "IPT 1"))
 
 
@@ -484,6 +495,7 @@ for _rid, _p, _l, _r, _lh, _rh, _alt in (("R1", ART, 30, 30, 0.6, 0.5, 0), ("R1"
                                          ("R1", R8, 30, 30, 0.7, 0.6, 0), ("R2", ART, 10, 10, 0.25, 0.2, 0),
                                          ("R3", ART, 20, 20, 0.4, 0.35, 0), ("R4", ART, 8, 8, 0.2, 0.15, 0)):
     _geom(_rid, _p, "loaded", _l, _lh, _alt); _geom(_rid, _p, "return", _r, _rh, _alt)
+_geom("R6", ART, "loaded", 30, 0.6)          # R6: the SAME 30 km as R1 to the same compound, return leg NOT baked
 
 
 def _line(rid, sect, qty, mat, ipt):
@@ -540,9 +552,12 @@ ok("the muck-away line is a DISPOSAL line (destination type Landfill): no materi
    LN["R3"]["disposal_route"] == "landfill" and LN["R3"]["material_t"] is None and near(LN["R3"]["disposal_t"], 113.412, 0.001))
 ok("the NH tool basis is shown beside, never in, the headline: R1 30 km × 2,900 t × 0.0002276687 = 19.807",
    near(LN["R1"]["transport_nh_t"], 19.807, 0.001) and near(B["transport_nh_t"], 19.807 + 20 * 5800 * 0.000227668667, 0.002))
-ok("sheets: Bulk Materials 36.068 (the aggregate lines) and Earthworks 120.927 (the soil line) — together the total",
-   near(S["baseline"]["sheets"]["Bulk Materials"], 36.068, 0.002) and near(S["baseline"]["sheets"]["Earthworks"], 120.927, 0.002)
-   and near(S["baseline"]["sheets"]["Bulk Materials"] + S["baseline"]["sheets"]["Earthworks"], B["total_t"], 0.003))
+# REVERSED (10 Oct 2026, review): the soil line goes to a LANDFILL — the NH tool reports soil
+# exported off site under Waste, so it is the Waste sheet, not Earthworks
+ok("sheets: Bulk Materials 36.068 (the aggregate lines) and Waste 120.927 (the soil to landfill) — together the total",
+   near(S["baseline"]["sheets"]["Bulk Materials"], 36.068, 0.002) and near(S["baseline"]["sheets"]["Waste"], 120.927, 0.002)
+   and near(S["baseline"]["sheets"]["Earthworks"], 0.0) and LN["R3"]["sheet"] == "Waste"
+   and near(S["baseline"]["sheets"]["Bulk Materials"] + S["baseline"]["sheets"]["Waste"], B["total_t"], 0.003))
 AL = S["baseline"]["allocation"]
 ok("allocation: Small aggregate's 36.068 t at 60 % Road Pavements / 30 % Drainage; the rest Not Allocated",
    near(AL["Road Pavements"], 21.641, 0.002) and near(AL["Drainage"], 10.820, 0.002) and near(AL["Not Allocated"], 124.534, 0.003))
@@ -594,9 +609,10 @@ ok("⭐ diesel vs electric, same tonnage: 300 → 342 trips, 3 → 3 lorries, 13
    and FC["diesel"]["lorries_peak"] == 3 and FC["electric"]["lorries_peak"] == 3
    and near(FC["diesel"]["transport_t"], 13.151, 0.002) and near(FC["electric"]["transport_t"], 2.872, 0.002)
    and near(FC["electric"]["kwh"], 19950.0, 0.1) and near(FC["delta_t"], -10.280, 0.002), json.dumps(FC)[:600])
-ok("...with the electric day stated: payload 25.5 t (twin 29), 500 kWh, 350 kW, range 400 km, no charge needed",
+ok("...with the electric day stated: payload 25.5 t (twin 29), 500 kWh, 350 kW, 400 km on one charge, no charge needed",
    FC["electric_profiles"][0]["payload_t"] == 25.5 and FC["electric_profiles"][0]["twin_payload_t"] == 29
-   and FC["daily_range_km_min"] == 400.0 and FC["charges_per_lorry_day_max"] == 0 and FC["infeasible_lines"] == 0)
+   and FC["range_per_charge_km_min"] == 400.0 and FC["charges_per_lorry_day_max"] == 0 and FC["infeasible_lines"] == 0
+   and FC["electric_profiles"][0]["status"] == "ASSUMPTION")
 
 e = _raises(lambda: carbon.scenario(alternatives=[{"name": "x", "levers": [{"driver": "source", "scope": {"route_id": "R1"}, "to_route": "R3"}]}]))
 ok("a supplier swap to a route with another destination is refused", isinstance(e, carbon.CarbonError) and "destination" in str(e))
@@ -614,12 +630,14 @@ ok("options: each category in view with its class, sheet, factors and whether re
 ok("options: the electric variant is offered beside the artic it twins, with its DERIVED factor",
    any(v["vehicle"] == EA and v["status"] == "DERIVED" and v["geometry_twin"] == ART for v in OP["vehicles"]))
 _or = {r["route_id"]: r for r in OP["routes"]}
-ok("options: R1's other suppliers to the same compound (R2 from Pit B, R5 from Pit C) and its baked HERE alternatives (0, 1)",
-   _or["R1"]["suppliers"] == [{"route_id": "R2", "origin_name": "Pit B"}, {"route_id": "R5", "origin_name": "Pit C"}]
+ok("options: R1's other suppliers to the same compound, each saying whether it is baked, and R1's baked HERE alternatives (0, 1)",
+   _or["R1"]["suppliers"] == [{"route_id": "R2", "origin_name": "Pit B", "baked": True}, {"route_id": "R5", "origin_name": "Pit C", "baked": False},
+                              {"route_id": "R6", "origin_name": "Pit D", "baked": True}]
    and _or["R1"]["alts"][ART] == [0, 1])
-ok("options: R3 is a landfill line with R4 (the soil hub, closed-loop) as another destination from the same origin",
+ok("options: R3 is a landfill line with R4 (the soil hub, closed-loop) as another destination; soils publish landfill and closed-loop only",
    _or["R3"]["disposal_route"] == "landfill"
-   and _or["R3"]["destinations"] == [{"route_id": "R4", "dest_name": "Soil hub", "disposal_route": "closed_loop"}])
+   and _or["R3"]["destinations"] == [{"route_id": "R4", "dest_name": "Soil hub", "disposal_route": "closed_loop", "baked": True}]
+   and _or["R3"]["disposal_routes"] == ["landfill", "closed_loop"] and _om[SA]["disposal_routes"] == ["landfill", "closed_loop", "open_loop"])
 _pk = {p["key"]: p for p in S["factors"]}
 ok("⭐ every factor used carries source, year and status (and the gov.uk row ID where one exists)",
    all(p.get("status") and ("year" in p) for p in S["factors"])
@@ -629,6 +647,128 @@ ok("⭐ every factor used carries source, year and status (and the gov.uk row ID
 ok("the known limits and the Planned items travel with every answer",
    len(S["limits"]) >= 7 and any("draft" in x for x in S["limits"]) and any("AR4" in x for x in S["limits"])
    and len(S["planned"]) >= 4 and S["unit"] == "km")
+
+# =========================================================================== #
+#  8c. The adversarial review of 10–11 Oct 2026 — each confirmed defect, asserted  #
+# =========================================================================== #
+def _alt(levers, **kw):
+    return carbon.scenario(alternatives=[{"name": "x", "levers": levers}], **kw)["alternatives"][0]
+
+
+a = _alt([{"driver": "disposal", "scope": {"route_id": "R3"}, "to": "open_loop"}])
+ok("🔴 review: a disposal route with NO published factor (soils, open-loop) is never counted as zero — unchanged, with a note",
+   near(a["delta_t"], 0.0, 0.0005) and any("open-loop" in n and "Earthworks / soil" in n for n in a["notes"]), str(a["notes"]))
+ok("...and a destination type whose factor is unpublished is flagged NO_DISPOSAL_FACTOR with its tonnes counted, never 0",
+   carbon.disposal_factor(CP, "average_construction", "landfill") is None and carbon.FLAG_NO_DISPOSAL_FACTOR == "NO_DISPOSAL_FACTOR")
+a = _alt([{"driver": "disposal", "scope": {"category": SA}, "to": "closed_loop"}])
+ok("🔴 review: a disposal lever reaches only lines going to a tip or recycling site — quarry deliveries are unchanged",
+   near(a["delta_t"], 0.0, 0.0005) and any("only to lines going to a tip" in n for n in a["notes"]))
+a = _alt([{"driver": "disposal", "to": "closed_loop"}])
+# R3 only: 5,800 × (1.01398 − 19.55376) = −107.530 t (the aggregate deliveries keep their production carbon)
+ok("...an UNSCOPED 'send waste to recycling' moves only the soil to landfill: −107.530 t, not the aggregates' production carbon",
+   near(a["delta_t"], -107.530, 0.002), str(a["delta_t"]))
+e = _raises(lambda: _alt([{"driver": "material", "epd": {"kg_per_t": 5.0, "source": "EPD-X"}}]))
+ok("🔴 review: an EPD is one product's figure — an unscoped EPD is refused", isinstance(e, carbon.CarbonError) and "scope it" in str(e))
+a = _alt([{"driver": "material", "scope": {"route_id": "R1"}, "epd": {"kg_per_t": 5.0, "source": "EPD-R1"}}])
+ok("...scoped to a route it applies to that route's line only: (7.80307 − 5) × 2.9 = −8.129 t", near(a["delta_t"], -8.129, 0.001))
+a = _alt([{"driver": "source", "scope": {"route_id": "R1"}, "to_route": "R5"}])
+ok("🔴 review: a swap to a supplier whose route is NOT baked is left out and flagged — never R1's own km under R5's name",
+   near(a["delta_t"], 0.0, 0.0005) and a["totals"]["flags"].get("ROUTE_SWAP_NOT_BAKED") == 1 and a["drivers"][0]["lines_changed"] == 0)
+a = _alt([{"driver": "source", "scope": {"route_id": "R1"}, "to_route": "R6"}])
+ok("🔴 review: a swap to the SAME 30 km whose return leg is not baked is not a saving: the loaded leg stands in, flagged",
+   near(a["delta_t"], 0.0, 0.0005) and a["totals"]["flags"].get("RETURN_STAND_IN") == 1, str(a["delta_t"]))
+
+# an electric trip longer than the battery stays diesel (battery 50 kWh: R1's 75 kWh trip cannot, R3's 50 kWh can)
+_lv = json.loads(json.dumps(config.load(conversions, use_cache=False)))
+_lv["vehicles"][EA]["battery_kwh_usable"] = 50
+ok("(a 50 kWh battery saves)", config.save(_lv, by="harness", network=network)["ok"])
+config.invalidate()
+SE = carbon.scenario(alternatives=[{"name": "e", "levers": [{"driver": "fuel", "fuel": "electric"}]}])
+FE = SE["fleet_compare"]
+ok("🔴 review: an electric trip that needs more than one battery is NOT credited — R1 stays diesel; only R3 moves (−5.874)",
+   near(SE["alternatives"][0]["drivers"][0]["delta_t"], -5.874, 0.002) and SE["alternatives"][0]["totals"]["flags"].get("EV_TRIP_EXCEEDS_BATTERY") == 1)
+ok("...and it is left out of BOTH sides of the diesel/electric comparison (1 line compared, 1 infeasible)",
+   FE["lines"] == 1 and FE["infeasible_lines"] == 1 and FE["diesel"]["trips"] == 200 and FE["electric"]["trips"] == 228, json.dumps(FE)[:300])
+config.reset_to_file(conversions, by="harness")
+config.invalidate()
+
+ok("🔴 review: charging is simulated trip by trip — 200 kWh trips on 500 kWh: 7 cycles, 3 stops of 51.4 min (not 2 of 77)",
+   carbon.ev_day(60, 160, 10, 1.25, 500, 350)["cycles"] == 7 and carbon.ev_day(60, 160, 10, 1.25, 500, 350)["charges"] == 3
+   and near(carbon.ev_day(60, 160, 10, 1.25, 500, 350)["minutes_per_charge"], 900 / 350 * 60 / 3, 1e-6))
+ok("...and the range is named for what it is: the range on ONE charge", "range_per_charge_km" in carbon.ev_day(60, 40, 10, 1.25, 500, 350)
+   and "daily_range_km" not in carbon.ev_day(60, 40, 10, 1.25, 500, 350))
+a = _alt([{"driver": "material", "reused": True}])
+# R1 2,900 × (2.21 − 7.80307) = −16.2199; R5 1,000 × (2.21 − 7.80307) = −5.5931; soils: no re-used row → unchanged
+ok("🔴 review: an unscoped 're-used' applies where a re-used row is published and notes the rest (−21.813 t), never fails",
+   near(a["delta_t"], -21.813, 0.002) and any("re-used" in n for n in a["notes"]), str(a))
+for _label, _lev in (("a scope that is not an object", {"driver": "recycled", "scope": "all", "pct": 10}),
+                     ("a distance of NaN", {"driver": "source", "distance_pct": "nan"}),
+                     ("an infinite alternative index", {"driver": "route", "alt_index": "inf"}),
+                     ("a lever that is not an object", "recycled")):
+    ok(f"🔴 review: {_label} is a CarbonError (a 400), never a 500 or a NaN total",
+       isinstance(_raises(lambda lv=_lev: _alt([lv])), carbon.CarbonError))
+ok("🔴 review: an allocation that is not a set of percentages is a CarbonError",
+   isinstance(_raises(lambda: carbon.scenario(allocation={SA: [10]})), carbon.CarbonError))
+a = _alt([{"driver": "recycled", "scope": {"category": SA}, "pct": 13}])
+ok("review: a lone lever has NO interaction (deltas taken on unrounded sums) and its driver equals the whole delta",
+   a["interaction_t"] == 0.0 and a["drivers"][0]["delta_t"] == a["delta_t"], str((a["interaction_t"], a["delta_t"], a["drivers"])))
+_part = {"vehicles": {"E": {"fuel": "electric", "kwh_per_km": 1.25}}, "carbon": {"electricity": {"generation_kg_co2e_per_kwh": 0.2}}}
+ok("review: a partial live electricity block merges key by key — the map's figure and the Carbon page's are the same number",
+   near(conversions._emissions(_part, "E"), 1.25 * (0.2 + 0.01299), 1e-9)
+   and near(carbon.vehicle_factor(carbon._doc(_part, _part["vehicles"], carbon.params(_part)), carbon.params(_part), "E")["kg_per_km"],
+            1.25 * (0.2 + 0.01299), 1e-9))
+_ev2 = carbon._doc(FILE, dict(carbon.vehicles(FILE), **{EA: dict(V[EA], kwh_per_km=1.8)}), CP)
+ok("review: a profile's OWN kWh/km is an ASSUMPTION (not credited to ZEHID); the 1.25 default stays DERIVED",
+   carbon.vehicle_factor(_ev2, CP, EA)["status"] == "ASSUMPTION" and "ASSUMPTION typed on the profile" in carbon.vehicle_factor(_ev2, CP, EA)["source"]
+   and carbon.vehicle_factor(_doc, CP, EA)["status"] == "DERIVED")
+ok("review: the tonne-km benchmark is read for each vehicle's SIZE class (a 7.5 t rigid against 0.54001, not the >17 t 0.17256)",
+   carbon.tkm_class("rigid", 7.5) == "rigid_3_5_7_5" and carbon.tkm_factor(CP, "rigid_3_5_7_5") == 0.54001
+   and carbon.tkm_class("rigid", 12) == "rigid_7_5_17" and carbon.tkm_factor(CP, "rigid_7_5_17") == 0.43002
+   and carbon.tkm_class("rigid", 32) == "rigid" and carbon.tkm_class("artic", 44) == "artic" and carbon.tkm_class("artic", 30) == "artic_3_5_33"
+   and carbon.tkm_factor(CP, "artic_3_5_33") == 0.12292)
+_e1 = {"baked": True, "flags": [], "tonnes": 100.0, "one_way_km": 10.0, "transport_t": 0.2, "vkm": 200.0, "laden_km": 100.0, "tkm_class": "artic", "vehicle_class": "artic"}
+_e2 = {"baked": True, "flags": ["RETURN_NOT_BAKED"], "tonnes": 100.0, "one_way_km": 10.0, "transport_t": 0.1, "vkm": 100.0, "laden_km": 100.0, "tkm_class": "artic", "vehicle_class": "artic"}
+_bm = carbon.benchmarks({"total_t": 0.3, "tonnes": 200.0, "electric_trips": 0, "trips": 20}, [_e1, _e2], CP)
+ok("🔴 review: a line counting its loaded leg only is left OUT of the benchmarks (it would read as empty-free), and counted",
+   _bm["kg_co2e_per_t_delivered"] == 2.0 and _bm["kg_co2e_per_tkm"] == 0.2 and _bm["laden_share_pct"] == 50.0 and _bm["excluded_lines"] == 1, str(_bm))
+SA2 = carbon.scenario(allocation={"R1": {"Road Pavements": 100}, SA: {"Drainage": 50}})["baseline"]["allocation"]
+# R1 (22.628903 + 5.63634) all to Road Pavements; R5 (Small aggregate, no route key) 50 % Drainage; the soil line unallocated
+ok("review: allocation is per ROW where a route is named (R1 → Road Pavements 28.265), else per category (R5 → Drainage 3.902)",
+   near(SA2["Road Pavements"], 28.265, 0.002) and near(SA2["Drainage"], 3.902, 0.002) and near(SA2["Not Allocated"], 124.828, 0.003), str(SA2))
+_pk2 = {f["key"]: f for f in S["factors"]}
+ok("review: the factors list carries what the ALTERNATIVES used — the 30 % blend (DERIVED, 6.42934) and the typed EPD (ASSUMPTION)",
+   _pk2.get("blend:aggregates:30.0", {}).get("status") == "DERIVED" and near(_pk2["blend:aggregates:30.0"]["value"], 6.42934, 1e-5)
+   and _pk2.get("epd:Small aggregate:5.0", {}).get("status") == "ASSUMPTION" and "EPD-T1 (fictional)" in _pk2["epd:Small aggregate:5.0"]["source"])
+ok("review: each line says which factor it used, how, and its status", all(k in S["lines"][0] for k in ("kg_per_km", "factor_status", "material_kg_per_t", "material_method", "material_status")))
+
+# validation: every shape the planner reads is checked, so no Config save can make every scenario fail
+for _label, _mut in (("a material figure typed as a bare number", lambda d: d["carbon"]["materials"]["aggregates"].__setitem__("kg_co2e_per_t", 7.8)),
+                     ("transport that is not an object", lambda d: d["carbon"].__setitem__("transport", "x")),
+                     ("disposal site types as a list", lambda d: d["carbon"].__setitem__("disposal_loc_types", ["landfill"])),
+                     ("a disposal site type mapped to an unknown route", lambda d: d["carbon"]["disposal_loc_types"].__setitem__("tip", "sea")),
+                     ("a non-numeric NH tool factor", lambda d: d["carbon"]["transport"]["nh_carbon_tool_v27"].__setitem__("laden_t_co2e_per_tkm", "x")),
+                     ("a negative tonne-km benchmark", lambda d: d["carbon"]["transport"]["tonne_km_2026"]["artic"].__setitem__("kg_co2e_per_tkm", -1)),
+                     ("materials as a list", lambda d: d["carbon"].__setitem__("materials", [1])),
+                     ("a carbon_material that is a list", lambda d: d["material_categories"]["Small aggregate"].__setitem__("carbon_material", ["x"]))):
+    ok(f"🔴 review: validate refuses {_label} (and does not crash)", bool(_v(_mut)), _label)
+ok("review: a PARTIAL live carbon block (one figure overridden) is accepted — the planner merges it with the file",
+   _v(lambda d: d.__setitem__("carbon", {"materials": {"aggregates": {"kg_co2e_per_t": {"primary": 9.0}}}})) == [])
+_off = copy.deepcopy(FILE)
+_off["carbon"]["materials"]["aggregates"]["kg_co2e_per_t"]["closed_loop"] = None
+_off["material_categories"]["General / imported"]["carbon_material"] = None
+ok("review: an explicit null in the live document switches a figure or a category OFF (it no longer falls back to the file)",
+   not carbon.material_factor(carbon.params(_off), "aggregates")["recycled_enabled"]
+   and carbon.carbon_material_of("General / imported", _off) is None and carbon.carbon_material_of("Small aggregate", _off) == "aggregates")
+_calls = {"n": 0}
+_real_lff = conversions.load_factors_file
+conversions.load_factors_file = lambda: (_calls.__setitem__("n", _calls["n"] + 1), _real_lff())[1]
+conversions._FILE_CACHE["doc"] = None
+try:
+    carbon.scenario(factors=_old, alternatives=[{"name": "e", "levers": [{"driver": "fuel", "fuel": "electric"}]}])
+finally:
+    conversions.load_factors_file = _real_lff
+ok("review: on a tenant without the block (the live demo) factors.json is parsed ONCE per change, not once per line",
+   _calls["n"] <= 1, str(_calls))
 
 # the team filter: a team code sees only its own lines (the Dashboard's rule)
 os.environ["IPT2_CODE"] = "ipt2-secret"
@@ -667,7 +807,7 @@ ok("⭐ the endpoint returns the engine's answer unchanged (baseline 156.995, Gr
    near(R["baseline"]["totals"]["total_t"], 156.995, 0.002) and near(R["alternatives"][0]["delta_t"], -124.153, 0.003))
 for _label, _body, _want in (
         ("an allocation over 100 %", main.CarbonScenarioIn(allocation={SA: {"Fencing": 60, "Waste": 60}}), "120"),
-        ("an EPD without its source", main.CarbonScenarioIn(alternatives=[main.CarbonAlternative(levers=[{"driver": "material", "epd": {"kg_per_t": 3}}])]), "source"),
+        ("an EPD without its source", main.CarbonScenarioIn(alternatives=[main.CarbonAlternative(levers=[{"driver": "material", "scope": {"category": SA}, "epd": {"kg_per_t": 3}}])]), "source"),
         ("an unknown status", main.CarbonScenarioIn(status="Everything"), "status"),
         ("seven alternatives", main.CarbonScenarioIn(alternatives=[main.CarbonAlternative() for _ in range(7)]), "at most 6")):
     e = _raises(lambda b=_body: main.carbon_scenario(b))

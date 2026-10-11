@@ -293,7 +293,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                json={"allocation": {"Small aggregate": {"Fencing": 70, "Drainage": 40}}})
     ok("🔴 an allocation over 100 % is refused — 400 naming the sum", r.status_code == 400 and "110" in r.text, r.text[:160])
     r = c.post("/api/carbon/scenario", headers=PLAN,
-               json={"alternatives": [{"name": "x", "levers": [{"driver": "material", "epd": {"kg_per_t": 90}}]}]})
+               json={"alternatives": [{"name": "x", "levers": [{"driver": "material", "scope": {"category": "Precast / concrete"}, "epd": {"kg_per_t": 90}}]}]})
     ok("🔴 an EPD without its source is refused — 400", r.status_code == 400 and "source" in r.text, r.text[:160])
     r = c.post("/api/carbon/scenario", headers=PLAN, json={"status": "Everything"})
     ok("an unknown status is refused — 400", r.status_code == 400)

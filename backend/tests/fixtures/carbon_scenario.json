@@ -3,6 +3,7 @@
   {
    "benchmarks": {
     "desnz_kg_co2e_per_tkm": 0.07835,
+    "excluded_lines": 0,
     "kg_co2e_per_t_all_in": 3.386,
     "kg_co2e_per_t_delivered": 0.217,
     "kg_co2e_per_tkm": 0.01415,
@@ -32,7 +33,7 @@
      "category": "Earthworks / soil",
      "disposal_t": 5.881,
      "material_t": 0.0,
-     "sheet": "Earthworks",
+     "sheet": "Waste",
      "tonnes": 5800.0,
      "total_t": 6.537,
      "transport_t": 0.656
@@ -77,7 +78,7 @@
     }
    ],
    "delta_pct": -79.1,
-   "delta_t": -124.152,
+   "delta_t": -124.153,
    "drivers": [
     {
      "delta_pct": -71.4,
@@ -109,7 +110,7 @@
     "trips": 382,
     "unsized_lines": 1
    },
-   "interaction_t": 3.525,
+   "interaction_t": 3.524,
    "levers": [
     {
      "driver": "recycled",
@@ -134,12 +135,14 @@
    "notes": [],
    "sheets": {
     "Bulk Materials": 26.305,
-    "Earthworks": 6.537,
+    "Earthworks": 0.0,
+    "Waste": 6.537,
     "unclassed": 0.0
    },
    "totals": {
     "baked_lines": 2,
     "baked_tonnes": 8700.0,
+    "disposal_excluded_tonnes": 0.0,
     "disposal_t": 5.881,
     "electric_trips": 382,
     "excludes_unbaked": true,
@@ -167,6 +170,7 @@
  "baseline": {
   "benchmarks": {
    "desnz_kg_co2e_per_tkm": 0.07835,
+   "excluded_lines": 0,
    "kg_co2e_per_t_all_in": 16.185,
    "kg_co2e_per_t_delivered": 1.512,
    "kg_co2e_per_tkm": 0.06479,
@@ -186,7 +190,7 @@
     "category": "Earthworks / soil",
     "disposal_t": 113.412,
     "material_t": 0.0,
-    "sheet": "Earthworks",
+    "sheet": "Waste",
     "tonnes": 5800.0,
     "total_t": 120.927,
     "transport_t": 7.515
@@ -251,12 +255,14 @@
   "notes": [],
   "sheets": {
    "Bulk Materials": 36.068,
-   "Earthworks": 120.927,
+   "Earthworks": 0.0,
+   "Waste": 120.927,
    "unclassed": 0.0
   },
   "totals": {
    "baked_lines": 2,
    "baked_tonnes": 8700.0,
+   "disposal_excluded_tonnes": 0.0,
    "disposal_t": 113.412,
    "electric_trips": 0,
    "excludes_unbaked": true,
@@ -309,6 +315,7 @@
    "scope": "Scope 3",
    "source": "UK Government GHG conversion factors 2026 (DESNZ), flat file v1.2, OGL v3.0",
    "status": "VERIFIED",
+   "unit": "kg CO2e per tonne",
    "year": 2026
   },
   {
@@ -335,6 +342,7 @@
    "scope": "Scope 3",
    "source": "UK Government GHG conversion factors 2026 (DESNZ), flat file v1.2, OGL v3.0",
    "status": "VERIFIED",
+   "unit": "kg CO2e per tonne",
    "year": 2026
   },
   {
@@ -359,10 +367,24 @@
    "kg_per_km_wtw": 0.23045,
    "kwh_per_km": 1.25,
    "label": "Artic Tipper (44t) — electric",
-   "source": "1.25 kWh/km (ZEHID 2026, mixed fleet) × UK electricity 2026 (generation 0.13096 + T&D 0.01299 kg CO2e/kWh)",
+   "source": "1.25 kWh/km (DERIVED from ZEHID 2026 (mixed fleet)) × UK electricity 2026 (generation 0.13096 + T&D 0.01299 kg CO2e/kWh)",
    "status": "DERIVED",
    "unit": "kg CO2e per vehicle-km",
    "vehicle": "Artic Tipper (44t) — electric",
+   "year": 2026
+  },
+  {
+   "ids": {
+    "closed_loop": "19_500_5003_15_1",
+    "primary": "19_500_5000_15_1",
+    "reused": "19_500_5001_15_1"
+   },
+   "key": "blend:aggregates:30.0",
+   "label": "Aggregates at 30 % recycled",
+   "source": "linear blend of the published primary 7.80307 and closed-loop 3.22398 kg CO2e/t",
+   "status": "DERIVED",
+   "unit": "kg CO2e per tonne",
+   "value": 6.42934,
    "year": 2026
   },
   {
@@ -384,7 +406,7 @@
   },
   {
    "key": "kwh_per_km",
-   "label": "Electric lorry energy use",
+   "label": "Electric lorry energy use (default)",
    "source": "ZEHID annual report 2026 (DfT / Innovate UK): 4,500 MWh delivered over 3.60 million km, mixed fleet, to 17 Jun 2026",
    "status": "DERIVED",
    "unit": "kWh per km",
@@ -415,29 +437,29 @@
   {
    "gwp": "AR5",
    "ids": [
-    "27_304_3120_14_1"
-   ],
-   "key": "tkm:rigid",
-   "label": "DESNZ 2026 tonne-km, rigid",
-   "note": "Freighting goods › HGV (non-refrigerated, all diesel) › Rigid (>17 tonnes) › Average laden › tonne.km",
-   "source": "UK Government GHG conversion factors 2026 (DESNZ), flat file v1.2, OGL v3.0",
-   "status": "VERIFIED",
-   "unit": "kg CO2e per tonne-km",
-   "value": 0.17256,
-   "year": 2026
-  },
-  {
-   "gwp": "AR5",
-   "ids": [
     "27_304_3132_14_1"
    ],
    "key": "tkm:artic",
-   "label": "DESNZ 2026 tonne-km, artic",
+   "label": "DESNZ 2026 tonne-km, Freighting goods › HGV (non-refrigerated, all diesel) › Articulated (>33t) › Average laden › tonne.km",
    "note": "Freighting goods › HGV (non-refrigerated, all diesel) › Articulated (>33t) › Average laden › tonne.km",
    "source": "UK Government GHG conversion factors 2026 (DESNZ), flat file v1.2, OGL v3.0",
    "status": "VERIFIED",
    "unit": "kg CO2e per tonne-km",
    "value": 0.07835,
+   "year": 2026
+  },
+  {
+   "gwp": "AR5",
+   "ids": [
+    "27_304_3120_14_1"
+   ],
+   "key": "tkm:rigid",
+   "label": "DESNZ 2026 tonne-km, Freighting goods › HGV (non-refrigerated, all diesel) › Rigid (>17 tonnes) › Average laden › tonne.km",
+   "note": "Freighting goods › HGV (non-refrigerated, all diesel) › Rigid (>17 tonnes) › Average laden › tonne.km",
+   "source": "UK Government GHG conversion factors 2026 (DESNZ), flat file v1.2, OGL v3.0",
+   "status": "VERIFIED",
+   "unit": "kg CO2e per tonne-km",
+   "value": 0.17256,
    "year": 2026
   },
   {
@@ -454,8 +476,7 @@
  ],
  "fleet_compare": {
   "charges_per_lorry_day_max": 0,
-  "daily_range_km_min": 400.0,
-  "delta_t": -10.279,
+  "delta_t": -10.28,
   "diesel": {
    "kwh": 0.0,
    "lorries_peak": 3,
@@ -478,6 +499,8 @@
     "charge_kw": 350.0,
     "kwh_per_km": 1.25,
     "payload_t": 25.5,
+    "source": "payload, battery and charger typed on the profile (ZEHID 2026 ranges); see Config → Vehicles",
+    "status": "ASSUMPTION",
     "twin": "Artic Tipper (44t)",
     "twin_payload_t": 29.0,
     "vehicle": "Artic Tipper (44t) — electric"
@@ -486,6 +509,7 @@
   "infeasible_lines": 0,
   "lines": 2,
   "minutes_per_charge_max": 0,
+  "range_per_charge_km_min": 400.0,
   "tonnes": 8700.0
  },
  "from": null,
@@ -503,12 +527,18 @@
   {
    "baked": true,
    "carbon_material": "aggregates",
+   "disposal_kg_per_t": null,
    "disposal_route": null,
    "disposal_t": null,
+   "factor_status": "VERIFIED",
    "flags": [],
    "fuel": "diesel",
    "ipt": "IPT1",
+   "kg_per_km": 0.939,
    "km_trip": 60.0,
+   "material_kg_per_t": 7.803,
+   "material_method": "primary",
+   "material_status": "VERIFIED",
    "material_t": 22.629,
    "material_type": "Small aggregate",
    "month_index": 10,
@@ -525,18 +555,24 @@
   {
    "baked": true,
    "carbon_material": "soils",
+   "disposal_kg_per_t": 19.554,
    "disposal_route": "landfill",
    "disposal_t": 113.412,
+   "factor_status": "VERIFIED",
    "flags": [],
    "fuel": "diesel",
    "ipt": "IPT2",
+   "kg_per_km": 0.939,
    "km_trip": 40.0,
+   "material_kg_per_t": null,
+   "material_method": "none",
+   "material_status": null,
    "material_t": null,
    "material_type": "Earthworks / soil",
    "month_index": 10,
    "one_way_km": 20.0,
    "route_id": "R3",
-   "sheet": "Earthworks",
+   "sheet": "Waste",
    "tonnes": 5800.0,
    "total_t": 120.927,
    "transport_nh_t": 26.41,
@@ -547,14 +583,20 @@
   {
    "baked": false,
    "carbon_material": "aggregates",
+   "disposal_kg_per_t": null,
    "disposal_route": null,
    "disposal_t": null,
+   "factor_status": "VERIFIED",
    "flags": [
     "UNBAKED"
    ],
    "fuel": "diesel",
    "ipt": "IPT1",
+   "kg_per_km": 0.939,
    "km_trip": null,
+   "material_kg_per_t": 7.803,
+   "material_method": "primary",
+   "material_status": "VERIFIED",
    "material_t": 7.803,
    "material_type": "Small aggregate",
    "month_index": 10,
@@ -572,7 +614,7 @@
  "methods": {
   "headline": "vehicle-km: trips × routed km of both legs × the vehicle's kg CO2e per vehicle-km (DESNZ 2026, tank-to-wheel)",
   "nh_tool": "NH Carbon Tool v2.7 basis: tonnes × one-way km × (laden + unladen) ÷ 2 × 2, 2024 factors with well-to-tank",
-  "tonne_km": "DESNZ 2026 class tonne-km, average laden — what a tonne-km calculator gives for the same haul"
+  "tonne_km": "DESNZ 2026 tonne-km for each vehicle's size class, average laden — what a tonne-km calculator gives for the same haul"
  },
  "options": {
   "allocation": [
@@ -602,6 +644,11 @@
     "carbon_material": "aggregates",
     "category": "Small aggregate",
     "closed_loop": 3.22398,
+    "disposal_routes": [
+     "landfill",
+     "closed_loop",
+     "open_loop"
+    ],
     "label": "Aggregates",
     "primary": 7.80307,
     "recycled_enabled": true,
@@ -622,6 +669,10 @@
     "carbon_material": "soils",
     "category": "Earthworks / soil",
     "closed_loop": 1.01398,
+    "disposal_routes": [
+     "landfill",
+     "closed_loop"
+    ],
     "label": "Soils",
     "primary": null,
     "recycled_enabled": false,
@@ -652,18 +703,30 @@
     "dest_name": "Compound",
     "destinations": [],
     "disposal_route": null,
+    "disposal_routes": [
+     "landfill",
+     "closed_loop",
+     "open_loop"
+    ],
     "material_category": "Small aggregate",
     "origin_id": "L1",
     "origin_name": "Pit A",
     "route_id": "R1",
     "suppliers": [
      {
+      "baked": true,
       "origin_name": "Pit B",
       "route_id": "R2"
      },
      {
+      "baked": false,
       "origin_name": "Pit C",
       "route_id": "R5"
+     },
+     {
+      "baked": true,
+      "origin_name": "Pit D",
+      "route_id": "R6"
      }
     ]
    },
@@ -677,12 +740,17 @@
     "dest_name": "Tip",
     "destinations": [
      {
+      "baked": true,
       "dest_name": "Soil hub",
       "disposal_route": "closed_loop",
       "route_id": "R4"
      }
     ],
     "disposal_route": "landfill",
+    "disposal_routes": [
+     "landfill",
+     "closed_loop"
+    ],
     "material_category": "Earthworks / soil",
     "origin_id": "L2",
     "origin_name": "Compound",
@@ -697,18 +765,30 @@
     "dest_name": "Compound",
     "destinations": [],
     "disposal_route": null,
+    "disposal_routes": [
+     "landfill",
+     "closed_loop",
+     "open_loop"
+    ],
     "material_category": "Small aggregate",
     "origin_id": "L6",
     "origin_name": "Pit C",
     "route_id": "R5",
     "suppliers": [
      {
+      "baked": true,
       "origin_name": "Pit A",
       "route_id": "R1"
      },
      {
+      "baked": true,
       "origin_name": "Pit B",
       "route_id": "R2"
+     },
+     {
+      "baked": true,
+      "origin_name": "Pit D",
+      "route_id": "R6"
      }
     ]
    }
@@ -737,7 +817,7 @@
     "label": "Artic Tipper (44t) — electric",
     "payload_t": 25.5,
     "scenario_only": true,
-    "source": "1.25 kWh/km (ZEHID 2026, mixed fleet) × UK electricity 2026 (generation 0.13096 + T&D 0.01299 kg CO2e/kWh)",
+    "source": "1.25 kWh/km (DERIVED from ZEHID 2026 (mixed fleet)) × UK electricity 2026 (generation 0.13096 + T&D 0.01299 kg CO2e/kWh)",
     "status": "DERIVED",
     "vehicle": "Artic Tipper (44t) — electric",
     "vehicle_class": "artic"
@@ -807,7 +887,7 @@
     "label": "Rigid 8-wheeler (32t) — electric",
     "payload_t": 16.5,
     "scenario_only": true,
-    "source": "1.25 kWh/km (ZEHID 2026, mixed fleet) × UK electricity 2026 (generation 0.13096 + T&D 0.01299 kg CO2e/kWh)",
+    "source": "1.25 kWh/km (DERIVED from ZEHID 2026 (mixed fleet)) × UK electricity 2026 (generation 0.13096 + T&D 0.01299 kg CO2e/kWh)",
     "status": "DERIVED",
     "vehicle": "Rigid 8-wheeler (32t) — electric",
     "vehicle_class": "rigid"

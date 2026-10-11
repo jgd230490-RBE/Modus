@@ -2999,8 +2999,11 @@ const CARBON_FLAG_WORDS = {
   KM_FROM_BASELINE_VEHICLE: "km from the forecast vehicle's baked route (the alternative vehicle is not baked)",
   KM_SCALED: "distance scaled by a typed percentage",
   ALT_ROUTE_NOT_BAKED: "that HERE alternative is not baked — unchanged",
-  EV_TRIP_EXCEEDS_BATTERY: "a trip needs more energy than the battery holds",
-  RETURN_NOT_BAKED: "return leg not baked — loaded leg only",
+  EV_TRIP_EXCEEDS_BATTERY: "a trip needs more energy than the battery holds — kept diesel, not credited",
+  RETURN_NOT_BAKED: "return leg not baked — loaded leg only, left out of the benchmarks",
+  RETURN_STAND_IN: "return leg of the chosen route not baked — the loaded leg stands in for it",
+  ROUTE_SWAP_NOT_BAKED: "the chosen route is not baked — that swap is left out",
+  NO_DISPOSAL_FACTOR: "no Government disposal factor for that material and route — left out, not counted as zero",
 };
 const CARBON_EMPTY = { recycled: {}, epd: {}, reused: {}, vehicle: {}, electric: false, distance: {}, supplier: {}, alt: {}, disposal: {} };
 
@@ -3173,7 +3176,7 @@ function CarbonPage({ meta, access, initialData }){
                       <label className="block text-[11px] text-slate-400 mt-1">Supplier
                         <select className={inp + " mt-0.5"} value={(st.supplier || {})[r.route_id] || ""} onChange={ev => setK("supplier", r.route_id, ev.target.value)}>
                           <option value="">{r.origin_name} (as planned)</option>
-                          {r.suppliers.map(s => <option key={s.route_id} value={s.route_id}>{s.origin_name} ({s.route_id})</option>)}
+                          {r.suppliers.map(s => <option key={s.route_id} value={s.route_id} disabled={!s.baked}>{s.origin_name} ({s.route_id}){s.baked ? "" : " — not baked"}</option>)}
                         </select></label>
                     )}
                     {altList.length > 1 && (
@@ -3186,16 +3189,14 @@ function CarbonPage({ meta, access, initialData }){
                       <label className="block text-[11px] text-slate-400 mt-1">Send instead to
                         <select className={inp + " mt-0.5"} value={d.to_route || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to_route: ev.target.value })}>
                           <option value="">{r.dest_name} (as planned)</option>
-                          {r.destinations.map(x => <option key={x.route_id} value={x.route_id}>{x.dest_name}{x.disposal_route ? ` (${x.disposal_route.replace("_", "-")})` : ""}</option>)}
+                          {r.destinations.map(x => <option key={x.route_id} value={x.route_id} disabled={!x.baked}>{x.dest_name}{x.disposal_route ? ` (${x.disposal_route.replace("_", "-")})` : ""}{x.baked ? "" : " — not baked"}</option>)}
                         </select></label>
                     )}
                     {r.disposal_route && (
                       <label className="block text-[11px] text-slate-400 mt-1">Disposal route at the site
                         <select className={inp + " mt-0.5"} value={d.to || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to: ev.target.value })}>
                           <option value="">as the site's type ({r.disposal_route.replace("_", "-")})</option>
-                          <option value="landfill">landfill</option>
-                          <option value="closed_loop">closed-loop reuse</option>
-                          <option value="open_loop">open-loop</option>
+                          {(r.disposal_routes || []).map(k => <option key={k} value={k}>{k.replace("_", "-")}</option>)}
                         </select></label>
                     )}
                   </div>
@@ -3251,7 +3252,7 @@ function CarbonPage({ meta, access, initialData }){
                   <td className="text-right tabular-nums">{bm(B).kg_co2e_per_tkm == null ? "—" : distRate(bm(B).kg_co2e_per_tkm).toFixed(4)}</td>
                   <td className="text-right tabular-nums">{A && bm(A).kg_co2e_per_tkm != null ? distRate(bm(A).kg_co2e_per_tkm).toFixed(4) : "—"}</td>
                   <td className="pl-3 text-[11px] text-slate-400">DESNZ 2026 class average {bm(B).desnz_kg_co2e_per_tkm == null ? "—" : distRate(bm(B).desnz_kg_co2e_per_tkm).toFixed(4)}: baseline {natWord(bm(B).vs_national_average_pct)}</td></tr>
-                <tr><td className="py-1.5 text-slate-700">Laden share of {DU()} driven</td><td className="text-right tabular-nums">{bm(B).laden_share_pct ?? "—"} %</td><td className="text-right tabular-nums">{A ? `${bm(A).laden_share_pct ?? "—"} %` : "—"}</td><td className="pl-3 text-[11px] text-slate-400">tipping hauls run empty back</td></tr>
+                <tr><td className="py-1.5 text-slate-700">Laden share of {DU()} driven</td><td className="text-right tabular-nums">{bm(B).laden_share_pct ?? "—"} %</td><td className="text-right tabular-nums">{A ? `${bm(A).laden_share_pct ?? "—"} %` : "—"}</td><td className="pl-3 text-[11px] text-slate-400">tipping hauls run empty back{bm(B).excluded_lines ? ` · ${bm(B).excluded_lines} line-months with no baked return are left out of these figures` : ""}</td></tr>
                 <tr><td className="py-1.5 text-slate-700">Zero-emission deliveries</td><td className="text-right tabular-nums">{bm(B).zero_emission_share_pct ?? "—"} %</td><td className="text-right tabular-nums">{A ? `${bm(A).zero_emission_share_pct ?? "—"} %` : "—"}</td><td className="pl-3 text-[11px] text-slate-400">{bm(B).nh_target || ""}</td></tr>
                 <tr><td className="py-1.5 text-slate-700">t CO₂e per {CUR()}m</td><td className="text-right tabular-nums">{bm(B).t_co2e_per_gbp_m ?? "—"}</td><td className="text-right tabular-nums">{A ? (bm(A).t_co2e_per_gbp_m ?? "—") : "—"}</td><td className="pl-3 text-[11px] text-slate-400">{spend === "" ? "type the programme spend on the left. " : ""}National Highways' own KPI: {(bm(B).nh_kpi_t_co2e_per_gbp_m || {})["2023_24"] ?? "—"} → {(bm(B).nh_kpi_t_co2e_per_gbp_m || {})["2024_25"] ?? "—"} t/£m (2023/24 → 2024/25)</td></tr>
               </tbody>
@@ -3286,7 +3287,7 @@ function CarbonPage({ meta, access, initialData }){
                   {(fc.electric_profiles || []).map(p => (
                     <div key={p.vehicle}>{vehLabel(p.vehicle)}: payload {p.payload_t} t (diesel {p.twin_payload_t} t) · {p.kwh_per_km} kWh/km · battery {p.battery_kwh_usable} kWh usable · charger {p.charge_kw} kW</div>
                   ))}
-                  <div>Range on one battery {fc.daily_range_km_min == null ? "—" : `${fmtDist(fc.daily_range_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} line-months need more than one battery a trip` : ""}</div>
+                  <div>Range on one charge {fc.range_per_charge_km_min == null ? "—" : `${fmtDist(fc.range_per_charge_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} line-month${fc.infeasible_lines === 1 ? "" : "s"} left out of both columns: a trip needs more than one battery` : ""}</div>
                   <div className="text-slate-400">The battery starts each shift full; charging time comes out of the shift. The +2 t weight allowance for zero-emission HGVs is a draft rule and is not applied.</div>
                 </div>
               </>

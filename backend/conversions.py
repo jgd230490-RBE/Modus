@@ -41,6 +41,18 @@ def load_factors_file():
         return json.load(f)
 
 
+_FILE_CACHE = {"mtime": None, "doc": None}
+
+
+def load_factors_file_cached():
+    """The file, parsed once and kept until it changes on disk. READ ONLY — the carbon planner's
+    fallbacks read it per request; a caller that wants to edit takes load_factors_file()."""
+    mt = os.path.getmtime(_FACTORS_PATH)
+    if _FILE_CACHE["doc"] is None or _FILE_CACHE["mtime"] != mt:
+        _FILE_CACHE["doc"], _FILE_CACHE["mtime"] = load_factors_file(), mt
+    return _FILE_CACHE["doc"]
+
+
 def _density(factors, material):
     cats = factors.get("material_categories", {})
     c = cats.get(material) or cats.get("_default", {})
@@ -70,15 +82,19 @@ def _emissions(factors, vehicle):
 
 
 def electricity_factors(factors=None):
-    """The `carbon.electricity` block of the live document, else the file's (a tenant seeded
-    before 10 Oct 2026 has no carbon block until Reset to file or a re-import)."""
-    blk = ((factors or {}).get("carbon") or {}).get("electricity") if isinstance(factors, dict) else None
-    if not isinstance(blk, dict) or blk.get("generation_kg_co2e_per_kwh") is None:
-        try:
-            blk = (load_factors_file().get("carbon") or {}).get("electricity") or {}
-        except Exception:
-            blk = {}
-    return blk
+    """The `carbon.electricity` block: the file's, with every key the live document carries laid
+    over it (a tenant seeded before 10 Oct 2026 has no carbon block until Reset to file or a
+    re-import). Key by key — the same rule carbon.params() uses — so the map, the Dashboard and
+    the Carbon page always read one electric figure."""
+    try:
+        seed = (load_factors_file_cached().get("carbon") or {}).get("electricity") or {}
+    except Exception:
+        seed = {}
+    live = ((factors or {}).get("carbon") or {}).get("electricity") if isinstance(factors, dict) else None
+    out = dict(seed) if isinstance(seed, dict) else {}
+    if isinstance(live, dict):
+        out.update(live)
+    return out
 
 
 def electric_kg_per_km(factors, v, basis="ttw"):

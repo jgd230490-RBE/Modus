@@ -145,6 +145,34 @@ the drivers in order, the three methods, 300 → 342 trips, no undefined/NaN).
 line × 1.3; HERE was not called). Signed in as a planner: the page loads, electric + 30 % recycled small
 aggregate moves the plan −1,294.5 t (−17.6 %), ranked electric first; miles shown correctly.
 
+## Review fixes (11 Oct) — an independent adversarial review of the engine
+Three reviewers (formulas, edge cases, brief compliance) raised 30 findings; each was re-checked by a
+separate verifier that tried to refute it: **26 confirmed**, 4 judged design choices (fixed anyway).
+Every fix has an assertion in `test_carbon.py` (175 / 0). The ones that changed figures or behaviour:
+- **A disposal route with no published factor counted as zero** and topped the ranking (soil "open-loop"
+  read −113 t). Now: a lever asking for it is skipped with a note; a site whose factor is unpublished is
+  flagged NO_DISPOSAL_FACTOR and its tonnes reported; the page lists only the published routes.
+- **A disposal lever hit delivery lines** (quarry aggregates lost their production carbon). It now applies
+  only to lines going to a tip or recycling site. An unscoped EPD is refused (one product's figure).
+- **Like with like:** a swap to a route whose return leg is not baked used to halve transport; the loaded
+  leg now stands in (RETURN_STAND_IN). A swap to an unbaked route used R1's own km under R5's name; it is
+  now left out and flagged (ROUTE_SWAP_NOT_BAKED); the page marks such routes "not baked".
+- **Electric:** a trip needing more than one battery was credited at electric rates and dropped from the
+  lorry count; it now stays diesel (flagged) and is left out of BOTH columns of the comparison. Charging is
+  simulated trip by trip (stops were undercounted); "daily range" is renamed range per charge.
+- **Benchmarks:** lines counting their loaded leg only are left out (and counted); tonne-km references are
+  read per size class (a 7.5 t rigid against 0.54001, not the > 17 t 0.17256) — three more published rows.
+- **Provenance:** the factors list now includes what the alternatives used (a recycled blend DERIVED, a typed
+  EPD as ASSUMPTION — the brief allows only the three statuses); a profile's own kWh/km is an ASSUMPTION.
+- **Robustness:** malformed levers and allocations are a 400, never a 500 or a NaN; `config.validate` refuses
+  every carbon-block shape that would break a scenario; a partial live block is accepted (merged); an explicit
+  null in the live document switches a figure or category off. Allocation may name a route (a row) as well as
+  a category. Deltas are taken on unrounded sums (a lone lever no longer shows a ±0.001 "interaction").
+- **Speed on the live demo:** the live row has no carbon block, so the engine re-read `factors.json` for every
+  line — about 2,000 parses and 4.5 s per scenario. The file is now parsed once and cached until it changes.
+- **Electric variants:** a third, "Artic Flatbed (44t) — electric", so the demo's flatbed lines can switch too
+  (the mixers and the smaller rigids still have none). `test_week1` count narrowed 14 → 15.
+
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
 supplier EPD); electric kWh/km is derived from a mixed-fleet programme; the 2 t ZEV allowance is

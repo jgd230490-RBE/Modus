@@ -92,7 +92,7 @@
       ]
     }
   },
-  "_vehicles_note": "Road HGVs over 3.5 t (no site plant): six UK trade-name entries, four EU N-category planning entries (2026-09-01), two UK truck mixers (H1, 29 Sep 2026) and two battery-electric variants (carbon planner, 10 Oct 2026). payload_t = typical carrying limit; emissions_kg_co2e_per_km = DESNZ 2026 GHG conversion factors, average laden, per vehicle-km, tank-to-wheel (verified 10 Oct 2026 against the gov.uk flat file v1.2; see each entry's _emissions_basis). fuel = 'diesel' (default) or 'electric'; an electric entry has no stored per-km figure — conversions._emissions() derives it as kwh_per_km × the UK electricity factor in the `carbon` block, so the two cannot drift. scenario_only: true keeps a profile out of the forecast pickers (it has no baked geometry of its own; geometry_twin names the diesel profile whose routed distances it reads). load_minutes/unload_minutes are per-vehicle turnaround estimates and override planning.load_minutes/unload_minutes, which remain the fallback. Starting estimates, not measured — edit to match your operation.",
+  "_vehicles_note": "Road HGVs over 3.5 t (no site plant): six UK trade-name entries, four EU N-category planning entries (2026-09-01), two UK truck mixers (H1, 29 Sep 2026) and three battery-electric variants of the haulage lorries — artic tipper, artic flatbed, 8-wheeler (carbon planner, 10 Oct 2026; the mixers and the smaller rigids have none yet). payload_t = typical carrying limit; emissions_kg_co2e_per_km = DESNZ 2026 GHG conversion factors, average laden, per vehicle-km, tank-to-wheel (verified 10 Oct 2026 against the gov.uk flat file v1.2; see each entry's _emissions_basis). fuel = 'diesel' (default) or 'electric'; an electric entry has no stored per-km figure — conversions._emissions() derives it as kwh_per_km × the UK electricity factor in the `carbon` block, so the two cannot drift. scenario_only: true keeps a profile out of the forecast pickers (it has no baked geometry of its own; geometry_twin names the diesel profile whose routed distances it reads). load_minutes/unload_minutes are per-vehicle turnaround estimates and override planning.load_minutes/unload_minutes, which remain the fallback. Starting estimates, not measured — edit to match your operation.",
   "vehicles": {
     "Rigid 7.5t": {
       "eu_category": "N2",
@@ -439,6 +439,36 @@
       },
       "country_hint": "GB"
     },
+    "Artic Flatbed (44t) — electric": {
+      "fuel": "electric",
+      "scenario_only": true,
+      "geometry_twin": "Artic Flatbed (44t)",
+      "eu_category": "N3",
+      "licence": "C+E",
+      "gvw_t": 44,
+      "payload_t": 24.5,
+      "_payload_basis": "ASSUMPTION, stated: the diesel twin's 28 t less 3.5 t. The ZEHID annual report 2026 (DfT / Innovate UK, zero-emission HGV and infrastructure demonstrator) reports battery-electric HGVs about 3.5 t heavier unladen, with payload down 1.5 t (42 t 4x2) to 3.5 t (6x2); the lower bound is taken. The draft UK +2 t GVW allowance for zero-emission HGVs does not lift a combination above 44 t (BVRLA; in-force status unconfirmed), so none applies at 44 t: a 44 t electric artic carries less per load. Replace with the fleet's plated figure.",
+      "kwh_per_km": 1.25,
+      "_kwh_basis": "DERIVED (mixed fleet) and an ASSUMPTION for this type: ZEHID annual report 2026 — 4,500 MWh delivered to lorries over 3.60 million km across the demonstrator fleet to 17 Jun 2026 = 1.25 kWh per km. A tipper on a short laden/empty cycle may differ; edit per profile.",
+      "battery_kwh_usable": 500,
+      "charge_kw": 350,
+      "_electric_basis": "ASSUMPTION — usable battery and charger power typical of 2026 battery-electric HGVs (ZEHID-funded sites charge at 43 kW to 5 MW). Used only by the carbon planner's fleet-size comparison. Replace with the fleet's and the compound's figures.",
+      "_emissions_basis": "DERIVED: the UK Government 2026 set has NO electric HGV factor (its HGV rows are all diesel; the EV rows are cars and vans). Carbon = kWh/km × UK electricity: generation 0.13096 (7_400_4000_5_1, Scope 2) + transmission and distribution 0.01299 (13_402_4000_5_1, Scope 3) = 0.14395 kg CO2e per kWh, 2026, verified 10 Oct 2026 against the gov.uk flat file v1.2; computed by conversions._emissions() from kwh_per_km, never stored here. Well-to-wheel adds WTT 0.03682 + 0.00359 (0.18436 in all) and is shown separately; the diesel figures on this page are tank-to-wheel. The empty/laden pair does not exist for an electric lorry; the per-leg method is NOT read by code yet.",
+      "routing": {
+        "gross_weight_kg": 44000,
+        "height_cm": 400,
+        "width_cm": 255,
+        "length_cm": 1650,
+        "axle_count": 5
+      },
+      "_routing_note": "Copied from the diesel twin: an electric lorry on the same chassis routes on the same weight and dimensions. Not baked on its own — geometry_twin is read instead.",
+      "load_minutes": 25,
+      "unload_minutes": 20,
+      "labels": {
+        "en": "Artic Flatbed (44t) — electric"
+      },
+      "country_hint": "GB"
+    },
     "Rigid 8-wheeler (32t) — electric": {
       "fuel": "electric",
       "scenario_only": true,
@@ -766,7 +796,23 @@
           "rigid": 5.8,
           "artic": 12.0
         },
-        "_implied_note": "DERIVED: vehicle-km factor ÷ tonne-km factor = the national-average load the tonne-km row assumes (0.99773/0.17256; 0.93939/0.07835)."
+        "_implied_note": "DERIVED: vehicle-km factor ÷ tonne-km factor = the national-average load the tonne-km row assumes (0.99773/0.17256; 0.93939/0.07835).",
+        "rigid_7_5_17": {
+          "kg_co2e_per_tkm": 0.43002,
+          "id": "27_304_3116_14_1",
+          "row": "Freighting goods › HGV (non-refrigerated, all diesel) › Rigid (>7.5 tonnes-17 tonnes) › Average laden › tonne.km"
+        },
+        "rigid_3_5_7_5": {
+          "kg_co2e_per_tkm": 0.54001,
+          "id": "27_304_3112_14_1",
+          "row": "Freighting goods › HGV (non-refrigerated, all diesel) › Rigid (>3.5 - 7.5 tonnes) › Average laden › tonne.km"
+        },
+        "artic_3_5_33": {
+          "kg_co2e_per_tkm": 0.12292,
+          "id": "27_304_3128_14_1",
+          "row": "Freighting goods › HGV (non-refrigerated, all diesel) › Articulated (>3.5 - 33t) › Average laden › tonne.km"
+        },
+        "_classes_note": "The benchmark row is chosen by the vehicle's size class (gvw_t): rigid ≤ 7.5 t, ≤ 17 t, > 17 t; artic ≤ 33 t, > 33 t — so a 7.5 t rigid is never measured against the > 17 t figure."
       },
       "nh_carbon_tool_v27": {
         "laden_t_co2e_per_tkm": 0.00012111,
@@ -819,7 +865,12 @@
         "scope": "Scope 1",
         "gwp": "AR5",
         "status": "VERIFIED",
-        "checked": "2026-10-10"
+        "checked": "2026-10-10",
+        "rigid_7_5_to_17t": {
+          "kg_co2e_per_vkm": 0.60985,
+          "id": "5_304_3116_4_1",
+          "row": "Rigid (>7.5 tonnes-17 tonnes), average laden, km"
+        }
       }
     },
     "electricity": {

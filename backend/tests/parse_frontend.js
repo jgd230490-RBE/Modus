@@ -1300,6 +1300,17 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("the scenario-only profiles (electric variants) never reach a forecast picker",
      code.includes("Object.entries((m && m.vehicle_details) || {}).forEach(([k, v]) => { if(v && v.scenario_only && !HIDDEN_VEHICLES.includes(k)) HIDDEN_VEHICLES.push(k); });"));
   ok("Config → Vehicles says an electric profile's kg CO₂e/km is derived", code.includes('placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""}'));
+  ok("review (11 Oct): every flag the engine can raise reads in words — including the stand-in return, the unbaked swap and the missing disposal factor",
+     ["UNBAKED", "KM_FROM_BASELINE_VEHICLE", "KM_SCALED", "ALT_ROUTE_NOT_BAKED", "EV_TRIP_EXCEEDS_BATTERY", "RETURN_NOT_BAKED",
+      "RETURN_STAND_IN", "ROUTE_SWAP_NOT_BAKED", "NO_DISPOSAL_FACTOR"].every(k => new RegExp(`\\b${k}: "`).test(code))
+     && code.includes("left out, not counted as zero"));
+  ok("review: a supplier or destination that is not baked is offered but cannot be picked", (cb.match(/disabled=\{!(s|x)\.baked\}/g) || []).length === 2
+     && cb.includes('" — not baked"'));
+  ok("review: the disposal choice lists only the routes the Government file publishes for the material", cb.includes("(r.disposal_routes || []).map(k =>")
+     && !cb.includes('<option value="open_loop">'));
+  ok("review: the electric range is the range on ONE charge, and an impossible trip is left out of both columns",
+     cb.includes("Range on one charge") && cb.includes("fc.range_per_charge_km_min") && !cb.includes("daily_range") && cb.includes("left out of both columns"));
+  ok("review: the benchmarks say how many line-months they leave out", cb.includes("bm(B).excluded_lines"));
   const gs2 = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
   ok("the guide has steps for the Carbon page, on its own anchors", /\n  carbon: \[/.test(gs2)
      && ["carbon-compare", "carbon-levers", "carbon-drivers"].every(a => gs2.includes(`anchor: "${a}"`) && src.includes(`data-guide="${a}"`)));
