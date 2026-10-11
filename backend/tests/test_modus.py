@@ -397,12 +397,30 @@ ok("the demo package validates", tenant_package.validate(demo) == [], str(tenant
 dc = tenant_package.counts(demo)
 # NARROWED 5 Oct 2026 (demo v2, H2): 74 lines — 72 Approved plus one Pending and one Rejected
 # so the approval step can be shown live; 14 gates, 5 zones, 6 haul-road links are new.
-ok("demo: 11 locations, 18 routes, 3 teams, 8 sections, 74 forecasts (72 approved + 1 pending + 1 rejected), 14 gates, 5 zones, 6 haul links",
-   dc["locations"] == 11 and dc["routes"] == 18 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 74
-   and dc["location_gates"] == 14 and dc["zones"] == 5 and dc["route_haul_roads"] == 6, str(dc))
+# NARROWED (11 Oct 2026, carbon planner phase 4): + a fictional landfill and a fictional soil-recycling
+# hub (2 locations, 2 gates), a muck-away route to each (2 routes), four approved months of surplus cut
+# to the landfill (4 forecasts). Every row that was there before is unchanged (diffed when regenerated).
+ok("demo: 13 locations, 20 routes, 3 teams, 8 sections, 78 forecasts (76 approved + 1 pending + 1 rejected), 16 gates, 5 zones, 6 haul links",
+   dc["locations"] == 13 and dc["routes"] == 20 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 78
+   and dc["location_gates"] == 16 and dc["zones"] == 5 and dc["route_haul_roads"] == 6, str(dc))
+_locs = {l["id"]: l for l in demo["tables"]["locations"]}
+_rts = {r["id"]: r for r in demo["tables"]["routes"]}
+ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries four approved "
+   "months of surplus cut; R020 to a fictional Soil recycling hub has a route and no forecast",
+   _locs[_rts["R019"]["dest_id"]]["loc_type"] == "Landfill" and _locs[_rts["R020"]["dest_id"]]["loc_type"] == "Soil recycling"
+   and _rts["R019"]["origin_id"] == _rts["R020"]["origin_id"] and "fictional" in _locs[_rts["R019"]["dest_id"]]["name"]
+   and "fictional" in _locs[_rts["R020"]["dest_id"]]["name"]
+   and sorted(f["month_index"] for f in demo["tables"]["forecasts"] if f["route_id"] == "R019" and f["status"] == "Approved") == [9, 10, 11, 12]
+   and not [f for f in demo["tables"]["forecasts"] if f["route_id"] == "R020"])
+_dfac = json.loads([r for r in demo["tables"]["config"] if r["key"] == "factors"][0]["value"])
+ok("⭐ demo (carbon): the package carries the carbon block, carbon_material on every category and the three scenario-only electric profiles",
+   "carbon" in _dfac and all(c.get("carbon_material") for k, c in _dfac["material_categories"].items() if not k.startswith("_"))
+   and sorted(k for k, v in _dfac["vehicles"].items() if isinstance(v, dict) and v.get("fuel") == "electric")
+   == ["Artic Flatbed (44t) — electric", "Artic Tipper (44t) — electric", "Rigid 8-wheeler (32t) — electric"]
+   and all(v.get("scenario_only") for v in _dfac["vehicles"].values() if isinstance(v, dict) and v.get("fuel") == "electric"))
 _st = {s_: sum(1 for r in demo["tables"]["forecasts"] if r["status"] == s_) for s_ in ("Approved", "Pending", "Rejected")}
-ok("demo: 72 Approved, exactly one Pending and one Rejected (with a reason)",
-   _st == {"Approved": 72, "Pending": 1, "Rejected": 1}
+ok("demo: 76 Approved (72 + the four muck-away months, 11 Oct), exactly one Pending and one Rejected (with a reason)",
+   _st == {"Approved": 76, "Pending": 1, "Rejected": 1}
    and all(r["reject_reason"] for r in demo["tables"]["forecasts"] if r["status"] == "Rejected"), str(_st))
 ok("demo: weeks are materialised and some actuals typed",
    dc["forecast_weeks"] > 0 and any(r.get("actual_qty") for r in demo["tables"]["forecast_weeks"]))
@@ -482,7 +500,7 @@ ok("demo: /api/meta reads the tenant back — £, Team, GB",
 ok("demo: the pickers see three teams and eight sections",
    len(m3["ipts"]) == 3 and len(m3["work_sections"]) == 8)
 ok("demo: the routes reach /api/meta with no distance (unbaked)",
-   len(m3["routes"]) == 18 and all(not r.get("distance_km") for r in m3["routes"]))
+   len(m3["routes"]) == 20 and all(not r.get("distance_km") for r in m3["routes"]))
 
 # --- 5a-bis. Postgres booleans (29 Sep 2026: the first demo import on Render) ---------
 # `psycopg2.errors.DatatypeMismatch: column "in_scope" is of type boolean but expression

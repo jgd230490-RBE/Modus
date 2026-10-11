@@ -185,8 +185,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # NARROWED 5 Oct 2026 (demo v2): 74 forecasts (72 approved + Pending + Rejected), 14 gates,
     # 5 zones, 6 haul-road links travel with the package too
     ok("...with every table's rows inserted",
-       res.get("inserted", {}).get("routes") == 18 and res["inserted"].get("forecasts") == 74
-       and res["inserted"].get("forecast_weeks") == 324 and res["inserted"].get("location_gates") == 14
+       # NARROWED 11 Oct 2026 (carbon phase 4): + 2 routes, 4 forecasts, 18 weeks, 2 gates (the muck-away choice)
+       res.get("inserted", {}).get("routes") == 20 and res["inserted"].get("forecasts") == 78
+       and res["inserted"].get("forecast_weeks") == 342 and res["inserted"].get("location_gates") == 16
        and res["inserted"].get("zones") == 5 and res["inserted"].get("route_haul_roads") == 6, str(res.get("inserted")))
     ok("...and the GB diesel price applied", res.get("fuel_index_applied") == ["GB"], str(res.get("fuel_index_applied")))
     r = c.post("/api/admin/tenant/import", params=TOKEN, json=DEMO)
@@ -197,9 +198,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("meta now reads the demo tenant: its name, £, GB",
        m["tenant"]["name"].startswith("Wolds Link") and m["tenant"]["currency_symbol"] == "£"
        and m["tenant"]["country"] == "GB", str(m["tenant"]))
-    ok("...three named teams, eight sections, eighteen routes",
+    ok("...three named teams, eight sections, twenty routes",
        [i["label"] for i in m["ipts"]] == ["North Team", "Central Team", "South Team"]
-       and len(m["work_sections"]) == 8 and len(m["routes"]) == 18,
+       and len(m["work_sections"]) == 8 and len(m["routes"]) == 20,
        str([i["label"] for i in m["ipts"]]))
 
     r = c.post("/api/auth", json={"code": "north-code-xyz"})
@@ -259,7 +260,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # ------------------------------------------------------- 3. the data, as people read it
     r = c.get("/api/forecasts", headers=PLAN)
     rows = r.json() if r.status_code == 200 else []
-    ok("a planner sees all 74 forecast rows (72 approved, 1 pending, 1 rejected — demo v2)", r.status_code == 200 and len(rows) == 74, f"{r.status_code} {len(rows)}")
+    ok("a planner sees all 78 forecast rows (76 approved, 1 pending, 1 rejected — demo v2 + the muck-away line)", r.status_code == 200 and len(rows) == 78, f"{r.status_code} {len(rows)}")
     r = c.get("/api/forecasts", headers=NORTH)
     nrows = r.json() if r.status_code == 200 else []
     ok("⭐ the North Team code sees ONLY North Team's rows",
@@ -278,8 +279,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.post("/api/carbon/scenario", headers=PLAN, json={})
     cs = r.json() if r.status_code == 200 else {}
     bt = (cs.get("baseline") or {}).get("totals") or {}
-    ok("⭐ the carbon scenario answers a planner: 72 approved line-months, unbaked network EXCLUDED from transport",
-       r.status_code == 200 and len(cs.get("lines") or []) == 72 and bt.get("baked_lines") == 0
+    ok("⭐ the carbon scenario answers a planner: 76 approved line-months, unbaked network EXCLUDED from transport",
+       r.status_code == 200 and len(cs.get("lines") or []) == 76 and bt.get("baked_lines") == 0
        and bt.get("excludes_unbaked") is True and bt.get("transport_t") == 0 and bt.get("material_t", 0) > 0,
        f"{r.status_code} {r.text[:200]}")
     ok("...with the known limits, the Planned items and every factor's source, year and status",
@@ -297,6 +298,18 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 an EPD without its source is refused — 400", r.status_code == 400 and "source" in r.text, r.text[:160])
     r = c.post("/api/carbon/scenario", headers=PLAN, json={"status": "Everything"})
     ok("an unknown status is refused — 400", r.status_code == 400)
+    # phase 4: the demo's landfill-vs-reuse choice. 27,800 t of surplus cut over Sep–Dec:
+    # landfill 27,800 × 19.55376 = 543.595 t; to the recycling hub 27,800 × 1.01398 = 28.189 t → −515.406 t
+    r = c.post("/api/carbon/scenario", headers=PLAN, json={"alternatives": [
+        {"name": "Reuse the cut", "levers": [{"driver": "disposal", "scope": {"route_id": "R019"}, "to_route": "R020"}]}]})
+    cs = r.json() if r.status_code == 200 else {}
+    _l19 = [l for l in cs.get("lines") or [] if l["route_id"] == "R019"]
+    _a = (cs.get("alternatives") or [{}])[0]
+    ok("⭐ demo (phase 4): the surplus cut to the fictional landfill is a Waste line at 19.55376 kg/t (543.595 t) …",
+       r.status_code == 200 and len(_l19) == 4 and all(l["disposal_route"] == "landfill" and l["sheet"] == "Waste" for l in _l19)
+       and abs(sum(l["disposal_t"] for l in _l19) - 543.595) < 0.002, str(_l19)[:300])
+    ok("⭐ …and sending it to the fictional soil-recycling hub moves 515.406 t, ranked as the disposal decision",
+       (_a.get("drivers") or [{}])[0].get("driver") == "disposal" and abs(_a.get("delta_t", 0) + 515.406) < 0.002, str(_a.get("drivers"))[:200])
 
     _r001 = [x for x in rows if x["route_id"] == "R001" and x["status"] == "Approved"]
     db.execute("INSERT INTO route_geometry (tenant_id, route_id, vehicle_profile, leg, alt_index, geometry, distance_km, "
@@ -412,14 +425,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and "attachment" in r.headers.get("content-disposition", ""), str(r.status_code))
     pkg = r.json() if r.status_code == 200 else {}
     ok("...a valid package of the same size", pkg.get("modus_package") == 1
-       and len(pkg["tables"]["routes"]) == 18 and len(pkg["tables"]["forecasts"]) == 74
-       and len(pkg["tables"]["forecast_weeks"]) == 324 and len(pkg["tables"]["location_gates"]) == 14)
+       and len(pkg["tables"]["routes"]) == 20 and len(pkg["tables"]["forecasts"]) == 78
+       and len(pkg["tables"]["forecast_weeks"]) == 342 and len(pkg["tables"]["location_gates"]) == 16)
     r = c.post("/api/admin/tenant/import", params=dict(TOKEN, replace=1), json=pkg)
     ok("⭐ replace=1 re-imports the exported tenant over itself", r.status_code == 200 and r.json().get("replaced") is True,
        r.text[:160])
     m2 = c.get("/api/meta").json()
-    ok("...and nothing is lost or doubled", len(m2["routes"]) == 18 and len(m2["ipts"]) == 3
-       and len(c.get("/api/forecasts", headers=PLAN).json()) == 74)
+    ok("...and nothing is lost or doubled", len(m2["routes"]) == 20 and len(m2["ipts"]) == 3
+       and len(c.get("/api/forecasts", headers=PLAN).json()) == 78)
 
     # ------------------------------------------------------------ 5. H9: demo requests (8 Oct)
     # Signed out, no cookie, no code: the landing page's visitor. SMTP stubbed at the module.

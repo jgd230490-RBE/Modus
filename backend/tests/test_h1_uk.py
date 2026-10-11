@@ -301,7 +301,7 @@ ok("H2: the scheme is a road — tenant name, overlay note, discipline words; no
    and [d["label"] for d in _T["disciplines"] if d["id"] == "superstructure"] == ["Pavement"]
    and [d["in_scope"] for d in _T["disciplines"] if d["id"] == "stations"] == [0])
 ok("H2: every site has a gate at its own coordinates; the quarries and the town compound enter and leave by different gates",
-   len(_T["location_gates"]) == 14 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
+   len(_T["location_gates"]) == 16 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
    and all(g["lat"] and g["lon"] for g in _T["location_gates"])
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L001") == ["access", "egress"]
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
@@ -326,9 +326,10 @@ ok("H2: the Burrough 7.5 t box straddles the lane the Stockpile North routes wer
 ok("H2: daily vehicle caps on the two village routes, so ROUTE_CAP has something to fire on",
    {r["id"]: r["max_vehicles_per_day"] for r in _T["routes"] if r["max_vehicles_per_day"]} == {"R016": 20, "R018": 30})
 ok("H2: the show week (12–18 Oct = Oct W3) and the week after are populated for every approved line, and October W1/W2 carry typed actuals",
-   sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 3)) == 18
-   and sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 4)) == 18
-   and sum(1 for w in _T["forecast_weeks"] if w["month_index"] == 10 and w["week_index"] in (1, 2) and w.get("actual_qty") is not None) == 36)
+   # NARROWED (11 Oct 2026): 19 approved October lines — the muck-away line joined the 18
+   sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 3)) == 19
+   and sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 4)) == 19
+   and sum(1 for w in _T["forecast_weeks"] if w["month_index"] == 10 and w["week_index"] in (1, 2) and w.get("actual_qty") is not None) == 38)
 ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validates as short text or null",
    main.meta()["tenant"]["demo_notice"] == "Fictional demo scheme · nothing here is real"
    and config.validate(dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]), tenant={"name": "x", "demo_notice": "y" * 121})) != []
@@ -647,8 +648,11 @@ ok("DESNZ 2026: rigid >17 t 0.99773 and artic >33 t 0.93939 kg CO₂e/km, averag
 ok("...the laden/empty pair is stored with the figure and says it is not read by code yet",
    V["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km_empty"] == 0.77910 and V["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km_laden"] == 1.11639
    and V["Artic Tipper (44t)"]["emissions_kg_co2e_per_km_empty"] == 0.65383 and "NOT read by code yet" in V["Artic Tipper (44t)"]["_emissions_basis"])
-ok("...and the file says the figures were read from a secondary copy and must be verified against gov.uk",
-   "VERIFY against the gov.uk flat file" in V["Rigid 8-wheeler (32t)"]["_emissions_basis"])
+# REVERSED (10 Oct 2026, carbon planner): the flat file v1.2 has been read; the note says so, with the row IDs
+ok("...and the file says the figures were VERIFIED on 10 Oct 2026 against the gov.uk flat file, with the row IDs",
+   "Verified 10 Oct 2026 against the gov.uk flat file v1.2" in V["Rigid 8-wheeler (32t)"]["_emissions_basis"]
+   and "5_304_3120_4_1" in V["Rigid 8-wheeler (32t)"]["_emissions_basis"]
+   and not any("VERIFY" in (v.get("_emissions_basis") or "") for v in V.values() if isinstance(v, dict)))
 # config.validate() returns the PROBLEMS (a list of sentences; empty = fine)
 ok("a vehicle_sets entry naming an unknown vehicle, or a name both led and hidden, is refused",
    any("No such lorry" in x for x in config.validate(dict(_doc, tenant=dict(_doc["tenant"], distance_unit="mi"),

@@ -1,7 +1,7 @@
 # Carbon planner — build note (10–11 Oct 2026, branch `claude/carbon-planner`)
 
 Built from `carbon-build-brief-1010.md`. Copy this file into the Claude project's notes.
-**Status: phases 1–3 (engine, scenario API, Carbon page) on the branch. Phase 4 follows; phase 5 is after the show.**
+**Status: phases 1–4 (engine, scenario API, Carbon page, demo data) and the review fixes on the branch. Phase 5 is after the show.**
 
 ## What it is for
 Carbon forecasting for strategic planning, to REDUCE carbon: which planning decisions move the
@@ -144,6 +144,38 @@ the drivers in order, the three methods, 300 → 342 trips, no undefined/NaN).
 (its config row has no carbon block, like the live demo) and route distances seeded by hand (straight
 line × 1.3; HERE was not called). Signed in as a planner: the page loads, electric + 30 % recycled small
 aggregate moves the plan −1,294.5 t (−17.6 %), ranked electric first; miles shown correctly.
+
+## Phase 4 — demo data (`backend/tools/make_demo_tenant.py` → `demo/uk-corridor.package.json`)
+- **A landfill-vs-reuse choice.** Two fictional sites near Langton Compound: "Wolds Link Inert Landfill
+  (fictional)" (type Landfill) and "Wolds Link Soil Recycling Hub (fictional)" (type Soil recycling), a gate
+  each; R019 Langton Compound → landfill with four approved months of surplus cut (27,800 t, Central Team,
+  typed actuals in Sep/Oct weeks 1–2, September week 3 confirmed, like every other line); R020 to the hub
+  with a route and no forecast — the alternative. On the page: Per route → R019 → "Send instead to" the hub
+  moves **−515.4 t** (27,800 t × (1.01398 − 19.55376) kg/t), ranked as the disposal decision.
+- **Materials and recycled options** come from the factor block (aggregates, concrete and metals take a
+  recycled share; soils and the average class say why not). **Electric:** the package carries the three
+  scenario-only electric profiles; Electric lorries switches every demo line (tippers and flatbeds).
+- **Deterministic and additive.** The new rows come from their own seeded generator placed after every
+  existing draw. Regenerated and diffed: every row that was in the package before is identical apart from
+  regeneration timestamps (`created_at`, `updated_at` …); the factors row gains the carbon block, the
+  electric profiles and `carbon_material`, with the tenant settings and the fair-price block unchanged.
+- **Pins narrowed (not deleted):** `test_modus` 11 → 13 locations, 18 → 20 routes, 74 → 78 forecasts
+  (72 → 76 approved), 14 → 16 gates, `/api/meta` 18 → 20 routes; `test_h1_uk` 14 → 16 gates, the show week
+  18 → 19 lines and 36 → 38 typed actuals, and the "VERIFY" note pin **reversed** (it now asserts the
+  verified wording and the row IDs); `http_smoke` the same counts and 324 → 342 weeks. Added: two
+  `test_modus` checks (the landfill/hub choice; the carbon block and electric profiles in the package) and
+  two `http_smoke` checks (the landfill line on the Waste sheet at 543.595 t; the hub moves −515.406 t).
+
+### Re-importing the demo — your decision, with its cost
+**The Carbon page does NOT need a re-import.** On today's live demo it reads the carbon block, the electric
+profiles and the material mapping from `factors.json` (checked locally on a database holding the old
+package). What a re-import adds is the landfill/hub example and the electric profiles in Config.
+**The cost:** `replace=1` deletes every baked route (the package carries no geometry), so every route reads
+UNBAKED and every CO2e figure, the map's carbon and the Look-ahead's cycles disappear until Routes → Bake all
+is run for Artic Tipper (44t) and Artic Flatbed (44t) (HERE calls; 20 routes × 2 vehicles × 2 legs, plus the
+alternatives). The standing rule in the notes (todo A12) says do not re-import before the show.
+**Recommendation: do not re-import before 15 Oct.** Show the disposal lever on any soil line instead, or
+re-import after the show.
 
 ## Review fixes (11 Oct) — an independent adversarial review of the engine
 Three reviewers (formulas, edge cases, brief compliance) raised 30 findings; each was re-checked by a
