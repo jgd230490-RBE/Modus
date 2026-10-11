@@ -480,8 +480,19 @@ haul.route_with_haul = _real_rwh
 reset_db()
 seed_two_locations()
 factors = conversions.load_factors()
+# NARROWED 11 Oct 2026 (EU vehicles removed): these loops run once per vehicle in the seed, so they lost four
+# profiles (15 → 11, six assertions each) when the user removed the EU type-approval entries. Those four were
+# also the only seed profiles WITHOUT their own load/unload minutes — the only proof here that a FALLBACK
+# turnaround (_default / planning minutes) splits exactly too. A synthetic profile with no minutes of its own
+# carries that case now; it is added to a COPY, so nothing else in this harness sees it.
+factors = json.loads(json.dumps(factors))
+factors["vehicles"]["Synthetic 4-axle, no minutes of its own"] = {
+    "gvw_t": 32, "payload_t": 18, "routing": {"gross_weight_kg": 32000, "axle_count": 4}}
 
 profiles = [p for p in (factors.get("vehicles") or {}) if not p.startswith("_")]
+ok("11 Oct 2026: the loops below include a profile with no load/unload minutes of its own (the fallback case)",
+   any("load_minutes" not in factors["vehicles"][p] for p in profiles)
+   and network._turnaround_minutes("Synthetic 4-axle, no minutes of its own", factors) == (12.0, 8.0))
 ok("factors.json has vehicle profiles to check against", len(profiles) > 0,
    f"got {len(profiles)}")
 for prof in profiles:

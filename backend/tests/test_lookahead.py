@@ -604,7 +604,9 @@ ok("days.py imports weeks and does not reimplement its writes",
 #   R1/WS1  tonnes, baked both legs      -> every figure, cycle from HERE
 #   R2/WS2  tonnes, NOT baked            -> trips + tonnes only, UNBAKED flag
 #   R3/WS3  unit=vehicles, loaded only   -> trips = qty, return estimated (‡), km_trip = loaded
-#   R1/WS4  a vehicle factors.json does not know -> V07 fallback, same as month-kpis
+#   R1/WS4  a vehicle factors.json does not know -> the first planning vehicle's payload, same as month-kpis
+#   (11 Oct 2026: R3 ran on the EU tipping semi, V12, until it left the seed; it runs on the
+#   Artic Tipper (44t) now, and the EU-code chip is proved on a synthetic entry below)
 import config  # noqa: E402
 import derived  # noqa: E402
 reset_db()
@@ -614,7 +616,9 @@ db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L
 for _rid, _ipt in (("R1", "IPT 1"), ("R2", "IPT 2"), ("R3", "IPT 3 / IPT 6")):
     db.execute("INSERT INTO routes (id, origin_id, dest_id, ipt) VALUES (?, ?, ?, ?)", (_rid, "L1", "L2", _ipt))
 V8 = "Rigid 8-wheeler (32t)"                                  # payload 20 t
-V12 = "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t"    # code V12, payload 26 t
+# NARROWED 11 Oct 2026 (EU vehicles removed): the name stays V12 so every use below reads the same;
+# it is the UK artic tipper now (no code, payload 29 t).
+V12 = "Artic Tipper (44t)"                                    # payload 29 t
 
 
 def _geom2(rid, prof, leg, km, hr):
@@ -662,8 +666,13 @@ ok("context names both ends of the route and the route's own IPT",
 ok("...and the LINE's IPT, WS, material, vehicle and unit",
    c1.get("ipt") == "IPT1" and c1.get("section_id") == "WS1" and c1.get("material_type") == "Small aggregate"
    and c1.get("vehicle_type") == V8 and c1.get("unit") == "t")
-ok("vehicle_short: the EU code where factors.json has one, the de-prefixed legacy name otherwise",
-   L["WS3"]["context"].get("vehicle_short") == "V12" and c1.get("vehicle_short") == "8-wheeler (32t)")
+# NARROWED 11 Oct 2026 (EU vehicles removed): no seed vehicle carries a code now, so both lines print
+# the de-prefixed name; the code branch (a tenant package's vehicles may carry one) is proved on a
+# synthetic entry, through the same derived.vehicle_short the context uses.
+ok("vehicle_short: the vehicle's own code where its entry has one, the de-prefixed name otherwise",
+   L["WS3"]["context"].get("vehicle_short") == "Tipper (44t)" and c1.get("vehicle_short") == "8-wheeler (32t)"
+   and derived.vehicle_short("Tractor + tipping semi (40 t)", {"vehicles": {"Tractor + tipping semi (40 t)": {"code": "T40"}}}) == "T40"
+   and derived.vehicle_short("Artic Tipper (44t)", {"vehicles": {"Artic Tipper (44t)": {"code": "  "}}}) == "Tipper (44t)")
 ok("payload is the planning figure with no fallback for a known vehicle",
    c1.get("payload_t") == 20.0 and c1.get("payload_fallback") is None)
 ok("a baked line: baked, return_baked, both distances, km_trip = loaded + return, no ‡",
@@ -738,8 +747,9 @@ f3 = [d for d in l3["days"] if datetime.date.fromisoformat(d["day_date"]).weekda
 q3 = float(l3["week"]["planned_qty"]) / NWD
 ok("unit=vehicles: trips = ceil(qty) itself, not qty / payload",
    f3["derived"]["trips"] == int(_m.ceil(round(q3, 9))))
-ok("...and tonnes = qty × the same payload trips use (26 t for V12)",
-   abs(f3["derived"]["tonnes"] - q3 * 26.0) < 1e-6 and c3.get("payload_t") == 26.0)
+# NARROWED 11 Oct 2026 (EU vehicles removed): R3 runs on the Artic Tipper (44t), 29 t (was V12, 26 t)
+ok("...and tonnes = qty × the same payload trips use (29 t for the artic tipper)",
+   abs(f3["derived"]["tonnes"] - q3 * 29.0) < 1e-6 and c3.get("payload_t") == 29.0)
 ok("⭐ loaded leg only: baked, return NOT baked, cycle marked ‡, km_trip = loaded leg alone",
    c3.get("baked") is True and c3.get("return_baked") is False and c3.get("cycle_mark") == "‡"
    and c3.get("cycle_source") == "here_return_estimated" and c3.get("km_trip") == 30.0
@@ -754,9 +764,11 @@ ok("a loaded-only bake is still 'baked' — no UNBAKED flag", c3.get("flags") ==
 # ---- unknown vehicle: the month-kpis fallback, and the two agree
 c4 = L["WS4"]["context"]
 kp = {l["section_id"]: l for l in main.public_month_kpis(month=MI, unit="t")["lines"]}
+# NARROWED 11 Oct 2026 (EU vehicles removed): the first planning vehicle is Rigid 8-wheeler (32t), 20 t (was V07, 18 t)
 ok("an unknown vehicle falls back to the first planning vehicle's payload and names it",
    c4.get("payload_fallback") == kp["WS4"].get("payload_fallback") and c4.get("payload_fallback") is not None
-   and c4.get("payload_t") == kp["WS4"].get("payload_t") == 18.0)
+   and c4.get("payload_fallback") == "Rigid 8-wheeler (32t)"
+   and c4.get("payload_t") == kp["WS4"].get("payload_t") == 20.0)
 ok("⭐ month-kpis and the Look-ahead agree on payload for every line this month",
    all(L[s]["context"]["payload_t"] == kp[s]["payload_t"] for s in ("WS1", "WS2", "WS3", "WS4")))
 ok("⭐ ...and on movements-per-vehicle-per-day, baked or not",

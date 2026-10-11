@@ -14,8 +14,6 @@
       "default_unit": "m3",
       "volume_convertible": true,
       "vehicles": [
-        "N3 lorry (BA) 4-axle TPMLM 32 t tipper",
-        "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t",
         "Rigid 8-wheeler (32t)",
         "Artic Tipper (44t)",
         "Rigid 6-wheeler (26t)"
@@ -27,8 +25,6 @@
       "default_unit": "m3",
       "volume_convertible": true,
       "vehicles": [
-        "N3 lorry (BA) 4-axle TPMLM 32 t tipper",
-        "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t",
         "Rigid 8-wheeler (32t)",
         "Artic Tipper (44t)"
       ],
@@ -39,8 +35,6 @@
       "default_unit": "t",
       "volume_convertible": true,
       "vehicles": [
-        "N3 lorry (BA) 4-axle TPMLM 32 t tipper",
-        "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t",
         "Rigid 8-wheeler (32t)",
         "Artic Tipper (44t)"
       ],
@@ -51,8 +45,6 @@
       "default_unit": "t",
       "volume_convertible": true,
       "vehicles": [
-        "N3 lorry (BA) 4-axle mixer 32 t",
-        "N3 tractor (BC) + O4 semi (DA) GCW 40 t",
         "Artic Flatbed (44t)",
         "Rigid 8-wheeler (32t)",
         "Truck mixer 8 m³ (32t)",
@@ -65,7 +57,6 @@
       "default_unit": "t",
       "volume_convertible": false,
       "vehicles": [
-        "N3 tractor (BC) + O4 semi (DA) GCW 40 t",
         "Artic Flatbed (44t)"
       ],
       "carbon_material": "metals"
@@ -75,8 +66,6 @@
       "default_unit": "t",
       "volume_convertible": false,
       "vehicles": [
-        "N3 tractor (BC) + O4 semi (DA) GCW 40 t",
-        "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t",
         "Artic Flatbed (44t)",
         "Artic Tipper (44t)"
       ],
@@ -87,12 +76,11 @@
       "default_unit": "t",
       "volume_convertible": true,
       "vehicles": [
-        "N3 lorry (BA) 4-axle TPMLM 32 t tipper",
         "Rigid 8-wheeler (32t)"
       ]
     }
   },
-  "_vehicles_note": "Road HGVs over 3.5 t (no site plant): six UK trade-name entries, four EU N-category planning entries (2026-09-01), two UK truck mixers (H1, 29 Sep 2026) and three battery-electric variants of the haulage lorries — artic tipper, artic flatbed, 8-wheeler (carbon planner, 10 Oct 2026; the mixers and the smaller rigids have none yet). payload_t = typical carrying limit; emissions_kg_co2e_per_km = DESNZ 2026 GHG conversion factors, average laden, per vehicle-km, tank-to-wheel (verified 10 Oct 2026 against the gov.uk flat file v1.2; see each entry's _emissions_basis). fuel = 'diesel' (default) or 'electric'; an electric entry has no stored per-km figure — conversions._emissions() derives it as kwh_per_km × the UK electricity factor in the `carbon` block, so the two cannot drift. scenario_only: true keeps a profile out of the forecast pickers (it has no baked geometry of its own; geometry_twin names the diesel profile whose routed distances it reads). load_minutes/unload_minutes are per-vehicle turnaround estimates and override planning.load_minutes/unload_minutes, which remain the fallback. Starting estimates, not measured — edit to match your operation.",
+  "_vehicles_note": "Road HGVs over 3.5 t (no site plant): six UK trade-name entries, two UK truck mixers (H1, 29 Sep 2026) and three battery-electric variants of the haulage lorries — artic tipper, artic flatbed, 8-wheeler (carbon planner, 10 Oct 2026; the mixers and the smaller rigids have none yet). payload_t = typical carrying limit; emissions_kg_co2e_per_km = DESNZ 2026 GHG conversion factors, average laden, per vehicle-km, tank-to-wheel (verified 10 Oct 2026 against the gov.uk flat file v1.2; see each entry's _emissions_basis). fuel = 'diesel' (default) or 'electric'; an electric entry has no stored per-km figure — conversions._emissions() derives it as kwh_per_km × the UK electricity factor in the `carbon` block, so the two cannot drift. scenario_only: true keeps a profile out of the forecast pickers (it has no baked geometry of its own; geometry_twin names the diesel profile whose routed distances it reads). load_minutes/unload_minutes are per-vehicle turnaround estimates and override planning.load_minutes/unload_minutes, which remain the fallback. Starting estimates, not measured — edit to match your operation. 11 Oct 2026: the four EU type-approval planning entries added on 2026-09-01 were removed from the seed (and from every category list and vehicle set below); a live document or tenant package that still carries them keeps loading and resolving, because nothing in the code names them.",
   "vehicles": {
     "Rigid 7.5t": {
       "eu_category": "N2",
@@ -141,6 +129,7 @@
       "fuel": "diesel"
     },
     "Rigid 6-wheeler (26t)": {
+      "planning_vehicle": true,
       "eu_category": "N3",
       "licence": "C",
       "gvw_t": 26,
@@ -164,6 +153,7 @@
       "fuel": "diesel"
     },
     "Rigid 8-wheeler (32t)": {
+      "planning_vehicle": true,
       "eu_category": "N3",
       "licence": "C",
       "gvw_t": 32,
@@ -187,6 +177,7 @@
       "fuel": "diesel"
     },
     "Artic Tipper (44t)": {
+      "planning_vehicle": true,
       "eu_category": "N3",
       "licence": "C+E",
       "gvw_t": 44,
@@ -210,6 +201,7 @@
       "fuel": "diesel"
     },
     "Artic Flatbed (44t)": {
+      "planning_vehicle": true,
       "eu_category": "N3",
       "licence": "C+E",
       "gvw_t": 44,
@@ -232,119 +224,6 @@
       "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — articulated (>33 t)', kg CO2e per vehicle-km: 0% laden 0.65383, 100% laden 1.08004, AVERAGE laden 0.93939 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3129_4_1 / 5_304_3131_4_1 / 5_304_3132_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.89 on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
       "fuel": "diesel"
     },
-    "N3 lorry (BA) 4-axle TPMLM 32 t tipper": {
-      "code": "V07",
-      "planning_vehicle": true,
-      "eu_category": "N3",
-      "body_code": "BA",
-      "licence": "C",
-      "gvw_t": 32,
-      "payload_t": 18,
-      "_payload_basis": "18 t is the conservative planning payload given in the 2026-09-01 build list. The pre-existing 'Rigid 8-wheeler (32t)' entry is the same chassis class and carries 20 t. Both are in this file on purpose; neither was changed.",
-      "emissions_kg_co2e_per_km": 0.99773,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
-      "aliases": [
-        "8x4 tipper"
-      ],
-      "_aliases_note": "'8x4 tipper' is the trade name given in the build list. Nothing reads `aliases` yet - it is stored so the roster's own wording survives.",
-      "routing": {
-        "gross_weight_kg": 32000,
-        "axle_count": 4
-      },
-      "_routing_note": "height_cm / width_cm / length_cm are ABSENT because the build list does not give them. here_routing._truck_params() sends only the keys present, so HERE routes this on weight and axle count alone - it does not borrow another vehicle's dimensions.",
-      "labels": {
-        "en": "8x4 rigid tipper (32 t)",
-        "eu": "N3 lorry (BA) 4-axle TPMLM 32 t tipper"
-      },
-      "emissions_kg_co2e_per_km_empty": 0.7791,
-      "emissions_kg_co2e_per_km_laden": 1.11639,
-      "fuel": "diesel"
-    },
-    "N3 lorry (BA) 4-axle mixer 32 t": {
-      "code": "V10",
-      "planning_vehicle": true,
-      "eu_category": "N3",
-      "body_code": "BA",
-      "licence": "C",
-      "gvw_t": 32,
-      "payload_m3": 8,
-      "payload_t": 19.2,
-      "_payload_basis": "THE BUILD LIST GIVES 8 m3, NOT A TONNAGE. payload_m3 holds that figure verbatim. payload_t = 8 m3 x 2.4 t/m3, the 'Precast / concrete' density already in this file - DERIVED, not sourced. It is very likely too high as a MASS payload: 19.2 t of concrete plus the drum exceeds what a 32 t GVW 4-axle can legally carry. conversions.py reads payload_t only, so a forecast entered in 'vehicles' on this profile converts on 19.2. Correct it the moment the roster gives a mass figure. Recorded in claude/open-questions.md.",
-      "emissions_kg_co2e_per_km": 0.99773,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
-      "aliases": [
-        "8x4 mixer"
-      ],
-      "_aliases_note": "'8x4 mixer' is a restatement of '4-axle mixer', not a trade name taken from the roster. Correct it if the roster words it differently.",
-      "routing": {
-        "gross_weight_kg": 32000,
-        "axle_count": 4
-      },
-      "_routing_note": "Dimensions absent - not given. See the V07 note.",
-      "labels": {
-        "en": "8x4 rigid mixer (32 t)",
-        "eu": "N3 lorry (BA) 4-axle mixer 32 t"
-      },
-      "emissions_kg_co2e_per_km_empty": 0.7791,
-      "emissions_kg_co2e_per_km_laden": 1.11639,
-      "fuel": "diesel"
-    },
-    "N3 tractor (BC) + O4 semi (DA) GCW 40 t": {
-      "code": "V11",
-      "planning_vehicle": true,
-      "eu_category": "N3 + O4",
-      "body_code": "BC + DA",
-      "licence": "C+E",
-      "gvw_t": 40,
-      "payload_t": 25.5,
-      "_payload_basis": "25.5 t is the conservative planning payload given in the 2026-09-01 build list. gvw_t 40 is the GCW it quotes, so tare works out at 14.5 t - which here_routing.tare_weight_kg() uses for the unladen return leg.",
-      "emissions_kg_co2e_per_km": 0.93939,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — articulated (>33 t)', kg CO2e per vehicle-km: 0% laden 0.65383, 100% laden 1.08004, AVERAGE laden 0.93939 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3129_4_1 / 5_304_3131_4_1 / 5_304_3132_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.89 on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
-      "aliases": [
-        "40 t artic",
-        "tractor + semi-trailer"
-      ],
-      "_aliases_note": "Restatements of the EU description, NOT trade names taken from the roster. Correct if the roster words them differently.",
-      "routing": {
-        "gross_weight_kg": 40000
-      },
-      "_routing_note": "axle_count is ABSENT as well as the dimensions: the build list says 'tractor (BC) + semi (DA)' with no axle count, and a 40 t combination is 5 or 6 axles depending on configuration. Guessing it would change which roads HERE allows.",
-      "labels": {
-        "en": "Artic (40 t)",
-        "eu": "N3 tractor (BC) + O4 semi (DA) GCW 40 t"
-      },
-      "emissions_kg_co2e_per_km_empty": 0.65383,
-      "emissions_kg_co2e_per_km_laden": 1.08004,
-      "fuel": "diesel"
-    },
-    "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t": {
-      "code": "V12",
-      "planning_vehicle": true,
-      "eu_category": "N3 + O4",
-      "body_code": "BC + DA",
-      "licence": "C+E",
-      "gvw_t": 40,
-      "payload_t": 26,
-      "_payload_basis": "26 t is the conservative planning payload given in the 2026-09-01 build list. The list quotes '40/44 t'; gvw_t is stored as 40 because that is the base GCW and 44 t applies only in specific combined-transport configurations. Tare therefore works out at 14 t. If 44 t is right for your operation, change gvw_t AND routing.gross_weight_kg together - they are read by different code paths.",
-      "emissions_kg_co2e_per_km": 0.93939,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — articulated (>33 t)', kg CO2e per vehicle-km: 0% laden 0.65383, 100% laden 1.08004, AVERAGE laden 0.93939 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3129_4_1 / 5_304_3131_4_1 / 5_304_3132_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.89 on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
-      "aliases": [
-        "artic tipper",
-        "tipping semi"
-      ],
-      "_aliases_note": "Restatements of the EU description, NOT trade names from the roster. Note 'artic tipper' is only an ALIAS - it is not the pre-existing 'Artic Tipper (44t)' key, which is a different entry with a 29 t payload.",
-      "routing": {
-        "gross_weight_kg": 40000
-      },
-      "_routing_note": "axle_count and dimensions absent - not given. See the V11 note.",
-      "labels": {
-        "en": "Artic tipper (40/44 t)",
-        "eu": "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t"
-      },
-      "emissions_kg_co2e_per_km_empty": 0.65383,
-      "emissions_kg_co2e_per_km_laden": 1.08004,
-      "fuel": "diesel"
-    },
     "_default": {
       "payload_t": 20,
       "emissions_kg_co2e_per_km": 0.97,
@@ -354,6 +233,7 @@
       "fuel": "diesel"
     },
     "Truck mixer 8 m³ (32t)": {
+      "planning_vehicle": true,
       "eu_category": "N3",
       "licence": "C",
       "gvw_t": 32,
@@ -382,6 +262,7 @@
       "fuel": "diesel"
     },
     "Truck mixer 6 m³ (26t)": {
+      "planning_vehicle": true,
       "eu_category": "N3",
       "licence": "C",
       "gvw_t": 26,
@@ -500,12 +381,14 @@
       "country_hint": "GB"
     }
   },
-  "_planning_vehicles_note": "The four EU-named entries above carry planning_vehicle: true and are listed FIRST in every picker. The six pre-existing entries are kept, unchanged, and listed after them as legacy. That is deliberate: every baked route_geometry row is keyed on vehicle_profile, network.DEFAULT_PROFILE is 'Artic Tipper (44t)', and every material category's `vehicles` list names them - remove one and its routes' payload, CO2 and trips/day fall through to _default (20 t, 0.90 kg/km) and every affected route then reports identical figures. Decided 2026-09-01: add four, keep six. None of the four carries load_minutes / unload_minutes, so all four fall back to planning.load_minutes 12 + planning.unload_minutes 8 = a 20-minute turnaround, which is stated rather than invented.",
+  "_planning_vehicles_note": "The vehicles that LEAD the Submit picker for an organisation whose country has no vehicle_sets entry (a new organisation boots with no country), in this order. Since 11 Oct 2026 they are the six UK haulage trade names, each flagged planning_vehicle: true: the array carries the ORDER and the flag marks the entry, and the two must agree (the Config page's Planning tick edits both). Left out on purpose: Rigid 4-wheeler (18t), because no material category lists it, so it would sit disabled in the lead group; Rigid 7.5t, which is not a haulage vehicle; the electric variants, which are scenario-only. The FIRST name is also the payload fallback: a forecast line whose vehicle this document does not know converts on its payload (Rigid 8-wheeler, 20 t) and says so (payload_fallback on /api/public/month-kpis and the Look-ahead). From 2026-09-01 to 11 Oct 2026 this list was four EU type-approval entries; they were removed from the product. conversions.planning_vehicle_names() never returns an empty lead list: with this array empty and no flag set it falls back to the vehicles the material categories list (see its docstring).",
   "planning_vehicles": [
-    "N3 lorry (BA) 4-axle TPMLM 32 t tipper",
-    "N3 lorry (BA) 4-axle mixer 32 t",
-    "N3 tractor (BC) + O4 semi (DA) GCW 40 t",
-    "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t"
+    "Rigid 8-wheeler (32t)",
+    "Rigid 6-wheeler (26t)",
+    "Artic Tipper (44t)",
+    "Truck mixer 8 m³ (32t)",
+    "Truck mixer 6 m³ (26t)",
+    "Artic Flatbed (44t)"
   ],
   "_planning_note": "Used to estimate haul-cycle turnaround, trips/day and fleet size. load_minutes and unload_minutes here are the fallback only; a vehicle's own values take precedence.",
   "planning": {
@@ -521,7 +404,7 @@
   "fair_price": {
     "_README": "10 Sep 2026 night — the FAIR PRICE model's coefficients (backend/fairprice.py). SEEDED by the human's decision: these are public cost benchmarks, not contract rates, and each carries its source. Edit on Config -> Costing · fuel, or here and 'Reset to file'. Three are ASSUMPTIONS with no public source — vehicle_new_price_eur (behind vehicle_standing_eur_per_h), running_eur_per_km, margin_pct — replace them with the fleet's own figures. The diesel price is NOT here: it is the live EU Weekly Oil Bulletin row (fuel.py).",
     "consumption": {
-      "_source": "artic laden ~34 L/100 km: ICCT 'Fuel efficiency technology in European heavy-duty vehicles' (2018), regional delivery cycle; +0.4-0.95 L/100 km per tonne of payload: UK DfT 'Effects of payload on the fuel consumption of trucks' — both via lkw-control.com/en/truck-fuel-consumption-per-100-km (read 2026-09-10). The LOW end 0.4 is used, so empty = laden - 0.4 x payload: artic 34 - 0.4 x 26 = 23.6. Rigid 32 t average-laden ~35 L/100 km was DERIVED (10 Sep) from the file's then DEFRA/BEIS 2025 factor 0.95 kg CO2e/km / 2.68 kg per litre, then 35 - 0.4 x 20 = 27 empty. ⚠️ H1 (29 Sep 2026): the vehicle factors above moved to the DESNZ 2026 set (rigid >17 t 0.99773 kg CO2e/km; diesel 2.58354 kg CO2e/L), on which the same derivation gives 38.6 laden and ~31 empty. The 27 is KEPT here on purpose so the seeded model's figures (test_fairprice pins them) do not move silently; replace it with the fleet's own figure, or with 31 if the derivation is preferred. The rigid figure is the weakest number in this block.",
+      "_source": "artic laden ~34 L/100 km: ICCT 'Fuel efficiency technology in European heavy-duty vehicles' (2018), regional delivery cycle; +0.4-0.95 L/100 km per tonne of payload: UK DfT 'Effects of payload on the fuel consumption of trucks' — both via lkw-control.com/en/truck-fuel-consumption-per-100-km (read 2026-09-10). The LOW end 0.4 is used, so empty = laden - 0.4 x payload, at a 26 t reference payload: artic 34 - 0.4 x 26 = 23.6. Rigid 32 t average-laden ~35 L/100 km was DERIVED (10 Sep) from the file's then DEFRA/BEIS 2025 factor 0.95 kg CO2e/km / 2.68 kg per litre, then 35 - 0.4 x 20 = 27 empty. ⚠️ H1 (29 Sep 2026): the vehicle factors above moved to the DESNZ 2026 set (rigid >17 t 0.99773 kg CO2e/km; diesel 2.58354 kg CO2e/L), on which the same derivation gives 38.6 laden and ~31 empty. The 27 is KEPT here on purpose so the seeded model's figures (test_fairprice pins them) do not move silently; replace it with the fleet's own figure, or with 31 if the derivation is preferred. The rigid figure is the weakest number in this block.",
       "l_per_100km_per_tonne": 0.4,
       "rigid": {
         "l_per_100km_empty": 27.0
@@ -557,9 +440,9 @@
     "_sanity_source": "IRU (2025): goods transport in Europe costs EUR 0.50-2.00 per km all-in. A check on the model's output, not an input. On the test fixture (60 km round trip, 20 t, 1.73 h cycle, diesel 1.922) the model gives ~EUR 113/trip = EUR 1.88/km, and the Estonian list price found on 09 Sep (EUR 45 + 1.50/km each way) gives EUR 135 for the same trip."
   },
   "_routing_note": "vehicles[].routing holds HGV dimensions for HERE truck routing (weight kg, sizes cm, axle count).",
-  "_materials_vehicles_note": "Which of the four new planning vehicles each category lists is CLAUDE'S INFERENCE, 2026-09-01, not sourced from the build list: V07/V12 tippers on soil and aggregates, V10 mixer on concrete, V11 flat semi on concrete/steel/general. It had to be decided because the Submit Forecast picker DISABLES a vehicle a category does not list, so an unlisted planning vehicle would be unselectable. The join is advisory in the UI, not enforced - correct any line of it freely.",
-  "_labels_note": "labels.{en,eu,ee} per vehicle - 2026-09-02, the EN/EU/EE toggle. The KEY is the canonical id and is what a forecast line stores; a label only changes what the picker shows. Missing en/eu/ee falls back to the key, never to an invented name. EU strings exist only for the four planning vehicles (the key IS the EU 2018/858 string); the six legacy keys are UK trade names, so their EU label falls back to the key. ee is ABSENT on every entry: the build list names 'veoauto, sadulveduk, kallur' as examples of EE official aliases but does not say which vehicle each belongs to, and the EU matrix that carries them is not in this repo. Fill labels.ee here and the toggle picks it up.",
-  "_vehicle_sets_note": "H1, 29 Sep 2026. Per tenant country: `lead` = the names the pickers list first (the country's trade names), `hide` = names the pickers do NOT offer to that tenant (they stay in the file and in /api/meta `vehicles`, so an existing line or baked route on one still resolves — nothing is renamed or removed, per the validator). A country not listed uses the top-level planning_vehicles as its lead list and hides nothing. The EU N-category names are hidden for GB because no UK haulier calls a lorry an 'N3 lorry (BA) 4-axle TPMLM'.",
+  "_materials_vehicles_note": "Which vehicles each category lists is advisory in the UI, not enforced: the Submit Forecast picker DISABLES a vehicle a category does not list (it stays visible, greyed), so every planning vehicle must be listed by at least one category or it is unselectable. The first vehicle the tenant is shown in a category's list is the Submit form's default for that material. 11 Oct 2026: the four EU type-approval entries were removed from every list. Correct any line freely.",
+  "_labels_note": "labels.en per vehicle: the name the pickers show. The KEY is the canonical id and is what a forecast line stores; a label only changes what a picker shows. A missing label falls back to the key, never to an invented name. Another label language (labels.<lang>) is offered by the header's vehicle-name buttons only when a vehicle the tenant is offered carries a label in it (conversions.vehicle_labels, 'langs'). The seed's vehicles carry English only, so a new organisation is offered English alone and the header shows no buttons. Until 11 Oct 2026 the four EU type-approval entries also carried labels.eu (the EN/EU/EE toggle of 2026-09-02); a document that still carries them keeps that option for a tenant that is offered those vehicles.",
+  "_vehicle_sets_note": "H1, 29 Sep 2026. Per tenant country: `lead` = the names the pickers list first (the country's trade names), `hide` = names the pickers do NOT offer to that tenant (they stay in the file and in /api/meta `vehicles`, so an existing line or baked route on one still resolves — nothing is renamed or removed, per the validator). A country not listed uses the top-level planning_vehicles as its lead list and hides nothing. Rigid 7.5t is hidden for GB: it is not a haulage vehicle on any current route. (Until 11 Oct 2026 the GB hide list also named the four EU type-approval entries, which were then removed from the seed.)",
   "vehicle_sets": {
     "GB": {
       "lead": [
@@ -572,10 +455,6 @@
         "Artic Flatbed (44t)"
       ],
       "hide": [
-        "N3 lorry (BA) 4-axle TPMLM 32 t tipper",
-        "N3 lorry (BA) 4-axle mixer 32 t",
-        "N3 tractor (BC) + O4 semi (DA) GCW 40 t",
-        "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t",
         "Rigid 7.5t"
       ]
     }

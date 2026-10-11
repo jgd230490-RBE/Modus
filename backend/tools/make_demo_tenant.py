@@ -240,7 +240,7 @@ def build():
     fp["consumption"]["_source"] = ("artic laden ~34 L/100 km: ICCT 'Fuel efficiency technology in European heavy-duty "
                                     "vehicles' (2018), regional delivery cycle; +0.4 L/100 km per tonne of payload (low end): "
                                     "UK DfT 'Effects of payload on the fuel consumption of trucks' — both via lkw-control.com "
-                                    "(read 2026-09-10). Empty = laden − 0.4 × payload: artic 34 − 0.4 × 26 = 23.6. Rigid 32 t "
+                                    "(read 2026-09-10). Empty = laden − 0.4 × payload, at a 26 t reference payload: artic 34 − 0.4 × 26 = 23.6. Rigid 32 t "
                                     "average-laden 38.6 L/100 km DERIVED from the DESNZ 2026 factors in this file (rigid >17 t "
                                     "0.99773 kg CO2e/km ÷ 2.58354 kg CO2e/L diesel), then 38.6 − 0.4 × 20 = 30.6, rounded to 31 "
                                     "empty. The rigid figure is the weakest number in this block.")

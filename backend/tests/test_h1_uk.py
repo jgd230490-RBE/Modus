@@ -17,7 +17,8 @@ WHAT IS ASSERTED
      documents both countries, is the deliberate exception).
   4. km/miles (HU5, per tenant): stored km, shown in the tenant's unit — the helpers in
      the app and the map, and the XLSX/PDF headers and figures.
-  5. The GB vehicle set: lead names, hidden EU names, the two truck mixers, DESNZ 2026
+  5. The GB vehicle set: lead names, the hidden list (Rigid 7.5t alone since the four EU
+     type-approval names left the product on 11 Oct 2026), the two truck mixers, DESNZ 2026
      CO₂ factors with their source on every >17 t rigid and >33 t artic entry.
   6. The Mapbox token default in config.py equals the one in map/config.js; GB → Europe/London.
   7. The probes exist and are shaped for the deployment: /api/admin/diagnostics/fuel-index
@@ -588,8 +589,13 @@ ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the
    and "+ {DU()} × running" in fe and "+ km × running" not in fe)
 ok("🔴 the route form's rate help names no country and reads the tenant's unit",
    "usual Estonian quote" not in fe and "per-{DU()} rate is a common haulage quote" in fe)
+# NARROWED 11 Oct 2026 (review): the column is gated on vehLangEditable("ee") — the COUNTRY rule alone. Gated on
+# vehLangShown("ee") it also needed a vehicle to carry an Estonian name already, so an Estonian organisation on
+# the new seed (English names only) could never type its first one. The header buttons keep vehLangShown.
 ok("🔴 Config → Vehicles shows the Estonian label column to an Estonian tenant only",
-   '.filter(h => h !== "Estonian" || vehLangShown("ee"))' in fe and '{vehLangShown("ee") && <td' in fe)
+   '.filter(h => h !== "Estonian" || vehLangEditable("ee"))' in fe and '{vehLangEditable("ee") && <td' in fe
+   and 'const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");' in fe
+   and 'h !== "Estonian" || vehLangShown("ee")' not in fe and '{vehLangShown("ee") && <td' not in fe)
 ok("🔴 the Submit form never defaults to a hidden vehicle (first SHOWN of the category's list)",
    "const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v))" in fe
    and "useState(firstShown(vehicles))" in fe and "(firstShown(suggestedVehicles) || v)" in fe
@@ -631,11 +637,27 @@ ok("the app types per-distance rates in the tenant's unit and stores per km (rou
 F = conversions.load_factors()
 lead = conversions.planning_vehicle_names(F)
 hidden = conversions.hidden_vehicle_names(F)
-ok("GB lead vehicles are the UK trade names, the EU N-category names are hidden, nothing is removed",
+# NARROWED 11 Oct 2026 (EU vehicles removed): the user removed the four EU type-approval names from the
+# product, so the GB demo hides Rigid 7.5t alone and carries no N3 name at all. Nothing ELSE was removed.
+ok("GB lead vehicles are the UK trade names, Rigid 7.5t is the one hidden, and no EU type-approval name is left",
    lead[:3] == ["Rigid 8-wheeler (32t)", "Rigid 6-wheeler (26t)", "Artic Tipper (44t)"]
-   and "Truck mixer 8 m³ (32t)" in lead and all(n.startswith("N3 ") for n in hidden if n != "Rigid 7.5t")
-   and len(hidden) == 5 and all(h in conversions.vehicle_names(F) for h in hidden)
+   and "Truck mixer 8 m³ (32t)" in lead and hidden == ["Rigid 7.5t"]
+   and not any(n.startswith("N3 ") for n in conversions.vehicle_names(F))
+   and len(hidden) == 1 and all(h in conversions.vehicle_names(F) for h in hidden)
    and set(lead).isdisjoint(hidden), str((lead, hidden)))
+_EU4 = ("N3 lorry (BA) 4-axle TPMLM 32 t tipper", "N3 lorry (BA) 4-axle mixer 32 t",
+        "N3 tractor (BC) + O4 semi (DA) GCW 40 t", "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t")
+_demo_txt = read("demo/uk-corridor.package.json")
+ok("11 Oct 2026: ⭐ the demo package carries none of the four EU type-approval names or their codes, anywhere",
+   not any(n in _demo_txt for n in _EU4)
+   and not any(t in _demo_txt for t in ("N3 lorry", "N3 tractor", "TPMLM", "O4 semi", "O4 tipping", '"V07"', '"V10"', '"V11"', '"V12"')))
+ok("11 Oct 2026: ...no vehicle in it carries a code, an alias or a non-English label, and its planning list is the UK six, flagged",
+   not any(isinstance(v, dict) and (v.get("code") or v.get("aliases") or set(v.get("labels") or {}) - {"en"})
+           for v in F["vehicles"].values())
+   and F["planning_vehicles"][0] == "Rigid 8-wheeler (32t)" and len(F["planning_vehicles"]) == 6
+   and all(F["vehicles"][n].get("planning_vehicle") is True for n in F["planning_vehicles"]))
+ok("11 Oct 2026: the GB demo is offered English vehicle names only, so the header shows no language buttons",
+   main.meta()["vehicle_labels"]["langs"] == ["en"] and main.meta()["vehicle_labels"]["fallbacks"] == {})
 ok("/api/meta carries hidden_vehicles and the GB lead list", main.meta()["hidden_vehicles"] == hidden
    and main.meta()["planning_vehicles"] == lead)
 V = F["vehicles"]

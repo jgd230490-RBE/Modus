@@ -114,7 +114,8 @@ function monthKpis(m) {
     trips_per_vehicle_day: i === 3 ? 0 : 4 - (i % 2),   // R-004 unbaked on purpose
     payload_fallback: false,
   }));
-  return { month: m, unit: "vehicles", working_days: 22, lines, payload_fallback_vehicle: "V07" };
+  // NARROWED 11 Oct 2026 (EU vehicles removed): the fallback vehicle is the first planning vehicle, Rigid 8-wheeler (was V07)
+  return { month: m, unit: "vehicles", working_days: 22, lines, payload_fallback_vehicle: "Rigid 8-wheeler (32t)" };
 }
 function forecastMatrix() {
   return {

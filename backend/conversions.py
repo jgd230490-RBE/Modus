@@ -119,8 +119,10 @@ def vehicle_names(factors):
 def planning_vehicle_names(factors, country=None):
     """
     The vehicles that LEAD every picker, in order: the country's `vehicle_sets[..].lead`
-    when the tenant's country has one (H1: GB's UK trade names), else the four EU-named
-    planning vehicles in the order factors.json lists them.
+    when the tenant's country has one (H1: GB's UK trade names), else the document's own
+    planning vehicles in the order its top-level `planning_vehicles` lists them (the seed:
+    the six UK haulage trade names, Rigid 8-wheeler first, since 11 Oct 2026). The FIRST
+    name is also the payload fallback (derived.payload_for).
 
     Two sources on purpose, and they have to agree: the top-level `planning_vehicles`
     array carries the ORDER, and `planning_vehicle: true` on the entry itself is the
@@ -128,12 +130,27 @@ def planning_vehicle_names(factors, country=None):
     returned — it would otherwise reach a picker as an option that silently resolves to
     _default (20 t, 0.90 kg/km), which is the failure factors_diagnostics() exists to
     catch. An entry that is flagged but missing from the array is appended, so flagging
-    a fifth vehicle is one edit and forgetting the array is visible, not silent.
+    another vehicle is one edit and forgetting the array is visible, not silent.
+
+    11 Oct 2026 (the EU type-approval vehicles removed): NEVER an empty list while the
+    document has a vehicle a tenant can pick. Until then the seed's array named the four
+    EU entries, so the empty case never came from the seed; emptied, it would have left
+    every tenant without a vehicle set with no lead group and no named payload fallback.
+    Now, when the array and the flags give nothing (a document without them, or every
+    Planning tick taken off on Config), the lead list is the vehicles the material
+    categories list, in the
+    order they first appear (category by category, as factors.json orders them) — the
+    vehicles a tenant actually uses, and for the seed that puts Rigid 8-wheeler (32t)
+    first, the same first name the array gives. Not the file's vehicle order: that starts
+    with Rigid 7.5t (3.5 t), which would then become the payload every unknown vehicle
+    converts on. Hidden (the country's `hide`) and scenario-only (electric) profiles are
+    never in it — a picker does not offer them. Only when no category lists a usable
+    vehicle does it fall back to every usable vehicle in file order.
     """
     vs = factors.get("vehicles", {}) or {}
     known = [k for k in vs if not k.startswith("_")]
     # H1 (29 Sep 2026): a country with its own `vehicle_sets` entry leads with THAT list
-    # (GB: the UK trade names) and never with the EU N-category names it hides.
+    # (GB: the UK trade names) and never with the names it hides.
     cs = _country_set(factors, country)
     if cs and cs.get("lead"):
         return [n for n in cs["lead"] if n in known]
@@ -141,7 +158,18 @@ def planning_vehicle_names(factors, country=None):
     for k in known:
         if k not in out and (vs.get(k) or {}).get("planning_vehicle"):
             out.append(k)
-    return out
+    if out:
+        return out
+    # 11 Oct 2026: the never-empty fallback described above
+    hidden = set(hidden_vehicle_names(factors, country))
+    usable = [k for k in known if k not in hidden and not (vs.get(k) or {}).get("scenario_only")]
+    for cat, c in (factors.get("material_categories") or {}).items():
+        if cat.startswith("_") or not isinstance(c, dict):
+            continue
+        for n in c.get("vehicles") or []:
+            if n in usable and n not in out:
+                out.append(n)
+    return out or usable
 
 
 def _tenant_country_of(factors):
@@ -175,33 +203,67 @@ def hidden_vehicle_names(factors, country=None):
     return [n for n in (cs.get("hide") or []) if n in vs]
 
 
+# The label slots a factors document can carry, in the order the header lists them. "en" is
+# the one every vehicle in the seed carries. 11 Oct 2026 (the EU type-approval vehicles
+# removed from the seed): "eu" and "ee" stay READABLE here because a document saved before
+# then (the live demo's Config row, an older tenant package) still carries labels.eu on
+# those four entries, and its strings must keep resolving. Whether a slot is OFFERED is
+# decided per document — `langs` in vehicle_labels() — not by this tuple.
 VEHICLE_LANGS = ("en", "eu", "ee")
 
 
-def vehicle_labels(factors):
+def offered_vehicle_langs(factors, country=None):
     """
-    {vehicle_key: {"en": ..., "eu": ..., "ee": ...}} with every slot filled.
+    The label languages the app OFFERS this tenant (the header's vehicle-name buttons):
+    "en" always, then every other slot of VEHICLE_LANGS that at least one vehicle the
+    tenant is offered — not in its country's `hide` list — carries a non-blank label in.
 
-    A missing label falls back to the KEY — never to another language and never to an
-    invented trade name (the 2026-09-02 feedback is explicit: fall back to the EU string
-    rather than invent). The key is the canonical id a forecast line stores; a label only
-    changes what a picker shows. `fallbacks` says which slots were filled that way, so a
-    UI can mark them rather than pass a fallback off as a translation.
+    11 Oct 2026. Until then all three were always sent and the client gated them by
+    country. A language nobody's vehicle uses is now not offered at all: the seed's
+    vehicles carry English only, so a new organisation gets English alone and no buttons.
+    A document that still carries the EU entries keeps "eu" for a tenant that is offered
+    them (no country set, say); GB hides them, so GB gets English alone, as before.
     """
+    vs = factors.get("vehicles", {}) or {}
+    hidden = set(hidden_vehicle_names(factors, country))
+    used = set()
+    for k, v in vs.items():
+        if k.startswith("_") or k in hidden:
+            continue
+        lab = (v or {}).get("labels") or {}
+        for lang in VEHICLE_LANGS:
+            if isinstance(lab.get(lang), str) and lab[lang].strip():
+                used.add(lang)
+    return ["en"] + [l for l in VEHICLE_LANGS if l != "en" and l in used]
+
+
+def vehicle_labels(factors, country=None):
+    """
+    {"labels": {vehicle_key: {lang: text}}, "fallbacks": {vehicle_key: [lang]}, "langs": [...]}.
+
+    `langs` is offered_vehicle_langs() — the languages the app offers this tenant, English
+    always (11 Oct 2026: no longer every slot the code can read). Every vehicle carries
+    every OFFERED slot, filled; a missing label falls back to the KEY — never to another
+    language and never to an invented trade name (the 2026-09-02 feedback is explicit:
+    rather than invent, show the id). The key is the canonical id a forecast line stores;
+    a label only changes what a picker shows. `fallbacks` says which slots were filled
+    that way, so a UI can mark them rather than pass a fallback off as a translation.
+    """
+    langs = offered_vehicle_langs(factors, country)
     out, fallbacks = {}, {}
     for k, v in (factors.get("vehicles", {}) or {}).items():
         if k.startswith("_"):
             continue
         lab = (v or {}).get("labels") or {}
         out[k] = {}
-        for lang in VEHICLE_LANGS:
+        for lang in langs:
             val = (lab.get(lang) or "").strip() if isinstance(lab.get(lang), str) else ""
             if val:
                 out[k][lang] = val
             else:
                 out[k][lang] = k
                 fallbacks.setdefault(k, []).append(lang)
-    return {"labels": out, "fallbacks": fallbacks, "langs": list(VEHICLE_LANGS)}
+    return {"labels": out, "fallbacks": fallbacks, "langs": langs}
 
 
 def flat_factors(factors):

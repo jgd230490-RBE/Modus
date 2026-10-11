@@ -268,9 +268,18 @@ ok("params() on a document WITHOUT the block falls back to the file's, key by ke
    and fairprice.params({"fair_price": {"driver_eur_per_h": 25}})["running_eur_per_km"] == 0.12
    and fairprice.params({"fair_price": {"consumption": {"artic": {"l_per_100km_empty": 22}}}})["consumption"]["rigid"]["l_per_100km_empty"] == 27.0)
 V8 = "Rigid 8-wheeler (32t)"
-V12 = "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t"
+# NARROWED 11 Oct 2026 (EU vehicles removed): the seed's tractor + O4 semi (V12) is gone, and it never isolated
+# the O4 test anyway (its gvw, 40 t, passed the >= 36 t test too). A synthetic entry does: a tractor + O4 semi
+# under 36 t, with no "Artic" in its name, is an artic because of its category alone. R2 below runs on the
+# UK Artic Tipper (44t); the name V12 stays so every use reads the same.
+V12 = "Artic Tipper (44t)"
+_O4 = {"vehicles": {"Tractor + semi (34 t)": {"eu_category": "N3 + O4", "gvw_t": 34, "payload_t": 20},
+                    "Tractor + semi, O3 (30 t)": {"eu_category": "N3 + O3", "gvw_t": 30, "payload_t": 17},
+                    "Rigid N3 (34 t)": {"eu_category": "N3", "gvw_t": 34, "payload_t": 20}}}
 ok("vehicle_class: a rigid is 'rigid'; a tractor + O4 semi, a 44 t artic, are 'artic'; unknown ⇒ rigid",
    fairprice.vehicle_class(V8, FACT_FILE) == "rigid" and fairprice.vehicle_class(V12, FACT_FILE) == "artic"
+   and fairprice.vehicle_class("Tractor + semi (34 t)", _O4) == "artic" and fairprice.vehicle_class("Tractor + semi, O3 (30 t)", _O4) == "artic"
+   and fairprice.vehicle_class("Rigid N3 (34 t)", _O4) == "rigid"
    and fairprice.vehicle_class("Artic Tipper (44t)", FACT_FILE) == "artic" and fairprice.vehicle_class("Rigid 7.5t", FACT_FILE) == "rigid"
    and fairprice.vehicle_class("Ghost truck", FACT_FILE) == "rigid")
 ok("litres: rigid empty 27, with 20 t 35 (= 27 + 0.4 × 20), artic with 26 t 34.0 (= the ICCT figure)",
@@ -363,8 +372,10 @@ ok("...no quote, no target — fair is the ONLY figure on the line, and it is it
    d1["eur"] is None and d1["eur_adj"] is None and d1["fair_eur"] is not None and c1["rate_source"] is None)
 ok("...the cycle the model used is the line's own (context.cycle_min)", c1["fair"]["month"] == c1["month"]
    and abs(c1["fair"]["time_eur"] - round(c1["cycle_min"] / 60.0 * (20.0 + 16.0), 2)) < 0.011)
-ok("R2 (artic, 26 t) prices as an artic", L["WS2"]["context"]["vehicle_class"] == "artic"
-   and L["WS2"]["context"]["fair"]["l_per_100km_laden"] == 34.0)
+# NARROWED 11 Oct 2026 (EU vehicles removed): R2 runs on the Artic Tipper (44t), 29 t (was V12, 26 t, whose laden
+# figure was exactly the ICCT 34.0): laden = empty 23.6 + 0.4 × 29 = 35.2
+ok("R2 (artic, 29 t) prices as an artic", L["WS2"]["context"]["vehicle_class"] == "artic"
+   and abs(L["WS2"]["context"]["fair"]["l_per_100km_laden"] - 35.2) < 1e-9)
 ok("🔴 R3 (unbaked) has NO fair price — no distance, nothing invented", L["WS3"]["context"]["fair"] is None
    and all(d["derived"]["fair_eur"] is None for d in L["WS3"]["days"]) and L["WS3"]["week_derived"]["fair_eur"] is None)
 ok("week and totals sum the fair figure over the lines that have one: 2 of 3",
