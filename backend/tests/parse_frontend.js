@@ -1975,6 +1975,19 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && !/approved lines feed the route map|the KPI cards\."|forecasting dashboard and the public route map/.test(src));
 }
 
+// ---- 11 Oct 2026 — the Locations form's examples named an Estonian company and place -------------------
+// "e.g. OÜ Eesti Killustik" showed on the UK demo and in the guide's Locations picture (S11), and "e.g. Väo quarry" on
+// every new location. The examples are now any tenant's. Source-level: the whole file, comments included.
+{
+  const opIn = (src.match(/<input value=\{form\.vendor\} onChange=\{e => setField\("vendor", e\.target\.value\)\}\s+placeholder="([^"]*)"/) || [])[1];
+  const nameIn = (src.match(/<input value=\{form\.name\} onChange=\{e => setField\("name", e\.target\.value\)\} placeholder="([^"]*)"/) || [])[1];
+  ok("🔴 the Locations form's Operator / company example is no tenant's company (it was 'e.g. OÜ Eesti Killustik')",
+     opIn === "e.g. the company that runs the site", opIn);
+  ok("...nor is the Name example a place in Estonia (it was 'e.g. Väo quarry')", nameIn === "e.g. North quarry", nameIn);
+  ok("...and 'Eesti', 'Killustik' and 'Väo' are nowhere in frontend/index.html",
+     !/Eesti|Killustik|Väo/.test(html));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

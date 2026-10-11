@@ -7971,7 +7971,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <div className="text-sm font-medium text-slate-700">{form.id ? `Editing ${form.id}` : "New location"}</div>
                 <label className="block">
                   <span className="block text-sm font-medium text-slate-700 mb-1">Name</span>
-                  <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="e.g. Väo quarry"
+                  <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="e.g. North quarry"
                     className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -8068,12 +8068,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 {/* Operator and free-text detail. Salvaged out of a1_data.js before that
                     file was retired — the quarry operator existed nowhere else in the
-                    system — and editable here so it stays current. */}
+                    system — and editable here so it stays current.
+                    11 Oct 2026: the examples are any tenant's (they named an Estonian company and
+                    place, and showed on the UK demo and in the guide's Locations picture). */}
                 <div className="grid grid-cols-1 gap-2">
                   <label className="block">
                     <span className="block text-sm font-medium text-slate-700 mb-1">Operator / company</span>
                     <input value={form.vendor} onChange={e => setField("vendor", e.target.value)}
-                      placeholder="e.g. OÜ Eesti Killustik"
+                      placeholder="e.g. the company that runs the site"
                       className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                   </label>
                   <label className="block">

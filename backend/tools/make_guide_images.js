@@ -228,8 +228,8 @@ const HOLDERS = {
   S09: ["Horizon — week totals for this month and next", "Look-ahead › Horizon", "app"],
   S10: ["The Confirm week dialog", "Look-ahead › Commit next week › Confirm week", "app"],
   S11: ["Locations — the map and the edit form with gates and stock held", "Locations, a stockpile selected", "app"],
-  S12: ["Routes — a route expanded: bake status, analysis, alternatives, planning block", "Routes, a baked route expanded", "app"],
-  S13: ["Zones — a disruption zone and a haul road with speed and mode", "Zones, the demo haul road selected", "app"],
+  S12: ["Routes — a route opened: its haul roads, the closures check and the analysis table", "Routes, R001 opened and scrolled to its analysis table", "app"],
+  S13: ["Zones — a temporary haul road with its speed and mode", "Zones, the demo haul road selected", "app"],
   S14: ["Configuration — the Vehicles section", "Configuration › Vehicles", "app"],
   S15: ["The supplier PDF — one row per line, Monday to Friday, coordinates, route map", "Look-ahead › PDF, first page", "pdf"],
   // 11 Oct 2026: the Carbon planner's two pictures (guide §6)

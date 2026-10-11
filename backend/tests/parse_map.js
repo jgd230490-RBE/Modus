@@ -1552,9 +1552,11 @@ ok("§0915-3: the divisor comes from the feed, and there is exactly one of it",
   // the only place a month figure is divided by a day count
   && (code.match(/monthTotal \/ wd/g) || []).length === 1
   && !/\/\s*22\b/.test(code.replace(/FORECAST_WORKING_DAYS > 0 \? FORECAST_WORKING_DAYS : 22/g, "")));
+// NARROWED 11 Oct 2026: the total is now printed with British thousands separators
+// (Math.round(sum).toLocaleString('en-GB')); it still goes through unitWord(), never the bare unit
 ok("§0915-4: the timeline bar says trips, not vehicles — and only for the loads unit",
   /TL_UNIT_WORD = \{ vehicles: 'trips'/.test(code)
-  && /' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\)/.test(code)
+  && /' routes · '\+Math\.round\(sum\)\.toLocaleString\('en-GB'\)\+' '\+unitWord\(unit\)/.test(code)
   && !/' routes · '\+Math\.round\(sum\)\+' '\+unit;/.test(code)
   // a tonnage must NOT be called trips
   && /t: 't', m3: 'm³'/.test(code));
@@ -1880,6 +1882,43 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("...the Conditions step says it appears with the timeline and names a closure, not only a mass limit",
      gsM.includes("appears while the timeline is open") && gsM.includes("a road closure or limit on a route")
      && !/a route over a mass limit/.test(gsM));
+}
+
+// ---- 11 Oct 2026 — the timeline bar counted carriageways, not routes (the guide's M06 showed it) ----------------
+// A route is two features in routes-source (its out and back carriageways): the bar read "Oct 2026 · 36 routes ·
+// 13328 trips" beside the figures bar's "18 Routes". What these prove: renderMonthFrame, isolated and run on a stub
+// source, counts a route once, adds its month once, still stamps both carriageways, and prints 6,664. What they do not
+// prove: the label in a browser (the guide's M06 retake shows that).
+{
+  const i = code.indexOf("function renderMonthFrame(m){");
+  const j = code.indexOf("\n    function openTimeline", i);
+  const body = i >= 0 && j > i ? code.slice(i, j) : "";
+  ok("11 Oct: the timeline bar counts distinct routes (a Set of route ids), not features, and adds each route's month once",
+     body.includes("const counted=new Set();") && body.includes("if(!counted.has(rid)){ counted.add(rid); sum+=vol; }")
+     && body.includes("+counted.size+' routes · '+") && !/count\+\+/.test(body) && !/let count=0/.test(body));
+  ok("...and prints the total with British thousands separators",
+     body.includes("Math.round(sum).toLocaleString('en-GB')"));
+  let label = null, feats = null;
+  try {
+    const fn = new Function("map", "TL", "perWorkingDay", "monthLabel", "unitWord", "ensureForecastLayers", "ensureFlowLayer", "document",
+      body + "\nreturn renderMonthFrame;");
+    const line = (rid, type) => ({ geometry: { type: "LineString", coordinates: [[0, 0], [1, 1]] }, properties: { route_id: rid, type } });
+    feats = [line("R001", "Inbound Highway"), line("R001", "Outbound Highway"), line("R002", "Inbound Highway"),
+             line("R002", "Outbound Highway"), line("R003", "Inbound Highway"),
+             { geometry: { type: "Point", coordinates: [0, 0] }, properties: { type: "Node", name: "Quarry" } }];
+    const data = { features: feats };
+    const el = { textContent: "" };
+    fn({ getSource: () => ({ _data: data, setData: () => {} }) },
+       { matrix: { unit: "vehicles", byRoute: { r001: { monthly: { 10: 4000 } }, r002: { monthly: { 10: 2664 } }, r003: { monthly: {} } } } },
+       (v) => Math.round(v / 22), () => "Oct 2026", (u) => (u === "vehicles" ? "trips" : u), () => {}, () => {},
+       { getElementById: (id) => (id === "tl-label" ? el : null) })(10);
+    label = el.textContent;
+  } catch (e) { label = "threw: " + e.message; }
+  ok("⭐ ...run on two routes of two carriageways each and a third with no volume, it reads 2 routes and 6,664 trips",
+     label === "Oct 2026 · 2 routes · 6,664 trips", label);
+  ok("⭐ ...and both carriageways of each route are still stamped (both are drawn), the empty route is not",
+     !!feats && feats.slice(0, 4).every(f => f.properties.is_forecast === true && f.properties.f_month_total > 0)
+     && feats[4].properties.is_forecast === false);
 }
 
 console.log();

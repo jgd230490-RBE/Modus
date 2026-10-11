@@ -62,7 +62,9 @@
  * LOCAL copy of the demo (MODUS_OUT in the scratchpad), never against the live site. 11 Oct 2026, after the
  * review: the GPU launch and the blank-foot check on the map, en-GB and London time, S12 checked to hold the
  * analysis table, S15 drawn at the size shown, S05 with the rail folded, S08's caption to what it shows,
- * MODUS_SKIP (S14 by default). Dry-run again against the local copy only.
+ * MODUS_SKIP (S14 by default). Dry-run again against the local copy only. 11 Oct 2026, the second review: S12 and
+ * S13's captions to what they show, S12 checked to hold the route's haul roads, its closures line and the whole
+ * analysis table, S09 with the rail folded and checked to hold next month's last week. Local copy only.
  *
  * MODUS_LOCAL_LIBS=<dir>  (a test aid for machines without CDN access) serves React, ReactDOM,
  *    Babel, Chart.js and mapbox-gl from <dir>/node_modules and a prebuilt <dir>/tw.css in place
@@ -206,6 +208,31 @@ async function setRail(page, open) {
   if (!(await btn.count())) return;          // already as asked
   await btn.click({ timeout: 5000 });
   await sleep(700);
+}
+// 11 Oct 2026: where the words of a table's column end — its head and every body row on screen — against the right edge
+// of the box that scrolls the table sideways (the window's, if none does). The column itself may be wider than its words
+// and run on under the edge; its words may not. S05 checks its Status column, S09 its last week.
+async function columnWords(th) {
+  return th.evaluate((el) => {
+    const head = el.parentElement, col = [...head.cells].indexOf(el), t = el.closest("table");
+    let box = el.parentElement;
+    while (box && !(box.scrollWidth > box.clientWidth + 4 && /auto|scroll/.test(getComputedStyle(box).overflowX))) box = box.parentElement;
+    const bb = box ? box.getBoundingClientRect() : { right: window.innerWidth, bottom: window.innerHeight };
+    const edge = Math.min(window.innerWidth, bb.right), foot = Math.min(window.innerHeight, bb.bottom);
+    const cells = [el, ...[...t.tBodies[0].rows].filter(r => r.cells.length === head.cells.length).map(r => r.cells[col])];
+    let right = 0, n = 0;
+    for (const c of cells) {
+      const cr = c.getBoundingClientRect();
+      if (cr.top >= foot || cr.bottom <= 0) continue;
+      const w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT);
+      for (let x = w.nextNode(); x; x = w.nextNode()) {
+        if (!x.textContent.trim()) continue;
+        const rg = document.createRange(); rg.selectNodeContents(x);
+        for (const q of rg.getClientRects()) { right = Math.max(right, q.right); n++; }
+      }
+    }
+    return { ok: n > 1 && right <= edge + 1, right: Math.round(right), edge: Math.round(edge), text: el.innerText.trim() };
+  });
 }
 async function showGridTop(page) {
   await scrollUnderHeader(page, page.locator("div.grid.gap-4").first(), 8);
@@ -531,26 +558,7 @@ async function pdfFirstPage(context) {
     await setRail(page, false);
     const st = page.locator("thead th", { hasText: /^Status$/ }).first();
     await st.waitFor({ timeout: 15000 });
-    const fit = await st.evaluate((el) => {
-      const head = el.parentElement, col = [...head.cells].indexOf(el), t = el.closest("table");
-      let box = el.parentElement;
-      while (box && !(box.scrollWidth > box.clientWidth + 4 && /auto|scroll/.test(getComputedStyle(box).overflowX))) box = box.parentElement;
-      const bb = box ? box.getBoundingClientRect() : { right: window.innerWidth, bottom: window.innerHeight };
-      const edge = Math.min(window.innerWidth, bb.right), foot = Math.min(window.innerHeight, bb.bottom);
-      const cells = [el, ...[...t.tBodies[0].rows].filter(r => r.cells.length === head.cells.length).map(r => r.cells[col])];
-      let right = 0, n = 0;
-      for (const c of cells) {
-        const cr = c.getBoundingClientRect();
-        if (cr.top >= foot || cr.bottom <= 0) continue;
-        const w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT);
-        for (let x = w.nextNode(); x; x = w.nextNode()) {
-          if (!x.textContent.trim()) continue;
-          const rg = document.createRange(); rg.selectNodeContents(x);
-          for (const q of rg.getClientRects()) { right = Math.max(right, q.right); n++; }
-        }
-      }
-      return { ok: n > 1 && right <= edge + 1, right: Math.round(right), edge: Math.round(edge) };
-    });
+    const fit = await columnWords(st);
     if (!fit.ok) throw new Error(`the Status column is cut off (its words end at ${fit.right} px, the table's box at ${fit.edge} px)`);
   });
   try { await setRail(page, true); }
@@ -570,10 +578,24 @@ async function pdfFirstPage(context) {
     await page.waitForLoadState("networkidle").catch(() => {});
     await sleep(3500);       // the week's map draws from its own fetch
   });
-  // S08 — Account (last week) · S09 — Horizon. 11 Oct 2026: S08 shows the top of the lines table; the Stockpiles block
+  // S08 — Account (last week). 11 Oct 2026: S08 shows the top of the lines table; the Stockpiles block
   // lies ~1,700 px under it (18 lines on the demo), so the caption no longer promises it (it said "and the Stockpiles block")
   await shot(page, "S08", () => lookahead(page, "Account"));
-  await shot(page, "S09", () => lookahead(page, "Horizon"));
+  // S09 — Horizon: this month's weeks and next month's. 11 Oct 2026 (second review): beside the open rail the nine week
+  // columns (~1,295 px) overflowed the table's box (~1,176 px) and next month's last week was cut off, so the rail is
+  // folded for this picture as for S05 and opened again after it, whatever happened. The shot fails unless the last
+  // column is a week and its words, in its head and in every row on screen, end inside the table's box.
+  await shot(page, "S09", async () => {
+    await lookahead(page, "Horizon");
+    await setRail(page, false);
+    const lastWeek = page.locator("thead tr", { has: page.locator("th", { hasText: /^Line/ }) }).first().locator("th").last();
+    await lastWeek.waitFor({ timeout: 15000 });
+    const fit = await columnWords(lastWeek);
+    if (!/^W\d/.test(fit.text)) throw new Error(`the Horizon table's last column is not a week (it reads "${fit.text.split("\n")[0]}")`);
+    if (!fit.ok) throw new Error(`the last week column is cut off (its words end at ${fit.right} px, the table's box at ${fit.edge} px)`);
+  });
+  try { await setRail(page, true); }
+  catch (e) { console.error("the rail would not open again after S09:", first(e)); }
   // S10 — the Confirm week dialog, opened and CANCELLED
   await shot(page, "S10", async () => {
     await lookahead(page, "commit");
@@ -598,10 +620,16 @@ async function pdfFirstPage(context) {
     await showGridTop(page);
     await scrollPanelTo(page, "Stock held");
   });
-  // S12 — Routes: R001 selected (red on the map) and expanded. The list scrolls in its own box (40 % of the
+  // S12 — Routes: R001 selected (red on the map) and opened (▶). The list scrolls in its own box (40 % of the
   // window) inside the page: both are scrolled to the analysis table, the vehicle × primary/alternative rows.
   // 11 Oct 2026: aimed with scrollUnderHeader (the page used to be left where the shots before had scrolled it), and
   // the shot fails unless the table's head and first row are inside the picture and inside the list's box.
+  // 11 Oct 2026 (second review): the opened route is ~480 px tall (its gates, haul roads, closures line, the table and
+  // its notes) and the box shows ~256 px under its own sticky head, so R001's row and its bake chips cannot be in the
+  // same picture as the table. The caption now says what the picture holds: the route's haul roads, the closures check
+  // and the analysis table. The box is scrolled so the table's LAST row sits just above its foot, and the shot fails
+  // unless the "Temporary haul roads on this route" heading, the closures line and every row of the table are inside
+  // the picture and inside the box.
   await shot(page, "S12", async () => {
     await dataPage(page, "routes", "Routes", "R001");
     const row = page.locator("tbody tr", { hasText: "R001" }).first();
@@ -609,21 +637,38 @@ async function pdfFirstPage(context) {
     await page.waitForLoadState("networkidle").catch(() => {});
     const th = page.locator("th", { hasText: /^Option$/ }).first();
     await th.waitFor({ timeout: 20000 });
+    // the closures line reads "Checking road restrictions…" until the server has answered
+    await page.waitForFunction(() => ![...document.querySelectorAll("p")].some(p => /^Checking road restrictions/.test(p.textContent.trim())), null, { timeout: 30000 })
+      .catch(() => {});
     await sleep(1500);
     await scrollUnderHeader(page, th, 150);
     const at = await th.evaluate((el, [top, H]) => {
-      const t = el.closest("table"), head = t.tHead.getBoundingClientRect(), r1 = t.tBodies[0] && t.tBodies[0].rows[0];
+      const t = el.closest("table"), rows = t.tBodies[0] ? [...t.tBodies[0].rows] : [], r1 = rows[rows.length - 1];
       let box = t.parentElement;
       while (box && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+      // the table's last row 6 px above the foot of the box (or of the window)
+      if (box && r1) box.scrollTop += r1.getBoundingClientRect().bottom - (Math.min(H, box.getBoundingClientRect().bottom) - 6);
+      const head = t.tHead.getBoundingClientRect();
       const b = box ? box.getBoundingClientRect() : { top: 0, bottom: H };
       const sticky = box && box.querySelector("thead.sticky");          // the list's own head stays over its top
       const lo = Math.max(top, b.top + (sticky ? sticky.getBoundingClientRect().height : 0)), hi = Math.min(H, b.bottom);
       const end = r1 ? r1.getBoundingClientRect().bottom : Infinity;
-      return { ok: head.top >= lo - 1 && end <= hi + 1, head: Math.round(head.top), end: Math.round(end), lo: Math.round(lo), hi: Math.round(hi) };
+      // what the caption names above the table, in the opened route's own cell
+      const cell = el.closest("td");
+      const haul = cell && [...cell.querySelectorAll("span")].find(s => /^Temporary haul roads on this route$/i.test(s.textContent.trim()));
+      const closures = cell && [...cell.querySelectorAll("p, button > span")].find(s => /planned closures|road restrictions/i.test(s.textContent)
+        && !/^Checking road restrictions/.test(s.textContent.trim()));
+      const top0 = (e) => e ? Math.round(e.getBoundingClientRect().top) : null;
+      const inside = (e) => e && e.getBoundingClientRect().top >= lo - 1 && e.getBoundingClientRect().bottom <= hi + 1;
+      return { ok: head.top >= lo - 1 && end <= hi + 1, head: Math.round(head.top), end: Math.round(end), lo: Math.round(lo), hi: Math.round(hi),
+               rows: rows.length, haul: !!haul, haulIn: inside(haul), haulAt: top0(haul), closures: !!closures, closuresIn: inside(closures), closuresAt: top0(closures) };
     }, [TOP, VIEW.height]);
-    if (!at.ok) throw new Error(`the analysis table is not inside the picture (its head at ${at.head} px and its first row ending at ${at.end} px; the picture shows ${at.lo}–${at.hi} px of it)`);
+    if (!at.ok) throw new Error(`the analysis table is not inside the picture (its head at ${at.head} px and its last row ending at ${at.end} px; the picture shows ${at.lo}–${at.hi} px of it)`);
+    if (!at.haul || !at.haulIn) throw new Error(`the route's haul roads are not in the picture (${at.haul ? "their heading is at " + at.haulAt + " px" : "the route has no haul-road block"}; the picture shows ${at.lo}–${at.hi} px of the list)`);
+    if (!at.closures || !at.closuresIn) throw new Error(`the closures check is not in the picture (${at.closures ? "its line is at " + at.closuresAt + " px" : "the route shows no closures line"})`);
   });
-  // S13 — Zones: the demo's haul road in the form
+  // S13 — Zones: the demo's haul road in the form. 11 Oct 2026 (second review): the caption names the haul road only (its
+  // speed and mode); no zone outline is in the map's frame and the demo's one disruption zone is a list row at the foot
   await shot(page, "S13", async () => {
     await dataPage(page, "zones", "Zones", "Langton haul road", "Temporary haul road");
     await showGridTop(page);

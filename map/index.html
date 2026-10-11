@@ -4004,14 +4004,19 @@
     }
     function renderMonthFrame(m){
         const src=map.getSource('routes-source'); if(!src||!TL.matrix) return;
-        const data=src._data, byR=TL.matrix.byRoute, unit=TL.matrix.unit; let count=0, sum=0;
+        const data=src._data, byR=TL.matrix.byRoute, unit=TL.matrix.unit; let sum=0;
+        // 11 Oct 2026: a route is drawn as two features (its out and back carriageways), and the bar counted
+        // features: "36 routes · 13328 trips" beside the figures bar's 18 routes, the month added twice.
+        // Every feature is still stamped (both carriageways are drawn); each route is counted, and its
+        // month added, once.
+        const counted=new Set();
         data.features.forEach(f=>{
             if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString'){
                 const rid=(f.properties.route_id||'').toString().trim().toLowerCase();
                 const rt=rid&&byR[rid]; const vol=rt?((rt.monthly||{})[m]||0):0;
                 // 15 Sep: f_avg is the DAILY rate for this month, not the month's total.
                 // f_month_total keeps the month figure for the popup and detail table.
-                if(vol>0){ f.properties.is_forecast=true; f.properties.f_avg=perWorkingDay(vol); f.properties.f_month_total=Math.round(vol); f.properties.f_unit=unit; f.properties.f_time=monthLabel(m); count++; sum+=vol; }
+                if(vol>0){ f.properties.is_forecast=true; f.properties.f_avg=perWorkingDay(vol); f.properties.f_month_total=Math.round(vol); f.properties.f_unit=unit; f.properties.f_time=monthLabel(m); if(!counted.has(rid)){ counted.add(rid); sum+=vol; } }
                 else f.properties.is_forecast=false;
             }
         });
@@ -4021,7 +4026,8 @@
         // m³, and "4 444 trips" over a tonnage would be a lie. Only the vehicle-loads
         // unit is renamed, and it is renamed to the word the rest of the product already
         // uses (the Dashboard's TRIPS card, the KPI card's "101 trips/d").
-        const lbl=document.getElementById('tl-label'); if(lbl) lbl.textContent = monthLabel(m)+' · '+count+' routes · '+Math.round(sum)+' '+unitWord(unit);
+        // 11 Oct 2026: the total with British thousands separators (6,664, not 6664).
+        const lbl=document.getElementById('tl-label'); if(lbl) lbl.textContent = monthLabel(m)+' · '+counted.size+' routes · '+Math.round(sum).toLocaleString('en-GB')+' '+unitWord(unit);
     }
     function openTimeline(){
         TL.on=true;

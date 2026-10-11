@@ -732,6 +732,59 @@ ok("S08's caption says what its picture shows (the Stockpiles block is below it)
    _caps.get("S08") == _S08 and _appc.get("S08") == _S08 and _holders.get("S08") == _S08
    and '<img src="media/S08.png" alt="%s"' % _S08 in src and "the Stockpiles block" not in _caps.get("S08", "x"))
 
+# =========================================================================== #
+#  11 Oct 2026 — the second review of the capture script                        #
+#  (branch claude/guide-screenshots)                                            #
+# =========================================================================== #
+# What these prove: S12 and S13's captions say what their pictures show, wherever a caption is written; S12 fails unless
+# the route's haul roads, its closures line and every row of the analysis table are in the picture; S09 folds the rail
+# and fails unless next month's last week is whole. What they do not prove: the live pictures (dry-run locally only).
+_S12 = "Routes — a route opened: its haul roads, the closures check and the analysis table"
+_S13 = "Zones — a temporary haul road with its speed and mode"
+# NARROWED 11 Oct 2026: S12's caption promised "bake status, analysis, alternatives, planning block". The opened route is
+# ~480 px tall and the list's box shows ~256 px under its sticky head, so R001's row (its bake chips) is above the picture,
+# and no alternatives or planning block are in it; it says what the picture shows
+ok("S12's caption says what its picture shows (no bake status, alternatives or planning block), in the figure, its alt "
+   "text, Appendix C and the placeholder",
+   _caps.get("S12") == _S12 and _appc.get("S12") == _S12 and _holders.get("S12") == _S12
+   and '<img src="media/S12.png" alt="%s"' % _S12 in src
+   and "bake status" not in src and "planning block" not in src and "planning block" not in gen_src)
+# NARROWED 11 Oct 2026: S13's caption promised "a disruption zone and a haul road"; no zone outline is in the map's frame
+# and the demo's one disruption zone is a list row cut off at the foot, so it names the haul road only
+ok("S13's caption names the haul road with its speed and mode only (no zone is in the picture), in the figure, its alt "
+   "text, Appendix C and the placeholder",
+   _caps.get("S13") == _S13 and _appc.get("S13") == _S13 and _holders.get("S13") == _S13
+   and '<img src="media/S13.png" alt="%s"' % _S13 in src
+   and "a disruption zone and a haul road" not in src and "a disruption zone and a haul road" not in gen_src)
+ok("\U0001f534 S12 scrolls the list so the analysis table's LAST row sits at the box's foot, and fails unless that row, the "
+   "route's haul-road heading and its closures line (once checked) are inside the picture and the box",
+   "r1 = rows[rows.length - 1]" in _s12
+   and "box.scrollTop += r1.getBoundingClientRect().bottom - (Math.min(H, box.getBoundingClientRect().bottom) - 6);" in _s12
+   and _s12.find("await scrollUnderHeader(page, th, 150);") < _s12.find("box.scrollTop += r1")
+   and "/^Temporary haul roads on this route$/i" in _s12 and "the route's haul roads are not in the picture" in _s12
+   and "/planned closures|road restrictions/i" in _s12 and "the closures check is not in the picture" in _s12
+   and "/^Checking road restrictions/.test(p.textContent.trim())" in _s12
+   and "if (!at.haul || !at.haulIn)" in _s12 and "if (!at.closures || !at.closuresIn)" in _s12
+   and "Temporary haul roads on this route" in fe_src
+   and "planned closures (current or future) within ${data.match_m} m of this route." in fe_src
+   and '{dated ? "Planned closures on this route" : "Road restrictions on this route"}' in fe_src
+   and "Checking road restrictions…" in fe_src)
+_s09 = cap_src[cap_src.find('await shot(page, "S09"'):cap_src.find('await shot(page, "S10"')]
+_colw = cap_src[cap_src.find("async function columnWords(th)"):cap_src.find("async function showGridTop(")]
+ok("S09 folds the rail as S05 does, opens it again after the shot whatever happened, and fails unless the Horizon's last "
+   "column is a week whose words end inside the table's box",
+   'await lookahead(page, "Horizon");' in _s09 and "await setRail(page, false);" in _s09
+   and "try { await setRail(page, true); }" in _s09
+   and _s09.find("setRail(page, false)") < _s09.find("columnWords(lastWeek)") < _s09.find("try { await setRail(page, true); }")
+   and "/^W\\d/.test(fit.text)" in _s09 and "the last week column is cut off" in _s09
+   and '<table className="text-sm" style={{ minWidth: 1300 }}>' in fe_src
+   and "W{w} · {weekSpanLbl(horizon, m, w)}" in fe_src)
+ok("...S05 and S09 share one column check: the words of the column's head and of every row on screen, against the right "
+   "edge of the box that scrolls the table sideways",
+   bool(_colw) and "createTreeWalker(c, NodeFilter.SHOW_TEXT)" in _colw and "right <= edge + 1" in _colw
+   and "n > 1" in _colw and "await columnWords(st);" in _s05 and "await columnWords(lastWeek);" in _s09
+   and cap_src.count("createTreeWalker") == 1)
+
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
