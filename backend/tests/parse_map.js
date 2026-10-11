@@ -472,8 +472,9 @@ ok("REBRAND (29 Sep): the retired G2 ink #0F172A is gone from the map, its confi
 ok("REBRAND: the map's brand ink is #1F2024 and its forecast routes stay blue (no orange on the map)",
   /brandDark:\s+"#1F2024"/.test(cfgSrc) && /forecastCasing:\s+"#1F2024"/.test(cfgSrc)
   && /brand:\s+"#2563EB"/.test(cfgSrc) && /forecast:\s+"#3B82F6"/.test(cfgSrc) && !/#FF8C14/i.test(cfgSrc));
+// 11 Oct 2026 NARROWED (the user): "corridor map" is now "public map" wherever a person reads the name
 ok("REBRAND: the map is titled Wayscope, defaults its tenant to Wayscope, and never says Modus",
-  /<title>Wayscope — corridor map<\/title>/.test(html) && /let TENANT = \{ name: 'Wayscope',/.test(code)
+  /<title>Wayscope — public map<\/title>/.test(html) && !/<title>[^<]*corridor map/i.test(html) && /let TENANT = \{ name: 'Wayscope',/.test(code)
   && !/\bModus\b/.test(html) && !/\bModus\b/.test(iptSrc) && !/\bModus\b/.test(cfgSrc));
 ok("REBRAND: the map's head carries the favicon links and the ink theme-color",
   /<link rel="icon" href="\/favicon\.ico" sizes="32x32">/.test(html) && /<link rel="manifest" href="\/site\.webmanifest">/.test(html)

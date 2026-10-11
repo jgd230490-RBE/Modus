@@ -879,6 +879,43 @@ ok("the three gate pages are titled Wayscope, carry the stacked logo, and no RBE
 ok("...and the gate pages use the Wayscope ink, not the RBE navy",
    "background:#1F2024" in main._GATE_CSS and not any(h.lower() in main._GATE_CSS.lower() for h in OLD))
 ok("FastAPI's app title is Wayscope", 'FastAPI(title="Wayscope"' in main_code)
+# 11 Oct 2026 (the user): the login boxes match the finalised theme, carry a show-password eye, and the
+# map is called the public map.
+ok("the gate pages use the finalised theme: orange action button, warm neutrals, orange focus ring; no blue button",
+   "background:#C2410C" in main._GATE_CSS and "outline:2px solid #C2410C" in main._GATE_CSS
+   and "border:1px solid #D6D3D1" in main._GATE_CSS and "background:#2563EB" not in main._GATE_CSS
+   and "color:#64748B" not in main._GATE_CSS)
+ok("the map password page is titled 'Public map', says it is shared by password, and has a show / hide eye",
+   "<h1>Public map</h1>" in main._MAP_PASSWORD_PAGE and "Corridor map" not in main._MAP_PASSWORD_PAGE
+   and "This map is not public" not in main._MAP_PASSWORD_PAGE
+   and 'class="pw-eye" id="eye" aria-label="Show password" aria-pressed="false"' in main._MAP_PASSWORD_PAGE
+   and "p.type = show ? 'text' : 'password';" in main._MAP_PASSWORD_PAGE
+   and "this.setAttribute('aria-label', show ? 'Hide password' : 'Show password');" in main._MAP_PASSWORD_PAGE)
+
+# 11 Oct 2026: the map password page carries the tenant's demo notice (a visitor without the
+# password saw no "fictional demo scheme" anywhere after PR #20 hid the header badge on the map).
+_ts = main.config.tenant_settings
+try:
+    main.config.tenant_settings = lambda *a, **k: {"demo_notice": "Fictional demo scheme · <nothing> here is real"}
+    _demo_pg = main._map_password_page()
+    main.config.tenant_settings = lambda *a, **k: {"demo_notice": None}
+    _real_pg = main._map_password_page()
+    def _boom(*a, **k): raise RuntimeError("no database")
+    main.config.tenant_settings = _boom
+    _err_pg = main._map_password_page()
+finally:
+    main.config.tenant_settings = _ts
+ok("⭐ the map password page shows the demo tenant's notice, escaped, above the logo",
+   '<div class="demo-notice">Fictional demo scheme · &lt;nothing&gt; here is real</div>' in _demo_pg
+   and _demo_pg.index('class="demo-notice"') < _demo_pg.index('class="logo"'))
+ok("...a real tenant (no notice) gets no notice box and no leftover marker",
+   'class="demo-notice"' not in _real_pg and "<!--demo-notice-->" not in _real_pg
+   and _real_pg.replace("\n", "") == main._MAP_PASSWORD_PAGE.replace("<!--demo-notice-->", "").replace("\n", ""))
+ok("...and a tenant read that fails still serves the password page, without a notice",
+   'id="p" name="p" type="password"' in _err_pg and 'class="demo-notice"' not in _err_pg)
+ok("🔴 the gate serves the page through _map_password_page(), not the bare constant",
+   "_HTML(_map_password_page(), status_code=401)" in main_code
+   and "_HTML(_MAP_PASSWORD_PAGE, status_code=401)" not in main_code)
 
 # the staff app: head links, tokens, the header
 _ICON_LINKS = ('<link rel="icon" href="/favicon.ico" sizes="32x32">',

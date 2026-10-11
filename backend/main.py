@@ -11,6 +11,7 @@ forecasting app are always in sync — no CSV files to keep up to date.
 """
 import json
 import os
+from html import escape as _html_escape
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
@@ -138,25 +139,36 @@ app.add_middleware(
 # Wayscope theme (29 Sep 2026): ink background, white box, blue for the control, the
 # stacked logo above the box. Orange appears only in the logo itself.
 _GATE_CSS = """
+  /* 11 Oct 2026 — the finalised theme (the staff app's shell): ink page, white box, warm neutrals,
+     the orange action button with white text, 14 px labels above the inputs, an orange focus ring. */
   :root { color-scheme: light; }
   body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center;
          justify-content:center; gap:22px; background:#1F2024; color:#fff;
-         font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+         font:15px/1.5 Inter,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
   .logo { width:min(60vw,150px); height:auto; display:block; }
-  .box { width:min(92vw,380px); background:#fff; color:#1F2024; border-radius:10px;
+  .box { width:min(92vw,380px); box-sizing:border-box; background:#fff; color:#1F2024; border-radius:10px;
          padding:28px 26px; box-shadow:0 10px 40px rgba(0,0,0,.45); }
-  h1 { margin:0 0 6px; font-size:19px; color:#1F2024; }
-  p  { margin:0 0 18px; font-size:13.5px; color:#64748B; }
-  label { display:block; font-size:12px; font-weight:600; color:#1F2024; margin-bottom:6px; }
-  input { width:100%; box-sizing:border-box; padding:10px 12px; font-size:15px;
-          border:1px solid #E2E8F0; border-radius:6px; }
-  input:focus { outline:2px solid #2563EB; outline-offset:1px; border-color:#2563EB; }
-  button { margin-top:14px; width:100%; padding:11px; font-size:15px; font-weight:600;
-           color:#fff; background:#2563EB; border:0; border-radius:6px; cursor:pointer; }
-  button:hover { background:#1D4ED8; }
+  h1 { margin:0 0 4px; font-size:20px; font-weight:600; color:#1F2024; }
+  p  { margin:0 0 20px; font-size:14px; color:#78716C; }
+  label { display:block; font-size:14px; font-weight:500; color:#1F2024; margin-bottom:6px; }
+  input { width:100%; box-sizing:border-box; padding:10px 12px; font:inherit; font-size:15px; color:#1F2024;
+          background:#fff; border:1px solid #D6D3D1; border-radius:6px; }
+  input:focus { outline:2px solid #C2410C; outline-offset:1px; border-color:#C2410C; }
+  button { margin-top:16px; width:100%; padding:11px; font:inherit; font-size:15px; font-weight:600;
+           color:#fff; background:#C2410C; border:0; border-radius:6px; cursor:pointer; }
+  button:hover { background:#9A3412; }
+  button:focus-visible { outline:2px solid #C2410C; outline-offset:2px; }
+  .pw-wrap { position:relative; }
+  .pw-wrap input { padding-right:46px; }
+  .pw-eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:38px; height:38px;
+            margin:0; padding:0; display:grid; place-items:center; color:#78716C; background:none; border-radius:6px; }
+  .pw-eye:hover { background:#F5F5F4; color:#1F2024; }
   .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
-  .foot { margin-top:16px; font-size:12px; color:#64748B; }
+  .foot { margin-top:18px; font-size:13px; color:#78716C; }
   a { color:#2563EB; }
+  .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:999px;
+                 background:#FFF7ED; color:#9A3412; border:1px solid #FDBA74; text-align:center;
+                 font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
 """
 _GATE_HEAD = """<link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -167,13 +179,17 @@ _GATE_LOGO = """<img class="logo" src="/brand/logo-stacked-on-dark.svg" alt="Way
 _MAP_PASSWORD_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Wayscope — map access</title>%s<style>%s</style>
+<!--demo-notice-->
 %s
 <div class="box">
-  <h1>Corridor map</h1>
-  <p>This map is not public. Enter the access password you were given.</p>
+  <h1>Public map</h1>
+  <p>This map is shared by password. Enter the one you were given.</p>
   <form id="f" autocomplete="off">
     <label for="p">Password</label>
-    <input id="p" name="p" type="password" autofocus>
+    <div class="pw-wrap">
+      <input id="p" name="p" type="password" autofocus>
+      <button type="button" class="pw-eye" id="eye" aria-label="Show password" aria-pressed="false" title="Show password"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
     <button type="submit">Open the map</button>
     <div class="err" id="e">That password was not recognised.</div>
   </form>
@@ -181,6 +197,17 @@ _MAP_PASSWORD_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
   the map opens with it.</div>
 </div>
 <script>
+// 11 Oct 2026: show / hide the password (the eye in the box)
+var EYE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>', EYE_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2"/><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+document.getElementById('eye').addEventListener('click', function () {
+  var p = document.getElementById('p'), show = p.type === 'password';
+  p.type = show ? 'text' : 'password';
+  this.innerHTML = show ? EYE_OFF : EYE;
+  this.setAttribute('aria-pressed', show ? 'true' : 'false');
+  this.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  this.title = show ? 'Hide password' : 'Show password';
+  p.focus();
+});
 document.getElementById('f').addEventListener('submit', async function (ev) {
   ev.preventDefault();
   var e = document.getElementById('e'); e.style.display = 'none';
@@ -191,6 +218,20 @@ document.getElementById('f').addEventListener('submit', async function (ev) {
   if (r.ok) { location.reload(); } else { e.style.display = 'block'; }
 });
 </script></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
+
+
+def _map_password_page():
+    """The password page with the tenant's demo notice above the logo, when it has one.
+
+    11 Oct 2026: a visitor without the map password saw no "fictional demo scheme" anywhere,
+    because the app's header badge hides while the embedded map is on screen (PR #20) and the
+    map's own strip sits behind this page. A real tenant has no notice, so the slot is empty."""
+    try:
+        dn = config.tenant_settings(conversions).get("demo_notice")
+    except Exception:
+        dn = None
+    note = '<div class="demo-notice">%s</div>' % _html_escape(dn) if dn else ""
+    return _MAP_PASSWORD_PAGE.replace("<!--demo-notice-->", note, 1)
 
 _HELP_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -240,7 +281,7 @@ if _Request is not None and hasattr(app, "middleware"):
     def _gate_refusal(decision, path):
         doc = gate.is_document(path)
         if decision == gate.NEED_MAP_PASSWORD:
-            return _HTML(_MAP_PASSWORD_PAGE, status_code=401) if doc else _JSON(
+            return _HTML(_map_password_page(), status_code=401) if doc else _JSON(
                 {"detail": "the map is password protected"}, status_code=401)
         if decision == gate.NEED_STAFF:
             return _HTML(_HELP_SIGNIN_PAGE, status_code=401) if doc else _JSON(
