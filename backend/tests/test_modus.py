@@ -879,6 +879,18 @@ ok("the three gate pages are titled Wayscope, carry the stacked logo, and no RBE
 ok("...and the gate pages use the Wayscope ink, not the RBE navy",
    "background:#1F2024" in main._GATE_CSS and not any(h.lower() in main._GATE_CSS.lower() for h in OLD))
 ok("FastAPI's app title is Wayscope", 'FastAPI(title="Wayscope"' in main_code)
+# 11 Oct 2026 (the user): the login boxes match the finalised theme, carry a show-password eye, and the
+# map is called the public map.
+ok("the gate pages use the finalised theme: orange action button, warm neutrals, orange focus ring; no blue button",
+   "background:#C2410C" in main._GATE_CSS and "outline:2px solid #C2410C" in main._GATE_CSS
+   and "border:1px solid #D6D3D1" in main._GATE_CSS and "background:#2563EB" not in main._GATE_CSS
+   and "color:#64748B" not in main._GATE_CSS)
+ok("the map password page is titled 'Public map', says it is shared by password, and has a show / hide eye",
+   "<h1>Public map</h1>" in main._MAP_PASSWORD_PAGE and "Corridor map" not in main._MAP_PASSWORD_PAGE
+   and "This map is not public" not in main._MAP_PASSWORD_PAGE
+   and 'class="pw-eye" id="eye" aria-label="Show password" aria-pressed="false"' in main._MAP_PASSWORD_PAGE
+   and "p.type = show ? 'text' : 'password';" in main._MAP_PASSWORD_PAGE
+   and "this.setAttribute('aria-label', show ? 'Hide password' : 'Show password');" in main._MAP_PASSWORD_PAGE)
 
 # 11 Oct 2026: the map password page carries the tenant's demo notice (a visitor without the
 # password saw no "fictional demo scheme" anywhere after PR #20 hid the header badge on the map).

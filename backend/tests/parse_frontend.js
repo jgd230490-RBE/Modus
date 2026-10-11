@@ -1444,6 +1444,17 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       && !/Toggle <span|Approved haul-route forecasts|Submit a forecast/.test(pm.replace(/\/\/.*$/gm, ""))
       && code.includes('onClick={() => setView("login")}'));
   }
+  {
+    const lg = (src.match(/function Login\(\{ onSignIn, onBack, savedName \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    ok("11 Oct: the staff sign-in uses the finalised theme — tokens, labels above, orange focus and button; no blue focus ring, no navy button",
+      lg.includes('<div className="auth-card">') && lg.includes('className="btn-pri auth-go"') && lg.includes('<label htmlFor="auth-code">Access code</label>')
+      && !/focus:ring-\[color:var\(--blue\)\]/.test(lg) && !/background:"var\(--navy\)"/.test(lg)
+      && /\.auth-input:focus\{outline:2px solid var\(--action\);/.test(html));
+    ok("11 Oct: the access code has a show / hide eye that flips the input type and its label",
+      lg.includes('type={show ? "text" : "password"}') && lg.includes("onClick={() => setShow(s => !s)}")
+      && lg.includes('aria-label={show ? "Hide access code" : "Show access code"}') && lg.includes("aria-pressed={show}")
+      && lg.includes('placeholder="Access code"'));
+  }
   // 5. the shared components
   ok("the empty-state family: one EmptyState with a kind, marked data-empty, no dashed border; a SkeletonTable; StatusWord; AppliedChips",
     code.includes("function EmptyState({ title, body, action, kind })") && code.includes('data-empty={k}') && !code.includes("border-dashed")

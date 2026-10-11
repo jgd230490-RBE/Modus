@@ -148,7 +148,7 @@ ok("...and the row holds NO code and NO raw IP",
 page = dr.access_page(r["name"], r["codes"])
 ok("⭐ the on-screen page carries the demo link, both codes, the fictional sentence and the three things to try",
    dr.DEMO_URL in page and "map-pass-abc" in page and "north-team-code" in page and "fictional" in page
-   and "Dashboard" in page and "Look-ahead" in page and "Corridor map" in page and "Hello Ada" in page)
+   and "Dashboard" in page and "Look-ahead" in page and "Public map" in page and "Corridor map" not in page and "Hello Ada" in page)   # 11 Oct 2026 NARROWED: renamed
 ok("...and never the planner / admin code or the admin token",
    not any(s in page for s in ("planner-secret-xyz", "admin-secret-xyz", "adm-token-for-tests")))
 ok("...it is noindex, links the privacy notice and loads no script",
@@ -234,7 +234,7 @@ try:
         ok(f"⭐ the {label} part carries the demo link, BOTH codes, the fictional sentence, the three things to try and the privacy link",
            dr.DEMO_URL in part and "map-pass-abc" in part and "north-team-code" in part
            and "fictional highways scheme" in part and "shared with everyone viewing the demo" in part
-           and "Dashboard" in part and "Look-ahead" in part and "Corridor map" in part
+           and "Dashboard" in part and "Look-ahead" in part and "Public map" in part and "Corridor map" not in part
            and "https://wayscope.co.uk/privacy.html" in part and "Hello Ada" in part)
         ok(f"🔴 the {label} part never carries the planner code, the admin code or the admin token",
            not any(x in part for x in ("planner-secret-xyz", "admin-secret-xyz", "adm-token-for-tests", "PLANNER_CODE", "ADMIN")))
