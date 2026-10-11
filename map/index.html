@@ -65,6 +65,19 @@
                   transition:left .25s ease; }
         body.sidebar-closed #kpi-hud{ left:0; padding-left:176px; }
         .mapboxgl-ctrl-top-right{ top:72px; }
+        /* 11 Oct 2026 — the user: the demo notice and the Guide button sat ON the figures bar on the desktop.
+           On a demo tenant the notice is now a 26 px strip across the top at every width (the phone layout
+           already did this), the bar, the panel and the map controls move down by 26 px, and the Guide
+           button sits at the right end of the strip. */
+        @media (min-width:1024px){
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; text-align:center; padding:5px 10px; height:26px; }
+            body.has-demo-notice #kpi-hud{ top:26px; }
+            body.has-demo-notice .sidebar{ top:26px; }
+            body.has-demo-notice #menu-toggle{ top:40px; }
+            body.has-demo-notice .mapboxgl-ctrl-top-right{ top:98px; }
+            body.has-demo-notice #tl-warnings{ top:110px; }
+            body.has-demo-notice #guide-btn{ left:auto !important; right:10px; top:2px; padding:1px 10px; font-size:11px; }
+        }
         .kpi-title{ font-size:16px; font-weight:600; color:var(--navy-deep); line-height:1.2;
                     letter-spacing:-.01em; min-width:120px; white-space:nowrap; }
         .kpi-title:empty{ display:none; }
@@ -611,11 +624,8 @@
         btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
         // Beside the demo notice, measured — the notice is centred and its width depends on
         // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
-        const placeBtn = () => {
-            if (window.innerWidth <= 1023) { btn.style.left = ''; return; }   // phone or tablet: the CSS rule places it at the right edge
-            const dn = document.getElementById('demo-notice');
-            if (dn) { btn.style.left = (dn.getBoundingClientRect().right + 8) + 'px'; }
-        };
+        // 11 Oct 2026: placed by CSS at every width now — at the right end of the notice strip, off the bar.
+        const placeBtn = () => { btn.style.left = ''; };
         placeBtn();
         window.addEventListener('resize', placeBtn);
         if (!guideRead()) setTimeout(guideStart, 900);
@@ -4012,11 +4022,18 @@
         const box = document.getElementById('tl-warnings');
         if (!box) return;
         const kpi = document.getElementById('kpi-hud');
+        // 11 Oct 2026: the zoom buttons follow the bar too. Below 1024 px the stacked bar's height depends on the
+        // tenant's words and the labels; a fixed 180 px put the buttons on the bar at 950 px (bar ended at 202).
+        const ctrl = document.querySelector('.mapboxgl-ctrl-top-right');
+        if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';
         if (window.innerWidth > 1023 || !kpi || box.style.display === 'none') { box.style.top = ''; return; }   // 9 Oct: tablets stack the bar too
         const h = kpi.getBoundingClientRect().height || 0;
         box.style.top = (Math.round(h) + 8) + 'px';
     }
     window.addEventListener('resize', positionWarnStack);
+    // 11 Oct: and whenever the bar itself changes height (cards filling in, labels wrapping, the window narrowing)
+    try { new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud')); } catch (e) {}
+    setTimeout(positionWarnStack, 1200);   // and once after first paint, for a browser that has not laid out yet
     function renderConditionsPill(live) {
         const pill = document.getElementById('kpi-conditions');
         if (!pill) return;

@@ -1607,14 +1607,22 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 the guide is set up ONLY when the tenant carries a demo notice",
      /function setupGuide\(\)\{\n\s+if \(!TENANT\.demo_notice\) return;/.test(code)
      && /\} else if \(dn\) \{ dn\.remove\(\); \}\n\s+setupGuide\(\);/.test(code));
-  ok("...and placed just right of the demo notice by measurement, re-placed on resize (a fixed offset overlapped the notice)",
-     /btn\.style\.left = \(dn\.getBoundingClientRect\(\)\.right \+ 8\) \+ 'px';/.test(code) && /window\.addEventListener\('resize', placeBtn\);/.test(code));
+  // 11 Oct 2026 REVERSED (the user: the notice and the Guide button sat on the figures bar): no measured
+  // placement beside a centred pill any more — the notice is a strip at every width and the button is placed by
+  // CSS at the right end of it; the resize hook only clears any inline left
+  ok("...and placed by CSS at the right end of the notice strip, never measured beside a centred pill",
+     !/getBoundingClientRect\(\)\.right \+ 8/.test(code) && /const placeBtn = \(\) => \{ btn\.style\.left = ''; \};/.test(code)
+     && /window\.addEventListener\('resize', placeBtn\);/.test(code));
   ok("9 Oct: tablets get one row of six KPI cards under the month (701-1023px), the phone keeps its 3x2 grid",
      /@media \(min-width:701px\) and \(max-width:1023px\)\{\s*#kpi-cards\{ grid-template-columns:repeat\(6, minmax\(0, 1fr\)\); \}/.test(html));
   ok("9 Oct: below 1024px (phone AND tablet) the notice is a full-width strip at the top and the menu, the bar and the Guide button move down under it",
      /@media \(max-width:1023px\)\{[\s\S]*?body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[\s\S]*?body\.has-demo-notice #menu-toggle\{ top:40px; \}[\s\S]*?body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:84px; \}[\s\S]*?#guide-btn\{ left:auto !important; right:12px; top:9px; \}[\s\S]*?body\.has-demo-notice #guide-btn\{ top:36px; \}/.test(html)
      && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice\);/.test(code)
-     && /if \(window\.innerWidth <= 1023\) \{ btn\.style\.left = ''; return; \}/.test(code));
+     && /const placeBtn = \(\) => \{ btn\.style\.left = ''; \};/.test(code));
+  // 11 Oct 2026: and from 1024 px up too — the strip, the bar / panel / controls 26 px lower, the button in the strip
+  ok("11 Oct: on the desktop the notice is a 26 px strip too, the bar, panel and map controls sit under it, the Guide button is in the strip",
+     /@media \(min-width:1024px\)\{\s*body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[^}]*height:26px; \}\s*body\.has-demo-notice #kpi-hud\{ top:26px; \}\s*body\.has-demo-notice \.sidebar\{ top:26px; \}/.test(html)
+     && /body\.has-demo-notice \.mapboxgl-ctrl-top-right\{ top:98px; \}/.test(html) && /body\.has-demo-notice #guide-btn\{ left:auto !important; right:10px; top:2px;/.test(html));
   ok("...the Guide button is created inside setupGuide and nowhere else",
      (code.match(/guideEl\('guide-btn', 'button'\)/g) || []).length === 1 && !html.includes('id="guide-btn"'));
   ok("remembered per visitor under wayscope_guide_map, every read and write in try/catch",
@@ -1658,7 +1666,7 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
 ok("the two headline cards lead: two-way movements and vehicles needed",
   /<div class="kpi-card lead">\s*<div class="kpi-value" id="kpi-trips">/.test(html) && /<div class="kpi-card lead">\s*<div class="kpi-value" id="kpi-vehicles">/.test(html)
   && /\.kpi-card\.lead \.kpi-value\{ font-size:28px;/.test(html)
-  && /@media \(min-width:1024px\)\{ #kpi-cards, \.kpi-row\{ gap:18px; \} \.kpi-label\{ white-space:normal; max-width:104px; \} \}/.test(html));
+  && /@media \(min-width:1024px\)\{ #kpi-cards, \.kpi-row\{ gap:18px; \} #kpi-cards \.kpi-label\{ white-space:normal; max-width:104px; \} \}/.test(html));
 ok("the side-panel rows say two-way, not trips", code.includes("two-way/d \\u00b7 ") && !code.includes("} trips/d \\u00b7"));
 ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fold; the panel stays 300 px",
   html.indexOf('<details class="layers-box" id="layers-box">') < html.indexOf('<h3>Basemap</h3>')
@@ -1667,6 +1675,9 @@ ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fol
 ok("busiest routes: the five largest by two-way movements a day (not doubled), each a button that selects the route, cleared with the month",
   html.includes('<div id="kpi-busiest"></div>') && code.includes(".sort((a, b) => b[2] - a[2]).slice(0, 5)")
   && code.includes("onclick=\"selectRoute(") && (code.match(/setHTML\('kpi-busiest', ''\)/g) || []).length === 2);
+ok("11 Oct: below 1024 px the zoom buttons sit under the measured bar (a fixed 180 px overlapped it at 950 px), set on resize and whenever the bar changes height",
+  code.includes("if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';")
+  && code.includes("new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud'))"));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
 console.log();
