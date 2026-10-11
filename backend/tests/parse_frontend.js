@@ -1276,27 +1276,48 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   const _dbWall = _dbBody.slice(_dbBody.indexOf("      ) : (\n        <>\n"));
   const _laGrid = _laBody.slice(_laBody.indexOf('<table className="tbl compact"'), _laBody.indexOf("</table>", _laBody.indexOf('<table className="tbl compact"')));
   // 8b. the data palette: six tokens, light and dark, read in fixed order, never a raw hex on a dataset
-  ok("the data palette is six tokens in the light look (plan blue, delivered orange, teal, model gold, purple, not-yet grey)",
-    /--chart-1:#4A72C9; --chart-1-soft:rgba\(74,114,201,\.18\); --chart-2:#C97A2E; --chart-3:#0A9396; --chart-4:#A07D34; --chart-5:#7F6BBE; --chart-none:#A8A29E;/.test(html));
+  // 11 Oct 2026 NARROWED: the user chose the orange-led palette (plan = brand orange, delivered = blue, model = violet)
+  ok("the data palette is six tokens in the light look (plan orange, delivered blue, teal, model violet, gold, not-yet grey)",
+    /--chart-1:#E8590C; --chart-1-soft:rgba\(232,89,12,\.18\); --chart-2:#2563EB; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E;/.test(html));
   ok("...and six dark steps on the dark surface (validated 10 Oct, colour-system-1010.md)",
-    /--chart-1:#6A8FE0; --chart-1-soft:rgba\(106,143,224,\.22\); --chart-2:#D07F2E; --chart-3:#179AA4; --chart-4:#B48E3E; --chart-5:#9080D4; --chart-none:#6B6965;/.test(html));
+    /--chart-1:#E8681E; --chart-1-soft:rgba\(232,104,30,\.22\); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965;/.test(html));
   ok("⭐ the charts read the slots in FIXED order and a sixth series is grey, never a new hue (no cycled PALETTE)",
     code.includes('const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];')
     && code.includes('const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");') && !/const PALETTE = \[/.test(code));
   ok("🔴 no Dashboard dataset carries a raw hex: planned is slot 1, delivered slot 2, the model slot 4 (status colours stay on the stockpile chart only)",
     !/backgroundColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody) && !/borderColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody)
-    && _dbBody.includes('C2 = tok("--chart-2", "#C97A2E"), C4 = tok("--chart-4", "#A07D34")')
+    && _dbBody.includes('C2 = tok("--chart-2", "#2563EB"), C4 = tok("--chart-4", "#7C3AED")')
     && _dbBody.includes("data: D.actualM, backgroundColor: C2") && _dbBody.includes("data: D.fairM, backgroundColor: C4")
     && _dbBody.includes("data: D.co2M, borderColor: C1, backgroundColor: C1S"));
   // 8. the shell: warm neutrals, a dimmed rail whose active item is ink
   ok("the shell tokens are the warm neutrals and the rail has its own two tokens, light and dark",
-    /--line:#E7E5E4; --bg:#F7F6F3;/.test(html) && /--rail-bg:#F3F2EF; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
+    /--line:#E7E5E4; --bg:#FFFFFF;/.test(html) && /--rail-bg:#FAFAF9; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
   ok("⭐ the rail's active item is INK, not the action colour (one accent on a neutral shell)",
-    /\.rail-item\.is-on\{border-left-color:var\(--rail-on\);background:var\(--surface\);color:var\(--rail-on\);font-weight:600;\}/.test(html)
+    /\.rail-item\.is-on\{background:var\(--surface\);color:var\(--rail-on\);font-weight:600;box-shadow:0 0 0 1px var\(--line\);\}/.test(html)
     && code.includes('className={"rail shrink-0 flex flex-col transition-[width] duration-150 "')
     && code.includes('className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}')
     && !code.includes('border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold'));
   ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>'));
+  // 11 Oct 2026 — the fresher shell (fresh-directions.html: A with B's orange button and kicker)
+  ok("the action colour is its own token: deep orange with white text in the light looks (5.2:1), brand orange with ink text in dark (7.0:1)",
+    /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--action:#FF8C14; --action-fg:#1F2024;/.test(html)
+    && /\.btn-pri\{display:inline-block;padding:7px 14px;border-radius:6px;background:var\(--action\);color:var\(--action-fg\);/.test(html)
+    && (html.match(/var\(--brand-orange\)/g) || []).length <= 2);
+  ok("the rail has line icons (inline SVG, no library) in place of the glyphs, one per nav entry",
+    code.includes("function NavIcon({ id })") && code.includes("<NavIcon id={it.id} />") && !code.includes("{it.glyph}</span>")
+    && ["dashboard", "submit", "forecasts", "lookahead", "locations", "routes", "zones", "config", "map"].every(k => new RegExp("\\n  " + k + ": \"M").test(code)));
+  ok("the rail search filters the pages in place, Enter opens the first match, Ctrl K focuses it",
+    code.includes('placeholder="Find a page…"') && code.includes("g.items.filter(navMatch)") && code.includes("if(e.key === \"Enter\" && navFirst){ setPage(navFirst.id); setNavQ(\"\"); }")
+    && code.includes('(e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")'));
+  ok("PageHeader takes a monospace kicker; the four rebuilt pages pass one",
+    code.includes("function PageHeader({ title, subtitle, actions, children, kicker })") && code.includes('{kicker && <div className="kicker">{kicker}</div>}')
+    && /\.kicker\{font:600 12px ui-monospace,/.test(html)
+    && ['<PageHeader title="Dashboard" kicker=', '<PageHeader title="Forecasts" kicker="Plan"', '<PageHeader title="Configuration" kicker="Data"', '<PageHeader title="Look-ahead" kicker='].every(t => code.includes(t)));
+  ok("the Dashboard's six figures sit in one strip card, and Big screen is the orange action button",
+    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:1px solid var\(--line\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
+  ok("orange-led means the largest material over the whole programme takes slot 1; ranked on every row, so a filter never repaints",
+    _dbBody.includes("const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });")
+    && _dbBody.includes(".sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0)"));
   // 5. the shared components
   ok("the empty-state family: one EmptyState with a kind, marked data-empty, no dashed border; a SkeletonTable; StatusWord; AppliedChips",
     code.includes("function EmptyState({ title, body, action, kind })") && code.includes('data-empty={k}') && !code.includes("border-dashed")
