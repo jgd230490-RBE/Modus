@@ -5,6 +5,7 @@
  *     NODE_PATH=$(npm root -g) node backend/tools/make_guide_images.js          # both sets
  *     NODE_PATH=$(npm root -g) node backend/tools/make_guide_images.js figures  # only fig-*.png
  *     NODE_PATH=$(npm root -g) node backend/tools/make_guide_images.js holders  # only the S and M placeholders
+ *     NODE_PATH=$(npm root -g) node backend/tools/make_guide_images.js holders S16,S17  # only those placeholders
  *
  * Needs Playwright with a Chromium it can launch. Writes into frontend/help/media/.
  *
@@ -12,7 +13,7 @@
  * data from anyone's project. They are drawn from the HTML below, so an edit to a figure
  * is an edit to this file, not to a picture.
  *
- * PLACEHOLDERS (S01–S15, M01–M08 except M04) stand where the guide's screenshots go.
+ * PLACEHOLDERS (S01–S17, M01–M08 except M04) stand where the guide's screenshots go.
  * Each says, on the image itself, that it is NOT a capture. A placeholder that looked like a
  * screenshot would be a false caption — the previous guide had exactly that bug inside its PNGs.
  * The real screens come from backend/tools/capture_guide.js (import the demo package on a
@@ -32,6 +33,9 @@ const { chromium } = require("playwright");
 const ROOT = path.resolve(__dirname, "..", "..");
 const MEDIA = path.join(ROOT, "frontend", "help", "media");
 const which = process.argv[2] || "all";
+// 11 Oct 2026: "holders S16,S17" draws only those placeholders, so adding a figure does not redraw (and
+// re-encode) every committed placeholder — or overwrite a screenshot that has already replaced one
+const onlyIds = (process.argv[3] || "").split(",").map(s => s.trim()).filter(Boolean);
 
 // ---- the Wayscope theme (frontend :root tokens) ------------------------------------------
 const T = {
@@ -228,6 +232,9 @@ const HOLDERS = {
   S13: ["Zones — a disruption zone and a haul road with speed and mode", "Zones, the demo haul road selected", "app"],
   S14: ["Configuration — the Vehicles section", "Configuration › Vehicles", "app"],
   S15: ["The supplier PDF — one row per line, Monday to Friday, coordinates, route map", "Look-ahead › PDF, first page", "pdf"],
+  // 11 Oct 2026: the Carbon planner's two pictures (guide §6)
+  S16: ["The Carbon planner — the six steps", "Carbon planner, the top of the page: step 1 and the start of step 2", "app"],
+  S17: ["Step 6 — the scheme's carbon target", "Carbon planner, step 6 with the saved target", "app"],
   M01: ["The public map with the Control Panel open", "/map/, corridor zoom", "map"],
   M02: ["The alignment popup — team, work section and chainage", "/map/, a band clicked", "map"],
   M03: ["Sites and assets — the stockpile gauge and its popup", "/map/, a stockpile clicked", "map"],
@@ -297,6 +304,7 @@ function holder(code, [caption, , kind]) {
   if (which === "all" || which === "holders") {
     await pg.setViewportSize({ width: 1440, height: 760 });
     for (const [code, spec] of Object.entries(HOLDERS)) {
+      if (onlyIds.length && !onlyIds.includes(code)) continue;
       await pg.setContent(holder(code, spec), { waitUntil: "load" });
       await pg.screenshot({ path: path.join(MEDIA, code + ".png"), clip: { x: 0, y: 0, width: 1440, height: 760 } });
       out.push(code + ".png");

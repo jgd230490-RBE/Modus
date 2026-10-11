@@ -173,8 +173,9 @@ ok("\U0001f534 ...and correcting that sentence did NOT take the Control Panel de
    and "the \u2630 button opens it" in src)
 
 # deep links
-ok("every figure with a screen behind it links into the live app (21 of 27)",
-   len(re.findall(r'figcaption[^<]*<a class="go"', src)) + len(re.findall(r'<a class="go"', src)) >= 21)
+# NARROWED 11 Oct 2026: the Carbon planner's two pictures (S16, S17) link to /#carbon, so 23 of 29 (was 21 of 27)
+ok("every figure with a screen behind it links into the live app (23 of 29)",
+   len(re.findall(r'figcaption[^<]*<a class="go"', src)) + len(re.findall(r'<a class="go"', src)) >= 23)
 ok("...staff figures by page hash, map figures at the map",
    'href="/#lookahead"' in src and 'href="/#dashboard"' in src and 'href="/map/"' in src)
 ok("...opening in a new tab so the guide is not lost",
@@ -514,8 +515,9 @@ ok("...and the one pointer to the admin appendix says it is in the admin view",
 _holders = dict(re.findall(r'\n  ([SM]\d\d): \["([^"]+)"', gen_src))
 _caps = dict(re.findall(r'<img src="media/([SM]\d\d)\.png"[^>]*><figcaption>Figure \d+ — (.*?)(?: &nbsp;·&nbsp;.*?)?</figcaption>', src))
 _appc = dict((f, c) for c, f in re.findall(r"<tr><td>\d+</td><td>([^<]+)</td><td>([SM]\d\d)\.png</td></tr>", src))
+# NARROWED 11 Oct 2026: 24 pictures (S16 and S17 added for the Carbon planner), was 22
 ok("\U0001f534 every placeholder's title is its figure caption, word for word, and Appendix C agrees (%d pictures)" % len(_caps),
-   len(_caps) == 22 and set(_holders) == set(_caps) and all(_holders[k] == _caps[k] for k in _caps)
+   len(_caps) == 24 and set(_holders) == set(_caps) and all(_holders[k] == _caps[k] for k in _caps)
    and all(_appc.get(k) == _caps[k] for k in _caps))
 _holder_fn = gen_src[gen_src.find("function holder("):gen_src.find("(async () =>")]
 ok("\U0001f534 ...the placeholder card no longer prints developer paths (the package file, the capture script)",
@@ -526,6 +528,132 @@ ok("\U0001f534 ...and the drawn figures say lorry / HGV, never truck; figure 3 l
    _figs_fn and re.search(r"\btrucks?\b", _figs_fn, re.I) is None
    and '["Carbon planner",' in _figs_fn and '["Route map", "the public map inside the app"]' in _figs_fn
    and "drawn before the Carbon planner" not in src)
+
+
+# =========================================================================== #
+#  11 Oct 2026 — the Carbon planner's pictures and the capture script           #
+#  (branch claude/guide-screenshots)                                            #
+# =========================================================================== #
+# What these prove: S16 and S17 are in the guide where the text is, captioned, listed, drawn as placeholders until
+# the live capture replaces them; the figures are numbered in order; the capture script shoots every picture, cannot
+# write, cancels the Confirm dialog and refuses to start without a site and a code.
+# What they do not prove: what the live capture will show (it was dry-run against a LOCAL copy only; see
+# capture_guide.js's header), or how the page looks in a browser.
+import shutil
+import subprocess
+
+CAP = os.path.join(ROOT, "backend", "tools", "capture_guide.js")
+cap_src = open(CAP, encoding="utf-8").read()
+_S16 = "The Carbon planner — the six steps"
+_S17 = "Step 6 — the scheme's carbon target"
+_sec6 = src[src.find('<h1 id="6-the-carbon-planner">'):src.find('<h1 id="6-the-look-ahead">')]
+_s61 = _sec6[_sec6.find('<h2 id="6-1-how-the-carbon-planner-works">'):_sec6.find('<h2 id="6-2-steps-1-to-4-your-plan-and-your-choices">')]
+_s65 = _sec6[_sec6.find('<h2 id="6-5-reading-the-carbon-target">'):]
+ok("\u2b50 S16 sits in \u00a76.1 and S17 in \u00a76.5 (read by every role), each with its alt text and a link to the Carbon planner",
+   '<img src="media/S16.png" alt="%s"' % _S16 in _s61 and '<img src="media/S17.png" alt="%s"' % _S17 in _s65
+   and _s61.count('href="/#carbon"') == 1 and _s65.count('href="/#carbon"') == 1
+   and src.count("media/S16.png") == 1 and src.count("media/S17.png") == 1)
+ok("...captioned word for word, listed in Appendix C, drawn as placeholders until captured",
+   _caps.get("S16") == _S16 and _caps.get("S17") == _S17 and _appc.get("S16") == _S16 and _appc.get("S17") == _S17
+   and _holders.get("S16") == _S16 and _holders.get("S17") == _S17
+   and os.path.isfile(os.path.join(MEDIA, "S16.png")) and os.path.isfile(os.path.join(MEDIA, "S17.png")))
+_fig_nums = [int(n) for n in re.findall(r"<figcaption>Figure (\d+) — ", src)]
+_appc_rows = re.findall(r"<tr><td>(\d+)</td><td>([^<]+)</td><td>([^<]+)</td></tr>", src)
+_fig_files = re.findall(r'<img src="media/([^"]+)"[^>]*><figcaption>Figure \d+ — ', src)
+ok("the figures are numbered 1 to %d in reading order, and Appendix C lists each, in that order, by its file" % len(_fig_nums),
+   _fig_nums == list(range(1, 30)) and [int(r[0]) for r in _appc_rows] == _fig_nums
+   and [r[2] for r in _appc_rows] == _fig_files)
+ok("\U0001f534 the notes about placeholders stay true before and after the capture (no 'yet', no 'has no picture')",
+   "A picture that says PLACEHOLDER on it is a stand-in, not a screenshot" in src
+   and "A picture that says PLACEHOLDER — NOT A SCREENSHOT on the image itself stands in for a screen that has not been captured yet" in src
+   and "not screenshots yet" not in src and "has no picture yet" not in src and "placeholders until they are captured" not in src)
+ok("...and the placeholder card still says those words on the image (make_guide_images.js)",
+   "Placeholder — not a screenshot" in _holder_fn and "text-transform:uppercase" in gen_src)
+ok("make_guide_images.js can draw named placeholders only (holders S16,S17), so adding a figure redraws no other picture",
+   "process.argv[3]" in gen_src and "if (onlyIds.length && !onlyIds.includes(code)) continue;" in gen_src)
+
+# the capture script: every picture, in the guide's set
+_want_ids = ["S%02d" % i for i in range(1, 18)] + ["M%02d" % i for i in range(1, 9) if i != 4]
+_shots_decl = re.search(r"const SHOTS = \[(.*?)\];", cap_src, re.S)
+_shots = re.findall(r'"([SM]\d\d)"', _shots_decl.group(1)) if _shots_decl else []
+ok("\u2b50 the capture script takes S01 to S17 and M01 to M08, and no M04 (%d pictures)" % len(_shots),
+   sorted(_shots) == sorted(_want_ids) and len(_shots) == 24 and "M04" not in _shots
+   and all(('shot(page, "%s"' % i) in cap_src for i in _want_ids if i != "S15")
+   and 'want("S15")' in cap_src and '"S15.png"' in cap_src and 'shot(page, "M04"' not in cap_src)
+ok("...the set it takes is the set the guide shows (every S and M image in the guide)",
+   sorted(_shots) == sorted(f[:-4] for f in media_files if re.match(r"[SM]\d\d\.png$", f)))
+ok("...MODUS_OUT and MODUS_ONLY are kept, and MODUS_ONLY refuses a picture the guide does not have",
+   "process.env.MODUS_OUT" in cap_src and "process.env.MODUS_ONLY" in cap_src
+   and "MODUS_ONLY names a picture the guide does not have" in cap_src)
+
+# never confirms, approves, bakes, sets or saves
+_clicked = []
+for _ln in cap_src.splitlines():
+    if re.search(r"\.(click|check|fill|selectOption|dblclick|press|type)\(", _ln):
+        _clicked.append(_ln)
+_names = re.findall(r'getByRole\(\s*"button"\s*,\s*\{\s*name:\s*([^,}]+)', cap_src) + re.findall(r"getByText\(([^)]*)\)", cap_src)
+_BANNED = re.compile(r"Confirm|Approve|Save|Bake|Set as|Clear|Delete|Withdraw|Reject|Re-open|Discard|Reset|Attach|Create|Edit|Draw|Start again|Download|check now")
+ok("\U0001f534 the capture never presses Confirm, Approve, Save, Bake, Set, Clear, Delete, Withdraw, Reject or the like: "
+   "no button name or text it looks for says so, and no line that clicks, ticks, types or picks names one (%d lines act)" % len(_clicked),
+   _clicked and _names and not any(_BANNED.search(n) for n in _names) and not any(_BANNED.search(l) for l in _clicked))
+ok("\U0001f534 ...the Confirm week dialog is opened by the HEADER button, found by its title, and the dialog's own "
+   "Confirm week has no title, so it cannot be the one found",
+   "const HEADER_CONFIRM = 'button[title^=\"Whole week, every line, one act\"]';" in cap_src
+   and fe_src.count('title="Whole week, every line, one act. Planned cells lock; actuals stay typeable."') == 1
+   and '<button onClick={doConfirm} className="px-4 py-2 text-sm font-semibold text-white rounded-lg" style={{ background: "var(--green)" }}>Confirm week</button>' in fe_src)
+_s10 = cap_src[cap_src.find('await shot(page, "S10"'):cap_src.find('await shot(page, "S11"')]
+ok("\U0001f534 ...and it is CANCELLED: the dialog's own Cancel, after the shot whatever happened, and the run stops if it will not close",
+   'dlg.getByRole("button", { name: "Cancel", exact: true }).click(' in cap_src
+   and 'await dlg.waitFor({ state: "detached"' in cap_src
+   and "try { await cancelConfirmDialog(page); }" in _s10 and "process.exit(1)" in _s10
+   and '"Confirm the week of' in cap_src and "Confirm the week of {spanLabel(cw.from, cw.to)}" in fe_src)
+ok("\U0001f534 ...every confirm() the app asks is answered No",
+   'page.on("dialog", d => d.dismiss()' in cap_src and ".accept(" not in cap_src)
+_reads = re.search(r"const READS_WITH_A_BODY = \[(.*?)\];", cap_src)
+ok("\U0001f534 ...and a write cannot leave the browser: every API call but a GET is aborted, bar three reads that take a body",
+   _reads and re.findall(r'"([^"]+)"', _reads.group(1)) == ["/api/auth", "/api/costing/preview", "/api/carbon/scenario"]
+   and "return route.abort();" in cap_src and 'm === "GET"' in cap_src
+   and "if (blocked.length) process.exit(1);" in cap_src)
+ok("...those three are reads on the server's own word (main.py: nothing stored)",
+   "this only tells it what it got. Nothing is stored server-side." in main_src
+   and main_src.count("it stores nothing") >= 2
+   and '@app.post("/api/costing/preview")' in main_src and '@app.post("/api/carbon/scenario")' in main_src)
+ok("...the Look-ahead's day cells are never clicked (a click opens a cell that saves on blur); rows open by their \u25b6 only",
+   "la-cell" not in cap_src and "td.la-stick button[title^='Show ']" in cap_src
+   and "onBlur={() => { saveDay(line, d); setEditing(null); }}" in fe_src)
+
+# S15 without poppler; S16/S17 aim at what the page has
+_pdf = cap_src[cap_src.find("async function pdfFirstPage("):cap_src.find("\n(async () => {")]
+ok("\u2b50 S15 is pictured without poppler: pdf.js 3.11.174 from cdnjs (exact version, worker included), poppler's pdftoppm tried first",
+   'const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";' in cap_src
+   and 'const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";' in cap_src
+   and 0 <= _pdf.find('execFileSync("pdftoppm"') < _pdf.find("pdfjsLib") and "GlobalWorkerOptions.workerSrc" in _pdf)
+ok("S16 and S17 aim at what the Carbon planner has: step 2 under the top, step 6 by its id, the target read before the shot",
+   '#carbon-step-2' in cap_src and '#carbon-step-6' in cap_src and 'id={"carbon-step-" + n}' in fe_src
+   and "Loading the carbon target" in cap_src and "Loading the carbon target…" in fe_src
+   and 'goApp(page, "carbon", "Carbon planner")' in cap_src and '<PageHeader title="Carbon planner"' in fe_src)
+
+# the header says how to run it, and it refuses to start without a site and a code
+ok("the header gives the exact PowerShell command and what it writes",
+   all(s in cap_src for s in ('$env:MODUS_URL = "https://app.wayscope.co.uk"', '$env:MODUS_PLANNER_CODE = Read-Host "Planner code"',
+                              "$env:NODE_PATH = (npm root -g)", "node backend/tools/capture_guide.js",
+                              "WHAT IT WRITES: frontend/help/media/S01.png … S17.png and M01.png … M08.png")))
+_refuse = cap_src.find("if (!BASE || !CODE)")
+ok("\U0001f534 it refuses to run without MODUS_URL and MODUS_PLANNER_CODE, before Playwright is even loaded",
+   0 < _refuse < cap_src.find('require("playwright")') and "process.exit(2);" in cap_src[_refuse:_refuse + 200])
+_node = shutil.which("node")
+_env = {k: v for k, v in os.environ.items() if k not in ("MODUS_URL", "MODUS_PLANNER_CODE", "MODUS_ONLY", "NODE_PATH")}
+def _run(extra):
+    e = dict(_env); e.update(extra)
+    return subprocess.run([_node, CAP], env=e, capture_output=True, text=True, encoding="utf-8", timeout=60)
+if _node:
+    _r0 = _run({})
+    _r1 = _run({"MODUS_URL": "https://app.wayscope.co.uk/map", "MODUS_PLANNER_CODE": "x"})
+    _r2 = _run({"MODUS_URL": "http://127.0.0.1:9", "MODUS_PLANNER_CODE": "x", "MODUS_ONLY": "M04"})
+ok("...run with no site or code it stops with exit code 2 and says what to set; a page address or an unknown picture is refused the same way",
+   _node is not None and _r0.returncode == 2 and "Set MODUS_URL and MODUS_PLANNER_CODE" in _r0.stderr
+   and _r1.returncode == 2 and "site address only" in _r1.stderr
+   and _r2.returncode == 2 and "M04" in _r2.stderr)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
