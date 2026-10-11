@@ -1263,6 +1263,70 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && />Lorry-\{DU\(\)\}\{arrow\("km"\)\}<\/th>/.test(src) && />HGV params<\/th>/.test(src));
 }
 
+// ---- 10 Oct 2026: the Carbon planner page (phase 3) ------------------------------
+// One read (POST /api/carbon/scenario), no carbon arithmetic in the browser, distances in the
+// tenant's unit, every factor's source / year / status on hover, the Planned panel and the
+// known limits on screen, and none of the words a public stand must not use.
+{
+  const s0 = src.indexOf("// ================================================================= Carbon planner (10 Oct 2026)");
+  const s1 = src.indexOf("// ================================================================= Look-ahead v2 (2026-09-09)");
+  const cbSrc = s0 > 0 && s1 > s0 ? src.slice(s0, s1) : "";
+  const cb = cbSrc.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  ok("⭐ the Carbon planner is a Plan-group page after Forecasts (not admin-gated: a team code sees its own lines)",
+     /\{ id: "forecasts", label: "Forecasts", glyph: "☰" \},\n    \{ id: "carbon", label: "Carbon planner", glyph: "◐" \},\n  \]\},/.test(code)
+     && !/group: "Plan", admin/.test(code));
+  ok("...and the page switch renders CarbonPage", /page === "carbon" && <CarbonPage meta=\{meta\} access=\{role\} \/>/.test(code));
+  ok("🔴 ONE read: POST /api/carbon/scenario, and no other fetch on the page",
+     cb.length > 5000 && (cb.match(/fetch\(/g) || []).length === 1 && cb.includes('fetch(`${API}/carbon/scenario`, { method: "POST"'));
+  ok("🔴 no carbon arithmetic in the browser: no emission key, no factor literal, no km/mile constant",
+     !/emissions_kg_co2e_per_km|kwh_per_km \*|0\.93939|0\.99773|7\.80307|0\.14395|0\.13096|1\.609344|19\.55376/.test(cb));
+  ok("distances and per-distance figures go through the tenant's unit (fmtDist, distRate, DU, TKM)",
+     cb.includes("fmtDist(") && cb.includes("distRate(") && cb.includes("DU()") && cb.includes("TKM()"));
+  ok("⭐ it says what it is not: a National Highways Carbon Tool return", cb.includes("not a National Highways Carbon Tool return"));
+  ok("⭐ the ranked list, the three methods side by side, the fleet comparison, the Planned panel and the limits",
+     ["What moves carbon most", "Three ways to count the same haul", "Diesel or electric — the same tonnage",
+      "Planned — not built yet", "Known limits", "No figures are shown for these until each exists."].every(t => cb.includes(t)));
+  ok("⭐ every factor's source, year and status on hover (title={prov(…)}) and as a status chip",
+     (cb.match(/title=\{prov\(/g) || []).length >= 5 && cb.includes("<Chip s={f.status} />") && cb.includes("Factors used — source, year and status")
+     && /const CARBON_TONE = \{ VERIFIED: [^}]*DERIVED: [^}]*ASSUMPTION: /.test(code));
+  ok("the alternative's levers cover all seven drivers the brief names",
+     ["recycled", "material", "vehicle", "fuel", "source", "route", "disposal"].every(d => cb.includes(`driver: "${d}"`)));
+  ok("the recycled slider is disabled with the server's reason where the Government file has no closed-loop or primary row",
+     cb.includes("disabled={!m.recycled_enabled || !!e.kg}") && cb.includes("Not available: {m.recycled_reason}."));
+  ok("an EPD needs its reference (the field says so; the server refuses it otherwise)", cb.includes("EPD reference (required)"));
+  ok("the unbaked lines are named, never estimated", cb.includes("transport excludes the {B.totals.lines - B.totals.baked_lines} unbaked"));
+  ok("🔴 the electric figures carry their basis: no Government electric HGV factor; the +2 t allowance is draft, not applied",
+     cb.includes("no Government electric HGV factor exists") && cb.includes("is a draft rule and is not applied")
+     && cb.includes("kWh per km × UK electricity") && !cb.includes("kWh per {DU()}"));
+  const cbStrings = (cb.match(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g) || []).concat(cb.match(/>[^<>{}]+</g) || []);
+  const banned = (x) => /\b(compliant|secure|NH-approved|real-time|predict\w*|optimi[sz]\w*|trucks?)\b/i.test(x) || /\bAI\b/.test(x);
+  ok("🔴 none of the banned words on the page: compliant, secure, NH-approved, real-time, AI, predict, optimise, truck",
+     cbStrings.length > 50 && !cbStrings.some(banned), cbStrings.filter(banned).join(" | "));
+  ok("🔴 no team id reaches the page (it never reads .ipt)", !cb.includes(".ipt"));
+  ok("the scenario-only profiles (electric variants) never reach a forecast picker",
+     code.includes("Object.entries((m && m.vehicle_details) || {}).forEach(([k, v]) => { if(v && v.scenario_only && !HIDDEN_VEHICLES.includes(k)) HIDDEN_VEHICLES.push(k); });"));
+  ok("Config → Vehicles says an electric profile's kg CO₂e/km is derived", code.includes('placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""}'));
+  ok("review (11 Oct): every flag the engine can raise reads in words — including the stand-in return, the unbaked swap and the missing disposal factor",
+     ["UNBAKED", "KM_FROM_BASELINE_VEHICLE", "KM_SCALED", "ALT_ROUTE_NOT_BAKED", "EV_TRIP_EXCEEDS_BATTERY", "RETURN_NOT_BAKED",
+      "RETURN_STAND_IN", "ROUTE_SWAP_NOT_BAKED", "NO_DISPOSAL_FACTOR"].every(k => new RegExp(`\\b${k}: "`).test(code))
+     && code.includes("left out, not counted as zero"));
+  ok("review: a supplier or destination that is not baked is offered but cannot be picked", (cb.match(/disabled=\{!(s|x)\.baked\}/g) || []).length === 2
+     && cb.includes('" — not baked"'));
+  ok("review: the disposal choice lists only the routes the Government file publishes for the material", cb.includes("(r.disposal_routes || []).map(k =>")
+     && !cb.includes('<option value="open_loop">'));
+  ok("review: the electric range is the range on ONE charge, and an impossible trip is left out of both columns",
+     cb.includes("Range on one charge") && cb.includes("fc.range_per_charge_km_min") && !cb.includes("daily_range") && cb.includes("left out of both columns"));
+  ok("review: the benchmarks say how many line-months they leave out", cb.includes("bm(B).excluded_lines"));
+  ok("after the UI pass (11 Oct): the Carbon page keeps the 14 px floor (13 px allowance; no 9, 10 or 11 px text) and no dashed border",
+     !/text-\[(9|10|11)px\]/.test(cb) && !cb.includes("border-dashed"));
+  ok("after the UI pass (11 Oct): the Carbon planner has its own rail icon, the Plan kicker, and the error kind of the empty state",
+     /\n  carbon: "M/.test(code) && (cb.match(/<PageHeader title="Carbon planner" kicker="Plan"/g) || []).length === 2
+     && cb.includes('<EmptyState kind="error" title="Couldn\'t compute the carbon scenario"'));
+  const gs2 = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
+  ok("the guide has steps for the Carbon page, on its own anchors", /\n  carbon: \[/.test(gs2)
+     && ["carbon-compare", "carbon-levers", "carbon-drivers"].every(a => gs2.includes(`anchor: "${a}"`) && src.includes(`data-guide="${a}"`)));
+}
+
 // ---- 10 Oct 2026: the UI pass (notes/ui-review-1009, mockups 1-6, 8 and 8b; colour-system-1010.md) ----
 // Source-level, like everything above. What they prove: the tokens exist in both looks, the charts read
 // the palette in fixed order and carry no raw hex, the shell is neutral (ink active rail item), the shared

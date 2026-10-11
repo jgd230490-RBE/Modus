@@ -41,6 +41,18 @@ def load_factors_file():
         return json.load(f)
 
 
+_FILE_CACHE = {"mtime": None, "doc": None}
+
+
+def load_factors_file_cached():
+    """The file, parsed once and kept until it changes on disk. READ ONLY — the carbon planner's
+    fallbacks read it per request; a caller that wants to edit takes load_factors_file()."""
+    mt = os.path.getmtime(_FACTORS_PATH)
+    if _FILE_CACHE["doc"] is None or _FILE_CACHE["mtime"] != mt:
+        _FILE_CACHE["doc"], _FILE_CACHE["mtime"] = load_factors_file(), mt
+    return _FILE_CACHE["doc"]
+
+
 def _density(factors, material):
     cats = factors.get("material_categories", {})
     c = cats.get(material) or cats.get("_default", {})
@@ -54,9 +66,46 @@ def _payload(factors, vehicle):
 
 
 def _emissions(factors, vehicle):
+    """
+    kg CO2e per vehicle-km for a vehicle: its stored figure (the DESNZ 2026 diesel factors,
+    tank-to-wheel). 10 Oct 2026 (carbon planner): an entry with fuel "electric" and no stored
+    figure is DERIVED here, once — kwh_per_km × the UK electricity factor (generation + T&D)
+    from the `carbon` block — because the Government 2026 set publishes no electric HGV factor.
+    A stored figure on an electric entry (a fleet's measured one) wins. Every other path is
+    unchanged: vehicle, else _default, else 0.90.
+    """
     vs = factors.get("vehicles", {})
     v = vs.get(vehicle) or vs.get("_default", {})
+    if v.get("fuel") == "electric" and v.get("emissions_kg_co2e_per_km") is None:
+        return electric_kg_per_km(factors, v)
     return float(v.get("emissions_kg_co2e_per_km", 0.90))
+
+
+def electricity_factors(factors=None):
+    """The `carbon.electricity` block: the file's, with every key the live document carries laid
+    over it (a tenant seeded before 10 Oct 2026 has no carbon block until Reset to file or a
+    re-import). Key by key — the same rule carbon.params() uses — so the map, the Dashboard and
+    the Carbon page always read one electric figure."""
+    try:
+        seed = (load_factors_file_cached().get("carbon") or {}).get("electricity") or {}
+    except Exception:
+        seed = {}
+    live = ((factors or {}).get("carbon") or {}).get("electricity") if isinstance(factors, dict) else None
+    out = dict(seed) if isinstance(seed, dict) else {}
+    if isinstance(live, dict):
+        out.update(live)
+    return out
+
+
+def electric_kg_per_km(factors, v, basis="ttw"):
+    """kg CO2e per km for an electric entry: kWh/km × (generation + T&D) — the tank-to-wheel
+    equivalent beside the diesel figures; basis "wtw" adds the two well-to-tank rows."""
+    e = electricity_factors(factors)
+    kwh = float((v or {}).get("kwh_per_km") or ((factors or {}).get("carbon") or {}).get("electric_hgv", {}).get("kwh_per_km_default") or 1.25)
+    per_kwh = float(e.get("generation_kg_co2e_per_kwh") or 0) + float(e.get("td_kg_co2e_per_kwh") or 0)
+    if basis == "wtw":
+        per_kwh += float(e.get("wtt_generation_kg_co2e_per_kwh") or 0) + float(e.get("wtt_td_kg_co2e_per_kwh") or 0)
+    return kwh * per_kwh
 
 
 def material_names(factors):
@@ -167,7 +216,10 @@ def flat_factors(factors):
     density.setdefault("_default", 1.6)
     payload = {k: v.get("payload_t", 20) for k, v in vs.items()}
     payload.setdefault("_default", 20)
-    emis = {k: v.get("emissions_kg_co2e_per_km", 0.90) for k, v in vs.items()}
+    # 10 Oct 2026: through _emissions(), so an electric entry carries its derived figure here
+    # too (the map and the Dashboard read this map) — identical for every diesel entry
+    emis = {k: (_emissions(factors, k) if isinstance(v, dict) and v.get("fuel") == "electric"
+                else v.get("emissions_kg_co2e_per_km", 0.90)) for k, v in vs.items()}
     emis.setdefault("_default", 0.90)
     return {
         "material_density_t_per_m3": density,

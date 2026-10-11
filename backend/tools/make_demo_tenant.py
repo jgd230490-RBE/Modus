@@ -514,6 +514,55 @@ def build():
             weeks.set_actual(line["route_id"], 10, line["discipline"], line["section_id"], wk,
                              actual_qty=actual, actual_note=None, by="site clerk")
 
+    # --- carbon planner (10 Oct 2026): a landfill-vs-reuse choice for the surplus cut -------
+    # Langton Compound's surplus cut leaves site to a (fictional) inert landfill — the baseline,
+    # four approved months — and a (fictional) soil-recycling hub sits closer, with a route but
+    # no forecast: the alternative the Carbon page's disposal control offers. The destinations'
+    # TYPES (Landfill / Soil recycling) are what mark the lines as disposal (carbon.disposal_loc_types).
+    # A SEPARATE generator, seeded, so every random draw above — and so every row above — is
+    # byte-for-byte what it was before this block existed. The electric profiles, the recycled
+    # options and the factor block come from backend/factors.json (the seed this tenant starts from).
+    crng = random.Random(20261010)
+    c2 = point_at(ALIGN_PTS, ALIGN_CHAIN, comp_chain["C2"])
+    tp, hb = offset(c2, east_m=7200, north_m=-3800), offset(c2, east_m=2100, north_m=1600)
+    add("TIP", "Wolds Link Inert Landfill (fictional)", "destination", "Landfill", tp[0], tp[1], receives=[EARTH],
+        detail="Inert landfill taking surplus cut. Fictional: no such site.")
+    add("HUB", "Wolds Link Soil Recycling Hub (fictional)", "destination", "Soil recycling", hb[0], hb[1], receives=[EARTH],
+        detail="Soil treatment and reuse; takes surplus cut for reuse on other schemes. Fictional: no such site.")
+    spoil = []
+    for dest in ("TIP", "HUB"):
+        r = network.create_route(loc["C2"], loc[dest], material_category=EARTH, ipt=team_of["C2"])
+        assert "error" not in r, r
+        spoil.append(r["id"] if isinstance(r, dict) and "id" in r else r.get("route", {}).get("id"))
+    n_sp = db.query("SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
+    sp_base = crng.uniform(6000, 9000)
+    for m in MONTHS:
+        n_sp += 1
+        db.execute(
+            "INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, "
+            "quantity, unit, material_type, material_description, vehicle_type, submitted_by, "
+            "status, reject_reason, ipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (db.current_tenant(), f"F{n_sp:04d}", spoil[0], mi_of[m], "earthworks", section_of["C2"],
+             float(round(sp_base * crng.uniform(0.85, 1.15) / 100.0) * 100), "t", EARTH, "Surplus cut to tip (spoil)",
+             "Artic Tipper (44t)", f"{team_of['C2']} planner", "Approved", None, team_of["C2"]))
+        weeks.materialise_line(spoil[0], "earthworks", section_of["C2"], month_index=mi_of[m])
+    # held to the same standard as every other site and line: a gate each, routes that name
+    # their gates, September and October weeks 1–2 typed, September week 3 confirmed
+    G["TIP"] = gate("TIP", "Weighbridge", -150, 80, "both", default=True, safety=4, internal=3,
+                    note="Inert waste acceptance; a weighbridge ticket per load (fictional).")
+    G["HUB"] = gate("HUB", "Site gate", 120, -60, "both", default=True, safety=3, internal=2)
+    for rid, dest in zip(spoil, ("TIP", "HUB")):
+        res = gates.set_route_gates(rid, origin_gate_id=G["C2"], dest_gate_id=G[dest], origin_given=True, dest_given=True)
+        assert "error" not in res, res
+    for m, wks in ((9, (1, 2)), (10, (1, 2))):
+        for wk in wks:
+            w = weeks.get_week(spoil[0], m, "earthworks", section_of["C2"], wk)
+            if not w:
+                continue
+            actual = round(float(w.get("planned_qty") or 0) * crng.uniform(0.86, 1.04) / 10.0) * 10
+            weeks.set_actual(spoil[0], m, "earthworks", section_of["C2"], wk, actual_qty=actual, actual_note=None, by="site clerk")
+    weeks.confirm_week(spoil[0], 9, "earthworks", section_of["C2"], 3, by="Central Team planner")
+
     # --- the overlay ------------------------------------------------------------------
     # Chainage markers at EXACT 100 m chainages, positioned along the line — the shape a
     # survey's chainage file has. (Markers at the alignment's own vertices would sit at
@@ -572,7 +621,11 @@ def build():
                       "UNBAKED until then, and the works-zone geofence only re-routes what is baked. Diesel index: fetched "
                       "automatically from DESNZ weekly road fuel prices (H1); fuel_index below is a typed placeholder applied "
                       "on import if the GB row is empty. Distances read in miles (tenant.distance_unit); km is what is stored. "
-                      "tenant.demo_notice puts 'Fictional demo scheme' on every screen and export.")
+                      "tenant.demo_notice puts 'Fictional demo scheme' on every screen and export. Carbon planner "
+                      "(10 Oct 2026): Langton Compound's surplus cut goes to a fictional inert landfill (four approved "
+                      "months); a fictional soil-recycling hub nearer by has a route and no forecast — the disposal "
+                      "alternative. The two electric lorry profiles are scenario-only: they read the diesel twin's "
+                      "baked distances and are never offered on a forecast.")
     # H1: a typed placeholder at the research's second-hand reading of the DESNZ series (≈195.5 p/L,
     # w/c 21 Sep 2026, pump price incl. VAT). The DESNZ fetch replaces it on the first refresh.
     pkg["fuel_index"] = [{"country": "GB", "eur_per_l": 1.955, "bulletin_date": "2026-09-21",

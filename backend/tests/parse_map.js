@@ -1658,7 +1658,9 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
 ok("the two headline cards lead: two-way movements and vehicles needed",
   /<div class="kpi-card lead">\s*<div class="kpi-value" id="kpi-trips">/.test(html) && /<div class="kpi-card lead">\s*<div class="kpi-value" id="kpi-vehicles">/.test(html)
   && /\.kpi-card\.lead \.kpi-value\{ font-size:28px;/.test(html)
-  && /@media \(min-width:1024px\)\{ #kpi-cards, \.kpi-row\{ gap:18px; \} \.kpi-label\{ white-space:normal; max-width:104px; \} \}/.test(html));
+  // NARROWED 11 Oct 2026: the map's CSS scopes the wrapping label rule to the cards (#kpi-cards .kpi-label),
+  // so the bar's own labels are not touched; the assertion was written before that edit landed on main
+  && /@media \(min-width:1024px\)\{ #kpi-cards, \.kpi-row\{ gap:18px; \} #kpi-cards \.kpi-label\{ white-space:normal; max-width:104px; \} \}/.test(html));
 ok("the side-panel rows say two-way, not trips", code.includes("two-way/d \\u00b7 ") && !code.includes("} trips/d \\u00b7"));
 ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fold; the panel stays 300 px",
   html.indexOf('<details class="layers-box" id="layers-box">') < html.indexOf('<h3>Basemap</h3>')
