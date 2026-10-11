@@ -50,6 +50,9 @@
     --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
     --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
     --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9AA1AB; --popover-line:rgba(255,255,255,.12);
+    /* 11 Oct 2026 — the demo bar: the map strip's own colours (ink, amber text, an amber rule) and a white
+       Guide pill, the same in every look, as on the map */
+    --demo-bg:#1F2024; --demo-fg:#FBBF24; --demo-rule:#D97706; --demo-btn-bg:#FFFFFF; --demo-btn-fg:#1F2024; --demo-btn-hover:#FEF3C7;
     color-scheme:light;
   }
   html[data-theme="light"]{
@@ -164,10 +167,21 @@
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
   .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 Inter,system-ui,sans-serif}
   .guide-tip b{color:#fff;font-weight:600}
-  /* 11 Oct 2026 (the user: "not needed twice"): where the embedded map is on screen it prints its own
-     "Fictional demo scheme" strip, so the header badge steps aside there. Every other screen keeps it. */
-  body[data-view="public"] .demo-badge, body[data-map-open="1"] .demo-badge{display:none !important;}
-  .demo-badge{margin-left:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;align-items:center;}
+  /* 11 Oct 2026 — the demo bar (the user: "There is a bar with FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL and a
+     guide button on the public map. Lets have that on every page."). One 26 px strip under the header on every
+     view and at every width, in the map strip's style: ink, amber uppercase text, letter-spaced, centred, the
+     Guide at its right end. It replaces the header's gold badge (and PR #20's rules that hid it under the map);
+     the embedded map no longer draws its own strip. A long notice ends in an ellipsis; the Guide keeps its slot.
+     Review, 11 Oct 2026: the notice is 14 px, the floor (it was 13 px, the hint allowance; a required notice is not
+     a hint), and the Guide is 14 px. Below 640 px the notice WRAPS instead of ending in an ellipsis: with the Guide
+     beside it a 375 px phone cut it to "FICTIONAL DEMO SCHEME · NOTHING H…" (the map's own phone strip wrapped). */
+  .demo-bar{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var(--demo-bg);color:var(--demo-fg);border-bottom:1px solid var(--demo-rule);font:700 14px/1 Inter,system-ui,sans-serif;letter-spacing:.06em;overflow:hidden;}
+  .demo-bar.has-guide{padding:0 84px;}
+  .demo-bar-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;}
+  .demo-bar-guide{position:absolute;right:8px;top:2px;height:21px;padding:0 10px;border:0;border-radius:999px;background:var(--demo-btn-bg);color:var(--demo-btn-fg);font:600 14px/21px Inter,system-ui,sans-serif;letter-spacing:0;cursor:pointer;}
+  .demo-bar-guide:hover{background:var(--demo-btn-hover);}
+  .demo-bar-guide:focus-visible{outline:2px solid var(--demo-fg);outline-offset:0;}
+  @media (max-width:639px){ .demo-bar{letter-spacing:.03em;height:auto;min-height:26px;padding:4px 12px;line-height:1.3;} .demo-bar.has-guide{padding:4px 76px 4px 12px;} .demo-bar-text{white-space:normal;text-overflow:clip;text-align:center;} .demo-bar-guide{top:50%;transform:translateY(-50%);} }
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
@@ -360,7 +374,9 @@ function useTheme(){
 }
 
 const API = "/api";
-const MAP_URL = "/map/?v=" + Date.now();  // per-load cache-buster so the iframe never serves a stale map
+// 11 Oct 2026 (the demo bar): embed=1 tells /map/ it is inside the app, so it draws no demo strip and no Guide
+// button of its own (the app's bar carries both). /map/ opened directly keeps its own.
+const MAP_URL = "/map/?embed=1&v=" + Date.now();  // per-load cache-buster so the iframe never serves a stale map
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 // ---- 2026-09-02, Task F: access codes are resolved by the SERVER --------------
@@ -1348,7 +1364,8 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
 // ================================================================= H10 — the in-app guide (8 Oct 2026)
 // A small coach-mark card for the DEMO tenant only (TENANT.demo_notice set): a real client
 // never sees it. Steps per page, anchored to a data-guide="…" element on that page; Back /
-// Next / Done and "Don't show again"; the header's Guide button replays the current page.
+// Next / Done and "Don't show again"; the demo bar's Guide button (11 Oct 2026; it was the
+// header's) replays the current page.
 // Remembered per visitor in localStorage under wayscope_guide_<page>, every read and write in
 // try/catch — with no storage the guide simply shows once per load. No library: the card is
 // in-page. Role-aware by construction: a page the code cannot open never renders, so its
@@ -1361,6 +1378,32 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
 const HEADER_DEMO_NAME = "Your organisation's name appears here";
 const GUIDE_KEY = "wayscope_guide_";
 const GUIDE_EVENT = "wayscope-guide";
+// 11 Oct 2026 (the demo bar): the bar's Guide replays the guide of what is on screen. On a Portal page that is
+// this app's guide (one event name, as the header's button did). On a map view (the public map, the staff Route
+// map) it is the EMBEDDED map's own tour: /map/ is on the same origin, so its global guideStart() is reachable
+// through the iframe. The map says when its tour is set up (MAP_TOUR_MSG, posted to this window); the map
+// password page never says so, so the bar shows no Guide over it. Guarded all the same.
+const MAP_TOUR_MSG = "wayscope-map-tour";
+function replayAppGuide(){ window.dispatchEvent(new Event(GUIDE_EVENT)); }
+function startMapTour(){
+  try {
+    const f = document.querySelector('iframe[title="Public Route Map"]');
+    const w = f && f.contentWindow;
+    if(w && typeof w.guideStart === "function") w.guideStart();
+  } catch(e){}
+}
+// 11 Oct 2026 (review): the embedded map hides its own notice and Guide only when this app's bar is really drawn
+// above it (it looks for .demo-bar in this page). The bar appears once /api/meta has answered, which can be after the
+// map has loaded; then the map is told (BAR_ON_MSG) and steps aside. If /api/meta fails there is no bar and the map
+// keeps its own, so the fictional scheme is never on screen without the notice. Same origin only.
+const BAR_ON_MSG = "wayscope-bar-on";
+function tellMapBarOn(){
+  try {
+    document.querySelectorAll('iframe[title="Public Route Map"]').forEach(f => {
+      if(f.contentWindow) f.contentWindow.postMessage({ type: BAR_ON_MSG }, window.location.origin);
+    });
+  } catch(e){}
+}
 const GUIDE_FORECAST_STEPS = [
   { anchor: "page-header", title: "One line per haul.", body: "Each line is a route, a material, a vehicle class and the tonnes by month." },
   { anchor: "forecast-status", title: "Status.", body: "Lines go from submitted to approved. Only approved lines reach the look-ahead and the map." },
@@ -1427,8 +1470,10 @@ function Guide({ page, groups }){
     if(guideRead("all") === "off"){ setHints(false); setStrip(false); return; }
     setHints(true); setStrip(guideRead(key) !== "done");
   }, [key]);
-  const startTour = () => { setTip(null); setSteps(build(guideRead("welcome") !== "done")); setI(0); };
-  // the header's Guide button and the strip's "Take the tour" run the tour (the welcome too, if never seen)
+  // 11 Oct 2026 (the demo bar): a page with no steps of its own (Config) replays the welcome, so the bar's Guide
+  // never does nothing there once the welcome has been seen
+  const startTour = () => { setTip(null); setSteps(build(guideRead("welcome") !== "done" || !(GUIDE_STEPS[key] || []).length)); setI(0); };
+  // the demo bar's Guide button and the strip's "Take the tour" run the tour (the welcome too, if never seen)
   useEffect(() => {
     const on = () => startTour();
     window.addEventListener(GUIDE_EVENT, on);
@@ -1540,8 +1585,21 @@ function App(){
   // the label language. Held in App so the header control and every table re-render
   // together; mirrored into the module-level VEH so plain helpers can read it.
   const [vehLang, setVehLangState] = useState(VEH.lang);
-  // which screen is up, for the CSS that hides the header's demo badge under the embedded map
-  useEffect(() => { document.body.dataset.view = view; }, [view]);
+  // 11 Oct 2026 (the demo bar): the Portal's page, reported up, and whether the embedded map's own tour is set up,
+  // so the bar's Guide replays the right guide. PR #20's body[data-view] flag (it hid the header badge on the public
+  // map) went with the badge.
+  const [page, setPage] = useState(null);
+  const [mapTour, setMapTour] = useState(false);
+  useEffect(() => {
+    const on = (e) => { if(e.origin === window.location.origin && e.data && e.data.type === MAP_TOUR_MSG) setMapTour(true); };
+    window.addEventListener("message", on);
+    return () => window.removeEventListener("message", on);
+  }, []);
+  // a new screen: any map on it is a new iframe, which announces its tour again once it is ready
+  useEffect(() => { setMapTour(false); }, [view, page]);
+  // 11 Oct 2026 (review): once /api/meta has answered and the bar is on screen (an effect runs after the commit),
+  // tell a map that loaded before it. A map that loads later finds the bar itself.
+  useEffect(() => { if(meta && TENANT.demo_notice) tellMapBarOn(); }, [meta]);
   const setVehLang = (l) => { VEH.lang = l; try { localStorage.setItem("modus_veh_lang", l); } catch(e){} setVehLangState(l); };
 
   useEffect(() => {
@@ -1584,15 +1642,21 @@ function App(){
     try { sessionStorage.removeItem("modus_access_code"); } catch(e){}
     setRole(null); setView("public");
   };
+  // the bar's Guide: none on the sign-in view (it has no tour); the embedded map's tour on a map view, once the map
+  // has said it is ready (never over the map password page); this app's guide on every other Portal page
+  const onMap = view === "public" || (view === "portal" && page === "map");
+  const barGuide = view === "login" ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;
 
   return (
     <div className="h-full flex flex-col">
       <Header view={view} role={role} setView={setView} signOut={signOut} vehLang={vehLang} setVehLang={setVehLang} />
+      {/* 11 Oct 2026: the demo bar, under the header on every view; main (flex-1 min-h-0) gives up its 26 px */}
+      <DemoBar onGuide={barGuide} />
       <main className="flex-1 min-h-0 flex flex-col">
         {view === "public" && <PublicMap onLogin={() => setView("login")} />}
         {view === "login" && <Login onSignIn={signIn} onBack={() => setView("public")} savedName={who} />}
         {view === "portal" && (
-          <Portal role={role} who={who} meta={meta} metaErr={metaErr} vehLang={vehLang} />
+          <Portal role={role} who={who} meta={meta} metaErr={metaErr} vehLang={vehLang} onPage={setPage} />
         )}
       </main>
     </div>
@@ -1617,11 +1681,8 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
               <span className="hidden sm:block text-[14px] font-medium hdr-muted truncate max-w-[36vw]">{TENANT.demo_notice ? HEADER_DEMO_NAME : TENANT.name}</span>
             </>
           )}
-          {TENANT.demo_notice && (
-            /* H2 (5 Oct 2026): a tenant with a demo notice carries it on every screen — the
-               header is on every screen. The map and both exports print it too. */
-            <span className="demo-badge hidden sm:inline-flex" title={TENANT.demo_notice}>{TENANT.demo_notice}</span>
-          )}
+          {/* 11 Oct 2026: the demo notice left the header for the demo bar under it (DemoBar), which every
+              view shows at every width; the header's badge was hidden below 640 px. */}
         </button>
         <div className="flex items-center gap-2 text-sm">
           {view === "public" && (
@@ -1643,13 +1704,8 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
                 ))}
               </span>
               <span className="hidden sm:inline hdr-muted mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>
-              {TENANT.demo_notice && (
-                /* H10 (8 Oct 2026): replays the current page's guide. Demo tenant only. */
-                <button type="button" onClick={() => window.dispatchEvent(new Event(GUIDE_EVENT))}
-                  className="px-3 py-2 rounded-md hdr-btn font-medium transition" title="Replay the guide for this page">
-                  Guide
-                </button>
-              )}
+              {/* 11 Oct 2026: the Guide button moved to the right end of the demo bar (DemoBar). It was shown
+                  only to a demo tenant, and the bar shows exactly then, so a real tenant loses nothing. */}
               <AppearancePicker />
               <button onClick={signOut}
                 className="px-4 py-2 rounded-md hdr-btn font-medium transition">
@@ -1660,6 +1716,27 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
         </div>
       </div>
     </header>
+  );
+}
+
+// ================================================================= Demo bar
+// 11 Oct 2026 (the user: "There is a bar with FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL and a guide button on
+// the public map. Lets have that on every page."). App puts it between the header and <main> on every view: the
+// public map, its password page, sign-in, and every Portal page. It shows once /api/meta has answered (the notice is
+// in it): not over Portal's "Loading…" or the service error. If /api/meta fails, the embedded map keeps its own notice;
+// the map's password page in the iframe has none then (it shows no scheme data) (review, 11 Oct 2026).
+// ONLY for a tenant with a demo notice: a real tenant gets no bar. The text is the tenant's own (sentence case; the
+// CSS uppercases it). `onGuide` is what the Guide button runs, or null where there is no tour to replay (then the bar
+// has no button). No hooks, and nothing here touches the document while rendering.
+function DemoBar({ onGuide }){
+  if(!TENANT.demo_notice) return null;
+  return (
+    <div className={"demo-bar" + (onGuide ? " has-guide" : "")} role="note">
+      <span className="demo-bar-text" title={TENANT.demo_notice}>{TENANT.demo_notice}</span>
+      {onGuide && (
+        <button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>
+      )}
+    </div>
   );
 }
 
@@ -1931,7 +2008,7 @@ function AppliedChips({ chips, onClear, onClearAll, count }){
   );
 }
 
-function Portal({ role, who, meta, metaErr, vehLang }){
+function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   const canApprove = !!(role && role.can_approve);
   // 2026-09-14: the URL hash names the page, so the user guide can link straight at a
   // screen ("#lookahead") and a page can be bookmarked. The hash WINS over the
@@ -1949,11 +2026,9 @@ function Portal({ role, who, meta, metaErr, vehLang }){
     // back through every page you clicked would be worse than one that leaves the app.
     try { if(pageFromHash() !== p) history.replaceState(null, "", "#" + p); } catch(e){}
   };
-  // the embedded map carries its own demo strip; the header badge hides while it is open
-  useEffect(() => {
-    document.body.dataset.mapOpen = page === "map" ? "1" : "";
-    return () => { document.body.dataset.mapOpen = ""; };
-  }, [page]);
+  // 11 Oct 2026 (the demo bar): App learns the page, so the bar's Guide starts the embedded map's own tour on the
+  // Route map and this app's guide elsewhere. PR #20's body[data-map-open] flag went with the header badge.
+  useEffect(() => { if(onPage) onPage(page); }, [page]);
   // someone edits the hash, or follows a second link from the guide into the same tab
   useEffect(() => {
     const onHash = () => { const h = pageFromHash(); if(h && h !== page) setPageState(h); };
@@ -2071,8 +2146,11 @@ function Portal({ role, who, meta, metaErr, vehLang }){
           <iframe src={MAP_URL} title="Public Route Map" className="w-full h-full border-0" />
         )}
       </main>
-      {/* H10: the coach-mark guide for this page; renders nothing unless TENANT.demo_notice is set */}
-      <Guide page={page} groups={visible} />
+      {/* H10: the coach-mark guide for this page; renders nothing unless TENANT.demo_notice is set.
+          11 Oct 2026 (the demo bar): not on the Route map, whose embedded map runs its own guide (its strip under
+          its bar, its dots, its tour). That was two "New here?" strips on one screen, and the app's guide there
+          shared the map's localStorage key (wayscope_guide_map). */}
+      {page !== "map" && <Guide page={page} groups={visible} />}
     </div>
   );
 }

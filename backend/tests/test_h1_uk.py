@@ -334,9 +334,12 @@ ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validate
    main.meta()["tenant"]["demo_notice"] == "Fictional demo scheme · nothing here is real"
    and config.validate(dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]), tenant={"name": "x", "demo_notice": "y" * 121})) != []
    and "demo_notice" in config.TENANT_DEFAULTS)
-ok("H2: the notice is on both exports (XLSX About row, PDF footer) and the app's header, and the map hides an empty rail layer",
+# NARROWED 11 Oct 2026 (the demo bar): the app carries the notice in the bar under its header on every view
+# (DemoBar), not in a header badge, which is gone
+ok("H2: the notice is on both exports (XLSX About row, PDF footer) and the app's demo bar under the header, and the map hides an empty rail layer",
    '("Notice", _demo_notice() or "")' in read("backend/export.py") and 'ft.insert(0, P("<b>" + E(_demo_notice()) + "</b>", st_grey))' in read("backend/export.py")
-   and 'className="demo-badge' in read("frontend/index.html") and "demo_notice: (tn.demo_notice || null)" in read("frontend/index.html")
+   and '<span className="demo-bar-text" title={TENANT.demo_notice}>{TENANT.demo_notice}</span>' in read("frontend/index.html")
+   and 'className="demo-badge' not in read("frontend/index.html") and "demo_notice: (tn.demo_notice || null)" in read("frontend/index.html")
    and "railItem.hidden = !hasRail" in read("map/index.html") and "dn.textContent = TENANT.demo_notice" in read("map/index.html"))
 # --- 30 Sep 2026: the national feed against baked routes must be pre-filtered by box -----
 # The first GB run with baked routes put the live service at 100 % CPU for hours: 2,920

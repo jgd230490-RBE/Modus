@@ -220,18 +220,32 @@ document.getElementById('f').addEventListener('submit', async function (ev) {
 </script></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
 
 
-def _map_password_page():
+def _map_password_page(embedded=False):
     """The password page with the tenant's demo notice above the logo, when it has one.
 
     11 Oct 2026: a visitor without the map password saw no "fictional demo scheme" anywhere,
     because the app's header badge hides while the embedded map is on screen (PR #20) and the
-    map's own strip sits behind this page. A real tenant has no notice, so the slot is empty."""
+    map's own strip sits behind this page. A real tenant has no notice, so the slot is empty.
+
+    11 Oct 2026 (the demo bar): inside the app (the iframe asks for /map/?embed=1) the app's demo
+    bar above the iframe carries the notice, so it is not repeated here (the user: "not needed
+    twice"). /map/ opened on its own has no bar above it and keeps the notice."""
     try:
         dn = config.tenant_settings(conversions).get("demo_notice")
     except Exception:
         dn = None
-    note = '<div class="demo-notice">%s</div>' % _html_escape(dn) if dn else ""
+    note = '<div class="demo-notice">%s</div>' % _html_escape(dn) if (dn and not embedded) else ""
     return _MAP_PASSWORD_PAGE.replace("<!--demo-notice-->", note, 1)
+
+
+def _embedded_request(request):
+    """True when the request is the app's iframe asking for the map: the embed=1 flag the app's MAP_URL
+    carries (map/index.html reads the same flag), and NOT a top-level page load. A browser sends
+    Sec-Fetch-Dest: document for an address typed or followed in the tab, iframe for a frame; so
+    /map/?embed=1 typed into the address bar keeps the notice, like the map's own EMBED check
+    (the flag AND a frame). 11 Oct 2026 (the demo bar)."""
+    return (request.query_params.get("embed") == "1"
+            and (request.headers.get("sec-fetch-dest") or "").lower() != "document")
 
 _HELP_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -278,10 +292,10 @@ if _Request is not None and hasattr(app, "middleware"):
     # that turns a decision into a response, and the wiring is what the harness cannot
     # run. Registered on the SAME middleware as the access contextvar so the gate can
     # see whether the X-Access-Code resolved.
-    def _gate_refusal(decision, path):
+    def _gate_refusal(decision, path, embedded=False):
         doc = gate.is_document(path)
         if decision == gate.NEED_MAP_PASSWORD:
-            return _HTML(_map_password_page(), status_code=401) if doc else _JSON(
+            return _HTML(_map_password_page(embedded), status_code=401) if doc else _JSON(
                 {"detail": "the map is password protected"}, status_code=401)
         if decision == gate.NEED_STAFF:
             return _HTML(_HELP_SIGNIN_PAGE, status_code=401) if doc else _JSON(
@@ -302,7 +316,7 @@ if _Request is not None and hasattr(app, "middleware"):
                 cookie=request.cookies.get(gate.COOKIE),
             )
             if decision != gate.ALLOW:
-                return _gate_refusal(decision, path)
+                return _gate_refusal(decision, path, embedded=_embedded_request(request))
 
             response = await call_next(request)
 
