@@ -65,20 +65,57 @@ def _payload(factors, vehicle):
     return float(v.get("payload_t", 20))
 
 
+#: 12 Oct 2026 (B2, the carbon fallbacks): the ONE figure a per-km factor falls to when the
+#: document gives none — a vehicle name it does not carry and no `_default` entry to catch it,
+#: or a stored figure that is null or blank. The UK Government (DESNZ) 2026 GHG conversion
+#: factors' published AVERAGE for non-refrigerated diesel HGVs, average laden, kg CO2e per
+#: vehicle-km, flat file v1.2 (notes/carbon-check-1009.md §2, §6). It replaced the 0.90
+#: literals here and on the map that no published row ever said; the seed's `_default` entry
+#: carries the same figure, so a document with or without that entry resolves alike.
+#: conversions._emissions() is the only reader: network.route_analysis, costlines and the
+#: flat factors /api/meta serves all go through it, so no two screens can disagree.
+FALLBACK_KG_CO2E_PER_KM = 0.89743
+
+
+def _stored_factor(v):
+    """The per-km figure an entry carries as a number, else None: null, a blank string, a
+    word or a bool all read as 'no figure' (a blank cell saved on Config is None here)."""
+    x = (v or {}).get("emissions_kg_co2e_per_km") if isinstance(v, dict) else None
+    if x is None or isinstance(x, bool) or x == "":
+        return None
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
 def _emissions(factors, vehicle):
     """
     kg CO2e per vehicle-km for a vehicle: its stored figure (the DESNZ 2026 diesel factors,
     tank-to-wheel). 10 Oct 2026 (carbon planner): an entry with fuel "electric" and no stored
     figure is DERIVED here, once — kwh_per_km × the UK electricity factor (generation + T&D)
     from the `carbon` block — because the Government 2026 set publishes no electric HGV factor.
-    A stored figure on an electric entry (a fleet's measured one) wins. Every other path is
-    unchanged: vehicle, else _default, else 0.90.
+    A stored figure on an electric entry (a fleet's measured one) wins.
+
+    12 Oct 2026 (B2): ONE fallback rule, the same for every caller — the vehicle's own figure;
+    an electric entry's derived figure; else the document's `_default` figure; else
+    FALLBACK_KG_CO2E_PER_KM. A stored 0 is a figure (a vehicle with no tailpipe carbon), not a
+    gap — route_analysis used to send 0 to `_default` while this returned 0, so the Routes
+    table and the Dashboard disagreed. A null or blank stored figure (the blank Config cell
+    that used to make float(None) raise here and blank every carbon figure on the map) now
+    falls through like a missing one; config.validate refuses it at save time.
     """
-    vs = factors.get("vehicles", {})
-    v = vs.get(vehicle) or vs.get("_default", {})
-    if v.get("fuel") == "electric" and v.get("emissions_kg_co2e_per_km") is None:
+    vs = (factors or {}).get("vehicles", {}) or {}
+    v = vs.get(vehicle)
+    if not isinstance(v, dict):
+        v = vs.get("_default") if isinstance(vs.get("_default"), dict) else {}
+    stored = _stored_factor(v)
+    if stored is not None:
+        return stored
+    if v.get("fuel") == "electric":
         return electric_kg_per_km(factors, v)
-    return float(v.get("emissions_kg_co2e_per_km", 0.90))
+    dflt = _stored_factor(vs.get("_default"))
+    return dflt if dflt is not None else FALLBACK_KG_CO2E_PER_KM
 
 
 def electricity_factors(factors=None):
@@ -128,8 +165,8 @@ def planning_vehicle_names(factors, country=None):
     array carries the ORDER, and `planning_vehicle: true` on the entry itself is the
     FLAG. A name in the array that is not a real vehicle key is DROPPED rather than
     returned — it would otherwise reach a picker as an option that silently resolves to
-    _default (20 t, 0.90 kg/km), which is the failure factors_diagnostics() exists to
-    catch. An entry that is flagged but missing from the array is appended, so flagging
+    _default (20 t, 0.89743 kg/km — FALLBACK_KG_CO2E_PER_KM), which is the failure
+    factors_diagnostics() exists to catch. An entry that is flagged but missing from the array is appended, so flagging
     another vehicle is one edit and forgetting the array is visible, not silent.
 
     11 Oct 2026 (the EU type-approval vehicles removed): NEVER an empty list while the
@@ -279,10 +316,11 @@ def flat_factors(factors):
     payload = {k: v.get("payload_t", 20) for k, v in vs.items()}
     payload.setdefault("_default", 20)
     # 10 Oct 2026: through _emissions(), so an electric entry carries its derived figure here
-    # too (the map and the Dashboard read this map) — identical for every diesel entry
-    emis = {k: (_emissions(factors, k) if isinstance(v, dict) and v.get("fuel") == "electric"
-                else v.get("emissions_kg_co2e_per_km", 0.90)) for k, v in vs.items()}
-    emis.setdefault("_default", 0.90)
+    # too (the map and the Dashboard read this map). 12 Oct 2026 (B2): EVERY entry through it,
+    # so a null or blank stored figure reaches the map as the resolved fallback, never as null,
+    # and `_default` is the document's figure or FALLBACK_KG_CO2E_PER_KM — the one rule.
+    emis = {k: _emissions(factors, k) for k, v in vs.items() if isinstance(v, dict)}
+    emis.setdefault("_default", FALLBACK_KG_CO2E_PER_KM)
     return {
         "material_density_t_per_m3": density,
         "vehicle_payload_t": payload,

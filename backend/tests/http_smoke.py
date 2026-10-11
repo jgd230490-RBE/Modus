@@ -363,6 +363,24 @@ with TestClient(main.app, base_url="https://testserver") as c:
            and abs(bt.get("transport_t", 0) - 75.99) < 0.01, f"{bt.get('baked_lines')} {bt.get('transport_t')}")
         ok("⭐ ...the SAME figure the Dashboard reads from /api/costing/lines (one number)", abs(bt.get("transport_t", 0) - cl_r001) < 0.002,
            f"{bt.get('transport_t')} vs {cl_r001}")
+        # 12 Oct 2026 (B2): the public map's two feeds carry that figure too, per line per month, with no co2_error
+        r = c.get("/api/public/forecast-matrix", params={"from": 1, "to": 60, "unit": "t"})
+        fm = r.json() if r.status_code == 200 else {}
+        _fm001 = [x for x in fm.get("routes") or [] if x["route_id"] == "R001"]
+        _fm_sum = sum(v for x in _fm001 for v in (x.get("co2_t") or {}).values() if v is not None)
+        ok("⭐ B2: /api/public/forecast-matrix carries co2_t per line per month for the hand-baked R001, keyed like monthly, summing to the costlines figure",
+           r.status_code == 200 and _fm001 and all(set(x.get("co2_t") or {}) == set(x["monthly"]) for x in _fm001)
+           and all(v is not None for x in _fm001 for v in x["co2_t"].values()) and abs(_fm_sum - cl_r001) < 0.002,
+           f"{r.status_code} {_fm_sum} vs {cl_r001} {[x.get('co2_t') for x in _fm001][:2]}")
+        ok("B2: ...an UNBAKED route's months read None, never a zero (the rest of the demo is not baked here)",
+           any(all(v is None for v in x["co2_t"].values()) for x in fm.get("routes") or [] if x["route_id"] != "R001"))
+        ok("B2: ...and co2_error is absent on the happy path", "co2_error" not in fm and "working_days" in fm)
+        _m001 = sorted({x["month_index"] for x in _r001})[0]
+        r = c.get("/api/public/month-kpis", params={"month": _m001, "unit": "t"})
+        mk = r.json() if r.status_code == 200 else {}
+        ok("B2: /api/public/month-kpis for R001's first month: co2_t present on its line, co2_error absent",
+           r.status_code == 200 and "co2_error" not in mk
+           and any(l["route_id"] == "R001" and l["co2_t"] is not None for l in mk.get("lines") or []), f"{r.status_code} {str(mk)[:160]}")
         ok("...and the NH Carbon Tool basis beside it: 261.82 t, labelled, not added in",
            abs(bt.get("transport_nh_t", 0) - 261.82) < 0.01 and "NH Carbon Tool" in (cs.get("methods") or {}).get("nh_tool", ""),
            str(bt.get("transport_nh_t")))

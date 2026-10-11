@@ -836,9 +836,12 @@ ok("...and the PDF still names the diesel index with no € column", "Diesel EE"
 #  7. What must NOT exist                                                      #
 # =========================================================================== #
 _map = open(os.path.join(ROOT, "map", "index.html"), encoding="utf-8").read().lower()
-ok("🔴 no fuel on the public map: no 'fuel-index', no 'baf', no '€/l'; 'diesel' only where it always was (the CO₂e caption, once)",
+# NARROWED 12 Oct 2026 (B2): the drawer's CO₂e card read the server's figure from then on and its caption
+# "round-trip diesel" went ("both legs" — the figure covers whatever fuel the vehicle entry says), so the
+# public map now carries NO fuel word at all: 'diesel' zero times, not once
+ok("🔴 no fuel on the public map: no 'fuel-index', no 'baf', no '€/l', and 'diesel' nowhere (the CO₂e caption dropped it on 12 Oct 2026)",
    "fuel-index" not in _map and "fuel index" not in _map and re.search(r"\bbaf\b", _map) is None
-   and "€/l" not in _map and _map.count("diesel") == 1 and "round-trip diesel" in _map)
+   and "€/l" not in _map and _map.count("diesel") == 0 and "round-trip diesel" not in _map)
 ok("no new upload endpoint: main.py has no UploadFile / File( import", "UploadFile" not in _src["main.py"] and "from fastapi import File" not in _src["main.py"])
 ok("no paid or station API named in fuel.py", all(x not in _src["fuel.py"].lower().split("what this does not do")[1]
    for x in ("oilpriceapi.com", "fuelo.", "alexela.", "circlek.")) and "energy.ec.europa.eu" not in _src["fuel.py"])

@@ -234,6 +234,20 @@ ok("⭐ CO2e sums per line AFTER the same filters, and unbaked lines are named, 
   && /excl\. \$\{co2Unbaked\} unbaked/.test(code));
 ok("⭐ CO2e to date follows the sidebar filters through the route's props",
   /\(last\.co2_to_date \|\| \[\]\)\.forEach\(c => \{[\s\S]{0,400}discFilter !== 'ALL' && c\.discipline !== discFilter/.test(code));
+// 12 Oct 2026 (B2): ONE carbon fallback (conversions.FALLBACK_KG_CO2E_PER_KM, the published 0.89743) and the
+// route drawer reads the SERVER's co2_t from forecast-matrix instead of multiplying its own trips × km × factor
+ok("⭐ B2: the map's only emissions fallback literal is the published 0.89743 — no 0.90 / 0.9 remains",
+  /vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.89743 \}/.test(code)
+  && !/vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.9\b/.test(code)
+  && !/pick\(F\.vehicle_emissions_kg_co2e_per_km,\s*veh\)\s*\|\|\s*0\.9/.test(code));
+ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix and sums the baked months, counting the unbaked ones",
+  /const co2m=row\.co2_t\|\|\{\};/.test(code)
+  && /mkeys\.forEach\(k=>\{ const c=co2m\[k\]; if\(c==null\)\{ unbakedM\+\+; \} else \{ co2t\+=c; bakedT\+=\(row\.monthly\[k\]\|\|0\); \} \}\);/.test(code)
+  && !/trips\*round\*emis\/1000/.test(code) && !/const emis=/.test(code));
+ok("B2: an unbaked route shows a dash and says so, never an estimate; a partly baked window names the months it excludes",
+  /card\('—','CO₂e','route not baked for this vehicle'\)/.test(code)
+  && /' · excl\. '\+unbakedM\+' unbaked month'/.test(code)
+  && /The same figure as the bar above and the Dashboard, read from the server\./.test(code));
 ok("no label in the bar is uppercase microtext", !/\.kpi-label\{[^}]*text-transform:uppercase/.test(html)
   && !/\.kpi-label\{[^}]*font-size:9/.test(html));
 ok("the KPI block is outside the sidebar element",

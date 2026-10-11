@@ -678,6 +678,15 @@ ok("...and the file says the figures were VERIFIED on 10 Oct 2026 against the go
    "Verified 10 Oct 2026 against the gov.uk flat file v1.2" in V["Rigid 8-wheeler (32t)"]["_emissions_basis"]
    and "5_304_3120_4_1" in V["Rigid 8-wheeler (32t)"]["_emissions_basis"]
    and not any("VERIFY" in (v.get("_emissions_basis") or "") for v in V.values() if isinstance(v, dict)))
+# 12 Oct 2026 (B2): the fallback is a PUBLISHED figure too — the 2026 set's average across all
+# non-refrigerated diesel HGVs, average laden — and the file, the constant and the map agree on it
+ok("B2: _default is the published Average-HGV 0.89743 (was an unpublished 0.97), the same figure as conversions.FALLBACK_KG_CO2E_PER_KM",
+   V["_default"]["emissions_kg_co2e_per_km"] == 0.89743 == conversions.FALLBACK_KG_CO2E_PER_KM
+   and "All HGVs" in V["_default"]["_emissions_basis"] and "DESNZ/DEFRA 2026" in V["_default"]["_emissions_basis"])
+ok("B2: ...and every per-km reader resolves an unknown GB vehicle to it — _emissions, the flat factors /api/meta serves",
+   conversions._emissions(F, "No such lorry") == 0.89743
+   and main.meta()["factors"]["vehicle_emissions_kg_co2e_per_km"]["_default"] == 0.89743
+   and main.meta()["factors"]["vehicle_emissions_kg_co2e_per_km"]["Artic Tipper (44t)"] == 0.93939)
 # config.validate() returns the PROBLEMS (a list of sentences; empty = fine)
 ok("a vehicle_sets entry naming an unknown vehicle, or a name both led and hidden, is refused",
    any("No such lorry" in x for x in config.validate(dict(_doc, tenant=dict(_doc["tenant"], distance_unit="mi"),

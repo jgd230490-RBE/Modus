@@ -1780,8 +1780,9 @@ def factors_diagnostics():
             "in_factors": matched,
             "in_database": prof in used,
             "payload_t": v.get("payload_t", default.get("payload_t")),
-            "emissions_kg_co2e_per_km": v.get("emissions_kg_co2e_per_km",
-                                              default.get("emissions_kg_co2e_per_km")),
+            # the RESOLVED figure (12 Oct 2026, B2): what route_analysis and costlines will
+            # use for this profile, fallback included — never a raw null
+            "emissions_kg_co2e_per_km": conversions._emissions(factors, prof),
             "gross_weight_kg": (v.get("routing", {}) or {}).get("gross_weight_kg"),
             "tare_weight_kg": here_routing.tare_weight_kg(prof, factors) if matched else None,
             "load_minutes": load_m, "unload_minutes": unload_m,
@@ -2271,9 +2272,10 @@ def route_analysis(route_id, profiles=None):
         loaded, ret = legs.get("loaded", {}), legs.get("return", {})
         v = veh.get(prof, {}) or {}
         payload_t = float(v.get("payload_t") or default_veh.get("payload_t") or 0)
-        co2_per_km = (conversions._emissions(factors, prof) if v.get("fuel") == "electric"   # 10 Oct: derived, one place
-                      else float(v.get("emissions_kg_co2e_per_km")
-                                 or default_veh.get("emissions_kg_co2e_per_km") or 0))
+        # 12 Oct 2026 (B2): the one lookup for every caller — own figure, derived electric,
+        # the document's _default, else conversions.FALLBACK_KG_CO2E_PER_KM; a stored 0 stays 0
+        # (the `or` chain here used to send it to _default while costlines read 0)
+        co2_per_km = conversions._emissions(factors, prof)
         # turnaround varies by vehicle — a flatbed strapping a load is not a tipper
         load_m, unload_m = _turnaround_minutes(prof, factors)
         for alt in sorted(loaded):

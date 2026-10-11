@@ -1724,26 +1724,54 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
     # `co2_to_date` is the same per-line figure summed over months 1..month, keyed the way
     # the map filters (route, discipline, section), so "CO2e to date" follows the sidebar
     # filters exactly as the month figures do. Approved only; never actuals.
+    # 12 Oct 2026 (B2): the read is _approved_co2(); when it fails the response SAYS so in
+    # `co2_error` and every co2_t is None — until today the except blanked every carbon
+    # figure silently (a null factor saved on Config was one trigger) and the map showed
+    # the month with no carbon and no reason.
+    table, co2_error = _approved_co2(factors, 1, int(month))
     co2_by_key, to_date, unbaked_to_date = {}, {}, 0
-    try:
-        for cl in costlines.lines(acc={"role": "planner"}, from_month=1, to_month=int(month),
-                                  status="Approved", factors=factors)["lines"]:
-            k = (cl["route_id"], cl["discipline"] or "", cl["section_id"] or "")
-            if int(cl["month_index"]) == int(month):
-                co2_by_key[k] = cl["co2_t"]
-            if cl["co2_t"] is None:
-                unbaked_to_date += 1
-                continue
-            to_date[k] = to_date.get(k, 0.0) + float(cl["co2_t"])
-    except Exception:
-        co2_by_key, to_date = {}, {}
+    for (rid, disc, sec, mi), co2 in table.items():
+        if mi == int(month):
+            co2_by_key[(rid, disc, sec)] = co2
+        if co2 is None:
+            unbaked_to_date += 1
+            continue
+        to_date[(rid, disc, sec)] = to_date.get((rid, disc, sec), 0.0) + float(co2)
     for l in lines:
         l["co2_t"] = co2_by_key.get((l["route_id"], l["discipline"], l["section_id"]))
     co2_to_date = [{"route_id": k[0], "discipline": k[1], "section_id": k[2], "co2_t": round(v, 3)}
                    for k, v in sorted(to_date.items())]
-    return {"month": int(month), "unit": unit, "working_days": wd,
-            "payload_fallback_vehicle": fb_name, "lines": lines,
-            "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
+    out = {"month": int(month), "unit": unit, "working_days": wd,
+           "payload_fallback_vehicle": fb_name, "lines": lines,
+           "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
+    if co2_error:
+        out["co2_error"] = co2_error
+    return out
+
+
+def _approved_co2(factors, from_month, to_month):
+    """
+    12 Oct 2026 (B2). The public map's carbon, per APPROVED line-month, from the ONE costlines
+    read the Dashboard uses (km × the vehicle's kg CO2e/km ÷ 1000, both legs): a table
+    {(route_id, discipline, section_id, month_index): co2_t}, co2_t None where the route is
+    not baked for the line's vehicle (no km, no carbon — never a zero dressed as a figure).
+
+    Returns (table, error). NEVER raises: on any failure the table is empty and `error` is
+    the reason ("ClassName: message"), so the two feeds that read it (/api/public/month-kpis
+    and /api/public/forecast-matrix) can set every co2_t to None AND carry `co2_error`,
+    instead of a month that silently shows no carbon. `error` is None on the happy path and
+    the feeds then carry no `co2_error` key at all.
+    """
+    try:
+        table = {}
+        for cl in costlines.lines(acc={"role": "planner"}, from_month=int(from_month),
+                                  to_month=int(to_month), status="Approved", factors=factors)["lines"]:
+            table[(cl["route_id"], cl["discipline"] or "", cl["section_id"] or "",
+                   int(cl["month_index"]))] = cl["co2_t"]
+        return table, None
+    except Exception as e:                       # noqa: BLE001 — the feed must answer
+        msg = str(e).strip()
+        return {}, (f"{e.__class__.__name__}: {msg}" if msg else e.__class__.__name__)[:300]
 
 
 @app.get("/api/public/stockpile-timeline")
@@ -1814,10 +1842,23 @@ def public_forecast_matrix(
     for g in out:
         g["total"] = conversions.round_for_unit(g["total"], unit)
     out.sort(key=lambda x: x["total"], reverse=True)
+    # 12 Oct 2026 (B2): carbon per line per month rides along — `co2_t` is a {month_index:
+    # t CO2e} map keyed exactly as `monthly`, None where the route is not baked for the
+    # line's vehicle — from the SAME costlines figure month-kpis and the Dashboard carry, so
+    # the map's timeline has one call for a carbon paint and its KPI prefetch, and the route
+    # drawer reads the server's figure instead of working out its own. Every other key is
+    # unchanged. When the read fails, every co2_t is None and `co2_error` says why.
+    table, co2_error = _approved_co2(factors, lo, hi)
+    for g in out:
+        g["co2_t"] = {m: table.get((g["route_id"], g["discipline"], g["section_id"], int(m)))
+                      for m in g["monthly"]}
     # ⭐ 2026-09-15 — `working_days` rides along so the timeline can print a DAILY rate on
     # the route label instead of the month's total. One divisor, one source: factors.json.
-    return {"unit": unit, "from": lo, "to": hi, "working_days": _working_days(factors),
-            "routes": out}
+    res = {"unit": unit, "from": lo, "to": hi, "working_days": _working_days(factors),
+           "routes": out}
+    if co2_error:
+        res["co2_error"] = co2_error
+    return res
 
 
 # ------------------------------------------------------------------ routing network (Phase 0)

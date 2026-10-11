@@ -1271,6 +1271,55 @@ ok("2026-10-06: co2_to_date is keyed (route, discipline, section) and covers the
    ("R1", "earthworks", "WS1") in _td and _td[("R1", "earthworks", "WS1")] >= _k2["WS1"]["co2_t"] - 1e-9)
 ok("2026-10-06: an unbaked line never enters co2_to_date",
    ("R1", "substructure", "WS2") not in _td and ("R1", "structures", "WS3") not in _td)
+# 12 Oct 2026 (B2): forecast-matrix carries the SAME carbon per line per month, so the map's timeline
+# needs one call for a carbon paint and its KPI prefetch, and the drawer reads the server's figure
+_pm = main.public_forecast_matrix(from_=9, to=9, unit="t")
+_pmb = {r["section_id"]: r for r in _pm["routes"] if r["route_id"] == "R1"}
+ok("⭐ B2: every forecast-matrix line carries co2_t, a {month: t} map keyed exactly like monthly",
+   all("co2_t" in r and set(r["co2_t"]) == set(r["monthly"]) for r in _pm["routes"]) and set(_pmb["WS1"]["co2_t"]) == {"9"},
+   str({k: r.get("co2_t") for k, r in _pmb.items()}))
+ok("⭐ B2: the baked line's co2_t equals month-kpis' (one costlines figure) and the unbaked lines read None",
+   abs(_pmb["WS1"]["co2_t"]["9"] - _k2["WS1"]["co2_t"]) < 1e-9 and _pmb["WS2"]["co2_t"]["9"] is None
+   and _pmb["WS3"]["co2_t"]["9"] is None)
+ok("B2: the response shape is otherwise identical — the keys the detail table and the drawer read, plus co2_t, and no co2_error",
+   set(_pmb["WS1"]) == {"route_id", "discipline", "section_id", "material_type", "material_description", "vehicle_type",
+                        "monthly", "total", "co2_t"}
+   and set(_pm) == {"unit", "from", "to", "working_days", "routes"}, str(sorted(_pmb["WS1"])))
+ok("B2: month-kpis carries no co2_error on the happy path", "co2_error" not in _kp)
+# the failure path: the costlines read raises → both feeds answer, every co2_t None, and SAY why.
+# Until today month-kpis caught the error and blanked every carbon figure silently (a null factor
+# saved on Config was one trigger); forecast-matrix had no carbon at all.
+_real_lines = costlines.lines
+
+
+def _boom(*a, **k):
+    raise RuntimeError("fixture: the costlines read failed")
+
+
+costlines.lines = _boom
+try:
+    _ke = main.public_month_kpis(month=9, unit="vehicles")
+    _pme = main.public_forecast_matrix(from_=9, to=9, unit="t")
+except Exception as e:                       # pragma: no cover — the assertion below reports it
+    _ke, _pme = {"raised": repr(e)}, {"raised": repr(e)}
+finally:
+    costlines.lines = _real_lines
+ok("⭐ B2: when the costlines read fails month-kpis never raises — co2_error names the reason and every co2_t is None",
+   _ke.get("co2_error") == "RuntimeError: fixture: the costlines read failed"
+   and _ke.get("lines") and all(l["co2_t"] is None for l in _ke["lines"]) and _ke.get("co2_to_date") == []
+   and _ke.get("co2_to_date_unbaked_lines") == 0, str(_ke)[:200])
+ok("B2: ...the rest of the month-kpis answer is intact (the volumes are not carbon's hostage)",
+   len(_ke.get("lines") or []) == len(_kp["lines"]) and _ke["lines"][0]["vehicle_loads"] == _kp["lines"][0]["vehicle_loads"])
+ok("⭐ B2: forecast-matrix the same — answers, co2_error, every month's co2_t None, volumes intact",
+   _pme.get("co2_error") == "RuntimeError: fixture: the costlines read failed"
+   and all(v is None for r in _pme.get("routes") or [] for v in r["co2_t"].values())
+   and [r["monthly"] for r in _pme["routes"]] == [r["monthly"] for r in _pm["routes"]], str(_pme)[:200])
+ok("B2: the costlines read is restored and the happy path has no co2_error again",
+   costlines.lines is _real_lines and "co2_error" not in main.public_forecast_matrix(from_=9, to=9, unit="t"))
+_main_src_b2 = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
+ok("B2: both public feeds read ONE helper for carbon (_approved_co2) and main.py has no bare `except Exception:` left around the costlines read",
+   _main_src_b2.count("= _approved_co2(factors") == 2 and _main_src_b2.count("def _approved_co2(") == 1
+   and "co2_by_key, to_date = {}, {}" not in _main_src_b2)
 ok("§9: ...matching route_analysis exactly, so the dashboard, the form and the map agree",
    [r for r in network.route_analysis("R1", profiles=["Rigid 8-wheeler (32t)"])["rows"]
     if r["alt_index"] == 0][0]["trips_per_day"] == 5)
@@ -1472,6 +1521,15 @@ ok("cfg: ⭐ a non-positive payload is refused", not cfg.save(bad, network=netwo
 bad = json.loads(json.dumps(FILE)); del bad["vehicles"]["Artic Tipper (44t)"]
 ok("cfg: ⭐ deleting the default routing profile is refused",
    any("default routing profile" in p for p in cfg.save(bad, network=network)["problems"]))
+# 12 Oct 2026 (B2): the blank kg CO2e/km cell — the Config page writes null for it — is refused at save,
+# naming the vehicle; until today it saved, and the live document then made every carbon figure vanish
+bad = json.loads(json.dumps(FILE)); bad["vehicles"]["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km"] = None
+_res_null = cfg.save(bad, network=network)
+ok("cfg: ⭐ B2: a BLANK (null) emissions factor is refused at save, naming the vehicle",
+   _res_null["ok"] is False and any("vehicle 'Rigid 8-wheeler (32t)'" in p and "blank" in p for p in _res_null["problems"]),
+   str(_res_null["problems"]))
+ok("cfg: ...and the live document is untouched by the refused save",
+   conversions.load_factors()["vehicles"]["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km"] == 0.99773)
 db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L1", "a", 58.5, 24.0))
 db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L2", "b", 58.6, 24.4))
 db.execute("INSERT INTO routes (id, origin_id, dest_id) VALUES (?, ?, ?)", ("R1", "L1", "L2"))
