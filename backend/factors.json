@@ -908,13 +908,18 @@
       "_note": "The per-profile figures on each electric vehicle entry win over these defaults."
     },
     "benchmarks": {
-      "nh_target": "All HGVs delivering to National Highways sites electric or hydrogen by 2040 (Net Zero Highways plan, 2025 update)",
-      "nh_kpi_t_co2e_per_gbp_m": {
-        "2023_24": 210,
-        "2024_25": 148
-      },
-      "nh_kpi_source": "National Highways Net Zero Highways plan, 2025 update",
-      "_note": "No 'per delivery' limit exists in any published rule: say 'below the national average' or 'X % under baseline' (PAS 2080 baseline vs scenario)."
+      "nh_target": "National Highways commitment: \"100% electric or hydrogen heavy vehicles deliver to our sites by 2040\" (Net Zero Highways annual progress report 2025-26)",
+      "_note": "No 'per delivery' limit exists in any published rule: say 'below the national average' or 'X % under baseline' (PAS 2080 baseline vs scenario).",
+      "nh_kpi_2023_prices": {
+        "2024_25": 159,
+        "2025_26": 181,
+        "base_prices": "2023 prices",
+        "source": "National Highways, Net Zero Highways annual progress report 2025-26, section 4 and footnote 1",
+        "url": "https://nationalhighways.co.uk/media/1oabu3i2/net-zero-highways-annual-progress-report-2025-26.pdf",
+        "status": "VERIFIED",
+        "checked": "2026-10-11",
+        "_note": "NH's carbon intensity of maintenance and construction, tCO2e per £m spent, restated at 2023 price levels (OBR March 2026 CPI). It rose from 159 to 181. It supersedes the 210 → 148 (2023/24 → 2024/25) of the Net Zero Highways plan 2025 update, which this block carried until 11 Oct 2026. Context only: NH's figure covers all its maintenance and construction, a different scope from the Carbon page."
+      }
     },
     "planned": {
       "_note": "Roadmap only — shown on the Carbon page as a 'Planned' panel with no figures.",

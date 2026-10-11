@@ -1364,9 +1364,9 @@ const GUIDE_STEPS = {
     { anchor: "lookahead-tabs", title: "Actuals.", body: "After the day, record what really moved. The gap between them is the seven-day accuracy." },
   ],
   carbon: [
-    { anchor: "carbon-compare", title: "The plan against an alternative.", body: "The approved plan beside the alternative you build, in tonnes of CO₂e: material, transport and disposal." },
-    { anchor: "carbon-levers", title: "The decisions.", body: "Recycled content, a supplier EPD, the vehicle, electric lorries, a nearer source, a HERE alternative route, the disposal site." },
-    { anchor: "carbon-drivers", title: "What moves carbon most.", body: "Each decision ranked by the tonnes it moves on its own. Hover any figure for its source, year and status." },
+    { anchor: "carbon-compare", title: "The approved plan and an alternative.", body: "Both in tonnes of carbon dioxide equivalent (tCO2e): making the material, transport and waste disposal, with the lorry loads beside them." },
+    { anchor: "carbon-levers", title: "The decisions.", body: "Recycled content, a custom carbon factor from a supplier, vehicle choice, battery electric lorries, a nearer supplier, an alternative route, the receiving site." },
+    { anchor: "carbon-drivers", title: "Which decisions change carbon most.", body: "Each decision tested on its own and ranked by the tonnes it changes. Hover any figure for its source, year and status." },
   ],
   data: [
     { anchor: "rail", title: "Routes are HGV-legal", body: "for the vehicle's dimensions and weight, and are drawn on the map." },
@@ -3423,22 +3423,30 @@ function ConfigPage({ meta, who, access }){
 
 // ================================================================= Carbon planner (10 Oct 2026)
 // Which planning decisions move the most carbon on haulage and bulk materials: the approved
-// plan (the baseline) beside ONE alternative built from the controls on the left. Every figure
-// comes from POST /api/carbon/scenario (backend/carbon.py) — this page computes nothing but the
-// display (distances through dist()/DU(), never a factor). Planning estimates, not a National
-// Highways Carbon Tool return. Every factor shows its source, year and status on hover.
-const CARBON_TONE = { VERIFIED: "var(--green)", DERIVED: "var(--blue)", ASSUMPTION: "var(--gold)", "EPD (supplier)": "var(--muted)" };
+// plan beside ONE alternative built from the controls. Every figure comes from POST
+// /api/carbon/scenario (backend/carbon.py) — this page computes nothing but the display
+// (distances through dist()/DU(), never a factor). Planning estimates, not a National Highways
+// Carbon Tool return. Every factor shows its source, year and status on hover.
+// 11 Oct 2026, plain-English pass (notes/carbon-ui-1011): the words National Highways, CLOCS, FORS
+// and the Environment Agency use — "approved plan" (NH uses "baseline" for its 2019/20 year),
+// "custom carbon factor (supplier EPD)", "vehicle choice", "receiving site", "disposal method";
+// lorry loads beside tCO2e; sentence case at 14 px (13 px only for hints and table headers);
+// status as a word; results above the controls on a phone.
+const CARBON_TONE = { VERIFIED: "var(--green)", DERIVED: "var(--chart-none)", ASSUMPTION: "var(--gold)" };
+const CARBON_STATUS_WORD = { VERIFIED: "Verified", DERIVED: "Derived", ASSUMPTION: "Assumption" };
 const CARBON_FLAG_WORDS = {
-  UNBAKED: "route not baked — no transport carbon",
-  KM_FROM_BASELINE_VEHICLE: "km from the forecast vehicle's baked route (the alternative vehicle is not baked)",
-  KM_SCALED: "distance scaled by a typed percentage",
-  ALT_ROUTE_NOT_BAKED: "that HERE alternative is not baked — unchanged",
-  EV_TRIP_EXCEEDS_BATTERY: "a trip needs more energy than the battery holds — kept diesel, not credited",
-  RETURN_NOT_BAKED: "return leg not baked — loaded leg only, left out of the benchmarks",
-  RETURN_STAND_IN: "return leg of the chosen route not baked — the loaded leg stands in for it",
-  ROUTE_SWAP_NOT_BAKED: "the chosen route is not baked — that swap is left out",
-  NO_DISPOSAL_FACTOR: "no Government disposal factor for that material and route — left out, not counted as zero",
+  UNBAKED: "no route distance yet, so transport is not counted (Bake on the Routes page)",
+  KM_FROM_BASELINE_VEHICLE: "distance taken from the forecast vehicle's route (the chosen vehicle has no route distance yet)",
+  KM_SCALED: "distance scaled by the haul distance percentage",
+  ALT_ROUTE_NOT_BAKED: "that alternative route has no distance yet, so it is unchanged",
+  EV_TRIP_EXCEEDS_BATTERY: "a trip needs more energy than the battery holds, so it stays diesel and is not credited",
+  RETURN_NOT_BAKED: "return leg has no route distance yet: loaded leg only, left out of the benchmarks",
+  RETURN_STAND_IN: "return leg of the chosen route has no distance yet, so the loaded leg stands in for it",
+  ROUTE_SWAP_NOT_BAKED: "the chosen route has no distance yet, so that change is left out",
+  NO_DISPOSAL_FACTOR: "no Government disposal factor for that material and method: left out, not counted as zero",
 };
+const CARBON_DISPOSAL_WORD = { landfill: "Landfill", closed_loop: "Recycled (closed-loop)", open_loop: "Recycled (open-loop)", combustion: "Combustion" };
+const CARBON_NH_CATEGORY = { "Bulk Materials": "Bulk Materials", "Earthworks": "Earthworks", "Waste": "Waste + Waste Transport" };
 const CARBON_EMPTY = { recycled: {}, epd: {}, reused: {}, vehicle: {}, electric: false, distance: {}, supplier: {}, alt: {}, disposal: {} };
 
 function carbonLevers(st){
@@ -3497,140 +3505,311 @@ function CarbonPage({ meta, access, initialData }){
   (data.factors || []).forEach(f => { fx[f.key] = f; });
   const vehOf = {};
   (opt.vehicles || []).forEach(v => { vehOf[v.vehicle] = v; });
-  const t1 = (n) => (n == null ? "—" : grp(n, 1));
+  // empty cells say what they mean (GOV.UK: "no data" or "not applicable", never N/A)
+  const t1 = (n) => (n == null ? "no data" : grp(n, 1));
+  const altCell = (fn) => (A ? fn(A) : "no alternative yet");
   const ids = (f) => { const x = f && f.ids; if(!x) return f && f.id ? ` · ${f.id}` : ""; const a = Array.isArray(x) ? x : Object.values(x); const s = a.filter(Boolean).join(", "); return s ? ` · ${s}` : ""; };
-  const prov = (f) => (f ? `${f.label}: ${f.value != null ? f.value : (f.kg_per_km != null ? f.kg_per_km : "")} ${f.unit || ""} · ${f.source || "—"} · ${f.year || "—"} · ${f.status || "—"}${ids(f)}` : "");
+  const prov = (f) => (f ? `${f.label}: ${f.value != null ? f.value : (f.kg_per_km != null ? f.kg_per_km : "")} ${f.unit || ""} · ${f.source || "no source"} · ${f.year || "year not given"} · ${CARBON_STATUS_WORD[f.status] || f.status || "no status"}${ids(f)}` : "");
   const setK = (k, key, v) => setSt(s => ({ ...s, [k]: { ...s[k], [key]: v } }));
-  const pct = (n) => (n == null ? "—" : `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)} %`);
-  const sign = (n) => (n == null ? "—" : `${n > 0 ? "+" : n < 0 ? "−" : ""}${grp(Math.abs(n), 1)}`);
+  const pct = (n) => (n == null ? "" : `${Math.abs(n).toFixed(1)}%`);
+  // a change in words, never colour alone: "120.4 tCO2e lower", "8.2 tCO2e higher", "no change"
+  const moved = (n) => (n == null ? "no data" : n < -0.0005 ? `${grp(-n, 1)} tCO2e lower` : n > 0.0005 ? `${grp(n, 1)} tCO2e higher` : "no change");
+  const tone = (n) => (n < -0.0005 ? "var(--green)" : n > 0.0005 ? "var(--red)" : "var(--muted)");
   const card = "bg-white rounded-xl border border-slate-200";
-  const head = "text-[12px] font-semibold uppercase tracking-wide text-slate-500";
+  const h3 = "text-base font-semibold text-slate-800";
+  const hint = "text-[13px] text-slate-500";
+  const lab = "block text-sm font-medium text-slate-700 mb-1";
   const inp = "border border-slate-300 rounded-md px-2 py-1 text-sm w-full tabular-nums bg-white";
-  const Chip = ({ s }) => (s ? <span className="text-[12px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border border-slate-200" style={{ color: CARBON_TONE[s] || "var(--muted)" }}>{s}</span> : null);
-  const Total = ({ title, sc, delta }) => (
-    <div className={card + " p-4"}>
-      <div className={head}>{title}</div>
-      <div className="kpi-num font-bold text-[color:var(--navy-deep)] mt-1" style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}
-           title="Material production + transport (vehicle-km, both legs) + disposal, in tonnes CO₂e">{t1(sc.totals.total_t)} <span className="text-sm font-semibold text-slate-400">t CO₂e</span></div>
-      {delta}
-      <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-        <div title="Quantity × the Government 2026 material factor (or the supplier EPD typed)"><div className="text-slate-400">Material</div><div className="font-semibold tabular-nums text-slate-700">{t1(sc.totals.material_t)}</div></div>
-        <div title="Trips × routed km × each vehicle's kg CO₂e per vehicle-km — the Dashboard's own method; unbaked lines excluded"><div className="text-slate-400">Transport</div><div className="font-semibold tabular-nums text-slate-700">{t1(sc.totals.transport_t)}</div></div>
-        <div title="Tonnes to a tip or recycling site × the Government 2026 waste disposal factor"><div className="text-slate-400">Disposal</div><div className="font-semibold tabular-nums text-slate-700">{t1(sc.totals.disposal_t)}</div></div>
+  const Chip = ({ s }) => (s ? <span className="inline-flex items-center gap-1.5 text-sm text-slate-700 whitespace-nowrap"><i aria-hidden="true" style={{ display: "inline-block", width: 8, height: 8, borderRadius: 4, background: CARBON_TONE[s] || "var(--chart-none)" }}></i>{CARBON_STATUS_WORD[s] || s}</span> : null);
+  const lorryLine = (sc) => {
+    const f = sc.fleet || {};
+    return (
+      <div className="text-sm text-slate-700 mt-1">
+        Lorry loads (deliveries): <b className="tabular-nums">{f.trips == null ? "no data" : grp(f.trips)}</b> · lorries needed in the busiest month: <b className="tabular-nums">{f.lorries_peak == null ? "no data" : f.lorries_peak}</b>
+        {f.unsized_lines ? <span className={hint}> (the busiest month leaves out {f.unsized_lines} plan line{f.unsized_lines === 1 ? "" : "s"} with no route distance)</span> : null}
       </div>
+    );
+  };
+  const Total = ({ title, sub, sc, children }) => (
+    <div className={card + " p-4"}>
+      <h3 className={h3}>{title}</h3>
+      <div className={hint}>{sub}</div>
+      <div className="kpi-num font-bold text-[color:var(--navy-deep)] mt-2" style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}
+           title="Making the material + transport to and from site + waste disposal, in tonnes of carbon dioxide equivalent (tCO2e)">{t1(sc.totals.total_t)} <span className="text-sm font-semibold text-slate-500">tCO2e</span></div>
+      <div className="text-sm text-slate-700 mt-1 tabular-nums">Material {t1(sc.totals.material_t)} + Transport {t1(sc.totals.transport_t)} + Waste disposal {t1(sc.totals.disposal_t)}</div>
+      {children}
     </div>
   );
   const bm = (sc) => sc.benchmarks || {};
-  const natWord = (v) => (v == null ? "no baked line" : `${Math.abs(v).toFixed(1)} % ${v < 0 ? "below" : "above"} the national average`);
-  const routesWithChoices = (opt.routes || []).filter(r => (r.suppliers || []).length || (r.destinations || []).length || Object.values(r.alts || {}).some(a => (a || []).length > 1));
+  const nhKpi = bm(B).nh_kpi || null;
+  const natWord = (v) => (v == null ? "no data" : `${Math.abs(v).toFixed(1)}% ${v < 0 ? "below" : "above"} the national average`);
+  const routesWithChoices = (opt.routes || []).filter(r => (r.suppliers || []).length || Object.values(r.alts || {}).some(a => (a || []).length > 1));
+  const wasteRoutes = (opt.routes || []).filter(r => r.disposal_route || (r.destinations || []).some(x => x.disposal_route));
   const fc = data.fleet_compare || {};
   const flagsOf = (sc) => Object.entries((sc && sc.totals && sc.totals.flags) || {});
+  const unrouted = (B.totals.lines || 0) - (B.totals.baked_lines || 0);
 
   return (
     <div className="max-w-7xl mx-auto p-6">
       <PageHeader title="Carbon planner" kicker="Plan"
-        subtitle="Which planning decisions move the most carbon on haulage and bulk materials: the approved plan beside an alternative you build on the left. Planning estimates, not a National Highways Carbon Tool return."
-        actions={<button onClick={() => { setSt(CARBON_EMPTY); setSpend(""); }} className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">Reset the alternative</button>}>
-        <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          <span><strong className="tabular-nums">{B.totals.lines}</strong> approved line-months · <strong className="tabular-nums">{B.totals.baked_lines}</strong> on a baked route</span>
-          {B.totals.excludes_unbaked && <span className="text-amber-700">transport excludes the {B.totals.lines - B.totals.baked_lines} unbaked — bake them on the Routes page</span>}
+        subtitle="Test planning decisions on haulage and bulk materials against the approved plan."
+        actions={<button onClick={() => { setSt(CARBON_EMPTY); setSpend(""); }} className="text-sm font-semibold px-3 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">Clear the alternative</button>}>
+        <div className="flex items-start gap-3 mt-3" role="note">
+          <span aria-hidden="true" className="inline-flex items-center justify-center font-bold shrink-0" style={{ width: 26, height: 26, borderRadius: 13, background: "var(--ink)", color: "var(--bg)" }}>!</span>
+          <strong className="text-base text-slate-800">Planning estimates. Not a National Highways Carbon Tool return.</strong>
+        </div>
+        <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+          <span><strong className="tabular-nums">{B.totals.lines}</strong> plan lines (one route, material and month each) · <strong className="tabular-nums">{B.totals.baked_lines}</strong> with a route distance</span>
+          {unrouted > 0 && <span className="text-amber-700">{unrouted} plan line{unrouted === 1 ? " has" : "s have"} no route distance yet, so {unrouted === 1 ? "its" : "their"} transport is not counted: route them with Bake on the Routes page</span>}
           {busy && <span className="text-slate-400">updating…</span>}
         </div>
       </PageHeader>
       {err && <div className="rounded-lg border p-3 text-sm mb-4" style={{ borderColor: "var(--red)", color: "var(--red)" }}>{err}</div>}
 
       <div className="grid lg:grid-cols-3 gap-5">
-        {/* ---------------- the levers ---------------- */}
-        <div className="space-y-4" data-guide="carbon-levers">
+        {/* ---------------- the answer: first on a phone, on the right on a wide screen ---------------- */}
+        <div className="lg:col-span-2 space-y-4 order-1 lg:order-2">
+          <div className="grid md:grid-cols-2 gap-4" data-guide="carbon-compare">
+            <Total title="Approved plan" sub="What the alternative is compared with" sc={B}>{lorryLine(B)}</Total>
+            {A ? (
+              <Total title="Alternative" sub="Built from the decisions you choose" sc={A}>
+                <div className="text-sm font-semibold mt-1 tabular-nums" style={{ color: tone(A.delta_t) }}>
+                  {A.delta_t != null && Math.abs(A.delta_t) > 0.0005 ? `${moved(A.delta_t)} than the approved plan (${pct(A.delta_pct)})` : "No change from the approved plan"}
+                </div>
+                {lorryLine(A)}
+                {A.delta_trips ? <div className="text-sm text-slate-700">{A.delta_trips < 0 ? `${grp(-A.delta_trips)} fewer lorry loads` : `${grp(A.delta_trips)} more lorry loads, because each lorry carries less`}</div> : null}
+                <div className={hint + " mt-1"}>Figures are rounded, so the parts may not add exactly to the total</div>
+              </Total>
+            ) : (
+              <div className={card + " p-4 text-sm text-slate-600"}>
+                <h3 className={h3}>Alternative</h3>
+                <p className="mt-2">Choose a decision: recycled content, a custom carbon factor (supplier EPD), vehicle choice, battery electric lorries, a nearer supplier, an alternative route or a receiving site. The approved plan stays as it is.</p>
+              </div>
+            )}
+          </div>
+
+          <div className={card + " p-4"} data-guide="carbon-drivers">
+            <h3 className={h3}>Which decisions change carbon most</h3>
+            <div className={hint}>Each decision tested on its own against the approved plan; National Highways records ideas like these in its Low Carbon Opportunities Register</div>
+            {!A || !(A.drivers || []).length ? (
+              <p className="text-sm text-slate-600 mt-2">Build an alternative to see each decision ranked by the tonnes of carbon dioxide equivalent it changes.</p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {(() => { const mx = Math.max(...A.drivers.map(d => Math.abs(d.delta_t)), 1e-9); return A.drivers.map(d => (
+                  <div key={d.driver} title={`${d.label}: ${moved(d.delta_t)} on its own (${pct(d.delta_pct)} of the approved plan), ${d.lines_changed} plan lines changed`}>
+                    <div className="flex justify-between gap-3 text-sm"><span className="text-slate-800">{d.label}</span>
+                      <span className="tabular-nums whitespace-nowrap"><b style={{ color: tone(d.delta_t) }}>{moved(d.delta_t)}</b> ({pct(d.delta_pct)})</span></div>
+                    <div className="h-2 rounded bg-slate-100" aria-hidden="true"><div className="h-2 rounded" style={{ width: `${Math.max(2, Math.abs(d.delta_t) / mx * 100)}%`, background: tone(d.delta_t) }} /></div>
+                  </div>)); })()}
+                <p className="text-sm text-slate-600">{Math.abs(A.interaction_t || 0) < 0.0005
+                  ? "The decisions do not affect each other here: together they come to the sum of each on its own."
+                  : `Together, the result is ${grp(Math.abs(A.interaction_t), 1)} tCO2e ${A.interaction_t < 0 ? "lower" : "higher"} than adding up each decision on its own.`}</p>
+                {(A.notes || []).map(n => <p key={n} className="text-sm text-amber-700">{n}</p>)}
+                {flagsOf(A).map(([k, n]) => <p key={k} className="text-sm text-amber-700">{n} plan line{n === 1 ? "" : "s"}: {CARBON_FLAG_WORDS[k] || k}</p>)}
+              </div>
+            )}
+          </div>
+
+          <div className={card + " overflow-hidden"}>
+            <table className="tbl">
+              <caption><b>How the plan compares</b> · against published references, never an invented limit</caption>
+              <thead><tr><th scope="col">Measure</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th><th scope="col">Reference</th></tr></thead>
+              <tbody>
+                <tr><td>Transport kgCO2e per tonne moved</td><td className="num">{bm(B).kg_co2e_per_t_delivered ?? "no data"}</td><td className="num">{altCell(a => bm(a).kg_co2e_per_t_delivered ?? "no data")}</td><td className={hint}>No published limit per delivery or per tonne exists</td></tr>
+                <tr><td>All-in kgCO2e per tonne (material, transport, waste disposal)</td><td className="num">{bm(B).kg_co2e_per_t_all_in ?? "no data"}</td><td className="num">{altCell(a => bm(a).kg_co2e_per_t_all_in ?? "no data")}</td><td className={hint}>Soil has no Government production factor, so earthworks carry haulage and disposal only</td></tr>
+                <tr title={prov(fx["tkm:artic"]) + "\n" + prov(fx["tkm:rigid"])}><td>kgCO2e per {TKM()}</td>
+                  <td className="num">{bm(B).kg_co2e_per_tkm == null ? "no data" : distRate(bm(B).kg_co2e_per_tkm).toFixed(4)}</td>
+                  <td className="num">{altCell(a => bm(a).kg_co2e_per_tkm == null ? "no data" : distRate(bm(a).kg_co2e_per_tkm).toFixed(4))}</td>
+                  <td className={hint}>Department for Energy Security and Net Zero (DESNZ) 2026 average for the same lorry sizes: {bm(B).desnz_kg_co2e_per_tkm == null ? "no data" : distRate(bm(B).desnz_kg_co2e_per_tkm).toFixed(4)}; the approved plan is {natWord(bm(B).vs_national_average_pct)}</td></tr>
+                <tr><td>Laden share of lorry-{DU()}<div className={hint}>Every return leg is counted empty: back-loads are not modelled</div></td><td className="num">{bm(B).laden_share_pct == null ? "no data" : `${bm(B).laden_share_pct}%`}</td><td className="num">{altCell(a => bm(a).laden_share_pct == null ? "no data" : `${bm(a).laden_share_pct}%`)}</td><td className={hint}>{bm(B).excluded_lines ? `${bm(B).excluded_lines} plan lines with no return route distance are left out of these figures` : "Every routed plan line is included"}</td></tr>
+                <tr><td>Zero-emission deliveries</td><td className="num">{bm(B).zero_emission_share_pct == null ? "no data" : `${bm(B).zero_emission_share_pct}%`}</td><td className="num">{altCell(a => bm(a).zero_emission_share_pct == null ? "no data" : `${bm(a).zero_emission_share_pct}%`)}</td><td className={hint}>{bm(B).nh_target || ""}</td></tr>
+                <tr><td>tCO2e per {CUR()} million of programme spend</td><td className="num">{bm(B).t_co2e_per_gbp_m ?? (spend === "" ? "not entered" : "no data")}</td><td className="num">{altCell(a => bm(a).t_co2e_per_gbp_m ?? (spend === "" ? "not entered" : "no data"))}</td>
+                  <td className={hint} title={nhKpi ? `${nhKpi.source || ""}${nhKpi.url ? " · " + nhKpi.url : ""}` : ""}>{nhKpi
+                    ? `National Highways, all maintenance and construction: ${nhKpi.series && nhKpi.series["2024_25"] != null ? nhKpi.series["2024_25"] : "no data"} (2024/25) to ${nhKpi.series && nhKpi.series["2025_26"] != null ? nhKpi.series["2025_26"] : "no data"} (2025/26) tCO2e per £m, ${nhKpi.price_base || ""}. Context only: this page counts materials, haulage and waste disposal, not the same scope.`
+                    : "No published National Highways figure on this tenant"}</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className={card + " overflow-hidden"}>
+            <table className="tbl">
+              <caption><b>Three ways to count the same haul</b> · transport only, tCO2e</caption>
+              <thead><tr><th scope="col">Method</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th></tr></thead>
+              <tbody>
+                <tr title={(data.methods || {}).headline}><td><b>Wayscope: per vehicle-km, both legs</b> (the figure on this page)<div className={hint}>Diesel is exhaust only (tank-to-wheel); electric is the grid electricity used</div></td><td className="num">{t1(B.totals.transport_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_t))}</td></tr>
+                <tr title={(data.methods || {}).nh_tool + "\n" + prov(fx["nh_tool"])}><td>National Highways Carbon Tool method (for comparison)<div className={hint}>Tonnes × one-way distance, return added, 2024 factors with well-to-tank</div></td><td className="num">{t1(B.totals.transport_nh_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_nh_t))}</td></tr>
+                <tr title={(data.methods || {}).tonne_km}><td>Tonne-km method: DESNZ 2026, average load<div className={hint}>What a tonne-km calculator gives for the same haul</div></td><td className="num">{t1(B.totals.transport_tkm_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_tkm_t))}</td></tr>
+              </tbody>
+            </table>
+            <p className="text-sm text-slate-600 px-4 py-3">All three use Government factors. GOV.UK says to prefer the per-vehicle-km figure when the vehicle and the route distance are known, which they are here. The Carbon Tool asks only for tonnes and a one-way distance, adds the return and well-to-tank, so it reads higher. Never quote one as the other. FORS hauliers report well-to-wheel emissions from the fuel they use; this page does not show that figure yet.</p>
+          </div>
+
+          <div className={card + " overflow-hidden"} data-guide="carbon-fleet">
+            {!fc.lines ? (
+              <div className="p-4"><h3 className={h3}>Diesel or battery electric, same tonnage</h3><p className="text-sm text-slate-600 mt-2">{fc.note || "No forecast vehicle with a route distance has an electric profile on Config."}</p></div>
+            ) : (
+              <>
+                <table className="tbl">
+                  <caption><b>Diesel or battery electric, same tonnage</b> · the same plan lines run both ways</caption>
+                  <thead><tr><th scope="col"></th><th scope="col" className="num">Lorries needed, busiest month</th><th scope="col" className="num">Lorry loads</th><th scope="col" className="num">kWh</th><th scope="col" className="num">tCO2e</th></tr></thead>
+                  <tbody>
+                    <tr><td>Diesel, as forecast</td><td className="num">{fc.diesel.lorries_peak}</td><td className="num">{grp(fc.diesel.trips)}</td><td className="num">not applicable</td><td className="num">{t1(fc.diesel.transport_t)}</td></tr>
+                    <tr title={prov(fx["kwh_per_km"]) + "\n" + prov(fx["electricity"])}><td>Battery electric</td><td className="num">{fc.electric.lorries_peak}</td><td className="num">{grp(fc.electric.trips)}</td><td className="num">{grp(fc.electric.kwh)}</td><td className="num">{t1(fc.electric.transport_t)}</td></tr>
+                  </tbody>
+                </table>
+                <div className="text-sm text-slate-600 px-4 py-3 space-y-1">
+                  {(fc.electric_profiles || []).map(p => (
+                    <div key={p.vehicle}>{vehLabel(p.vehicle)}: payload {p.payload_t} t (diesel {p.twin_payload_t} t) · {p.kwh_per_km} kWh per km · battery {p.battery_kwh_usable} kWh usable · charger {p.charge_kw} kW <Chip s={p.status} /></div>
+                  ))}
+                  <div>Range on one charge {fc.range_per_charge_km_min == null ? "no data" : `${fmtDist(fc.range_per_charge_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} plan line${fc.infeasible_lines === 1 ? "" : "s"} left out of both columns: a trip needs more than one battery` : ""}</div>
+                  <div className={hint}>The battery starts each shift full; charging time comes out of the shift. The +2 t weight allowance for zero-emission heavy goods vehicles (HGVs) is a draft rule and is not applied.</div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className={card + " overflow-hidden"}>
+            <table className="tbl">
+              <caption><b>By material</b> · each plan line sits in one National Highways Carbon Tool category: earthworks excludes bulk materials</caption>
+              <thead><tr><th scope="col">Material</th><th scope="col">Carbon Tool category (NH)</th><th scope="col" className="num">Tonnes</th><th scope="col" className="num">Approved plan, tCO2e</th><th scope="col" className="num">Alternative, tCO2e</th></tr></thead>
+              <tbody>
+                {(B.by_category || []).map(c => {
+                  const a = A ? (A.by_category || []).find(x => x.category === c.category) : null;
+                  return <tr key={c.category}><td>{c.category}</td><td>{CARBON_NH_CATEGORY[c.sheet] || c.sheet || "no category"}</td><td className="num">{grp(c.tonnes)}</td><td className="num">{t1(c.total_t)}</td><td className="num">{A ? (a ? t1(a.total_t) : "no data") : "no alternative yet"}</td></tr>;
+                })}
+              </tbody>
+            </table>
+            <p className={hint + " px-4 py-2"}>Soil going to a tip or a recycling site is reported under Waste + Waste Transport and carries the waste disposal factor, not a production factor.</p>
+          </div>
+
+          <div className={card + " p-4"}>
+            <button className={h3 + " w-full text-left"} onClick={() => setShowFactors(v => !v)} aria-expanded={showFactors}>{showFactors ? "▾" : "▸"} Factors used: source, year and status ({(data.factors || []).length})</button>
+            <p className={hint + " mt-1"}>Verified: matches the published row · Derived: worked out from published rows · Assumption: typed or estimated</p>
+            {showFactors && (
+              <ul className="mt-2 space-y-2 text-sm">
+                {(data.factors || []).map(f => (
+                  <li key={f.key} title={prov(f)} className="flex flex-wrap items-baseline gap-x-2">
+                    <Chip s={f.status} /><span className="font-semibold text-slate-800">{f.label}</span>
+                    <span className="text-slate-600 tabular-nums">{f.value != null ? (Array.isArray(f.value) ? f.value.join("–") : f.value) : f.kg_per_km != null ? f.kg_per_km : (f.kg_co2e_per_t ? Object.entries(f.kg_co2e_per_t).filter(([, v]) => v != null).map(([k, v]) => `${k.replace("_", "-")} ${v}`).join(" · ") : "")} {f.unit || (f.kg_co2e_per_t ? "kgCO2e per tonne" : "")}</span>
+                    <span className="text-slate-500">{f.source || "no source"} · {f.year || "year not given"}{ids(f)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* ---------------- the decisions: below the answer on a phone, on the left on a wide screen ---------------- */}
+        <div className="space-y-4 order-2 lg:order-1" data-guide="carbon-levers">
           <div className={card + " p-4 space-y-4"}>
-            <div className={head}>Materials</div>
+            <h3 className={h3}>Materials</h3>
             {(opt.materials || []).map(m => {
               const f = fx["material:" + m.carbon_material];
               const e = (st.epd || {})[m.category] || {};
               return (
                 <div key={m.category} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
                   <div className="text-sm font-semibold text-slate-800">{m.category}</div>
-                  <div className="text-[13px] text-slate-400" title={prov(f)}>{m.label || "no Government class"} · {m.sheet || "—"} · {grp(m.tonnes)} t{m.primary != null ? ` · ${m.primary} kg CO₂e/t primary` : ""} {f && <Chip s={f.status} />}</div>
-                  <label className="block mt-2 text-xs text-slate-600" title={m.recycled_enabled ? "Linear blend of the Government primary and closed-loop figures" : m.recycled_reason}>
-                    Recycled content <span className="tabular-nums font-semibold">{(st.recycled || {})[m.category] || 0} %</span>
+                  <div className={hint} title={prov(f)}>{m.label || "No Government class"} · {grp(m.tonnes)} t{m.primary != null ? ` · ${m.primary} kgCO2e per tonne (Government factor)` : ""} {f && <Chip s={f.status} />}</div>
+                  <label className="block mt-2" title={m.recycled_enabled ? "Linear blend of the Government primary and recycled (closed-loop) factors" : m.recycled_reason}>
+                    <span className={lab}>Recycled content: {(st.recycled || {})[m.category] || 0}%</span>
                     <input type="range" min="0" max="100" step="5" className="w-full" disabled={!m.recycled_enabled || !!e.kg}
                       value={(st.recycled || {})[m.category] || 0} onChange={ev => setK("recycled", m.category, +ev.target.value)} />
-                    {!m.recycled_enabled && <span className="block text-[13px] text-slate-400">Not available: {m.recycled_reason}.</span>}
+                    {!m.recycled_enabled && <span className={"block " + hint}>Not available: {m.recycled_reason}.</span>}
                   </label>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <label className="block text-[13px] text-slate-400">Supplier EPD, kg CO₂e/t
-                      <input className={inp + " mt-0.5"} inputMode="decimal" value={e.kg || ""} placeholder="Government figure"
-                        onChange={ev => setK("epd", m.category, { ...e, kg: ev.target.value })} /></label>
-                    <label className="block text-[13px] text-slate-400">EPD reference (required)
-                      <input className={inp + " mt-0.5"} value={e.source || ""} placeholder="e.g. the EPD number"
-                        onChange={ev => setK("epd", m.category, { ...e, source: ev.target.value })} /></label>
-                  </div>
+                  <label className="block mt-2">
+                    <span className={lab}>Custom carbon factor (supplier EPD), kgCO2e per tonne</span>
+                    <span className={"block " + hint + " mb-1"}>Replaces the Government factor; give the reference of the supplier's environmental product declaration (EPD)</span>
+                    <input className={inp} inputMode="decimal" value={e.kg || ""} placeholder="Government factor" onChange={ev => setK("epd", m.category, { ...e, kg: ev.target.value })} />
+                  </label>
+                  <label className="block mt-2">
+                    <span className={lab}>EPD reference (required)</span>
+                    <input className={inp} value={e.source || ""} placeholder="for example, the EPD number" onChange={ev => setK("epd", m.category, { ...e, source: ev.target.value })} />
+                  </label>
                   {m.reused != null && (
-                    <label className="flex items-center gap-2 mt-2 text-xs text-slate-600" title={`Government 'Re-used' row: ${m.reused} kg CO₂e/t`}>
-                      <input type="checkbox" checked={!!(st.reused || {})[m.category]} disabled={!!e.kg}
-                        onChange={ev => setK("reused", m.category, ev.target.checked)} /> Re-used material ({m.reused} kg CO₂e/t)
+                    <label className="flex items-start gap-2 mt-2 text-sm text-slate-700" title={`Government reused factor: ${m.reused} kgCO2e per tonne`}>
+                      <input type="checkbox" className="mt-1" checked={!!(st.reused || {})[m.category]} disabled={!!e.kg}
+                        onChange={ev => setK("reused", m.category, ev.target.checked)} />
+                      <span>Reused material ({m.reused} kgCO2e per tonne)<span className={"block " + hint}>Uses the Government reused factor; lorry loads are unchanged</span></span>
                     </label>
                   )}
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <label className="block text-[13px] text-slate-400">Vehicle
-                      <select className={inp + " mt-0.5"} value={(st.vehicle || {})[m.category] || ""} onChange={ev => setK("vehicle", m.category, ev.target.value)}>
-                        <option value="">as forecast</option>
-                        {(m.vehicles || []).map(v => <option key={v} value={v}>{vehLabel(v)}{(vehOf[v] || {}).fuel === "electric" ? " (scenario)" : ""}</option>)}
-                      </select></label>
-                    <label className="block text-[13px] text-slate-400" title="A typed percentage of the baked distance: a nearer or farther source. Flagged as typed.">
-                      Source distance <span className="tabular-nums font-semibold text-slate-600">{(st.distance || {})[m.category] || 100} %</span>
-                      <input type="range" min="50" max="150" step="5" className="w-full" value={(st.distance || {})[m.category] || 100}
-                        onChange={ev => setK("distance", m.category, +ev.target.value)} /></label>
-                  </div>
                 </div>
               );
             })}
           </div>
 
-          <div className={card + " p-4 space-y-3"}>
-            <div className={head}>Fleet and spend</div>
+          <div className={card + " p-4 space-y-4"}>
+            <h3 className={h3}>Lorries and routes</h3>
             <label className="flex items-start gap-2 text-sm text-slate-700" title={prov(fx["electricity"])}>
               <input type="checkbox" className="mt-1" checked={!!st.electric} onChange={ev => setSt(s => ({ ...s, electric: ev.target.checked }))} />
-              <span>Electric lorries where a variant exists <span className="block text-[13px] text-slate-400">kWh per km × UK electricity; no Government electric HGV factor exists. Lower payload, more trips.</span></span>
+              <span><span className="font-medium">Battery electric lorries</span><span className={"block " + hint}>Where Config has an electric profile for that lorry; kWh per km × UK electricity, as no Government electric HGV factor exists</span></span>
             </label>
-            <label className="block text-[13px] text-slate-400">Programme spend, {CUR()}m (optional, for tCO₂e per {CUR()}m)
-              <input className={inp + " mt-0.5"} inputMode="decimal" value={spend} onChange={ev => setSpend(ev.target.value)} placeholder="not entered" /></label>
+            {(opt.materials || []).map(m => (
+              <div key={m.category} className="border-t border-slate-100 pt-3">
+                <div className="text-sm font-semibold text-slate-800">{m.category}</div>
+                <label className="block mt-2">
+                  <span className={lab}>Vehicle choice</span>
+                  <select className={inp} value={(st.vehicle || {})[m.category] || ""} onChange={ev => setK("vehicle", m.category, ev.target.value)}>
+                    <option value="">As forecast</option>
+                    {(m.vehicles || []).map(v => <option key={v} value={v}>{vehLabel(v)}{(vehOf[v] || {}).fuel === "electric" ? " (scenario only)" : ""}</option>)}
+                  </select>
+                </label>
+                <label className="block mt-2" title="A typed percentage of the route distance; flagged as typed">
+                  <span className={lab}>Haul distance: {(st.distance || {})[m.category] || 100}% of the planned route</span>
+                  <span className={"block " + hint}>Below 100% is a nearer supplier, above is farther</span>
+                  <input type="range" min="50" max="150" step="5" className="w-full" value={(st.distance || {})[m.category] || 100}
+                    onChange={ev => setK("distance", m.category, +ev.target.value)} />
+                </label>
+              </div>
+            ))}
+            {routesWithChoices.length > 0 && (
+              <div className="border-t border-slate-100 pt-3">
+                <button className="text-sm font-semibold text-slate-800 w-full text-left" onClick={() => setShowRoutes(v => !v)} aria-expanded={showRoutes}>{showRoutes ? "▾" : "▸"} Supplier and route, one route at a time ({routesWithChoices.length})</button>
+                {showRoutes && routesWithChoices.map(r => {
+                  const altList = Object.values(r.alts || {}).find(a => (a || []).length > 1) || [];
+                  return (
+                    <div key={r.route_id} className="border-t border-slate-100 pt-2 mt-2">
+                      <div className="text-sm font-semibold text-slate-700">{r.route_id} · {r.origin_name} → {r.dest_name}</div>
+                      {(r.suppliers || []).length > 0 && (
+                        <label className="block mt-1"><span className={lab}>Supplier</span>
+                          <select className={inp} value={(st.supplier || {})[r.route_id] || ""} onChange={ev => setK("supplier", r.route_id, ev.target.value)}>
+                            <option value="">{r.origin_name} (as planned)</option>
+                            {r.suppliers.map(s => <option key={s.route_id} value={s.route_id} disabled={!s.baked}>{s.origin_name} ({s.route_id}){s.baked ? "" : " — no route distance yet"}</option>)}
+                          </select></label>
+                      )}
+                      {altList.length > 1 && (
+                        <label className="block mt-1"><span className={lab}>Haul route</span>
+                          <select className={inp} value={(st.alt || {})[r.route_id] || 0} onChange={ev => setK("alt", r.route_id, +ev.target.value)}>
+                            {altList.map(k => <option key={k} value={k}>{k === 0 ? "As planned" : `Alternative route ${k}`}</option>)}
+                          </select></label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {routesWithChoices.length > 0 && (
-            <div className={card + " p-4"}>
-              <button className={head + " w-full text-left"} onClick={() => setShowRoutes(v => !v)}>{showRoutes ? "▾" : "▸"} Per route: supplier, haul route, disposal ({routesWithChoices.length})</button>
-              {showRoutes && routesWithChoices.map(r => {
-                const altList = Object.values(r.alts || {}).find(a => (a || []).length > 1) || [];
+          {wasteRoutes.length > 0 && (
+            <div className={card + " p-4 space-y-3"}>
+              <h3 className={h3}>Surplus material and waste</h3>
+              <p className={hint}>Where surplus material goes, and how it is dealt with there</p>
+              {wasteRoutes.map(r => {
                 const d = (st.disposal || {})[r.route_id] || {};
                 return (
-                  <div key={r.route_id} className="border-t border-slate-100 pt-2 mt-2 text-xs">
-                    <div className="font-semibold text-slate-700">{r.route_id} · {r.origin_name} → {r.dest_name}{r.disposal_route ? ` (${r.disposal_route.replace("_", "-")})` : ""}</div>
-                    {(r.suppliers || []).length > 0 && (
-                      <label className="block text-[13px] text-slate-400 mt-1">Supplier
-                        <select className={inp + " mt-0.5"} value={(st.supplier || {})[r.route_id] || ""} onChange={ev => setK("supplier", r.route_id, ev.target.value)}>
-                          <option value="">{r.origin_name} (as planned)</option>
-                          {r.suppliers.map(s => <option key={s.route_id} value={s.route_id} disabled={!s.baked}>{s.origin_name} ({s.route_id}){s.baked ? "" : " — not baked"}</option>)}
-                        </select></label>
-                    )}
-                    {altList.length > 1 && (
-                      <label className="block text-[13px] text-slate-400 mt-1">Haul route
-                        <select className={inp + " mt-0.5"} value={(st.alt || {})[r.route_id] || 0} onChange={ev => setK("alt", r.route_id, +ev.target.value)}>
-                          {altList.map(k => <option key={k} value={k}>{k === 0 ? "as baked" : `HERE alternative ${k}`}</option>)}
-                        </select></label>
-                    )}
+                  <div key={r.route_id} className="border-t border-slate-100 pt-2">
+                    <div className="text-sm font-semibold text-slate-700">{r.route_id} · {r.origin_name} → {r.dest_name}{r.disposal_route ? ` (${(CARBON_DISPOSAL_WORD[r.disposal_route] || r.disposal_route).toLowerCase()})` : ""}</div>
                     {(r.destinations || []).length > 0 && (
-                      <label className="block text-[13px] text-slate-400 mt-1">Send instead to
-                        <select className={inp + " mt-0.5"} value={d.to_route || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to_route: ev.target.value })}>
+                      <label className="block mt-1"><span className={lab}>Receiving site</span>
+                        <select className={inp} value={d.to_route || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to_route: ev.target.value })}>
                           <option value="">{r.dest_name} (as planned)</option>
-                          {r.destinations.map(x => <option key={x.route_id} value={x.route_id} disabled={!x.baked}>{x.dest_name}{x.disposal_route ? ` (${x.disposal_route.replace("_", "-")})` : ""}{x.baked ? "" : " — not baked"}</option>)}
+                          {r.destinations.map(x => <option key={x.route_id} value={x.route_id} disabled={!x.baked}>{x.dest_name}{x.disposal_route ? ` (${(CARBON_DISPOSAL_WORD[x.disposal_route] || x.disposal_route).toLowerCase()})` : ""}{x.baked ? "" : " — no route distance yet"}</option>)}
                         </select></label>
                     )}
                     {r.disposal_route && (
-                      <label className="block text-[13px] text-slate-400 mt-1">Disposal route at the site
-                        <select className={inp + " mt-0.5"} value={d.to || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to: ev.target.value })}>
-                          <option value="">as the site's type ({r.disposal_route.replace("_", "-")})</option>
-                          {(r.disposal_routes || []).map(k => <option key={k} value={k}>{k.replace("_", "-")}</option>)}
+                      <label className="block mt-1"><span className={lab}>Disposal method</span>
+                        <select className={inp} value={d.to || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to: ev.target.value })}>
+                          <option value="">As the site's type ({(CARBON_DISPOSAL_WORD[r.disposal_route] || r.disposal_route).toLowerCase()})</option>
+                          {(r.disposal_routes || []).map(k => <option key={k} value={k}>{CARBON_DISPOSAL_WORD[k] || k}</option>)}
                         </select></label>
                     )}
                   </div>
@@ -3638,136 +3817,26 @@ function CarbonPage({ meta, access, initialData }){
               })}
             </div>
           )}
-        </div>
-
-        {/* ---------------- the answer ---------------- */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="grid md:grid-cols-2 gap-4" data-guide="carbon-compare">
-            <Total title="Baseline — the approved plan" sc={B} />
-            {A ? (
-              <Total title="Alternative" sc={A} delta={
-                <div className="text-sm mt-1 tabular-nums" style={{ color: A.delta_t < 0 ? "var(--green)" : A.delta_t > 0 ? "var(--red)" : "var(--muted)" }}>
-                  {sign(A.delta_t)} t ({pct(A.delta_pct)}) {A.delta_t < 0 ? "under the baseline" : A.delta_t > 0 ? "over the baseline" : "— no change"}
-                </div>} />
-            ) : (
-              <div className={card + " p-4 text-sm text-slate-500"}>
-                <div className={head}>Alternative</div>
-                <p className="mt-2">Move a control on the left: recycled content, a supplier EPD, a vehicle, electric lorries, a nearer source, a HERE alternative or a disposal site. The baseline stays as approved.</p>
-              </div>
-            )}
-          </div>
-
-          <div className={card + " p-4"} data-guide="carbon-drivers">
-            <div className={head}>What moves carbon most</div>
-            {!A || !(A.drivers || []).length ? (
-              <p className="text-sm text-slate-500 mt-2">Build an alternative to see each decision ranked by the tonnes of CO₂e it moves.</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {(() => { const mx = Math.max(...A.drivers.map(d => Math.abs(d.delta_t)), 1e-9); return A.drivers.map(d => (
-                  <div key={d.driver} title={`${d.label}: ${sign(d.delta_t)} t CO₂e on its own (${pct(d.delta_pct)} of the baseline), ${d.lines_changed} line-months changed`}>
-                    <div className="flex justify-between text-sm"><span className="text-slate-700">{d.label}</span>
-                      <span className="tabular-nums font-semibold" style={{ color: d.delta_t < 0 ? "var(--green)" : d.delta_t > 0 ? "var(--red)" : "var(--muted)" }}>{sign(d.delta_t)} t</span></div>
-                    <div className="h-2 rounded bg-slate-100"><div className="h-2 rounded" style={{ width: `${Math.max(2, Math.abs(d.delta_t) / mx * 100)}%`, background: d.delta_t < 0 ? "var(--green)" : "var(--red)" }} /></div>
-                  </div>)); })()}
-                <p className="text-[13px] text-slate-400">Each decision is applied on its own to the baseline. Together they interact: {sign(A.interaction_t)} t not explained by any one alone.</p>
-                {(A.notes || []).map(n => <p key={n} className="text-[13px] text-amber-700">{n}</p>)}
-                {flagsOf(A).map(([k, n]) => <p key={k} className="text-[13px] text-amber-700">{n} line-month{n === 1 ? "" : "s"}: {CARBON_FLAG_WORDS[k] || k}</p>)}
-              </div>
-            )}
-          </div>
 
           <div className={card + " p-4"}>
-            <div className={head}>Benchmarks</div>
-            <table className="w-full text-sm mt-2">
-              <thead><tr className="text-[13px] text-slate-400"><th className="text-left font-semibold py-1">Measure</th><th className="text-right font-semibold">Baseline</th><th className="text-right font-semibold">Alternative</th><th className="text-left font-semibold pl-3">Reference</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr><td className="py-1.5 text-slate-700">kg CO₂e per tonne delivered (transport)</td><td className="text-right tabular-nums">{bm(B).kg_co2e_per_t_delivered ?? "—"}</td><td className="text-right tabular-nums">{A ? (bm(A).kg_co2e_per_t_delivered ?? "—") : "—"}</td><td className="pl-3 text-[13px] text-slate-400">no "per delivery" limit exists in any rule</td></tr>
-                <tr title={prov(fx["tkm:artic"]) + "\n" + prov(fx["tkm:rigid"])}><td className="py-1.5 text-slate-700">kg CO₂e per {TKM()}</td>
-                  <td className="text-right tabular-nums">{bm(B).kg_co2e_per_tkm == null ? "—" : distRate(bm(B).kg_co2e_per_tkm).toFixed(4)}</td>
-                  <td className="text-right tabular-nums">{A && bm(A).kg_co2e_per_tkm != null ? distRate(bm(A).kg_co2e_per_tkm).toFixed(4) : "—"}</td>
-                  <td className="pl-3 text-[13px] text-slate-400">DESNZ 2026 class average {bm(B).desnz_kg_co2e_per_tkm == null ? "—" : distRate(bm(B).desnz_kg_co2e_per_tkm).toFixed(4)}: baseline {natWord(bm(B).vs_national_average_pct)}</td></tr>
-                <tr><td className="py-1.5 text-slate-700">Laden share of {DU()} driven</td><td className="text-right tabular-nums">{bm(B).laden_share_pct ?? "—"} %</td><td className="text-right tabular-nums">{A ? `${bm(A).laden_share_pct ?? "—"} %` : "—"}</td><td className="pl-3 text-[13px] text-slate-400">tipping hauls run empty back{bm(B).excluded_lines ? ` · ${bm(B).excluded_lines} line-months with no baked return are left out of these figures` : ""}</td></tr>
-                <tr><td className="py-1.5 text-slate-700">Zero-emission deliveries</td><td className="text-right tabular-nums">{bm(B).zero_emission_share_pct ?? "—"} %</td><td className="text-right tabular-nums">{A ? `${bm(A).zero_emission_share_pct ?? "—"} %` : "—"}</td><td className="pl-3 text-[13px] text-slate-400">{bm(B).nh_target || ""}</td></tr>
-                <tr><td className="py-1.5 text-slate-700">t CO₂e per {CUR()}m</td><td className="text-right tabular-nums">{bm(B).t_co2e_per_gbp_m ?? "—"}</td><td className="text-right tabular-nums">{A ? (bm(A).t_co2e_per_gbp_m ?? "—") : "—"}</td><td className="pl-3 text-[13px] text-slate-400">{spend === "" ? "type the programme spend on the left. " : ""}National Highways' own KPI: {(bm(B).nh_kpi_t_co2e_per_gbp_m || {})["2023_24"] ?? "—"} → {(bm(B).nh_kpi_t_co2e_per_gbp_m || {})["2024_25"] ?? "—"} t/£m (2023/24 → 2024/25)</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className={card + " p-4"}>
-            <div className={head}>Three ways to count the same haul (transport only, t CO₂e)</div>
-            <table className="w-full text-sm mt-2">
-              <thead><tr className="text-[13px] text-slate-400"><th className="text-left font-semibold py-1">Method</th><th className="text-right font-semibold">Baseline</th><th className="text-right font-semibold">Alternative</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr title={(data.methods || {}).headline}><td className="py-1.5 text-slate-800 font-semibold">Wayscope — per vehicle-km (the headline)</td><td className="text-right tabular-nums">{t1(B.totals.transport_t)}</td><td className="text-right tabular-nums">{A ? t1(A.totals.transport_t) : "—"}</td></tr>
-                <tr title={(data.methods || {}).nh_tool + "\n" + prov(fx["nh_tool"])}><td className="py-1.5 text-slate-700">National Highways Carbon Tool basis (shown for comparison)</td><td className="text-right tabular-nums">{t1(B.totals.transport_nh_t)}</td><td className="text-right tabular-nums">{A ? t1(A.totals.transport_nh_t) : "—"}</td></tr>
-                <tr title={(data.methods || {}).tonne_km}><td className="py-1.5 text-slate-700">DESNZ 2026 per tonne-km (national average load)</td><td className="text-right tabular-nums">{t1(B.totals.transport_tkm_t)}</td><td className="text-right tabular-nums">{A ? t1(A.totals.transport_tkm_t) : "—"}</td></tr>
-              </tbody>
-            </table>
-            <p className="text-[13px] text-slate-400 mt-2">All three are Government factors. gov.uk says to prefer the per-vehicle-km figure when the vehicle and the routed distance are known, which they are here. The Carbon Tool asks only tonnes and a one-way distance, doubles it for the return and adds well-to-tank, so it reads higher. Never quote one as the other.</p>
-          </div>
-
-          <div className={card + " p-4"} data-guide="carbon-fleet">
-            <div className={head}>Diesel or electric — the same tonnage</div>
-            {!fc.lines ? <p className="text-sm text-slate-500 mt-2">{fc.note || "No forecast vehicle on a baked route has an electric variant."}</p> : (
-              <>
-                <table className="w-full text-sm mt-2">
-                  <thead><tr className="text-[13px] text-slate-400"><th className="text-left font-semibold py-1"></th><th className="text-right font-semibold">Lorries (peak month)</th><th className="text-right font-semibold">Trips</th><th className="text-right font-semibold">kWh</th><th className="text-right font-semibold">t CO₂e</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    <tr><td className="py-1.5 text-slate-700">Diesel, as forecast</td><td className="text-right tabular-nums">{fc.diesel.lorries_peak}</td><td className="text-right tabular-nums">{grp(fc.diesel.trips)}</td><td className="text-right tabular-nums">—</td><td className="text-right tabular-nums">{t1(fc.diesel.transport_t)}</td></tr>
-                    <tr title={prov(fx["kwh_per_km"]) + "\n" + prov(fx["electricity"])}><td className="py-1.5 text-slate-700">Electric variant</td><td className="text-right tabular-nums">{fc.electric.lorries_peak}</td><td className="text-right tabular-nums">{grp(fc.electric.trips)}</td><td className="text-right tabular-nums">{grp(fc.electric.kwh)}</td><td className="text-right tabular-nums">{t1(fc.electric.transport_t)}</td></tr>
-                  </tbody>
-                </table>
-                <div className="text-[13px] text-slate-500 mt-2 space-y-0.5">
-                  {(fc.electric_profiles || []).map(p => (
-                    <div key={p.vehicle}>{vehLabel(p.vehicle)}: payload {p.payload_t} t (diesel {p.twin_payload_t} t) · {p.kwh_per_km} kWh/km · battery {p.battery_kwh_usable} kWh usable · charger {p.charge_kw} kW</div>
-                  ))}
-                  <div>Range on one charge {fc.range_per_charge_km_min == null ? "—" : `${fmtDist(fc.range_per_charge_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} line-month${fc.infeasible_lines === 1 ? "" : "s"} left out of both columns: a trip needs more than one battery` : ""}</div>
-                  <div className="text-slate-400">The battery starts each shift full; charging time comes out of the shift. The +2 t weight allowance for zero-emission HGVs is a draft rule and is not applied.</div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className={card + " overflow-hidden"}>
-            <div className={head + " px-4 pt-4"}>By material</div>
-            <table className="w-full text-sm mt-2">
-              <thead className="bg-slate-50 text-[13px] text-slate-500"><tr><th className="text-left font-semibold px-4 py-1.5">Category</th><th className="text-left font-semibold">NH sheet</th><th className="text-right font-semibold">Tonnes</th><th className="text-right font-semibold">Baseline t CO₂e</th><th className="text-right font-semibold px-4">Alternative</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {(B.by_category || []).map(c => {
-                  const a = A ? (A.by_category || []).find(x => x.category === c.category) : null;
-                  return <tr key={c.category}><td className="px-4 py-1.5 text-slate-700">{c.category}</td><td className="text-slate-500">{c.sheet || "—"}</td><td className="text-right tabular-nums">{grp(c.tonnes)}</td><td className="text-right tabular-nums">{t1(c.total_t)}</td><td className="text-right tabular-nums px-4">{a ? t1(a.total_t) : "—"}</td></tr>;
-                })}
-              </tbody>
-            </table>
-            <p className="text-[13px] text-slate-400 px-4 py-2">Each line sits on one sheet only: earthworks excludes bulk materials. A soil line to a tip or recycling site carries the waste factor, not a material factor.</p>
-          </div>
-
-          <div className={card + " p-4"}>
-            <button className={head + " w-full text-left"} onClick={() => setShowFactors(v => !v)}>{showFactors ? "▾" : "▸"} Factors used — source, year and status ({(data.factors || []).length})</button>
-            {showFactors && (
-              <ul className="mt-2 space-y-1.5 text-xs">
-                {(data.factors || []).map(f => (
-                  <li key={f.key} title={prov(f)} className="flex flex-wrap items-baseline gap-x-2">
-                    <Chip s={f.status} /><span className="font-semibold text-slate-700">{f.label}</span>
-                    <span className="text-slate-500 tabular-nums">{f.value != null ? (Array.isArray(f.value) ? f.value.join("–") : f.value) : f.kg_per_km != null ? f.kg_per_km : (f.kg_co2e_per_t ? Object.entries(f.kg_co2e_per_t).filter(([, v]) => v != null).map(([k, v]) => `${k.replace("_", "-")} ${v}`).join(" · ") : "")} {f.unit || (f.kg_co2e_per_t ? "kg CO₂e/t" : "")}</span>
-                    <span className="text-slate-400">{f.source || "—"} · {f.year || "—"}{ids(f)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <label className="block">
+              <span className={lab}>Programme spend, in {CUR()} million (optional)</span>
+              <span className={"block " + hint + " mb-1"}>Used only for tCO2e per {CUR()} million</span>
+              <input className={inp} inputMode="decimal" value={spend} onChange={ev => setSpend(ev.target.value)} placeholder="not entered" />
+            </label>
           </div>
         </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 mt-5">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4" data-guide="carbon-planned">
-          <div className={head}>Planned — not built yet</div>
-          <ul className="list-disc pl-5 mt-2 text-sm text-slate-500 space-y-1">{(data.planned || []).map(p => <li key={p}>{p}</li>)}</ul>
-          <p className="text-[13px] text-slate-400 mt-2">No figures are shown for these until each exists.</p>
-        </div>
         <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
-          <div className={head}>Known limits</div>
-          <ul className="list-disc pl-5 mt-2 text-xs text-slate-500 space-y-1">{(data.limits || []).map(l => <li key={l}>{l}</li>)}</ul>
+          <h3 className={h3}>Known limits</h3>
+          <ul className="list-disc pl-5 mt-2 text-sm text-slate-600 space-y-1">{(data.limits || []).map(l => <li key={l}>{l}</li>)}</ul>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4" data-guide="carbon-planned">
+          <h3 className={h3}>Not built yet</h3>
+          <ul className="list-disc pl-5 mt-2 text-sm text-slate-600 space-y-1">{(data.planned || []).map(p => <li key={p}>{p}</li>)}</ul>
+          <p className={hint + " mt-2"}>No figures are shown for these until each exists.</p>
         </div>
       </div>
     </div>

@@ -181,23 +181,28 @@ if (loaded) {
   if (fs.existsSync(cbPath) && typeof sandbox.CarbonPage === "function") {
     const cs = JSON.parse(fs.readFileSync(cbPath, "utf8"));
     const cOut = render("the Carbon page renders POPULATED from the scenario fixture", h(sandbox.CarbonPage, { meta, access: planner, initialData: cs }));
-    ok("⭐ ...baseline 157.0 t and the alternative 32.8 t, 124.2 t (79.1 %) under it",
-      cOut.includes("Baseline — the approved plan") && cOut.includes("157.0") && cOut.includes("32.8")
-      && cOut.includes("−124.2 t (−79.1 %) under the baseline"));
-    const iD = cOut.indexOf("Disposal route"), iF = cOut.indexOf("Diesel vs electric");
-    ok("⭐ ...the drivers in the server's order: disposal, then diesel vs electric, then recycled content",
-      cOut.includes("What moves carbon most") && iD > 0 && iF > iD && cOut.lastIndexOf("Recycled content") > iF);
+    // NARROWED 11 Oct 2026 (plain-English pass): the same figures, in the new words
+    ok("⭐ ...the approved plan 157.0 t and the alternative 32.8 t, 124.2 tCO2e lower (79.1%)",
+      cOut.includes(">Approved plan<") && cOut.includes("157.0") && cOut.includes("32.8")
+      && cOut.includes("124.2 tCO2e lower than the approved plan (79.1%)") && !cOut.includes("Baseline"));
+    const iD = cOut.indexOf("Receiving site and disposal method"), iF = cOut.indexOf(">Battery electric lorries<");
+    ok("⭐ ...the drivers in the server's order: receiving site and disposal method, then battery electric lorries, then recycled content",
+      cOut.includes("Which decisions change carbon most") && iD > 0 && iF > iD && cOut.lastIndexOf("Recycled content") > iF);
+    ok("...lorry loads beside the carbon: 335 on the approved plan, 382 on the alternative, 47 more because each lorry carries less",
+      cOut.includes(">335<") && cOut.includes(">382<") && cOut.includes("47 more lorry loads, because each lorry carries less"));
+    ok("...the NH intensity is the restated 159 to 181 at 2023 prices, context only",
+      cOut.includes("159 (2024/25) to 181 (2025/26) tCO2e per £m, 2023 prices") && !cOut.includes("210"));
     ok("...the three methods side by side, the NH Carbon Tool basis labelled for comparison",
-      cOut.includes("Wayscope — per vehicle-km (the headline)") && cOut.includes("National Highways Carbon Tool basis (shown for comparison)")
+      cOut.includes("Wayscope: per vehicle-km, both legs") && cOut.includes("National Highways Carbon Tool method (for comparison)")
       && cOut.includes("46.2"));
     ok("...the diesel-or-electric table: 300 diesel trips, 342 electric, 19 950 kWh",
-      cOut.includes("Electric variant") && cOut.includes(">300<") && cOut.includes(">342<") && cOut.includes("19 950")
+      cOut.includes(">Battery electric<") && cOut.includes(">300<") && cOut.includes(">342<") && cOut.includes("19 950")
       && cOut.includes("no charge needed inside a shift") && !cOut.includes("up to 0 charge"));
     ok("...the controls: a disabled recycled slider for soil with the reason, the EPD fields, the electric switch",
       cOut.includes("Not available: no primary-production factor is published for Soils.") && cOut.includes("EPD reference (required)")
-      && cOut.includes("Electric lorries where a variant exists"));
+      && cOut.includes("Battery electric lorries") && cOut.includes("Where Config has an electric profile for that lorry"));
     ok("...the Planned panel and the known limits, and nothing renders as undefined or NaN",
-      cOut.includes("Planned — not built yet") && cOut.includes("Known limits") && !/undefined|NaN/.test(cOut));
+      cOut.includes("Not built yet") && cOut.includes("Known limits") && !/undefined|NaN/.test(cOut));
   } else {
     ok("CarbonPage is defined", false);
   }
