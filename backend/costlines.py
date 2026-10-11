@@ -217,6 +217,7 @@ def preview(route_id, vehicle_type, material_type, unit, cells, factors=None):
     Reads nothing from the forecasts table (the cells are the body); writes nothing.
     Unbaked route ⇒ fair None, planned partial (the per-km term missing) — flagged, never
     estimated. No diesel index ⇒ fair None. A cell with no quantity is skipped.
+    11 Oct 2026: + `carbon`, the all-in tCO2e of the typed cells (preview_carbon below).
     """
     factors = factors or conversions.load_factors()
     routes = derived._routes_and_names()
@@ -225,6 +226,7 @@ def preview(route_id, vehicle_type, material_type, unit, cells, factors=None):
     out, tot = [], {"tonnes": 0.0, "trips": 0, "planned_eur": None, "planned_km": 0.0, "planned_trips": 0, "planned_tonnes": 0.0,
                     "fair_eur": None, "fair_km": 0.0, "fair_trips": 0, "fair_tonnes": 0.0, "target": 0, "flags": set()}
     baked, rate_source, vehicle_class = None, None, None
+    return_baked, co2_t = None, 0.0
     for c in cells or []:
         q = _num(c.get("quantity") if isinstance(c, dict) else getattr(c, "quantity", None))
         mi = int(c.get("month_index") if isinstance(c, dict) else getattr(c, "month_index"))
@@ -235,6 +237,11 @@ def preview(route_id, vehicle_type, material_type, unit, cells, factors=None):
         ctx = derived.line_context(line, factors, routes=routes, cache=cache, cost=cost)
         f = derived.day_figures(q, ctx, factors)
         baked = bool(ctx.get("baked")); rate_source = ctx.get("rate_source"); vehicle_class = ctx.get("vehicle_class")
+        return_baked = bool(ctx.get("return_baked"))
+        if baked:
+            # 11 Oct 2026 (carbon target): transport carbon by the SAME formula as lines() above,
+            # km_day × the vehicle's kg CO2e per km ÷ 1000, rounded per cell as each saved line-month is
+            co2_t += round(float(f.get("km_day") or 0.0) * conversions._emissions(factors, vehicle_type) / 1000.0, 3)
         bk = (float(ctx.get("basis_km") or 0) * f["trips"]) if baked else None
         planned = unit_prices(f.get("eur"), f["tonnes"], f["trips"], bk)
         planned["source"] = rate_source; planned["partial"] = bool(f.get("eur_partial"))
@@ -263,6 +270,74 @@ def preview(route_id, vehicle_type, material_type, unit, cells, factors=None):
     reason = (None if totals["fair"]["eur"] is not None else
               ("no cells" if not out else "not baked" if not baked else
                "no diesel index" if (cost or {}).get("index_eur_per_l") is None else "no fair price"))
+    carbon_block = preview_carbon(material_type, (routes.get(route_id) or {}).get("dest_id"), tot["tonnes"],
+                                  (round(co2_t, 3) if baked else None) if out else 0.0,
+                                  bool(out) and not baked, return_baked, bool(out), factors)
     return {"route_id": route_id, "vehicle_type": vehicle_type, "vehicle_class": vehicle_class, "baked": baked,
             "cells": out, "totals": totals, "fair_reason": reason,
-            "index_eur_per_l": (cost or {}).get("index_eur_per_l"), "index_bulletin_date": (cost or {}).get("index_bulletin_date")}
+            "index_eur_per_l": (cost or {}).get("index_eur_per_l"), "index_bulletin_date": (cost or {}).get("index_bulletin_date"),
+            "carbon": carbon_block}
+
+
+def preview_carbon(material_type, dest_id, tonnes, transport_t, unrouted, return_baked, has_cells, factors):
+    """
+    11 Oct 2026 (carbon target) — the ALL-IN carbon of the cells being typed, for the Submit
+    forecast strip: {material_t, transport_t, disposal_t, total_t, unrouted, basis}.
+
+      transport  the figure preview() works out (lines()' co2_t formula); None, and unrouted, when
+                 the route has no distance
+      material   tonnes × the Government primary factor of the category's carbon material
+                 (carbon.material_factor), unless the destination is a disposal site;
+      disposal   then tonnes × the disposal factor for that site's method (carbon.disposal_route_of /
+                 disposal_factor), and material is None;
+      total      the sum of the parts that exist (None when none does).
+    The factors are carbon.py's own, so the line reads here as it will on the Carbon page once
+    approved. `basis` says what is counted in one plain sentence. Pure computation: one read of
+    the locations, nothing stored.
+    """
+    import carbon as _carbon                     # carbon imports this module: imported at call time only
+    cp = _carbon.params(factors)
+    cm = _carbon.carbon_material_of(material_type, factors) if material_type else None
+    row = (cp.get("materials") or {}).get(cm) if cm else None
+    label = str((row or {}).get("label") or cm or "this material").lower()
+    year = (row or {}).get("year") or 2026
+    loc = _carbon._locations().get(dest_id) if dest_id else None
+    route = _carbon.disposal_route_of(cp, loc)
+    material_t = disposal_t = None
+    if route:
+        kg = _carbon.disposal_factor(cp, cm, route) if cm else None
+        how = PREVIEW_DISPOSAL_WORDS.get(route, route)
+        if kg is not None:
+            disposal_t = round(float(tonnes) * kg / 1000.0, 3)
+            what = f"disposal by {how} at the UK Government {year} factor for {label}"
+        else:
+            what = f"disposal is not counted (no Government factor is published for {label} by {how})"
+    else:
+        kg = _carbon.material_factor(cp, cm).get("kg_per_t") if cm else None
+        if kg is not None:
+            material_t = round(float(tonnes) * kg / 1000.0, 3)
+            what = f"making the material at the UK Government {year} factor for {label}"
+        elif cm:
+            what = f"making the material is not counted (no Government factor is published for {label})"
+        else:
+            what = "making the material is not counted (this material has no Government material class)"
+    if unrouted:
+        move = "transport is not counted until the route has a distance"
+    elif return_baked:
+        move = "transport there and back on the routed distance"
+    else:
+        move = "transport on the loaded leg only (the return is not routed yet)"
+    parts = [v for v in (material_t, transport_t, disposal_t) if v is not None]
+    if not has_cells:
+        basis = "Nothing typed yet."
+    else:
+        clauses = [move, what] if route else [what, move]
+        basis = "; ".join(clauses) + "."
+        basis = basis[0].upper() + basis[1:]
+    return {"material_t": material_t, "transport_t": transport_t, "disposal_t": disposal_t,
+            "total_t": round(sum(parts), 3) if parts else None, "unrouted": bool(unrouted), "basis": basis}
+
+
+# the disposal methods in the words a sentence needs (carbon.DISPOSAL_WORDS carries brackets)
+PREVIEW_DISPOSAL_WORDS = {"landfill": "landfill", "closed_loop": "closed-loop recycling",
+                          "open_loop": "open-loop recycling", "combustion": "combustion"}

@@ -100,6 +100,35 @@ DRIVER_LABELS = {
     "disposal": "Receiving site and disposal method",
 }
 DISPOSAL_ROUTES = ("landfill", "closed_loop", "open_loop", "combustion")
+DISPOSAL_WORDS = {"landfill": "landfill", "closed_loop": "recycled (closed-loop)", "open_loop": "recycled (open-loop)",
+                  "combustion": "combustion"}
+# After the show (11 Oct 2026, notes/carbon-ui-1011 item 13): the waste hierarchy step of each disposal
+# method that EXISTS here — prevention, preparing for re-use, recycling, other recovery, disposal (a legal
+# duty: Waste (England and Wales) Regulations 2011, regulation 12). The step follows the METHOD the carbon
+# figure uses, so a site whose type maps to closed-loop reads "Recycling"; combustion depends on the plant.
+WASTE_HIERARCHY = {
+    "landfill": "Disposal",
+    "closed_loop": "Recycling",
+    "open_loop": "Recycling",
+    "combustion": "Other recovery if the plant recovers energy, otherwise disposal",
+}
+WASTE_HIERARCHY_SOURCE = ("Waste hierarchy: prevention, preparing for re-use, recycling, other recovery, disposal. "
+                          "Waste (England and Wales) Regulations 2011, regulation 12; Defra, Guidance on applying the "
+                          "waste hierarchy (2011)")
+# item 14: the life-cycle modules each figure belongs to, as BS EN 15804 / EN 15978 name them (NH's material
+# roadmaps use them; its Carbon Tool v2.7 guidance does not, so they stay secondary labels): making the
+# material A1–A3, transport to site A4, surplus material taken away and its disposal A5 (no sub-module claimed)
+STAGES = ("A1-A3", "A4", "A5")
+# item 8: what the figures count, in the same words on the page and on the printed summary
+SCOPE_WORDS = {
+    "counts": ("Making the material (A1–A3); transport to site and back, both legs (A4); surplus material "
+               "taken away and its disposal (A5)."),
+    "not_counted": ("Site plant and site energy, staff travel, traffic on the finished road. Producing the fuel or "
+                    "electricity (well-to-tank) is a separate well-to-wheel figure, not in the total."),
+    "factors": ("UK Government GHG conversion factors 2026 (DESNZ). The National Highways Carbon Tool comparison uses "
+                "the tool's own 2024 factors. Each factor shows its source, year and status."),
+}
+SUMMARY_STAMP = "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
 FLAG_UNBAKED = derived.FLAG_UNBAKED
 FLAG_KM_BORROWED = "KM_FROM_BASELINE_VEHICLE"
 FLAG_KM_SCALED = "KM_SCALED"
@@ -509,6 +538,38 @@ def vehicle_factor(doc, cp, vehicle):
             "basis": "per vehicle-km"}
 
 
+def wtt_factor(doc, cp, vehicle, vf=None):
+    """
+    After the show (item 12): the vehicle's WELL-TO-TANK kg CO2e per km — producing and delivering
+    the fuel or electricity — or None. Diesel: the DESNZ 2026 'WTT- delivery vehs & freight' row of
+    the SAME class and load as the vehicle's tank-to-wheel row (matched on that row's ID, never on a
+    name), VERIFIED. Electric: kWh/km × the two electricity well-to-tank rows (generation + T&D), with
+    the kWh/km's own status. A typed figure that matches no published row has no well-to-tank row:
+    None — the line is counted out of the well-to-wheel figure, never guessed.
+    """
+    vf = vf or vehicle_factor(doc, cp, vehicle)
+    if vf.get("fuel") == "electric":
+        if vf.get("kg_per_km_wtw") is None or vf.get("kg_per_km") is None:
+            return None
+        e = conversions.electricity_factors(doc)
+        return {"kg_per_km": float(vf["kg_per_km_wtw"]) - float(vf["kg_per_km"]), "status": vf["status"],
+                "id": f"{e.get('wtt_generation_id')} + {e.get('wtt_td_id')}", "year": 2026,
+                "source": (f"{vf.get('kwh_per_km')} kWh/km × UK electricity well-to-tank 2026 (generation "
+                           f"{e.get('wtt_generation_kg_co2e_per_kwh')} + T&D {e.get('wtt_td_kg_co2e_per_kwh')} kg CO2e/kWh)")}
+    if vf.get("status") != "VERIFIED" or not vf.get("id"):
+        return None
+    tr = cp.get("transport") or {}
+    rows = tr.get("vehicle_km_2026") or {}
+    wtt = tr.get("wtt_vehicle_km_2026") or {}
+    key = next((k for k, r in rows.items() if not str(k).startswith("_") and isinstance(r, dict)
+                and r.get("id") == vf["id"]), None)
+    w = wtt.get(key) if key else None
+    if not isinstance(w, dict) or _num(w.get("kg_co2e_per_vkm")) is None:
+        return None
+    return {"kg_per_km": float(w["kg_co2e_per_vkm"]), "status": wtt.get("status") or "VERIFIED", "id": w.get("id"),
+            "year": wtt.get("year"), "source": f"DESNZ 2026, {w.get('row')}, Scope 3, well-to-tank"}
+
+
 def _prov_material(cp, name):
     m = _material_row(cp, name) or {}
     return {"key": f"material:{name}", "label": m.get("label") or name, "kg_co2e_per_t": m.get("kg_co2e_per_t"),
@@ -600,6 +661,10 @@ def _check_levers(levers, vs, routes):
         for k in ("pct", "distance_pct", "alt_index"):
             if k in lv and lv[k] is not None and _num(lv[k]) is None:
                 raise CarbonError(f"'{k}' must be a finite number")
+        # 11 Oct 2026: a list or an object here was a TypeError (a 500), not a refusal
+        for k in ("vehicle", "fuel", "to_route", "to"):
+            if lv.get(k) is not None and not isinstance(lv[k], str):
+                raise CarbonError(f"'{k}' must be text")
         if d == "vehicle" and lv.get("vehicle") not in vs:
             raise CarbonError(f"vehicle '{lv.get('vehicle')}' is not on Config")
         if d == "fuel" and lv.get("fuel") not in ("electric", "diesel"):
@@ -781,6 +846,8 @@ def _eval(line, s, ctx):
     vclass = fairprice.vehicle_class(veh, doc)
     tcls = tkm_class(vclass, v.get("gvw_t"))
     tr_t = transport_vehicle_km_t(trips, km_trip, vf["kg_per_km"]) if base_baked else None
+    wf = wtt_factor(doc, cp, veh, vf)                         # item 12: beside the total, never in it
+    wtt_t = transport_vehicle_km_t(trips, km_trip, wf["kg_per_km"]) if (base_baked and wf is not None) else None
     nh_t = transport_nh_t(one_way, tonnes, cp) if base_baked else None
     tkm_t = transport_tkm_t(one_way, tonnes, cp, tcls) if base_baked else None
     vkm = trips * km_trip if (base_baked and km_trip is not None) else None
@@ -828,6 +895,7 @@ def _eval(line, s, ctx):
         "recycled_pct": mat.get("recycled_pct"), "material_t": mat_t,
         "disposal_route": disp, "disposal_kg_per_t": dis_kg, "disposal_t": dis_t,
         "transport_t": tr_t, "transport_nh_t": nh_t, "transport_tkm_t": tkm_t,
+        "wtt_kg_per_km": (wf or {}).get("kg_per_km"), "transport_wtt_t": wtt_t,
         "total_t": total, "flags": flags, "ipt": line.get("ipt"),
     }
 
@@ -848,7 +916,9 @@ def _totals(evals, cp, spend_m=None, allocation=None):
     t = {"lines": len(evals), "baked_lines": 0, "tonnes": 0.0, "baked_tonnes": 0.0, "trips": 0, "electric_trips": 0,
          "vkm": 0.0, "laden_km": 0.0, "tkm": 0.0, "kwh": 0.0, "material_t": 0.0, "transport_t": 0.0,
          "transport_nh_t": 0.0, "transport_tkm_t": 0.0, "disposal_t": 0.0, "total_t": 0.0,
-         "material_excluded_tonnes": 0.0, "disposal_excluded_tonnes": 0.0, "flags": {}}
+         "material_excluded_tonnes": 0.0, "disposal_excluded_tonnes": 0.0, "flags": {},
+         "transport_wtt_t": 0.0, "wtw_lines_out": 0}
+    stages = {k: 0.0 for k in STAGES}
     by_cat, by_route, by_month, sheets = {}, {}, {}, []
     alloc = {k: 0.0 for k in ALLOCATION + (NOT_ALLOCATED,)} if allocation else None
     for i, e in enumerate(evals):
@@ -866,6 +936,15 @@ def _totals(evals, cp, spend_m=None, allocation=None):
             t["transport_nh_t"] += e["transport_nh_t"] or 0.0
             t["transport_tkm_t"] += e["transport_tkm_t"] or 0.0
             t["kwh"] += e["kwh"] or 0.0
+            if e.get("transport_wtt_t") is None:
+                t["wtw_lines_out"] += 1
+            else:
+                t["transport_wtt_t"] += e["transport_wtt_t"]
+        stages["A1-A3"] += e["material_t"] or 0.0
+        if e["disposal_route"]:
+            stages["A5"] += (e["transport_t"] or 0.0) + (e["disposal_t"] or 0.0)
+        else:
+            stages["A4"] += e["transport_t"] or 0.0
         t["material_t"] += e["material_t"] or 0.0
         if e["material_t"] is None and not e["disposal_route"]:
             t["material_excluded_tonnes"] += e["tonnes"]
@@ -897,6 +976,9 @@ def _totals(evals, cp, spend_m=None, allocation=None):
             for k, x in allocate(e["total_t"], pcts).items():
                 alloc[k] += x
     t["excludes_unbaked"] = t["baked_lines"] < t["lines"]
+    # well-to-wheel = the tank-to-wheel transport + producing the fuel or electricity; a line whose lorry has
+    # no published well-to-tank row adds its tank-to-wheel only, and is counted in wtw_lines_out
+    t["transport_wtw_t"] = t["transport_t"] + t["transport_wtt_t"]
     peak = max(by_month.values(), key=lambda x: x["lorries"], default=None)
     t["lorries_peak"] = peak["lorries"] if peak else 0
     t["lorries_peak_month"] = peak["month_index"] if peak else None
@@ -908,6 +990,7 @@ def _totals(evals, cp, spend_m=None, allocation=None):
         "by_route": sorted([{k: _r(v) for k, v in r.items()} for r in by_route.values()], key=lambda x: -x["total_t"]),
         "by_month": [{k: _r(v) for k, v in by_month[k2].items()} for k2 in sorted(by_month)],
         "sheets": {k: round(v, 3) for k, v in split_sheets(sheets).items()},
+        "stages": {k: round(v, 3) for k, v in stages.items()},
         "benchmarks": benchmarks(t, evals, cp, spend_m),
     }
     if alloc is not None:
@@ -1010,6 +1093,8 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
     base_eval = [_eval(l, s, ctx) for l, s in zip(lines, states0)]
     base = _totals(base_eval, cp, spend_m, allocation)
     bt = sum(e["total_t"] for e in base_eval)
+    b_trips = sum(e["trips"] for e in base_eval)
+    b_vkm = sum(e["vkm"] or 0.0 for e in base_eval)
 
     out_alts, alt_evals = [], []
     for a in alts:
@@ -1028,14 +1113,20 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
             changed = sum(1 for e0, e1 in zip(base_eval, de) if abs(e1["total_t"] - e0["total_t"]) > 1e-9)
             singles += dt
             drivers.append({"driver": d, "label": DRIVER_LABELS[d], "delta_t": round(dt, 3),
-                            "delta_pct": round(dt * 100.0 / bt, 1) if bt else None, "lines_changed": changed})
+                            "delta_pct": round(dt * 100.0 / bt, 1) if bt else None, "lines_changed": changed,
+                            # item 9: the lorry effect of the decision on its own, as TfL states freight
+                            # benefits — lorry loads and lorry-km (km here; the page shows the tenant's unit)
+                            "delta_trips": sum(e["trips"] for e in de) - b_trips,
+                            "delta_vkm_km": round(sum(e["vkm"] or 0.0 for e in de) - b_vkm, 3)})
         drivers.sort(key=lambda x: -abs(x["delta_t"]))
         delta = sum(e["total_t"] for e in ev) - bt
         interaction = delta - singles
         out_alts.append(dict(tot, name=str(a.get("name") or "Alternative"), levers=lv,
                              delta_t=round(delta, 3), delta_pct=(round(delta * 100.0 / bt, 1) if bt else None),
                              # 11 Oct 2026: the change in lorry loads, so the page never subtracts
-                             delta_trips=sum(e["trips"] for e in ev) - sum(e["trips"] for e in base_eval),
+                             delta_trips=sum(e["trips"] for e in ev) - b_trips,
+                             delta_vkm_km=round(sum(e["vkm"] or 0.0 for e in ev) - b_vkm, 3),
+                             lever_words=[_lever_words(x, ctx) for x in lv],
                              drivers=drivers, interaction_t=(0.0 if abs(interaction) < 5e-4 else round(interaction, 3)),
                              notes=sorted(a_notes), fleet=_fleet_summary(ev)))
 
@@ -1051,20 +1142,73 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
         "status": status, "from": from_month, "to": to_month,
         "unit": "km",
         "limits": list(LIMITS),
+        "waste_hierarchy": dict(WASTE_HIERARCHY),
+        "scope_words": dict(SCOPE_WORDS),
+        "waste_hierarchy_source": WASTE_HIERARCHY_SOURCE,
         "planned": list(((cp.get("planned") or {}).get("items")) or []),
         "methods": {
             "headline": "vehicle-km: trips × routed km of both legs × the vehicle's kg CO2e per vehicle-km (DESNZ 2026, tank-to-wheel)",
             "nh_tool": "NH Carbon Tool v2.7 basis: tonnes × one-way km × (laden + unladen) ÷ 2 × 2, 2024 factors with well-to-tank",
             "tonne_km": "DESNZ 2026 tonne-km for each vehicle's size class, average laden — what a tonne-km calculator gives for the same haul",
+            "well_to_wheel": "the vehicle-km figure plus producing the fuel or electricity: DESNZ 2026 well-to-tank per vehicle-km for diesel, kWh/km × the electricity well-to-tank rows for electric",
         },
     }
+
+
+def _place(ctx, rid, end):
+    r = ctx["routes"].get(rid) or {}
+    return (ctx["locs"].get(r.get(end)) or {}).get("name")
+
+
+def _route_words(rid, ctx):
+    o, d = _place(ctx, rid, "origin_id"), _place(ctx, rid, "dest_id")
+    return f"route {rid}: {o} → {d}" if (o and d) else f"route {rid}"
+
+
+def _lever_words(lv, ctx):
+    """One decision in words, for the printed summary: what was chosen and where it applies."""
+    sc = lv.get("scope") or {}
+    where = (_route_words(sc["route_id"], ctx) if sc.get("route_id")
+             else str(sc["category"]) if sc.get("category") else "every plan line")
+    vs = ctx["vs"]
+    name = lambda k: (((vs.get(k) or {}).get("labels") or {}).get("en")) or k
+    d = lv.get("driver")
+    if d == "recycled":
+        w = f"Recycled content {(_num(lv.get('pct')) or 0):g}%"
+    elif d == "material" and lv.get("epd"):
+        e = lv["epd"] or {}
+        kg = _num(e.get("kg_per_t"))
+        w = f"Custom carbon factor (supplier EPD) {kg if kg is None else format(kg, 'g')} kgCO2e per tonne, reference {e.get('source') or 'not given'}"
+    elif d == "material":
+        w = "Reused material"
+    elif d == "vehicle":
+        w = f"Vehicle choice: {name(lv.get('vehicle'))}"
+    elif d == "fuel":
+        w = ("Battery electric lorries, where Config has an electric profile for that lorry"
+             if lv.get("fuel") == "electric" else "Diesel lorries")
+    elif d == "source" and lv.get("to_route"):
+        w = f"Supplier: {_place(ctx, lv['to_route'], 'origin_id') or 'another supplier'} (route {lv['to_route']})"
+    elif d == "source":
+        w = f"Haul distance {(_num(lv.get('distance_pct')) or 100):g}% of the planned route"
+    elif d == "route":
+        w = f"Alternative route {int(_num(lv.get('alt_index')) or 0)}"
+    elif d == "disposal":
+        parts = []
+        if lv.get("to_route"):
+            parts.append(f"Receiving site: {_place(ctx, lv['to_route'], 'dest_id') or 'another site'} (route {lv['to_route']})")
+        if lv.get("to"):
+            parts.append(f"Disposal method: {DISPOSAL_WORDS.get(lv['to'], lv['to'])}")
+        w = "; ".join(parts) or "Receiving site and disposal method as planned"
+    else:
+        w = DRIVER_LABELS.get(d, str(d))
+    return f"{w} — {where}"
 
 
 def _line_out(e):
     keep = ("route_id", "month_index", "material_type", "carbon_material", "sheet", "vehicle", "fuel", "tonnes",
             "trips", "baked", "one_way_km", "km_trip", "kg_per_km", "factor_status", "material_kg_per_t",
             "material_method", "material_status", "material_t", "transport_t", "transport_nh_t",
-            "disposal_route", "disposal_kg_per_t", "disposal_t", "total_t", "flags", "ipt")
+            "transport_wtt_t", "disposal_route", "disposal_kg_per_t", "disposal_t", "total_t", "flags", "ipt")
     return {k: _r(e[k]) for k in keep}
 
 
@@ -1205,6 +1349,12 @@ def provenance(evals, ctx, alt_evals=(), lever_sets=()):
     for vname in sorted({e["vehicle"] for e in every}
                         | {electric_variant(vs, e["vehicle"]) for e in evals if electric_variant(vs, e["vehicle"])}):
         out.append(dict(vehicle_factor(doc, cp, vname), key=f"vehicle:{vname}", label=vname, unit="kg CO2e per vehicle-km"))
+    for vname in sorted({e["vehicle"] for e in every}):
+        w = wtt_factor(doc, cp, vname)
+        if w is not None:
+            out.append({"key": f"wtt:{vname}", "label": f"{vname}, well-to-tank", "unit": "kg CO2e per vehicle-km",
+                        "value": round(w["kg_per_km"], 5), "status": w["status"], "year": w.get("year"),
+                        "source": w["source"], "ids": [w.get("id")]})
     seen = set()
     for e in every:
         if e["material_method"] == "blend":

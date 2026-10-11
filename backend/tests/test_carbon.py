@@ -35,6 +35,7 @@ Run:  python3 backend/tests/test_carbon.py
 """
 import copy
 import json
+import re
 import os
 import sys
 import tempfile
@@ -458,6 +459,23 @@ ok("provenance: artic 0.93939 VERIFIED (5_304_3132_4_1); electric DERIVED; a typ
    and carbon.vehicle_factor(_doc, CP, EA)["status"] == "DERIVED"
    and carbon.vehicle_factor(carbon._doc(_doc, dict(_doc["vehicles"], X={"payload_t": 10, "emissions_kg_co2e_per_km": 0.8}), CP), CP, "X")["status"] == "ASSUMPTION")
 
+# after the show (11 Oct 2026, notes/carbon-ui-1011 item 12): well-to-tank, read from the DESNZ 2026 flat file
+_W, _T = CB["transport"]["wtt_vehicle_km_2026"], CB["transport"]["vehicle_km_2026"]
+ok("🔴 the DESNZ 2026 well-to-tank HGV rows (WTT- delivery vehs & freight, average laden, km), one per tank-to-wheel row",
+   {k: (r["kg_co2e_per_vkm"], r["id"]) for k, r in _W.items() if isinstance(r, dict)} == {
+       "rigid_over_17t": (0.23756, "28_907_3120_4_1"), "artic_over_33t": (0.22058, "28_907_3132_4_1"),
+       "rigid_3_5_to_7_5t": (0.11851, "28_907_3112_4_1"), "rigid_7_5_to_17t": (0.14453, "28_907_3116_4_1")}
+   and _W["status"] == "VERIFIED" and _W["scope"] == "Scope 3" and _W["year"] == 2026 and _W["checked"] == "2026-10-11")
+ok("...each matched to its tank-to-wheel row by the row ID's class and load (…_3132_4_1 ↔ …_3132_4_1), never by a name",
+   all(_W[k]["id"].split("_")[2:] == _T[k]["id"].split("_")[2:] for k in _W if isinstance(_W[k], dict))
+   and "FORS Silver and Gold" in _W["_note"] and "never in it" in _W["_note"])
+_wa, _wr, _we = carbon.wtt_factor(_doc, CP, ART), carbon.wtt_factor(_doc, CP, R8), carbon.wtt_factor(_doc, CP, EA)
+_wx = carbon.wtt_factor(carbon._doc(_doc, dict(_doc["vehicles"], X={"payload_t": 10, "emissions_kg_co2e_per_km": 0.8}), CP), CP, "X")
+ok("well-to-tank per km: artic 0.22058 and rigid 0.23756 VERIFIED; electric 1.25 × (0.03682 + 0.00359) = 0.0505125 DERIVED",
+   _wa["kg_per_km"] == 0.22058 and _wa["id"] == "28_907_3132_4_1" and _wa["status"] == "VERIFIED"
+   and _wr["kg_per_km"] == 0.23756 and near(_we["kg_per_km"], 0.0505125, 1e-9) and _we["status"] == "DERIVED")
+ok("🔴 ...a typed figure that matches no published row has NO well-to-tank row: None, never a guessed ratio", _wx is None)
+
 # =========================================================================== #
 #  8. A scenario end to end                                                     #
 # =========================================================================== #
@@ -793,6 +811,49 @@ ok("🔴 ...and a live document still carrying the old key can never feed it: th
    carbon.benchmarks({"total_t": 1.0, "tonnes": 1.0, "electric_trips": 0, "trips": 1}, [], carbon.params(_old_kpi))["nh_kpi"]["series"]
    == {"2024_25": 159, "2025_26": 181})
 
+# after the show (11 Oct 2026, notes/carbon-ui-1011 items 8, 9, 11–14): every figure hand-worked from the fixture
+ok("item 12 ⭐ well-to-wheel: artic WTT 0.22058 per km × (R1 6,000 + R3 8,000 km) = 3.088 t, beside 13.151 tank-to-wheel → 16.240",
+   near(B["transport_wtt_t"], 3.08812, 0.0005) and near(B["transport_wtw_t"], 16.23958, 0.0005) and B["wtw_lines_out"] == 0
+   and near(LN["R1"]["transport_wtt_t"], 1.32348, 0.0005) and LN["R5"]["transport_wtt_t"] is None, str(B))
+ok("🔴 ...never in the total: the total is still material + transport + disposal",
+   near(B["total_t"], B["material_t"] + B["transport_t"] + B["disposal_t"], 0.002) and near(B["total_t"], 156.995, 0.002))
+# Greener: R1 114 × 60 km and R4 228 × 16 km electric = 10,488 km × 0.0505125
+ok("...electric well-to-tank: 'Greener' 10,488 km × 0.0505125 = 0.530 t, well-to-wheel 1.887 + 0.530 = 2.417",
+   near(G["totals"]["transport_wtt_t"], 0.529775, 0.0005) and near(G["totals"]["transport_wtw_t"], 2.41696, 0.0006), str(G["totals"]))
+ok("item 14 ⭐ life-cycle modules add up to the total: A1–A3 30.432 (material), A4 5.636 (R1 delivered), A5 120.927 (R3's muck-away + disposal)",
+   near(S["baseline"]["stages"]["A1-A3"], 30.432, 0.002) and near(S["baseline"]["stages"]["A4"], 5.636, 0.002)
+   and near(S["baseline"]["stages"]["A5"], 120.927, 0.002) and near(sum(S["baseline"]["stages"].values()), B["total_t"], 0.003))
+ok("...and on 'Greener': A1–A3 25.074 (30 % recycled), A4 1.231 (electric R1), A5 6.537 (to the soil hub)",
+   near(G["stages"]["A1-A3"], 25.074, 0.002) and near(G["stages"]["A4"], 1.231, 0.002) and near(G["stages"]["A5"], 6.537, 0.002)
+   and near(sum(G["stages"].values()), G["totals"]["total_t"], 0.003), str(G["stages"]))
+_GD = {d["driver"]: d for d in G["drivers"]}
+ok("item 9 ⭐ each decision's lorry effect on its own: the soil hub 0 loads and 4,800 fewer km (200 × 16 against 200 × 40); "
+   "electric 47 more loads and 1,960 more km; recycled content none",
+   _GD["disposal"]["delta_trips"] == 0 and near(_GD["disposal"]["delta_vkm_km"], -4800.0, 0.01)
+   and _GD["fuel"]["delta_trips"] == 47 and near(_GD["fuel"]["delta_vkm_km"], 1960.0, 0.01)
+   and _GD["recycled"]["delta_trips"] == 0 and near(_GD["recycled"]["delta_vkm_km"], 0.0, 0.01), str(_GD))
+ok("...the alternative's own: 3,512 fewer lorry-km (14,000 → 10,488); the rigids 2,700 more (145 × 60 against 100 × 60)",
+   near(G["delta_vkm_km"], -3512.0, 0.01) and near(A["Rigids"]["delta_vkm_km"], 2700.0, 0.01))
+ok("item 13 the waste hierarchy step of each of the four disposal methods that exist, and only those",
+   S["waste_hierarchy"] == {"landfill": "Disposal", "closed_loop": "Recycling", "open_loop": "Recycling",
+                            "combustion": "Other recovery if the plant recovers energy, otherwise disposal"}
+   and set(S["waste_hierarchy"]) == set(carbon.DISPOSAL_ROUTES) and "regulation 12" in S["waste_hierarchy_source"])
+ok("item 8 what the page counts, in one set of words for the page and the summary; well-to-tank named as outside the total",
+   S["scope_words"] == carbon.SCOPE_WORDS and "(A1–A3)" in S["scope_words"]["counts"] and "both legs (A4)" in S["scope_words"]["counts"]
+   and "Site plant and site energy, staff travel" in S["scope_words"]["not_counted"] and "not in the total" in S["scope_words"]["not_counted"])
+ok("item 11 the decisions in words for the summary: what, then where (a route by its places as well as its id)",
+   G["lever_words"] == ["Recycled content 30% — Small aggregate", "Receiving site: Soil hub (route R4) — route R3: Compound → Tip",
+                        "Battery electric lorries, where Config has an electric profile for that lorry — every plan line"]
+   and A["EPD"]["lever_words"] == ["Custom carbon factor (supplier EPD) 5 kgCO2e per tonne, reference EPD-T1 (fictional) — Small aggregate"]
+   and A["Nearer pit"]["lever_words"] == ["Supplier: Pit B (route R2) — route R1: Pit A → Compound"]
+   and A["80 %"]["lever_words"] == ["Haul distance 80% of the planned route — route R1: Pit A → Compound"], str(G["lever_words"]))
+_FK = {f["key"]: f for f in S["factors"]}
+ok("...the well-to-tank rows used are in the factor list with their status and row ID",
+   _FK[f"wtt:{ART}"]["value"] == 0.22058 and _FK[f"wtt:{ART}"]["status"] == "VERIFIED" and _FK[f"wtt:{ART}"]["ids"] == ["28_907_3132_4_1"]
+   and near(_FK[f"wtt:{EA}"]["value"], 0.05051, 0.00001) and _FK[f"wtt:{EA}"]["status"] == "DERIVED")
+ok("item 10 (committed / proposed / considered) waits for saved scenarios: listed under 'not built yet', with no figure",
+   any(x.startswith("Committed, proposed or considered on each decision") for x in CB["planned"]["items"]))
+
 # the team filter: a team code sees only its own lines (the Dashboard's rule)
 os.environ["IPT2_CODE"] = "ipt2-secret"
 try:
@@ -843,7 +904,61 @@ access.set_current("submitter123")
 ok("...any signed-in code may read it (a submitter in demo mode sees every line, as on the Dashboard)",
    len(main.carbon_scenario(main.CarbonScenarioIn())["lines"]) == 3)
 access.set_current("planner123")
+
+# item 11: the one-page summary (POST /api/carbon/summary.pdf), called as a function
+import export  # noqa: E402
+from portable import pdf_text  # noqa: E402
+_GREEN = [{"driver": "recycled", "scope": {"category": SA}, "pct": 30},
+          {"driver": "disposal", "scope": {"route_id": "R3"}, "to_route": "R4"}, {"driver": "fuel", "fuel": "electric"}]
+_real_notice = export._demo_notice
+export._demo_notice = lambda: "Fictional demo scheme · nothing here is real"
+try:
+    _pr = main.carbon_summary_pdf(main.CarbonSummaryIn(alternatives=[main.CarbonAlternative(name="Greener", levers=_GREEN)],
+                                                       commentary="Check R3 <b>first</b> & keep the tip as a fallback"))
+finally:
+    export._demo_notice = _real_notice
+_pt = pdf_text(_pr.body)
+_flat = " ".join(_pt.split())
+ok("⭐ the summary is a PDF download, ONE page", _pr.media_type == "application/pdf" and _pr.body[:5] == b"%PDF-"
+   and 'filename="carbon-summary.pdf"' in _pr.headers.get("Content-Disposition", "")
+   and _pr.body.count(b"/Type /Page") - _pr.body.count(b"/Type /Pages") == 1)
+ok("🔴 ...stamped: a Wayscope planning estimate on the DESNZ 2026 basis, not Carbon Tool figures; the demo notice on it",
+   "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in _flat
+   and "Fictional demo scheme" in _flat and "Not a National Highways Carbon Tool return" in _flat)
+ok("...the scenario's own figures: 157.0 against 32.8, the change in words with the lorry loads and lorry-km",
+   "157.0" in _flat and "32.8" in _flat and "124.2 tCO2e lower (79.1%) · 47 more lorry loads · 3 512 fewer lorry-km" in _flat
+   and "16.2" in _flat and "2.4" in _flat, _flat[:600])
+ok("...the decisions in words (the arrow written 'to', which Helvetica can print) and ranked with their lorry effect",
+   "Recycled content 30% — Small aggregate" in _flat and "Receiving site: Soil hub (route R4) — route R3: Compound to Tip" in _flat
+   and "Receiving site and disposal method" in _flat and "4 800 fewer lorry-km" in _flat and "→" not in _pt)
+ok("...what the figures count, and the commentary printed AS TYPED (markup escaped, never interpreted)",
+   "Making the material (A1–A3)" in _flat and "Left out here:" in _flat and "1 plan line has no route distance yet" in _flat
+   and "Check R3 <b>first</b> & keep the tip as a fallback" in _flat)
+ok("🔴 ...none of the words a public stand must not use",
+   not any(w in _flat.lower() for w in ("secure", "trusted by", "testimonial", "real-time", "optimis", "predict", "telematics",
+                                        "live tracking", "truck")) and not re.search(r"\bAI\b", _flat))
+_pr0 = main.carbon_summary_pdf(main.CarbonSummaryIn())
+_f0 = " ".join(pdf_text(_pr0.body).split())
+ok("...with no alternative it prints the approved plan and an empty box to write in", "No alternative chosen" in _f0
+   and "no alternative" in _f0 and "Fictional demo scheme" not in _f0)
+for _label, _body, _want in (
+        ("two alternatives", main.CarbonSummaryIn(alternatives=[main.CarbonAlternative(), main.CarbonAlternative()]), "one alternative"),
+        ("a commentary over 1,500 characters", main.CarbonSummaryIn(commentary="x" * 1501), "1500"),
+        ("an unknown status", main.CarbonSummaryIn(status="Everything"), "status")):
+    e = _raises(lambda b=_body: main.carbon_summary_pdf(b))
+    ok(f"🔴 summary: {_label} is a 400 with the reason", getattr(e, "status_code", None) == 400 and _want in str(getattr(e, "detail", "")), repr(e))
+access.set_current(None)
+e = _raises(lambda: main.carbon_summary_pdf(main.CarbonSummaryIn()))
+ok("🔴 summary: no code → 401", getattr(e, "status_code", None) == 401, repr(e))
+access.set_current("planner123")
 _mp = read("backend/main.py")
+_fs = _mp[_mp.index("def carbon_summary_pdf("):_mp.index("def carbon_summary_pdf(") + 2400]
+ok("🔴 source: the summary's first act is _require_access(); it stores nothing", _fs.index("_require_access()") < _fs.index("carbon.scenario(")
+   and "db." not in _fs.split(chr(10) * 3)[0] and '@app.post("/api/carbon/summary.pdf")' in _mp)
+_ex = read("backend/export.py")
+_bc = _ex[_ex.index("def build_carbon_pdf("):_ex.index("def _index_date_label(")].split(chr(34) * 3, 2)[2]   # the code, below its docstring
+ok("...and the PDF draws, never computes: every figure is read off the scenario", "carbon.scenario" not in _bc
+   and "_carbon.SUMMARY_STAMP" in _bc and "kg_per_km" not in _bc and "E(txt)" in _bc)
 _fn = _mp[_mp.index("def carbon_scenario("):_mp.index("def carbon_scenario(") + 2000]
 ok("🔴 source: the endpoint's first act is _require_access(), and a CarbonError becomes a 400",
    _fn.index("_require_access()") < _fn.index("carbon.scenario(") and "except carbon.CarbonError as e:" in _fn

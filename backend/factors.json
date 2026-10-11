@@ -871,6 +871,35 @@
           "id": "5_304_3116_4_1",
           "row": "Rigid (>7.5 tonnes-17 tonnes), average laden, km"
         }
+      },
+      "wtt_vehicle_km_2026": {
+        "_note": "Well-to-tank (Scope 3): producing and delivering the diesel, per vehicle-km, for the SAME class and load as each vehicle_km_2026 row (the row IDs share their last three parts: 5_304_3132_4_1 ↔ 28_907_3132_4_1). Added 11 Oct 2026 for the well-to-wheel figure, which FORS Silver and Gold require operators to report (Bronze recommends it). Shown beside the total, never in it.",
+        "rigid_over_17t": {
+          "kg_co2e_per_vkm": 0.23756,
+          "id": "28_907_3120_4_1",
+          "row": "WTT- delivery vehs & freight › WTT- HGV (non-refrigerated, all diesel) › Rigid (>17 tonnes) › Average laden › km"
+        },
+        "artic_over_33t": {
+          "kg_co2e_per_vkm": 0.22058,
+          "id": "28_907_3132_4_1",
+          "row": "WTT- delivery vehs & freight › WTT- HGV (non-refrigerated, all diesel) › Articulated (>33t) › Average laden › km"
+        },
+        "rigid_3_5_to_7_5t": {
+          "kg_co2e_per_vkm": 0.11851,
+          "id": "28_907_3112_4_1",
+          "row": "WTT- delivery vehs & freight › WTT- HGV (non-refrigerated, all diesel) › Rigid (>3.5 - 7.5 tonnes) › Average laden › km"
+        },
+        "rigid_7_5_to_17t": {
+          "kg_co2e_per_vkm": 0.14453,
+          "id": "28_907_3116_4_1",
+          "row": "WTT- delivery vehs & freight › WTT- HGV (non-refrigerated, all diesel) › Rigid (>7.5 tonnes-17 tonnes) › Average laden › km"
+        },
+        "source": "UK Government GHG conversion factors 2026 (DESNZ), flat file v1.2, OGL v3.0",
+        "year": 2026,
+        "scope": "Scope 3",
+        "gwp": "AR5",
+        "status": "VERIFIED",
+        "checked": "2026-10-11"
       }
     },
     "electricity": {
@@ -929,7 +958,8 @@
         "Compound charger sizing from the fleet plan",
         "Battery degradation over a programme",
         "Plant fuel on earthworks",
-        "NH Carbon Tool export (.rct) once a real sample file is held"
+        "NH Carbon Tool export (.rct) once a real sample file is held",
+        "Committed, proposed or considered on each decision (the construction logistics plan statuses), once scenarios can be saved after per-person sign-in"
       ]
     },
     "disposal_loc_types": {

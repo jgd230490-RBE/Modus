@@ -294,6 +294,15 @@
   .dash-filters select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
   .dash-filters select option{color:#1F2024;}
   .tbl tr.is-picked td{background:var(--chart-1-soft);}
+  /* 11 Oct 2026 — the carbon target on the Dashboard, Forecasts and Submit forecast (tokens only, so every look follows) */
+  .ct-strip{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;color:var(--ink);}
+  .ct-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px;}
+  .ct-h{font-size:16px;font-weight:600;color:var(--ink);margin:0;}
+  .ct-line{font-size:14px;line-height:1.5;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .ct-note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:4px;}
+  .ct-more{margin-top:6px;font-size:14px;color:var(--ink);}
+  .ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;}
+  .ct-more ul{margin:4px 0 0 18px;list-style:disc;}
   /* 10 Oct 2026 — the Look-ahead grid (mockup 3): sticky first column, click-to-edit cells, a totals row */
   .tbl .la-stick{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
   .tbl th.la-stick{background:var(--surface-2);z-index:3;}
@@ -559,12 +568,146 @@ function WallSection({ show, divider, title, children }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, onWall }){
+// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast ------------
+// A planner sets the target on the Carbon planner. Each page reads it with ONE call,
+// GET /api/carbon/target (any signed-in code; the progress is worked out on the lines that code
+// can see). The SERVER works out every figure AND decides whether each one is on target
+// (status.on_target_as_forecast / on_target_with_decisions: within 0.05 tCO2e either way,
+// carbon_target.ON_TARGET_TOL_T, the one rule). These helpers only put its answers into words,
+// the same words on all four pages (the Carbon page's step 6 uses them too): no margin, no sum.
+// The figures are ALL-IN (making the material, transport and waste disposal), so where they sit
+// beside the transport-only figures the page says so once. A team code reads "your team's lines"
+// in the tenant's own word, never a team id, and its figures are not compared with the target:
+// the target is the scheme's and is not split by team (the server sends no team target_t).
+const CT_ALLIN = "All-in: making the material, transport and waste disposal";
+const CT_NONE = "No carbon target set yet.";
+const CT_WHO = "A planner sets it in the Carbon planner.";
+const ctT = (n) => grp(n, 1);
+const ctOk = (ct) => !!(ct && ct.target && ct.status);
+const ctTeam = (ct) => !!(ct && ct.status && ct.status.scope === "team");
+const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;
+const ctSplit = () => `not split by ${TEAM().toLowerCase()}`;
+// the server's verdict in words: "on target", or the gap's size and its side (its sign); nothing is compared here
+function ctGap(on, gap){
+  if(on == null || gap == null) return null;
+  if(on) return "on target";
+  return `${ctT(Math.abs(gap))} tCO2e ${gap > 0 ? "over" : "under"} the target`;
+}
+// the target in one sentence, the same on every page; a % and a cap read differently, so the toggle shows everywhere
+function ctTargetLine(ct){
+  const t = ct.target, s = ct.status, pct = `${(+t.pct_below).toFixed(1)}%`;
+  if(ctTeam(ct)) return t.mode === "cap"
+    ? `Target: a fixed cap of ${ctT(t.cap_t)} tCO2e for the whole scheme, ${ctSplit()}`
+    : `Target: ${pct} below the approved plan, for the whole scheme, ${ctSplit()}`;
+  if(t.mode === "cap") return `Target: a fixed cap of ${ctT(t.cap_t)} tCO2e (${pct} below the approved plan when it was set)`;
+  return `Target: ${pct} below the approved plan = ${ctT(s.target_t)} tCO2e`;
+}
+// as forecast, and with the agreed decisions, each with the server's verdict. When the decisions no longer
+// apply, the second is the server's sentence, or (dash: a line with no room for it) "—" and the page prints it below
+function ctProgress(ct, dash){
+  const s = ct.status, on = ctTeam(ct) ? ` on ${ctYour()}` : "";
+  const g1 = ctGap(s.on_target_as_forecast, s.gap_as_forecast_t), g2 = ctGap(s.on_target_with_decisions, s.gap_with_decisions_t);
+  return [
+    `As forecast${on}: ${ctT(s.approved_t)} tCO2e${g1 ? ", " + g1 : ""}`,
+    s.invalid ? (dash ? `With the agreed decisions${on}: —` : s.invalid)
+      : `With the agreed decisions${on}: ${ctT(s.with_decisions_t)} tCO2e${g2 ? ", " + g2 : ""}`,
+  ];
+}
+function ctScopeNote(ct){
+  if(!ctTeam(ct)) return null;
+  return `These figures are for ${ctYour()} only. The target is for the whole scheme, so they are not compared with it.`;
+}
+// a stamp as the reader's own clock dates it (the server stamps UTC): "12 Oct 2026", the same on every page
+function ctWhen(at){
+  const d = new Date(at);
+  return (!at || isNaN(d.getTime())) ? "" : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+function ctSetBy(t){
+  if(!t || !t.updated_by) return null;
+  const w = ctWhen(t.updated_at);
+  return `Set by ${t.updated_by}${w ? ", " + w : ""}`;
+}
+// Submit forecast: the target beside the carbon of the cells being typed, with the plan as forecast AND
+// with the agreed decisions, in the Dashboard's and Forecasts' own words
+function ctCellsTarget(ct){
+  if(!ct) return null;
+  if(!ctOk(ct)) return `${CT_NONE} ${CT_WHO}`;
+  const [p1, p2] = ctProgress(ct, true);
+  return `${ctTargetLine(ct)} · ${p1} · ${p2}`;
+}
+// the big screen's Carbon group: one more figure in the group's own pattern. A team code has no target
+// of its own: a cap shows the scheme's cap, a % shows "—", and the sub says it is the whole scheme's.
+function ctFig(ct, err){
+  if(!ct) return { value: "—", sub: err ? "did not load" : "loading", title: err ? "The carbon target did not load." : "Loading the carbon target." };
+  if(!ctOk(ct)) return { value: "—", sub: "none set yet", title: `${CT_NONE} ${CT_WHO}` };
+  const t = ct.target, s = ct.status, team = ctTeam(ct);
+  const how = t.mode === "cap" ? "fixed cap" : `${(+t.pct_below).toFixed(1)}% below the approved plan`;
+  const v = team ? (t.mode === "cap" ? t.cap_t : null) : s.target_t;
+  const g1 = ctGap(s.on_target_as_forecast, s.gap_as_forecast_t), g2 = ctGap(s.on_target_with_decisions, s.gap_with_decisions_t);
+  const sub = team ? `whole scheme: ${how}, ${ctSplit()}`
+    : `${how} · as forecast: ${g1} · ${s.invalid ? "the agreed decisions no longer fit the plan" : "with the agreed decisions: " + g2}`;
+  const words = [ctTargetLine(ct), ...ctProgress(ct), ctScopeNote(ct), CT_ALLIN + ". The other carbon figures here are transport only"];
+  return { value: v == null ? "—" : (Math.abs(v) >= 1e4 ? bigNum(v) : ctT(v)), sub, title: words.filter(Boolean).map(w => w.replace(/\.$/, "")).join(". ") + "." };
+}
+
+// The Dashboard's strip under the six cards. Nothing while the read is on its way.
+function CarbonTargetStrip({ ct, err, onOpen }){
+  if(!ct) return err ? <div className="ct-strip" data-carbon-target="error"><span className="ct-line">The carbon target did not load.</span></div> : null;
+  if(!ctOk(ct)) return (
+    <div className="ct-strip ct-row" data-carbon-target="none">
+      <span className="ct-line">{CT_NONE} {CT_WHO}</span>
+      {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}
+    </div>
+  );
+  const t = ct.target, s = ct.status, [p1, p2] = ctProgress(ct), note = ctScopeNote(ct), by = ctSetBy(t);
+  const words = t.lever_words || [];
+  return (
+    <section className="ct-strip" data-carbon-target="set" aria-label="Carbon target">
+      <div className="ct-row"><h3 className="ct-h">Carbon target</h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
+        {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}</div>
+      <div className="ct-line"><b>{ctTargetLine(ct)}</b></div>
+      <div className="ct-line">{p1}</div>
+      <div className="ct-line">{p2}</div>
+      {note && <div className="ct-note">{note}</div>}
+      <div className="ct-note" title={`Transport is ${ctT(s.approved_transport_t)} tCO2e of the approved plan as forecast: the Transport carbon card's figure with no filters.`}>
+        {CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : "the whole approved plan"}. The Transport carbon card above counts transport only.
+      </div>
+      {!ctTeam(ct) && words.length > 0 && (
+        <details className="ct-more">
+          <summary>The {words.length} agreed decision{words.length === 1 ? "" : "s"}</summary>
+          <ul>{words.map((w, i) => <li key={i}>{w}</li>)}</ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+// The Forecasts page's line under its header: what the approved plan comes to, and what the
+// lines waiting for approval would add (the count is the page's own; the tonnes are the server's).
+function CarbonTargetLine({ ct, err, pendingN }){
+  if(!ct) return err ? <p className="ct-line mb-4" data-carbon-target="error">The carbon target did not load.</p> : null;
+  if(!ctOk(ct)) return <p className="ct-line mb-4" data-carbon-target="none">{CT_NONE} {CT_WHO}</p>;
+  // 11 Oct 2026: the same three things as the Dashboard, in its words (the target, as forecast, with the agreed decisions)
+  const s = ct.status, [p1, p2] = ctProgress(ct, true);
+  return (
+    <div className="ct-strip mb-4" data-carbon-target="set" title={`${CT_ALLIN}.`}>
+      <div className="ct-line"><b>Carbon (all-in):</b> {ctTargetLine(ct)}</div>
+      <div className="ct-line">{p1} · {p2}</div>
+      {s.invalid && <div className="ct-note">{s.invalid}</div>}
+      {pendingN != null && <div className="ct-line">{pendingN === 0 ? "No lines are waiting for approval."
+        : `The ${pendingN} pending line${pendingN === 1 ? "" : "s"} would add ${ctT(s.pending_t)} tCO2e.`}</div>}
+    </div>
+  );
+}
+
+function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOpen }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
   const [err, setErr] = useState(false);
   const [weekErr, setWeekErr] = useState("");
+  const [ct, setCt] = useState(initialTarget || null);    // 11 Oct 2026: the carbon target (GET /api/carbon/target)
+  const [ctErr, setCtErr] = useState(false);
   const [status, setStatus] = useState("Approved");
   const [unit, setUnit] = useState("t");
   const [material, setMaterial] = useState("All");
@@ -630,6 +773,16 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
     fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
       if(live){ setWeek(j); setWeekErr(""); }
     }).catch(e => { if(live) setWeekErr(`Couldn't load this week (${e}).`); });
+    return () => { live = false; };
+  }, [tick]);
+  // the carbon target: its own read, so a failure never hides the programme figures. Once on
+  // mount; the big screen reads it again with the rest every 5 minutes.
+  useEffect(() => {
+    if(initialTarget) return;
+    let live = true;
+    fetch(`${API}/carbon/target`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+      if(live){ setCt(j); setCtErr(false); }
+    }).catch(() => { if(live) setCtErr(true); });
     return () => { live = false; };
   }, [tick]);
   useEffect(() => {
@@ -794,6 +947,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const numTd = "num";
   const cost = data.costing || {};
   const K = D.kpis;
+  const ctW = ctFig(ct, ctErr);        // 11 Oct 2026: the carbon target as one more big-screen figure
   const srcChip = (s) => s === "target" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title="No rate on the route — the target rate from Config">target</span>
                         : s === "route" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title="The rates typed on the route">quote</span> : null;
   // KPI cards: two figures per row below 1536 px, four on a wide screen — a figure is
@@ -812,7 +966,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
     </div>
   );
   const rangeLabel = D.lo === D.hi ? D.labels[0] : (monthLabelAbs(D.lo, months.start_year) + " – " + monthLabelAbs(D.hi, months.start_year));
-  const scopeNote = `${status === "All" ? "all forecasts" : status.toLowerCase() + " only"}${ipt !== "All" ? " · " + (ipt === "none" ? "no " + TEAM().toLowerCase() : ipt) : ""}${discipline !== "All" ? " · " + discipline : ""}${selected ? " · " + selected.route_id + (selected.discipline ? " · " + selected.discipline : "") : ""}`;
+  const scopeNote = `${status === "All" ? "all forecasts" : status.toLowerCase() + " only"}${ipt !== "All" ? " · " + (ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt)) : ""}${discipline !== "All" ? " · " + discipline : ""}${selected ? " · " + selected.route_id + (selected.discipline ? " · " + selected.discipline : "") : ""}`;
   const plannedVsFair = (K.planned && K.fair && K.fair.eur > 0 && K.plannedN === K.fairN) ? (K.planned.eur - K.fair.eur) * 100 / K.fair.eur : null;
   const hhmm = (d) => d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "";
 
@@ -920,6 +1074,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
             <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`} sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`} · DESNZ 2026`}
                   title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
           </div>
+          <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
           <div className="grid lg:grid-cols-5 gap-4">
             <div className="card p-4 lg:col-span-3">
@@ -1103,6 +1258,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
           <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over baked tonnes" title={K.intensity == null ? "Needs a baked line" : `${K.intensity.toFixed(2)} kg CO₂e per tonne moved — tCO₂e ÷ the tonnes on baked lines (the unbaked ones have no km)`} />
           <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" title={`${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"} — tonnes × the route's basis ${DU()}, baked lines`} />
           <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} title={K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned — the busiest month in view` : "The month with the most planned tonnes"} />
+          <Fig value={ctW.value} label="tCO2e target, all-in" sub={ctW.sub} title={ctW.title} />
         </Group>
       </div>
       </WallSection>
@@ -1428,9 +1584,12 @@ const GUIDE_STEPS = {
     { anchor: "lookahead-tabs", title: "Actuals.", body: "After the day, record what really moved. The gap between them is the seven-day accuracy." },
   ],
   carbon: [
-    { anchor: "carbon-compare", title: "The approved plan and an alternative.", body: "Both in tonnes of carbon dioxide equivalent (tCO2e): making the material, transport and waste disposal, with the lorry loads beside them." },
-    { anchor: "carbon-levers", title: "The decisions.", body: "Recycled content, a custom carbon factor from a supplier, vehicle choice, battery electric lorries, a nearer supplier, an alternative route, the receiving site." },
-    { anchor: "carbon-drivers", title: "Which decisions change carbon most.", body: "Each decision tested on its own and ranked by the tonnes it changes. Hover any figure for its source, year and status." },
+    { anchor: "carbon-compare", title: "1. Your approved plan.", body: "Its carbon in tCO2e and its lorry loads: where you start." },
+    { anchor: "carbon-levers", title: "2. Materials.", body: "Recycled content, reused material or a supplier's EPD." },
+    { anchor: "carbon-lorries", title: "3. Lorries and routes.", body: "Battery electric, vehicle choice, haul distance, supplier and route." },
+    { anchor: "carbon-surplus", title: "4. Surplus material.", body: "Where it goes, and how it is dealt with there." },
+    { anchor: "carbon-drivers", title: "5. Result.", body: "The new total, and which decisions change carbon most." },
+    { anchor: "carbon-target", title: "6. Carbon target.", body: "The planner sets the agreed decisions as the scheme's target." },
   ],
   data: [
     { anchor: "rail", title: "Routes are HGV-legal", body: "for the vehicle's dimensions and weight, and are drawn on the map." },
@@ -1454,6 +1613,9 @@ function Guide({ page, groups }){
   const [dots, setDots] = useState([]);
   const [tip, setTip] = useState(null);
   const [railRight, setRailRight] = useState(240);
+  // 11 Oct 2026: the strip sits 16 px off the foot, or just above an element pinned there ([data-sticky-foot]:
+  // the Carbon page's result strip), so it never covers it
+  const [stripBottom, setStripBottom] = useState(16);
   const build = (withWelcome) => {
     const own = GUIDE_STEPS[key] || [];
     if(!withWelcome) return own;
@@ -1487,6 +1649,10 @@ function Guide({ page, groups }){
     const place = () => {
       const rail = document.querySelector('[data-guide="rail"]');
       if(rail) setRailRight(Math.round(rail.getBoundingClientRect().right));
+      const foot = document.querySelector('[data-sticky-foot]');
+      const fr = foot && (foot.offsetWidth || foot.offsetHeight) ? foot.getBoundingClientRect() : null;
+      const lift = (fr && fr.top < window.innerHeight && fr.bottom > window.innerHeight - 60) ? Math.round(window.innerHeight - fr.top) + 8 : 16;
+      setStripBottom(b => (b === lift ? b : lift));
       const seen = new Set(), out = [];
       own.forEach(s => {
         if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);
@@ -1524,7 +1690,7 @@ function Guide({ page, groups }){
   const hintsEl = (hints && !step) ? (
     <>
       {strip && (
-        <div className="guide-strip" role="note" style={{ left: railRight + 16, bottom: 16 }}>   {/* bottom-left of the page: never over the page header */}
+        <div className="guide-strip" role="note" style={{ left: railRight + 16, bottom: stripBottom }}>   {/* bottom-left of the page: never over the page header */}
           <span>New here? A short tour shows what this page is for.</span>
           <button type="button" className="guide-strip-go" onClick={startTour}>Take the tour</button>
           <button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>
@@ -2132,10 +2298,10 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       </aside>
 
       <main className="flex-1 min-h-0 overflow-auto">
-        {page === "dashboard" && <Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} />}
+        {page === "dashboard" && <Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} onOpen={setPage} />}
         {page === "submit" && <Matrix meta={meta} who={who} editTarget={editTarget} vehLang={vehLang} access={role} />}
         {page === "forecasts" && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
-        {page === "carbon" && <CarbonPage meta={meta} access={role} />}
+        {page === "carbon" && <CarbonPage meta={meta} access={role} who={who} />}
         {page === "lookahead" && <LookAhead meta={meta} who={who} access={role} />}
         {/* one mounted instance across the three data pages — see the note at the top */}
         {DATA_PAGES.includes(page) && canApprove && (
@@ -2175,7 +2341,7 @@ function vehOption(v, suggested, current){
 }
 
 // ================================================================= Matrix
-function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
+function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTarget }){
   const { routes, materials, vehicles, units, months, factors,
           material_categories = {}, seasonal_restrictions = [],
           disciplines = [], work_sections = [], planning_vehicles = [] } = meta;
@@ -2299,6 +2465,17 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
   // `initialCost` is for the render harness (no effect runs there).
   const [cost, setCost] = useState(initialCost || null);
   const [costErr, setCostErr] = useState("");
+  // 11 Oct 2026: the scheme's carbon target, read once when the page opens (GET /api/carbon/target).
+  // The carbon of the cells comes with the price (the preview's `carbon` block); nothing is
+  // worked out here. A failure just leaves the line out.
+  const [ct, setCt] = useState(initialTarget || null);
+  useEffect(() => {
+    if(initialTarget) return;
+    let live = true;
+    fetch(`${API}/carbon/target`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(j => { if(live) setCt(j); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
 
   // default the category from the route's material guess when the route resolves.
   // /api/meta now normalises material_guess to a factors.json category server-side, so
@@ -2796,6 +2973,20 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
                : cost.fair_reason ? `no fair price — ${cost.fair_reason}`
                : `the cost model on Config → Costing · fuel at diesel ${CUR()}${cost.index_eur_per_l != null ? (+cost.index_eur_per_l).toFixed(3) : "—"}/L${(cost.totals.fair_flags || []).includes("WINTER") ? " · winter months +fuel" : ""} · a floor for negotiation, never a quote · fair ${CUR()} under each cell`}
             </span>
+            {/* 11 Oct 2026: the carbon of the cells (the server's, with its parts) and the scheme's target */}
+            {cost && cost.carbon && (() => {
+              const c = cost.carbon;
+              const parts = [["material", c.material_t], ["transport", c.transport_t], ["waste disposal", c.disposal_t]]
+                .filter(([, v]) => v != null).map(([k, v]) => `${k} ${ctT(v)}`);
+              return (
+                <div className="w-full ct-line" data-carbon-cells="1" title={c.basis || undefined}>
+                  Carbon of these cells: <b>{ctT(c.total_t)} tCO2e</b>{parts.length ? ` (${parts.join(" · ")})` : ""}
+                  {c.unrouted ? " · no route distance yet, so transport is not counted" : ""}
+                </div>
+              );
+            })()}
+            {ct && <div className="w-full ct-line" data-carbon-target={ctOk(ct) ? "set" : "none"}>{ctCellsTarget(ct)}</div>}
+            {ct && ctOk(ct) && ct.status.invalid && <div className="w-full ct-note">{ct.status.invalid}</div>}
           </div>
           <div className="px-3 py-1.5 text-[10.5px] text-slate-400 bg-white">
             Movements = loads per working day ({perDay.wd}/month). Vehicles needed = movements ÷{" "}
@@ -2847,12 +3038,14 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
 //   planner    approve / reject inline, withdraw anyone's
 // Grouped per line, NOT per line-and-year (a multi-year save is one submission), and
 // withdraw is scoped to the months the row actually shows.
-function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialRows }){
+function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialRows, initialTarget }){
   const { routes, months } = meta;
   const routeById = useMemo(() => Object.fromEntries(routes.map(r => [r.route_id, r])), [routes]);
   const canApprove = !!(access && access.can_approve);
-  const [rows, setRows] = useState(initialRows || null);     // initialRows / initialCost: the render harness only
+  const [rows, setRows] = useState(initialRows || null);     // initialRows / initialCost / initialTarget: the render harness only
   const [cost, setCost] = useState(initialCost || null);       // 11 Sep: /api/costing/lines, joined per line
+  const [ct, setCt] = useState(initialTarget || null);         // 11 Oct 2026: the carbon target (GET /api/carbon/target)
+  const [ctErr, setCtErr] = useState(false);
   const [err, setErr] = useState(false);
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState("");
@@ -2870,6 +3063,15 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
       fetch(`${API}/costing/lines?status=All`).then(r => r.ok ? r.json() : Promise.reject(r.status))
         .then(j => { if(live) setCost(j); }).catch(() => { if(live) setCost({ lines: [], error: true }); });
     }
+    return () => { live = false; };
+  }, [tick]);
+  // the carbon target: its own read, again after Refresh, Approve, Reject or Withdraw (they move
+  // lines between pending and approved, which is what its figures are made of)
+  useEffect(() => {
+    if(initialTarget) return;
+    let live = true;
+    fetch(`${API}/carbon/target`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(j => { if(live){ setCt(j); setCtErr(false); } }).catch(() => { if(live) setCtErr(true); });
     return () => { live = false; };
   }, [tick]);
 
@@ -2924,6 +3126,8 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
     && (!f.mine || g.submittedBy === who)
     && (!f.q || `${g.routeId} ${(routeById[g.routeId] || {}).origin || ""} ${(routeById[g.routeId] || {}).dest || ""} ${g.material || ""} ${g.submittedBy}`.toLowerCase().includes(f.q.toLowerCase())));
   const counts = useMemo(() => groups.reduce((a, g) => { a[g.status] = (a[g.status] || 0) + 1; return a; }, {}), [groups]);
+  // lines with any month waiting for approval (Pending or Mixed): what status.pending_t covers
+  const pendingN = useMemo(() => groups.filter(g => g.statuses.has("Pending")).length, [groups]);
 
   const done = () => { setTick(t => t + 1); if(onChanged) onChanged(); };
   // Scoped to the LINE and to exactly the months the row shows — never 1..60.
@@ -3020,6 +3224,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
           {shown.length > 0 && <button onClick={exportCsv} className="btn-sec">Export CSV</button>}
           {!canApprove && <button onClick={() => onEdit({})} className="btn-pri">Submit a forecast</button>}
         </>} />
+      <CarbonTargetLine ct={ct} err={ctErr} pendingN={rows ? pendingN : null} />
 
       {err ? <EmptyState kind="error" title="Forecasts did not load" body="The server did not answer in time. Nothing you typed is lost."
                action={<button onClick={() => setTick(t => t + 1)} className="btn-sec">Try again</button>} />
@@ -3538,7 +3743,29 @@ function ConfigPage({ meta, who, access }){
 // and the Environment Agency use — "approved plan" (NH uses "baseline" for its 2019/20 year),
 // "custom carbon factor (supplier EPD)", "vehicle choice", "receiving site", "disposal method";
 // lorry loads beside tCO2e; sentence case at 14 px (13 px only for hints and table headers);
-// status as a word; results above the controls on a phone.
+// status as a word.
+// After the show (11 Oct 2026, items 8, 9, 11–15): what the page counts, the life-cycle modules and a
+// well-to-wheel figure beside (never in) the total, each decision's lorry effect, the waste hierarchy
+// step of each disposal method, a one-page summary PDF with a commentary, and who acts on the results.
+// All from the server: the page still computes nothing but the display.
+// 11 Oct 2026, the process layout (the user: "still confusing and very wordy — make it like a process,
+// with a final target at the end"): six numbered steps, top to bottom on every screen — 1 your approved
+// plan, 2 materials, 3 lorries and routes, 4 surplus material, 5 result, 6 carbon target. This replaces
+// the 11 Oct "results above the controls on a phone" rule: the steps run in order, and a slim strip at
+// the foot of the screen keeps the result in view while choosing. Every explanation, table and list sits
+// in a native <details className="dash-more"> (closed), so it stays in the markup the render harness
+// reads. Step 6 reads GET /api/carbon/target (backend/carbon_target.py); a planner or admin code sets it
+// from this page's decisions (PUT: the decisions, the mode, the page state, the name typed at sign-in;
+// the SERVER works every figure out), switches % / cap (PUT with the mode only) or clears it (DELETE).
+// A team code reads it. Shared codes: no per-person identity until G3, so "set by" is the typed name.
+const CARBON_STEPS = [
+  { who: "Client", what: "Agrees the carbon target for the scheme (a planner records it in step 6) and asks the supply chain to plan against it." },
+  { who: "Buyer", what: "Asks each supplier for an environmental product declaration (EPD) and enters it here as a custom carbon factor, with its reference." },
+  { who: "Principal contractor", what: "Writes the decisions it commits to into the construction logistics plan and the subcontracts, then reports actual quantities in the client's own return (on National Highways schemes, the Carbon Tool)." },
+];
+const CARBON_STEP_TITLES = ["Your approved plan", "Materials", "Lorries and routes", "Surplus material", "Result", "Carbon target"];
+// the two ways the server holds a target (carbon_target.MODE_WORDS), in its own words
+const CARBON_TARGET_MODES = [["pct", "% below the approved plan"], ["cap", "Fixed tCO2e cap"]];
 const CARBON_TONE = { VERIFIED: "var(--green)", DERIVED: "var(--chart-none)", ASSUMPTION: "var(--gold)" };
 const CARBON_STATUS_WORD = { VERIFIED: "Verified", DERIVED: "Derived", ASSUMPTION: "Assumption" };
 const CARBON_FLAG_WORDS = {
@@ -3572,15 +3799,85 @@ function carbonLevers(st){
   return L;
 }
 
-function CarbonPage({ meta, access, initialData }){
+// The page state a stored target carries (ui_state) back into the controls. The server keeps it as
+// sent and never reads it, so every key is checked here: an object stays an object, electric is a
+// yes/no, anything else falls back to the empty state.
+function carbonStateFrom(u){
+  const o = { ...CARBON_EMPTY };
+  Object.keys(CARBON_EMPTY).forEach(k => {
+    const v = (u || {})[k];
+    if(k === "electric") o[k] = !!v;
+    else if(v && typeof v === "object" && !Array.isArray(v)) o[k] = v;
+  });
+  return o;
+}
+
+// A refusal from /api/carbon/target in words: the server's own sentence for a 400, plain words otherwise.
+function carbonTargetError(status, txt){
+  let d = "";
+  try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+  if(status === 401) return "Sign in again to see the carbon target.";
+  if(status === 403) return "Only a planner or admin code can change the carbon target.";
+  return d || `The carbon target could not be reached (error ${status}). Try again.`;
+}
+
+// One numbered step card. Top level (never defined inside CarbonPage), so the inputs inside a step
+// keep their focus and a <details> keeps its open state while the page re-renders.
+// Its data-guide (the guide's anchor) is written at each use and passed through to the card.
+function CarbonStep({ n, children, ...rest }){
+  return (
+    <li>
+      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5" id={"carbon-step-" + n} data-step={n} {...rest} aria-labelledby={"carbon-step-" + n + "-h"}>
+        <h2 id={"carbon-step-" + n + "-h"} className="flex items-center gap-3 text-lg font-semibold text-slate-800">
+          <span className="inline-flex items-center justify-center shrink-0 text-base font-bold tabular-nums" style={{ width: 28, height: 28, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface-2)", color: "var(--ink)" }}>{n}</span>
+          <span>{CARBON_STEP_TITLES[n - 1]}</span>
+        </h2>
+        {children}
+      </section>
+    </li>
+  );
+}
+
+function CarbonPage({ meta, access, who, initialData, initialTarget }){
   const [st, setSt] = useState(CARBON_EMPTY);
   const [spend, setSpend] = useState("");
   const [data, setData] = useState(initialData || null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [showRoutes, setShowRoutes] = useState(false);
-  const [showFactors, setShowFactors] = useState(false);
+  const [note, setNote] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfErr, setPdfErr] = useState(null);     // 11 Oct 2026: the summary's own error, shown under its button
+  // step 6: the scheme's carbon target, as GET /api/carbon/target returns it ({ target, status })
+  const [tg, setTg] = useState(initialTarget || null);
+  const [mode, setMode] = useState(() => ((initialTarget && initialTarget.target && initialTarget.target.mode) || "pct"));
+  const [tLoaded, setTLoaded] = useState(!!initialTarget);
+  const [tBusy, setTBusy] = useState(false);
+  const [tErr, setTErr] = useState(null);
+  const [tMsg, setTMsg] = useState(null);
+  const alive = useRef(true);
   const levers = useMemo(() => carbonLevers(st), [JSON.stringify(st)]);
+  // one call for the three verbs: GET (read), PUT (set, or switch % / cap), DELETE (clear). Each returns
+  // the same payload as the GET, so the step shows what the server now holds.
+  const targetCall = async (method, body, done) => {
+    setTBusy(true); setTErr(null); setTMsg(null);
+    try {
+      const r = await fetch(`${API}/carbon/target`, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      const txt = await r.text();
+      if(!r.ok) throw new Error(carbonTargetError(r.status, txt));
+      const j = JSON.parse(txt);
+      if(alive.current){
+        setTg(j); setTLoaded(true);
+        if(j && j.target && j.target.mode) setMode(j.target.mode);
+        if(done) setTMsg(done);
+      }
+    } catch(e){ if(alive.current) setTErr(e.message || "The carbon target could not be reached."); }
+    if(alive.current) setTBusy(false);
+  };
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useEffect(() => {
+    if(initialTarget) return;
+    targetCall("GET", null, null);
+  }, []);
   useEffect(() => {
     if(initialData) return;
     let live = true;
@@ -3598,7 +3895,7 @@ function CarbonPage({ meta, access, initialData }){
   }, [JSON.stringify(levers), spend]);
 
   if(!data && err) return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-6">
       <PageHeader title="Carbon planner" kicker="Plan" subtitle="Planning estimates, not a National Highways Carbon Tool return." />
       <EmptyState kind="error" title="Couldn't compute the carbon scenario" body={err} />
     </div>
@@ -3622,29 +3919,28 @@ function CarbonPage({ meta, access, initialData }){
   // a change in words, never colour alone: "120.4 tCO2e lower", "8.2 tCO2e higher", "no change"
   const moved = (n) => (n == null ? "no data" : n < -0.0005 ? `${grp(-n, 1)} tCO2e lower` : n > 0.0005 ? `${grp(n, 1)} tCO2e higher` : "no change");
   const tone = (n) => (n < -0.0005 ? "var(--green)" : n > 0.0005 ? "var(--red)" : "var(--muted)");
-  const card = "bg-white rounded-xl border border-slate-200";
   const h3 = "text-base font-semibold text-slate-800";
   const hint = "text-[13px] text-slate-500";
   const lab = "block text-sm font-medium text-slate-700 mb-1";
   const inp = "border border-slate-300 rounded-md px-2 py-1 text-sm w-full tabular-nums bg-white";
+  const big = "kpi-num font-bold text-[color:var(--navy-deep)] mt-3";
   const Chip = ({ s }) => (s ? <span className="inline-flex items-center gap-1.5 text-sm text-slate-700 whitespace-nowrap"><i aria-hidden="true" style={{ display: "inline-block", width: 8, height: 8, borderRadius: 4, background: CARBON_TONE[s] || "var(--chart-none)" }}></i>{CARBON_STATUS_WORD[s] || s}</span> : null);
   const lorryLine = (sc) => {
     const f = sc.fleet || {};
     return (
       <div className="text-sm text-slate-700 mt-1">
         Lorry loads (deliveries): <b className="tabular-nums">{f.trips == null ? "no data" : grp(f.trips)}</b> · lorries needed in the busiest month: <b className="tabular-nums">{f.lorries_peak == null ? "no data" : f.lorries_peak}</b>
-        {f.unsized_lines ? <span className={hint}> (the busiest month leaves out {f.unsized_lines} plan line{f.unsized_lines === 1 ? "" : "s"} with no route distance)</span> : null}
       </div>
     );
   };
-  const Total = ({ title, sub, sc, children }) => (
-    <div className={card + " p-4"}>
-      <h3 className={h3}>{title}</h3>
-      <div className={hint}>{sub}</div>
-      <div className="kpi-num font-bold text-[color:var(--navy-deep)] mt-2" style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}
-           title="Making the material + transport to and from site + waste disposal, in tonnes of carbon dioxide equivalent (tCO2e)">{t1(sc.totals.total_t)} <span className="text-sm font-semibold text-slate-500">tCO2e</span></div>
-      <div className="text-sm text-slate-700 mt-1 tabular-nums">Material {t1(sc.totals.material_t)} + Transport {t1(sc.totals.transport_t)} + Waste disposal {t1(sc.totals.disposal_t)}</div>
-      {children}
+  const unsizedNote = (sc) => { const u = (sc.fleet || {}).unsized_lines; return u ? <div className={hint}>The busiest month leaves out {u} plan line{u === 1 ? "" : "s"} with no route distance.</div> : null; };
+  // the parts of a total, for the "in full" toggles of steps 1 and 5 (a plain function, not a component)
+  const breakdown = (sc) => (
+    <div className="space-y-1 mt-2">
+      <div className="text-sm text-slate-700 tabular-nums">Material {t1(sc.totals.material_t)} + Transport {t1(sc.totals.transport_t)} + Waste disposal {t1(sc.totals.disposal_t)}</div>
+      <div className={hint + " tabular-nums"} title="Life-cycle modules as BS EN 15804 names them: A1–A3 making the material, A4 transport to site, A5 surplus material taken away and its disposal">By life-cycle module: A1–A3 {t1((sc.stages || {})["A1-A3"])} · A4 {t1((sc.stages || {}).A4)} · A5 {t1((sc.stages || {}).A5)}</div>
+      <div className="text-sm text-slate-700 tabular-nums" title={(data.methods || {}).well_to_wheel}>Transport well-to-wheel: {t1(sc.totals.transport_wtw_t)} tCO2e <span className={hint}>(adds producing the fuel or electricity; beside the total, not in it)</span></div>
+      <div className={hint}>Figures are rounded, so the parts may not add exactly to the total</div>
     </div>
   );
   const bm = (sc) => sc.benchmarks || {};
@@ -3653,206 +3949,188 @@ function CarbonPage({ meta, access, initialData }){
   const routesWithChoices = (opt.routes || []).filter(r => (r.suppliers || []).length || Object.values(r.alts || {}).some(a => (a || []).length > 1));
   const wasteRoutes = (opt.routes || []).filter(r => r.disposal_route || (r.destinations || []).some(x => x.disposal_route));
   const fc = data.fleet_compare || {};
-  const flagsOf = (sc) => Object.entries((sc && sc.totals && sc.totals.flags) || {});
   const unrouted = (B.totals.lines || 0) - (B.totals.baked_lines || 0);
+  // item 9: a decision's lorry effect in words, the distance in the tenant's unit
+  const loadsWord = (n) => (!n ? "" : n < 0 ? `${grp(-n)} fewer lorry loads` : `${grp(n)} more lorry loads`);
+  const kmWord = (km) => (km == null || Math.abs(km) < 0.5 ? "" : `${grp(Math.abs(dist(km)), 0)} ${km < 0 ? "fewer" : "more"} lorry-${DU()}`);
+  const lorryEffect = (d) => [loadsWord(d.delta_trips), kmWord(d.delta_vkm_km)].filter(Boolean).join(" · ") || `no change in lorry loads or lorry-${DU()}`;
+  // item 13: the waste hierarchy step of a disposal method (from the server, for the four methods that exist)
+  const step = (k) => ((data.waste_hierarchy || {})[k] || "");
+  const dispWord = (k) => `${CARBON_DISPOSAL_WORD[k] || k}${step(k) ? ` · waste hierarchy: ${step(k).toLowerCase()}` : ""}`;
+  // item 8: what is left out of these figures, from the server's counts
+  const sw = data.scope_words || {};
+  const fl0 = B.totals.flags || {};
+  const leftOut = [
+    unrouted > 0 ? `${unrouted} plan line${unrouted === 1 ? " has" : "s have"} no route distance yet: transport not counted (Bake on the Routes page)` : "",
+    (B.totals.material_excluded_tonnes || 0) > 0 ? `${grp(B.totals.material_excluded_tonnes)} t has no Government production factor: making it is not counted` : "",
+    fl0.RETURN_NOT_BAKED ? `${fl0.RETURN_NOT_BAKED} plan line${fl0.RETURN_NOT_BAKED === 1 ? " has" : "s have"} no return route distance: loaded leg only` : "",
+    fl0.NO_DISPOSAL_FACTOR ? `${fl0.NO_DISPOSAL_FACTOR} plan line${fl0.NO_DISPOSAL_FACTOR === 1 ? " has" : "s have"} no Government disposal factor: disposal not counted` : "",
+    B.totals.wtw_lines_out ? `${B.totals.wtw_lines_out} plan line${B.totals.wtw_lines_out === 1 ? "'s lorry has" : "s' lorries have"} no published well-to-tank row` : "",
+  ].filter(Boolean);
+  // the result in words: "124.2 tCO2e lower than the approved plan (79.1%)"; the lorry effect from the server
+  const resultWords = A ? (A.delta_t != null && Math.abs(A.delta_t) > 0.0005 ? `${moved(A.delta_t)} than the approved plan (${pct(A.delta_pct)})` : "No change from the approved plan") : "";
+  const loadsChange = A ? ([A.delta_trips ? (A.delta_trips < 0 ? `${grp(-A.delta_trips)} fewer lorry loads` : `${grp(A.delta_trips)} more lorry loads, because each lorry carries less`) : "", kmWord(A.delta_vkm_km)].filter(Boolean).join(" · ") || `No change in lorry loads or lorry-${DU()}`) : "";
+  // item 11: the one-page summary — the same body as the page's read, plus the commentary; the server draws it
+  // 11 Oct 2026: its failure is said under its own button (pdfErr), never in the scenario's error
+  const downloadSummary = async () => {
+    setPdfBusy(true); setPdfErr(null);
+    try {
+      const r = await fetch(`${API}/carbon/summary.pdf`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alternatives: levers.length ? [{ name: "Alternative", levers }] : [],
+                               spend_gbp_m: (spend === "" || isNaN(+spend)) ? null : +spend, commentary: note || null }) });
+      if(!r.ok){
+        const txt = await r.text();
+        let d = "";
+        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+        throw new Error(d || `error ${r.status}`);
+      }
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "carbon-summary.pdf";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setPdfErr("The summary could not be made: " + (e.message || e)); }
+    setPdfBusy(false);
+  };
+
+  // ---- step 6: the target, every figure from the server ----
+  const T = (tg && tg.target) || null;
+  const S = (tg && tg.status) || null;
+  const canSet = !!(access && access.can_approve);
+  const team = !!(S && S.scope === "team");
+  // 11 Oct 2026 (the review): the target, the two figures and their verdicts in the SAME words as the
+  // Dashboard, Forecasts and Submit forecast (ctTargetLine, ctProgress: the server decides "on target";
+  // no margin is worked out here). A team code's figures are its own lines and are not compared.
+  const ctHere = ctOk(tg);
+  const p6 = ctHere ? ctProgress(tg) : [];
+  // Set waits until the current target has been read: with the read failed the page cannot know there is one
+  // to replace, so it would replace it without asking. A refused scenario disables it too, saying why.
+  const setWhy = !tLoaded ? (tErr ? "The scheme's current carbon target did not load, so a new one cannot be set yet." : "Reading the current carbon target…")
+    : busy ? "Wait for the result to update."
+    : err ? `Not updated: ${err}`
+    : !levers.length || !A ? "Make a choice in steps 2 to 4 first."
+    : !(A.delta_t < -0.0005) ? "These decisions do not lower carbon, so they cannot be the target." : "";
+  const setTarget = () => {
+    if(!tLoaded) return;
+    if(T && !confirm("Replace the scheme's carbon target with these decisions?")) return;
+    targetCall("PUT", { mode, levers, ui_state: st, updated_by: who || null }, "Target set.");
+  };
+  // with no target yet the toggle only picks how the next one is held; on a saved target it switches
+  // the stored one (PUT with the mode alone: the server keeps every number), after a check, and shows what it now holds
+  const pickMode = (k) => {
+    if(!T) { setMode(k); return; }
+    if(canSet && T.mode !== k && confirm(k === "cap" ? "Hold the scheme's carbon target as a fixed tCO2e cap? Every page shows the change."
+                                                    : "Hold the scheme's carbon target as % below the approved plan? Every page shows the change."))
+      targetCall("PUT", { mode: k, updated_by: who || null }, k === "cap" ? "Now held as a fixed tCO2e cap." : "Now held as % below the approved plan.");
+  };
+  const clearTarget = () => {
+    if(!confirm("Clear the scheme's carbon target?")) return;
+    targetCall("DELETE", null, "Target cleared.");
+  };
+  // approvers only: a team code's read carries no page state (it names other teams' routes)
+  const openAgreed = () => { if(!canSet || !T || !T.ui_state) return; setSt(carbonStateFrom(T.ui_state)); setTMsg("The agreed decisions are now in steps 2 to 4."); };
+  // the routes where a supplier or a haul route is chosen, counted on the closed details' summary
+  const chosenN = Object.values(st.supplier || {}).filter(Boolean).length + Object.values(st.alt || {}).filter(k => +k > 0).length;
+  const toResult = () => { const el = document.getElementById("carbon-step-5"); if(el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-6">
       <PageHeader title="Carbon planner" kicker="Plan"
-        subtitle="Test planning decisions on haulage and bulk materials against the approved plan."
-        actions={<button onClick={() => { setSt(CARBON_EMPTY); setSpend(""); }} className="text-sm font-semibold px-3 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50">Clear the alternative</button>}>
-        <div className="flex items-start gap-3 mt-3" role="note">
-          <span aria-hidden="true" className="inline-flex items-center justify-center font-bold shrink-0" style={{ width: 26, height: 26, borderRadius: 13, background: "var(--ink)", color: "var(--bg)" }}>!</span>
-          <strong className="text-base text-slate-800">Planning estimates. Not a National Highways Carbon Tool return.</strong>
-        </div>
-        <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          <span><strong className="tabular-nums">{B.totals.lines}</strong> plan lines (one route, material and month each) · <strong className="tabular-nums">{B.totals.baked_lines}</strong> with a route distance</span>
-          {unrouted > 0 && <span className="text-amber-700">{unrouted} plan line{unrouted === 1 ? " has" : "s have"} no route distance yet, so {unrouted === 1 ? "its" : "their"} transport is not counted: route them with Bake on the Routes page</span>}
-          {busy && <span className="text-slate-400">updating…</span>}
-        </div>
-      </PageHeader>
-      {err && <div className="rounded-lg border p-3 text-sm mb-4" style={{ borderColor: "var(--red)", color: "var(--red)" }}>{err}</div>}
+        subtitle="From the approved plan to a carbon target, in six steps."
+        actions={<button onClick={() => { setSt(CARBON_EMPTY); setSpend(""); setTMsg(null); }} className="btn-sec">Start again</button>} />
+      {/* 11 Oct 2026: a refused scenario is said in step 5, in the strip at the foot and beside Set, where it is seen;
+          the banner up here was off screen on the single-column page */}
 
-      <div className="grid lg:grid-cols-3 gap-5">
-        {/* ---------------- the answer: first on a phone, on the right on a wide screen ---------------- */}
-        <div className="lg:col-span-2 space-y-4 order-1 lg:order-2">
-          <div className="grid md:grid-cols-2 gap-4" data-guide="carbon-compare">
-            <Total title="Approved plan" sub="What the alternative is compared with" sc={B}>{lorryLine(B)}</Total>
-            {A ? (
-              <Total title="Alternative" sub="Built from the decisions you choose" sc={A}>
-                <div className="text-sm font-semibold mt-1 tabular-nums" style={{ color: tone(A.delta_t) }}>
-                  {A.delta_t != null && Math.abs(A.delta_t) > 0.0005 ? `${moved(A.delta_t)} than the approved plan (${pct(A.delta_pct)})` : "No change from the approved plan"}
+      <ol className="space-y-4" aria-label="The six steps">
+        {/* ---------------- 1. your approved plan ---------------- */}
+        <CarbonStep n={1} data-guide="carbon-compare">
+          <div className="flex items-start gap-3 mt-3" role="note">
+            <span aria-hidden="true" className="inline-flex items-center justify-center font-bold shrink-0" style={{ width: 26, height: 26, borderRadius: 13, background: "var(--ink)", color: "var(--bg)" }}>!</span>
+            <strong className="text-base text-slate-800">Planning estimates. Not a National Highways Carbon Tool return.</strong>
+          </div>
+          <div className={big} style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}
+               title="Making the material + transport to and from site + waste disposal, in tonnes of carbon dioxide equivalent (tCO2e)">{t1(B.totals.total_t)} <span className="text-sm font-semibold text-slate-500">tCO2e</span></div>
+          {lorryLine(B)}
+          {leftOut.length > 0 && <p className="text-sm text-amber-700 mt-2">{leftOut[0]}{leftOut.length > 1 ? ` (and ${leftOut.length - 1} more under What this counts)` : ""}</p>}
+          {ctHere && <p className="text-sm text-slate-700 mt-2">{ctTargetLine(tg)} (step 6)</p>}
+          <details className="dash-more mt-3" data-guide="carbon-counts">
+            <summary>What this counts</summary>
+            <div>
+              <p className="text-sm text-slate-600 mt-2"><strong className="tabular-nums">{B.totals.lines}</strong> plan lines (one route, material and month each), <strong className="tabular-nums">{B.totals.baked_lines}</strong> with a route distance</p>
+              <dl className="grid md:grid-cols-2 gap-x-5 gap-y-3 mt-2 text-sm">
+                <div><dt className="font-semibold text-slate-800">Counts</dt><dd className="text-slate-600">{sw.counts || "no data"}</dd></div>
+                <div><dt className="font-semibold text-slate-800">Does not count</dt><dd className="text-slate-600">{sw.not_counted || "no data"}</dd></div>
+                <div><dt className="font-semibold text-slate-800">Factors</dt><dd className="text-slate-600">{sw.factors || "no data"}</dd></div>
+                <div><dt className="font-semibold text-slate-800">Left out here</dt><dd className="text-slate-600">{leftOut.length
+                  ? <ul className="list-disc pl-5 space-y-1">{leftOut.map(x => <li key={x}>{x}</li>)}</ul>
+                  : "Nothing: every plan line is counted in full."}</dd></div>
+              </dl>
+              {breakdown(B)}
+              {unsizedNote(B)}
+            </div>
+          </details>
+        </CarbonStep>
+
+        {/* ---------------- 2. materials ---------------- */}
+        <CarbonStep n={2} data-guide="carbon-levers">
+          {(opt.materials || []).map(m => {
+            const f = fx["material:" + m.carbon_material];
+            const e = (st.epd || {})[m.category] || {};
+            const bc = (B.by_category || []).find(x => x.category === m.category);
+            const ac = A ? (A.by_category || []).find(x => x.category === m.category) : null;
+            return (
+              <div key={m.category} className="border-t border-slate-100 pt-3 mt-3">
+                <div className="flex flex-wrap justify-between gap-x-3 text-sm">
+                  <span className="font-semibold text-slate-800" title={`National Highways Carbon Tool category: ${bc ? (CARBON_NH_CATEGORY[bc.sheet] || bc.sheet || "no category") : "no category"}`}>{m.category}</span>
+                  <span className="tabular-nums text-slate-700">{grp(m.tonnes)} t · {bc ? t1(bc.total_t) : "no data"} tCO2e{ac ? <> → <b>{t1(ac.total_t)}</b> with your choices</> : null}</span>
                 </div>
-                {lorryLine(A)}
-                {A.delta_trips ? <div className="text-sm text-slate-700">{A.delta_trips < 0 ? `${grp(-A.delta_trips)} fewer lorry loads` : `${grp(A.delta_trips)} more lorry loads, because each lorry carries less`}</div> : null}
-                <div className={hint + " mt-1"}>Figures are rounded, so the parts may not add exactly to the total</div>
-              </Total>
-            ) : (
-              <div className={card + " p-4 text-sm text-slate-600"}>
-                <h3 className={h3}>Alternative</h3>
-                <p className="mt-2">Choose a decision: recycled content, a custom carbon factor (supplier EPD), vehicle choice, battery electric lorries, a nearer supplier, an alternative route or a receiving site. The approved plan stays as it is.</p>
-              </div>
-            )}
-          </div>
-
-          <div className={card + " p-4"} data-guide="carbon-drivers">
-            <h3 className={h3}>Which decisions change carbon most</h3>
-            <div className={hint}>Each decision tested on its own against the approved plan; National Highways records ideas like these in its Low Carbon Opportunities Register</div>
-            {!A || !(A.drivers || []).length ? (
-              <p className="text-sm text-slate-600 mt-2">Build an alternative to see each decision ranked by the tonnes of carbon dioxide equivalent it changes.</p>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {(() => { const mx = Math.max(...A.drivers.map(d => Math.abs(d.delta_t)), 1e-9); return A.drivers.map(d => (
-                  <div key={d.driver} title={`${d.label}: ${moved(d.delta_t)} on its own (${pct(d.delta_pct)} of the approved plan), ${d.lines_changed} plan lines changed`}>
-                    <div className="flex justify-between gap-3 text-sm"><span className="text-slate-800">{d.label}</span>
-                      <span className="tabular-nums whitespace-nowrap"><b style={{ color: tone(d.delta_t) }}>{moved(d.delta_t)}</b> ({pct(d.delta_pct)})</span></div>
-                    <div className="h-2 rounded bg-slate-100" aria-hidden="true"><div className="h-2 rounded" style={{ width: `${Math.max(2, Math.abs(d.delta_t) / mx * 100)}%`, background: tone(d.delta_t) }} /></div>
-                  </div>)); })()}
-                <p className="text-sm text-slate-600">{Math.abs(A.interaction_t || 0) < 0.0005
-                  ? "The decisions do not affect each other here: together they come to the sum of each on its own."
-                  : `Together, the result is ${grp(Math.abs(A.interaction_t), 1)} tCO2e ${A.interaction_t < 0 ? "lower" : "higher"} than adding up each decision on its own.`}</p>
-                {(A.notes || []).map(n => <p key={n} className="text-sm text-amber-700">{n}</p>)}
-                {flagsOf(A).map(([k, n]) => <p key={k} className="text-sm text-amber-700">{n} plan line{n === 1 ? "" : "s"}: {CARBON_FLAG_WORDS[k] || k}</p>)}
-              </div>
-            )}
-          </div>
-
-          <div className={card + " overflow-hidden"}>
-            <table className="tbl">
-              <caption><b>How the plan compares</b> · against published references, never an invented limit</caption>
-              <thead><tr><th scope="col">Measure</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th><th scope="col">Reference</th></tr></thead>
-              <tbody>
-                <tr><td>Transport kgCO2e per tonne moved</td><td className="num">{bm(B).kg_co2e_per_t_delivered ?? "no data"}</td><td className="num">{altCell(a => bm(a).kg_co2e_per_t_delivered ?? "no data")}</td><td className={hint}>No published limit per delivery or per tonne exists</td></tr>
-                <tr><td>All-in kgCO2e per tonne (material, transport, waste disposal)</td><td className="num">{bm(B).kg_co2e_per_t_all_in ?? "no data"}</td><td className="num">{altCell(a => bm(a).kg_co2e_per_t_all_in ?? "no data")}</td><td className={hint}>Soil has no Government production factor, so earthworks carry haulage and disposal only</td></tr>
-                <tr title={prov(fx["tkm:artic"]) + "\n" + prov(fx["tkm:rigid"])}><td>kgCO2e per {TKM()}</td>
-                  <td className="num">{bm(B).kg_co2e_per_tkm == null ? "no data" : distRate(bm(B).kg_co2e_per_tkm).toFixed(4)}</td>
-                  <td className="num">{altCell(a => bm(a).kg_co2e_per_tkm == null ? "no data" : distRate(bm(a).kg_co2e_per_tkm).toFixed(4))}</td>
-                  <td className={hint}>Department for Energy Security and Net Zero (DESNZ) 2026 average for the same lorry sizes: {bm(B).desnz_kg_co2e_per_tkm == null ? "no data" : distRate(bm(B).desnz_kg_co2e_per_tkm).toFixed(4)}; the approved plan is {natWord(bm(B).vs_national_average_pct)}</td></tr>
-                <tr><td>Laden share of lorry-{DU()}<div className={hint}>Every return leg is counted empty: back-loads are not modelled</div></td><td className="num">{bm(B).laden_share_pct == null ? "no data" : `${bm(B).laden_share_pct}%`}</td><td className="num">{altCell(a => bm(a).laden_share_pct == null ? "no data" : `${bm(a).laden_share_pct}%`)}</td><td className={hint}>{bm(B).excluded_lines ? `${bm(B).excluded_lines} plan lines with no return route distance are left out of these figures` : "Every routed plan line is included"}</td></tr>
-                <tr><td>Zero-emission deliveries</td><td className="num">{bm(B).zero_emission_share_pct == null ? "no data" : `${bm(B).zero_emission_share_pct}%`}</td><td className="num">{altCell(a => bm(a).zero_emission_share_pct == null ? "no data" : `${bm(a).zero_emission_share_pct}%`)}</td><td className={hint}>{bm(B).nh_target || ""}</td></tr>
-                <tr><td>tCO2e per {CUR()} million of programme spend</td><td className="num">{bm(B).t_co2e_per_gbp_m ?? (spend === "" ? "not entered" : "no data")}</td><td className="num">{altCell(a => bm(a).t_co2e_per_gbp_m ?? (spend === "" ? "not entered" : "no data"))}</td>
-                  <td className={hint} title={nhKpi ? `${nhKpi.source || ""}${nhKpi.url ? " · " + nhKpi.url : ""}` : ""}>{nhKpi
-                    ? `National Highways, all maintenance and construction: ${nhKpi.series && nhKpi.series["2024_25"] != null ? nhKpi.series["2024_25"] : "no data"} (2024/25) to ${nhKpi.series && nhKpi.series["2025_26"] != null ? nhKpi.series["2025_26"] : "no data"} (2025/26) tCO2e per £m, ${nhKpi.price_base || ""}. Context only: this page counts materials, haulage and waste disposal, not the same scope.`
-                    : "No published National Highways figure on this tenant"}</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className={card + " overflow-hidden"}>
-            <table className="tbl">
-              <caption><b>Three ways to count the same haul</b> · transport only, tCO2e</caption>
-              <thead><tr><th scope="col">Method</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th></tr></thead>
-              <tbody>
-                <tr title={(data.methods || {}).headline}><td><b>Wayscope: per vehicle-km, both legs</b> (the figure on this page)<div className={hint}>Diesel is exhaust only (tank-to-wheel); electric is the grid electricity used</div></td><td className="num">{t1(B.totals.transport_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_t))}</td></tr>
-                <tr title={(data.methods || {}).nh_tool + "\n" + prov(fx["nh_tool"])}><td>National Highways Carbon Tool method (for comparison)<div className={hint}>Tonnes × one-way distance, return added, 2024 factors with well-to-tank</div></td><td className="num">{t1(B.totals.transport_nh_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_nh_t))}</td></tr>
-                <tr title={(data.methods || {}).tonne_km}><td>Tonne-km method: DESNZ 2026, average load<div className={hint}>What a tonne-km calculator gives for the same haul</div></td><td className="num">{t1(B.totals.transport_tkm_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_tkm_t))}</td></tr>
-              </tbody>
-            </table>
-            <p className="text-sm text-slate-600 px-4 py-3">All three use Government factors. GOV.UK says to prefer the per-vehicle-km figure when the vehicle and the route distance are known, which they are here. The Carbon Tool asks only for tonnes and a one-way distance, adds the return and well-to-tank, so it reads higher. Never quote one as the other. FORS hauliers report well-to-wheel emissions from the fuel they use; this page does not show that figure yet.</p>
-          </div>
-
-          <div className={card + " overflow-hidden"} data-guide="carbon-fleet">
-            {!fc.lines ? (
-              <div className="p-4"><h3 className={h3}>Diesel or battery electric, same tonnage</h3><p className="text-sm text-slate-600 mt-2">{fc.note || "No forecast vehicle with a route distance has an electric profile on Config."}</p></div>
-            ) : (
-              <>
-                <table className="tbl">
-                  <caption><b>Diesel or battery electric, same tonnage</b> · the same plan lines run both ways</caption>
-                  <thead><tr><th scope="col"></th><th scope="col" className="num">Lorries needed, busiest month</th><th scope="col" className="num">Lorry loads</th><th scope="col" className="num">kWh</th><th scope="col" className="num">tCO2e</th></tr></thead>
-                  <tbody>
-                    <tr><td>Diesel, as forecast</td><td className="num">{fc.diesel.lorries_peak}</td><td className="num">{grp(fc.diesel.trips)}</td><td className="num">not applicable</td><td className="num">{t1(fc.diesel.transport_t)}</td></tr>
-                    <tr title={prov(fx["kwh_per_km"]) + "\n" + prov(fx["electricity"])}><td>Battery electric</td><td className="num">{fc.electric.lorries_peak}</td><td className="num">{grp(fc.electric.trips)}</td><td className="num">{grp(fc.electric.kwh)}</td><td className="num">{t1(fc.electric.transport_t)}</td></tr>
-                  </tbody>
-                </table>
-                <div className="text-sm text-slate-600 px-4 py-3 space-y-1">
-                  {(fc.electric_profiles || []).map(p => (
-                    <div key={p.vehicle}>{vehLabel(p.vehicle)}: payload {p.payload_t} t (diesel {p.twin_payload_t} t) · {p.kwh_per_km} kWh per km · battery {p.battery_kwh_usable} kWh usable · charger {p.charge_kw} kW <Chip s={p.status} /></div>
-                  ))}
-                  <div>Range on one charge {fc.range_per_charge_km_min == null ? "no data" : `${fmtDist(fc.range_per_charge_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} plan line${fc.infeasible_lines === 1 ? "" : "s"} left out of both columns: a trip needs more than one battery` : ""}</div>
-                  <div className={hint}>The battery starts each shift full; charging time comes out of the shift. The +2 t weight allowance for zero-emission heavy goods vehicles (HGVs) is a draft rule and is not applied.</div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className={card + " overflow-hidden"}>
-            <table className="tbl">
-              <caption><b>By material</b> · each plan line sits in one National Highways Carbon Tool category: earthworks excludes bulk materials</caption>
-              <thead><tr><th scope="col">Material</th><th scope="col">Carbon Tool category (NH)</th><th scope="col" className="num">Tonnes</th><th scope="col" className="num">Approved plan, tCO2e</th><th scope="col" className="num">Alternative, tCO2e</th></tr></thead>
-              <tbody>
-                {(B.by_category || []).map(c => {
-                  const a = A ? (A.by_category || []).find(x => x.category === c.category) : null;
-                  return <tr key={c.category}><td>{c.category}</td><td>{CARBON_NH_CATEGORY[c.sheet] || c.sheet || "no category"}</td><td className="num">{grp(c.tonnes)}</td><td className="num">{t1(c.total_t)}</td><td className="num">{A ? (a ? t1(a.total_t) : "no data") : "no alternative yet"}</td></tr>;
-                })}
-              </tbody>
-            </table>
-            <p className={hint + " px-4 py-2"}>Soil going to a tip or a recycling site is reported under Waste + Waste Transport and carries the waste disposal factor, not a production factor.</p>
-          </div>
-
-          <div className={card + " p-4"}>
-            <button className={h3 + " w-full text-left"} onClick={() => setShowFactors(v => !v)} aria-expanded={showFactors}>{showFactors ? "▾" : "▸"} Factors used: source, year and status ({(data.factors || []).length})</button>
-            <p className={hint + " mt-1"}>Verified: matches the published row · Derived: worked out from published rows · Assumption: typed or estimated</p>
-            {showFactors && (
-              <ul className="mt-2 space-y-2 text-sm">
-                {(data.factors || []).map(f => (
-                  <li key={f.key} title={prov(f)} className="flex flex-wrap items-baseline gap-x-2">
-                    <Chip s={f.status} /><span className="font-semibold text-slate-800">{f.label}</span>
-                    <span className="text-slate-600 tabular-nums">{f.value != null ? (Array.isArray(f.value) ? f.value.join("–") : f.value) : f.kg_per_km != null ? f.kg_per_km : (f.kg_co2e_per_t ? Object.entries(f.kg_co2e_per_t).filter(([, v]) => v != null).map(([k, v]) => `${k.replace("_", "-")} ${v}`).join(" · ") : "")} {f.unit || (f.kg_co2e_per_t ? "kgCO2e per tonne" : "")}</span>
-                    <span className="text-slate-500">{f.source || "no source"} · {f.year || "year not given"}{ids(f)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* ---------------- the decisions: below the answer on a phone, on the left on a wide screen ---------------- */}
-        <div className="space-y-4 order-2 lg:order-1" data-guide="carbon-levers">
-          <div className={card + " p-4 space-y-4"}>
-            <h3 className={h3}>Materials</h3>
-            {(opt.materials || []).map(m => {
-              const f = fx["material:" + m.carbon_material];
-              const e = (st.epd || {})[m.category] || {};
-              return (
-                <div key={m.category} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
-                  <div className="text-sm font-semibold text-slate-800">{m.category}</div>
-                  <div className={hint} title={prov(f)}>{m.label || "No Government class"} · {grp(m.tonnes)} t{m.primary != null ? ` · ${m.primary} kgCO2e per tonne (Government factor)` : ""} {f && <Chip s={f.status} />}</div>
-                  <label className="block mt-2" title={m.recycled_enabled ? "Linear blend of the Government primary and recycled (closed-loop) factors" : m.recycled_reason}>
-                    <span className={lab}>Recycled content: {(st.recycled || {})[m.category] || 0}%</span>
-                    <input type="range" min="0" max="100" step="5" className="w-full" disabled={!m.recycled_enabled || !!e.kg}
-                      value={(st.recycled || {})[m.category] || 0} onChange={ev => setK("recycled", m.category, +ev.target.value)} />
-                    {!m.recycled_enabled && <span className={"block " + hint}>Not available: {m.recycled_reason}.</span>}
+                <label className="block mt-2" title={m.recycled_enabled ? "Linear blend of the Government primary and recycled (closed-loop) factors" : m.recycled_reason}>
+                  <span className={lab}>Recycled content: {(st.recycled || {})[m.category] || 0}%</span>
+                  <input type="range" min="0" max="100" step="5" className="w-full" disabled={!m.recycled_enabled || !!e.kg}
+                    value={(st.recycled || {})[m.category] || 0} onChange={ev => setK("recycled", m.category, +ev.target.value)} />
+                  {!m.recycled_enabled && <span className={"block " + hint}>Not available: {m.recycled_reason}.</span>}
+                </label>
+                {m.reused != null && (
+                  <label className="flex items-start gap-2 mt-2 text-sm text-slate-700" title={`Uses the Government reused factor, ${m.reused} kgCO2e per tonne; lorry loads are unchanged`}>
+                    <input type="checkbox" className="mt-1" checked={!!(st.reused || {})[m.category]} disabled={!!e.kg}
+                      onChange={ev => setK("reused", m.category, ev.target.checked)} />
+                    <span>Reused material ({m.reused} kgCO2e per tonne)</span>
                   </label>
-                  <label className="block mt-2">
-                    <span className={lab}>Custom carbon factor (supplier EPD), kgCO2e per tonne</span>
-                    <span className={"block " + hint + " mb-1"}>Replaces the Government factor; give the reference of the supplier's environmental product declaration (EPD)</span>
-                    <input className={inp} inputMode="decimal" value={e.kg || ""} placeholder="Government factor" onChange={ev => setK("epd", m.category, { ...e, kg: ev.target.value })} />
-                  </label>
-                  <label className="block mt-2">
-                    <span className={lab}>EPD reference (required)</span>
-                    <input className={inp} value={e.source || ""} placeholder="for example, the EPD number" onChange={ev => setK("epd", m.category, { ...e, source: ev.target.value })} />
-                  </label>
-                  {m.reused != null && (
-                    <label className="flex items-start gap-2 mt-2 text-sm text-slate-700" title={`Government reused factor: ${m.reused} kgCO2e per tonne`}>
-                      <input type="checkbox" className="mt-1" checked={!!(st.reused || {})[m.category]} disabled={!!e.kg}
-                        onChange={ev => setK("reused", m.category, ev.target.checked)} />
-                      <span>Reused material ({m.reused} kgCO2e per tonne)<span className={"block " + hint}>Uses the Government reused factor; lorry loads are unchanged</span></span>
+                )}
+                {e.kg ? <p className={hint + " mt-1"}>Supplier EPD in use: {e.kg} kgCO2e per tonne{e.source ? `, reference ${e.source}` : ""}, so recycled content and reuse do not apply (change it under Use a supplier EPD).</p> : null}
+                <details className="dash-more mt-2">
+                  <summary>Use a supplier EPD</summary>
+                  <div>
+                    <div className={hint + " mt-2"} title={prov(f)}>Government factor: {m.label || "no Government class"}{m.primary != null ? ` · ${m.primary} kgCO2e per tonne` : ""} {f && <Chip s={f.status} />}</div>
+                    <label className="block mt-2">
+                      <span className={lab}>Custom carbon factor (supplier EPD), kgCO2e per tonne</span>
+                      <span className={"block " + hint + " mb-1"}>Replaces the Government factor; give the reference of the supplier's environmental product declaration (EPD)</span>
+                      <input className={inp} inputMode="decimal" value={e.kg || ""} placeholder="Government factor" onChange={ev => setK("epd", m.category, { ...e, kg: ev.target.value })} />
+                      {e.kg && isNaN(+e.kg) ? <span className={"block " + hint}>Type a number, with a point for decimals (for example 12.5).</span> : null}
                     </label>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    <label className="block mt-2">
+                      <span className={lab}>EPD reference (required)</span>
+                      <input className={inp} value={e.source || ""} placeholder="for example, the EPD number" onChange={ev => setK("epd", m.category, { ...e, source: ev.target.value })} />
+                      {e.kg && !String(e.source || "").trim() ? <span className={"block " + hint}>Add the EPD reference: the result does not update until it has one.</span> : null}
+                    </label>
+                  </div>
+                </details>
+              </div>
+            );
+          })}
+        </CarbonStep>
 
-          <div className={card + " p-4 space-y-4"}>
-            <h3 className={h3}>Lorries and routes</h3>
-            <label className="flex items-start gap-2 text-sm text-slate-700" title={prov(fx["electricity"])}>
-              <input type="checkbox" className="mt-1" checked={!!st.electric} onChange={ev => setSt(s => ({ ...s, electric: ev.target.checked }))} />
-              <span><span className="font-medium">Battery electric lorries</span><span className={"block " + hint}>Where Config has an electric profile for that lorry; kWh per km × UK electricity, as no Government electric HGV factor exists</span></span>
-            </label>
-            {(opt.materials || []).map(m => (
-              <div key={m.category} className="border-t border-slate-100 pt-3">
-                <div className="text-sm font-semibold text-slate-800">{m.category}</div>
+        {/* ---------------- 3. lorries and routes ---------------- */}
+        <CarbonStep n={3} data-guide="carbon-lorries">
+          <label className="flex items-start gap-2 text-sm text-slate-700 mt-3" title={prov(fx["electricity"])}>
+            <input type="checkbox" className="mt-1" checked={!!st.electric} onChange={ev => setSt(s => ({ ...s, electric: ev.target.checked }))} />
+            <span><span className="font-medium">Battery electric lorries</span><span className={"block " + hint}>Where Config has an electric profile for that lorry</span></span>
+          </label>
+          {(opt.materials || []).map(m => (
+            <div key={m.category} className="border-t border-slate-100 pt-3 mt-3">
+              <div className="text-sm font-semibold text-slate-800">{m.category}</div>
+              <div className="grid sm:grid-cols-2 gap-x-4">
                 <label className="block mt-2">
                   <span className={lab}>Vehicle choice</span>
                   <select className={inp} value={(st.vehicle || {})[m.category] || ""} onChange={ev => setK("vehicle", m.category, ev.target.value)}>
@@ -3860,21 +4138,22 @@ function CarbonPage({ meta, access, initialData }){
                     {(m.vehicles || []).map(v => <option key={v} value={v}>{vehLabel(v)}{(vehOf[v] || {}).fuel === "electric" ? " (scenario only)" : ""}</option>)}
                   </select>
                 </label>
-                <label className="block mt-2" title="A typed percentage of the route distance; flagged as typed">
+                <label className="block mt-2" title="Below 100% is a nearer supplier, above is farther. A typed percentage of the route distance, flagged as typed">
                   <span className={lab}>Haul distance: {(st.distance || {})[m.category] || 100}% of the planned route</span>
-                  <span className={"block " + hint}>Below 100% is a nearer supplier, above is farther</span>
                   <input type="range" min="50" max="150" step="5" className="w-full" value={(st.distance || {})[m.category] || 100}
                     onChange={ev => setK("distance", m.category, +ev.target.value)} />
                 </label>
               </div>
-            ))}
-            {routesWithChoices.length > 0 && (
-              <div className="border-t border-slate-100 pt-3">
-                <button className="text-sm font-semibold text-slate-800 w-full text-left" onClick={() => setShowRoutes(v => !v)} aria-expanded={showRoutes}>{showRoutes ? "▾" : "▸"} Supplier and route, one route at a time ({routesWithChoices.length})</button>
-                {showRoutes && routesWithChoices.map(r => {
+            </div>
+          ))}
+          {routesWithChoices.length > 0 && (
+            <details className="dash-more mt-3">
+              <summary>Supplier and route, route by route ({routesWithChoices.length}{chosenN ? ` · ${chosenN} chosen` : ""})</summary>
+              <div>
+                {routesWithChoices.map(r => {
                   const altList = Object.values(r.alts || {}).find(a => (a || []).length > 1) || [];
                   return (
-                    <div key={r.route_id} className="border-t border-slate-100 pt-2 mt-2">
+                    <div key={r.route_id} className="border-t border-slate-100 pt-2 mt-2 first:border-0">
                       <div className="text-sm font-semibold text-slate-700">{r.route_id} · {r.origin_name} → {r.dest_name}</div>
                       {(r.suppliers || []).length > 0 && (
                         <label className="block mt-1"><span className={lab}>Supplier</span>
@@ -3893,59 +4172,290 @@ function CarbonPage({ meta, access, initialData }){
                   );
                 })}
               </div>
-            )}
-          </div>
+            </details>
+          )}
+          <details className="dash-more mt-3" data-guide="carbon-fleet">
+            <summary>Diesel or battery electric, same tonnage</summary>
+            <div>
+              <p className="text-sm text-slate-600 mt-2">Battery electric is worked out as kWh per km × UK electricity, as no Government electric HGV factor exists. The +2 t weight allowance for zero-emission heavy goods vehicles (HGVs) is a draft rule and is not applied.</p>
+              {!fc.lines ? (
+                <p className="text-sm text-slate-600 mt-2">{fc.note || "No forecast vehicle with a route distance has an electric profile on Config."}</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto mt-2">
+                    <table className="tbl">
+                      <caption><b>Lorries, loads and carbon</b> · the same plan lines run both ways</caption>
+                      <thead><tr><th scope="col"></th><th scope="col" className="num">Lorries needed, busiest month</th><th scope="col" className="num">Lorry loads</th><th scope="col" className="num">kWh</th><th scope="col" className="num">tCO2e</th></tr></thead>
+                      <tbody>
+                        <tr><td>Diesel, as forecast</td><td className="num">{fc.diesel.lorries_peak}</td><td className="num">{grp(fc.diesel.trips)}</td><td className="num">not applicable</td><td className="num">{t1(fc.diesel.transport_t)}</td></tr>
+                        <tr title={prov(fx["kwh_per_km"]) + "\n" + prov(fx["electricity"])}><td>Battery electric</td><td className="num">{fc.electric.lorries_peak}</td><td className="num">{grp(fc.electric.trips)}</td><td className="num">{grp(fc.electric.kwh)}</td><td className="num">{t1(fc.electric.transport_t)}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="text-sm text-slate-600 pt-3 space-y-1">
+                    {(fc.electric_profiles || []).map(p => (
+                      <div key={p.vehicle}>{vehLabel(p.vehicle)}: payload {p.payload_t} t (diesel {p.twin_payload_t} t) · {p.kwh_per_km} kWh per km · battery {p.battery_kwh_usable} kWh usable · charger {p.charge_kw} kW <Chip s={p.status} /></div>
+                    ))}
+                    <div>Range on one charge {fc.range_per_charge_km_min == null ? "no data" : `${fmtDist(fc.range_per_charge_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} plan line${fc.infeasible_lines === 1 ? "" : "s"} left out of both columns: a trip needs more than one battery` : ""}</div>
+                    <div className={hint}>The battery starts each shift full; charging time comes out of the shift.</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </details>
+        </CarbonStep>
 
-          {wasteRoutes.length > 0 && (
-            <div className={card + " p-4 space-y-3"}>
-              <h3 className={h3}>Surplus material and waste</h3>
-              <p className={hint}>Where surplus material goes, and how it is dealt with there</p>
+        {/* ---------------- 4. surplus material ---------------- */}
+        <CarbonStep n={4} data-guide="carbon-surplus">
+          {wasteRoutes.length === 0 ? (
+            <p className="text-sm text-slate-600 mt-2">No surplus material leaves site in this plan.</p>
+          ) : (
+            <>
               {wasteRoutes.map(r => {
                 const d = (st.disposal || {})[r.route_id] || {};
                 return (
-                  <div key={r.route_id} className="border-t border-slate-100 pt-2">
+                  <div key={r.route_id} className="border-t border-slate-100 pt-3 mt-3">
                     <div className="text-sm font-semibold text-slate-700">{r.route_id} · {r.origin_name} → {r.dest_name}{r.disposal_route ? ` (${(CARBON_DISPOSAL_WORD[r.disposal_route] || r.disposal_route).toLowerCase()})` : ""}</div>
-                    {(r.destinations || []).length > 0 && (
-                      <label className="block mt-1"><span className={lab}>Receiving site</span>
-                        <select className={inp} value={d.to_route || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to_route: ev.target.value })}>
-                          <option value="">{r.dest_name} (as planned)</option>
-                          {r.destinations.map(x => <option key={x.route_id} value={x.route_id} disabled={!x.baked}>{x.dest_name}{x.disposal_route ? ` (${(CARBON_DISPOSAL_WORD[x.disposal_route] || x.disposal_route).toLowerCase()})` : ""}{x.baked ? "" : " — no route distance yet"}</option>)}
-                        </select></label>
-                    )}
-                    {r.disposal_route && (
-                      <label className="block mt-1"><span className={lab}>Disposal method</span>
-                        <select className={inp} value={d.to || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to: ev.target.value })}>
-                          <option value="">As the site's type ({(CARBON_DISPOSAL_WORD[r.disposal_route] || r.disposal_route).toLowerCase()})</option>
-                          {(r.disposal_routes || []).map(k => <option key={k} value={k}>{CARBON_DISPOSAL_WORD[k] || k}</option>)}
-                        </select></label>
-                    )}
+                    {r.disposal_route && step(r.disposal_route) ? <div className={hint}>Waste hierarchy: {step(r.disposal_route).toLowerCase()}</div> : null}
+                    <div className="grid sm:grid-cols-2 gap-x-4">
+                      {(r.destinations || []).length > 0 && (
+                        <label className="block mt-2"><span className={lab}>Receiving site</span>
+                          <select className={inp} value={d.to_route || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to_route: ev.target.value })}>
+                            <option value="">{r.dest_name} (as planned)</option>
+                            {r.destinations.map(x => <option key={x.route_id} value={x.route_id} disabled={!x.baked}>{x.dest_name}{x.disposal_route ? ` (${dispWord(x.disposal_route).toLowerCase()})` : ""}{x.baked ? "" : " — no route distance yet"}</option>)}
+                          </select></label>
+                      )}
+                      {r.disposal_route && (
+                        <label className="block mt-2"><span className={lab}>Disposal method</span>
+                          <select className={inp} value={d.to || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to: ev.target.value })}>
+                            <option value="">As the site's type ({(CARBON_DISPOSAL_WORD[r.disposal_route] || r.disposal_route).toLowerCase()})</option>
+                            {(r.disposal_routes || []).map(k => <option key={k} value={k}>{dispWord(k)}</option>)}
+                          </select></label>
+                      )}
+                    </div>
                   </div>
                 );
               })}
-            </div>
+              <details className="dash-more mt-3">
+                <summary>Transfer notes</summary>
+                <div>
+                  <p className={hint + " mt-2"} title={data.waste_hierarchy_source || ""}>The waste hierarchy step follows the disposal method used for the carbon figure. Each transfer still needs a waste transfer note (or a season ticket covering a series of transfers); Wayscope does not replace these or the duty of care.</p>
+                </div>
+              </details>
+            </>
           )}
+        </CarbonStep>
 
-          <div className={card + " p-4"}>
-            <label className="block">
-              <span className={lab}>Programme spend, in {CUR()} million (optional)</span>
-              <span className={"block " + hint + " mb-1"}>Used only for tCO2e per {CUR()} million</span>
-              <input className={inp} inputMode="decimal" value={spend} onChange={ev => setSpend(ev.target.value)} placeholder="not entered" />
-            </label>
+        {/* ---------------- 5. result ---------------- */}
+        <CarbonStep n={5} data-guide="carbon-drivers">
+          {err && <p className="text-sm font-semibold mt-2" role="alert" style={{ color: "var(--red)" }}>Not updated: {err}{A ? " The figures below are from your previous choices." : ""}</p>}
+          {!A ? (
+            err ? null : <p className="text-sm text-slate-600 mt-2">Make a choice in steps 2 to 4 to see the result. The approved plan stays as it is.</p>
+          ) : (
+            <>
+              <div className={big} style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}>{t1(A.totals.total_t)} <span className="text-sm font-semibold text-slate-500">tCO2e</span>{busy && <span className={hint + " font-normal"}> updating…</span>}</div>
+              <p className="text-sm font-semibold mt-1 tabular-nums" style={{ color: tone(A.delta_t) }}>{resultWords}</p>
+              <p className="text-sm text-slate-700 tabular-nums">{loadsChange}</p>
+              <h3 className={h3 + " mt-4"}>Which decisions change carbon most</h3>
+              {!(A.drivers || []).length ? (
+                <p className="text-sm text-slate-600 mt-2">No decision changes carbon on its own here.</p>
+              ) : (
+                <div className="mt-2 space-y-3">
+                  {(() => { const mx = Math.max(...A.drivers.map(d => Math.abs(d.delta_t)), 1e-9); return A.drivers.map(d => (
+                    <div key={d.driver} title={`${d.label}: ${moved(d.delta_t)} on its own (${pct(d.delta_pct)} of the approved plan), ${d.lines_changed} plan lines changed; ${lorryEffect(d)}`}>
+                      <div className="flex justify-between gap-3 text-sm"><span className="text-slate-800">{d.label}</span>
+                        <span className="tabular-nums whitespace-nowrap"><b style={{ color: tone(d.delta_t) }}>{moved(d.delta_t)}</b> ({pct(d.delta_pct)})</span></div>
+                      <div className={hint + " tabular-nums"}>{lorryEffect(d)}</div>
+                      <div className="h-2 rounded bg-slate-100" aria-hidden="true"><div className="h-2 rounded" style={{ width: `${Math.max(2, Math.abs(d.delta_t) / mx * 100)}%`, background: tone(d.delta_t) }} /></div>
+                    </div>)); })()}
+                </div>
+              )}
+              {(A.notes || []).map(n => <p key={n} className="text-sm text-amber-700 mt-2">{n}</p>)}
+              {Object.entries((A.totals && A.totals.flags) || {}).filter(([k]) => k !== "UNBAKED").map(([k, n]) => <p key={k} className="text-sm text-amber-700 mt-2">{n} plan line{n === 1 ? "" : "s"}: {CARBON_FLAG_WORDS[k] || k}</p>)}
+              {(A.lever_words || []).length > 0 && (
+                <>
+                  <h3 className={h3 + " mt-4"}>Your decisions</h3>
+                  <ul className="list-disc pl-5 mt-1 text-sm text-slate-700 space-y-1">{A.lever_words.map(w => <li key={w}>{w}</li>)}</ul>
+                </>
+              )}
+              <details className="dash-more mt-3">
+                <summary>The result in full</summary>
+                <div>
+                  {breakdown(A)}
+                  {lorryLine(A)}
+                  {unsizedNote(A)}
+                  <p className="text-sm text-slate-600 mt-2">{Math.abs(A.interaction_t || 0) < 0.0005
+                    ? "The decisions do not affect each other here: together they come to the sum of each on its own."
+                    : `Together, the result is ${grp(Math.abs(A.interaction_t), 1)} tCO2e ${A.interaction_t < 0 ? "lower" : "higher"} than adding up each decision on its own.`}</p>
+                  {(A.totals && A.totals.flags || {}).UNBAKED ? <p className="text-sm text-amber-700 mt-2">{A.totals.flags.UNBAKED} plan line{A.totals.flags.UNBAKED === 1 ? "" : "s"}: {CARBON_FLAG_WORDS.UNBAKED}</p> : null}
+                  <p className={hint + " mt-2"}>Each decision is tested on its own against the approved plan; National Highways records ideas like these in its Low Carbon Opportunities Register.</p>
+                </div>
+              </details>
+            </>
+          )}
+          <details className="dash-more mt-3">
+            <summary>How the plan compares</summary>
+            <div>
+              <div className="overflow-x-auto mt-2">
+                <table className="tbl">
+                  <caption><b>How the plan compares</b> · against published references, never an invented limit</caption>
+                  <thead><tr><th scope="col">Measure</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th><th scope="col">Reference</th></tr></thead>
+                  <tbody>
+                    <tr><td>Transport kgCO2e per tonne moved</td><td className="num">{bm(B).kg_co2e_per_t_delivered ?? "no data"}</td><td className="num">{altCell(a => bm(a).kg_co2e_per_t_delivered ?? "no data")}</td><td className={hint}>No published limit per delivery or per tonne exists</td></tr>
+                    <tr><td>All-in kgCO2e per tonne (material, transport, waste disposal)</td><td className="num">{bm(B).kg_co2e_per_t_all_in ?? "no data"}</td><td className="num">{altCell(a => bm(a).kg_co2e_per_t_all_in ?? "no data")}</td><td className={hint}>Soil has no Government production factor, so earthworks carry haulage and disposal only</td></tr>
+                    <tr title={prov(fx["tkm:artic"]) + "\n" + prov(fx["tkm:rigid"])}><td>kgCO2e per {TKM()}</td>
+                      <td className="num">{bm(B).kg_co2e_per_tkm == null ? "no data" : distRate(bm(B).kg_co2e_per_tkm).toFixed(4)}</td>
+                      <td className="num">{altCell(a => bm(a).kg_co2e_per_tkm == null ? "no data" : distRate(bm(a).kg_co2e_per_tkm).toFixed(4))}</td>
+                      <td className={hint}>Department for Energy Security and Net Zero (DESNZ) 2026 average for the same lorry sizes: {bm(B).desnz_kg_co2e_per_tkm == null ? "no data" : distRate(bm(B).desnz_kg_co2e_per_tkm).toFixed(4)}; the approved plan is {natWord(bm(B).vs_national_average_pct)}</td></tr>
+                    <tr><td>Laden share of lorry-{DU()}<div className={hint}>Every return leg is counted empty: back-loads are not modelled</div></td><td className="num">{bm(B).laden_share_pct == null ? "no data" : `${bm(B).laden_share_pct}%`}</td><td className="num">{altCell(a => bm(a).laden_share_pct == null ? "no data" : `${bm(a).laden_share_pct}%`)}</td><td className={hint}>{bm(B).excluded_lines ? `${bm(B).excluded_lines} plan lines with no return route distance are left out of these figures` : "Every routed plan line is included"}</td></tr>
+                    <tr><td>Zero-emission deliveries</td><td className="num">{bm(B).zero_emission_share_pct == null ? "no data" : `${bm(B).zero_emission_share_pct}%`}</td><td className="num">{altCell(a => bm(a).zero_emission_share_pct == null ? "no data" : `${bm(a).zero_emission_share_pct}%`)}</td><td className={hint}>{bm(B).nh_target || ""}</td></tr>
+                    <tr><td>tCO2e per {CUR()} million of programme spend</td><td className="num">{bm(B).t_co2e_per_gbp_m ?? (spend === "" ? "not entered" : "no data")}</td><td className="num">{altCell(a => bm(a).t_co2e_per_gbp_m ?? (spend === "" ? "not entered" : "no data"))}</td>
+                      <td className={hint} title={nhKpi ? `${nhKpi.source || ""}${nhKpi.url ? " · " + nhKpi.url : ""}` : ""}>{nhKpi
+                        ? `National Highways, all maintenance and construction: ${nhKpi.series && nhKpi.series["2024_25"] != null ? nhKpi.series["2024_25"] : "no data"} (2024/25) to ${nhKpi.series && nhKpi.series["2025_26"] != null ? nhKpi.series["2025_26"] : "no data"} (2025/26) tCO2e per £m, ${nhKpi.price_base || ""}. Context only: this page counts materials, haulage and waste disposal, not the same scope.`
+                        : "No published National Highways figure on this tenant"}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <label className="block mt-3 max-w-xs">
+                <span className={lab}>Programme spend, in {CUR()} million (optional)</span>
+                <span className={"block " + hint + " mb-1"}>Used only for tCO2e per {CUR()} million</span>
+                <input className={inp} inputMode="decimal" value={spend} onChange={ev => setSpend(ev.target.value)} placeholder="not entered" />
+              </label>
+            </div>
+          </details>
+          <details className="dash-more mt-3">
+            <summary>Three ways to count the same haul</summary>
+            <div>
+              <div className="overflow-x-auto mt-2">
+                <table className="tbl">
+                  <caption><b>Transport only</b> · tCO2e, by method</caption>
+                  <thead><tr><th scope="col">Method</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th></tr></thead>
+                  <tbody>
+                    <tr title={(data.methods || {}).headline}><td><b>Wayscope: per vehicle-km, both legs</b> (the figure on this page)<div className={hint}>Diesel is exhaust only (tank-to-wheel); electric is the grid electricity used</div></td><td className="num">{t1(B.totals.transport_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_t))}</td></tr>
+                    <tr title={(data.methods || {}).well_to_wheel}><td>Wayscope, well-to-wheel (adds producing the fuel or electricity)<div className={hint}>FORS Silver and Gold require operators to report well-to-wheel; Bronze recommends it</div></td><td className="num">{t1(B.totals.transport_wtw_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_wtw_t))}</td></tr>
+                    <tr title={(data.methods || {}).nh_tool + "\n" + prov(fx["nh_tool"])}><td>National Highways Carbon Tool method (for comparison)<div className={hint}>Tonnes × one-way distance, return added, 2024 factors with well-to-tank</div></td><td className="num">{t1(B.totals.transport_nh_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_nh_t))}</td></tr>
+                    <tr title={(data.methods || {}).tonne_km}><td>Tonne-km method: DESNZ 2026, average load<div className={hint}>What a tonne-km calculator gives for the same haul</div></td><td className="num">{t1(B.totals.transport_tkm_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_tkm_t))}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-sm text-slate-600 pt-3">All three use Government factors. GOV.UK says to prefer the per-vehicle-km figure when the vehicle and the route distance are known, which they are here. The Carbon Tool asks only for tonnes and a one-way distance, adds the return and well-to-tank, so it reads higher. Never quote one as the other. Well-to-wheel adds producing the fuel or electricity (well-to-tank) to the same vehicle-km: it sits beside the total, never in it{B.totals.wtw_lines_out ? `, and leaves out ${B.totals.wtw_lines_out} plan line${B.totals.wtw_lines_out === 1 ? "" : "s"} whose lorry has no published well-to-tank row` : ""}.</p>
+            </div>
+          </details>
+          <div className="mt-4" data-guide="carbon-summary">
+            <details className="dash-more">
+              <summary>Add a commentary (optional)</summary>
+              <div>
+                <p className={hint + " mt-2"}>One page: the approved plan beside the alternative, the decisions in words and ranked, what the figures count, and your commentary. Stamped "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures".</p>
+                <label className="block mt-2">
+                  <span className={lab}>Commentary (optional)</span>
+                  <span className={"block " + hint + " mb-1"}>Printed on the summary as typed; not saved</span>
+                  <textarea className={inp} rows={4} maxLength={1500} value={note} onChange={ev => setNote(ev.target.value)} placeholder="for example, why this alternative, and what is still to confirm" />
+                </label>
+              </div>
+            </details>
+            <button onClick={downloadSummary} disabled={pdfBusy} className="btn-sec mt-3">{pdfBusy ? "Making the summary…" : "Download the summary (PDF)"}</button>
+            {pdfErr && <p className="text-sm mt-2" role="alert" style={{ color: "var(--red)" }}>{pdfErr}</p>}
+          </div>
+        </CarbonStep>
+
+        {/* ---------------- 6. carbon target ---------------- */}
+        <CarbonStep n={6} data-guide="carbon-target">
+          <p className="text-sm text-slate-600 mt-2">Once set, the target shows on the Dashboard, Forecasts and Submit forecast.</p>
+          {!tLoaded ? (tErr ? null : <p className="text-sm text-slate-400 mt-3">Loading the carbon target…</p>) : ctHere ? (
+            <div className="mt-3 space-y-1 text-sm text-slate-700" data-target-mode={T.mode}>
+              <p className="text-base font-semibold text-slate-800 tabular-nums">{ctTargetLine(tg)}</p>
+              <p className={hint}>Set by {T.updated_by || "a name not given"}{ctWhen(T.updated_at) ? `, ${ctWhen(T.updated_at)}` : ""}</p>
+              <p className="tabular-nums mt-2">{p6[0]}</p>
+              {S.invalid
+                ? <p className="text-amber-700">{S.invalid}</p>
+                : <p className="tabular-nums">{p6[1]}</p>}
+              {team && <p className={hint}>{ctScopeNote(tg)}</p>}
+              {S.pending_t > 0.0005 && <p className="tabular-nums">Lines waiting for approval would add {t1(S.pending_t)} tCO2e.</p>}
+              {/* the decisions are listed to a scheme code only, as on the Dashboard (a team code's read keeps only words that name no route) */}
+              {!team && (T.lever_words || []).length > 0 && (
+                <>
+                  <p className="font-medium text-slate-800 mt-2">The agreed decisions</p>
+                  <ul className="list-disc pl-5 space-y-1">{T.lever_words.map(w => <li key={w}>{w}</li>)}</ul>
+                </>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-700 mt-3">{CT_NONE}</p>
+          )}
+          {canSet ? (
+            <div className="mt-4">
+              <span className={lab} id="carbon-mode-l">Hold the target as</span>
+              <div role="group" aria-labelledby="carbon-mode-l" className="inline-flex flex-wrap rounded-md border border-slate-300 overflow-hidden">
+                {CARBON_TARGET_MODES.map(([k, w]) => (
+                  <button key={k} type="button" aria-pressed={mode === k} disabled={tBusy} onClick={() => pickMode(k)}
+                    className="text-sm font-semibold px-3 py-1.5"
+                    style={mode === k ? { background: "var(--ink)", color: "var(--bg)" } : { background: "var(--surface)", color: "var(--ink)" }}>{mode === k ? "✓ " : ""}{w}</button>
+                ))}
+              </div>
+              <p className={hint + " mt-1"}>{mode === "pct" ? "A % follows the approved plan as lines are approved." : "A cap stays the same as lines are approved."}{T ? " Switching it changes the saved target; you are asked first." : ""}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                {/* wraps on a phone: .btn-pri is nowrap, and the step card is about 230 px wide at 375 */}
+                <button type="button" className="btn-pri" style={{ whiteSpace: "normal" }} disabled={!!setWhy || tBusy} onClick={setTarget}>Set as the scheme's carbon target</button>
+                {T && <button type="button" className="btn-sec" disabled={tBusy} onClick={openAgreed}>Open the agreed decisions</button>}
+                {T && <button type="button" className="btn-sec" disabled={tBusy} onClick={clearTarget}>Clear the target</button>}
+              </div>
+              {setWhy && <p className={hint + " mt-1"}>{setWhy}</p>}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600 mt-3">Your planner sets the scheme's carbon target.</p>
+          )}
+          {tErr && <p className="text-sm mt-2" role="alert" style={{ color: "var(--red)" }}>{tErr}</p>}
+          {!tLoaded && tErr && <button type="button" className="btn-sec mt-2" disabled={tBusy} onClick={() => targetCall("GET", null, null)}>Try again</button>}
+          {tMsg && <p className="text-sm text-slate-700 mt-2" role="status">{tMsg}</p>}
+        </CarbonStep>
+      </ol>
+
+      {(A || err) && (
+        <div className="sticky bottom-0 z-10 mt-4" data-sticky-foot="">
+          <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-700 shadow-sm flex flex-wrap items-center gap-x-3 gap-y-1">
+            {err
+              ? <span role="alert" style={{ color: "var(--red)" }}>Not updated: {err}</span>
+              : <span className="tabular-nums">Result: <b>{t1(A.totals.total_t)} tCO2e</b>, {A.delta_t != null && Math.abs(A.delta_t) > 0.0005 ? `${moved(A.delta_t)} (${pct(A.delta_pct)})` : "no change"}</span>}
+            {busy && <span className="text-slate-400">updating…</span>}
+            <button type="button" className="link-btn" onClick={toResult}>See step 5</button>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="grid md:grid-cols-2 gap-4 mt-5">
-        <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
-          <h3 className={h3}>Known limits</h3>
-          <ul className="list-disc pl-5 mt-2 text-sm text-slate-600 space-y-1">{(data.limits || []).map(l => <li key={l}>{l}</li>)}</ul>
+      <details className="dash-more mt-5">
+        <summary>About these figures</summary>
+        <div className="space-y-5 pt-3">
+          <section>
+            <h3 className={h3}>Factors used: source, year and status ({(data.factors || []).length})</h3>
+            <p className={hint + " mt-1"}>Verified: matches the published row · Derived: worked out from published rows · Assumption: typed or estimated</p>
+            <ul className="mt-2 space-y-2 text-sm">
+              {(data.factors || []).map(f => (
+                <li key={f.key} title={prov(f)} className="flex flex-wrap items-baseline gap-x-2">
+                  <Chip s={f.status} /><span className="font-semibold text-slate-800">{f.label}</span>
+                  <span className="text-slate-600 tabular-nums">{f.value != null ? (Array.isArray(f.value) ? f.value.join("–") : f.value) : f.kg_per_km != null ? f.kg_per_km : (f.kg_co2e_per_t ? Object.entries(f.kg_co2e_per_t).filter(([, v]) => v != null).map(([k, v]) => `${k.replace("_", "-")} ${v}`).join(" · ") : "")} {f.unit || (f.kg_co2e_per_t ? "kgCO2e per tonne" : "")}</span>
+                  <span className="text-slate-500">{f.source || "no source"} · {f.year || "year not given"}{ids(f)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h3 className={h3}>Known limits</h3>
+            <ul className="list-disc pl-5 mt-2 text-sm text-slate-600 space-y-1">{(data.limits || []).map(l => <li key={l}>{l}</li>)}</ul>
+          </section>
+          <section data-guide="carbon-planned">
+            <h3 className={h3}>Not built yet</h3>
+            <ul className="list-disc pl-5 mt-2 text-sm text-slate-600 space-y-1">{(data.planned || []).map(p => <li key={p}>{p}</li>)}</ul>
+            <p className={hint + " mt-2"}>No figures are shown for these until each exists.</p>
+          </section>
+          <section data-guide="carbon-using">
+            <h3 className={h3}>Who acts on these results</h3>
+            <ol className="grid md:grid-cols-3 gap-4 mt-2 text-sm">
+              {CARBON_STEPS.map((s, i) => <li key={s.who}><span className="font-semibold text-slate-800">{i + 1}. {s.who}</span><span className="block text-slate-600">{s.what}</span></li>)}
+            </ol>
+            <p className={hint + " mt-2"}>These figures compare options before work starts; they are not a record of what was delivered.</p>
+          </section>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4" data-guide="carbon-planned">
-          <h3 className={h3}>Not built yet</h3>
-          <ul className="list-disc pl-5 mt-2 text-sm text-slate-600 space-y-1">{(data.planned || []).map(p => <li key={p}>{p}</li>)}</ul>
-          <p className={hint + " mt-2"}>No figures are shown for these until each exists.</p>
-        </div>
-      </div>
+      </details>
     </div>
   );
 }

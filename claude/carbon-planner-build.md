@@ -248,6 +248,118 @@ Standard v4, FORS, EA, GOV.UK style guide); nothing new is calculated in the bro
   no longer carries 210 → 148), one REVERSED (the NH series); parse_frontend +12, five NARROWED to the new words;
   render_frontend +2, five NARROWED. The demo package is regenerated (benchmark block and timestamps only).
 
+## After the show (11 Oct, branch `claude/carbon-after-show`, merge after 15 Oct, after `claude/carbon-ui`)
+Items 8, 9 and 11–15 of `notes/carbon-ui-1011` (the research and the checkers' corrections are in
+`notes/carbon-ui-research-1011.md`). Item 10 (Committed / Proposed / Considered on each decision) needs saved
+scenarios, so it waits for G3; it is listed under "Not built yet". Every figure is still the server's.
+
+- **Item 8, what this page counts** (top of the page): Counts / Does not count / Factors in one set of words
+  (`carbon.SCOPE_WORDS`, returned as `scope_words`, also on the PDF), and "Left out here" from the server's
+  counts: unrouted lines, tonnes with no production factor, lines with no return distance, no disposal factor,
+  lines whose lorry has no well-to-tank row.
+- **Item 9, each decision's lorry effect:** `drivers[].delta_trips` and `drivers[].delta_vkm_km` (each decision
+  alone against the approved plan), and `alternatives[].delta_vkm_km`. The page shows "N fewer lorry loads · Y
+  fewer lorry-mi" in the tenant's unit.
+- **Item 11, the one-page summary:** `POST /api/carbon/summary.pdf` (same body as the scenario + `commentary`,
+  at most 1,500 characters, at most one alternative; stores nothing). Built by `export.build_carbon_pdf` from the
+  scenario, stamped "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" and the tenant's demo
+  notice. The decisions are written out by `carbon._lever_words` ("Receiving site: Soil hub (route R4) — route
+  R3: Compound → Tip"; the arrow prints as "to", which Helvetica has). The commentary is escaped, printed as typed.
+- **Item 12, well-to-wheel beside the total, never in it:** `factors.json` → `carbon.transport.wtt_vehicle_km_2026`,
+  four DESNZ 2026 rows read from the flat file (WTT- delivery vehs & freight › HGV non-refrigerated all diesel ›
+  average laden › km: rigid >17 t 0.23756, artic >33 t 0.22058, rigid 3.5–7.5 t 0.11851, rigid 7.5–17 t 0.14453;
+  VERIFIED, checked 11 Oct). `carbon.wtt_factor` matches each lorry's tank-to-wheel row by ID (…_3132_4_1 ↔
+  …_3132_4_1); electric is kWh/km × the two electricity WTT rows already in the file. A typed figure that matches
+  no row gets none (`wtw_lines_out`), never a guessed ratio. Totals: `transport_wtt_t`, `transport_wtw_t`.
+  **factors.json changed: merge, do not overwrite.**
+- **Item 13, waste hierarchy:** `carbon.WASTE_HIERARCHY` tags only the four methods that exist (landfill:
+  disposal; closed- and open-loop: recycling; combustion: other recovery if the plant recovers energy, otherwise
+  disposal), with the regulation named. The tag follows the method the carbon figure uses, so a re-use site
+  mapped to closed-loop reads "recycling" until that mapping is settled. One line: a transfer note (or season
+  ticket) is still needed; Wayscope does not replace it or the duty of care.
+- **Item 14, life-cycle modules:** `stages` {A1-A3, A4, A5} on the approved plan and each alternative (material;
+  transport of deliveries; transport of surplus taken away + its disposal; no A5 sub-module claimed). They add up
+  to the total, asserted. Shown as a secondary line.
+- **Item 15, "Using these results":** client, buyer, principal contractor, each with one sentence; "Roles as
+  CLOCS names them"; no claim that the page meets CLOCS.
+- **Tests:** test_carbon 208 (+29: the WTT rows and their matching, every new figure hand-worked from the
+  fixture, the PDF's text, one page, stamp, escaping, 400s and 401); parse_frontend 517 (+8, one NARROWED: the
+  page now makes the scenario read and the summary download, nothing else); render_frontend 122 (+6);
+  http_smoke 110 (+5: well-to-wheel and the summary over real HTTP with the demo notice). The smoke check found a
+  real bug, fixed before commit: a battery-electric decision scoped to one route lost its "where" in the words.
+- **Seen in a browser (local, demo package):** the counts box, the module and well-to-wheel lines, the lorry
+  effect and the summary card; the PDF opened in the browser's viewer (rows aligned, one page). The waste
+  hierarchy controls were checked through the fixture render only: the local copy has no muck-away routes.
+
+## Carbon target (11 Oct, before the freeze; branch `claude/carbon-process`)
+"Set the agreed decisions as the programme's carbon target": the server side (f8f3591), the Carbon page as six
+steps ending in the target (def0ef6), the target on the Dashboard, Forecasts and Submit forecast (6efb87c,
+da234bf, 5569482), and the review fixes (11 Oct, late; below under **Review fixes**).
+
+- **Stored:** one tenanted `config` row, key `carbon_target` (`backend/carbon_target.py`, the costing row
+  pattern: 5 s cache keyed by tenant, UPDATE or INSERT stamping `updated_by` / `updated_at`, cleared on write and
+  on a tenant import). Document: `mode` ("pct" = % below the approved plan, "cap" = fixed tCO2e cap),
+  `pct_below` (held to 6 dp since the review fixes; the pages print 1 dp), `cap_t`, `set_at_approved_t`, `set_at_alternative_t`, `levers`, `lever_words`, `ui_state`
+  (the page's own state, at most 20 000 characters). No new table. It travels in the tenant package like every
+  config row; the demo package has none. `carbon.py` still writes nothing.
+- **All-in:** every figure is making the material + transport (both legs) + waste disposal, the Carbon page's
+  headline. `approved_transport_t` is the transport part only, for the Dashboard's transport card to tie to.
+- **Who:** `GET /api/carbon/target` any signed-in code; `PUT` and `DELETE` planner or admin code only
+  (`_require_approver`: a team code gets 403, no code 401). `updated_by` is the name typed at sign-in, sent by
+  the browser and not checked: there is no per-person identity until G3.
+- **PUT with `levers`:** the server runs `carbon.scenario` over the approved plan with the decisions as the one
+  alternative and stores what it gives; the browser sends no figure. Refused (400, one plain sentence, nothing
+  written): no decisions; decisions that do not lower carbon, or by under 0.1 %; a bad mode; a page state over
+  20 000 characters; decisions the rules refuse. **PUT without `levers`:** `mode` switches pct ↔ cap and keeps
+  every number (400 when there is no target). **DELETE** clears it.
+- **Progress (`status`):** measured on the lines the code can see, scope "scheme" (planner, admin, demo
+  submitter) or "team" (a team code: its own lines, never compared with the target — `target_t`, both gaps and
+  both verdicts are null in BOTH modes since the review fixes; it was the scheme's % applied to the team's lines). `approved_t` as forecast, `with_decisions_t` (the stored decisions re-run every read, because they are
+  not recorded on the forecast lines), `target_t`, both gaps, `pending_t` (what the lines waiting for approval
+  would add), `by_month`, and `invalid`: when a stored decision no longer applies (a route or a vehicle gone) the
+  plan with the decisions is null and `invalid` says why; never an error. Two scenario runs per read.
+- **Submit forecast preview:** `POST /api/costing/preview` gains `carbon` {material_t, transport_t, disposal_t,
+  total_t, unrouted, basis}: transport by the saved lines' own co2_t formula (null and `unrouted` when the route
+  has no distance), material at the Government primary factor, or disposal at the site's disposal factor when the
+  destination is a tip or recycling site, and one sentence saying what is counted. Stores nothing.
+- **Rounding (fixed in the review fixes):** `pct_below` was held to 1 dp, so straight after a % target was set the
+  plan with the decisions read a little over it (demo, the soil-hub decision: 7.95 % held as 8.0 %, 5 967.1 against
+  5 963.9). It is now worked out from the two 3 dp totals and held to 6 dp, so the gap is 0.0 at set time.
+- **Tests:** new `test_carbon_target.py` (every figure hand-worked from a three-line network plus one pending
+  line; it writes `fixtures/carbon_target.json`, the planner's GET for a % target, and
+  `fixtures/cost_preview_carbon.json`); `http_smoke.py` +15 (401 / 403 / 200, a set-read-switch-clear round trip
+  on the demo package, the preview's carbon).
+- **Review fixes (11 Oct, late):**
+  - **R1** `pct_below` from the totals, held to 6 dp (above).
+  - **R2 one "on target" rule, on the server:** `status.on_target_as_forecast` / `on_target_with_decisions`, True
+    when the gap is within `ON_TARGET_TOL_T` = 0.05 tCO2e either way, None when nothing is compared. The four pages
+    say it in one set of words ("on target" / "N tCO2e over the target" / "N tCO2e under the target") from shared
+    helpers (`ctTargetLine`, `ctProgress`, `ctGap`); the browser's own bands (`CT_ROUND`, step 6's `tol`) are gone.
+    Before, a cap 2.0 t over read "on target" on the Dashboard and "over" on the Carbon page.
+  - **R3** a team code's GET carries no `levers` and no `ui_state`, and only the words of decisions that name no
+    route (`carbon_target.for_code`). "Open the agreed decisions" is an approver's control only.
+  - **No team share:** above. On the demo the North code read "253.2 over the target" while the scheme was on it.
+  - **The pages:** Submit forecast now shows the target, as forecast AND with the agreed decisions, and the
+    server's sentence when the decisions no longer apply; a cap reads "a fixed cap of" everywhere; one "no target"
+    sentence; the Dashboard strip offers the Carbon planner in both states and no longer tells a team code its
+    figures are "on the whole approved plan"; the "Set by" date is the reader's own day on every page.
+  - **The Carbon page:** Set waits until the current target has been read (a failed read let Set replace a target
+    without asking) and offers Try again; a refused scenario says "Not updated: …" in step 5, in the strip at the
+    foot and as Set's reason (it left the old result on screen as if current); the summary's error sits under its
+    button; an EPD says what it needs; switching % / cap on a saved target asks first; Start again clears step 6's
+    message; Set wraps on a phone; "Roles as CLOCS names them" is gone ("Buyer" is not a CLOCS role).
+  - **The Guide's strip** lifts above an element marked `data-sticky-foot` (the result strip), which it covered.
+  - **Server:** NaN / Infinity in a PUT is refused (it was stored and made every later GET a 500); a stored row
+    holding one reads as no target; a lever's `vehicle`, `fuel`, `to_route` or `to` sent as a list or an object is a
+    400, not a 500 (also on `/api/carbon/scenario`). Messages name the "Carbon planner" and say a planner sets it again.
+  - **Tests:** `test_carbon_target.py`, `http_smoke.py`, `parse_frontend.js`, `render_frontend.js` narrowed with dated
+    notes; `dom_frontend.js` gains the target in a real DOM (a failed read, Try again, confirm(), a refused scenario,
+    the PDF error, the Dashboard's and Forecasts' error lines, the button's click). The big-screen figure is tested
+    by calling `ctFig`; the Dashboard is not rendered in wall mode. Nothing here was seen in a browser.
+- **Not built:** a history of past targets, a per-team target (a product decision: share the scheme target out by
+  plan, or not at all), the target on the map or the printed summary, and anything that records which decisions
+  were actually taken on the forecast lines.
+
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
 supplier EPD); electric kWh/km is derived from a mixed-fleet programme; the 2 t ZEV allowance is

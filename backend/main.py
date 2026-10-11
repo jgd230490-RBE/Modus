@@ -47,6 +47,7 @@ import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel inde
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
+import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -1471,6 +1472,96 @@ def carbon_scenario(body: CarbonScenarioIn):
                                spend_m=body.spend_gbp_m, allocation=body.allocation)
     except carbon.CarbonError as e:
         raise HTTPException(400, str(e))
+
+
+class CarbonSummaryIn(CarbonScenarioIn):
+    commentary: Optional[str] = None          # printed on the summary as typed; never stored
+
+
+CARBON_COMMENTARY_MAX = 1500
+
+
+@app.post("/api/carbon/summary.pdf")
+def carbon_summary_pdf(body: CarbonSummaryIn):
+    """
+    After the show (11 Oct 2026, notes/carbon-ui-1011 item 11): the Carbon page's one-page summary
+    as a PDF, from the SAME read as /api/carbon/scenario: the approved plan beside the page's one
+    alternative, the decisions in words and ranked, what the figures count, and the typed
+    Commentary. Stamped "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures",
+    and the tenant's demo notice when set. Stores nothing: the commentary is printed, not saved.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    acc = _require_access()
+    if body.status not in CARBON_STATUSES:
+        raise HTTPException(400, f"status must be one of {', '.join(CARBON_STATUSES)}")
+    if len(body.alternatives) > 1:
+        raise HTTPException(400, "the summary prints the approved plan and one alternative")
+    if body.commentary is not None and len(body.commentary) > CARBON_COMMENTARY_MAX:
+        raise HTTPException(400, f"the commentary is at most {CARBON_COMMENTARY_MAX} characters")
+    alts = [a.model_dump() if hasattr(a, "model_dump") else a.dict() for a in body.alternatives]
+    try:
+        sc = carbon.scenario(acc, alternatives=alts, baseline_levers=body.baseline,
+                             from_month=body.from_month, to_month=body.to_month, status=body.status,
+                             spend_m=body.spend_gbp_m, allocation=body.allocation)
+    except carbon.CarbonError as e:
+        raise HTTPException(400, str(e))
+    try:
+        data = export.build_carbon_pdf(sc, commentary=body.commentary)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="carbon-summary.pdf"'})
+
+
+# ------------------------------------------------------------------ carbon target (11 Oct 2026)
+class CarbonTargetIn(BaseModel):
+    mode: Optional[str] = None                # "pct" (% below the approved plan) or "cap" (a fixed tCO2e cap)
+    levers: Optional[List[dict]] = None       # the agreed decisions; absent = switch how the target is held
+    ui_state: Optional[dict] = None           # the Carbon page's own state, stored as sent (at most 20 000 characters)
+    updated_by: Optional[str] = None          # the name typed at sign-in, as for the costing target (no identity until G3)
+
+
+@app.get("/api/carbon/target")
+def get_carbon_target():
+    """
+    11 Oct 2026 — the programme's carbon target and the progress against it, ALL-IN tCO2e (making the
+    material, transport and waste disposal). Any signed-in code. `status` is measured on the lines the
+    code can see: scope "scheme" for planner, admin and the demo submitter, "team" for a team code. Both
+    are null when no target is set. Stored decisions that no longer apply give status.invalid, never an
+    error. 11 Oct 2026: the server says whether each figure is on target (status.on_target_as_forecast /
+    on_target_with_decisions, within carbon_target.ON_TARGET_TOL_T); the target is the scheme's, so a team
+    code's target_t, gaps and on_target flags are null in both modes, and its GET never carries the stored
+    decisions or the page state (only the words of decisions that name no route).
+    """
+    acc = _require_access()
+    return carbon_target.payload(acc)
+
+
+@app.put("/api/carbon/target")
+def put_carbon_target(body: CarbonTargetIn):
+    """
+    Set the carbon target (planner or admin). With `levers`, the server runs carbon.scenario over the
+    approved plan with them as the one alternative and stores what that gives; the browser sends no
+    figure. Without `levers`, `mode` switches how an existing target is held, keeping every number.
+    400 with a plain sentence when the rules refuse it. Returns the same payload as GET.
+    """
+    acc = _require_approver()
+    try:
+        if body.levers is not None:
+            carbon_target.set_from_levers(acc, body.mode, body.levers, body.ui_state, by=body.updated_by)
+        else:
+            carbon_target.set_mode(body.mode, by=body.updated_by)
+    except carbon_target.TargetError as e:
+        raise HTTPException(400, str(e))
+    return carbon_target.payload(acc)
+
+
+@app.delete("/api/carbon/target")
+def delete_carbon_target():
+    """Clear the carbon target (planner or admin). Returns the GET payload, target null."""
+    acc = _require_approver()
+    carbon_target.clear()
+    return carbon_target.payload(acc)
 
 
 # ------------------------------------------------------------------ public feed (map)

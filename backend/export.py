@@ -726,6 +726,188 @@ def build_pdf(page):
     return buf.getvalue()
 
 
+# ------------------------------------------------------------------ carbon summary (11 Oct 2026)
+def _pdf_safe(s):
+    """Helvetica's WinAnsi set has no arrow: route words read "A to B" on paper."""
+    return str(s if s is not None else "").replace("→", "to")
+
+
+def build_carbon_pdf(sc, commentary=None, generated=None):
+    """
+    After the show (notes/carbon-ui-1011 item 11): the Carbon page's one-page summary for the file —
+    the approved plan beside the alternative, the decisions in words and ranked, what the figures
+    count, and a Commentary box. Every figure is the scenario's own (carbon.scenario, the read the
+    page shows); this draws, it never computes. Stamped on the page: a Wayscope planning estimate on
+    the DESNZ 2026 basis, not Carbon Tool figures; the tenant's demo notice when it is set.
+    """
+    if rl_canvas is None:
+        raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
+    import carbon as _carbon
+    buf = io.BytesIO()
+    W, H = A4
+    lm = rm = 14 * mm
+    top, bottom = 30 * mm, 14 * mm
+    usable = W - lm - rm
+    when = generated or datetime.datetime.now(datetime.timezone.utc).strftime("%d %b %Y")
+    title = f"{_tenant_name()} · Carbon planner summary"
+    stamp = _carbon.SUMMARY_STAMP
+    notice = _demo_notice()
+
+    def on_page(c, doc):
+        c.saveState()
+        c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(2)
+        c.line(lm, H - 9 * mm, W - rm, H - 9 * mm)
+        c.setFont("Helvetica-Bold", 13); c.setFillColorRGB(*NAVY_RGB)
+        c.drawString(lm, H - 15 * mm, _pdf_safe(title))
+        c.setFont("Helvetica", 8); c.setFillColorRGB(*GREY)
+        c.drawRightString(W - rm, H - 15 * mm, f"Generated {when}")
+        c.setFont("Helvetica-Bold", 9); c.setFillColorRGB(*RED_RGB)
+        c.drawString(lm, H - 20.5 * mm, stamp)
+        if notice:
+            c.setFont("Helvetica-Bold", 8.5); c.setFillColorRGB(*NAVY_RGB)
+            c.drawString(lm, H - 25 * mm, _pdf_safe(notice))
+        c.setFont("Helvetica", 7); c.setFillColorRGB(*GREY)
+        c.drawString(lm, 7 * mm, stamp)
+        c.drawRightString(W - rm, 7 * mm, f"page {doc.page}")
+        c.restoreState()
+
+    doc = BaseDocTemplate(buf, pagesize=(W, H), leftMargin=lm, rightMargin=rm, topMargin=top,
+                          bottomMargin=bottom, title=title, pageCompression=0)
+    doc.addPageTemplates([PageTemplate(id="p", frames=[Frame(lm, bottom, usable, H - top - bottom, id="f",
+                                                                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)],
+                                       onPage=on_page)])
+    st = ParagraphStyle("b", fontName="Helvetica", fontSize=8.5, leading=10.5)
+    st_r = ParagraphStyle("r", parent=st, alignment=2)
+    st_h = ParagraphStyle("h", parent=st, fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=colors.white)
+    st_hr = ParagraphStyle("hr", parent=st_h, alignment=2)
+    st_sec = ParagraphStyle("sec", parent=st, fontName="Helvetica-Bold", fontSize=10, leading=13, spaceBefore=4,
+                            textColor=colors.Color(*NAVY_RGB))
+    st_grey = ParagraphStyle("g", parent=st, fontSize=7.5, leading=9.5, textColor=colors.Color(*GREY))
+
+    def E(v):
+        return _pdf_safe(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def P(txt, style=st):
+        return Paragraph(str(txt), style)
+
+    def t1(v):
+        return "no data" if v is None else _n(v, 1)
+
+    def moved(v):
+        if v is None:
+            return "no data"
+        return (f"{_n(-v, 1)} tCO2e lower" if v < -0.0005 else f"{_n(v, 1)} tCO2e higher" if v > 0.0005 else "no change")
+
+    def loads(n):
+        return "" if not n else (f"{_n(-n)} fewer lorry loads" if n < 0 else f"{_n(n)} more lorry loads")
+
+    def lkm(km):
+        if km is None or abs(km) < 0.5:
+            return ""
+        return f"{_n(abs(_dist(km)))} {'fewer' if km < 0 else 'more'} lorry-{_du()}"
+
+    def grid(data, widths, right_from=1):
+        t = LongTable(data, colWidths=widths, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.Color(*NAVY_RGB)),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.Color(0.85, 0.87, 0.9)),
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.Color(0.75, 0.78, 0.83)),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
+        return t
+
+    B = sc.get("baseline") or {}
+    A = (sc.get("alternatives") or [None])[0]
+    bt, at = B.get("totals") or {}, (A or {}).get("totals") or {}
+    bs, as_ = B.get("stages") or {}, (A or {}).get("stages") or {}
+    bf, af = B.get("fleet") or {}, (A or {}).get("fleet") or {}
+
+    def alt(v):
+        return v if A else "no alternative"
+
+    story = []
+    # 1. the approved plan and the alternative
+    story.append(P("The approved plan and the alternative", st_sec))
+    stage = lambda s: f"{t1(s.get('A1-A3'))} · {t1(s.get('A4'))} · {t1(s.get('A5'))}"
+    rows = [[P("tCO2e", st_h), P("Approved plan", st_hr), P("Alternative", st_hr)],
+            [P("<b>Total</b>"), P(f"<b>{t1(bt.get('total_t'))}</b>", st_r), P(f"<b>{alt(t1(at.get('total_t')))}</b>", st_r)],
+            [P("Material"), P(t1(bt.get("material_t")), st_r), P(alt(t1(at.get("material_t"))), st_r)],
+            [P("Transport"), P(t1(bt.get("transport_t")), st_r), P(alt(t1(at.get("transport_t"))), st_r)],
+            [P("Waste disposal"), P(t1(bt.get("disposal_t")), st_r), P(alt(t1(at.get("disposal_t"))), st_r)],
+            [P("By life-cycle module: A1–A3 · A4 · A5"), P(stage(bs), st_r), P(alt(stage(as_)), st_r)],
+            [P("Transport well-to-wheel (adds producing the fuel or electricity; not in the total)"),
+             P(t1(bt.get("transport_wtw_t")), st_r), P(alt(t1(at.get("transport_wtw_t"))), st_r)],
+            [P("Lorry loads (deliveries)"), P(_n(bf.get("trips")), st_r), P(alt(_n(af.get("trips"))), st_r)],
+            [P("Lorries needed in the busiest month"), P(_n(bf.get("lorries_peak")), st_r), P(alt(_n(af.get("lorries_peak"))), st_r)]]
+    story.append(grid(rows, [usable * 0.52, usable * 0.24, usable * 0.24]))
+    if A:                                    # full width, so the change reads as one line, not a wrapped cell
+        ch = [moved(A.get("delta_t")) + (f" ({abs(A['delta_pct']):.1f}%)" if A.get("delta_pct") is not None and abs(A.get("delta_t") or 0) > 0.0005 else "")]
+        ch += [x for x in (loads(A.get("delta_trips")), lkm(A.get("delta_vkm_km"))) if x]
+        story.append(Spacer(1, 1.5 * mm))
+        story.append(P("<b>Change against the approved plan: " + E(" · ".join(ch)) + "</b>"))
+
+    # 2. the decisions, in words and ranked
+    story.append(P("The decisions in the alternative", st_sec))
+    words = (A or {}).get("lever_words") or []
+    if words:
+        for w in words:
+            story.append(P("• " + E(w)))
+    else:
+        story.append(P("No alternative chosen: this summary shows the approved plan only.", st_grey))
+    drivers = (A or {}).get("drivers") or []
+    if drivers:
+        story.append(P("Which decisions change carbon most, each on its own", st_sec))
+        dr = [[P("Decision", st_h), P("tCO2e", st_hr), P("Lorry loads", st_hr), P(f"Lorry-{_du()}", st_hr)]]
+        for d in drivers:
+            dr.append([P(E(d.get("label"))), P(E(moved(d.get("delta_t"))) + (f" ({abs(d['delta_pct']):.1f}%)" if d.get("delta_pct") is not None else ""), st_r),
+                       P(E(loads(d.get("delta_trips")) or "no change"), st_r), P(E(lkm(d.get("delta_vkm_km")) or "no change"), st_r)])
+        story.append(grid(dr, [usable * 0.34, usable * 0.24, usable * 0.21, usable * 0.21]))
+        it = A.get("interaction_t") or 0
+        story.append(P("The decisions do not affect each other here: together they come to the sum of each on its own."
+                       if abs(it) < 0.0005 else
+                       f"Together, the result is {_n(abs(it), 1)} tCO2e {'lower' if it < 0 else 'higher'} than adding up each decision on its own.",
+                       st_grey))
+
+    # 3. what the figures count
+    sw = sc.get("scope_words") or {}
+    fl = bt.get("flags") or {}
+    unrouted = (bt.get("lines") or 0) - (bt.get("baked_lines") or 0)
+    out = [x for x in (
+        f"{unrouted} plan line{'s have' if unrouted != 1 else ' has'} no route distance yet: transport not counted" if unrouted > 0 else "",
+        f"{_n(bt.get('material_excluded_tonnes'))} t has no Government production factor: making it is not counted" if (bt.get("material_excluded_tonnes") or 0) > 0 else "",
+        f"{fl.get('RETURN_NOT_BAKED')} plan lines have no return route distance: loaded leg only" if fl.get("RETURN_NOT_BAKED") else "",
+        f"{fl.get('NO_DISPOSAL_FACTOR')} plan lines have no Government disposal factor: disposal not counted" if fl.get("NO_DISPOSAL_FACTOR") else "",
+        f"{bt.get('wtw_lines_out')} plan lines' lorries have no published well-to-tank row" if bt.get("wtw_lines_out") else "",
+    ) if x]
+    story.append(P("What these figures count", st_sec))
+    for k, lab in (("counts", "Counts"), ("not_counted", "Does not count"), ("factors", "Factors")):
+        story.append(P(f"<b>{lab}:</b> " + E(sw.get(k) or "")))
+    story.append(P("<b>Left out here:</b> " + (E("; ".join(out)) if out else "nothing: every plan line is counted in full.")))
+
+    # 4. the commentary, as typed (escaped), or a box to write in
+    story.append(P("Commentary", st_sec))
+    txt = (commentary or "").strip()
+    body = P(E(txt).replace(chr(10), "<br/>")) if txt else P("", st)
+    box = LongTable([[body]], colWidths=[usable], rowHeights=[None if txt else 28 * mm])
+    box.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, colors.Color(0.75, 0.78, 0.83)),
+                             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                             ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5)]))
+    story.append(box)
+    story.append(Spacer(1, 3 * mm))
+
+    # 5. the footer lines
+    ft = [P("<b>Planning estimates. Not a National Highways Carbon Tool return.</b> Figures are rounded, so the parts may "
+            "not add exactly to the total.", st_grey),
+          P(f"Computed on request from the {E((sc.get('status') or 'Approved').lower())} forecast; nothing is stored. The "
+            "commentary is printed as typed and is not saved. Each factor's source, year and status is on the Carbon page.", st_grey)]
+    if notice:
+        ft.insert(0, P("<b>" + E(notice) + "</b>", st_grey))
+    story.append(KeepTogether(ft))
+    doc.build(story)
+    return buf.getvalue()
+
+
 def _index_date_label(cost):
     """The word for the index's date: "Bulletin date" only where the series IS a bulletin
     (the EU Weekly Oil Bulletin); "Published" for DESNZ; "Index date" for a typed figure
