@@ -661,6 +661,10 @@ def _check_levers(levers, vs, routes):
         for k in ("pct", "distance_pct", "alt_index"):
             if k in lv and lv[k] is not None and _num(lv[k]) is None:
                 raise CarbonError(f"'{k}' must be a finite number")
+        # 11 Oct 2026: a list or an object here was a TypeError (a 500), not a refusal
+        for k in ("vehicle", "fuel", "to_route", "to"):
+            if lv.get(k) is not None and not isinstance(lv[k], str):
+                raise CarbonError(f"'{k}' must be text")
         if d == "vehicle" and lv.get("vehicle") not in vs:
             raise CarbonError(f"vehicle '{lv.get('vehicle')}' is not on Config")
         if d == "fuel" and lv.get("fuel") not in ("electric", "diesel"):

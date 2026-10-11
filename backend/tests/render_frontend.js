@@ -223,13 +223,15 @@ if (loaded) {
     // "Using these results" is "Who acts on these results" under About these figures)
     ok("...item 11 the summary card and item 15 who acts",
       cOut.includes("<summary>Add a commentary (optional)</summary>") && cOut.includes("Download the summary (PDF)") && cOut.includes("Who acts on these results")
-      && cOut.includes("Principal contractor") && cOut.includes("Roles as CLOCS names them."));
+      // REVERSED 11 Oct 2026 ("Buyer" is not a CLOCS role, so the page no longer says the roles are CLOCS's)
+      && cOut.includes("Principal contractor") && !cOut.includes("as CLOCS names them") && cOut.includes("Agrees the carbon target for the scheme (a planner records it in step 6)"));
     ok("...the Planned panel and the known limits, and nothing renders as undefined or NaN",
       cOut.includes("Not built yet") && cOut.includes("Known limits") && !/undefined|NaN/.test(cOut));
 
     // ---- 11 Oct 2026: the process layout and step 6, the carbon target (fixtures/carbon_target.json from
-    // test_carbon_target.py: a 73.1% target, approved 161.446, with the decisions 43.431, target 43.429, gaps
-    // 118.017 and 0.002, pending 5.653). The other states are the same GET with the fields the server would send.
+    // test_carbon_target.py: a 73.1% target (held to 6 dp, 73.098745), approved 161.446, with the decisions 43.431,
+    // target 43.431, gaps 118.015 and 0.0, the server's verdicts "not on target" and "on target", pending 5.653).
+    // The other states are the same GET with the fields the server would send (verdicts included).
     ok("⭐ ...the six steps render in order, with the result strip at the foot pointing to step 5",
       [1, 2, 3, 4, 5, 6].every(n => cOut.indexOf(`id="carbon-step-${n}"`) > 0 && (n === 1 || cOut.indexOf(`id="carbon-step-${n - 1}"`) < cOut.indexOf(`id="carbon-step-${n}"`)))
       && ["Your approved plan", "Materials", "Lorries and routes", "Surplus material", "Result", "Carbon target"].every(t => cOut.includes(`<span>${t}</span>`))
@@ -243,35 +245,63 @@ if (loaded) {
       const step6 = (o) => { const i = o.indexOf('id="carbon-step-6"'); return i < 0 ? "" : o.slice(i, o.indexOf("About these figures", i)); };
       const cp = (ct, acc) => render("the Carbon page renders a carbon target state", h(sandbox.CarbonPage, { meta, access: acc || planner, who: "Sam", initialData: cs, initialTarget: ct }));
       const pSet = cp(CT6), p6 = step6(pSet);
-      ok("⭐ ...step 6, a planner and a set target: the target; as forecast 118.0 tCO2e over; with the agreed decisions on target (0.002 is inside the stored 73.1%'s rounding); what the pending lines would add; who set it",
-        p6.includes("Target: 73.1% below the approved plan, which is 43.4 tCO2e today") && p6.includes("As forecast: <b>161.4 tCO2e</b>, 118.0 tCO2e over the target")
-        && p6.includes("With the agreed decisions: <b>43.4 tCO2e</b>, on target") && p6.includes("Lines waiting for approval would add 5.7 tCO2e.")
+      // NARROWED 11 Oct 2026 (the review: one way of saying the target on all four pages; the verdicts are the server's):
+      // "which is 43.4 tCO2e today" is the Dashboard's "= 43.4 tCO2e"; the figures are no longer bold, as on the Dashboard
+      ok("⭐ ...step 6, a planner and a set target: the target; as forecast 118.0 tCO2e over; with the agreed decisions on target (the server's verdict); what the pending lines would add; who set it",
+        p6.includes(">Target: 73.1% below the approved plan = 43.4 tCO2e<") && p6.includes(">As forecast: 161.4 tCO2e, 118.0 tCO2e over the target<")
+        && p6.includes(">With the agreed decisions: 43.4 tCO2e, on target<") && p6.includes("Lines waiting for approval would add 5.7 tCO2e.")
         && p6.includes(">Set by Sam (planner)<") && p6.includes("<li>Recycled content 30% — Small aggregate</li>") && !/undefined|NaN/.test(pSet));
       ok("...the planner's controls: the stored mode pressed and ticked, Set waiting for a choice (and saying so), Open the agreed decisions, Clear the target",
         p6.includes('aria-pressed="true"') && p6.includes("✓ % below the approved plan") && p6.includes(">Fixed tCO2e cap</button>")
-        && /<button type="button" class="btn-pri" disabled="">Set as the scheme&#x27;s carbon target<\/button>/.test(p6) && p6.includes("Make a choice in steps 2 to 4 first.")
+        // NARROWED 11 Oct 2026 (Set wraps on a phone: style white-space normal)
+        && /<button type="button" class="btn-pri" style="white-space:normal" disabled="">Set as the scheme&#x27;s carbon target<\/button>/.test(p6) && p6.includes("Make a choice in steps 2 to 4 first.")
         && p6.includes(">Open the agreed decisions</button>") && p6.includes(">Clear the target</button>"));
       ok("...and step 1 says there is a target, pointing to step 6",
-        pSet.slice(0, pSet.indexOf('id="carbon-step-2"')).includes("Carbon target: 73.1% below the approved plan, which is 43.4 tCO2e today (step 6)"));
+        // NARROWED 11 Oct 2026 (the shared target sentence)
+        pSet.slice(0, pSet.indexOf('id="carbon-step-2"')).includes(">Target: 73.1% below the approved plan = 43.4 tCO2e (step 6)<"));
       const pNone = step6(cp({ target: null, status: null }));
       ok("...no target: says so, the % mode picked for the next one, nothing to open or clear",
-        pNone.includes("No carbon target is set yet.") && pNone.includes("✓ % below the approved plan") && !pNone.includes("Clear the target") && !pNone.includes("Open the agreed decisions"));
-      const pCap = step6(cp(with6({ target_t: 43.431, gap_as_forecast_t: 118.015, gap_with_decisions_t: -12.34 }, { mode: "cap" })));
+        // NARROWED 11 Oct 2026 (one "no target" sentence on all four pages)
+        pNone.includes(">No carbon target set yet.<") && pNone.includes("✓ % below the approved plan") && !pNone.includes("Clear the target") && !pNone.includes("Open the agreed decisions"));
+      // NARROWED 11 Oct 2026 (the server's verdict: under by 12.34 is not on target; the cap reads with its "(… when it was set)")
+      const pCap = step6(cp(with6({ target_t: 43.431, gap_as_forecast_t: 118.015, gap_with_decisions_t: -12.34, on_target_with_decisions: false }, { mode: "cap" })));
       ok("...a cap reads as a fixed cap, ticked; a gap below it reads 12.3 tCO2e under the target",
-        pCap.includes("Target: a fixed cap of 43.4 tCO2e") && pCap.includes("✓ Fixed tCO2e cap")
-        && pCap.includes("With the agreed decisions: <b>43.4 tCO2e</b>, 12.3 tCO2e under the target") && !/undefined|NaN/.test(pCap));
-      const pTeam = step6(cp(with6({ scope: "team" }), submitter));
-      const pTeamCap = step6(cp(with6({ scope: "team", target_t: null, gap_as_forecast_t: null, gap_with_decisions_t: null }, { mode: "cap" }), submitter));
-      ok("⭐ ...a team code: its own lines in the tenant's word, no controls, told who sets it; a cap is the whole scheme's; no team id",
-        pTeam.includes("Target: 73.1% below the approved plan; on your team&#x27;s lines that is 43.4 tCO2e") && pTeam.includes("Your planner sets the scheme&#x27;s carbon target.")
+        pCap.includes(">Target: a fixed cap of 43.4 tCO2e (73.1% below the approved plan when it was set)<") && pCap.includes("✓ Fixed tCO2e cap")
+        && pCap.includes(">With the agreed decisions: 43.4 tCO2e, 12.3 tCO2e under the target<") && !/undefined|NaN/.test(pCap));
+      // REVERSED 11 Oct 2026 (the review: a team code got the scheme's % applied to its own lines, so a team the decisions do not
+      // touch read "over the target" while the scheme was on it). The server now sends a team code no target_t, no gaps and no
+      // verdicts in EITHER mode; the page says the target is the whole scheme's and labels the figures as the team's lines.
+      const TEAM6 = { scope: "team", target_t: null, gap_as_forecast_t: null, gap_with_decisions_t: null, on_target_as_forecast: null, on_target_with_decisions: null };
+      const pTeam = step6(cp(with6(TEAM6), submitter));
+      const pTeamCap = step6(cp(with6(TEAM6, { mode: "cap" }), submitter));
+      ok("⭐ ...a team code: its own lines in the tenant's word, no controls, told who sets it; the target, % or cap, is the whole scheme's, not compared; no team id",
+        pTeam.includes(">Target: 73.1% below the approved plan, for the whole scheme, not split by team<") && pTeam.includes("Your planner sets the scheme&#x27;s carbon target.")
         && !pTeam.includes("Set as the scheme") && !pTeam.includes("Clear the target") && !pTeam.includes("aria-pressed")
-        && pTeamCap.includes("for the whole scheme (a cap has no share per team)") && !pTeamCap.includes("over the target")
+        && pTeamCap.includes(">Target: a fixed cap of 43.4 tCO2e for the whole scheme, not split by team<")
+        && [pTeam, pTeamCap].every(o => o.includes(">As forecast on your team&#x27;s lines: 161.4 tCO2e<") && o.includes(">With the agreed decisions on your team&#x27;s lines: 43.4 tCO2e<")
+          && o.includes("These figures are for your team&#x27;s lines only. The target is for the whole scheme, so they are not compared with it.")
+          && !/over the target|under the target|\bon target\b/.test(o))
         && !/IPT\d/.test(pTeam + pTeamCap) && !/undefined|NaN/.test(pTeam + pTeamCap));
-      const pBad = step6(cp(with6({ with_decisions_t: null, gap_with_decisions_t: null,
-        invalid: "The agreed decisions no longer fit the plan (route 'R4' does not exist), so the plan with them cannot be worked out. Set the target again on the Carbon page." })));
+      ok("🔴 R3 ...a team code gets no 'Open the agreed decisions' and no list of the decisions (as on the Dashboard)",
+        !pTeam.includes("Open the agreed decisions") && !pTeam.includes("The agreed decisions</p>") && !pTeam.includes("Recycled content 30%")
+        && pSet.includes("The agreed decisions</p>") && p6.includes(">Open the agreed decisions</button>"));
+      // NARROWED 11 Oct 2026 (the server's sentence now names the Carbon planner and says a planner sets it again; no bold figures)
+      const pBad = step6(cp(with6({ with_decisions_t: null, gap_with_decisions_t: null, on_target_with_decisions: null,
+        invalid: "The agreed decisions no longer fit the plan (route 'R4' does not exist), so the plan with them cannot be worked out. A planner needs to set the target again on the Carbon planner." })));
       ok("...decisions that no longer apply: the server's sentence in place of the second line, the as-forecast line kept",
         pBad.includes("The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist)") && !pBad.includes("With the agreed decisions:")
-        && pBad.includes("As forecast: <b>161.4 tCO2e</b>, 118.0 tCO2e over the target"));
+        && pBad.includes(">As forecast: 161.4 tCO2e, 118.0 tCO2e over the target<"));
+      // 11 Oct 2026 (R2): ONE rule, the server's. A cap 2.0 tCO2e over reads over here as on the Dashboard; and the page
+      // follows the server's verdict, not the size of the gap (a 2.0 gap the server calls on target reads on target)
+      const pCap2 = step6(cp(with6({ approved_t: 7361.1, with_decisions_t: 7002.8, target_t: 7000.8, gap_with_decisions_t: 2.0, on_target_with_decisions: false }, { mode: "cap", cap_t: 7000.8 })));
+      const pFollow = step6(cp(with6({ gap_with_decisions_t: 2.0, on_target_with_decisions: true })));
+      ok("⭐ R2 ...a cap 2.0 tCO2e over reads '2.0 tCO2e over the target'; the verdict is the server's on_target, never a margin worked out here",
+        pCap2.includes(">With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<") && pFollow.includes(">With the agreed decisions: 43.4 tCO2e, on target<"));
+      const pWhen = step6(cp(with6({}, { updated_at: "2026-10-11T23:30:00Z" })));
+      const _d = new Date("2026-10-11T23:30:00Z"), _M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const _day = `${_d.getDate()} ${_M[_d.getMonth()]} ${_d.getFullYear()}`;
+      ok("...the date a target was set is the reader's own day (00:30 BST is 12 Oct, not the UTC 11 Oct), the same helper as the Dashboard's",
+        pWhen.includes(`>Set by Sam (planner), ${_day}<`) && sandbox.ctSetBy({ updated_by: "Sam (planner)", updated_at: "2026-10-11T23:30:00Z" }) === `Set by Sam (planner), ${_day}`);
     }
   } else {
     ok("CarbonPage is defined", false);
@@ -375,8 +405,9 @@ if (loaded) {
   }
 
   // ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast, from the fixtures
-  // test_carbon_target.py writes: carbon_target.json (the planner's GET of a 73.1% target: approved 161.446,
-  // with the decisions 43.431, target 43.429, gaps 118.017 and 0.002, pending 5.653, transport 14.091)
+  // test_carbon_target.py writes: carbon_target.json (the planner's GET of a 73.1% target held to 6 dp: approved
+  // 161.446, with the decisions 43.431, target 43.431, gaps 118.015 and 0.0 with the server's verdicts, pending
+  // 5.653, transport 14.091)
   // and cost_preview_carbon.json (R1, 2900 t: material 22.629 + transport 5.636 = 28.265). The other
   // states (cap, team, under, no longer applies) are the same GET with the fields the server would send.
   const ctPath = path.join(__dirname, "fixtures", "carbon_target.json");
@@ -389,21 +420,33 @@ if (loaded) {
     // the part of a page the target owns (a page's own team filter carries ids in its option values)
     const seg = (out, a, b) => { const i = out.indexOf(a); return i < 0 ? "" : out.slice(i, out.indexOf(b, i) < 0 ? undefined : out.indexOf(b, i)); };
     const withS = (s, t) => ({ target: { ...CT.target, ...(t || {}) }, status: { ...CT.status, ...s } });
-    const CAP = withS({ target_t: 43.431, gap_as_forecast_t: 118.015, gap_with_decisions_t: 0 }, { mode: "cap" });
-    const TEAMP = withS({ scope: "team" });
-    const TEAMC = withS({ scope: "team", target_t: null, gap_as_forecast_t: null, gap_with_decisions_t: null }, { mode: "cap" });
-    const UNDER = withS({ gap_with_decisions_t: -12.34 });
-    const BAD = withS({ with_decisions_t: null, gap_with_decisions_t: null,
-      invalid: "The agreed decisions no longer fit the plan (route 'R4' does not exist), so the plan with them cannot be worked out. Set the target again on the Carbon page." });
+    // NARROWED 11 Oct 2026 (R2 and the team change): each state carries the server's verdicts; a team code, % or cap, has no
+    // target_t, gaps or verdicts (the server sends none), and the server's sentence for decisions that no longer apply is its new one
+    const TEAMNO = { scope: "team", target_t: null, gap_as_forecast_t: null, gap_with_decisions_t: null, on_target_as_forecast: null, on_target_with_decisions: null };
+    const CAP = withS({ target_t: 43.431, gap_as_forecast_t: 118.015, gap_with_decisions_t: 0, on_target_as_forecast: false, on_target_with_decisions: true }, { mode: "cap" });
+    const TEAMP = withS(TEAMNO);
+    const TEAMC = withS(TEAMNO, { mode: "cap" });
+    const UNDER = withS({ gap_with_decisions_t: -12.34, on_target_with_decisions: false });
+    const BAD = withS({ with_decisions_t: null, gap_with_decisions_t: null, on_target_with_decisions: null,
+      invalid: "The agreed decisions no longer fit the plan (route 'R4' does not exist), so the plan with them cannot be worked out. A planner needs to set the target again on the Carbon planner." });
+    const CAP2 = withS({ approved_t: 7361.1, with_decisions_t: 7002.8, target_t: 7000.8, gap_as_forecast_t: 360.3, gap_with_decisions_t: 2.0,
+                         on_target_as_forecast: false, on_target_with_decisions: false }, { mode: "cap", cap_t: 7000.8 });
+    const FOLLOW = withS({ gap_with_decisions_t: 2.0, on_target_with_decisions: true });
     const ctMeta = { ...meta, months: { start_year: 2026, count: 24 }, materials: ["Small aggregate"], vehicles: ["Rigid 8-wheeler (32t)"],
                      factors: { ...meta.factors, material_density_t_per_m3: { "Small aggregate": 1.6 }, vehicle_payload_t: { "Rigid 8-wheeler (32t)": 20 } } };
     const dash = (ct, extra) => render("the Dashboard renders with a carbon target state", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: ct, ...(extra || {}) }));
     const dSet = dash(CT, { onOpen(){} });
+    // NARROWED 11 Oct 2026 (a gap carries its unit, as on the Carbon page: "118.0 tCO2e over the target")
     ok("⭐ Dashboard: the strip reads the contract's words — 73.1% below the approved plan = 43.4 tCO2e; as forecast 161.4, 118.0 over; with the agreed decisions 43.4, on target",
       dSet.includes('data-carbon-target="set"') && dSet.includes("<b>Target: 73.1% below the approved plan = 43.4 tCO2e</b>")
-      && dSet.includes(">As forecast: 161.4 tCO2e, 118.0 over the target<") && dSet.includes(">With the agreed decisions: 43.4 tCO2e, on target<"));
-    ok("...a 0.002 t gap is inside the rounding of the stored 73.1% (161.446 × 0.0005 = 0.081), so it reads on target, not 0.0 over",
-      !dSet.includes("0.0 over") && !dSet.includes("0.0 under"));
+      && dSet.includes(">As forecast: 161.4 tCO2e, 118.0 tCO2e over the target<") && dSet.includes(">With the agreed decisions: 43.4 tCO2e, on target<"));
+    // NARROWED 11 Oct 2026 (R1 + R2): there is no rounding to absorb (the % is held to 6 dp, the gap is 0.0) and the verdict is
+    // the server's; the page follows it — a 2.0 gap the server calls on target reads on target, never "2.0 over"
+    const dFollow = dash(FOLLOW);
+    ok("...the gap at set time is 0.0 and reads on target, not 0.0 over; the verdict is the server's (a 2.0 gap it calls on target reads on target)",
+      !dSet.includes("0.0 over") && !dSet.includes("0.0 under") && CT.status.gap_with_decisions_t === 0 && CT.status.on_target_with_decisions === true
+      && dFollow.includes(">With the agreed decisions: 43.4 tCO2e, on target<") && !dFollow.includes("2.0 tCO2e over"));
+    ok("...the strip offers the Carbon planner with a target set too (it only did with none)", dSet.includes(">Open the Carbon planner</button>"));
     ok("...says once that it is all-in beside the transport-only card, with the transport part (14.1) on hover; who set it, with no date for a scrubbed one",
       dSet.includes("All-in: making the material, transport and waste disposal, on the whole approved plan. The Transport carbon card above counts transport only.")
       && dSet.includes('title="Transport is 14.1 tCO2e of the approved plan as forecast: the Transport carbon card&#x27;s figure with no filters."')
@@ -418,18 +461,32 @@ if (loaded) {
       dNone.includes('data-carbon-target="none"') && dNone.includes("No carbon target set yet. A planner sets it in the Carbon planner.")
       && dNone.includes(">Open the Carbon planner</button>") && dNoNav.includes("No carbon target set yet.") && !dNoNav.includes("Open the Carbon planner"));
     const dCap = dash(CAP), dUnder = dash(UNDER), dBad = dash(BAD);
-    ok("...a cap: 43.4 tCO2e cap (73.1% below the approved plan when it was set); a gap below the target reads 12.3 under",
-      dCap.includes("<b>Target: 43.4 tCO2e cap (73.1% below the approved plan when it was set)</b>") && dCap.includes("tCO2e, on target<")
-      && dUnder.includes(">With the agreed decisions: 43.4 tCO2e, 12.3 under the target<"));
+    // NARROWED 11 Oct 2026 (a cap reads "a fixed cap of" on every page, so the % / cap toggle shows everywhere; a gap carries its unit)
+    ok("...a cap: a fixed cap of 43.4 tCO2e (73.1% below the approved plan when it was set); a gap below the target reads 12.3 tCO2e under",
+      dCap.includes("<b>Target: a fixed cap of 43.4 tCO2e (73.1% below the approved plan when it was set)</b>") && dCap.includes("tCO2e, on target<")
+      && dUnder.includes(">With the agreed decisions: 43.4 tCO2e, 12.3 tCO2e under the target<"));
+    // NARROWED 11 Oct 2026 (the server's new sentence; the gap carries its unit)
     ok("...decisions that no longer apply: the server's sentence in place of the second line, the as-forecast line kept",
-      dBad.includes(">The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist), so the plan with them cannot be worked out. Set the target again on the Carbon page.<")
-      && !dBad.includes("With the agreed decisions:") && dBad.includes(">As forecast: 161.4 tCO2e, 118.0 over the target<") && !/undefined|NaN/.test(dBad));
+      dBad.includes(">The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist), so the plan with them cannot be worked out. A planner needs to set the target again on the Carbon planner.<")
+      && !dBad.includes("With the agreed decisions:") && dBad.includes(">As forecast: 161.4 tCO2e, 118.0 tCO2e over the target<") && !/undefined|NaN/.test(dBad));
     const dTp = dash(TEAMP), dTc = dash(TEAMC);
-    ok("⭐ ...a team code: its own lines in the tenant's word, the scheme's cut applied; a cap is not compared; no decisions listed; no team id",
-      dTp.includes("These figures are for your team&#x27;s lines only, with the scheme&#x27;s cut applied to them.") && !dTp.includes("agreed decisions</summary>")
-      && dTc.includes("The cap is for the whole scheme, so they are not compared with it.") && dTc.includes(">As forecast: 161.4 tCO2e<")
-      && !dTc.includes("over the target") && !/IPT\d/.test(seg(dTp, "data-carbon-target", "Material demand") + seg(dTc, "data-carbon-target", "Material demand"))
+    // REVERSED 11 Oct 2026 (the review): it asserted "with the scheme's cut applied to them" for a team code in % mode. A team
+    // code's figures are now never compared with the scheme's target, % or cap, and the strip no longer says they are "on the
+    // whole approved plan" (they are the team's lines)
+    ok("⭐ ...a team code: its own lines in the tenant's word; the target, % or cap, is the whole scheme's and not compared; no decisions listed; no team id",
+      [dTp, dTc].every(o => o.includes("These figures are for your team&#x27;s lines only. The target is for the whole scheme, so they are not compared with it.")
+        && o.includes(">As forecast on your team&#x27;s lines: 161.4 tCO2e<") && o.includes(">With the agreed decisions on your team&#x27;s lines: 43.4 tCO2e<")
+        && !/over the target|under the target|\bon target\b/.test(seg(o, "data-carbon-target", "Material demand")) && !o.includes("agreed decisions</summary>")
+        && !o.includes("whole approved plan") && o.includes("All-in: making the material, transport and waste disposal, on the approved plan on your team&#x27;s lines."))
+      && dTp.includes("<b>Target: 73.1% below the approved plan, for the whole scheme, not split by team</b>") && !dTp.includes("scheme&#x27;s cut")
+      && dTc.includes("<b>Target: a fixed cap of 43.4 tCO2e for the whole scheme, not split by team</b>")
+      && !/IPT\d/.test(seg(dTp, "data-carbon-target", "Material demand") + seg(dTc, "data-carbon-target", "Material demand"))
       && !/undefined|NaN/.test(dTp + dTc));
+    // R2: a cap 2.0 tCO2e over (approved 7 361.1, with the decisions 7 002.8, cap 7 000.8) reads OVER on the Dashboard, as on the
+    // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
+    const dCap2 = dash(CAP2);
+    ok("⭐ R2 ...a cap 2.0 tCO2e over reads '2.0 tCO2e over the target' on the Dashboard (it read 'on target' there and 'over' on the Carbon page)",
+      dCap2.includes(">With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<") && !dCap2.includes("7 002.8 tCO2e, on target"));
 
     const rowsCt = cl.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
       quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: null,
@@ -438,8 +495,11 @@ if (loaded) {
     const fc = (ct, extra) => render("the Forecasts page renders with a carbon target state",
       h(Forecasts, { meta: ctMeta, who: "t", access: planner, onEdit(){}, onChanged(){}, initialRows: rowsCt, initialCost: cl, initialTarget: ct, ...(extra || {}) }));
     const fSet = fc(CT);
-    ok(`⭐ Forecasts: under the header, approved plan as forecast 161.4 tCO2e · with the agreed decisions 43.4 · target 43.4, and the ${pendN} pending line(s) would add 5.7`,
-      pendN >= 1 && fSet.includes("<b>Carbon (all-in):</b> approved plan as forecast 161.4 tCO2e · with the agreed decisions 43.4 · target 43.4<")
+    // NARROWED 11 Oct 2026 (one way of saying the target: the Dashboard's target sentence, then both figures with the server's
+    // verdicts — it printed the three figures with no verdict, so a % target read as missed the moment it was set)
+    ok(`⭐ Forecasts: under the header, the target (73.1% below the approved plan = 43.4 tCO2e), as forecast 118.0 over, with the agreed decisions on target, and the ${pendN} pending line(s) would add 5.7`,
+      pendN >= 1 && fSet.includes("<b>Carbon (all-in):</b> Target: 73.1% below the approved plan = 43.4 tCO2e<")
+      && fSet.includes(">As forecast: 161.4 tCO2e, 118.0 tCO2e over the target · With the agreed decisions: 43.4 tCO2e, on target<")
       && fSet.includes(`>The ${pendN} pending line${pendN === 1 ? "" : "s"} would add 5.7 tCO2e.<`)
       && fSet.indexOf('data-carbon-target="set"') > fSet.indexOf(">Forecasts<") && fSet.indexOf('data-carbon-target="set"') < fSet.indexOf("<table")
       && !/undefined|NaN/.test(fSet));
@@ -448,14 +508,22 @@ if (loaded) {
     const fTp = fc(TEAMP, { access: submitter }), fTc = fc(TEAMC, { access: submitter }), fBad = fc(BAD);
     ok("...no target: one line that says so; while the list loads, no pending sentence (the count is the page's own)",
       fNone.includes(">No carbon target set yet. A planner sets it in the Carbon planner.<") && !fNone.includes("Open the Carbon planner")
-      && fLoading.includes("approved plan as forecast 161.4") && !fLoading.includes("pending line") && !fLoading.includes("waiting for approval"));
+      // NARROWED 11 Oct 2026 (the shared words)
+      && fLoading.includes(">As forecast: 161.4 tCO2e, 118.0 tCO2e over the target") && !fLoading.includes("pending line") && !fLoading.includes("waiting for approval"));
     // NARROWED 11 Oct 2026 (the merge: the segment ran on to "<table" and so took in the page's own Team
     // filter, whose option values are team ids by design; it now stops at that filter row, and each
     // segment must hold the target's line, so the no-id check cannot pass on an empty string)
     const fSegs = [fTp, fTc, fBad].map(o => seg(o, "data-carbon-target", 'data-guide="forecast-status"'));
-    ok("...a team code: its own lines and the scheme's cut; a cap reads as the scheme's, not split by team; decisions that no longer apply say so",
-      fTp.includes("<b>Carbon (all-in), your team&#x27;s lines:</b>") && fTp.includes("target 43.4 (the scheme&#x27;s 73.1% cut)")
-      && fTc.includes("scheme cap 43.4, not split by team") && fBad.includes("with the agreed decisions —") && fBad.includes("Set the target again on the Carbon page.")
+    const fCap2 = fc(CAP2);
+    ok("⭐ R2 ...Forecasts says the same verdicts as the Dashboard: a cap 2.0 tCO2e over reads over",
+      fCap2.includes(">As forecast: 7 361.1 tCO2e, 360.3 tCO2e over the target · With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<")
+      && fCap2.includes("Target: a fixed cap of 7 000.8 tCO2e (73.1% below the approved plan when it was set)<"));
+    // REVERSED 11 Oct 2026 (no team share of the scheme's target): it asserted "target 43.4 (the scheme's 73.1% cut)" for a team code
+    ok("...a team code: its own lines; the target, % or cap, the whole scheme's and not split by team; decisions that no longer apply say so",
+      fTp.includes("<b>Carbon (all-in):</b> Target: 73.1% below the approved plan, for the whole scheme, not split by team<") && !fTp.includes("scheme&#x27;s 73.1% cut")
+      && fTp.includes(">As forecast on your team&#x27;s lines: 161.4 tCO2e · With the agreed decisions on your team&#x27;s lines: 43.4 tCO2e<")
+      && fTc.includes("Target: a fixed cap of 43.4 tCO2e for the whole scheme, not split by team<") && !/over the target|under the target|\bon target\b/.test(fSegs[0] + fSegs[1])
+      && fBad.includes("With the agreed decisions: —<") && fBad.includes("A planner needs to set the target again on the Carbon planner.")
       && fSegs.every(x => x.includes("Carbon (all-in)") && !x.includes("<select"))
       && !/IPT\d/.test(fSegs.join("")) && !/undefined|NaN/.test(fTp + fTc + fBad));
 
@@ -470,23 +538,47 @@ if (loaded) {
       && mSet.includes('title="Making the material at the UK Government 2026 factor for aggregates; transport there and back on the routed distance."')
       && !mSet.includes("no route distance yet") && mSet.indexOf('data-cost-strip="1"') < mSet.indexOf('data-carbon-cells="1"')
       && mSet.indexOf('data-carbon-cells="1"') < mSet.indexOf("Movements = loads per working day"));
-    ok("...and the scheme target beside it: 43.4 tCO2e · approved plan now 161.4 tCO2e; nothing undefined or NaN",
-      mSet.includes(">Scheme target: 43.4 tCO2e · approved plan now 161.4 tCO2e<") && !/undefined|NaN/.test(mSet));
+    // NARROWED 11 Oct 2026 (the review: Submit forecast showed only "approved plan now", which always read far over a % target;
+    // it now says the same three things as the Dashboard and Forecasts, with the server's verdicts)
+    ok("...and the scheme target beside it, as forecast AND with the agreed decisions, in the Dashboard's words; nothing undefined or NaN",
+      mSet.includes(">Target: 73.1% below the approved plan = 43.4 tCO2e · As forecast: 161.4 tCO2e, 118.0 tCO2e over the target · With the agreed decisions: 43.4 tCO2e, on target<")
+      && !mSet.includes("approved plan now") && !/undefined|NaN/.test(mSet));
     const mUnr = mx({ ...PC, carbon: { material_t: 22.629, transport_t: null, disposal_t: null, total_t: 22.629, unrouted: true,
       basis: "Making the material at the UK Government 2026 factor for aggregates; transport is not counted until the route has a distance." } }, CT);
     const mTip = mx({ ...PC, carbon: { material_t: null, transport_t: null, disposal_t: 19.554, total_t: 19.554, unrouted: true,
       basis: "Transport is not counted until the route has a distance; disposal by landfill at the UK Government 2026 factor for soils." } }, NONE);
     ok("...an unrouted line says transport is not counted (never estimated); a tip line shows waste disposal only; no target says so",
       mUnr.includes("Carbon of these cells: <b>22.6 tCO2e</b> (material 22.6) · no route distance yet, so transport is not counted<")
-      && mTip.includes("Carbon of these cells: <b>19.6 tCO2e</b> (waste disposal 19.6) · no route distance yet") && mTip.includes(">No scheme carbon target set yet.<"));
+      // NARROWED 11 Oct 2026 (one "no target" sentence on all four pages)
+      && mTip.includes("Carbon of these cells: <b>19.6 tCO2e</b> (waste disposal 19.6) · no route distance yet") && mTip.includes(">No carbon target set yet. A planner sets it in the Carbon planner.<"));
     const mTp = mx(PC, TEAMP, submitter), mTc = mx(PC, TEAMC, submitter);
     const pcNo = { ...PC }; delete pcNo.carbon;
     const mNo = mx(pcNo, null);
-    ok("...a team code: the target for its own lines, or the scheme's cap not split by team; no carbon block and no target read yet: neither line",
-      mTp.includes(">Target for your team&#x27;s lines: 43.4 tCO2e · their approved plan now 161.4 tCO2e<")
-      && mTc.includes(">Scheme cap: 43.4 tCO2e, not split by team · approved plan on your team&#x27;s lines now 161.4 tCO2e<")
+    // REVERSED 11 Oct 2026 (no team share of the scheme's target): it asserted "Target for your team's lines: 43.4 tCO2e"
+    ok("...a team code: the scheme's target, % or cap, not split by team, beside its own lines' figures; no carbon block and no target read yet: neither line",
+      mTp.includes(">Target: 73.1% below the approved plan, for the whole scheme, not split by team · As forecast on your team&#x27;s lines: 161.4 tCO2e · With the agreed decisions on your team&#x27;s lines: 43.4 tCO2e<")
+      && mTc.includes(">Target: a fixed cap of 43.4 tCO2e for the whole scheme, not split by team · As forecast on your team&#x27;s lines: 161.4 tCO2e")
       && !mNo.includes("data-carbon-cells") && !mNo.includes("data-carbon-target")
       && !/IPT\d/.test([mTp, mTc].map(o => seg(o, 'data-cost-strip="1"', "Movements = loads per working day")).join("")) && !/undefined|NaN/.test(mTp + mTc + mNo));
+    const mBad = mx(PC, BAD), mCap2 = mx(PC, CAP2);
+    ok("...decisions that no longer apply: 'With the agreed decisions: —' on the line and the server's sentence under it; a cap 2.0 over reads over",
+      mBad.includes(" · With the agreed decisions: —<") && mBad.includes('<div class="w-full ct-note">The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist), so the plan with them cannot be worked out. A planner needs to set the target again on the Carbon planner.</div>')
+      && mCap2.includes("With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<") && !/undefined|NaN/.test(mBad + mCap2));
+
+    // the big screen's target figure (ctFig, called directly: the Dashboard is NOT rendered in wall mode here)
+    const fg = (ct, err) => sandbox.ctFig(ct, err);
+    const gS = fg(CT), gC = fg(CAP), gTp = fg(TEAMP), gTc = fg(TEAMC), gB = fg(BAD), gC2 = fg(CAP2);
+    ok("⭐ the big screen's figure: the scheme's target 43.4, its sub the mode and both verdicts in the shared words",
+      gS.value === "43.4" && gS.sub === "73.1% below the approved plan · as forecast: 118.0 tCO2e over the target · with the agreed decisions: on target"
+      && gS.title.startsWith("Target: 73.1% below the approved plan = 43.4 tCO2e. As forecast: 161.4 tCO2e, 118.0 tCO2e over the target. With the agreed decisions: 43.4 tCO2e, on target.")
+      && gC.sub.startsWith("fixed cap · as forecast: ") && gC2.sub.endsWith("with the agreed decisions: 2.0 tCO2e over the target"));
+    ok("...a team code: a % shows no figure of its own ('—'), a cap shows the scheme's; the sub says it is the whole scheme's, not split by team",
+      gTp.value === "—" && gTp.sub === "whole scheme: 73.1% below the approved plan, not split by team"
+      && gTc.value === "43.4" && gTc.sub === "whole scheme: fixed cap, not split by team" && !/over|under|\bon target\b/.test(gTp.sub + gTc.sub));
+    ok("...decisions that no longer apply, no target, a failed read and the wait: each in words, nothing undefined or NaN",
+      gB.sub.endsWith("the agreed decisions no longer fit the plan") && fg(NONE).sub === "none set yet"
+      && fg(NONE).title === "No carbon target set yet. A planner sets it in the Carbon planner." && fg(null, true).sub === "did not load"
+      && fg(null, false).sub === "loading" && !/undefined|NaN/.test(JSON.stringify([gS, gC, gTp, gTc, gB, gC2])));
   }
 
   // ---- the shared furniture -----------------------------------------------------

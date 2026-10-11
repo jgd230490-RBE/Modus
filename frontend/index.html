@@ -537,67 +537,83 @@ function WallSection({ show, divider, title, children }){
 // ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast ------------
 // A planner sets the target on the Carbon planner. Each page reads it with ONE call,
 // GET /api/carbon/target (any signed-in code; the progress is worked out on the lines that code
-// can see). The SERVER works out every figure; these helpers only format and compare. The
-// figures are ALL-IN (making the material, transport and waste disposal), so where they sit
-// beside the transport-only figures the page says so once. A team code reads "your team's
-// lines" in the tenant's own word, never a team id.
-// pct_below is stored to 1 dp, so straight after a % target is set the plan with the decisions
-// can read a little over it (the demo: an 11.25% cut stored as 11.3% reads 3.1 over). A gap
-// inside that rounding, half of 0.1% of the approved plan, is read as on target.
-const CT_ROUND = 0.0005;
+// can see). The SERVER works out every figure AND decides whether each one is on target
+// (status.on_target_as_forecast / on_target_with_decisions: within 0.05 tCO2e either way,
+// carbon_target.ON_TARGET_TOL_T, the one rule). These helpers only put its answers into words,
+// the same words on all four pages (the Carbon page's step 6 uses them too): no margin, no sum.
+// The figures are ALL-IN (making the material, transport and waste disposal), so where they sit
+// beside the transport-only figures the page says so once. A team code reads "your team's lines"
+// in the tenant's own word, never a team id, and its figures are not compared with the target:
+// the target is the scheme's and is not split by team (the server sends no team target_t).
 const CT_ALLIN = "All-in: making the material, transport and waste disposal";
+const CT_NONE = "No carbon target set yet.";
+const CT_WHO = "A planner sets it in the Carbon planner.";
 const ctT = (n) => grp(n, 1);
 const ctOk = (ct) => !!(ct && ct.target && ct.status);
 const ctTeam = (ct) => !!(ct && ct.status && ct.status.scope === "team");
 const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;
-function ctGap(gap, approved){
-  if(gap == null) return null;
-  if(Math.abs(gap) <= Math.abs(+approved || 0) * CT_ROUND) return "on target";
-  return `${ctT(Math.abs(gap))} ${gap > 0 ? "over" : "under"} the target`;
+const ctSplit = () => `not split by ${TEAM().toLowerCase()}`;
+// the server's verdict in words: "on target", or the gap's size and its side (its sign); nothing is compared here
+function ctGap(on, gap){
+  if(on == null || gap == null) return null;
+  if(on) return "on target";
+  return `${ctT(Math.abs(gap))} tCO2e ${gap > 0 ? "over" : "under"} the target`;
 }
+// the target in one sentence, the same on every page; a % and a cap read differently, so the toggle shows everywhere
 function ctTargetLine(ct){
   const t = ct.target, s = ct.status, pct = `${(+t.pct_below).toFixed(1)}%`;
-  if(t.mode === "cap") return `Target: ${ctT(t.cap_t)} tCO2e cap (${pct} below the approved plan when it was set)`;
+  if(ctTeam(ct)) return t.mode === "cap"
+    ? `Target: a fixed cap of ${ctT(t.cap_t)} tCO2e for the whole scheme, ${ctSplit()}`
+    : `Target: ${pct} below the approved plan, for the whole scheme, ${ctSplit()}`;
+  if(t.mode === "cap") return `Target: a fixed cap of ${ctT(t.cap_t)} tCO2e (${pct} below the approved plan when it was set)`;
   return `Target: ${pct} below the approved plan = ${ctT(s.target_t)} tCO2e`;
 }
-function ctProgress(ct){
-  const s = ct.status;
-  const g1 = ctGap(s.gap_as_forecast_t, s.approved_t), g2 = ctGap(s.gap_with_decisions_t, s.approved_t);
+// as forecast, and with the agreed decisions, each with the server's verdict. When the decisions no longer
+// apply, the second is the server's sentence, or (dash: a line with no room for it) "—" and the page prints it below
+function ctProgress(ct, dash){
+  const s = ct.status, on = ctTeam(ct) ? ` on ${ctYour()}` : "";
+  const g1 = ctGap(s.on_target_as_forecast, s.gap_as_forecast_t), g2 = ctGap(s.on_target_with_decisions, s.gap_with_decisions_t);
   return [
-    `As forecast: ${ctT(s.approved_t)} tCO2e${g1 ? ", " + g1 : ""}`,
-    s.invalid || `With the agreed decisions: ${ctT(s.with_decisions_t)} tCO2e${g2 ? ", " + g2 : ""}`,
+    `As forecast${on}: ${ctT(s.approved_t)} tCO2e${g1 ? ", " + g1 : ""}`,
+    s.invalid ? (dash ? `With the agreed decisions${on}: —` : s.invalid)
+      : `With the agreed decisions${on}: ${ctT(s.with_decisions_t)} tCO2e${g2 ? ", " + g2 : ""}`,
   ];
 }
 function ctScopeNote(ct){
   if(!ctTeam(ct)) return null;
-  return ct.target.mode === "cap"
-    ? `These figures are for ${ctYour()} only. The cap is for the whole scheme, so they are not compared with it.`
-    : `These figures are for ${ctYour()} only, with the scheme's cut applied to them.`;
+  return `These figures are for ${ctYour()} only. The target is for the whole scheme, so they are not compared with it.`;
+}
+// a stamp as the reader's own clock dates it (the server stamps UTC): "12 Oct 2026", the same on every page
+function ctWhen(at){
+  const d = new Date(at);
+  return (!at || isNaN(d.getTime())) ? "" : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 function ctSetBy(t){
   if(!t || !t.updated_by) return null;
-  const at = String(t.updated_at || "");
-  return `Set by ${t.updated_by}${/^\d{4}-\d{2}-\d{2}/.test(at) ? ", " + longDate(at.slice(0, 10)) : ""}`;
+  const w = ctWhen(t.updated_at);
+  return `Set by ${t.updated_by}${w ? ", " + w : ""}`;
 }
-// Submit forecast: the target beside the carbon of the cells being typed
+// Submit forecast: the target beside the carbon of the cells being typed, with the plan as forecast AND
+// with the agreed decisions, in the Dashboard's and Forecasts' own words
 function ctCellsTarget(ct){
   if(!ct) return null;
-  if(!ctOk(ct)) return "No scheme carbon target set yet.";
-  const s = ct.status;
-  if(!ctTeam(ct)) return `Scheme target: ${ctT(s.target_t)} tCO2e · approved plan now ${ctT(s.approved_t)} tCO2e`;
-  if(s.target_t == null) return `Scheme cap: ${ctT(ct.target.cap_t)} tCO2e, not split by team · approved plan on ${ctYour()} now ${ctT(s.approved_t)} tCO2e`;
-  return `Target for ${ctYour()}: ${ctT(s.target_t)} tCO2e · their approved plan now ${ctT(s.approved_t)} tCO2e`;
+  if(!ctOk(ct)) return `${CT_NONE} ${CT_WHO}`;
+  const [p1, p2] = ctProgress(ct, true);
+  return `${ctTargetLine(ct)} · ${p1} · ${p2}`;
 }
-// the big screen's Carbon group: one more figure in the group's own pattern
+// the big screen's Carbon group: one more figure in the group's own pattern. A team code has no target
+// of its own: a cap shows the scheme's cap, a % shows "—", and the sub says it is the whole scheme's.
 function ctFig(ct, err){
   if(!ct) return { value: "—", sub: err ? "did not load" : "loading", title: err ? "The carbon target did not load." : "Loading the carbon target." };
-  if(!ctOk(ct)) return { value: "—", sub: "none set yet", title: "No carbon target set yet. A planner sets it in the Carbon planner." };
-  const s = ct.status, v = s.target_t != null ? s.target_t : ct.target.cap_t;
-  const g1 = ctGap(s.gap_as_forecast_t, s.approved_t), g2 = ctGap(s.gap_with_decisions_t, s.approved_t);
-  const sub = s.target_t == null ? "scheme cap, not split by team"
-    : `as forecast: ${g1} · with the decisions: ${s.invalid ? "no longer apply" : g2}`;
+  if(!ctOk(ct)) return { value: "—", sub: "none set yet", title: `${CT_NONE} ${CT_WHO}` };
+  const t = ct.target, s = ct.status, team = ctTeam(ct);
+  const how = t.mode === "cap" ? "fixed cap" : `${(+t.pct_below).toFixed(1)}% below the approved plan`;
+  const v = team ? (t.mode === "cap" ? t.cap_t : null) : s.target_t;
+  const g1 = ctGap(s.on_target_as_forecast, s.gap_as_forecast_t), g2 = ctGap(s.on_target_with_decisions, s.gap_with_decisions_t);
+  const sub = team ? `whole scheme: ${how}, ${ctSplit()}`
+    : `${how} · as forecast: ${g1} · ${s.invalid ? "the agreed decisions no longer fit the plan" : "with the agreed decisions: " + g2}`;
   const words = [ctTargetLine(ct), ...ctProgress(ct), ctScopeNote(ct), CT_ALLIN + ". The other carbon figures here are transport only"];
-  return { value: Math.abs(v) >= 1e4 ? bigNum(v) : ctT(v), sub, title: words.filter(Boolean).map(w => w.replace(/\.$/, "")).join(". ") + "." };
+  return { value: v == null ? "—" : (Math.abs(v) >= 1e4 ? bigNum(v) : ctT(v)), sub, title: words.filter(Boolean).map(w => w.replace(/\.$/, "")).join(". ") + "." };
 }
 
 // The Dashboard's strip under the six cards. Nothing while the read is on its way.
@@ -605,7 +621,7 @@ function CarbonTargetStrip({ ct, err, onOpen }){
   if(!ct) return err ? <div className="ct-strip" data-carbon-target="error"><span className="ct-line">The carbon target did not load.</span></div> : null;
   if(!ctOk(ct)) return (
     <div className="ct-strip ct-row" data-carbon-target="none">
-      <span className="ct-line">No carbon target set yet. A planner sets it in the Carbon planner.</span>
+      <span className="ct-line">{CT_NONE} {CT_WHO}</span>
       {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}
     </div>
   );
@@ -613,13 +629,14 @@ function CarbonTargetStrip({ ct, err, onOpen }){
   const words = t.lever_words || [];
   return (
     <section className="ct-strip" data-carbon-target="set" aria-label="Carbon target">
-      <div className="ct-row"><h3 className="ct-h">Carbon target</h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}</div>
+      <div className="ct-row"><h3 className="ct-h">Carbon target</h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
+        {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}</div>
       <div className="ct-line"><b>{ctTargetLine(ct)}</b></div>
       <div className="ct-line">{p1}</div>
       <div className="ct-line">{p2}</div>
       {note && <div className="ct-note">{note}</div>}
       <div className="ct-note" title={`Transport is ${ctT(s.approved_transport_t)} tCO2e of the approved plan as forecast: the Transport carbon card's figure with no filters.`}>
-        {CT_ALLIN}, on the whole approved plan. The Transport carbon card above counts transport only.
+        {CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : "the whole approved plan"}. The Transport carbon card above counts transport only.
       </div>
       {!ctTeam(ct) && words.length > 0 && (
         <details className="ct-more">
@@ -635,16 +652,13 @@ function CarbonTargetStrip({ ct, err, onOpen }){
 // lines waiting for approval would add (the count is the page's own; the tonnes are the server's).
 function CarbonTargetLine({ ct, err, pendingN }){
   if(!ct) return err ? <p className="ct-line mb-4" data-carbon-target="error">The carbon target did not load.</p> : null;
-  if(!ctOk(ct)) return <p className="ct-line mb-4" data-carbon-target="none">No carbon target set yet. A planner sets it in the Carbon planner.</p>;
-  const s = ct.status, team = ctTeam(ct);
-  const tgt = s.target_t == null ? `scheme cap ${ctT(ct.target.cap_t)}, not split by team`
-    : `target ${ctT(s.target_t)}${team ? ` (the scheme's ${(+ct.target.pct_below).toFixed(1)}% cut)` : ""}`;
+  if(!ctOk(ct)) return <p className="ct-line mb-4" data-carbon-target="none">{CT_NONE} {CT_WHO}</p>;
+  // 11 Oct 2026: the same three things as the Dashboard, in its words (the target, as forecast, with the agreed decisions)
+  const s = ct.status, [p1, p2] = ctProgress(ct, true);
   return (
     <div className="ct-strip mb-4" data-carbon-target="set" title={`${CT_ALLIN}.`}>
-      <div className="ct-line">
-        <b>{team ? `Carbon (all-in), ${ctYour()}:` : "Carbon (all-in):"}</b> approved plan as forecast {ctT(s.approved_t)} tCO2e
-        {" · "}with the agreed decisions {s.with_decisions_t == null ? "—" : ctT(s.with_decisions_t)}{" · "}{tgt}
-      </div>
+      <div className="ct-line"><b>Carbon (all-in):</b> {ctTargetLine(ct)}</div>
+      <div className="ct-line">{p1} · {p2}</div>
       {s.invalid && <div className="ct-note">{s.invalid}</div>}
       {pendingN != null && <div className="ct-line">{pendingN === 0 ? "No lines are waiting for approval."
         : `The ${pendingN} pending line${pendingN === 1 ? "" : "s"} would add ${ctT(s.pending_t)} tCO2e.`}</div>}
@@ -918,7 +932,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOp
     </div>
   );
   const rangeLabel = D.lo === D.hi ? D.labels[0] : (monthLabelAbs(D.lo, months.start_year) + " – " + monthLabelAbs(D.hi, months.start_year));
-  const scopeNote = `${status === "All" ? "all forecasts" : status.toLowerCase() + " only"}${ipt !== "All" ? " · " + (ipt === "none" ? "no " + TEAM().toLowerCase() : ipt) : ""}${discipline !== "All" ? " · " + discipline : ""}${selected ? " · " + selected.route_id + (selected.discipline ? " · " + selected.discipline : "") : ""}`;
+  const scopeNote = `${status === "All" ? "all forecasts" : status.toLowerCase() + " only"}${ipt !== "All" ? " · " + (ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt)) : ""}${discipline !== "All" ? " · " + discipline : ""}${selected ? " · " + selected.route_id + (selected.discipline ? " · " + selected.discipline : "") : ""}`;
   const plannedVsFair = (K.planned && K.fair && K.fair.eur > 0 && K.plannedN === K.fairN) ? (K.planned.eur - K.fair.eur) * 100 / K.fair.eur : null;
   const hhmm = (d) => d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "";
 
@@ -1538,6 +1552,9 @@ function Guide({ page, groups }){
   const [dots, setDots] = useState([]);
   const [tip, setTip] = useState(null);
   const [railRight, setRailRight] = useState(240);
+  // 11 Oct 2026: the strip sits 16 px off the foot, or just above an element pinned there ([data-sticky-foot]:
+  // the Carbon page's result strip), so it never covers it
+  const [stripBottom, setStripBottom] = useState(16);
   const build = (withWelcome) => {
     const own = GUIDE_STEPS[key] || [];
     if(!withWelcome) return own;
@@ -1569,6 +1586,10 @@ function Guide({ page, groups }){
     const place = () => {
       const rail = document.querySelector('[data-guide="rail"]');
       if(rail) setRailRight(Math.round(rail.getBoundingClientRect().right));
+      const foot = document.querySelector('[data-sticky-foot]');
+      const fr = foot && (foot.offsetWidth || foot.offsetHeight) ? foot.getBoundingClientRect() : null;
+      const lift = (fr && fr.top < window.innerHeight && fr.bottom > window.innerHeight - 60) ? Math.round(window.innerHeight - fr.top) + 8 : 16;
+      setStripBottom(b => (b === lift ? b : lift));
       const seen = new Set(), out = [];
       own.forEach(s => {
         if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);
@@ -1606,7 +1627,7 @@ function Guide({ page, groups }){
   const hintsEl = (hints && !step) ? (
     <>
       {strip && (
-        <div className="guide-strip" role="note" style={{ left: railRight + 16, bottom: 16 }}>   {/* bottom-left of the page: never over the page header */}
+        <div className="guide-strip" role="note" style={{ left: railRight + 16, bottom: stripBottom }}>   {/* bottom-left of the page: never over the page header */}
           <span>New here? A short tour shows what this page is for.</span>
           <button type="button" className="guide-strip-go" onClick={startTour}>Take the tour</button>
           <button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>
@@ -2861,6 +2882,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
               );
             })()}
             {ct && <div className="w-full ct-line" data-carbon-target={ctOk(ct) ? "set" : "none"}>{ctCellsTarget(ct)}</div>}
+            {ct && ctOk(ct) && ct.status.invalid && <div className="w-full ct-note">{ct.status.invalid}</div>}
           </div>
           <div className="px-3 py-1.5 text-[10.5px] text-slate-400 bg-white">
             Movements = loads per working day ({perDay.wd}/month). Vehicles needed = movements ÷{" "}
@@ -3633,7 +3655,7 @@ function ConfigPage({ meta, who, access }){
 // the SERVER works every figure out), switches % / cap (PUT with the mode only) or clears it (DELETE).
 // A team code reads it. Shared codes: no per-person identity until G3, so "set by" is the typed name.
 const CARBON_STEPS = [
-  { who: "Client", what: "Sets the carbon target for the scheme and asks the supply chain to plan against it." },
+  { who: "Client", what: "Agrees the carbon target for the scheme (a planner records it in step 6) and asks the supply chain to plan against it." },
   { who: "Buyer", what: "Asks each supplier for an environmental product declaration (EPD) and enters it here as a custom carbon factor, with its reference." },
   { who: "Principal contractor", what: "Writes the decisions it commits to into the construction logistics plan and the subcontracts, then reports actual quantities in the client's own return (on National Highways schemes, the Carbon Tool)." },
 ];
@@ -3720,6 +3742,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfErr, setPdfErr] = useState(null);     // 11 Oct 2026: the summary's own error, shown under its button
   // step 6: the scheme's carbon target, as GET /api/carbon/target returns it ({ target, status })
   const [tg, setTg] = useState(initialTarget || null);
   const [mode, setMode] = useState(() => ((initialTarget && initialTarget.target && initialTarget.target.mode) || "pct"));
@@ -3844,20 +3867,26 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
   const resultWords = A ? (A.delta_t != null && Math.abs(A.delta_t) > 0.0005 ? `${moved(A.delta_t)} than the approved plan (${pct(A.delta_pct)})` : "No change from the approved plan") : "";
   const loadsChange = A ? ([A.delta_trips ? (A.delta_trips < 0 ? `${grp(-A.delta_trips)} fewer lorry loads` : `${grp(A.delta_trips)} more lorry loads, because each lorry carries less`) : "", kmWord(A.delta_vkm_km)].filter(Boolean).join(" · ") || `No change in lorry loads or lorry-${DU()}`) : "";
   // item 11: the one-page summary — the same body as the page's read, plus the commentary; the server draws it
+  // 11 Oct 2026: its failure is said under its own button (pdfErr), never in the scenario's error
   const downloadSummary = async () => {
-    setPdfBusy(true);
+    setPdfBusy(true); setPdfErr(null);
     try {
       const r = await fetch(`${API}/carbon/summary.pdf`, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ alternatives: levers.length ? [{ name: "Alternative", levers }] : [],
                                spend_gbp_m: (spend === "" || isNaN(+spend)) ? null : +spend, commentary: note || null }) });
-      if(!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 200)}`);
+      if(!r.ok){
+        const txt = await r.text();
+        let d = "";
+        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+        throw new Error(d || `error ${r.status}`);
+      }
       const blob = await r.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "carbon-summary.pdf";
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    } catch(e){ setErr("The summary could not be made: " + (e.message || e)); }
+    } catch(e){ setPdfErr("The summary could not be made: " + (e.message || e)); }
     setPdfBusy(false);
   };
 
@@ -3866,42 +3895,48 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
   const S = (tg && tg.status) || null;
   const canSet = !!(access && access.can_approve);
   const team = !!(S && S.scope === "team");
-  const when = (s) => { const d = new Date(s); return (!s || isNaN(d.getTime())) ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
-  // The server holds the % to 1 dp (the contract), so straight after a % target is set the plan with the
-  // decisions can read up to 0.05% of the approved plan over it (demo: 3.1 tCO2e on 6 482.5). A gap inside
-  // that rounding, or inside the 3 dp of a cap, reads "on target". A comparison only: no figure is made here.
-  const tol = (T && T.mode === "pct" && S ? Math.abs(S.approved_t || 0) * 0.0005 : 0) + 0.0005;
-  // 11 Oct 2026 (the merge): "under", as the Dashboard, Forecasts and Submit forecast say it (ctGap)
-  const gapWord = (g) => (g == null ? "" : Math.abs(g) <= tol ? "on target" : g > 0 ? `${grp(g, 1)} tCO2e over the target` : `${grp(-g, 1)} tCO2e under the target`);
-  const targetWords = !T ? "" : T.mode === "cap"
-    ? `a fixed cap of ${t1(T.cap_t)} tCO2e${team ? ` for the whole scheme (a cap has no share per ${TEAM().toLowerCase()})` : ""}`
-    : `${Number(T.pct_below).toFixed(1)}% below the approved plan${S && S.target_t != null ? (team ? `; on ${ctYour()} that is ${t1(S.target_t)} tCO2e` : `, which is ${t1(S.target_t)} tCO2e today`) : ""}`;
-  const setWhy = !levers.length || !A ? "Make a choice in steps 2 to 4 first."
+  // 11 Oct 2026 (the review): the target, the two figures and their verdicts in the SAME words as the
+  // Dashboard, Forecasts and Submit forecast (ctTargetLine, ctProgress: the server decides "on target";
+  // no margin is worked out here). A team code's figures are its own lines and are not compared.
+  const ctHere = ctOk(tg);
+  const p6 = ctHere ? ctProgress(tg) : [];
+  // Set waits until the current target has been read: with the read failed the page cannot know there is one
+  // to replace, so it would replace it without asking. A refused scenario disables it too, saying why.
+  const setWhy = !tLoaded ? (tErr ? "The scheme's current carbon target did not load, so a new one cannot be set yet." : "Reading the current carbon target…")
     : busy ? "Wait for the result to update."
+    : err ? `Not updated: ${err}`
+    : !levers.length || !A ? "Make a choice in steps 2 to 4 first."
     : !(A.delta_t < -0.0005) ? "These decisions do not lower carbon, so they cannot be the target." : "";
   const setTarget = () => {
+    if(!tLoaded) return;
     if(T && !confirm("Replace the scheme's carbon target with these decisions?")) return;
     targetCall("PUT", { mode, levers, ui_state: st, updated_by: who || null }, "Target set.");
   };
   // with no target yet the toggle only picks how the next one is held; on a saved target it switches
-  // the stored one (PUT with the mode alone: the server keeps every number) and shows what it now holds
+  // the stored one (PUT with the mode alone: the server keeps every number), after a check, and shows what it now holds
   const pickMode = (k) => {
     if(!T) { setMode(k); return; }
-    if(canSet && T.mode !== k) targetCall("PUT", { mode: k, updated_by: who || null }, k === "cap" ? "Now held as a fixed tCO2e cap." : "Now held as % below the approved plan.");
+    if(canSet && T.mode !== k && confirm(k === "cap" ? "Hold the scheme's carbon target as a fixed tCO2e cap? Every page shows the change."
+                                                    : "Hold the scheme's carbon target as % below the approved plan? Every page shows the change."))
+      targetCall("PUT", { mode: k, updated_by: who || null }, k === "cap" ? "Now held as a fixed tCO2e cap." : "Now held as % below the approved plan.");
   };
   const clearTarget = () => {
     if(!confirm("Clear the scheme's carbon target?")) return;
     targetCall("DELETE", null, "Target cleared.");
   };
-  const openAgreed = () => { setSt(carbonStateFrom(T.ui_state)); setTMsg("The agreed decisions are now in steps 2 to 4."); };
+  // approvers only: a team code's read carries no page state (it names other teams' routes)
+  const openAgreed = () => { if(!canSet || !T || !T.ui_state) return; setSt(carbonStateFrom(T.ui_state)); setTMsg("The agreed decisions are now in steps 2 to 4."); };
+  // the routes where a supplier or a haul route is chosen, counted on the closed details' summary
+  const chosenN = Object.values(st.supplier || {}).filter(Boolean).length + Object.values(st.alt || {}).filter(k => +k > 0).length;
   const toResult = () => { const el = document.getElementById("carbon-step-5"); if(el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
 
   return (
     <div className="max-w-4xl mx-auto p-6">
       <PageHeader title="Carbon planner" kicker="Plan"
         subtitle="From the approved plan to a carbon target, in six steps."
-        actions={<button onClick={() => { setSt(CARBON_EMPTY); setSpend(""); }} className="btn-sec">Start again</button>} />
-      {err && <div className="rounded-lg border p-3 text-sm mb-4" style={{ borderColor: "var(--red)", color: "var(--red)" }}>{err}</div>}
+        actions={<button onClick={() => { setSt(CARBON_EMPTY); setSpend(""); setTMsg(null); }} className="btn-sec">Start again</button>} />
+      {/* 11 Oct 2026: a refused scenario is said in step 5, in the strip at the foot and beside Set, where it is seen;
+          the banner up here was off screen on the single-column page */}
 
       <ol className="space-y-4" aria-label="The six steps">
         {/* ---------------- 1. your approved plan ---------------- */}
@@ -3914,7 +3949,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
                title="Making the material + transport to and from site + waste disposal, in tonnes of carbon dioxide equivalent (tCO2e)">{t1(B.totals.total_t)} <span className="text-sm font-semibold text-slate-500">tCO2e</span></div>
           {lorryLine(B)}
           {leftOut.length > 0 && <p className="text-sm text-amber-700 mt-2">{leftOut[0]}{leftOut.length > 1 ? ` (and ${leftOut.length - 1} more under What this counts)` : ""}</p>}
-          {T && <p className="text-sm text-slate-700 mt-2">Carbon target: {targetWords} (step 6)</p>}
+          {ctHere && <p className="text-sm text-slate-700 mt-2">{ctTargetLine(tg)} (step 6)</p>}
           <details className="dash-more mt-3" data-guide="carbon-counts">
             <summary>What this counts</summary>
             <div>
@@ -3959,6 +3994,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
                     <span>Reused material ({m.reused} kgCO2e per tonne)</span>
                   </label>
                 )}
+                {e.kg ? <p className={hint + " mt-1"}>Supplier EPD in use: {e.kg} kgCO2e per tonne{e.source ? `, reference ${e.source}` : ""}, so recycled content and reuse do not apply (change it under Use a supplier EPD).</p> : null}
                 <details className="dash-more mt-2">
                   <summary>Use a supplier EPD</summary>
                   <div>
@@ -3967,10 +4003,12 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
                       <span className={lab}>Custom carbon factor (supplier EPD), kgCO2e per tonne</span>
                       <span className={"block " + hint + " mb-1"}>Replaces the Government factor; give the reference of the supplier's environmental product declaration (EPD)</span>
                       <input className={inp} inputMode="decimal" value={e.kg || ""} placeholder="Government factor" onChange={ev => setK("epd", m.category, { ...e, kg: ev.target.value })} />
+                      {e.kg && isNaN(+e.kg) ? <span className={"block " + hint}>Type a number, with a point for decimals (for example 12.5).</span> : null}
                     </label>
                     <label className="block mt-2">
                       <span className={lab}>EPD reference (required)</span>
                       <input className={inp} value={e.source || ""} placeholder="for example, the EPD number" onChange={ev => setK("epd", m.category, { ...e, source: ev.target.value })} />
+                      {e.kg && !String(e.source || "").trim() ? <span className={"block " + hint}>Add the EPD reference: the result does not update until it has one.</span> : null}
                     </label>
                   </div>
                 </details>
@@ -4006,7 +4044,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
           ))}
           {routesWithChoices.length > 0 && (
             <details className="dash-more mt-3">
-              <summary>Supplier and route, route by route ({routesWithChoices.length})</summary>
+              <summary>Supplier and route, route by route ({routesWithChoices.length}{chosenN ? ` · ${chosenN} chosen` : ""})</summary>
               <div>
                 {routesWithChoices.map(r => {
                   const altList = Object.values(r.alts || {}).find(a => (a || []).length > 1) || [];
@@ -4106,8 +4144,9 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
 
         {/* ---------------- 5. result ---------------- */}
         <CarbonStep n={5} data-guide="carbon-drivers">
+          {err && <p className="text-sm font-semibold mt-2" role="alert" style={{ color: "var(--red)" }}>Not updated: {err}{A ? " The figures below are from your previous choices." : ""}</p>}
           {!A ? (
-            <p className="text-sm text-slate-600 mt-2">Make a choice in steps 2 to 4 to see the result. The approved plan stays as it is.</p>
+            err ? null : <p className="text-sm text-slate-600 mt-2">Make a choice in steps 2 to 4 to see the result. The approved plan stays as it is.</p>
           ) : (
             <>
               <div className={big} style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}>{t1(A.totals.total_t)} <span className="text-sm font-semibold text-slate-500">tCO2e</span>{busy && <span className={hint + " font-normal"}> updating…</span>}</div>
@@ -4211,26 +4250,25 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
               </div>
             </details>
             <button onClick={downloadSummary} disabled={pdfBusy} className="btn-sec mt-3">{pdfBusy ? "Making the summary…" : "Download the summary (PDF)"}</button>
+            {pdfErr && <p className="text-sm mt-2" role="alert" style={{ color: "var(--red)" }}>{pdfErr}</p>}
           </div>
         </CarbonStep>
 
         {/* ---------------- 6. carbon target ---------------- */}
         <CarbonStep n={6} data-guide="carbon-target">
           <p className="text-sm text-slate-600 mt-2">Once set, the target shows on the Dashboard, Forecasts and Submit forecast.</p>
-          {!tLoaded ? (tErr ? null : <p className="text-sm text-slate-400 mt-3">Loading the carbon target…</p>) : T ? (
+          {!tLoaded ? (tErr ? null : <p className="text-sm text-slate-400 mt-3">Loading the carbon target…</p>) : ctHere ? (
             <div className="mt-3 space-y-1 text-sm text-slate-700" data-target-mode={T.mode}>
-              <p className="text-base font-semibold text-slate-800 tabular-nums">Target: {targetWords}</p>
-              <p className={hint}>Set by {T.updated_by || "a name not given"}{when(T.updated_at) ? `, ${when(T.updated_at)}` : ""}</p>
-              {S && (
-                <>
-                  <p className="tabular-nums mt-2">As forecast: <b>{t1(S.approved_t)} tCO2e</b>{gapWord(S.gap_as_forecast_t) ? `, ${gapWord(S.gap_as_forecast_t)}` : ""}</p>
-                  {S.invalid
-                    ? <p className="text-amber-700">{S.invalid}</p>
-                    : <p className="tabular-nums">With the agreed decisions: <b>{t1(S.with_decisions_t)} tCO2e</b>{gapWord(S.gap_with_decisions_t) ? `, ${gapWord(S.gap_with_decisions_t)}` : ""}</p>}
-                  {S.pending_t > 0.0005 && <p className="tabular-nums">Lines waiting for approval would add {t1(S.pending_t)} tCO2e.</p>}
-                </>
-              )}
-              {(T.lever_words || []).length > 0 && (
+              <p className="text-base font-semibold text-slate-800 tabular-nums">{ctTargetLine(tg)}</p>
+              <p className={hint}>Set by {T.updated_by || "a name not given"}{ctWhen(T.updated_at) ? `, ${ctWhen(T.updated_at)}` : ""}</p>
+              <p className="tabular-nums mt-2">{p6[0]}</p>
+              {S.invalid
+                ? <p className="text-amber-700">{S.invalid}</p>
+                : <p className="tabular-nums">{p6[1]}</p>}
+              {team && <p className={hint}>{ctScopeNote(tg)}</p>}
+              {S.pending_t > 0.0005 && <p className="tabular-nums">Lines waiting for approval would add {t1(S.pending_t)} tCO2e.</p>}
+              {/* the decisions are listed to a scheme code only, as on the Dashboard (a team code's read keeps only words that name no route) */}
+              {!team && (T.lever_words || []).length > 0 && (
                 <>
                   <p className="font-medium text-slate-800 mt-2">The agreed decisions</p>
                   <ul className="list-disc pl-5 space-y-1">{T.lever_words.map(w => <li key={w}>{w}</li>)}</ul>
@@ -4238,7 +4276,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-700 mt-3">No carbon target is set yet.</p>
+            <p className="text-sm text-slate-700 mt-3">{CT_NONE}</p>
           )}
           {canSet ? (
             <div className="mt-4">
@@ -4250,9 +4288,10 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
                     style={mode === k ? { background: "var(--ink)", color: "var(--bg)" } : { background: "var(--surface)", color: "var(--ink)" }}>{mode === k ? "✓ " : ""}{w}</button>
                 ))}
               </div>
-              <p className={hint + " mt-1"}>{mode === "pct" ? "A % follows the approved plan as lines are approved." : "A cap stays the same as lines are approved."}</p>
+              <p className={hint + " mt-1"}>{mode === "pct" ? "A % follows the approved plan as lines are approved." : "A cap stays the same as lines are approved."}{T ? " Switching it changes the saved target; you are asked first." : ""}</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button type="button" className="btn-pri" disabled={!!setWhy || tBusy} onClick={setTarget}>Set as the scheme's carbon target</button>
+                {/* wraps on a phone: .btn-pri is nowrap, and the step card is about 230 px wide at 375 */}
+                <button type="button" className="btn-pri" style={{ whiteSpace: "normal" }} disabled={!!setWhy || tBusy} onClick={setTarget}>Set as the scheme's carbon target</button>
                 {T && <button type="button" className="btn-sec" disabled={tBusy} onClick={openAgreed}>Open the agreed decisions</button>}
                 {T && <button type="button" className="btn-sec" disabled={tBusy} onClick={clearTarget}>Clear the target</button>}
               </div>
@@ -4262,14 +4301,17 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
             <p className="text-sm text-slate-600 mt-3">Your planner sets the scheme's carbon target.</p>
           )}
           {tErr && <p className="text-sm mt-2" role="alert" style={{ color: "var(--red)" }}>{tErr}</p>}
+          {!tLoaded && tErr && <button type="button" className="btn-sec mt-2" disabled={tBusy} onClick={() => targetCall("GET", null, null)}>Try again</button>}
           {tMsg && <p className="text-sm text-slate-700 mt-2" role="status">{tMsg}</p>}
         </CarbonStep>
       </ol>
 
-      {A && (
-        <div className="sticky bottom-0 z-10 mt-4">
+      {(A || err) && (
+        <div className="sticky bottom-0 z-10 mt-4" data-sticky-foot="">
           <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-700 shadow-sm flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="tabular-nums">Result: <b>{t1(A.totals.total_t)} tCO2e</b>, {A.delta_t != null && Math.abs(A.delta_t) > 0.0005 ? `${moved(A.delta_t)} (${pct(A.delta_pct)})` : "no change"}</span>
+            {err
+              ? <span role="alert" style={{ color: "var(--red)" }}>Not updated: {err}</span>
+              : <span className="tabular-nums">Result: <b>{t1(A.totals.total_t)} tCO2e</b>, {A.delta_t != null && Math.abs(A.delta_t) > 0.0005 ? `${moved(A.delta_t)} (${pct(A.delta_pct)})` : "no change"}</span>}
             {busy && <span className="text-slate-400">updating…</span>}
             <button type="button" className="link-btn" onClick={toResult}>See step 5</button>
           </div>
@@ -4306,7 +4348,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
             <ol className="grid md:grid-cols-3 gap-4 mt-2 text-sm">
               {CARBON_STEPS.map((s, i) => <li key={s.who}><span className="font-semibold text-slate-800">{i + 1}. {s.who}</span><span className="block text-slate-600">{s.what}</span></li>)}
             </ol>
-            <p className={hint + " mt-2"}>Roles as CLOCS names them. These figures compare options before work starts; they are not a record of what was delivered.</p>
+            <p className={hint + " mt-2"}>These figures compare options before work starts; they are not a record of what was delivered.</p>
           </section>
         </div>
       </details>

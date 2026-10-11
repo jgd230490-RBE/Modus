@@ -1354,8 +1354,10 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && cb.includes("<strong className=\"text-base text-slate-800\">Planning estimates. Not a National Highways Carbon Tool return.</strong>"));
   // REVERSED 11 Oct 2026 (the user: "make it like a process, with a final target at the end": the six steps run top to
   // bottom on every screen, so the answer no longer jumps above the controls on a phone; a strip at the foot keeps it in view)
+  // NARROWED 11 Oct 2026 (the review: the Guide's strip covered it): the strip at the foot carries data-sticky-foot, which the
+  // Guide measures to lift its own strip above it
   ok("on a phone the steps run in order (the answer is not moved above the controls) and a strip at the foot keeps the result in view",
-     !/\border-[12]\b|\blg:order-/.test(cb) && cb.includes('<div className="sticky bottom-0 z-10 mt-4">')
+     !/\border-[12]\b|\blg:order-/.test(cb) && cb.includes('<div className="sticky bottom-0 z-10 mt-4" data-sticky-foot="">')
      && cb.includes('<button type="button" className="link-btn" onClick={toResult}>See step 5</button>')
      && cb.includes('document.getElementById("carbon-step-5")'));
   ok("lorry loads beside the carbon on both cards, the change in loads from the server (no subtraction in the browser)",
@@ -1411,9 +1413,13 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("item 14 the life-cycle modules as a secondary line (hint size), named for BS EN 15804, from the server's stages",
      cb.includes("By life-cycle module: A1–A3 {t1((sc.stages || {})[\"A1-A3\"])} · A4 {t1((sc.stages || {}).A4)} · A5 {t1((sc.stages || {}).A5)}")
      && cb.includes("Life-cycle modules as BS EN 15804 names them"));
-  ok("item 15 'Using these results': three steps, each saying who acts, in CLOCS's role names; not a record of delivery",
+  // REVERSED 11 Oct 2026 (the review: "Buyer" is not one of CLOCS's roles — client, principal contractor, site operator, fleet
+  // operator, notes/carbon-ui-research-1011.md — so the page no longer says "Roles as CLOCS names them"; and the client
+  // agrees the target while a planner records it, as step 6 and the Dashboard say)
+  ok("item 15 'Using these results': three steps, each saying who acts, never attributed to CLOCS; not a record of delivery",
      cb.includes('data-guide="carbon-using"') && ["{ who: \"Client\"", "{ who: \"Buyer\"", "{ who: \"Principal contractor\""].every(t => cb.includes(t))
-     && cb.includes("Roles as CLOCS names them.") && cb.includes("they are not a record of what was delivered")
+     && !cb.includes("as CLOCS names them") && cb.includes("Agrees the carbon target for the scheme (a planner records it in step 6)")
+     && !cb.includes("Sets the carbon target for the scheme") && cb.includes("they are not a record of what was delivered")
      && !/meets? CLOCS|CLOCS[- ]compliant|complies/i.test(cb));
   const gs2 = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
   ok("the guide has steps for the Carbon page, on its own anchors", /\n  carbon: \[/.test(gs2)
@@ -1449,10 +1455,14 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      cb.includes('targetCall("PUT", { mode, levers, ui_state: st, updated_by: who || null }, "Target set.")')
      && cb.includes('targetCall("PUT", { mode: k, updated_by: who || null }')
      && cb.includes('targetCall("DELETE", null, "Target cleared.")') && cb.includes('targetCall("GET", null, null)')
-     && (cb.match(/targetCall\("/g) || []).length === 4 && !/\b(target_t|cap_t|pct_below|approved_t|with_decisions_t)\s*:/.test(cb));
+     // NARROWED 11 Oct 2026 (the review: a failed read left no way back but a reload): 4 → 5, the fifth is "Try again", a GET
+     && (cb.match(/targetCall\("/g) || []).length === 5 && cb.includes('onClick={() => targetCall("GET", null, null)}>Try again</button>')
+     && !/\b(target_t|cap_t|pct_below|approved_t|with_decisions_t)\s*:/.test(cb));
   ok("...a planner or admin code sets, switches or clears it; any other code reads it and is told who sets it",
      cb.includes("const canSet = !!(access && access.can_approve);") && cb.includes("{canSet ? (")
-     && cb.includes("Your planner sets the scheme's carbon target.") && cb.includes("if(canSet && T.mode !== k) targetCall("));
+     // NARROWED 11 Oct 2026 (the review: one click rewrote the saved target): switching a saved target asks first
+     && cb.includes("Your planner sets the scheme's carbon target.") && cb.includes("if(canSet && T.mode !== k && confirm(k === \"cap\"")
+     && cb.includes("Every page shows the change.") && cb.includes("Switching it changes the saved target; you are asked first."));
   ok("...the two ways a target is held are the server's own words (carbon_target.MODE_WORDS), the picked one ticked as well as filled",
      cb.includes('const CARBON_TARGET_MODES = [["pct", "% below the approved plan"], ["cap", "Fixed tCO2e cap"]];')
      && /MODE_WORDS = \{"pct": "% below the approved plan", "cap": "Fixed tCO2e cap"\}/.test(fs.readFileSync(path.join(ROOT, "backend", "carbon_target.py"), "utf8"))
@@ -1469,13 +1479,47 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("🔴 the new hooks sit before the page's early returns (React #310 blanked the app on 5 Oct)",
      _cp.indexOf("const [tg, setTg]") > 0 && _cp.indexOf("const alive = useRef(true);") > 0 && _cp.indexOf('targetCall("GET", null, null)') > 0
      && Math.max(_cp.indexOf("const [tg, setTg]"), _cp.indexOf("const alive = useRef(true);"), _cp.indexOf('targetCall("GET", null, null)')) < _cp.indexOf("if(!data && err) return"));
-  ok("...step 6 only compares the server's gaps with the rounding of a stored % (half of 0.1% of the approved plan); no figure is worked out",
-     cb.includes('const tol = (T && T.mode === "pct" && S ? Math.abs(S.approved_t || 0) * 0.0005 : 0) + 0.0005;')
-     && cb.includes("gapWord(S.gap_as_forecast_t)") && cb.includes("gapWord(S.gap_with_decisions_t)") && !/S\.\w+_t\s*[-+*/]\s*S\./.test(cb));
-  ok("🔴 the merge: the Carbon page says a gap as the other three pages do ('over' or 'under' the target) and a team in the tenant's word",
-     cb.includes("tCO2e under the target`") && !cb.includes("below the target") && !/your team's lines|per team\)/.test(cb)
-     && cb.includes("; on ${ctYour()} that is ") && cb.includes("(a cap has no share per ${TEAM().toLowerCase()})")
+  // REVERSED 11 Oct 2026 (R2, one "on target" rule decided on the server): step 6 no longer works out a tolerance of its own
+  // (it gave a cap no band while the Dashboard gave it 0.05% of the plan, so a 2.0 t gap read "on target" on one page and
+  // "over" on the other). It now says the server's verdict in the shared words.
+  ok("...step 6 compares nothing: no tolerance, no gap word of its own; the server's verdicts in the shared words (ctTargetLine, ctProgress)",
+     !cb.includes("const tol =") && !cb.includes("gapWord") && !cb.includes("targetWords") && !/\* ?0\.0005/.test(cb)
+     && cb.includes("const p6 = ctHere ? ctProgress(tg) : [];") && cb.includes("{ctTargetLine(tg)}") && cb.includes("{p6[0]}") && cb.includes("{p6[1]}")
+     && !/S\.\w+_t\s*[-+*/]\s*S\./.test(cb));
+  // 11 Oct 2026 (the review, low): the old guard only caught S-to-S arithmetic; this is the surfaces' guard, both ways round
+  ok("🔴 ...and no carbon arithmetic anywhere on the page: no _t field added, taken, multiplied or divided, either way round",
+     !/_t\s*[-+*/]\s*[\w(+]/.test(cb) && !/[-+*/]\s*(?:A|B|S|T|a|d|sc|e|s|c|t)\.[\w.]*_t\b/.test(cb));
+  // NARROWED 11 Oct 2026 (the review: "one way of saying the target" was not one way): the page no longer builds its own target
+  // sentence or gap words (it said "which is X today", "a fixed cap of", "N tCO2e over"; the Dashboard "= X", "X cap", "N over");
+  // every page uses the same helpers, and a team code is told the target is the whole scheme's, not split by team
+  ok("🔴 the merge: the Carbon page says the target and a gap with the other three pages' own helpers, and a team in the tenant's word",
+     code.includes("tCO2e ${gap > 0 ? \"over\" : \"under\"} the target`") && !cb.includes("below the target") && !/your team's lines|per team\)/.test(cb)
+     && !cb.includes("; on ${ctYour()} that is ") && !cb.includes("(a cap has no share per") && cb.includes("{ctScopeNote(tg)}")
      && code.includes('${gap > 0 ? "over" : "under"} the target'));
+  ok("⭐ R3: 'Open the agreed decisions' is an approver's control only, and does nothing without a stored page state",
+     cb.indexOf(">Open the agreed decisions</button>") > cb.indexOf("{canSet ? (") && cb.indexOf(">Open the agreed decisions</button>") < cb.indexOf("Your planner sets the scheme's carbon target.")
+     && cb.includes("const openAgreed = () => { if(!canSet || !T || !T.ui_state) return; setSt(carbonStateFrom(T.ui_state));"));
+  ok("...the agreed decisions are listed in step 6 to a scheme code only, as on the Dashboard",
+     cb.includes("{!team && (T.lever_words || []).length > 0 && ("));
+  ok("⭐ a failed read of the target: Set waits (it cannot know there is a target to replace), says why, and offers Try again",
+     cb.includes("const setWhy = !tLoaded ? (tErr ? \"The scheme's current carbon target did not load, so a new one cannot be set yet.\" : \"Reading the current carbon target…\")")
+     && cb.includes("const setTarget = () => {\n    if(!tLoaded) return;") && cb.includes("{!tLoaded && tErr && <button"));
+  ok("⭐ a refused scenario: step 5, the strip at the foot and Set's reason all say 'Not updated' with the server's sentence; the old figures are called the previous choices",
+     cb.includes(": err ? `Not updated: ${err}`") && cb.includes("Not updated: {err}{A ? \" The figures below are from your previous choices.\" : \"\"}")
+     && cb.includes("{(A || err) && (") && cb.includes('<span role="alert" style={{ color: "var(--red)" }}>Not updated: {err}</span>')
+     && cb.includes("err ? null : <p className=\"text-sm text-slate-600 mt-2\">Make a choice in steps 2 to 4 to see the result."));
+  ok("...the summary's failure sits under its own button (pdfErr), never in the scenario's error; its hook is with the others",
+     cb.includes("} catch(e){ setPdfErr(\"The summary could not be made: \" + (e.message || e)); }") && !cb.includes("setErr(\"The summary could not be made")
+     && cb.includes("{pdfErr && <p") && _cp.indexOf("const [pdfErr, setPdfErr] = useState(null);") > 0
+     && _cp.indexOf("const [pdfErr, setPdfErr] = useState(null);") < _cp.indexOf("if(!data && err) return"));
+  ok("...an EPD says what it needs beside its fields, and an EPD in use is said beside the controls it switches off",
+     cb.includes("Add the EPD reference: the result does not update until it has one.") && cb.includes("Type a number, with a point for decimals (for example 12.5).")
+     && cb.includes("so recycled content and reuse do not apply (change it under Use a supplier EPD)."));
+  ok("...Start again also clears step 6's last message; the route details count the choices made inside them; Set wraps on a phone",
+     cb.includes('setSt(CARBON_EMPTY); setSpend(""); setTMsg(null);') && cb.includes("{chosenN ? ` · ${chosenN} chosen` : \"\"}")
+     && cb.includes('<button type="button" className="btn-pri" style={{ whiteSpace: "normal" }} disabled={!!setWhy || tBusy} onClick={setTarget}>'));
+  ok("...the date of a target is the reader's own day on every page (one helper, ctWhen), never toLocaleDateString's month words",
+     cb.includes("ctWhen(T.updated_at)") && !cb.includes("toLocaleDateString") && code.includes("function ctWhen(at){"));
 }
 
 // ---- 10 Oct 2026: the UI pass (notes/ui-review-1009, mockups 1-6, 8 and 8b; colour-system-1010.md) ----
@@ -1542,7 +1586,10 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     ok("11 Oct: nothing pops up uninvited — the first visit shows the strip and the dots, not the tour",
       gf.includes('setHints(true); setStrip(guideRead(key) !== "done");') && !/if\(s\.length\)\{ setSteps\(s\); setI\(0\); \}/.test(gf));
     ok("11 Oct: the strip offers the tour and × switches every tip off; dots one per distinct anchor, re-placed every second, none during the tour",
-      gf.includes(">Take the tour</button>") && gf.includes("style={{ left: railRight + 16, bottom: 16 }}") && gf.includes('aria-label="Hide the tips"') && gf.includes("onClick={off}")
+      // NARROWED 11 Oct 2026 (the review: on the Carbon page it covered the result strip): the strip's foot is 16 px, or just above a [data-sticky-foot]
+      gf.includes(">Take the tour</button>") && gf.includes("style={{ left: railRight + 16, bottom: stripBottom }}") && gf.includes('aria-label="Hide the tips"') && gf.includes("onClick={off}")
+      && gf.includes("const [stripBottom, setStripBottom] = useState(16);") && gf.includes("document.querySelector('[data-sticky-foot]')")
+      && gf.includes("Math.round(window.innerHeight - fr.top) + 8 : 16;") && gf.indexOf("useState(16)") < gf.indexOf("if(!step) return hintsEl;")
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
       && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
   }
@@ -1628,8 +1675,10 @@ ok("...and it collapses with the rail like every other item (label behind railOp
 // Source-level. What they prove: each surface reads GET /api/carbon/target in its OWN read (or, on
 // Submit forecast, the preview's carbon block), nothing works carbon out in the browser, the
 // six-card pin still holds, and the words are the contract's. Not covered here: the loaded
-// states (render_frontend.js, from fixtures/carbon_target.json) and the read itself, the button
-// and the error state (dom_frontend.js). Not covered anywhere: a browser, the live server.
+// states and the big-screen figure (render_frontend.js, from fixtures/carbon_target.json; ctFig is
+// called directly, the Dashboard is not rendered in wall mode), and the read itself, the button's
+// click and the error state (dom_frontend.js, against a stubbed fetch — NARROWED 11 Oct 2026: this
+// comment claimed dom_frontend.js covered them before it did). Not covered anywhere: a browser, the live server.
 {
   const c0 = src.indexOf("// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast");
   const c1 = src.indexOf("function Dashboard(");
@@ -1681,25 +1730,49 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("🔴 no carbon arithmetic in the browser: no factor, no × or ÷ 1000, no sum or difference of the server's tCO2e fields; the gaps are the server's",
     !/emissions_kg_co2e_per_km|kg_per_km|_factor|\* ?1000|\/ ?1000|0\.93939|7\.80307|19\.55376|1\.01398/.test(ctc + mxCt)
     && !/_t\s*[-+*/]\s*[\w(+]/.test(ctc + mxCt) && !/[-+*/]\s*(?:s|c|t|ct\.status|ct\.target)\.\w+_t\b/.test(ctc + mxCt)
-    && ctc.includes("ctGap(s.gap_as_forecast_t, s.approved_t)") && ctc.includes("ctGap(s.gap_with_decisions_t, s.approved_t)"));
-  ok("...the one comparison the page makes: a gap inside the rounding of the stored % (half of 0.1% of the approved plan) reads 'on target'",
-    ctc.includes("const CT_ROUND = 0.0005;") && (ctc.match(/CT_ROUND/g) || []).length === 2
-    && ctc.includes("if(Math.abs(gap) <= Math.abs(+approved || 0) * CT_ROUND) return \"on target\";"));
+    // NARROWED 11 Oct 2026 (R2): the words come from the server's verdict (on_target_*), not a comparison with the approved plan
+    && ctc.includes("ctGap(s.on_target_as_forecast, s.gap_as_forecast_t)") && ctc.includes("ctGap(s.on_target_with_decisions, s.gap_with_decisions_t)"));
+  // REVERSED 11 Oct 2026 (R2, one "on target" rule decided on the server; the % is held to 6 dp, so there is no rounding to absorb).
+  // It asserted CT_ROUND and the Dashboard's own band (|gap| ≤ 0.05% of the plan, whatever the mode).
+  ok("...the pages compare nothing: no band, no CT_ROUND anywhere; 'on target' is the server's on_target_* and the side is the gap's sign",
+    !code.includes("CT_ROUND") && !/Math\.abs\(gap\)\s*<=/.test(code) && ctc.includes("function ctGap(on, gap){")
+    && ctc.includes("if(on == null || gap == null) return null;") && ctc.includes('if(on) return "on target";')
+    && fs.readFileSync(path.join(ROOT, "backend", "carbon_target.py"), "utf8").includes("ON_TARGET_TOL_T = 0.05"));
+  // NARROWED 11 Oct 2026 (one way of saying the target on all four pages): a cap reads "a fixed cap of" everywhere (the toggle
+  // shows on every page), a gap carries its unit, a team code's figures say whose lines they are and its target is the scheme's
   ok("⭐ the contract's words: the two modes, as forecast and with the agreed decisions, on / over / under the target",
     ctc.includes("`Target: ${pct} below the approved plan = ${ctT(s.target_t)} tCO2e`")
-    && ctc.includes("`Target: ${ctT(t.cap_t)} tCO2e cap (${pct} below the approved plan when it was set)`")
-    && ctc.includes("`As forecast: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
-    && ctc.includes("s.invalid || `With the agreed decisions: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
+    && ctc.includes("`Target: a fixed cap of ${ctT(t.cap_t)} tCO2e (${pct} below the approved plan when it was set)`")
+    && ctc.includes("`Target: a fixed cap of ${ctT(t.cap_t)} tCO2e for the whole scheme, ${ctSplit()}`")
+    && ctc.includes("`Target: ${pct} below the approved plan, for the whole scheme, ${ctSplit()}`")
+    && ctc.includes("`As forecast${on}: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
+    && ctc.includes("`With the agreed decisions${on}: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
+    && ctc.includes("s.invalid ? (dash ? `With the agreed decisions${on}: —` : s.invalid)")
     && ctc.includes('${gap > 0 ? "over" : "under"} the target') && ctc.includes("pct = `${(+t.pct_below).toFixed(1)}%`"));
+  ok("⭐ the same three things on the Dashboard, Forecasts, Submit forecast and the big screen: the target line and both figures, from one pair of helpers",
+    (ctc.match(/ctTargetLine\(ct\)/g) || []).length >= 4 && (ctc.match(/ctProgress\(ct(, true)?\)/g) || []).length >= 4
+    && ctc.includes("return `${ctTargetLine(ct)} · ${p1} · ${p2}`;") && ctc.includes("<div className=\"ct-line\">{p1} · {p2}</div>")
+    && !ctc.includes("approved plan now") && !ctc.includes("the scheme's cut") && ctc.includes("with the agreed decisions: \" + g2"));
+  ok("...Submit forecast prints the server's sentence under its line when the decisions no longer apply",
+    _mxc.includes("{ct && ctOk(ct) && ct.status.invalid && <div className=\"w-full ct-note\">{ct.status.invalid}</div>}"));
+  ok("...the Dashboard's strip offers the Carbon planner whether a target is set or not",
+    (ctc.match(/\{onOpen && <button type="button" className="btn-sec" onClick=\{\(\) => onOpen\("carbon"\)\}>Open the Carbon planner<\/button>\}/g) || []).length === 2);
+  ok("🔴 the Dashboard's subtitle names a team, never its id (it printed the raw id; on main too)",
+    code.includes('(ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt))') && !code.includes('(ipt === "none" ? "no " + TEAM().toLowerCase() : ipt)'));
   ok("...all-in said once where transport-only figures sit: the strip names the Transport carbon card, the big-screen figure the group it joins",
     ctc.includes('const CT_ALLIN = "All-in: making the material, transport and waste disposal";')
-    && ctc.includes("{CT_ALLIN}, on the whole approved plan. The Transport carbon card above counts transport only.")
+    // NARROWED 11 Oct 2026 (the review: a team code read "your team's lines only" and "on the whole approved plan" about the same figures)
+    && ctc.includes("{CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : \"the whole approved plan\"}. The Transport carbon card above counts transport only.")
     && ctc.includes('CT_ALLIN + ". The other carbon figures here are transport only"') && ctc.includes("s.approved_transport_t"));
   ok("...no target says who sets it; a team code reads its own lines in the tenant's word (a cap is not compared), never a team id",
-    (ctc.match(/No carbon target set yet\. A planner sets it in the Carbon planner\./g) || []).length === 3
+    // NARROWED 11 Oct 2026 (one "no target" sentence, CT_NONE + CT_WHO, on all four pages; a team code's figures are never compared
+    // with the scheme's target in either mode, so "with the scheme's cut applied to them" is REVERSED)
+    ctc.includes('const CT_NONE = "No carbon target set yet.";') && ctc.includes('const CT_WHO = "A planner sets it in the Carbon planner.";')
+    && (ctc.match(/\{CT_NONE\} \{CT_WHO\}/g) || []).length === 2 && (ctc.match(/`\$\{CT_NONE\} \$\{CT_WHO\}`/g) || []).length === 2
+    && !/No carbon target set yet\. A planner|No scheme carbon target|No carbon target is set yet/.test(code)
     && ctc.includes("const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;") && ctc.includes('ct.status.scope === "team"')
-    && ctc.includes("The cap is for the whole scheme, so they are not compared with it.") && ctc.includes("with the scheme's cut applied to them.")
-    && ctc.includes("not split by team") && !/\.ipt\b|IPT ?[1-6]|teamName\(|teamText\(/.test(ctc + mxCt));
+    && ctc.includes("The target is for the whole scheme, so they are not compared with it.") && !ctc.includes("with the scheme's cut applied to them.")
+    && ctc.includes("const ctSplit = () => `not split by ${TEAM().toLowerCase()}`;") && !/\.ipt\b|IPT ?[1-6]|teamName\(|teamText\(/.test(ctc + mxCt));
   ok("...the agreed decisions are listed for a scheme code only, collapsed (a team code's GET still carries them: this is wording, not a lock)",
     ctc.includes("{!ctTeam(ct) && words.length > 0 && (") && ctc.includes('<details className="ct-more">') && ctc.includes("const words = t.lever_words || [];"));
   ok("🔴 the target's words: tCO2e with a plain 2, none of the banned words, no small, uppercase or colour-only text",

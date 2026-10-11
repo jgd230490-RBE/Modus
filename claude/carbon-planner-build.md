@@ -292,13 +292,14 @@ scenarios, so it waits for G3; it is listed under "Not built yet". Every figure 
   hierarchy controls were checked through the fixture render only: the local copy has no muck-away routes.
 
 ## Carbon target (11 Oct, before the freeze; branch `claude/carbon-process`)
-The server side of "set the agreed decisions as the programme's carbon target". The page (step 6), the
-Dashboard and Forecasts strips and the Submit forecast line are built by the frontend against this API.
+"Set the agreed decisions as the programme's carbon target": the server side (f8f3591), the Carbon page as six
+steps ending in the target (def0ef6), the target on the Dashboard, Forecasts and Submit forecast (6efb87c,
+da234bf, 5569482), and the review fixes (11 Oct, late; below under **Review fixes**).
 
 - **Stored:** one tenanted `config` row, key `carbon_target` (`backend/carbon_target.py`, the costing row
   pattern: 5 s cache keyed by tenant, UPDATE or INSERT stamping `updated_by` / `updated_at`, cleared on write and
   on a tenant import). Document: `mode` ("pct" = % below the approved plan, "cap" = fixed tCO2e cap),
-  `pct_below` (1 dp), `cap_t`, `set_at_approved_t`, `set_at_alternative_t`, `levers`, `lever_words`, `ui_state`
+  `pct_below` (held to 6 dp since the review fixes; the pages print 1 dp), `cap_t`, `set_at_approved_t`, `set_at_alternative_t`, `levers`, `lever_words`, `ui_state`
   (the page's own state, at most 20 000 characters). No new table. It travels in the tenant package like every
   config row; the demo package has none. `carbon.py` still writes nothing.
 - **All-in:** every figure is making the material + transport (both legs) + waste disposal, the Carbon page's
@@ -312,8 +313,8 @@ Dashboard and Forecasts strips and the Submit forecast line are built by the fro
   20 000 characters; decisions the rules refuse. **PUT without `levers`:** `mode` switches pct ↔ cap and keeps
   every number (400 when there is no target). **DELETE** clears it.
 - **Progress (`status`):** measured on the lines the code can see, scope "scheme" (planner, admin, demo
-  submitter) or "team" (a team code: the same % on its own lines; a fixed cap has no team share, so `target_t`
-  is null). `approved_t` as forecast, `with_decisions_t` (the stored decisions re-run every read, because they are
+  submitter) or "team" (a team code: its own lines, never compared with the target — `target_t`, both gaps and
+  both verdicts are null in BOTH modes since the review fixes; it was the scheme's % applied to the team's lines). `approved_t` as forecast, `with_decisions_t` (the stored decisions re-run every read, because they are
   not recorded on the forecast lines), `target_t`, both gaps, `pending_t` (what the lines waiting for approval
   would add), `by_month`, and `invalid`: when a stored decision no longer applies (a route or a vehicle gone) the
   plan with the decisions is null and `invalid` says why; never an error. Two scenario runs per read.
@@ -321,17 +322,43 @@ Dashboard and Forecasts strips and the Submit forecast line are built by the fro
   total_t, unrouted, basis}: transport by the saved lines' own co2_t formula (null and `unrouted` when the route
   has no distance), material at the Government primary factor, or disposal at the site's disposal factor when the
   destination is a tip or recycling site, and one sentence saying what is counted. Stores nothing.
-- **Rounding, seen on the demo:** `pct_below` is held to 1 dp, so straight after a % target is set the plan with
-  the decisions reads a little over it (demo: 5 753.1 against 5 750.0, 3.1 over, because 11.25 % is held as
-  11.3 %). The page should call a gap inside that rounding "on target", or the contract should hold the % to
-  more places. A cap has no such gap.
+- **Rounding (fixed in the review fixes):** `pct_below` was held to 1 dp, so straight after a % target was set the
+  plan with the decisions read a little over it (demo, the soil-hub decision: 7.95 % held as 8.0 %, 5 967.1 against
+  5 963.9). It is now worked out from the two 3 dp totals and held to 6 dp, so the gap is 0.0 at set time.
 - **Tests:** new `test_carbon_target.py` (every figure hand-worked from a three-line network plus one pending
   line; it writes `fixtures/carbon_target.json`, the planner's GET for a % target, and
   `fixtures/cost_preview_carbon.json`); `http_smoke.py` +15 (401 / 403 / 200, a set-read-switch-clear round trip
   on the demo package, the preview's carbon).
-- **Not built:** the frontend (step 6, the strips, the Submit line), a history of past targets, a per-team
-  target, the target on the map or the printed summary, and anything that records which decisions were actually
-  taken on the forecast lines.
+- **Review fixes (11 Oct, late):**
+  - **R1** `pct_below` from the totals, held to 6 dp (above).
+  - **R2 one "on target" rule, on the server:** `status.on_target_as_forecast` / `on_target_with_decisions`, True
+    when the gap is within `ON_TARGET_TOL_T` = 0.05 tCO2e either way, None when nothing is compared. The four pages
+    say it in one set of words ("on target" / "N tCO2e over the target" / "N tCO2e under the target") from shared
+    helpers (`ctTargetLine`, `ctProgress`, `ctGap`); the browser's own bands (`CT_ROUND`, step 6's `tol`) are gone.
+    Before, a cap 2.0 t over read "on target" on the Dashboard and "over" on the Carbon page.
+  - **R3** a team code's GET carries no `levers` and no `ui_state`, and only the words of decisions that name no
+    route (`carbon_target.for_code`). "Open the agreed decisions" is an approver's control only.
+  - **No team share:** above. On the demo the North code read "253.2 over the target" while the scheme was on it.
+  - **The pages:** Submit forecast now shows the target, as forecast AND with the agreed decisions, and the
+    server's sentence when the decisions no longer apply; a cap reads "a fixed cap of" everywhere; one "no target"
+    sentence; the Dashboard strip offers the Carbon planner in both states and no longer tells a team code its
+    figures are "on the whole approved plan"; the "Set by" date is the reader's own day on every page.
+  - **The Carbon page:** Set waits until the current target has been read (a failed read let Set replace a target
+    without asking) and offers Try again; a refused scenario says "Not updated: …" in step 5, in the strip at the
+    foot and as Set's reason (it left the old result on screen as if current); the summary's error sits under its
+    button; an EPD says what it needs; switching % / cap on a saved target asks first; Start again clears step 6's
+    message; Set wraps on a phone; "Roles as CLOCS names them" is gone ("Buyer" is not a CLOCS role).
+  - **The Guide's strip** lifts above an element marked `data-sticky-foot` (the result strip), which it covered.
+  - **Server:** NaN / Infinity in a PUT is refused (it was stored and made every later GET a 500); a stored row
+    holding one reads as no target; a lever's `vehicle`, `fuel`, `to_route` or `to` sent as a list or an object is a
+    400, not a 500 (also on `/api/carbon/scenario`). Messages name the "Carbon planner" and say a planner sets it again.
+  - **Tests:** `test_carbon_target.py`, `http_smoke.py`, `parse_frontend.js`, `render_frontend.js` narrowed with dated
+    notes; `dom_frontend.js` gains the target in a real DOM (a failed read, Try again, confirm(), a refused scenario,
+    the PDF error, the Dashboard's and Forecasts' error lines, the button's click). The big-screen figure is tested
+    by calling `ctFig`; the Dashboard is not rendered in wall mode. Nothing here was seen in a browser.
+- **Not built:** a history of past targets, a per-team target (a product decision: share the scheme target out by
+  plan, or not at all), the target on the map or the printed summary, and anything that records which decisions
+  were actually taken on the forecast lines.
 
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a

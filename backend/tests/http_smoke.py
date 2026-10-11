@@ -385,11 +385,16 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ ...the server's own figures read back consistently: the cut is phase 4's 515.406 t, the % is that over the plan",
        st.get("scope") == "scheme" and abs((st.get("approved_t", 0) - st.get("with_decisions_t", 0)) - 515.406) < 0.002
        and tg.get("set_at_approved_t") == st.get("approved_t") and tg.get("cap_t") == st.get("with_decisions_t")
-       and abs(tg.get("pct_below", 0) - 515.406 * 100 / st.get("approved_t", 1)) < 0.06, str(st)[:300])
-    ok("⭐ ...target = approved × (1 − %) to 0.01, and the gaps are the differences",
-       abs(st.get("target_t", 0) - st.get("approved_t", 0) * (1 - tg.get("pct_below", 0) / 100)) < 0.01
+       # NARROWED 11 Oct 2026 (% held to 6 dp, R1): to 0.00001, was 0.06 (the 1 dp rounding)
+       and abs(tg.get("pct_below", 0) - 515.406 * 100 / st.get("approved_t", 1)) < 0.00001, str(st)[:300])
+    # NARROWED 11 Oct 2026 (R1): to 0.002, was 0.01; and the plan with the decisions IS the target the moment it is set
+    ok("⭐ ...target = approved × (1 − %) to 0.002, the gaps are the differences, and with the decisions it is exactly on target",
+       abs(st.get("target_t", 0) - st.get("approved_t", 0) * (1 - tg.get("pct_below", 0) / 100)) < 0.002
        and abs(st.get("gap_as_forecast_t", 0) - (st.get("approved_t", 0) - st.get("target_t", 0))) < 0.002
-       and abs(st.get("gap_with_decisions_t", 9) - (st.get("with_decisions_t", 0) - st.get("target_t", 0))) < 0.002, str(st)[:300])
+       and abs(st.get("gap_with_decisions_t", 9) - (st.get("with_decisions_t", 0) - st.get("target_t", 0))) < 0.002
+       and abs(st.get("gap_with_decisions_t", 9)) <= 0.001 and st.get("target_t") == st.get("with_decisions_t"), str(st)[:300])
+    ok("⭐ R2 over HTTP: the server's own verdicts — as forecast not on target (515.4 over), with the decisions on target",
+       st.get("on_target_as_forecast") is False and st.get("on_target_with_decisions") is True, str(st)[:300])
     # the one Pending demo line is R013's soil to a compound: soils have no primary factor and the route is
     # unbaked, so it adds 0.0 all-in — counted as 0, not left out
     ok("...the pending line adds 0.0 (soil to a compound, unrouted), transport 0 (nothing routed), months listed, nothing invalid",
@@ -398,10 +403,18 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and abs(sum(m["approved_t"] for m in st["by_month"]) - st.get("approved_t", 0)) < 0.02, str(st)[:300])
     r = c.get("/api/carbon/target", headers=NORTH)
     sn = (r.json() or {}).get("status") or {} if r.status_code == 200 else {}
-    ok("⭐ the North Team code reads it: scope team, its own lines, the same % applied (the cut is Central's line, so none here)",
+    # REVERSED 11 Oct 2026 (the review: the scheme's % applied to North's lines, which the decision does not touch, read
+    # "253.2 over the target" to every show visitor while the scheme was on target). It asserted North's target_t =
+    # its approved plan × (1 − %). Now a team code gets no share of the scheme's target, and so no verdict.
+    ok("⭐ the North Team code reads it: scope team, its own lines (the cut is Central's line, so none here), NOT compared with the scheme's target",
        r.status_code == 200 and sn.get("scope") == "team" and 0 < sn.get("approved_t", 0) < st.get("approved_t", 0)
        and sn.get("with_decisions_t") == sn.get("approved_t")
-       and abs(sn.get("target_t", 0) - sn.get("approved_t", 0) * (1 - tg.get("pct_below", 0) / 100)) < 0.01, str(sn)[:300])
+       and sn.get("target_t") is None and sn.get("gap_with_decisions_t") is None and sn.get("on_target_with_decisions") is None
+       and sn.get("on_target_as_forecast") is None, str(sn)[:300])
+    tn = (r.json() or {}).get("target") or {} if r.status_code == 200 else {}
+    ok("🔴 R3 over HTTP: North's GET carries no stored decisions and no page state, and no words for the route-scoped decision",
+       r.status_code == 200 and tn.get("mode") == "pct" and "levers" not in tn and "ui_state" not in tn
+       and tn.get("lever_words") == [] and "R019" not in r.text and "R020" not in r.text, str(tn)[:300])
     r = c.put("/api/carbon/target", headers=PLAN, json={"mode": "cap", "updated_by": "Smoke planner"})
     cc = r.json() if r.status_code == 200 else {}
     ok("⭐ switch to a fixed cap: every number kept, the target is the cap",
@@ -409,7 +422,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and cc["target"]["pct_below"] == tg.get("pct_below") and cc["status"]["target_t"] == tg.get("cap_t"), r.text[:300])
     r = c.get("/api/carbon/target", headers=NORTH)
     ok("🔴 ...and a team code sees no share of a fixed cap (target_t null)", r.status_code == 200 and r.json()["status"]["target_t"] is None
-       and r.json()["status"]["gap_as_forecast_t"] is None, r.text[:200])
+       and r.json()["status"]["gap_as_forecast_t"] is None and r.json()["status"]["on_target_as_forecast"] is None
+       and "levers" not in r.json()["target"], r.text[:200])
     r = c.put("/api/carbon/target", headers=PLAN, json={"mode": "pct", "levers": []})
     ok("🔴 no decisions — 400 with the sentence", r.status_code == 400 and "Choose at least one decision" in r.text, r.text[:160])
     r = c.delete("/api/carbon/target", headers=NORTH)

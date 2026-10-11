@@ -14,12 +14,14 @@
     "with_decisions_t": 10.262
    }
   ],
-  "gap_as_forecast_t": 118.017,
-  "gap_with_decisions_t": 0.002,
+  "gap_as_forecast_t": 118.015,
+  "gap_with_decisions_t": 0.0,
   "invalid": null,
+  "on_target_as_forecast": false,
+  "on_target_with_decisions": true,
   "pending_t": 5.653,
   "scope": "scheme",
-  "target_t": 43.429,
+  "target_t": 43.431,
   "with_decisions_t": 43.431
  },
  "target": {
@@ -45,7 +47,7 @@
    }
   ],
   "mode": "pct",
-  "pct_below": 73.1,
+  "pct_below": 73.098745,
   "set_at_alternative_t": 43.431,
   "set_at_approved_t": 161.446,
   "ui_state": {

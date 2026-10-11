@@ -1471,9 +1471,12 @@ def get_carbon_target():
     """
     11 Oct 2026 — the programme's carbon target and the progress against it, ALL-IN tCO2e (making the
     material, transport and waste disposal). Any signed-in code. `status` is measured on the lines the
-    code can see: scope "scheme" for planner, admin and the demo submitter, "team" for a team code (a
-    fixed cap has no team share, so its target_t is null there). Both are null when no target is set.
-    Stored decisions that no longer apply give status.invalid, never an error.
+    code can see: scope "scheme" for planner, admin and the demo submitter, "team" for a team code. Both
+    are null when no target is set. Stored decisions that no longer apply give status.invalid, never an
+    error. 11 Oct 2026: the server says whether each figure is on target (status.on_target_as_forecast /
+    on_target_with_decisions, within carbon_target.ON_TARGET_TOL_T); the target is the scheme's, so a team
+    code's target_t, gaps and on_target flags are null in both modes, and its GET never carries the stored
+    decisions or the page state (only the words of decisions that name no route).
     """
     acc = _require_access()
     return carbon_target.payload(acc)
