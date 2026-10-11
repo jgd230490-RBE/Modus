@@ -164,6 +164,9 @@
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
   .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 Inter,system-ui,sans-serif}
   .guide-tip b{color:#fff;font-weight:600}
+  /* 11 Oct 2026 (the user: "not needed twice"): where the embedded map is on screen it prints its own
+     "Fictional demo scheme" strip, so the header badge steps aside there. Every other screen keeps it. */
+  body[data-view="public"] .demo-badge, body[data-map-open="1"] .demo-badge{display:none !important;}
   .demo-badge{margin-left:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;align-items:center;}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
@@ -1519,6 +1522,8 @@ function App(){
   // the label language. Held in App so the header control and every table re-render
   // together; mirrored into the module-level VEH so plain helpers can read it.
   const [vehLang, setVehLangState] = useState(VEH.lang);
+  // which screen is up, for the CSS that hides the header's demo badge under the embedded map
+  useEffect(() => { document.body.dataset.view = view; }, [view]);
   const setVehLang = (l) => { VEH.lang = l; try { localStorage.setItem("modus_veh_lang", l); } catch(e){} setVehLangState(l); };
 
   useEffect(() => {
@@ -1925,6 +1930,11 @@ function Portal({ role, who, meta, metaErr, vehLang }){
     // back through every page you clicked would be worse than one that leaves the app.
     try { if(pageFromHash() !== p) history.replaceState(null, "", "#" + p); } catch(e){}
   };
+  // the embedded map carries its own demo strip; the header badge hides while it is open
+  useEffect(() => {
+    document.body.dataset.mapOpen = page === "map" ? "1" : "";
+    return () => { document.body.dataset.mapOpen = ""; };
+  }, [page]);
   // someone edits the hash, or follows a second link from the guide into the same tab
   useEffect(() => {
     const onHash = () => { const h = pageFromHash(); if(h && h !== page) setPageState(h); };
