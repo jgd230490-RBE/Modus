@@ -41,7 +41,7 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME;");   // the store is a const in the script scope; expose it for §3
+w.eval(js + "\nwindow.__T = THEME; window.__TENANT = TENANT;");   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
@@ -84,6 +84,109 @@ w.__T.subs.add((n) => seen.push(n));
 act(() => { w.applyTheme("dark"); w.applyTheme("light"); });
 ok("APPEARANCE: subscribers (the charts) hear every change in order", seen.join("|") === "dark|light");
 
-console.log(`\n${pass} passed, ${fail.length} failed`);
-fail.forEach(f => console.log("  FAIL: " + f));
-process.exit(fail.length ? 1 : 0);
+// ---- 4. the demo bar (11 Oct 2026) ------------------------------------------------------
+// The whole App, mounted: /api/meta answers with the demo tenant, /api/auth with a planner, every other fetch
+// never settles. The map iframe is jsdom's (nothing is loaded into it), so the embedded map's side — the message
+// it posts and its guideStart — is played by this harness: parse_map.js runs the map's own code for that.
+// NOT covered: how it looks, and the real iframe in a browser.
+const N = "Fictional demo scheme · nothing here is real";
+const META = { routes: [], materials: ["Aggregate"], vehicles: ["Artic Tipper (44t)"], units: ["m3", "t", "vehicles"],
+  months: { start_year: 2026, count: 60 }, factors: { material_density_t_per_m3: {}, vehicle_payload_t: {},
+  vehicle_emissions_kg_co2e_per_km: {}, planning: { working_days_per_month: 21 } }, mapbox_token: "",
+  vehicle_labels: { labels: {}, fallbacks: {}, langs: ["en", "eu", "ee"] }, disciplines: [], sections: [], ipts: [],
+  tenant: { name: "Wolds Link", team_label: "Team", currency: "GBP", currency_symbol: "£", country: "GB", distance_unit: "mi", demo_notice: N } };
+const PLANNER = { role: "planner", label: "Planner", ipt: null, can_approve: true, ipt_locked: false, ipt_required: true, demo: true, ipts: [] };
+const respond = (data) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
+const tick = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
+async function demoBar(){
+  let meta = META;
+  w.fetch = (url) => /\/api\/meta$/.test(String(url)) ? respond(meta) : /\/api\/auth$/.test(String(url)) ? respond(PLANNER) : new Promise(() => {});
+  w.localStorage.setItem("modus_page", "dashboard");
+  const mount = async () => {
+    const box = w.document.createElement("div"); w.document.body.appendChild(box);
+    const root = w.ReactDOM.createRoot(box);
+    await act(async () => { root.render(w.React.createElement(w.App)); });
+    await tick(); await tick();
+    return { box, root };
+  };
+  const { box, root } = await mount();
+  const bar = () => box.querySelector(".demo-bar");
+  const guideBtn = () => box.querySelector(".demo-bar-guide");
+  const order = () => { const kids = [...box.firstElementChild.children].map(e => e.tagName.toLowerCase() + (e.classList.contains("demo-bar") ? ".demo-bar" : "")); return kids.join(">"); };
+  const post = (data, origin) => act(() => { w.dispatchEvent(new w.MessageEvent("message", { data, origin: origin || w.location.origin })); });
+  ok("DEMO BAR: once /api/meta answers with a demo tenant, the bar is on the public map, straight under the header and before <main>",
+     w.__TENANT.demo_notice === N && !!bar() && order() === "header>div.demo-bar>main");
+  ok("DEMO BAR: it carries the tenant's own words (the CSS uppercases them) as text, with the full text on hover",
+     bar().querySelector(".demo-bar-text").textContent === N && bar().querySelector(".demo-bar-text").getAttribute("title") === N && bar().getAttribute("role") === "note");
+  ok("DEMO BAR: no header badge, and no Guide in the header", !box.querySelector(".demo-badge") && ![...box.querySelectorAll("header button")].some(b => /Guide/.test(b.textContent)));
+  ok("DEMO BAR: on the public map there is no Guide until the embedded map says its tour is ready (the password page never does)", !guideBtn() && !bar().classList.contains("has-guide"));
+  await post({ type: "wayscope-map-tour" }, "https://elsewhere.example");
+  await post({ type: "something-else" });
+  ok("🔴 DEMO BAR: a message from another origin, or of another type, shows no Guide", !guideBtn());
+  await post({ type: "wayscope-map-tour" });
+  ok("⭐ DEMO BAR: the map's own message shows the Guide at the bar's right end", !!guideBtn() && bar().classList.contains("has-guide") && guideBtn().textContent === "Guide");
+  const frame = box.querySelector('iframe[title="Public Route Map"]');
+  ok("DEMO BAR: the public map's iframe is the embedded map (?embed=1)", !!frame && /^\/map\/\?embed=1&v=\d+$/.test(frame.getAttribute("src")));
+  let mapTours = 0, appGuides = 0;
+  w.addEventListener("wayscope-guide", () => appGuides++);
+  frame.contentWindow.guideStart = () => mapTours++;
+  click(guideBtn());
+  ok("⭐ DEMO BAR: on the public map the Guide starts the EMBEDDED map's own tour (its guideStart), not the app's", mapTours === 1 && appGuides === 0);
+  delete frame.contentWindow.guideStart;
+  let threw = false; try { click(guideBtn()); } catch (e) { threw = true; }
+  ok("🔴 DEMO BAR: with no guideStart in the frame (the map password page) the Guide throws nothing and starts nothing", !threw && mapTours === 1 && appGuides === 0);
+  // sign-in: the bar stays, with no Guide (there is no tour)
+  click([...box.querySelectorAll("header button")].find(b => /Staff sign in/.test(b.textContent)));
+  ok("DEMO BAR: on the sign-in view the bar stays, under the header, with no Guide", order() === "header>div.demo-bar>main" && !guideBtn() && !!box.querySelector('input[placeholder="Access code"]'));
+  const setVal = (el, v) => act(() => { Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await setVal(box.querySelector('input[placeholder="Your name"]'), "Tester");
+  await setVal(box.querySelector('input[placeholder="Access code"]'), "planner-code");
+  await act(async () => { [...box.querySelectorAll("button")].find(b => b.textContent === "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  ok("DEMO BAR: signed in, on a Portal page (Dashboard), the bar is still under the header, with the Guide", order() === "header>div.demo-bar>main" && !!box.querySelector('[data-guide="rail"]') && !!guideBtn());
+  ok("DEMO BAR: the header still has no Guide of its own, and Appearance still comes before Sign out",
+     ![...box.querySelectorAll("header button")].some(b => /^Guide$/.test(b.textContent.trim())) && !!box.querySelector("header .appearance-btn"));
+  await act(async () => { guideBtn().dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  ok("⭐ DEMO BAR: on a Portal page the Guide replays the app's guide (the one event name) and the tour opens, welcome first",
+     appGuides === 1 && mapTours === 1 && !!w.document.querySelector(".guide-card") && /Welcome to the demo\./.test(w.document.querySelector(".guide-card").textContent));
+  // walk the tour to its end ("Got it"): the Dashboard and the welcome are marked seen, the tips stay switched on
+  for (let n = 0; n < 12 && w.document.querySelector(".guide-card .guide-next"); n++) click(w.document.querySelector(".guide-card .guide-next"));
+  ok("DEMO BAR: the tour closes with Got it and the tips stay on (so the next check means something)",
+     !w.document.querySelector(".guide-card") && w.localStorage.getItem("wayscope_guide_all") !== "off" && w.localStorage.getItem("wayscope_guide_dashboard") === "done");
+  // the staff Route map: the app's guide steps aside, the bar's Guide goes to the embedded map once it is ready
+  await act(async () => { [...box.querySelectorAll(".rail-item")].find(b => /Route map/.test(b.textContent)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick();
+  const sframe = box.querySelector('iframe[title="Public Route Map"]');
+  ok("DEMO BAR: on the staff Route map the iframe is the embedded map, and there is no Guide until it says its tour is ready",
+     !!sframe && /^\/map\/\?embed=1&v=\d+$/.test(sframe.getAttribute("src")) && !guideBtn());
+  ok("DEMO BAR: ...and the app's own guide is not mounted there (no second 'New here?' strip, no tour card, nothing under wayscope_guide_map)",
+     !w.document.querySelector(".guide-strip") && !w.document.querySelector(".guide-card") && w.localStorage.getItem("wayscope_guide_map") === null);
+  await post({ type: "wayscope-map-tour" });
+  sframe.contentWindow.guideStart = () => mapTours++;
+  click(guideBtn());
+  ok("⭐ DEMO BAR: on the staff Route map the Guide starts the embedded map's tour, not the app's", mapTours === 2 && appGuides === 1);
+  await act(async () => { [...box.querySelectorAll(".rail-item")].find(b => /Dashboard/.test(b.textContent)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick();
+  click(guideBtn());
+  ok("DEMO BAR: back on a Portal page the Guide is the app's again", appGuides === 2 && mapTours === 2);
+  await act(async () => { [...box.querySelectorAll(".rail-item")].find(b => /Route map/.test(b.textContent)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick();
+  ok("🔴 DEMO BAR: back on the Route map, a NEW iframe: no Guide until it announces its tour again (the readiness was reset with the screen)", !guideBtn());
+  await act(async () => { root.unmount(); }); box.remove();
+  // a real tenant: no notice, so no bar and no Guide anywhere
+  meta = { ...META, tenant: { ...META.tenant, name: "Real Client", demo_notice: null } };
+  w.localStorage.setItem("modus_page", "dashboard");
+  const real = await mount();
+  ok("🔴 DEMO BAR: a real tenant (no notice) gets no bar and no Guide button anywhere",
+     w.__TENANT.demo_notice === null && !real.box.querySelector(".demo-bar") && ![...real.box.querySelectorAll("button")].some(b => b.textContent.trim() === "Guide")
+     && [...real.box.firstElementChild.children].map(e => e.tagName.toLowerCase()).join(">") === "header>main");
+  await act(async () => { real.root.unmount(); });
+}
+
+(async () => {
+  try { await demoBar(); ok("DEMO BAR: the section ran to the end", true); }
+  catch (e) { ok("DEMO BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  console.log(`\n${pass} passed, ${fail.length} failed`);
+  fail.forEach(f => console.log("  FAIL: " + f));
+  process.exit(fail.length ? 1 : 0);
+})();

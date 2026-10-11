@@ -1234,8 +1234,12 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && />Got it<\/button>/.test(guideFn) && />Don't show again<\/button>/.test(guideFn));
   ok("Done marks the page (and the welcome) seen; 'Don't show again' switches every page off",
      guideFn.includes('guideWrite(key, "done"); guideWrite("welcome", "done");') && guideFn.includes('guideWrite("all", "off");'));
-  ok("the header has a Guide button, demo tenant only, that replays through one event name",
-     /\{TENANT\.demo_notice && \(\n\s+\/\* H10[\s\S]{0,200}window\.dispatchEvent\(new Event\(GUIDE_EVENT\)\)[\s\S]{0,200}Guide\n/.test(src)
+  // NARROWED 11 Oct 2026 (the demo bar): the Guide button left the header for the demo bar under it, which shows
+  // exactly when the header's did (a demo tenant); on a Portal page it still replays through the one event name
+  ok("the demo bar has the Guide button, demo tenant only, that replays the app's guide through one event name",
+     /function replayAppGuide\(\)\{ window\.dispatchEvent\(new Event\(GUIDE_EVENT\)\); \}/.test(src)
+     && /: onMap \? \(mapTour \? startMapTour : null\) : replayAppGuide;/.test(src)
+     && /function DemoBar\(\{ onGuide \}\)\{\n  if\(!TENANT\.demo_notice\) return null;/.test(src)
      && guideFn.includes("window.addEventListener(GUIDE_EVENT, on)") && /const GUIDE_EVENT = "wayscope-guide";/.test(src));
   ok("🔴 the guide never renders a team id: no IPT in its copy", !/IPT/.test(gs ? gs[0] : "x"));
   ok("🔴 no 'truck' in its copy (UK: lorry / HGV)", !/truck/i.test(gs ? gs[0] : "x"));
@@ -1432,12 +1436,84 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
       && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
   }
-  ok("11 Oct: the header's demo badge hides only where the embedded map (which prints its own strip) is on screen",
-    /body\[data-view="public"\] \.demo-badge, body\[data-map-open="1"\] \.demo-badge\{display:none !important;\}/.test(html)
-    && code.includes("document.body.dataset.view = view;") && code.includes('document.body.dataset.mapOpen = page === "map" ? "1" : "";')
-    && code.includes('return () => { document.body.dataset.mapOpen = ""; };')
-    && /className="demo-badge hidden sm:inline-flex"/.test(code));
+  // REVERSED 11 Oct 2026 (the demo bar, the user: the map's strip "on every page"): the header badge and PR #20's
+  // logic that hid it under the embedded map are gone — the bar under the header carries the notice on every view,
+  // and the embedded map no longer draws its own. Nothing else read body[data-view] or body[data-map-open].
+  ok("11 Oct (demo bar): the header's demo badge and PR #20's hide logic are gone — no .demo-badge, no body[data-view] / body[data-map-open] CSS, neither effect",
+    // the CSS and the code with their comments removed (the comments say what went and why)
+    ((css) => !/demo-badge/.test(css) && !/data-view|data-map-open/.test(css))
+      ((html.match(/<style>([\s\S]*?)<\/style>/) || ["", ""])[1].replace(/\/\*[\s\S]*?\*\//g, ""))
+    && !/demo-badge|data-view|data-map-open/.test(code)
+    && !code.includes("document.body.dataset.view") && !code.includes("dataset.mapOpen") && !/\bmapOpen\b/.test(code));
+  // ---- 11 Oct 2026: the demo bar on every page ---------------------------------------------------------------
+  // The user: "There is a bar with FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL and a guide button on the public
+  // map. Lets have that on every page." One bar in App between the header and <main>, keyed on TENANT.demo_notice.
   {
+    const appFn = (src.match(/function App\(\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    const appCode = (code.match(/function App\(\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    const hdrFn = (code.match(/function Header\(\{ view, role, setView, signOut, vehLang, setVehLang \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    const barFn = (src.match(/function DemoBar\(\{ onGuide \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    const portalFn = (src.match(/function Portal\(\{ role, who, meta, metaErr, vehLang, onPage \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    ok("⭐ the bar sits in App between <Header/> and <main> (main is flex-1 min-h-0, so it gives up the 26 px and nothing overflows)",
+      /<Header view=\{view\} role=\{role\} setView=\{setView\} signOut=\{signOut\} vehLang=\{vehLang\} setVehLang=\{setVehLang\} \/>\s*(?:\{\}\s*)?<DemoBar onGuide=\{barGuide\} \/>\s*<main className="flex-1 min-h-0 flex flex-col">/.test(appCode)
+      && (code.match(/<DemoBar /g) || []).length === 1);
+    ok("⭐ ...so it is on every view: the public map (and its password page), sign-in, and every Portal page including Loading and the service error",
+      appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "public" && <PublicMap')
+      && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "login" && <Login') && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "portal" && ('));
+    ok("🔴 keyed on TENANT.demo_notice: a real tenant (no notice) gets no bar at all",
+      barFn.startsWith("\n  if(!TENANT.demo_notice) return null;") && !/use[A-Z]\w*\(/.test(barFn));
+    ok("the bar shows the tenant's own words (uppercased by CSS, the full text on hover) and the Guide only when there is a tour to replay",
+      barFn.includes('<span className="demo-bar-text" title={TENANT.demo_notice}>{TENANT.demo_notice}</span>')
+      && barFn.includes('{onGuide && (') && barFn.includes('<button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>')
+      && barFn.includes('className={"demo-bar" + (onGuide ? " has-guide" : "")}') && !/HEADER_DEMO_NAME|IPT/.test(barFn));
+    ok("🔴 nothing in the bar touches the document while rendering (render_frontend's stub has no querySelector), and App reads no body dataset",
+      !/document\./.test(barFn) && !/document\.body|querySelector/.test(appCode));
+    ok("the bar is CSS classes in <style>: 26 px, ink with amber text from tokens, centred, uppercase, letter-spaced, an ellipsis, the Guide at the right end",
+      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:1px solid var\(--demo-rule\);font:700 13px\/1 Inter,system-ui,sans-serif;letter-spacing:\.06em;/.test(html)
+      && /\.demo-bar-text\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;\}/.test(html)
+      && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;[^}]*font:600 14px\/21px /.test(html) && /\.demo-bar\.has-guide\{padding:0 84px;\}/.test(html)
+      && /--demo-bg:#1F2024; --demo-fg:#FBBF24; --demo-rule:#D97706;/.test(html));
+    ok("...the Guide keeps its slot at every width, phones included (the text truncates, the button does not move)",
+      /@media \(max-width:639px\)\{ \.demo-bar\{letter-spacing:\.03em;\} \.demo-bar\.has-guide\{padding:0 76px 0 12px;\} \}/.test(html)
+      && !/hidden sm:|sm:inline|md:/.test(barFn));
+    ok("...no Tailwind colour utility in the bar (no DARK-REMAP needed) and no brand orange",
+      !/\b(?:bg|text|border)-(?:slate|amber|gray|white|black|blue|red|\[)/.test(barFn) && !/brand-orange/.test(barFn));
+    ok("🔴 the header has no badge and no Guide button of its own any more (the bar has them)",
+      !/demo-badge/.test(hdrFn) && !/GUIDE_EVENT|>\s*Guide\s*</.test(hdrFn) && !/TENANT\.demo_notice &&/.test(hdrFn)
+      && /<AppearancePicker \/>/.test(hdrFn) && /Sign out/.test(hdrFn) && /Staff sign in/.test(hdrFn));
+    ok("the bar's Guide: none on sign-in; the embedded map's tour on a map view once the map says it is ready; the app's guide on other Portal pages",
+      appFn.includes('const onMap = view === "public" || (view === "portal" && page === "map");')
+      && appFn.includes('const barGuide = view === "login" ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
+    ok("...the map's readiness comes from a same-origin message of one type, and resets on every new screen (a new iframe announces itself again)",
+      appFn.includes("if(e.origin === window.location.origin && e.data && e.data.type === MAP_TOUR_MSG) setMapTour(true);")
+      && appFn.includes('window.addEventListener("message", on);') && appFn.includes('return () => window.removeEventListener("message", on);')
+      && appFn.includes("useEffect(() => { setMapTour(false); }, [view, page]);") && /const MAP_TOUR_MSG = "wayscope-map-tour";/.test(src));
+    ok("...Portal reports its page up (a hook before its early returns), App passes setPage",
+      portalFn.includes("useEffect(() => { if(onPage) onPage(page); }, [page]);")
+      && portalFn.indexOf("useEffect(() => { if(onPage) onPage(page); }, [page]);") < portalFn.indexOf("if(metaErr){")
+      && /<Portal role=\{role\} who=\{who\} meta=\{meta\} metaErr=\{metaErr\} vehLang=\{vehLang\} onPage=\{setPage\} \/>/.test(src));
+    ok("🔴 the map's tour is started through the same-origin iframe, guarded: no iframe, the map password page (no guideStart) or a throw does nothing",
+      /function startMapTour\(\)\{\n  try \{\n    const f = document\.querySelector\('iframe\[title="Public Route Map"\]'\);\n    const w = f && f\.contentWindow;\n    if\(w && typeof w\.guideStart === "function"\) w\.guideStart\(\);\n  \} catch\(e\)\{\}\n\}/.test(src));
+    ok("⭐ both iframes are the map EMBEDDED: MAP_URL carries embed=1 and both iframes use MAP_URL",
+      /const MAP_URL = "\/map\/\?embed=1&v=" \+ Date\.now\(\);/.test(src)
+      && /<iframe src=\{MAP_URL\} title="Public Route Map" className="flex-1 w-full border-0" \/>/.test(src)
+      && /<iframe src=\{MAP_URL\} title="Public Route Map" className="w-full h-full border-0" \/>/.test(src)
+      && (src.match(/<iframe /g) || []).length === 2 && !/<iframe src="\/map/.test(src));
+    {
+      const mapHtml = fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+      ok("⭐ the contract with /map/: it posts the same message type, defines a global guideStart, and reads the same embed flag",
+        mapHtml.includes("window.parent.postMessage({ type: 'wayscope-map-tour' }, location.origin);")
+        && /\n    function guideStart\(\)\{/.test(mapHtml) && mapHtml.includes("new URLSearchParams(location.search).get('embed') === '1'"));
+    }
+    ok("the app's own guide is not mounted on the Route map (the embedded map runs its own): one 'New here?' strip there, and the app never touches wayscope_guide_map",
+      portalFn.includes('{page !== "map" && <Guide page={page} groups={visible} />}') && (src.match(/<Guide /g) || []).length === 1
+      && !/\n  map: \[/.test((src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1]));
+    ok("a page with no steps of its own (Config) replays the welcome, so the bar's Guide never does nothing",
+      /const startTour = \(\) => \{ setTip\(null\); setSteps\(build\(guideRead\("welcome"\) !== "done" \|\| !\(GUIDE_STEPS\[key\] \|\| \[\]\)\.length\)\); setI\(0\); \};/.test(src));
+  }
+  {
+    // NOTE 11 Oct 2026 (the demo bar): the bar above the map lives in App, not in PublicMap; this pin is about
+    // PublicMap's own strip (the old title line and the Submit link), which stays gone
     const pm = (src.match(/function PublicMap\(\{ onLogin \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
     ok("11 Oct: the public map page is only the map — no strip above it, no 'Submit a forecast' link; the header keeps Staff sign in",
       pm.includes('<iframe src={MAP_URL} title="Public Route Map" className="flex-1 w-full border-0" />')

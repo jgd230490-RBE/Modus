@@ -506,6 +506,11 @@
     // The tenant's vocabulary and country, from the same response as the overlay.
     let TEAM = 'Team';
     let TENANT = { name: 'Wayscope', team_label: 'Team', country: null, currency: 'EUR', distance_unit: 'km' };
+    // 11 Oct 2026 (the demo bar): the staff app iframes this page as /map/?embed=1 (frontend MAP_URL). Inside the
+    // app, the app's bar under its header carries the demo notice and the Guide button, so this page draws neither
+    // and sets no has-demo-notice (no 26 px gap); its tour, hint strip and dots stay, and the app's Guide calls
+    // guideStart() in here. Both the flag AND a frame: /map/?embed=1 opened on its own keeps its own strip.
+    const EMBED = (() => { try { return new URLSearchParams(location.search).get('embed') === '1' && window.self !== window.top; } catch (e) { return false; } })();
     // H1 (29 Sep 2026, HU5): the distance unit the tenant reads — km stored, converted here
     const KM_PER_MI = 1.609344;
     const DU = () => (TENANT.distance_unit === 'mi' ? 'mi' : 'km');
@@ -569,9 +574,10 @@
         const hasRail = !!(window.evr_rail_data && window.evr_rail_data.features && window.evr_rail_data.features.length);
         if (railItem) railItem.hidden = !hasRail;
         // H2: the tenant's demo notice, on the map like every other screen
+        // 11 Oct 2026: not when embedded (EMBED) — the app's demo bar above the iframe carries it
         let dn = document.getElementById('demo-notice');
-        document.body.classList.toggle('has-demo-notice', !!TENANT.demo_notice);   // the phone layout keys on it
-        if (TENANT.demo_notice) {
+        document.body.classList.toggle('has-demo-notice', !!TENANT.demo_notice && !EMBED);   // the phone layout keys on it
+        if (TENANT.demo_notice && !EMBED) {
             if (!dn) { dn = document.createElement('div'); dn.id = 'demo-notice'; document.body.appendChild(dn); }
             dn.textContent = TENANT.demo_notice;
         } else if (dn) { dn.remove(); }
@@ -586,7 +592,8 @@
     // known once the overlay has answered). Anchored to elements by id; the Play step takes
     // the timeline's button when the bar is open, else the sidebar's "Play forecast timeline".
     // Remembered per visitor in localStorage (wayscope_guide_map), in try/catch. A Guide
-    // button beside the demo notice replays it. In-page, no library; the Mapbox instance is
+    // button beside the demo notice replays it (11 Oct 2026: on /map/ opened directly; inside
+    // the app the app's demo bar has the button, see EMBED). In-page, no library; the Mapbox instance is
     // never touched — the cards are plain fixed divs over it.
     const MAP_GUIDE_KEY = "wayscope_guide_map";
     const MAP_GUIDE_STEPS = [
@@ -696,14 +703,21 @@
     }
     function setupGuide(){
         if (!TENANT.demo_notice) return;
-        const btn = guideEl('guide-btn', 'button');
-        btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
-        // Beside the demo notice, measured — the notice is centred and its width depends on
-        // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
-        // 11 Oct 2026: placed by CSS at every width now — at the right end of the notice strip, off the bar.
-        const placeBtn = () => { btn.style.left = ''; };
-        placeBtn();
-        window.addEventListener('resize', placeBtn);
+        if (EMBED) {
+            // 11 Oct 2026 (the demo bar): inside the app there is no Guide button here (its base CSS would put it
+            // on the figures bar). The app's bar has the Guide; tell the app this map's tour is ready, and it calls
+            // guideStart() through the iframe. Same origin only.
+            try { window.parent.postMessage({ type: 'wayscope-map-tour' }, location.origin); } catch (e) {}
+        } else {
+            const btn = guideEl('guide-btn', 'button');
+            btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
+            // Beside the demo notice, measured — the notice is centred and its width depends on
+            // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
+            // 11 Oct 2026: placed by CSS at every width now — at the right end of the notice strip, off the bar.
+            const placeBtn = () => { btn.style.left = ''; };
+            placeBtn();
+            window.addEventListener('resize', placeBtn);
+        }
         // 11 Oct 2026: no tour starts by itself any more — the strip offers it and the dots mark the features
         placeGuideHints();
         window.addEventListener('resize', placeGuideHints);

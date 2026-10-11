@@ -1617,7 +1617,9 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      /@media \(min-width:701px\) and \(max-width:1023px\)\{\s*#kpi-cards\{ grid-template-columns:repeat\(6, minmax\(0, 1fr\)\); \}/.test(html));
   ok("9 Oct: below 1024px (phone AND tablet) the notice is a full-width strip at the top and the menu, the bar and the Guide button move down under it",
      /@media \(max-width:1023px\)\{[\s\S]*?body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[\s\S]*?body\.has-demo-notice #menu-toggle\{ top:40px; \}[\s\S]*?body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:84px; \}[\s\S]*?#guide-btn\{ left:auto !important; right:12px; top:9px; \}[\s\S]*?body\.has-demo-notice #guide-btn\{ top:36px; \}/.test(html)
-     && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice\);/.test(code)
+     // NARROWED 11 Oct 2026 (the demo bar): the class is set for a demo tenant on /map/ opened directly, not when
+     // the map is embedded in the app (EMBED), whose bar above the iframe carries the notice
+     && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice && !EMBED\);/.test(code)
      && /const placeBtn = \(\) => \{ btn\.style\.left = ''; \};/.test(code));
   // 11 Oct 2026: and from 1024 px up too — the strip, the bar / panel / controls 26 px lower, the button in the strip
   ok("11 Oct: on the desktop the notice is a 26 px strip too, the bar, panel and map controls sit under it, the Guide button is in the strip",
@@ -1651,6 +1653,97 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = step\.title;/.test(code)
      && /card\.querySelector\('p'\)\.textContent = step\.body;/.test(code));
   ok("🔴 no team id in the map guide's copy", !/IPT/.test(gs ? gs[0] : "x"));
+}
+// ---- 11 Oct 2026: the demo bar (the user: the map's strip and Guide "on every page") -------------------------
+// The staff app now carries the notice and the Guide in a bar under its header on every view, and iframes this
+// page as /map/?embed=1. Embedded, the map draws no #demo-notice, no #guide-btn and sets no has-demo-notice (no
+// 26 px gap), keeps its tour, hint strip and dots, and tells the app its tour is ready. /map/ opened directly is
+// unchanged. Source first, then the real functions run against a small fake DOM (no browser, no jsdom here).
+{
+  const embedDecl = (code.match(/const EMBED = (\(\(\) => \{ try \{ return [^\n]*\}\)\(\));/) || [])[1];
+  ok("11 Oct (demo bar): EMBED is the embed=1 flag AND a frame, read once, in try/catch",
+     !!embedDecl && embedDecl.includes("new URLSearchParams(location.search).get('embed') === '1' && window.self !== window.top")
+     && embedDecl.includes("catch (e) { return false; }"));
+  if (embedDecl) {
+    const ev = (search, framed, throws) => {
+      const self = {};
+      const win = throws ? { self, get top() { throw new Error("cross-origin"); } } : { self, top: framed ? {} : self };
+      return new Function("location", "window", "URLSearchParams", "return " + embedDecl)({ search }, win, URLSearchParams);
+    };
+    ok("...true only inside a frame with ?embed=1: framed with the flag → embedded; the flag on its own, a frame on its own, neither → standalone",
+       ev("?embed=1&v=1", true) === true && ev("?embed=1&v=1", false) === false && ev("?v=1", true) === false
+       && ev("", false) === false && ev("?embed=0", true) === false && ev("?embed=1", true, true) === false);
+  }
+  ok("...the strip and the class are skipped when embedded; the notice is still set as text, never as HTML",
+     /if \(TENANT\.demo_notice && !EMBED\) \{\n\s+if \(!dn\) \{ dn = document\.createElement\('div'\); dn\.id = 'demo-notice'; document\.body\.appendChild\(dn\); \}\n\s+dn\.textContent = TENANT\.demo_notice;/.test(code));
+  const sg = (code.match(/function setupGuide\(\)\{([\s\S]*?)\n    \}\n/) || ["", ""])[1];
+  ok("...setupGuide: embedded, no Guide button — it posts 'wayscope-map-tour' to the app (same origin only); standalone, the button as before",
+     /if \(EMBED\) \{\s*try \{ window\.parent\.postMessage\(\{ type: 'wayscope-map-tour' \}, location\.origin\); \} catch \(e\) \{\}\s*\} else \{\s*const btn = guideEl\('guide-btn', 'button'\);/.test(sg)
+     && (sg.match(/postMessage\(/g) || []).length === 1 && !/postMessage\([^)]*'\*'/.test(code));
+  ok("...the tour, the hint strip and the dots are set up either way (after the if / else)",
+     sg.indexOf("placeGuideHints();\n        window.addEventListener('resize', placeGuideHints);") > sg.indexOf("window.addEventListener('resize', placeBtn);\n        }")
+     && sg.indexOf("window.addEventListener('resize', placeBtn);\n        }") > 0);
+  ok("...the frontend's MAP_URL carries the flag, so both of the app's iframes are embedded",
+     /const MAP_URL = "\/map\/\?embed=1&v=" \+ Date\.now\(\);/.test(fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8")));
+
+  // ---- the real functions, run: applyTenantVocabulary → setupGuide → placeGuideHints, then guideStart ----------
+  const a = src.indexOf("    function applyTenantVocabulary() {");
+  const bEnd = "window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });";
+  const b = src.indexOf(bEnd);
+  ok("the guide's functions are one contiguous block (applyTenantVocabulary … the resize hook)", a > 0 && b > a);
+  const run = (embed, notice) => {
+    const byId = {}, posted = [], intervals = [];
+    const mk = (tag) => {
+      const el = { tagName: String(tag || "div").toUpperCase(), id: "", style: {}, dataset: {}, attrs: {}, hidden: false, className: "",
+        textContent: "", innerHTML: "", offsetWidth: 600, offsetHeight: 72, onclick: null,
+        setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
+        remove() { if (byId[this.id] === this) delete byId[this.id]; },
+        getBoundingClientRect() { return { top: 0, left: 300, right: 1280, bottom: 72, width: 980, height: 72 }; },
+        scrollIntoView() {}, closest() { return null; }, querySelector() { return mk("span"); } };
+      return el;
+    };
+    for (const id of ["kpi-hud", "tl-play", "kpi-conditions", "kpi-moving"]) { const e = mk(); e.id = id; byId[id] = e; }
+    const cls = new Set();
+    const document = {
+      body: { classList: { toggle(c, on) { if (on) cls.add(c); else cls.delete(c); }, contains: (c) => cls.has(c) },
+              appendChild(el) { byId[el.id] = el; return el; } },
+      getElementById: (id) => byId[id] || null, createElement: (t) => mk(t), querySelector: () => null,
+    };
+    const store = {};
+    const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+    const window = { innerWidth: 1280, innerHeight: 800, addEventListener() {}, evr_rail_data: null, OVERLAY_VERSION: null,
+                     parent: { postMessage: (msg, origin) => posted.push([msg, origin]) } };
+    const location = { origin: "https://app.wayscope.test", search: embed ? "?embed=1&v=1" : "" };
+    const TENANT = { name: "Wolds Link", team_label: "Team", demo_notice: notice };
+    const f = new Function("document", "window", "localStorage", "location", "setInterval", "TENANT", "TEAM", "EMBED",
+      src.slice(a, b + bEnd.length) + "\nreturn { applyTenantVocabulary, guideStart, setupGuide };");
+    const api = f(document, window, localStorage, location, (fn, ms) => intervals.push(ms), TENANT, "Team", embed);
+    api.applyTenantVocabulary();
+    const before = { cls: cls.has("has-demo-notice"), notice: byId["demo-notice"] ? byId["demo-notice"].textContent : null,
+                     btn: byId["guide-btn"] || null, strip: !!byId["guide-strip"], dots: Object.keys(byId).filter(k => /^guide-dot-/.test(k)).length,
+                     posted: posted.slice(), intervals: intervals.slice() };
+    if (notice) api.guideStart();
+    return { ...before, card: !!byId["guide-card"], api };
+  };
+  if (a > 0 && b > a) {
+    const N = "Fictional demo scheme · nothing here is real";
+    let emb = null, alone = null, real = null, err = "";
+    try { emb = run(true, N); alone = run(false, N); real = run(true, null); } catch (e) { err = e.message; }
+    ok("⭐ the guide block runs against a fake DOM, embedded and standalone", !!emb && !!alone && !!real, err);
+    if (emb && alone && real) {
+      ok("⭐ embedded (demo tenant): no strip, no has-demo-notice class (no 26 px gap), no Guide button of its own",
+         emb.cls === false && emb.notice === null && emb.btn === null);
+      ok("⭐ ...and it tells the app, once, that its tour is ready — to this origin only",
+         emb.posted.length === 1 && emb.posted[0][0].type === "wayscope-map-tour" && emb.posted[0][1] === "https://app.wayscope.test");
+      ok("⭐ ...its hint strip and dots are still there, and guideStart() (what the app's Guide calls) opens the tour",
+         emb.strip === true && emb.dots >= 3 && emb.intervals.includes(1000) && emb.card === true);
+      ok("⭐ standalone /map/ is unchanged: the strip with the tenant's words, the class, the Guide button running guideStart, no message",
+         alone.cls === true && alone.notice === N && !!alone.btn && alone.btn.textContent === "Guide" && alone.btn.onclick === alone.api.guideStart
+         && alone.posted.length === 0 && alone.strip === true && alone.card === true);
+      ok("🔴 a real tenant (no notice), embedded: no strip, no class, no button, no message, no hint strip",
+         real.cls === false && real.notice === null && real.btn === null && real.posted.length === 0 && real.strip === false && real.dots === 0);
+    }
+  }
 }
 // ---- 9 Oct 2026: UK wording on the public map's visible copy -------------------------
 // The route drawer said 'Trips / day / truck', 'Trucks for peak' and 'DEFRA-2025-based'. UK copy says

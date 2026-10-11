@@ -118,6 +118,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("...and the password page is branded: Wayscope title, the stacked logo, no RBE-era wording",
        "<title>Wayscope — map access</title>" in r.text and 'src="/brand/logo-stacked-on-dark.svg"' in r.text
        and "alliance" not in r.text.lower() and "Modus" not in r.text)
+    # 11 Oct 2026 (the demo bar): the app's iframes ask for /map/?embed=1&v=…; the gate reads the path only
+    r = c.get("/map/?embed=1&v=1")
+    ok("🔴 the embedded map's address (/map/?embed=1) is closed the same way — the password page, 401",
+       r.status_code == 401 and "<title>Wayscope — map access</title>" in r.text, str(r.status_code))
     r = c.get("/help/")
     ok("🔴 the guide is closed without a staff sign-in — 401", r.status_code == 401, str(r.status_code))
     r = c.get("/api/public/alignment")
@@ -147,6 +151,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/map/")
     ok("with the staff cookie the map opens and loads the overlay module",
        r.status_code == 200 and "overlay.js" in r.text and "Wayscope" in r.text, str(r.status_code))
+    _map_doc = r.text
+    r = c.get("/map/?embed=1&v=1")
+    ok("...and /map/?embed=1 (the app's iframe) is the same document, which reads the flag itself (11 Oct, the demo bar)",
+       r.status_code == 200 and r.text == _map_doc and "get('embed') === '1'" in r.text, str(r.status_code))
     r = c.get("/map/overlay.js")
     ok("the overlay module is served", r.status_code == 200 and "applyOverlayPackage" in r.text)
     r = c.get("/map/data/alignment.js")
