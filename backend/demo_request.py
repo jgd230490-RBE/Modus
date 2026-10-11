@@ -214,7 +214,7 @@ Thanks for asking to see Wayscope. Here's everything you need for the demo.
 
 Open the demo: {DEMO_URL}
 
-Corridor map password: {c['map']}
+Public map password: {c['map']}
 Team access code: {c['team']}
 
 The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.
@@ -222,7 +222,7 @@ The demo is a fictional highways scheme, and nothing in it is a real project. Th
 Three things to try:
 1. Dashboard: today's tonnes, trips and vehicles, and this week against plan.
 2. Look-ahead: next week committed by route and by day, with closures and route caps flagged.
-3. Corridor map: press Play to watch a month of haul unfold.
+3. Public map: press Play to watch a month of haul unfold.
 
 A short guide opens on each page the first time you visit. You can replay it any time from "Guide" in the corner.
 
@@ -241,13 +241,13 @@ def email_html(name, c):
 <p>Hello {e(_first_name(name))},</p>
 <p>Thanks for asking to see Wayscope. Here's everything you need for the demo.</p>
 <p><b>Open the demo:</b> <a href="{DEMO_URL}">{DEMO_URL}</a></p>
-<p><b>Corridor map password:</b> {e(c['map'])}<br><b>Team access code:</b> {e(c['team'])}</p>
+<p><b>Public map password:</b> {e(c['map'])}<br><b>Team access code:</b> {e(c['team'])}</p>
 <p>The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.</p>
 <p>Three things to try:</p>
 <ol>
 <li><b>Dashboard:</b> today's tonnes, trips and vehicles, and this week against plan.</li>
 <li><b>Look-ahead:</b> next week committed by route and by day, with closures and route caps flagged.</li>
-<li><b>Corridor map:</b> press Play to watch a month of haul unfold.</li>
+<li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
 </ol>
 <p>A short guide opens on each page the first time you visit. You can replay it any time from "Guide" in the corner.</p>
 <p>If you'd like a walkthrough of approving a week as a planner, just reply to this email.</p>
@@ -417,7 +417,7 @@ def access_page(name, c):
   <h1>Hello {e(_first_name(name))}, here's your demo access.</h1>
   <p>Thanks for asking to see Wayscope. Everything you need is below. Keep this page open, or write the two codes down.</p>
   <div class="codes">
-    <div><span class="k">Corridor map password</span><span class="v">{e(c['map'])}</span></div>
+    <div><span class="k">Public map password</span><span class="v">{e(c['map'])}</span></div>
     <div><span class="k">Team access code</span><span class="v">{e(c['team'])}</span></div>
   </div>
   <a class="btn" href="{DEMO_URL}">Open the demo</a>
@@ -426,7 +426,7 @@ def access_page(name, c):
   <ol>
     <li><b>Dashboard:</b> today's tonnes, trips and vehicles, and this week against plan.</li>
     <li><b>Look-ahead:</b> next week committed by route and by day, with closures and route caps flagged.</li>
-    <li><b>Corridor map:</b> press Play to watch a month of haul unfold.</li>
+    <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
   </ol>
   <p>If you'd like a walkthrough of approving a week as a planner, email <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a>.</p>
   <p class="fine">You asked for this at wayscope.co.uk. <a href="{lu}/privacy.html">Privacy notice</a> · <a href="{lu}/">Back to Wayscope</a></p>
