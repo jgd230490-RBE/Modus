@@ -668,11 +668,25 @@ def _scrub(o):
     return o
 _fix_dir = os.path.join(HERE, "fixtures")
 os.makedirs(_fix_dir, exist_ok=True)
+# 2026-10-11: the fixture's `today` is PINNED to a weekday of the commit week
+# (portable.fixture_today), as in test_lookahead.py: written on Sunday 11 Oct with the clock's
+# date, render_frontend.js's Dashboard "today" check failed on correct output. `pg` (the
+# assertions below) stays the clock's page; the fixture is a second read with the pinned date.
+from portable import fixture_today
+_fx_today = fixture_today()
+_fix = _scrub(lookahead.page(bucket="commit", today=_fx_today))
 with open(os.path.join(_fix_dir, "lookahead_page_fuel.json"), "w", encoding="utf-8") as _fh:
-    _fh.write(json.dumps(_scrub(pg), indent=1, ensure_ascii=False))
+    _fh.write(json.dumps(_fix, indent=1, ensure_ascii=False))
 ok("the fuel render fixture is written: 3 lines, a BAF, 2 target-priced lines, index 2.018",
    len(pg["commit"]["lines"]) == 3 and pg["costing"]["baf_pct"] is not None
    and pg["commit"]["totals"]["eur_target_lines"] == 2 and pg["costing"]["index_eur_per_l"] == 2.018)
+_clock = _scrub(pg)
+ok("...its today is a weekday inside the commit week (pinned on a weekend), and nothing else differs from the clock's page",
+   _fix["today"] == _fx_today.isoformat() and _fx_today.weekday() <= 4
+   and _fix["commit_week"]["from"] <= _fix["today"] <= _fix["commit_week"]["to"]
+   and {k: v for k, v in _fix.items() if k != "today"} == {k: v for k, v in _clock.items() if k != "today"},
+   f"fixture today {_fix['today']} · clock {_clock['today']} · week {_fix['commit_week'].get('from')}..{_fix['commit_week'].get('to')}"
+   f" · keys that differ: {[k for k in _fix if _fix.get(k) != _clock.get(k)]}")
 ok("the page carries costing at top level and on commit", isinstance(pg.get("costing"), dict)
    and pg["commit"].get("costing", {}).get("baf_pct") == pg["costing"]["baf_pct"])
 acct = pg["account"]

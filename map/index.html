@@ -917,7 +917,10 @@
     function toggleAlignment(visible) {
         toggleLayer('rail-alignment', visible);
         toggleLayer('rail-alignment-underlay', visible && (function () {
-            const el = document.getElementById(iptCheckboxId(underlayKey()));
+            // 11 Oct 2026: no underlay (the demo) means no key, and iptCheckboxId(null) threw when the
+            // alignment was ticked back ON, so the line returned but its band legend stayed hidden
+            const uk = underlayKey();
+            const el = uk ? document.getElementById(iptCheckboxId(uk)) : null;
             return !el || el.checked;
         })());
         ['ipt-legend', 'ipt-legend-note'].forEach(id => {
@@ -2762,8 +2765,12 @@
                 const wsName = p.ws_name || (window.wsLabel ? window.wsLabel(wsCode) : '');
                 const wsMeta = (window.WS_NAMES || {})[wsCode] || {};
                 // the underlay note is conditional on the underlay actually being on
-                const undBox = document.getElementById(iptCheckboxId(underlayKey()));
-                const undOn = (!undBox || undBox.checked) &&
+                // 🔴 11 Oct 2026: and on there BEING one. A package with no underlay (the demo has none)
+                // has no key; iptCheckboxId(null) threw here, so a click on the alignment opened no popup,
+                // and had it not thrown, the note would have read "undefined applies on this stretch".
+                const uk = underlayKey();
+                const undBox = uk ? document.getElementById(iptCheckboxId(uk)) : null;
+                const undOn = !!uk && (!undBox || undBox.checked) &&
                               document.getElementById('layer-alignment').checked &&
                               !(p.muted === true || p.muted === 'true');
                 // a band edge the package lists as provisional (e.g. 'WS2/WS3 @ 14500')
@@ -3061,8 +3068,12 @@
         ensureZoneLayers();
     }
 
+    // 🔴 11 Oct 2026: wait for 'idle', NEVER 'style.load'. isStyleLoaded() stays false until every
+    // source's tiles are in, so it is false when this runs from inside the style.load handler (or just
+    // after the zones fetch) — and waiting for a style.load that has already fired waited forever: the
+    // zones were never drawn, on load or after a basemap switch. 'idle' fires once everything is loaded.
     function ensureZoneLayers() {
-        if (!map.isStyleLoaded()) { map.once('style.load', ensureZoneLayers); return; }
+        if (!map.isStyleLoaded()) { map.once('idle', ensureZoneLayers); return; }
         if (!map.getSource('zones-source')) map.addSource('zones-source', { type: 'geojson', data: ZONES.data });
         else map.getSource('zones-source').setData(ZONES.data);
         const cb = document.getElementById('layer-zones');
@@ -3236,8 +3247,11 @@
         return !!(cb && cb.checked);
     }
 
+    // 🔴 11 Oct 2026: 'idle', not 'style.load' — the same trap as ensureZoneLayers(). The closures
+    // arrived while tiles were still loading, waited for a style.load that had already fired, and
+    // ticking "Planned road closures" then drew nothing, even after a basemap switch.
     function ensureRestrictionLayers(){
-        if(!map.isStyleLoaded()){ map.once('style.load', ensureRestrictionLayers); return; }
+        if(!map.isStyleLoaded()){ map.once('idle', ensureRestrictionLayers); return; }
         if(!RESTR.data) return;
         if(!map.getSource('restrictions-source')) map.addSource('restrictions-source', { type:'geojson', data: RESTR.data });
         else map.getSource('restrictions-source').setData(RESTR.data);
