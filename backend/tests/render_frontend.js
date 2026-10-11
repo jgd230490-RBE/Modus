@@ -714,6 +714,38 @@ if (loaded) {
       ok(`...${v}: an EmptyState, and nothing undefined`, o.includes('data-empty="') && !/undefined|NaN/.test(o));
     }
   }
+
+  // ---- 11 Oct 2026: the demo bar, rendered in the App shell --------------------------------------------------
+  // App renders here on its first (public) view: no effect runs, so no map has announced its tour and the bar has
+  // no Guide yet; that path is exercised in dom_frontend.js. This proves the bar mounts between the header and
+  // <main> without touching the stubbed document, carries the tenant's words, and is absent for a real tenant.
+  {
+    const { App, DemoBar } = sandbox;
+    const N = "Fictional demo scheme · nothing here is real";
+    ok("App and DemoBar are defined", typeof App === "function" && typeof DemoBar === "function");
+    vm.runInContext(`TENANT.name = "Wolds Link"; TENANT.demo_notice = ${JSON.stringify(N)};`, sandbox);
+    const appOut = render("⭐ App renders with a demo tenant (the stubbed document has no querySelector, so the bar reads none while rendering)", h(App));
+    const iH = appOut.indexOf("</header>"), iB = appOut.indexOf('<div class="demo-bar"'), iM = appOut.indexOf("<main");
+    ok("⭐ ...the bar sits straight after the header and before <main>", iH > 0 && iB === iH + "</header>".length && iM > iB);
+    ok("...with the tenant's words in the bar's text span, and no Guide before the map says its tour is ready",
+      appOut.includes(`<span class="demo-bar-text" title="${N}">${N}</span>`) && !appOut.includes("demo-bar-guide") && !appOut.includes("has-guide"));
+    ok("...the header has no badge and no Guide button any more", !appOut.includes("demo-badge") && !/>Guide</.test(appOut.slice(0, iH)));
+    ok("...and the public map's iframe is the EMBEDDED map", /<iframe src="\/map\/\?embed=1&amp;v=\d+" title="Public Route Map"/.test(appOut));
+    const withGuide = render("the bar renders with a Guide to replay", h(DemoBar, { onGuide: () => {} }));
+    ok("...the Guide button at its end, and the has-guide slot", withGuide.startsWith('<div class="demo-bar has-guide" role="note">')
+      && withGuide.endsWith('<button type="button" class="demo-bar-guide" title="Replay the guide for this page">Guide</button></div>'));
+    const noGuide = render("the bar renders with no tour to replay (the sign-in view)", h(DemoBar, { onGuide: null }));
+    ok("...the notice alone, no button", noGuide === `<div class="demo-bar" role="note"><span class="demo-bar-text" title="${N}">${N}</span></div>`);
+    const long = "x".repeat(120);
+    vm.runInContext(`TENANT.demo_notice = ${JSON.stringify(long)};`, sandbox);
+    ok("a 120-character notice (the validator's limit) is rendered whole; the CSS ends it in an ellipsis",
+      ReactDOMServer.renderToStaticMarkup(h(DemoBar, { onGuide: () => {} })).includes(`>${long}</span>`));
+    vm.runInContext("TENANT.demo_notice = null;", sandbox);
+    const realOut = render("App renders for a real tenant (no notice)", h(App));
+    ok("🔴 a real tenant gets no bar and no Guide anywhere", !realOut.includes("demo-bar") && !/>Guide</.test(realOut)
+      && ReactDOMServer.renderToStaticMarkup(h(DemoBar, { onGuide: () => {} })) === "");
+    vm.runInContext('delete TENANT.demo_notice; TENANT.name = "Wayscope";', sandbox);
+  }
 }
 
 console.log();
