@@ -240,8 +240,10 @@ try:
            not any(x in part for x in ("planner-secret-xyz", "admin-secret-xyz", "adm-token-for-tests", "PLANNER_CODE", "ADMIN")))
         ok(f"the {label} part is signed John Davis and says why they got it",
            "John Davis" in part and "requested a demo at wayscope.co.uk" in part)
-    ok("the words are the copy's (landing-copy-v2-1008.md §3): 'If you'd like a walkthrough of approving a week as a planner'",
-       "walkthrough of approving a week as a planner" in text)
+    # NARROWED 11 Oct 2026 (guide v2.1 review): the copy's "approving a week as a planner" mixed two acts (lines are
+    # approved, weeks are confirmed); the offer of a planner walkthrough stays, in the app's own words.
+    ok("the words are the copy's (landing-copy-v2-1008.md §3): 'If you'd like a walkthrough of ... a planner', in the app's words",
+       "If you'd like a walkthrough of the planner's side, approving forecasts and confirming the week" in text)
     note = SENT[1].calls[-1][1]
     ok("the notification: to DEMO_NOTIFY, one line with name, organisation, role, email, wants and updates",
        note["To"] == "notify@wayscope.co.uk" and note["Subject"].startswith("Demo request: Ada Example")
@@ -347,6 +349,27 @@ ok("🔴 no code value, app password or token is written anywhere in the module"
    not re.search(r"(pk\.|[0-9a-f]{40,})", open(os.path.join(BACKEND, "demo_request.py"), encoding="utf-8").read()))
 ok("the module reads the codes at call time (os.getenv inside codes()), never at import",
    re.search(r"def codes\(\):\n(?:.*\n){1,4}.*os\.getenv\(\"MAP_PASSWORD\"\)", open(os.path.join(BACKEND, "demo_request.py"), encoding="utf-8").read()) is not None)
+
+# 11 Oct 2026 — the guide update: the email and the access page say how the tour works now (nothing pops up; the
+# New here? box, the dots, Guide on the demo bar). Narrowed nothing.
+_c = {"map": "map-pass-abc", "team": "north-team-code", "team_var": "X"}
+_new_guide = 'Each page offers a short tour in a small "New here?" box'
+for _part, _label in ((dr.email_text("Ada Example", _c), "plain"), (dr.email_html("Ada Example", _c), "HTML"),
+                      (dr.access_page("Ada Example", _c), "access page")):
+    ok(f"guide update: the {_label} says nothing pops up and how to start the tour from the demo bar",
+       _new_guide in _part and "Nothing pops up by itself." in _part and "Fictional demo" in _part
+       and "starts the tour for the page you are on" in _part)
+    ok(f"🔴 ...and the {_label} no longer says a guide opens on each page or sits in the corner",
+       "opens on each page the first time" not in _part and "in the corner" not in _part)
+    # 11 Oct 2026 (late, guide v2.1 review): the three things to try say what the pages show now. Today's figures
+    # are in the Dashboard's folded "This week and today" section; the Look-ahead opens on this week.
+    ok(f"🔴 the {_label}'s things to try: the Dashboard is the plan with today one click down; the Look-ahead is this week",
+       "the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today." in _part
+       and "this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead." in _part
+       and "today's tonnes, trips and vehicles, and this week against plan" not in _part
+       and "next week committed by route and by day" not in _part)
+    ok(f"...the {_label} offers a walkthrough of approving forecasts and confirming the week, not 'approving a week'",
+       "the planner's side, approving forecasts and confirming the week" in _part and "approving a week" not in _part)
 
 print()
 for f in FAIL:

@@ -1561,8 +1561,8 @@ function tellMapBarOn(){
   } catch(e){}
 }
 const GUIDE_FORECAST_STEPS = [
-  { anchor: "page-header", title: "One line per haul.", body: "Each line is a route, a material, a vehicle class and the tonnes by month." },
-  { anchor: "forecast-status", title: "Status.", body: "Lines go from submitted to approved. Only approved lines reach the look-ahead and the map." },
+  { anchor: "page-header", title: "One line per haul.", body: "Each line is one route, material and vehicle, with a quantity for each month in m³, tonnes or vehicles." },
+  { anchor: "forecast-status", title: "Status.", body: "A new line is Pending until a planner approves it. Only approved lines reach the Look-ahead and the public map." },
   { anchor: "page-header", title: "Trips and vehicles", body: "are worked out for you from tonnes, payload and the route's cycle time." },
 ];
 const GUIDE_STEPS = {
@@ -1571,17 +1571,22 @@ const GUIDE_STEPS = {
     { anchor: "rail", title: "The menu", body: null },                      // body lists the groups this role can see
   ],
   dashboard: [
-    { anchor: "page-header", title: "Today.", body: "The tonnes, trips and vehicles planned for today, and how many lines have been reported." },
-    { anchor: "dash-figures", title: "This week against plan.", body: "Last week's delivery against what was committed: the seven-day number." },
-    { anchor: "dash-figures", title: "Cost and carbon.", body: "Planned cost, the modelled fair price, and CO₂e for the lines in view." },
+    // 11 Oct 2026 (guide update): the header holds the filters since the UI pass; today's figures are in a folded
+    // section, the cards hold no cost, and the old step 2 named a figure that was never on screen.
+    // 11 Oct 2026 (review): this week's plan and the carbon target ignore the filters, and the cards step named five of six
+    { anchor: "page-header", title: "The plan at a glance.", body: "Pick the months, team and status here; the cards and charts follow, except this week's plan and the carbon target. Today's figures are under This week and today, further down." },
+    { anchor: "dash-figures", title: "Six cards.", body: "Material in view, deliveries a day, vehicles needed, delivered against plan and transport carbon for the lines in view, and this week's plan from the Look-ahead. Point at a card to see how it is worked out." },
+    { anchor: "dash-figures", title: "Carbon.", body: "Transport carbon counts transport only. The strip under the cards shows the scheme's all-in carbon target, once a planner has set one. Cost is in the Cost over time chart." },
     { anchor: "dash-wall", title: "Big screen.", body: "Opens a version made for a site-office TV." },
   ],
   submit: GUIDE_FORECAST_STEPS,
   forecasts: GUIDE_FORECAST_STEPS,
   lookahead: [
-    { anchor: "lookahead-tabs", title: "Next week, by day.", body: "The planner commits movements by route and by day." },
-    { anchor: "lookahead-flags", title: "Flags.", body: "Closures on the route, mass limits, seasonal windows and route caps show here before anything moves." },
-    { anchor: "lookahead-tabs", title: "Actuals.", body: "After the day, record what really moved. The gap between them is the seven-day accuracy." },
+    // 11 Oct 2026 (guide update): Commit opens on this week; a seasonal window is not a Look-ahead flag; actuals are
+    // typed per week on Account, and the old step 3 named a figure that was never on screen
+    { anchor: "lookahead-tabs", title: "This week, by day.", body: "Commit shows this week's plan by route and by day. Use the next week switch to plan ahead, and Confirm week to lock it as the haulier sheet." },
+    { anchor: "lookahead-flags", title: "Flags.", body: "Road closures or restrictions, route caps, routes shared with another team, shortages and over-full stockpiles show here. Flags never block anything." },
+    { anchor: "lookahead-tabs", title: "Actuals.", body: "On Account, type what really moved last week. A line that reaches 98% of its plan counts as delivered." },
   ],
   carbon: [
     { anchor: "carbon-compare", title: "1. Your approved plan.", body: "Its carbon in tCO2e and its lorry loads: where you start." },
@@ -1592,8 +1597,10 @@ const GUIDE_STEPS = {
     { anchor: "carbon-target", title: "6. Carbon target.", body: "The planner sets the agreed decisions as the scheme's target." },
   ],
   data: [
-    { anchor: "rail", title: "Routes are HGV-legal", body: "for the vehicle's dimensions and weight, and are drawn on the map." },
-    { anchor: "rail", title: "Zones", body: "carry the rules: a weight limit, a seasonal window, or a cap on lorries per day." },
+    // 11 Oct 2026 (guide update): the old title claimed more than routing does; a zone carries no seasonal window
+    // (Config) and no daily lorry cap (set on the route)
+    { anchor: "rail", title: "Routes", body: "are routed for a lorry of the vehicle's weight and size, out laden and back empty, and drawn on the map." },
+    { anchor: "rail", title: "Zones", body: "mark road closures, weight or height limits, works areas and temporary haul roads; routing can avoid them. Lorry caps are set on each route, seasonal windows in Config." },
   ],
 };
 function guideRead(k){ try { return localStorage.getItem(GUIDE_KEY + k); } catch(e){ return null; } }
@@ -3235,7 +3242,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
     <div className="max-w-7xl mx-auto p-6">
       <PageHeader title="Forecasts" kicker="Plan"
         subtitle={canApprove
-          ? "Every forecast line you can see, across every year it covers. Approve or reject each line here; approved lines feed the route map, the look-ahead and the KPI cards."
+          ? "Every forecast line you can see, across every year it covers. Approve or reject each line here; approved lines feed the public map, the Look-ahead and the Dashboard."
           : `Your ${TEAM().toLowerCase()}'s forecast lines, across every year each one covers. Edit reopens a line in Submit forecast; a revised line goes back for approval.`}
         actions={<>
           <button onClick={() => setTick(t => t + 1)} className="btn-sec">Refresh</button>
@@ -5633,7 +5640,7 @@ function RoutePlanning({ route, token, onSaved }){
 // ================================================================= Data Management (Phase 1)
 // This is the structural view of the network: every route is drawn the same neutral
 // navy and the selected one is the only thing highlighted. Material colouring belongs
-// on the forecasting dashboard and the public route map, not here.
+// on the Dashboard and the public map, not here.
 const ROUTE_COLOR = "#2563EB";
 // pairs HERE could not route — drawn dashed straight so 'impossible' reads differently
 // from 'not baked yet', which used to look identical (both simply absent)
@@ -7889,7 +7896,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       <PageHeader
         title={onLoc ? "Locations" : onRoutes ? "Routes" : "Zones"}
         subtitle={onLoc
-          ? "Every site the network hauls from and to. Click the map to place one, drag a marker to move it; a site that a route uses cannot be deleted."
+          ? "Every site the network hauls from and to. Click the map to place one, drag a marker to move it; deleting a site also deletes every route that uses it."
           : onRoutes
           ? "Origin → destination pairs, baked against HERE for real HGV geometry in both directions. Editing a route keeps its forecasts; moving an end clears the geometry until it is re-baked."
           : "Haul roads, restricted areas and the other polygons routing is aware of. A haul road is a zone a route can be told to use."}
@@ -8629,7 +8636,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   backgroundImage: `repeating-linear-gradient(to right, ${FAILED_COLOR} 0 4px, transparent 4px 7px)` }} />No route found
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">Routes are drawn one colour here — this view is about the shape of the network. Material colouring lives on the forecasting dashboard and the public route map.</p>
+            <p className="text-[11px] text-slate-400 mt-2">Routes are drawn one colour here — this view is about the shape of the network. Material colouring lives on the Dashboard and the public map.</p>
             <p className="text-[11px] text-slate-400 mt-1">
               Every route is routed twice: laden out, empty back — the empty lorry is lighter,
               so it can use roads the loaded one legally can't. A green vehicle chip means both
