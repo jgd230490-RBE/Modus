@@ -444,10 +444,17 @@ def save(doc, by=None, network=None):
     return {"ok": True, "problems": []}
 
 
-def reset_to_file(conversions, by=None):
-    """Overwrite the stored document with the file. The one way the file wins again."""
+def reset_to_file(conversions, by=None, network=None):
+    """Overwrite the stored document with the file. The one way the file wins again.
+
+    11 Oct 2026: `network` is passed through to save(), so a reset is held to the same
+    rule as a Save: a vehicle the network is baked for cannot be removed. Until the EU
+    vehicles left the seed the file always carried every vehicle a live document did, so
+    a reset never removed one; now a live row saved before 11 Oct (the demo's) carries
+    four the file lacks, and an unguarded reset would drop them under baked geometry and
+    re-base every line on them silently. The endpoint always passes the network."""
     doc = _file_doc(conversions)
-    res = save(doc, by=f"reset:factors.json ({by or 'unknown'})")
+    res = save(doc, by=f"reset:factors.json ({by or 'unknown'})", network=network)
     return {"ok": res["ok"], "problems": res["problems"], "doc": doc}
 
 

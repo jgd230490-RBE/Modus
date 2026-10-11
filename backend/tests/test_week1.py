@@ -383,6 +383,7 @@ ok("A (11 Oct 2026): a vehicle without its own load/unload minutes falls back to
 import config  # noqa: E402
 import derived  # noqa: E402
 import fairprice  # noqa: E402
+import inspect  # noqa: E402
 EU_OLD = {
     "N3 lorry (BA) 4-axle TPMLM 32 t tipper": {
         "code": "V07", "planning_vehicle": True, "eu_category": "N3", "body_code": "BA", "licence": "C",
@@ -440,8 +441,40 @@ ok("A3: the same document for a GB tenant (the live demo's case): GB's lead list
    conversions.planning_vehicle_names(_OGB)[0] == "Rigid 8-wheeler (32t)"
    and conversions.hidden_vehicle_names(_OGB) == [V07, V10, V11, V12, "Rigid 7.5t"]
    and conversions.vehicle_labels(_OGB)["langs"] == ["en"] and derived.payload_for("Ghost lorry", _OGB) == (20.0, "Rigid 8-wheeler (32t)"))
-config.reset_to_file(conversions, by="test_week1 A3")
+# 11 Oct 2026 (review): Reset to file is now the one path where the file LACKS vehicles a live
+# document carries, so it must be held to Save's rule — a vehicle the network is baked for cannot
+# be removed. Until this fix the reset called save() with no network and dropped a baked EU
+# vehicle silently (its geometry orphaned, every line on it re-based on the fallback payload).
+# Baked here: V07 (which the file lacks) and the default profile (which the file keeps).
+for _vp in (V07, "Artic Tipper (44t)"):
+    db.execute("INSERT INTO route_geometry (tenant_id, route_id, vehicle_profile, leg, alt_index, geometry, "
+               "distance_km, duration_hr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+               (db.current_tenant(), "RA3", _vp, "loaded", 0, "[[-0.5,53.2],[-0.4,53.3]]", 30.0, 0.7))
+_rr = None
+try:
+    main.reset_factors_config(updated_by="test_week1 A3", token=os.environ.get("ADMIN_TOKEN"))
+except Exception as _e:
+    _rr = _e
 config.invalidate()
+ok("A3 (11 Oct 2026 review): ⭐ Reset to file is REFUSED (400) while the network is baked for an EU vehicle the file lacks, naming it",
+   getattr(_rr, "status_code", None) == 400
+   and f"vehicle '{V07}' has baked route geometry and cannot be removed" in str(getattr(_rr, "detail", "")), repr(_rr)[:300])
+ok("A3 (11 Oct 2026 review): ...and the refused reset leaves the live document as it was: all four EU entries, V07 still leads",
+   set(EU_OLD) <= set(conversions.load_factors()["vehicles"]) and main.meta()["planning_vehicles"] == [V07, V10, V11, V12]
+   and config.status(conversions)["differs_from_file"] is True)
+ok("A3 (11 Oct 2026 review): ...the refusal names ONLY the vehicle the file lacks — the baked default profile, which the file keeps, is not a problem",
+   "Artic Tipper (44t)" not in str(getattr(_rr, "detail", "")))
+ok("A3 (11 Oct 2026 review): the reset endpoint and reset_to_file both pass the network through (source level)",
+   "reset_to_file(conversions, by=updated_by, network=network)" in inspect.getsource(main.reset_factors_config)
+   and "save(doc, by=f\"reset:factors.json ({by or 'unknown'})\", network=network)" in inspect.getsource(config.reset_to_file))
+db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?",
+           (db.current_tenant(), "RA3", V07))
+# NARROWED 11 Oct 2026 (review): the reset below now goes through the endpoint (which passes the
+# network) once V07's geometry is gone; the default profile's baked row stays and must not block it.
+_rok = main.reset_factors_config(updated_by="test_week1 A3", token=os.environ.get("ADMIN_TOKEN"))
+config.invalidate()
+ok("A3 (11 Oct 2026 review): with no baked geometry on a vehicle the file lacks, the endpoint's reset succeeds (a baked profile the file keeps does not block it)",
+   _rok.get("ok") is True)
 ok("A3: Reset to file brings back the seed: the six UK lead names, no EU entry",
    main.meta()["planning_vehicles"] == PLANNING and not set(EU_OLD) & set(main.meta()["vehicles"]))
 

@@ -73,5 +73,13 @@
  },
  "fair_reason": null,
  "index_eur_per_l": 1.922,
- "index_bulletin_date": "2026-09-07"
+ "index_bulletin_date": "2026-09-07",
+ "carbon": {
+  "material_t": 62.581,
+  "transport_t": 24.066,
+  "disposal_t": null,
+  "total_t": 86.647,
+  "unrouted": false,
+  "basis": "Making the material at the UK Government 2026 factor for aggregates; transport there and back on the routed distance."
+ }
 }

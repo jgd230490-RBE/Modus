@@ -589,8 +589,13 @@ ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the
    and "+ {DU()} × running" in fe and "+ km × running" not in fe)
 ok("🔴 the route form's rate help names no country and reads the tenant's unit",
    "usual Estonian quote" not in fe and "per-{DU()} rate is a common haulage quote" in fe)
+# NARROWED 11 Oct 2026 (review): the column is gated on vehLangEditable("ee") — the COUNTRY rule alone. Gated on
+# vehLangShown("ee") it also needed a vehicle to carry an Estonian name already, so an Estonian organisation on
+# the new seed (English names only) could never type its first one. The header buttons keep vehLangShown.
 ok("🔴 Config → Vehicles shows the Estonian label column to an Estonian tenant only",
-   '.filter(h => h !== "Estonian" || vehLangShown("ee"))' in fe and '{vehLangShown("ee") && <td' in fe)
+   '.filter(h => h !== "Estonian" || vehLangEditable("ee"))' in fe and '{vehLangEditable("ee") && <td' in fe
+   and 'const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");' in fe
+   and 'h !== "Estonian" || vehLangShown("ee")' not in fe and '{vehLangShown("ee") && <td' not in fe)
 ok("🔴 the Submit form never defaults to a hidden vehicle (first SHOWN of the category's list)",
    "const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v))" in fe
    and "useState(firstShown(vehicles))" in fe and "(firstShown(suggestedVehicles) || v)" in fe

@@ -229,8 +229,17 @@ ok("11 Oct 2026: the English fallback sits after the tenant block, not inside it
 ok("11 Oct 2026: Config → Vehicles' Planning tick keeps the planning list's order and appends a new tick",
   code.includes("const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith(\"_\") && d.vehicles[x].planning_vehicle && !kept.includes(x))];")
   && !code.includes("d.planning_vehicles = Object.keys(d.vehicles).filter("));
-ok("11 Oct 2026: Config → Vehicles' Estonian column (shown only when offered) shows the id as its placeholder, not 'falls back to EU'",
+// NARROWED 11 Oct 2026 (review): the label said "(shown only when offered)"; the column now follows the country alone
+ok("11 Oct 2026: Config → Vehicles' Estonian column (an Estonian tenant's) shows the id as its placeholder, not 'falls back to EU'",
   !src.includes('placeholder="falls back to EU"') && code.includes('value={lab.ee || ""} placeholder={k}'));
+// 11 Oct 2026 (review): gated on what the server OFFERS, the column needed an Estonian name to exist before one could
+// be typed — on the new seed (English names only) an Estonian organisation never saw it. The column follows the
+// country rule alone; the header's buttons still need a choice (vehLangShown, above).
+ok("11 Oct 2026 (review): ⭐ the Config Estonian column is gated on the COUNTRY alone (vehLangEditable), not on the offered languages",
+  code.includes('const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");')
+  && !/const vehLangEditable = [^\n]*VEH\.langs/.test(code)
+  && code.includes('.filter(h => h !== "Estonian" || vehLangEditable("ee"))') && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""}')
+  && !code.includes('vehLangShown("ee")'));
 // 11 Oct 2026: ⭐ the four EU type-approval vehicles are gone from the app's source — no name, no code, no 'aliases'
 // note (only those entries carried aliases), and no comment that describes them as present
 ok("11 Oct 2026: ⭐ the staff app names none of the four EU type-approval vehicles or their codes",

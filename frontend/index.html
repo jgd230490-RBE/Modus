@@ -3626,7 +3626,7 @@ function ConfigPage({ meta, who, access }){
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangShown("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -3634,7 +3634,7 @@ function ConfigPage({ meta, who, access }){
                     <tr key={k}>
                       <td><div className="font-medium text-slate-800 leading-tight">{k}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
                       <td className="min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={k} aria-label={`${k} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
-                      {vehLangShown("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={k} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
+                      {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={k} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
                       <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${k} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
                       <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${k} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
                       <td className="num w-28"><input className={inp + " text-right"} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km ?? ""} aria-label={`${k} kg CO2e per km`} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
@@ -5782,6 +5782,11 @@ const VEH_LANGS = [["en", "English"], ["eu", "European"], ["ee", "Estonian"]];
 const vehLangShown = (k) => k === "en" || ((VEH.langs || []).includes(k) && (
      (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE")
   || (k === "eu" && String(TENANT.country || "").toUpperCase() !== "GB")));
+// 11 Oct 2026 (review): the Config page's Estonian label COLUMN follows the country alone. The header's
+// buttons need a vehicle to carry the language (vehLangShown), but the column is where an Estonian
+// organisation types its FIRST Estonian name, and gating it on what is offered left no way in but the
+// raw JSON. The column only edits labels.ee; nothing a forecast stores changes.
+const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");
 const vehLabel = (v, lang) => ((VEH.labels[v] || {})[lang || VEH.lang]) || v || "";
 const vehIsFallback = (v, lang) => ((VEH.fallbacks[v] || []).includes(lang || VEH.lang));
 // short form for tables: the label, minus the leading 'Artic'/'Rigid' of the trade names

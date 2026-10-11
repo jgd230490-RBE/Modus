@@ -537,6 +537,37 @@ async function reloadResume(){
   await act(async () => { d.root.unmount(); }); d.box.remove();
 }
 
+// ---- 11 Oct 2026 (review): Config → Vehicles' Estonian column follows the COUNTRY, not the offered languages ----
+// On the new seed every vehicle carries English alone, so the server offers ["en"]. Gated on what is offered, an
+// Estonian organisation never saw the column it needs to type its first Estonian name. Mounted for real, the doc
+// served by a stubbed GET /api/config/factors.
+async function configEstonianColumn(){
+  const DOC = { vehicles: { _default: { payload_t: 20 }, "Rigid 8-wheeler (32t)": { payload_t: 20, gvw_t: 32, labels: { en: "Rigid 8-wheeler (32t)" } } },
+                material_categories: {}, planning: { load_minutes: 12, unload_minutes: 8, working_days_per_month: 22 } };
+  w.fetch = (url) => /\/api\/config\/factors$/.test(String(url)) ? respond({ doc: DOC, status: { source: "file" }, file: DOC }) : new Promise(() => {});
+  const mount = async (country) => {
+    w.__TENANT.country = country; w.__VEH.langs = ["en"];
+    const box = w.document.createElement("div"); w.document.body.appendChild(box);
+    const root = w.ReactDOM.createRoot(box);
+    await act(async () => { root.render(w.React.createElement(w.ConfigPage, { meta: {}, who: "tester", access: plannerAcc })); });
+    await tick(); await tick();
+    const th = [...box.querySelectorAll("table.tbl thead th")].map(x => x.textContent.trim());
+    const inputs = box.querySelectorAll("table.tbl tbody tr")[0] ? box.querySelectorAll("table.tbl tbody tr")[0].querySelectorAll('input[placeholder="Rigid 8-wheeler (32t)"]').length : -1;
+    await act(async () => { root.unmount(); }); box.remove();
+    return { th, inputs };
+  };
+  const ee = await mount("EE");
+  ok("CONFIG (11 Oct 2026 review): ⭐ an Estonian tenant offered English alone still sees the Estonian column, to type its first Estonian name",
+     ee.th.includes("Vehicle (id)") && ee.th.includes("Estonian") && ee.inputs === 2, JSON.stringify(ee));
+  const gb = await mount("GB");
+  ok("CONFIG (11 Oct 2026 review): ...a GB tenant does not (the country rule stands), English column only",
+     gb.th.includes("English") && !gb.th.includes("Estonian") && gb.inputs === 1, JSON.stringify(gb));
+  const hdr = headerWith(["en"], "EE");
+  ok("CONFIG (11 Oct 2026 review): ...while the header still draws no buttons for that Estonian tenant until a vehicle carries an Estonian name",
+     hdr.names.length === 0 && !hdr.seg, JSON.stringify(hdr));
+  w.__VEH.langs = ["en"]; w.__TENANT.country = null; w.__VEH.lang = "en"; w.fetch = () => new Promise(() => {});
+}
+
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
 (async () => {
@@ -546,6 +577,8 @@ async function reloadResume(){
   catch (e) { ok("MAP UNDER THE BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await reloadResume(); ok("RELOAD: the section ran to the end", true); }
   catch (e) { ok("RELOAD: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await configEstonianColumn(); ok("CONFIG (11 Oct 2026 review): the section ran to the end", true); }
+  catch (e) { ok("CONFIG (11 Oct 2026 review): the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));

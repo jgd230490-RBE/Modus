@@ -1276,9 +1276,11 @@ def put_factors_config(body: FactorsIn, token: Optional[str] = None):
 
 @app.post("/api/admin/config/factors/reset")
 def reset_factors_config(updated_by: Optional[str] = None, token: Optional[str] = None):
-    """Overwrite the live document with backend/factors.json."""
+    """Overwrite the live document with backend/factors.json. Refused, with the problems,
+    when the file would remove a vehicle the network is baked for (11 Oct 2026: the same
+    check a Save makes)."""
     _check_admin(token)
-    res = config.reset_to_file(conversions, by=updated_by)
+    res = config.reset_to_file(conversions, by=updated_by, network=network)
     if not res["ok"]:
         raise HTTPException(400, "; ".join(res["problems"]))
     return {"ok": True, "status": config.status(conversions)}

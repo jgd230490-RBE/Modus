@@ -432,10 +432,11 @@ ok("demo: GBP and GB", fac["tenant"]["currency"] == "GBP" and fac["tenant"]["cou
 ok("demo: no thaw season, no seasonal restrictions",
    fac["fair_price"]["season"]["thaw_months"] == [] and fac["seasonal_restrictions"] == [])
 # 11 Oct 2026: the user removed the four EU type-approval vehicles from the product. Gone from the seed every new
-# organisation gets (backend/factors.json), from the demo package, and from the source a person reads. Test
-# fixtures and the tests themselves may still name them (a test rebuilds an old document on purpose), and so may
-# a LIVE document saved before then — the code keeps working with it (test_week1 A3), so no validator rule
-# refuses the names.
+# organisation gets (backend/factors.json), from the demo package, and from the source a person reads. The
+# tests themselves may still name them (a test rebuilds an old document on purpose), and so may a LIVE document
+# saved before then — the code keeps working with it (test_week1 A3), so no validator rule refuses the names.
+# NARROWED 11 Oct 2026 (review): the committed test FIXTURES may not name them any more — cost_lines.json was
+# the last copy (render_frontend / dom_frontend drew a 'V12' chip from it on a fresh clone); it was regenerated.
 _EU4 = ("N3 lorry (BA) 4-axle TPMLM 32 t tipper", "N3 lorry (BA) 4-axle mixer 32 t",
         "N3 tractor (BC) + O4 semi (DA) GCW 40 t", "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t")
 _EU_TOKENS = ("N3 lorry", "N3 tractor", "TPMLM", "O4 semi", "O4 tipping")
@@ -454,6 +455,11 @@ _src_files = ["frontend/index.html", "frontend/help/index.html", "map/index.html
 _hits = [f for f in _src_files if any(t in read(f) for t in _EU_TOKENS + ("V07", "V10", "V11", "V12"))]
 ok("11 Oct 2026: ⭐ no product source (the app, the guide, the map, the backend, the tools, README, env.example) names them or their codes",
    not _hits, str(_hits))
+_fix_files = sorted("backend/tests/fixtures/" + f for f in os.listdir(os.path.join(ROOT, "backend", "tests", "fixtures"))
+                    if f.endswith(".json"))
+_fix_hits = [f for f in _fix_files if any(t in read(f) for t in _EU_TOKENS + ("V07", "V10", "V11", "V12"))]
+ok("11 Oct 2026 (review): ⭐ no test fixture the render harnesses read names them or their codes (cost_lines.json regenerated)",
+   len(_fix_files) >= 10 and "backend/tests/fixtures/cost_lines.json" in _fix_files and not _fix_hits, str(_fix_hits))
 _lead = conversions.planning_vehicle_names(_seed)
 ok("11 Oct 2026: ⭐ the seed's lead list (every new organisation, every country without a vehicle set) is NOT empty, "
    "holds no scenario-only or hidden profile, and every name in it is listed by a material category",
