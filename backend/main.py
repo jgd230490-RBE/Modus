@@ -48,6 +48,7 @@ import costlines     # 11 Sep — one read of every forecast line's volume, haul
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
+import road_sections  # 12 Oct 2026 — shared road sections (public map review §2.2d): the index and the month read
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -1897,6 +1898,50 @@ def public_map_data(profile: Optional[str] = None):
     would just look like a road that isn't there.
     """
     return network.public_map_data(profile=profile)
+
+
+@app.get("/api/public/road-load")
+def public_road_load(month: int = Query(..., ge=1, le=MONTH_COUNT), leg: str = Query("loaded")):
+    """
+    12 Oct 2026 (public map review §2.2d). The month's approved volume per SHARED road
+    section: one entry per run of road two or more routes have in common, with two-way
+    movements a day (one load = one two-way movement, the routes' Approved trips in the
+    month ÷ working days, summed over the routes that share the run), vehicles, the
+    month's CO2e share by length, the routes and their team names, and the run's
+    polyline. The loaded leg by default; leg=return serves the same loads running back
+    empty, separately and never added. Behind the map gate like the rest of /api/public/.
+
+    Working days come from _working_days(), the one reader of that figure.
+    """
+    if leg not in road_sections.LEGS:
+        raise HTTPException(400, f"leg must be one of {list(road_sections.LEGS)}")
+    factors = conversions.load_factors()
+    return road_sections.road_load(int(month), factors=factors,
+                                   working_days=_working_days(factors), leg=leg)
+
+
+@app.post("/api/admin/road-sections/rebuild")
+def road_sections_rebuild(token: Optional[str] = None):
+    """Rebuild the shared-section index from the stored geometry. No external call."""
+    _check_admin(token)
+    return road_sections.rebuild()
+
+
+@app.get("/api/admin/road-sections/status")
+def road_sections_status(token: Optional[str] = None):
+    """Counts: routes indexed, runs, vertices shared — per leg — and whether the stored index is stale."""
+    _check_admin(token)
+    return road_sections.status()
+
+
+@app.get("/api/admin/diagnostics/road-sections")
+def diagnostics_road_sections(top: int = Query(10, ge=1, le=100), leg: str = Query("loaded"),
+                              token: Optional[str] = None):
+    """Read-only: the status and the longest stored runs with their route sets."""
+    _check_admin(token)
+    if leg not in road_sections.LEGS:
+        raise HTTPException(400, f"leg must be one of {list(road_sections.LEGS)}")
+    return road_sections.diagnostics(top=int(top), leg=leg)
 
 
 # --------------------------------------------------------------------------- #

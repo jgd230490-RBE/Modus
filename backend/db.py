@@ -59,6 +59,10 @@ TENANTED_TABLES = {
     # Look-ahead v2 slice 1, 2026-09-09. A day layer on forecast_weeks, same rule, same
     # edit. Keyed by the week's line key plus a date; visibility is the parent line's ipt.
     "forecast_days",
+    # 12 Oct 2026 (public map review §2.2d). The shared-road-section index built from
+    # route_geometry: derived data, but derived from one tenant's baked routes and
+    # carried in its package, so tenanted like the geometry it comes from.
+    "route_sections",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -391,6 +395,9 @@ def init_network_db():
                 conn.rollback()  # column already present — fine
         _create_tenanted(cur, "routes")
         _create_tenanted(cur, "route_geometry")
+        # 12 Oct 2026 (§2.2d): the shared-section index. Born with tenant_id in the
+        # key, so no migration; a plain CREATE IF NOT EXISTS on both backends.
+        _create_tenanted(cur, "route_sections")
         conn.commit()
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
@@ -978,6 +985,22 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, route_id, vehicle_profile, leg, alt_index)
         )
     """,
+    # 12 Oct 2026 (§2.2d). One row per shared RUN of road: the routes that own it (a JSON
+    # list of route ids), its polyline (a JSON lon/lat list), its haversine length and
+    # when it was built. Derived from route_geometry by road_sections.rebuild() and
+    # rewritten whole on every rebuild — never edited by hand, never typed.
+    "route_sections": """
+        CREATE TABLE route_sections (
+            tenant_id     TEXT NOT NULL DEFAULT 'default',
+            section_id    TEXT NOT NULL,
+            leg           TEXT NOT NULL DEFAULT 'loaded',
+            routes_json   TEXT NOT NULL,
+            geometry_json TEXT NOT NULL,
+            length_km     REAL,
+            built_at      TEXT,
+            PRIMARY KEY (tenant_id, leg, section_id)
+        )
+    """,
     "disciplines": """
         CREATE TABLE disciplines (
             tenant_id  TEXT NOT NULL DEFAULT 'default',
@@ -1277,6 +1300,7 @@ _TENANT_PK = {
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",
+    "route_sections": "(tenant_id, leg, section_id)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

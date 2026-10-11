@@ -656,7 +656,10 @@ ok("🔴 computed, NOT stored — the read created exactly the day rows slice 1 
    db.query("SELECT COUNT(*) AS n FROM forecast_days WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
    == len(DATES) * 4 and n_days_before == 0)
 ok("...no new table, no new column: sixteen tenanted tables, forecast_days' DDL unchanged",
-   len(db.TENANTED_TABLES) == 16 and "trips" not in db._TENANT_DDL["forecast_days"].lower())
+   # NARROWED 12 Oct 2026: the sixteen are counted without route_sections (§2.2d), the one
+   # table added since; slice 2 itself still added none
+   len(db.TENANTED_TABLES - {"route_sections"}) == 16 and "route_sections" in db.TENANTED_TABLES
+   and "trips" not in db._TENANT_DDL["forecast_days"].lower())
 
 # ---- context chips
 c1 = L["WS1"]["context"]
@@ -889,7 +892,9 @@ ok("routes gained the five planning columns (DDL and live table)",
 ok("forecast_weeks gained actual_cost_eur, calibrated_at, calibrated_qty",
    all(c in [x.lower() for x in db._columns_of(db.get_conn().cursor(), "forecast_weeks")]
        for c in ("actual_cost_eur", "calibrated_at", "calibrated_qty")))
-ok("...and still sixteen tenanted tables — no new table for slices 3-6", len(db.TENANTED_TABLES) == 16)
+ok("...and still sixteen tenanted tables — no new table for slices 3-6 (NARROWED 12 Oct 2026: counted without "
+   "route_sections, §2.2d, the one table added since)",
+   len(db.TENANTED_TABLES - {"route_sections"}) == 16 and "route_sections" in db.TENANTED_TABLES)
 db.init_lookahead_db()
 ok("init_lookahead_db() is idempotent on a table that already has the columns", True)
 

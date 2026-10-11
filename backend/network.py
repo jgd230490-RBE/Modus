@@ -15,6 +15,7 @@ import here_routing
 import stockpiles   # Week 1, Task D2 — the stockpile balance read model
 import zones          # Phase 3 — supplies the avoid[areas] the bake path sends to HERE
 import haul           # Phase 4 — threads temporary haul roads into the bake path
+import road_sections  # 12 Oct 2026 (§2.2d) — the shared-section index, rebuilt when a primary geometry changes
 import gates          # Phase 5a — resolves which gate each leg enters and leaves by
 
 DEFAULT_PROFILE = "Artic Tipper (44t)"
@@ -388,6 +389,10 @@ def _upsert_geom(route_id, profile, geometry, dist, dur, error, leg="loaded", al
         "UPDATE routes SET restrictions_hits = NULL, restrictions_checked_at = NULL, "
         "restrictions_status = NULL WHERE tenant_id = ? AND id = ?",
         (db.current_tenant(), route_id))
+    # 12 Oct 2026 (§2.2d): a new PRIMARY geometry changes which roads are shared, so the
+    # section index is rebuilt here. Alternatives are not indexed and do not trigger it.
+    if int(alt_index or 0) == 0:
+        road_sections._rebuild_quietly("geometry upsert")
 
 
 def clear_geometry(profile=None, leg=None, route_id=None):
@@ -421,6 +426,7 @@ def clear_geometry(profile=None, leg=None, route_id=None):
     if clauses:
         sql += " AND " + " AND ".join(clauses)
     db.execute(sql, (db.current_tenant(),) + tuple(params))
+    road_sections._rebuild_quietly("geometry clear")     # 12 Oct 2026 (§2.2d)
     return True
 
 
@@ -1313,6 +1319,7 @@ def delete_route(route_id):
                (db.current_tenant(), route_id))
     db.execute("DELETE FROM routes WHERE tenant_id = ? AND id = ?",
                (db.current_tenant(), route_id))
+    road_sections._rebuild_quietly("route delete")       # 12 Oct 2026 (§2.2d)
     return {"id": route_id}
 
 
@@ -1321,6 +1328,7 @@ def clear_routes():
     n = len(db.query("SELECT id FROM routes WHERE tenant_id = ?", (db.current_tenant(),)))
     db.execute("DELETE FROM route_geometry WHERE tenant_id = ?", (db.current_tenant(),))
     db.execute("DELETE FROM routes WHERE tenant_id = ?", (db.current_tenant(),))
+    road_sections._rebuild_quietly("routes clear")       # 12 Oct 2026 (§2.2d)
     return {"cleared": n}
 
 
@@ -1737,6 +1745,7 @@ def promote_alternative(route_id, profile, alt_index, leg="loaded"):
         "UPDATE route_geometry SET alt_index = ? WHERE tenant_id = ? AND route_id = ? "
         "AND vehicle_profile = ? AND leg = ? AND alt_index = ?",
         (alt_index, db.current_tenant(), route_id, profile, leg, TMP))
+    road_sections._rebuild_quietly("alternative promoted")   # 12 Oct 2026: a new primary
     return {"route_id": route_id, "profile": profile, "leg": leg,
             "promoted": alt_index, "swapped_with": 0,
             "note": "Re-baking this route will restore HERE's own ranking."}
