@@ -1921,11 +1921,15 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   const gfU = (src.match(/const GUIDE_FORECAST_STEPS = \[[\s\S]*?\];/) || [""])[0];
   const stepsOf = (k) => (gsU.match(new RegExp(`\\n  ${k}: \\[([\\s\\S]*?)\\n  \\],`)) || ["", ""])[1];
   const dashU = stepsOf("dashboard"), laU = stepsOf("lookahead"), dataU = stepsOf("data");
+  // NARROWED 11 Oct 2026 (guide v2.1 review): "everything below follows" was not true (this week's plan and the
+  // carbon target read their own, unfiltered data), so step 1 now names the two exceptions
   ok("guide update: the dashboard tour starts on the filters and points to today's folded section, on the same four anchors",
-     dashU.includes('{ anchor: "page-header", title: "The plan at a glance.", body: "Pick the months, team and status here; everything below follows. Today\'s figures are under This week and today, further down." }')
+     dashU.includes('{ anchor: "page-header", title: "The plan at a glance.", body: "Pick the months, team and status here; the cards and charts follow, except this week\'s plan and the carbon target. Today\'s figures are under This week and today, further down." }')
      && (dashU.match(/anchor: "/g) || []).length === 4 && dashU.includes('anchor: "dash-wall"'));
+  // NARROWED 11 Oct 2026 (guide v2.1 review): the step titled "Six cards." named five; it names all six now, and says
+  // which one is the Look-ahead's rather than "for the lines in view"
   ok("...the cards step names the six cards; the carbon step says transport only and points to the target strip; cost is in its chart",
-     dashU.includes('title: "Six cards."') && dashU.includes("Deliveries a day, vehicles needed, this week's plan, delivered against plan and transport carbon")
+     dashU.includes('title: "Six cards."') && dashU.includes("Material in view, deliveries a day, vehicles needed, delivered against plan and transport carbon for the lines in view, and this week's plan from the Look-ahead.")
      && dashU.includes('title: "Carbon."') && dashU.includes("Transport carbon counts transport only.") && dashU.includes("Cost is in the Cost over time chart."));
   ok("🔴 ...and the old dashboard promises are gone (today in the header, the seven-day number, cost on the cards)",
      !/title: "Today\."|seven-day|Cost and carbon\.|Planned cost, the modelled fair price/.test(dashU));
@@ -1943,6 +1947,23 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && gfU.includes("the Look-ahead and the public map.") && !/the tonnes by month|from submitted to approved/.test(gfU));
   ok("🔴 the changed tour copy keeps the house words: lorry, never truck; no team id",
      !/\btrucks?\b/i.test(gsU + gfU) && !/IPT/.test(gsU + gfU));
+  // 11 Oct 2026 (late, guide v2.1 review) — the corrected statements
+  ok("🔴 guide v2.1 review: the dashboard tour no longer says everything follows the filters",
+     !/everything below follows/.test(dashU) && /except this week's plan and the carbon target/.test(dashU));
+  ok("🔴 ...the actuals step says a line that REACHES 98% of its plan is delivered (clashes.HOLD_BAND: actual >= 0.98 x plan), not 'within'",
+     laU.includes("A line that reaches 98% of its plan counts as delivered.") && !/within 98%/.test(laU));
+}
+
+// ---- 11 Oct 2026 (late) — guide v2.1 review: the on-screen text that contradicted the guide -------------
+{
+  ok("🔴 the Locations subtitle says deleting a site deletes its routes (network.delete_location), as the confirm does",
+     src.includes("drag a marker to move it; deleting a site also deletes every route that uses it.")
+     && !src.includes("a site that a route uses cannot be deleted")
+     && src.includes("This also removes any routes that use it."));
+  ok("🔴 ...the planner's Forecasts subtitle and the Data legend call the map the public map, and the Dashboard by its name",
+     src.includes("approved lines feed the public map, the Look-ahead and the Dashboard.")
+     && src.includes("Material colouring lives on the Dashboard and the public map.")
+     && !/approved lines feed the route map|the KPI cards\."|forecasting dashboard and the public route map/.test(src));
 }
 
 // ---- report ------------------------------------------------------------------

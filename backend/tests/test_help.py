@@ -161,8 +161,15 @@ ok("...and it explains the map password and that it does not open the guide",
 # 2026-09-14: written after I replaced this whole paragraph instead of its first sentence
 # and silently deleted the Control Panel description with it. Correcting a stale sentence
 # must not cost the paragraph around it.
+# NARROWED 11 Oct 2026 (guide v2.1 review): the Control Panel description became a list, so the one line
+# "Route filtering, Basemap, Overlays" no longer exists. The description must still name every group, in order.
+_cp_at = src.find("The <strong>Control Panel</strong> on the left holds, top to bottom:")
+_cp = src[_cp_at:src.find("</ul>", _cp_at)] if _cp_at >= 0 else ""
+_cp_groups = ("Route filtering", "Layers and basemap", "Basemap, Overlays and Haul routes", "What's moving",
+              "Road closures", "Road restrictions", "Forecast traffic volume")
 ok("\U0001f534 ...and correcting that sentence did NOT take the Control Panel description "
-   "with it", "Control Panel" in src and "Route filtering, Basemap, Overlays" in src
+   "with it", "Control Panel" in src and all(g in _cp for g in _cp_groups)
+   and [_cp.index(g) for g in _cp_groups] == sorted(_cp.index(g) for g in _cp_groups)
    and "the \u2630 button opens it" in src)
 
 # deep links
@@ -354,7 +361,7 @@ ok("⭐ the picker covers the carbon symptoms people will hit (all-in vs transpo
                            "The carbon target says the agreed decisions no longer fit the plan",
                            "Our carbon does not match the National Highways Carbon Tool")))
 
-# REVERSED 11 Oct 2026: the 9 Oct TARK TEE row said an unreachable or never-run check raises the flag; clashes.py
+# 11 Oct 2026: guide text corrected (no assertion reversed): the 9 Oct TARK TEE row said an unreachable or never-run check raises the flag; clashes.py
 # raises no RESTRICTION flag then (sources.restrictions is "unavailable" and the line under the rail says NOT checked)
 ok("🔴 the restriction flags are raised by a hit only; an unchecked route raises none and the rail line says NOT checked",
    "or the check is unavailable or has never run" not in text and text.count("A route never checked raises no flag") == 2
@@ -363,6 +370,158 @@ ok("🔴 the restriction flags are raised by a hit only; an unchecked route rais
 # the /help/ sign-in page names the rail's link as it reads
 ok("the guide's own sign-in page names the rail link as it reads (User guide), not 'Help link'",
    "User guide at the foot of the app's menu on the left." in main_src and "Help link in the app" not in main_src)
+
+# =========================================================================== #
+#  11 Oct 2026 (late) — the two verifiers' findings on guide v2.1, fixed          #
+# =========================================================================== #
+# Each pins a corrected statement (checked against the code the same evening) and that the wrong one is gone.
+# What they do not prove: how the page reads in a browser, or what the regenerated PNGs show (the images are
+# pinned through their generator's source, not their pixels).
+FE = os.path.join(ROOT, "frontend", "index.html")
+GEN = os.path.join(ROOT, "backend", "tools", "make_guide_images.js")
+fe_src = open(FE, encoding="utf-8").read()
+gen_src = open(GEN, encoding="utf-8").read()
+
+# sign-in: a reload returns to the public map, because nothing restores the session from the stored code.
+# A TRIPWIRE as well: if the app starts restoring the session on load (branch claude/stay-signed-in), this fails
+# until the guide's sentence and its troubleshooting row are changed to match.
+_restores = ('ACCESS.code ? "resume"' in fe_src) or ("Signing you back in" in fe_src)
+_says_reload = ("closing the tab, or reloading the page, returns you to the public map" in text
+                and "Reloading returns you to the public map: sign in again." in text)
+ok("\U0001f534 sign-in: the guide says a reload returns you to the public map exactly when the app does not "
+   "restore the session (if this fails after a merge, rewrite the 2.1 bullet and the 'page looks stale' row)",
+   _says_reload != _restores and "closing the tab signs you out of the app" not in text)
+ok("...the Forecasts badge counts Pending or Mixed lines, and the guide says so (not 'waiting for approval')",
+   'r.status === "Pending" || r.status === "Mixed"' in fe_src
+   and "shows how many lines are Pending or Mixed" in text and "lines are waiting for approval while" not in text)
+
+# the demo bar and the tour
+ok("the shared demo: one callout names what not to press, and the map's first tour has no welcome",
+   "On the shared demo, show these but do not press them" in text and "Bake all</strong> (it spends routing calls)" in src
+   and "Your first tour in the app starts with a two-step welcome; the map's tour has none." in text
+   and "Opened at the site address followed by /map/, the map shows the notice at its top, with Guide beside it." in text)
+
+# the Dashboard: what follows the filters, what a focused line narrows
+ok("\U0001f534 the Dashboard: no claim that it calculates nothing of its own; the filters skip this week's plan, "
+   "the target strip and two folded sections; a focused line narrows the cards and charts only",
+   "calculates nothing of its own" not in text and "narrow every chart and figure" not in text
+   and "except <strong>Planned this week</strong> and the carbon target strip" in src
+   and "Top routes highlights its bar and Route planning detail still lists every line" in text
+   and "held to plan. It ignores the filters." in text and "Carbon planner (§6.4)" not in text)
+
+# Submit forecast, Forecasts, approval
+ok("Submit / Forecasts: the Route reference picker; Horizon keeps a re-pended line; Refresh reads the list again",
+   "where two routes join the same pair, it becomes a list to pick from" in text
+   and "Horizon still shows its weeks, marked \"month is now Pending\"" in text
+   and "<strong>Refresh</strong> reads the list again." in src and "<strong>Refresh</strong> reloads the page." not in src)
+ok("\U0001f534 rejecting or re-pending a month deletes NO weeks (main.py: 'Rejecting or reopening deletes NOTHING')",
+   "deletes <strong>none</strong> of its weeks, typed actuals included" in src
+   and "does <strong>not</strong> delete weeks that already carry typed actuals" not in src
+   and "Rejecting or reopening deletes NOTHING" in main_src)
+
+# the Carbon planner
+ok("\U0001f534 Carbon planner: only the totals and the target are all-in; the transport-only tables are named",
+   "Every figure is all-in" not in text
+   and "The totals in steps 1 and 5, and the carbon target in step 6, are all-in" in text
+   and "the transport rows of <strong>How the plan compares</strong>" in src)
+ok("...step 3's controls are a list of their own; step 4 says a tip or recycling site comes with the package",
+   "<li><strong>3 Lorries and routes</strong>:<ul><li><strong>Battery electric lorries</strong>" in src
+   and "the Locations page cannot give a site those types yet" in text
+   and "The table has four rows because the second is a version of the first." not in text
+   and "so they are always lower" not in text and "so they read lower and never match" in text)
+
+# the Look-ahead
+ok("the Look-ahead: weekends are held at 0 and not shown (the grid is Monday to Friday), nowhere 'unless typed'",
+   "Saturday and Sunday are held at zero and not shown." in text and "Saturday and Sunday held at 0 and not shown" in text
+   and "default to zero" not in text and "0 unless typed" not in text
+   and "Sat/Sun are held at 0 and not shown" in fe_src)
+ok("...the KPI strip is a list; the check line's two other states; Esc saves a day",
+   "The <strong>KPI strip</strong> reads:</p>\n<ul>" in src and "not checked since baking" in text
+   and "the stored result stands" in text and "Esc, or clicking elsewhere, saves too" in text
+   and 'e.key === "Enter" || e.key === "Escape") e.currentTarget.blur()' in fe_src)
+
+# the public map
+ok("\U0001f534 the map: compound and railhead are the only squares; a tip draws as Other",
+   "port, site, railhead and compound (squares)" not in text
+   and "Rounded squares: compound (a site cabin) and railhead (rails)." in text
+   and "A site of any other type, such as a tip, is drawn as other." in text)
+ok("...the filters skip stockpiles; the quick buttons are named; the t / day figure is hidden in vehicles",
+   "the route conditions (not to stockpiles over capacity)" in text
+   and "Light, Dark, Satellite and Streets (Streets is not in the Basemap list)" in text
+   and "Material a day appears too" not in text and "as shipped it counts in vehicles, so that figure is not shown" in text)
+ok("...an unbaked line is counted as unknown; a route with no geometry is left out of the bar",
+   "A line whose route is not baked for its vehicle is counted as unknown" in text
+   and "A line whose route has no drawn geometry at all is left out of the bar." in text
+   and "a route that is not baked is counted as unknown" not in text)
+
+# Data pages and settings
+ok("Data pages: a tip keeps its imported type; the Planning tick does not lead a country with its own vehicle set",
+   "a tip or recycling site keeps the type it was imported with" in text
+   and "the Planning tick does not change the lists" in text and "vehicle_sets" in text)
+ok("...the money settings split into three bullets; the token paragraph says a team code cannot open those pages",
+   "<li><strong>Diesel index</strong> —" in src and "<li><strong>Fuel surcharge (BAF)</strong> —" in src
+   and "whichever of the planner or admin codes they signed in with (a team code cannot open those pages)" in text
+   and "and withdraw the lines you saved" in text and "submit, edit and withdraw your team's forecast lines" not in text)
+
+# What the figures mean
+ok("\U0001f534 lorry-km is always both legs; the distance basis changes only t·km and the per-km rate (derived.py, costlines.py)",
+   "<tr><td>Lorry-km</td>" in src and "<tr><td>t·km and the per-km rate</td>" in src
+   and "never lorry-km or carbon" in text and "<tr><td>km, t·km</td>" not in src
+   and "trips × the distance-basis km × rate per km" in text)
+ok("\U0001f534 + BAF is the surcharged quote, quote × (1 + surcharge), not the surcharge (costing.adjust)",
+   "quote × (1 + surcharge)" in text and "the quote × the fuel surcharge." not in text
+   and "return round(float(eur) * (1.0 + float(pct)), 2)" in open(os.path.join(ROOT, "backend", "costing.py"), encoding="utf-8").read())
+ok("...the map's movements a day are not rounded up and are averaged over months with volume",
+   "On the public map, loads are tonnes ÷ payload, not rounded up, averaged over the months that have volume" in text)
+
+# troubleshooting, appendices, glossary
+ok("troubleshooting: the map password box's message has a row; A.1 says whose cadence is unpublished",
+   "That password was not recognised." in text and "That password was not recognised." in main_src
+   and "Tark Tee does not publish how often it updates" in text
+   and "the authority's own update cadence is not published" not in text)
+ok("...A.2: every electric version is 3.5 t lighter; the glossary says CO₂e and CO2e are one thing",
+   "(each 3.5 t less than its diesel lorry)" in text and "(3.5 t less than the diesel lorry)" not in text
+   and "<td class=\"k\">CO₂e / CO2e</td>" in src)
+
+# cross-references: text a team submitter sees never points at a section hidden from them
+_gated = re.findall(r'"([0-9a-z-]+)": "planner"', src)
+_vis = src[:src.find('<h1 id="appendix-d-technical-reference"')]
+for _gid in _gated:
+    _m = re.search(r'<(h[12]) id="%s">' % re.escape(_gid), _vis)
+    if not _m:
+        continue
+    _lv = int(_m.group(1)[1])
+    _nx = re.compile(r"<h[1-%d][ >]" % _lv).search(_vis, _m.end())
+    _vis = _vis[:_m.start()] + (_vis[_nx.start():] if _nx else "")
+_vis = re.sub(r"<nav id=\"nav\">.*?</nav>", "", _vis, flags=re.S)
+_hidden_nums = set()
+for _gid in _gated:
+    _hm = re.search(r'<h[12] id="%s">([0-9.]+)' % re.escape(_gid), src)
+    if _hm:
+        _hidden_nums.add(_hm.group(1).rstrip("."))
+_bad_refs = [r for r in re.findall(r"§([0-9]+(?:\.[0-9]+)?)", _vis)
+             if r in _hidden_nums or any(r.startswith(h + ".") for h in _hidden_nums)]
+ok("\U0001f534 a team submitter's view never refers to a section hidden from it (%d gated sections: %s)"
+   % (len(_hidden_nums), ", ".join(sorted(_hidden_nums))), _hidden_nums and not _bad_refs)
+ok("...and the one pointer to the admin appendix says it is in the admin view",
+   "Appendix D, in the admin view of this guide" in text and "see Appendix D." not in text)
+
+# the pictures: each placeholder's title is its figure caption; no developer instructions on them; no truck
+_holders = dict(re.findall(r'\n  ([SM]\d\d): \["([^"]+)"', gen_src))
+_caps = dict(re.findall(r'<img src="media/([SM]\d\d)\.png"[^>]*><figcaption>Figure \d+ — (.*?)(?: &nbsp;·&nbsp;.*?)?</figcaption>', src))
+_appc = dict((f, c) for c, f in re.findall(r"<tr><td>\d+</td><td>([^<]+)</td><td>([SM]\d\d)\.png</td></tr>", src))
+ok("\U0001f534 every placeholder's title is its figure caption, word for word, and Appendix C agrees (%d pictures)" % len(_caps),
+   len(_caps) == 22 and set(_holders) == set(_caps) and all(_holders[k] == _caps[k] for k in _caps)
+   and all(_appc.get(k) == _caps[k] for k in _caps))
+_holder_fn = gen_src[gen_src.find("function holder("):gen_src.find("(async () =>")]
+ok("\U0001f534 ...the placeholder card no longer prints developer paths (the package file, the capture script)",
+   _holder_fn and "capture_guide.js" not in _holder_fn and "uk-corridor.package.json" not in _holder_fn
+   and "Placeholder — not a screenshot" in _holder_fn)
+_figs_fn = gen_src[gen_src.find("function figNumbers("):gen_src.find("// ---- placeholders")]
+ok("\U0001f534 ...and the drawn figures say lorry / HGV, never truck; figure 3 lists the Carbon planner and the public map",
+   _figs_fn and re.search(r"\btrucks?\b", _figs_fn, re.I) is None
+   and '["Carbon planner",' in _figs_fn and '["Route map", "the public map inside the app"]' in _figs_fn
+   and "drawn before the Carbon planner" not in src)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
