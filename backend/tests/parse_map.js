@@ -1703,6 +1703,11 @@ ok("11 Oct: the map takes the app's shell — warm neutrals, sentence-case 13 px
   && /select \{ width:100%;[^}]*font-size:14px;/.test(html) && /\.btn \{[^}]*background:var\(--action\); color:var\(--action-fg\); \}/.test(html)
   && !/font-size:1(0|0\.5|1)px;\s*color:#8a9099/.test(html) && html.includes('<div style="height:44px;flex:none"></div>')
   && /\.fc-row label\{ font-size:12\.5px;/.test(html) && /\.an-lbl\{ font-size:12px; font-weight:500; letter-spacing:0; text-transform:none;/.test(html));
+ok("11 Oct: the Loads / day card is hidden in a vehicles unit (it repeated two-way movements); kept for tonnes / m3",
+  /<div class="kpi-card" id="kpi-material-card">/.test(html) && code.includes("if (mc) mc.hidden = (unitLbl === 'vehicles');"));
+ok("11 Oct: a bar card never shrinks below its figure; the What's moving figures wrap instead of being cut off",
+  /#kpi-cards \.kpi-card\{ min-width:min-content; \}/.test(html) && /\.kpi-chip\{ flex-wrap:wrap; \}/.test(html)
+  && /\.kpi-chip \.chip-n\{[^}]*white-space:normal;/.test(html) && !/\.kpi-chip \.chip-n\{[^}]*white-space:nowrap/.test(html));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
 console.log();

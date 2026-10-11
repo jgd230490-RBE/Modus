@@ -94,6 +94,9 @@
         /* 11 Oct 2026 — measured at 1280 px: six cards beside the conditions pill overflowed by 231 px and cut
            off both CO2e cards. Labels wrap at about 104 px and the gaps tighten on the desktop bar only. */
         @media (min-width:1024px){ #kpi-cards, .kpi-row{ gap:18px; } #kpi-cards .kpi-label{ white-space:normal; max-width:104px; } }
+        /* 11 Oct 2026 (live, October data): a card could shrink below its own figure, so "302.9" ran into "18".
+           A card now never goes narrower than its figure or its longest label word. */
+        @media (min-width:1024px){ #kpi-cards .kpi-card{ min-width:min-content; } }
         .kpi-card.lead .kpi-label{ color:var(--ink); font-weight:500; }
         .layers-box{ border-top:1px solid var(--line); padding-top:12px; }
         .layers-box > summary{ cursor:pointer; list-style:none; font-size:14px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
@@ -126,7 +129,9 @@
         .kpi-chips:empty{ display:none; }
         .kpi-chip{ display:flex; justify-content:space-between; gap:10px; font-size:13.5px; line-height:1.35; padding:7px 2px;
                    border-top:1px solid var(--line); color:var(--navy-deep); font-variant-numeric:tabular-nums; }
-        .kpi-chip .chip-n{ color:var(--muted); white-space:nowrap; text-align:right; }
+        /* 11 Oct 2026 (live): "29 veh/d · 131 two-way/d · 3,795 t/d" was cut off at 300 px; the figures wrap instead */
+        .kpi-chip{ flex-wrap:wrap; }
+        .kpi-chip .chip-n{ color:var(--muted); white-space:normal; text-align:right; margin-left:auto; }
         .kpi-switch{ display:flex; gap:2px; margin:0 0 8px; padding:2px; border-radius:7px;
                      background:#eef2f7; border:1px solid #e2e8f0; }
         .kpi-switch:empty{ display:none; }
@@ -429,7 +434,7 @@
                 <div class="kpi-value" id="kpi-vehicles">—</div>
                 <div class="kpi-label" id="kpi-vehicles-label">Vehicles needed</div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpi-material-card">
                 <div class="kpi-value" id="kpi-material">—</div>
                 <div class="kpi-label" id="kpi-material-label">Material a day</div>
             </div>
@@ -1754,6 +1759,9 @@
         const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
         const unitLbl = (CONFIG.FORECAST_UNIT === 'm3') ? 'm³' : (CONFIG.FORECAST_UNIT || 'vehicles');
         set('kpi-material-label', `${unitLbl === 'vehicles' ? 'Loads' : unitLbl} / day`);
+        // 11 Oct 2026 (the user): in a vehicles unit "Loads / day" IS the two-way movements figure (one load = one
+        // two-way movement), so the card only repeated it and pushed the bar over. Shown for tonnes / m³ only.
+        { const mc = document.getElementById('kpi-material-card'); if (mc) mc.hidden = (unitLbl === 'vehicles'); }
 
         // no forecast on screen: nothing to rate per day. Active routes = every baked
         // route in the filter, which is what the map is drawing.
