@@ -1467,6 +1467,11 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
       && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
   }
+  ok("11 Oct: the header's demo badge hides only where the embedded map (which prints its own strip) is on screen",
+    /body\[data-view="public"\] \.demo-badge, body\[data-map-open="1"\] \.demo-badge\{display:none !important;\}/.test(html)
+    && code.includes("document.body.dataset.view = view;") && code.includes('document.body.dataset.mapOpen = page === "map" ? "1" : "";')
+    && code.includes('return () => { document.body.dataset.mapOpen = ""; };')
+    && /className="demo-badge hidden sm:inline-flex"/.test(code));
   // 5. the shared components
   ok("the empty-state family: one EmptyState with a kind, marked data-empty, no dashed border; a SkeletonTable; StatusWord; AppliedChips",
     code.includes("function EmptyState({ title, body, action, kind })") && code.includes('data-empty={k}') && !code.includes("border-dashed")
