@@ -11,6 +11,7 @@ forecasting app are always in sync — no CSV files to keep up to date.
 """
 import json
 import os
+from html import escape as _html_escape
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
@@ -157,6 +158,9 @@ _GATE_CSS = """
   .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
   .foot { margin-top:16px; font-size:12px; color:#64748B; }
   a { color:#2563EB; }
+  .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:999px;
+                 background:#FFF7ED; color:#9A3412; border:1px solid #FDBA74; text-align:center;
+                 font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
 """
 _GATE_HEAD = """<link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -167,6 +171,7 @@ _GATE_LOGO = """<img class="logo" src="/brand/logo-stacked-on-dark.svg" alt="Way
 _MAP_PASSWORD_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Wayscope — map access</title>%s<style>%s</style>
+<!--demo-notice-->
 %s
 <div class="box">
   <h1>Corridor map</h1>
@@ -191,6 +196,20 @@ document.getElementById('f').addEventListener('submit', async function (ev) {
   if (r.ok) { location.reload(); } else { e.style.display = 'block'; }
 });
 </script></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
+
+
+def _map_password_page():
+    """The password page with the tenant's demo notice above the logo, when it has one.
+
+    11 Oct 2026: a visitor without the map password saw no "fictional demo scheme" anywhere,
+    because the app's header badge hides while the embedded map is on screen (PR #20) and the
+    map's own strip sits behind this page. A real tenant has no notice, so the slot is empty."""
+    try:
+        dn = config.tenant_settings(conversions).get("demo_notice")
+    except Exception:
+        dn = None
+    note = '<div class="demo-notice">%s</div>' % _html_escape(dn) if dn else ""
+    return _MAP_PASSWORD_PAGE.replace("<!--demo-notice-->", note, 1)
 
 _HELP_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -240,7 +259,7 @@ if _Request is not None and hasattr(app, "middleware"):
     def _gate_refusal(decision, path):
         doc = gate.is_document(path)
         if decision == gate.NEED_MAP_PASSWORD:
-            return _HTML(_MAP_PASSWORD_PAGE, status_code=401) if doc else _JSON(
+            return _HTML(_map_password_page(), status_code=401) if doc else _JSON(
                 {"detail": "the map is password protected"}, status_code=401)
         if decision == gate.NEED_STAFF:
             return _HTML(_HELP_SIGNIN_PAGE, status_code=401) if doc else _JSON(
