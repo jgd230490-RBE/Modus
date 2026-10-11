@@ -45,6 +45,7 @@ import costing       # 10 Sep evening — target rates + fuel settings (config k
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
+import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -1370,6 +1371,51 @@ def costing_lines(from_: Optional[int] = Query(None, alias="from"), to: Optional
     """
     acc = _require_access()
     return costlines.lines(acc, from_month=from_, to_month=to, status=status)
+
+
+# ------------------------------------------------------------------ carbon planner (10 Oct 2026)
+class CarbonAlternative(BaseModel):
+    name: Optional[str] = None
+    levers: List[dict] = []
+
+
+class CarbonScenarioIn(BaseModel):
+    from_month: Optional[int] = None
+    to_month: Optional[int] = None
+    status: str = "Approved"
+    baseline: List[dict] = []                 # levers that describe today's plan (e.g. a known recycled share)
+    alternatives: List[CarbonAlternative] = []
+    spend_gbp_m: Optional[float] = None       # typed programme spend, for tCO2e per £m (NH's own KPI)
+    allocation: Optional[dict] = None         # {category: {Fencing: %, ...}} — over 100 % is refused
+
+
+CARBON_STATUSES = ("Approved", "Pending", "Rejected", "All")
+CARBON_MAX_ALTERNATIVES = 6
+
+
+@app.post("/api/carbon/scenario")
+def carbon_scenario(body: CarbonScenarioIn):
+    """
+    10 Oct 2026 — the Carbon page's one read: the baseline (the caller's visible forecast lines,
+    Approved by default) and up to six alternatives, each with its totals, the delta, and the
+    per-driver deltas RANKED by tCO2e moved; benchmarks; diesel-vs-electric fleet counts; every
+    factor's source, year and status. A read that takes a body: it stores nothing. Any
+    signed-in code — a team code sees only its own lines, the same filter as /api/costing/lines.
+    Planning estimates, not a National Highways Carbon Tool return. 400 for a lever the rules
+    refuse (allocation over 100 %, an EPD with no source, an unknown vehicle).
+    """
+    acc = _require_access()
+    if body.status not in CARBON_STATUSES:
+        raise HTTPException(400, f"status must be one of {', '.join(CARBON_STATUSES)}")
+    if len(body.alternatives) > CARBON_MAX_ALTERNATIVES:
+        raise HTTPException(400, f"at most {CARBON_MAX_ALTERNATIVES} alternatives at a time")
+    alts = [a.model_dump() if hasattr(a, "model_dump") else a.dict() for a in body.alternatives]
+    try:
+        return carbon.scenario(acc, alternatives=alts, baseline_levers=body.baseline,
+                               from_month=body.from_month, to_month=body.to_month, status=body.status,
+                               spend_m=body.spend_gbp_m, allocation=body.allocation)
+    except carbon.CarbonError as e:
+        raise HTTPException(400, str(e))
 
 
 # ------------------------------------------------------------------ public feed (map)
