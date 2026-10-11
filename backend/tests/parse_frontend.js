@@ -1318,6 +1318,9 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("orange-led means the largest material over the whole programme takes slot 1; ranked on every row, so a filter never repaints",
     _dbBody.includes("const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });")
     && _dbBody.includes(".sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0)"));
+  ok("11 Oct: the guide card is quiet — the page's surface, thin border, 13 px; no popover-dark card, no solid action-colour Next",
+    /\.guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:var\(--surface\);/.test(html)
+    && !/\.guide-card\{[^}]*background:var\(--popover-bg\)/.test(html) && !/button\.guide-next\{background:var\(--navy\)/.test(html));
   // 5. the shared components
   ok("the empty-state family: one EmptyState with a kind, marked data-empty, no dashed border; a SkeletonTable; StatusWord; AppliedChips",
     code.includes("function EmptyState({ title, body, action, kind })") && code.includes('data-empty={k}') && !code.includes("border-dashed")

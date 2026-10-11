@@ -138,15 +138,19 @@
   .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
   .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
   /* H10 (8 Oct 2026): the in-app guide — a coach-mark card, demo tenant only. In-page, no library. */
-  .guide-ring{position:fixed;z-index:9000;pointer-events:none;border:2px solid var(--navy);border-radius:10px;box-shadow:0 0 0 4px rgba(37,99,235,.18);transition:top .15s,left .15s,width .15s,height .15s}
-  .guide-card{position:fixed;z-index:9001;width:min(340px,calc(100vw - 24px));background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.28);padding:14px 16px 12px;font-size:13.5px;line-height:1.5}
-  .guide-card h4{margin:0 0 4px;font-size:14px;font-weight:600;color:#fff}
-  .guide-card p{margin:0;color:var(--popover-fg)}
-  .guide-card .guide-foot{display:flex;align-items:center;gap:8px;margin-top:12px}
-  .guide-card .guide-step{font-size:11px;color:var(--popover-muted);margin-right:auto}
-  .guide-card .guide-foot button{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 11px;border:1px solid var(--popover-line);background:transparent;color:#fff;cursor:pointer}
-  .guide-card .guide-foot button.guide-next{background:var(--navy);color:var(--control-fg);border-color:transparent}
-  .guide-card .guide-off{display:block;margin-top:8px;font:inherit;font-size:11.5px;color:var(--popover-muted);background:none;border:none;padding:0;text-decoration:underline;cursor:pointer}
+  /* 11 Oct 2026 — the user: the guide box was too bold. A quiet card on the page's own surface, thin border,
+     soft shadow, 13 px text, light buttons; a faint ring. Tokens, so the dark look follows. */
+  .guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid color-mix(in srgb,var(--ink) 35%,transparent);border-radius:8px;box-shadow:0 0 0 3px color-mix(in srgb,var(--ink) 6%,transparent);transition:top .15s,left .15s,width .15s,height .15s}
+  .guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:var(--surface);color:var(--muted);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,.10);padding:12px 14px 10px;font-size:13px;line-height:1.5}
+  .guide-card h4{margin:0 0 2px;font-size:13.5px;font-weight:600;color:var(--ink)}
+  .guide-card p{margin:0;color:var(--muted)}
+  .guide-card .guide-foot{display:flex;align-items:center;gap:6px;margin-top:10px}
+  .guide-card .guide-step{font-size:12px;color:var(--muted);opacity:.8;margin-right:auto}
+  .guide-card .guide-foot button{font:inherit;font-size:12.5px;font-weight:500;border-radius:6px;padding:4px 10px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer}
+  .guide-card .guide-foot button:hover{background:var(--surface-2)}
+  .guide-card .guide-foot button.guide-next{border-color:var(--grey);background:var(--surface);color:var(--ink)}
+  .guide-card .guide-off{display:block;margin-top:6px;font:inherit;font-size:12px;color:var(--muted);opacity:.8;background:none;border:none;padding:0;cursor:pointer}
+  .guide-card .guide-off:hover{text-decoration:underline}
   .demo-badge{margin-left:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;align-items:center;}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is

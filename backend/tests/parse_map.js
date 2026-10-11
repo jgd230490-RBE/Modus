@@ -1678,6 +1678,9 @@ ok("busiest routes: the five largest by two-way movements a day (not doubled), e
 ok("11 Oct: below 1024 px the zoom buttons sit under the measured bar (a fixed 180 px overlapped it at 950 px), set on resize and whenever the bar changes height",
   code.includes("if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';")
   && code.includes("new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud'))"));
+ok("11 Oct: the guide card is quiet — white, thin border, soft shadow, 13 px; no dark card, no solid blue button, a faint ring",
+  /#guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:#fff;/.test(html) && !/#guide-card\{[^}]*background:#1F2024/.test(html)
+  && !/button\.guide-next\{background:var\(--navy\)/.test(html) && /#guide-ring\{[^}]*border:1\.5px solid rgba\(31,32,36,\.35\)/.test(html));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
 console.log();
