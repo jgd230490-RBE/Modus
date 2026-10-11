@@ -262,6 +262,15 @@
   .dash-filters select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
   .dash-filters select option{color:#1F2024;}
   .tbl tr.is-picked td{background:var(--chart-1-soft);}
+  /* 11 Oct 2026 — the carbon target on the Dashboard, Forecasts and Submit forecast (tokens only, so every look follows) */
+  .ct-strip{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;color:var(--ink);}
+  .ct-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px;}
+  .ct-h{font-size:16px;font-weight:600;color:var(--ink);margin:0;}
+  .ct-line{font-size:14px;line-height:1.5;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .ct-note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:4px;}
+  .ct-more{margin-top:6px;font-size:14px;color:var(--ink);}
+  .ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;}
+  .ct-more ul{margin:4px 0 0 18px;list-style:disc;}
   /* 10 Oct 2026 — the Look-ahead grid (mockup 3): sticky first column, click-to-edit cells, a totals row */
   .tbl .la-stick{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
   .tbl th.la-stick{background:var(--surface-2);z-index:3;}
@@ -525,12 +534,132 @@ function WallSection({ show, divider, title, children }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, onWall }){
+// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast ------------
+// A planner sets the target on the Carbon planner. Each page reads it with ONE call,
+// GET /api/carbon/target (any signed-in code; the progress is worked out on the lines that code
+// can see). The SERVER works out every figure; these helpers only format and compare. The
+// figures are ALL-IN (making the material, transport and waste disposal), so where they sit
+// beside the transport-only figures the page says so once. A team code reads "your team's
+// lines" in the tenant's own word, never a team id.
+// pct_below is stored to 1 dp, so straight after a % target is set the plan with the decisions
+// can read a little over it (the demo: an 11.25% cut stored as 11.3% reads 3.1 over). A gap
+// inside that rounding, half of 0.1% of the approved plan, is read as on target.
+const CT_ROUND = 0.0005;
+const CT_ALLIN = "All-in: making the material, transport and waste disposal";
+const ctT = (n) => grp(n, 1);
+const ctOk = (ct) => !!(ct && ct.target && ct.status);
+const ctTeam = (ct) => !!(ct && ct.status && ct.status.scope === "team");
+const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;
+function ctGap(gap, approved){
+  if(gap == null) return null;
+  if(Math.abs(gap) <= Math.abs(+approved || 0) * CT_ROUND) return "on target";
+  return `${ctT(Math.abs(gap))} ${gap > 0 ? "over" : "under"} the target`;
+}
+function ctTargetLine(ct){
+  const t = ct.target, s = ct.status, pct = `${(+t.pct_below).toFixed(1)}%`;
+  if(t.mode === "cap") return `Target: ${ctT(t.cap_t)} tCO2e cap (${pct} below the approved plan when it was set)`;
+  return `Target: ${pct} below the approved plan = ${ctT(s.target_t)} tCO2e`;
+}
+function ctProgress(ct){
+  const s = ct.status;
+  const g1 = ctGap(s.gap_as_forecast_t, s.approved_t), g2 = ctGap(s.gap_with_decisions_t, s.approved_t);
+  return [
+    `As forecast: ${ctT(s.approved_t)} tCO2e${g1 ? ", " + g1 : ""}`,
+    s.invalid || `With the agreed decisions: ${ctT(s.with_decisions_t)} tCO2e${g2 ? ", " + g2 : ""}`,
+  ];
+}
+function ctScopeNote(ct){
+  if(!ctTeam(ct)) return null;
+  return ct.target.mode === "cap"
+    ? `These figures are for ${ctYour()} only. The cap is for the whole scheme, so they are not compared with it.`
+    : `These figures are for ${ctYour()} only, with the scheme's cut applied to them.`;
+}
+function ctSetBy(t){
+  if(!t || !t.updated_by) return null;
+  const at = String(t.updated_at || "");
+  return `Set by ${t.updated_by}${/^\d{4}-\d{2}-\d{2}/.test(at) ? ", " + longDate(at.slice(0, 10)) : ""}`;
+}
+// Submit forecast: the target beside the carbon of the cells being typed
+function ctCellsTarget(ct){
+  if(!ct) return null;
+  if(!ctOk(ct)) return "No scheme carbon target set yet.";
+  const s = ct.status;
+  if(!ctTeam(ct)) return `Scheme target: ${ctT(s.target_t)} tCO2e · approved plan now ${ctT(s.approved_t)} tCO2e`;
+  if(s.target_t == null) return `Scheme cap: ${ctT(ct.target.cap_t)} tCO2e, not split by team · approved plan on ${ctYour()} now ${ctT(s.approved_t)} tCO2e`;
+  return `Target for ${ctYour()}: ${ctT(s.target_t)} tCO2e · their approved plan now ${ctT(s.approved_t)} tCO2e`;
+}
+// the big screen's Carbon group: one more figure in the group's own pattern
+function ctFig(ct, err){
+  if(!ct) return { value: "—", sub: err ? "did not load" : "loading", title: err ? "The carbon target did not load." : "Loading the carbon target." };
+  if(!ctOk(ct)) return { value: "—", sub: "none set yet", title: "No carbon target set yet. A planner sets it in the Carbon planner." };
+  const s = ct.status, v = s.target_t != null ? s.target_t : ct.target.cap_t;
+  const g1 = ctGap(s.gap_as_forecast_t, s.approved_t), g2 = ctGap(s.gap_with_decisions_t, s.approved_t);
+  const sub = s.target_t == null ? "scheme cap, not split by team"
+    : `as forecast: ${g1} · with the decisions: ${s.invalid ? "no longer apply" : g2}`;
+  const words = [ctTargetLine(ct), ...ctProgress(ct), ctScopeNote(ct), CT_ALLIN + ". The other carbon figures here are transport only"];
+  return { value: Math.abs(v) >= 1e4 ? bigNum(v) : ctT(v), sub, title: words.filter(Boolean).map(w => w.replace(/\.$/, "")).join(". ") + "." };
+}
+
+// The Dashboard's strip under the six cards. Nothing while the read is on its way.
+function CarbonTargetStrip({ ct, err, onOpen }){
+  if(!ct) return err ? <div className="ct-strip" data-carbon-target="error"><span className="ct-line">The carbon target did not load.</span></div> : null;
+  if(!ctOk(ct)) return (
+    <div className="ct-strip ct-row" data-carbon-target="none">
+      <span className="ct-line">No carbon target set yet. A planner sets it in the Carbon planner.</span>
+      {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}
+    </div>
+  );
+  const t = ct.target, s = ct.status, [p1, p2] = ctProgress(ct), note = ctScopeNote(ct), by = ctSetBy(t);
+  const words = t.lever_words || [];
+  return (
+    <section className="ct-strip" data-carbon-target="set" aria-label="Carbon target">
+      <div className="ct-row"><h3 className="ct-h">Carbon target</h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}</div>
+      <div className="ct-line"><b>{ctTargetLine(ct)}</b></div>
+      <div className="ct-line">{p1}</div>
+      <div className="ct-line">{p2}</div>
+      {note && <div className="ct-note">{note}</div>}
+      <div className="ct-note" title={`Transport is ${ctT(s.approved_transport_t)} tCO2e of the approved plan as forecast: the Transport carbon card's figure with no filters.`}>
+        {CT_ALLIN}, on the whole approved plan. The Transport carbon card above counts transport only.
+      </div>
+      {!ctTeam(ct) && words.length > 0 && (
+        <details className="ct-more">
+          <summary>The {words.length} agreed decision{words.length === 1 ? "" : "s"}</summary>
+          <ul>{words.map((w, i) => <li key={i}>{w}</li>)}</ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+// The Forecasts page's line under its header: what the approved plan comes to, and what the
+// lines waiting for approval would add (the count is the page's own; the tonnes are the server's).
+function CarbonTargetLine({ ct, err, pendingN }){
+  if(!ct) return err ? <p className="ct-line mb-4" data-carbon-target="error">The carbon target did not load.</p> : null;
+  if(!ctOk(ct)) return <p className="ct-line mb-4" data-carbon-target="none">No carbon target set yet. A planner sets it in the Carbon planner.</p>;
+  const s = ct.status, team = ctTeam(ct);
+  const tgt = s.target_t == null ? `scheme cap ${ctT(ct.target.cap_t)}, not split by team`
+    : `target ${ctT(s.target_t)}${team ? ` (the scheme's ${(+ct.target.pct_below).toFixed(1)}% cut)` : ""}`;
+  return (
+    <div className="ct-strip mb-4" data-carbon-target="set" title={`${CT_ALLIN}.`}>
+      <div className="ct-line">
+        <b>{team ? `Carbon (all-in), ${ctYour()}:` : "Carbon (all-in):"}</b> approved plan as forecast {ctT(s.approved_t)} tCO2e
+        {" · "}with the agreed decisions {s.with_decisions_t == null ? "—" : ctT(s.with_decisions_t)}{" · "}{tgt}
+      </div>
+      {s.invalid && <div className="ct-note">{s.invalid}</div>}
+      {pendingN != null && <div className="ct-line">{pendingN === 0 ? "No lines are waiting for approval."
+        : `The ${pendingN} pending line${pendingN === 1 ? "" : "s"} would add ${ctT(s.pending_t)} tCO2e.`}</div>}
+    </div>
+  );
+}
+
+function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOpen }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
   const [err, setErr] = useState(false);
   const [weekErr, setWeekErr] = useState("");
+  const [ct, setCt] = useState(initialTarget || null);    // 11 Oct 2026: the carbon target (GET /api/carbon/target)
+  const [ctErr, setCtErr] = useState(false);
   const [status, setStatus] = useState("Approved");
   const [unit, setUnit] = useState("t");
   const [material, setMaterial] = useState("All");
@@ -596,6 +725,16 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
     fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
       if(live){ setWeek(j); setWeekErr(""); }
     }).catch(e => { if(live) setWeekErr(`Couldn't load this week (${e}).`); });
+    return () => { live = false; };
+  }, [tick]);
+  // the carbon target: its own read, so a failure never hides the programme figures. Once on
+  // mount; the big screen reads it again with the rest every 5 minutes.
+  useEffect(() => {
+    if(initialTarget) return;
+    let live = true;
+    fetch(`${API}/carbon/target`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+      if(live){ setCt(j); setCtErr(false); }
+    }).catch(() => { if(live) setCtErr(true); });
     return () => { live = false; };
   }, [tick]);
   useEffect(() => {
@@ -760,6 +899,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
   const numTd = "num";
   const cost = data.costing || {};
   const K = D.kpis;
+  const ctW = ctFig(ct, ctErr);        // 11 Oct 2026: the carbon target as one more big-screen figure
   const srcChip = (s) => s === "target" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title="No rate on the route — the target rate from Config">target</span>
                         : s === "route" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title="The rates typed on the route">quote</span> : null;
   // KPI cards: two figures per row below 1536 px, four on a wide screen — a figure is
@@ -886,6 +1026,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
             <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`} sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`} · DESNZ 2026`}
                   title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
           </div>
+          <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
           <div className="grid lg:grid-cols-5 gap-4">
             <div className="card p-4 lg:col-span-3">
@@ -1069,6 +1210,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
           <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over baked tonnes" title={K.intensity == null ? "Needs a baked line" : `${K.intensity.toFixed(2)} kg CO₂e per tonne moved — tCO₂e ÷ the tonnes on baked lines (the unbaked ones have no km)`} />
           <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" title={`${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"} — tonnes × the route's basis ${DU()}, baked lines`} />
           <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} title={K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned — the busiest month in view` : "The month with the most planned tonnes"} />
+          <Fig value={ctW.value} label="tCO2e target, all-in" sub={ctW.sub} title={ctW.title} />
         </Group>
       </div>
       </WallSection>
@@ -2034,7 +2176,7 @@ function Portal({ role, who, meta, metaErr, vehLang }){
       </aside>
 
       <main className="flex-1 min-h-0 overflow-auto">
-        {page === "dashboard" && <Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} />}
+        {page === "dashboard" && <Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} onOpen={setPage} />}
         {page === "submit" && <Matrix meta={meta} who={who} editTarget={editTarget} vehLang={vehLang} access={role} />}
         {page === "forecasts" && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
         {page === "carbon" && <CarbonPage meta={meta} access={role} who={who} />}
@@ -2074,7 +2216,7 @@ function vehOption(v, suggested, current){
 }
 
 // ================================================================= Matrix
-function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
+function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTarget }){
   const { routes, materials, vehicles, units, months, factors,
           material_categories = {}, seasonal_restrictions = [],
           disciplines = [], work_sections = [], planning_vehicles = [] } = meta;
@@ -2198,6 +2340,17 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
   // `initialCost` is for the render harness (no effect runs there).
   const [cost, setCost] = useState(initialCost || null);
   const [costErr, setCostErr] = useState("");
+  // 11 Oct 2026: the scheme's carbon target, read once when the page opens (GET /api/carbon/target).
+  // The carbon of the cells comes with the price (the preview's `carbon` block); nothing is
+  // worked out here. A failure just leaves the line out.
+  const [ct, setCt] = useState(initialTarget || null);
+  useEffect(() => {
+    if(initialTarget) return;
+    let live = true;
+    fetch(`${API}/carbon/target`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(j => { if(live) setCt(j); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
 
   // default the category from the route's material guess when the route resolves.
   // /api/meta now normalises material_guess to a factors.json category server-side, so
@@ -2695,6 +2848,19 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
                : cost.fair_reason ? `no fair price — ${cost.fair_reason}`
                : `the cost model on Config → Costing · fuel at diesel ${CUR()}${cost.index_eur_per_l != null ? (+cost.index_eur_per_l).toFixed(3) : "—"}/L${(cost.totals.fair_flags || []).includes("WINTER") ? " · winter months +fuel" : ""} · a floor for negotiation, never a quote · fair ${CUR()} under each cell`}
             </span>
+            {/* 11 Oct 2026: the carbon of the cells (the server's, with its parts) and the scheme's target */}
+            {cost && cost.carbon && (() => {
+              const c = cost.carbon;
+              const parts = [["material", c.material_t], ["transport", c.transport_t], ["waste disposal", c.disposal_t]]
+                .filter(([, v]) => v != null).map(([k, v]) => `${k} ${ctT(v)}`);
+              return (
+                <div className="w-full ct-line" data-carbon-cells="1" title={c.basis || undefined}>
+                  Carbon of these cells: <b>{ctT(c.total_t)} tCO2e</b>{parts.length ? ` (${parts.join(" · ")})` : ""}
+                  {c.unrouted ? " · no route distance yet, so transport is not counted" : ""}
+                </div>
+              );
+            })()}
+            {ct && <div className="w-full ct-line" data-carbon-target={ctOk(ct) ? "set" : "none"}>{ctCellsTarget(ct)}</div>}
           </div>
           <div className="px-3 py-1.5 text-[10.5px] text-slate-400 bg-white">
             Movements = loads per working day ({perDay.wd}/month). Vehicles needed = movements ÷{" "}
@@ -2746,12 +2912,14 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost }){
 //   planner    approve / reject inline, withdraw anyone's
 // Grouped per line, NOT per line-and-year (a multi-year save is one submission), and
 // withdraw is scoped to the months the row actually shows.
-function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialRows }){
+function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialRows, initialTarget }){
   const { routes, months } = meta;
   const routeById = useMemo(() => Object.fromEntries(routes.map(r => [r.route_id, r])), [routes]);
   const canApprove = !!(access && access.can_approve);
-  const [rows, setRows] = useState(initialRows || null);     // initialRows / initialCost: the render harness only
+  const [rows, setRows] = useState(initialRows || null);     // initialRows / initialCost / initialTarget: the render harness only
   const [cost, setCost] = useState(initialCost || null);       // 11 Sep: /api/costing/lines, joined per line
+  const [ct, setCt] = useState(initialTarget || null);         // 11 Oct 2026: the carbon target (GET /api/carbon/target)
+  const [ctErr, setCtErr] = useState(false);
   const [err, setErr] = useState(false);
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState("");
@@ -2769,6 +2937,15 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
       fetch(`${API}/costing/lines?status=All`).then(r => r.ok ? r.json() : Promise.reject(r.status))
         .then(j => { if(live) setCost(j); }).catch(() => { if(live) setCost({ lines: [], error: true }); });
     }
+    return () => { live = false; };
+  }, [tick]);
+  // the carbon target: its own read, again after Refresh, Approve, Reject or Withdraw (they move
+  // lines between pending and approved, which is what its figures are made of)
+  useEffect(() => {
+    if(initialTarget) return;
+    let live = true;
+    fetch(`${API}/carbon/target`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(j => { if(live){ setCt(j); setCtErr(false); } }).catch(() => { if(live) setCtErr(true); });
     return () => { live = false; };
   }, [tick]);
 
@@ -2823,6 +3000,8 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
     && (!f.mine || g.submittedBy === who)
     && (!f.q || `${g.routeId} ${(routeById[g.routeId] || {}).origin || ""} ${(routeById[g.routeId] || {}).dest || ""} ${g.material || ""} ${g.submittedBy}`.toLowerCase().includes(f.q.toLowerCase())));
   const counts = useMemo(() => groups.reduce((a, g) => { a[g.status] = (a[g.status] || 0) + 1; return a; }, {}), [groups]);
+  // lines with any month waiting for approval (Pending or Mixed): what status.pending_t covers
+  const pendingN = useMemo(() => groups.filter(g => g.statuses.has("Pending")).length, [groups]);
 
   const done = () => { setTick(t => t + 1); if(onChanged) onChanged(); };
   // Scoped to the LINE and to exactly the months the row shows — never 1..60.
@@ -2919,6 +3098,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
           {shown.length > 0 && <button onClick={exportCsv} className="btn-sec">Export CSV</button>}
           {!canApprove && <button onClick={() => onEdit({})} className="btn-pri">Submit a forecast</button>}
         </>} />
+      <CarbonTargetLine ct={ct} err={ctErr} pendingN={rows ? pendingN : null} />
 
       {err ? <EmptyState kind="error" title="Forecasts did not load" body="The server did not answer in time. Nothing you typed is lost."
                action={<button onClick={() => setTick(t => t + 1)} className="btn-sec">Try again</button>} />
