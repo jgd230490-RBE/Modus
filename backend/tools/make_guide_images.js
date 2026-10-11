@@ -224,7 +224,7 @@ const HOLDERS = {
   S05: ["Forecasts — the list with its filters, cost and status (planner view)", "Forecasts, as the planner", "app"],
   S06: ["Commit view — KPI strip, clash rail and the Monday–Friday grid", "Look-ahead › Commit", "app"],
   S07: ["A row expanded, and the map of this week's lines under the grid", "Look-ahead › Commit, first row expanded", "app"],
-  S08: ["Account view — planned, actual, variance, cost, and the Stockpiles block", "Look-ahead › Account", "app"],
+  S08: ["Account view — last week line by line: planned, actual, variance and cost", "Look-ahead › Account", "app"],
   S09: ["Horizon — week totals for this month and next", "Look-ahead › Horizon", "app"],
   S10: ["The Confirm week dialog", "Look-ahead › Commit next week › Confirm week", "app"],
   S11: ["Locations — the map and the edit form with gates and stock held", "Locations, a stockpile selected", "app"],

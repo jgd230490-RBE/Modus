@@ -7,12 +7,22 @@
  *     $env:MODUS_URL = "https://app.wayscope.co.uk"
  *     $env:MODUS_PLANNER_CODE = Read-Host "Planner code"     # typed at the prompt, kept out of the history
  *     $env:NODE_PATH = (npm root -g)
+ *     Remove-Item Env:MODUS_ONLY, Env:MODUS_SKIP, Env:MODUS_OUT -ErrorAction SilentlyContinue   # no leftovers
  *     node backend/tools/capture_guide.js
  *
  *   Needs Playwright and its Chromium, installed once: npm i -g playwright; npx playwright install chromium
  *   Takes about four minutes. To retake some shots only, first:  $env:MODUS_ONLY = "M02,M05"
  *   (Remove-Item Env:MODUS_ONLY to go back to all). $env:MODUS_OUT = "<folder>" writes somewhere
  *   else: a dry run that must not replace the committed pictures.
+ *   MODUS_SKIP — a comma list of pictures NOT taken (their placeholders stay); default "S14". S14 is
+ *   Config › Vehicles, and the live demo still lists the EU vehicles there until the branch that removes
+ *   them (claude/remove-eu-vehicles) merges after the show; then take it alone with $env:MODUS_ONLY = "S14"
+ *   (MODUS_ONLY wins over MODUS_SKIP). $env:MODUS_SKIP = "none" skips nothing.
+ *
+ * THE BROWSER it drives is its own, told it is in Britain (locale en-GB, Europe/London time, --lang=en-GB)
+ * whatever this laptop's regional settings are, so the pictures read 16.1 t and 01/09/2026. It asks for the GPU
+ * (--enable-gpu, --use-angle=d3d11): headless Chromium's software renderer, SwiftShader, leaves a blank
+ * strip at the foot of the map, and a map shot whose foot is blank fails rather than be saved.
  *
  * WHAT IT WRITES: frontend/help/media/S01.png … S17.png and M01.png … M08.png (there is no M04),
  * 1440 × 760 each, over the placeholders. A shot that fails is reported and its file is NOT
@@ -40,14 +50,7 @@
  *    then fetches ONE picture (a billable Google request) for the first site that has imagery.
  *
  * Shots that can fail for a reason that is not the script's (each failure says which):
- *   M02 — 11 Oct 2026: the public map's alignment click THROWS on a tenant with no underlay (the demo
- *         has none): iptCheckboxId(underlayKey()) calls .replace on null, so no popup opens. Fails
- *         until map/index.html is fixed; then retake it with MODUS_ONLY.
- *   M05 — needs a road-closure or restriction provider for the tenant's country (Great Britain:
- *         National Highways planned closures; Estonia: Tark Tee); none → skipped. 11 Oct 2026: the map
- *         often never draws the closures at all (ensureRestrictionLayers() waits for a style.load that
- *         has already fired; the same pattern leaves the disruption zones undrawn), so it may fail
- *         until map/index.html is fixed.
+ *   M02, M05 — 11 Oct 2026: may fail and keep their placeholders until the public map's bugs (the alignment click throws, closures and zones are not drawn) are fixed; then retake them with MODUS_ONLY.
  *   M08 — needs GOOGLE_MAPS_API_KEY on the server and a site with Street View imagery within
  *         50 m. Neither → fails and the placeholder stays.
  *   S15 — renders page 1 of the week PDF: with poppler's pdftoppm where installed, otherwise in the
@@ -56,7 +59,10 @@
  * History: written 16 Sep 2026 and never run against a deployment. 11 Oct 2026: every shot checked
  * against today's UI (the demo bar since PR #27, the carbon-target strip, the Carbon planner, the
  * Look-ahead's ▶ rows and remembered view, the folded Layers and basemap) and dry-run against a
- * LOCAL copy of the demo (MODUS_OUT in the scratchpad), never against the live site.
+ * LOCAL copy of the demo (MODUS_OUT in the scratchpad), never against the live site. 11 Oct 2026, after the
+ * review: the GPU launch and the blank-foot check on the map, en-GB and London time, S12 checked to hold the
+ * analysis table, S15 drawn at the size shown, S05 with the rail folded, S08's caption to what it shows,
+ * MODUS_SKIP (S14 by default). Dry-run again against the local copy only.
  *
  * MODUS_LOCAL_LIBS=<dir>  (a test aid for machines without CDN access) serves React, ReactDOM,
  *    Babel, Chart.js and mapbox-gl from <dir>/node_modules and a prebuilt <dir>/tw.css in place
@@ -87,6 +93,14 @@ if (ONLY.some(id => !SHOTS.includes(id))) {
   console.error(`MODUS_ONLY names a picture the guide does not have: ${ONLY.filter(id => !SHOTS.includes(id)).join(", ")}.`);
   process.exit(2);
 }
+// MODUS_SKIP: pictures not taken (their placeholders stay). Default S14: the live Config › Vehicles still lists the
+// EU vehicles until claude/remove-eu-vehicles merges. "none" skips nothing; MODUS_ONLY wins over it.
+const SKIP_RAW = process.env.MODUS_SKIP === undefined ? "S14" : process.env.MODUS_SKIP;
+const SKIP = /^\s*none\s*$/i.test(SKIP_RAW) ? [] : SKIP_RAW.split(",").map(s => s.trim()).filter(Boolean);
+if (SKIP.some(id => !SHOTS.includes(id))) {
+  console.error(`MODUS_SKIP names a picture the guide does not have: ${SKIP.filter(id => !SHOTS.includes(id)).join(", ")}.`);
+  process.exit(2);
+}
 const { chromium } = require("playwright");
 
 const WHO = process.env.MODUS_NAME || "Guide capture";
@@ -99,8 +113,17 @@ const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf
 
 const VIEW = { width: 1440, height: 760 };
 const TOP = 92;            // the sticky header (66 px) and the demo bar (26 px) cover the page under them
+// 11 Oct 2026: the browser is British whatever this laptop's regional settings (an Estonian laptop gave 16,1 t). The
+// context's locale sets JavaScript's figures and dates; a date box (<input type="date">, S13's From/To) is drawn by
+// Chromium in the operating system's regional format (01.09.2026) unless Chromium itself starts with --lang=en-GB.
+const LOCALE = { locale: "en-GB", timezoneId: "Europe/London" };
+const LANG_ARGS = ["--lang=en-GB"];
+// 11 Oct 2026: the map is WebGL, and headless Chromium's software renderer (SwiftShader) left a blank strip ~100 px
+// tall at the foot of every map picture. With the GPU it draws to the foot; without one, the plain launch is used and
+// mapReady() fails a map shot whose foot is blank rather than save it.
+const GPU_ARGS = ["--enable-gpu", "--use-angle=d3d11", "--ignore-gpu-blocklist"];
 const done = [], failed = [], skipped = [], blocked = [];
-const want = (id) => !ONLY.length || ONLY.includes(id);
+const want = (id) => ONLY.length ? ONLY.includes(id) : !SKIP.includes(id);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const first = (s) => String((s && s.message) || s).split("\n")[0];
 
@@ -110,7 +133,9 @@ async function shot(page, id, fn) {
     const before = blocked.length;
     await fn();
     if (blocked.length > before) throw new Error(`the page tried to write: ${blocked.slice(before).join("; ")}`);
-    await page.screenshot({ path: path.join(MEDIA, id + ".png"), clip: { x: 0, y: 0, ...VIEW } });
+    // a map picture is taken by the foot check itself and saved only if its foot is drawn
+    if (id.startsWith("M")) fs.writeFileSync(path.join(MEDIA, id + ".png"), await mapFootDrawn(page));
+    else await page.screenshot({ path: path.join(MEDIA, id + ".png"), clip: { x: 0, y: 0, ...VIEW } });
     done.push(id);
     console.log("  ✓", id);
   } catch (e) {
@@ -174,6 +199,14 @@ async function dataPage(page, hash, title, rowText, fallbackType) {
   await row.click({ timeout: 8000 });        // locates it on the map and opens it in the form; nothing is saved
   await sleep(2500);
 }
+// the rail (the list of pages on the left) folded or opened with its own button; this browser remembers the choice
+// (localStorage), so a fold is always undone by the caller
+async function setRail(page, open) {
+  const btn = page.locator(`aside[data-guide="rail"] button[title="${open ? "Expand" : "Collapse"}"]`).first();
+  if (!(await btn.count())) return;          // already as asked
+  await btn.click({ timeout: 5000 });
+  await sleep(700);
+}
 async function showGridTop(page) {
   await scrollUnderHeader(page, page.locator("div.grid.gap-4").first(), 8);
 }
@@ -193,6 +226,61 @@ async function mapReady(page) {
   await page.waitForFunction(() => typeof map !== "undefined" && map.loaded && map.loaded()
     && window.alignment_data && typeof a1_data !== "undefined", null, { timeout: 45000 });
   await sleep(2500);
+  if (!RENDERER) {       // said once: what drew the map (a "SwiftShader" here means no GPU)
+    RENDERER = await page.evaluate(() => { try { const gl = map.painter.context.gl, x = gl.getExtension("WEBGL_debug_renderer_info");
+      return x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : "unknown"; } catch (e) { return "unknown"; } });
+    console.log("  (the map is drawn by " + RENDERER + ")");
+  }
+  await mapFootDrawn(page);
+}
+let RENDERER = "";
+// 11 Oct 2026: the map's foot is drawn, or the shot fails. The map canvas must reach the foot of the window; the whole
+// picture is taken, and a strip of FOOT_ROWS rows just above the foot, where the canvas itself is on top (clear of the
+// logo, the basemap buttons, the attribution and the timeline), is read back from it: blank is (nearly) every row one
+// flat colour, which is what the software renderer left (a white-to-grey band ~100 px tall); a drawn map varies along
+// every row. It must be the WHOLE picture: without the GPU a small clip of the same strip came out drawn while the
+// full-window picture had the band. Checked when the map is ready, and as each map picture is taken: the picture
+// returned is the one checked, and the one saved.
+const FOOT_ROWS = 20;
+async function mapFootDrawn(page) {
+  let last = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) { await page.evaluate(() => map.triggerRepaint()); await sleep(1500); }
+    const seg = await page.evaluate((rows) => {
+      const cv = map.getCanvas(), b = cv.getBoundingClientRect(), H = window.innerHeight;
+      if (b.bottom < H - 2) return { short: true, bottom: Math.round(b.bottom), H };
+      const y0 = Math.round(H - 30 - rows), ys = [y0, y0 + Math.floor(rows / 2), y0 + rows - 1];
+      let best = null, run = null;
+      for (let x = Math.ceil(b.left) + 2; x < Math.min(b.right, window.innerWidth) - 2; x += 4) {
+        if (ys.every(y => document.elementFromPoint(x, y) === cv)) {
+          run = run || { x0: x }; run.x1 = x;
+          if (!best || run.x1 - run.x0 > best.x1 - best.x0) best = { x0: run.x0, x1: run.x1 };
+        } else run = null;
+      }
+      return best && { x: best.x0, y: y0, width: best.x1 - best.x0, height: rows };
+    }, FOOT_ROWS);
+    if (seg && seg.short) throw new Error(`the map canvas ends at ${seg.bottom} px, above the foot of the window (${seg.H} px)`);
+    if (!seg || seg.width < 100) throw new Error("nothing at the foot of the map is clear enough to check that it is drawn");
+    const png = await page.screenshot({ clip: { x: 0, y: 0, ...VIEW } });      // the whole picture, not a clip of the strip
+    const flat = await page.evaluate(async ([b64, s]) => {
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      const bmp = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+      const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height;
+      const g = c.getContext("2d"); g.drawImage(bmp, 0, 0);
+      const d = g.getImageData(s.x, s.y, s.width, s.height).data;
+      let n = 0;
+      for (let y = 0; y < s.height; y++) {
+        const lo = [255, 255, 255], hi = [0, 0, 0];
+        for (let i = y * s.width * 4; i < (y + 1) * s.width * 4; i += 4) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], d[i + k]); hi[k] = Math.max(hi[k], d[i + k]); }
+        if (hi.every((h, k) => h - lo[k] <= 3)) n++;
+      }
+      return n;
+    }, [png.toString("base64"), seg]);
+    if (flat < FOOT_ROWS - 2) return png;
+    last = `${flat} of ${FOOT_ROWS} rows flat at x ${seg.x}–${seg.x + seg.width}, y ${seg.y}`;
+  }
+  throw new Error(`the foot of the map is blank (${last}); the map was drawn by ${RENDERER || "an unknown renderer"}`
+    + (/SwiftShader/i.test(RENDERER) ? ", software, not the GPU" : ""));
 }
 async function mapIdle(page, extra = 1200) {
   await page.evaluate(() => new Promise(res => { if (map.loaded() && !map.isMoving()) { map.once("idle", res); map.triggerRepaint(); } else map.once("idle", res); setTimeout(res, 15000); }));
@@ -298,7 +386,9 @@ async function pdfFirstPage(context) {
         const doc = await lib.getDocument({ data }).promise;
         const p1 = await doc.getPage(1);
         const vp = p1.getViewport({ scale: 1 });
-        const scale = 1380 * 1.5 / vp.width;          // drawn at 1.5× and shown at 1380 px wide
+        // 11 Oct 2026: drawn at the size it is shown (1380 px wide). Drawn at 1.5× and shrunk, thin strokes were
+        // dropped (the minus of a longitude vanished).
+        const scale = 1380 / vp.width;
         const v = p1.getViewport({ scale });
         const cv = document.createElement("canvas");
         cv.width = Math.ceil(v.width); cv.height = Math.ceil(v.height);
@@ -319,8 +409,14 @@ async function pdfFirstPage(context) {
 
 (async () => {
   fs.mkdirSync(MEDIA, { recursive: true });
-  const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 1 });
+  let browser;
+  try { browser = await chromium.launch({ args: [...GPU_ARGS, ...LANG_ARGS] }); }
+  catch (e) {
+    console.log(`  (Chromium would not start with the GPU arguments, so it starts without them; map shots may fail: ${first(e)})`);
+    browser = await chromium.launch({ args: LANG_ARGS });
+  }
+  if (!ONLY.length) SKIP.forEach(id => skipped.push(`${id} (MODUS_SKIP${process.env.MODUS_SKIP === undefined ? ", the default" : ""}: its placeholder stays)`));
+  const context = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 1, ...LOCALE });
   // the in-app tour's strip and dots off, in this throwaway browser only
   await context.addInitScript(() => {
     try { localStorage.setItem("wayscope_guide_all", "off"); localStorage.setItem("wayscope_guide_map", "off"); } catch (e) {}
@@ -426,8 +522,39 @@ async function pdfFirstPage(context) {
     await scrollUnderHeader(page, page.getByText("From year", { exact: true }).first(), 20);
     await sleep(1500);
   });
-  // S05 — Forecasts, as the planner
-  await shot(page, "S05", () => goApp(page, "forecasts", "Forecasts"));
+  // S05 — Forecasts, as the planner. 11 Oct 2026: beside the open rail the table's Status column was cut off at 1440 px,
+  // so the rail is folded for this picture (the app's own "‹ Collapse", in this throwaway browser) and opened again
+  // after it, whatever happened. The shot fails unless the Status column's words, in its head and in every row on
+  // screen, end inside the table's box (the column itself is wider than its words and runs on under the edge).
+  await shot(page, "S05", async () => {
+    await goApp(page, "forecasts", "Forecasts");
+    await setRail(page, false);
+    const st = page.locator("thead th", { hasText: /^Status$/ }).first();
+    await st.waitFor({ timeout: 15000 });
+    const fit = await st.evaluate((el) => {
+      const head = el.parentElement, col = [...head.cells].indexOf(el), t = el.closest("table");
+      let box = el.parentElement;
+      while (box && !(box.scrollWidth > box.clientWidth + 4 && /auto|scroll/.test(getComputedStyle(box).overflowX))) box = box.parentElement;
+      const bb = box ? box.getBoundingClientRect() : { right: window.innerWidth, bottom: window.innerHeight };
+      const edge = Math.min(window.innerWidth, bb.right), foot = Math.min(window.innerHeight, bb.bottom);
+      const cells = [el, ...[...t.tBodies[0].rows].filter(r => r.cells.length === head.cells.length).map(r => r.cells[col])];
+      let right = 0, n = 0;
+      for (const c of cells) {
+        const cr = c.getBoundingClientRect();
+        if (cr.top >= foot || cr.bottom <= 0) continue;
+        const w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT);
+        for (let x = w.nextNode(); x; x = w.nextNode()) {
+          if (!x.textContent.trim()) continue;
+          const rg = document.createRange(); rg.selectNodeContents(x);
+          for (const q of rg.getClientRects()) { right = Math.max(right, q.right); n++; }
+        }
+      }
+      return { ok: n > 1 && right <= edge + 1, right: Math.round(right), edge: Math.round(edge) };
+    });
+    if (!fit.ok) throw new Error(`the Status column is cut off (its words end at ${fit.right} px, the table's box at ${fit.edge} px)`);
+  });
+  try { await setRail(page, true); }
+  catch (e) { console.error("the rail would not open again after S05:", first(e)); }
   // S06 — Commit · this week: KPI strip, flags and the Monday–Friday grid
   await shot(page, "S06", () => lookahead(page, "commit"));
   // S07 — the last row expanded (▶ only; a day cell is never clicked) and the map under the grid
@@ -443,7 +570,8 @@ async function pdfFirstPage(context) {
     await page.waitForLoadState("networkidle").catch(() => {});
     await sleep(3500);       // the week's map draws from its own fetch
   });
-  // S08 — Account (last week) · S09 — Horizon
+  // S08 — Account (last week) · S09 — Horizon. 11 Oct 2026: S08 shows the top of the lines table; the Stockpiles block
+  // lies ~1,700 px under it (18 lines on the demo), so the caption no longer promises it (it said "and the Stockpiles block")
   await shot(page, "S08", () => lookahead(page, "Account"));
   await shot(page, "S09", () => lookahead(page, "Horizon"));
   // S10 — the Confirm week dialog, opened and CANCELLED
@@ -471,7 +599,9 @@ async function pdfFirstPage(context) {
     await scrollPanelTo(page, "Stock held");
   });
   // S12 — Routes: R001 selected (red on the map) and expanded. The list scrolls in its own box (40 % of the
-  // window), so the page goes to its foot and the box to the analysis table: the vehicle × primary/alternative rows.
+  // window) inside the page: both are scrolled to the analysis table, the vehicle × primary/alternative rows.
+  // 11 Oct 2026: aimed with scrollUnderHeader (the page used to be left where the shots before had scrolled it), and
+  // the shot fails unless the table's head and first row are inside the picture and inside the list's box.
   await shot(page, "S12", async () => {
     await dataPage(page, "routes", "Routes", "R001");
     const row = page.locator("tbody tr", { hasText: "R001" }).first();
@@ -480,13 +610,18 @@ async function pdfFirstPage(context) {
     const th = page.locator("th", { hasText: /^Option$/ }).first();
     await th.waitFor({ timeout: 20000 });
     await sleep(1500);
-    await page.evaluate(() => { const m = document.querySelector("main"); if (m) m.scrollTop = m.scrollHeight; });
-    await th.evaluate((el) => {
-      let s = el.parentElement;
-      while (s && !(s.scrollHeight > s.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
-      if (s) s.scrollTop += el.getBoundingClientRect().top - s.getBoundingClientRect().top - 150;
-    });
-    await sleep(1200);
+    await scrollUnderHeader(page, th, 150);
+    const at = await th.evaluate((el, [top, H]) => {
+      const t = el.closest("table"), head = t.tHead.getBoundingClientRect(), r1 = t.tBodies[0] && t.tBodies[0].rows[0];
+      let box = t.parentElement;
+      while (box && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+      const b = box ? box.getBoundingClientRect() : { top: 0, bottom: H };
+      const sticky = box && box.querySelector("thead.sticky");          // the list's own head stays over its top
+      const lo = Math.max(top, b.top + (sticky ? sticky.getBoundingClientRect().height : 0)), hi = Math.min(H, b.bottom);
+      const end = r1 ? r1.getBoundingClientRect().bottom : Infinity;
+      return { ok: head.top >= lo - 1 && end <= hi + 1, head: Math.round(head.top), end: Math.round(end), lo: Math.round(lo), hi: Math.round(hi) };
+    }, [TOP, VIEW.height]);
+    if (!at.ok) throw new Error(`the analysis table is not inside the picture (its head at ${at.head} px and its first row ending at ${at.end} px; the picture shows ${at.lo}–${at.hi} px of it)`);
   });
   // S13 — Zones: the demo's haul road in the form
   await shot(page, "S13", async () => {

@@ -655,5 +655,83 @@ ok("...run with no site or code it stops with exit code 2 and says what to set; 
    and _r1.returncode == 2 and "site address only" in _r1.stderr
    and _r2.returncode == 2 and "M04" in _r2.stderr)
 
+# =========================================================================== #
+#  11 Oct 2026 — the review's fixes to the capture script                       #
+#  (branch claude/guide-screenshots)                                            #
+# =========================================================================== #
+# What these prove: the browser asks for the GPU and a map picture with a blank foot fails; the pictures are British
+# (en-GB, London time); S14 is not taken unless asked; S15 is drawn at the size shown; S12 fails unless the analysis
+# table is in the picture; S05 folds the rail and opens it again; S08's caption says what its picture shows.
+# What they do not prove: what the GPU does on another machine, or the pictures themselves (dry-run locally only).
+_launch = cap_src.find("chromium.launch({ args: [...GPU_ARGS, ...LANG_ARGS] })")
+_plain = cap_src.find("browser = await chromium.launch({ args: LANG_ARGS });")
+ok("\U0001f534 the capture's Chromium asks for the GPU (--enable-gpu, --use-angle=d3d11, --ignore-gpu-blocklist), "
+   "and starts without it only if that launch fails",
+   'const GPU_ARGS = ["--enable-gpu", "--use-angle=d3d11", "--ignore-gpu-blocklist"];' in cap_src
+   and 0 < _launch < cap_src.find("catch (e)", _launch) < _plain
+   and cap_src.count("chromium.launch(") == 2)
+_ready = cap_src[cap_src.find("async function mapReady("):cap_src.find("async function mapIdle(")]
+_shotfn = cap_src[cap_src.find("async function shot("):cap_src.find("// ---- the staff app")]
+_foot = cap_src[cap_src.find("async function mapFootDrawn(page)"):cap_src.find("async function mapIdle(")]
+ok("\U0001f534 ...and a map picture whose foot is blank fails: checked when the map is ready and as each M picture is "
+   "taken, on a strip read back from the WHOLE picture (a small clip came out drawn when the picture was not), and the "
+   "picture checked is the picture saved",
+   "await mapFootDrawn(page);" in _ready and _foot
+   and 'if (id.startsWith("M")) fs.writeFileSync(path.join(MEDIA, id + ".png"), await mapFootDrawn(page));' in _shotfn
+   and "const png = await page.screenshot({ clip: { x: 0, y: 0, ...VIEW } });" in _foot
+   and "if (flat < FOOT_ROWS - 2) return png;" in _foot and "page.screenshot({ clip: seg })" not in _foot
+   and "document.elementFromPoint(x, y) === cv" in _foot and "createImageBitmap" in _foot
+   and "the foot of the map is blank" in _foot and "above the foot of the window" in _foot)
+ok("\U0001f534 the pictures are British whatever the laptop's settings: one browser context, locale en-GB, Europe/London, "
+   "and Chromium started with --lang=en-GB (a date box follows the operating system's region otherwise), with or without the GPU",
+   'const LOCALE = { locale: "en-GB", timezoneId: "Europe/London" };' in cap_src
+   and 'const LANG_ARGS = ["--lang=en-GB"];' in cap_src and _launch > 0 and _plain > 0
+   and "browser.newContext({ viewport: VIEW, deviceScaleFactor: 1, ...LOCALE })" in cap_src
+   and cap_src.count("newContext(") == 1)
+ok("\U0001f534 MODUS_SKIP defaults to S14 (the live Config still lists the EU vehicles), MODUS_ONLY wins over it, "
+   "'none' skips nothing, and the header says so",
+   'const SKIP_RAW = process.env.MODUS_SKIP === undefined ? "S14" : process.env.MODUS_SKIP;' in cap_src
+   and "const want = (id) => ONLY.length ? ONLY.includes(id) : !SKIP.includes(id);" in cap_src
+   and "/^\\s*none\\s*$/i.test(SKIP_RAW)" in cap_src
+   and "MODUS_SKIP names a picture the guide does not have" in cap_src
+   and 'MODUS_SKIP — a comma list of pictures NOT taken (their placeholders stay); default "S14".' in cap_src
+   and '$env:MODUS_ONLY = "S14"' in cap_src and "claude/remove-eu-vehicles" in cap_src
+   and cap_src.find("const SKIP_RAW") < cap_src.find('require("playwright")')
+   and "if (!ONLY.length) SKIP.forEach(id => skipped.push(" in cap_src)
+ok("...the header's command clears leftovers from a retake or a dry run, and says in one line that M02 and M05 may fail",
+   "Remove-Item Env:MODUS_ONLY, Env:MODUS_SKIP, Env:MODUS_OUT -ErrorAction SilentlyContinue" in cap_src
+   and " *   M02, M05 — 11 Oct 2026: may fail and keep their placeholders until the public map's bugs" in cap_src
+   and "iptCheckboxId(underlayKey())" not in cap_src[:cap_src.find("const fs = require")])
+if _node:
+    _r3 = _run({"MODUS_URL": "http://127.0.0.1:9", "MODUS_PLANNER_CODE": "x", "MODUS_SKIP": "S14,X99"})
+ok("...and MODUS_SKIP naming a picture the guide does not have is refused with exit code 2, before any browser",
+   _node is not None and _r3.returncode == 2 and "X99" in _r3.stderr and "MODUS_SKIP" in _r3.stderr)
+_pdf2 = cap_src[cap_src.find("async function pdfFirstPage("):cap_src.find("\n(async () => {")]
+ok("\U0001f534 S15's pdf.js page is drawn at the size it is shown (scale = 1380 / width), not drawn at 1.5\u00d7 and shrunk",
+   "const scale = 1380 / vp.width;" in _pdf2 and "1380 * 1.5" not in _pdf2 and "width:1380px" in _pdf2)
+_s12 = cap_src[cap_src.find('await shot(page, "S12"'):cap_src.find('await shot(page, "S13"')]
+ok("\U0001f534 S12 is aimed at the analysis table with scrollUnderHeader, and fails unless the table's head and first row "
+   "are inside the picture and inside the list's own box",
+   "await scrollUnderHeader(page, th, 150);" in _s12 and "m.scrollTop = m.scrollHeight" not in _s12
+   and 'box.querySelector("thead.sticky")' in _s12 and "the analysis table is not inside the picture" in _s12
+   and "head.top >= lo - 1 && end <= hi + 1" in _s12
+   and '<th className="px-2 py-1 text-left font-semibold">Option</th>' in fe_src
+   and '<thead className="bg-slate-50 text-slate-500 text-xs sticky top-0">' in fe_src)
+_s05 = cap_src[cap_src.find('await shot(page, "S05"'):cap_src.find('await shot(page, "S06"')]
+ok("S05 folds the rail with the app's own button, fails unless the Status column's words are whole, and opens the rail "
+   "again after the shot whatever happened",
+   "await setRail(page, false);" in _s05 and "try { await setRail(page, true); }" in _s05
+   and _s05.find("setRail(page, false)") < _s05.find("try { await setRail(page, true); }")
+   and "the Status column is cut off" in _s05
+   and 'aside[data-guide="rail"] button[title="${open ? "Expand" : "Collapse"}"]' in cap_src
+   and 'title={railOpen ? "Collapse" : "Expand"}' in fe_src and 'data-guide="rail"' in fe_src)
+# NARROWED 11 Oct 2026: S08's caption no longer promises the Stockpiles block (it lies ~1,700 px under the top of the
+# lines table, outside the picture); it says what the picture shows
+_S08 = "Account view \u2014 last week line by line: planned, actual, variance and cost"
+ok("S08's caption says what its picture shows (the Stockpiles block is below it), in the figure, Appendix C and the placeholder",
+   _caps.get("S08") == _S08 and _appc.get("S08") == _S08 and _holders.get("S08") == _S08
+   and '<img src="media/S08.png" alt="%s"' % _S08 in src and "the Stockpiles block" not in _caps.get("S08", "x"))
+
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
