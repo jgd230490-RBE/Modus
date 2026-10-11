@@ -73,6 +73,21 @@
         .kpi-row{ display:flex; gap:28px; }
         .kpi-row-2{ margin-top:0; }
         .kpi-card{ min-width:0; }
+        /* 11 Oct 2026 — the two headline figures: two-way movements and vehicles needed a day */
+        .kpi-card.lead .kpi-value{ font-size:28px; font-weight:600; }
+        /* 11 Oct 2026 — measured at 1280 px: six cards beside the conditions pill overflowed by 231 px and cut
+           off both CO2e cards. Labels wrap at about 104 px and the gaps tighten on the desktop bar only. */
+        @media (min-width:1024px){ #kpi-cards, .kpi-row{ gap:18px; } #kpi-cards .kpi-label{ white-space:normal; max-width:104px; } }
+        .kpi-card.lead .kpi-label{ color:var(--ink); font-weight:500; }
+        .layers-box{ border-top:1px solid var(--line); padding-top:12px; }
+        .layers-box > summary{ cursor:pointer; list-style:none; font-size:13px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
+        .layers-box > summary::-webkit-details-marker{ display:none; }
+        .layers-box > summary::before{ content:'\203A'; display:inline-block; width:14px; color:var(--muted); transition:transform .15s; }
+        .layers-box[open] > summary::before{ transform:rotate(90deg); }
+        .layers-box > .control-group{ margin-bottom:18px; }
+        .busy-row{ display:flex; justify-content:space-between; gap:10px; width:100%; background:none; border:0; border-top:1px solid var(--line); padding:7px 2px; font:inherit; font-size:12.5px; color:var(--ink); cursor:pointer; text-align:left; }
+        .busy-row:hover{ color:var(--navy); }
+        .busy-row .chip-n{ color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
         .kpi-sep{ width:1px; align-self:stretch; background:var(--line); margin:14px 0; }
         .kpi-value{ font-size:26px; font-weight:500; letter-spacing:-.02em; color:var(--navy-deep); line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap; }
         .kpi-label{ font-size:12px; font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted); margin-top:4px; line-height:1.25; white-space:nowrap; }
@@ -253,6 +268,10 @@
         <button class="btn btn-ghost" onclick="resetFilters()">Reset filters</button>
     </div>
 
+    <!-- 11 Oct 2026 — the map leads (ui-review-1009, mockup 7): the layer controls fold away. Closed by
+         default; every control inside keeps its id and handler, so nothing that reads them changes. -->
+    <details class="layers-box" id="layers-box">
+    <summary>Layers and basemap</summary>
     <div class="control-group">
         <h3>Basemap</h3>
         <select id="basemap-select" onchange="changeBasemap(this.value)">
@@ -330,6 +349,7 @@
         <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes</label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
         <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:10.5px;color:#8a9099;">loading…</span></div>
     </div>
+    </details>
 
     <!-- Phase 2.5a — road-restriction layers from the tenant country's road authority
          (Estonia's Tark Tee; since H1 also National Highways' planned closures for
@@ -345,6 +365,8 @@
         <h3 id="kpi-moving-title">What's moving</h3>
         <div class="kpi-switch" id="kpi-switch"></div>
         <div class="kpi-chips" id="kpi-breakdown"></div>
+        <h3 style="margin-top:16px">Busiest routes</h3>
+        <div id="kpi-busiest"></div>
     </div>
 
     <div class="control-group" id="restrictions-group" hidden>
@@ -366,11 +388,11 @@
     <div class="kpi-title" id="kpi-title" title=""></div>
     <div id="kpi-cards">
         <div class="kpi-row">
-            <div class="kpi-card">
+            <div class="kpi-card lead">
                 <div class="kpi-value" id="kpi-trips">—</div>
-                <div class="kpi-label">Movements a day</div>
+                <div class="kpi-label" title="One two-way movement = one delivery: a lorry out laden and back empty">Two-way movements a day</div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card lead">
                 <div class="kpi-value" id="kpi-vehicles">—</div>
                 <div class="kpi-label" id="kpi-vehicles-label">Vehicles needed</div>
             </div>
@@ -1668,7 +1690,7 @@
             // longer being shown. Found by looking at the page, not by reading it.
             set('kpi-vehicles-label', 'Vehicles needed');
             set('kpi-routes', n); set('kpi-routes-label', 'Active routes');
-            setHTML('kpi-breakdown', ''); setHTML('kpi-switch', '');
+            setHTML('kpi-breakdown', ''); setHTML('kpi-switch', ''); setHTML('kpi-busiest', '');
             set('kpi-note', 'Turn on Show forecast or the timeline for daily rates. Active routes = every baked route matching the filters.');
             return;
         }
@@ -1705,6 +1727,7 @@
             // carbon), summed after the same filters; to-date from the LAST month on screen.
             let mCo2 = [], co2Unbaked = 0;
             const groups = {};                 // key -> {veh, t, fleet, months:Set}
+            const byRoute = {};                // 11 Oct: route -> {veh, months:Set, rp} for the busiest list
             const add = (key, l, wdv) => {
                 const g = groups[key] || (groups[key] = { veh: 0, t: 0, fleet: 0, months: new Set() });
                 g.veh += l.vehicle_loads; g.t += (l.qty_t || 0);
@@ -1727,6 +1750,8 @@
                               : KPI.by === 'section' ? (l.section_id || 'no work section')
                               : (l.discipline || 'unassigned');
                     add(key, l, wd);
+                    const br = byRoute[l.route_id] || (byRoute[l.route_id] = { veh: 0, months: new Set(), rp });
+                    br.veh += l.vehicle_loads; br.months.add(p.month != null ? p.month : pi);
                     if (groups[key]) groups[key].months.add(p.month != null ? p.month : pi);
                 });
                 if (any) { mVeh.push(veh); mQty.push(qty); mFleet.push(fleet); mCo2.push(co2); }
@@ -1751,7 +1776,7 @@
                 set('kpi-co2-day-label', 'CO\u2082e a day'); set('kpi-co2-total-label', 'CO\u2082e to date');
                 // §D: an empty month hides the rows AND the switcher — a switcher over
                 // nothing invites a click that changes nothing
-                setHTML('kpi-breakdown', ''); setHTML('kpi-switch', ''); showMoving(false);
+                setHTML('kpi-breakdown', ''); setHTML('kpi-switch', ''); setHTML('kpi-busiest', ''); showMoving(false);
                 set('kpi-vehicles-label', 'Vehicles needed');
                 set('kpi-routes-label', 'Routes in ' + label);
                 set('kpi-note', 'No approved forecast in this month.');
@@ -1762,7 +1787,9 @@
             const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
             const n = mVeh.length;                         // months with volume
             const vehDay = avg(mVeh) / wd, qtyDay = avg(mQty) / wd;
-            set('kpi-trips', fmtN(vehDay, 1));
+            // 11 Oct 2026 (the user): one load = one delivery = one TWO-WAY movement (out laden, back
+            // empty). The figure is loads per working day, not doubled; the label says two-way.
+            set('kpi-trips', fmtN(vehDay, 0));
             // fleet = the busiest month's requirement, not the average: a fleet that
             // is one truck short in the peak month is short
             const fleet = Math.max(...mFleet);
@@ -1797,12 +1824,18 @@
                     const gm = Math.max(1, g.months.size);
                     return `<span class="kpi-chip"><span>${esc(k)}</span><span class="chip-n">` +
                            `${fmtN(g.fleet / gm, 0)} veh/d \u00b7 ` +
-                           `${fmtN(g.veh / gm / wd, 1)} trips/d \u00b7 ` +
+                           `${fmtN(g.veh / gm / wd, 0)} two-way/d \u00b7 ` +
                            `${fmtN(g.t / gm / wd, 0)} t/d</span></span>`;
                 }).join('');
             setHTML('kpi-breakdown', chips);
             positionWarnStack();          // the card just changed height
-            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, averaged over ${n} months with volume` : ''}. Movements = loads per working day (${wd}/month). Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle), rounded up per line${n > 1 ? ', busiest month' : ''}. CO\u2082e = routed km × the vehicle's kg CO\u2082e/km, approved plan only.`
+            // 11 Oct 2026 — the five busiest routes in two-way movements a day; a click selects the route
+            const busiest = Object.entries(byRoute).map(([rid, b]) => [rid, b, b.veh / Math.max(1, b.months.size) / wd])
+                .sort((a, b) => b[2] - a[2]).slice(0, 5)
+                .map(([rid, b, mv]) => `<button type="button" class="busy-row" onclick="selectRoute('${esc(rid)}')" title="Show ${esc(rid)} on the map">` +
+                    `<span>${esc((b.rp.origin || rid) + ' \u2192 ' + (b.rp.dest || ''))}</span><span class="chip-n">${fmtN(mv, 0)} two-way a day</span></button>`).join('');
+            setHTML('kpi-busiest', busiest);
+            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, averaged over ${n} months with volume` : ''}. Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty. Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle), rounded up per line${n > 1 ? ', busiest month' : ''}. CO\u2082e = routed km × the vehicle's kg CO\u2082e/km, approved plan only.`
                 + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload because their vehicle is not in factors.json.` : ''));
             // the method note reads as a tooltip on the month, not as a paragraph in the bar
             const tt = document.getElementById('kpi-title'); if (tt) tt.title = document.getElementById('kpi-note').innerText;

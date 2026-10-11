@@ -1360,8 +1360,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
     && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8);
-  ok("...the six cards: material, loads a day (working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
-    ['label="Material in view"', 'label="Loads a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
+  ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
+    ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
     && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
   ok("...a collapsed section re-measures what it holds when opened (Mapbox and Chart.js measure zero while hidden)",
     _dbBody.includes('const onMore = (e) => { if(e.target.open) requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(err){} }); };')
