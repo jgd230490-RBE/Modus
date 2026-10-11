@@ -48,6 +48,7 @@ import costlines     # 11 Sep — one read of every forecast line's volume, haul
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
+import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -2180,6 +2181,26 @@ def list_gates(location_id: Optional[str] = None, include_inactive: bool = True)
     """Readable without a token — the map and the route panels need it, and a gate
     coordinate is no more sensitive than the location marker already published."""
     return {"gates": gates.list_gates(location_id, include_inactive=include_inactive)}
+
+
+@app.get("/api/gates/arrivals")
+def gate_arrivals_month(month: Optional[int] = None):
+    """
+    11 Oct 2026 — lorries a day at each gate for one month, every team summed: laden arrivals at the
+    destination's entry gate plus empty arrivals (coming to load) at the origin's entry gate, approved
+    lines only, ÷ working days; the average gap is the shift's minutes ÷ arrivals, flagged red only
+    when it is shorter than the gate's typed check-in. Any signed-in code; a team code gets the totals
+    and the team names, never another team's figure (gate_arrivals.arrivals masks per_team from acc).
+    Reads only. No hourly peak exists in the data, so every figure says "if arrivals are spread evenly".
+    """
+    acc = _require_access()
+    if month is None:
+        import datetime as _dt
+        month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
+    if not (1 <= int(month) <= MONTH_COUNT):
+        raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    factors = conversions.load_factors()
+    return gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=_working_days(factors))
 
 
 @app.post("/api/admin/gates")

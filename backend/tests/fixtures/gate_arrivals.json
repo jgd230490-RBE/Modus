@@ -1,0 +1,112 @@
+{
+ "month": 9,
+ "label": "Sep 2026",
+ "working_days": 22.0,
+ "shift_hours": 10.0,
+ "open_minutes": 600.0,
+ "scope": "scheme",
+ "gates": [
+  {
+   "gate_id": "G001",
+   "gate_name": "Weighbridge (in)",
+   "location_id": "L1",
+   "location_name": "West pit",
+   "loc_type": "Quarry",
+   "role": "origin",
+   "laden_per_day": 0.0,
+   "empty_per_day": 252.3,
+   "arrivals_per_day": 252.3,
+   "gap_minutes": 2.4,
+   "gate_minutes": 2.0,
+   "flag": null,
+   "reason": "One every 2.4 min if arrivals are spread evenly, against a 2 min check-in: spacing holds on the average. No hourly peak is typed.",
+   "pending_lines": 1,
+   "pending_per_day": 5.0,
+   "teams": [
+    "Team 1",
+    "Team 2"
+   ],
+   "per_team": [
+    {
+     "team": "Team 1",
+     "arrivals_per_day": 161.4
+    },
+    {
+     "team": "Team 2",
+     "arrivals_per_day": 90.9
+    }
+   ],
+   "origin_share_note": "West pit serves other customers too; Wayscope sees only this scheme's share of this gate's traffic.",
+   "fallthrough_routes": [
+    "R1",
+    "R2",
+    "R3"
+   ]
+  },
+  {
+   "gate_id": "G003",
+   "gate_name": "Compound gate",
+   "location_id": "L2",
+   "location_name": "East compound",
+   "loc_type": "Compound",
+   "role": "both",
+   "laden_per_day": 227.3,
+   "empty_per_day": 4.5,
+   "arrivals_per_day": 231.8,
+   "gap_minutes": 2.6,
+   "gate_minutes": 3.0,
+   "flag": "red",
+   "reason": "231.8 arrivals a day, one every 2.6 min if arrivals are spread evenly, shorter than the 3 min check-in: a queue even with perfect spacing.",
+   "pending_lines": 0,
+   "pending_per_day": 0.0,
+   "teams": [
+    "Team 1",
+    "Team 2"
+   ],
+   "per_team": [
+    {
+     "team": "Team 1",
+     "arrivals_per_day": 140.9
+    },
+    {
+     "team": "Team 2",
+     "arrivals_per_day": 90.9
+    }
+   ],
+   "origin_share_note": null,
+   "fallthrough_routes": []
+  },
+  {
+   "gate_id": "G004",
+   "gate_name": "Stockpile gate",
+   "location_id": "L3",
+   "location_name": "North stockpile",
+   "loc_type": "Stockpile",
+   "role": "destination",
+   "laden_per_day": 29.5,
+   "empty_per_day": 0.0,
+   "arrivals_per_day": 29.5,
+   "gap_minutes": 20.3,
+   "gate_minutes": null,
+   "flag": null,
+   "reason": "No check-in time typed for this gate, so nothing is compared.",
+   "pending_lines": 1,
+   "pending_per_day": 5.0,
+   "teams": [
+    "Team 1"
+   ],
+   "per_team": [
+    {
+     "team": "Team 1",
+     "arrivals_per_day": 29.5
+    }
+   ],
+   "origin_share_note": null,
+   "fallthrough_routes": []
+  }
+ ],
+ "notes": [
+  "1 pending line in Sep 2026 would add 5.0 lorries a day (10.0 gate arrivals across the gates below); they are not in the figures.",
+  "Averages only, if arrivals are spread evenly across the 10 h shift. No hourly peak is typed."
+ ]
+}

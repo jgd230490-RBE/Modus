@@ -109,13 +109,14 @@ const metaMin = { routes: [], materials: ["Small aggregate"], vehicles: ["Artic 
 async function carbonTargetDom(){
   const SC = FIX("carbon_scenario.json"), CTX = FIX("carbon_target.json");
   const calls = [];
-  const srv = { target: () => reply(500, "boom") };
+  const srv = { target: () => reply(500, "boom"), gates: () => new Promise(() => {}) };   // 11 Oct 2026: gate arrivals never answer here, so the Dashboard mounts below keep the panel silent
   let confirmAnswer = false, confirms = 0;
   w.confirm = () => { confirms++; return confirmAnswer; };
   w.fetch = (url, opt) => {
     const method = (opt && opt.method) || "GET", body = opt && opt.body ? JSON.parse(opt.body) : null;
     calls.push({ url, method, body });
     if (url === "/api/carbon/target") return method === "GET" ? srv.target() : reply(200, CTX);
+    if (String(url).startsWith("/api/gates/arrivals")) return srv.gates();
     if (url === "/api/carbon/scenario") {
       const lv = ((body.alternatives || [])[0] || {}).levers || [];
       if (lv.some(l => l.epd && !String(l.epd.source || "").trim())) return reply(400, { detail: "an EPD override needs its source (the EPD's reference)" });
@@ -246,6 +247,84 @@ async function carbonTargetDom(){
      !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 43.4 tCO2e, on target")
      && opened.length === 2 && opened[1] === "carbon");
   d3.done();
+}
+
+// ---- 4b. gate arrivals in a real DOM (11 Oct 2026) ----------------------------------------
+// The Dashboard's own read of GET /api/gates/arrivals?month=N: a failed read says so in one line and
+// leaves the programme figures and the carbon strip alone; a landed read is three rows with the red
+// row's chip saying "Queue likely"; picking another month re-reads with that month and nothing else
+// (every call a GET: the panel writes nothing); an empty month shows the empty state. The fixture is
+// the one test_gate_arrivals.py writes (the planner's month 9). Not covered: a browser, the live server.
+async function gateArrivalsDom(){
+  const GA = FIX("gate_arrivals.json"), CTX = FIX("carbon_target.json"), CL = FIX("cost_lines.json");
+  const calls = [];
+  const srv = { gates: () => reply(500, "boom") };
+  w.fetch = (url, opt) => {
+    const method = (opt && opt.method) || "GET";
+    calls.push({ url: String(url), method });
+    if (url === "/api/carbon/target") return reply(200, CTX);
+    if (String(url).startsWith("/api/gates/arrivals")) return srv.gates();
+    return new Promise(() => {});
+  };
+  const dMeta = { ...metaMin, routes: [], vehicles: ["Rigid 8-wheeler (32t)"],
+    factors: { ...metaMin.factors, vehicle_payload_t: { "Rigid 8-wheeler (32t)": 20 } } };
+  const mount = (C, props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    act(() => { r.render(w.React.createElement(C, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+  const gaCalls = () => calls.filter(c => c.url.startsWith("/api/gates/arrivals"));
+  // today's month, the panel's default, worked out the same way (clamped to the 24-month horizon of metaMin)
+  const _d = new Date(), thisMonth = Math.max(1, Math.min(dMeta.months.count, (_d.getFullYear() - dMeta.months.start_year) * 12 + _d.getMonth() + 1));
+
+  // (1) the read fails
+  const d1 = mount(w.Dashboard, { meta: dMeta, initialData: CL });
+  await settle(50);
+  const e1 = d1.el.querySelector('[data-gate-arrivals="error"]');
+  ok("⭐ GATE DOM: the panel's own read fails: one line says so, the carbon strip and the programme figures stay",
+     !!e1 && e1.textContent === "The gate arrivals did not load." && d1.el.textContent.includes("Transport carbon")
+     && !!d1.el.querySelector('[data-carbon-target="set"]') && !d1.el.querySelector("[data-ga-gate]"));
+  ok("GATE DOM: ...it asked for this month, once, as a GET",
+     gaCalls().length === 1 && gaCalls()[0].url === `/api/gates/arrivals?month=${thisMonth}` && gaCalls()[0].method === "GET");
+  d1.done();
+
+  // (2) the read lands
+  srv.gates = () => reply(200, GA);
+  calls.length = 0;
+  const d2 = mount(w.Dashboard, { meta: dMeta, initialData: CL });
+  await settle(50);
+  const redRow = d2.el.querySelector('[data-ga-flag="red"]');
+  ok("⭐ GATE DOM: the read lands: three rows, the red row's chip says Queue likely, the others Spacing holds / No check-in time typed",
+     d2.el.querySelectorAll("[data-ga-gate]").length === 3 && !!d2.el.querySelector('[data-gate-arrivals="set"]')
+     && !!redRow && redRow.textContent.includes("Queue likely") && redRow.textContent.includes("East compound")
+     && d2.el.querySelectorAll('[data-ga-flag="none"]').length === 2
+     && d2.el.textContent.includes("Spacing holds") && d2.el.textContent.includes("No check-in time typed")
+     && d2.el.textContent.includes("one every 2.6 min if arrivals are spread evenly"));
+  // the select is the REQUEST's month (this month, the panel's default), the header line the server's label — here the stub
+  // answered a month-9 fixture to whatever month was asked, so the two differ on purpose
+  ok("GATE DOM: ...the month select holds the month that was asked for, and the header line carries the server's label",
+     d2.el.querySelector("select.ga-sel") && d2.el.querySelector("select.ga-sel").value === String(thisMonth)
+     && d2.el.textContent.includes("Sep 2026: lorries a day at each gate"));
+
+  // (3) picking another month re-reads with that month and nothing else
+  const other = thisMonth === 3 ? 4 : 3;
+  const sel = d2.el.querySelector("select.ga-sel");
+  const before = calls.length;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(sel, String(other));
+    sel.dispatchEvent(new w.Event("change", { bubbles: true }));
+  });
+  await settle(50);
+  ok("⭐ GATE DOM: picking another month re-reads with that month and nothing else; every call is a GET (the panel writes nothing)",
+     gaCalls().length === 2 && gaCalls()[1].url === `/api/gates/arrivals?month=${other}` && calls.length === before + 1
+     && calls.every(c => c.method === "GET") && sel.value === String(other));
+  d2.done();
+
+  // (4) an empty month
+  srv.gates = () => reply(200, { ...GA, month: 11, label: "Nov 2026", gates: [], notes: ["No approved lines in Nov 2026.", GA.notes[GA.notes.length - 1]] });
+  const d4 = mount(w.Dashboard, { meta: dMeta, initialData: CL });
+  await settle(50);
+  ok("GATE DOM: an empty month shows the empty state with the month's name and the averages note; no rows",
+     !!d4.el.querySelector('[data-gate-arrivals="none"]') && d4.el.textContent.includes("No approved lines in Nov 2026")
+     && d4.el.textContent.includes("No hourly peak is typed") && !d4.el.querySelector("[data-ga-gate]"));
+  d4.done();
 }
 
 // ---- 5. the demo bar (11 Oct 2026) ------------------------------------------------------
@@ -451,6 +530,8 @@ async function lateBar(){
   try { await lateBar(); ok("MAP UNDER THE BAR: the section ran to the end", true); }
   catch (e) { ok("MAP UNDER THE BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
+  try { await gateArrivalsDom(); ok("GATE DOM: the section ran to the end", true); }
+  catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

@@ -1837,7 +1837,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
     && code.includes("<Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} onOpen={setPage} />")
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOpen })")
+    // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature)
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     (_dbWl.match(/<Fig value=\{ctW\.value\} label="tCO2e target, all-in" sub=\{ctW\.sub\} title=\{ctW\.title\} \/>/g) || []).length === 1
@@ -1910,6 +1911,95 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     /\.ct-strip\{background:var\(--surface\);border:1px solid var\(--line\);/.test(html) && /\.ct-line\{font-size:14px;[^}]*color:var\(--ink\)/.test(html)
     && /\.ct-note\{font-size:13px;[^}]*color:var\(--muted\)/.test(html)
     && !/\b(?:bg|text|border)-(?:white|black|slate|gray|red|amber|green|emerald|blue)\b/.test(ctc + mxCt) && !/\b(?:bg|text|border)-\[/.test(ctc + mxCt));
+}
+
+// ---- 11 Oct 2026: Gate arrivals on the Dashboard ----------------------------------------------
+// Source-level. What they prove: the panel is one block before the carbon target's (so the carbon
+// slice's pins keep their shape), the Dashboard reads GET /api/gates/arrivals?month=N in its OWN read
+// keyed on the panel's month, the browser derives nothing (no ceil, no ÷ 60, no payload), the words are
+// the contract's ("if arrivals are spread evenly", red only and always with a word), teams reach the
+// screen through teamText, and the six cards / five sections / eight charts / four big-screen sections
+// are untouched. Not covered here: the loaded states (render_frontend.js, from fixtures/gate_arrivals.json),
+// the read, a failed read and the month change (dom_frontend.js). Not covered anywhere: a browser, the live server.
+{
+  const g0 = src.indexOf("// ---- 11 Oct 2026: Gate arrivals on the Dashboard");
+  const g1 = src.indexOf("// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast");
+  const gaSrc = g0 > 0 && g1 > g0 ? src.slice(g0, g1) : "";
+  const gac = gaSrc.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  const _dbc = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
+  const _dbW = _dbc.slice(_dbc.indexOf("{!wall ? ("), _dbc.indexOf("      ) : (\n        <>\n"));
+  const _dbWl = _dbc.slice(_dbc.indexOf("      ) : (\n        <>\n"));
+  const ctSrc = src.slice(g1, src.indexOf("function Dashboard("));
+  const gaIdsStripped = gac.replace(/key=\{g\.gate_id\}|data-ga-gate=\{g\.gate_id\}/g, "");
+  ok("⭐ GATE ARRIVALS: one block before the carbon target's, holding the panel and its word helpers",
+    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth })")
+    && gac.includes("const gaMonthToday = (months) => {") && gac.includes("const gaFlagWord = (g) =>")
+    && ctSrc.startsWith("// ---- 11 Oct 2026: the carbon target") && !ctSrc.includes("GateArrivalsPanel"));
+  // NARROWED 11 Oct 2026 (review): the read is also skipped on the big screen, where the panel is not rendered
+  ok("🔴 the Dashboard reads it in its OWN GET, guarded by initialGates and by wall, keyed on tick, the month and wall; nothing in the block fetches",
+    /fetch\(`\$\{API\}\/gates\/arrivals\?month=\$\{gaMonth\}`\)[\s\S]{0,260}\}, \[tick, gaMonth, wall\]\);/.test(_dbc)
+    && /if\(initialGates\) return;\n\s*if\(wall\) return;\n\s*let live = true;\n\s*setGaErr\(false\);/.test(_dbc)
+    && _dbc.includes("const [ga, setGa] = useState(initialGates || null);") && _dbc.includes("if(initialGates) return;")
+    && _dbc.includes("{ if(live) setGaErr(true); }") && !/fetch\(/.test(gac) && !/gates\/arrivals[^`]*`,/.test(_dbc)
+    && (_dbc.match(/fetch\(`\$\{API\}\/gates\/arrivals/g) || []).length === 1);
+  ok("⭐ the panel sits under the carbon strip and before the first collapsed section; the six cards, five sections, eight charts are untouched",
+    _dbW.includes("<GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />")
+    && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
+    && (_dbW.match(/<Card label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5
+    && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 5);
+  ok("the hooks sit before the early returns (React #310)",
+    _dbc.indexOf("const [ga, setGa]") > 0 && _dbc.indexOf("const [ga, setGa]") < _dbc.indexOf("if(err) return")
+    && _dbc.indexOf("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));") < _dbc.indexOf("if(err) return")
+    && _dbc.indexOf("fetch(`${API}/gates/arrivals") < _dbc.indexOf("if(err) return"));
+  ok("🔴 the words: 'if arrivals are spread evenly', 'Queue likely', 'Spacing holds', 'No check-in time typed', 'coming to load', lorries not trucks; none of the banned words; no small, uppercase or colour-only text",
+    gac.includes('const GA_SPREAD = "if arrivals are spread evenly";') && gac.includes('"Queue likely"') && gac.includes('"Spacing holds"')
+    && gac.includes('"No check-in time typed"') && gac.includes("coming to load") && gac.includes('"not typed"') && gac.includes("min a lorry")
+    // 11 Oct 2026 (review): a pending-only gate (gap null) says so, before the check-in test, and never "one every —"
+    && gac.includes('g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds")')
+    && gac.includes('{g.gap_minutes == null ? "no approved arrivals" : `one every ${gaMin(g.gap_minutes)} ${GA_SPREAD}`}')
+    && gac.includes("all {TEAMS().toLowerCase()} together") && !/every \{TEAMS\(\)/.test(code)
+    && gac.includes("Pending lines appear as a note until they are approved, then in the figures.")
+    && gac.includes("lorries a day at each gate") && gac.includes("The gate arrivals did not load.")
+    && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?|booking|peak hour)\b/i.test(gac)
+    && !/\bAI\b/.test(gac) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(gac) && !/style=\{\{ ?color/.test(gac));
+  ok("🔴 red only, and always with a word: the chip's dot is var(--red) for flag 'red' and var(--chart-none) otherwise; no amber or gold token in the block",
+    gac.includes('g.flag === "red" ? "var(--red)" : "var(--chart-none)"') && !/--gold|--amber|amber/.test(gac)
+    && gac.includes('<span className="font-semibold">{gaFlagWord(g)}</span>') && gac.includes("title={g.reason}")
+    && gac.includes('g.flag === "red" ? "Queue likely"') && gac.includes('data-ga-flag={g.flag || "none"}'));
+  ok("the browser derives nothing: no division, ceil or payload arithmetic in the block; it formats the server's fields",
+    !/Math\.ceil|\/ *60|payload|\* *60|working_days *[*\/]|[*\/] *working_days/.test(gac)
+    // NARROWED 11 Oct 2026 (review): `unbaked_note` was a field the server never sends; the block renders only the contract's
+    && ["arrivals_per_day", "laden_per_day", "empty_per_day", "gap_minutes", "gate_minutes", "per_team", "origin_share_note", "pending_per_day", "pending_lines"].every(f => gac.includes(f))
+    && !gac.includes("unbaked"));
+  ok("teams reach the screen through teamText only; no id is rendered",
+    gac.includes("teamText(t)") && gac.includes("teamText(t.team)") && !/g\.gate_id\}|location_id\}|scope\}|fallthrough_routes/.test(gaIdsStripped)
+    && !/IPT ?[1-6]/.test(gac) && gac.includes("{TEAMS().toLowerCase()}"));
+  ok("the month select uses the Dashboard's month words (monthLabelAbs) and defaults to today's month clamped to the horizon",
+    gac.includes("monthLabelAbs(i, startYear)") && gac.includes("Math.max(1, Math.min(n,") && gac.includes('aria-label="Month"')
+    && gac.includes("onChange={e => onMonth(+e.target.value)}"));
+  ok("the states are data attributes the DOM and render harnesses read: error / none / set, each root a guide anchor",
+    gac.includes('data-gate-arrivals="error"') && gac.includes('data-gate-arrivals={state}') && gac.includes('const state = gates.length === 0 ? "none" : "set";')
+    && (gac.match(/data-guide="dash-gates"/g) || []).length === 2 && gac.includes('if(!ga) return err'));
+  ok("the empty state is the EmptyState family (kind none) and the error line copies the carbon strip's shape",
+    gac.includes('<EmptyState kind="none" title={`No approved lines in ${ga.label}`}')
+    && gac.includes('<div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>'));
+  ok("the CSS is tokens: 14 px table text, --ink / --line, no Tailwind colour in the block",
+    /\.ga-table\{[^}]*font-size:14px;[^}]*color:var\(--ink\)/.test(html) && /\.ga-table th\{font-size:14px/.test(html) && /\.ga-table td\{font-size:14px/.test(html)
+    && /\.ga-sel\{font-size:14px/.test(html) && !/\b(?:bg|text|border)-(?:white|black|slate|gray|red|amber|green|emerald|blue)\b/.test(gac) && !/\b(?:bg|text|border)-\[/.test(gac));
+  // 11 Oct 2026 (review): under 720 px the header row is hidden, so each cell carries its column's label (the phone test)
+  ok("on a phone every figure cell carries its column's label: data-label on the four figure cells and the ::before rule in the media query",
+    ["Arrivals a day", "Average gap", "Check-in", "Status"].every(l => gac.includes(`<td data-label="${l}"`))
+    && /@media \(max-width:720px\)\{\.ga-table thead\{display:none;\}[^\n]*\.ga-table td\[data-label\]::before\{content:attr\(data-label\) ": ";/.test(html));
+  const gsGa = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
+  ok("the guide names the panel and the anchor exists",
+    gsGa.includes('{ anchor: "dash-gates", title: "Gate arrivals.", body: "Lorries a day at each gate, every team together, and the average gap if arrivals are spread evenly." },')
+    && src.includes('data-guide="dash-gates"'));
+  ok("the footnote names the read and how the figure is made",
+    _dbBody.includes("Gate arrivals come from <code>/api/gates/arrivals</code>") && _dbBody.includes("the gap is the shift's minutes ÷ arrivals, an average with no hourly peak")
+    && _dbBody.includes("all {TEAMS().toLowerCase()} summed at the gate a lorry arrives by") && !_dbBody.includes("every {TEAMS()"));
+  ok("the big screen is unchanged: still four sections, and the panel is not on it",
+    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4
+    && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
 }
 
 // ---- report ------------------------------------------------------------------
