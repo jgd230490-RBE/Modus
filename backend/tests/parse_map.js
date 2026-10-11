@@ -1607,14 +1607,22 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 the guide is set up ONLY when the tenant carries a demo notice",
      /function setupGuide\(\)\{\n\s+if \(!TENANT\.demo_notice\) return;/.test(code)
      && /\} else if \(dn\) \{ dn\.remove\(\); \}\n\s+setupGuide\(\);/.test(code));
-  ok("...and placed just right of the demo notice by measurement, re-placed on resize (a fixed offset overlapped the notice)",
-     /btn\.style\.left = \(dn\.getBoundingClientRect\(\)\.right \+ 8\) \+ 'px';/.test(code) && /window\.addEventListener\('resize', placeBtn\);/.test(code));
+  // 11 Oct 2026 REVERSED (the user: the notice and the Guide button sat on the figures bar): no measured
+  // placement beside a centred pill any more — the notice is a strip at every width and the button is placed by
+  // CSS at the right end of it; the resize hook only clears any inline left
+  ok("...and placed by CSS at the right end of the notice strip, never measured beside a centred pill",
+     !/getBoundingClientRect\(\)\.right \+ 8/.test(code) && /const placeBtn = \(\) => \{ btn\.style\.left = ''; \};/.test(code)
+     && /window\.addEventListener\('resize', placeBtn\);/.test(code));
   ok("9 Oct: tablets get one row of six KPI cards under the month (701-1023px), the phone keeps its 3x2 grid",
      /@media \(min-width:701px\) and \(max-width:1023px\)\{\s*#kpi-cards\{ grid-template-columns:repeat\(6, minmax\(0, 1fr\)\); \}/.test(html));
   ok("9 Oct: below 1024px (phone AND tablet) the notice is a full-width strip at the top and the menu, the bar and the Guide button move down under it",
      /@media \(max-width:1023px\)\{[\s\S]*?body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[\s\S]*?body\.has-demo-notice #menu-toggle\{ top:40px; \}[\s\S]*?body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:84px; \}[\s\S]*?#guide-btn\{ left:auto !important; right:12px; top:9px; \}[\s\S]*?body\.has-demo-notice #guide-btn\{ top:36px; \}/.test(html)
      && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice\);/.test(code)
-     && /if \(window\.innerWidth <= 1023\) \{ btn\.style\.left = ''; return; \}/.test(code));
+     && /const placeBtn = \(\) => \{ btn\.style\.left = ''; \};/.test(code));
+  // 11 Oct 2026: and from 1024 px up too — the strip, the bar / panel / controls 26 px lower, the button in the strip
+  ok("11 Oct: on the desktop the notice is a 26 px strip too, the bar, panel and map controls sit under it, the Guide button is in the strip",
+     /@media \(min-width:1024px\)\{\s*body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0;[^}]*height:26px; \}\s*body\.has-demo-notice #kpi-hud\{ top:26px; \}\s*body\.has-demo-notice \.sidebar\{ top:26px; \}/.test(html)
+     && /body\.has-demo-notice \.mapboxgl-ctrl-top-right\{ top:98px; \}/.test(html) && /body\.has-demo-notice #guide-btn\{ left:auto !important; right:10px; top:2px;/.test(html));
   ok("...the Guide button is created inside setupGuide and nowhere else",
      (code.match(/guideEl\('guide-btn', 'button'\)/g) || []).length === 1 && !html.includes('id="guide-btn"'));
   ok("remembered per visitor under wayscope_guide_map, every read and write in try/catch",
@@ -1622,12 +1630,17 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      && /function guideRead\(\)\{ try \{ return localStorage\.getItem\(MAP_GUIDE_KEY\); \} catch \(e\) \{ return null; \} \}/.test(code)
      && /function guideWrite\(v\)\{ try \{ localStorage\.setItem\(MAP_GUIDE_KEY, v\); \} catch \(e\) \{\} \}/.test(code)
      && (code.match(/localStorage\.(get|set)Item\(MAP_GUIDE_KEY/g) || []).length === 2);
-  ok("first visit: it starts by itself only when nothing is remembered; the button always replays",
-     /if \(!guideRead\(\)\) setTimeout\(guideStart, 900\);/.test(code) && /btn\.onclick = guideStart;/.test(code));
-  ok("Back / Next / Done and 'Don't show again'; Done remembers, 'Don't show again' switches off",
+  // 11 Oct 2026 REVERSED (the user, options 4 + 1 + 2): nothing starts by itself any more
+  ok("11 Oct: no tour starts by itself; the strip offers it, the dots mark the features, re-placed every second; the button replays",
+     !/setTimeout\(guideStart, 900\)/.test(code) && /btn\.onclick = guideStart;/.test(code)
+     && code.includes("placeGuideHints();\n        window.addEventListener('resize', placeGuideHints);\n        setInterval(placeGuideHints, 1000);"));
+  // 11 Oct 2026 NARROWED: the last button says "Got it" (Google's wording); it still remembers
+  ok("Back / Next / Got it and 'Don't show again'; Got it remembers, 'Don't show again' switches off",
      /onclick="guideStep\(-1\)">Back</.test(code) && /onclick="guideStep\(1\)">Next</.test(code)
-     && /onclick="guideEnd\(\)">Done</.test(code) && /onclick="guideOff\(\)">Don\\'t show again</.test(code)
-     && /function guideEnd\(\)\{ guideWrite\('done'\);/.test(code) && /function guideOff\(\)\{ guideWrite\('off'\); guideEnd\(\); \}/.test(code));
+     && /onclick="guideEnd\(\)">Got it</.test(code) && /onclick="guideOff\(\)">Don\\'t show again</.test(code)
+     && /function guideEnd\(keep\)\{ if \(!keep\) guideWrite\('done'\);/.test(code)
+     // 11 Oct 2026 NARROWED: 'off' must survive the card closing (it used to be overwritten with 'done')
+     && /function guideOff\(\)\{ guideWrite\('off'\); guideEnd\(true\); \}/.test(code));
   ok("🔴 ONE Mapbox instance, never removed: the guide adds no map and no map.remove()",
      (code.match(/new mapboxgl\.Map\(/g) || []).length === 1 && !/map\.remove\(\)/.test(code));
   ok("🔴 no new script tag: the guide is in-page (three script src tags, as before)", (html.match(/<script src=/g) || []).length === 3);
@@ -1669,6 +1682,27 @@ ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fol
 ok("busiest routes: the five largest by two-way movements a day (not doubled), each a button that selects the route, cleared with the month",
   html.includes('<div id="kpi-busiest"></div>') && code.includes(".sort((a, b) => b[2] - a[2]).slice(0, 5)")
   && code.includes("onclick=\"selectRoute(") && (code.match(/setHTML\('kpi-busiest', ''\)/g) || []).length === 2);
+ok("11 Oct: below 1024 px the zoom buttons sit under the measured bar (a fixed 180 px overlapped it at 950 px), set on resize and whenever the bar changes height",
+  code.includes("if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';")
+  && code.includes("new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud'))"));
+// 11 Oct 2026 REVERSED (the user chose the Google style): the bubble is dark and slightly transparent, with an arrow
+ok("11 Oct: the tour bubble is Google-style — dark, slightly transparent (88 %, blurred), 13 px, an arrow, text buttons",
+  /#guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:rgba\(32,33,36,\.88\);[^}]*backdrop-filter:blur\(8px\)/.test(html)
+  && /#guide-card\[data-place="below"\]::before/.test(html) && /#guide-card \.guide-foot button\.guide-next\{color:#8AB4F8\}/.test(html)
+  && code.includes("card.dataset.place = place;"));
+ok("11 Oct: the strip sits just under the bar, offers the tour and hides everything with ×; shown until the tour is done",
+  code.includes("if (on && guideRead() !== 'done' && kpi) {") && code.includes("onclick=\"guideStart()\">Take the tour</button>")
+  && code.includes("onclick=\"guideOff()\">\\u00d7</button>") && code.includes("strip.style.top = (Math.round(k.bottom) + 10) + 'px';"));
+ok("11 Oct: one pulsing dot per visible feature, hover / focus / tap shows its line, none during the tour or once switched off",
+  code.includes("function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }") && code.includes("const on = guideHintsOn() && guideIndex < 0;")
+  && code.includes("dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;")
+  && /\.guide-dot\{position:fixed;z-index:9002;[^}]*animation:guide-pulse 2s infinite\}/.test(html) && /prefers-reduced-motion:reduce\)\{\.guide-dot\{animation:none/.test(html));
+ok("11 Oct: the map takes the app's shell — warm neutrals, sentence-case 13 px headings, 14 px controls, orange primary buttons, routes still blue",
+  /--line:#E7E5E4; --bg:#FFFFFF;/.test(html) && /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--navy:#2563EB;/.test(html)
+  && /\.sidebar h3 \{ margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var\(--navy-deep\); text-transform:none; \}/.test(html)
+  && /select \{ width:100%;[^}]*font-size:14px;/.test(html) && /\.btn \{[^}]*background:var\(--action\); color:var\(--action-fg\); \}/.test(html)
+  && !/font-size:1(0|0\.5|1)px;\s*color:#8a9099/.test(html) && html.includes('<div style="height:44px;flex:none"></div>')
+  && /\.fc-row label\{ font-size:12\.5px;/.test(html) && /\.an-lbl\{ font-size:12px; font-weight:500; letter-spacing:0; text-transform:none;/.test(html));
 ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
 console.log();

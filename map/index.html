@@ -22,14 +22,17 @@
     <style>
         :root{
             --navy:#2563EB; --navy-deep:#1F2024; --ink:#1E293B; --muted:#64748B;
-            --line:#E2E8F0; --bg:#F8FAFC; --accent:#DC2626; --green:#059669;
+            --line:#E7E5E4; --bg:#FFFFFF; --accent:#DC2626; --green:#059669;
+            /* 11 Oct 2026 — the map takes the staff app's shell: warm neutrals, orange primary buttons. --navy
+               stays blue: it is the route colour and the link colour (the user: routes stay blue). */
+            --action:#C2410C; --action-fg:#FFFFFF; --surface-2:#FAFAF9; --note:#78716C;
         }
         *{ box-sizing:border-box; }
         body { margin:0; padding:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink); overflow:hidden; -webkit-font-smoothing:antialiased; }
         #map { position:absolute; top:0; bottom:0; right:0; left:300px; transition:left .25s ease; }
         body.sidebar-closed #map, .sidebar.closed ~ #map { left:0; }
 
-        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:#fff; color:var(--navy); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:#fff; color:var(--navy-deep); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
         #menu-toggle:hover{ border-color:#d0d3d8; }
 
         .sidebar { position:absolute; top:0; bottom:0; left:0; width:300px; background:#fff; border-right:1px solid var(--line); padding:20px 18px 24px; z-index:10; display:flex; flex-direction:column; gap:22px; overflow-y:auto; transition:transform .25s ease; }
@@ -37,17 +40,17 @@
         .sidebar h2 { margin:0; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--navy-deep); padding-top:42px; display:flex; align-items:center; gap:9px; }
         .sidebar h2::before{ content:""; width:8px; height:22px; background:var(--navy); border-radius:2px; }
         .sidebar h2 small{ display:block; font-size:9.5px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
-        .sidebar h3 { margin:0 0 9px; font-size:10.5px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+        .sidebar h3 { margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var(--navy-deep); text-transform:none; }
 
         select, button, input { font-family:inherit; }
-        select { width:100%; background:#fff; border:1px solid var(--line); border-radius:7px; padding:8px 9px; color:var(--ink); font-size:12.5px; outline:none; margin-bottom:6px; transition:border-color .15s; }
+        select { width:100%; background:#fff; border:1px solid #D6D3D1; border-radius:6px; padding:8px 10px; color:var(--ink); font-size:14px; outline:none; margin-bottom:6px; transition:border-color .15s; }
         select:focus { border-color:var(--navy); }
-        .btn { width:100%; border:none; border-radius:7px; padding:8px; font-size:12.5px; font-weight:600; cursor:pointer; background:var(--navy); color:#fff; }
-        .btn-ghost { background:#f3f4f6; color:var(--ink); }
-        .btn-ghost:hover{ background:#eceef1; }
+        .btn { width:100%; border:none; border-radius:6px; padding:8px; font-size:14px; font-weight:600; cursor:pointer; background:var(--action); color:var(--action-fg); }
+        .btn-ghost { background:#fff; color:var(--ink); border:1px solid #D6D3D1; font-weight:500; }
+        .btn-ghost:hover{ background:var(--surface-2); }
 
         .control-group { display:flex; flex-direction:column; }
-        .control-item { display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:7px 2px; }
+        .control-item { display:flex; align-items:center; justify-content:space-between; font-size:13.5px; padding:7px 2px; }
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
         .control-item input[type=checkbox]{ accent-color:var(--navy); width:14px; height:14px; }
@@ -65,6 +68,19 @@
                   transition:left .25s ease; }
         body.sidebar-closed #kpi-hud{ left:0; padding-left:176px; }
         .mapboxgl-ctrl-top-right{ top:72px; }
+        /* 11 Oct 2026 — the user: the demo notice and the Guide button sat ON the figures bar on the desktop.
+           On a demo tenant the notice is now a 26 px strip across the top at every width (the phone layout
+           already did this), the bar, the panel and the map controls move down by 26 px, and the Guide
+           button sits at the right end of the strip. */
+        @media (min-width:1024px){
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; text-align:center; padding:5px 10px; height:26px; }
+            body.has-demo-notice #kpi-hud{ top:26px; }
+            body.has-demo-notice .sidebar{ top:26px; }
+            body.has-demo-notice #menu-toggle{ top:40px; }
+            body.has-demo-notice .mapboxgl-ctrl-top-right{ top:98px; }
+            body.has-demo-notice #tl-warnings{ top:110px; }
+            body.has-demo-notice #guide-btn{ left:auto !important; right:10px; top:2px; padding:1px 10px; font-size:11px; }
+        }
         .kpi-title{ font-size:16px; font-weight:600; color:var(--navy-deep); line-height:1.2;
                     letter-spacing:-.01em; min-width:120px; white-space:nowrap; }
         .kpi-title:empty{ display:none; }
@@ -80,12 +96,12 @@
         @media (min-width:1024px){ #kpi-cards, .kpi-row{ gap:18px; } #kpi-cards .kpi-label{ white-space:normal; max-width:104px; } }
         .kpi-card.lead .kpi-label{ color:var(--ink); font-weight:500; }
         .layers-box{ border-top:1px solid var(--line); padding-top:12px; }
-        .layers-box > summary{ cursor:pointer; list-style:none; font-size:13px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
+        .layers-box > summary{ cursor:pointer; list-style:none; font-size:14px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
         .layers-box > summary::-webkit-details-marker{ display:none; }
         .layers-box > summary::before{ content:'\203A'; display:inline-block; width:14px; color:var(--muted); transition:transform .15s; }
         .layers-box[open] > summary::before{ transform:rotate(90deg); }
         .layers-box > .control-group{ margin-bottom:18px; }
-        .busy-row{ display:flex; justify-content:space-between; gap:10px; width:100%; background:none; border:0; border-top:1px solid var(--line); padding:7px 2px; font:inherit; font-size:12.5px; color:var(--ink); cursor:pointer; text-align:left; }
+        .busy-row{ display:flex; justify-content:space-between; gap:10px; width:100%; background:none; border:0; border-top:1px solid var(--line); padding:7px 2px; font:inherit; font-size:13.5px; color:var(--ink); cursor:pointer; text-align:left; }
         .busy-row:hover{ color:var(--navy); }
         .busy-row .chip-n{ color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
         .kpi-sep{ width:1px; align-self:stretch; background:var(--line); margin:14px 0; }
@@ -108,7 +124,7 @@
         #kpi-moving.on{ display:flex; }
         .kpi-chips{ display:flex; flex-direction:column; }
         .kpi-chips:empty{ display:none; }
-        .kpi-chip{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; line-height:1.35; padding:7px 2px;
+        .kpi-chip{ display:flex; justify-content:space-between; gap:10px; font-size:13.5px; line-height:1.35; padding:7px 2px;
                    border-top:1px solid var(--line); color:var(--navy-deep); font-variant-numeric:tabular-nums; }
         .kpi-chip .chip-n{ color:var(--muted); white-space:nowrap; text-align:right; }
         .kpi-switch{ display:flex; gap:2px; margin:0 0 8px; padding:2px; border-radius:7px;
@@ -178,15 +194,15 @@
         @media (min-width:701px) and (max-width:1023px){
             #kpi-cards{ grid-template-columns:repeat(6, minmax(0, 1fr)); }   /* a tablet: one row of six under the month */
         }
-        .restr-warn{ font-size:11px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
+        .restr-warn{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
 
         .fc-box h3{ border:none; }
         .fc-row{ display:flex; gap:10px; margin-bottom:10px; }
         .fc-row > div{ flex:1; }
-        .fc-row label{ font-size:10.5px; font-weight:600; color:var(--muted); display:block; margin-bottom:3px; }
-        .fc-toggle{ font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:9px; font-weight:600; background:#f6f8fb; border:1px solid var(--line); padding:9px 11px; border-radius:8px; }
+        .fc-row label{ font-size:12.5px; font-weight:500; color:var(--muted); display:block; margin-bottom:3px; }
+        .fc-toggle{ font-size:13.5px; cursor:pointer; display:flex; align-items:center; gap:9px; font-weight:500; background:var(--surface-2); border:1px solid var(--line); padding:9px 11px; border-radius:6px; }
         .fc-toggle input{ accent-color:var(--navy); }
-        #forecast-status{ margin-top:9px; font-size:11px; font-weight:500; color:var(--muted); line-height:1.5; }
+        #forecast-status{ margin-top:9px; font-size:12.5px; font-weight:500; color:var(--muted); line-height:1.5; }
         #btn-detail{ margin-top:8px; display:none; }
 
         .mapboxgl-popup-content { border-radius:10px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:'Inter',sans-serif !important; }
@@ -205,8 +221,8 @@
         .an-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; }
         .an-card{ border:1px solid var(--line); border-radius:9px; padding:11px 13px; }
         .an-val{ font-size:19px; font-weight:700; color:var(--navy-deep); letter-spacing:-.02em; }
-        .an-lbl{ font-size:10.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
-        .an-sub{ font-size:11px; color:var(--muted); margin-top:1px; }
+        .an-lbl{ font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted); margin-top:3px; }
+        .an-sub{ font-size:12.5px; color:var(--muted); margin-top:1px; }
         .an-title{ font-size:14px; font-weight:700; color:var(--navy-deep); }
         .an-route{ font-size:12px; color:var(--muted); margin:2px 0 14px; }
         table.fc-matrix{ border-collapse:collapse; font-size:11.5px; width:100%; }
@@ -238,22 +254,39 @@
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
-            #guide-ring{position:fixed;z-index:9000;pointer-events:none;border:2px solid var(--navy);border-radius:10px;box-shadow:0 0 0 4px rgba(37,99,235,.18);}
-            #guide-card{position:fixed;z-index:9001;width:min(340px,calc(100vw - 24px));background:#1F2024;color:#E6E7EA;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.28);padding:14px 16px 12px;font:13.5px/1.5 system-ui,sans-serif;}
-            #guide-card h4{margin:0 0 4px;font-size:14px;font-weight:600;color:#fff;}
-            #guide-card p{margin:0;}
-            #guide-card .guide-foot{display:flex;align-items:center;gap:8px;margin-top:12px;}
-            #guide-card .guide-step{font-size:11px;color:#9AA1AB;margin-right:auto;}
-            #guide-card .guide-foot button{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 11px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#fff;cursor:pointer;}
-            #guide-card .guide-foot button.guide-next{background:var(--navy);color:#fff;border-color:transparent;}
-            #guide-card .guide-off{display:block;margin-top:8px;font:inherit;font-size:11.5px;color:#9AA1AB;background:none;border:none;padding:0;text-decoration:underline;cursor:pointer;}
+  /* 11 Oct 2026 — the guide, options 4 + 1 + 2 (the user): Google-style bubbles, slightly transparent; a light
+     one-line strip that offers the tour; small pulsing dots on the features. Nothing pops up uninvited. */
+  #guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:8px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
+  #guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 Inter,system-ui,sans-serif}
+  #guide-card[data-place="below"]::before{content:"";position:absolute;top:-6px;left:20px;border:6px solid transparent;border-top:0;border-bottom-color:rgba(32,33,36,.88)}
+  #guide-card[data-place="above"]::before{content:"";position:absolute;bottom:-6px;left:20px;border:6px solid transparent;border-bottom:0;border-top-color:rgba(32,33,36,.88)}
+  #guide-card h4{margin:0 0 2px;font-size:13.5px;font-weight:600;color:#fff}
+  #guide-card p{margin:0;color:rgba(255,255,255,.86)}
+  #guide-card .guide-foot{display:flex;align-items:center;gap:2px;margin-top:8px}
+  #guide-card .guide-step{font-size:12px;color:rgba(255,255,255,.55);margin-right:auto}
+  #guide-card .guide-foot button{font:inherit;font-size:13px;font-weight:500;border-radius:4px;padding:4px 8px;border:0;background:transparent;color:rgba(255,255,255,.75);cursor:pointer}
+  #guide-card .guide-foot button:hover{background:rgba(255,255,255,.08)}
+  #guide-card .guide-foot button.guide-next{color:#8AB4F8}
+  #guide-card .guide-off{display:block;margin-top:2px;font:inherit;font-size:12px;color:rgba(255,255,255,.5);background:none;border:none;padding:0;cursor:pointer}
+  #guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
+  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44403C;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 Inter,system-ui,sans-serif}
+  .guide-strip b{color:#1F2024;font-weight:600}
+  .guide-strip .guide-strip-go{font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
+  .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
+  .guide-strip .guide-x{font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
+  .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
+  .guide-dot{position:fixed;z-index:9002;width:10px;height:10px;border-radius:50%;background:#C2410C;border:0;padding:0;cursor:pointer;animation:guide-pulse 2s infinite}
+  @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(194,65,12,.45)}70%{box-shadow:0 0 0 8px rgba(194,65,12,0)}100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}}
+  @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
+  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 Inter,system-ui,sans-serif}
+  .guide-tip b{color:#fff;font-weight:600}
             #demo-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:30;background:#1F2024;color:#FBBF24;border:1px solid #D97706;border-radius:999px;padding:4px 12px;font:700 10.5px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;}
 </style>
 </head>
 <body>
 <div id="menu-toggle" onclick="toggleSidebar()">☰ Control Panel</div>
 <div class="sidebar" id="main-sidebar">
-    <div style="height:26px"></div>
+    <div style="height:44px;flex:none"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button -->
 
     <div class="control-group">
         <h3>Route filtering</h3>
@@ -291,9 +324,9 @@
              colours are defined. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alignment" checked onchange="toggleAlignment(this.checked)"> Alignment (by package)</label><span class="color-dot" id="ipt-alignment-swatch" style="background:#94a3b8; border-radius:0; width:13px; height:3px;"></span></div>
         <div id="ipt-legend" style="padding-left:23px;margin:-2px 0 4px;"></div>
-        <div id="ipt-legend-note" style="padding-left:23px;margin:-2px 0 6px;font-size:10.5px;color:#8a9099;line-height:1.45;">Drawn continuously. Where the alignment file has no surveyed main track the line is interpolated &mdash; click it to see whether a stretch is measured.</div>
+        <div id="ipt-legend-note" style="padding-left:23px;margin:-2px 0 6px;font-size:12px;color:var(--note);line-height:1.45;">Drawn continuously. Where the alignment file has no surveyed main track the line is interpolated &mdash; click it to see whether a stretch is measured.</div>
         <div class="control-item"><label><input type="checkbox" id="layer-ws-bounds" checked onchange="toggleWsBounds(this.checked)"> Work section boundaries</label><span class="color-dot" style="background:#334155; border-radius:0; width:3px; height:13px;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">Package edges · ticks from zoom 11, labels from 13</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">Package edges · ticks from zoom 11, labels from 13</span></div>
         <!-- The alignment as it was drawn before the IPT overlay: every track type, one
              dark line, nothing cut. Kept as its own layer because the IPT view answers
              "which package" and this one answers "where is the railway" — and the gap
@@ -301,7 +334,7 @@
              view is the one that carries information. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alignment-survey" onchange="toggleLayer('rail-alignment-survey', this.checked)"> Alignment (survey, continuous)</label><span class="color-dot" style="background:#000000; border-radius:0; width:13px; height:2px;"></span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-chainage" onchange="toggleLayer('chainage-global', this.checked); toggleLayer('chainage-labels', this.checked);"> Chainage markers</label><span class="color-dot" style="background:#94a3b8;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">10 km ticks at corridor zoom · denser and labelled as you zoom in</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">10 km ticks at corridor zoom · denser and labelled as you zoom in</span></div>
         <!-- 2026-09-08 (§A). ONE type, ONE symbol, and the legend IS the filter — seven
              boxes that each hide their own type and nothing else. Previously the only
              location control was this master switch, and a railhead was hidden by the
@@ -317,19 +350,19 @@
              it should stay that way: this is a 200 km corridor and the buildings only
              mean anything at site zoom. Not an ortho mesh — the brief is explicit. -->
         <div class="control-item"><label><input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label><span class="color-dot" style="background:#cbd5e1;"></span></div>
-        <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">from zoom 14 · Mapbox basemaps only</span></div>
+        <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 14 · Mapbox basemaps only</span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-gates" checked onchange="toggleGates(this.checked)"> Site gates</label><span class="color-dot" style="background:#64748B;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">from zoom 10 · hollow = deactivated</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 10 · hollow = deactivated</span></div>
         <!-- Phase 3. Two colours, one meaning each: red = the router is steered around
              this area, grey = drawn for information and HERE never hears about it. With
              the forecast timeline open these follow the month on screen, so a closure
              that ends in March is gone by April. -->
         <div class="control-item"><label><input type="checkbox" id="layer-zones" checked onchange="toggleZones(this.checked)"> Disruption zones</label><span class="color-dot" style="background:#DC2626;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;">red = avoided by routing · grey = advisory</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">red = avoided by routing · grey = advisory</span></div>
         <!-- The EXISTING railway (the package's `rail`), not the alignment being built.
              Dim until an origin filter picks a Railhead, then bold. Default ON. -->
         <div class="control-item"><label><input type="checkbox" id="layer-rail" checked onchange="toggleRail(this.checked)"> Existing rail network</label><span class="color-dot" style="background:repeating-linear-gradient(90deg,#64748B 0 2px,transparent 2px 6px); border-radius:0; width:13px; height:3px;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:10.5px;color:#8a9099;" id="rail-note">provisional geometry · bolds when a railhead is the origin</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);" id="rail-note">provisional geometry · bolds when a railhead is the origin</span></div>
     </div>
 
     <div class="control-group">
@@ -347,7 +380,7 @@
              legs is a lot of line, and this answers a question nobody asks
              continuously. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes</label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:10.5px;color:#8a9099;">loading…</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:12px;color:var(--note);">loading…</span></div>
     </div>
     </details>
 
@@ -371,9 +404,9 @@
 
     <div class="control-group" id="restrictions-group" hidden>
         <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
-        <div id="restriction-toggles"><div class="control-item"><span style="font-size:11px;color:#8a9099;">Loading…</span></div></div>
+        <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
         <div class="control-item" style="padding-left:2px;margin-top:-2px;">
-            <span id="restriction-source" style="font-size:10px;color:#8a9099;">Advisory — the router is not given this data.</span>
+            <span id="restriction-source" style="font-size:12px;color:var(--note);">Advisory — the router is not given this data.</span>
         </div>
     </div>
 
@@ -584,41 +617,92 @@
         if (r) { ring.hidden = false; ring.style.top = (r.top - 4) + 'px'; ring.style.left = (r.left - 4) + 'px';
                  ring.style.width = (r.width + 8) + 'px'; ring.style.height = (r.height + 8) + 'px'; }
         else ring.hidden = true;
-        const vw = window.innerWidth, vh = window.innerHeight, W = Math.min(340, vw - 24);
-        let top = 80, left = Math.max(12, (vw - W) / 2);
-        if (r) { left = Math.min(Math.max(12, r.left), Math.max(12, vw - W - 12)); top = r.bottom + 12; if (top + 220 > vh) top = Math.max(12, r.top - 232); }
+        const vw = window.innerWidth, vh = window.innerHeight, W = Math.min(300, vw - 24);
+        let top = 80, left = Math.max(12, (vw - W) / 2), place = 'none';
+        if (r) { left = Math.min(Math.max(12, r.left), Math.max(12, vw - W - 12)); top = r.bottom + 12; place = 'below'; if (top + 220 > vh) { top = Math.max(12, r.top - 232); place = 'above'; } }
         top = Math.min(Math.max(12, top), Math.max(12, vh - 232));   // never off the window, whatever the anchor did
         const card = guideEl('guide-card');
-        card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', 'Guide');
+        card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', 'Guide'); card.dataset.place = place;
         card.style.top = top + 'px'; card.style.left = left + 'px'; card.style.width = W + 'px';
         const last = guideIndex === MAP_GUIDE_STEPS.length - 1;
         card.innerHTML = '<h4></h4><p></p><div class="guide-foot"><span class="guide-step"></span>'
             + (guideIndex > 0 ? '<button type="button" onclick="guideStep(-1)">Back</button>' : '')
-            + (last ? '<button type="button" class="guide-next" onclick="guideEnd()">Done</button>'
+            + (last ? '<button type="button" class="guide-next" onclick="guideEnd()">Got it</button>'
                     : '<button type="button" class="guide-next" onclick="guideStep(1)">Next</button>')
             + '</div><button type="button" class="guide-off" onclick="guideOff()">Don\'t show again</button>';
         card.querySelector('h4').textContent = step.title;
         card.querySelector('p').textContent = step.body;
         card.querySelector('.guide-step').textContent = (guideIndex + 1) + ' of ' + MAP_GUIDE_STEPS.length;
     }
-    function guideStart(){ guideIndex = 0; guideRender(); }
+    function guideStart(){ guideIndex = 0; placeGuideHints(); guideRender(); }
     function guideStep(d){ guideIndex += d; if (guideIndex < 0) guideIndex = 0; if (guideIndex >= MAP_GUIDE_STEPS.length) { guideEnd(); return; } guideRender(); }
-    function guideEnd(){ guideWrite('done'); guideIndex = -1; for (const id of ['guide-ring', 'guide-card']) { const el = document.getElementById(id); if (el) el.remove(); } }
-    function guideOff(){ guideWrite('off'); guideEnd(); }
+    function guideEnd(keep){ if (!keep) guideWrite('done'); guideIndex = -1; for (const id of ['guide-ring', 'guide-card']) { const el = document.getElementById(id); if (el) el.remove(); } placeGuideHints(); }
+    // 11 Oct 2026: 'off' is written AFTER the card closes — guideEnd used to overwrite it with 'done', so the
+    // tips could never be switched off once the dots existed
+    function guideOff(){ guideWrite('off'); guideEnd(true); }
+    // 11 Oct 2026 (the user, options 4 + 2): the strip under the bar offers the tour (until it is done or
+    // switched off) and a pulsing dot sits on each visible feature (until switched off); hover, focus or
+    // tap a dot to read its line. Re-placed every second, because the bar and the panel change under it.
+    function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }
+    function placeGuideHints(){
+        const on = guideHintsOn() && guideIndex < 0;
+        const kpi = document.getElementById('kpi-hud');
+        let strip = document.getElementById('guide-strip');
+        if (on && guideRead() !== 'done' && kpi) {
+            if (!strip) {
+                strip = guideEl('guide-strip'); strip.className = 'guide-strip'; strip.setAttribute('role', 'note');
+                strip.innerHTML = '<span>New here? Press <b>Play</b> to watch a month of haul.</span>'
+                    + '<button type="button" class="guide-strip-go" onclick="guideStart()">Take the tour</button>'
+                    + '<button type="button" class="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onclick="guideOff()">\u00d7</button>';
+            }
+            const k = kpi.getBoundingClientRect();
+            strip.style.top = (Math.round(k.bottom) + 10) + 'px'; strip.style.left = (Math.round(k.left) + 12) + 'px';
+        } else if (strip) strip.remove();
+        MAP_GUIDE_STEPS.forEach((st, n) => {
+            const el = on ? guideAnchor(st) : null;
+            let dot = document.getElementById('guide-dot-' + n);
+            if (!el) { if (dot) dot.remove(); return; }
+            if (!dot) {
+                dot = guideEl('guide-dot-' + n, 'button'); dot.type = 'button'; dot.className = 'guide-dot';
+                dot.setAttribute('aria-label', 'Tip: ' + st.title);
+                const show = () => guideTip(n, true), hide = () => guideTip(n, false);
+                dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;
+                dot.onclick = () => guideTip(n, !document.getElementById('guide-tip'));
+            }
+            const r = el.getBoundingClientRect();
+            // a wide feature (the bar) takes its dot just inside the top-left corner, clear of the Guide button
+            const wide = r.width > 400;
+            dot.style.top = Math.round(wide ? r.top + 6 : Math.max(4, r.top - 4)) + 'px';
+            dot.style.left = Math.round(wide ? r.left + 6 : Math.min(r.right - 8, window.innerWidth - 20)) + 'px';
+        });
+        if (!on) guideTip(-1, false);
+    }
+    function guideTip(n, show){
+        let tip = document.getElementById('guide-tip');
+        if (!show || n < 0) { if (tip) tip.remove(); return; }
+        const dot = document.getElementById('guide-dot-' + n), st = MAP_GUIDE_STEPS[n];
+        if (!dot || !st) return;
+        tip = guideEl('guide-tip'); tip.className = 'guide-tip'; tip.setAttribute('role', 'tooltip');
+        tip.innerHTML = '<b></b> <span></span>';
+        tip.querySelector('b').textContent = st.title; tip.querySelector('span').textContent = st.body;
+        const r = dot.getBoundingClientRect();
+        tip.style.top = Math.round(r.bottom + 8) + 'px';
+        tip.style.left = Math.round(Math.max(12, Math.min(r.left - (r.left > window.innerWidth / 2 ? 236 : 0), window.innerWidth - 272))) + 'px';
+    }
     function setupGuide(){
         if (!TENANT.demo_notice) return;
         const btn = guideEl('guide-btn', 'button');
         btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
         // Beside the demo notice, measured — the notice is centred and its width depends on
         // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
-        const placeBtn = () => {
-            if (window.innerWidth <= 1023) { btn.style.left = ''; return; }   // phone or tablet: the CSS rule places it at the right edge
-            const dn = document.getElementById('demo-notice');
-            if (dn) { btn.style.left = (dn.getBoundingClientRect().right + 8) + 'px'; }
-        };
+        // 11 Oct 2026: placed by CSS at every width now — at the right end of the notice strip, off the bar.
+        const placeBtn = () => { btn.style.left = ''; };
         placeBtn();
         window.addEventListener('resize', placeBtn);
-        if (!guideRead()) setTimeout(guideStart, 900);
+        // 11 Oct 2026: no tour starts by itself any more — the strip offers it and the dots mark the features
+        placeGuideHints();
+        window.addEventListener('resize', placeGuideHints);
+        setInterval(placeGuideHints, 1000);
     }
     window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });
 
@@ -744,7 +828,7 @@
                 ? `<b style="color:#5b6270;">${r.ipt}</b> · ${(window.IPT_UNDERLAY || {}).label || 'corridor underlay'}`
                 : `<b style="color:#5b6270;">${r.ipt}</b>${r.ws.length ? ' · ' + r.ws.join(', ') : ''}`;
             const handler = under ? 'toggleUnderlay(this.checked)' : 'applyIptFilter()';
-            return `<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;line-height:1.7;${r.muted ? 'opacity:.7;' : ''}" title="${r.labels.join(' · ').replace(/"/g, '&quot;')}">`
+            return `<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.7;${r.muted ? 'opacity:.7;' : ''}" title="${r.labels.join(' · ').replace(/"/g, '&quot;')}">`
                 + `<input type="checkbox" id="${iptCheckboxId(r.ipt)}" checked onchange="${handler}" style="margin:0;">`
                 + `<span style="flex:0 0 14px;height:${under ? 4 : 3}px;background:${colour};border-radius:0;"></span>`
                 + `<span style="color:#8a9099;">${label}</span></div>`;
@@ -1274,7 +1358,7 @@
         const note = { Quarry: 'fill = material' };
         box.innerHTML = LOC_KINDS.map(k =>
             `<div class="control-item" style="padding:3px 2px;border:0;">` +
-            `<label style="font-size:10.5px;color:#6b7280;font-weight:500;">` +
+            `<label style="font-size:12.5px;color:#57534E;font-weight:500;">` +
             `<input type="checkbox" id="loc-kind-${k.toLowerCase()}" checked onchange="toggleLocKind()"> ` +
             `${k}${note[k] ? ` <span style="color:#a2a8b0">· ${note[k]}</span>` : ''}</label>` +
             `<img alt="" src="${swatch(k)}" style="width:15px;height:15px;margin-left:auto;">` +
@@ -2670,9 +2754,9 @@
                               + `and awaits the design drawings.</div>`
                             : '')
                         + (wsMeta.note
-                            ? `<div style="margin-top:5px;font-size:10.5px;color:#8a9099;">⚠ ${wsMeta.note}.</div>`
+                            ? `<div style="margin-top:5px;font-size:12px;color:var(--note);">⚠ ${wsMeta.note}.</div>`
                             : '')
-                        + `<div style="margin-top:6px;font-size:10.5px;color:#8a9099;">Reference geometry. Band boundaries from the scope diagram.</div>`
+                        + `<div style="margin-top:6px;font-size:12px;color:var(--note);">Reference geometry. Band boundaries from the scope diagram.</div>`
                         + `</div>`
                     )
                     .addTo(map);
@@ -2714,7 +2798,7 @@
                             ? `<div style="margin-top:6px;padding:5px 7px;background:#fef3c7;border-radius:3px;font-size:11.5px;color:#7c5e10;">`
                               + `<b>Provisional.</b> This boundary is approximate and awaits the design drawings.</div>`
                             : '')
-                        + (p.note ? `<div style="margin-top:6px;font-size:10.5px;color:#8a9099;">⚠ ${p.note}.</div>` : '')
+                        + (p.note ? `<div style="margin-top:6px;font-size:12px;color:var(--note);">⚠ ${p.note}.</div>` : '')
                         + `</div>`
                     )
                     .addTo(map);
@@ -3010,7 +3094,7 @@
             // failure, still shows nothing at all: neither is a fact about the place.
             // No image request is made in any of these cases.
             if(meta && !meta.available && meta.status === 'ZERO_RESULTS'){
-                box.innerHTML = '<div style="font-size:10px;color:#8a9099;">No Street View here</div>';
+                box.innerHTML = '<div style="font-size:12px;color:var(--note);">No Street View here</div>';
                 return;
             }
             if(!meta || !meta.available) return;   // no key / fetch failed: show nothing
@@ -3020,7 +3104,7 @@
             // letting the image imply it is the gate.
             const off = (meta.offset_m != null && meta.offset_m > 25)
                 ? '<div style="font-size:10px;color:#92400e;">nearest imagery is ' + Math.round(meta.offset_m) + ' m away</div>' : '';
-            const when = meta.date ? '<div style="font-size:10px;color:#8a9099;">Google Street View · ' + meta.date + '</div>' : '';
+            const when = meta.date ? '<div style="font-size:12px;color:var(--note);">Google Street View · ' + meta.date + '</div>' : '';
             box.innerHTML = '<img src="' + src + '" alt="Street View near ' + (name || '') +
                 '" style="width:100%;border-radius:6px;display:block;" loading="lazy">' + off + when;
         }catch(e){ /* imagery is a nicety — a failure leaves the popup as it was */ }
@@ -3076,7 +3160,7 @@
             // a map with no restriction overlay is degraded, not broken — say so quietly
             // in the panel rather than throwing a banner over a working map
             const box = document.getElementById('restriction-toggles');
-            if(box) box.innerHTML = '<div class="control-item"><span style="font-size:11px;color:#8a9099;">Restrictions unavailable</span></div>';
+            if(box) box.innerHTML = '<div class="control-item"><span style="font-size:12px;color:var(--note);">Restrictions unavailable</span></div>';
             console.warn('restrictions unavailable', e);
         }
         RESTR.loading = false;
@@ -3203,7 +3287,7 @@
         // attribution names the provider the API named — never a hard-coded authority
         const pvd = RESTR.provider || {};
         const attrib = [pvd.name, pvd.short].filter(Boolean).join(' · ');
-        if (attrib) body += '<div style="font-size:10px;color:#8a9099;margin-top:7px;">' + attrib + '</div>';
+        if (attrib) body += '<div style="font-size:12px;color:var(--note);margin-top:7px;">' + attrib + '</div>';
         return '<div style="min-width:220px;"><h4 style="margin:0 0 4px;color:' + colour +
                ';font-size:13.5px;">' + title + '</h4>' + body + '</div>';
     }
@@ -3257,7 +3341,7 @@
                  `border-left:3px solid #DC2626;font-size:11.5px;line-height:1.45;'>` +
                  `<b>Provisional geometry.</b> ${p.accuracy_note || ''}</p>`;
         }
-        h += `<p style='margin:4px 0;font-size:10.5px;color:#8a9099;line-height:1.4;'>` +
+        h += `<p style='margin:4px 0;font-size:12px;color:var(--note);line-height:1.4;'>` +
              `Source: ${p.source || 'unknown'}</p></div>`;
         return h;
     }
@@ -3278,7 +3362,7 @@
         if (p.safety_minutes) h += `<p style='margin:4px 0;'><b>Induction:</b> ${p.safety_minutes} min</p>`;
         if (p.internal_travel_minutes) h += `<p style='margin:4px 0;'><b>Gate to face:</b> ` +
                                             `${p.internal_travel_minutes} min</p>`;
-        h += `<p style='margin:6px 0 0 0;font-size:11px;color:#8a9099;'>${p.gate_id} · ` +
+        h += `<p style='margin:6px 0 0 0;font-size:12px;color:var(--note);'>${p.gate_id} · ` +
              `access point, not the site itself</p></div>`;
         return h;
     }
@@ -4012,11 +4096,18 @@
         const box = document.getElementById('tl-warnings');
         if (!box) return;
         const kpi = document.getElementById('kpi-hud');
+        // 11 Oct 2026: the zoom buttons follow the bar too. Below 1024 px the stacked bar's height depends on the
+        // tenant's words and the labels; a fixed 180 px put the buttons on the bar at 950 px (bar ended at 202).
+        const ctrl = document.querySelector('.mapboxgl-ctrl-top-right');
+        if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';
         if (window.innerWidth > 1023 || !kpi || box.style.display === 'none') { box.style.top = ''; return; }   // 9 Oct: tablets stack the bar too
         const h = kpi.getBoundingClientRect().height || 0;
         box.style.top = (Math.round(h) + 8) + 'px';
     }
     window.addEventListener('resize', positionWarnStack);
+    // 11 Oct: and whenever the bar itself changes height (cards filling in, labels wrapping, the window narrowing)
+    try { new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud')); } catch (e) {}
+    setTimeout(positionWarnStack, 1200);   // and once after first paint, for a browser that has not laid out yet
     function renderConditionsPill(live) {
         const pill = document.getElementById('kpi-conditions');
         if (!pill) return;

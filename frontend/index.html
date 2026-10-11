@@ -138,15 +138,32 @@
   .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
   .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
   /* H10 (8 Oct 2026): the in-app guide — a coach-mark card, demo tenant only. In-page, no library. */
-  .guide-ring{position:fixed;z-index:9000;pointer-events:none;border:2px solid var(--navy);border-radius:10px;box-shadow:0 0 0 4px rgba(37,99,235,.18);transition:top .15s,left .15s,width .15s,height .15s}
-  .guide-card{position:fixed;z-index:9001;width:min(340px,calc(100vw - 24px));background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.28);padding:14px 16px 12px;font-size:13.5px;line-height:1.5}
-  .guide-card h4{margin:0 0 4px;font-size:14px;font-weight:600;color:#fff}
-  .guide-card p{margin:0;color:var(--popover-fg)}
-  .guide-card .guide-foot{display:flex;align-items:center;gap:8px;margin-top:12px}
-  .guide-card .guide-step{font-size:11px;color:var(--popover-muted);margin-right:auto}
-  .guide-card .guide-foot button{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 11px;border:1px solid var(--popover-line);background:transparent;color:#fff;cursor:pointer}
-  .guide-card .guide-foot button.guide-next{background:var(--navy);color:var(--control-fg);border-color:transparent}
-  .guide-card .guide-off{display:block;margin-top:8px;font:inherit;font-size:11.5px;color:var(--popover-muted);background:none;border:none;padding:0;text-decoration:underline;cursor:pointer}
+  /* 11 Oct 2026 — the guide, options 4 + 1 + 2 (the user): Google-style bubbles, slightly transparent; a light
+     one-line strip that offers the tour; small pulsing dots on the features. Nothing pops up uninvited. */
+  .guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:8px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
+  .guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 Inter,system-ui,sans-serif}
+  .guide-card[data-place="below"]::before{content:"";position:absolute;top:-6px;left:20px;border:6px solid transparent;border-top:0;border-bottom-color:rgba(32,33,36,.88)}
+  .guide-card[data-place="above"]::before{content:"";position:absolute;bottom:-6px;left:20px;border:6px solid transparent;border-bottom:0;border-top-color:rgba(32,33,36,.88)}
+  .guide-card h4{margin:0 0 2px;font-size:13.5px;font-weight:600;color:#fff}
+  .guide-card p{margin:0;color:rgba(255,255,255,.86)}
+  .guide-card .guide-foot{display:flex;align-items:center;gap:2px;margin-top:8px}
+  .guide-card .guide-step{font-size:12px;color:rgba(255,255,255,.55);margin-right:auto}
+  .guide-card .guide-foot button{font:inherit;font-size:13px;font-weight:500;border-radius:4px;padding:4px 8px;border:0;background:transparent;color:rgba(255,255,255,.75);cursor:pointer}
+  .guide-card .guide-foot button:hover{background:rgba(255,255,255,.08)}
+  .guide-card .guide-foot button.guide-next{color:#8AB4F8}
+  .guide-card .guide-off{display:block;margin-top:2px;font:inherit;font-size:12px;color:rgba(255,255,255,.5);background:none;border:none;padding:0;cursor:pointer}
+  .guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
+  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44403C;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 Inter,system-ui,sans-serif}
+  .guide-strip b{color:#1F2024;font-weight:600}
+  .guide-strip .guide-strip-go{font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
+  .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
+  .guide-strip .guide-x{font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
+  .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
+  .guide-dot{position:fixed;z-index:9002;width:10px;height:10px;border-radius:50%;background:#C2410C;border:0;padding:0;cursor:pointer;animation:guide-pulse 2s infinite}
+  @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(194,65,12,.45)}70%{box-shadow:0 0 0 8px rgba(194,65,12,0)}100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}}
+  @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
+  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 Inter,system-ui,sans-serif}
+  .guide-tip b{color:#fff;font-weight:600}
   .demo-badge{margin-left:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;align-items:center;}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
@@ -1365,6 +1382,14 @@ function Guide({ page, groups }){
   const [steps, setSteps] = useState([]);
   const [i, setI] = useState(0);
   const [box, setBox] = useState(null);
+  // 11 Oct 2026 (the user, options 4 + 1 + 2): nothing pops up uninvited. On a demo tenant a one-line
+  // strip offers the tour (4), the tour is Google-style "Got it" bubbles, slightly transparent (1), and
+  // small pulsing dots mark this page's features — hover or tap one to read its line (2).
+  const [hints, setHints] = useState(false);
+  const [strip, setStrip] = useState(false);
+  const [dots, setDots] = useState([]);
+  const [tip, setTip] = useState(null);
+  const [railRight, setRailRight] = useState(240);
   const build = (withWelcome) => {
     const own = GUIDE_STEPS[key] || [];
     if(!withWelcome) return own;
@@ -1374,19 +1399,45 @@ function Guide({ page, groups }){
       : { ...s, body: `The menu on the left follows the work: ${menu}.` });
     return [...welcome, ...own];
   };
-  // the first visit of a page, demo tenant only
+  // a page opened on a demo tenant: the strip (until this page's tour is done) and the dots (until switched off)
   useEffect(() => {
     if(!TENANT.demo_notice) return;
-    if(guideRead("all") === "off" || guideRead(key) === "done") return;
-    const s = build(guideRead("welcome") !== "done");
-    if(s.length){ setSteps(s); setI(0); }
+    setSteps([]); setTip(null);
+    if(guideRead("all") === "off"){ setHints(false); setStrip(false); return; }
+    setHints(true); setStrip(guideRead(key) !== "done");
   }, [key]);
-  // the header's Guide button replays the current page (the welcome too, if never seen)
+  const startTour = () => { setTip(null); setSteps(build(guideRead("welcome") !== "done")); setI(0); };
+  // the header's Guide button and the strip's "Take the tour" run the tour (the welcome too, if never seen)
   useEffect(() => {
-    const on = () => { setSteps(build(guideRead("welcome") !== "done")); setI(0); };
+    const on = () => startTour();
     window.addEventListener(GUIDE_EVENT, on);
     return () => window.removeEventListener(GUIDE_EVENT, on);
   }, [key, groups]);
+  // the dots: one per distinct anchor of this page's steps, placed on the anchor's top-right corner and
+  // re-placed every second (pages render late), on resize and on scroll; none while the tour runs
+  useEffect(() => {
+    if(!hints || steps.length){ setDots([]); return; }
+    const own = GUIDE_STEPS[key] || [];
+    const place = () => {
+      const rail = document.querySelector('[data-guide="rail"]');
+      if(rail) setRailRight(Math.round(rail.getBoundingClientRect().right));
+      const seen = new Set(), out = [];
+      own.forEach(s => {
+        if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);
+        const el = document.querySelector(`[data-guide="${s.anchor}"]`);
+        if(!el || !(el.offsetWidth || el.offsetHeight)) return;
+        const r = el.getBoundingClientRect();
+        if(r.bottom < 0 || r.top > window.innerHeight) return;
+        const wide = r.width > 400;   // a wide feature (a page header) takes its dot just inside the top-left corner
+        out.push({ anchor: s.anchor, title: s.title, body: s.body, top: Math.round(wide ? r.top + 6 : Math.max(4, r.top - 4)), left: Math.round(wide ? r.left - 14 : Math.min(r.right - 8, window.innerWidth - 20)) });
+      });
+      setDots(prev => JSON.stringify(prev) === JSON.stringify(out) ? prev : out);
+    };
+    place();
+    const id = setInterval(place, 1000);
+    window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
+    return () => { clearInterval(id); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [hints, key, steps.length]);
   const step = steps[i];
   // measure the anchor; an anchor that is not on screen (a conditional element) falls back to the page header
   useEffect(() => {
@@ -1402,26 +1453,47 @@ function Guide({ page, groups }){
     window.addEventListener("resize", measure); window.addEventListener("scroll", measure, true);
     return () => { window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true); };
   }, [step]);
-  if(!step) return null;
-  const finish = () => { guideWrite(key, "done"); guideWrite("welcome", "done"); setSteps([]); };
-  const off = () => { guideWrite("all", "off"); finish(); };
-  const vw = window.innerWidth, vh = window.innerHeight, W = Math.min(340, vw - 24);
-  let top = 80, left = Math.max(12, (vw - W) / 2);
+  const finish = () => { guideWrite(key, "done"); guideWrite("welcome", "done"); setSteps([]); setStrip(false); };
+  const off = () => { guideWrite("all", "off"); finish(); setHints(false); };
+  const hintsEl = (hints && !step) ? (
+    <>
+      {strip && (
+        <div className="guide-strip" role="note" style={{ left: railRight + 16, bottom: 16 }}>   {/* bottom-left of the page: never over the page header */}
+          <span>New here? A short tour shows what this page is for.</span>
+          <button type="button" className="guide-strip-go" onClick={startTour}>Take the tour</button>
+          <button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>
+        </div>
+      )}
+      {dots.map(d => (
+        <button key={d.anchor} type="button" className="guide-dot" style={{ top: d.top, left: d.left }} aria-label={`Tip: ${d.title}`}
+          onMouseEnter={() => setTip(d)} onMouseLeave={() => setTip(t => (t && t.anchor === d.anchor) ? null : t)}
+          onFocus={() => setTip(d)} onBlur={() => setTip(null)} onClick={() => setTip(t => (t && t.anchor === d.anchor) ? null : d)} />
+      ))}
+      {tip && (
+        <div className="guide-tip" role="tooltip" style={{ top: tip.top + 18, left: Math.max(12, Math.min(tip.left - (tip.left > window.innerWidth / 2 ? 236 : 0), window.innerWidth - 272)) }}>
+          <b>{tip.title}</b> {tip.body}
+        </div>
+      )}
+    </>
+  ) : null;
+  if(!step) return hintsEl;
+  const vw = window.innerWidth, vh = window.innerHeight, W = Math.min(300, vw - 24);
+  let top = 80, left = Math.max(12, (vw - W) / 2), place = "none";
   if(box){
     if(box.height > vh * 0.5 && box.left + box.width + W + 24 <= vw){
       // a TALL anchor (the rail): beside it, level with its top, so the card never covers it
-      left = box.left + box.width + 12; top = Math.max(12, box.top + 12);
+      left = box.left + box.width + 12; top = Math.max(12, box.top + 12); place = "side";
     } else {
       left = Math.min(Math.max(12, box.left), Math.max(12, vw - W - 12));
-      top = box.top + box.height + 12;
-      if(top + 220 > vh) top = Math.max(12, box.top - 232);
+      top = box.top + box.height + 12; place = "below";
+      if(top + 220 > vh){ top = Math.max(12, box.top - 232); place = "above"; }
     }
   }
   top = Math.min(Math.max(12, top), Math.max(12, vh - 232));   // never off the window, whatever the anchor did
   return (
     <>
       {box && <div className="guide-ring" style={{ top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8 }} />}
-      <div className="guide-card" role="dialog" aria-label="Guide" style={{ top, left, width: W }}>
+      <div className="guide-card" role="dialog" aria-label="Guide" data-place={place} style={{ top, left, width: W }}>
         <h4>{step.title}</h4>
         <p>{step.body}</p>
         <div className="guide-foot">
@@ -1429,7 +1501,7 @@ function Guide({ page, groups }){
           {i > 0 && <button type="button" onClick={() => setI(i - 1)}>Back</button>}
           {i < steps.length - 1
             ? <button type="button" className="guide-next" onClick={() => setI(i + 1)}>Next</button>
-            : <button type="button" className="guide-next" onClick={finish}>Done</button>}
+            : <button type="button" className="guide-next" onClick={finish}>Got it</button>}
         </div>
         <button type="button" className="guide-off" onClick={off}>Don't show again</button>
       </div>
