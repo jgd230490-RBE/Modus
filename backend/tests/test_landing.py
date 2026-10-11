@@ -335,7 +335,7 @@ ok("🔴 no claim that the figures are already in the Carbon Tool's form or prep
 ok("🔴 no placeholder or caption promising a carbon export", not re.search(r"carbon[^.]{0,40}\bexport", _low))
 ok("...and the page says plainly the figures are planning estimates, not a Carbon Tool return",
    "not a Carbon Tool return" in body and "your Carbon Tool return stays your own" in body)
-ok("the Carbon page (the planner, PR #16) is named on the landing page", "The Carbon page sets the approved plan beside" in body)
+ok("the Carbon planner (PR #16) is named, by its menu name, on the landing page", "The Carbon planner sets the approved plan beside" in body)
 ok("the look-ahead copy no longer promises that declared disruption is what occurs",
    "the disruption that occurs" not in _low and "how closely the week matched what was declared" in body)
 
