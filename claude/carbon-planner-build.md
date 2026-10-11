@@ -205,6 +205,18 @@ Every fix has an assertion in `test_carbon.py` (175 / 0). The ones that changed 
 - **Electric variants:** a third, "Artic Flatbed (44t) — electric", so the demo's flatbed lines can switch too
   (the mixers and the smaller rigids still have none). `test_week1` count narrowed 14 → 15.
 
+## Merge with main (11 Oct, after PRs #14, #15 and #17 landed)
+GitHub reported conflicts on PR #16: the UI pass rewrote `frontend/index.html` and added its assertions in the
+same place as the carbon ones in `parse_frontend.js`. Resolved by merging `main` into the branch:
+- **Config → Vehicles row:** the UI pass's restyled row, with the carbon "derived: kWh × UK grid" hint re-added.
+- **parse_frontend.js:** both assertion blocks kept, carbon first.
+- **Brought the Carbon page into the UI pass's rules:** its own rail icon (the rail now draws a line icon per
+  page; without one it showed the Forecasts icon), the "Plan" kicker on its header, the error kind of the empty
+  state, the 14 px floor (11 px text → 13 px, 10 px → 12 px) and no dashed border — the UI pass's own checks
+  flagged the last two. Asserted in the carbon block so they hold wherever the page sits.
+- **parse_map (a separate commit):** one map-panel assertion on `main` failed before this branch touched it (the
+  map's CSS was scoped to `#kpi-cards .kpi-label` after the assertion was written). Narrowed to the real selector.
+
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
 supplier EPD); electric kWh/km is derived from a mixed-fleet programme; the 2 t ZEV allowance is
