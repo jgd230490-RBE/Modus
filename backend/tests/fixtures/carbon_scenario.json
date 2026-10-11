@@ -87,10 +87,13 @@
    "delta_pct": -79.1,
    "delta_t": -124.153,
    "delta_trips": 47,
+   "delta_vkm_km": -3512.0,
    "drivers": [
     {
      "delta_pct": -71.4,
      "delta_t": -112.04,
+     "delta_trips": 0,
+     "delta_vkm_km": -4800.0,
      "driver": "disposal",
      "label": "Receiving site and disposal method",
      "lines_changed": 1
@@ -98,6 +101,8 @@
     {
      "delta_pct": -6.5,
      "delta_t": -10.28,
+     "delta_trips": 47,
+     "delta_vkm_km": 1960.0,
      "driver": "fuel",
      "label": "Battery electric lorries",
      "lines_changed": 2
@@ -105,6 +110,8 @@
     {
      "delta_pct": -3.4,
      "delta_t": -5.358,
+     "delta_trips": 0,
+     "delta_vkm_km": 0.0,
      "driver": "recycled",
      "label": "Recycled content",
      "lines_changed": 2
@@ -119,6 +126,11 @@
     "unsized_lines": 1
    },
    "interaction_t": 3.524,
+   "lever_words": [
+    "Recycled content 30% — Small aggregate",
+    "Receiving site: Soil hub (route R4) — route R3: Compound → Tip",
+    "Battery electric lorries, where Config has an electric profile for that lorry — every plan line"
+   ],
    "levers": [
     {
      "driver": "recycled",
@@ -147,6 +159,11 @@
     "Waste": 6.537,
     "unclassed": 0.0
    },
+   "stages": {
+    "A1-A3": 25.074,
+    "A4": 1.231,
+    "A5": 6.537
+   },
    "totals": {
     "baked_lines": 2,
     "baked_tonnes": 8700.0,
@@ -170,8 +187,11 @@
     "transport_nh_t": 30.371,
     "transport_t": 1.887,
     "transport_tkm_t": 10.452,
+    "transport_wtt_t": 0.53,
+    "transport_wtw_t": 2.417,
     "trips": 382,
-    "vkm": 10488.0
+    "vkm": 10488.0,
+    "wtw_lines_out": 0
    }
   }
  ],
@@ -274,6 +294,11 @@
    "Waste": 120.927,
    "unclassed": 0.0
   },
+  "stages": {
+   "A1-A3": 30.432,
+   "A4": 5.636,
+   "A5": 120.927
+  },
   "totals": {
    "baked_lines": 2,
    "baked_tonnes": 8700.0,
@@ -297,8 +322,11 @@
    "transport_nh_t": 46.217,
    "transport_t": 13.151,
    "transport_tkm_t": 15.905,
+   "transport_wtt_t": 3.088,
+   "transport_wtw_t": 16.24,
    "trips": 335,
-   "vkm": 14000.0
+   "vkm": 14000.0,
+   "wtw_lines_out": 0
   }
  },
  "factors": [
@@ -386,6 +414,30 @@
    "status": "DERIVED",
    "unit": "kg CO2e per vehicle-km",
    "vehicle": "Artic Tipper (44t) — electric",
+   "year": 2026
+  },
+  {
+   "ids": [
+    "28_907_3132_4_1"
+   ],
+   "key": "wtt:Artic Tipper (44t)",
+   "label": "Artic Tipper (44t), well-to-tank",
+   "source": "DESNZ 2026, WTT- delivery vehs & freight › WTT- HGV (non-refrigerated, all diesel) › Articulated (>33t) › Average laden › km, Scope 3, well-to-tank",
+   "status": "VERIFIED",
+   "unit": "kg CO2e per vehicle-km",
+   "value": 0.22058,
+   "year": 2026
+  },
+  {
+   "ids": [
+    "15_917_4000_5_1 + 15_918_4000_5_1"
+   ],
+   "key": "wtt:Artic Tipper (44t) — electric",
+   "label": "Artic Tipper (44t) — electric, well-to-tank",
+   "source": "1.25 kWh/km × UK electricity well-to-tank 2026 (generation 0.03682 + T&D 0.00359 kg CO2e/kWh)",
+   "status": "DERIVED",
+   "unit": "kg CO2e per vehicle-km",
+   "value": 0.05051,
    "year": 2026
   },
   {
@@ -564,6 +616,7 @@
    "total_t": 28.265,
    "transport_nh_t": 19.807,
    "transport_t": 5.636,
+   "transport_wtt_t": 1.323,
    "trips": 100,
    "vehicle": "Artic Tipper (44t)"
   },
@@ -592,6 +645,7 @@
    "total_t": 120.927,
    "transport_nh_t": 26.41,
    "transport_t": 7.515,
+   "transport_wtt_t": 1.765,
    "trips": 200,
    "vehicle": "Artic Tipper (44t)"
   },
@@ -622,6 +676,7 @@
    "total_t": 7.803,
    "transport_nh_t": null,
    "transport_t": null,
+   "transport_wtt_t": null,
    "trips": 35,
    "vehicle": "Artic Tipper (44t)"
   }
@@ -629,7 +684,8 @@
  "methods": {
   "headline": "vehicle-km: trips × routed km of both legs × the vehicle's kg CO2e per vehicle-km (DESNZ 2026, tank-to-wheel)",
   "nh_tool": "NH Carbon Tool v2.7 basis: tonnes × one-way km × (laden + unladen) ÷ 2 × 2, 2024 factors with well-to-tank",
-  "tonne_km": "DESNZ 2026 tonne-km for each vehicle's size class, average laden — what a tonne-km calculator gives for the same haul"
+  "tonne_km": "DESNZ 2026 tonne-km for each vehicle's size class, average laden — what a tonne-km calculator gives for the same haul",
+  "well_to_wheel": "the vehicle-km figure plus producing the fuel or electricity: DESNZ 2026 well-to-tank per vehicle-km for diesel, kWh/km × the electricity well-to-tank rows for electric"
  },
  "options": {
   "allocation": [
@@ -915,11 +971,24 @@
   "Compound charger sizing from the fleet plan",
   "Battery degradation over a programme",
   "Plant fuel on earthworks",
-  "NH Carbon Tool export (.rct) once a real sample file is held"
+  "NH Carbon Tool export (.rct) once a real sample file is held",
+  "Committed, proposed or considered on each decision (the construction logistics plan statuses), once scenarios can be saved after per-person sign-in"
  ],
+ "scope_words": {
+  "counts": "Making the material (A1–A3); transport to site and back, both legs (A4); surplus material taken away and its disposal (A5).",
+  "factors": "UK Government GHG conversion factors 2026 (DESNZ). The National Highways Carbon Tool comparison uses the tool's own 2024 factors. Each factor shows its source, year and status.",
+  "not_counted": "Site plant and site energy, staff travel, traffic on the finished road. Producing the fuel or electricity (well-to-tank) is a separate well-to-wheel figure, not in the total."
+ },
  "shift_hours_per_day": 10.0,
  "status": "Approved",
  "to": null,
  "unit": "km",
+ "waste_hierarchy": {
+  "closed_loop": "Recycling",
+  "combustion": "Other recovery if the plant recovers energy, otherwise disposal",
+  "landfill": "Disposal",
+  "open_loop": "Recycling"
+ },
+ "waste_hierarchy_source": "Waste hierarchy: prevention, preparing for re-use, recycling, other recovery, disposal. Waste (England and Wales) Regulations 2011, regulation 12; Defra, Guidance on applying the waste hierarchy (2011)",
  "working_days_per_month": 22.0
 }

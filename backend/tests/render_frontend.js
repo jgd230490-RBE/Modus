@@ -201,6 +201,24 @@ if (loaded) {
     ok("...the controls: a disabled recycled slider for soil with the reason, the EPD fields, the electric switch",
       cOut.includes("Not available: no primary-production factor is published for Soils.") && cOut.includes("EPD reference (required)")
       && cOut.includes("Battery electric lorries") && cOut.includes("Where Config has an electric profile for that lorry"));
+    // after the show (11 Oct 2026, items 8, 9, 11–15) — the figures test_carbon.py hand-works
+    ok("...item 8 what the page counts, and the one unrouted line named as left out",
+      cOut.includes("What this page counts") && cOut.includes("Making the material (A1–A3); transport to site and back, both legs (A4)")
+      && cOut.includes("1 plan line has no route distance yet: transport not counted"));
+    ok("...item 14 the life-cycle modules on both cards: 30.4 · 5.6 · 120.9 and 25.1 · 1.2 · 6.5",
+      cOut.includes("By life-cycle module: A1–A3 30.4 · A4 5.6 · A5 120.9") && cOut.includes("By life-cycle module: A1–A3 25.1 · A4 1.2 · A5 6.5"));
+    ok("...item 12 well-to-wheel beside the totals: 16.2 and 2.4 tCO2e, and in the methods table",
+      cOut.includes("Transport well-to-wheel: 16.2 tCO2e") && cOut.includes("Transport well-to-wheel: 2.4 tCO2e")
+      && cOut.includes("Wayscope, well-to-wheel (adds producing the fuel or electricity)"));
+    ok("...item 9 each decision's lorry effect: the soil hub 4 800 fewer lorry-km; electric 47 more loads and 1 960 more lorry-km; the alternative 3 512 fewer",
+      cOut.includes("4 800 fewer lorry-km") && cOut.includes("47 more lorry loads · 1 960 more lorry-km")
+      && cOut.includes("no change in lorry loads or lorry-km") && cOut.includes("3 512 fewer lorry-km"));
+    ok("...item 13 the waste hierarchy on the muck-away route (landfill: disposal) and on each method offered",
+      cOut.includes("Waste hierarchy: disposal") && cOut.includes("Recycled (closed-loop) · waste hierarchy: recycling")
+      && cOut.includes("Wayscope does not replace these or the duty of care"));
+    ok("...item 11 the summary card and item 15 who acts",
+      cOut.includes("Summary for the file") && cOut.includes("Download the summary (PDF)") && cOut.includes("Using these results")
+      && cOut.includes("Principal contractor") && cOut.includes("Roles as CLOCS names them."));
     ok("...the Planned panel and the known limits, and nothing renders as undefined or NaN",
       cOut.includes("Not built yet") && cOut.includes("Known limits") && !/undefined|NaN/.test(cOut));
   } else {

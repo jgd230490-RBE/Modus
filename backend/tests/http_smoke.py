@@ -336,6 +336,30 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("⭐ electric on R001: the ranked driver is diesel vs electric, carbon down, more trips at the lower payload",
            (alt.get("drivers") or [{}])[0].get("driver") == "fuel" and alt.get("delta_t", 0) < -50
            and fc.get("lines") == 4 and fc["electric"]["trips"] > fc["diesel"]["trips"], str(alt.get("drivers"))[:200])
+        # after the show (11 Oct 2026, items 12 and 14): well-to-wheel and the modules, over HTTP.
+        # 75.99 t at 0.93939 kg/km is 80,893 artic-km; × the 0.22058 well-to-tank row = 17.84 t
+        ok("⭐ well-to-wheel over HTTP: R001's 75.99 t tank-to-wheel + 17.84 t well-to-tank, beside the total (not in it)",
+           abs(bt.get("transport_wtt_t", 0) - 17.84) < 0.01 and abs(bt.get("transport_wtw_t", 0) - 93.83) < 0.02
+           and abs(bt.get("total_t", 0) - (bt.get("material_t", 0) + bt.get("transport_t", 0) + bt.get("disposal_t", 0))) < 0.01,
+           f"{bt.get('transport_wtt_t')} {bt.get('transport_wtw_t')}")
+        st = (cs.get("baseline") or {}).get("stages") or {}
+        ok("...the life-cycle modules add up to the total over HTTP", st and abs(sum(st.values()) - bt.get("total_t", 0)) < 0.01, str(st))
+        # item 11: the summary PDF through the real HTTP layer — the demo notice and the stamp on it
+        r = c.post("/api/carbon/summary.pdf", json={})
+        ok("🔴 the carbon summary without a code — 401", r.status_code == 401, str(r.status_code))
+        r = c.post("/api/carbon/summary.pdf", headers=PLAN, json={"alternatives": [
+            {"name": "Electric on R001", "levers": [{"driver": "fuel", "scope": {"route_id": "R001"}, "fuel": "electric"}]}],
+            "commentary": "Smoke check & <nothing> else"})
+        from portable import pdf_text
+        _st = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+        ok("⭐ the carbon summary over HTTP: a one-page PDF, stamped, with the fictional-scheme notice and the commentary as typed",
+           r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-"
+           and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in _st
+           and "Fictional demo scheme" in _st and "Smoke check & <nothing> else" in _st
+           and "Battery electric lorries, where Config has an electric profile for that lorry — route R001" in _st,
+           f"{r.status_code} {_st[:300]}")
+        r = c.post("/api/carbon/summary.pdf", headers=PLAN, json={"commentary": "x" * 1501})
+        ok("🔴 a commentary over 1,500 characters is refused — 400", r.status_code == 400 and "1500" in r.text, r.text[:160])
     finally:
         db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?",
                    ("default", "R001", "Artic Tipper (44t)"))

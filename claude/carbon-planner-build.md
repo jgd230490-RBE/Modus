@@ -248,6 +248,49 @@ Standard v4, FORS, EA, GOV.UK style guide); nothing new is calculated in the bro
   no longer carries 210 → 148), one REVERSED (the NH series); parse_frontend +12, five NARROWED to the new words;
   render_frontend +2, five NARROWED. The demo package is regenerated (benchmark block and timestamps only).
 
+## After the show (11 Oct, branch `claude/carbon-after-show`, merge after 15 Oct, after `claude/carbon-ui`)
+Items 8, 9 and 11–15 of `notes/carbon-ui-1011` (the research and the checkers' corrections are in
+`notes/carbon-ui-research-1011.md`). Item 10 (Committed / Proposed / Considered on each decision) needs saved
+scenarios, so it waits for G3; it is listed under "Not built yet". Every figure is still the server's.
+
+- **Item 8, what this page counts** (top of the page): Counts / Does not count / Factors in one set of words
+  (`carbon.SCOPE_WORDS`, returned as `scope_words`, also on the PDF), and "Left out here" from the server's
+  counts: unrouted lines, tonnes with no production factor, lines with no return distance, no disposal factor,
+  lines whose lorry has no well-to-tank row.
+- **Item 9, each decision's lorry effect:** `drivers[].delta_trips` and `drivers[].delta_vkm_km` (each decision
+  alone against the approved plan), and `alternatives[].delta_vkm_km`. The page shows "N fewer lorry loads · Y
+  fewer lorry-mi" in the tenant's unit.
+- **Item 11, the one-page summary:** `POST /api/carbon/summary.pdf` (same body as the scenario + `commentary`,
+  at most 1,500 characters, at most one alternative; stores nothing). Built by `export.build_carbon_pdf` from the
+  scenario, stamped "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" and the tenant's demo
+  notice. The decisions are written out by `carbon._lever_words` ("Receiving site: Soil hub (route R4) — route
+  R3: Compound → Tip"; the arrow prints as "to", which Helvetica has). The commentary is escaped, printed as typed.
+- **Item 12, well-to-wheel beside the total, never in it:** `factors.json` → `carbon.transport.wtt_vehicle_km_2026`,
+  four DESNZ 2026 rows read from the flat file (WTT- delivery vehs & freight › HGV non-refrigerated all diesel ›
+  average laden › km: rigid >17 t 0.23756, artic >33 t 0.22058, rigid 3.5–7.5 t 0.11851, rigid 7.5–17 t 0.14453;
+  VERIFIED, checked 11 Oct). `carbon.wtt_factor` matches each lorry's tank-to-wheel row by ID (…_3132_4_1 ↔
+  …_3132_4_1); electric is kWh/km × the two electricity WTT rows already in the file. A typed figure that matches
+  no row gets none (`wtw_lines_out`), never a guessed ratio. Totals: `transport_wtt_t`, `transport_wtw_t`.
+  **factors.json changed: merge, do not overwrite.**
+- **Item 13, waste hierarchy:** `carbon.WASTE_HIERARCHY` tags only the four methods that exist (landfill:
+  disposal; closed- and open-loop: recycling; combustion: other recovery if the plant recovers energy, otherwise
+  disposal), with the regulation named. The tag follows the method the carbon figure uses, so a re-use site
+  mapped to closed-loop reads "recycling" until that mapping is settled. One line: a transfer note (or season
+  ticket) is still needed; Wayscope does not replace it or the duty of care.
+- **Item 14, life-cycle modules:** `stages` {A1-A3, A4, A5} on the approved plan and each alternative (material;
+  transport of deliveries; transport of surplus taken away + its disposal; no A5 sub-module claimed). They add up
+  to the total, asserted. Shown as a secondary line.
+- **Item 15, "Using these results":** client, buyer, principal contractor, each with one sentence; "Roles as
+  CLOCS names them"; no claim that the page meets CLOCS.
+- **Tests:** test_carbon 208 (+29: the WTT rows and their matching, every new figure hand-worked from the
+  fixture, the PDF's text, one page, stamp, escaping, 400s and 401); parse_frontend 517 (+8, one NARROWED: the
+  page now makes the scenario read and the summary download, nothing else); render_frontend 122 (+6);
+  http_smoke 110 (+5: well-to-wheel and the summary over real HTTP with the demo notice). The smoke check found a
+  real bug, fixed before commit: a battery-electric decision scoped to one route lost its "where" in the words.
+- **Seen in a browser (local, demo package):** the counts box, the module and well-to-wheel lines, the lorry
+  effect and the summary card; the PDF opened in the browser's viewer (rows aligned, one page). The waste
+  hierarchy controls were checked through the fixture render only: the local copy has no muck-away routes.
+
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
 supplier EPD); electric kWh/km is derived from a mixed-fleet programme; the 2 t ZEV allowance is

@@ -3432,6 +3432,15 @@ function ConfigPage({ meta, who, access }){
 // "custom carbon factor (supplier EPD)", "vehicle choice", "receiving site", "disposal method";
 // lorry loads beside tCO2e; sentence case at 14 px (13 px only for hints and table headers);
 // status as a word; results above the controls on a phone.
+// After the show (11 Oct 2026, items 8, 9, 11–15): what the page counts, the life-cycle modules and a
+// well-to-wheel figure beside (never in) the total, each decision's lorry effect, the waste hierarchy
+// step of each disposal method, a one-page summary PDF with a commentary, and who acts on the results.
+// All from the server: the page still computes nothing but the display.
+const CARBON_STEPS = [
+  { who: "Client", what: "Sets the carbon target for the scheme and asks the supply chain to plan against it." },
+  { who: "Buyer", what: "Asks each supplier for an environmental product declaration (EPD) and enters it here as a custom carbon factor, with its reference." },
+  { who: "Principal contractor", what: "Writes the decisions it commits to into the construction logistics plan and the subcontracts, then reports actual quantities in the client's own return (on National Highways schemes, the Carbon Tool)." },
+];
 const CARBON_TONE = { VERIFIED: "var(--green)", DERIVED: "var(--chart-none)", ASSUMPTION: "var(--gold)" };
 const CARBON_STATUS_WORD = { VERIFIED: "Verified", DERIVED: "Derived", ASSUMPTION: "Assumption" };
 const CARBON_FLAG_WORDS = {
@@ -3473,6 +3482,8 @@ function CarbonPage({ meta, access, initialData }){
   const [busy, setBusy] = useState(false);
   const [showRoutes, setShowRoutes] = useState(false);
   const [showFactors, setShowFactors] = useState(false);
+  const [note, setNote] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
   const levers = useMemo(() => carbonLevers(st), [JSON.stringify(st)]);
   useEffect(() => {
     if(initialData) return;
@@ -3537,6 +3548,8 @@ function CarbonPage({ meta, access, initialData }){
       <div className="kpi-num font-bold text-[color:var(--navy-deep)] mt-2" style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}
            title="Making the material + transport to and from site + waste disposal, in tonnes of carbon dioxide equivalent (tCO2e)">{t1(sc.totals.total_t)} <span className="text-sm font-semibold text-slate-500">tCO2e</span></div>
       <div className="text-sm text-slate-700 mt-1 tabular-nums">Material {t1(sc.totals.material_t)} + Transport {t1(sc.totals.transport_t)} + Waste disposal {t1(sc.totals.disposal_t)}</div>
+      <div className={hint + " tabular-nums"} title="Life-cycle modules as BS EN 15804 names them: A1–A3 making the material, A4 transport to site, A5 surplus material taken away and its disposal">By life-cycle module: A1–A3 {t1((sc.stages || {})["A1-A3"])} · A4 {t1((sc.stages || {}).A4)} · A5 {t1((sc.stages || {}).A5)}</div>
+      <div className="text-sm text-slate-700 tabular-nums" title={(data.methods || {}).well_to_wheel}>Transport well-to-wheel: {t1(sc.totals.transport_wtw_t)} tCO2e <span className={hint}>(adds producing the fuel or electricity; beside the total, not in it)</span></div>
       {children}
     </div>
   );
@@ -3548,6 +3561,40 @@ function CarbonPage({ meta, access, initialData }){
   const fc = data.fleet_compare || {};
   const flagsOf = (sc) => Object.entries((sc && sc.totals && sc.totals.flags) || {});
   const unrouted = (B.totals.lines || 0) - (B.totals.baked_lines || 0);
+  // item 9: a decision's lorry effect in words, the distance in the tenant's unit
+  const loadsWord = (n) => (!n ? "" : n < 0 ? `${grp(-n)} fewer lorry loads` : `${grp(n)} more lorry loads`);
+  const kmWord = (km) => (km == null || Math.abs(km) < 0.5 ? "" : `${grp(Math.abs(dist(km)), 0)} ${km < 0 ? "fewer" : "more"} lorry-${DU()}`);
+  const lorryEffect = (d) => [loadsWord(d.delta_trips), kmWord(d.delta_vkm_km)].filter(Boolean).join(" · ") || `no change in lorry loads or lorry-${DU()}`;
+  // item 13: the waste hierarchy step of a disposal method (from the server, for the four methods that exist)
+  const step = (k) => ((data.waste_hierarchy || {})[k] || "");
+  const dispWord = (k) => `${CARBON_DISPOSAL_WORD[k] || k}${step(k) ? ` · waste hierarchy: ${step(k).toLowerCase()}` : ""}`;
+  // item 8: what is left out of these figures, from the server's counts
+  const sw = data.scope_words || {};
+  const fl0 = B.totals.flags || {};
+  const leftOut = [
+    unrouted > 0 ? `${unrouted} plan line${unrouted === 1 ? " has" : "s have"} no route distance yet: transport not counted (Bake on the Routes page)` : "",
+    (B.totals.material_excluded_tonnes || 0) > 0 ? `${grp(B.totals.material_excluded_tonnes)} t has no Government production factor: making it is not counted` : "",
+    fl0.RETURN_NOT_BAKED ? `${fl0.RETURN_NOT_BAKED} plan line${fl0.RETURN_NOT_BAKED === 1 ? " has" : "s have"} no return route distance: loaded leg only` : "",
+    fl0.NO_DISPOSAL_FACTOR ? `${fl0.NO_DISPOSAL_FACTOR} plan line${fl0.NO_DISPOSAL_FACTOR === 1 ? " has" : "s have"} no Government disposal factor: disposal not counted` : "",
+    B.totals.wtw_lines_out ? `${B.totals.wtw_lines_out} plan line${B.totals.wtw_lines_out === 1 ? "'s lorry has" : "s' lorries have"} no published well-to-tank row` : "",
+  ].filter(Boolean);
+  // item 11: the one-page summary — the same body as the page's read, plus the commentary; the server draws it
+  const downloadSummary = async () => {
+    setPdfBusy(true);
+    try {
+      const r = await fetch(`${API}/carbon/summary.pdf`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alternatives: levers.length ? [{ name: "Alternative", levers }] : [],
+                               spend_gbp_m: (spend === "" || isNaN(+spend)) ? null : +spend, commentary: note || null }) });
+      if(!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 200)}`);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "carbon-summary.pdf";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setErr("The summary could not be made: " + (e.message || e)); }
+    setPdfBusy(false);
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -3566,6 +3613,18 @@ function CarbonPage({ meta, access, initialData }){
       </PageHeader>
       {err && <div className="rounded-lg border p-3 text-sm mb-4" style={{ borderColor: "var(--red)", color: "var(--red)" }}>{err}</div>}
 
+      <div className={card + " p-4 mb-5"} data-guide="carbon-counts">
+        <h3 className={h3}>What this page counts</h3>
+        <dl className="grid md:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-3 mt-2 text-sm">
+          <div><dt className="font-semibold text-slate-800">Counts</dt><dd className="text-slate-600">{sw.counts || "no data"}</dd></div>
+          <div><dt className="font-semibold text-slate-800">Does not count</dt><dd className="text-slate-600">{sw.not_counted || "no data"}</dd></div>
+          <div><dt className="font-semibold text-slate-800">Factors</dt><dd className="text-slate-600">{sw.factors || "no data"}</dd></div>
+          <div><dt className="font-semibold text-slate-800">Left out here</dt><dd className="text-slate-600">{leftOut.length
+            ? <ul className="list-disc pl-5 space-y-1">{leftOut.map(x => <li key={x}>{x}</li>)}</ul>
+            : "Nothing: every plan line is counted in full."}</dd></div>
+        </dl>
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-5">
         {/* ---------------- the answer: first on a phone, on the right on a wide screen ---------------- */}
         <div className="lg:col-span-2 space-y-4 order-1 lg:order-2">
@@ -3578,6 +3637,7 @@ function CarbonPage({ meta, access, initialData }){
                 </div>
                 {lorryLine(A)}
                 {A.delta_trips ? <div className="text-sm text-slate-700">{A.delta_trips < 0 ? `${grp(-A.delta_trips)} fewer lorry loads` : `${grp(A.delta_trips)} more lorry loads, because each lorry carries less`}</div> : null}
+                {kmWord(A.delta_vkm_km) ? <div className="text-sm text-slate-700">{kmWord(A.delta_vkm_km)}</div> : null}
                 <div className={hint + " mt-1"}>Figures are rounded, so the parts may not add exactly to the total</div>
               </Total>
             ) : (
@@ -3596,9 +3656,10 @@ function CarbonPage({ meta, access, initialData }){
             ) : (
               <div className="mt-3 space-y-3">
                 {(() => { const mx = Math.max(...A.drivers.map(d => Math.abs(d.delta_t)), 1e-9); return A.drivers.map(d => (
-                  <div key={d.driver} title={`${d.label}: ${moved(d.delta_t)} on its own (${pct(d.delta_pct)} of the approved plan), ${d.lines_changed} plan lines changed`}>
+                  <div key={d.driver} title={`${d.label}: ${moved(d.delta_t)} on its own (${pct(d.delta_pct)} of the approved plan), ${d.lines_changed} plan lines changed; ${lorryEffect(d)}`}>
                     <div className="flex justify-between gap-3 text-sm"><span className="text-slate-800">{d.label}</span>
                       <span className="tabular-nums whitespace-nowrap"><b style={{ color: tone(d.delta_t) }}>{moved(d.delta_t)}</b> ({pct(d.delta_pct)})</span></div>
+                    <div className={hint + " tabular-nums"}>{lorryEffect(d)}</div>
                     <div className="h-2 rounded bg-slate-100" aria-hidden="true"><div className="h-2 rounded" style={{ width: `${Math.max(2, Math.abs(d.delta_t) / mx * 100)}%`, background: tone(d.delta_t) }} /></div>
                   </div>)); })()}
                 <p className="text-sm text-slate-600">{Math.abs(A.interaction_t || 0) < 0.0005
@@ -3637,11 +3698,12 @@ function CarbonPage({ meta, access, initialData }){
               <thead><tr><th scope="col">Method</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th></tr></thead>
               <tbody>
                 <tr title={(data.methods || {}).headline}><td><b>Wayscope: per vehicle-km, both legs</b> (the figure on this page)<div className={hint}>Diesel is exhaust only (tank-to-wheel); electric is the grid electricity used</div></td><td className="num">{t1(B.totals.transport_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_t))}</td></tr>
+                <tr title={(data.methods || {}).well_to_wheel}><td>Wayscope, well-to-wheel (adds producing the fuel or electricity)<div className={hint}>FORS Silver and Gold require operators to report well-to-wheel; Bronze recommends it</div></td><td className="num">{t1(B.totals.transport_wtw_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_wtw_t))}</td></tr>
                 <tr title={(data.methods || {}).nh_tool + "\n" + prov(fx["nh_tool"])}><td>National Highways Carbon Tool method (for comparison)<div className={hint}>Tonnes × one-way distance, return added, 2024 factors with well-to-tank</div></td><td className="num">{t1(B.totals.transport_nh_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_nh_t))}</td></tr>
                 <tr title={(data.methods || {}).tonne_km}><td>Tonne-km method: DESNZ 2026, average load<div className={hint}>What a tonne-km calculator gives for the same haul</div></td><td className="num">{t1(B.totals.transport_tkm_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_tkm_t))}</td></tr>
               </tbody>
             </table>
-            <p className="text-sm text-slate-600 px-4 py-3">All three use Government factors. GOV.UK says to prefer the per-vehicle-km figure when the vehicle and the route distance are known, which they are here. The Carbon Tool asks only for tonnes and a one-way distance, adds the return and well-to-tank, so it reads higher. Never quote one as the other. FORS hauliers report well-to-wheel emissions from the fuel they use; this page does not show that figure yet.</p>
+            <p className="text-sm text-slate-600 px-4 py-3">All three use Government factors. GOV.UK says to prefer the per-vehicle-km figure when the vehicle and the route distance are known, which they are here. The Carbon Tool asks only for tonnes and a one-way distance, adds the return and well-to-tank, so it reads higher. Never quote one as the other. Well-to-wheel adds producing the fuel or electricity (well-to-tank) to the same vehicle-km: it sits beside the total, never in it{B.totals.wtw_lines_out ? `, and leaves out ${B.totals.wtw_lines_out} plan line${B.totals.wtw_lines_out === 1 ? "" : "s"} whose lorry has no published well-to-tank row` : ""}.</p>
           </div>
 
           <div className={card + " overflow-hidden"} data-guide="carbon-fleet">
@@ -3696,6 +3758,17 @@ function CarbonPage({ meta, access, initialData }){
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className={card + " p-4"} data-guide="carbon-summary">
+            <h3 className={h3}>Summary for the file</h3>
+            <p className={hint}>One page: the approved plan beside the alternative, the decisions in words and ranked, what the figures count, and your commentary. Stamped "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures".</p>
+            <label className="block mt-3">
+              <span className={lab}>Commentary (optional)</span>
+              <span className={"block " + hint + " mb-1"}>Printed on the summary as typed; not saved</span>
+              <textarea className={inp} rows={4} maxLength={1500} value={note} onChange={ev => setNote(ev.target.value)} placeholder="for example, why this alternative, and what is still to confirm" />
+            </label>
+            <button onClick={downloadSummary} disabled={pdfBusy} className="mt-3 text-sm font-semibold px-3 py-1.5 rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-50">{pdfBusy ? "Making the summary…" : "Download the summary (PDF)"}</button>
           </div>
         </div>
 
@@ -3798,23 +3871,25 @@ function CarbonPage({ meta, access, initialData }){
                 return (
                   <div key={r.route_id} className="border-t border-slate-100 pt-2">
                     <div className="text-sm font-semibold text-slate-700">{r.route_id} · {r.origin_name} → {r.dest_name}{r.disposal_route ? ` (${(CARBON_DISPOSAL_WORD[r.disposal_route] || r.disposal_route).toLowerCase()})` : ""}</div>
+                    {r.disposal_route && step(r.disposal_route) ? <div className={hint}>Waste hierarchy: {step(r.disposal_route).toLowerCase()}</div> : null}
                     {(r.destinations || []).length > 0 && (
                       <label className="block mt-1"><span className={lab}>Receiving site</span>
                         <select className={inp} value={d.to_route || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to_route: ev.target.value })}>
                           <option value="">{r.dest_name} (as planned)</option>
-                          {r.destinations.map(x => <option key={x.route_id} value={x.route_id} disabled={!x.baked}>{x.dest_name}{x.disposal_route ? ` (${(CARBON_DISPOSAL_WORD[x.disposal_route] || x.disposal_route).toLowerCase()})` : ""}{x.baked ? "" : " — no route distance yet"}</option>)}
+                          {r.destinations.map(x => <option key={x.route_id} value={x.route_id} disabled={!x.baked}>{x.dest_name}{x.disposal_route ? ` (${dispWord(x.disposal_route).toLowerCase()})` : ""}{x.baked ? "" : " — no route distance yet"}</option>)}
                         </select></label>
                     )}
                     {r.disposal_route && (
                       <label className="block mt-1"><span className={lab}>Disposal method</span>
                         <select className={inp} value={d.to || ""} onChange={ev => setK("disposal", r.route_id, { ...d, to: ev.target.value })}>
                           <option value="">As the site's type ({(CARBON_DISPOSAL_WORD[r.disposal_route] || r.disposal_route).toLowerCase()})</option>
-                          {(r.disposal_routes || []).map(k => <option key={k} value={k}>{CARBON_DISPOSAL_WORD[k] || k}</option>)}
+                          {(r.disposal_routes || []).map(k => <option key={k} value={k}>{dispWord(k)}</option>)}
                         </select></label>
                     )}
                   </div>
                 );
               })}
+              <p className={hint + " border-t border-slate-100 pt-2"} title={data.waste_hierarchy_source || ""}>The waste hierarchy step follows the disposal method used for the carbon figure. Each transfer still needs a waste transfer note (or a season ticket covering a series of transfers); Wayscope does not replace these or the duty of care.</p>
             </div>
           )}
 
@@ -3826,6 +3901,14 @@ function CarbonPage({ meta, access, initialData }){
             </label>
           </div>
         </div>
+      </div>
+
+      <div className={card + " p-4 mt-5"} data-guide="carbon-using">
+        <h3 className={h3}>Using these results</h3>
+        <ol className="grid md:grid-cols-3 gap-4 mt-2 text-sm">
+          {CARBON_STEPS.map((s, i) => <li key={s.who}><span className="font-semibold text-slate-800">{i + 1}. {s.who}</span><span className="block text-slate-600">{s.what}</span></li>)}
+        </ol>
+        <p className={hint + " mt-2"}>Roles as CLOCS names them. These figures compare options before work starts; they are not a record of what was delivered.</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 mt-5">

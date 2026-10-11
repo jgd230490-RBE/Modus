@@ -1279,8 +1279,10 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      /\{ id: "forecasts", label: "Forecasts", glyph: "☰" \},\n    \{ id: "carbon", label: "Carbon planner", glyph: "◐" \},\n  \]\},/.test(code)
      && !/group: "Plan", admin/.test(code));
   ok("...and the page switch renders CarbonPage", /page === "carbon" && <CarbonPage meta=\{meta\} access=\{role\} \/>/.test(code));
-  ok("🔴 ONE read: POST /api/carbon/scenario, and no other fetch on the page",
-     cb.length > 5000 && (cb.match(/fetch\(/g) || []).length === 1 && cb.includes('fetch(`${API}/carbon/scenario`, { method: "POST"'));
+  // NARROWED 11 Oct 2026 (after the show, item 11): + the one summary download, which the server draws from the same read
+  ok("🔴 ONE read: POST /api/carbon/scenario, and no other fetch on the page but the summary PDF download",
+     cb.length > 5000 && (cb.match(/fetch\(/g) || []).length === 2 && cb.includes('fetch(`${API}/carbon/scenario`, { method: "POST"')
+     && cb.includes('fetch(`${API}/carbon/summary.pdf`, { method: "POST"'));
   ok("🔴 no carbon arithmetic in the browser: no emission key, no factor literal, no km/mile constant",
      !/emissions_kg_co2e_per_km|kwh_per_km \*|0\.93939|0\.99773|7\.80307|0\.14395|0\.13096|1\.609344|19\.55376/.test(cb));
   ok("distances and per-distance figures go through the tenant's unit (fmtDist, distRate, DU, TKM)",
@@ -1359,6 +1361,39 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("the tables use the app's .tbl style with a caption, and the NH category takes NH's own name for waste",
      (cb.match(/<table className="tbl">/g) || []).length === 4 && (cb.match(/<caption><b>/g) || []).length === 4
      && cb.includes('"Waste": "Waste + Waste Transport"'));
+  // after the show (11 Oct 2026, notes/carbon-ui-1011 items 8, 9, 11–15): every figure from the server
+  ok("item 8 'What this page counts' sits above the answer, in the server's words, with what is left out from the server's counts",
+     cb.includes('data-guide="carbon-counts"') && cb.includes("What this page counts") && cb.includes("const sw = data.scope_words || {};")
+     && ["{sw.counts", "{sw.not_counted", "{sw.factors"].every(t => cb.includes(t)) && cb.includes("Nothing: every plan line is counted in full.")
+     && cb.indexOf('data-guide="carbon-counts"') < cb.indexOf('<div className="grid lg:grid-cols-3 gap-5">')
+     && ["B.totals.material_excluded_tonnes", "fl0.RETURN_NOT_BAKED", "fl0.NO_DISPOSAL_FACTOR", "B.totals.wtw_lines_out"].every(t => cb.includes(t)));
+  ok("item 9 each decision's lorry effect from the server (delta_trips, delta_vkm_km), the distance in the tenant's unit",
+     cb.includes("const lorryEffect = (d) => [loadsWord(d.delta_trips), kmWord(d.delta_vkm_km)]") && cb.includes("dist(km)") && cb.includes("lorry-${DU()}")
+     && cb.includes("<div className={hint + \" tabular-nums\"}>{lorryEffect(d)}</div>") && cb.includes("kmWord(A.delta_vkm_km)") && !/vkm\s*-/.test(cb));
+  ok("item 11 the summary: one POST with the page's own body and the commentary, typed but never saved, stamped",
+     cb.includes('data-guide="carbon-summary"') && cb.includes("commentary: note || null") && cb.includes("maxLength={1500}")
+     && cb.includes("Printed on the summary as typed; not saved") && cb.includes("Download the summary (PDF)")
+     && cb.includes("Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures") && !/localStorage/.test(cb));
+  {
+    const _mn = fs.readFileSync(path.join(ROOT, "backend", "main.py"), "utf8");
+    ok("...the page's 1,500-character limit is the server's", /CARBON_COMMENTARY_MAX = 1500\b/.test(_mn));
+  }
+  ok("item 12 well-to-wheel beside the total on both cards and in the methods table, FORS's rule said as FORS says it",
+     cb.includes("Transport well-to-wheel: {t1(sc.totals.transport_wtw_t)} tCO2e") && cb.includes("beside the total, not in it")
+     && cb.includes("Wayscope, well-to-wheel (adds producing the fuel or electricity)")
+     && cb.includes("FORS Silver and Gold require operators to report well-to-wheel; Bronze recommends it")
+     && !cb.includes("this page does not show that figure yet") && cb.includes("{altCell(a => t1(a.totals.transport_wtw_t))}"));
+  ok("item 13 the waste hierarchy step from the server on every disposal option, and the transfer-note line",
+     cb.includes("const step = (k) => ((data.waste_hierarchy || {})[k] || \"\");") && cb.includes("{dispWord(k)}")
+     && cb.includes("dispWord(x.disposal_route)") && cb.includes("waste transfer note (or a season ticket covering a series of transfers)")
+     && cb.includes("Wayscope does not replace these or the duty of care") && cb.includes("title={data.waste_hierarchy_source"));
+  ok("item 14 the life-cycle modules as a secondary line (hint size), named for BS EN 15804, from the server's stages",
+     cb.includes("By life-cycle module: A1–A3 {t1((sc.stages || {})[\"A1-A3\"])} · A4 {t1((sc.stages || {}).A4)} · A5 {t1((sc.stages || {}).A5)}")
+     && cb.includes("Life-cycle modules as BS EN 15804 names them"));
+  ok("item 15 'Using these results': three steps, each saying who acts, in CLOCS's role names; not a record of delivery",
+     cb.includes('data-guide="carbon-using"') && ["{ who: \"Client\"", "{ who: \"Buyer\"", "{ who: \"Principal contractor\""].every(t => cb.includes(t))
+     && cb.includes("Roles as CLOCS names them.") && cb.includes("they are not a record of what was delivered")
+     && !/meets? CLOCS|CLOCS[- ]compliant|complies/i.test(cb));
   const gs2 = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
   ok("the guide has steps for the Carbon page, on its own anchors", /\n  carbon: \[/.test(gs2)
      && ["carbon-compare", "carbon-levers", "carbon-drivers"].every(a => gs2.includes(`anchor: "${a}"`) && src.includes(`data-guide="${a}"`)));

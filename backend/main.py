@@ -1418,6 +1418,45 @@ def carbon_scenario(body: CarbonScenarioIn):
         raise HTTPException(400, str(e))
 
 
+class CarbonSummaryIn(CarbonScenarioIn):
+    commentary: Optional[str] = None          # printed on the summary as typed; never stored
+
+
+CARBON_COMMENTARY_MAX = 1500
+
+
+@app.post("/api/carbon/summary.pdf")
+def carbon_summary_pdf(body: CarbonSummaryIn):
+    """
+    After the show (11 Oct 2026, notes/carbon-ui-1011 item 11): the Carbon page's one-page summary
+    as a PDF, from the SAME read as /api/carbon/scenario: the approved plan beside the page's one
+    alternative, the decisions in words and ranked, what the figures count, and the typed
+    Commentary. Stamped "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures",
+    and the tenant's demo notice when set. Stores nothing: the commentary is printed, not saved.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    acc = _require_access()
+    if body.status not in CARBON_STATUSES:
+        raise HTTPException(400, f"status must be one of {', '.join(CARBON_STATUSES)}")
+    if len(body.alternatives) > 1:
+        raise HTTPException(400, "the summary prints the approved plan and one alternative")
+    if body.commentary is not None and len(body.commentary) > CARBON_COMMENTARY_MAX:
+        raise HTTPException(400, f"the commentary is at most {CARBON_COMMENTARY_MAX} characters")
+    alts = [a.model_dump() if hasattr(a, "model_dump") else a.dict() for a in body.alternatives]
+    try:
+        sc = carbon.scenario(acc, alternatives=alts, baseline_levers=body.baseline,
+                             from_month=body.from_month, to_month=body.to_month, status=body.status,
+                             spend_m=body.spend_gbp_m, allocation=body.allocation)
+    except carbon.CarbonError as e:
+        raise HTTPException(400, str(e))
+    try:
+        data = export.build_carbon_pdf(sc, commentary=body.commentary)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="carbon-summary.pdf"'})
+
+
 # ------------------------------------------------------------------ public feed (map)
 def _working_days(factors):
     """
