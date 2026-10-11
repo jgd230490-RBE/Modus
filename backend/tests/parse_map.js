@@ -2014,7 +2014,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /else if\(e\.key === 'ArrowRight'\)\{ e\.preventDefault\(\); stepTimeline\(1\); \}/.test(code));
   ok("ARIA: the bar is a focusable named group; Play carries aria-pressed; the slider is named Month and speaks the month",
      /<div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">/.test(html)
-     && /<button class="tl-btn" id="tl-play" onclick="toggleTimeline\(\)" title="Play \/ pause" aria-label="Play or pause" aria-pressed="false">/.test(html)
+     && /<button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline\(\)" title="Play \/ pause" aria-label="Play or pause" aria-pressed="false">/.test(html)
      && /<input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub\(this\.value\)" aria-label="Month" aria-valuetext="Jan 2026">/.test(html)
      && /b\.setAttribute\('aria-pressed', 'true'\)/.test(code) && /b\.setAttribute\('aria-pressed', 'false'\)/.test(code)
      && /r\.setAttribute\('aria-valuetext', monthLabel\(m\)\)/.test(code));
@@ -2285,6 +2285,115 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && !code.includes("byR[(rt.route_id||'').toString().trim().toLowerCase()]=rt;"));
   ok("row 3 / D23: the stockpile sentence says what is recorded at month end, not what 'the plan puts'",
      code.includes("recorded in it at the end of ${monthLabel(month)}.") && !code.includes("The plan puts"));
+}
+
+// ---- 12 Oct 2026 — the mobile hotfix (review 2.8, live A6), names and the small bugs (claude/mr1-mobile) -------
+// Source-level pins on the phone overrides. Every phone rule is an override INSIDE a media block, so the base
+// `.sidebar … width:300px`, the base #tl-label / #tl-speed rules and the base @media (max-width:1023px) pins above
+// keep passing untouched. No browser here: what the rules do at 385 / 768 / 667x375 px was checked by hand.
+{
+  const phone = (html.match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}\n        @media \(min-width:701px\)/) || ["", ""])[1];
+  const narrow = (html.match(/@media \(max-width:700px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const landscape = (html.match(/@media \(max-width:1023px\) and \(max-height:480px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  // the timeline bar's phone blocks come AFTER its base rules (same specificity: order decides — the first build put them
+  // before and the base `body.sidebar-closed #timeline-bar{ left:50%; }` won, measured live as a half-width bar at 385 px)
+  const tlBase = html.indexOf("#tl-speed{ border:1px solid var(--line);");
+  const tlPhone = (html.slice(tlBase).match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const tlNarrow = (html.slice(tlBase).match(/@media \(max-width:700px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  ok("mobile: the phone media blocks exist — stacked (≤1023), phone (≤700), landscape (≤1023 and ≤480 high), and the timeline bar's two after its base rules",
+     phone.length > 0 && narrow.length > 0 && landscape.length > 0 && tlBase > 0 && tlPhone.length > 0 && tlNarrow.length > 0,
+     `${phone.length}/${narrow.length}/${landscape.length}/${tlPhone.length}/${tlNarrow.length}`);
+  ok("...and no timeline-bar rule sits in the early (pre-base) phone blocks, where the base would override it",
+     !/#timeline-bar|#tl-label|#tl-speed/.test(phone) && !/#timeline-bar|#tl-label|#tl-speed/.test(narrow));
+  // 2. viewport and touch
+  ok("mobile: the viewport meta no longer forbids pinch-zoom (no maximum-scale, no user-scalable=no)",
+     html.includes('<meta name="viewport" content="width=device-width, initial-scale=1">')
+     && (html.match(/<meta name="viewport"/g) || []).length === 1
+     && !/<meta[^>]*(maximum-scale|user-scalable)/.test(html));
+  ok("mobile: touch-action:manipulation on the panel, the menu button, the bar, the conditions panel, the timeline bar and the drawer",
+     /\.sidebar, #menu-toggle, #kpi-hud, #tl-warnings, #timeline-bar, #route-drawer\{ touch-action:manipulation; \}/.test(html));
+  // 1a / 1f. the JS threshold matches the CSS; the toggle never re-opens
+  ok("mobile: the sidebar auto-closes below 1024 (the CSS breakpoint), not 768, and nothing else tests 768",
+     code.includes("if (window.innerWidth <= 1023) closeSidebar();") && !/innerWidth <= 768/.test(code));
+  ok("mobile: closeSidebar() closes only an OPEN panel, and filterByNode uses it (the old toggle re-opened a closed panel on a phone)",
+     code.includes("function sidebarIsOpen() { return !document.getElementById('main-sidebar').classList.contains('closed'); }")
+     && code.includes("function closeSidebar() { if (sidebarIsOpen()) toggleSidebar(); }")
+     && code.includes("applyFilters(); if(window.innerWidth <= 1023) closeSidebar();")
+     && !/if\(window\.innerWidth <= \d+\) toggleSidebar\(\)/.test(code));
+  // 1b. the panel is a drawer over the map below 1024, above the bar, with its own close control; full width on a phone
+  ok("mobile: below 1024 the panel sits above the bar (15), the conditions panel (24) and the timeline (25), under the demo strip (30)",
+     /\.sidebar\{ z-index:28; \}/.test(phone) && /\.sidebar \{[^}]*z-index:10;/.test(html) && /#demo-notice\{[^}]*z-index:30;/.test(html));
+  ok("mobile: below 1024 the map is not pushed 300 px right, nor is the route drawer",
+     /#map, \.sidebar ~ #map\{ left:0; \}/.test(phone) && /#route-drawer, body\.sidebar-closed #route-drawer\{ left:0; \}/.test(tlPhone)
+     && !/#route-drawer/.test(phone)   // its base rule comes after the early block, so the override lives after the base
+     && /#map \{ position:absolute; top:0; bottom:0; right:0; left:300px;/.test(html));   // the desktop base is untouched
+  ok("mobile: the panel carries its own 44 px close control, first in the panel, shown below 1024 only, where the menu button hides while the panel is open",
+     /<div class="sidebar" id="main-sidebar">\n\s+<button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar\(\)" aria-label="Close the control panel"/.test(html)
+     && /\.sidebar-close\{ display:none; position:absolute; top:10px; left:10px; width:44px; height:44px;/.test(html)
+     && /\.sidebar-close\{ display:flex; \}/.test(phone) && /body:not\(\.sidebar-closed\) #menu-toggle\{ display:none; \}/.test(phone)
+     && /body\.has-demo-notice \.sidebar\{ top:var\(--notice-h, 26px\); \}/.test(phone));
+  ok("mobile: on a phone (≤700) the panel is the full width; the base stays 300 px",
+     /\.sidebar\{ width:100%; border-right:none; \}/.test(narrow) && /\.sidebar \{ position:absolute; top:0; bottom:0; left:0; width:300px;/.test(html));
+  // 1c. the timeline bar and the bar's lead labels
+  ok("mobile: below 1024 the timeline bar is full width with 44 px buttons, the label wraps (no 190 px min-width), the speed select and close stay on screen",
+     /#timeline-bar, body\.sidebar-closed #timeline-bar\{ left:12px; right:12px; transform:none; max-width:none; flex-wrap:wrap;/.test(tlPhone)
+     && /#timeline-bar \.tl-btn\{ width:44px; height:44px;/.test(tlPhone) && /#timeline-bar \.tl-close\{ width:44px; height:44px;[^}]*margin-left:auto; \}/.test(tlPhone)
+     && /#tl-label\{ min-width:0; white-space:normal; flex:1 1 120px;/.test(tlPhone)
+     && /#tl-label\{ font-size:12px;[^}]*min-width:190px; white-space:nowrap; flex:0 0 auto; \}/.test(html));   // the base rule is untouched
+  ok("mobile: on a phone the bar runs on two rows — label, speed, close above; the three buttons and the slider below (a ::after line break)",
+     /#tl-label\{ order:1; \}/.test(tlNarrow) && /#tl-speed\{ order:2; \}/.test(tlNarrow) && /#timeline-bar \.tl-close\{ order:3; \}/.test(tlNarrow)
+     && /#timeline-bar::after\{ content:""; flex:0 0 100%; height:0; order:4; \}/.test(tlNarrow)
+     && /#timeline-bar \.tl-btn\{ order:5; \}/.test(tlNarrow) && /#timeline-bar input\[type=range\]\{ order:6; flex:1 1 60px; width:auto; \}/.test(tlNarrow));
+  ok("mobile: the two lead labels cannot collide — below 1024 a label wraps inside its card and a card can shrink (the base keeps nowrap)",
+     /#kpi-cards \.kpi-card\{ min-width:0; \}/.test(phone) && /#kpi-cards \.kpi-label\{ white-space:normal; \}/.test(phone)
+     && /\.kpi-label\{[^}]*white-space:nowrap; \}/.test(html));
+  // 1d. the conditions panel is capped by the viewport
+  ok("mobile: the conditions panel's max-height is measured from the bar's bottom to the timeline bar's top (or the viewport's bottom edge), and cleared on the desktop",
+     code.includes("const floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;")
+     && code.includes("box.style.maxHeight = Math.max(120, floor - (Math.round(kpi.getBoundingClientRect().bottom) + 8)) + 'px';")
+     && code.includes("{ box.style.top = ''; box.style.maxHeight = ''; return; }"));
+  // 1e. landscape
+  ok("mobile: landscape (≤480 px high) collapses the bar to one row of the two lead figures, and the block comes after the tablet row so it wins",
+     /#kpi-cards\{ grid-template-columns:repeat\(2, minmax\(0, 1fr\)\); \}/.test(landscape) && /#kpi-cards \.kpi-card:not\(\.lead\)\{ display:none; \}/.test(landscape)
+     && html.indexOf("@media (max-width:1023px) and (max-height:480px)") > html.indexOf("@media (min-width:701px) and (max-width:1023px)"));
+  // 3. names
+  ok("names: #menu-toggle is a button that names and reports its panel (was a div); toggleSidebar keeps aria-expanded true",
+     html.includes('<button type="button" id="menu-toggle" onclick="toggleSidebar()" aria-controls="main-sidebar" aria-expanded="true">☰ Control Panel</button>')
+     && !/<div id="menu-toggle"/.test(html)
+     && code.includes("if (mt) mt.setAttribute('aria-expanded', String(sidebarIsOpen()));"));
+  ok("names: the month slider is named 'Month' (aria-label) and the timeline's aria-valuetext sits beside it",
+     /<input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub\(this\.value\)" aria-label="Month" aria-valuetext="Jan 2026">/.test(html));
+  {
+    // every icon-only button (no letters in its text) carries an aria-label — static markup and the buttons built in JS
+    const re = /<button\b([^>]*)>([^<]*)<\/button>/g;
+    const bare = [];
+    // (a button empty at source, #kpi-conditions, is filled with words at run time)
+    for (const s of [html, code]) { let b; while ((b = re.exec(s)) !== null) { if (b[2].trim() && !/[A-Za-z]/.test(b[2]) && !/aria-label="/.test(b[1])) bare.push(b[0].slice(0, 80)); } }
+    ok("names: every icon-only button has an aria-label (timeline ◀ ▶ ▶▶ ×, drawer ×, panel ×, basemap widget, conditions × ×)",
+       bare.length === 0 && (html.match(/aria-label="/g) || []).length >= 8, JSON.stringify(bare));
+    ok("...and the speed select is named", /<select id="tl-speed" onchange="setTimelineSpeed\(this\.value\)" title="[^"]*" aria-label="Play speed, months per second">/.test(html));
+  }
+  // 4. one hover handler
+  ok("hover: ONE mousemove handler queries the three route layers (the forEach registered it three times and never used its argument)",
+     (code.match(/map\.on\('mousemove'/g) || []).length === 1 && !code.includes("interactiveLayers.forEach")
+     && code.includes("map.on('mousemove', (e) => {\n                    let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });"));
+  // 5. the demo strip on a phone
+  ok("mobile: the demo strip is 14 px below 1024 (was 9.5), wrapping, and the offsets under it follow its MEASURED height (--notice-h, 26 px floor)",
+     /body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; white-space:normal; text-align:center; font-size:14px;/.test(phone)
+     && !/#demo-notice\{[^}]*font-size:9\.5px/.test(html)
+     && /body\.has-demo-notice #menu-toggle\{ top:calc\(var\(--notice-h, 26px\) \+ 14px\); \}/.test(phone)
+     && /body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:calc\(var\(--notice-h, 26px\) \+ 58px\); \}/.test(phone)
+     && /body\.has-demo-notice #guide-btn\{ top:calc\(var\(--notice-h, 26px\) \+ 10px\); \}/.test(phone)
+     // the calc rules follow the 40 / 84 / 36 floors inside the same block, so they win
+     && phone.indexOf("#menu-toggle{ top:calc(") > phone.indexOf("#menu-toggle{ top:40px; }"));
+  ok("mobile: measureNotice() reads the strip's height into --notice-h below 1024, removes it otherwise, watches the strip, and runs with every bar measurement",
+     /function measureNotice\(\) \{/.test(code) && code.includes("document.body.style.setProperty('--notice-h', nh + 'px');")
+     && code.includes("if (!on) { document.body.style.removeProperty('--notice-h'); return; }")
+     && code.includes("dn._ro = new ResizeObserver(() => positionWarnStack()); dn._ro.observe(dn);")
+     && /function positionWarnStack\(\) \{\n\s+measureNotice\(\);/.test(code)
+     // and after the strip is created at tenant load, and when the app's bar takes it away
+     && /setupGuide\(\);[^\n]*\n\s+if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);/.test(code)
+     && /document\.body\.classList\.toggle\('has-demo-notice', false\);\n\s+if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);/.test(code));
 }
 
 console.log();
