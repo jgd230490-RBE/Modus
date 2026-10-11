@@ -1743,7 +1743,11 @@ function Guide({ page, groups }){
 
 // ================================================================= App
 function App(){
-  const [view, setView] = useState("public");   // public | login | portal
+  // 11 Oct 2026: a reload no longer signs you out. The access code was already kept in sessionStorage (this tab
+  // only) for the fetch header, but the view always started on the public map, so F5 at the stand dropped the
+  // demo to the public page. Now, with a stored code, the app starts on "resume", asks /api/auth what the code
+  // grants (the same call the sign-in form makes), and returns to the staff app. A refused code is forgotten.
+  const [view, setView] = useState(() => ACCESS.code ? "resume" : "public");   // public | login | portal | resume
   const [role, setRole] = useState(null);
   const [who, setWho] = useState(() => { try { return localStorage.getItem("modus_who") || ""; } catch(e){ return ""; } });
   const [meta, setMeta] = useState(null);
@@ -1803,6 +1807,19 @@ function App(){
     try { localStorage.setItem("modus_who", n); } catch(e){}
     setView("portal");
   };
+  useEffect(() => {
+    if(!ACCESS.code) return;
+    fetch(`${API}/auth`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: ACCESS.code }) })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(info => { ACCESS.info = info; setRole(info); setView("portal"); })
+      .catch(e => {
+        // 401 / 403: the code is no longer accepted (changed on the server), so forget it. A network
+        // failure keeps it, and the next reload tries again; either way the visitor gets the public map.
+        if(e === 401 || e === 403){ ACCESS.code = ""; try { sessionStorage.removeItem("modus_access_code"); } catch(x){} }
+        setView("public");
+      });
+  }, []);
   const signOut = () => {
     ACCESS.code = ""; ACCESS.info = null;
     try { sessionStorage.removeItem("modus_access_code"); } catch(e){}
@@ -1811,7 +1828,7 @@ function App(){
   // the bar's Guide: none on the sign-in view (it has no tour); the embedded map's tour on a map view, once the map
   // has said it is ready (never over the map password page); this app's guide on every other Portal page
   const onMap = view === "public" || (view === "portal" && page === "map");
-  const barGuide = view === "login" ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;
+  const barGuide = (view === "login" || view === "resume") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;
 
   return (
     <div className="h-full flex flex-col">
@@ -1821,6 +1838,7 @@ function App(){
       <main className="flex-1 min-h-0 flex flex-col">
         {view === "public" && <PublicMap onLogin={() => setView("login")} />}
         {view === "login" && <Login onSignIn={signIn} onBack={() => setView("public")} savedName={who} />}
+        {view === "resume" && <div className="flex-1 flex items-center justify-center text-sm text-slate-500" role="status">Signing you back in…</div>}
         {view === "portal" && (
           <Portal role={role} who={who} meta={meta} metaErr={metaErr} vehLang={vehLang} onPage={setPage} />
         )}
