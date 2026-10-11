@@ -325,6 +325,20 @@ ok("company line is plain Wayscope: no company number, no Ltd / Limited",
 # with the rest of the code tiles); the code names are asserted absent above.
 ok("the planner code is NOT published", "[PLANNER CODE]" not in body and "PLANNER_CODE" not in body)
 
+# --- 11 Oct review (notes/landing-review-1011.md L2, L6): no claim to a Carbon Tool export ---
+# H3, the Carbon Tool export, is not built. The page may say how Wayscope HOLDS a haul (quantity and
+# one-way distance per origin and destination); it may not say the figures are a return or ready for one.
+_low = body.lower()
+ok("🔴 no claim that the figures are already in the Carbon Tool's form or prepared for entry into it",
+   "already in the form the carbon tool" not in _low and "prepared for entry into the carbon tool" not in _low
+   and "in the form the carbon tool asks for" not in _low)
+ok("🔴 no placeholder or caption promising a carbon export", not re.search(r"carbon[^.]{0,40}\bexport", _low))
+ok("...and the page says plainly the figures are planning estimates, not a Carbon Tool return",
+   "not a Carbon Tool return" in body and "your Carbon Tool return stays your own" in body)
+ok("the Carbon planner (PR #16) is named, by its menu name, on the landing page", "The Carbon planner sets the approved plan beside" in body)
+ok("the look-ahead copy no longer promises that declared disruption is what occurs",
+   "the disruption that occurs" not in _low and "how closely the week matched what was declared" in body)
+
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
 print("placeholders still on the page:", ", ".join(placeholders) or "none")
