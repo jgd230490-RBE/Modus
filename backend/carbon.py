@@ -983,10 +983,16 @@ def options(lines, ctx, factors):
             "material_category": r.get("material_category"),
             "disposal_route": disposal_route_of(cp, locs.get(r.get("dest_id"))),
             "alts": {v: geo.alts(rid, v) for v in vehs},
-            "suppliers": sorted(k for k, x in routes.items() if k != rid and x.get("dest_id") == r.get("dest_id")
-                                and (x.get("material_category") or "") == (r.get("material_category") or "")),
-            "destinations": sorted(k for k, x in routes.items() if k != rid and x.get("origin_id") == r.get("origin_id")
-                                   and (x.get("material_category") or "") == (r.get("material_category") or "")),
+            # other suppliers of the same material to the same destination, and other destinations
+            # for the same material from the same origin (a tip vs a recycling site), each with
+            # the place it names so the page never shows a bare id
+            "suppliers": [{"route_id": k, "origin_name": (locs.get(x.get("origin_id")) or {}).get("name")}
+                          for k, x in sorted(routes.items()) if k != rid and x.get("dest_id") == r.get("dest_id")
+                          and (x.get("material_category") or "") == (r.get("material_category") or "")],
+            "destinations": [{"route_id": k, "dest_name": (locs.get(x.get("dest_id")) or {}).get("name"),
+                              "disposal_route": disposal_route_of(cp, locs.get(x.get("dest_id")))}
+                             for k, x in sorted(routes.items()) if k != rid and x.get("origin_id") == r.get("origin_id")
+                             and (x.get("material_category") or "") == (r.get("material_category") or "")],
         })
     return {"materials": mats, "vehicles": veh, "routes": rts, "drivers": DRIVER_LABELS,
             "allocation": list(ALLOCATION), "disposal_routes": list(DISPOSAL_ROUTES)}

@@ -614,10 +614,12 @@ ok("options: each category in view with its class, sheet, factors and whether re
 ok("options: the electric variant is offered beside the artic it twins, with its DERIVED factor",
    any(v["vehicle"] == EA and v["status"] == "DERIVED" and v["geometry_twin"] == ART for v in OP["vehicles"]))
 _or = {r["route_id"]: r for r in OP["routes"]}
-ok("options: R1's other supplier to the same compound (R2, R5) and its baked HERE alternatives (0, 1)",
-   _or["R1"]["suppliers"] == ["R2", "R5"] and _or["R1"]["alts"][ART] == [0, 1])
-ok("options: R3 is a landfill line with R4 as another destination from the same origin",
-   _or["R3"]["disposal_route"] == "landfill" and _or["R3"]["destinations"] == ["R4"])
+ok("options: R1's other suppliers to the same compound (R2 from Pit B, R5 from Pit C) and its baked HERE alternatives (0, 1)",
+   _or["R1"]["suppliers"] == [{"route_id": "R2", "origin_name": "Pit B"}, {"route_id": "R5", "origin_name": "Pit C"}]
+   and _or["R1"]["alts"][ART] == [0, 1])
+ok("options: R3 is a landfill line with R4 (the soil hub, closed-loop) as another destination from the same origin",
+   _or["R3"]["disposal_route"] == "landfill"
+   and _or["R3"]["destinations"] == [{"route_id": "R4", "dest_name": "Soil hub", "disposal_route": "closed_loop"}])
 _pk = {p["key"]: p for p in S["factors"]}
 ok("⭐ every factor used carries source, year and status (and the gov.uk row ID where one exists)",
    all(p.get("status") and ("year" in p) for p in S["factors"])
@@ -653,6 +655,51 @@ ok("⭐ a tenant seeded before 10 Oct gets the same baseline and the electric al
    and near(S2["alternatives"][0]["drivers"][0]["delta_t"], -10.280, 0.002))
 config.reset_to_file(conversions, by="harness")
 config.invalidate()
+
+# =========================================================================== #
+#  8b. Phase 2 — the endpoint (POST /api/carbon/scenario), called as a function   #
+# =========================================================================== #
+R = main.carbon_scenario(main.CarbonScenarioIn(spend_gbp_m=2.0, alternatives=[main.CarbonAlternative(
+    name="Greener", levers=[{"driver": "recycled", "scope": {"category": SA}, "pct": 30},
+                            {"driver": "disposal", "scope": {"route_id": "R3"}, "to_route": "R4"},
+                            {"driver": "fuel", "fuel": "electric"}])]))
+ok("⭐ the endpoint returns the engine's answer unchanged (baseline 156.995, Greener −124.153)",
+   near(R["baseline"]["totals"]["total_t"], 156.995, 0.002) and near(R["alternatives"][0]["delta_t"], -124.153, 0.003))
+for _label, _body, _want in (
+        ("an allocation over 100 %", main.CarbonScenarioIn(allocation={SA: {"Fencing": 60, "Waste": 60}}), "120"),
+        ("an EPD without its source", main.CarbonScenarioIn(alternatives=[main.CarbonAlternative(levers=[{"driver": "material", "epd": {"kg_per_t": 3}}])]), "source"),
+        ("an unknown status", main.CarbonScenarioIn(status="Everything"), "status"),
+        ("seven alternatives", main.CarbonScenarioIn(alternatives=[main.CarbonAlternative() for _ in range(7)]), "at most 6")):
+    e = _raises(lambda b=_body: main.carbon_scenario(b))
+    ok(f"🔴 {_label} is a 400 with the reason", getattr(e, "status_code", None) == 400 and _want in str(getattr(e, "detail", "")),
+       repr(e))
+access.set_current(None)
+e = _raises(lambda: main.carbon_scenario(main.CarbonScenarioIn()))
+ok("🔴 no code → 401 (the endpoint is gated like every staff read)", getattr(e, "status_code", None) == 401, repr(e))
+access.set_current("submitter123")
+ok("...any signed-in code may read it (a submitter in demo mode sees every line, as on the Dashboard)",
+   len(main.carbon_scenario(main.CarbonScenarioIn())["lines"]) == 3)
+access.set_current("planner123")
+_mp = read("backend/main.py")
+_fn = _mp[_mp.index("def carbon_scenario("):_mp.index("def carbon_scenario(") + 2000]
+ok("🔴 source: the endpoint's first act is _require_access(), and a CarbonError becomes a 400",
+   _fn.index("_require_access()") < _fn.index("carbon.scenario(") and "except carbon.CarbonError as e:" in _fn
+   and "raise HTTPException(400, str(e))" in _fn and '@app.post("/api/carbon/scenario")' in _mp)
+ok("...it is a POST that stores nothing: no db call in the endpoint", "db." not in _fn.split("def carbon_scenario(")[1].split(chr(10) * 3)[0])
+
+# the fixture the render harness draws the Carbon page from (sorted keys: stable on every OS)
+def _scrub(o):
+    if isinstance(o, dict):
+        return {k: ("<ts>" if k.endswith("_at") and isinstance(v, str) else _scrub(v)) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_scrub(x) for x in o]
+    return o
+
+
+_fix = os.path.join(HERE, "fixtures", "carbon_scenario.json")
+with open(_fix, "w", encoding="utf-8", newline=chr(10)) as fh:
+    fh.write(json.dumps(_scrub(R), indent=1, ensure_ascii=False, sort_keys=True) + chr(10))
+ok("the carbon fixture is written for render_frontend.js", os.path.exists(_fix))
 
 # =========================================================================== #
 #  9. Source-level                                                              #

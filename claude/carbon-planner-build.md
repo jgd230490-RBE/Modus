@@ -1,7 +1,7 @@
 # Carbon planner — build note (10–11 Oct 2026, branch `claude/carbon-planner`)
 
 Built from `carbon-build-brief-1010.md`. Copy this file into the Claude project's notes.
-**Status: phase 1 (engine) on the branch. Phases 2–4 follow on the same branch; phase 5 is after the show.**
+**Status: phases 1–2 (engine, scenario API) on the branch. Phases 3–4 follow; phase 5 is after the show.**
 
 ## What it is for
 Carbon forecasting for strategic planning, to REDUCE carbon: which planning decisions move the
@@ -71,6 +71,40 @@ Dashboard show one transport number per line (asserted, and over HTTP on the not
 19.20 t vehicle-km, 261.82 t tool basis, 90.10 t tonne-km). Narrowed: `test_week1` vehicle count
 12 → 14 (plus a check that the two additions are the electric twins).
 
+## Phase 2 — the scenario API (`POST /api/carbon/scenario`, in `backend/main.py`)
+Body (all optional): `status` (Approved by default; Pending / Rejected / All), `from_month`,
+`to_month`, `baseline` (levers describing today's plan), `alternatives` (up to six, each
+`{name, levers}`), `spend_gbp_m` (typed programme spend, for tCO2e per £m) and `allocation`
+(`{category: {Fencing: %, …}}`). A lever is `{driver, scope, …}`, where `scope` is `{category}`
+or `{route_id}` or empty (every line):
+
+| driver | values | what it changes |
+|---|---|---|
+| material | `epd: {kg_per_t, source}` or `reused: true` | the material factor (EPD needs its source) |
+| recycled | `pct` 0–100 | primary/closed-loop blend, only where both are published |
+| source | `to_route` (same destination) or `distance_pct` | supplier, or a typed % of the baked distance (flagged) |
+| route | `alt_index` | a baked HERE alternative (unbaked → flagged, unchanged) |
+| vehicle | `vehicle` | payload → trips, factor, cycle |
+| fuel | `electric` / `diesel` | swaps to the profile's electric variant and back |
+| disposal | `to_route` (same origin) and/or `to` (landfill, closed_loop …) | tip vs recycling site |
+
+Answer: the baseline and each alternative (totals, by category / route / month, the two NH
+sheets, allocation, benchmarks, fleet), each alternative's delta and **drivers ranked by tCO2e
+moved** with the interaction, the diesel-vs-electric fleet comparison, the options the page can
+offer (with place names, never bare ids), every factor's provenance, the methods, the known
+limits and the Planned items. A rule the engine refuses is a 400 with the reason.
+
+**Gating:** any signed-in code, filtered like `/api/costing/lines` (a team code sees only its own
+lines). This is how the staff reads (Dashboard, Forecasts, Look-ahead) are gated; the nav's group
+structure is frozen by assertion, so the page sits in the Plan group beside them.
+
+**Tests:** `test_carbon.py` 136 / 0 (adds the endpoint called as a function: 401 without a code,
+the four 400s, the answer unchanged, and a source check that `_require_access()` comes first).
+`http_smoke.py` 92 → 103: 401 without a code; the demo's 72 approved line-months with the unbaked
+network excluded from transport; the North Team code sees only its lines; the 400s; then R001
+baked BY HAND with the note's illustrative 18.4 + 19.1 km gives **75.99 t** (the note's worked
+example) and the same figure as `/api/costing/lines`, with the tool basis 261.82 t beside it.
+
 ## Known limits (also on screen)
 Government material factors are coarser than ICE; concrete is one generic figure (enter a
 supplier EPD); electric kWh/km is derived from a mixed-fleet programme; the 2 t ZEV allowance is
@@ -79,6 +113,6 @@ transport and fuel are AR5. Access is still shared codes (no per-person identity
 not call any deployment secure.
 
 ## Only tested against stubs
-Everything in phase 1 runs on a scratch SQLite with hand-seeded route geometry: no HERE bake,
-no browser. The factor values were read from the downloaded gov.uk file and NH workbook kept in
+Everything in phases 1–2 runs on a scratch SQLite with hand-seeded route geometry: no HERE bake,
+no browser. The HTTP checks run FastAPI's TestClient, not Render. The factor values were read from the downloaded gov.uk file and NH workbook kept in
 `notes\evidence\carbon-1009\`, not fetched live during the tests.

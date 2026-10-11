@@ -268,6 +268,65 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/forecasts")
     ok("🔴 forecasts without a code — 401", r.status_code == 401, str(r.status_code))
 
+    # ------------------------------------------- 3b. the carbon planner (10 Oct 2026, phase 2)
+    # The demo package ships NO geometry, so every line is unbaked: transport is excluded and
+    # says so. One route is then baked BY HAND (no HERE) with the illustrative distances of
+    # notes/carbon-why-different-1010.md §3 (R001 Kilby Ridge → Harborough, 18.4 + 19.1 km), so
+    # the figures can be checked through the real HTTP layer against the note and the Dashboard.
+    r = c.post("/api/carbon/scenario", json={})
+    ok("🔴 the carbon scenario without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.post("/api/carbon/scenario", headers=PLAN, json={})
+    cs = r.json() if r.status_code == 200 else {}
+    bt = (cs.get("baseline") or {}).get("totals") or {}
+    ok("⭐ the carbon scenario answers a planner: 72 approved line-months, unbaked network EXCLUDED from transport",
+       r.status_code == 200 and len(cs.get("lines") or []) == 72 and bt.get("baked_lines") == 0
+       and bt.get("excludes_unbaked") is True and bt.get("transport_t") == 0 and bt.get("material_t", 0) > 0,
+       f"{r.status_code} {r.text[:200]}")
+    ok("...with the known limits, the Planned items and every factor's source, year and status",
+       len(cs.get("limits") or []) >= 7 and len(cs.get("planned") or []) >= 4
+       and all(f.get("status") for f in cs.get("factors") or []) and cs.get("unit") == "km")
+    r = c.post("/api/carbon/scenario", headers=NORTH, json={})
+    ok("⭐ the North Team code's scenario holds only North Team's lines",
+       r.status_code == 200 and r.json()["lines"] and all(l["ipt"] == "IPT1" for l in r.json()["lines"])
+       and len(r.json()["lines"]) < 72, f"{r.status_code} {r.text[:160]}")
+    r = c.post("/api/carbon/scenario", headers=PLAN,
+               json={"allocation": {"Small aggregate": {"Fencing": 70, "Drainage": 40}}})
+    ok("🔴 an allocation over 100 % is refused — 400 naming the sum", r.status_code == 400 and "110" in r.text, r.text[:160])
+    r = c.post("/api/carbon/scenario", headers=PLAN,
+               json={"alternatives": [{"name": "x", "levers": [{"driver": "material", "epd": {"kg_per_t": 90}}]}]})
+    ok("🔴 an EPD without its source is refused — 400", r.status_code == 400 and "source" in r.text, r.text[:160])
+    r = c.post("/api/carbon/scenario", headers=PLAN, json={"status": "Everything"})
+    ok("an unknown status is refused — 400", r.status_code == 400)
+
+    _r001 = [x for x in rows if x["route_id"] == "R001" and x["status"] == "Approved"]
+    db.execute("INSERT INTO route_geometry (tenant_id, route_id, vehicle_profile, leg, alt_index, geometry, distance_km, "
+               "duration_hr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ("default", "R001", "Artic Tipper (44t)", "loaded", 0, "[[-1.2,52.5],[-1.1,52.6]]", 18.4, 0.42))
+    db.execute("INSERT INTO route_geometry (tenant_id, route_id, vehicle_profile, leg, alt_index, geometry, distance_km, "
+               "duration_hr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ("default", "R001", "Artic Tipper (44t)", "return", 0, "[[-1.1,52.6],[-1.2,52.5]]", 19.1, 0.44))
+    try:
+        r = c.post("/api/carbon/scenario", headers=PLAN, json={"alternatives": [
+            {"name": "Electric on R001", "levers": [{"driver": "fuel", "scope": {"route_id": "R001"}, "fuel": "electric"}]}]})
+        cs = r.json() if r.status_code == 200 else {}
+        bt = (cs.get("baseline") or {}).get("totals") or {}
+        cl = c.get("/api/costing/lines?status=Approved", headers=PLAN).json()
+        cl_r001 = sum(x["co2_t"] for x in cl["lines"] if x["route_id"] == "R001" and x["co2_t"] is not None)
+        ok("⭐ R001 baked by hand: 62,500 t over four months, 75.99 t CO2e — the note's worked example, over HTTP",
+           len(_r001) == 4 and abs(sum(x["quantity"] for x in _r001) - 62500) < 1e-6 and bt.get("baked_lines") == 4
+           and abs(bt.get("transport_t", 0) - 75.99) < 0.01, f"{bt.get('baked_lines')} {bt.get('transport_t')}")
+        ok("⭐ ...the SAME figure the Dashboard reads from /api/costing/lines (one number)", abs(bt.get("transport_t", 0) - cl_r001) < 0.002,
+           f"{bt.get('transport_t')} vs {cl_r001}")
+        ok("...and the NH Carbon Tool basis beside it: 261.82 t, labelled, not added in",
+           abs(bt.get("transport_nh_t", 0) - 261.82) < 0.01 and "NH Carbon Tool" in (cs.get("methods") or {}).get("nh_tool", ""),
+           str(bt.get("transport_nh_t")))
+        alt = (cs.get("alternatives") or [{}])[0]
+        fc = cs.get("fleet_compare") or {}
+        ok("⭐ electric on R001: the ranked driver is diesel vs electric, carbon down, more trips at the lower payload",
+           (alt.get("drivers") or [{}])[0].get("driver") == "fuel" and alt.get("delta_t", 0) < -50
+           and fc.get("lines") == 4 and fc["electric"]["trips"] > fc["diesel"]["trips"], str(alt.get("drivers"))[:200])
+    finally:
+        db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?",
+                   ("default", "R001", "Artic Tipper (44t)"))
+
     r = c.get("/api/lookahead", headers=PLAN)
     la = r.json() if r.status_code == 200 else {}
     ok("the Look-ahead page reads over HTTP", r.status_code == 200 and "commit" in la, r.text[:200])
