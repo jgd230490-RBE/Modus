@@ -54,7 +54,11 @@
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
         .control-item input[type=checkbox]{ accent-color:var(--navy); width:14px; height:14px; }
-        .color-dot { width:11px; height:11px; border-radius:50%; display:inline-block; margin-left:auto; }
+        .color-dot { width:11px; height:11px; border-radius:50%; display:inline-block; margin-left:auto; box-sizing:border-box; }
+        /* D24: a zone kind with nothing in force in the month on screen reads as dimmed, not gone */
+        #zone-kinds .control-item { padding:4px 2px; font-size:12.5px; }
+        #zone-kinds .control-item + .control-item { border-top:none; }
+        .zone-kind.dim label, .zone-kind.dim .color-dot { opacity:.4; }
         /* 2026-10-06 — THE KPI BAR. The floating glass card (blur, shadow, 9.5 px uppercase
            labels) is gone. The glance layer is a flat white strip docked to the TOP of the
            map pane, full pane width: month on the left, six numbers, and the month's standing
@@ -358,12 +362,23 @@
         <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 14 · Mapbox basemaps only</span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-gates" checked onchange="toggleGates(this.checked)"> Site gates</label><span class="color-dot" style="background:#64748B;"></span></div>
         <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 10 · hollow = deactivated</span></div>
-        <!-- Phase 3. Two colours, one meaning each: red = the router is steered around
-             this area, grey = drawn for information and HERE never hears about it. With
-             the forecast timeline open these follow the month on screen, so a closure
-             that ends in March is gone by April. -->
-        <div class="control-item"><label><input type="checkbox" id="layer-zones" checked onchange="toggleZones(this.checked)"> Disruption zones</label><span class="color-dot" style="background:#DC2626;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">red = avoided by routing · grey = advisory</span></div>
+        <!-- Phase 3 / D24 (12 Oct 2026). One symbol per KIND, and one toggle per kind under
+             the group master (the master keeps its old id). Colours per colour-system-1010.md
+             line 24: a closure is AMBER (#D97706) - red stays for a cap breach or a clash;
+             works a lighter amber with a dashed edge; a weight or height limit is a boxed
+             label carrying the limit text; advisory grey. Whether the router avoids an area
+             is still said in the popup, not by the colour. With the forecast timeline open
+             these follow the month on screen, so a closure that ends in March is gone by
+             April, and a kind's row dims when none of it is in force that month. -->
+        <div class="control-item"><label><input type="checkbox" id="layer-zones" checked onchange="toggleZones(this.checked)"> Disruption zones</label><span class="color-dot" style="background:#D97706;"></span></div>
+        <div id="zone-kinds" style="padding-left:23px;margin:-2px 0 4px;">
+            <div class="control-item zone-kind" data-kind="closure"><label><input type="checkbox" id="layer-zone-closure" checked onchange="toggleZoneKind('closure', this.checked)"> Road closure</label><span class="color-dot" style="background:rgba(217,119,6,.35); border:2px solid #D97706;"></span></div>
+            <div class="control-item zone-kind" data-kind="works"><label><input type="checkbox" id="layer-zone-works" checked onchange="toggleZoneKind('works', this.checked)"> Works area</label><span class="color-dot" style="background:rgba(245,158,11,.3); border:2px dashed #D97706;"></span></div>
+            <div class="control-item zone-kind" data-kind="weight_limit"><label><input type="checkbox" id="layer-zone-weight_limit" checked onchange="toggleZoneKind('weight_limit', this.checked)"> Weight / height limit</label><span class="color-dot" style="background:#ffffff; border:2px solid #1F2024; border-radius:3px;"></span></div>
+            <div class="control-item zone-kind" data-kind="haul_road"><label><input type="checkbox" id="layer-zone-haul_road" checked onchange="toggleZoneKind('haul_road', this.checked)"> Haul road</label><span class="color-dot" style="background:#C2790B;"></span></div>
+            <div class="control-item zone-kind" data-kind="other"><label><input type="checkbox" id="layer-zone-other" checked onchange="toggleZoneKind('other', this.checked)"> Advisory</label><span class="color-dot" style="background:rgba(100,116,139,.3); border:2px solid #64748B;"></span></div>
+        </div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">amber = closure or works · boxed = a weight or height limit · grey = advisory · a dimmed row has none in force in the month on screen</span></div>
         <!-- The EXISTING railway (the package's `rail`), not the alignment being built.
              Dim until an origin filter picks a Railhead, then bold. Default ON. -->
         <div class="control-item"><label><input type="checkbox" id="layer-rail" checked onchange="toggleRail(this.checked)"> Existing rail network</label><span class="color-dot" style="background:repeating-linear-gradient(90deg,#64748B 0 2px,transparent 2px 6px); border-radius:0; width:13px; height:3px;"></span></div>
@@ -766,12 +781,33 @@
             VIEW_APPLIED = true;
         }
     }
-    function fitToNetworkOnce(fc) {
-        if (VIEW_APPLIED || !fc || !fc.features || !fc.features.length) return;
+    // [w, s, e, n] of any nested coordinate array, or null when there is nothing in it
+    function coordsBounds(coords) {
         let w = 180, s = 90, e = -180, n = -90, any = false;
         const eat = (c) => { if (!Array.isArray(c)) return; if (typeof c[0] === 'number') { w = Math.min(w, c[0]); e = Math.max(e, c[0]); s = Math.min(s, c[1]); n = Math.max(n, c[1]); any = true; } else c.forEach(eat); };
-        fc.features.forEach(f => f.geometry && eat(f.geometry.coordinates));
-        if (any && e > w && n > s) { map.fitBounds([[w, s], [e, n]], { padding: 60, duration: 0 }); VIEW_APPLIED = true; }
+        eat(coords);
+        return any ? [w, s, e, n] : null;
+    }
+    function networkBounds(fc) {
+        if (!fc || !fc.features || !fc.features.length) return null;
+        const b = coordsBounds(fc.features.map(f => f.geometry ? f.geometry.coordinates : []));
+        return (b && b[2] > b[0] && b[3] > b[1]) ? b : null;
+    }
+    // 12 Oct 2026 (live A7): the network's bounds, kept so the national closures feed can be
+    // asked for the tenant's corner of the country (a 20 km margin) instead of all of it.
+    // Settled once, success or failure, so nothing that awaits it can wait forever.
+    let NET_BBOX = null, _netBoundsSettle = null;
+    const NETWORK_BOUNDS = new Promise(res => { _netBoundsSettle = res; });
+    function settleNetworkBounds(fc) {
+        const b = networkBounds(fc);
+        if (b) NET_BBOX = b;
+        if (_netBoundsSettle) { _netBoundsSettle(NET_BBOX); _netBoundsSettle = null; }
+    }
+    function fitToNetworkOnce(fc) {
+        settleNetworkBounds(fc);
+        if (VIEW_APPLIED) return;
+        const b = networkBounds(fc);
+        if (b) { map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 60, duration: 0 }); VIEW_APPLIED = true; }
     }
 
     // Package / work-section colouring. A surveyed alignment carries no chainage of
@@ -1886,7 +1922,7 @@
                     else unbakedLines++;
                     if (l.payload_fallback) fellBack++;
                     const key = KPI.by === 'ipt' ? (teamText(rp.ipt) || 'no ' + TEAM.toLowerCase())
-                              : KPI.by === 'section' ? (l.section_id || 'no work section')
+                              : KPI.by === 'section' ? (l.section_id ? ((((window.WS_NAMES || {})[l.section_id]) || {}).name || l.section_id) : 'no work section')
                               : (l.discipline || 'unassigned');
                     add(key, l, wd);
                     const br = byRoute[l.route_id] || (byRoute[l.route_id] = { veh: 0, months: new Set(), rp });
@@ -2018,6 +2054,10 @@
             inVis ? ['all', ['==', ['get', 'type'], 'Inbound Highway'], ...filterArr.slice(1)] : none);
         if (map.getLayer('outbound-lines-casing')) map.setFilter('outbound-lines-casing',
             outVis ? ['all', ['==', ['get', 'type'], 'Outbound Highway'], ...filterArr.slice(1)] : none);
+        // 12 Oct 2026 (review §3 row 3): the forecast overlay honours the same filters and the
+        // leg toggles. It used to be filtered on is_forecast alone, so an origin filter left
+        // every other route's blue overlay and label on the map.
+        if (typeof applyForecastFilter === 'function') applyForecastFilter();
 
         // Week 1, Task E. The road filter above is untouched: selecting a railhead as
         // the origin still isolates the road hauls that start there. This only changes
@@ -2734,6 +2774,11 @@
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
         if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();
+        // 12 Oct 2026 (live A2): with the timeline open, a basemap switch used to re-draw the
+        // base routes only — the forecast overlay, its labels and the condition ring were gone
+        // while the bar's figures stayed. routes-source is back (above, with the is_forecast
+        // stamps still on a1_data), so the month is re-rendered and its conditions rebuilt.
+        if (typeof TL !== 'undefined' && TL.on && TL.matrix) { renderMonthFrame(TL.month); renderTimelineWarnings(TL.month); }
     });
 
     // Click an alignment segment for its IPT, work sections and chainage extent.
@@ -2962,6 +3007,7 @@
         } catch (e) {
             if (status) status.textContent = 'Could not load the route network: ' + e.message;
             console.error('map-data failed', e);
+            settleNetworkBounds(null);     // no bounds: the closures feed falls back to the national set
             return;
         }
         const src = map.getSource('routes-source');
@@ -3052,10 +3098,13 @@
                 features: (j.zones || []).filter(z => z.active && z.geometry).map(z => ({
                     type: 'Feature',
                     properties: {
-                        id: z.id, name: z.name || '', kind: z.kind || 'other',
+                        id: z.id, name: z.name || '', kind: ZONE_KINDS.includes(z.kind) ? z.kind : 'other',
                         note: z.note || '', starts_on: z.starts_on || '', ends_on: z.ends_on || '',
                         affects_routing: !!z.affects_routing,
                         start_n: dnum(z.starts_on, 0), end_n: dnum(z.ends_on, 99999999),
+                        // D24: the limit a weight/height zone carries, read from its name or
+                        // note ("Burrough village 7.5 t limit" -> "7.5 t"); the name when neither says
+                        limit_text: zoneLimitText(z),
                     },
                     geometry: z.geometry,
                 })),
@@ -3072,41 +3121,103 @@
     // source's tiles are in, so it is false when this runs from inside the style.load handler (or just
     // after the zones fetch) — and waiting for a style.load that has already fired waited forever: the
     // zones were never drawn, on load or after a basemap switch. 'idle' fires once everything is loaded.
+    // ===== D24 (12 Oct 2026): one symbol and one toggle per zone KIND ================
+    // Colours per colour-system-1010.md line 24: amber #D97706 is "edited / closure /
+    // warning"; red is kept for a cap breach or a clash and is NOT used here. Whether the
+    // router avoids an area is still stated in the popup — it is no longer what the colour says.
+    const ZONE_KINDS = ['closure', 'works', 'weight_limit', 'haul_road', 'other'];
+    const ZONE_AMBER = '#D97706', ZONE_AMBER_LIGHT = '#F59E0B', ZONE_INK = '#1F2024', ZONE_GREY = '#64748B';
+    const ZONE_FILL_COLOUR = ['match', ['get', 'kind'], 'closure', ZONE_AMBER, 'works', ZONE_AMBER_LIGHT, 'weight_limit', ZONE_INK, ZONE_GREY];
+    const ZONE_FILL_OPACITY = ['match', ['get', 'kind'], 'closure', 0.25, 'works', 0.18, 'weight_limit', 0.06, 0.15];
+    const ZONE_EDGE_COLOUR = ['match', ['get', 'kind'], 'closure', ZONE_AMBER, 'works', ZONE_AMBER, 'weight_limit', ZONE_INK, ZONE_GREY];
+    const ZONE_LAYERS = ['zone-fill', 'zone-outline', 'zone-outline-works', 'zone-label', 'zone-limit'];
+    // "7.5 t" / "4.1 m" out of the zone's name, then its note; the name when neither carries one
+    function zoneLimitText(z) {
+        const re = /(\d+(?:[.,]\d+)?)\s?(t|tonnes?|m)\b/i;
+        for (const s of [z.name, z.note]) {
+            const m = re.exec(s || '');
+            if (m) return m[1].replace(',', '.') + ' ' + (m[2].toLowerCase().startsWith('t') ? 't' : 'm');
+        }
+        return z.name || '';
+    }
+    // the bordered box behind a limit label: white, 2 px ink edge, stretched to the text.
+    // Images are dropped with the style on a basemap switch, so it is re-added behind hasImage.
+    function zoneBadgeImage() {
+        const S = 24, c = document.createElement('canvas'); c.width = S; c.height = S;
+        const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.strokeStyle = ZONE_INK; g.lineWidth = 2;
+        const r = 4, x = 1, y = 1, w = S - 2, h = S - 2;
+        g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+        g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h);
+        g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
+        g.fill(); g.stroke();
+        return { width: S, height: S, data: g.getImageData(0, 0, S, S).data };
+    }
+    function zoneKindVisible(kind) {
+        const cb = document.getElementById('layer-zone-' + kind);
+        return !cb || cb.checked;
+    }
+
     function ensureZoneLayers() {
         if (!map.isStyleLoaded()) { map.once('idle', ensureZoneLayers); return; }
         if (!map.getSource('zones-source')) map.addSource('zones-source', { type: 'geojson', data: ZONES.data });
         else map.getSource('zones-source').setData(ZONES.data);
         const cb = document.getElementById('layer-zones');
         const vis = (!cb || cb.checked) ? 'visible' : 'none';
+        if (!map.hasImage('zone-limit-badge')) map.addImage('zone-limit-badge', zoneBadgeImage(),
+            { pixelRatio: 1, stretchX: [[6, 18]], stretchY: [[6, 18]], content: [6, 6, 18, 18] });
         if (!map.getLayer('zone-fill')) map.addLayer({
             id: 'zone-fill', type: 'fill', source: 'zones-source',
             layout: { visibility: vis },
-            paint: {
-                'fill-color': ['case', ['get', 'affects_routing'], CONFIG.COLORS.selection, '#64748B'],
-                'fill-opacity': 0.20,
-            },
+            paint: { 'fill-color': ZONE_FILL_COLOUR, 'fill-opacity': ZONE_FILL_OPACITY },
         });
+        // closure: solid 2 px amber; limit: solid ink; advisory: solid grey
         if (!map.getLayer('zone-outline')) map.addLayer({
             id: 'zone-outline', type: 'line', source: 'zones-source',
             layout: { visibility: vis },
-            paint: {
-                'line-color': ['case', ['get', 'affects_routing'], CONFIG.COLORS.selection, '#64748B'],
-                'line-width': 2,
-            },
+            paint: { 'line-color': ZONE_EDGE_COLOUR, 'line-width': ['match', ['get', 'kind'], 'closure', 2, 1.5] },
+        });
+        // works: the same amber, dashed — its own layer because the dash is not data-driven
+        if (!map.getLayer('zone-outline-works')) map.addLayer({
+            id: 'zone-outline-works', type: 'line', source: 'zones-source',
+            layout: { visibility: vis },
+            paint: { 'line-color': ZONE_AMBER, 'line-width': 2, 'line-dasharray': [2, 1.5] },
         });
         if (!map.getLayer('zone-label')) map.addLayer({
             id: 'zone-label', type: 'symbol', source: 'zones-source', minzoom: 9,
             layout: { visibility: vis, 'text-field': ['get', 'name'], 'text-size': 11 },
-            paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
+            paint: { 'text-color': ZONE_INK, 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
+        });
+        // the limit itself, boxed, above the name — "7.5 t" is the whole point of the zone
+        if (!map.getLayer('zone-limit')) map.addLayer({
+            id: 'zone-limit', type: 'symbol', source: 'zones-source', minzoom: 9,
+            layout: { visibility: vis, 'text-field': ['get', 'limit_text'], 'text-size': 11.5, 'text-offset': [0, -1.7],
+                      'icon-image': 'zone-limit-badge', 'icon-text-fit': 'both', 'icon-text-fit-padding': [2, 6, 2, 6],
+                      'text-allow-overlap': true, 'icon-allow-overlap': true },
+            paint: { 'text-color': ZONE_INK },
         });
         applyZoneMonth((typeof TL !== 'undefined' && TL.on) ? TL.month : null);
         raiseMarks();
     }
 
-    // Restrict the overlay to zones whose date window overlaps the month on screen. With
-    // no timeline open (month === null) every active zone is shown, whatever its dates —
-    // a planner opening the map cold should see the whole picture, not just today's.
+    // Restrict the overlay to zones whose date window overlaps the month on screen and
+    // whose kind is ticked. With no timeline open (month === null) every active zone is
+    // shown, whatever its dates — a planner opening the map cold should see the whole
+    // picture, not just today's. The legend rows follow the same month: a kind with
+    // nothing in force is dimmed, not removed.
     function applyZoneMonth(month) {
+        const span = month ? monthSpan(month) : null;
+        const inForce = {};
+        (ZONES.data.features || []).forEach(f => {
+            const p = f.properties || {};
+            if (!span || (p.start_n <= span[1] && p.end_n >= span[0])) inForce[p.kind] = (inForce[p.kind] || 0) + 1;
+        });
+        const when = month && typeof monthLabel === 'function' ? ' in ' + monthLabel(month) : '';
+        ZONE_KINDS.forEach(k => {
+            const row = document.querySelector('.zone-kind[data-kind="' + k + '"]');
+            if (!row) return;
+            row.classList.toggle('dim', !inForce[k]);
+            row.title = inForce[k] ? inForce[k] + ' in force' + when : 'none in force' + (when || ' in this plan');
+        });
         if (!map.getLayer('zone-fill')) return;
         // Phase 4: haul roads are zones too, and /api/zones returns them, but they are
         // drawn from routes-source as 'Temp Haul Track' with their own colour, dash,
@@ -3114,18 +3225,29 @@
         // grey advisory outline, once there as a haul road — and the grey one would win
         // on any zoom where it sat on top.
         const notHaul = ['!=', ['get', 'kind'], 'haul_road'];
-        let f = notHaul;
-        if (month) {
-            const [lo, hi] = monthSpan(month);
-            f = ['all', notHaul, ['<=', ['get', 'start_n'], hi], ['>=', ['get', 'end_n'], lo]];
-        }
-        ['zone-fill', 'zone-outline', 'zone-label'].forEach(l => {
-            if (map.getLayer(l)) map.setFilter(l, f);
+        const kindsOn = ZONE_KINDS.filter(k => k !== 'haul_road' && zoneKindVisible(k));
+        const base = ['all', notHaul, ['in', ['get', 'kind'], ['literal', kindsOn]]];
+        if (span) base.push(['<=', ['get', 'start_n'], span[1]], ['>=', ['get', 'end_n'], span[0]]);
+        const f = base;
+        [['zone-fill', null], ['zone-outline', ['!=', ['get', 'kind'], 'works']], ['zone-outline-works', ['==', ['get', 'kind'], 'works']],
+         ['zone-label', null], ['zone-limit', ['==', ['get', 'kind'], 'weight_limit']]].forEach(([l, extra]) => {
+            if (map.getLayer(l)) map.setFilter(l, extra ? ['all', ...f.slice(1), extra] : f);
         });
     }
 
     function toggleZones(visible) {
-        ['zone-fill', 'zone-outline', 'zone-label'].forEach(l => toggleLayer(l, visible));
+        ZONE_LAYERS.forEach(l => toggleLayer(l, visible));
+    }
+    // one kind at a time. Haul roads are drawn from routes-source under "Temporary haul",
+    // so that row drives (and follows) the same checkbox rather than a second layer.
+    function toggleZoneKind(kind, on) {
+        if (kind === 'haul_road') {
+            const t = document.getElementById('layer-temp');
+            if (t) t.checked = on;
+            toggleTempHaul(on);
+            return;
+        }
+        applyZoneMonth((typeof TL !== 'undefined' && TL.on) ? TL.month : null);
     }
 
     // ===== Phase 2.5a: Google Street View =========================================
@@ -3216,8 +3338,17 @@
             RESTR.colour = {};
             RESTR.layers.forEach(l => { RESTR.colour[l.key] = l.colour; });
             buildRestrictionToggles();
-            const fc = await fetch(CONFIG.API_BASE + '/restrictions').then(r=>r.json());
-            RESTR.data = fc;
+            // 12 Oct 2026 (live A7): ask for the tenant's corner of the country — the network's
+            // bounds plus 20 km — rather than the whole national set (~8 MB, 2,865 closures for
+            // GB). The server may not know `bbox` yet (FastAPI ignores an unknown query
+            // parameter), so the same box is applied here as well: the fallback when the
+            // national set comes back anyway. The download is NOT deferred to the first toggle:
+            // a condition's highlight needs the features before anything is ticked.
+            const bb = await restrictionBbox();
+            const q = bb ? '?bbox=' + bb.map(v => v.toFixed(4)).join(',') : '';
+            const fc = await fetch(CONFIG.API_BASE + '/restrictions' + q).then(r=>r.json());
+            RESTR.data = bb ? clipToBbox(fc, bb) : fc;
+            RESTR.bbox = bb;
             ensureRestrictionLayers();
         }catch(e){
             // a map with no restriction overlay is degraded, not broken — say so quietly
@@ -3227,6 +3358,29 @@
             console.warn('restrictions unavailable', e);
         }
         RESTR.loading = false;
+    }
+
+    // the network's bounds with a 20 km margin, as [w, s, e, n]; null when the network has not
+    // loaded (then the national set is fetched, exactly as before). Waits at most 20 s for the
+    // network so a slow map-data fetch can never hold the closures feed hostage.
+    const RESTR_MARGIN_KM = 20;
+    async function restrictionBbox(){
+        const b = await Promise.race([NETWORK_BOUNDS, new Promise(res => setTimeout(() => res(NET_BBOX), 20000))]);
+        if(!b) return null;
+        const midLat = (b[1] + b[3]) / 2;
+        const dLat = RESTR_MARGIN_KM / 111.0;
+        const dLon = RESTR_MARGIN_KM / (111.0 * Math.max(0.2, Math.cos(midLat * Math.PI / 180)));
+        return [b[0] - dLon, b[1] - dLat, b[2] + dLon, b[3] + dLat];
+    }
+    // keep the features whose own bounds touch the box; everything else about the collection
+    // (attribution, counts, the provider's note) rides through untouched
+    function clipToBbox(fc, bb){
+        if(!fc || !Array.isArray(fc.features)) return fc;
+        const kept = fc.features.filter(f => {
+            const g = f && f.geometry ? coordsBounds(f.geometry.coordinates) : null;
+            return g && g[0] <= bb[2] && g[2] >= bb[0] && g[1] <= bb[3] && g[3] >= bb[1];
+        });
+        return Object.assign({}, fc, { features: kept, clipped_to_bbox: bb, features_before_clip: fc.features.length });
     }
 
     function buildRestrictionToggles(){
@@ -3290,8 +3444,33 @@
                 'text-size':11, 'text-offset':[0,1.1], 'text-allow-overlap':false },
             paint:{ 'text-color':COLOUR, 'text-halo-color':'#ffffff', 'text-halo-width':2 },
         });
+        // 12 Oct 2026 (review §2.5 row 1): the National Highways closure a Conditions row is
+        // about, highlighted by its event_number — amber (#D97706, colour-system-1010.md line
+        // 24), wide, and shown whether or not the closures toggle is on. The filter is kept in
+        // WARN.hitEvents so a basemap switch, which re-adds this layer from here, restores it.
+        if(!map.getLayer('restriction-hit')) map.addLayer({
+            id:'restriction-hit', type:'line', source:'restrictions-source',
+            filter: restrictionHitFilter([]),
+            layout:{ visibility:'visible', 'line-cap':'round', 'line-join':'round' },
+            paint:{ 'line-color':'#D97706',
+                    'line-width':['interpolate',['linear'],['zoom'],7,5,14,11],
+                    'line-opacity':0.9 },
+        });
         applyRestrictionFilter();
+        applyRestrictionHits();
         raiseMarks();
+    }
+    function restrictionHitFilter(evs){
+        return ['all', ['in', ['geometry-type'], ['literal', ['LineString','MultiLineString']]],
+                       ['in', ['to-string', ['get','event_number']], ['literal', evs]]];
+    }
+    function applyRestrictionHits(){
+        const evs = (typeof WARN !== 'undefined' && WARN.hitEvents) || [];
+        if(map.getLayer('restriction-hit')) map.setFilter('restriction-hit', restrictionHitFilter(evs));
+    }
+    function setRestrictionHits(evs){
+        WARN.hitEvents = evs.map(String);
+        applyRestrictionHits();
     }
 
     // Visibility is per KIND, but there is one layer pair, so "which kinds are ticked"
@@ -3435,6 +3614,9 @@
 
     function toggleTempHaul(visible) {
         ['temp-haul-lines', 'temp-haul-label'].forEach(l => toggleLayer(l, visible));
+        // D24: the "Haul road" row under Disruption zones is the same switch, kept in step
+        const z = document.getElementById('layer-zone-haul_road');
+        if (z && z.checked !== !!visible) z.checked = !!visible;
     }
 
     function tempHaulPopupHTML(p) {
@@ -3636,7 +3818,7 @@
             let status = document.getElementById('forecast-status');
 
             if (!isChecked) {
-                ['forecast-labels','forecast-layer','forecast-casing','forecast-flow'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
+                ['forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyRailHighlight();      // §6b: forecast off -> dim, unless a railhead origin is selected
@@ -3719,6 +3901,7 @@
                     });
                 }
                 ensureFlowLayer();
+                applyForecastFilter();     // the overlay follows the sidebar filters and the leg toggles
 
                 const bd = document.getElementById('btn-detail');
                 if (matchCount > 0) {
@@ -3936,17 +4119,64 @@
     }
 
     // ===== Directional flow animation + playable forecast timeline =====
+    // 12 Oct 2026 (review §3 row 3): the overlay's filter is is_forecast AND the leg toggles
+    // AND the routes that pass the sidebar filters (the same routePassesFilters() the KPI
+    // count and the rail rule use). Before this it was is_forecast alone, so filtering to
+    // one origin left every other route's blue overlay and label on the map.
+    const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','forecast-flow'];
+    function forecastLayerFilter(){
+        const legs = [];
+        const inCb = document.getElementById('layer-inbound'), outCb = document.getElementById('layer-outbound');
+        if(!inCb || inCb.checked) legs.push('Inbound Highway');
+        if(!outCb || outCb.checked) legs.push('Outbound Highway');
+        const rids = [];
+        ((a1_data && a1_data.features) || []).forEach(f => {
+            if(f.geometry && f.geometry.type === 'LineString' && f.properties.type === 'Inbound Highway'
+               && f.properties.route_id && routePassesFilters(f.properties)) rids.push(f.properties.route_id);
+        });
+        return ['all', ['==', ['get', 'is_forecast'], true],
+                       ['in', ['get', 'type'], ['literal', legs]],
+                       ['in', ['get', 'route_id'], ['literal', rids]]];
+    }
+    function applyForecastFilter(){
+        const f = forecastLayerFilter();
+        FORECAST_OVERLAY_LAYERS.forEach(l => { if(map.getLayer(l)) map.setFilter(l, f); });
+    }
     function ensureForecastLayers(){
         if(map.getLayer('forecast-layer')) return;
-        map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:['==','is_forecast',true],paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':6,'line-opacity':0.9}});
-        map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:['==','is_forecast',true],paint:{'line-color':CONFIG.COLORS.forecast,'line-width':3.5,'line-opacity':0.95}});
-        map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:['==','is_forecast',true],layout:{'symbol-placement':'line-center','text-field':['concat', ['get', 'f_avg'], ' ', FORECAST_LABEL_UNIT],'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
+        const f = forecastLayerFilter();
+        map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':6,'line-opacity':0.9}});
+        map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':3.5,'line-opacity':0.95}});
+        map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:f,layout:{'symbol-placement':'line-center','text-field':['concat', ['get', 'f_avg'], ' ', FORECAST_LABEL_UNIT],'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
         raiseMarks();
+        ensureCapBadgeLayer();
     }
     function ensureFlowLayer(){
         if(map.getLayer('forecast-flow') || !map.getSource('routes-source')) return;
-        map.addLayer({id:'forecast-flow',type:'line',source:'routes-source',filter:['==','is_forecast',true],paint:{'line-color':'#ffffff','line-width':2,'line-opacity':0.85,'line-dasharray':[0,4,3]}});
+        map.addLayer({id:'forecast-flow',type:'line',source:'routes-source',filter:forecastLayerFilter(),paint:{'line-color':'#ffffff','line-width':2,'line-opacity':0.85,'line-dasharray':[0,4,3]}});
         raiseMarks();
+    }
+    // D21 / D33: the small badge under the label of a route whose loaded-leg movements a day
+    // are over its planning flag (max_vehicles_per_day on the map-data feature; no property,
+    // no badge). Filtered to the loaded leg and the routes renderTimelineWarnings() found
+    // over, kept in WARN.capRoutes so a re-added layer restores it. The word is "planning
+    // flag", never "limit": the figure is the tenant's own planning number, not a legal one.
+    function capBadgeFilter(ids){
+        return ['all', ['==', ['get', 'type'], 'Inbound Highway'], ['in', ['get', 'route_id'], ['literal', ids]]];
+    }
+    function ensureCapBadgeLayer(){
+        if(map.getLayer('forecast-cap-badge') || !map.getSource('routes-source')) return;
+        const ids = (typeof WARN !== 'undefined' && WARN.capRoutes) || [];
+        map.addLayer({id:'forecast-cap-badge',type:'symbol',source:'routes-source',filter:capBadgeFilter(ids),
+            layout:{'symbol-placement':'line-center','text-field':['concat', 'over planning flag ', ['to-string', ['get', 'max_vehicles_per_day']]],
+                    'text-size':10.5,'text-offset':[0,1.1],'text-allow-overlap':true},
+            paint:{'text-color':'#ffffff','text-halo-color':'#D97706','text-halo-width':2}});
+        raiseMarks();
+    }
+    function setCapBadges(ids){
+        WARN.capRoutes = ids.slice();
+        ensureCapBadgeLayer();
+        if(map.getLayer('forecast-cap-badge')) map.setFilter('forecast-cap-badge', capBadgeFilter(WARN.capRoutes));
     }
     // Animated "ant-march" dashes convey haul direction (origin -> destination, in
     // geometry order).
@@ -4012,7 +4242,17 @@
         const r = await fetch(CONFIG.API_BASE+'/public/forecast-matrix?from=1&to='+CONFIG.MONTH_COUNT+'&unit='+unit);
         if(!r.ok) throw new Error('API '+r.status);
         const j = await r.json();
-        const byR={}; (j.routes||[]).forEach(rt=>{ byR[(rt.route_id||'').toString().trim().toLowerCase()]=rt; });
+        // 12 Oct 2026 (review §3 row 3): the matrix is one entry per LINE (route × discipline ×
+        // section — main.py keeps them apart for the detail table), so the per-route figure is
+        // the SUM of its lines' months. `byR[rid] = rt` kept whichever line came last and
+        // under-read every route carrying two disciplines.
+        const byR={};
+        (j.routes||[]).forEach(rt=>{
+            const rid=(rt.route_id||'').toString().trim().toLowerCase();
+            const acc = byR[rid] || (byR[rid] = { route_id: rt.route_id, monthly: {}, total: 0, lines: 0 });
+            Object.keys(rt.monthly||{}).forEach(k=>{ acc.monthly[k] = (acc.monthly[k]||0) + (Number(rt.monthly[k])||0); });
+            acc.total += Number(rt.total)||0; acc.lines++;
+        });
         if(j.working_days > 0) FORECAST_WORKING_DAYS = j.working_days;   // 15 Sep — the label's divisor
         TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days }; return TL.matrix;
     }
@@ -4052,7 +4292,7 @@
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='none';
         const src=map.getSource('routes-source');
         if(src){ const d=src._data; d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
-        ['forecast-labels','forecast-layer','forecast-casing','forecast-flow'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        ['forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
         applyZoneMonth(null);   // no month on screen: show every active zone again
         applyFilters();         // KPI cards and the rail rule follow the timeline closing
     }
@@ -4093,18 +4333,25 @@
 
     // ===== 2026-09-02 (§8) — warnings for the month on the playhead ==================
     //
-    // Three sources, all already in the product, filtered to the APPROVED routes that
+    // Four sources, all already in the product, filtered to the APPROVED routes that
     // carry volume in the month on screen and pass the sidebar filters:
-    //   1. Tark Tee hits on a baked route   (/api/routes/restrictions, fetched once, cached)
+    //   1. Tark Tee / National Highways hits on a baked route, in force THIS month
+    //                                       (/api/routes/restrictions, fetched once, cached)
     //   2. a stockpile over capacity        (/api/public/stockpile-timeline, fetched once)
     //   3. a seasonal window from factors.json that matches the calendar month and the
     //      line's vehicle                    (/api/meta, already fetched)
-    // No new warning types and no weather API. At most three on screen plus "+N more";
-    // dismissing hides that warning for that month only. Rebuilt on every tick.
-    const WARN = { restr: null, restrPending: null, piles: null, pilesPending: null, dismissed: {} };
+    //   4. (12 Oct 2026, D21/D33) the route's planning flag — max_vehicles_per_day on the
+    //      map-data feature — against the month's loaded-leg movements a day
+    //                                       (/api/public/month-kpis, already fetched)
+    // No weather API. Dismissing hides that warning for that month only. Rebuilt on every tick.
+    const WARN = { restr: null, restrPending: null, piles: null, pilesPending: null, dismissed: {},
+                   hitEvents: [], hitRoute: {}, capRoutes: [] };
+    // 12 Oct 2026 (live A1): every hit carries from / to and is filtered to the month on screen
+    // client-side, so the check is asked for expired closures too — a past month must be able
+    // to list what applied then. The server may not know the parameter yet; it is ignored then.
     async function warnRestrictions() {
         if (WARN.restr) return WARN.restr;
-        if (!WARN.restrPending) WARN.restrPending = fetch(CONFIG.API_BASE + '/routes/restrictions')
+        if (!WARN.restrPending) WARN.restrPending = fetch(CONFIG.API_BASE + '/routes/restrictions?include_expired=1')
             .then(r => r.ok ? r.json() : { routes: {} })
             .then(j => { WARN.restr = (j && j.routes) || {}; return WARN.restr; })
             .catch(() => { WARN.restr = {}; return WARN.restr; });
@@ -4136,12 +4383,37 @@
     WARN.open = false; WARN.autoOpened = false; WARN.counts = { clash: 0, warn: 0, caution: 0 };
     function toggleConditions() { WARN.open = !WARN.open; renderTimelineWarnings(TL.month); }
     // "Show on map": a route is selected (its own glow layer); a stockpile is flown to and
-    // ringed. Both already exist as map concepts; nothing new is drawn for a route.
+    // ringed; a National Highways closure ('h', keyed by its event_number) selects the route it
+    // sits on and flies to the CLOSURE's bounds rather than the whole route.
     function showCondition(kind, id) {
+        if (kind === 'h') { showRestrictionHit(id); return; }
         if (kind === 'r') { if (typeof selectRoute === 'function') selectRoute(id); return; }
         const f = a1_data.features.find(x => x.geometry && x.geometry.type === 'Point'
                                              && x.properties && x.properties.type === 'Node' && x.properties.id === id);
         if (f) map.flyTo({ center: f.geometry.coordinates, zoom: Math.max(map.getZoom(), 13), duration: 700 });
+    }
+    function showRestrictionHit(ev) {
+        const rid = WARN.hitRoute[String(ev)];
+        if (rid && typeof selectRoute === 'function') selectRoute(rid);
+        const f = ((RESTR.data || {}).features || []).find(x => x.properties && String(x.properties.event_number) === String(ev));
+        const b = f && f.geometry ? coordsBounds(f.geometry.coordinates) : null;
+        if (b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 90, maxZoom: 14, duration: 700 });
+    }
+    // does a hit's date window overlap the month? No dates (a standing limit) always does.
+    function hitInMonth(h, month) {
+        const [lo, hi] = monthSpan(month);
+        const day = s => (typeof s === 'string' ? s.slice(0, 10) : '');
+        return dnum(day(h.from), 0) <= hi && dnum(day(h.to), 99999999) >= lo;
+    }
+    // one row per closure per route: a closure met by both legs arrives twice (the server
+    // keys hits per leg) and is counted once here, by event_number or by its description
+    function dedupeHits(hits) {
+        const seen = new Set();
+        return hits.filter(h => {
+            const k = h.event_number ? 'e|' + h.event_number : 'd|' + [h.kind, h.what, h.from, h.to].join('|');
+            if (seen.has(k)) return false;
+            seen.add(k); return true;
+        });
     }
     // the red ring on an over-capacity stockpile: a circle layer on the same source as the
     // location icons, filtered to the ids over this month (a Node's id IS the location
@@ -4177,20 +4449,23 @@
     function renderConditionsPill(live) {
         const pill = document.getElementById('kpi-conditions');
         if (!pill) return;
-        const c = { clash: 0, warn: 0, caution: 0 };
-        live.forEach(i => { c[i.lvl] = (c[i.lvl] || 0) + 1; });
+        // a planning-flag row is warn level but is counted under its own noun — the pill
+        // must not call it a "limit"
+        const c = { clash: 0, warn: 0, caution: 0, cap: 0 };
+        live.forEach(i => { const k = i.src === 'cap' ? 'cap' : i.lvl; c[k] = (c[k] || 0) + 1; });
         WARN.counts = c;
         if (!live.length) { pill.classList.remove('on'); pill.innerHTML = ''; return; }
         const part = (lvl, n, noun) => (n ? `<span class="cond-dot ${lvl}"></span><span>${n} ${noun}${n === 1 ? '' : 's'}</span>` : '');
         pill.innerHTML = part('clash', c.clash, 'over capacity').replace(/capacitys/, 'capacity')
-            + part('warn', c.warn, 'route limit') + part('caution', c.caution, 'seasonal window')
+            + part('warn', c.warn, 'route limit') + part('warn', c.cap, 'over a planning flag').replace(/flags/, 'flag')
+            + part('caution', c.caution, 'seasonal window')
             + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6470" stroke-width="2" aria-hidden="true"><path d="${WARN.open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}"></path></svg>`;
         pill.classList.add('on');
     }
     function renderTimelineWarnings(m) {
         const box = document.getElementById('tl-warnings');
         if (!box) return;
-        if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; renderConditionsPill([]); setCondRing([]); positionWarnStack(); return; }
+        if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; renderConditionsPill([]); setCondRing([]); setRestrictionHits([]); setCapBadges([]); positionWarnStack(); return; }
         const month = m;
         Promise.all([warnRestrictions(), warnPiles(), kpiFetchMonth(month).catch(() => null)]).then(([restr, piles, kp]) => {
             if (TL.month !== month || !TL.on) return;     // the playhead moved on
@@ -4216,17 +4491,24 @@
             // "conflicting" means, and that is the human's decision, not mine.
             //
             // 1. Tark Tee / National Highways: a real limit exceeded on a visible baked route -> WARNING
+            // 12 Oct 2026 (live A1): only the hits whose window overlaps THIS month — the same
+            // six October closures used to be listed in every month that carried volume — one
+            // row per closure per route, and the closure itself highlighted by event_number.
+            const hitEvents = []; WARN.hitRoute = {};
             routes.forEach(p => {
                 const hit = restr[p.route_id];
                 if (!hit || !hit.hits) return;
-                const worst = hit.hits[0];
-                const n = hit.hits.length;
+                const inMonth = dedupeHits(hit.hits.filter(h => hitInMonth(h, month)));
+                if (!inMonth.length) return;
+                const worst = inMonth[0];
+                const n = inMonth.length;
+                inMonth.forEach(h => { if (h.event_number) { hitEvents.push(String(h.event_number)); WARN.hitRoute[String(h.event_number)] = p.route_id; } });
                 items.push({ key: `r|${p.route_id}|${month}`,
                     // ⚠️ a Tark Tee 'breach' is still a WARNING, not a Clash. It is a
                     // vehicle-versus-limit verdict on a drivable road, not an impossibility
                     // — and the weak-bridge class it cannot judge at all (§A2) means this
                     // source must never be the loudest thing on screen.
-                    lvl: 'warn', who: p.route_id, kind: 'r', id: p.route_id,
+                    lvl: 'warn', who: p.route_id, kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? String(worst.event_number) : p.route_id,
                     // "Mass limits" + breach -> "Exceeds a mass limit"; a non-breach hit
                     // on a layer ("Planned road closures") keeps the layer's own noun
                     noun: (worst.severity === 'breach'
@@ -4236,13 +4518,34 @@
                     sort: worst.severity === 'breach' ? 1 : 2 });
             });
             // 2. stockpiles over at the end of this month -> CLASH
+            // D23 (12 Oct 2026): the balance is actuals-derived, so the sentence says "recorded",
+            // not "the plan puts" — it is what the stockpile timeline has on record, not a plan figure.
             (piles || []).forEach(sp => {
                 const mm = sp.months && sp.months[String(month)];
                 if (!mm || !mm.over) return;
                 const u = sp.unit === 'm3' ? 'm³' : (sp.unit || 't');
                 items.push({ key: `s|${sp.location_id}|${month}`, lvl: 'clash', who: sp.name, kind: 's', id: sp.location_id,
                     noun: 'Over capacity',
-                    what: `${sp.name} holds ${Math.round(sp.capacity_qty).toLocaleString()} ${u}. The plan puts ${Math.round(mm.balance_end).toLocaleString()} ${u} in it by the end of ${monthLabel(month)}.`, sort: 0 });
+                    what: `${sp.name} holds ${Math.round(sp.capacity_qty).toLocaleString()} ${u}. ${Math.round(mm.balance_end).toLocaleString()} ${u} recorded in it at the end of ${monthLabel(month)}.`, sort: 0 });
+            });
+            // 4. the route's planning flag against this month's movements a day -> WARNING
+            // D21: movements a day = the loaded leg's vehicle loads (one load = one two-way
+            // movement, never doubled) over the month's working days from the API. D33: public,
+            // worded as a "planning flag" — never a limit, legal or otherwise. The property is
+            // absent until the backend exposes it on the map-data feature; absent means no row.
+            const wdm = (kp && kp.working_days > 0) ? kp.working_days : FORECAST_WORKING_DAYS;
+            const loadsByRoute = {};
+            (kp && kp.lines || []).forEach(l => { loadsByRoute[l.route_id] = (loadsByRoute[l.route_id] || 0) + (Number(l.vehicle_loads) || 0); });
+            const overCap = [];
+            routes.forEach(p => {
+                const cap = Number(p.max_vehicles_per_day);
+                if (!(cap > 0) || !(loadsByRoute[p.route_id] > 0)) return;
+                const perDay = loadsByRoute[p.route_id] / wdm;
+                if (perDay <= cap) return;
+                overCap.push(p.route_id);
+                items.push({ key: `c|${p.route_id}|${month}`, lvl: 'warn', src: 'cap', who: p.route_id, kind: 'r', id: p.route_id,
+                    noun: 'Over the planning cap',
+                    what: `${p.route_id} ${Math.round(perDay)} a day against a planning flag of ${cap}`, sort: 1.5 });
             });
             // 3. seasonal windows, per visible line's vehicle
             const vehByRoute = {};
@@ -4264,6 +4567,10 @@
             const live = items.filter(i => !WARN.dismissed[i.key]).sort((a, b) => a.sort - b.sort);
             renderConditionsPill(live);
             setCondRing(live.filter(i => i.kind === 's').map(i => i.id));
+            // the closures the live rows are about, drawn amber whether or not the layer is on;
+            // the badge on every route over its planning flag (dismissing a row clears both)
+            setRestrictionHits(hitEvents.filter(ev => live.some(i => i.kind === 'h' && WARN.hitRoute[ev] === i.who)));
+            setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));
             // a month with a red condition opens the panel once, by itself
             if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
             if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
