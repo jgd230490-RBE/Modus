@@ -1688,18 +1688,11 @@ function AppearancePicker(){
 
 // ================================================================= Public map
 function PublicMap({ onLogin }){
+  // 11 Oct 2026 (the user): the strip above the map ("Public Route Map · Approved haul-route forecasts.
+  // Toggle Show Forecast Routes…" and "Submit a forecast →") is gone. The header's "Staff sign in" does
+  // what the link did (onLogin), and the map's own guide explains the forecast toggle.
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      <div className="bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between">
-        <p className="text-sm text-slate-600">
-          <span className="font-semibold text-[color:var(--navy)]">Public Route Map</span>
-          <span className="mx-2 text-slate-300">·</span>
-          Approved haul-route forecasts. Toggle <span className="font-medium">Show Forecast Routes</span> in the map panel.
-        </p>
-        <button onClick={onLogin} className="text-sm text-[color:var(--blue)] hover:underline font-medium">
-          Submit a forecast →
-        </button>
-      </div>
       <iframe src={MAP_URL} title="Public Route Map" className="flex-1 w-full border-0" />
     </div>
   );
