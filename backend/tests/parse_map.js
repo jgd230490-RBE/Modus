@@ -255,8 +255,10 @@ ok("§9: vehicles/day = vehicle-loads over months with volume, per working day",
 // day; vehicles needed = Σ per line ceil(movements/day ÷ trips one vehicle can make on
 // that route), busiest month, with unbaked lines counted as unknown rather than zero.
 // 2026-10-06: the label reads "Movements a day" (sentence case, no slash) — NARROWED
-ok("§9: movements/day is the loads-per-working-day figure", /set\('kpi-trips', fmtN\(vehDay, 1\)\)/.test(code)
-  && />Movements a day</.test(html));
+// 11 Oct 2026 NARROWED (the user): one load = one delivery = one TWO-WAY movement; the figure is loads per
+// working day, NEVER doubled, and the label says "Two-way movements a day"
+ok("§9: two-way movements/day is the loads-per-working-day figure, not doubled", /set\('kpi-trips', fmtN\(vehDay, 0\)\)/.test(code)
+  && />Two-way movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code));
 ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per line, from the route's cycle",
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
 ok("§9: ⭐ an unbaked line is counted as unknown, never as zero vehicles",
@@ -1366,8 +1368,9 @@ ok("the breakdown is chips, not a faint run-on line",
 // ⭐ THREE numbers per chip, and the third is TONNES on purpose. The map unit is
 // 'vehicles' by default, and in that unit "material/day" and "movements/day" are the
 // same number — printing both would put the 04 Sep correction back on screen.
-ok("⭐ §D: every chip carries vehicles, trips AND tonnes",
-  /veh\/d/.test(code) && /trips\/d/.test(code) && /t\/d<\/span>/.test(code)
+// 11 Oct 2026 NARROWED: the middle figure is called two-way movements (the user), still three quantities
+ok("⭐ §D: every chip carries vehicles, two-way movements AND tonnes",
+  /veh\/d/.test(code) && /two-way\/d/.test(code) && /t\/d<\/span>/.test(code)
   && /g\.t \+= \(l\.qty_t \|\| 0\)/.test(code));
 // vehicles ceil() PER LINE, exactly as the headline does — a vehicle on one route
 // cannot also be on another, and the groups must add up to the card above them
@@ -1648,6 +1651,23 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (average laden, both legs, tailpipe only, set on Config)",
      /Carbon: DESNZ 2026 kg CO₂e per vehicle-km, average laden, applied to both legs, tailpipe only; set per vehicle on the Config page\./.test(code) && !/DEFRA/.test(code));
 }
+
+
+// ---- 11 Oct 2026: the map panel (mockup 7, the user's decisions: no search, two-way movements and vehicles
+// needed a day as the headline, the 300 px panel kept) ----
+ok("the two headline cards lead: two-way movements and vehicles needed",
+  /<div class="kpi-card lead">\s*<div class="kpi-value" id="kpi-trips">/.test(html) && /<div class="kpi-card lead">\s*<div class="kpi-value" id="kpi-vehicles">/.test(html)
+  && /\.kpi-card\.lead \.kpi-value\{ font-size:28px;/.test(html)
+  && /@media \(min-width:1024px\)\{ #kpi-cards, \.kpi-row\{ gap:18px; \} \.kpi-label\{ white-space:normal; max-width:104px; \} \}/.test(html));
+ok("the side-panel rows say two-way, not trips", code.includes("two-way/d \\u00b7 ") && !code.includes("} trips/d \\u00b7"));
+ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fold; the panel stays 300 px",
+  html.indexOf('<details class="layers-box" id="layers-box">') < html.indexOf('<h3>Basemap</h3>')
+  && html.indexOf('<h3>Haul routes</h3>') < html.indexOf('</details>', html.indexOf('id="layers-box"'))
+  && !/<details class="layers-box" id="layers-box" open/.test(html) && /\.sidebar \{ position:absolute; top:0; bottom:0; left:0; width:300px;/.test(html));
+ok("busiest routes: the five largest by two-way movements a day (not doubled), each a button that selects the route, cleared with the month",
+  html.includes('<div id="kpi-busiest"></div>') && code.includes(".sort((a, b) => b[2] - a[2]).slice(0, 5)")
+  && code.includes("onclick=\"selectRoute(") && (code.match(/setHTML\('kpi-busiest', ''\)/g) || []).length === 2);
+ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geocod/i.test(code) && !/Find a place/.test(html));
 
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

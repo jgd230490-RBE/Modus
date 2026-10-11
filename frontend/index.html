@@ -855,7 +855,7 @@ function Dashboard({ meta, initialData, initialWeek, onWall }){
           <div className="dash-cards" data-guide="dash-figures">
             <Card label="Material in view" value={`${bigNum(K.totT)} t`} sub={`${D.lines} line-month${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`}
                   title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion`} />
-            <Card label="Loads a day" value={grp(Math.round(loadsPerDay))} sub={`${grp(K.totTrips)} loads over ${grp(nMonths * wdPerMonth)} working days`}
+            <Card label="Deliveries a day" value={grp(Math.round(loadsPerDay))} sub={`each a two-way movement · ${grp(K.totTrips)} over ${grp(nMonths * wdPerMonth)} working days`}
                   title={`${grp(K.totTrips)} loaded trips (ceil of tonnes ÷ payload per line-month) ÷ ${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days (Config → Planning)`} />
             <Card label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"} sub={K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs baked routes"}
                   title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
