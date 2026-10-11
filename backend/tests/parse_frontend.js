@@ -1673,7 +1673,16 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       && /<AppearancePicker \/>/.test(hdrFn) && /Sign out/.test(hdrFn) && /Staff sign in/.test(hdrFn));
     ok("the bar's Guide: none on sign-in; the embedded map's tour on a map view once the map says it is ready; the app's guide on other Portal pages",
       appFn.includes('const onMap = view === "public" || (view === "portal" && page === "map");')
-      && appFn.includes('const barGuide = view === "login" ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
+      // 11 Oct: "resume" (signing back in after a reload) has no guide either, like the sign-in view
+      && appFn.includes('const barGuide = (view === "login" || view === "resume") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
+    ok("🔴 a reload with a stored code starts on resume and re-checks it with /api/auth, never trusting it unchecked",
+      appFn.includes('const [view, setView] = useState(() => ACCESS.code ? "resume" : "public");')
+      && appFn.includes('body: JSON.stringify({ code: ACCESS.code }) })')
+      && appFn.includes('.then(info => { ACCESS.info = info; setRole(info); setView("portal"); })')
+      && (appFn.match(/setView\("portal"\)/g) || []).length === 2);   // signIn() and the checked resume, nowhere else
+    ok("...a 401 / 403 forgets the stored code; the public map is the fallback either way",
+      appFn.includes('if(e === 401 || e === 403){ ACCESS.code = ""; try { sessionStorage.removeItem("modus_access_code"); } catch(x){} }')
+      && /\.catch\(e => \{[\s\S]{0,400}setView\("public"\);\s*\}\);/.test(appFn));
     ok("...the map's readiness comes from a same-origin message of one type, and resets on every new screen (a new iframe announces itself again)",
       appFn.includes("if(e.origin === window.location.origin && e.data && e.data.type === MAP_TOUR_MSG) setMapTour(true);")
       && appFn.includes('window.addEventListener("message", on);') && appFn.includes('return () => window.removeEventListener("message", on);')
