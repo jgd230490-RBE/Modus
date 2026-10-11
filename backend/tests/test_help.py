@@ -382,15 +382,19 @@ GEN = os.path.join(ROOT, "backend", "tools", "make_guide_images.js")
 fe_src = open(FE, encoding="utf-8").read()
 gen_src = open(GEN, encoding="utf-8").read()
 
-# sign-in: a reload returns to the public map, because nothing restores the session from the stored code.
-# A TRIPWIRE as well: if the app starts restoring the session on load (branch claude/stay-signed-in), this fails
-# until the guide's sentence and its troubleshooting row are changed to match.
+# sign-in. NARROWED 11 Oct 2026: branch claude/stay-signed-in (pushed, not merged) makes a reload keep you signed in,
+# while main signs you out on a reload. So the guide says only what is true either way (the code lives in this tab,
+# and closing the tab signs you out) and makes NO claim about a reload; it may name the reload behaviour once it
+# describes the code that is actually there.
 _restores = ('ACCESS.code ? "resume"' in fe_src) or ("Signing you back in" in fe_src)
-_says_reload = ("closing the tab, or reloading the page, returns you to the public map" in text
-                and "Reloading returns you to the public map: sign in again." in text)
-ok("\U0001f534 sign-in: the guide says a reload returns you to the public map exactly when the app does not "
-   "restore the session (if this fails after a merge, rewrite the 2.1 bullet and the 'page looks stale' row)",
-   _says_reload != _restores and "closing the tab signs you out of the app" not in text)
+_claims_signout_on_reload = ("reloading the page, returns you to the public map" in text
+                             or "Reloading returns you to the public map" in text)
+_claims_kept_on_reload = ("reload keeps you signed in" in text.lower())
+ok("\U0001f534 sign-in: the guide never states the reload behaviour wrongly (true on main and on claude/stay-signed-in): "
+   "closing the tab signs you out; a reload is described only if the app does what it says",
+   "The code is kept for this browser tab only: closing the tab signs you out, and you sign in again." in text
+   and not (_claims_signout_on_reload and _restores) and not (_claims_kept_on_reload and not _restores)
+   and "Hard-refresh (empty cache and reload), or open a private window and sign in again." in text)
 ok("...the Forecasts badge counts Pending or Mixed lines, and the guide says so (not 'waiting for approval')",
    'r.status === "Pending" || r.status === "Mixed"' in fe_src
    and "shows how many lines are Pending or Mixed" in text and "lines are waiting for approval while" not in text)
