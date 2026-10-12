@@ -7053,6 +7053,9 @@
                 if (typeof setAreaMode === 'function') setAreaMode(p.council);
                 flip(document.getElementById('layer-areas-district'), true);
                 flip(document.getElementById('layer-areas-county'), true);
+                // the forecast routes are not one of the council view's boxes: off here, so the same button always gives
+                // the same picture (picked after Everything they stayed on, thin and grey)
+                flip(document.getElementById('toggle-forecast'), false);
             } else {
                 // leave the council view FIRST: its restore ticks the remembered boxes back, which would fight the boxes set here
                 if (typeof leaveCouncilView === 'function') leaveCouncilView();

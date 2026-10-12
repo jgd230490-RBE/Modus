@@ -4614,6 +4614,10 @@ function qrRead(mod) {
     P.applyPreset('councils-movements'); P.writeView();
     ok("presets (sandbox) Councils: movements from Councils: carbon: only the colouring changes (no box flipped), the link drops council=carbon",
        AREAS.mode === 'movements' && evs.length === evBefore && !/council=/.test(location.search) && pressed() === 'councils-movements', location.search);
+    // REVERSED-in-build 13 Oct (browser check): a council view picked after a forecast view left the forecast routes on
+    fc.checked = true; P.applyPreset('busiest-roads'); P.applyPreset('councils-carbon');
+    ok("⭐ presets (sandbox): a council view picked after a forecast view switches the forecast routes off too (the same picture whatever came before)",
+       !fc.checked && AREAS.mode === 'carbon' && councilOn() && others().every(b => !b.checked));
     // 5. Closures, leaving the council view: the remembered boxes come back first, then the view's own set
     const leaves = calls.leave;
     P.applyPreset('closures');
