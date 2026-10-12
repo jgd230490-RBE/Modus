@@ -291,6 +291,11 @@
   .dash-more .card.overflow-hidden{border:0;}
   .dash-filters label{display:block;padding:6px 10px;}
   .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
+  /* 12 Oct 2026 (C4): the Monthly bulletin menu on the Dashboard — the 14 px floor for its words */
+  .bulletin-menu label span{font-size:14px;}
+  .bulletin-menu .row-menu-list a{display:block;padding:7px 10px;font-size:14px;color:var(--popover-fg);border-radius:6px;text-decoration:underline;}
+  .bulletin-menu .row-menu-list a:hover{background:rgba(255,255,255,.06);}
+  .bulletin-menu .bm-err{white-space:normal;max-width:260px;font-size:14px;color:#FCA5A5;padding:4px 10px;}
   .dash-filters select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
   .dash-filters select option{color:#1F2024;}
   .tbl tr.is-picked td{background:var(--chart-1-soft);}
@@ -1020,6 +1025,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOp
                 <label><span>Vehicle</span><select value={vehicle} onChange={e => setVehicle(e.target.value)}><option>All</option>{vehicles.filter(v => vehShown(v, vehicle)).map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}</select></label>
               </div>
             </details>
+            <BulletinMenu months={months} />
           </>}
           <button type="button" data-guide="dash-wall" onClick={toggleWall} className={wall ? "btn-sec" : "btn-pri"}
                   title={wall ? "Back to the working view (Esc)" : "Fullscreen, larger type, filters and the table hidden, refreshed every 5 minutes"}>{wall ? "Exit big screen" : "Big screen"}</button>
@@ -1514,6 +1520,50 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
       )}
       <div className="text-[11px] text-slate-400 mt-2">balance at the week's end = opening + typed week actuals delivered there − typed consumption · a week nobody reported counts as nothing · consumption is typed on Look-ahead → Account · red past capacity, amber from 90 %</div>
     </div>
+  );
+}
+
+// 12 Oct 2026 (C4, map review §2.6, mockup 9) — the monthly bulletin from the Dashboard: the PDF is fetched
+// with the access code (like the Carbon summary) and saved; the HTML page opens in a new tab, where the staff
+// cookie set at sign-in opens it (/bulletin/ is staff-only, like the guide). The month defaults to this
+// calendar month inside the programme. Every figure is the server's (bulletin_doc.sheet); nothing is computed here.
+function BulletinMenu({ months }){
+  const now = new Date();
+  const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));
+  const [m, setM] = useState(cur);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const download = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`${API}/bulletin/month.pdf?month=${m}`);
+      if(!r.ok){
+        const txt = await r.text();
+        let d = "";
+        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+        throw new Error(d || `error ${r.status}`);
+      }
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `bulletin-${months.start_year + Math.floor((m - 1) / 12)}-${String((m - 1) % 12 + 1).padStart(2, "0")}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setErr("The bulletin could not be made: " + (e.message || e)); }
+    setBusy(false);
+  };
+  return (
+    <details className="row-menu bulletin-menu">
+      <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}
+               title="The month's lorry movements as a two-page PDF and a web page, from the approved plan">Monthly bulletin ▾</summary>
+      <div className="row-menu-list dash-filters">
+        <label><span>Month</span><select value={m} onChange={e => setM(+e.target.value)} aria-label="Bulletin month">
+          {Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select></label>
+        <button type="button" onClick={download} disabled={busy}>{busy ? "Making the bulletin…" : "Download the PDF"}</button>
+        <a href={`/bulletin/?month=${m}`} target="_blank" rel="noopener">Open the page</a>
+        {err && <div className="bm-err" role="alert">{err}</div>}
+      </div>
+    </details>
   );
 }
 

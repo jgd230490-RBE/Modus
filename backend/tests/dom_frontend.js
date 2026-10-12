@@ -278,6 +278,44 @@ async function carbonTargetDom(){
      !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 43.4 tCO2e, on target")
      && opened.length === 2 && opened[1] === "carbon");
   d3.done();
+
+  // ---- 12 Oct 2026 (C4): the Monthly bulletin on the Dashboard — the click, the request, the error, the save ----
+  // fetch answers like the server: first a 503 (the PDF library missing), then a PDF. NOT covered: a browser's
+  // real download, the HTML page itself (test_bulletin.py, http_smoke.py).
+  const bulletinCalls = [];
+  const realFetch = w.fetch;
+  let pdfReply = () => reply(503, { detail: "reportlab is not installed: test" });
+  w.fetch = (url, opt) => {
+    if (String(url).startsWith("/api/bulletin/")) { bulletinCalls.push(url); return pdfReply(); }
+    return realFetch(url, opt);
+  };
+  const saved = [];
+  w.URL.createObjectURL = () => "blob:bulletin"; w.URL.revokeObjectURL = () => {};
+  const realClick = w.HTMLAnchorElement.prototype.click;
+  w.HTMLAnchorElement.prototype.click = function(){ saved.push(this.download); };
+  const d4 = mount(w.Dashboard, { meta: dMeta, initialData: CL });
+  await settle(50);
+  const bmSel = d4.el.querySelector('select[aria-label="Bulletin month"]');
+  const bmLink = () => [...d4.el.querySelectorAll(".bulletin-menu a")].find(x => x.textContent === "Open the page");
+  ok("BULLETIN DOM: the menu is on the Dashboard with every programme month, and its link follows the month",
+     !!bmSel && bmSel.options.length === dMeta.months.count && !!bmLink());
+  act(() => { bmSel.value = "10"; bmSel.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  ok("BULLETIN DOM: choosing October 2026 points the page link at /bulletin/?month=10, in a new tab",
+     bmLink().getAttribute("href") === "/bulletin/?month=10" && bmLink().getAttribute("target") === "_blank");
+  act(() => { byText(d4.el, "button", "Download the PDF").click(); });
+  await settle(50);
+  const bmErr = d4.el.querySelector(".bm-err");
+  ok("⭐ BULLETIN DOM: Download asks the server for that month's PDF; a refusal is said under it, in the server's words",
+     bulletinCalls.length === 1 && bulletinCalls[0] === "/api/bulletin/month.pdf?month=10" && !!bmErr
+     && bmErr.textContent === "The bulletin could not be made: reportlab is not installed: test" && saved.length === 0);
+  pdfReply = () => reply(200, "%PDF-");
+  act(() => { byText(d4.el, "button", "Download the PDF").click(); });
+  await settle(50);
+  ok("⭐ BULLETIN DOM: ...and a PDF is saved as bulletin-2026-10.pdf, the error line cleared",
+     bulletinCalls.length === 2 && saved.length === 1 && saved[0] === "bulletin-2026-10.pdf" && !d4.el.querySelector(".bm-err"));
+  d4.done();
+  w.HTMLAnchorElement.prototype.click = realClick;
+  w.fetch = realFetch;
 }
 
 // ---- 5. the demo bar (11 Oct 2026) ------------------------------------------------------

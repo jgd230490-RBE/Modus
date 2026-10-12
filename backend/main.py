@@ -51,6 +51,7 @@ import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternati
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
 import road_sections  # 12 Oct 2026 — shared road sections (public map review §2.2d): the index and the month read
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
+import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -263,6 +264,20 @@ _HELP_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
   User guide at the foot of the app's menu on the left.</div>
 </div></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
 
+# 12 Oct 2026 (C4): the monthly bulletin at /bulletin/ is staff-only like the guide (D10); its refusal
+# says what it guards and where to come back to.
+_BULLETIN_SIGNIN_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wayscope — monthly bulletin</title>%s<style>%s</style>
+%s
+<div class="box">
+  <h1>The monthly bulletin is for signed-in staff</h1>
+  <p>It is issued by the scheme's staff, so it sits behind the same sign-in.</p>
+  <button onclick="location.href='/'">Go to the app and sign in</button>
+  <div class="foot">Once you are signed in, open it from Monthly bulletin on the Dashboard, or come back
+  to <code>/bulletin/</code>.</div>
+</div></html>""" % (_GATE_HEAD, _GATE_CSS, _GATE_LOGO)
+
 _MAP_UNCONFIGURED_PAGE = """<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Wayscope — map closed</title>%s<style>%s</style>
@@ -302,6 +317,9 @@ if _Request is not None and hasattr(app, "middleware"):
             return _HTML(_map_password_page(embedded), status_code=401) if doc else _JSON(
                 {"detail": "the map is password protected"}, status_code=401)
         if decision == gate.NEED_STAFF:
+            if gate.scope_for(path) == "bulletin":
+                return _HTML(_BULLETIN_SIGNIN_PAGE, status_code=401) if doc else _JSON(
+                    {"detail": "sign in to the app to read the bulletin"}, status_code=401)
             return _HTML(_HELP_SIGNIN_PAGE, status_code=401) if doc else _JSON(
                 {"detail": "sign in to the app to read the guide"}, status_code=401)
         # UNCONFIGURED — nobody set MAP_PASSWORD. Closed, and says why. Staff are
@@ -1637,6 +1655,55 @@ def bulletin_month(month: int = Query(..., ge=1, le=MONTH_COUNT)):
     """
     acc = _require_access()
     return bulletin.month_page(month, acc)
+
+
+def _bulletin_month_default():
+    """The calendar month today, inside the programme's horizon."""
+    import datetime as _dt
+    mi = weeks.month_index_of(_dt.datetime.now(_dt.timezone.utc).date())
+    return max(1, min(MONTH_COUNT, mi))
+
+
+@app.get("/api/bulletin/month.pdf")
+def bulletin_month_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: Request = None):
+    """
+    12 Oct 2026 (C4, review §2.6, mockup 9) — the monthly bulletin as an A4 PDF, two pages, from
+    bulletin_doc.sheet(): the SAME view model the HTML page at /bulletin/ renders, which is
+    bulletin.month_page() formatted, so the PDF, the page and the JSON cannot disagree. Staff only
+    (D10): a valid code (the Dashboard's button sends it) or the staff cookie (the HTML page's
+    Download link sends only that). The map is Mapbox's static image, or the schematic when it
+    cannot be had; the tenant's demo notice is on every page. Stores nothing.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — a valid access code is required")
+    sheet = bulletin_doc.sheet(month, access.current())
+    try:
+        data = export.build_bulletin_pdf(sheet)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    y, m = weeks._month_of(month)
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="bulletin-{y}-{m:02d}.pdf"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/bulletin/")
+def bulletin_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), request: Request = None):
+    """
+    12 Oct 2026 (C4) — the monthly bulletin as an HTML page (GOV.UK: HTML first, the PDF
+    alongside), from the same view model as the PDF; one column on a phone, a print stylesheet.
+    Staff-gated like /help/: gate.scope_for() calls /bulletin "bulletin" and the middleware refuses
+    anything but a valid code or the STAFF cookie (the map password does not open it). The body
+    checks again, so the harnesses that stub the middleware see the same rule. No month: this
+    calendar month, inside the programme.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        return Response(content=_BULLETIN_SIGNIN_PAGE, status_code=401, media_type="text/html; charset=utf-8")
+    mi = month if month is not None else _bulletin_month_default()
+    return Response(content=bulletin_doc.html(bulletin_doc.sheet(mi, access.current())),
+                    media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
 # ------------------------------------------------------------------ public feed (map)
@@ -3270,7 +3337,7 @@ def demo_requests_csv(token: Optional[str] = None):
 # it is the public page. check_dir=False for the same reason as /brand below.
 app.mount("/landing", NoCacheStatic(directory=str(ROOT / "landing"), html=True, check_dir=False), name="landing")
 # 29 Sep 2026 — the Wayscope brand files (logos, favicon set, theme tokens) at /brand/.
-# Not gated: gate.scope_for() polices /map, /help and the map's data prefixes only, so a
+# Not gated: gate.scope_for() polices /map, /help, /bulletin and the map's data prefixes only, so a
 # refused visitor still sees the logo on the password page. Mounted before the "/" route.
 # check_dir=False: Starlette otherwise REFUSES TO BOOT when the folder is missing, which
 # would take the whole deployment down if the brand files were ever deployed separately

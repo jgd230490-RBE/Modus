@@ -2035,6 +2035,41 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && !/approved lines feed the route map|the KPI cards\."|forecasting dashboard and the public route map/.test(src));
 }
 
+// ---- 12 Oct 2026 (C4, map review §2.6, mockup 9) — the Monthly bulletin on the Dashboard -----------------
+// Source-level. What it proves: the menu sits on the Dashboard's working view (not the big screen), the PDF is
+// fetched from /api/bulletin/month.pdf with the month (the access code rides on the wrapped fetch), the page
+// link is /bulletin/?month=N in a new tab, the default month is the calendar month inside the programme, the
+// words meet the 14 px floor, and nothing is computed in the browser. Not covered here: the click and the
+// error line (dom_frontend.js), the server (test_bulletin.py, http_smoke.py), a real browser download.
+{
+  const bm = code.slice(code.indexOf("function BulletinMenu({ months })"), code.indexOf("function BulletinMenu({ months })") + 3200);
+  const bmc = bm.slice(0, bm.indexOf("\n}\n") + 3);
+  ok("⭐ BULLETIN: one BulletinMenu component, outside the Dashboard's own body (the carbon-target pins slice it), used ONCE, in the working view's actions",
+    bmc.length > 500 && (code.match(/<BulletinMenu months=\{months\} \/>/g) || []).length === 1
+    && _dbBody.includes("            <BulletinMenu months={months} />\n          </>}\n          <button type=\"button\" data-guide=\"dash-wall\"")
+    && !_dbBody.includes("function BulletinMenu(") && code.indexOf("function BulletinMenu(") > code.indexOf("function DashboardStockChart("));
+  ok("⭐ BULLETIN: the PDF is fetched from /api/bulletin/month.pdf for the chosen month and saved as bulletin-YYYY-MM.pdf",
+    bmc.includes("const r = await fetch(`${API}/bulletin/month.pdf?month=${m}`);") && bmc.includes("const blob = await r.blob();")
+    && bmc.includes('a.download = `bulletin-${months.start_year + Math.floor((m - 1) / 12)}-${String((m - 1) % 12 + 1).padStart(2, "0")}.pdf`;')
+    && bmc.includes("URL.revokeObjectURL(a.href)"));
+  ok("⭐ BULLETIN: the HTML page opens in a new tab at /bulletin/?month=N (the staff cookie opens it; no code in the address)",
+    bmc.includes('<a href={`/bulletin/?month=${m}`} target="_blank" rel="noopener">Open the page</a>') && !/access_code|X-Access-Code|code=/.test(bmc));
+  ok("BULLETIN: the month defaults to this calendar month, clamped to the programme; every month is offered by its label",
+    bmc.includes("const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));")
+    && bmc.includes("const [m, setM] = useState(cur);") && bmc.includes("monthLabelAbs(i, months.start_year)"));
+  ok("BULLETIN: a failed PDF says so under the button in the server's words, never silently",
+    bmc.includes('setErr("The bulletin could not be made: " + (e.message || e));') && bmc.includes('<div className="bm-err" role="alert">{err}</div>')
+    && bmc.includes('{busy ? "Making the bulletin…" : "Download the PDF"}'));
+  ok("🔴 BULLETIN: nothing is computed in the browser — no working-day divisor, no movements arithmetic, no team id",
+    !/working_days|\/ 22|vehicle_loads|two_way|IPT/.test(bmc));
+  ok("🔴 BULLETIN: the 14 px floor for the menu's words (its label, its link, its error line)",
+    /\.bulletin-menu label span\{font-size:14px;\}/.test(html) && /\.bulletin-menu \.row-menu-list a\{[^}]*font-size:14px;/.test(html)
+    && /\.bulletin-menu \.bm-err\{[^}]*font-size:14px;/.test(html));
+  ok("BULLETIN: the house words — lorry movements, never truck; none of the banned words in the menu",
+    bmc.includes("The month's lorry movements as a two-page PDF and a web page, from the approved plan")
+    && !/\btrucks?\b|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(bmc) && !/\bAI\b/.test(bmc));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

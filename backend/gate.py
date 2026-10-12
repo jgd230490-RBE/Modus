@@ -237,7 +237,10 @@ def downgrade_kwargs(token, now=None):
 
 
 def scope_for(path):
-    """"map", "help", or None for anything this gate does not police."""
+    """"map", "help", "bulletin", or None for anything this gate does not police.
+
+    12 Oct 2026 (C4): "bulletin" — the monthly bulletin's HTML page at /bulletin/. Staff only, the
+    same rule as the guide (D10): a valid code or the STAFF cookie, never the map password."""
     if not path:
         return None
     p = path.split("?", 1)[0].split("#", 1)[0]
@@ -247,6 +250,8 @@ def scope_for(path):
         return "map"
     if p == "/help" or p.startswith("/help/"):
         return "help"
+    if p == "/bulletin" or p.startswith("/bulletin/"):
+        return "bulletin"
     if p in OPEN_PATHS:
         return None
     for pref in MAP_DATA_PREFIXES:
@@ -274,7 +279,7 @@ def decide(path, has_valid_code=False, cookie=None, now=None):
     level = verify(cookie, now=now)
     if level == LEVEL_STAFF:
         return ALLOW
-    if scope == "help":
+    if scope in ("help", "bulletin"):       # staff only: the map cookie does not open these
         return NEED_STAFF
     if level == LEVEL_MAP:
         return ALLOW

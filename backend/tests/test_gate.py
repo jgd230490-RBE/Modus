@@ -120,6 +120,13 @@ for p in ("/", "/api/auth", "/api/map-auth", "/api/forecasts", "/api/costing/lin
           "/api/lookahead", "/mapping", "/helper", "/api/metadata"):
     ok(f"scope_for({p!r}) is ungated", gate.scope_for(p) is None,
        f"got {gate.scope_for(p)!r}")
+# 12 Oct 2026 (C4): the monthly bulletin's HTML page is the staff's, like the guide (D10)
+for p in ("/bulletin", "/bulletin/", "/bulletin/?month=10", "/bulletin/index.html"):
+    ok(f"⭐ scope_for({p!r}) is bulletin — the monthly bulletin is staff-only", gate.scope_for(p) == "bulletin",
+       repr(gate.scope_for(p)))
+ok("...while /bulletinx and the bulletin's API paths are not this gate's (the API bodies check staff themselves)",
+   gate.scope_for("/bulletinx") is None and gate.scope_for("/api/bulletin/month") is None
+   and gate.scope_for("/api/bulletin/month.pdf") is None and gate.is_document("/bulletin/"))
 ok("a path without a leading slash still resolves", gate.scope_for("map/index.html") == "map")
 ok("scope_for(None) and scope_for('') are safe",
    gate.scope_for(None) is None and gate.scope_for("") is None)
@@ -222,6 +229,13 @@ ok("help, no credential -> refused", gate.decide("/help/") == gate.NEED_STAFF)
 ok("help, STAFF cookie -> allowed", gate.decide("/help/", cookie=staff_c) == gate.ALLOW)
 ok("help, valid access code -> allowed",
    gate.decide("/help/", has_valid_code=True) == gate.ALLOW)
+# 12 Oct 2026 (C4): the bulletin, the same rule as the guide
+ok("🔴 bulletin, MAP cookie -> refused. The map password does not open the staff's monthly bulletin",
+   gate.decide("/bulletin/?month=10", cookie=map_c) == gate.NEED_STAFF)
+ok("🔴 bulletin, no credential -> refused", gate.decide("/bulletin/") == gate.NEED_STAFF)
+ok("⭐ bulletin, STAFF cookie -> allowed (the Dashboard's link opens it in a new tab with no header)",
+   gate.decide("/bulletin/?month=10", cookie=staff_c) == gate.ALLOW)
+ok("bulletin, valid access code -> allowed", gate.decide("/bulletin/", has_valid_code=True) == gate.ALLOW)
 
 # failing closed
 clean(password=None)
@@ -238,12 +252,16 @@ ok("⭐ ...but a signed-in staff member still gets the map with no password conf
 ok("...and help is unaffected by the map password being unset",
    gate.decide("/help/", has_valid_code=True) == gate.ALLOW
    and gate.decide("/help/") == gate.NEED_STAFF)
+ok("...and so is the bulletin: staff only, never UNCONFIGURED",
+   gate.decide("/bulletin/", has_valid_code=True) == gate.ALLOW and gate.decide("/bulletin/") == gate.NEED_STAFF)
 
 # the escape hatch
 clean(gate_on=False)
 ok("MAP_GATE=off reopens the map", gate.decide("/map/") == gate.ALLOW)
 ok("MAP_GATE=off reopens help too (documented: local development only)",
    gate.decide("/help/") == gate.ALLOW)
+ok("MAP_GATE=off reopens the bulletin page too (local development only; its body still checks staff)",
+   gate.decide("/bulletin/") == gate.ALLOW)
 for v in ("off", "OFF", "0", "false", "no"):
     env(MAP_GATE=v)
     ok(f"MAP_GATE={v!r} is off", not gate.gate_enabled())
