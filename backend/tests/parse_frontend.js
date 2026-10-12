@@ -2066,7 +2066,9 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     /\.bulletin-menu label span\{font-size:14px;\}/.test(html) && /\.bulletin-menu \.row-menu-list a\{[^}]*font-size:14px;/.test(html)
     && /\.bulletin-menu \.bm-err\{[^}]*font-size:14px;/.test(html));
   ok("BULLETIN: the house words — lorry movements, never truck; none of the banned words in the menu",
-    bmc.includes("The month's lorry movements as a two-page PDF and a web page, from the approved plan")
+    // NARROWED 12 Oct 2026 (browser check): the demo's October bulletin is THREE pages (19 routes), so the menu no
+    // longer promises two; the PDF is two pages or more (test_bulletin: "at least two A4 pages")
+    bmc.includes("The month's lorry movements as a PDF and a web page, from the approved plan") && !bmc.includes("two-page PDF")
     && !/\btrucks?\b|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(bmc) && !/\bAI\b/.test(bmc));
 }
 

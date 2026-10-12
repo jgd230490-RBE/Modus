@@ -2764,6 +2764,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            JSON.stringify(api.splitHitRowId("00525419-001|R002")) === '{"ev":"00525419-001","rid":"R002"}' && api.splitHitRowId("E9").rid === null);
         api.renderConditionsPill([{ src: "cap", lvl: "warn" }, { src: "cap", lvl: "warn" }]);
         ok("⭐ the pill's plural: '2 routes over planning flags' (it printed '2 over a planning flag')", pill().includes("2 routes over planning flags"), pill());
+        ok("browser check 12 Oct: each pill item is one unit, dot and words together, so the wrapping desktop pill never parts them",
+           (pill().match(/<span class="cond-part"><span class="cond-dot /g) || []).length === 1, pill());
         ASYNC_PINS.push((async () => {
           api.renderTimelineWarnings(10); await flush(); await flush();
           ok("⭐ one closure on two routes: two rows, each carrying its OWN route (E1|R2, E1|R5)",
@@ -3086,8 +3088,19 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /id: 'road-load-casing'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.forecastCasing,/.test(blkCode));
   ok("⭐ C1: ONE label per run with its OWN text expression ('N two-way / day · R routes'), never the per-route f_avg concat",
      blkCode.includes("const ROAD_LOAD_LABEL = ['concat', ['get', 'rl_mv_text'], ' two-way / day · ', ['get', 'rl_routes_text']];")
-     && /id: 'road-load-labels', type: 'symbol', source: 'road-load-source',[\s\S]{0,120}'symbol-placement': 'line-center', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14,/.test(blkCode)
+     // NARROWED 12 Oct 2026 (browser check): the label sits on its own point source, placed as a level point label;
+     // the line-placed version ('line-center' on road-load-source) never rendered on bent roads
+     && /id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,[\s\S]{0,120}'symbol-placement': 'point', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14,/.test(blkCode)
      && !/\['get', 'f_avg'\]/.test(blkCode));
+  ok("⭐ browser check 12 Oct: the run label is NOT placed along the line (Mapbox drops a line-placed label wherever the road bends past the text's angle)",
+     !/id: 'road-load-labels'[\s\S]{0,200}'symbol-placement': 'line/.test(blkCode)
+     && blkCode.includes("const ROAD_LOAD_LABEL_SOURCE = 'road-load-label-source';")
+     && blkCode.includes("if (!map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.addSource(ROAD_LOAD_LABEL_SOURCE, { type: 'geojson'")
+     && blkCode.includes("if (map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.removeSource(ROAD_LOAD_LABEL_SOURCE);")
+     && blkCode.includes("if (lsrc) lsrc.setData({ type: 'FeatureCollection', features: roadLoadLabelPoints(feats) });"));
+  ok("browser check 12 Oct: the run label keeps to one line (text-max-width 30 ems) and is never forced over other labels",
+     /id: 'road-load-labels'[\s\S]{0,300}'text-max-width': 30,/.test(blkCode)
+     && !/id: 'road-load-labels'[\s\S]{0,400}'text-allow-overlap': true/.test(blkCode));
   // the four count pins of review §2.2d, honoured (asserted above unchanged; these say WHY they still hold)
   ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
      (blkCode.match(/layout: \{ 'line-cap': 'round', 'line-join': 'round' \}/g) || []).length === 2
@@ -3163,9 +3176,48 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', paintRuns ? ROAD_LOAD_CARBON_LABEL : ROAD_LOAD_LABEL);"));
   ok("⭐ C1: the carbon legend is a stepped gradient with the note 'Approved plan only, average-laden factor on both legs, excludes N …'",
      blkCode.includes("'<div class=\"ml-steps\">' + CARBON_RAMP.map(c => '<i style=\"background:' + c + '\"></i>').join('') + '</div>'")
-     && blkCode.includes("'<div class=\"ml-foot\">Approved plan only, average-laden factor on both legs, excludes ' + miss + ' line' + (miss === 1 ? '' : 's') +")
+     // NARROWED 12 Oct 2026 (browser check): the excluded-line clause is written only when a line is excluded; the demo
+     // read "excludes 0 lines with no stored road route"
+     && blkCode.includes("'<div class=\"ml-foot\">Approved plan only, average-laden factor on both legs' +")
+     && blkCode.includes("(miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +")
+     && !blkCode.includes("on both legs, excludes ' + miss")
      // NARROWED 12 Oct 2026 (Track C review): the legend names the maximum used, route-month or section-month
-     && blkCode.includes("' with no stored road route. Stops are fixed from the programme\\'s largest ' + sc.what + ' ('"));
+     && blkCode.includes("'. Stops are fixed from the programme\\'s largest ' + sc.what + ' ('"));
+  ok("browser check 12 Oct: on the desktop bar the conditions pill wraps inside 300 px (at 1280 px it covered the last figure card by 91 px)",
+     /@media \(min-width:1024px\)\{ #kpi-conditions\{ flex-wrap:wrap; max-width:300px; flex-shrink:0;/.test(html)
+     && html.includes(".cond-part{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }")
+     && code.includes("const part = (lvl, n, noun) => (n ? `<span class=\"cond-part\"><span class=\"cond-dot ${lvl}\"></span>")
+     && code.includes("+ (c.cap ? `<span class=\"cond-part\"><span class=\"cond-dot warn\"></span>"));
+  ok("browser check 12 Oct: while the timeline bar is open the map's attribution (with the ONS / OS licence lines) rides above it on the desktop",
+     /@media \(min-width:768px\)\{\s*body\.timeline-on \.mapboxgl-ctrl-bottom-left, body\.timeline-on \.mapboxgl-ctrl-bottom-right\{ bottom:var\(--tl-foot, 0px\); \}/.test(html)
+     && code.includes("document.body.classList.toggle('timeline-on', open);")
+     && code.includes("const h = open ? Math.round((bar.offsetHeight || 0) + 18 + 8) : 0;")
+     && code.includes("window.addEventListener('resize', syncTimelineFoot);")
+     && (code.match(/bar\.style\.display='(flex|none)';\n        syncTimelineFoot\(\);/g) || []).length === 2);
+  ok("⭐ browser check 12 Oct (phone): the section click opens the sheet card on the phone shell and the map popup only above it",
+     code.includes("if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openRunCard === 'function') { openRunCard(run.id); return; }\n            new mapboxgl.Popup({ offset: 10, maxWidth: '360px' })")
+     && code.includes("box.innerHTML = String(SHEET.card).indexOf('run:') === 0 ? runCardHTML(String(SHEET.card).slice(4)) : routeCardHTML(SHEET.card);"));
+  ok("⭐ browser check 12 Oct (phone): a near-miss tap is answered — exact hits and other clickable layers keep their own click, then a section, then a route",
+     code.includes("if ((runL.length || routeL.length) && map.queryRenderedFeatures(e.point, { layers: runL.concat(routeL) }).length) return;")
+     && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;")
+     && /const runs = runL\.length \? map\.queryRenderedFeatures\(box, \{ layers: runL \}\) : \[\];\s*if \(runs\.length\) \{ openRunCard\(runs\[0\]\.properties\.id\); return; \}/.test(code)
+     && code.includes("if (map && typeof map.on === 'function') map.on('click', phoneTapNear);")
+     && /function phoneTapNear\(e\) \{\s*if \(!isPhoneShell\(\) \|\| !e \|\| !e\.point\) return;/.test(code));
+  {
+    const a = html.indexOf("#month-text{ width:100%; border-left:none; z-index:29; }");
+    const mq = a > 0 ? html.lastIndexOf("@media", a) : -1;
+    const blockCss = a > 0 ? html.slice(a, html.indexOf("\n        }", a)) : "";
+    ok("browser check 12 Oct (phone): the text view fits 390 px (number headings wrap, 4 px cell padding) and the Guide button gives way to its close button",
+       mq > 0 && /@media \(max-width:767px\)/.test(html.slice(mq, mq + 40))
+       && blockCss.includes("table.mt-table th, table.mt-table td{ padding:7px 4px; }")
+       && blockCss.includes("table.mt-table th.num{ white-space:normal; }")
+       && blockCss.includes(".mt-body{ padding:12px 14px 18px; }")
+       && blockCss.includes("body.month-text-open #guide-btn{ display:none; }"), html.slice(mq, mq + 40));
+  }
+  ok("browser check 12 Oct: a junction stub is drawn but not labelled (12 of 47 demo runs were 19 to 181 m)",
+     blkCode.includes("const ROAD_LOAD_LABEL_MIN_KM = 0.2;")
+     && blkCode.includes("properties: { id: r.id, rl_km: (r.length_km == null ? null : Number(r.length_km)),")
+     && blkCode.includes("return feats.filter(f => f.properties.rl_km == null || f.properties.rl_km >= ROAD_LOAD_LABEL_MIN_KM)"));
   ok("C1: f_co2 is stamped on BOTH legs (both colour) and the excluded-line count sums the routes the filters pass, once each",
      /src\._data\.features\.forEach\(f => \{[\s\S]{0,500}if \(f\.properties\.f_co2 !== c\) \{ f\.properties\.f_co2 = c; changed = true; \}/.test(blkCode)
      && !/f\.properties\.type === 'Inbound Highway'/.test(blkCode.slice(blkCode.indexOf("function stampCarbon"), blkCode.indexOf("function carbonMissingLines"))));
@@ -3229,7 +3281,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks",
         "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
-        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, ROAD_LOAD_CARBON_LABEL };")(
+        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, ROAD_LOAD_CARBON_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
@@ -3238,6 +3290,20 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null);
     } catch (e) { blkErr = e.message; }
     ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
+    if (blkApi) {
+      const mp = blkApi.runMidpoint;
+      const near = (a, b) => !!a && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
+      ok("browser check 12 Oct: runMidpoint is half way by LENGTH, not the middle vertex (a 3 + 1 run's middle sits on the long leg)",
+         near(mp([[0, 0], [0, 3], [0, 4]]), [0, 2]) && near(mp([[0, 0], [0, 1]]), [0, 0.5]) && near(mp([[5, 5]]), [5, 5])
+         && mp([]) === null && near(mp([[1, 1], [1, 1]]), [1, 1]));
+      ok("browser check 12 Oct: a figure above zero that rounds to nothing reads 'under 0.1 t', never '0 t'; a true zero stays '0 t'",
+         blkApi.fmtTonnes(0.018) === "under 0.1 t" && blkApi.fmtTonnes(0.049) === "under 0.1 t" && blkApi.fmtTonnes(0.05) === "0.1 t"
+         && blkApi.fmtTonnes(0) === "0 t" && blkApi.fmtTonnes(12.66) === "12.7 t" && blkApi.fmtTonnes(1234) === (1234).toLocaleString() + " t",
+         [0.018, 0.05, 0, 1234].map(blkApi.fmtTonnes).join(" | "));
+      const stub = km => ({ type: "Feature", geometry: { type: "LineString", coordinates: [[0, 0], [0, 1]] }, properties: { id: "x" + km, rl_km: km } });
+      ok("browser check 12 Oct: runs under 0.2 km get no label point; 0.2 km and over, and a run with no length from the server, do",
+         blkApi.roadLoadLabelPoints([stub(0.019), stub(0.199), stub(0.2), stub(3.1), stub(null)]).map(f => f.properties.id).join(",") === "x0.2,x3.1,xnull");
+    }
     if (blkApi) {
       const B = blkApi;
       // the stops
@@ -3299,6 +3365,15 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            JSON.stringify(fetches) === JSON.stringify(["/api/public/road-load?month=10"]) && !!fmap.layers["road-load-line"] && !!fmap.layers["road-load-casing"]
            && !!fmap.layers["road-load-labels"] && fmap.layers["forecast-labels"].layout.visibility === "none"
            && fmap.sources["road-load-source"]._data.features.length === 2, JSON.stringify(fetches));
+        {
+          const lp = fmap.sources["road-load-label-source"] ? fmap.sources["road-load-label-source"]._data.features : [];
+          ok("⭐ browser check 12 Oct: one label POINT per drawn run, at the run's middle by length, carrying the run's own figures",
+             lp.length === 2 && lp.every(f => f.geometry.type === "Point")
+             && Math.abs(lp[0].geometry.coordinates[0] - 1) < 1e-9 && Math.abs(lp[0].geometry.coordinates[1] - 1) < 1e-9
+             && Math.abs(lp[1].geometry.coordinates[0] - 0.5) < 1e-9 && Math.abs(lp[1].geometry.coordinates[1] - 0.5) < 1e-9
+             && lp[0].properties.rl_mv_text === "46" && lp[1].properties.rl_mv_text === "under 1"
+             && fmap.layers["road-load-labels"].spec.source === "road-load-label-source", JSON.stringify(lp.map(f => f.geometry.coordinates)));
+        }
         ok("C1: the card is wired once (click, enter, leave on road-load-line)",
            fmap.log.filter(x => x.startsWith("on:")).join(",") === "on:mouseenter:road-load-line,on:mouseleave:road-load-line,on:click:road-load-line");
         ok("C1: the legend says the month, the three width stops and the counting rule",
@@ -3316,6 +3391,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         passFilter = p => p.route_id === "R1"; B.refreshMapModeFilters();
         ok("C1: a filter change re-cuts the cached month with no fetch", fetches.length === 2 && fmap.sources["road-load-source"]._data.features.length === 1
            && fmap.sources["road-load-source"]._data.features[0].properties.rl_mv_text === "22");
+        ok("browser check 12 Oct: ...and the label points follow the same cut (one point, the filtered figure)",
+           fmap.sources["road-load-label-source"]._data.features.length === 1
+           && fmap.sources["road-load-label-source"]._data.features[0].properties.rl_mv_text === "22");
         passFilter = () => true; B.refreshMapModeFilters();
         // carbon on, with road load on: the runs are painted, the forecast routes stay blue
         el("toggle-carbon").checked = true; B.toggleCarbon(); await flush(); await flush();
@@ -3346,6 +3424,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("⭐ C1: Road load off, Carbon on: the road-load source and layers go, the FORECAST routes are painted by f_co2 at a fixed width",
            !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && fl["line-color"][2][1][1][1] === "f_co2" && fl["line-width"] === 5
            && fmap.layers["forecast-casing"].paint["line-width"] === 7.5);
+        ok("browser check 12 Oct: Road load off removes the label-point source too", !fmap.sources["road-load-label-source"] && !fmap.layers["road-load-labels"]);
         ok("⭐ C1: ...the route label switches to t CO₂e (its own layer on the loaded leg) and the per-route figure label stays hidden",
            !!fmap.layers["carbon-route-labels"] && JSON.stringify(fmap.layers["carbon-route-labels"].filter) === JSON.stringify(["all", ["all"], ["==", ["get", "type"], "Inbound Highway"]])
            && fmap.layers["forecast-labels"].layout.visibility === "none");
@@ -3626,7 +3705,7 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
       "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout",
       nb + "\nreturn { renderMonthChips, pickMonth, chipLabel, routeHoverView, runHoverView, encodeView, decodeView, monthParam, monthFromParam, layersFromChanges, shareUrl, writeView, currentView, VIEW, "
          + "qrGfMul, qrRsDivisor, qrRsRemainder, qrFormatBits, qrVersionBits, qrMatrix, qrSvg, qrDataCodewords, qrAlignPositions, concernAddress, concernMailto, renderConcernLinks, "
-         + "monthTableRows, routeFigures, condSummary, sheetTo, toggleSheet, SHEET, CHIPS };")(
+         + "monthTableRows, routeFigures, condSummary, sheetTo, toggleSheet, SHEET, CHIPS, openRunCard, runCardHTML, TAP_SLOP };")(
       document, window, TL, KPI, WARN, CONFIG, monthLabel, map, teamText, TENANT, fmtN, (km) => String(km), () => 'km', {},
       () => ({}), 21, () => [9, 12], () => Promise.resolve(TL.matrix), () => { calls.open++; TL.on = true; }, m => { calls.set.push(m); TL.month = m; },
       () => { calls.stop++; TL.playing = false; }, () => 9, () => {}, r => calls.sel.push(r), () => { calls.clear++; }, () => Promise.resolve(null),
@@ -3785,6 +3864,15 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        && byId['m-handle'].attrs['aria-label'] === 'Show less');
     api.toggleSheet();
     ok("...and a second tap lowers it to peek again", byId['m-sheet'].dataset.state === 'peek' && byId['m-handle'].attrs['aria-expanded'] === 'false');
+    api.openRunCard('S9');
+    ok("⭐ browser check 12 Oct (phone): a shared section's card opens IN THE SHEET at half, with a close button, never a map popup",
+       api.SHEET.card === 'run:S9' && byId['m-sheet'].dataset.state === 'half' && byId['m-card'].hidden === false && byId['m-main'].hidden === true
+       && byId['m-card'].innerHTML.includes('onclick="closeRouteCard()">Close the card</button>'), byId['m-card'].innerHTML.slice(0, 300));
+    ok("browser check 12 Oct (phone): ...and with no road-load month on screen it says so instead of an empty card",
+       byId['m-card'].innerHTML.includes('This shared road section is not on the map for the month on screen.'));
+    api.sheetTo('peek');
+    ok("browser check 12 Oct (phone): lowering the sheet to peek closes the section card like a route card", api.SHEET.card === null && byId['m-card'].hidden === true && byId['m-main'].hidden === false);
+    ok("browser check 12 Oct (phone): a tap looks 10 px round itself for a line", api.TAP_SLOP === 10);
     api.sheetTo('full');
     ok("C3 sheet: full opens the panel as the layers sheet; the Layers button reports it", sidebarOpen === true && api.SHEET.state === 'full'
        && byId['m-layers-btn'].attrs['aria-expanded'] === 'true' && byId['m-handle'].attrs['aria-expanded'] === 'true');

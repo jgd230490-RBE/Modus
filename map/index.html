@@ -158,6 +158,12 @@
                          color:var(--navy-deep); cursor:pointer; white-space:nowrap; }
         #kpi-conditions:hover{ border-color:#cbd5e1; }
         #kpi-conditions.on{ display:flex; }
+        .cond-part{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+        /* 12 Oct 2026 (browser check, 1280 px, sidebar open): with a planning-flag item the pill was 453 px wide and
+           covered the last figure card by 91 px. On the desktop bar its items wrap into rows inside a 300 px pill;
+           each dot stays with its words. */
+        @media (min-width:1024px){ #kpi-conditions{ flex-wrap:wrap; max-width:300px; flex-shrink:0; column-gap:12px; row-gap:2px;
+                                                   white-space:normal; border-radius:14px; padding:6px 12px; } }
         .cond-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
         .cond-dot.clash{ background:#C2321C; } .cond-dot.warn{ background:#D98A17; } .cond-dot.caution{ background:#8A94A3; }
         /* 2026-10-06 — the breakdown ("what is moving") lives in the SIDEBAR now, as plain
@@ -333,6 +339,12 @@
         /* Playable forecast timeline bar */
         #timeline-bar{ display:none; position:absolute; left:calc(50% + 150px); transform:translateX(-50%); bottom:18px; z-index:25; background:#fff; border:1px solid var(--line); border-radius:11px; box-shadow:0 8px 28px rgba(16,24,40,.16); padding:8px 12px; align-items:center; gap:11px; }
         body.sidebar-closed #timeline-bar{ left:50%; }
+        /* 12 Oct 2026 (browser check, 1280 px): with a council layer on, Mapbox's attribution wraps to two lines and the
+           first, the ONS / OS licence line, sat behind the timeline bar. While the bar is open the map's foot controls
+           ride above it (syncTimelineFoot measures the bar); the phone shell has its own rule (--m-sheet-h). */
+        @media (min-width:768px){
+            body.timeline-on .mapboxgl-ctrl-bottom-left, body.timeline-on .mapboxgl-ctrl-bottom-right{ bottom:var(--tl-foot, 0px); }
+        }
         /* the range is the only item allowed to give ground when the bar runs out of
            room — everything else is flex:0 0 auto, so nothing can be overlapped again */
         #timeline-bar input[type=range]{ width:250px; flex:1 1 250px; min-width:90px; accent-color:var(--navy); cursor:pointer; }
@@ -490,6 +502,12 @@
             .route-card dl{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:0 0 10px; }
             .route-card dt{ color:var(--muted); } .route-card dd{ margin:0; font-weight:600; text-align:right; }
             #month-text{ width:100%; border-left:none; z-index:29; }
+            /* 12 Oct 2026 (browser check, 390 px): the routes table was 366 px in a 337 px column, so the whole text view
+               scrolled sideways; and the Guide button (z 30) sat on the view's close button */
+            .mt-body{ padding:12px 14px 18px; }
+            table.mt-table th, table.mt-table td{ padding:7px 4px; }
+            table.mt-table th.num{ white-space:normal; }
+            body.month-text-open #guide-btn{ display:none; }
             #route-hover-card{ display:none !important; }
             body .guide-strip{ max-width:calc(100vw - 100px); }   /* clear of the 44 px zoom buttons on the right */
         }
@@ -5046,6 +5064,13 @@
     // when the programme's volume sits in one month.
     // Round caps and no dasharray: the route layers' butt caps and dash constants are counted by parse_map.js.
     const ROAD_LOAD_LAYERS = ['road-load-casing', 'road-load-line', 'road-load-labels'];
+    // 12 Oct 2026 (browser check): the run's label is a LEVEL point label at the middle of the run, on its own point
+    // source. A label placed along the line ('line-center') was dropped by Mapbox wherever the road bends more than the
+    // text's maximum angle, which on real roads was nearly every run: Road load drew, but no figure showed.
+    const ROAD_LOAD_LABEL_SOURCE = 'road-load-label-source';
+    //: a run shorter than this is drawn and has its card, but no label: on the demo 12 of 47 runs were junction stubs of
+    //: 19 to 181 m, each labelled as if it were a stretch of road
+    const ROAD_LOAD_LABEL_MIN_KM = 0.2;
     const CARBON_LABEL_LAYER = 'carbon-route-labels';
     //: two-way movements a day at which the road-load line reaches its three widths (fixed: one width, one volume)
     const ROAD_LOAD_STOPS = [5, 30, 120];
@@ -5118,7 +5143,12 @@
                 ['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]],
                 CARBON_NONE];
     }
-    function fmtTonnes(t){ return (t >= 100 ? Math.round(t).toLocaleString() : (Math.round(t * 10) / 10).toString()) + ' t'; }
+    // 12 Oct 2026 (browser check): a section of a few tens of metres carries a few kg, which rounded to "0 t CO2e"
+    // beside "82 two-way / day". A figure above zero that rounds to nothing says "under 0.1 t".
+    function fmtTonnes(t){
+        if (t > 0 && t < 0.05) return 'under 0.1 t';
+        return (t >= 100 ? Math.round(t).toLocaleString() : (Math.round(t * 10) / 10).toString()) + ' t';
+    }
     // the routes the sidebar filters let through, by id (the same routePassesFilters() the overlay and the bar use)
     function modeRoutesPassing(){
         const out = {};
@@ -5145,12 +5175,42 @@
                             : (known.length ? known.reduce((a, sh) => a + Number(sh.co2_t), 0) : null);
             const n = shares.length;
             feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords },
-                properties: { id: r.id, rl_mv: mv, rl_mv_text: (mv > 0 && mv < 1) ? 'under 1' : String(Math.round(mv)),
+                properties: { id: r.id, rl_km: (r.length_km == null ? null : Number(r.length_km)),
+                              rl_mv: mv, rl_mv_text: (mv > 0 && mv < 1) ? 'under 1' : String(Math.round(mv)),
                               rl_routes: n, rl_routes_text: n + (n === 1 ? ' route' : ' routes'),
                               rl_co2: (co2 == null ? null : Math.round(co2 * 10) / 10),
                               rl_co2_text: (co2 == null ? 'no carbon figure' : fmtTonnes(co2) + ' CO₂e') } });
         });
         return feats;
+    }
+    // the point half way along a run, by length (east-west scaled by the run's mean latitude; a run is a few km at most)
+    function runMidpoint(coords){
+        if (!coords || !coords.length) return null;
+        if (coords.length === 1) return coords[0];
+        const k = Math.cos((coords.reduce((a, c) => a + c[1], 0) / coords.length) * Math.PI / 180);
+        const seg = [];
+        let total = 0;
+        for (let i = 1; i < coords.length; i++) {
+            const d = Math.hypot((coords[i][0] - coords[i - 1][0]) * k, coords[i][1] - coords[i - 1][1]);
+            seg.push(d); total += d;
+        }
+        if (!(total > 0)) return coords[0];
+        let half = total / 2;
+        for (let i = 0; i < seg.length; i++) {
+            if (half <= seg[i]) {
+                const t = seg[i] > 0 ? half / seg[i] : 0;
+                return [coords[i][0] + t * (coords[i + 1][0] - coords[i][0]), coords[i][1] + t * (coords[i + 1][1] - coords[i][1])];
+            }
+            half -= seg[i];
+        }
+        return coords[coords.length - 1];
+    }
+    // one label point per drawn run of at least ROAD_LOAD_LABEL_MIN_KM (a run with no length from the server is labelled),
+    // carrying the run's own properties (so the label's text expression is unchanged)
+    function roadLoadLabelPoints(feats){
+        return feats.filter(f => f.properties.rl_km == null || f.properties.rl_km >= ROAD_LOAD_LABEL_MIN_KM)
+                    .map(f => ({ type: 'Feature', geometry: { type: 'Point', coordinates: runMidpoint(f.geometry.coordinates) }, properties: f.properties }))
+                    .filter(f => !!f.geometry.coordinates);
     }
     function fetchRoadLoad(m){
         if (RL.cache[m]) return Promise.resolve(RL.cache[m]);
@@ -5164,6 +5224,7 @@
     }
     function ensureRoadLoadLayers(){
         if (!map.getSource('road-load-source')) map.addSource('road-load-source', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        if (!map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.addSource(ROAD_LOAD_LABEL_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         if (map.getLayer('road-load-line')) return;
         map.addLayer({ id: 'road-load-casing', type: 'line', source: 'road-load-source',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
@@ -5171,8 +5232,9 @@
         map.addLayer({ id: 'road-load-line', type: 'line', source: 'road-load-source',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: { 'line-color': CONFIG.COLORS.brand, 'line-width': ROAD_LOAD_LINE_WIDTH, 'line-opacity': 0.95 } });
-        map.addLayer({ id: 'road-load-labels', type: 'symbol', source: 'road-load-source',
-            layout: { 'symbol-placement': 'line-center', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14, 'text-offset': [0, -1.2] },
+        map.addLayer({ id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,
+            layout: { 'symbol-placement': 'point', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14, 'text-anchor': 'bottom', 'text-offset': [0, -0.8],
+                      'text-max-width': 30, 'text-padding': 4 },
             paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
         wireRoadLoadPopup();
         raiseMarks();
@@ -5180,12 +5242,15 @@
     function removeRoadLoadLayers(){
         ROAD_LOAD_LAYERS.slice().reverse().forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
         if (map.getSource('road-load-source')) map.removeSource('road-load-source');
+        if (map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.removeSource(ROAD_LOAD_LABEL_SOURCE);
     }
     function drawRoadLoad(m){
         ensureRoadLoadLayers();
         const data = RL.cache[m];
-        const src = map.getSource('road-load-source');
-        if (src) src.setData({ type: 'FeatureCollection', features: data ? roadLoadFeatures(data, modeRoutesPassing()) : [] });
+        const src = map.getSource('road-load-source'), lsrc = map.getSource(ROAD_LOAD_LABEL_SOURCE);
+        const feats = data ? roadLoadFeatures(data, modeRoutesPassing()) : [];
+        if (src) src.setData({ type: 'FeatureCollection', features: feats });
+        if (lsrc) lsrc.setData({ type: 'FeatureCollection', features: roadLoadLabelPoints(feats) });
     }
     function ensureCarbonLabelLayer(){
         if (map.getLayer(CARBON_LABEL_LAYER) || !map.getSource('routes-source')) return;
@@ -5287,8 +5352,9 @@
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
                         ranges.map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
                         '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>No stored road route · no figure</div>' +
-                        '<div class="ml-foot">Approved plan only, average-laden factor on both legs, excludes ' + miss + ' line' + (miss === 1 ? '' : 's') +
-                        ' with no stored road route. Stops are fixed from the programme\'s largest ' + sc.what + ' (' + fmtTonnes(sc.max || 0) + '), so a colour means the same tonnes in every month.' +
+                        '<div class="ml-foot">Approved plan only, average-laden factor on both legs' +
+                        (miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +
+                        '. Stops are fixed from the programme\'s largest ' + sc.what + ' (' + fmtTonnes(sc.max || 0) + '), so a colour means the same tonnes in every month.' +
                         (rl ? ' A section carries each route\'s month CO₂e × the section\'s length ÷ that route\'s two-way length.' : '') +
                         (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '') + '</div>';
                 }
@@ -5395,6 +5461,9 @@
             const id = e.features[0].properties.id;
             const run = ((RL.cache[RL.month] || {}).runs || []).find(r => String(r.id) === String(id));
             if (!run) return;
+            // 12 Oct 2026 (browser check, phone): on the phone shell the card opens in the sheet, as a route's does; a map
+            // popup there was cut off by the sheet and the screen edge
+            if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openRunCard === 'function') { openRunCard(run.id); return; }
             new mapboxgl.Popup({ offset: 10, maxWidth: '360px' }).setLngLat(e.lngLat)
                 .setHTML(roadLoadPopupHTML(run, RL.month, modeRoutesPassing())).addTo(map);
         });
@@ -5627,6 +5696,7 @@
         TL.on=true;
         const cb=document.getElementById('toggle-forecast'); if(cb) cb.checked=false;
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='flex';
+        syncTimelineFoot();
         const rng=document.getElementById('tl-range'); if(rng) rng.max=CONFIG.MONTH_COUNT;
         const sel=document.getElementById('tl-speed'); if(sel) sel.value=String(TL.speed);
         const fl=document.getElementById('tl-full'); if(fl) fl.checked=TL.full;
@@ -5642,6 +5712,7 @@
         stopTimeline(); TL.on=false;
         renderTimelineWarnings(null);      // §8: no month on screen, no warnings
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='none';
+        syncTimelineFoot();
         const src=map.getSource('routes-source');
         if(src){ const d=src._data; d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
         // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
@@ -5884,6 +5955,17 @@
         box.style.maxHeight = Math.max(120, floor - (Math.round(kpi.getBoundingClientRect().bottom) + 8)) + 'px';
     }
     window.addEventListener('resize', positionWarnStack);
+    // 12 Oct 2026 (browser check): while the timeline bar is open, the map's foot controls (Mapbox's logo and the
+    // attribution, with the ONS / OS licence lines of a council layer) sit above it: body.timeline-on and --tl-foot,
+    // the bar's height plus its 18 px offset and an 8 px gap. Read by CSS from 768 px up only.
+    function syncTimelineFoot(){
+        const bar = document.getElementById('timeline-bar');
+        const open = !!(bar && bar.style.display === 'flex');
+        document.body.classList.toggle('timeline-on', open);
+        const h = open ? Math.round((bar.offsetHeight || 0) + 18 + 8) : 0;
+        try { document.documentElement.style.setProperty('--tl-foot', h + 'px'); } catch (e) {}
+    }
+    window.addEventListener('resize', syncTimelineFoot);
     // 11 Oct: and whenever the bar itself changes height (cards filling in, labels wrapping, the window narrowing)
     try { new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud')); } catch (e) {}
     setTimeout(positionWarnStack, 1200);   // and once after first paint, for a browser that has not laid out yet
@@ -5896,10 +5978,10 @@
         live.forEach(i => { const k = i.src === 'cap' ? 'cap' : i.lvl; c[k] = (c[k] || 0) + 1; });
         WARN.counts = c;
         if (!live.length) { pill.classList.remove('on'); pill.innerHTML = ''; return; }
-        const part = (lvl, n, noun) => (n ? `<span class="cond-dot ${lvl}"></span><span>${n} ${noun}${n === 1 ? '' : 's'}</span>` : '');
+        const part = (lvl, n, noun) => (n ? `<span class="cond-part"><span class="cond-dot ${lvl}"></span><span>${n} ${noun}${n === 1 ? '' : 's'}</span></span>` : '');
         pill.innerHTML = part('clash', c.clash, 'over capacity').replace(/capacitys/, 'capacity')
             + part('warn', c.warn, 'route limit')
-            + (c.cap ? `<span class="cond-dot warn"></span><span>${c.cap === 1 ? '1 route over a planning flag' : c.cap + ' routes over planning flags'}</span>` : '')
+            + (c.cap ? `<span class="cond-part"><span class="cond-dot warn"></span><span>${c.cap === 1 ? '1 route over a planning flag' : c.cap + ' routes over planning flags'}</span></span>` : '')
             + part('caution', c.caution, 'seasonal window')
             + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6470" stroke-width="2" aria-hidden="true"><path d="${WARN.open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}"></path></svg>`;
         pill.classList.add('on');
@@ -6847,7 +6929,7 @@
         const box = document.getElementById('m-card'), main = document.getElementById('m-main');
         if (!box || !main) return;
         if (!SHEET.card) { box.hidden = true; box.innerHTML = ''; main.hidden = false; return; }
-        box.innerHTML = routeCardHTML(SHEET.card);
+        box.innerHTML = String(SHEET.card).indexOf('run:') === 0 ? runCardHTML(String(SHEET.card).slice(4)) : routeCardHTML(SHEET.card);
         box.hidden = false; main.hidden = true;
     }
     function openRouteCard(rid) {
@@ -6864,6 +6946,42 @@
         renderRouteCard();
         if (typeof clearSelection === 'function') clearSelection();
     }
+    // 12 Oct 2026 (browser check, phone): a shared road section's card opens in the sheet too (SHEET.card 'run:<id>'),
+    // with the section's figures for the month on screen; the desktop keeps its map popup
+    function runCardHTML(id) {
+        const m = (typeof RL !== 'undefined') ? RL.month : null;
+        const run = m ? (((RL.cache || {})[m] || {}).runs || []).find(r => String(r.id) === String(id)) : null;
+        return (run && typeof roadLoadPopupHTML === 'function'
+                    ? roadLoadPopupHTML(run, m, typeof modeRoutesPassing === 'function' ? modeRoutesPassing() : null)
+                    : '<p class="mt-note">This shared road section is not on the map for the month on screen.</p>')
+             + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the card</button>';
+    }
+    function openRunCard(id) {
+        if (id == null || id === '') return;
+        SHEET.card = 'run:' + id;
+        renderRouteCard();
+        if (SHEET.state !== 'half') sheetTo('half');
+    }
+    // 12 Oct 2026 (browser check, phone): a finger lands a few px off a 4 to 8 px line and a layer's own click needs the
+    // exact pixel, so a tap 6 px off a shared section opened nothing. On the phone shell a tap that hits no line and
+    // nothing else clickable looks TAP_SLOP px round it: a shared section first, then a route.
+    const TAP_SLOP = 10;
+    function phoneTapNear(e) {
+        if (!isPhoneShell() || !e || !e.point) return;
+        const has = l => !!map.getLayer(l);
+        const runL = ['road-load-line'].filter(has), routeL = ['forecast-layer', 'inbound-lines', 'outbound-lines'].filter(has);
+        try {
+            if ((runL.length || routeL.length) && map.queryRenderedFeatures(e.point, { layers: runL.concat(routeL) }).length) return;   // the layer's own click answers
+            if (typeof clickableAt === 'function' && clickableAt(e.point)) return;
+            const box = [[e.point.x - TAP_SLOP, e.point.y - TAP_SLOP], [e.point.x + TAP_SLOP, e.point.y + TAP_SLOP]];
+            const runs = runL.length ? map.queryRenderedFeatures(box, { layers: runL }) : [];
+            if (runs.length) { openRunCard(runs[0].properties.id); return; }
+            const routes = routeL.length ? map.queryRenderedFeatures(box, { layers: routeL }) : [];
+            const rid = routes.length && routes[0].properties ? routes[0].properties.route_id : null;
+            if (rid) openRouteCard(rid);
+        } catch (err) {}
+    }
+    if (map && typeof map.on === 'function') map.on('click', phoneTapNear);
 
     // ---------------------------------------------------------------- wiring
     let _soon = null;

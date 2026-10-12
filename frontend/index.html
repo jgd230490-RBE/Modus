@@ -1555,7 +1555,7 @@ function BulletinMenu({ months }){
   return (
     <details className="row-menu bulletin-menu">
       <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}
-               title="The month's lorry movements as a two-page PDF and a web page, from the approved plan">Monthly bulletin ▾</summary>
+               title="The month's lorry movements as a PDF and a web page, from the approved plan">Monthly bulletin ▾</summary>
       <div className="row-menu-list dash-filters">
         <label><span>Month</span><select value={m} onChange={e => setM(+e.target.value)} aria-label="Bulletin month">
           {Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select></label>
