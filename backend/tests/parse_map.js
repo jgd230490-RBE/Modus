@@ -4486,6 +4486,167 @@ function qrRead(mod) {
   }
 }
 
+// ---- 13 Oct 2026 (the user): PRESET VIEWS at the top of the panel ------------------------------------------------------
+{
+  const nb = newBlockSrc(), nbc = newBlockCode();
+  ok("⭐ presets: a 'Views' group is the FIRST group of the panel (above Route filtering), its buttons built by renderPresets()",
+     html.includes('<div class="control-group" id="preset-group">\n        <h3>Views</h3>\n        <div class="preset-views" id="preset-views" role="group" aria-label="Preset views"></div>')
+     && html.indexOf('id="preset-group"') < html.indexOf('<h3>Route filtering</h3>') && html.indexOf('id="preset-group"') > html.indexOf('id="main-sidebar"'));
+  ok("⭐ presets: the six views, in the user's order and words",
+     nbc.includes("{ key: 'councils-movements', label: 'Councils: movements', council: 'movements' },\n        { key: 'councils-carbon', label: 'Councils: carbon', council: 'carbon' },\n        { key: 'busiest-roads', label: 'Busiest roads', heat: 'volume' },\n        { key: 'route-carbon', label: 'Route carbon', heat: 'carbon' },\n        { key: 'closures', label: 'Closures and restrictions', closures: true },\n        { key: 'everything', label: 'Everything' },"));
+  ok("⭐ presets: a view outside the council view LEAVES it first (its restore would fight the boxes), sets the boxes, then the heat map",
+     /if \(typeof leaveCouncilView === 'function'\) leaveCouncilView\(\);\s*const want = presetLayers\(p\);\s*layerBoxes\(\)\.filter\(cb => !HEAT_RADIO_IDS\.includes\(cb\.id\)\)\.forEach\(cb => flip\(cb, want\.has\(layerKey\(cb\.id\)\)\)\);\s*const radio = /.test(nbc));
+  ok("presets: every box a view changes dispatches 'change' (its own handler and the link listener run as for a click)",
+     nbc.includes("const flip = (cb, v) => { if (cb && !!cb.checked !== v) { cb.checked = v; cb.dispatchEvent(new Event('change', { bubbles: true })); } };")
+     && nbc.includes("radio.checked = true; radio.dispatchEvent(new Event('change', { bubbles: true }));"));
+  ok("presets: a council view sets the colouring BEFORE ticking the boxes; council views are left out when the tenant has no council areas",
+     /setAreaMode\(p\.council\);\s*flip\(document\.getElementById\('layer-areas-district'\), true\);\s*flip\(document\.getElementById\('layer-areas-county'\), true\);/.test(nbc)
+     && nbc.includes("const list = PRESETS.filter(p => !p.council || presetCouncilAvailable());"));
+  ok("⭐ presets: the phone gets them in the Layers sheet (the panel is the sheet) at 48 px, and picking one lowers the sheet",
+     html.includes(".preset-chip{ min-height:48px; padding:0 14px; }")
+     && nbc.includes("if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof closeLayersSheet === 'function') closeLayersSheet();"));
+  ok("⭐ presets link: the council colouring travels as &council=carbon (only while By council is on), and is read back before the boxes are ticked",
+     nbc.includes("if (v.council === 'carbon') q.set('council', 'carbon');")
+     && nbc.includes("council: q.get('council') === 'carbon' ? 'carbon' : null };")
+     && nbc.includes("council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null };")
+     && /if \(v\.council === 'carbon' && typeof AREAS !== 'undefined'\) AREAS\.mode = 'carbon';\s*if \(v\.layers\) \{/.test(nbc)
+     && code.includes("if (typeof scheduleViewWrite === 'function') scheduleViewWrite();\n        if (typeof schedulePresetRender === 'function') schedulePresetRender();\n    }"));
+  ok("presets: the banned public words are not in the preset labels or note",
+     !/\b(optimi[sz]e|predict|real-time|AI|secure|live tracking)\b/i.test(cut0(html, 'id="preset-group"', '</div>\n\n') + cut0(nb, 'const PRESETS = [', '];')));
+
+  // the sandbox: the last block against a fake DOM whose boxes behave as the page's (radio group, the council view's
+  // contract: the first council box unticks the others and remembers them, leaving ticks them back, the heat map goes Off)
+  const byId = {}, order = [];
+  const evs = [];
+  const mk = (id, checked, type) => { const el = { id, type: type || 'checkbox', checked: !!checked, hidden: false, innerHTML: '', textContent: '', value: '', style: {}, dataset: {}, attrs: {},
+      options: [], selectedIndex: 0, setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; }, focus() {}, addEventListener() {},
+      querySelector() { return null; }, querySelectorAll() { return []; }, getBoundingClientRect() { return { left: 0, top: 0, width: 300, height: 100, right: 300, bottom: 100 }; },
+      dispatchEvent(e) { evs.push(id); onChange(el); return true; } };
+    byId[id] = el; return el; };
+  // the page's boxes (defaults as shipped: the closures' box off, the council boxes off)
+  [['layer-alignment', 1], ['layer-ws-bounds', 1], ['layer-chainage', 0], ['layer-nodes', 1], ['layer-gates', 1], ['layer-zones', 1], ['layer-zone-closure', 1],
+   ['layer-zone-works', 1], ['layer-rail', 1], ['layer-inbound', 1], ['layer-outbound', 1], ['layer-temp', 1], ['layer-alts', 0],
+   ['layer-areas-district', 0], ['layer-areas-county', 0], ['restr-nh_closures', 0]].forEach(([id, on]) => order.push(mk(id, on)));
+  const heatOff = mk('heat-off', 1, 'radio'), rl = mk('toggle-road-load', 0, 'radio'), co = mk('toggle-carbon', 0, 'radio'), fc = mk('toggle-forecast', 0);
+  ['preset-views', 'council-group', 'm-sheet', 'filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt', 'layers-box', 'sidebar-close', 'toggle-x'].forEach(id => mk(id, 0, 'div'));
+  ['filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt'].forEach(id => { byId[id].value = 'ALL'; byId[id].options = [{ value: 'ALL', textContent: 'All' }]; });
+  const COUNCIL = { saved: null }, calls = { leave: 0, timeline: 0, sheet: 0 };
+  const AREAS = { mode: 'movements' };
+  const councilOn = () => byId['layer-areas-district'].checked || byId['layer-areas-county'].checked;
+  const others = () => order.filter(b => /^(layer-|restr-)/.test(b.id) && !/^layer-(areas|zone)-/.test(b.id));
+  function onChange(el) {
+    if (el.type === 'radio' && el.checked) [heatOff, rl, co].forEach(r => { if (r !== el) r.checked = false; });
+    if (/^layer-areas-/.test(el.id)) {           // the council view's contract (toggleAreaTier + councilSolo)
+      if (councilOn() && COUNCIL.saved === null) { COUNCIL.saved = others().filter(b => b.checked).map(b => b.id); others().forEach(b => { if (b.checked) { b.checked = false; b.dispatchEvent({}); } }); }
+      else if (!councilOn() && COUNCIL.saved !== null) { const ids = COUNCIL.saved; COUNCIL.saved = null; ids.forEach(i => { if (!byId[i].checked) { byId[i].checked = true; byId[i].dispatchEvent({}); } }); }
+      if (el.checked) { heatOff.checked = true; rl.checked = false; co.checked = false; }
+    }
+    if ((el === rl || el === co) && el.checked) calls.timeline++;
+  }
+  const fakeGlobals = {
+    AREAS, councilFocus: councilOn, heatMode: () => rl.checked ? 'volume' : co.checked ? 'carbon' : null,
+    leaveCouncilView: () => { calls.leave++; if (!councilOn()) return; byId['layer-areas-district'].checked = false; byId['layer-areas-county'].checked = false; onChange(byId['layer-areas-district']); },
+    setAreaMode: m => { AREAS.mode = m === 'carbon' ? 'carbon' : 'movements'; }, closeLayersSheet: () => { calls.sheet++; }, Event: function (t) { this.type = t; },
+  };
+  const savedGlobals = {}; Object.keys(fakeGlobals).forEach(k => { savedGlobals[k] = globalThis[k]; });
+  Object.assign(globalThis, fakeGlobals);
+  const document = {
+    getElementById: id => byId[id] || null,
+    querySelectorAll: s => /layer-|restr-|toggle-/.test(s) ? order.concat([rl, co, fc]).filter(b => /layer-|restr-/.test(s) && /^(layer-|restr-)/.test(b.id) || ['toggle-road-load', 'toggle-carbon', 'toggle-forecast'].includes(b.id)) : [],
+    addEventListener() {}, createElement: () => mk('x' + Math.random(), 0, 'div'), body: { appendChild() {}, classList: { add() {}, remove() {}, toggle() {} } }, activeElement: null,
+  };
+  const TL = { on: false, playing: false, month: 10, matrix: null };
+  const location = { origin: 'https://app.wayscope.test', pathname: '/map/', search: '', hash: '' };
+  const history = { replaceState(s, t, u) { const q = u.indexOf('?'); location.search = q >= 0 ? u.slice(q) : ''; } };
+  let phone = false, sheetOpen = false;
+  const window = { matchMedia: () => ({ matches: phone, addEventListener() {} }), innerWidth: 1280, innerHeight: 800 };
+  const map = { touchPitch: { disable() {}, enable() {} }, dragRotate: { disable() {}, enable() {} }, setFeatureState() {}, getContainer: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0 }) }), resize() {}, on() {} };
+  let P = null, err = '';
+  try {
+    P = new Function("document", "window", "TL", "KPI", "WARN", "CONFIG", "monthLabel", "map", "teamText", "TENANT", "fmtN", "fmtDist", "DU", "ROUTEINFO",
+      "routePropsById", "FORECAST_WORKING_DAYS", "forecastWindow", "ensureTimelineMatrix", "openTimeline", "setTimelineMonth", "stopTimeline", "tlStartMonth",
+      "applyFilters", "selectRoute", "clearSelection", "kpiFetchMonth", "sidebarIsOpen", "toggleSidebar", "closeSidebar", "isPhoneShell", "PHONE_SHELL_MQ",
+      "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout",
+      nb + "\nreturn { PRESETS, PRESET, applyPreset, renderPresets, presetMatches, presetLayers, VIEW, layersOn, currentView, encodeView, decodeView, writeView, applyViewFromUrl };")(
+      document, window, TL, { cache: {} }, { counts: {}, live: [] }, { MONTH_COUNT: 60, START_YEAR: 2026, API_BASE: '' }, m => 'Oct 2026', map, v => v, { name: 'Wolds Link (fictional)' },
+      n => String(n), km => String(km), () => 'km', {}, () => ({}), 21, () => [9, 12], () => Promise.resolve(null), () => {}, () => {}, () => {}, () => 9,
+      () => {}, () => {}, () => {}, () => Promise.resolve(null), () => sheetOpen, () => { calls.sheet++; sheetOpen = !sheetOpen; }, () => {}, () => phone, '(max-width:767px)',
+      location, history, {}, () => 0, undefined, () => 0, () => {});
+  } catch (e) { err = String(e && e.stack || e); }
+  ok("presets (sandbox): the last block runs against a fake DOM with the page's boxes", !!P, err.slice(0, 400));
+  if (P) {
+    const on = () => order.concat([fc]).filter(b => b.checked).map(b => b.id.replace(/^layer-/, '').replace(/^toggle-/, '')).sort().join(',');
+    const pressed = () => [...byId['preset-views'].innerHTML.matchAll(/data-preset="([^"]+)" aria-pressed="true"/g)].map(m => m[1]).join(',');
+    const DEF = on();
+    P.VIEW.ready = true;
+    ok("presets (sandbox): the defaults are read from the boxes as shipped (no council box, no closures, no forecast)", P.VIEW.defaults.join(',') === DEF && !/areas|restr|forecast/.test(DEF), P.VIEW.defaults.join(','));
+    // no council areas loaded: the group is hidden, so the two council views are not offered
+    byId['council-group'].hidden = true; P.renderPresets();
+    ok("⭐ presets (sandbox): with no council areas the council views are not offered; the four others are",
+       [...byId['preset-views'].innerHTML.matchAll(/data-preset="([^"]+)"/g)].map(m => m[1]).join(',') === 'busiest-roads,route-carbon,closures,everything'
+       && byId['preset-views'].innerHTML.includes('>Closures and restrictions</button>'), byId['preset-views'].innerHTML.slice(0, 300));
+    P.applyPreset('councils-carbon');
+    ok("presets (sandbox): ...and a council view asked for anyway does nothing", !byId['layer-areas-district'].checked && on() === DEF);
+    byId['council-group'].hidden = false;
+    // 1. Busiest roads
+    P.applyPreset('busiest-roads');
+    ok("⭐ presets (sandbox) Busiest roads: Volume picked (Off and Carbon not), the forecast routes on, the page's layers as shipped, the timeline asked for",
+       rl.checked && !co.checked && !heatOff.checked && fc.checked && on() === [DEF, 'forecast'].join(',').split(',').sort().join(',') && calls.timeline === 1, on());
+    P.writeView();
+    ok("⭐ presets (sandbox) Busiest roads: the link carries it (layers=forecast.road-load), and the button shows pressed",
+       /layers=forecast\.road-load(&|$)/.test(location.search) && pressed() === 'busiest-roads', location.search + ' / ' + pressed());
+    // 2. Route carbon
+    P.applyPreset('route-carbon');
+    P.writeView();
+    ok("⭐ presets (sandbox) Route carbon: Carbon picked, Volume let go, link layers=carbon.forecast, only it pressed",
+       co.checked && !rl.checked && !heatOff.checked && /layers=carbon\.forecast(&|$)/.test(location.search) && pressed() === 'route-carbon', location.search + ' / ' + pressed());
+    // 3. Councils: carbon (from a heat map)
+    byId['layer-chainage'].checked = true;         // a box ticked by hand before: the council view remembers it
+    P.applyPreset('councils-carbon');
+    ok("⭐ presets (sandbox) Councils: carbon: the colouring is carbon, both council boxes ticked, every other layer off, the heat map Off",
+       AREAS.mode === 'carbon' && byId['layer-areas-district'].checked && byId['layer-areas-county'].checked && others().every(b => !b.checked)
+       && heatOff.checked && !co.checked && !rl.checked, on());
+    P.writeView();
+    ok("⭐ presets (sandbox) Councils: carbon: the link carries &council=carbon and the council boxes; only it pressed",
+       /council=carbon/.test(location.search) && /areas-county\.areas-district/.test(location.search) && pressed() === 'councils-carbon', location.search + ' / ' + pressed());
+    // 4. Councils: movements (council to council: only the colouring changes)
+    const evBefore = evs.length;
+    P.applyPreset('councils-movements'); P.writeView();
+    ok("presets (sandbox) Councils: movements from Councils: carbon: only the colouring changes (no box flipped), the link drops council=carbon",
+       AREAS.mode === 'movements' && evs.length === evBefore && !/council=/.test(location.search) && pressed() === 'councils-movements', location.search);
+    // 5. Closures, leaving the council view: the remembered boxes come back first, then the view's own set
+    const leaves = calls.leave;
+    P.applyPreset('closures');
+    ok("⭐ presets (sandbox) Closures and restrictions: leaves the council view, the National Highways closures box and every zone kind on, the heat map Off, chainage (ticked by hand earlier) off again",
+       calls.leave === leaves + 1 && !councilOn() && byId['restr-nh_closures'].checked && byId['layer-zones'].checked && byId['layer-zone-closure'].checked
+       && heatOff.checked && !rl.checked && !co.checked && !byId['layer-chainage'].checked && fc.checked && COUNCIL.saved === null, on());
+    P.writeView();
+    ok("presets (sandbox) Closures: the link carries the closures box; only it pressed", /restr-nh_closures/.test(location.search) && pressed() === 'closures', location.search + ' / ' + pressed());
+    // 6. Everything
+    P.applyPreset('everything'); P.writeView();
+    ok("⭐ presets (sandbox) Everything: the page's layers as shipped with the forecast routes; closures off, heat map Off, no council",
+       on() === [DEF, 'forecast'].join(',').split(',').sort().join(',') && heatOff.checked && !councilOn() && location.search === '?layers=forecast' && pressed() === 'everything', location.search + ' ' + on());
+    // a box changed by hand: the map no longer matches any view, no button pressed
+    byId['layer-gates'].checked = false; P.renderPresets();
+    ok("presets (sandbox): a box changed by hand afterwards: no view shows pressed", pressed() === '');
+    // the link read back: a shared Councils: carbon view opens coloured by carbon
+    AREAS.mode = 'movements';
+    location.search = '?layers=areas-county.areas-district&council=carbon';
+    P.applyViewFromUrl();
+    ok("⭐ presets link (sandbox): a shared Councils: carbon link opens with the districts coloured by carbon and the council boxes ticked",
+       AREAS.mode === 'carbon' && byId['layer-areas-district'].checked && byId['layer-areas-county'].checked);
+    ok("presets link: decode keeps only council=carbon (anything else is the default colouring)",
+       P.decodeView('?council=carbon').council === 'carbon' && P.decodeView('?council=x').council === null && P.decodeView('').council === null
+       && P.encodeView({ month: null, layers: [], filters: {}, council: 'movements' }, []) === '');
+    // a phone: the sheet goes down after a pick
+    sheetOpen = true; P.applyPreset('everything');
+    ok("presets (sandbox): on the desktop a pick leaves the panel open", sheetOpen === true && calls.sheet === 0);
+    phone = true; P.applyPreset('busiest-roads'); phone = false;
+    ok("⭐ presets (sandbox): on the phone shell a pick lowers the Layers sheet (the panel closes, the map shows)", sheetOpen === false && calls.sheet === 1);
+  }
+  Object.keys(fakeGlobals).forEach(k => { if (savedGlobals[k] === undefined) delete globalThis[k]; else globalThis[k] = savedGlobals[k]; });
+}
+
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
