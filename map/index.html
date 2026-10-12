@@ -810,6 +810,7 @@
         <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:2px;"></span></div>
         <div class="area-county-fig" id="area-county-fig"></div>
         <div class="area-note" id="area-unitary-note"></div>
+        <div class="area-note" id="area-focus-note" hidden>While By council is on, the routes with lorries this month are drawn thin and grey, the road network is hidden and the heat map is off, so the councils read by themselves.</div>
         <div class="area-note" id="area-when"></div>
         <div class="area-note" id="area-notes"></div>
         <div class="area-note" id="area-attribution"></div>
@@ -4089,6 +4090,8 @@
         const unitary = j.areas.filter(a => a.tier === 'district' && a.highway_authority && countyHA.size && !countyHA.has(a.highway_authority)).map(a => a.name);
         const un = document.getElementById('area-unitary-note');
         if (un) un.textContent = unitary.length ? unitary.join(' and ') + (unitary.length === 1 ? ' is' : ' are') + ' unitary: there the district is the highway authority.' : '';
+        const fn = document.getElementById('area-focus-note');
+        if (fn) fn.hidden = !(areaTierOn('district') || areaTierOn('county'));
         const at = document.getElementById('area-attribution');
         if (at) at.textContent = (j.attribution || []).join(' · ');
         const st = document.getElementById('area-when');
@@ -4170,6 +4173,9 @@
         const vis = areaVisibility();
         AREA_LAYERS.concat(AREA_COUNTY_LAYERS).forEach(l => toggleLayer(l, vis[l] === 'visible'));
         if (on) refreshAreas(); else renderAreas();
+        // 12 Oct 2026 (night): By council is seen by itself: the heat map goes Off, the routes go thin and grey
+        if (on) { const off = document.getElementById('heat-off'); if (off && !off.checked) { off.checked = true; if (typeof scheduleViewWrite === 'function') scheduleViewWrite(); } }
+        if (typeof refreshMapModes === 'function') refreshMapModes();
     }
     // one district at a time: its fill, outline and label go; the routes stay
     function toggleArea(id, on) {
@@ -5511,6 +5517,30 @@
         return n;
     }
     // the per-route forecast labels: hidden while either mode is on (two figures never show for one road)
+    // 12 Oct 2026 (night, the user: "turn other layers off or minimal when this is on as this would be good to see by
+    // itself"): while a "By council" box is ticked the council fill is the picture. The routes stay, drawn thin and pale
+    // grey (where the lorries run), with no casing, no flow dashes, no labels and no cap badges; the heat map is off
+    // (the two never share the blues). Unticking both boxes puts everything back.
+    const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;
+    const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-cap-badge'];
+    function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }
+    // the base road network (green inbound, amber outbound, the temporary haul roads) fades out too: by OPACITY, so its
+    // own tick boxes (visibility) are untouched, and each layer's own opacity comes back when the council view ends
+    const COUNCIL_FADE_LAYERS = ['inbound-lines-casing', 'inbound-lines', 'outbound-lines-casing', 'outbound-lines', 'temp-haul-lines'];
+    const COUNCIL_SAVED = {};
+    function fadeNetworkForCouncil(on){
+        COUNCIL_FADE_LAYERS.forEach(l => {
+            if (!map.getLayer(l)) return;
+            const cur = map.getPaintProperty(l, 'line-opacity');
+            if (on) {
+                if (cur !== 0) COUNCIL_SAVED[l] = (cur === undefined ? 1 : cur);   // a re-added layer (basemap switch) saves afresh
+                map.setPaintProperty(l, 'line-opacity', 0);
+            } else if (l in COUNCIL_SAVED) {
+                map.setPaintProperty(l, 'line-opacity', COUNCIL_SAVED[l]);
+                delete COUNCIL_SAVED[l];
+            }
+        });
+    }
     function setForecastLabelsVisible(on){
         if (map.getLayer('forecast-labels')) map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');
     }
@@ -5520,12 +5550,15 @@
     function applyCarbonMode(m){
         const mode = m ? heatMode() : null, vol = mode === 'volume', co2 = mode === 'carbon';
         const stops = carbonScale(false).stops;                 // carbon is per route only (no section carbon)
-        const paint = vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;
+        const focus = councilFocus();
+        const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;
         const heat = vol || co2;
         if (map.getLayer('forecast-layer')) {
             map.setPaintProperty('forecast-layer', 'line-color', paint);
-            map.setPaintProperty('forecast-layer', 'line-width', heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
+            map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
         }
+        COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
+        fadeNetworkForCouncil(focus);
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', heat ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
         if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }
         else {
@@ -5595,7 +5628,7 @@
         const off = document.getElementById('heat-off');
         if (off && off.checked !== !mode) off.checked = !mode;     // a link or a reset that cleared both shows "Off"
         RL.month = m;
-        setForecastLabelsVisible(!(m && (rl || co2)));
+        setForecastLabelsVisible(!(m && (rl || co2)) && !councilFocus());
         if (!m || !rl) removeRoadLoadLayers();
         if (m && rl) {
             drawRoadLoad(m);    // the cached month at once, or an empty source while it is read
@@ -5631,11 +5664,20 @@
     }
     // a tick with no month on screen opens the timeline (its month), as the mockups show the month on the bar
     // (the bar's first frame calls refreshMapModes() once its month is known)
+    // a heat mode picked while By council is on: the council boxes untick (and the link follows)
+    function leaveCouncilView(){
+        if (!councilFocus()) return;
+        ['district', 'county'].forEach(t => { const cb = document.getElementById('layer-areas-' + t); if (cb) cb.checked = false; });
+        if (typeof toggleAreaTier === 'function') toggleAreaTier('district', false);
+        if (typeof scheduleViewWrite === 'function') scheduleViewWrite();
+    }
     function toggleRoadLoad(){
+        if (modeOn('toggle-road-load')) leaveCouncilView();
         if (modeOn('toggle-road-load') && !mapModeMonth() && typeof TL !== 'undefined' && !TL.on) { openTimeline(); return; }
         refreshMapModes();
     }
     function toggleCarbon(){
+        if (modeOn('toggle-carbon')) leaveCouncilView();
         if (modeOn('toggle-carbon') && !mapModeMonth() && typeof TL !== 'undefined' && !TL.on) { openTimeline(); return; }
         refreshMapModes();
     }

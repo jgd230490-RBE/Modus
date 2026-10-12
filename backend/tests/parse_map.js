@@ -3173,7 +3173,27 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && src.includes("if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow\n                return;"));
   ok("⭐ C1: in either mode the per-route forecast labels HIDE, so two figures never show for one road",
      blkCode.includes("map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');")
-     && blkCode.includes("setForecastLabelsVisible(!(m && (rl || co2)));"));
+     // NARROWED 12 Oct 2026 (night): and while By council is on (the council view quiets the routes)
+     && blkCode.includes("setForecastLabelsVisible(!(m && (rl || co2)) && !councilFocus());"));
+  // 12 Oct 2026 (night, the user: By council "would be good to see by itself")
+  ok("⭐ council view: while a By council box is ticked the routes are thin pale grey with no casing, flow dashes or cap badges, and the route labels hide",
+     blkCode.includes("const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;")
+     && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-cap-badge'];")
+     && blkCode.includes("COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });")
+     && blkCode.includes("function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }"));
+  ok("⭐ council view: ticking a council box turns the heat map Off; picking Volume or Carbon unticks the council boxes (one picture at a time); both write the link",
+     code.includes("if (on) { const off = document.getElementById('heat-off'); if (off && !off.checked) { off.checked = true; if (typeof scheduleViewWrite === 'function') scheduleViewWrite(); } }")
+     && src.includes("if (typeof refreshMapModes === 'function') refreshMapModes();\n    }\n    // one district at a time")
+     && blkCode.includes("if (modeOn('toggle-road-load')) leaveCouncilView();") && blkCode.includes("if (modeOn('toggle-carbon')) leaveCouncilView();")
+     && blkCode.includes("['district', 'county'].forEach(t => { const cb = document.getElementById('layer-areas-' + t); if (cb) cb.checked = false; });"));
+  ok("⭐ council view: the base network (inbound, outbound, their casings, temporary haul roads) fades by OPACITY, saved and restored, never by visibility (its own boxes stay)",
+     blkCode.includes("const COUNCIL_FADE_LAYERS = ['inbound-lines-casing', 'inbound-lines', 'outbound-lines-casing', 'outbound-lines', 'temp-haul-lines'];")
+     && blkCode.includes("map.setPaintProperty(l, 'line-opacity', 0);") && blkCode.includes("map.setPaintProperty(l, 'line-opacity', COUNCIL_SAVED[l]);")
+     && blkCode.includes("fadeNetworkForCouncil(focus);")
+     && !/COUNCIL_FADE_LAYERS[\s\S]{0,600}'visibility'/.test(blkCode.slice(blkCode.indexOf("const COUNCIL_FADE_LAYERS"), blkCode.indexOf("function setForecastLabelsVisible"))));
+  ok("council view: the By council group says what happens to the routes and the heat map while it is on",
+     html.includes('<div class="area-note" id="area-focus-note" hidden>While By council is on, the routes with lorries this month are drawn thin and grey, the road network is hidden and the heat map is off, so the councils read by themselves.</div>')
+     && code.includes("if (fn) fn.hidden = !(areaTierOn('district') || areaTierOn('county'));"));
   ok("⭐ C1: the section card lists the routes, their teams through teamText (never the raw id) and their shares; registered ONCE",
      blkCode.includes("rlEsc(teamText((sh.teams || []).join(', ')) || '—')")
      && !/\.ipt\b/.test(blkCode) && !/\bipt\b/.test(blkCode)
@@ -3217,8 +3237,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // share of a route, a different quantity on the same ramp); Volume paints the routes by f_avg AND the shared sections
   // by rl_mv on the same fixed stops. Colour only, one width (rule 1).
   ok("⭐ heat map: Volume paints routes (f_avg) and shared sections (rl_mv) on the volume stops; Carbon paints the routes only; one width",
-     blkCode.includes("const paint = vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;")
-     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);")
+     // NARROWED 12 Oct 2026 (night): the council view (By council on) paints the routes thin and grey before either mode
+     blkCode.includes("const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;")
+     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);")
      && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', VOLUME_STOPS));")
      && !blkCode.includes("carbonColor('rl_co2'") && !blkCode.includes("paintRuns")
      // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
@@ -3528,6 +3549,24 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("wording: ...and not while Carbon is off (the card then shows no CO2e figure)",
            !B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null).includes("Carbon Tool"));
         el("toggle-carbon").checked = true; B.refreshMapModes(); await flush();
+        {
+          // 12 Oct 2026 (night): the council view, then back
+          fmap.addLayer({ id: "forecast-flow", paint: {}, layout: {} });
+          fmap.addLayer({ id: "inbound-lines", paint: { "line-opacity": 0.8 }, layout: {} });
+          fmap.getPaintProperty = (id, k) => fmap.layers[id].paint[k];
+          globalThis.areaTierOn = t => t === "district";
+          B.refreshMapModes(); await flush();
+          const fq = fmap.layers["forecast-layer"].paint;
+          ok("⭐ council view (sandbox): with Local authority districts ticked the routes are #A8A29E at 2 px, the casing and flow hidden, the labels hidden",
+             fq["line-color"] === "#A8A29E" && fq["line-width"] === 2 && fmap.layers["forecast-casing"].layout.visibility === "none"
+             && fmap.layers["forecast-flow"].layout.visibility === "none" && fmap.layers["forecast-labels"].layout.visibility === "none", JSON.stringify(fq));
+          ok("council view (sandbox): the inbound network line is faded to opacity 0", fmap.layers["inbound-lines"].paint["line-opacity"] === 0);
+          delete globalThis.areaTierOn;
+          B.refreshMapModes(); await flush();
+          ok("council view (sandbox): unticked, the casing and flow are back and the routes take the mode's paint again",
+             fmap.layers["forecast-casing"].layout.visibility === "visible" && fmap.layers["forecast-flow"].layout.visibility === "visible"
+             && fmap.layers["forecast-layer"].paint["line-color"] !== "#A8A29E" && fmap.layers["inbound-lines"].paint["line-opacity"] === 0.8);
+        }
         // a failed carbon read
         TL.matrix.co2Error = "The carbon figures could not be read (OperationalError)."; B.refreshMapModes(); await flush();
         ok("C1: a failed carbon read paints every route grey (no figure) and says so in the legend",
