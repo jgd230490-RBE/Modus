@@ -2578,10 +2578,12 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /'text-field': \['get', 'limit_text'\], 'text-size': 14,/.test(code)
      && !/'text-size':10\.5/.test(code));
   // width by volume
-  ok("⭐ width by volume: the forecast line and its casing widen with f_avg on FIXED stops; the old 3.5 / 6 px are the floor",
-     code.includes("const FORECAST_VOL_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? [100, 600, 2000] : [5, 30, 100];")
-     && code.includes("return ['interpolate', ['linear'], ['to-number', ['get', 'f_avg'], 0], s[0], base, s[1], base + 2.5, s[2], base + 5];")
-     && code.includes("const FORECAST_LINE_WIDTH = forecastWidth(3.5);") && code.includes("const FORECAST_CASING_WIDTH = forecastWidth(6);")
+  // REVERSED 12 Oct 2026 (the user, evening: "line width by volume leave out and change to heat map like the carbon"):
+  // the forecast line is ONE width again; volume is a colour (the Volume heat map), never a width
+  ok("⭐ width by volume is GONE: the forecast line and its casing are one width (3.5 / 6 px), no f_avg width stops",
+     code.includes("const FORECAST_LINE_WIDTH = 3.5;") && code.includes("const FORECAST_CASING_WIDTH = 6;")
+     && !code.includes("FORECAST_VOL_STOPS") && !code.includes("forecastWidth(")
+     && !/\['interpolate', \['linear'\], \['to-number', \['get', '(f_avg|rl_mv)'\]/.test(code)
      && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 2
      && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
   ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
@@ -3055,11 +3057,21 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   const blkCode = blk.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
 
   // ---- the controls: two checkboxes, off by default, under Forecast traffic volume ----
-  ok("⭐ C1: a 'Road load' checkbox and a 'Carbon' checkbox sit in the forecast box, both OFF by default (no checked attribute)",
-     code.includes('<label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-road-load" onchange="toggleRoadLoad()"> Road load</label>')
-     && code.includes('<label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month</span></label>')
+  // NARROWED 12 Oct 2026 (the user, evening: "toggle between carbon and volume"): the two checkboxes are ONE radio group,
+  // Heat map: Off · Volume · Carbon; "Off" ships checked; the ids are kept so a shared link still opens on the same mode
+  ok("⭐ C1: a 'Heat map' radio group — Off (checked), Volume, Carbon — sits in the forecast box; Volume and Carbon OFF by default",
+     code.includes('<div class="heat-group" role="radiogroup" aria-labelledby="heat-label">')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume <span class="mode-sub">two-way movements a day</span></label>')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month, per route</span></label>')
+     && !/type="checkbox" id="toggle-(road-load|carbon)"/.test(code) && !code.includes("> Road load</label>")
      && !/id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code)
      && code.indexOf('id="toggle-road-load"') > code.indexOf('id="toggle-forecast"') && code.indexOf('id="toggle-carbon"') > code.indexOf('id="toggle-road-load"'));
+  ok("heat map (12 Oct, evening): 'Off' re-draws without either mode and re-writes the shared link; the width legend's CSS is gone",
+     code.includes("function toggleHeatOff(){\n        refreshMapModes();\n        if (typeof scheduleViewWrite === 'function') scheduleViewWrite();")
+     && code.includes("if (off && off.checked !== !mode) off.checked = !mode;")
+     && !html.includes(".ml-w{") && !code.includes("ml-w\"")
+     && code.includes("const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon', 'toggle-forecast'];"));
   ok("C1: each mode has a legend box, hidden until its checkbox is ticked",
      code.includes('<div class="mode-legend" id="road-load-legend" hidden></div>') && code.includes('<div class="mode-legend" id="carbon-legend" hidden></div>'));
   ok("C1: the new notes and legends are 14 px (the floor for new text)",
@@ -3077,10 +3089,12 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && blkCode.includes("if (f > 0 && f === t) return f;"));
 
   // ---- road load: the source, the line, the label, the card ----
-  ok("⭐ C1: a road-load SOURCE and a line layer whose width is data-driven by two-way movements a day on FIXED, ascending stops",
+  ok("⭐ C1: a road-load SOURCE and a line layer of ONE width, coloured by two-way movements a day on FIXED, ascending stops",
      blkCode.includes("map.addSource('road-load-source', { type: 'geojson'")
-     && blkCode.includes("const ROAD_LOAD_STOPS = [5, 30, 120];")
-     && blkCode.includes("return ['interpolate', ['linear'], ['to-number', ['get', 'rl_mv'], 0], s[0], base, s[1], base + 4, s[2], base + 9];")
+     // REVERSED 12 Oct 2026 (evening): one width (5 / 7.5 px), never by volume; volume is the colour on FIXED stops
+     && !blkCode.includes("ROAD_LOAD_STOPS") && !blkCode.includes("roadLoadWidth")
+     && blkCode.includes("const VOLUME_STOPS = [10, 25, 50, 100];")
+     && blkCode.includes("const ROAD_LOAD_LINE_WIDTH = 5;") && blkCode.includes("const ROAD_LOAD_CASING_WIDTH = 7.5;")
      && /id: 'road-load-line', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_LINE_WIDTH/.test(blkCode)
      && /id: 'road-load-casing', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_CASING_WIDTH/.test(blkCode));
   ok("⭐ C1: routes stay blue — the road-load line is the plan blue (CONFIG.COLORS.brand) under an ink casing",
@@ -3151,7 +3165,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      blkCode.includes("const CARBON_STEP_FRACTIONS = [0.2, 0.4, 0.6, 0.8];")
      // NARROWED 12 Oct 2026 (Track C review): the stops come through carbonScale — the route-month maximum for the routes,
      // the section-month maximum for the shared sections
-     && blkCode.includes("const scale = carbonScale(rl), stops = scale.stops;")
+     // NARROWED 12 Oct 2026 (evening): carbon paints the routes only, so always the route-month stops
+     && blkCode.includes("const stops = carbonScale(false).stops;")
      && blkCode.includes("const max = mtx ? (sec ? mtx.sectionCo2Max : (mtx.co2Max || 0)) : 0;")
      && blkCode.includes("['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]],")
      && code.includes("const c = (rt.co2_t||{})[k];")
@@ -3162,18 +3177,22 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      // REVERSED 12 Oct 2026 (wording review): the label on a DRAWN route with no figure says 'no carbon figure' - the
      // route is on the map, so 'no stored road route' contradicted it (and a failed carbon read is not that either)
      && blkCode.includes("'no carbon figure'") && !blkCode.includes("'no stored road route'"));
-  ok("⭐ C1: Carbon paints the road-load runs when Road load is on, else the forecast routes; colour only (fixed width, rule 1)",
-     blkCode.includes("const paintRoutes = co2 && !rl;") && blkCode.includes("const paintRuns = co2 && rl;")
-     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-color', paintRoutes ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast);")
-     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', paintRoutes ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);")
-     && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', paintRuns ? carbonColor('rl_co2', stops) : CONFIG.COLORS.brand);")
+  // REVERSED 12 Oct 2026 (evening): one heat map at a time. Carbon paints the ROUTES only (a section's carbon is a length
+  // share of a route, a different quantity on the same ramp); Volume paints the routes by f_avg AND the shared sections
+  // by rl_mv on the same fixed stops. Colour only, one width (rule 1).
+  ok("⭐ heat map: Volume paints routes (f_avg) and shared sections (rl_mv) on the volume stops; Carbon paints the routes only; one width",
+     blkCode.includes("const paint = vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;")
+     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);")
+     && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', VOLUME_STOPS));")
+     && !blkCode.includes("carbonColor('rl_co2'") && !blkCode.includes("paintRuns")
      // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
      && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   ok("⭐ C1: the route label switches to 't CO₂e' in carbon mode (its own layer, on the loaded leg: one label per route)",
      // REVERSED 12 Oct 2026 (wording review): the fallback reads 'no carbon figure' (was 'no stored road route')
      blkCode.includes("['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];")
      && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway']];")
-     && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', paintRuns ? ROAD_LOAD_CARBON_LABEL : ROAD_LOAD_LABEL);"));
+     // NARROWED 12 Oct 2026 (evening): the sections are drawn in Volume only, so their label is always the volume one
+     && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);") && !code.includes("ROAD_LOAD_CARBON_LABEL"));
   ok("⭐ C1: the carbon legend is a stepped gradient with the note 'Approved plan only, average-laden factor on both legs, excludes N …'",
      blkCode.includes("'<div class=\"ml-steps\">' + CARBON_RAMP.map(c => '<i style=\"background:' + c + '\"></i>').join('') + '</div>'")
      // NARROWED 12 Oct 2026 (browser check): the excluded-line clause is written only when a line is excluded; the demo
@@ -3281,7 +3300,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks",
         "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
-        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, ROAD_LOAD_CARBON_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes };")(
+        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
@@ -3376,9 +3395,20 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         }
         ok("C1: the card is wired once (click, enter, leave on road-load-line)",
            fmap.log.filter(x => x.startsWith("on:")).join(",") === "on:mouseenter:road-load-line,on:mouseleave:road-load-line,on:click:road-load-line");
-        ok("C1: the legend says the month, the three width stops and the counting rule",
-           el("road-load-legend").hidden === false && el("road-load-legend").innerHTML.includes("Road load · Oct 2026")
-           && el("road-load-legend").innerHTML.includes("120 and over two-way movements a day") && el("road-load-legend").innerHTML.includes("the loaded leg is counted once"));
+        // NARROWED 12 Oct 2026 (evening): the legend is the five-step ramp on the fixed volume stops, not three widths
+        ok("C1: the legend says the month, the five colour steps of the volume stops and the counting rule",
+           el("road-load-legend").hidden === false && el("road-load-legend").innerHTML.includes("Volume · two-way movements a day in Oct 2026")
+           && el("road-load-legend").innerHTML.includes("under 10") && el("road-load-legend").innerHTML.includes("100 and over")
+           && el("road-load-legend").innerHTML.includes("ml-steps") && !el("road-load-legend").innerHTML.includes("ml-w")
+           && el("road-load-legend").innerHTML.includes("the loaded leg is counted once"));
+        {
+          const fl0 = fmap.layers["forecast-layer"].paint, rl0 = fmap.layers["road-load-line"].paint;
+          ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], one width",
+             JSON.stringify(fl0["line-color"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], "#94BBF9", 10, "#5A96F6", 25, "#2071F3", 50, "#0B55CB", 100, "#073888"])
+             && JSON.stringify(rl0["line-color"]) === JSON.stringify(B.volumeColor("rl_mv", [10, 25, 50, 100]))
+             && fl0["line-width"] === 5 && rl0["line-width"] === 5 && fmap.layers["forecast-casing"].paint["line-width"] === 7.5
+             && !fmap.layers["carbon-route-labels"] && B.heatMode() === "volume", JSON.stringify(fl0));
+        }
         B.refreshMapModes(); await flush(); B.refreshMapModes(); await flush();
         ok("⭐ C1: the same month again is read from the cache — no second fetch, no second set of layers", fetches.length === 1);
         TL.month = 11; B.refreshMapModes(); await flush(); await flush();
@@ -3395,29 +3425,34 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            fmap.sources["road-load-label-source"]._data.features.length === 1
            && fmap.sources["road-load-label-source"]._data.features[0].properties.rl_mv_text === "22");
         passFilter = () => true; B.refreshMapModeFilters();
-        // carbon on, with road load on: the runs are painted, the forecast routes stay blue
-        el("toggle-carbon").checked = true; B.toggleCarbon(); await flush(); await flush();
-        ok("⭐ C1: Carbon with Road load on paints the RUNS by rl_co2 on the blue ramp, fixed width; the forecast routes stay plan blue",
-           fmap.layers["road-load-line"].paint["line-color"][0] === "case" && fmap.layers["road-load-line"].paint["line-color"][2][1][1][1] === "rl_co2"
-           && fmap.layers["road-load-line"].paint["line-width"] === 5 && fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6"
-           && JSON.stringify(fmap.layers["road-load-labels"].layout["text-field"]) === JSON.stringify(B.ROAD_LOAD_CARBON_LABEL)
-           && !fmap.layers["carbon-route-labels"]);
-        ok("⭐ C1: the carbon legend: per shared section, the five ranges from the fixed stops, 'excludes 3 lines with no stored road route'",
-           el("carbon-legend").hidden === false && el("carbon-legend").innerHTML.includes("Carbon · t CO₂e in Oct 2026, per shared section")
+        // REVERSED 12 Oct 2026 (evening): Volume and Carbon are radio buttons — picking Carbon un-picks Volume (the browser
+        // does it; the fake DOM is told). An old link with BOTH ticked is guarded: Volume wins.
+        el("toggle-carbon").checked = true;
+        ok("heat map: with both ids ticked (an old road-load.carbon link) the mode is Volume, never both", B.heatMode() === "volume");
+        el("toggle-road-load").checked = false; B.toggleCarbon(); await flush(); await flush();
+        ok("⭐ C1: picking Carbon takes the shared sections away and paints the ROUTES by f_co2 on the blue ramp, one width",
+           !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"]
+           && fmap.layers["forecast-layer"].paint["line-color"][0] === "case" && fmap.layers["forecast-layer"].paint["line-color"][2][1][1][1] === "f_co2"
+           && fmap.layers["forecast-layer"].paint["line-width"] === 5 && !!fmap.layers["carbon-route-labels"]
+           && el("road-load-legend").hidden === true);
+        // NARROWED 12 Oct 2026 (evening): per route (carbon never paints the shared sections now)
+        ok("⭐ C1: the carbon legend: per route, the five ranges from the fixed stops, 'excludes 3 lines with no stored road route'",
+           el("carbon-legend").hidden === false && el("carbon-legend").innerHTML.includes("Carbon · t CO₂e in Oct 2026, per route")
            && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
            && el("carbon-legend").innerHTML.includes("Approved plan only, average-laden factor on both legs, excludes 3 lines with no stored road route.")
            && el("carbon-legend").innerHTML.includes("(55.5 t)"), el("carbon-legend").innerHTML.slice(0, 400));
-        // Track C review: with the server's largest SECTION-month, the section ramp's stops come from it, not from co2Max
+        // REVERSED 12 Oct 2026 (evening): carbon paints the routes only, so a section-month figure from the server never
+        // sets the stops; the route-month maximum always does
         TL.matrix.sectionCo2Max = 9.1; B.refreshMapModes(); await flush();
-        const rlc = fmap.layers["road-load-line"].paint["line-color"][2];
-        ok("⭐ Track C review: Road load + Carbon cut the section stops from the largest SECTION-month (9.1 t), not the route-month 55.5 t",
-           JSON.stringify([rlc[3], rlc[5], rlc[7], rlc[9]]) === JSON.stringify(B.carbonStops(9.1)) && B.carbonStops(9.1)[3] < 11
-           && el("carbon-legend").innerHTML.includes("largest section-month (9.1 t)") && !el("carbon-legend").innerHTML.includes("(55.5 t)"),
+        const rlc = fmap.layers["forecast-layer"].paint["line-color"][2];
+        ok("⭐ heat map: Carbon's stops come from the largest ROUTE-month (55.5 t) even when the server sends a section-month (9.1 t)",
+           JSON.stringify([rlc[3], rlc[5], rlc[7], rlc[9]]) === JSON.stringify(B.carbonStops(55.5))
+           && el("carbon-legend").innerHTML.includes("largest route-month (55.5 t)") && !el("carbon-legend").innerHTML.includes("section-month"),
            JSON.stringify(rlc) + " " + el("carbon-legend").innerHTML.slice(0, 200));
         delete TL.matrix.sectionCo2Max; B.refreshMapModes(); await flush();
         ok("Track C review: ...and with no section figure from the server, the route-month maximum, named as such",
            el("carbon-legend").innerHTML.includes("largest route-month (55.5 t)")
-           && JSON.stringify(fmap.layers["road-load-line"].paint["line-color"][2].filter((x, i) => i >= 3 && i % 2 === 1)) === JSON.stringify(B.carbonStops(55.5)));
+           && JSON.stringify(fmap.layers["forecast-layer"].paint["line-color"][2].filter((x, i) => i >= 3 && i % 2 === 1)) === JSON.stringify(B.carbonStops(55.5)));
         // road load off: the forecast routes carry the carbon
         el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
         const fl = fmap.layers["forecast-layer"].paint;
@@ -3453,7 +3488,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         TL.matrix.co2Error = null;
         // everything off
         el("toggle-carbon").checked = false; B.toggleCarbon(); await flush();
-        ok("⭐ C1: both off: the forecast routes are plan blue at their volume widths again, the carbon labels gone, the route labels back",
+        // NARROWED 12 Oct 2026 (evening): one width now, not "volume widths"; and the "Off" button shows picked
+        ok("heat map: with neither mode picked, refreshMapModes shows the 'Off' radio picked", el("heat-off").checked === true);
+        ok("⭐ C1: both off: the forecast routes are plan blue at their one width again, the carbon labels gone, the route labels back",
            fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6" && fmap.layers["forecast-layer"].paint["line-width"] === "FLW"
            && fmap.layers["forecast-casing"].paint["line-width"] === "FCW" && !fmap.layers["carbon-route-labels"]
            && fmap.layers["forecast-labels"].layout.visibility === "visible" && el("carbon-legend").hidden === true && el("road-load-legend").hidden === true);
