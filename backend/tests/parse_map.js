@@ -1566,7 +1566,10 @@ ok("§0915-1: the label's figure is per working day, never the month's total",
   /f\.properties\.f_avg=perWorkingDay\(vol\)/.test(code)
   && !/f\.properties\.f_avg=Math\.round\(vol\)/.test(code)
   // window path: the server's per_day, with avg only as a fallback
-  && /f\.properties\.f_avg = \(m\.per_day != null\) \? m\.per_day : m\.avg;/.test(code));
+  // 12 Oct second fix pass — NARROWED: the fallback is the monthly avg put through perWorkingDay(), never the bare
+  // monthly figure (it printed under "Two-way / day" and drew the line at full width by volume)
+  && /f\.properties\.f_avg = \(m\.per_day != null\) \? m\.per_day : perWorkingDay\(m\.avg\);/.test(code)
+  && !/f\.properties\.f_avg = \(m\.per_day != null\) \? m\.per_day : m\.avg;/.test(code));
 ok("§0915-2: the month figure is KEPT on the feature, not thrown away",
   /f\.properties\.f_month_total=Math\.round\(vol\)/.test(code)
   && /f\.properties\.f_month_avg = m\.avg/.test(code));
@@ -1867,7 +1870,8 @@ ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fol
   && !/<details class="layers-box" id="layers-box" open/.test(html) && /\.sidebar \{ position:absolute; top:0; bottom:0; left:0; width:300px;/.test(html));
 ok("busiest routes: the five largest by two-way movements a day (not doubled), each a button that selects the route, cleared with the month",
   html.includes('<div id="kpi-busiest"></div>') && code.includes(".sort((a, b) => b[2] - a[2]).slice(0, 5)")
-  && code.includes("onclick=\"selectRoute(") && (code.match(/setHTML\('kpi-busiest', ''\)/g) || []).length === 2);
+  // 12 Oct second fix pass — NARROWED: cleared in THREE places now (no forecast, an empty month, and a month still loading)
+  && code.includes("onclick=\"selectRoute(") && (code.match(/setHTML\('kpi-busiest', ''\)/g) || []).length === 3);
 ok("11 Oct: below 1024 px the zoom buttons sit under the measured bar (a fixed 180 px overlapped it at 950 px), set on resize and whenever the bar changes height",
   code.includes("if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';")
   && code.includes("new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud'))"));
@@ -2139,6 +2143,12 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       // F3: the wrap ends the "month Play was pressed on"
       TL.month = 12; TL.startedOn = 10; api.tickTimeline();
       ok("F3: the wrap clears the month Play was pressed on", TL.month === 9 && TL.startedOn === null);
+      // 12 Oct second fix pass: a one-month span "wraps" onto the same month every tick; that must not forget the
+      // month Play was pressed on, or late conditions for it stop playback one tick in
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set([10]), span: [10, 10] };
+        TL.month = 10; TL.startedOn = 10; api.tickTimeline(); api.tickTimeline();
+        ok("⭐ F3: a one-month span keeps the month Play was pressed on across its every-tick wraps", TL.month === 10 && TL.startedOn === 10);
+        TL.matrix = keep; TL.startedOn = null; }
       // the prefetch order: the month on screen first, then the span in the order Play reaches it; the span only
       TL.month = 11;
       const po = typeof api.tlPrefetchOrder === "function" ? api.tlPrefetchOrder() : null;
@@ -2561,13 +2571,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       const a1_data = { features: [{ geometry: { type: "LineString" }, properties: { route_id: "R1", type: "Inbound Highway", origin: "Q", dest: "C", ipt: "IPT1" } }] };
       const pay = (m, loads) => ({ month: m, working_days: 20, payload_fallback_vehicle: "x", co2_to_date: [],
         lines: [{ route_id: "R1", vehicle_loads: loads, qty_unit: loads, qty_t: loads * 20, trips_per_vehicle_day: 4, discipline: "Earthworks", co2_t: 2 }] });
-      let api = null, err = "";
+      let api = null, err = "", moving = null;
       try {
         api = new Function("document", "window", "TL", "KPI", "CONFIG", "fetch", "a1_data", "routePassesFilters", "monthLabel", "teamText", "TEAM",
           "renderKpiSwitch", "showMoving", "positionWarnStack", "selectRoute",
           src.slice(a, b) + "\nreturn { calculateKPIs, kpiFetchMonth };")(
           document, { WS_NAMES: {} }, TL, KPI, { FORECAST_UNIT: "vehicles", API_BASE: "" }, fetch, a1_data, () => true, monthLabel, x => x, "Team",
-          () => {}, () => {}, () => {}, () => {});
+          () => {}, on => { moving = !!on; }, () => {}, () => {});
       } catch (e) { err = e.message; }
       ok("F1 sandbox: the figures bar runs against a fake DOM", !!api, err);
       if (api) {
@@ -2579,6 +2589,18 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
         ok("⭐ F1: a month still loading says so at once — '<Month> · loading figures' — and the previous month's figures are cleared",
            el("kpi-title").innerText === "Nov 2026 · loading figures" && el("kpi-trips").innerText === "—", el("kpi-title").innerText);
+        // 12 Oct second fix pass (the sceptic): the rest of the bar named October under "Nov 2026 · loading figures"
+        { const oct = (TL.month = 10, api.calculateKPIs("ALL", "ALL", "ALL", "ALL"),
+                       { chips: el("kpi-breakdown").innerHTML, busy: el("kpi-busiest").innerHTML, moving, tip: el("kpi-title").title });
+          ok("F1 sandbox: October renders its chips, its busiest routes, 'What's moving' and the method tooltip (so the next pin means something)",
+             oct.chips.includes("Earthworks") && oct.busy.includes("busy-row") && oct.moving === true && oct.tip.includes("Approved forecast, Oct 2026")
+             && el("kpi-moving-title").innerText === "What’s moving in Oct 2026");
+          TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("⭐ F1: while Nov loads nothing of October is left in the bar — no chips, no busiest routes, 'What's moving' hidden, labels and note say Nov or loading, no Oct tooltip",
+             el("kpi-breakdown").innerHTML === "" && el("kpi-busiest").innerHTML === "" && el("kpi-switch").innerHTML === "" && moving === false
+             && el("kpi-routes-label").innerText === "Routes in Nov 2026" && el("kpi-vehicles-label").innerText === "Vehicles needed"
+             && el("kpi-note").innerText === "Loading the figures for Nov 2026." && el("kpi-title").title === "",
+             JSON.stringify({ b: el("kpi-breakdown").innerHTML.slice(0, 60), moving, note: el("kpi-note").innerText, tip: el("kpi-title").title.slice(0, 40) })); }
         TL.month = 12; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
         ASYNC_PINS.push((async () => {
           deferred[11](pay(11, 200)); await flush(); await flush();
@@ -2615,16 +2637,19 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       const RESTR = { data: { features: [{ properties: { event_number: "E1" }, geometry: { coordinates: [[0, 0], [1, 1]] } }] } };
       const map = { getSource: () => ({}), getLayer: () => true, addLayer() {}, setFilter() {}, fitBounds() { rec.fit++; }, jumpTo() {}, flyTo() {}, getZoom: () => 10 };
       let api = null, err = "";
+      // 12 Oct second fix pass: the month's KPI fetch is a delegate (a pin can hold it pending, as a cold Play does) and the
+      // page's KPI cache is passed in (the conditions read it so a cached month builds every row at once)
+      const KPI = { cache: {} }; let kpiCalls = 0, kpiFetch = () => Promise.resolve(kp);
       try {
         api = new Function("document", "window", "ResizeObserver", "setTimeout", "CONFIG", "fetch", "a1_data", "routePassesFilters", "TL", "map", "RESTR",
           "coordsBounds", "selectRoute", "reducedMotion", "monthSpan", "dnum", "stopTimeline", "announceTimeline", "monthLabel", "kpiFetchMonth",
-          "FORECAST_WORKING_DAYS", "META", "setRestrictionHits", "setCapBadges",
+          "FORECAST_WORKING_DAYS", "META", "setRestrictionHits", "setCapBadges", "KPI",
           src.slice(a, b) + "\nreturn { WARN, renderTimelineWarnings, dismissWarning, showRestrictionHit, renderConditionsPill, capSentence, pileSentence, pileLastRecorded, splitHitRowId };")(
           document, { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
           { API_BASE: "", MONTH_COUNT: 60, START_YEAR: 2026 }, () => { throw new Error("fetch must not be called"); }, a1_data, () => true, TL, map, RESTR,
           () => [0, 0, 1, 1], rid => rec.select.push(rid), () => false, monthSpan, dnum,
-          reason => { rec.stops.push(reason); TL.playing = false; }, t => rec.announced.push(t), monthLabel, () => Promise.resolve(kp),
-          22, { seasonal: [] }, evs => rec.hits.push(evs.slice()), ids => rec.caps.push(ids.slice()));
+          reason => { rec.stops.push(reason); TL.playing = false; }, t => rec.announced.push(t), monthLabel, m => { kpiCalls++; return kpiFetch(m); },
+          22, { seasonal: [] }, evs => rec.hits.push(evs.slice()), ids => rec.caps.push(ids.slice()), KPI);
       } catch (e) { err = e.message; }
       ok("warn sandbox: the warn block runs against plain data", !!api, err);
       if (api) {
@@ -2638,6 +2663,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            api.capSentence("R016", 32.2, 20) === "R016: 32 two-way movements a day against a planning flag of 20");
         ok("...and keeps a decimal when the round would land on the flag (20.3 over 20 never reads '20 … of 20')",
            api.capSentence("R1", 20.3, 20) === "R1: 20.3 two-way movements a day against a planning flag of 20");
+        // 12 Oct second fix pass (the sceptic): 441 loads / 22 days = 20.045 printed "20.0 … against a planning flag of 20"
+        ok("⭐ ...nor '20.0 … of 20': a figure just over the flag takes the decimals it needs (20.045 → 20.05, 20.04 → 20.04)",
+           api.capSentence("R1", 441 / 22, 20) === "R1: 20.05 two-way movements a day against a planning flag of 20"
+           && api.capSentence("R1", 20.04, 20) === "R1: 20.04 two-way movements a day against a planning flag of 20",
+           api.capSentence("R1", 441 / 22, 20));
+        ok("...and a figure too close to show reads 'just over 20', never '20.000'",
+           api.capSentence("R1", 20.0001, 20) === "R1: just over 20 two-way movements a day against a planning flag of 20");
         ok("the last month anything was recorded against a pile is the last month its balance moved (Oct here)", api.pileLastRecorded(W.piles[0]) === 10);
         ok("a row id splits into its event and its route; an old bare event id still works",
            JSON.stringify(api.splitHitRowId("00525419-001|R002")) === '{"ev":"00525419-001","rid":"R002"}' && api.splitHitRowId("E9").rid === null);
@@ -2678,10 +2710,44 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
           ok("⭐ a clash pause stops ONCE and passes its reason to the one announcement (no second write)",
              rec.stops.length === 1 && rec.stops[0] === "Oct 2026 · playback paused: 1 over capacity" && rec.announced.length === 0 && TL.clashPaused === true,
              JSON.stringify(rec));
+          // 12 Oct second fix pass (the sceptic): a cold tick — the month's KPI fetch still in flight — must not hold up
+          // the over-capacity row, the pause or the pill; the planning-flag row joins when the figures land
+          { const pend = {}; kpiFetch = m => new Promise(res => { pend[m] = res; });
+            rec.stops.length = 0; TL.month = 11; TL.ticked = 11; TL.playing = true; TL.clashPaused = false; TL.startedOn = 10;
+            api.renderTimelineWarnings(11); await flush(); await flush();
+            ok("⭐ a red month whose KPI figures are still loading pauses Play on the tick that reaches it (it waited on the fetch and missed the first loop)",
+               rec.stops.length === 1 && rec.stops[0] === "Nov 2026 · playback paused: 1 over capacity" && TL.clashPaused === true, JSON.stringify(rec.stops));
+            ok("...the pill already describes Nov (1 over capacity) and carries no planning-flag count before the figures land",
+               pill().includes("1 over capacity") && !pill().includes("planning flag") && W.countsMonth === 11, pill());
+            ok("...and the panel says Nov with the stockpile row", box().includes("Conditions in Nov 2026") && box().includes("Over capacity") && !box().includes("Over a planning flag"));
+            pend[11] && pend[11](kp); await flush(); await flush();
+            ok("⭐ when Nov's figures land the planning-flag row and its pill count join, without a second stop",
+               box().includes("Over a planning flag") && pill().includes("1 route over a planning flag") && rec.stops.length === 1, pill());
+            // a late fetch for a month the playhead has left paints nothing
+            TL.month = 11; TL.ticked = 11; TL.playing = false; api.renderTimelineWarnings(11); await flush(); await flush();
+            const before = box(); TL.month = 12; pend[11] && pend[11](kp); await flush(); await flush();
+            ok("...a month the playhead has left is not painted when its figures land", box() === before);
+            // a month already in the page's KPI cache builds every row at once and fetches nothing
+            KPI.cache[12] = kp; kpiCalls = 0; api.renderTimelineWarnings(12); await flush(); await flush();
+            ok("⭐ a month already in the KPI cache builds its planning-flag row at once and does not fetch",
+               kpiCalls === 0 && box().includes("Conditions in Dec 2026") && box().includes("Over a planning flag"), String(kpiCalls));
+            kpiFetch = () => Promise.resolve(kp); }
         })());
       }
     }
   }
+}
+
+// 12 Oct second fix pass: source pins for the conditions' timing and the 14 px floor on the row sentence
+{
+  const rtw = code.slice(code.indexOf("    function renderTimelineWarnings(m) {"), code.indexOf("    function buildConditions("));
+  ok("⭐ the conditions wait on the closures and stockpiles only, never on the month's KPI fetch (a cold tick missed the pause)",
+     rtw.length > 0 && /Promise\.all\(\[warnRestrictions\(\), warnPiles\(\)\]\)\.then/.test(rtw)
+     && !/Promise\.all\(\[warnRestrictions\(\), warnPiles\(\), kpiFetchMonth/.test(code)
+     && /kpiFetchMonth\(month\)\.catch\(\(\) => null\)\.then\(kp => \{\s*if \(!kp \|\| TL\.month !== month \|\| !TL\.on\) return;/.test(rtw));
+  ok("the condition row's sentence is 14 px (new text; the row is 13 px)", /\.tl-warn \.what\{ color:var\(--muted\); font-size:14px; \}/.test(html));
+  ok("F3: only a wrap over more than one month forgets the month Play was pressed on",
+     /if\(wrap && lo !== hi\) TL\.startedOn = null;/.test(code) && !/if\(wrap\) TL\.startedOn = null;/.test(code));
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

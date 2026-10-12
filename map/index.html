@@ -170,7 +170,7 @@
         .tl-warn .cond-dot{ flex:0 0 9px; margin-top:5px; }
         .tl-warn .body{ flex:1; min-width:0; }
         .tl-warn b{ display:block; font-size:14px; font-weight:500; color:var(--navy-deep); margin-bottom:2px; }
-        .tl-warn .what{ color:var(--muted); }
+        .tl-warn .what{ color:var(--muted); font-size:14px; }   /* 12 Oct: the row's sentence is new text, 14 px floor */
         .tl-warn .show{ display:inline-block; margin-top:4px; font-size:13px; font-weight:500; color:var(--navy-deep); background:none; border:none; padding:0; cursor:pointer; font-family:inherit; }
         .tl-warn .show:hover{ text-decoration:underline; }
         .tl-warn .x{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
@@ -2059,6 +2059,7 @@
                 set('kpi-vehicles-label', 'Vehicles needed');
                 set('kpi-routes-label', 'Routes in ' + label);
                 set('kpi-note', 'No approved forecast in this month.');
+                { const tt = document.getElementById('kpi-title'); if (tt) tt.title = ''; }   // not the last month's method note
                 return;
             }
             const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
@@ -2125,6 +2126,15 @@
         set('kpi-title', label + ' \u00b7 loading figures');
         set('kpi-vehicles', '—'); set('kpi-trips', '—'); set('kpi-material', '—'); set('kpi-routes', '—');
         set('kpi-co2-day', '—'); set('kpi-co2-total', '—');
+        // 12 Oct second fix pass: and EVERYTHING else in the bar that names a month — the chips, the busiest routes,
+        // "What's moving in <old month>", the labels and the method note (and its tooltip) — is cleared as the empty
+        // month clears it, so nothing from the previous month sits under the loading title
+        set('kpi-co2-day-label', 'CO₂e a day'); set('kpi-co2-total-label', 'CO₂e to date');
+        setHTML('kpi-breakdown', ''); setHTML('kpi-switch', ''); setHTML('kpi-busiest', ''); showMoving(false);
+        set('kpi-vehicles-label', 'Vehicles needed');
+        set('kpi-routes-label', 'Routes in ' + label);
+        set('kpi-note', 'Loading the figures for ' + label + '.');
+        { const tt = document.getElementById('kpi-title'); if (tt) tt.title = ''; }
         Promise.all(months.map(kpiFetchMonth)).then(payloads => {
             if (KPI.onScreen !== onScreen) return;     // the playhead or the filters moved on
             render(payloads);
@@ -3985,7 +3995,10 @@
                             // server's; `avg` (a monthly average over the window) is kept
                             // on the feature because the popup and the detail table still
                             // read a monthly figure and should go on doing so.
-                            f.properties.f_avg = (m.per_day != null) ? m.per_day : m.avg;
+                            // 12 Oct second fix pass: the fallback was `m.avg`, a MONTHLY figure, which printed under
+                            // "Two-way / day" and drew every route over 100 a month at full width; it now goes through
+                            // perWorkingDay() with the feed's divisor, as the timeline path does
+                            f.properties.f_avg = (m.per_day != null) ? m.per_day : perWorkingDay(m.avg);
                             f.properties.f_month_avg = m.avg;
                             f.properties.f_peak = m.peak;
                             f.properties.f_total = m.total;
@@ -4424,7 +4437,9 @@
         const [lo, hi] = tlLoopBounds();
         const wrap = TL.month >= hi || TL.month < lo;
         if(wrap && lo !== hi) TL.clashPaused = false;
-        if(wrap) TL.startedOn = null;
+        // second fix pass: and the same for the month Play was pressed on — a one-month span "wraps" onto that same
+        // month every tick, so clearing it there let late conditions for it stop playback after one tick (F3)
+        if(wrap && lo !== hi) TL.startedOn = null;
         TL.month = wrap ? lo : TL.month+1;
         TL.ticked = TL.month;
         setTimelineMonth(TL.month);
@@ -4626,9 +4641,13 @@
     }
     // D21 / D33: one noun ("planning flag") and the unit in the sentence. A figure that rounds down onto the flag
     // keeps one decimal, so the row can never read "20 ... against a planning flag of 20".
+    // Second fix pass: nor "20.0 ... of 20" (441 loads / 22 days = 20.045): it takes the fewest decimals (1 to 3) that
+    // still print a figure above the flag, and says "just over" if even three decimals would not.
     function capSentence(rid, perDay, cap) {
         const r = Math.round(perDay);
-        const shown = r > cap ? String(r) : perDay.toFixed(1);
+        let shown = r > cap ? String(r) : null;
+        for (let d = 1; shown === null && d <= 3; d++) { const s = perDay.toFixed(d); if (Number(s) > cap) shown = s; }
+        if (shown === null) shown = 'just over ' + cap;
         return `${rid}: ${shown} two-way movements a day against a planning flag of ${cap}`;
     }
     // the last month whose end-of-month balance differs from the month before it: the last month anything was
@@ -4790,145 +4809,163 @@
         if (!box) return;
         if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; renderConditionsPill([]); setCondRing([]); setRestrictionHits([]); setCapBadges([]); positionWarnStack(); return; }
         const month = m;
-        Promise.all([warnRestrictions(), warnPiles(), kpiFetchMonth(month).catch(() => null)]).then(([restr, piles, kp]) => {
+        // 12 Oct second fix pass: the conditions no longer wait on the month's KPI fetch. The over-capacity rows (and so
+        // the clash pause, the pill, the ring and the closures) need only the stockpile and closure data, which are
+        // fetched once; they render as soon as those are in. The planning-flag and seasonal-window rows need the month's
+        // loads, so they are added when its KPI figures land (at once, from the cache, on every later loop). Before, a
+        // month fetch slower than one tick meant a red month neither paused Play nor opened the panel on the first
+        // loop, and the pill kept the previous month's counts under the new month.
+        const kpCached = () => (typeof KPI !== 'undefined' && KPI.cache && KPI.cache[month]) || null;
+        Promise.all([warnRestrictions(), warnPiles()]).then(([restr, piles]) => {
             // 12 Oct fix pass (F3 seen in Chrome): Play pressed on a month that itself carries a clash counts as this
             // loop's pause, even when the month's conditions land after Play was pressed (or after the first tick) —
-            // before, the first loop stopped again on the NEXT red month. The wrap clears startedOn.
+            // before, the first loop stopped again on the NEXT red month. A wrap over more than one month clears startedOn.
             if (TL.playing && month === TL.startedOn && (piles || []).some(sp => {
                     const mm = sp.months && sp.months[String(month)];
                     return mm && mm.over && !WARN.dismissed[`s|${sp.location_id}|${month}`]; })) TL.clashPaused = true;
             if (TL.month !== month || !TL.on) return;     // the playhead moved on
-            const items = [];
-            const routes = linesOnScreen(month);
-            const cal = ((month - 1) % 12) + 1;
-            // ===== 2026-09-08 (§E) — three NAMED levels ==============================
-            //
-            //   CLASH   a physical impossibility. Today: a stockpile past its capacity.
-            //   WARNING a vehicle exceeding a real limit on a route being driven.
-            //   CAUTION a seasonal window that applies to this month and this vehicle.
-            //
-            // 2026-10-06: the level WORD is no longer printed. The dot's colour and a plain
-            // noun ("Over capacity", the limit's own label, "Seasonal window") carry it.
-            //
-            // 🔴 THE SECOND CLASH SOURCE THE BRIEF NAMES DOES NOT EXIST AND IS NOT BEING
-            // INVENTED. "Two Approved movements the product already flags as conflicting
-            // on a shared gate/head" — nothing in this product flags that. There is no
-            // conflict, contention or booking concept anywhere in the backend (grep for
-            // conflict/clash/contention finds two unrelated comments), because it needs a
-            // TIME model, which is Phase 7. `gate_blockers` is a deactivated gate refusing
-            // to bake, not two movements colliding. Building it would mean inventing what
-            // "conflicting" means, and that is the human's decision, not mine.
-            //
-            // 1. Tark Tee / National Highways: a real limit exceeded on a visible baked route -> WARNING
-            // 12 Oct 2026 (live A1): only the hits whose window overlaps THIS month — the same
-            // six October closures used to be listed in every month that carried volume — one
-            // row per closure per route, and the closure itself highlighted by event_number.
-            const hitEvents = []; WARN.hitRoute = {};
-            routes.forEach(p => {
-                const hit = restr[p.route_id];
-                if (!hit || !hit.hits) return;
-                const inMonth = dedupeHits(hit.hits.filter(h => hitInMonth(h, month)));
-                if (!inMonth.length) return;
-                const worst = inMonth[0];
-                const n = inMonth.length;
-                inMonth.forEach(h => {
-                    if (!h.event_number) return;
-                    const ev = String(h.event_number);
-                    if (!hitEvents.includes(ev)) hitEvents.push(ev);
-                    const rs = WARN.hitRoute[ev] || (WARN.hitRoute[ev] = []);
-                    if (!rs.includes(p.route_id)) rs.push(p.route_id);
-                });
-                items.push({ key: `r|${p.route_id}|${month}`,
-                    // ⚠️ a Tark Tee 'breach' is still a WARNING, not a Clash. It is a
-                    // vehicle-versus-limit verdict on a drivable road, not an impossibility
-                    // — and the weak-bridge class it cannot judge at all (§A2) means this
-                    // source must never be the loudest thing on screen.
-                    lvl: 'warn', who: p.route_id, kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? hitRowId(worst.event_number, p.route_id) : p.route_id,
-                    // "Mass limits" + breach -> "Exceeds a mass limit"; a non-breach hit
-                    // on a layer ("Planned road closures") keeps the layer's own noun
-                    noun: (worst.severity === 'breach'
-                        ? 'Exceeds a ' + String(worst.label || 'restriction').toLowerCase().replace(/s$/, '')
-                        : String(worst.label || 'Restriction on the route')),
-                    what: `${p.route_id}${worst.what ? ' \u2014 ' + worst.what : ''}${n > 1 ? ` (+${n - 1} more on this route)` : ''}`,
-                    sort: worst.severity === 'breach' ? 1 : 2 });
+            const kp0 = kpCached();
+            buildConditions(box, month, restr, piles, kp0);
+            if (kp0) return;
+            kpiFetchMonth(month).catch(() => null).then(kp => {
+                if (!kp || TL.month !== month || !TL.on) return;     // no figures, or the playhead moved on
+                buildConditions(box, month, restr, piles, kp);
             });
-            // 2. stockpiles over at the end of this month -> CLASH
-            // D23 (12 Oct 2026): the balance is actuals-derived, so the sentence says "recorded",
-            // not "the plan puts" — it is what the stockpile timeline has on record, not a plan figure.
-            (piles || []).forEach(sp => {
-                const mm = sp.months && sp.months[String(month)];
-                if (!mm || !mm.over) return;
-                const u = sp.unit === 'm3' ? 'm³' : (sp.unit || 't');
-                items.push({ key: `s|${sp.location_id}|${month}`, lvl: 'clash', who: sp.name, kind: 's', id: sp.location_id,
-                    noun: 'Over capacity',
-                    what: pileSentence(sp, month, u), sort: 0 });
-            });
-            // 4. the route's planning flag against this month's movements a day -> WARNING
-            // D21: movements a day = the loaded leg's vehicle loads (one load = one two-way
-            // movement, never doubled) over the month's working days from the API. D33: public,
-            // worded as a "planning flag" — never a limit, legal or otherwise. The property is
-            // absent until the backend exposes it on the map-data feature; absent means no row.
-            const wdm = (kp && kp.working_days > 0) ? kp.working_days : FORECAST_WORKING_DAYS;
-            const loadsByRoute = {};
-            (kp && kp.lines || []).forEach(l => { loadsByRoute[l.route_id] = (loadsByRoute[l.route_id] || 0) + (Number(l.vehicle_loads) || 0); });
-            const overCap = [];
-            routes.forEach(p => {
-                const cap = Number(p.max_vehicles_per_day);
-                if (!(cap > 0) || !(loadsByRoute[p.route_id] > 0)) return;
-                const perDay = loadsByRoute[p.route_id] / wdm;
-                if (perDay <= cap) return;
-                overCap.push(p.route_id);
-                items.push({ key: `c|${p.route_id}|${month}`, lvl: 'warn', src: 'cap', who: p.route_id, kind: 'r', id: p.route_id,
-                    noun: 'Over a planning flag',
-                    what: capSentence(p.route_id, perDay, cap), sort: 1.5 });
-            });
-            // 3. seasonal windows, per visible line's vehicle
-            const vehByRoute = {};
-            (kp && kp.lines || []).forEach(l => { (vehByRoute[l.route_id] = vehByRoute[l.route_id] || new Set()).add(l.vehicle_type); });
-            (META.seasonal || []).forEach(w => {
-                if (!(w.months || []).includes(cal)) return;
-                const rv = w.restricted_vehicles || [];
-                routes.forEach(p => {
-                    const vs = vehByRoute[p.route_id];
-                    if (!vs) return;
-                    const applies = rv.length === 0 || [...vs].some(v => rv.includes(v));
-                    if (!applies) return;
-                    // 3. a seasonal window matching this month and this vehicle -> CAUTION
-                    items.push({ key: `w|${w.name}|${p.route_id}|${month}`, lvl: 'caution', who: p.route_id, kind: 'r', id: p.route_id,
-                        noun: 'Seasonal window',
-                        what: `${w.name}: ${(w.message || '').split(/[.—]/)[0]}. ${p.route_id}.`, sort: 3 });
-                });
-            });
-            const live = items.filter(i => !WARN.dismissed[i.key]).sort((a, b) => a.sort - b.sort);
-            renderConditionsPill(live);
-            WARN.countsMonth = month;      // which month the pill's counts describe (startTimeline reads it)
-            setCondRing(live.filter(i => i.kind === 's').map(i => i.id));
-            // the closures the live rows are about, drawn amber whether or not the layer is on;
-            // the badge on every route over its planning flag (dismissing a row clears both)
-            setRestrictionHits(liveHitEvents(hitEvents, WARN.hitRoute, live));
-            setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));
-            // a month with a red condition opens the panel once, by itself
-            if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
-            // 12 Oct 2026 (D22): playback stops ONCE PER LOOP on the first red month it ticks into, with the
-            // panel open; the next press of Play carries on and does not stop again until the loop wraps.
-            // Only a month reached by a tick can stop it — never the month Play was pressed on.
-            if (TL.playing && TL.ticked === month && !TL.clashPaused && live.some(i => i.lvl === 'clash')) {
-                TL.clashPaused = true; WARN.open = true;
-                stopTimeline(monthLabel(month) + ' · playback paused: ' + live.filter(i => i.lvl === 'clash').length + ' over capacity');
-                renderConditionsPill(live);
-            }
-            if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
-            const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-            box.innerHTML = `<div class="tl-head"><b>Conditions in ${esc(monthLabel(month))}</b>` +
-                `<button type="button" class="x" title="Close" aria-label="Close the conditions panel" onclick="toggleConditions()">&times;</button></div>` +
-                live.map(i =>
-                `<div class="tl-warn ${i.lvl}"><span class="cond-dot"></span><span class="body">` +
-                `<b>${esc(i.noun)}</b><span class="what">${esc(i.what)}</span><br>` +
-                `<button class="show" onclick="showCondition('${i.kind}','${esc(i.id).replace(/'/g, '')}')">Show on map</button></span>` +
-                `<button type="button" class="x" title="Dismiss for this month" aria-label="Dismiss for this month" onclick="dismissWarning('${esc(i.key).replace(/'/g, '')}')">&times;</button></div>`).join('');
-            box.style.display = 'flex';
-            positionWarnStack();
         });
+    }
+    // the rows for one month from the closures, the stockpiles and (when it has landed) the month's KPI payload `kp`;
+    // kp === null builds the rows that do not need it and leaves out the planning-flag and seasonal-window rows
+    function buildConditions(box, month, restr, piles, kp) {
+        const items = [];
+        const routes = linesOnScreen(month);
+        const cal = ((month - 1) % 12) + 1;
+        // ===== 2026-09-08 (§E) — three NAMED levels ==============================
+        //
+        //   CLASH   a physical impossibility. Today: a stockpile past its capacity.
+        //   WARNING a vehicle exceeding a real limit on a route being driven.
+        //   CAUTION a seasonal window that applies to this month and this vehicle.
+        //
+        // 2026-10-06: the level WORD is no longer printed. The dot's colour and a plain
+        // noun ("Over capacity", the limit's own label, "Seasonal window") carry it.
+        //
+        // 🔴 THE SECOND CLASH SOURCE THE BRIEF NAMES DOES NOT EXIST AND IS NOT BEING
+        // INVENTED. "Two Approved movements the product already flags as conflicting
+        // on a shared gate/head" — nothing in this product flags that. There is no
+        // conflict, contention or booking concept anywhere in the backend (grep for
+        // conflict/clash/contention finds two unrelated comments), because it needs a
+        // TIME model, which is Phase 7. `gate_blockers` is a deactivated gate refusing
+        // to bake, not two movements colliding. Building it would mean inventing what
+        // "conflicting" means, and that is the human's decision, not mine.
+        //
+        // 1. Tark Tee / National Highways: a real limit exceeded on a visible baked route -> WARNING
+        // 12 Oct 2026 (live A1): only the hits whose window overlaps THIS month — the same
+        // six October closures used to be listed in every month that carried volume — one
+        // row per closure per route, and the closure itself highlighted by event_number.
+        const hitEvents = []; WARN.hitRoute = {};
+        routes.forEach(p => {
+            const hit = restr[p.route_id];
+            if (!hit || !hit.hits) return;
+            const inMonth = dedupeHits(hit.hits.filter(h => hitInMonth(h, month)));
+            if (!inMonth.length) return;
+            const worst = inMonth[0];
+            const n = inMonth.length;
+            inMonth.forEach(h => {
+                if (!h.event_number) return;
+                const ev = String(h.event_number);
+                if (!hitEvents.includes(ev)) hitEvents.push(ev);
+                const rs = WARN.hitRoute[ev] || (WARN.hitRoute[ev] = []);
+                if (!rs.includes(p.route_id)) rs.push(p.route_id);
+            });
+            items.push({ key: `r|${p.route_id}|${month}`,
+                // ⚠️ a Tark Tee 'breach' is still a WARNING, not a Clash. It is a
+                // vehicle-versus-limit verdict on a drivable road, not an impossibility
+                // — and the weak-bridge class it cannot judge at all (§A2) means this
+                // source must never be the loudest thing on screen.
+                lvl: 'warn', who: p.route_id, kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? hitRowId(worst.event_number, p.route_id) : p.route_id,
+                // "Mass limits" + breach -> "Exceeds a mass limit"; a non-breach hit
+                // on a layer ("Planned road closures") keeps the layer's own noun
+                noun: (worst.severity === 'breach'
+                    ? 'Exceeds a ' + String(worst.label || 'restriction').toLowerCase().replace(/s$/, '')
+                    : String(worst.label || 'Restriction on the route')),
+                what: `${p.route_id}${worst.what ? ' \u2014 ' + worst.what : ''}${n > 1 ? ` (+${n - 1} more on this route)` : ''}`,
+                sort: worst.severity === 'breach' ? 1 : 2 });
+        });
+        // 2. stockpiles over at the end of this month -> CLASH
+        // D23 (12 Oct 2026): the balance is actuals-derived, so the sentence says "recorded",
+        // not "the plan puts" — it is what the stockpile timeline has on record, not a plan figure.
+        (piles || []).forEach(sp => {
+            const mm = sp.months && sp.months[String(month)];
+            if (!mm || !mm.over) return;
+            const u = sp.unit === 'm3' ? 'm³' : (sp.unit || 't');
+            items.push({ key: `s|${sp.location_id}|${month}`, lvl: 'clash', who: sp.name, kind: 's', id: sp.location_id,
+                noun: 'Over capacity',
+                what: pileSentence(sp, month, u), sort: 0 });
+        });
+        // 4. the route's planning flag against this month's movements a day -> WARNING
+        // D21: movements a day = the loaded leg's vehicle loads (one load = one two-way
+        // movement, never doubled) over the month's working days from the API. D33: public,
+        // worded as a "planning flag" — never a limit, legal or otherwise. The property is
+        // absent until the backend exposes it on the map-data feature; absent means no row.
+        const wdm = (kp && kp.working_days > 0) ? kp.working_days : FORECAST_WORKING_DAYS;
+        const loadsByRoute = {};
+        (kp && kp.lines || []).forEach(l => { loadsByRoute[l.route_id] = (loadsByRoute[l.route_id] || 0) + (Number(l.vehicle_loads) || 0); });
+        const overCap = [];
+        routes.forEach(p => {
+            const cap = Number(p.max_vehicles_per_day);
+            if (!(cap > 0) || !(loadsByRoute[p.route_id] > 0)) return;
+            const perDay = loadsByRoute[p.route_id] / wdm;
+            if (perDay <= cap) return;
+            overCap.push(p.route_id);
+            items.push({ key: `c|${p.route_id}|${month}`, lvl: 'warn', src: 'cap', who: p.route_id, kind: 'r', id: p.route_id,
+                noun: 'Over a planning flag',
+                what: capSentence(p.route_id, perDay, cap), sort: 1.5 });
+        });
+        // 3. seasonal windows, per visible line's vehicle
+        const vehByRoute = {};
+        (kp && kp.lines || []).forEach(l => { (vehByRoute[l.route_id] = vehByRoute[l.route_id] || new Set()).add(l.vehicle_type); });
+        (META.seasonal || []).forEach(w => {
+            if (!(w.months || []).includes(cal)) return;
+            const rv = w.restricted_vehicles || [];
+            routes.forEach(p => {
+                const vs = vehByRoute[p.route_id];
+                if (!vs) return;
+                const applies = rv.length === 0 || [...vs].some(v => rv.includes(v));
+                if (!applies) return;
+                // 3. a seasonal window matching this month and this vehicle -> CAUTION
+                items.push({ key: `w|${w.name}|${p.route_id}|${month}`, lvl: 'caution', who: p.route_id, kind: 'r', id: p.route_id,
+                    noun: 'Seasonal window',
+                    what: `${w.name}: ${(w.message || '').split(/[.—]/)[0]}. ${p.route_id}.`, sort: 3 });
+            });
+        });
+        const live = items.filter(i => !WARN.dismissed[i.key]).sort((a, b) => a.sort - b.sort);
+        renderConditionsPill(live);
+        WARN.countsMonth = month;      // which month the pill's counts describe (startTimeline reads it)
+        setCondRing(live.filter(i => i.kind === 's').map(i => i.id));
+        // the closures the live rows are about, drawn amber whether or not the layer is on;
+        // the badge on every route over its planning flag (dismissing a row clears both)
+        setRestrictionHits(liveHitEvents(hitEvents, WARN.hitRoute, live));
+        setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));
+        // a month with a red condition opens the panel once, by itself
+        if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
+        // 12 Oct 2026 (D22): playback stops ONCE PER LOOP on the first red month it ticks into, with the
+        // panel open; the next press of Play carries on and does not stop again until the loop wraps.
+        // Only a month reached by a tick can stop it — never the month Play was pressed on.
+        if (TL.playing && TL.ticked === month && !TL.clashPaused && live.some(i => i.lvl === 'clash')) {
+            TL.clashPaused = true; WARN.open = true;
+            stopTimeline(monthLabel(month) + ' · playback paused: ' + live.filter(i => i.lvl === 'clash').length + ' over capacity');
+            renderConditionsPill(live);
+        }
+        if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        box.innerHTML = `<div class="tl-head"><b>Conditions in ${esc(monthLabel(month))}</b>` +
+            `<button type="button" class="x" title="Close" aria-label="Close the conditions panel" onclick="toggleConditions()">&times;</button></div>` +
+            live.map(i =>
+            `<div class="tl-warn ${i.lvl}"><span class="cond-dot"></span><span class="body">` +
+            `<b>${esc(i.noun)}</b><span class="what">${esc(i.what)}</span><br>` +
+            `<button class="show" onclick="showCondition('${i.kind}','${esc(i.id).replace(/'/g, '')}')">Show on map</button></span>` +
+            `<button type="button" class="x" title="Dismiss for this month" aria-label="Dismiss for this month" onclick="dismissWarning('${esc(i.key).replace(/'/g, '')}')">&times;</button></div>`).join('');
+        box.style.display = 'flex';
+        positionWarnStack();
     }
 
     (function initAnalysis(){
