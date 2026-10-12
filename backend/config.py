@@ -25,6 +25,7 @@ whether 18 t is the right payload. That stays with the person editing.
 import datetime
 import json
 import os
+import re
 
 import db
 
@@ -71,7 +72,11 @@ TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", 
                    # H2 (5 Oct 2026): a short notice every screen and export carries when set —
                    # the demo tenant says "Fictional demo scheme · nothing here is real". A real
                    # tenant leaves it null and nothing is shown. Validated as text or null.
-                   "demo_notice": None}
+                   "demo_notice": None,
+                   # 12 Oct 2026 (map review 2.1 / 2.3): the address the public map's "Report a concern" link
+                   # writes to. TYPED by the tenant, never invented: null (the demo) and the map says that no
+                   # contact address has been typed. Validated as one plain email address or null.
+                   "concern_email": None}
 
 CURRENCIES = {
     "EUR": {"symbol": "€", "name": "euro"},
@@ -137,7 +142,17 @@ def tenant_settings(conversions=None, doc=None):
     t["distance_unit"] = du if du in DISTANCE_UNITS else "km"
     dn = (block or {}).get("demo_notice") if isinstance(block, dict) else None
     t["demo_notice"] = dn.strip() if isinstance(dn, str) and dn.strip() else None
+    ce = (block or {}).get("concern_email") if isinstance(block, dict) else None
+    t["concern_email"] = ce.strip() if is_concern_email(ce) else None
     return t
+
+
+# one plain address: something@domain.tld, no spaces, no second address, nothing a mailto: could be bent with
+_CONCERN_EMAIL_RE = re.compile(r"^[^\s@<>\"',;:?&]+@[^\s@<>\"',;:?&]+\.[^\s@<>\"',;:?&]+$")
+
+
+def is_concern_email(v):
+    return isinstance(v, str) and 0 < len(v.strip()) <= 254 and bool(_CONCERN_EMAIL_RE.match(v.strip()))
 # a small in-process cache so the many load_factors() calls inside one request do not
 # each hit the database. Invalidated on every write through this module; a write made
 # by another process (another Render instance) shows up within TTL seconds.
@@ -424,6 +439,9 @@ def validate(doc, network=None):
             dn = tb.get("demo_notice")
             if dn is not None and (not isinstance(dn, str) or len(dn) > 120):
                 p.append("tenant.demo_notice must be text of at most 120 characters, or null")
+            ce = tb.get("concern_email")
+            if ce is not None and ce != "" and not is_concern_email(ce):
+                p.append("tenant.concern_email must be one email address, or null")
     for w in doc.get("seasonal_restrictions") or []:
         if not isinstance(w, dict) or not w.get("name"):
             p.append("every seasonal restriction needs a name")
