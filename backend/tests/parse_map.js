@@ -3186,13 +3186,22 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && src.includes("if (typeof refreshMapModes === 'function') refreshMapModes();\n    }\n    // one district at a time")
      && blkCode.includes("if (modeOn('toggle-road-load')) leaveCouncilView();") && blkCode.includes("if (modeOn('toggle-carbon')) leaveCouncilView();")
      && blkCode.includes("['district', 'county'].forEach(t => { const cb = document.getElementById('layer-areas-' + t); if (cb) cb.checked = false; });"));
-  ok("⭐ council view: the base network (inbound, outbound, their casings, temporary haul roads) fades by OPACITY, saved and restored, never by visibility (its own boxes stay)",
-     blkCode.includes("const COUNCIL_FADE_LAYERS = ['inbound-lines-casing', 'inbound-lines', 'outbound-lines-casing', 'outbound-lines', 'temp-haul-lines'];")
-     && blkCode.includes("map.setPaintProperty(l, 'line-opacity', 0);") && blkCode.includes("map.setPaintProperty(l, 'line-opacity', COUNCIL_SAVED[l]);")
-     && blkCode.includes("fadeNetworkForCouncil(focus);")
-     && !/COUNCIL_FADE_LAYERS[\s\S]{0,600}'visibility'/.test(blkCode.slice(blkCode.indexOf("const COUNCIL_FADE_LAYERS"), blkCode.indexOf("function setForecastLabelsVisible"))));
+  // REVERSED 12 Oct 2026 (night, the user: every other layer OFF, with the ability to tick layers back by hand): the
+  // opacity fade is gone (a faded layer could not be brought back by its box); the boxes are unticked and remembered
+  ok("⭐ council view: no opacity fade of the network any more; the first council box UNTICKS every other layer box (zone kinds left) and remembers them; the last unticked ticks them back",
+     !code.includes("COUNCIL_FADE_LAYERS") && !code.includes("fadeNetworkForCouncil")
+     && code.includes(`return [...document.querySelectorAll('input[type=checkbox][id^="layer-"], input[type=checkbox][id^="restr-"]')]`)
+     && code.includes(".filter(cb => cb.id.indexOf('layer-areas-') !== 0 && cb.id.indexOf('layer-zone-') !== 0);")
+     && code.includes("COUNCIL_SOLO.saved = boxes.filter(cb => cb.checked).map(cb => cb.id);")
+     && code.includes("ids.forEach(id => { const cb = document.getElementById(id); if (cb) flip(cb, true); });")
+     && code.includes("councilSolo(areaTierOn('district') || areaTierOn('county'));")
+     && code.includes("cb.dispatchEvent(new Event('change', { bubbles: true }));"));
+  ok("⭐ districts as blocks (mockup 4): fill 0.8 with a month, white 2.5 px borders between districts, the county's dashed ink line kept",
+     code.includes("const AREA_FILL_OPACITY = 0.8;")
+     && code.includes("paint: { 'line-color': '#FFFFFF', 'line-width': 2.5, 'line-opacity': 1 } }, before);")
+     && /id: 'area-county-outline'[\s\S]{0,200}'line-color': AREA_INK, 'line-width': 2, 'line-dasharray': \[3, 2\]/.test(code));
   ok("council view: the By council group says what happens to the routes and the heat map while it is on",
-     html.includes('<div class="area-note" id="area-focus-note" hidden>While By council is on, the routes with lorries this month are drawn thin and grey, the road network is hidden and the heat map is off, so the councils read by themselves.</div>')
+     html.includes('<div class="area-note" id="area-focus-note" hidden>While By council is on, every other layer is switched off and the heat map is off, so the councils read by themselves. Tick any layer to add it back (routes show thin and grey); unticking By council brings back the layers you had on.</div>')
      && code.includes("if (fn) fn.hidden = !(areaTierOn('district') || areaTierOn('county'));"));
   ok("⭐ C1: the section card lists the routes, their teams through teamText (never the raw id) and their shares; registered ONCE",
      blkCode.includes("rlEsc(teamText((sh.teams || []).join(', ')) || '—')")
@@ -3552,20 +3561,19 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         {
           // 12 Oct 2026 (night): the council view, then back
           fmap.addLayer({ id: "forecast-flow", paint: {}, layout: {} });
-          fmap.addLayer({ id: "inbound-lines", paint: { "line-opacity": 0.8 }, layout: {} });
-          fmap.getPaintProperty = (id, k) => fmap.layers[id].paint[k];
           globalThis.areaTierOn = t => t === "district";
           B.refreshMapModes(); await flush();
           const fq = fmap.layers["forecast-layer"].paint;
           ok("⭐ council view (sandbox): with Local authority districts ticked the routes are #A8A29E at 2 px, the casing and flow hidden, the labels hidden",
              fq["line-color"] === "#A8A29E" && fq["line-width"] === 2 && fmap.layers["forecast-casing"].layout.visibility === "none"
              && fmap.layers["forecast-flow"].layout.visibility === "none" && fmap.layers["forecast-labels"].layout.visibility === "none", JSON.stringify(fq));
-          ok("council view (sandbox): the inbound network line is faded to opacity 0", fmap.layers["inbound-lines"].paint["line-opacity"] === 0);
+          // REVERSED 12 Oct 2026 (night): no network fade in the mode block; the boxes are unticked (pinned above)
+          ok("council view (sandbox): the mode block leaves the network's paint alone (no inbound-lines layer touched)", !fmap.layers["inbound-lines"]);
           delete globalThis.areaTierOn;
           B.refreshMapModes(); await flush();
           ok("council view (sandbox): unticked, the casing and flow are back and the routes take the mode's paint again",
              fmap.layers["forecast-casing"].layout.visibility === "visible" && fmap.layers["forecast-flow"].layout.visibility === "visible"
-             && fmap.layers["forecast-layer"].paint["line-color"] !== "#A8A29E" && fmap.layers["inbound-lines"].paint["line-opacity"] === 0.8);
+             && fmap.layers["forecast-layer"].paint["line-color"] !== "#A8A29E");
         }
         // a failed carbon read
         TL.matrix.co2Error = "The carbon figures could not be read (OperationalError)."; B.refreshMapModes(); await flush();
@@ -4246,7 +4254,8 @@ function qrRead(mod) {
      && ab.includes("'fill-pattern': 'area-hatch'") && ab.includes("if (map.hasImage && !map.hasImage('area-hatch')) map.addImage('area-hatch', areaHatchImage());")
      && ab.includes("const AREA_LAYERS = ['area-fill', 'area-nofig', 'area-outline', 'area-label'];"));
   ok("Track C review areas: with no month the fill is off (outlines only) and the legend says to pick a month; a tick with no month opens the timeline",
-     ab.includes("map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : 0.42);") && ab.includes("'fill-opacity': AREAS.month ? 0.42 : 0")
+     // NARROWED 12 Oct 2026 (night): the fill's opacity is AREA_FILL_OPACITY (0.8, districts as blocks), still 0 with no month
+     ab.includes("map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : AREA_FILL_OPACITY);") && ab.includes("'fill-opacity': AREAS.month ? AREA_FILL_OPACITY : 0")
      && ab.includes("lg.innerHTML = noMonth ? '<div class=\"area-note\">Shows one month: press Play or pick a month.</div>'")
      && /if \(on && !areasMonth\(\) && typeof TL !== 'undefined' && !TL\.on && typeof openTimeline === 'function'\) openTimeline\(\);/.test(ab));
   // a phone on its side

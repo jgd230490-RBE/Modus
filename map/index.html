@@ -810,7 +810,7 @@
         <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:2px;"></span></div>
         <div class="area-county-fig" id="area-county-fig"></div>
         <div class="area-note" id="area-unitary-note"></div>
-        <div class="area-note" id="area-focus-note" hidden>While By council is on, the routes with lorries this month are drawn thin and grey, the road network is hidden and the heat map is off, so the councils read by themselves.</div>
+        <div class="area-note" id="area-focus-note" hidden>While By council is on, every other layer is switched off and the heat map is off, so the councils read by themselves. Tick any layer to add it back (routes show thin and grey); unticking By council brings back the layers you had on.</div>
         <div class="area-note" id="area-when"></div>
         <div class="area-note" id="area-notes"></div>
         <div class="area-note" id="area-attribution"></div>
@@ -3887,6 +3887,9 @@
     const AREA_NONE = '#E7E5E4';                                         // no approved laden route, or no figure
     const AREA_STOPS = { movements: [50, 100, 200], carbon: [50, 100, 200] };   // fixed, ascending: a day / t in the month
     const AREA_INK = '#1F2024';
+    // 12 Oct 2026 (night, the user: districts "segregated as it is on the mockup"): each district a near-solid block of
+    // its step, parted from its neighbours by a white 2.5 px line (mockup 4); the county's dashed ink line stays on top
+    const AREA_FILL_OPACITY = 0.8;
     const AREA_LAYERS = ['area-fill', 'area-nofig', 'area-outline', 'area-label'];
     const AREA_COUNTY_LAYERS = ['area-county-outline', 'area-county-fill', 'area-county-label'];
     function areaFillExpr(mode) {
@@ -4049,7 +4052,7 @@
         if (key !== AREAS.drawn && map.getSource('areas-source')) {
             map.getSource('areas-source').setData(areaFeatures(j, AREAS.mode, AREAS.off, when));
             if (map.getLayer('area-fill')) map.setPaintProperty('area-fill', 'fill-color', areaFillExpr(AREAS.mode));
-            if (map.getLayer('area-fill')) map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : 0.42);
+            if (map.getLayer('area-fill')) map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : AREA_FILL_OPACITY);
             AREAS.drawn = key;
         }
         // the group: the colour-by switch, one row per district with its own box and figure, the legend, the lines
@@ -4126,13 +4129,13 @@
         const district = ['all', ['==', ['get', 'tier'], 'district'], ['!', ['get', 'off']]];
         const labelPt = ['==', ['geometry-type'], 'Point'];          // the labels read the label points only
         if (!map.getLayer('area-fill')) map.addLayer({ id: 'area-fill', type: 'fill', source: 'areas-source', filter: district,
-            layout: { visibility: dVis }, paint: { 'fill-color': areaFillExpr(AREAS.mode), 'fill-opacity': AREAS.month ? 0.42 : 0 } }, before);
+            layout: { visibility: dVis }, paint: { 'fill-color': areaFillExpr(AREAS.mode), 'fill-opacity': AREAS.month ? AREA_FILL_OPACITY : 0 } }, before);
         // Track C review: a district with no figure (v = -1) is hatched over its neutral fill, never shown as a zero
         if (!map.getLayer('area-nofig')) map.addLayer({ id: 'area-nofig', type: 'fill', source: 'areas-source',
             filter: ['all', ['==', ['get', 'tier'], 'district'], ['!', ['get', 'off']], ['==', ['get', 'v'], -1]],
             layout: { visibility: dVis }, paint: { 'fill-pattern': 'area-hatch', 'fill-opacity': 0.8 } }, before);
         if (!map.getLayer('area-outline')) map.addLayer({ id: 'area-outline', type: 'line', source: 'areas-source', filter: district,
-            layout: { visibility: dVis }, paint: { 'line-color': AREA_INK, 'line-width': 1, 'line-opacity': 0.55 } }, before);
+            layout: { visibility: dVis }, paint: { 'line-color': '#FFFFFF', 'line-width': 2.5, 'line-opacity': 1 } }, before);
         if (!map.getLayer('area-county-outline')) map.addLayer({ id: 'area-county-outline', type: 'line', source: 'areas-source',
             filter: ['==', ['get', 'tier'], 'county'],
             layout: { visibility: cVis }, paint: { 'line-color': AREA_INK, 'line-width': 2, 'line-dasharray': [3, 2] } }, before);
@@ -4167,12 +4170,34 @@
         out['area-county-label'] = v(c && !d);
         return out;
     }
+    // 12 Oct 2026 (night, the user: "all other layers turn off when this layer is on, with the ability to manually select
+    // additional layers if needed"): the first council box ticked UNTICKS every other layer box (the map's own and the
+    // closures'; the zone kinds are left, their parent box covers them) and remembers which were on; any can be ticked
+    // back by hand meanwhile; unticking the last council box ticks the remembered ones back (a box ticked by hand stays).
+    const COUNCIL_SOLO = { saved: null };
+    function councilOtherBoxes() {
+        return [...document.querySelectorAll('input[type=checkbox][id^="layer-"], input[type=checkbox][id^="restr-"]')]
+            .filter(cb => cb.id.indexOf('layer-areas-') !== 0 && cb.id.indexOf('layer-zone-') !== 0);
+    }
+    function councilSolo(on) {
+        const flip = (cb, v) => { if (cb.checked !== v) { cb.checked = v; cb.dispatchEvent(new Event('change', { bubbles: true })); } };
+        if (on && COUNCIL_SOLO.saved === null) {
+            const boxes = councilOtherBoxes();
+            COUNCIL_SOLO.saved = boxes.filter(cb => cb.checked).map(cb => cb.id);
+            boxes.forEach(cb => flip(cb, false));
+        } else if (!on && COUNCIL_SOLO.saved !== null) {
+            const ids = COUNCIL_SOLO.saved;
+            COUNCIL_SOLO.saved = null;
+            ids.forEach(id => { const cb = document.getElementById(id); if (cb) flip(cb, true); });
+        }
+    }
     function toggleAreaTier(tier, on) {
         // Track C review: a tick with no single month on screen opens the timeline (its month), as Road load and Carbon do
         if (on && !areasMonth() && typeof TL !== 'undefined' && !TL.on && typeof openTimeline === 'function') openTimeline();
         const vis = areaVisibility();
         AREA_LAYERS.concat(AREA_COUNTY_LAYERS).forEach(l => toggleLayer(l, vis[l] === 'visible'));
         if (on) refreshAreas(); else renderAreas();
+        councilSolo(areaTierOn('district') || areaTierOn('county'));
         // 12 Oct 2026 (night): By council is seen by itself: the heat map goes Off, the routes go thin and grey
         if (on) { const off = document.getElementById('heat-off'); if (off && !off.checked) { off.checked = true; if (typeof scheduleViewWrite === 'function') scheduleViewWrite(); } }
         if (typeof refreshMapModes === 'function') refreshMapModes();
@@ -5524,23 +5549,6 @@
     const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;
     const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-cap-badge'];
     function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }
-    // the base road network (green inbound, amber outbound, the temporary haul roads) fades out too: by OPACITY, so its
-    // own tick boxes (visibility) are untouched, and each layer's own opacity comes back when the council view ends
-    const COUNCIL_FADE_LAYERS = ['inbound-lines-casing', 'inbound-lines', 'outbound-lines-casing', 'outbound-lines', 'temp-haul-lines'];
-    const COUNCIL_SAVED = {};
-    function fadeNetworkForCouncil(on){
-        COUNCIL_FADE_LAYERS.forEach(l => {
-            if (!map.getLayer(l)) return;
-            const cur = map.getPaintProperty(l, 'line-opacity');
-            if (on) {
-                if (cur !== 0) COUNCIL_SAVED[l] = (cur === undefined ? 1 : cur);   // a re-added layer (basemap switch) saves afresh
-                map.setPaintProperty(l, 'line-opacity', 0);
-            } else if (l in COUNCIL_SAVED) {
-                map.setPaintProperty(l, 'line-opacity', COUNCIL_SAVED[l]);
-                delete COUNCIL_SAVED[l];
-            }
-        });
-    }
     function setForecastLabelsVisible(on){
         if (map.getLayer('forecast-labels')) map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');
     }
@@ -5558,7 +5566,6 @@
             map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
         }
         COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
-        fadeNetworkForCouncil(focus);
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', heat ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
         if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }
         else {
