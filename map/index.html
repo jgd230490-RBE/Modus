@@ -5250,6 +5250,11 @@
     //: 19 to 181 m, each labelled as if it were a stretch of road
     const ROAD_LOAD_LABEL_MIN_KM = 0.2;
     const CARBON_LABEL_LAYER = 'carbon-route-labels';
+    // 12 Oct 2026 (night, seen live in the user's Chrome: 1 of 18 carbon labels drawn): a label placed along the route
+    // ('line-center') is dropped by Mapbox wherever the road bends past the text's maximum angle, which on real HERE
+    // routes is nearly everywhere - the road-load labels' failure of the same morning. The carbon label is now a LEVEL
+    // point label at each route's middle by length, on its own point source (runMidpoint, as the road-load labels).
+    const CARBON_LABEL_SOURCE = 'carbon-label-source';
     //: the Volume heat map's four stops, two-way movements a day, FIXED (one colour = one volume in every month and
     //: every scheme): under 10 · 10-25 · 25-50 · 50-100 · 100 and over. A shared section's figure is a sum of routes,
     //: so the top step is reached mostly on shared roads.
@@ -5440,11 +5445,37 @@
         if (lsrc) lsrc.setData({ type: 'FeatureCollection', features: roadLoadLabelPoints(feats) });
     }
     function ensureCarbonLabelLayer(){
-        if (map.getLayer(CARBON_LABEL_LAYER) || !map.getSource('routes-source')) return;
-        map.addLayer({ id: CARBON_LABEL_LAYER, type: 'symbol', source: 'routes-source', filter: carbonLabelFilter(),
-            layout: { 'symbol-placement': 'line-center', 'text-field': CARBON_ROUTE_LABEL, 'text-size': 14, 'text-offset': [0, -1] },
+        if (!map.getSource('routes-source')) return;
+        if (!map.getSource(CARBON_LABEL_SOURCE)) map.addSource(CARBON_LABEL_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        if (map.getLayer(CARBON_LABEL_LAYER)) return;
+        map.addLayer({ id: CARBON_LABEL_LAYER, type: 'symbol', source: CARBON_LABEL_SOURCE, filter: carbonLabelFilter(),
+            layout: { 'symbol-placement': 'point', 'text-field': CARBON_ROUTE_LABEL, 'text-size': 14, 'text-anchor': 'bottom', 'text-offset': [0, -0.8],
+                      'text-max-width': 30, 'text-padding': 4 },
             paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
         raiseMarks();
+    }
+    // one point per route on the overlay, at the middle of its LOADED leg by length (the longest part of a multi-part
+    // line), carrying what the layer's filter and text read: route_id, type, is_forecast and f_co2
+    function carbonLabelPoints(){
+        const src = map.getSource('routes-source');
+        const feats = (src && src._data && src._data.features) || [];
+        const out = [];
+        feats.forEach(f => {
+            const p = f.properties || {}, g = f.geometry;
+            if (!g || p.type !== 'Inbound Highway' || !p.is_forecast) return;
+            let coords = null;
+            if (g.type === 'LineString') coords = g.coordinates;
+            else if (g.type === 'MultiLineString') coords = (g.coordinates || []).reduce((a, c) => (c.length > a.length ? c : a), []);
+            const pt = runMidpoint(coords);
+            if (!pt) return;
+            out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: pt },
+                       properties: { route_id: p.route_id, type: p.type, is_forecast: true, f_co2: p.f_co2 } });
+        });
+        return out;
+    }
+    function syncCarbonLabels(){
+        const s = map.getSource(CARBON_LABEL_SOURCE);
+        if (s) s.setData({ type: 'FeatureCollection', features: carbonLabelPoints() });
     }
     // the overlay's own filter, on the LOADED leg only: one carbon label per route, never one per carriageway
     function carbonLabelFilter(){
@@ -5496,8 +5527,11 @@
             map.setPaintProperty('forecast-layer', 'line-width', heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
         }
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', heat ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
-        if (co2) ensureCarbonLabelLayer();
-        else if (map.getLayer(CARBON_LABEL_LAYER)) map.removeLayer(CARBON_LABEL_LAYER);
+        if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }
+        else {
+            if (map.getLayer(CARBON_LABEL_LAYER)) map.removeLayer(CARBON_LABEL_LAYER);
+            if (map.getSource(CARBON_LABEL_SOURCE)) map.removeSource(CARBON_LABEL_SOURCE);
+        }
         if (map.getLayer('road-load-line')) {
             map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', VOLUME_STOPS));
             map.setPaintProperty('road-load-line', 'line-width', ROAD_LOAD_LINE_WIDTH);

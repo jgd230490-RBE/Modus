@@ -3138,6 +3138,14 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && blkCode.includes("if (!map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.addSource(ROAD_LOAD_LABEL_SOURCE, { type: 'geojson'")
      && blkCode.includes("if (map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.removeSource(ROAD_LOAD_LABEL_SOURCE);")
      && blkCode.includes("if (lsrc) lsrc.setData({ type: 'FeatureCollection', features: roadLoadLabelPoints(feats) });"));
+  // 12 Oct 2026 (night, live in the user's Chrome: 1 of 18 carbon labels drawn on real HERE routes)
+  ok("⭐ live check 12 Oct: the carbon route label is a LEVEL point label at the route's middle, on its own source — never placed along the line",
+     blkCode.includes("const CARBON_LABEL_SOURCE = 'carbon-label-source';")
+     && /id: CARBON_LABEL_LAYER, type: 'symbol', source: CARBON_LABEL_SOURCE, filter: carbonLabelFilter\(\),\s*layout: \{ 'symbol-placement': 'point', 'text-field': CARBON_ROUTE_LABEL, 'text-size': 14,/.test(blkCode)
+     && !/id: CARBON_LABEL_LAYER[\s\S]{0,300}'symbol-placement': 'line/.test(blkCode)
+     && blkCode.includes("const pt = runMidpoint(coords);")
+     && blkCode.includes("if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }")
+     && blkCode.includes("if (map.getSource(CARBON_LABEL_SOURCE)) map.removeSource(CARBON_LABEL_SOURCE);"));
   ok("browser check 12 Oct: the run label keeps to one line (text-max-width 30 ems) and is never forced over other labels",
      /id: 'road-load-labels'[\s\S]{0,300}'text-max-width': 30,/.test(blkCode)
      && !/id: 'road-load-labels'[\s\S]{0,400}'text-allow-overlap': true/.test(blkCode));
@@ -3149,7 +3157,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 4);
   ok("C1: both lazy adders re-raise the marks (raiseMarks count is additive)",
      /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*raiseMarks\(\);/.test(blkCode)
-     && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,400}raiseMarks\(\);/.test(blkCode)
+     // NARROWED 12 Oct 2026 (night): the carbon label layer's definition is longer (point placement), so a wider window
+     && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,700}raiseMarks\(\);/.test(blkCode)
      && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
   ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
      (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
@@ -3327,7 +3336,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks",
         "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
-        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff };")(
+        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff, carbonLabelPoints };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
@@ -3494,6 +3503,17 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("⭐ C1: f_co2 is the route's month figure on BOTH legs (rounded to 0.1 t); a route with no figure is null, never 0",
            fco2 === "R1/Inbound=47.3,R1/Outbound=47.3,R2/Inbound=null,R2/Outbound=null,R3/Inbound=5", fco2);
         ok("C1: the legend says per route now", el("carbon-legend").innerHTML.includes("per route</b>"));
+        {
+          // 12 Oct 2026 (night): the label points — one per route on the overlay, loaded leg only, at the middle by length
+          const saved = a1_data.features.map(f => f.properties.is_forecast);
+          a1_data.features.forEach(f => { f.properties.is_forecast = f.properties.route_id !== "R2"; });
+          const pts = B.carbonLabelPoints();
+          ok("⭐ live check 12 Oct: one carbon label point per route on the overlay (loaded leg only, none for a route off the overlay), at its middle, carrying f_co2",
+             pts.length === 2 && pts.map(p => p.properties.route_id).join(",") === "R1,R3" && pts.every(p => p.geometry.type === "Point" && p.properties.type === "Inbound Highway")
+             && Math.abs(pts[0].geometry.coordinates[0] - 0.5) < 1e-9 && Math.abs(pts[0].geometry.coordinates[1] - 0.5) < 1e-9
+             && pts[0].properties.f_co2 === 47.3 && pts[1].properties.f_co2 === 5, JSON.stringify(pts.map(p => p.properties)));
+          a1_data.features.forEach((f, i) => { f.properties.is_forecast = saved[i]; });
+        }
         // 12 Oct 2026 (wording review): a CO2e figure a person reads carries the Carbon page's stamp, from the feed
         ok("⭐ wording: with no stamp in the feed the carbon legend prints none (never retyped on the page)",
            !el("carbon-legend").innerHTML.includes("Carbon Tool"));
