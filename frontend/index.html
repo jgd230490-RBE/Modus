@@ -1783,10 +1783,17 @@ function App(){
   // only to a valid code or a staff cookie. The mount fetch runs BEFORE a fresh sign-in (no header yet), so once
   // the code is known it is fetched again (the fetch wrapper adds the header); a resume had the code at mount and
   // is not fetched twice. Everything the sign-in screen needs is in both shapes.
+  // 12 Oct 2026 (the review and fix pass): the flag is set from the ANSWER's shape (m.scope), not from whether a
+  // code was stored — a resumed tab with a code the server no longer accepts got the public shape, and after a fresh
+  // sign-in the portal ran with no routes or teams. Only the latest fetch's answer is applied (metaSeq), so a slow
+  // public answer from mount cannot land on top of the staff one fetched after sign-in.
   const metaHadCode = useRef(false);
+  const metaSeq = useRef(0);
   const loadMeta = () => {
-    metaHadCode.current = !!ACCESS.code;
+    const seq = ++metaSeq.current;
     return fetch(`${API}/meta`).then(r => r.json()).then(m => {
+      if(seq !== metaSeq.current) return;
+      metaHadCode.current = !!(m && m.scope === "staff");
       const vl = m && m.vehicle_labels;
       // 11 Oct 2026: `langs` is what the server OFFERS this tenant (English, plus any label language one of its vehicles still carries)
       if(vl){ VEH.labels = vl.labels || {}; VEH.fallbacks = vl.fallbacks || {}; VEH.langs = (Array.isArray(vl.langs) && vl.langs.length) ? vl.langs : ["en"]; }
@@ -1809,7 +1816,7 @@ function App(){
       if(!vehLangShown(VEH.lang)){ VEH.lang = "en"; setVehLangState("en"); }
       (m && m.ipts || []).forEach(i => { if(i && i.id) TEAM_LABELS[iptKey(i.id)] = i.label || i.id; });
       setMeta(m);
-    }).catch(() => setMetaErr(true));
+    }).catch(() => { if(seq === metaSeq.current) setMetaErr(true); });
   };
   useEffect(() => { loadMeta(); }, []);
   useEffect(() => { if(role && !metaHadCode.current) loadMeta(); }, [role]);
@@ -1841,6 +1848,10 @@ function App(){
   const signOut = () => {
     ACCESS.code = ""; ACCESS.info = null;
     try { sessionStorage.removeItem("modus_access_code"); } catch(e){}
+    // 12 Oct 2026 (the review and fix pass): the server swaps the 12-hour STAFF cookie for a map-only one, so the next
+    // person at a shared machine gets the public map and not the staff data; the next sign-in fetches /api/meta again
+    fetch(`${API}/gate-signout?keep=map`, { method: "POST" }).catch(() => {});
+    metaHadCode.current = false;
     setRole(null); setView("public");
   };
   // the bar's Guide: none on the sign-in view (it has no tour); the embedded map's tour on a map view, once the map

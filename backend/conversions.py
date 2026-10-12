@@ -71,7 +71,11 @@ def _payload(factors, vehicle):
 #: factors' published AVERAGE for non-refrigerated diesel HGVs, average laden, kg CO2e per
 #: vehicle-km, flat file v1.2 (notes/carbon-check-1009.md §2, §6). It replaced the 0.90
 #: literals here and on the map that no published row ever said; the seed's `_default` entry
-#: carries the same figure, so a document with or without that entry resolves alike.
+#: carries the same figure, so a document seeded from the file resolves alike with or without
+#: that entry. NOT so for a tenant whose stored config predates 12 Oct 2026: load_factors()
+#: reads the tenant's config row, not factors.json, so the live demo keeps its stored
+#: `_default` of 0.97 until its Config page is reset to file or its package is re-imported
+#: (both barred before the show); network.factors_diagnostics() warns when they differ.
 #: conversions._emissions() is the only reader: network.route_analysis, costlines and the
 #: flat factors /api/meta serves all go through it, so no two screens can disagree.
 FALLBACK_KG_CO2E_PER_KM = 0.89743

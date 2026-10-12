@@ -191,7 +191,9 @@ def password_ok(supplied):
     want = map_password()
     if not want or not supplied:
         return False
-    return hmac.compare_digest(want, str(supplied).strip())
+    # bytes (12 Oct 2026): compare_digest raises TypeError on a non-ASCII str, which turned
+    # a password with an accent into a 500 instead of a refusal
+    return hmac.compare_digest(want.encode("utf-8"), str(supplied).strip().encode("utf-8"))
 
 
 def cookie_kwargs(level, now=None):
@@ -207,6 +209,31 @@ def cookie_kwargs(level, now=None):
         "samesite": "lax",
         "secure": True,
     }
+
+
+def downgrade_kwargs(token, now=None):
+    """
+    12 Oct 2026 (the review and fix pass): what the app's Sign out sets in place of a STAFF
+    cookie — a MAP cookie that expires when the staff one would have, never later. Signing
+    out of the app used to clear only the code in the tab: the 12-hour staff cookie stayed,
+    so on a shared machine (the stand laptop) the next person still got the staff shape of
+    /api/meta, `staff` from whoami, the network reads and /help/. The public map keeps
+    working on that machine (whoever signed out could open it), the staff surface does not.
+    None when the token is not a valid staff cookie: the caller leaves it alone.
+    """
+    if verify(token, now=now) != LEVEL_STAFF:
+        return None
+    now_i = int(now if now is not None else time.time())
+    try:
+        exp = int(str(token).split(".")[1])
+    except (IndexError, ValueError):
+        return None
+    ttl = min(max(1, exp - now_i), MAP_TTL_S)
+    value = sign(LEVEL_MAP, now=now_i, ttl_s=ttl)
+    if not value:
+        return None
+    return {"key": COOKIE, "value": value, "max_age": ttl, "path": "/", "httponly": True,
+            "samesite": "lax", "secure": True}
 
 
 def scope_for(path):

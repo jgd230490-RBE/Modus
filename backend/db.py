@@ -248,6 +248,50 @@ def execute(sql, params=()):
     _run(sql, params, fetch=False)
 
 
+def execute_atomic(steps):
+    """
+    12 Oct 2026 (the road-sections review): several writes on ONE connection, committed
+    ONCE, rolled back together on any error — so a reader never sees half of a replace
+    (a DELETE without its INSERTs) and a replace that fails leaves the old rows in place.
+
+    `steps` is a list of (sql, params) for one statement, or (sql, [params, ...]) with a
+    third item True for one statement over many rows (executemany; on Postgres
+    psycopg2.extras.execute_batch, which sends the rows in pages rather than one round
+    trip each). A dead pooled connection is retried once, as _run does: nothing was
+    committed, so the retry repeats the whole set.
+    """
+    for attempt in (0, 1):
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            for step in steps:
+                sql, params = step[0], step[1]
+                many = len(step) > 2 and step[2]
+                if many:
+                    rows = list(params or [])
+                    if not rows:
+                        continue
+                    if IS_PG:
+                        psycopg2.extras.execute_batch(cur, _adapt(sql), rows, page_size=200)
+                    else:
+                        cur.executemany(_adapt(sql), rows)
+                else:
+                    cur.execute(_adapt(sql), params)
+            conn.commit()
+            return None
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            if attempt == 0 and _is_conn_error(e) and isinstance(conn, _PooledConn):
+                conn.discard()
+                continue
+            raise
+        finally:
+            conn.close()
+
+
 # FORECASTS_DDL was here. Phase 4.5 made _TENANT_DDL["forecasts"] the single source
 # for this table, so a second copy of the DDL could only ever drift out of it — and a
 # drifted copy without tenant_id is precisely the "column present, isolation absent"

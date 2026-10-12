@@ -293,8 +293,11 @@ ok("⭐ rule 3 (ceil per line): vehicles = Σ per line ceil(loads ÷ wd ÷ trips
 WRONG_ONCE = math.ceil((loads_r1_a + loads_r1_c) / WD / TPV1) + math.ceil(loads_r2 / WD / TPV2)
 ok("…and NOT ceil once over R1's two artic lines together (the breaking case: the two lines' fractions)",
    FLEET != WRONG_ONCE and R["vehicles"]["fleet"] != WRONG_ONCE, f"{FLEET} vs {WRONG_ONCE}")
+# NARROWED 12 Oct 2026 (the review and fix pass): plain words for a council reader — "no stored road route", not the team's "unbaked"
 ok("⭐ rule 4 (unbaked named, not zeroed): the rigid line is in the movements, out of the fleet, and the label says so",
-   R["vehicles"]["excludes_unbaked_lines"] == 1 and R["vehicles"]["label"] == "Vehicles needed (excludes 1 unbaked line)"
+   R["vehicles"]["excludes_unbaked_lines"] == 1
+   and R["vehicles"]["label"] == "Vehicles needed (excludes 1 line with no stored road route for the vehicle)"
+   and "unbaked" not in R["vehicles"]["label"]
    and R["vehicles"]["not_baked"] is False and near(H["two_way_a_day"] - (LOADS - loads_r1_b) / WD, loads_r1_b / WD, 1e-3),
    str(R["vehicles"]))
 R_NO_RIGID = bulletin.rollup_payloads([dict(P10, lines=[l for l in P10["lines"] if l["vehicle_type"] != R8])], ROUTES, WD)
@@ -314,7 +317,8 @@ ok("…the breaking case: were R3 drawn, its 1,000 t would join the figures (rou
 CO2 = sum(l["co2_t"] for l in P10["lines"] if l["co2_t"] is not None and l["route_id"] in ROUTES)
 ok("⭐ rule 7 (carbon): CO₂e a day = Σ co2_t ÷ wd, the month's total, 1 unbaked line named, the Carbon page's stamp",
    near(R["carbon"]["co2_t_a_day"], CO2 / WD, 1e-3) and near(R["carbon"]["co2_t_in_month"], CO2, 1e-3)
-   and R["carbon"]["excludes_unbaked_lines"] == 1 and R["carbon"]["label_day"] == "CO₂e a day (excl. 1 unbaked)"
+   and R["carbon"]["excludes_unbaked_lines"] == 1
+   and R["carbon"]["label_day"] == "CO₂e a day (excl. 1 line with no stored road route)"  # NARROWED 12 Oct 2026 (wording)
    and R["carbon"]["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
    and CO2 > 0, str(R["carbon"]))
 ok("…co2 to date follows the payload's programme-to-date list over the drawn routes",
@@ -328,7 +332,7 @@ ok("⭐ when no counted line carries carbon the figures read None and not_baked 
    "not 0.0 t; the volumes are untouched",
    R_NOCO2["carbon"]["co2_t_a_day"] is None and R_NOCO2["carbon"]["co2_t_in_month"] is None
    and R_NOCO2["carbon"]["not_baked"] is True and R_NOCO2["carbon"]["excludes_unbaked_lines"] == 4
-   and R_NOCO2["carbon"]["label_day"] == "CO₂e a day (excl. 4 unbaked)" and R_NOCO2["headline"] == H
+   and R_NOCO2["carbon"]["label_day"] == "CO₂e a day (excl. 4 lines with no stored road route)" and R_NOCO2["headline"] == H
    and R_NOCO2["vehicles"] == R["vehicles"], str(R_NOCO2["carbon"]))
 _real_cl = costlines.lines
 
@@ -345,11 +349,24 @@ finally:
 R_ERR = bulletin.rollup_payloads([P10_ERR], ROUTES, WD)
 ok("⭐ …and when the costlines read fails, the payload's co2_error rides on the carbon block as `error`, the figures None, "
    "the headline and fleet the same (volumes are not carbon's hostage)",
-   P10_ERR.get("co2_error") == "RuntimeError: fixture: the costlines read failed"
+   # NARROWED 12 Oct 2026 (the review and fix pass): co2_error is a fixed sentence naming the class; the message is
+   # logged server-side, never served on a /api/public/ feed (an exception's text can carry SQL or internal keys)
+   P10_ERR.get("co2_error") == "The carbon figures could not be read (RuntimeError)."
+   and "fixture" not in P10_ERR.get("co2_error", "")
    and R_ERR["carbon"]["error"] == P10_ERR["co2_error"] and R_ERR["carbon"]["not_baked"] is True
    and R_ERR["carbon"]["co2_t_in_month"] is None and R_ERR["carbon"]["co2_t_a_day"] is None
    and R_ERR["carbon"]["excludes_unbaked_lines"] == 4 and R_ERR["headline"] == H and R_ERR["vehicles"] == R["vehicles"],
    f"{P10_ERR.get('co2_error')} {R_ERR['carbon']}")
+# 12 Oct 2026 (the review and fix pass): the to-date figure follows the same rule — it used to print 0.0 t beside
+# not_baked True and the error, because a failed read empties co2_to_date and an empty sum is 0.0
+ok("⭐ …and CO₂e to date is None too when the read failed (never 0.0 t beside the error)",
+   R_ERR["carbon"]["co2_t_to_date"] is None, str(R_ERR["carbon"]))
+R_NOTD = bulletin.rollup_payloads([dict(P10, lines=[dict(l, co2_t=None) for l in P10["lines"]], co2_to_date=[],
+                                        co2_to_date_unbaked_lines=6)], ROUTES, WD)
+ok("⭐ …and when nothing to date carries carbon (no row, 6 line-months without a stored route) to date is None, not 0.0 t",
+   R_NOTD["carbon"]["co2_t_to_date"] is None and R_NOTD["carbon"]["to_date_excludes_unbaked_lines"] == 6, str(R_NOTD["carbon"]))
+ok("…while a programme with rows to date keeps its figure (the happy month above)", R["carbon"]["co2_t_to_date"] is not None
+   and R_NOCO2["carbon"]["co2_t_to_date"] is not None)
 ok("…the read is restored: the next payload carries carbon and no co2_error again",
    costlines.lines is _real_cl and "co2_error" not in bulletin.month_payload(10)
    and bulletin.rollup_payloads([bulletin.month_payload(10)], ROUTES, WD)["carbon"]["error"] is None)
@@ -445,8 +462,9 @@ ok("an empty month says so: empty, four headline figures null, routes 0, no busi
 R_UNDRAWN = bulletin.rollup_payloads([dict(P10, lines=[l for l in P10["lines"] if l["route_id"] == "R3"])], ROUTES, WD)
 ok("…a month whose only lines sit on undrawn routes is empty too, but the note NAMES them rather than saying there is no forecast",
    R_UNDRAWN["empty"] is True and R_UNDRAWN["routes_not_drawn"] == {"lines": 1, "routes": ["R3"], "note": R_UNDRAWN["routes_not_drawn"]["note"]}
+   # NARROWED 12 Oct 2026 (wording): "with no stored road route yet", not "not yet baked"
    and R_UNDRAWN["note"] == ("No approved forecast on a route the map draws in this month: 1 line on 1 route "
-                             "not yet baked, listed below and not counted."), R_UNDRAWN["note"])
+                             "with no stored road route yet, listed below and not counted."), R_UNDRAWN["note"])
 
 # =========================================================================== #
 #  4. The harness comparison: calculateKPIs's rules, written again, independently
@@ -610,6 +628,15 @@ ok("…the routes without a stored check are listed as never checked; the block 
 C9 = bulletin.conditions_of_month(9, payload=P10, factors=FACTORS)
 ok("…the breaking case: in September the ended closure IS a hit and the October one is not",
    [x["headline"] for x in C9["restrictions"]["hits"]] == ["A46 Barrier repairs (2026-09-10 → 2026-09-30)", "Mass limit 18 t"])
+# 12 Oct 2026 (the review and fix pass): the stored check keeps only closures in force when it ran, so for a month
+# that had ended by then it can be missing closures — the block says so instead of a bare "checked"
+_C9r = C9["restrictions"]
+ok("⭐ a month that ended before the stored check ran says the check came after it and may be incomplete",
+   _C9r["checked_after_month"] is True and _C9r["past_month_note"] == (
+       "Checked on 2026-10-11, after this month ended; closures that had ended by then are not stored, "
+       "so this month's list may be incomplete."), str(_C9r.get("past_month_note")))
+ok("…while the month the check ran in carries no such note", C10["restrictions"]["checked_after_month"] is False
+   and C10["restrictions"]["past_month_note"] is None)
 ok("the hit a person reads carries the dates, the road and the verdict, never a team id",
    _h[0]["from"] == "2026-10-16" and _h[0]["road_nr"] == "A6" and _h[1]["verdict"] == "breach"
    and not ID_FORM.search(json.dumps(C10)))
@@ -628,8 +655,11 @@ ok("…and a location with no capacity is never 'over'", all(x["location_id"] !=
 # 12 Oct 2026 (the tenancy / wording review; D23): the sentence a person reads says the balance is RECORDED —
 # typed week actuals carried forward — never "the plan puts", which is what the map says today (`map/index.html`)
 ok("⭐ the stockpile sentence reads \"recorded in it at the end of Sep 2026\", names the capacity and the unit, and never \"the plan puts\"",
-   _c9[0]["wording"] == ("Mill Compound holds 1,000 t. 1,200 t recorded in it at the end of Sep 2026, from the week actuals "
-                         "typed so far, carried forward.")
+   # NARROWED 12 Oct 2026 (the review and fix pass): "has a capacity of", not "holds" — "holds" read as the pile's
+   # contents now, beside a different recorded figure
+   _c9[0]["wording"] == ("Mill Compound has a capacity of 1,000 t; 1,200 t recorded in it at the end of Sep 2026, from the "
+                         "week actuals typed so far, carried forward.")
+   and " holds " not in _c9[0]["wording"]
    and _c9[0]["wording"] == bulletin.stockpile_wording("Mill Compound", 1000, 1200, "t", 9)
    and "plan puts" not in _c9[0]["wording"], str(_c9[0].get("wording")))
 ok("…the wording is one function and bulletin.py never says \"The plan puts\"",
@@ -655,6 +685,11 @@ ok("⭐ route caps: R1's 1,651 loads over the working days exceed its cap of 60 
    and _cap["exceeded"][0]["cap"] == 60 and near(_cap["exceeded"][0]["two_way_a_day"], (loads_r1_a + loads_r1_b + loads_r1_c) / WD, 1e-3)
    and _cap["exceeded"][0]["wording"] == "planning flag" and _cap["routes_with_cap"] == 1
    and "never a block" in _cap["note"], str(_cap))
+# 12 Oct 2026 (the review and fix pass): one name for the one figure — two-way movements a day, against a DAILY cap
+ok("…the cap note names the figure 'two-way movements a day' (one load = one movement), never 'loaded trips'",
+   _cap["note"] == ("Two-way movements a day (one load = one movement; the month's loads ÷ working days) against the "
+                    "daily cap typed on the route — a planning flag, never a block.")
+   and "Loaded trips" not in read("backend/bulletin.py") and "loaded trips a day" not in read("backend/bulletin.py"))
 db.execute("UPDATE routes SET max_vehicles_per_day = ? WHERE tenant_id = ? AND id = ?", (80, "default", "R1"))
 ok("…the breaking case: a cap of 80 is not exceeded, and R2 (no cap) is never listed",
    bulletin.conditions_of_month(10, payload=P10, factors=FACTORS)["route_caps"]["exceeded"] == [])
@@ -700,6 +735,16 @@ ok("⭐ a team code's page: the scheme's figures, its own team's rows only, the 
    PAGE_T["rollup"]["headline"] == H and [r["key"] for r in PAGE_T["rollup"]["breakdown"]["team"]] == ["North Team"]
    and PAGE_T["scope"]["team"] == "North Team" and "limited to your team" in PAGE_T["scope"]["note"]
    and PAGE_T["conditions"]["restrictions"]["hits"] == PAGE["conditions"]["restrictions"]["hits"], str(PAGE_T["scope"]))
+# 12 Oct 2026 (the review and fix pass): the per-team limit hides nothing (the headline less the team's own row is the
+# other teams' total, and the busiest routes and the other rows are the scheme's) — the note says so, in plain words.
+# Whether a team code should see less is the user's decision; this pins what it sees TODAY.
+ok("⭐ a team code's page says plainly that the headline, busiest routes and other rows include every team",
+   PAGE_T["scope"]["note"] == bulletin.SCOPE_NOTE_TEAM and "include every team" in PAGE_T["scope"]["note"]
+   and "map password" in PAGE_T["scope"]["note"])
+ok("…and that is what it gets: the team code's busiest routes and discipline rows are the planner's",
+   PAGE_T["rollup"]["busiest_routes"] == PAGE["rollup"]["busiest_routes"]
+   and PAGE_T["rollup"]["breakdown"]["discipline"] == PAGE["rollup"]["breakdown"]["discipline"]
+   and PAGE_T["rollup"]["breakdown"]["section"] == PAGE["rollup"]["breakdown"]["section"])
 ok("month_rollup over a window reaches the same figures as the pure function",
    bulletin.month_rollup(10, PLANNER, months=[10, 11])["vehicles"]["fleet"] == R2M["vehicles"]["fleet"]
    and bulletin.month_rollup(10, PLANNER)["headline"] == H)

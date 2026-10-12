@@ -353,6 +353,43 @@ ok("🔴 whoami never returns a code or a team id: the label falls back to '<tea
    "access.canonical_ipt(team) == acc[\"ipt\"]" in _body("public_whoami")
    and not re.search(r"environ|_CODE|X-Access-Code|body\.code", _body("public_whoami").split('"""')[2]))
 
+
+# ---------------------------------------------------------------- 8. 12 Oct 2026 — the review and fix pass
+# non-ASCII: hmac.compare_digest raises TypeError on a str with a non-ASCII character, which made ?token=é a 500
+clean()
+try:
+    ok("🔴 a password with a non-ASCII character is refused (False), never a TypeError (a 500)",
+       gate.password_ok("corridor-2026é") is False and gate.password_ok("é") is False)
+except TypeError as e:
+    ok("🔴 a password with a non-ASCII character is refused (False), never a TypeError (a 500)", False, repr(e))
+env(MAP_PASSWORD="corrédor")
+ok("...and a non-ASCII password itself still matches exactly", gate.password_ok("corrédor") is True
+   and gate.password_ok("corredor") is False)
+clean()
+ok("C11: _check_admin compares BYTES, so a non-ASCII token is a 403, not a 500",
+   "hmac.compare_digest(admin_token.encode(\"utf-8\"), str(token).strip().encode(\"utf-8\"))" in _body("_check_admin"))
+
+# Sign out on a shared machine: the 12-hour STAFF cookie is swapped for a MAP cookie that ends no later
+clean()
+_now = 1_800_000_000
+_staff = gate.sign(gate.LEVEL_STAFF, now=_now)
+_kw = gate.downgrade_kwargs(_staff, now=_now + 3600)
+ok("⭐ downgrade_kwargs turns a valid STAFF cookie into a MAP cookie (the public map still opens, the staff surface does not)",
+   _kw is not None and _kw["key"] == gate.COOKIE and gate.verify(_kw["value"], now=_now + 3600) == gate.LEVEL_MAP
+   and _kw["httponly"] is True and _kw["path"] == "/", str(_kw))
+ok("⭐ ...expiring when the staff cookie would have, never later (11 h left of 12, not the map's 30 days)",
+   _kw["max_age"] == gate.STAFF_TTL_S - 3600
+   and gate.verify(_kw["value"], now=_now + gate.STAFF_TTL_S + 1) is None, str(_kw.get("max_age")))
+ok("...a MAP cookie, a forged one, an expired one or none is left alone (None)",
+   gate.downgrade_kwargs(gate.sign(gate.LEVEL_MAP, now=_now), now=_now) is None
+   and gate.downgrade_kwargs("staff.9999999999.forged", now=_now) is None
+   and gate.downgrade_kwargs(_staff, now=_now + gate.STAFF_TTL_S + 5) is None
+   and gate.downgrade_kwargs(None) is None and gate.downgrade_kwargs("") is None)
+ok("/api/gate-signout?keep=map sets the downgraded cookie; without keep it drops the cookie as before",
+   "def gate_signout(request: Request = None, keep: Optional[str] = None)" in MAIN
+   and "gate.downgrade_kwargs(cookies.get(gate.COOKIE))" in _body("gate_signout")
+   and "r.delete_cookie(gate.COOKIE, path=\"/\")" in _body("gate_signout"))
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

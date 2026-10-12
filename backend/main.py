@@ -398,10 +398,24 @@ def map_auth(body: MapAuthIn):
 
 
 @app.post("/api/gate-signout")
-def gate_signout():
-    """Drop the gate cookie — for testing the gate, and for a shared machine."""
+def gate_signout(request: Request = None, keep: Optional[str] = None):
+    """
+    Drop the gate cookie — for testing the gate, and for a shared machine.
+
+    12 Oct 2026 (the review and fix pass): `keep=map` is what the app's Sign out sends. A
+    STAFF cookie is replaced by a MAP cookie that expires no later than the staff one did
+    (gate.downgrade_kwargs), so the public map still opens on that machine and the staff
+    surface (the full /api/meta, the network reads, /help/) does not. Any other cookie is
+    left as it is under keep=map; without `keep` the cookie is dropped, as before.
+    """
     from fastapi.responses import JSONResponse as _J
     r = _J({"ok": True})
+    if keep == "map":
+        cookies = getattr(request, "cookies", None) or {}
+        kw = gate.downgrade_kwargs(cookies.get(gate.COOKIE))
+        if kw:
+            r.set_cookie(**kw)
+        return r
     r.delete_cookie(gate.COOKIE, path="/")
     return r
 
@@ -1814,10 +1828,15 @@ def _approved_co2(factors, from_month, to_month):
     not baked for the line's vehicle (no km, no carbon — never a zero dressed as a figure).
 
     Returns (table, error). NEVER raises: on any failure the table is empty and `error` is
-    the reason ("ClassName: message"), so the two feeds that read it (/api/public/month-kpis
-    and /api/public/forecast-matrix) can set every co2_t to None AND carry `co2_error`,
-    instead of a month that silently shows no carbon. `error` is None on the happy path and
-    the feeds then carry no `co2_error` key at all.
+    a fixed sentence naming the exception's class, so the two feeds that read it
+    (/api/public/month-kpis and /api/public/forecast-matrix) can set every co2_t to None
+    AND carry `co2_error`, instead of a month that silently shows no carbon. `error` is
+    None on the happy path and the feeds then carry no `co2_error` key at all.
+
+    12 Oct 2026 (the review and fix pass): the exception's MESSAGE is logged here and never
+    put in the feed. Both feeds sit under /api/public/, which anyone with the shared map
+    password reads, and a database error's text can carry SQL fragments (a KeyError names
+    internal keys).
     """
     try:
         table = {}
@@ -1827,8 +1846,13 @@ def _approved_co2(factors, from_month, to_month):
                    int(cl["month_index"]))] = cl["co2_t"]
         return table, None
     except Exception as e:                       # noqa: BLE001 — the feed must answer
-        msg = str(e).strip()
-        return {}, (f"{e.__class__.__name__}: {msg}" if msg else e.__class__.__name__)[:300]
+        print(f"⚠️  carbon read failed (months {from_month}-{to_month}): "
+              f"{e.__class__.__name__}: {str(e).strip()[:500]}")
+        return {}, CO2_ERROR_SENTENCE.format(cls=e.__class__.__name__)[:200]
+
+
+#: what a person reads when the carbon read fails — never the exception's own text
+CO2_ERROR_SENTENCE = "The carbon figures could not be read ({cls})."
 
 
 @app.get("/api/public/stockpile-timeline")
@@ -1911,8 +1935,10 @@ def public_forecast_matrix(
                       for m in g["monthly"]}
     # ⭐ 2026-09-15 — `working_days` rides along so the timeline can print a DAILY rate on
     # the route label instead of the month's total. One divisor, one source: factors.json.
+    # 12 Oct 2026 (the review and fix pass): the Carbon page's planning-estimate stamp rides
+    # along, so the route drawer prints it under its CO2e card from the server's own words
     res = {"unit": unit, "from": lo, "to": hi, "working_days": _working_days(factors),
-           "routes": out}
+           "routes": out, "carbon_stamp": carbon.SUMMARY_STAMP}
     if co2_error:
         res["co2_error"] = co2_error
     return res
@@ -2284,7 +2310,9 @@ def _check_admin(token):
     admin_token = os.getenv("ADMIN_TOKEN", "").strip()
     if not admin_token:
         raise HTTPException(403, "admin access is not configured — set ADMIN_TOKEN")
-    if not token or not hmac.compare_digest(admin_token, str(token).strip()):
+    # bytes, not str (12 Oct 2026): hmac.compare_digest raises TypeError on a str holding a
+    # non-ASCII character, so ?token=é answered 500 instead of 403
+    if not token or not hmac.compare_digest(admin_token.encode("utf-8"), str(token).strip().encode("utf-8")):
         raise HTTPException(403, "bad or missing admin token")
 
 

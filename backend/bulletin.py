@@ -24,7 +24,8 @@ the same payload the browser gets and assert equality)
      cannot also be working another.
   4. A line whose route is not baked for ITS vehicle has no cycle: it is counted in the
      movements and the tonnes, left out of the fleet, and the fleet says "excludes N
-     unbaked lines" — named, not zeroed.
+     lines with no stored road route for the vehicle" — named, not zeroed. (The map bar
+     still says "unbaked"; the bulletin is read by councils and says it in plain words.)
   5. Over a window of months the fleet is the BUSIEST month's, not the average: a fleet
      one lorry short in the peak month is short.
   6. Every per-day average divides by the months WITH volume, not the window length.
@@ -46,7 +47,10 @@ ACCESS
 ------
 The figures are the scheme's (they are the public map's figures). A team code gets the
 same headline, routes and carbon; only the per-team rows of the breakdown are limited to
-its own team. Team ids never leave this module: `taxonomy.team_text` names them.
+its own team, and the page's scope note says so in those words (SCOPE_NOTE_TEAM) — the
+headline less the team's own row is the other teams' total, so the limit hides nothing a
+team code could not work out. Team ids never leave this module: `taxonomy.team_text`
+names them.
 
 WHAT THIS DOES NOT DO
 ---------------------
@@ -74,6 +78,9 @@ CAP_WORDING = "planning flag"
 NO_CAP_WORDING = "no planning cap typed"
 NEVER_CHECKED = "never checked"
 BUSIEST_N = 5
+SCOPE_NOTE_TEAM = ("The figures are the whole scheme's, as the public map shows them to anyone with the map "
+                   "password: the headline, the busiest routes and the discipline and section rows include "
+                   "every team. Only the per-team rows are limited to your team.")
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 _MONTHS_LONG = ("January", "February", "March", "April", "May", "June", "July", "August",
@@ -87,7 +94,9 @@ def stockpile_wording(name, capacity_qty, balance_end, unit, month_index):
     forward — not a plan figure — so it is "recorded in it", never "the plan puts".
     """
     u = unit or "t"
-    return (f"{name} holds {float(capacity_qty):,.0f} {u}. {float(balance_end):,.0f} {u} "
+    # 12 Oct 2026 (the review and fix pass): "has a capacity of", not "holds" — "holds" read as
+    # what is in the pile now, and the next figure is a different "contents" figure
+    return (f"{name} has a capacity of {float(capacity_qty):,.0f} {u}; {float(balance_end):,.0f} {u} "
             f"recorded in it at the end of {month_label(month_index)}, from the week actuals typed so far, "
             "carried forward.")
 
@@ -146,6 +155,10 @@ def _route_in_scope(route_ipt, scope):
         return True
     parts = re.split(r"[/,+&]", str(route_ipt or ""))
     return any(access.canonical_ipt(p) == scope for p in parts)
+
+
+def _lines(n):
+    return "line" if n == 1 else "lines"
 
 
 def _avg(xs):
@@ -247,7 +260,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
 
     n = len(m_veh)
     not_drawn_block = {"lines": sum(not_drawn.values()), "routes": sorted(not_drawn),
-                       "note": ("Lines on routes the map does not draw (no baked geometry for any vehicle) "
+                       "note": ("Lines on routes the map does not draw (no stored road route for any vehicle) "
                                 "are not in these figures. They are listed here, not counted as zero.")
                        if not_drawn else None}
     if not n:
@@ -255,7 +268,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
         empty_note = ("No approved forecast in this month." if not not_drawn else
                       f"No approved forecast on a route the map draws in this month: {nd_lines} line"
                       f"{'' if nd_lines == 1 else 's'} on {nd_routes} route{'' if nd_routes == 1 else 's'} "
-                      "not yet baked, listed below and not counted.")
+                      "with no stored road route yet, listed below and not counted.")
         return {"empty": True, "months_with_volume": 0, "working_days": wd,
                 "headline": {"two_way_a_day": None, "movements_in_month": None,
                              "working_days": wd, "routes_in_use": 0, "tonnes": None},
@@ -269,7 +282,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
 
     fleet_peak = max(m_fleet)                                    # rule 5: busiest month
     two_way_a_day = _avg(m_veh) / wd
-    unb_label = (f"excludes {unbaked_lines} unbaked line{'' if unbaked_lines == 1 else 's'}"
+    unb_label = (f"excludes {unbaked_lines} {_lines(unbaked_lines)} with no stored road route for the vehicle"
                  if unbaked_lines else None)
 
     # rule 9: the busiest routes, with the four figures the page prints per route
@@ -375,14 +388,20 @@ def _carbon_block(co2_month, co2_day, co2_unbaked, payloads, routes, wd, co2_lin
     carbon. The payload's `co2_error` rides along as `error` so the page can say why.
     """
     last = payloads[-1] if payloads else {}
-    to_date = 0.0
+    to_date, to_date_rows = 0.0, 0
     for c in (last.get("co2_to_date") or []):
         if c.get("route_id") in routes:
             to_date += float(c.get("co2_t") or 0.0)
+            to_date_rows += 1
     errors = [p.get("co2_error") for p in payloads if isinstance(p, dict) and p.get("co2_error")]
     not_baked = bool(co2_unbaked and not co2_lines)
-    if not_baked:
+    if not_baked or errors:
         co2_month = co2_day = None
+    # 12 Oct 2026 (the review and fix pass): the to-date figure follows the same rule — a failed
+    # read empties co2_to_date, and a programme with nothing stored to date is not 0.0 t
+    to_date_unbaked = int(last.get("co2_to_date_unbaked_lines") or 0)
+    if errors or (not to_date_rows and to_date_unbaked):
+        to_date = None
     return {
         "co2_t_a_day": _r(co2_day),
         "co2_t_in_month": _r(co2_month),
@@ -390,8 +409,11 @@ def _carbon_block(co2_month, co2_day, co2_unbaked, payloads, routes, wd, co2_lin
         "excludes_unbaked_lines": co2_unbaked,
         "not_baked": not_baked,
         "error": (errors[0] if errors else None),
-        "to_date_excludes_unbaked_lines": int(last.get("co2_to_date_unbaked_lines") or 0),
-        "label_day": ("CO₂e a day" + (f" (excl. {co2_unbaked} unbaked)" if co2_unbaked else "")),
+        "to_date_excludes_unbaked_lines": to_date_unbaked,
+        # 12 Oct 2026 (the review and fix pass): plain words for a council reader — "baked" is the
+        # team's word for a stored road route; the JSON keys keep it
+        "label_day": ("CO₂e a day" + (f" (excl. {co2_unbaked} {_lines(co2_unbaked)} with no stored road route)"
+                                      if co2_unbaked else "")),
         "stamp": carbon.SUMMARY_STAMP,
         "rule": "CO₂e = routed km × the vehicle's kg CO₂e/km, approved plan only.",
     }
@@ -442,8 +464,9 @@ def conditions_of_month(month_index, payload=None, factors=None):
                     of the month wins), from stockpiles.balances
       seasonal      the factors.json windows that name this calendar month and a vehicle
                     the month's lines use (or no vehicle, so every route)
-      route_caps    loaded trips a day (the month's loads ÷ working days) against the
-                    cap typed on the route — a planning flag, never a block
+      route_caps    two-way movements a day (one load = one movement; the month's loads
+                    ÷ working days) against the daily cap typed on the route — a planning
+                    flag, never a block
     Routes are the month's approved routes, drawn or not: a condition on the plan does not
     wait for a bake.
     """
@@ -498,6 +521,14 @@ def conditions_of_month(month_index, payload=None, factors=None):
              "note": ("Hits are from the stored check on each route, dated hits only where their dates "
                       "overlap this calendar month; undated limits always count. A route never checked is "
                       "listed as such, not as clear.")}
+    # 12 Oct 2026 (the review and fix pass): the stored check keeps only closures in force WHEN
+    # it ran (restrictions' current_only), so for a month that had ended by then the closures of
+    # that month that had also ended are not stored — "checked" would overstate it
+    after = sorted({str(c)[:10] for c in checked if str(c)[:10] > span_to.isoformat()})
+    restr["checked_after_month"] = bool(after)
+    restr["past_month_note"] = (
+        f"Checked on {after[0]}, after this month ended; closures that had ended by then are not "
+        "stored, so this month's list may be incomplete." if after else None)
 
     # 2. stockpiles over at the end of the month
     piles = []
@@ -528,7 +559,7 @@ def conditions_of_month(month_index, payload=None, factors=None):
             seasonal.append({"name": w.get("name"), "message": w.get("message"),
                              "months": w.get("months"), "restricted_vehicles": rv, "routes": applies})
 
-    # 4. typed caps against the month's loaded trips a day
+    # 4. typed caps against the month's two-way movements a day
     caps = db.query("SELECT id, max_vehicles_per_day FROM routes WHERE tenant_id = ? "
                     "AND max_vehicles_per_day IS NOT NULL", (db.current_tenant(),))
     exceeded, checked_caps = [], 0
@@ -542,8 +573,8 @@ def conditions_of_month(month_index, payload=None, factors=None):
             exceeded.append({"route_id": r["id"], "cap": cap, "two_way_a_day": _r(a_day),
                              "over_by": _r(a_day - cap), "wording": CAP_WORDING})
     route_caps = {"wording": CAP_WORDING, "exceeded": exceeded, "routes_with_cap": checked_caps,
-                  "note": ("Loaded trips a day (the month's loads ÷ working days) against the cap typed on "
-                           "the route. A typed cap is a planning flag, never a block.")}
+                  "note": ("Two-way movements a day (one load = one movement; the month's loads ÷ working "
+                           "days) against the daily cap typed on the route — a planning flag, never a block.")}
 
     return {"month": mi, "calendar_month": cal, "span": [span_from.isoformat(), span_to.isoformat()],
             "restrictions": restr, "stockpiles_over": piles, "seasonal": seasonal,
@@ -579,9 +610,13 @@ def month_page(month_index, acc):
         "working_days": wd,
         "rollup": rollup,
         "conditions": conditions_of_month(mi, payload=payload, factors=factors),
+        # 12 Oct 2026 (the review and fix pass): the note says plainly what a team code sees.
+        # Only the per-team breakdown rows are limited; the headline, the busiest routes and the
+        # discipline and section rows are the whole scheme's — the public map's own figures,
+        # which /api/public/month-kpis gives anyone with the map password. Whether a team code
+        # should see less is the user's decision (build note, Track B review pass).
         "scope": {"team": taxonomy.team_name(acc.get("ipt")) if acc and acc.get("ipt") else None,
-                  "note": ("The figures are the scheme's, as the public map shows them; the per-team rows "
-                           "are limited to your team." if acc and acc.get("ipt") else None)},
+                  "note": (SCOPE_NOTE_TEAM if acc and acc.get("ipt") else None)},
         "demo_notice": tenant.get("demo_notice") or None,
         "tenant_name": tenant.get("name"),
         "plan_only": True,

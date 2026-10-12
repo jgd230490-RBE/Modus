@@ -240,14 +240,28 @@ ok("⭐ B2: the map's only emissions fallback literal is the published 0.89743 �
   /vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.89743 \}/.test(code)
   && !/vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.9\b/.test(code)
   && !/pick\(F\.vehicle_emissions_kg_co2e_per_km,\s*veh\)\s*\|\|\s*0\.9/.test(code));
-ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix and sums the baked months, counting the unbaked ones",
-  /const co2m=row\.co2_t\|\|\{\};/.test(code)
-  && /mkeys\.forEach\(k=>\{ const c=co2m\[k\]; if\(c==null\)\{ unbakedM\+\+; \} else \{ co2t\+=c; bakedT\+=\(row\.monthly\[k\]\|\|0\); \} \}\);/.test(code)
+// NARROWED 12 Oct 2026 (the review and fix pass): the drawer sums EVERY forecast-matrix row of the route (one row per
+// discipline and section) — it read the first row only, under a caption that called it the bar's figure
+ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix for EVERY line of the route and sums the baked line-months",
+  /const rows=\(mtx\.routes\|\|\[\]\)\.filter\(r=>\(r\.route_id\|\|''\)\.toString\(\)\.trim\(\)\.toLowerCase\(\)===rl\);/.test(code)
+  && /rows\.forEach\(rw=>\{[\s\S]{0,400}const co2m=rw\.co2_t\|\|\{\};[\s\S]{0,400}if\(c==null\)\{ unbakedMonths\[k\]=true; \} else \{ co2t\+=c; bakedT\+=mt; co2LineMonths\+\+; \}/.test(code)
+  && !/const row=\(mtx\.routes\|\|\[\]\)\.find\(/.test(code)
   && !/trips\*round\*emis\/1000/.test(code) && !/const emis=/.test(code));
-ok("B2: an unbaked route shows a dash and says so, never an estimate; a partly baked window names the months it excludes",
-  /card\('—','CO₂e','route not baked for this vehicle'\)/.test(code)
-  && /' · excl\. '\+unbakedM\+' unbaked month'/.test(code)
-  && /The same figure as the bar above and the Dashboard, read from the server\./.test(code));
+// NARROWED 12 Oct 2026 (the review and fix pass): "(est.)" is back on the label, the server's planning-estimate stamp is
+// printed under the cards, a failed carbon read says so (it used to blame a missing route), and the wording says
+// "no stored road route" instead of the team's word "baked"
+ok("B2: no stored route shows a dash and says so, never an estimate; a partly stored window names the months it excludes",
+  /card\('—','CO₂e \(est\.\)','no road route stored for this vehicle yet'\)/.test(code)
+  && /' · excl\. '\+unbakedM\+' month'\+\(unbakedM>1\?'s':''\)\+' with no stored road route'/.test(code)
+  && /Read from the server: the costlines figure the bar above and the Dashboard use, summed over every line on this route\./.test(code)
+  && !/The same figure as the bar above and the Dashboard, read from the server\./.test(code)
+  && !/route not baked for this vehicle/.test(code));
+ok("⭐ the drawer's CO2e card is labelled an estimate and carries the server's planning-estimate stamp (forecast-matrix carbon_stamp)",
+  /card\(co2t\.toFixed\(1\)\+' t','CO₂e \(est\.\)'/.test(code)
+  && /\(mtx\.carbon_stamp\?' '\+mtx\.carbon_stamp\+'\.':''\)/.test(code));
+ok("⭐ a failed carbon read (forecast-matrix co2_error) reads 'carbon could not be read', never 'not stored'",
+  /const co2Card=mtx\.co2_error\s*\n\s*\? card\('—','CO₂e \(est\.\)','carbon could not be read'\)/.test(code)
+  && /const anyBaked=co2LineMonths>0 && !mtx\.co2_error;/.test(code));
 ok("no label in the bar is uppercase microtext", !/\.kpi-label\{[^}]*text-transform:uppercase/.test(html)
   && !/\.kpi-label\{[^}]*font-size:9/.test(html));
 ok("the KPI block is outside the sidebar element",

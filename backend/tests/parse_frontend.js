@@ -196,11 +196,20 @@ ok("labels come off /api/meta, not a second list in the client",
 // 12 Oct 2026 (map review D31): /api/meta answers two shapes — routes, teams and sections only to a code or a staff
 // cookie. The mount fetch runs before a fresh sign-in, so the app fetches again once `role` is set, unless the mount
 // fetch already carried a code (a resume).
-ok("D31: /api/meta is loaded through one function, on mount and again after a sign-in that supplied the code",
-  /const loadMeta = \(\) => \{\s*\n\s*metaHadCode\.current = !!ACCESS\.code;\s*\n\s*return fetch\(`\$\{API\}\/meta`\)/.test(code)
+// NARROWED 12 Oct 2026 (the review and fix pass): the "already staff" flag is set from the ANSWER's shape (m.scope),
+// never from whether a code was stored — a stale stored code got the public shape, and the re-fetch after a fresh
+// sign-in was then skipped (no routes, no teams in the portal). Only the latest fetch's answer is applied.
+ok("D31: /api/meta is loaded through one function, on mount and again after a sign-in, unless the answer already was the staff shape",
+  /const loadMeta = \(\) => \{\s*\n\s*const seq = \+\+metaSeq\.current;\s*\n\s*return fetch\(`\$\{API\}\/meta`\)\.then\(r => r\.json\(\)\)\.then\(m => \{\s*\n\s*if\(seq !== metaSeq\.current\) return;\s*\n\s*metaHadCode\.current = !!\(m && m\.scope === "staff"\);/.test(code)
+  && !/metaHadCode\.current = !!ACCESS\.code/.test(code)
+  && /\.catch\(\(\) => \{ if\(seq === metaSeq\.current\) setMetaErr\(true\); \}\);/.test(code)
   && /useEffect\(\(\) => \{ loadMeta\(\); \}, \[\]\);/.test(code)
   && /useEffect\(\(\) => \{ if\(role && !metaHadCode\.current\) loadMeta\(\); \}, \[role\]\);/.test(code)
   && (code.match(/fetch\(`\$\{API\}\/meta`\)/g) || []).length === 1);
+// 12 Oct 2026 (the review and fix pass): Sign out asks the server to swap the 12-hour staff cookie for a map-only one
+// (gate.downgrade_kwargs) — clearing the tab's code alone left the staff surface open to the next person at the machine
+ok("Sign out POSTs /api/gate-signout?keep=map and forgets the staff shape, so the next sign-in fetches /api/meta again",
+  /const signOut = \(\) => \{[\s\S]{0,500}fetch\(`\$\{API\}\/gate-signout\?keep=map`, \{ method: "POST" \}\)\.catch\(\(\) => \{\}\);\s*\n\s*metaHadCode\.current = false;/.test(code));
 // ⭐ THE INVARIANT. The <option value> is the canonical id; only the text changes.
 ok("⭐ the picker's option VALUE is the canonical id, the text is the label",
   /<option key=\{v\} value=\{v\} disabled=[\s\S]{0,160}\{vehLabel\(v\)\}/.test(code));

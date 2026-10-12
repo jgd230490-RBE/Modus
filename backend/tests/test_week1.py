@@ -1323,7 +1323,9 @@ ok("⭐ B2: the baked line's co2_t equals month-kpis' (one costlines figure) and
 ok("B2: the response shape is otherwise identical — the keys the detail table and the drawer read, plus co2_t, and no co2_error",
    set(_pmb["WS1"]) == {"route_id", "discipline", "section_id", "material_type", "material_description", "vehicle_type",
                         "monthly", "total", "co2_t"}
-   and set(_pm) == {"unit", "from", "to", "working_days", "routes"}, str(sorted(_pmb["WS1"])))
+   # NARROWED 12 Oct 2026 (the review and fix pass): plus the Carbon page's stamp, which the route drawer prints
+   and set(_pm) == {"unit", "from", "to", "working_days", "routes", "carbon_stamp"}
+   and _pm["carbon_stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures", str(sorted(_pmb["WS1"])))
 ok("B2: month-kpis carries no co2_error on the happy path", "co2_error" not in _kp)
 # the failure path: the costlines read raises → both feeds answer, every co2_t None, and SAY why.
 # Until today month-kpis caught the error and blanked every carbon figure silently (a null factor
@@ -1343,14 +1345,17 @@ except Exception as e:                       # pragma: no cover — the assertio
     _ke, _pme = {"raised": repr(e)}, {"raised": repr(e)}
 finally:
     costlines.lines = _real_lines
+# NARROWED 12 Oct 2026 (the review and fix pass): co2_error is a fixed sentence naming the exception's class only —
+# both feeds are /api/public/ (anyone with the map password), and an exception's text can carry SQL or internal keys;
+# the message is printed to the server log instead
 ok("⭐ B2: when the costlines read fails month-kpis never raises — co2_error names the reason and every co2_t is None",
-   _ke.get("co2_error") == "RuntimeError: fixture: the costlines read failed"
+   _ke.get("co2_error") == "The carbon figures could not be read (RuntimeError)." and "fixture" not in _ke.get("co2_error", "")
    and _ke.get("lines") and all(l["co2_t"] is None for l in _ke["lines"]) and _ke.get("co2_to_date") == []
    and _ke.get("co2_to_date_unbaked_lines") == 0, str(_ke)[:200])
 ok("B2: ...the rest of the month-kpis answer is intact (the volumes are not carbon's hostage)",
    len(_ke.get("lines") or []) == len(_kp["lines"]) and _ke["lines"][0]["vehicle_loads"] == _kp["lines"][0]["vehicle_loads"])
 ok("⭐ B2: forecast-matrix the same — answers, co2_error, every month's co2_t None, volumes intact",
-   _pme.get("co2_error") == "RuntimeError: fixture: the costlines read failed"
+   _pme.get("co2_error") == "The carbon figures could not be read (RuntimeError)."
    and all(v is None for r in _pme.get("routes") or [] for v in r["co2_t"].values())
    and [r["monthly"] for r in _pme["routes"]] == [r["monthly"] for r in _pm["routes"]], str(_pme)[:200])
 ok("B2: the costlines read is restored and the happy path has no co2_error again",

@@ -522,6 +522,10 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
     return len(opts), None
 
 
+# 12 Oct 2026 (the review and fix pass): every leg the batch upserts marks the shared-section
+# index dirty and it is rebuilt ONCE when the batch ends — it used to be rebuilt after every
+# primary upsert, about 25 full rebuilds a batch
+@road_sections.rebuild_once("bake batch")
 def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERNATIVES):
     """
     Route up to `limit` not-yet-attempted (route, leg) pairs for a profile and cache
@@ -1336,6 +1340,7 @@ def clear_routes():
     return {"cleared": n}
 
 
+@road_sections.rebuild_once("route bake")      # 12 Oct 2026: both legs, one index rebuild
 def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERNATIVES):
     """
     Route + cache geometry for a single route (used to bake a freshly authored route).
@@ -1828,6 +1833,13 @@ def factors_diagnostics():
                 "the version you think it is."])
             + ([] if len(set(pay)) > 1 else
                ["Every vehicle in factors.json carries the same payload."])
+            # 12 Oct 2026 (the review and fix pass): a tenant's stored config is read before the
+            # file, so a config saved before the one-fallback rule keeps its own _default figure
+            + ([] if conversions._stored_factor(default) in (None, conversions.FALLBACK_KG_CO2E_PER_KM) else
+               [f"_default carries {conversions._stored_factor(default)} kg CO2e/km, not the published "
+                f"fallback {conversions.FALLBACK_KG_CO2E_PER_KM} (DESNZ 2026, all HGVs, average laden). "
+                "This tenant's stored factors predate 12 Oct 2026: reset the Config page to file, or "
+                "re-import the package, to use the published figure."])
         ),
     }
 

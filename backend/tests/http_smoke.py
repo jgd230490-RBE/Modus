@@ -401,8 +401,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 200 and _pe["rollup"]["empty"] is True and _pe["rollup"]["headline"]["two_way_a_day"] is None
        and _pe["rollup"]["headline"]["routes_in_use"] == 0 and _pe["rollup"]["routes_not_drawn"]["lines"] == 19
        and len(_pe["rollup"]["routes_not_drawn"]["routes"]) == 19
+       # NARROWED 12 Oct 2026 (the review and fix pass): plain words, "with no stored road route yet", not "not yet baked"
        and _pe["rollup"]["note"] == ("No approved forecast on a route the map draws in this month: 19 lines on 19 routes "
-                                     "not yet baked, listed below and not counted.")
+                                     "with no stored road route yet, listed below and not counted.")
        and _pe["conditions"]["route_caps"]["wording"] == "planning flag", f"{r.status_code} {str(_pe)[:300]}")
     # NARROWED 12 Oct 2026 (the tests-and-regressions review): the carbon figures on that empty roll-up are
     # BOTH None (co2_t_a_day used to read 0.0), and there is no co2_error to carry
@@ -520,8 +521,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
            [(p["name"], p["capacity_qty"], p["balance_end"], p["over_by"]) for p in _cn["stockpiles_over"]]
            == [("Stockpile Tilton", 40000.0, 40510.0, 510.0)], str(_cn["stockpiles_over"]))
         ok("⭐ …and its sentence says the balance is RECORDED (typed week actuals carried forward), never \"the plan puts\" (D23)",
-           _cn["stockpiles_over"][0]["wording"] == ("Stockpile Tilton holds 40,000 t. 40,510 t recorded in it at the end of Oct 2026, "
-                                                    "from the week actuals typed so far, carried forward.")
+           # NARROWED 12 Oct 2026 (the review and fix pass): "has a capacity of", not "holds"
+           _cn["stockpiles_over"][0]["wording"] == ("Stockpile Tilton has a capacity of 40,000 t; 40,510 t recorded in it at the end "
+                                                    "of Oct 2026, from the week actuals typed so far, carried forward.")
            and "plan puts" not in r.text, str(_cn["stockpiles_over"][0].get("wording")))
         _cap = _cn["route_caps"]
         ok("⭐ …the typed cap on R016 (20 a day) is exceeded by October's loaded trips a day and reads \"planning flag\", never a block",
@@ -707,13 +709,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/public/road-load", params={"month": 10})
     ok("⭐ /api/public/road-load answers 200 on the unbaked demo", r.status_code == 200, f"{r.status_code} {r.text[:120]}")
     rl = r.json() if r.status_code == 200 else {}
-    ok("...empty runs, the month, the loaded leg, the planning block's working days and a note",
+    # REVERSED 12 Oct 2026 (the review and fix pass): the feed counts what the public map bar counts — lines on routes
+    # the map DRAWS. On the unbaked demo that is none, so the totals are empty and every October line is NAMED in
+    # routes_not_drawn (until then they were counted in the totals, which the bar beside the map never shows)
+    ok("...empty runs, the month, the loaded leg, the planning block's working days and a note naming the undrawn lines",
        rl.get("runs") == [] and rl.get("month") == 10 and rl.get("leg") == "loaded" and (rl.get("working_days") or 0) > 0
-       and rl.get("totals", {}).get("runs") == 0 and rl.get("totals", {}).get("lines", 0) > 0
-       and any("not baked" in n for n in rl.get("notes", [])), str(rl.get("notes")))
-    ok("...and the October demo volume is counted per route in the totals (78 lines, 20 routes: Sep-Dec)",
-       rl.get("totals", {}).get("routes_with_volume", 0) > 0 and rl.get("totals", {}).get("trips", 0) > 0
-       and rl.get("totals", {}).get("unbaked_lines", 0) == rl.get("totals", {}).get("lines", -1), str(rl.get("totals")))
+       and rl.get("totals", {}).get("runs") == 0 and rl.get("totals", {}).get("lines") == 0
+       and any("no stored road route" in n and "routes_not_drawn" in n for n in rl.get("notes", [])), str(rl.get("notes")))
+    ok("...and the October demo volume is NOT in the totals (the map draws none of it): all 19 lines named in routes_not_drawn",
+       rl.get("totals", {}).get("routes_with_volume") == 0 and rl.get("totals", {}).get("trips") == 0
+       and rl.get("routes_not_drawn", {}).get("lines") == 19 and len(rl.get("routes_not_drawn", {}).get("routes", [])) == 19
+       and rl.get("totals", {}).get("co2_t") == 0.0, str(rl.get("totals")))
     _ret = c.get("/api/public/road-load", params={"month": 10, "leg": "return"})
     # NARROWED 12 Oct 2026: the status is checked too — called as a function, month-kpis' `unit` default was
     # FastAPI's Query object and this answered 400 "unit must be one of [...]"; the note is the LAST line
@@ -957,6 +963,28 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 401 and "access code" in r.text and "password" not in r.text, f"{r.status_code} {r.text[:100]}")
     r = c.put("/api/locations/L001/capacity", json={"capacity_qty": 1, "capacity_unit": "t"})
     ok("🔴 D18: ...and the capacity write is refused by its admin check (403)", r.status_code == 403, f"{r.status_code} {r.text[:80]}")
+
+    # 12 Oct 2026 (the review and fix pass): the app's Sign out on a shared machine. It used to clear the code in the
+    # tab only, so the 12-hour STAFF cookie kept the staff shape of /api/meta, whoami "staff" and /help/ open to the
+    # next person. Now it POSTs /api/gate-signout?keep=map: the staff cookie becomes a map cookie (expiring no later).
+    r = c.post("/api/auth", json={"code": "plan-code-xyz"})
+    ok("sign-out check: a planner sign-in sets the STAFF cookie (whoami staff, /help/ open, the staff /api/meta, all without a header)",
+       r.status_code == 200 and c.get("/api/public/whoami").json().get("level") == "staff"
+       and c.get("/help/").status_code == 200 and c.get("/api/meta").json().get("scope") == "staff")
+    r = c.post("/api/gate-signout", params={"keep": "map"})
+    ok("⭐ Sign out (keep=map): 200, and the same machine is now MAP level — whoami says map", r.status_code == 200
+       and c.get("/api/public/whoami").json() == {"level": "map", "team_label": None}, c.get("/api/public/whoami").text)
+    _mo = c.get("/api/meta").json()
+    ok("🔴 ...the staff surface is closed to the next person: /api/meta is the public shape and /help/ is refused",
+       _mo.get("scope") == "public" and _mo.get("routes") == [] and _mo.get("ipts") == [] and c.get("/help/").status_code == 401,
+       str(_mo.get("scope")))
+    ok("⭐ ...while the public map still opens on that machine", c.get("/map/").status_code == 200)
+    r = c.post("/api/gate-signout", params={"keep": "map"})
+    ok("...a second keep=map sign-out on a map cookie leaves it alone (still map)", r.status_code == 200
+       and c.get("/api/public/whoami").json().get("level") == "map")
+    r = c.get("/api/admin/road-sections/status", params={"token": "é-not-the-token"})
+    ok("🔴 a non-ASCII admin token is a 403, not a 500 (hmac.compare_digest on str raised TypeError)", r.status_code == 403,
+       f"{r.status_code} {r.text[:80]}")
 
 print()
 for f in FAIL:

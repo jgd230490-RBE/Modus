@@ -1064,6 +1064,28 @@ ok("🔴 the forecast pickers never offer a scenario-only profile (it joins HIDD
    "Object.entries((m && m.vehicle_details) || {}).forEach(([k, v]) => { if(v && v.scenario_only && !HIDDEN_VEHICLES.includes(k)) HIDDEN_VEHICLES.push(k); });"
    in read("frontend/index.html"))
 
+# 12 Oct 2026 (the review and fix pass): a tenant's STORED factors are read before the file, so the live demo keeps its
+# old _default (0.97) until its Config is reset to file or its package re-imported — factors_diagnostics says so
+import network  # noqa: E402
+_real_lf = conversions.load_factors
+_old_doc = json.loads(json.dumps(conversions.load_factors()))
+_old_doc["vehicles"]["_default"]["emissions_kg_co2e_per_km"] = 0.97
+try:
+    conversions.load_factors = lambda *a, **k: _old_doc
+    _fd_old = network.factors_diagnostics()
+    conversions.load_factors = lambda *a, **k: json.loads(json.dumps(_real_lf()))
+    _fd_new = network.factors_diagnostics()
+finally:
+    conversions.load_factors = _real_lf
+ok("⭐ factors_diagnostics warns when the stored _default (0.97, a config saved before 12 Oct) is not the published fallback",
+   any("_default carries 0.97" in w and "0.89743" in w and "reset the Config page to file" in w for w in _fd_old["warnings"]),
+   str(_fd_old["warnings"]))
+ok("...and says nothing about it when the _default is the published figure",
+   not any("_default carries" in w for w in _fd_new["warnings"]), str(_fd_new["warnings"]))
+ok("the constant's note no longer claims a stored config resolves alike (the live demo keeps 0.97 until a reset or re-import)",
+   "resolves alike." not in read("backend/conversions.py") and "keeps its stored" in read("backend/conversions.py")
+   and "cannot disagree" not in V["_default"]["_emissions_basis"])
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)

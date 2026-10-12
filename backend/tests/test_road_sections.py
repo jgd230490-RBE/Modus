@@ -288,6 +288,64 @@ ok("1. coords_of reads the bake's plain list AND a GeoJSON LineString",
    and road_sections.coords_of("not json") == [] and road_sections.coords_of(None) == [])
 ok("1. haversine: one degree of latitude is ~111.2 km", abs(road_sections.haversine_km([0, 0], [0, 1]) - 111.195) < 0.01)
 
+# 12 Oct 2026 (the review and fix pass): every shared SEGMENT is in exactly one run. Until then a run was a walk
+# sequence: a route that doubled back over a shared stretch made a run with a U-turn (2.738 km where the other owner
+# drives 2.054), so that owner's CO2e share came out at 1.33 × its month figure; two routes that both looped made two
+# runs over one segment, counted twice.
+
+
+def _owner_km(runs_):
+    km = {}
+    for x in runs_:
+        for rid in x["routes"]:
+            km[rid] = km.get(rid, 0.0) + x["length_km"]
+    return km
+
+
+def _segments(runs_):
+    segs = []
+    for x in runs_:
+        g = [tuple(p) for p in x["geometry"]]
+        segs += [tuple(sorted((g[i - 1], g[i]))) for i in range(1, len(g))]
+    return segs
+
+
+W = [V(i) for i in range(5)]
+UA = [W[0], W[1], W[2], W[3], W[2], [W[2][0], 52.54]]                 # A drives 0..3, turns back to 2, leaves south
+UB = [W[0], W[1], W[2], W[3]]
+ru, su = road_sections.build_runs({"R001": UA, "R002": UB})
+ok("1. 🔴 a route that doubles back over the shared stretch gives ONE run with no U-turn in it: vertices 0..3",
+   len(ru) == 1 and ru[0]["geometry"] == W[0:4] and ru[0]["vertices"] == 4,
+   str([(x["routes"], x["vertices"]) for x in ru]))
+ok("1. ⭐ ...so no owner's runs add up to more than its own length (B: the run is all of B, never 1.33 × it)",
+   all(km <= plen({"R001": UA, "R002": UB}[rid]) + 1e-3 for rid, km in _owner_km(ru).items())
+   and abs(_owner_km(ru)["R002"] - plen(UB)) < 2e-3, str(_owner_km(ru)))
+X_, Y_ = [W[4][0], 52.56], [W[2][0], 52.54]
+LPA = [W[1], W[2], W[3], W[4], X_, W[4], [V(5)[0], 52.55], [V(6)[0], 52.55]]          # A loops out to X and back
+LPB = [W[1], W[2], W[3], Y_, W[3], W[4], [V(5)[0], 52.55], [V(6)[0], 52.55]]          # B loops out to Y and back
+rl_, sl_ = road_sections.build_runs({"R001": LPA, "R002": LPB})
+ok("1. 🔴 two routes that both loop: no segment is in two runs (segment 3-4 used to be counted twice)",
+   len(_segments(rl_)) == len(set(_segments(rl_))), str([x["geometry"] for x in rl_]))
+ok("1. ...and the stretch both drive, 1..6, is one run (the chains either side of A's loop are joined)",
+   len(rl_) == 1 and rl_[0]["geometry"] == [W[1], W[2], W[3], W[4], [V(5)[0], 52.55], [V(6)[0], 52.55]],
+   str([(x["routes"], x["vertices"]) for x in rl_]))
+ok("1. ...and each owner's runs add up to no more than its own length",
+   all(km <= plen({"R001": LPA, "R002": LPB}[rid]) + 1e-3 for rid, km in _owner_km(rl_).items()), str(_owner_km(rl_)))
+ok("1. ...over every fixture above too: no segment twice, no owner over its length",
+   all(len(_segments(rr)) == len(set(_segments(rr))) for rr in (runs, runs3, rn, rf, ru, rl_))
+   and all(km <= plen({"R001": A, "R002": B, "R003": C}[rid]) + 1e-3 for rid, km in _owner_km(runs3).items()))
+ok("1. run ids are unique within a leg (the id hashes every vertex, not only the two ends)",
+   len({x["id"] for x in runs3}) == len(runs3) and len({x["id"] for x in rl_}) == len(rl_))
+# the documented limit, pinned as it is: an extra vertex on one route between two shared vertices loses that stretch
+EA = [W[1], W[2], [round((W[2][0] + W[3][0]) / 2, 6), 52.55], W[3], W[4]]
+re_, _ = road_sections.build_runs({"R001": EA, "R002": [W[1], W[2], W[3], W[4]]})
+ok("1. the known limit (different vertex sets): A with an extra vertex between 2 and 3 gives runs 1-2 and 3-4, and 2-3 is lost",
+   sorted(x["geometry"] for x in re_) == sorted([[W[1], W[2]], [W[3], W[4]]])
+   and "stretch 2-3 is B's alone and is lost" in read("backend/road_sections.py"), str([x["geometry"] for x in re_]))
+r1v, s1v = road_sections.build_runs({"R001": A, "R009": [A[3], A[3]]})
+ok("1. a 'route' of one repeated point has no segment: not indexed, owns no vertex, makes no run",
+   r1v == [] and s1v == {"routes_indexed": 1, "vertices_total": 9, "vertices_shared": 0, "runs": 0}, str(s1v))
+
 # =========================================================================== #
 #  2. Schema, registry, package order                                          #
 # =========================================================================== #
@@ -392,6 +450,77 @@ ok("4. the hook never raises into the bake: it prints and returns None",
    and "except Exception as e:\n        print(f\"road_sections: index not rebuilt after {where}: {e}\")" in read("backend/road_sections.py"))
 # re-add C for the month read below
 network._upsert_geom(rC, PROFILE, json.dumps(C), round(plen(C), 3), 1.0, None, leg="loaded", alt_index=0)
+
+# 12 Oct 2026 (the review and fix pass): a bake batch rebuilds the index ONCE, not after every leg it upserts
+_real_rebuild = road_sections.rebuild
+_calls = []
+road_sections.rebuild = lambda profile=None: (_calls.append(1), _real_rebuild(profile))[1]
+try:
+    with road_sections.batched("test"):
+        network._upsert_geom(rC, PROFILE, json.dumps(C), round(plen(C), 3), 1.0, None, leg="loaded", alt_index=0)
+        network._upsert_geom(rA, PROFILE, json.dumps(A), round(plen(A), 3), 1.0, None, leg="loaded", alt_index=0)
+        with road_sections.batched("nested"):
+            network._upsert_geom(rB, PROFILE, json.dumps(B), round(plen(B), 3), 1.0, None, leg="loaded", alt_index=0)
+        ok("4. inside batched() an upsert marks the index dirty and does not rebuild", _calls == [], str(_calls))
+    ok("4. ⭐ ...and the block's end rebuilds ONCE for three upserts (a nested block defers to the outer one)",
+       _calls == [1], str(_calls))
+    _calls.clear()
+    with road_sections.batched("nothing"):
+        pass
+    ok("4. a block that changed nothing does not rebuild", _calls == [])
+    # bake_batch end to end, HERE stubbed: four legs upserted, one rebuild
+    _real_conf, _real_leg = network.here_routing.configured, network._bake_leg
+
+    def _fake_leg(r, o, d, profile, leg, factors, alternatives=None, avoid=None, zone_tag=None, gates_by_loc=None):
+        pts = {"R001": A, "R002": B, "R003": C}.get(r["id"], C)
+        pts = pts if leg == "loaded" else list(reversed(pts))
+        network._upsert_geom(r["id"], profile, json.dumps(pts), round(plen(pts), 3), 1.0, None, leg=leg, alt_index=0)
+        return 1, None
+    network.here_routing.configured = lambda: True
+    network._bake_leg = _fake_leg
+    try:
+        _out = network.bake_batch(profile="Test profile (no geometry yet)", limit=4)
+        ok("4. ⭐ bake_batch over four legs rebuilds the index ONCE (it used to be once per primary upsert)",
+           _out.get("baked") == 4 and _calls == [1], f"{_out.get('baked')} {_calls}")
+        _calls.clear()
+        network.bake_route("R003", profile="Test profile (no geometry yet)")
+        ok("4. bake_route over both legs rebuilds once too", _calls == [1], str(_calls))
+    finally:
+        network.here_routing.configured, network._bake_leg = _real_conf, _real_leg
+        db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND vehicle_profile = ?",
+                   (db.current_tenant(), "Test profile (no geometry yet)"))
+finally:
+    road_sections.rebuild = _real_rebuild
+road_sections.rebuild()
+ok("4. bake_batch and bake_route carry the rebuild-once decorator (source)",
+   '@road_sections.rebuild_once("bake batch")\ndef bake_batch(' in read("backend/network.py")
+   and '@road_sections.rebuild_once("route bake")' in read("backend/network.py"))
+# the rebuild is one transaction: a failure part-way leaves the previous index whole
+_before = sorted((x["id"], x["leg"]) for leg in road_sections.LEGS for x in road_sections.stored_runs(leg))
+_real_compute = road_sections.compute
+
+
+def _dup_compute(profile=None):
+    b = _real_compute(profile)
+    rr = b["legs"]["loaded"]["runs"]
+    if rr:
+        rr.append(dict(rr[0]))          # the same id twice: the INSERT collides on the primary key
+    return b
+
+
+road_sections.compute = _dup_compute
+try:
+    road_sections.rebuild()
+    ok("4. a rebuild whose INSERT fails raises (here: a duplicate id)", False)
+except Exception:
+    ok("4. a rebuild whose INSERT fails raises (here: a duplicate id)", True)
+finally:
+    road_sections.compute = _real_compute
+_after = sorted((x["id"], x["leg"]) for leg in road_sections.LEGS for x in road_sections.stored_runs(leg))
+ok("4. ⭐ ...and the stored index is the previous one, whole: the DELETE was rolled back with the INSERTs",
+   _after == _before and len(_before) == 3, f"{_before} vs {_after}")
+ok("4. the rebuild writes through db.execute_atomic (one connection, one commit)",
+   "db.execute_atomic([" in read("backend/road_sections.py") and "def execute_atomic(steps):" in read("backend/db.py"))
 
 # =========================================================================== #
 #  5. The month read                                                           #
@@ -517,10 +646,27 @@ except ValueError:
 rE = network.create_route(q3["id"], d1["id"], material_category=BAL, route_id="R005", ipt="IPT1")["id"]
 add_line("F5", rE, 20 * PAYLOAD, "IPT1")
 pay2 = road_sections.road_load(M, factors=factors, working_days=WD)
-ok("5. a line on an unbaked route counts in the totals' trips but reaches no run, and the note says so",
-   pay2["totals"]["trips"] == 170 and pay2["totals"]["unbaked_lines"] == 1
-   and pay2["notes"] == ["1 line(s) on routes that are not baked carry trips but no road section."]
-   and ab["trips"] == [x for x in pay2["runs"] if x["routes"] == ["R001", "R002"]][0]["trips"], str(pay2["notes"]))
+# REVERSED 12 Oct 2026 (the review and fix pass): the feed claims the public map bar's figures, and the bar (and the
+# bulletin's rule 1) leaves out a line on a route the map does not draw. This line used to count in the totals
+# (170 trips against the bar's 150); it is now named in routes_not_drawn and not counted, exactly as the bulletin does.
+ok("5. 🔴 a line on a route the map does not draw is NOT in the totals (150, the bar's figure, not 170) and reaches no run",
+   pay2["totals"]["trips"] == 150 and pay2["totals"]["loads"] == 150 and pay2["totals"]["unbaked_lines"] == 0
+   and pay2["totals"]["routes_with_volume"] == 2
+   and ab["trips"] == [x for x in pay2["runs"] if x["routes"] == ["R001", "R002"]][0]["trips"], str(pay2["totals"]))
+ok("5. ⭐ ...it is NAMED in routes_not_drawn (lines, routes, a sentence), never counted as zero",
+   pay2["routes_not_drawn"]["lines"] == 1 and pay2["routes_not_drawn"]["routes"] == ["R005"]
+   and "not in these figures" in pay2["routes_not_drawn"]["note"] and pay2["notes"] == [], str(pay2["routes_not_drawn"]))
+import bulletin  # noqa: E402
+_bar_m = bulletin.rollup_payloads([main.public_month_kpis(month=M, unit="vehicles")], bulletin.drawn_routes(), WD)
+ok("5. ⭐ ...so the feed's totals equal the bar's own roll-up for the month (the bulletin's: movements, loads, routes, vehicles)",
+   pay2["totals"]["movements_per_day"] == round(_bar_m["headline"]["two_way_a_day"], 2)
+   and pay2["totals"]["loads"] == _bar_m["headline"]["movements_in_month"]
+   and pay2["totals"]["routes_with_volume"] == _bar_m["headline"]["routes_in_use"]
+   and pay2["totals"]["vehicles"] == _bar_m["vehicles"]["fleet"]
+   and _bar_m["routes_not_drawn"]["routes"] == pay2["routes_not_drawn"]["routes"],
+   f"{pay2['totals']} vs {_bar_m['headline']} {_bar_m['vehicles']}")
+ok("5. the empty month's routes_not_drawn block is empty and has no sentence",
+   empty["routes_not_drawn"] == {"lines": 0, "routes": [], "note": None} and empty["routes_off_index"] == [])
 # the return read's carbon: A's loaded shares + A's return share never exceed A's month CO2e, and the
 # return run is divided over the same two-way length
 ret_shareA = sum(s["co2_t"] for x in ret["runs"] for s in x["route_shares"] if s["route_id"] == "R001")
@@ -552,17 +698,51 @@ ok("5. ...vehicles on the run follow the bar's rule, ceil per line of (loads / w
    dab["vehicles"] == sum(math.ceil((l["vehicle_loads"] / WD) / l["trips_per_vehicle_day"]) for l in P12["lines"]
                           if l["route_id"] in ("R001", "R002") and l["trips_per_vehicle_day"]) and dab["vehicles"] >= 2)
 
+# 12 Oct 2026 (the review and fix pass): a run whose owners carry volume but no carbon (their routes are not stored
+# for the lines' vehicle) prints no 0.0 t — its co2_t is None and it names the lines left out
+RIGID = "Rigid 8-wheeler (32t)"
+for _fid, _rid in (("F8", rA), ("F9", rB)):
+    db.execute("INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, quantity, unit, "
+               "material_type, material_description, vehicle_type, submitted_by, status, reject_reason, ipt) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+               (db.current_tenant(), _fid, _rid, 2, "superstructure", "", 400, "t", BAL, "Type 1", RIGID, "test",
+                "Approved", None, "IPT1"))
+feb = road_sections.road_load(2, factors=factors, working_days=WD)
+fab = [x for x in feb["runs"] if x["routes"] == ["R001", "R002"]]
+ok("5. ⭐ a run whose owners' lines carry no carbon (not stored for the rigid) reads co2_t None, never 0.0 t, and names the 2 lines",
+   len(fab) == 1 and fab[0]["co2_t"] is None and fab[0]["co2_lines_unbaked"] == 2 and fab[0]["loads"] > 0
+   and all(s["co2_t"] is None for s in fab[0]["route_shares"]), str(fab[:1] and {k: fab[0][k] for k in ("co2_t", "co2_lines_unbaked")}))
+ok("5. ...the month's totals CO2e is None too (no line carries carbon), with the count", feb["totals"]["co2_t"] is None
+   and feb["totals"]["co2_lines_unbaked"] == 2 and feb["totals"]["unbaked_lines"] == 2, str(feb["totals"]))
+ok("5. ...while a run with one owner's carbon and another's missing keeps the figure it has (October: C has no volume, 0 not None)",
+   abc["co2_t"] is not None and [s for s in abc["route_shares"] if s["route_id"] == "R003"][0]["co2_t"] == 0.0)
+# a line team value that is not exactly one id (two joined) is named through team_text, never passed through raw
+db.execute("INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, quantity, unit, "
+           "material_type, material_description, vehicle_type, submitted_by, status, reject_reason, ipt) "
+           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+           (db.current_tenant(), "F10", rA, 3, "superstructure", "", 5 * PAYLOAD, "t", BAL, "Type 1", PROFILE, "test",
+            "Approved", None, "IPT1 / IPT2"))
+mar = road_sections.road_load(3, factors=factors, working_days=WD)
+ok("5. 🔴 a compound line team value ('two ids joined by a slash') reaches the feed as NAMES, never as ids",
+   len(mar["runs"]) == 2 and "IPT" not in json.dumps(mar) and not TEAM_ID.search(json.dumps(mar))
+   and any("North Team" in t and "Central Team" in t for x in mar["runs"] for t in x["teams"]), str([x["teams"] for x in mar["runs"]]))
+
 # ⭐ the carbon read fails: the month read answers, says why, and never raises (B2's co2_error, carried through)
 _real_lines = costlines.lines
 costlines.lines = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("factors document broken"))
 try:
     broken = road_sections.road_load(M, factors=factors, working_days=WD)
-    ok("5. ⭐ when costlines fails the month read still answers: the runs and movements intact, every CO2e 0, co2_error naming the reason",
-       len(broken["runs"]) == 2 and broken["runs"][0]["movements_per_day"] > 0 and all(x["co2_t"] == 0 for x in broken["runs"])
-       and broken["totals"]["co2_t"] == 0 and str(broken.get("co2_error", "")).startswith("RuntimeError")
+    # NARROWED 12 Oct 2026 (the review and fix pass): every CO2e is None (null), not 0 — a failed read is not 0.0 t
+    # of carbon (the bulletin's e85b491 rule) — and co2_error is a fixed sentence naming the class only (main logs the
+    # message: an exception's text can carry SQL or internal keys to a map-password holder)
+    ok("5. ⭐ when costlines fails the month read still answers: the runs and movements intact, every CO2e null (never 0), co2_error naming the reason",
+       len(broken["runs"]) == 2 and broken["runs"][0]["movements_per_day"] > 0 and all(x["co2_t"] is None for x in broken["runs"])
+       and all(s["co2_t"] is None for x in broken["runs"] for s in x["route_shares"])
+       and broken["totals"]["co2_t"] is None and "RuntimeError" in str(broken.get("co2_error", ""))
+       and "factors document broken" not in str(broken.get("co2_error", ""))
        and any("co2_error" in n for n in broken["notes"]), str(broken.get("co2_error")))
 except Exception as e:  # pragma: no cover — the assertion reports it
-    ok("5. ⭐ when costlines fails the month read still answers: the runs and movements intact, every CO2e 0, co2_error naming the reason",
+    ok("5. ⭐ when costlines fails the month read still answers: the runs and movements intact, every CO2e null (never 0), co2_error naming the reason",
        False, repr(e))
 finally:
     costlines.lines = _real_lines
@@ -616,6 +796,14 @@ for fn, label in ((lambda t: main.road_sections_rebuild(token=t), "rebuild"),
         ok(f"6. 🔴 admin {label} refuses a missing token", False)
     except _HTTPException as e:
         ok(f"6. 🔴 admin {label} refuses a missing token", e.status_code == 403)
+    # 12 Oct 2026 (the review and fix pass): a non-ASCII token was a TypeError in hmac.compare_digest — a 500
+    try:
+        fn("é-adm")
+        ok(f"6. 🔴 admin {label} refuses a non-ASCII token with 403, not a 500", False)
+    except _HTTPException as e:
+        ok(f"6. 🔴 admin {label} refuses a non-ASCII token with 403, not a 500", e.status_code == 403)
+    except TypeError as e:
+        ok(f"6. 🔴 admin {label} refuses a non-ASCII token with 403, not a 500", False, repr(e))
 rb = main.road_sections_rebuild(token="adm-test")
 ok("6. the rebuild answers the status counts: 3 routes, 2 runs, 5 vertices shared",
    rb["routes_indexed"] == 3 and rb["runs"] == 2 and rb["vertices_shared"] == 5 and rb["stale"] is False, str(rb))
