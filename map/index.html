@@ -408,7 +408,18 @@
         #timeline-bar .tl-btn:focus-visible, .tl-seg button:focus-visible, .tl-ghost:focus-visible, #tl-toast button:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
         .tl-lbl{ line-height:1.2; min-width:0; flex:0 1 auto; }
         #timeline-bar #tl-label{ display:block; font-size:17px; font-weight:600; color:var(--ink); min-width:0; white-space:nowrap; }
-        #tl-figs{ display:block; font-size:14px; color:#44403C; font-variant-numeric:tabular-nums; margin-top:2px; white-space:nowrap; }
+        /* 12 Oct 2026 (night): minimal first. Outside wall mode, the compact bar keeps row 1 (less the switch, the pair and
+           Wall mode) and a thin strip of the months to click or drag; "Horizon" removes the class */
+        body:not(.wall-mode) #timeline-bar.tl-compact[role="group"]{ padding:8px 12px 8px; }
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-sw, body:not(.wall-mode) #timeline-bar.tl-compact .tl-seg,
+        body:not(.wall-mode) #timeline-bar.tl-compact #tl-wall, body:not(.wall-mode) #timeline-bar.tl-compact .tl-looplbl,
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-loop, body:not(.wall-mode) #timeline-bar.tl-compact .tl-years,
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-hints{ display:none; }
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-railwrap{ margin-top:8px; }
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-rail{ height:12px; }
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-rail i.cl:before, body:not(.wall-mode) #timeline-bar.tl-compact .tl-rail i.oc:after{ display:none; }
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-playhead{ top:-4px; height:20px; }
+        body:not(.wall-mode) #timeline-bar.tl-compact .tl-playhead:before{ display:none; }
         .tl-ctl{ margin-left:auto; display:flex; align-items:center; gap:12px 14px; font-size:14px; white-space:nowrap; flex-wrap:wrap; justify-content:flex-end; color:var(--ink); }
         .tl-sw{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; position:relative; }
         .tl-sw input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
@@ -889,12 +900,17 @@
      month of the horizon (approved volume shaded, a triangle for a closure on a route in use, a red dot for over capacity;
      click or drag to go to a month), the year marks, and the keys and the rail's legend. The range input stays as the
      keyboard and screen-reader control of the month; the rail is the pointer's. -->
-<div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">
+<!-- 12 Oct 2026 (night, the user: "horizon opens automatically - minimal should show first"; "the bar takes up too much
+     space"): the bar OPENS MINIMAL (class tl-compact): the buttons, the month, the speed, "Horizon" and close over a thin
+     month strip. "Horizon" shows the rest (Pause on clash, Plan months / Full horizon, Wall mode, the loop label, the full
+     rail, the years, the keys and the legend). Wall mode always shows its own full view. The figures line under the month
+     ("290 two-way movements a day · 18 routes · …") is gone from the bar; the figures bar at the top carries them. -->
+<div id="timeline-bar" class="tl-compact" role="group" aria-label="Forecast timeline" tabindex="0">
   <div class="tl-row1">
   <button type="button" class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month" aria-label="Previous month">◀</button>
   <button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause" aria-label="Play" aria-pressed="false">▶</button>
   <button type="button" class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month" aria-label="Next month">▶▶</button>
-  <div class="tl-lbl"><span id="tl-label">Jan 2026</span><span id="tl-figs"></span></div>
+  <div class="tl-lbl"><span id="tl-label">Jan 2026</span></div>
   <div class="tl-ctl">
   <label class="tl-sw" title="Stop once per loop on the first month with a red condition (over capacity)"><input type="checkbox" id="tl-pause-clash" role="switch" checked onchange="setPauseOnClash(this.checked)"><i aria-hidden="true"></i>Pause on clash</label>
   <div class="tl-seg" role="radiogroup" aria-label="Months Play loops over">
@@ -903,6 +919,7 @@
   <select id="tl-speed" onchange="setTimelineSpeed(this.value)" title="Play speed — months per second" aria-label="Play speed, months per second">
     <option value="0.25">¼× · 3 s a month</option><option value="0.5">½× · 1.5 s a month</option><option value="1" selected>1× · 0.75 s a month</option><option value="2">2× · 0.4 s a month</option><option value="4">4× · 0.2 s a month</option>
   </select>
+  <button type="button" class="tl-ghost" id="tl-more" aria-expanded="false" onclick="setTimelineExpanded(!TL.expanded)" title="Show every month of the horizon and the play settings">Horizon ▴</button>
   <button type="button" class="tl-ghost" id="tl-wall" onclick="enterWallMode()" title="Full screen for a stand: plays by itself, no buttons or panels; Esc to leave">Wall mode</button>
   <button type="button" class="tl-close" onclick="closeTimeline()" title="Close timeline" aria-label="Close the timeline">&times;</button>
   </div>
@@ -5718,7 +5735,7 @@
     // reached by a tick (only those can pause — never the month Play was pressed on).
     // 12 Oct fix pass: `startedOn` = the month Play was pressed on, until the loop first wraps (F3); `matrixPending` = the
     // matrix fetch in flight, so a double press does not fetch it twice.
-    const TL = { on:false, playing:false, month:1, timer:null, matrix:null, matrixPending:null, speed:1, full:false, clashPaused:false, ticked:null, startedOn:null };
+    const TL = { on:false, playing:false, month:1, timer:null, matrix:null, matrixPending:null, speed:1, full:false, clashPaused:false, ticked:null, startedOn:null, expanded:false };
     try { const sp = parseFloat(localStorage.getItem('modus_tl_speed')); if(sp > 0){ TL.speed = sp; } } catch(e){}
     // 12 Oct 2026 (evening, M3): `pauseOnClash` = the bar's "Pause on clash" switch (on unless the visitor turned it off,
     // remembered in this browser); `wall` = wall mode is on (it dwells on a red month instead of pausing)
@@ -5901,8 +5918,17 @@
         // month, cached), and are re-added with the overlay after a basemap switch
         if(typeof refreshMapModes === 'function') refreshMapModes();
     }
+    // 12 Oct 2026 (night): minimal (false) or the full horizon view (true); every open starts minimal
+    function setTimelineExpanded(on){
+        TL.expanded = !!on;
+        const bar=document.getElementById('timeline-bar'); if(bar) bar.classList.toggle('tl-compact', !TL.expanded);
+        const b=document.getElementById('tl-more');
+        if(b){ b.setAttribute('aria-expanded', String(TL.expanded)); b.textContent = TL.expanded ? 'Minimal ▾' : 'Horizon ▴'; }
+        if(TL.on){ if(typeof renderTlLoop === 'function') renderTlLoop(); syncTimelineFoot(); }
+    }
     function openTimeline(){
         TL.on=true;
+        setTimelineExpanded(false);
         const cb=document.getElementById('toggle-forecast'); if(cb) cb.checked=false;
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='flex';
         syncTimelineFoot();
@@ -6482,8 +6508,8 @@
     })();
     // the line under the month: the figures bar's own numbers for this month, once they are in
     function syncTlFigs(){
+        // 12 Oct 2026 (night): the bar no longer prints this line (the user); wall mode's own figures still do
         const figs = document.getElementById('tl-figs');
-        if (!figs) return;
         const m = TL.month, txt = id => { const e = document.getElementById(id); return e ? (e.textContent || '').trim() : ''; };
         let line = TL.figsFallback || '';
         const trips = txt('kpi-trips'), routes = txt('kpi-routes'), co2 = txt('kpi-co2-day');
@@ -6496,7 +6522,7 @@
             line = parts.join(' · ');
         }
         line = line ? line.charAt(0).toUpperCase() + line.slice(1) : '';
-        if (figs.textContent !== line) figs.textContent = line;
+        if (figs && figs.textContent !== line) figs.textContent = line;
         const wm = document.getElementById('wall-month'), wf = document.getElementById('wall-figs');
         if (wm) wm.textContent = TL.on ? monthLong(m) : '';
         if (wf && wf.textContent !== line) wf.textContent = line;
