@@ -22,12 +22,22 @@ WHAT IS ASSERTED
     calendar month and vehicle, a typed cap exceeded as a "planning flag";
   * the endpoint body: 401 without a code, the page's keys with the planner code, the
     team code's per-team rows.
+  * (C4, 12 Oct 2026) the bulletin as people read it: the PDF's text carries the four headline
+    figures equal to the hand computation, "fictional demo scheme" on every page, the map's
+    kpi-note sentence verbatim, the planning flag, the works of the month, plan against plan,
+    the carbon stamp, placeholders for the typed fields; the HTML page the same figures; no
+    team id or name; the banned-word scan with the "Truck mixer" exception; the literal-22 ban
+    on the composition; ONE page frame in export.py; the static map's URL; the endpoints' staff
+    rule (a code or the STAFF cookie, never the map cookie).
 
 WHAT THIS DOES NOT PROVE
 ------------------------
 HERE is never called: the geometry rows are typed in, so every cycle time is what
 network.route_analysis makes of typed distances. The HTTP layer is stubbed (http_smoke.py
-drives the real one). No PDF, no HTML — none exists yet.
+drives the real one and the middleware). NARROWED 12 Oct 2026 (C4): the PDF and the HTML page now
+exist and are asserted in section 8 (pdf_text of the PDF, the HTML's own markup); Mapbox is never
+called (portable.offline, and a capturing stub for the static-image URL), so the Mapbox image itself
+and how either document LOOKS are not checked here.
 
 Run:  python3 backend/tests/test_bulletin.py
 """
@@ -758,6 +768,243 @@ finally:
 ok("⭐ the demo notice rides on the page whenever the tenant sets one, with the tenant's name",
    PAGE_D["demo_notice"] == "Fictional demo scheme · nothing here is real" and PAGE_D["tenant_name"] == "Wolds Link (fictional)"
    and PAGE_D["rollup"]["headline"] == H)
+
+# =========================================================================== #
+#  8. The bulletin as people read it (C4, 12 Oct 2026): the PDF, the HTML page   #
+# =========================================================================== #
+# Review §2.6 / mockup 9. The PDF and the page are built from ONE view model (bulletin_doc.sheet), so
+# the figures a person reads are asserted against the hand computation above (H, LOADS, WD), in
+# pdf_text() of the PDF and in the HTML. Mapbox is never called: portable.offline() refuses every
+# request, so the map is the schematic, and the static-image URL is read off a capturing stub.
+import export  # noqa: E402
+import bulletin_doc  # noqa: E402
+import gate  # noqa: E402
+import zones  # noqa: E402
+from portable import pdf_text, offline  # noqa: E402
+
+NOTICE = "Fictional demo scheme · nothing here is real"
+_real_urlopen = offline(export)
+zones.create_zone("Mill Lane 7.5 t limit except for access", {"type": "Polygon", "coordinates": [[[-0.5, 52.0], [-0.49, 52.0], [-0.49, 52.01], [-0.5, 52.0]]]},
+                  kind="weight_limit", note="20 lorries a day typed")
+zones.create_zone("Old bridge closure", {"type": "Polygon", "coordinates": [[[-0.6, 52.0], [-0.59, 52.0], [-0.59, 52.01], [-0.6, 52.0]]]},
+                  kind="closure", starts_on="2026-09-01", ends_on="2026-09-30")
+zones.create_zone("Quarry haul road", {"type": "LineString", "coordinates": [[-0.7, 52.0], [-0.69, 52.01]]}, kind="haul_road")
+_real_ts2 = config.tenant_settings
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    S10 = bulletin_doc.sheet(10, PLANNER, now=datetime.datetime(2026, 10, 12, 9, 0, tzinfo=datetime.timezone.utc))
+    S11 = bulletin_doc.sheet(11, PLANNER)
+    PDF10 = export.build_bulletin_pdf(S10)
+    PDF11 = export.build_bulletin_pdf(S11)
+    HTML10 = bulletin_doc.html(S10)
+finally:
+    config.tenant_settings = _real_ts2
+T10 = pdf_text(PDF10)
+PAGES = [" ".join(p.split()) for p in T10.split("\f") if p.strip()]
+T10J = " ".join(T10.split())
+T11J = " ".join(pdf_text(PDF11).split())
+HTML_TEXT = " ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", " ", HTML10, flags=re.S)).split())
+import html as _hm  # noqa: E402
+HTML_TEXT = _hm.unescape(HTML_TEXT)
+
+ok("⭐ the bulletin PDF: a PDF of at least two A4 pages", PDF10[:5] == b"%PDF-" and len(PAGES) >= 2, f"{len(PAGES)} pages")
+ok("⭐ \"fictional demo scheme\" on EVERY page of the PDF (the frame draws the tenant's notice on each)",
+   all("fictional demo scheme" in p.lower() for p in PAGES), str([("fictional demo scheme" in p.lower()) for p in PAGES]))
+# the four headline figures, formatted here independently of the module: the hand loads, not the roll-up
+_fig = {"two_way": f"{LOADS / WD:,.0f}", "month": f"{LOADS:,.1f}", "routes": "2", "tonnes": f"{40000 + 4400 + 1500 + 14500:,.0f} t"}
+ok("⭐ page 1 carries the four headline figures equal to the roll-up: two-way a day, movements in the month, routes, tonnes",
+   _fig["two_way"] == "98" and _fig["month"] == "2,151.0" and _fig["tonnes"] == "60,400 t"
+   and all(v in PAGES[0] for v in _fig.values())
+   and [f["value"] for f in S10["headline"]] == [_fig["two_way"], _fig["month"], _fig["routes"], _fig["tonnes"]],
+   f"{_fig} | {[f['value'] for f in S10['headline']]}")
+ok("…each figure is the roll-up's (the sheet reads the same headline the JSON serves)",
+   S10["rollup"]["headline"] == H and S10["headline"][0]["value"] == f"{H['two_way_a_day']:,.0f}"
+   and S10["headline"][1]["value"] == f"{H['movements_in_month']:,.1f}")
+ok("…the movements in the month name the working days from the scheme's settings (the roll-up's day count)",
+   S10["headline"][1]["label"] == f"movements in the month ({WD:g} working days, from the scheme's settings)"
+   and f"movements in the month ({WD:g}" in PAGES[0] and "working days, from the scheme's" in PAGES[0])
+ok("⭐ the HTML page carries the SAME four figures as the PDF (one view model): page and PDF cannot disagree",
+   all(f'<div class="v">{v.replace("&", "&amp;")}</div>' in HTML10 for v in _fig.values())
+   and all(v in HTML_TEXT for v in _fig.values()))
+_KPI = f"Two-way movements = loads (deliveries) per working day ({WD:g}/month); each is a lorry out laden and back empty."
+ok("⭐ page 1: the counting line and the one-sentence definition — the map's kpi-note sentence, verbatim",
+   "Counts are two-way movements: one lorry out laden and back empty is one delivery, counted once, never doubled." in PAGES[0]
+   and _KPI in PAGES[0] and _KPI in HTML_TEXT
+   and "Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty." in MAP)
+ok("…and the other-schemes line (HS2 counts HGVs visiting the site; EKFB printed each way)",
+   "HS2 prints HGVs visiting the site" in PAGES[0] and "EKFB 2020 printed maximum HGV each way" in PAGES[0])
+ok("⭐ the busiest routes on page 1: origin to destination (Helvetica has no arrow), the planning flag typed on R1 and the plan above it",
+   "Kelsey Quarry to Mill Compound" in PAGES[0] and "Ridge Pit to Mill Compound" in PAGES[0]
+   and "60 a day · plan is above it" in PAGES[0] and "no planning cap typed" in PAGES[0]
+   and S10["busiest"][0]["flag_text"] == "60 a day · plan is above it" and S10["busiest"][0]["over_flag"] is True)
+ok("…the letter pins: the busiest route's sites are A and B, in the legend under the map",
+   [p["letter"] + " " + p["name"] for p in S10["places"]] == ["A Kelsey Quarry", "B Mill Compound", "C Ridge Pit"]
+   and S10["busiest"][0]["letters"] == "A → B" and S10["busiest"][1]["letters"] == "C → B")
+ok("…the busiest list is the roll-up's, in its order", [r["route_id"] for r in S10["busiest"]] == [b["route_id"] for b in B])
+ok("⭐ last month, plan against plan: October's sheet says September had none planned; November's prints October's rate for R1",
+   S10["busiest"][0]["last_month_text"] == "none planned"
+   and [r for r in S11["routes"] if r["route_id"] == "R1"][0]["last_month_text"] == f"{(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f} a day"
+   and f"{(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f} a day" in T11J)
+ok("⭐ the roll-up's by_route list ranks EVERY drawn route the same way as the busiest five (the chart and the list agree)",
+   R["by_route"][:len(R["busiest_routes"])] == R["busiest_routes"] and {r["route_id"] for r in R["by_route"]} == set(R["routes_in_use"])
+   and [r["route_id"] for r in R7["by_route"]] == ["S7", "S6", "S5", "S4", "S3", "S2", "S1"] and R_EMPTY["by_route"] == [])
+ok("⭐ page 2: the chart of movements a day by route, what is being moved, the works, what changed, terms, caveats",
+   all(h in T10J for h in ("Two-way movements a day by route", "What is being moved", "Works affecting the roads in October 2026",
+                           "What changed since last month", "Terms explained", "Caveats"))
+   and "Two-way movements a day by route" not in PAGES[0])
+ok("…the chart's caption names the print treatment and the dashed planning flag", "Dashed red mark: the planning flag typed on the route" in T10J
+   and "flag 60" in T10J)
+ok("…what is being moved is the bar's discipline panel, with an All routes row equal to the headline",
+   [m["name"] for m in S10["moved"]] == [d["name"] for d in BD["discipline"]] and S10["moved_total"]["a_day"] == _fig["two_way"]
+   and S10["moved_total"]["vehicles"] == f"{FLEET:,}")
+ok("⭐ works affecting the roads: the stored A6 closure in October with its dates and provider; the ENDED closure is not there",
+   "A6 Resurfacing" in T10J and "16 Oct 2026 to 17 Oct 2026" in T10J and "A46 Barrier repairs" not in T10J
+   and "Mass limit 18 t" in T10J and "Mass limit: Mass limit" not in T10J and S10["works"][0]["who"] == (bulletin.restrictions.provider() or {}).get("name", S10["works"][0]["who"]))
+ok("⭐ …the local controls are the zones in force in the month, numbered: the weight limit in; the September closure and the haul road out",
+   [(z["n"], z["name"], z["kind"]) for z in S10["controls"]] == [(1, "Mill Lane 7.5 t limit except for access", "weight limit")]
+   and "Mill Lane 7.5 t limit except for access" in T10J and "Old bridge closure" not in T10J and "Quarry haul road" not in T10J)
+ok("…the routes never checked are named as never checked — never a clear road",
+   "never checked for 2 of this month's routes (R2, R3); not a clear road." in T10J)
+ok("…the typed cap exceeded reads as a planning flag, never a block",
+   f"Route R1: {(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f} two-way movements a day planned against a planning flag of 60 a day. "
+   "A planning flag is never a block." in T10J)
+ok("⭐ what changed since last month is plan against plan, and says so; October against an empty September; November against October",
+   "Plan against plan: each month's approved plan as it stands today. No earlier issue of this bulletin is stored." in T10J
+   and S10["change_text"].startswith("Since September 2026: Two-way movements a day — → 98")
+   and f"Since October 2026: Two-way movements a day 98 to {(V11) / WD:,.0f}" in T11J
+   and [c["label"] for c in S10["change_rows"]] == ["September 2026", "October 2026", "November 2026 (next)"], S10["change_text"])
+ok("⭐ the D28 rule is named: the month's loads summed as typed (fractional), not rounded per line",
+   "The month's loads are summed as typed (fractional), not rounded per line." in T10J)
+ok("⭐ carbon carries the stamp: planning estimate, DESNZ 2026 basis, not Carbon Tool figures; CO2e spelled so Helvetica prints it",
+   "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in T10J and "CO2e = routed km" in T10J
+   and "₂" not in "".join(v for _, v in S10["terms"]) and "CO₂e = routed km" in HTML_TEXT
+   and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in HTML_TEXT)
+ok("⭐ the report-a-lorry block with the typed fields as placeholders (no invented contact)",
+   "Report a lorry off route: the date, time, place, direction of travel and registration, to [contact line and email: "
+   "a typed field this scheme has not set yet]." in T10J and "Working hours: [a typed field this scheme has not set yet]." in T10J
+   and "@" not in S10["report"]["lorry"])
+ok("…the frame: the title, the as-at stamp, the plan-only foot", "Lorry movements in October 2026" in PAGES[0]
+   and "Approved plan as at 12 October 2026" in PAGES[0] and "A planning forecast, not a monitoring report" in PAGES[1])
+ok("…the map is the schematic offline, and the caption says so", "schematic from the stored road routes, not to scale" in PAGES[0]
+   and "Routes this month: 2" in PAGES[0])
+ok("🔴 no team id in the PDF or the page, and no team name either (the per-team rows are not printed, D33)",
+   not ID_FORM.search(T10J) and not ID_FORM.search(HTML10) and "North Team" not in T10J + HTML10 and "Central Team" not in T10J + HTML10)
+_BANNED = re.compile(r"\b(secure|real[- ]time|telematics|optimi[sz]e|predict|live tracking)\b", re.I)
+_trucks = lambda t: [m for m in re.findall(r"\btrucks?\b[ \w]{0,7}", t, re.I) if not m.lower().startswith("truck mixer")]
+ok("🔴 the banned-word scan over the PDF text and the HTML (\"Truck mixer\" is a vehicle's name, the one exception)",
+   not _BANNED.search(T10J + " " + HTML_TEXT) and not re.search(r"\bAI\b", T10J + " " + HTML_TEXT)
+   and not _trucks(T10J + " " + HTML_TEXT) and _trucks("a Truck mixer (8 m3) and a truck") == ["truck"],
+   str(_BANNED.findall(T10J + HTML_TEXT)) + str(_trucks(T10J + " " + HTML_TEXT)))
+ok("…and over the two modules' own words", not _BANNED.search(read("backend/bulletin_doc.py"))
+   and not re.search(r"\bAI\b", read("backend/bulletin_doc.py")) and not _trucks(read("backend/bulletin_doc.py")))
+_EXP = read("backend/export.py")
+_EXB = _EXP[_EXP.index("# ------------------------------------------------------------------ the monthly bulletin (C4"):]
+ok("🔴 the literal-22 ban on the composition: bulletin_doc.py and the bulletin's PDF code carry no '22' and never read the day count",
+   "22" not in read("backend/bulletin_doc.py") and "22" not in _EXB
+   and "working_days_per_month" not in read("backend/bulletin_doc.py") + _EXB and "[\"planning\"]" not in _EXB and "get(\"planning\")" not in _EXB)
+ok("…the composition draws, it never computes the roll-up: no payload sum, no ceil, no SQL",
+   "vehicle_loads" not in read("backend/bulletin_doc.py") + _EXB and "math.ceil" not in read("backend/bulletin_doc.py") + _EXB
+   and "db." not in read("backend/bulletin_doc.py") + _EXB and "bulletin.month_page(" in read("backend/bulletin_doc.py"))
+
+# the HTML page
+ok("⭐ the HTML page: a document with a viewport, the demo notice, the PDF alongside, the public map linked, a print stylesheet",
+   HTML10.startswith("<!doctype html>") and '<meta name="viewport" content="width=device-width,initial-scale=1">' in HTML10
+   and f'<div class="notice">{NOTICE}</div>' in HTML10 and 'href="/api/bulletin/month.pdf?month=10">Download the PDF</a>' in HTML10
+   and 'href="/map/">Open the public map</a>' in HTML10 and "@media print{" in HTML10 and "@page{size:A4;margin:14mm}" in HTML10)
+ok("…the page moves a month either way", 'href="/bulletin/?month=9">‹ September 2026</a>' in HTML10
+   and 'href="/bulletin/?month=11">November 2026 ›</a>' in HTML10)
+_px = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", HTML10)]
+ok("🔴 the 14 px floor: no type on the page is set below 14 px (SVG labels included)", _px and min(_px) >= 14, str(sorted(set(_px))))
+ok("…the routes are blue, the bars in the print treatment (light fill, solid edge), the flag dashed in red with its word",
+   'stroke="#4A72C9"' in HTML10 and 'fill="#D7E0F3" stroke="#4A72C9" stroke-width="2"' in HTML10
+   and 'stroke="#DC2626" stroke-width="2" stroke-dasharray="4 3"><title>planning flag 60 a day</title>' in HTML10
+   and "Dashed red mark: the planning flag typed on the route." in HTML10)
+ok("…the chart scrolls on a phone rather than shrinking its labels; the map is an inline schematic, not a second Mapbox",
+   ".chartwrap svg{min-width:640px}" in HTML10 and "mapbox" not in HTML10.lower())
+ok("…every place a person reads text is escaped (a zone typed with markup prints as text)",
+   "<script" not in bulletin_doc.html(dict(S10, title="<script>x</script>")).split("<style>")[1].split("</style>")[1]
+   .replace("&lt;script&gt;", ""))
+
+# the static map's URL (a capturing stub, never the network)
+_seen = []
+
+
+def _capture(req, timeout=0):
+    _seen.append(req.full_url)
+    raise OSError("harness: captured, not fetched")
+
+
+export.urllib.request.urlopen = _capture
+_none = export.bulletin_map_png(S10["map_routes"], S10["places"], S10["controls"], token="pk.test")
+_u = _seen[0] if _seen else ""
+ok("⭐ the static map: plan-blue paths, width by two-way movements (R1, the busier, 8 px; R2 thinner), letter pins, the numbered amber control, within the URL limit",
+   _none is None and len(_seen) == 1 and "path-8+4A72C9-0.85(" in _u and re.search(r"path-[2-7]\+4A72C9-0\.85\(", _u)
+   and "pin-s-a+1F2024(" in _u and "pin-s-b+1F2024(" in _u and "pin-s-1+D97706(" in _u and len(_u) <= 8000
+   and "/styles/v1/mapbox/light-v11/static/" in _u, _u[:300])
+_many = [{"route_id": f"X{i}", "coords": [(-1.0 + j * 0.0013 + i * 0.01, 52.5 + ((j * 7919) % 97) * 0.0011) for j in range(500)],
+          "a_day": i, "weight": i / 40} for i in range(1, 41)]
+_seen.clear()
+export.bulletin_map_png(_many, S10["places"], S10["controls"], token="pk.test")
+ok("🔴 forty long routes: the URL is thinned (or the pins dropped) to fit 8,000 characters — never sent over the limit",
+   all(len(u) <= 8000 for u in _seen), str([len(u) for u in _seen]))
+export.urllib.request.urlopen = _real_urlopen
+offline(export)
+
+# the frame, shared
+ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary and the bulletin",
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 3 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
+   and _EXP.count("BaseDocTemplate(buf") == 1 and "def page_frame(" in _EXP and "def frame_doc(" in _EXP
+   and _EXP.count("doc = frame_doc(") == 3)
+ok("…the bulletin's frame carries the demo notice on every page and the plan-only foot",
+   "notice=((_pdf_safe(notice), \"Helvetica-Bold\", 8.5, NAVY_RGB, H - 25 * mm) if notice else None)" in _EXB
+   and "foot=(_pdf_safe(S[\"foot\"]), \"Helvetica\", 7, GREY)" in _EXB)
+
+# the endpoints (bodies; http_smoke drives the real HTTP layer and the middleware)
+_tok = access._ACCESS.set(None)
+try:
+    try:
+        main.bulletin_month_pdf(month=10, request=None)
+        ok("🔴 the PDF without a code or a staff cookie — 401", False)
+    except _HTTPException as e:
+        ok("🔴 the PDF without a code or a staff cookie — 401", e.status_code == 401)
+    _r = main.bulletin_page(month=10, request=None)
+    ok("🔴 the HTML page without a code or a staff cookie — 401, the bulletin's own sign-in page",
+       _r.status_code == 401 and "The monthly bulletin is for signed-in staff" in _r.body and "/bulletin/" in _r.body)
+    os.environ["GATE_SECRET"] = "bulletin-harness-secret"
+
+
+    class _CookieReq:
+        def __init__(self, level):
+            self.cookies = {gate.COOKIE: gate.sign(level)}
+            self.headers = {}
+    _r = main.bulletin_page(month=10, request=_CookieReq(gate.LEVEL_MAP))
+    ok("🔴 …the MAP cookie does not open it (staff only, D10)", _r.status_code == 401)
+    _r = main.bulletin_page(month=10, request=_CookieReq(gate.LEVEL_STAFF))
+    ok("⭐ …the STAFF cookie does (the Dashboard's link opens it in a new tab with no header)",
+       _r.status_code == 200 and _r.media_type.startswith("text/html") and "Lorry movements in October 2026" in _r.body
+       and _r.headers.get("Cache-Control") == "no-store")
+    _p = main.bulletin_month_pdf(month=10, request=_CookieReq(gate.LEVEL_STAFF))
+    ok("…and the PDF the page links to opens on the staff cookie too", _p.media_type == "application/pdf" and _p.body[:5] == b"%PDF-")
+finally:
+    access._ACCESS.reset(_tok)
+    os.environ.pop("GATE_SECRET", None)
+_p = main.bulletin_month_pdf(month=10, request=None)
+ok("⭐ the PDF with a code: application/pdf, named for the month, not cached",
+   _p.media_type == "application/pdf" and _p.body[:5] == b"%PDF-"
+   and _p.headers["Content-Disposition"] == 'attachment; filename="bulletin-2026-10.pdf"' and _p.headers["Cache-Control"] == "no-store")
+_r = main.bulletin_page(month=None, request=None)
+ok("…the page with no month opens the calendar month today, inside the programme",
+   _r.status_code == 200 and main._bulletin_month_default() == max(1, min(main.MONTH_COUNT, weeks.month_index_of(datetime.date.today())))
+   and bulletin.month_label_long(main._bulletin_month_default()) in _r.body)
+_MS = read("backend/main.py")
+_fp = _MS[_MS.index("def bulletin_month_pdf("):_MS.index("def bulletin_page(")].split(chr(34) * 3, 2)[2]     # the code, below its docstring
+_fh = _MS[_MS.index("def bulletin_page("):_MS.index("def bulletin_page(") + 2200].split(chr(34) * 3, 2)[2]
+ok("🔴 source: both endpoints check staff (_staff_request) before reading anything; the PDF and page come from bulletin_doc.sheet",
+   '@app.get("/api/bulletin/month.pdf")' in _MS and '@app.get("/bulletin/")' in _MS
+   and _fp.index("_staff_request(request)") < _fp.index("bulletin_doc.sheet(") and _fh.index("_staff_request(request)") < _fh.index("bulletin_doc.sheet(")
+   and "export.build_bulletin_pdf(sheet)" in _fp and "bulletin_doc.html(bulletin_doc.sheet(" in _fh)
+ok("…the middleware refuses /bulletin with the bulletin's page, not the guide's", 'if gate.scope_for(path) == "bulletin":' in _MS
+   and "_BULLETIN_SIGNIN_PAGE" in _MS)
 
 # =========================================================================== #
 print()

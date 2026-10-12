@@ -8,7 +8,7 @@ map/index.html), reproduced on the server from the SAME per-line payload the bar
 (`/api/public/month-kpis`, called as a function here, not over HTTP), whole scheme, no
 sidebar filters — plus the "conditions of the month" the map assembles from three sources,
 read from what is STORED rather than from a live check. The HTML / PDF composition is
-another track; this module returns JSON only.
+bulletin_doc.py (C4: the HTML page and the PDF from one view model); this module returns JSON only.
 
 THE BAR'S RULES, AS REPRODUCED (one function, `rollup_payloads`, so a harness can hand it
 the same payload the browser gets and assert equality)
@@ -276,7 +276,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
                              "not_baked": False},
                 "material": {"shown": unit != "vehicles", "unit": unit, "per_day": None},
                 "carbon": _carbon_block(None, None, 0, payloads, routes, wd, co2_lines=0),
-                "busiest_routes": [], "breakdown": {"discipline": [], "team": [], "section": []},
+                "busiest_routes": [], "by_route": [], "breakdown": {"discipline": [], "team": [], "section": []},
                 "routes_not_drawn": not_drawn_block, "payload_fallback": {"lines": 0, "vehicle": fb_name},
                 "note": empty_note}
 
@@ -310,6 +310,9 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
         }))
     ranked.sort(key=lambda x: (-x[0], x[1]))
     busiest = [row for _, _, row in ranked[:BUSIEST_N]]
+    # 12 Oct 2026 (C4, the bulletin's page 2 chart): EVERY drawn route of the window, ranked the same
+    # way and with the same four figures, so the chart and the busiest list cannot disagree
+    by_route = [row for _, _, row in ranked]
 
     # rule 10: the breakdown rows, sorted by tonnes like the bar's chips
     breakdown = {}
@@ -359,6 +362,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
         "carbon": _carbon_block(_avg(m_co2), _avg(m_co2) / wd, co2_unbaked, payloads, routes, wd,
                                 co2_lines=co2_lines),
         "busiest_routes": busiest,
+        "by_route": by_route,
         "breakdown": breakdown,
         "routes_in_use": sorted(routes_in),
         "routes_not_drawn": not_drawn_block,

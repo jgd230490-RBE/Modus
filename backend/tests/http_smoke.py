@@ -124,6 +124,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 401 and "<title>Wayscope — map access</title>" in r.text, str(r.status_code))
     r = c.get("/help/")
     ok("🔴 the guide is closed without a staff sign-in — 401", r.status_code == 401, str(r.status_code))
+    # 12 Oct 2026 (C4): the monthly bulletin's page is staff-only like the guide, with its own refusal page
+    r = c.get("/bulletin/?month=10")
+    ok("🔴 the monthly bulletin page is closed without a staff sign-in — 401, the bulletin's own sign-in page (the middleware's)",
+       r.status_code == 401 and "The monthly bulletin is for signed-in staff" in r.text and "user guide" not in r.text.lower(),
+       f"{r.status_code} {r.text[:120]}")
+    r = c.get("/api/bulletin/month.pdf?month=10")
+    ok("🔴 ...and so is its PDF — 401", r.status_code == 401, str(r.status_code))
     r = c.get("/api/public/alignment")
     ok("🔴 the overlay API is gated like the map — 401 JSON", r.status_code == 401
        and r.headers.get("content-type", "").startswith("application/json"), str(r.status_code))
@@ -538,6 +545,45 @@ with TestClient(main.app, base_url="https://testserver") as c:
            r2.status_code == 200 and pn["rollup"]["headline"] == hl and pn["rollup"]["busiest_routes"] == _b
            and pn["rollup"]["breakdown"]["team"] == [] and pn["scope"]["team"] == "North Team"
            and pn["rollup"]["breakdown"]["discipline"] == pg["rollup"]["breakdown"]["discipline"], f"{r2.status_code} {str(pn.get('scope'))}")
+        # 12 Oct 2026 (C4): the bulletin as people read it, over HTTP — the PDF and the page, from the same roll-up.
+        # Mapbox is never called: portable.offline() refuses the static-image fetch, so the map is the schematic.
+        import export
+        from portable import offline
+        _real_open = offline(export)
+        try:
+            r = c.get("/api/bulletin/month.pdf?month=10", headers=PLAN)
+            _bt = pdf_text(r.content) if r.status_code == 200 else ""
+            _bp = [" ".join(x.split()) for x in _bt.split("\f") if x.strip()]
+            _bj = " ".join(_bt.split())
+            _figs = (f"{hl['two_way_a_day']:,.0f}", f"{hl['movements_in_month']:,.1f}", f"{hl['routes_in_use']:,}", f"{hl['tonnes']:,.0f} t")
+            ok("⭐ the bulletin PDF over HTTP: a PDF named for the month, not cached, \"fictional demo scheme\" on every page",
+               r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-"
+               and r.headers.get("content-disposition") == 'attachment; filename="bulletin-2026-10.pdf"'
+               and r.headers.get("cache-control") == "no-store" and len(_bp) >= 2
+               and all("fictional demo scheme" in x.lower() for x in _bp), f"{r.status_code} {len(_bp)} pages")
+            ok("⭐ ...page 1 carries the four headline figures equal to /api/bulletin/month's roll-up",
+               bool(_bp) and all(f in _bp[0] for f in _figs), f"{_figs} | {_bp[0][:400] if _bp else ''}")
+            ok("...the busiest route by its places, the stockpile over capacity, the never-checked routes, the carbon stamp, the planning flag",
+               "Kilby Ridge Quarry to Harborough Compound" in _bj and "Stockpile Tilton has a capacity of 40,000 t" in _bj
+               and "never checked for any of this month's routes" in _bj
+               and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in _bj
+               and "Route R016:" in _bj and "planning flag of 20 a day" in _bj, _bj[:600])
+            ok("🔴 ...no team id, none of the banned words",
+               not re.search(r"\bIPT\s*[-_ ]?\s*[1-6]\b", _bj) and not re.search(r"\b(secure|real[- ]time|telematics|optimi[sz]e|predict|live tracking)\b", _bj, re.I)
+               and not re.search(r"\bAI\b", _bj))
+            r = c.get("/bulletin/?month=10", headers=PLAN)
+            ok("⭐ the bulletin page over HTTP with a code: HTML, not cached, the same four figures, the PDF alongside",
+               r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
+               and r.headers.get("cache-control") == "no-store" and all(f in r.text for f in _figs)
+               and 'href="/api/bulletin/month.pdf?month=10">Download the PDF</a>' in r.text
+               and "Fictional demo scheme · nothing here is real" in r.text, f"{r.status_code} {r.text[:200]}")
+            ok("...a team code is staff too: the page and the PDF open for the North Team code",
+               c.get("/bulletin/?month=10", headers=NORTH).status_code == 200
+               and c.get("/api/bulletin/month.pdf?month=10", headers=NORTH).status_code == 200)
+            ok("🔴 ...a month outside the horizon is refused — 422", c.get("/api/bulletin/month.pdf?month=61", headers=PLAN).status_code == 422
+               and c.get("/bulletin/?month=0", headers=PLAN).status_code == 422)
+        finally:
+            export.urllib.request.urlopen = _real_open
     finally:
         db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?",
                    ("default", "R001", "Artic Tipper (44t)"))
@@ -994,6 +1040,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.post("/api/map-auth", json={"password": "map-pass-xyz"})
     ok("the map password opens the map…", r.status_code == 200 and c.get("/map/").status_code == 200)
     ok("…but 🔴 not the guide", c.get("/help/").status_code == 401)
+    ok("…and 🔴 not the monthly bulletin (staff only, D10)", c.get("/bulletin/?month=10").status_code == 401
+       and c.get("/api/bulletin/month.pdf?month=10").status_code == 401)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",
@@ -1019,6 +1067,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # tab only, so the 12-hour STAFF cookie kept the staff shape of /api/meta, whoami "staff" and /help/ open to the
     # next person. Now it POSTs /api/gate-signout?keep=map: the staff cookie becomes a map cookie (expiring no later).
     r = c.post("/api/auth", json={"code": "plan-code-xyz"})
+    ok("⭐ the STAFF cookie alone opens the monthly bulletin page (the Dashboard's link opens it in a new tab with no header)",
+       r.status_code == 200 and c.get("/bulletin/?month=10").status_code == 200)
     ok("sign-out check: a planner sign-in sets the STAFF cookie (whoami staff, /help/ open, the staff /api/meta, all without a header)",
        r.status_code == 200 and c.get("/api/public/whoami").json().get("level") == "staff"
        and c.get("/help/").status_code == 200 and c.get("/api/meta").json().get("scope") == "staff")
@@ -1029,6 +1079,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 ...the staff surface is closed to the next person: /api/meta is the public shape and /help/ is refused",
        _mo.get("scope") == "public" and _mo.get("routes") == [] and _mo.get("ipts") == [] and c.get("/help/").status_code == 401,
        str(_mo.get("scope")))
+    ok("🔴 ...and the monthly bulletin is closed to the next person too", c.get("/bulletin/?month=10").status_code == 401)
     ok("⭐ ...while the public map still opens on that machine", c.get("/map/").status_code == 200)
     r = c.post("/api/gate-signout", params={"keep": "map"})
     ok("...a second keep=map sign-out on a map cookie leaves it alone (still map)", r.status_code == 200
