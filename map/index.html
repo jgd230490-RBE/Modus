@@ -298,12 +298,14 @@
         .fc-toggle.fc-mode{ font-size:14px; }
         #fc-chips-label{ font-size:14px; }
         .fc-mode .mode-sub{ font-weight:400; color:var(--muted); }
+        /* 12 Oct 2026 (evening): the two modes are one "Heat map" choice (Off · Volume · Carbon) */
+        .heat-group{ margin-top:12px; }
+        .heat-label{ font-size:14px; font-weight:600; color:var(--navy-deep); }
         .mode-note{ margin:6px 0 0; font-size:14px; color:var(--muted); line-height:1.45; }
         .mode-legend{ margin:8px 0 2px; font-size:14px; color:var(--navy-deep); line-height:1.45; }
         .mode-legend[hidden]{ display:none; }
         .mode-legend b{ display:block; font-weight:600; margin-bottom:4px; }
         .mode-legend .ml-row{ display:flex; align-items:center; gap:10px; padding:2px 0; }
-        .mode-legend .ml-w{ display:inline-block; width:34px; flex:0 0 34px; border-radius:7px; background:#2563EB; box-shadow:0 0 0 1px #1F2024; }
         .mode-legend .ml-steps{ display:flex; gap:2px; margin:4px 0 2px; }
         .mode-legend .ml-steps i{ flex:1; height:14px; display:block; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
         .mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:2px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
@@ -1536,16 +1538,12 @@
     // 🔴 The division is the SERVER's (`per_day` / `working_days` on both public feeds),
     // not this file's: lesson 25, one config value one reader.
     const FORECAST_LABEL_UNIT = 'Two-way / day';
-    // 12 Oct 2026 (fix pass; the review's "plus width by volume"): the forecast line widens with the route's
-    // movements a day (f_avg). FIXED stops, so one width means one volume in every month; the old widths
-    // (3.5 px line, 6 px casing) are the floor. Tonnes / m³ use stops twenty times larger (about a 20 t load).
-    const FORECAST_VOL_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? [100, 600, 2000] : [5, 30, 100];
-    function forecastWidth(base){
-        const s = FORECAST_VOL_STOPS;
-        return ['interpolate', ['linear'], ['to-number', ['get', 'f_avg'], 0], s[0], base, s[1], base + 2.5, s[2], base + 5];
-    }
-    const FORECAST_LINE_WIDTH = forecastWidth(3.5);     // 3.5 px to 5 a day, 6 at 30, 8.5 at 100 and over
-    const FORECAST_CASING_WIDTH = forecastWidth(6);     // always 2.5 px wider than the line it sits under
+    // 12 Oct 2026 (the user, evening): "line width by volume leave out and change to heat map like the carbon
+    // (toggle between carbon and volume)". The fix pass's width by volume (f_avg on fixed stops) is gone: the
+    // forecast line is ONE width again (3.5 px on a 6 px casing), and volume is shown by COLOUR in the Volume heat
+    // map (VOLUME_STOPS, refreshMapModes), so a line's width never carries a figure.
+    const FORECAST_LINE_WIDTH = 3.5;
+    const FORECAST_CASING_WIDTH = 6;
     //: working days in a planning month, as the public feed reports it. 22 only until
     //: the first feed answers — never a second copy of the figure.
     let FORECAST_WORKING_DAYS = 22;
@@ -4640,11 +4638,16 @@
                         <div><label id="fc-chips-label">Month</label><div class="month-chips" id="fc-chips" role="group" aria-labelledby="fc-chips-label"></div></div>
                     </div>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
-                    <label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-road-load" onchange="toggleRoadLoad()"> Road load</label>
-                    <div class="mode-note" id="road-load-note">One figure per stretch of road two or more routes share: the routes using it, summed.</div>
+                    <!-- 12 Oct 2026 (the user, evening): ONE heat map, volume OR carbon, never both (radio buttons) -->
+                    <div class="heat-group" role="radiogroup" aria-labelledby="heat-label">
+                    <div class="heat-label" id="heat-label">Heat map</div>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume <span class="mode-sub">two-way movements a day</span></label>
+                    <div class="mode-note" id="road-load-note">Each route by its own figure; a stretch of road two or more routes share by the routes using it, summed.</div>
                     <div class="mode-legend" id="road-load-legend" hidden></div>
-                    <label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month</span></label>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month, per route</span></label>
                     <div class="mode-legend" id="carbon-legend" hidden></div>
+                    </div>
                     <button class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
                     <button class="btn btn-ghost" id="tl-open" onclick="startTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
                     <div id="forecast-status">Approved forecasts only.</div>
@@ -5213,6 +5216,14 @@
     // Both are OFF by default and both need ONE month on screen: the timeline's (a month chip or Play), or Show forecast
     // when the programme's volume sits in one month.
     // Round caps and no dasharray: the route layers' butt caps and dash constants are counted by parse_map.js.
+    // 12 Oct 2026 (the user, evening): "line width by volume leave out and change to heat map like the carbon (toggle
+    // between carbon and volume)". The two boxes are now ONE choice, Heat map: Off · Volume · Carbon (radio buttons;
+    // the ids toggle-road-load and toggle-carbon are kept, so a shared link's &layers=road-load / carbon still opens).
+    // VOLUME paints the forecast routes by their own two-way movements a day (f_avg) AND draws the shared sections on
+    // top painted by the routes using them, summed (rl_mv) - the same quantity on the same fixed stops, so a shared
+    // stretch reads hotter than each route on it. CARBON paints the routes by t CO2e (as before, per route); it no
+    // longer paints the shared sections, because a section's carbon is a length share of each route and would sit on
+    // the same ramp as whole-route tonnes with other stops. Every line is ONE width in both modes: colour is the figure.
     const ROAD_LOAD_LAYERS = ['road-load-casing', 'road-load-line', 'road-load-labels'];
     // 12 Oct 2026 (browser check): the run's label is a LEVEL point label at the middle of the run, on its own point
     // source. A label placed along the line ('line-center') was dropped by Mapbox wherever the road bends more than the
@@ -5222,17 +5233,17 @@
     //: 19 to 181 m, each labelled as if it were a stretch of road
     const ROAD_LOAD_LABEL_MIN_KM = 0.2;
     const CARBON_LABEL_LAYER = 'carbon-route-labels';
-    //: two-way movements a day at which the road-load line reaches its three widths (fixed: one width, one volume)
-    const ROAD_LOAD_STOPS = [5, 30, 120];
-    function roadLoadWidth(base){
-        const s = ROAD_LOAD_STOPS;
-        return ['interpolate', ['linear'], ['to-number', ['get', 'rl_mv'], 0], s[0], base, s[1], base + 4, s[2], base + 9];
-    }
-    const ROAD_LOAD_LINE_WIDTH = roadLoadWidth(4);       // 4 px to 5 a day, 8 at 30, 13 at 120 and over
-    const ROAD_LOAD_CASING_WIDTH = roadLoadWidth(6.5);   // always 2.5 px wider than the line it sits under
+    //: the Volume heat map's four stops, two-way movements a day, FIXED (one colour = one volume in every month and
+    //: every scheme): under 10 · 10-25 · 25-50 · 50-100 · 100 and over. A shared section's figure is a sum of routes,
+    //: so the top step is reached mostly on shared roads.
+    const VOLUME_STOPS = [10, 25, 50, 100];
+    //: the routes' own stops: the same, unless the map's forecast unit is not vehicle loads (t or m³ a day, about a
+    //: 20 t load), in which case they are twenty times larger and the legend names the unit
+    const ROUTE_VOLUME_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? VOLUME_STOPS.map(s => s * 20) : VOLUME_STOPS;
+    const ROAD_LOAD_LINE_WIDTH = 5;        // one width (the heat map's), never by volume
+    const ROAD_LOAD_CASING_WIDTH = 7.5;    // 2.5 px wider than the line it sits under
     //: the run's label: "118 two-way / day · 7 routes" (its OWN expression, not the per-route f_avg one)
     const ROAD_LOAD_LABEL = ['concat', ['get', 'rl_mv_text'], ' two-way / day · ', ['get', 'rl_routes_text']];
-    const ROAD_LOAD_CARBON_LABEL = ['concat', ['get', 'rl_co2_text'], ' · ', ['get', 'rl_routes_text']];
     //: the route label in carbon mode: the route's t CO2e in the month, from the server
     const CARBON_ROUTE_LABEL = ['case', ['==', ['typeof', ['get', 'f_co2']], 'number'],
                                 ['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];
@@ -5292,6 +5303,15 @@
         return ['case', ['==', ['typeof', ['get', prop]], 'number'],
                 ['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]],
                 CARBON_NONE];
+    }
+    // the Volume heat map's colour: the same five blues on the volume stops (a route on the overlay always carries a
+    // figure, so there is no grey "no figure" here)
+    function volumeColor(prop, stops){
+        const s = stops, c = CARBON_RAMP;
+        return ['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]];
+    }
+    function stepRanges(s, unit){
+        return ['under ' + s[0] + unit, s[0] + ' to ' + s[1] + unit, s[1] + ' to ' + s[2] + unit, s[2] + ' to ' + s[3] + unit, s[3] + unit + ' and over'];
     }
     // 12 Oct 2026 (browser check): a section of a few tens of metres carries a few kg, which rounded to "0 t CO2e"
     // beside "82 two-way / day". A figure above zero that rounds to nothing says "under 0.1 t".
@@ -5446,43 +5466,50 @@
     function setForecastLabelsVisible(on){
         if (map.getLayer('forecast-labels')) map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');
     }
+    // 12 Oct 2026 (evening): one heat map at a time. Volume (toggle-road-load) wins if both ids were ever checked at
+    // once (an old shared link that carried road-load.carbon: radio buttons cannot hold both, this is the guard).
+    function heatMode(){ return modeOn('toggle-road-load') ? 'volume' : modeOn('toggle-carbon') ? 'carbon' : null; }
     function applyCarbonMode(m){
-        const rl = !!m && modeOn('toggle-road-load'), co2 = !!m && modeOn('toggle-carbon');
-        const scale = carbonScale(rl), stops = scale.stops;     // Track C review: section stops with Road load on
-        const paintRoutes = co2 && !rl;
+        const mode = m ? heatMode() : null, vol = mode === 'volume', co2 = mode === 'carbon';
+        const stops = carbonScale(false).stops;                 // carbon is per route only (no section carbon)
+        const paint = vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;
+        const heat = vol || co2;
         if (map.getLayer('forecast-layer')) {
-            map.setPaintProperty('forecast-layer', 'line-color', paintRoutes ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast);
-            map.setPaintProperty('forecast-layer', 'line-width', paintRoutes ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
+            map.setPaintProperty('forecast-layer', 'line-color', paint);
+            map.setPaintProperty('forecast-layer', 'line-width', heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
         }
-        if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', paintRoutes ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
-        if (paintRoutes) ensureCarbonLabelLayer();
+        if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', heat ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
+        if (co2) ensureCarbonLabelLayer();
         else if (map.getLayer(CARBON_LABEL_LAYER)) map.removeLayer(CARBON_LABEL_LAYER);
         if (map.getLayer('road-load-line')) {
-            const paintRuns = co2 && rl;
-            map.setPaintProperty('road-load-line', 'line-color', paintRuns ? carbonColor('rl_co2', stops) : CONFIG.COLORS.brand);
-            map.setPaintProperty('road-load-line', 'line-width', paintRuns ? CARBON_LINE_WIDTH : ROAD_LOAD_LINE_WIDTH);
-            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', paintRuns ? CARBON_CASING_WIDTH : ROAD_LOAD_CASING_WIDTH);
-            if (map.getLayer('road-load-labels')) map.setLayoutProperty('road-load-labels', 'text-field', paintRuns ? ROAD_LOAD_CARBON_LABEL : ROAD_LOAD_LABEL);
+            map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', VOLUME_STOPS));
+            map.setPaintProperty('road-load-line', 'line-width', ROAD_LOAD_LINE_WIDTH);
+            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', ROAD_LOAD_CASING_WIDTH);
+            if (map.getLayer('road-load-labels')) map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);
         }
     }
     function renderModeLegends(m){
         const rlBox = document.getElementById('road-load-legend'), coBox = document.getElementById('carbon-legend');
-        const rl = modeOn('toggle-road-load'), co2 = modeOn('toggle-carbon');
+        const mode = heatMode(), rl = mode === 'volume', co2 = mode === 'carbon';
         const needMonth = 'Shows one month: press Play or pick a month.';
         if (rlBox) {
             rlBox.hidden = !rl;
             if (rl) {
                 const data = m ? RL.cache[m] : null;
                 if (!m) rlBox.innerHTML = '<div class="mode-note">' + needMonth + '</div>';
-                else if (RL.error[m]) rlBox.innerHTML = '<div class="mode-note">Road load could not be read for ' + rlEsc(monthLabel(m)) + ' (' + rlEsc(RL.error[m]) + ').</div>';
-                else if (!data) rlBox.innerHTML = '<div class="mode-note">Reading road load for ' + rlEsc(monthLabel(m)) + '…</div>';
+                else if (RL.error[m]) rlBox.innerHTML = '<div class="mode-note">The shared sections could not be read for ' + rlEsc(monthLabel(m)) + ' (' + rlEsc(RL.error[m]) + '); the routes are painted by their own figure.</div>';
+                else if (!data) rlBox.innerHTML = '<div class="mode-note">Reading the shared sections for ' + rlEsc(monthLabel(m)) + '…</div>';
                 else {
                     const n = roadLoadFeatures(data, modeRoutesPassing()).length;
-                    rlBox.innerHTML = '<b>Road load · ' + rlEsc(monthLabel(m)) + '</b>' +
-                        ROAD_LOAD_STOPS.map((s, i) => '<div class="ml-row"><span class="ml-w" style="height:' + [4, 8, 13][i] + 'px"></span>' +
-                            (i === ROAD_LOAD_STOPS.length - 1 ? s + ' and over' : s) + ' two-way movements a day</div>').join('') +
-                        '<div class="ml-foot">' + n + ' shared section' + (n === 1 ? '' : 's') + ' with volume. One load = one two-way movement; the loaded leg is counted once. ' +
-                        'A stretch one route uses alone has no label here: turn Road load off to read that route\'s own figure.' +
+                    const other = ROUTE_VOLUME_STOPS !== VOLUME_STOPS;
+                    rlBox.innerHTML = '<b>Volume · two-way movements a day in ' + rlEsc(monthLabel(m)) + '</b>' +
+                        '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
+                        stepRanges(VOLUME_STOPS, '').map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
+                        '<div class="ml-foot">Each route is painted by its own figure; ' + n + ' shared section' + (n === 1 ? '' : 's') +
+                        ' (a stretch of road two or more routes use) by the routes using it, summed, and labelled. ' +
+                        'One load = one two-way movement; the loaded leg is counted once. Stops are fixed, so a colour means the same volume in every month. ' +
+                        'Hover or click a route for its own figure.' +
+                        (other ? ' Routes are painted in ' + rlEsc(CONFIG.FORECAST_UNIT) + ' a day on stops twenty times these.' : '') +
                         ((data.notes || []).length ? ' ' + data.notes.map(rlEsc).join(' ') : '') + '</div>';
                 }
             }
@@ -5495,8 +5522,8 @@
                 else if (!mtx) coBox.innerHTML = '<div class="mode-note">Reading carbon for ' + rlEsc(monthLabel(m)) + '…</div>';
                 else if (mtx.co2Error) coBox.innerHTML = '<div class="mode-note">' + rlEsc(mtx.co2Error) + ' Every line is grey: no figure.</div>';
                 else {
-                    const sc = carbonScale(rl), s = sc.stops, per = rl ? 'per shared section' : 'per route';
-                    const ranges = ['under ' + s[0] + ' t', s[0] + ' to ' + s[1] + ' t', s[1] + ' to ' + s[2] + ' t', s[2] + ' to ' + s[3] + ' t', s[3] + ' t and over'];
+                    const sc = carbonScale(false), s = sc.stops, per = 'per route';
+                    const ranges = stepRanges(s, ' t');
                     const miss = carbonMissingLines(m);
                     coBox.innerHTML = '<b>Carbon · t CO₂e in ' + rlEsc(monthLabel(m)) + ', ' + per + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
@@ -5505,7 +5532,6 @@
                         '<div class="ml-foot">Approved plan only, average-laden factor on both legs' +
                         (miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +
                         '. Stops are fixed from the programme\'s largest ' + sc.what + ' (' + fmtTonnes(sc.max || 0) + '), so a colour means the same tonnes in every month.' +
-                        (rl ? ' A section carries each route\'s month CO₂e × the section\'s length ÷ that route\'s two-way length.' : '') +
                         (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '') + '</div>';
                 }
             }
@@ -5514,7 +5540,9 @@
     // the one entry point: every month change, every toggle, the style.load re-add and the overlay switching off
     function refreshMapModes(){
         if (typeof map === 'undefined' || !map || !map.getLayer) return;
-        const m = mapModeMonth(), rl = modeOn('toggle-road-load'), co2 = modeOn('toggle-carbon');
+        const m = mapModeMonth(), mode = heatMode(), rl = mode === 'volume', co2 = mode === 'carbon';
+        const off = document.getElementById('heat-off');
+        if (off && off.checked !== !mode) off.checked = !mode;     // a link or a reset that cleared both shows "Off"
         RL.month = m;
         setForecastLabelsVisible(!(m && (rl || co2)));
         if (!m || !rl) removeRoadLoadLayers();
@@ -5541,9 +5569,14 @@
     function refreshMapModeFilters(){
         if (typeof map === 'undefined' || !map || !map.getLayer) return;
         const m = RL.month;
-        if (m && modeOn('toggle-road-load') && RL.cache[m] && map.getSource('road-load-source')) drawRoadLoad(m);
+        if (m && heatMode() === 'volume' && RL.cache[m] && map.getSource('road-load-source')) drawRoadLoad(m);
         if (map.getLayer(CARBON_LABEL_LAYER)) map.setFilter(CARBON_LABEL_LAYER, carbonLabelFilter());
-        if (m && (modeOn('toggle-road-load') || modeOn('toggle-carbon'))) renderModeLegends(m);
+        if (m && heatMode()) renderModeLegends(m);
+    }
+    // "Off": the radio group's third button; both mode ids are now unchecked, so refreshMapModes clears both
+    function toggleHeatOff(){
+        refreshMapModes();
+        if (typeof scheduleViewWrite === 'function') scheduleViewWrite();   // the link drops road-load / carbon
     }
     // a tick with no month on screen opens the timeline (its month), as the mockups show the month on the bar
     // (the bar's first frame calls refreshMapModes() once its month is known)
