@@ -667,8 +667,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("...and the October demo volume is counted per route in the totals (78 lines, 20 routes: Sep-Dec)",
        rl.get("totals", {}).get("routes_with_volume", 0) > 0 and rl.get("totals", {}).get("trips", 0) > 0
        and rl.get("totals", {}).get("unbaked_lines", 0) == rl.get("totals", {}).get("lines", -1), str(rl.get("totals")))
-    ok("...the return leg answers too, with its 'never added' note",
-       c.get("/api/public/road-load", params={"month": 10, "leg": "return"}).json().get("notes", [None])[-1].startswith("Return leg"))
+    _ret = c.get("/api/public/road-load", params={"month": 10, "leg": "return"})
+    # NARROWED 12 Oct 2026: the status is checked too — called as a function, month-kpis' `unit` default was
+    # FastAPI's Query object and this answered 400 "unit must be one of [...]"; the note is the LAST line
+    ok("...the return leg answers 200 too, with its 'never added' note",
+       _ret.status_code == 200 and (_ret.json().get("notes") or [""])[-1].startswith("Return leg"), _ret.text[:160])
     # NARROWED 12 Oct 2026 (the tenancy / wording review): the 400 reads as words, not a Python list
     _bad = c.get("/api/public/road-load", params={"month": 10, "leg": "x"})
     ok("an unknown leg is a 400 whose reason reads \"leg must be one of 'loaded' or 'return'\"",

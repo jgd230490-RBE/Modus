@@ -80,6 +80,18 @@ _MONTHS_LONG = ("January", "February", "March", "April", "May", "June", "July", 
                 "September", "October", "November", "December")
 
 
+def stockpile_wording(name, capacity_qty, balance_end, unit, month_index):
+    """
+    The sentence a person reads about a stockpile over capacity (D23, 12 Oct 2026). The
+    balance is a running total of the week ACTUALS typed on the Look-ahead, carried
+    forward — not a plan figure — so it is "recorded in it", never "the plan puts".
+    """
+    u = unit or "t"
+    return (f"{name} holds {float(capacity_qty):,.0f} {u}. {float(balance_end):,.0f} {u} "
+            f"recorded in it at the end of {month_label(month_index)}, from the week actuals typed so far, "
+            "carried forward.")
+
+
 # --------------------------------------------------------------------------- #
 #  The inputs — the same functions the public map's endpoints run                #
 # --------------------------------------------------------------------------- #
@@ -199,7 +211,9 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
                 fell_back += 1
             keys = {
                 "discipline": l.get("discipline") or "unassigned",
-                "team": taxonomy.team_text(rp.get("ipt"), labels) or f"no {str(word).lower()}",
+                # `word` handed in: team_text would otherwise read the tenant settings
+                # for every line, and this function promises no database read
+                "team": taxonomy.team_text(rp.get("ipt"), labels, word) or f"no {str(word).lower()}",
                 "section": l.get("section_id") or "no work section",
             }
             for by, key in keys.items():                         # rule 10
@@ -498,7 +512,9 @@ def conditions_of_month(month_index, payload=None, factors=None):
             piles.append({"location_id": sp["location_id"], "name": sp["name"],
                           "capacity_qty": sp["capacity_qty"], "unit": sp["capacity_unit"],
                           "balance_end": last["balance_end"],
-                          "over_by": _r(float(last["balance_end"]) - float(sp["capacity_qty"]))})
+                          "over_by": _r(float(last["balance_end"]) - float(sp["capacity_qty"])),
+                          "wording": stockpile_wording(sp["name"], sp["capacity_qty"], last["balance_end"],
+                                                       sp["capacity_unit"], mi)})
 
     # 3. seasonal windows for this calendar month
     seasonal = []
@@ -578,5 +594,5 @@ def month_page(month_index, acc):
                               "EKFB 2020 printed maximum HGV each way. Wayscope prints two-way movements."),
             "carbon": carbon.SUMMARY_STAMP,
         },
-        "generated_at": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }

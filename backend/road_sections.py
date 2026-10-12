@@ -33,14 +33,20 @@ whenever a primary geometry is upserted or cleared, on import, or on demand.
 
 THE MONTH READ (road_load)
 --------------------------
-One load = one two-way movement, never doubled. The LOADED leg carries the figure:
-movements a day on a run = the sum, over the routes that own it, of their Approved
-lines' trips in the month ÷ the working days — the same per-line trips costlines.lines()
-gives the Dashboard, so the run can never disagree with the bar. Vehicles = the sum of
-the lines' vehicles (each already rounded up, as the bar does). CO2e for the month is
-apportioned by length: a route's co2_t × run length ÷ the route's loaded-leg length,
-both measured the same way (haversine over the stored vertices). Teams are NAMES,
-through taxonomy — a team id never leaves this module.
+One load = one two-way movement, never doubled. The LOADED leg carries the figure, and
+the figure is the PUBLIC MAP BAR's: the per-route numbers come from the same per-line
+payload the bar and the bulletin read (/api/public/month-kpis called as a function), so a
+run drawn on the map and the bar beside it cannot disagree. Movements a day on a run =
+the sum, over the routes that own it, of their Approved lines' loads in the month (tonnes
+÷ payload, as typed, fractional — the bar's rule, never rounded per line) ÷ the working
+days. Vehicles = Σ per line ceil((loads ÷ working days) ÷ what one vehicle can do a day
+on that route), the bar's rule; the Dashboard's rounded-up `trips` rides beside it,
+named. CO2e for the month is apportioned by length: a route's co2_t (costlines' figure,
+both legs) × run length ÷ the route's TWO-WAY length (loaded + baked return) — the carbon
+emitted ON the run, both lengths haversine over the stored vertices. (Until 12 Oct the
+divisor was the loaded leg alone, which put the whole trip's carbon on the laden half of
+the road: twice the carbon emitted there wherever the return leg was baked.) Teams are
+NAMES, through taxonomy — a team id never leaves this module.
 
 WHAT THIS DOES NOT DO
 ---------------------
@@ -57,6 +63,17 @@ import db
 import taxonomy
 
 LEGS = ("loaded", "return")
+
+
+def leg_error():
+    """
+    The one sentence a caller reads when `leg` names no leg — words, not a Python tuple
+    or list rendered into the message (12 Oct 2026 review: the 400s used to print
+    "['loaded', 'return']"). main.py's two 400s and road_load's ValueError all read this.
+    """
+    return "leg must be one of " + " or ".join(f"'{l}'" for l in LEGS)
+
+
 KEY_DP = 6              # the exact key: six decimal places (~0.1 m)
 SNAP_DEG = 1e-5         # the second key: vertices within this (in both axes) are one vertex
 MIN_RUN = 2             # a run is two or more consecutive shared vertices
@@ -379,55 +396,108 @@ def _route_teams():
         "SELECT id, ipt FROM routes WHERE tenant_id = ?", (db.current_tenant(),))}
 
 
+def month_lines(month):
+    """
+    The public map bar's per-line payload for one month — /api/public/month-kpis called
+    as a function (as bulletin.month_payload does), never over HTTP. The import is
+    deferred because main imports network, which imports this module.
+    """
+    import main
+    # `unit` handed in: called as a function the parameter's default is FastAPI's Query
+    # object, not "vehicles", and the endpoint answers 400 (found by http_smoke, 12 Oct)
+    return main.public_month_kpis(month=int(month), unit="vehicles")
+
+
+def route_lengths(profile):
+    """
+    {route_id: {"loaded", "return", "two_way"}} in km, measured the one way this module
+    measures a run — haversine over the stored primary vertices of `profile`. `two_way` is
+    loaded + return where the return leg is baked, else the loaded alone: derived's km_trip
+    rule (`distance_km + (return_km if return_baked else 0)`), so a route's month CO2e,
+    which costlines works out over km_trip, is divided over the same legs it was summed on.
+    """
+    loaded = {rid: length_km(pts) for rid, pts in polylines_for("loaded", profile).items()}
+    ret = {rid: length_km(pts) for rid, pts in polylines_for("return", profile).items()}
+    out = {}
+    for rid in set(loaded) | set(ret):
+        lk, rk = loaded.get(rid, 0.0), ret.get(rid, 0.0)
+        out[rid] = {"loaded": lk, "return": rk, "two_way": lk + rk}
+    return out
+
+
+_NO_VOLUME = {"loads": 0.0, "trips": 0, "vehicles": 0, "co2_t": 0.0, "lines": 0,
+              "unbaked_lines": 0, "co2_lines_unbaked": 0}
+
+
+def _carbon_stamp():
+    """carbon.SUMMARY_STAMP, imported late: carbon imports network, which imports this module."""
+    import carbon
+    return carbon.SUMMARY_STAMP
+
+
 def road_load(month, factors=None, working_days=None, leg="loaded", profile=None):
     """
     One entry per stored run of `leg` that carries volume in `month`.
 
-    Figures per run (loaded leg): movements_per_day = Σ over the owner routes of their
-    Approved lines' trips in the month ÷ working days — two-way movements, one per load,
-    never doubled; vehicles = Σ of the lines' vehicles (each rounded up per line, as the
-    bar does); co2_t = Σ route co2_t × run length ÷ route loaded length. The return leg
-    is served separately and carries the SAME loads back empty: its figure is labelled
-    as empties and is never added to the loaded figure.
+    The per-route figures are the public map bar's, from the one per-line payload the bar
+    and the bulletin read (month_lines), so the three cannot disagree:
+      loads              Σ the lines' vehicle_loads — tonnes ÷ payload, as typed, fractional
+      movements_per_day  loads ÷ working days: two-way movements, one per load, never
+                         doubled, never rounded per line (the bar's rule)
+      vehicles           Σ per line ceil((loads ÷ working days) ÷ what one vehicle can do a
+                         day on that route) — the bar's rule; a line whose route is not
+                         baked for its vehicle has no cycle: counted in `unbaked_lines`,
+                         never zeroed
+      trips              Σ per line ceil(loads) — the Dashboard's rounded-up figure, kept
+                         beside the bar's and named so a reader of both pages sees why
+                         they differ by rounding; it is NOT the movements figure
+      co2_t              Σ route month CO2e × run length ÷ the route's two-way length
+                         (route_lengths): the carbon emitted ON the run. A route's shares
+                         over its loaded-leg runs and its return-leg runs together never
+                         exceed its month figure.
+    The return leg is served separately and carries the SAME loads back empty: labelled
+    as empties and never added to the loaded figure.
 
-    `working_days` is the planning block's working_days_per_month, handed in by main's
-    one reader of it; when not given, the figure costlines.lines() divided by is used.
+    `working_days` is the planning block's figure handed in by main's one reader of it;
+    when not given, the payload's own `working_days` (the same reader) is used. `factors`
+    is accepted for the endpoint's call shape and not read — the payload resolves its own.
+    When the payload's carbon read failed it says so in `co2_error`: that rides through
+    here, every co2_t reads 0 and nothing raises.
     """
-    import conversions
-    import costlines
     month = int(month)
     if leg not in LEGS:
-        raise ValueError(f"leg must be one of {LEGS}")
-    factors = factors or conversions.load_factors()
-    cl = costlines.lines(acc={"role": "planner"}, from_month=month, to_month=month,
-                         status="Approved", factors=factors)
-    wd = float(working_days or cl.get("working_days_per_month") or 0) or None
+        raise ValueError(leg_error())
+    payload = month_lines(month)
+    wd = float(working_days or payload.get("working_days") or 0) or None
     if not wd:
         raise ValueError("working days per month is not set")
 
-    # per route: trips, vehicles, co2 — summed over the month's Approved lines
+    # per route: the bar's arithmetic over the month's Approved lines
     per_route = {}
     unbaked_lines = 0
     line_teams = {}
-    for l in cl["lines"]:
+    for l in payload.get("lines", []) or []:
         rid = l["route_id"]
-        pr = per_route.setdefault(rid, {"trips": 0, "vehicles": 0, "co2_t": 0.0, "lines": 0,
-                                        "co2_lines_unbaked": 0})
+        pr = per_route.setdefault(rid, dict(_NO_VOLUME))
         pr["lines"] += 1
-        pr["trips"] += int(l.get("trips") or 0)
-        if l.get("vehicles") is not None:
-            pr["vehicles"] += int(l["vehicles"])
+        loads = float(l.get("vehicle_loads") or 0.0)
+        pr["loads"] += loads
+        pr["trips"] += int(math.ceil(round(loads, 9))) if loads > 0 else 0
+        tpv = l.get("trips_per_vehicle_day")
+        if tpv and float(tpv) > 0:
+            pr["vehicles"] += int(math.ceil((loads / wd) / float(tpv))) if loads > 0 else 0
+        else:
+            pr["unbaked_lines"] += 1
+            unbaked_lines += 1
         if l.get("co2_t") is None:
             pr["co2_lines_unbaked"] += 1
-            if not l.get("baked"):
-                unbaked_lines += 1
         else:
             pr["co2_t"] += float(l["co2_t"])
         if l.get("ipt"):
             line_teams.setdefault(rid, set()).add(l["ipt"])
 
     profile = profile or index_profile()
-    route_len = {rid: length_km(pts) for rid, pts in polylines_for(leg, profile).items()}
+    lens = route_lengths(profile)
     route_team = _route_teams()
     labels = taxonomy.team_labels()
 
@@ -439,37 +509,44 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
             names.add(taxonomy.team_name(t, labels))
         return sorted(n for n in names if n)
 
+    def co2_share(rid, run_km):
+        pr = per_route.get(rid)
+        tw = (lens.get(rid) or {}).get("two_way") or 0.0
+        return (pr["co2_t"] * run_km / tw) if (pr and tw > 0) else 0.0
+
     runs_out = []
     for run in stored_runs(leg):
         owners = run["routes"]
-        trips = sum(per_route.get(r, {}).get("trips", 0) for r in owners)
-        if trips <= 0:
+        loads = sum(per_route.get(r, _NO_VOLUME)["loads"] for r in owners)
+        if loads <= 0:
             continue
-        vehicles = sum(per_route.get(r, {}).get("vehicles", 0) for r in owners)
         co2 = 0.0
         routes_out = []
         for r in owners:
-            pr = per_route.get(r, {"trips": 0, "vehicles": 0, "co2_t": 0.0})
-            rl = route_len.get(r) or 0.0
-            share = (pr["co2_t"] * run["length_km"] / rl) if rl > 0 else 0.0
+            pr = per_route.get(r, _NO_VOLUME)
+            share = co2_share(r, run["length_km"])
             co2 += share
+            rl = lens.get(r) or {}
             routes_out.append({
                 "route_id": r,
                 "teams": team_names(r),
+                "loads": round(pr["loads"], 3),
                 "trips": pr["trips"],
-                "movements_per_day": round(pr["trips"] / wd, 2),
+                "movements_per_day": round(pr["loads"] / wd, 2),
                 "vehicles": pr["vehicles"],
                 "co2_t": round(share, 3),
-                "route_length_km": round(rl, 3),
+                "route_length_km": round(rl.get(leg, 0.0), 3),
+                "two_way_length_km": round(rl.get("two_way", 0.0), 3),
             })
         runs_out.append({
             "id": run["id"],
             "leg": leg,
             "routes": owners,
             "teams": sorted({t for r in owners for t in team_names(r)}),
-            "trips": trips,
-            "movements_per_day": round(trips / wd, 2),
-            "vehicles": vehicles,
+            "loads": round(loads, 3),
+            "trips": sum(per_route.get(r, _NO_VOLUME)["trips"] for r in owners),
+            "movements_per_day": round(loads / wd, 2),
+            "vehicles": sum(per_route.get(r, _NO_VOLUME)["vehicles"] for r in owners),
             "co2_t": round(co2, 3),
             "length_km": run["length_km"],
             "vertices": run["vertices"],
@@ -478,24 +555,26 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
             "geometry": run["geometry"],
         })
 
-    routes_with_volume = sorted(r for r, pr in per_route.items() if pr["trips"] > 0)
-    total_trips = sum(pr["trips"] for pr in per_route.values())
+    routes_with_volume = sorted(r for r, pr in per_route.items() if pr["loads"] > 0)
+    total_loads = sum(pr["loads"] for pr in per_route.values())
     totals = {
         # per ROUTE, not a sum over runs: a route runs through many runs, so adding the
         # runs up would count its loads once per run
         "routes_with_volume": len(routes_with_volume),
         "routes_in_runs": len({r for run in runs_out for r in run["routes"]}),
-        "trips": total_trips,
-        "movements_per_day": round(total_trips / wd, 2),
+        "loads": round(total_loads, 3),
+        "trips": sum(pr["trips"] for pr in per_route.values()),
+        "movements_per_day": round(total_loads / wd, 2),
         "vehicles": sum(pr["vehicles"] for pr in per_route.values()),
         "co2_t": round(sum(pr["co2_t"] for pr in per_route.values()), 3),
         "runs": len(runs_out),
         "shared_km": round(sum(r["length_km"] for r in runs_out), 3),
-        "lines": len(cl["lines"]),
+        "lines": sum(pr["lines"] for pr in per_route.values()),
         "unbaked_lines": unbaked_lines,
+        "co2_lines_unbaked": sum(pr["co2_lines_unbaked"] for pr in per_route.values()),
     }
     notes = []
-    if not cl["lines"]:
+    if not per_route:
         notes.append("No approved volume in this month.")
     elif not runs_out:
         if not stored_runs(leg):
@@ -509,18 +588,35 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
     if leg == "return":
         notes.append("Return leg: the same loads running back empty. These are not "
                      "additional movements and are never added to the loaded figure.")
-    return {
+    out = {
         "month": month,
         "leg": leg,
         "working_days": wd,
         "profile": profile,
-        "basis": "two-way movements a day: one load = one two-way movement; "
-                 "approved lines' trips in the month / working days, summed over the "
-                 "routes that share the section",
+        "basis": "two-way movements a day: one load = one two-way movement; the month's "
+                 "approved loads (tonnes ÷ payload, as typed, not rounded per line) / working "
+                 "days, summed over the routes that share the section — the public map bar's "
+                 "figure. `trips` is the Dashboard's rounded-up count, shown beside it.",
+        "co2_basis": "CO2e on a section = Σ each route's month CO2e (routed km × the vehicle's "
+                     "kg CO2e/km, both legs) × section length / the route's two-way length "
+                     "(loaded + baked return): the carbon emitted on the section.",
         "runs": runs_out,
         "totals": totals,
         "notes": notes,
+        # the Carbon page's stamp, read from carbon.py (deferred: carbon imports network,
+        # which imports this module) — a CO2e figure a person reads is an estimate from the
+        # plan and the feed says so beside it, in the Carbon page's own words
+        "carbon": {
+            "stamp": _carbon_stamp(),
+            "rule": "CO₂e = routed km × the vehicle's kg CO₂e/km, approved plan only; a section's "
+                    "share = that route's month CO₂e × section length ÷ that route's two-way length "
+                    "(loaded + baked return).",
+        },
     }
+    if payload.get("co2_error"):
+        out["co2_error"] = payload["co2_error"]
+        notes.append("The carbon read failed, so every CO2e figure here is 0 — see co2_error.")
+    return out
 
 
 # --------------------------------------------------------------------------- #

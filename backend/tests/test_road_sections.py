@@ -12,9 +12,13 @@ WHAT THIS PROVES
     part splits the stretch into two runs with the right owner sets; a vertex 3e-6
     degrees off still matches (the snap) and one 5e-5 off does not; the return leg is
     indexed separately;
-  * the month read: movements on a run = the two routes' Approved trips ÷ the planning
-    block's working days, equal to the sum of the per-route figures and NEVER doubled;
-    vehicles = the sum of the lines' rounded-up vehicles; CO2e apportioned by length;
+  * the month read: movements on a run = the two routes' Approved LOADS (the public map
+    bar's fractional figure, from the same month-kpis payload the bar reads) ÷ the planning
+    block's working days, equal to the sum of the per-route figures and NEVER doubled, and
+    never Σ ceil per line (the breaking case: a 10.4-load line and a 0.5-load line);
+    vehicles = Σ ceil per line, the bar's rule; CO2e apportioned by length over the route's
+    TWO-WAY length (loaded + baked return), so a run carries the carbon emitted on it, not
+    the whole trip's; a failed carbon read answers with co2_error and never raises;
     team NAMES, never an id; a month with no volume gives empty runs and a note;
   * the index is rebuilt by network._upsert_geom (alt 0 only), by clear_geometry and by
     the package import; the package carries the table; the public endpoint sits behind the
@@ -420,6 +424,17 @@ ok("5. fixture: costlines gives A 100 trips and B 50 in October (ceil(t / payloa
    per_route.get("R001", {}).get("trips") == 100 and per_route.get("R002", {}).get("trips") == 50
    and per_route["R001"]["co2_t"] > 0 and per_route["R002"]["co2_t"] > 0, str(per_route))
 ok("5. fixture: the working days come from the planning block, not a literal", WD == cl["working_days_per_month"] and WD > 0)
+# the bar's payload for the same month: fractional loads, ceil-per-line fleet, the same co2 — what the map bar reads
+P10 = main.public_month_kpis(month=M)
+bar = {}
+for l in P10["lines"]:
+    b = bar.setdefault(l["route_id"], {"loads": 0.0, "fleet": 0, "co2_t": 0.0})
+    b["loads"] += l["vehicle_loads"]; b["co2_t"] += (l["co2_t"] or 0.0)
+    if l["trips_per_vehicle_day"]:
+        b["fleet"] += math.ceil((l["vehicle_loads"] / WD) / l["trips_per_vehicle_day"])
+ok("5. fixture: the bar's payload gives A 100 loads and B 50 (whole numbers here, so equal to costlines' trips) and the same carbon",
+   bar["R001"]["loads"] == 100 and bar["R002"]["loads"] == 50 and P10["working_days"] == WD
+   and abs(bar["R001"]["co2_t"] - per_route["R001"]["co2_t"]) < 1e-6, str(bar))
 
 pay = road_sections.road_load(M, factors=factors, working_days=WD)
 ok("5. the October read serves the loaded leg, the working days and a basis sentence",
@@ -440,11 +455,21 @@ ok("5. ...and NOT the per-route figure times two (the A8 bug on the label)",
 ok("5. the other month's line and the Pending line do not count (150, not 160 or 1149)", ab["trips"] == 150 and abc["trips"] == 150)
 ok("5. vehicles on the run = the sum of the lines' rounded-up vehicles, as the bar does",
    ab["vehicles"] == per_route["R001"]["vehicles"] + per_route["R002"]["vehicles"] and ab["vehicles"] >= 2, str(ab["vehicles"]))
-# co2 share proportional to length
+# co2 share proportional to length — over the route's TWO-WAY length, because the route's month CO2e is
+# costlines' both-legs figure (km_trip = loaded + baked return). Both A and B have a baked return here.
 LA, LB = plen(A), plen(B)
-exp_ab = per_route["R001"]["co2_t"] * ab["length_km"] / LA + per_route["R002"]["co2_t"] * ab["length_km"] / LB
-ok("5. ⭐ CO2e on the run = Σ route co2 × run length / route loaded length",
+LA2, LB2 = LA + plen(A_RET), LB + plen(B_RET)
+exp_ab = per_route["R001"]["co2_t"] * ab["length_km"] / LA2 + per_route["R002"]["co2_t"] * ab["length_km"] / LB2
+exp_ab_loaded_only = per_route["R001"]["co2_t"] * ab["length_km"] / LA + per_route["R002"]["co2_t"] * ab["length_km"] / LB
+ok("5. ⭐ CO2e on the run = Σ route month CO2e × run length / the route's TWO-WAY length (loaded + baked return): the carbon emitted on the stretch",
    abs(ab["co2_t"] - exp_ab) < 2e-3, f"{ab['co2_t']} vs {exp_ab}")
+ok("5. 🔴 ...and NOT over the loaded leg alone, which put the whole trip's carbon on the laden half of the road (about twice the figure)",
+   abs(ab["co2_t"] - exp_ab_loaded_only) > 1e-3 and exp_ab_loaded_only > 1.8 * exp_ab, f"{ab['co2_t']} vs loaded-only {exp_ab_loaded_only}")
+ok("5. ...each route share names this leg's length and the two-way length it was divided over",
+   [s for s in ab["route_shares"] if s["route_id"] == "R001"][0]["two_way_length_km"] == round(LA2, 3)
+   and [s for s in ab["route_shares"] if s["route_id"] == "R002"][0]["two_way_length_km"] == round(LB2, 3))
+ok("5. ...and the run and each share carry the bar's fractional loads beside the Dashboard's trips",
+   ab["loads"] == 150 and [s["loads"] for s in ab["route_shares"]] == [100, 50] and ab["trips"] == 150)
 shareA_ab = [s for s in ab["route_shares"] if s["route_id"] == "R001"][0]
 shareA_abc = [s for s in abc["route_shares"] if s["route_id"] == "R001"][0]
 ok("5. ...A's share on the two runs is in the ratio of their lengths",
@@ -476,7 +501,8 @@ nov = road_sections.road_load(11, factors=factors, working_days=WD)
 ok("5. November: A's 10 trips alone still show on the shared runs (10 / wd), B contributes 0",
    len(nov["runs"]) == 2 and all(x["trips"] == 10 for x in nov["runs"])
    and [s["trips"] for s in nov["runs"][0]["route_shares"] if s["route_id"] == "R002"] == [0])
-ok("5. working_days not given: the figure costlines divided by is used", road_sections.road_load(M, factors=factors)["working_days"] == WD)
+ok("5. working_days not given: the payload's figure (main._working_days, the one reader) is used",
+   road_sections.road_load(M, factors=factors)["working_days"] == WD == P10["working_days"])
 ret = road_sections.road_load(M, factors=factors, working_days=WD, leg="return")
 ok("5. the return leg is served separately: its own run (V5..V7), the same 150 loads, and a note that they are not added",
    ret["leg"] == "return" and len(ret["runs"]) == 1 and ret["runs"][0]["trips"] == 150
@@ -495,6 +521,68 @@ ok("5. a line on an unbaked route counts in the totals' trips but reaches no run
    pay2["totals"]["trips"] == 170 and pay2["totals"]["unbaked_lines"] == 1
    and pay2["notes"] == ["1 line(s) on routes that are not baked carry trips but no road section."]
    and ab["trips"] == [x for x in pay2["runs"] if x["routes"] == ["R001", "R002"]][0]["trips"], str(pay2["notes"]))
+# the return read's carbon: A's loaded shares + A's return share never exceed A's month CO2e, and the
+# return run is divided over the same two-way length
+ret_shareA = sum(s["co2_t"] for x in ret["runs"] for s in x["route_shares"] if s["route_id"] == "R001")
+ok("5. ⭐ a route's loaded-leg shares plus its return-leg shares stay within its month CO2e (nothing counted twice across the legs)",
+   shareA_ab["co2_t"] + shareA_abc["co2_t"] + ret_shareA <= per_route["R001"]["co2_t"] + 1e-6 and ret_shareA > 0,
+   f"{shareA_ab['co2_t']} + {shareA_abc['co2_t']} + {ret_shareA} vs {per_route['R001']['co2_t']}")
+ok("5. ...the return run's share is A's CO2e × its length / the same two-way length",
+   abs(ret_shareA - per_route["R001"]["co2_t"] * ret["runs"][0]["length_km"] / LA2) < 2e-3)
+
+# ⭐ the breaking case for the movements figure: FRACTIONAL loads. The bar sums loads as typed (tonnes ÷ payload);
+# the Dashboard's costlines rounds up per line. December: A carries 10.4 loads, B 0.5 — the bar says 10.9 a month,
+# ceil-per-line says 12. The run on the public map must say what the bar beside it says.
+add_line("F6", rA, 10.4 * PAYLOAD, "IPT1", month=12)
+add_line("F7", rB, 0.5 * PAYLOAD, "IPT2", month=12)
+P12 = main.public_month_kpis(month=12)
+bar12 = sum(l["vehicle_loads"] for l in P12["lines"] if l["route_id"] in ("R001", "R002"))
+dec = road_sections.road_load(12, factors=factors, working_days=WD)
+dab = [x for x in dec["runs"] if x["routes"] == ["R001", "R002"]][0]
+ok("5. ⭐ December: the run's loads are the bar's 10.9 (10.4 + 0.5), and movements a day = 10.9 / working days",
+   abs(dab["loads"] - 10.9) < 1e-6 and abs(bar12 - 10.9) < 1e-6 and dab["movements_per_day"] == round(10.9 / WD, 2),
+   f"{dab['loads']} {dab['movements_per_day']} bar {bar12}")
+ok("5. 🔴 ...NOT Σ ceil per line (12 / working days): the public map's run and its bar cannot disagree by rounding",
+   dab["trips"] == 12 and dab["movements_per_day"] != round(12 / WD, 2) and dec["totals"]["loads"] == round(10.9, 3)
+   and dec["totals"]["movements_per_day"] == round(10.9 / WD, 2), f"{dab['trips']} {dab['movements_per_day']} vs {round(12 / WD, 2)}")
+ok("5. ...the per-route shares carry the fractional loads too (10.4 and 0.5) and the basis sentence names the rule",
+   [s["loads"] for s in dab["route_shares"]] == [10.4, 0.5] and "not rounded per line" in dec["basis"]
+   and "two-way length" in dec["co2_basis"])
+ok("5. ...vehicles on the run follow the bar's rule, ceil per line of (loads / wd) / what one vehicle can do on that route",
+   dab["vehicles"] == sum(math.ceil((l["vehicle_loads"] / WD) / l["trips_per_vehicle_day"]) for l in P12["lines"]
+                          if l["route_id"] in ("R001", "R002") and l["trips_per_vehicle_day"]) and dab["vehicles"] >= 2)
+
+# ⭐ the carbon read fails: the month read answers, says why, and never raises (B2's co2_error, carried through)
+_real_lines = costlines.lines
+costlines.lines = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("factors document broken"))
+try:
+    broken = road_sections.road_load(M, factors=factors, working_days=WD)
+    ok("5. ⭐ when costlines fails the month read still answers: the runs and movements intact, every CO2e 0, co2_error naming the reason",
+       len(broken["runs"]) == 2 and broken["runs"][0]["movements_per_day"] > 0 and all(x["co2_t"] == 0 for x in broken["runs"])
+       and broken["totals"]["co2_t"] == 0 and str(broken.get("co2_error", "")).startswith("RuntimeError")
+       and any("co2_error" in n for n in broken["notes"]), str(broken.get("co2_error")))
+except Exception as e:  # pragma: no cover — the assertion reports it
+    ok("5. ⭐ when costlines fails the month read still answers: the runs and movements intact, every CO2e 0, co2_error naming the reason",
+       False, repr(e))
+finally:
+    costlines.lines = _real_lines
+ok("5. ...and with the read restored there is no co2_error and the carbon is back",
+   "co2_error" not in road_sections.road_load(M, factors=factors, working_days=WD)
+   and road_sections.road_load(M, factors=factors, working_days=WD)["totals"]["co2_t"] > 0)
+# 12 Oct 2026 (the tenancy / wording review): the carbon on a run is a planning estimate and the feed SAYS so
+# with the Carbon page's stamp, read from carbon.py — the road-load popup prints CO2e and had nothing beside it
+import carbon  # noqa: E402
+ok("5. ⭐ the feed carries the Carbon page's planning-estimate stamp, read from carbon.py, with the apportioning rule",
+   pay["carbon"]["stamp"] == carbon.SUMMARY_STAMP == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
+   and "approved plan only" in pay["carbon"]["rule"] and "÷ that route's two-way length" in pay["carbon"]["rule"]
+   and "loaded length" not in pay["carbon"]["rule"]
+   and empty["carbon"]["stamp"] == carbon.SUMMARY_STAMP and ret["carbon"]["stamp"] == carbon.SUMMARY_STAMP, str(pay.get("carbon")))
+try:
+    road_sections.road_load(M, leg="sideways")
+    ok("5. the unknown-leg refusal reads as words, not a Python tuple", False)
+except ValueError as e:
+    ok("5. the unknown-leg refusal reads as words, not a Python tuple",
+       str(e) == road_sections.leg_error() == "leg must be one of 'loaded' or 'return'" and "(" not in str(e) and "[" not in str(e), str(e))
 
 # =========================================================================== #
 #  6. The endpoints (bodies) and the gate scope                                #
@@ -511,7 +599,9 @@ try:
     main.public_road_load(month=M, leg="sideways")
     ok("6. the endpoint refuses an unknown leg with 400", False)
 except _HTTPException as e:
-    ok("6. the endpoint refuses an unknown leg with 400", e.status_code == 400)
+    # NARROWED 12 Oct 2026 (the tenancy / wording review): the detail reads as words, not "['loaded', 'return']"
+    ok("6. the endpoint refuses an unknown leg with 400 whose detail reads \"leg must be one of 'loaded' or 'return'\"",
+       e.status_code == 400 and e.detail == "leg must be one of 'loaded' or 'return'", str(e.detail))
 os.environ["ADMIN_TOKEN"] = "adm-test"
 for fn, label in ((lambda t: main.road_sections_rebuild(token=t), "rebuild"),
                   (lambda t: main.road_sections_status(token=t), "status"),
@@ -588,6 +678,18 @@ _sel = [n.value for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Constant)
 ok("8. every SELECT / DELETE / INSERT in the module names tenant_id (the audit's rule, restated)",
    len(_sel) >= 6 and all("tenant_id" in q for q in _sel) and src.count("db.current_tenant()") >= 6, str(len(_sel)))
 ok("8. nothing external: no urllib, requests or HERE", not re.search(r"\b(urllib|requests|here_routing)\b", src))
+ok("8. ⭐ the month read takes the bar's payload (public_month_kpis as a function) and no longer sums costlines' rounded-up trips itself",
+   'main.public_month_kpis(month=int(month), unit="vehicles")' in src and "import costlines" not in src
+   and "math.ceil((loads / wd) / float(tpv))" in src and 'float(l.get("vehicle_loads")' in src)
+ok("8. ...and divides a route's CO2e over its two-way length, the legs costlines summed it over",
+   'lk + rk' in src and '"two_way"' in src and "return_baked" in src)
+# 12 Oct 2026 (the tenancy / wording review)
+ok("8. the stamp is read from carbon.py, never copied into this module", "carbon.SUMMARY_STAMP" in src
+   and "planning estimate" not in src.replace("planning-estimate", ""))
+ok("8. no Python tuple or list is rendered into a message a person reads: the leg refusals read leg_error() everywhere",
+   "{LEGS}" not in src and "{list(" not in src and src.count("leg_error()") >= 2
+   and src_main.count("road_sections.leg_error()") == 2 and "{list(road_sections.LEGS)}" not in src_main)
+ok("8. no US spelling in the module's sentences", not re.search(r"\b(color|center|meter|kilometer|neighbor|analyze|optimize)\b", src, re.I))
 ok("8. the module says what it does not do", "WHAT THIS DOES NOT DO" in src)
 
 print()

@@ -1974,7 +1974,7 @@ def public_road_load(month: int = Query(..., ge=1, le=MONTH_COUNT), leg: str = Q
     Working days come from _working_days(), the one reader of that figure.
     """
     if leg not in road_sections.LEGS:
-        raise HTTPException(400, f"leg must be one of {list(road_sections.LEGS)}")
+        raise HTTPException(400, road_sections.leg_error())
     factors = conversions.load_factors()
     return road_sections.road_load(int(month), factors=factors,
                                    working_days=_working_days(factors), leg=leg)
@@ -2000,7 +2000,7 @@ def diagnostics_road_sections(top: int = Query(10, ge=1, le=100), leg: str = Que
     """Read-only: the status and the longest stored runs with their route sets."""
     _check_admin(token)
     if leg not in road_sections.LEGS:
-        raise HTTPException(400, f"leg must be one of {list(road_sections.LEGS)}")
+        raise HTTPException(400, road_sections.leg_error())
     return road_sections.diagnostics(top=int(top), leg=leg)
 
 
