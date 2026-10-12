@@ -2817,6 +2817,203 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   }
 }
 
+// 12 Oct 2026 (§2.2b, D27): movements and carbon per council — the "By council" group, its ramp, its card
+{
+  const start = code.indexOf("    const AREAS = { cache: {}");
+  // `code` is comment-stripped, so the block ends at its last statement, not at the next banner comment
+  const end = code.indexOf("\n    }\n", code.indexOf("map.on('mouseleave', 'area-fill'", start)) + 7;
+  const blk = start >= 0 && end > start ? code.slice(start, end) : "";
+  ok("§2.2b: the council block is in the page (AREAS, the ramp, the layers, the card)", blk.length > 2000
+     && /function areaFillExpr\(mode\)/.test(blk) && /function areaCardHTML\(a, payload, when\)/.test(blk)
+     && /function ensureAreaLayers\(\)/.test(blk) && /function setupAreaCard\(\)/.test(blk));
+  // its OWN group and boxes, outside "Disruption zones", off by default
+  const gStart = html.indexOf('<div class="control-group" id="council-group" hidden>');
+  const layersEnd = html.indexOf("</details>", html.indexOf('<details class="layers-box" id="layers-box">'));
+  const zonesBox = html.indexOf('id="layer-zones"'), zoneKinds = html.indexOf('<div id="zone-kinds"');
+  const group = gStart >= 0 ? html.slice(gStart, html.indexOf("</div>\n\n", gStart)) : "";
+  ok("⭐ §2.2b: a 'By council' group of its own, AFTER the layers box closes — not inside 'Disruption zones' or its kinds",
+     gStart > layersEnd && layersEnd > zonesBox && zonesBox > 0 && zoneKinds > 0 && gStart > zoneKinds
+     && /<h3>By council<\/h3>/.test(group), String(gStart) + " " + String(layersEnd));
+  ok("⭐ §2.2b: its own checkboxes, districts and county, each with its own handler — and both OFF by default",
+     /<input type="checkbox" id="layer-areas-district" onchange="toggleAreaTier\('district', this\.checked\)">/.test(group)
+     && /<input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier\('county', this\.checked\)">/.test(group)
+     && !/id="layer-areas-(district|county)"[^>]*\schecked[\s>]/.test(group));
+  ok("§2.2b: the group is hidden until the tenant has areas (a map with none is correct, not broken)",
+     /if \(group\) group\.hidden = !has;/.test(blk));
+  ok("§2.2b: the zone toggle does not drive the council layers, nor the council toggle the zones",
+     !/AREA_LAYERS|area-fill/.test(code.slice(code.indexOf("    function toggleZones(visible) {"), code.indexOf("    function toggleZoneKind(")))
+     && !/ZONE_LAYERS|zone-fill/.test(code.slice(code.indexOf("    function toggleAreaTier("), code.indexOf("    function toggleArea(id, on)"))));
+  ok("§2.2b: one box per district (each its own layer: the fill, outline and label go, the routes stay)",
+     /onchange="toggleArea\(\\'' \+ esc\(a\.area_id\)/.test(blk) && /\['!', \['get', 'off'\]\]/.test(blk)
+     && /if \(on\) AREAS\.off\.delete\(id\); else AREAS\.off\.add\(id\);/.test(blk));
+  // the ramp: ONE hue, the plan blue (D26), fixed stops, ascending
+  const rampM = blk.match(/const AREA_RAMP = \[([^\]]+)\]/);
+  const ramp = rampM ? rampM[1].match(/#[0-9A-Fa-f]{6}/g) : [];
+  const hsl = h => { const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    let hh = 0; if (d) { hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; hh *= 60; if (hh < 0) hh += 360; }
+    return [hh, l]; };
+  const H = ramp.map(hsl);
+  ok("⭐ §2.2b (D26): the fill ramp is ONE hue — four steps of the plan blue (#4A72C9 among them), light to dark",
+     ramp.length === 4 && ramp.map(x => x.toUpperCase()).includes("#4A72C9")
+     && H.every(([h]) => Math.abs(h - 221) < 3) && H.every(([, l], i) => i === 0 || l < H[i - 1][1]), JSON.stringify(ramp));
+  ok("🔴 §2.2b: no orange in the council block (the routes are blue, the return leg amber; orange is not used on the map)",
+     !/#FF8C14|#C97A2E|#E0770C|#D97706|#F59E0B/i.test(blk));
+  const AREA_NONE = "#E7E5E4";
+  const fillExpr = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE",
+    (blk.match(/function areaFillExpr\(mode\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaFillExpr;")(
+    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE);
+  const fm = fillExpr("movements"), fc = fillExpr("carbon");
+  const stops = e => e.slice(3).filter((x, i) => i % 2 === 0);
+  ok("⭐ §2.2b: a Mapbox step on FIXED literal stops in ascending order, the neutral below the first",
+     fm[0] === "step" && JSON.stringify(fm[1]) === '["get","v"]' && fm[2] === AREA_NONE
+     && JSON.stringify(stops(fm)) === "[0.01,50,100,200]" && JSON.stringify(stops(fc)) === "[0.01,50,100,200]"
+     && JSON.stringify(fm.slice(4).filter((x, i) => i % 2 === 0)) === JSON.stringify(ramp), JSON.stringify(fm));
+  ok("§2.2b: the stops are literals in the source, not worked out from the data (no max, no quantiles)",
+     /const AREA_STOPS = \{ movements: \[50, 100, 200\], carbon: \[50, 100, 200\] \};/.test(blk)
+     && !/Math\.max\(|quantile|percentile/.test(blk.slice(blk.indexOf("function areaFillExpr"), blk.indexOf("function areaFigureText"))));
+  ok("§2.2b: the fill is drawn UNDER every layer of ours (routes, sites, zones), so the routes stay on top",
+     /map\.addLayer\(\{ id: 'area-fill', type: 'fill'[\s\S]*?\}, before\);/.test(blk) && /const before = areaBeforeId\(\);/.test(blk)
+     && /'routes-source'/.test(blk.slice(blk.indexOf("function areaBeforeId"), blk.indexOf("function ensureAreaLayers"))));
+  ok("§2.2b: a fill, an outline and a label per district; the county a dashed outline of its own",
+     /id: 'area-fill', type: 'fill'/.test(blk) && /id: 'area-outline', type: 'line'/.test(blk)
+     && /id: 'area-label', type: 'symbol'/.test(blk) && /id: 'area-county-outline', type: 'line'/.test(blk)
+     && /filter: \['==', \['get', 'tier'\], 'county'\]/.test(blk) && /'line-dasharray': \[3, 2\]/.test(blk));
+  ok("§2.2b: the label is 14 px (the floor) with a white halo", /'text-field': \['get', 'label'\], 'text-size': 14,/.test(blk));
+  ok("§2.2b: the colour-by switch has two modes, movements first (D27: movements first, carbon second)",
+     /mode: 'movements'/.test(blk) && /\[\['movements', 'Two-way movements a day'\], \['carbon', 't CO(?:₂|\\u2082)e this month'\]\]/.test(blk)
+     && /function setAreaMode\(mode\)/.test(blk));
+  // the legend, as the page builds it
+  const legend = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE",
+    (blk.match(/function areaLegendHTML\(mode, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaLegendHTML;")(
+    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE);
+  const lgM = legend("movements", "Oct 2026"), lgC = legend("carbon", "Oct 2026");
+  ok("⭐ §2.2b: the legend row per mode — movements titled for laden legs, five rows (four blues and the neutral)",
+     lgM.includes("Two-way movements a day on roads a laden leg uses") && (lgM.match(/class="area-lg"/g) || []).length === 5
+     && lgM.includes("under 50") && lgM.includes("200 and over") && lgM.includes("no approved laden route")
+     && ramp.every(c => lgM.includes(c)), lgM);
+  ok("⭐ §2.2b: ...and carbon titled with the month and the split, in t (never kg per tonne)",
+     lgC.includes("t CO₂e in Oct 2026, split by the km inside each district") && lgC.includes("200 t and over")
+     && lgC.includes("under 50 t") && !/\bkg\b|per tonne/.test(lgC), lgC);
+  // the attribution: the source carries the dataset's licence lines; the group prints them
+  const seedTxt = fs.readFileSync(path.join(ROOT, "backend", "data", "areas_demo.geojson"), "utf8");
+  const seed = JSON.parse(seedTxt);
+  ok("⭐ §2.2b: the seed's two licence lines, word for word (ONS licence page)",
+     JSON.stringify(seed.attribution) === JSON.stringify([
+       "Source: Office for National Statistics licensed under the Open Government Licence v.3.0",
+       "Contains OS data © Crown copyright and database right 2026"]), JSON.stringify(seed.attribution));
+  ok("⭐ §2.2b: the map prints the lines the server sends: on the source's attribution (beside Mapbox's) and in the group",
+     /attribution: \(AREAS\.data\.attribution \|\| \[\]\)\.join\(' (?:·|\\u00b7) '\)/.test(blk)
+     && /if \(at\) at\.textContent = \(j\.attribution \|\| \[\]\)\.join\(' (?:·|\\u00b7) '\);/.test(blk)
+     && /<div class="area-note" id="area-attribution"><\/div>/.test(html));
+  ok("🔴 §2.2b: ...and never a hard-coded dataset's lines (another tenant's boundaries must not be credited to ONS)",
+     !/Office for National Statistics|Crown copyright/.test(code));
+  // the card, as the page builds it
+  const card = new Function((blk.match(/function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaCardHTML;")();
+  const A = { area_id: "E07000131", name: "Harborough", tier: "district", tier_words: "local authority district",
+              source: "ONS Local Authority Districts (May 2026) Boundaries UK BSC", highway_authority: "Leicestershire County Council",
+              movements_per_day: 12.34, routes: ["R001", "R002"], return_only_routes: ["R009"], co2_t: 30.5, co2_t_per_day: 1.39,
+              lorry_km: 12345.6, sites: ["Harborough Compound", "<b>x</b>"], sites_count: 2 };
+  const P = { totals: { routes_with_volume: 18, co2_t: 482 }, carbon: { stamp: "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" } };
+  const ch = card(A, P, "Oct 2026");
+  ok("⭐ §2.2b: the per-council card: the name, the tier and the highway authority, movements with the rule, CO2e of the month's total",
+     ch.includes("Harborough") && ch.includes("Local authority district") && ch.includes("highway authority: Leicestershire County Council")
+     && ch.includes("Two-way movements a day") && ch.includes("<b>12.3</b>") && ch.includes("2 of the 18 routes with approved volume in Oct 2026 enter it laden")
+     && ch.includes("1 more run back through it empty") && ch.includes("one load = one two-way movement")
+     && ch.includes("30.5 t of 482 t") && ch.includes("split by the km inside") && ch.includes("Lorry-km in Oct 2026"), ch);
+  ok("§2.2b: ...the planning-estimate stamp from the server, and every name escaped",
+     ch.includes(P.carbon.stamp) && ch.includes("&lt;b>x&lt;/b>") && !ch.includes("<b>x</b>"));
+  ok("§2.2b: ...a carbon the server could not give reads 'no figure', never 0 t",
+     card(Object.assign({}, A, { co2_t: null }), P, "Oct 2026").includes("<b>no figure</b>")
+     && !card(Object.assign({}, A, { co2_t: null }), P, "Oct 2026").includes("<b>0 t"));
+  ok("🔴 §2.2b: no team id in the card or the block (no team is named here at all)",
+     !/\bIPT ?[1-6]\b|\bipt\b/i.test(blk) && !/IPT/.test(ch));
+  ok("§2.2b: the card's click yields to a route, site or zone on top (queryRenderedFeatures over our GeoJSON layers)",
+     /if \(above\.length\) return;/.test(blk) && /map\.on\('click', 'area-fill'/.test(blk) && /let AREA_CARD_WIRED = false;/.test(blk));
+  ok("§2.2b: every figure is the server's — no working-day count, no division by days in the page",
+     !/working_days|\b22\b|\/ ?wd\b/.test(blk));
+  ok("§2.2b: the areas follow the month on screen: the playhead's, the forecast window's start, else this month",
+     /if \(typeof TL !== 'undefined' && TL\.on && TL\.month\) return TL\.month;/.test(blk)
+     && /if\(typeof refreshAreas==='function'\) refreshAreas\(\);/.test(code) && /if \(typeof refreshAreas === 'function'\) refreshAreas\(\);/.test(code)
+     && /if \(m !== areasMonth\(\)\) return;/.test(blk));
+  ok("§2.2b: off means off — no fetch while both boxes are clear (after the one probe that shows the group)",
+     /if \(AREAS\.probed && !areaTierOn\('district'\) && !areaTierOn\('county'\)\) return;/.test(blk));
+  ok("§2.2b: a basemap switch re-adds the layers from the cached month (style.load)",
+     /if \(AREAS\.data\) \{ AREAS\.drawn = ''; ensureAreaLayers\(\); renderAreas\(\); \} else refreshAreas\(\);/.test(code));
+  // the county tier (the highway authority's figure, D27's county/UA toggle): its own figure, its card, its label
+  ok("⭐ §2.2b: the group carries the mockup's two sub-heads and the county's own figure on a line under its box",
+     /<div class="area-legend-title area-sub" id="area-mode-title">Colour the districts by<\/div>\s*<div class="kpi-switch area-mode" id="area-mode"><\/div>/.test(group)
+     && /<div class="area-legend-title area-sub">Highway authority<\/div>\s*<div class="control-item"><label><input type="checkbox" id="layer-areas-county"[^\n]*<\/div>\s*<div class="area-county-fig" id="area-county-fig"><\/div>/.test(group)
+     && /if \(cf\) cf\.textContent = counties\.length === 1 \? areaRowFigure\(counties\[0\]\.name \+ ' (?:·|\\u00b7) ' \+ areaFigureText\(counties\[0\], AREAS\.mode, ''\)\)/.test(blk));
+  ok("§2.2b: the colour-by switch belongs to the districts — hidden with their box, and the hidden attribute beats .kpi-switch's flex",
+     /if \(sw\) sw\.hidden = !areaTierOn\('district'\);/.test(blk) && /if \(swT\) swT\.hidden = !areaTierOn\('district'\);/.test(blk)
+     && /#council-group \[hidden\]\{ display:none; \}/.test(html));
+  ok("🔴 §2.2b: a figure beside a district wraps inside the panel (Chrome, 12 Oct: '16 routes' ran off its edge)",
+     /\.area-fig\{[^}]*text-align:right;[^}]*\}/.test(html) && !/\.area-fig\{[^}]*white-space:nowrap/.test(html)
+     && /#area-district-rows \.control-item label\{ width:auto; flex:1 1 auto; min-width:0; \}/.test(html));
+  {
+    const rf = new Function((blk.match(/function areaRowFigure\(t\) \{[^\n]*\}/) || ["function areaRowFigure(){}"])[0] + "; return areaRowFigure;")();
+    ok("§2.2b: ...and breaks only at its ' · ', never inside a figure ('130 t CO2e' stays whole)",
+       rf("257 a day · 16 routes") === "257 a day · 16 routes" && rf("130 t CO₂e") === "130 t CO₂e"
+       && /esc\(areaRowFigure\(areaFigureText\(a, AREAS\.mode, ''\)\)\)/.test(blk));
+  }
+  ok("⭐ §2.2b: ONE label per area, on the server's label point (a polygon label repeats on every tile: Harborough twice in Chrome)",
+     /if \(Array\.isArray\(a\.label_point\)\) feats\.push\(\{ type: 'Feature', geometry: \{ type: 'Point', coordinates: a\.label_point \}, properties: props \}\);/.test(blk)
+     && /const labelPt = \['==', \['geometry-type'\], 'Point'\];/.test(blk)
+     && /id: 'area-label', type: 'symbol', source: 'areas-source', filter: district\.concat\(\[labelPt\]\),/.test(blk)
+     && /filter: \['all', \['==', \['get', 'tier'\], 'county'\], labelPt\],/.test(blk));
+  {
+    const af = new Function("areaFigureText", (blk.match(/function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaFeatures;")(() => "x");
+    const fc = af({ areas: [{ area_id: "A", name: "Alpha", tier: "district", movements_per_day: 3, geometry: { type: "Polygon", coordinates: [] }, label_point: [-0.9, 52.5] },
+                            { area_id: "B", name: "Beta", tier: "district", movements_per_day: 0, geometry: { type: "Polygon", coordinates: [] } }] }, "movements", new Set(), "");
+    ok("§2.2b: ...a polygon per area plus one point where the server gave one (none invented where it did not)",
+       fc.features.length === 3 && fc.features.filter(f => f.geometry.type === "Point").length === 1
+       && fc.features[1].geometry.coordinates[0] === -0.9 && fc.features[1].properties.label === "ALPHA\nx");
+  }
+  ok("§2.2b: the card leads with the figure the map is coloured by (carbon mode: CO2e first, as mockup 4's frame B)",
+     /const carbonFirst = typeof AREAS !== 'undefined' && AREAS\.mode === 'carbon';/.test(blk) && /h \+= carbonFirst \? co \+ mv : mv \+ co;/.test(blk));
+  ok("⭐ §2.2b: the county answers a click with its own card — a fill with no paint under it, on while its box is",
+     /const AREA_COUNTY_LAYERS = \['area-county-outline', 'area-county-fill', 'area-county-label'\];/.test(blk)
+     && /id: 'area-county-fill', type: 'fill', source: 'areas-source',\s*filter: \['==', \['get', 'tier'\], 'county'\],\s*layout: \{ visibility: cVis \}, paint: \{ 'fill-color': AREA_INK, 'fill-opacity': 0 \} \}, before\);/.test(blk)
+     && /map\.on\('click', 'area-county-fill', \(e\) => \{[\s\S]*?setHTML\(areaCardHTML\(a, AREAS\.data, when\)\)/.test(blk));
+  ok("🔴 §2.2b: ...but never over a district: a district (or a route, site or zone) under the click answers instead",
+     /f\.layer\.id === 'area-fill' \|\| \(!String\(f\.layer\.id\)\.startsWith\('area-'\)[\s\S]*?if \(above\.length\) return;/.test(
+       blk.slice(blk.indexOf("map.on('click', 'area-county-fill'"))));
+  {
+    const visFn = new Function("areaTierOn", "AREA_LAYERS", "AREA_COUNTY_LAYERS",
+      (blk.match(/function areaVisibility\(\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaVisibility;");
+    const AL = ["area-fill", "area-outline", "area-label"], CL = ["area-county-outline", "area-county-fill", "area-county-label"];
+    const vis = (d, c) => visFn(t => (t === "district" ? d : c), AL, CL)();
+    const both = vis(true, true), cOnly = vis(false, true), dOnly = vis(true, false), none = vis(false, false);
+    ok("⭐ §2.2b: which layer shows, from the two boxes: the county's label only while the districts are off",
+       both["area-fill"] === "visible" && both["area-county-outline"] === "visible" && both["area-county-label"] === "none"
+       && cOnly["area-fill"] === "none" && cOnly["area-county-fill"] === "visible" && cOnly["area-county-label"] === "visible"
+       && dOnly["area-county-fill"] === "none" && dOnly["area-label"] === "visible"
+       && Object.values(none).every(v => v === "none") && Object.keys(none).length === 6, JSON.stringify([both, cOnly]));
+    ok("§2.2b: both boxes go through the one rule (toggleAreaTier and ensureAreaLayers read areaVisibility)",
+       /const vis = areaVisibility\(\);\s*AREA_LAYERS\.concat\(AREA_COUNTY_LAYERS\)\.forEach\(l => toggleLayer\(l, vis\[l\] === 'visible'\)\);/.test(blk)
+       && /const vis = areaVisibility\(\), dVis = vis\['area-fill'\], cVis = vis\['area-county-outline'\];/.test(blk)
+       && /visibility: vis\['area-county-label'\]/.test(blk));
+  }
+  ok("⭐ §2.2b: the card counts the sites as the mockup does — '8 of 13' from the server's total",
+     card(Object.assign({}, A, { sites_count: 8 }), { totals: { routes_with_volume: 18, co2_t: 482, sites: 13 } }, "Oct 2026").includes("<b>8 of 13</b>")
+     && card(Object.assign({}, A, { sites_count: 8 }), { totals: { routes_with_volume: 18 } }, "Oct 2026").includes("<b>8</b>"));
+  ok("§2.2b: an unticked district gets a legend row of its own ('layer off'), only while one is off",
+     /\+ \(AREAS\.off\.size\s*\? '<div class="area-lg"><span class="area-sw" style="background:transparent; border:1px dashed ' \+ AREA_INK \+ '"><\/span>layer off \(unticked above\)<\/div>' : ''\)/.test(blk));
+  // US spellings as words a person reads: Mapbox's own paint keys ('fill-color') and the page's class names
+  // ('color-dot') are hyphenated identifiers, not wording, so a hyphen on either side is not a match
+  ok("§2.2b: UK wording and none of the banned words in the block or the group",
+     !/\b(truck|real[- ]time|live tracking|telematics|optimi[sz]e|predict|secure)\b/i.test(blk + group)
+     && !/(?<!-)\b(color|center)\b(?!-)/i.test(blk + group));
+  // the 14 px floor on every new rule
+  const css = html.slice(html.indexOf("/* §2.2b / D27 (12 Oct 2026)"), html.indexOf(String.fromCharCode(10), html.indexOf(".area-cf{")));
+  const sizes = (css.match(/font-size:(\d+(?:\.\d+)?)px/g) || []).map(s => parseFloat(s.replace(/[^\d.]/g, "")));
+  ok("⭐ §2.2b: the 14 px floor on the new text (every font-size in the group's and the card's rules is 14 px or more)",
+     sizes.length >= 8 && sizes.every(v => v >= 14), JSON.stringify(sizes));
+  ok("🔴 §2.2b: ...including the group's heading and its two boxes, which the shared h3 (13 px) and .control-item (13.5 px) rules set below it (Chrome, 12 Oct)",
+     /#council-group h3, #council-group \.control-item\{ font-size:14px; \}/.test(css));
+}
+
 // 12 Oct second fix pass: source pins for the conditions' timing and the 14 px floor on the row sentence
 {
   const rtw = code.slice(code.indexOf("    function renderTimelineWarnings(m) {"), code.indexOf("    function buildConditions("));

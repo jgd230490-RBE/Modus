@@ -229,8 +229,9 @@ ok("...and the audit lists it as untenanted WITH a reason (not silently exempt)"
 ok("the tenant's settings live in the tenanted config table under one key, no new table",
    # NARROWED 12 Oct 2026: route_sections (public map review §2.2d) is the one table added
    # since; costing itself still added none, which is what this pins.
-   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections"}) == 16
-   and "route_sections" in db.TENANTED_TABLES)
+   # NARROWED again 12 Oct 2026: areas and route_area_km (§2.2b, D27) are the two added after it
+   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km"}) == 16
+   and {"route_sections", "areas", "route_area_km"} <= db.TENANTED_TABLES)
 ok("nothing is seeded: no target rate, no share, no base, no yard, no index row",
    costing.settings()["target"] == {k: None for k in costing.TARGET_FIELDS}
    and costing.settings()["fuel"]["share_pct"] is None and costing.settings()["fuel"]["baf_base_eur_per_l"] is None

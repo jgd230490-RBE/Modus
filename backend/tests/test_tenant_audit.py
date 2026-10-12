@@ -88,6 +88,9 @@ TENANTED = {
     # tenant's geometry and carried in its package. Registered in the same edit as the
     # table — five for five.
     "route_sections",
+    # 12 Oct 2026 (public map review §2.2b, D27). The council boundaries and the per-route
+    # clip against them. Registered in the same edit as the tables — six and seven.
+    "areas", "route_area_km",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

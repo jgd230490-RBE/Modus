@@ -39,7 +39,7 @@ IS_PG = bool(DATABASE_URL)
 
 TENANT_DEFAULT = os.environ.get("TENANT_ID", "default").strip() or "default"
 
-# The twelve tenanted tables. test_tenant_audit.py cross-checks this set against
+# The tenanted tables. test_tenant_audit.py cross-checks this set against
 # every CREATE TABLE in this file, so it cannot drift from the schema.
 TENANTED_TABLES = {
     "forecasts", "locations", "routes", "route_geometry",
@@ -63,6 +63,10 @@ TENANTED_TABLES = {
     # route_geometry: derived data, but derived from one tenant's baked routes and
     # carried in its package, so tenanted like the geometry it comes from.
     "route_sections",
+    # 12 Oct 2026 (public map review §2.2b, D27). The council boundaries a tenant imports
+    # (one row per polygon) and the per-route clip against them: both one tenant's data,
+    # both carried in its package. Registered in the same edit as the tables.
+    "areas", "route_area_km",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -442,6 +446,10 @@ def init_network_db():
         # 12 Oct 2026 (§2.2d): the shared-section index. Born with tenant_id in the
         # key, so no migration; a plain CREATE IF NOT EXISTS on both backends.
         _create_tenanted(cur, "route_sections")
+        # 12 Oct 2026 (§2.2b): the council areas and the route clip. Born with tenant_id
+        # in the key, so no migration; a plain CREATE IF NOT EXISTS on both backends.
+        _create_tenanted(cur, "areas")
+        _create_tenanted(cur, "route_area_km")
         conn.commit()
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
@@ -1045,6 +1053,40 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, leg, section_id)
         )
     """,
+    # 12 Oct 2026 (§2.2b, D27). One row per council boundary polygon a tenant imported
+    # (POST /api/admin/areas/import): the id (an ONS code for ONS data), the name, the tier
+    # ('district' or 'county'), the GeoJSON Polygon / MultiPolygon as text, the dataset, the
+    # licence lines the map must print beside it (a JSON list) and the highway authority
+    # where the import names one.
+    "areas": """
+        CREATE TABLE areas (
+            tenant_id         TEXT NOT NULL DEFAULT 'default',
+            area_id           TEXT NOT NULL,
+            name              TEXT NOT NULL,
+            tier              TEXT NOT NULL,
+            geometry_json     TEXT NOT NULL,
+            source            TEXT,
+            attribution_json  TEXT,
+            highway_authority TEXT,
+            imported_at       TEXT,
+            PRIMARY KEY (tenant_id, area_id)
+        )
+    """,
+    # 12 Oct 2026 (§2.2b). Km of each route's PRIMARY polyline (per vehicle profile and leg)
+    # inside each area, and one row per leg with area_id '*' carrying the leg's whole length.
+    # Derived by areas.rebuild() and rewritten whole — never typed.
+    "route_area_km": """
+        CREATE TABLE route_area_km (
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            route_id        TEXT NOT NULL,
+            vehicle_profile TEXT NOT NULL,
+            leg             TEXT NOT NULL DEFAULT 'loaded',
+            area_id         TEXT NOT NULL,
+            km              REAL,
+            built_at        TEXT,
+            PRIMARY KEY (tenant_id, route_id, vehicle_profile, leg, area_id)
+        )
+    """,
     "disciplines": """
         CREATE TABLE disciplines (
             tenant_id  TEXT NOT NULL DEFAULT 'default',
@@ -1345,6 +1387,8 @@ _TENANT_PK = {
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",
     "route_sections": "(tenant_id, leg, section_id)",
+    "areas": "(tenant_id, area_id)",
+    "route_area_km": "(tenant_id, route_id, vehicle_profile, leg, area_id)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

@@ -750,6 +750,46 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and set(r.json().get("legs", {})) == {"loaded", "return"} and r.json()["legs"]["return"]["runs"] == 0, r.text[:200])
     ok("the diagnostic refuses an unknown leg with 400 (token accepted)",
        c.get("/api/admin/diagnostics/road-sections", params=dict(TOKEN, leg="x")).status_code == 400)
+    # ------------------------------------------------- 3c. 12 Oct 2026 (§2.2b, D27): movements and carbon per council
+    # The shipped demo package carries no areas, so the feed answers empty and says so; the admin import of the seed
+    # file (backend/data/areas_demo.geojson) loads the nine polygons over the real transport. Nothing is baked here,
+    # so every area reads 0 movements and the clip is empty — the live clip runs on Render after a bake.
+    r = c.get("/api/public/areas", params={"month": 10})
+    ar = r.json() if r.status_code == 200 else {}
+    ok("⭐ /api/public/areas answers 200 on the demo with no areas: empty, with the note and the working days",
+       r.status_code == 200 and ar.get("areas") == [] and (ar.get("working_days") or 0) > 0
+       and "No council areas are loaded for this tenant." in ar.get("notes", []) and ar.get("attribution") == [], r.text[:200])
+    ok("a month out of range or no month is a 422", c.get("/api/public/areas", params={"month": 99}).status_code == 422
+       and c.get("/api/public/areas").status_code == 422)
+    AREAS_SEED = json.load(open(os.path.join(BACKEND, "data", "areas_demo.geojson"), encoding="utf-8"))
+    ok("🔴 the areas import is 403 without the token, and so is the list",
+       c.post("/api/admin/areas/import", json=AREAS_SEED).status_code == 403 and c.get("/api/admin/areas").status_code == 403)
+    _bad_fc = {"type": "FeatureCollection", "features": AREAS_SEED["features"][:1]}          # no licence lines
+    r = c.post("/api/admin/areas/import", params=TOKEN, json=_bad_fc)
+    ok("an import with no licence lines is a 400 that says so (token accepted)",
+       r.status_code == 400 and "licence lines" in r.json().get("detail", ""), r.text[:200])
+    r = c.post("/api/admin/areas/import", params=TOKEN, json=AREAS_SEED)
+    ok("⭐ with the token the seed imports: 9 areas (8 districts, 1 county), the two ONS lines, the clip empty (nothing baked)",
+       r.status_code == 200 and r.json().get("imported") == 9 and r.json().get("tiers") == {"district": 8, "county": 1}
+       and r.json().get("attribution") == sorted(AREAS_SEED["attribution"]) and r.json()["clip"]["rows"] == 0, r.text[:300])
+    r = c.get("/api/admin/areas", params=TOKEN)
+    ok("the admin list answers 200: nine areas without geometry, no route entering any (unbaked)",
+       r.status_code == 200 and len(r.json().get("areas", [])) == 9 and all("geometry" not in a for a in r.json()["areas"])
+       and all(a["routes_entering"] == [] for a in r.json()["areas"]), r.text[:200])
+    r = c.get("/api/public/areas", params={"month": 10})
+    ar = r.json() if r.status_code == 200 else {}
+    _by = {a["name"]: a for a in ar.get("areas", [])}
+    ok("⭐ the feed now serves the nine polygons with the two licence lines, 0 movements each (nothing drawn), 0.0 t",
+       r.status_code == 200 and len(_by) == 9 and ar.get("attribution") == AREAS_SEED["attribution"]
+       and all(a["movements_per_day"] == 0 and a["co2_t"] == 0.0 and a["geometry"]["type"] in ("Polygon", "MultiPolygon")
+               for a in ar["areas"]), r.text[:200])
+    ok("...the demo's sites where the package coordinates put them (Harborough 8, Melton 2, Blaby, Charnwood, Rutland 1)",
+       [_by.get(n, {}).get("sites_count") for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland")] == [8, 2, 1, 1, 1])
+    ok("...of the 13 the totals carry (the card's '8 of 13'), and one label point per area for the map's one label",
+       ar.get("totals", {}).get("sites") == 13
+       and all(isinstance(a.get("label_point"), list) and len(a["label_point"]) == 2 for a in ar.get("areas", [])), r.text[:200])
+    ok("...and the October lines are named as undrawn, never counted in an area",
+       len(ar.get("routes_not_drawn", [])) == 19 and ar.get("totals", {}).get("loads") == 0)
     # ------------------------------------------- 3d. the network behind the gate (12 Oct 2026, map review D18)
     # The twelve reads that needed no credential until today, read three ways: the staff COOKIE (this client, no
     # header), the planner CODE in the header with no cookie, and — at the end of this file — the MAP cookie and
@@ -871,12 +911,16 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and len(pkg["tables"]["forecast_weeks"]) == 342 and len(pkg["tables"]["location_gates"]) == 16)
     ok("...and it carries the route_sections table (empty: nothing is baked here)",
        "route_sections" in pkg.get("tables", {}) and pkg["tables"]["route_sections"] == [])
+    ok("...and the nine council areas imported above, with an empty clip table (§2.2b)",
+       len(pkg.get("tables", {}).get("areas", [])) == 9 and pkg["tables"].get("route_area_km") == [])
     r = c.post("/api/admin/tenant/import", params=dict(TOKEN, replace=1), json=pkg)
     ok("⭐ replace=1 re-imports the exported tenant over itself", r.status_code == 200 and r.json().get("replaced") is True,
        r.text[:160])
     m2 = c.get("/api/meta").json()
     ok("...and nothing is lost or doubled", len(m2["routes"]) == 20 and len(m2["ipts"]) == 3
        and len(c.get("/api/forecasts", headers=PLAN).json()) == 78)
+    ok("...and the council areas came back with the package (9)",
+       len(c.get("/api/admin/areas", params=TOKEN).json().get("areas", [])) == 9)
 
     # ------------------------------------------------------------ 5. H9: demo requests (8 Oct)
     # Signed out, no cookie, no code: the landing page's visitor. SMTP stubbed at the module.
@@ -924,6 +968,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
            c.get("/api/public/route-forecasts").status_code == 401)
         ok("🔴 ...and so is /api/public/road-load (12 Oct 2026, §2.2d)",
            c.get("/api/public/road-load", params={"month": 10}).status_code == 401)
+        ok("🔴 ...and so is /api/public/areas (12 Oct 2026, §2.2b)",
+           c.get("/api/public/areas", params={"month": 10}).status_code == 401)
         r = c.get("/api/admin/diagnostics/smtp")
         ok("the SMTP probe is refused without the admin token", r.status_code == 403, str(r.status_code))
         r = c.get("/api/admin/diagnostics/smtp", params=TOKEN)
@@ -952,6 +998,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",
        all(v == 200 for v in _codes_map.values()), str(_codes_map))
+    r = c.get("/api/public/areas", params={"month": 10})
+    ok("⭐ §2.2b: the map cookie reads the council areas (the outside viewer is the audience, D27) — the nine polygons",
+       r.status_code == 200 and len(r.json().get("areas", [])) == 9, f"{r.status_code} {r.text[:120]}")
+    ok("🔴 ...but not the admin list or import", c.get("/api/admin/areas").status_code == 403
+       and c.post("/api/admin/areas/import", json={"type": "FeatureCollection", "features": []}).status_code == 403)
     r = c.get("/api/public/whoami")
     ok("⭐ whoami: the map cookie is level `map`, no team", r.status_code == 200 and r.json() == {"level": "map", "team_label": None}, r.text)
     _mm = c.get("/api/meta").json()

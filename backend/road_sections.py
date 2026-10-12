@@ -437,16 +437,33 @@ def rebuild_once(where):
 
 
 def _rebuild_quietly(where):
-    """The hook the bake, the clear and the import call. Never raises into them."""
+    """
+    The hook the bake, the clear and the import call. Never raises into them.
+
+    12 Oct 2026 (§2.2b): the one hook for EVERY index derived from the primary geometry —
+    after the shared sections it re-clips the routes against the council areas
+    (areas.rebuild_quietly), so a bake batch still rebuilds each index once, at its end.
+    """
     box = _DEFER.get()
     if box is not None:
         box["dirty"] = True
         return None
     try:
-        return rebuild()
+        res = rebuild()
     except Exception as e:
         print(f"road_sections: index not rebuilt after {where}: {e}")
-        return None
+        res = None
+    _rebuild_areas(where)
+    return res
+
+
+def _rebuild_areas(where):
+    """The council-area clip (areas.py), imported late: areas imports this module."""
+    try:
+        import areas
+        areas.rebuild_quietly(where)
+    except Exception as e:
+        print(f"road_sections: council areas not re-clipped after {where}: {e}")
 
 
 def stored_runs(leg="loaded"):
