@@ -911,11 +911,20 @@ ok("...km_basis must be round_trip or loaded",
    "km_basis" in (network.set_route_planning("R1", {"km_basis"}, km_basis="both").get("error") or ""))
 ok("...a negative rate is refused",
    "negative" in (network.set_route_planning("R1", {"rate_eur_per_t"}, rate_eur_per_t=-1).get("error") or ""))
+# 12 Oct 2026 (C11 closed): the planning write needs the admin token; with none it is a 403 before the route lookup
 try:
     main.set_route_planning("R9", main.RoutePlanning(rate_eur_per_t=1.0))
+    ok("C11: the planning endpoint refuses a call with no admin token", False)
+except Exception as e:
+    ok("C11: the planning endpoint refuses a call with no admin token (403)", getattr(e, "status_code", None) == 403)
+os.environ["ADMIN_TOKEN"] = "la-admin-token"
+try:
+    main.set_route_planning("R9", main.RoutePlanning(rate_eur_per_t=1.0), token="la-admin-token")
     ok("the planning endpoint 404s an unknown route", False)
 except Exception as e:
     ok("the planning endpoint 404s an unknown route", getattr(e, "status_code", None) == 404)
+finally:
+    os.environ.pop("ADMIN_TOKEN", None)
 network.set_route_planning("R3", {"rate_eur_per_t", "km_basis"}, rate_eur_per_t=3.0, km_basis="loaded")
 ok("routes_status carries the planning fields",
    {x["id"]: x for x in network.routes_status()}["R1"].get("rate_eur_per_km") == 1.5)

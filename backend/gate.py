@@ -40,9 +40,9 @@ the map on their own dashboard.
 FAILING CLOSED
 --------------
 With no MAP_PASSWORD configured, an unauthenticated request for /map/ is REFUSED, not
-allowed. That is deliberate, and it is the opposite of what ADMIN_TOKEN does — an unset
-ADMIN_TOKEN opens every admin endpoint, which is open question C11 and is not a pattern
-worth repeating.
+allowed. That is deliberate. Until 12 Oct 2026 it was the opposite of what ADMIN_TOKEN did —
+an unset ADMIN_TOKEN opened every admin endpoint (open question C11); main._check_admin()
+now fails closed the same way, so C11 is closed.
 
 Staff are never affected by a missing password: a valid code, or a staff cookie, opens
 the map either way. A forgotten MAP_PASSWORD costs you external viewers, never your own
@@ -79,10 +79,22 @@ UNCONFIGURED = "unconfigured"
 # would be theatre — the data is the thing worth protecting, and it is all readable
 # without the page.
 #
+# 12 Oct 2026 (map review D18): the tenant's NETWORK joins the list. Until then twelve data
+# reads needed no credential at all — route geometry, geometries, analysis, analysis-batch,
+# locations/geojson, gates, haul-roads (two), routes status/summary, a route's restriction
+# check — so the whole corridor was readable by anyone who guessed a path. Now
+# /api/routes/, /api/locations/, /api/gates and /api/haul-roads open only to a valid access
+# code or the map cookie. These are PREFIXES (scope_for matches by prefix), so the two
+# staff writes under them — PUT /api/routes/{id}/status and PUT /api/locations/{id}/capacity
+# — are wrapped too: a valid code passes unchanged (ALLOW), and without one the refusal is
+# the map's 401 before the body's own check would have run. The /api/admin/* writes are NOT
+# under these prefixes and stay keyed on the admin token alone.
+#
 # /api/meta is deliberately NOT here: the staff app fetches it on mount, BEFORE anyone
-# signs in, to build its dropdowns. Gating it would empty the sign-in screen. It carries
-# units, material names and vehicle labels out of factors.json — no location, no route,
-# no forecast, nothing about the project.
+# signs in, to build its dropdowns, and the public map reads its factors and seasonal
+# windows. Gating it would empty the sign-in screen. Instead (12 Oct 2026, D31) it answers
+# two SHAPES: the route list, the team list and the work sections only to a valid code or a
+# staff cookie — see main.meta().
 #
 # /api/health is deliberately NOT here: Render polls it.
 # 8 Oct 2026 (H9): the ONE path under /api/public/ an OUTSIDER must reach without the map
@@ -96,6 +108,13 @@ MAP_DATA_PREFIXES = (
     "/api/zones",
     "/api/restrictions/",
     "/api/routes/restrictions",
+    # 12 Oct 2026 (D18): the network. A trailing slash makes each a path SEGMENT — scope_for
+    # matches the bare path too (`p == pref.rstrip("/")`), so /api/gates and /api/gates/… are
+    # the map's while /api/gatesx is not.
+    "/api/routes/",
+    "/api/locations/",
+    "/api/gates/",
+    "/api/haul-roads/",
     "/api/streetview",
 )
 

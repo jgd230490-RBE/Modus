@@ -193,6 +193,14 @@ ok("11 Oct 2026: the offered languages come off /api/meta (vehicle_labels.langs)
   code.includes('VEH.langs = (Array.isArray(vl.langs) && vl.langs.length) ? vl.langs : ["en"];'));
 ok("labels come off /api/meta, not a second list in the client",
   code.includes("m.vehicle_labels") && code.includes("VEH.labels = vl.labels"));
+// 12 Oct 2026 (map review D31): /api/meta answers two shapes — routes, teams and sections only to a code or a staff
+// cookie. The mount fetch runs before a fresh sign-in, so the app fetches again once `role` is set, unless the mount
+// fetch already carried a code (a resume).
+ok("D31: /api/meta is loaded through one function, on mount and again after a sign-in that supplied the code",
+  /const loadMeta = \(\) => \{\s*\n\s*metaHadCode\.current = !!ACCESS\.code;\s*\n\s*return fetch\(`\$\{API\}\/meta`\)/.test(code)
+  && /useEffect\(\(\) => \{ loadMeta\(\); \}, \[\]\);/.test(code)
+  && /useEffect\(\(\) => \{ if\(role && !metaHadCode\.current\) loadMeta\(\); \}, \[role\]\);/.test(code)
+  && (code.match(/fetch\(`\$\{API\}\/meta`\)/g) || []).length === 1);
 // ⭐ THE INVARIANT. The <option value> is the canonical id; only the text changes.
 ok("⭐ the picker's option VALUE is the canonical id, the text is the label",
   /<option key=\{v\} value=\{v\} disabled=[\s\S]{0,160}\{vehLabel\(v\)\}/.test(code));

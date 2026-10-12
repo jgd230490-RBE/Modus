@@ -785,6 +785,10 @@ def public_map_data(profile=None):
                     "cycle_hr": round(cycle_hr, 2) if cycle_hr else None,
                     "trips_per_day": trips,
                     "disciplines": sorted(disc.get(r["id"], [])),
+                    # 12 Oct 2026 (map review §2.5 row 2): the route's typed daily cap, so
+                    # the public map can show a plan against it as a planning flag. On BOTH
+                    # legs (a filter on either must find it); None when nobody typed one.
+                    "max_vehicles_per_day": r.get("max_vehicles_per_day"),
                 },
                 "geometry": {"type": "LineString",
                              "coordinates": json.loads(g["geometry"])},
@@ -1616,6 +1620,8 @@ def meta_routes(profile=None):
             "distance_km": round(km, 2) if km is not None else None,
             "distance_profile": used,
             "baked_profiles": sorted(per_profile),
+            # 12 Oct 2026 (map review §2.5 row 2): the typed daily cap; None when untyped
+            "max_vehicles_per_day": r.get("max_vehicles_per_day"),
         })
     return out
 

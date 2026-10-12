@@ -638,6 +638,26 @@ ok("and it is flagged as a fallback rather than passed off as the default",
    fb["profile_is_fallback"] is True)
 ok("the fallback route names every profile it has", fb["baked_profiles"] == ["Rigid 7.5t"])
 
+# 12 Oct 2026 (map review §2.5 row 2): the route's typed daily cap rides on every public route
+# line (both legs) and on meta_routes, None until somebody types one — so the map can show the
+# plan against it as a planning flag. The column arrives with the Look-ahead's planning ALTERs.
+ok("§2.5: every route line feature carries max_vehicles_per_day, None while untyped",
+   all("max_vehicles_per_day" in p and p["max_vehicles_per_day"] is None for ps in by_route.values() for p in ps))
+db.init_lookahead_db()
+_cap = network.set_route_planning("R-Q01-C01", {"max_vehicles_per_day"}, max_vehicles_per_day=20)
+ok("§2.5: a cap can be typed on the route", _cap.get("max_vehicles_per_day") == 20, str(_cap)[:160])
+_by2 = {}
+for f in network.public_map_data()["features"]:
+    if f["geometry"]["type"] == "LineString":
+        _by2.setdefault(f["properties"]["route_id"], {})[f["properties"]["leg"]] = f["properties"]["max_vehicles_per_day"]
+ok("§2.5: ⭐ the typed cap reaches BOTH legs of that route and no other",
+   _by2["R-Q01-C01"] == {"loaded": 20, "return": 20} and _by2["R-Q01-C02"] == {"loaded": None}
+   and _by2["R-Q02-C01"] == {"loaded": None}, str(_by2))
+_mr2 = {r["route_id"]: r.get("max_vehicles_per_day", "missing") for r in network.meta_routes()}
+ok("§2.5: ...and meta_routes carries it the same way (20 on the typed route, None elsewhere)",
+   _mr2["R-Q01-C01"] == 20 and _mr2["R-Q01-C02"] is None and "missing" not in _mr2.values())
+network.set_route_planning("R-Q01-C01", {"max_vehicles_per_day"}, max_vehicles_per_day=None)
+
 ok("every location becomes a marker", len(nodes) == 27, str(len(nodes)))
 q07n = [f["properties"] for f in nodes if f["properties"]["id"] == "Q07"][0]
 ok("the salvaged vendor reaches the popup", "Eesti Killustik" in q07n["aux_info"], q07n["aux_info"])

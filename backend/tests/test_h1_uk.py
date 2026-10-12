@@ -134,6 +134,8 @@ for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT
            "PLANNER_CODE", "ADMIN_CODE", "ADMIN_TOKEN"):
     os.environ.pop(_v, None)
 os.environ["ALLOW_DEMO_CODES"] = "1"
+# 12 Oct 2026 (C11 closed): the admin diagnostics REFUSE when ADMIN_TOKEN is unset, so the harness sets one
+os.environ["ADMIN_TOKEN"] = "h1-admin-token"
 
 import db  # noqa: E402
 db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
@@ -291,7 +293,14 @@ def _fake_nh_page(offset, count=restrictions.NH_PAGE, timeout=None):
         {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.9, 52.5], [-0.89, 52.51]]},
          "properties": {"OBJECTID": 2, "description": "Lane closure for barrier works", "road_number": "A46",
                         "eventtype": "Lane closure", "natureofworks": "Barrier works", "formattedeventnumber": "NH-0002",
-                        "scheduledplannedstartdate": _now_ms - 2 * _day, "scheduledplannedenddate": _now_ms + 400 * _day}}]}
+                        "scheduledplannedstartdate": _now_ms - 2 * _day, "scheduledplannedenddate": _now_ms + 400 * _day}},
+        # 12 Oct 2026 (map review §2.2c (c)): a closure on the same route that ENDED ten days ago. Dropped by every
+        # default read (the stored check, the look-ahead, /api/restrictions), kept only when a caller asks for the
+        # past with include_expired — a past month on the public map's timeline.
+        {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.905, 52.499], [-0.8955, 52.5052]]},
+         "properties": {"OBJECTID": 1, "description": "Carriageway closure for resurfacing, finished", "road_number": "A6",
+                        "eventtype": "Carriageway closure", "natureofworks": "Resurfacing", "formattedeventnumber": "NH-0001",
+                        "scheduledplannedstartdate": _now_ms - 40 * _day, "scheduledplannedenddate": _now_ms - 10 * _day}}]}
 
 
 # --- 5 Oct 2026, H2: demo v2 — what the stand needs is IN the data ------------------------
@@ -399,7 +408,7 @@ PAGES = {
     "/api/forecast-weeks/clashes": main.forecast_week_clashes(bucket="commit", restrictions_on=1),
     "/api/public/alignment": json.loads(main.public_alignment(_Request()).body),
     "/api/routes/{id}/restrictions": main.route_restrictions(_r1),
-    "/api/admin/diagnostics/fuel-index": main.diagnostics_fuel_index(probe=False),
+    "/api/admin/diagnostics/fuel-index": main.diagnostics_fuel_index(probe=False, token=os.environ["ADMIN_TOKEN"]),
     "/api/admin/diagnostics/restrictions (no probe)": restrictions.diagnostics(probe=False),
 }
 for path, payload in PAGES.items():
@@ -427,6 +436,49 @@ _rr = PAGES["/api/routes/{id}/restrictions"]
 ok("GB route check: the hit carries its dates, event number and the ROADWORKS word; verdict unknown (a closure, not a limit)",
    _rr["hits"] and _rr["hits"][0]["event_number"] == "NH-0002" and _rr["hits"][0]["from"] and _rr["hits"][0]["to"]
    and _rr["flag_label"] == "ROADWORKS" and _rr["hits"][0]["verdict"] == "unknown" and _rr["match_m"] == 100.0)
+# 12 Oct 2026 (map review §2.2c (c)): the ENDED closure NH-0001 sits on the same route. Every default read drops it;
+# include_expired keeps it, so a past month can list what applied then.
+# (a hit is reported once per LEG — both legs of _r1 are baked along the same road, so each closure appears twice;
+# the review's §2.2d notes that duplication, and these read the SET of event numbers)
+_ev = lambda hits: sorted({h["event_number"] for h in hits})
+ok("🔴 §2.2c: by default the ended closure is NOT in the route check — NH-0002 alone, and the check says one record was excluded",
+   _ev(_rr["hits"]) == ["NH-0002"] and _rr["current_only"] is True and _rr["expired_or_future_excluded"] == 1,
+   str(_ev(_rr["hits"])) + " " + str(_rr.get("expired_or_future_excluded")))
+_ca = restrictions.check_all()
+ok("§2.2c: check_all() default — the route's current hit only, current_only True, one record excluded, one feature checked",
+   _ev(_ca["routes"][_r1]["hits"]) == ["NH-0002"] and _ca["current_only"] is True
+   and _ca["expired_or_future_excluded"] == 1 and _ca["features_checked"] == 1, str(_ev(_ca.get("routes", {}).get(_r1, {}).get("hits", []))))
+_cx = restrictions.check_all(current_only=False)
+ok("⭐ §2.2c: check_all(current_only=False) lists the ENDED closure too — NH-0001 with its from/to in the past — and says so",
+   _ev(_cx["routes"][_r1]["hits"]) == ["NH-0001", "NH-0002"] and _cx["current_only"] is False
+   and _cx["expired_or_future_excluded"] == 0 and _cx["features_checked"] == 2
+   and all(h["to"] and h["to"] < _t.strftime("%Y-%m-%d", _t.gmtime()) for h in _cx["routes"][_r1]["hits"] if h["event_number"] == "NH-0001"),
+   str([(h["event_number"], h["from"], h["to"]) for h in _cx["routes"][_r1]["hits"]])[:300])
+ok("§2.2c: GET /api/routes/restrictions?include_expired=1 is that call; the default is unchanged",
+   _ev(main.all_route_restrictions(include_expired=True)["routes"][_r1]["hits"]) == ["NH-0001", "NH-0002"]
+   and _ev(main.all_route_restrictions()["routes"][_r1]["hits"]) == ["NH-0002"])
+ok("§2.2c: the stored check and the look-ahead still read CURRENT closures only (NH-0001 is in neither)",
+   _ev(restrictions.stored_checks([_r1])[_r1]["hits"]) == ["NH-0002"]
+   and "NH-0001" not in json.dumps(_la, default=str))
+# §2.3: the national feed clipped to a window — the corridor's box keeps its closures, a window elsewhere keeps none
+_corr = json.loads(main.get_restrictions(bbox="-1.0,52.4,-0.8,52.6", include_expired=True).body)
+ok("§2.3: GET /api/restrictions?bbox=<the corridor>&include_expired=1 keeps both closures, clipped 0, window echoed",
+   sorted(f["properties"]["event_number"] for f in _corr["features"]) == ["NH-0001", "NH-0002"] and _corr["clipped"] == 0
+   and _corr["bbox"] == [-1.0, 52.4, -0.8, 52.6] and _corr["counts"] == {"nh_closures": 2}, str({k: _corr.get(k) for k in ("clipped", "bbox", "counts")}))
+_far = json.loads(main.get_restrictions(bbox="-3.0,54.0,-2.0,55.0").body)
+ok("§2.3: a window elsewhere keeps nothing and says what it clipped (1 — the default read had already dropped the ended one)",
+   _far["features"] == [] and _far["clipped"] == 1 and _far["counts"] == {} and _far["total_records"] == 2)
+_edge = json.loads(main.get_restrictions(bbox="-0.89,52.51,-0.5,53.0").body)
+ok("§2.3: a window TOUCHING a closure's box at one corner keeps it (touching counts)",
+   [f["properties"]["event_number"] for f in _edge["features"]] == ["NH-0002"] and _edge["clipped"] == 0)
+try:
+    main.get_restrictions(bbox="-0.8,52.4,-1.0,52.6")
+    ok("§2.3: a window with west > east is refused", False)
+except _HTTPException as e:
+    ok("§2.3: a window with west > east is refused (400)", e.status_code == 400)
+_ser_code = read("backend/restrictions.py").split("def serialised(")[1].split("\ndef ")[0].split('"""')[2]   # after the docstring
+ok("12 Oct 2026: the serialised-body cache holds the collection it serialised and compares by identity, not by a reused id",
+   "if hit and hit[0] is fc:" in _ser_code and "_SERIALISED[k] = (fc, body)" in _ser_code and "id(fc)" not in _ser_code)
 
 # the exports, read back for real
 try:
@@ -708,7 +760,7 @@ ok("GB → Europe/London for the departure-time probe", here_routing.COUNTRY_TZ.
 # =========================================================================== #
 #  7. The probes                                                                #
 # =========================================================================== #
-_pf = main.diagnostics_fuel_index(probe=True)
+_pf = main.diagnostics_fuel_index(probe=True, token=os.environ["ADMIN_TOKEN"])
 ok("the fuel-index probe runs the DESNZ path inline and shows the resolved CSV and the parsed row",
    _pf["provider"]["key"] == "desnz" and _pf["probe"]["ok"] is True and _pf["probe"]["parsed"]["eur_per_l"] == 1.955
    and _pf["probe"]["detail"]["csv_url"].endswith(".csv") and _pf["urls"] == [fuel.DESNZ_CONTENT_API])

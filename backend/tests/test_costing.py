@@ -770,16 +770,27 @@ try:
     main.get_fuel_index(lazy=0)
     ok("...lazy=0 never touches the feed", _calls["n"] == 0)
     _calls["mode"] = "ok"
-    r = main.refresh_fuel_index(sync=1)
-    ok("POST /api/admin/fuel-index/refresh (token unset ⇒ open, as every admin endpoint is today — C11) fetches and stores 1.922",
+    # REVERSED 12 Oct 2026 (C11 closed): this read "token unset ⇒ open, as every admin endpoint is today — C11" and
+    # asserted that the refresh RAN with no token configured. An unset ADMIN_TOKEN now REFUSES every admin call, and
+    # the refused refresh never touches the feed.
+    e = _raises(lambda: main.refresh_fuel_index(sync=1))
+    ok("🔴 C11 closed: POST /api/admin/fuel-index/refresh with ADMIN_TOKEN unset is refused (403) and the feed is not called",
+       getattr(e, "status_code", None) == 403 and _calls["n"] == 0, repr(e)[:120])
+    os.environ["ADMIN_TOKEN"] = "s3cret"
+    e = _raises(lambda: main.refresh_fuel_index(sync=1))
+    ok("C11: ...and with a token configured, a call that sends none is refused too (403)",
+       getattr(e, "status_code", None) == 403 and _calls["n"] == 0, repr(e)[:120])
+    r = main.refresh_fuel_index(sync=1, token="s3cret")
+    ok("POST /api/admin/fuel-index/refresh with the admin token fetches and stores 1.922",
        r["index"]["eur_per_l"] == 1.922 and r["index"]["source"] == fuel.SOURCE_BULLETIN)
-    r = main.put_fuel_manual(main.ManualIndexIn(eur_per_l=1.95, bulletin_date="2026-09-14", updated_by="a"))
+    r = main.put_fuel_manual(main.ManualIndexIn(eur_per_l=1.95, bulletin_date="2026-09-14", updated_by="a"), token="s3cret")
     ok("PUT manual writes source 'manual' and the widget state says so", r["index"]["source"] == "manual" and r["index"]["eur_per_l"] == 1.95)
-    r = main.reset_fuel_base(updated_by="a")
+    r = main.reset_fuel_base(updated_by="a", token="s3cret")
     ok("POST reset-base clears the base; the next confirm may lock again", r["fuel"]["baf_base_eur_per_l"] is None
        and r["summary"]["baf_reason"] == "no base")
 finally:
     fuel.urllib.request.urlopen = _real_urlopen
+    os.environ.pop("ADMIN_TOKEN", None)
 
 # =========================================================================== #
 #  6. Export — the columns, the Fuel sheet, and what is NOT on the supplier's  #

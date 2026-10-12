@@ -140,6 +140,10 @@ sys.modules.setdefault("fastapi.staticfiles", _static)
 TMP = tempfile.mkdtemp(prefix="rbe_phase4_")
 from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
+# 12 Oct 2026 (C11 closed): the zone and haul-road writes REFUSE when ADMIN_TOKEN is unset, so the
+# harness configures one and hands it to every admin call (they passed no token until then)
+os.environ["ADMIN_TOKEN"] = "phase4-admin-token"
+TOK = "phase4-admin-token"
 
 import db  # noqa: E402
 db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
@@ -691,7 +695,7 @@ def zone_body(**kw):
     return _Body(b)
 
 
-created = main.create_zone(zone_body(name="Haul A", speed_kph=25))
+created = main.create_zone(zone_body(name="Haul A", speed_kph=25), token=TOK)
 ok("POST /api/admin/zones creates a haul road", created["zone"]["kind"] == "haul_road")
 ok("with its speed", created["zone"]["speed_kph"] == 25.0)
 ok("a NEW haul road invalidates nothing — it is attached to no route yet",
@@ -702,7 +706,12 @@ zid = created["zone"]["id"]
 add_geom("R1", "loaded", haul_tag="")
 add_geom("R1", "return", haul_tag="")
 
-res = main.attach_haul_road("R1", _Body({"zone_id": zid, "seq": None}))
+try:
+    main.attach_haul_road("R1", _Body({"zone_id": zid, "seq": None}))
+    ok("C11 (12 Oct 2026): attaching without the admin token is refused", False)
+except _HTTPException as e:
+    ok("C11 (12 Oct 2026): attaching without the admin token is refused (403)", e.status_code == 403)
+res = main.attach_haul_road("R1", _Body({"zone_id": zid, "seq": None}), token=TOK)
 ok("POST attaches the road to the route", res["attached"]["zone_id"] == zid)
 ok("attaching clears the route's baked legs", res["invalidated"]["leg_count"] == 2)
 ok("and demands a re-bake", res["rebake_required"] is True)
@@ -711,7 +720,7 @@ ok("attaching refreshes origin_temp_km",
    db.query("SELECT origin_temp_km FROM routes WHERE id='R1'")[0]["origin_temp_km"] > 0)
 
 try:
-    main.attach_haul_road("R1", _Body({"zone_id": zid, "seq": None}))
+    main.attach_haul_road("R1", _Body({"zone_id": zid, "seq": None}), token=TOK)
     ok("attaching twice raises", False)
 except _HTTPException as e:
     ok("attaching twice raises 400", e.status_code == 400)
@@ -728,18 +737,18 @@ ok("including the alternatives question",
 ok("and the section-split question",
    any("section" in u for u in got["unverified"]))
 
-imp = main.zone_impact(zid)
+imp = main.zone_impact(zid, token=TOK)
 ok("/impact on a haul road lists the routes attached", imp["routes_attached"] == ["R1"])
 ok("and dry-runs the invalidation", imp["would_invalidate"]["dry_run"] is True)
 
 add_geom("R1", "loaded", haul_tag=zid)
-upd = main.update_zone(zid, zone_body(name="Haul A", speed_kph=40))
+upd = main.update_zone(zid, zone_body(name="Haul A", speed_kph=40), token=TOK)
 ok("PUT on a haul road uses the exact haul invalidation",
    upd["invalidated"]["approximate"] == 0)
 ok("editing the speed invalidates the legs baked through it",
    upd["invalidated"]["leg_count"] >= 1)
 
-deleted = main.delete_zone(zid)
+deleted = main.delete_zone(zid, token=TOK)
 ok("DELETE reports how many routes it was detached from",
    deleted["detached_from_routes"] == 1)
 ok("and the link is gone", haul.link_counts() == {})
