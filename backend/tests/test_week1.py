@@ -141,6 +141,9 @@ sys.modules.setdefault("fastapi.staticfiles", _static)
 TMP = tempfile.mkdtemp(prefix="rbe_week1_")
 from portable import remove_scratch_db   # tests/portable.py: Windows cannot unlink an open SQLite file
 os.environ.pop("DATABASE_URL", None)
+# 12 Oct 2026 (C11 closed): the admin endpoints REFUSE when ADMIN_TOKEN is unset, so the harness
+# configures one and hands it to every admin call it makes (it passed token=None until then)
+os.environ["ADMIN_TOKEN"] = "week1-admin-token"
 
 import db  # noqa: E402
 db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
@@ -164,6 +167,7 @@ FIX_TAX = os.path.join(HERE, "fixtures", "taxonomy_rbe.json")
 # request context itself, as a PLANNER, so every pre-existing assertion still exercises
 # the same code paths it did. Nothing here proves the header is actually read.
 import access  # noqa: E402
+import gate  # noqa: E402  — 12 Oct 2026: the staff / map cookies for /api/meta's two shapes and whoami
 for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT6_CODE",
            "PLANNER_CODE", "ADMIN_CODE"):
     os.environ.pop(_v, None)
@@ -1097,6 +1101,41 @@ ok("F: 'IPT 3', 'ipt3' and 'IPT-3' all canonicalise to IPT3",
 ok("F: ...and rubbish canonicalises to None",
    access.canonical_ipt("IPT 7") is None and access.canonical_ipt("Earthworks") is None)
 
+# --- 12 Oct 2026 (map review): /api/public/whoami and the two shapes of /api/meta ----------
+# The view flag for the public map. Never a code, never a team id: this tenant names no slot,
+# so the team code's label is "Team 3", the way the app prints it.
+_as("three-secret")
+_w = main.public_whoami()
+ok("whoami: a team code is staff, with its team's NAME — 'Team 3' here (no slot is named), never 'IPT3'",
+   _w == {"level": "staff", "team_label": "Team 3"} and "IPT" not in json.dumps(_w), str(_w))
+_as("plan-secret")
+ok("whoami: a planner is staff with no team", main.public_whoami() == {"level": "staff", "team_label": None})
+access.set_current("no-such-code")        # nothing recognised and no cookie
+ok("whoami: no code and no cookie → level null (the gate would have refused the call before this)",
+   main.public_whoami() == {"level": None, "team_label": None})
+_staff_cookie = types.SimpleNamespace(cookies={gate.COOKIE: gate.sign(gate.LEVEL_STAFF)})
+_map_cookie = types.SimpleNamespace(cookies={gate.COOKIE: gate.sign(gate.LEVEL_MAP)})
+ok("whoami: a staff COOKIE alone (the app's iframe) is staff with no team; the MAP cookie is level map",
+   main.public_whoami(_staff_cookie) == {"level": "staff", "team_label": None}
+   and main.public_whoami(_map_cookie) == {"level": "map", "team_label": None})
+# D31: /api/meta — the public shape to a caller with no code and no staff cookie
+_mp = main.meta()
+ok("D31: 🔴 /api/meta with no code is the PUBLIC shape: scope public, NO routes, NO teams, NO sections",
+   _mp["scope"] == "public" and _mp["routes"] == [] and _mp["ipts"] == [] and _mp["work_sections"] == [],
+   str({k: _mp.get(k) for k in ("scope", "routes", "ipts", "work_sections")})[:200])
+ok("D31: ...but everything the sign-in screen and the public map read is still there (this section seeds no taxonomy, so disciplines is a present, empty list)",
+   _mp["units"] and _mp["vehicles"] and _mp["vehicle_labels"] and _mp["tenant"] and _mp["months"]
+   and isinstance(_mp["factors"], dict) and isinstance(_mp["seasonal_restrictions"], list) and isinstance(_mp["disciplines"], list))
+ok("D31: the MAP cookie is not staff — still the public shape",
+   main.meta(_map_cookie)["scope"] == "public" and main.meta(_map_cookie)["routes"] == [])
+_ms = main.meta(_staff_cookie)
+ok("D31: ⭐ a staff COOKIE alone (the app's iframe sends no header) gets the staff shape, routes included",
+   _ms["scope"] == "staff" and [r["route_id"] for r in _ms["routes"]] == ["R1", "R5"]
+   and set(_ms) == set(_mp), str([r["route_id"] for r in _ms["routes"]]))
+_as("plan-secret")
+ok("D31: ...and so does a valid code (the staff app's own fetches)",
+   main.meta()["scope"] == "staff" and len(main.meta()["routes"]) == 2)
+
 # planner writes lines for two IPTs
 _as("plan-secret")
 try:
@@ -1271,6 +1310,60 @@ ok("2026-10-06: co2_to_date is keyed (route, discipline, section) and covers the
    ("R1", "earthworks", "WS1") in _td and _td[("R1", "earthworks", "WS1")] >= _k2["WS1"]["co2_t"] - 1e-9)
 ok("2026-10-06: an unbaked line never enters co2_to_date",
    ("R1", "substructure", "WS2") not in _td and ("R1", "structures", "WS3") not in _td)
+# 12 Oct 2026 (B2): forecast-matrix carries the SAME carbon per line per month, so the map's timeline
+# needs one call for a carbon paint and its KPI prefetch, and the drawer reads the server's figure
+_pm = main.public_forecast_matrix(from_=9, to=9, unit="t")
+_pmb = {r["section_id"]: r for r in _pm["routes"] if r["route_id"] == "R1"}
+ok("⭐ B2: every forecast-matrix line carries co2_t, a {month: t} map keyed exactly like monthly",
+   all("co2_t" in r and set(r["co2_t"]) == set(r["monthly"]) for r in _pm["routes"]) and set(_pmb["WS1"]["co2_t"]) == {"9"},
+   str({k: r.get("co2_t") for k, r in _pmb.items()}))
+ok("⭐ B2: the baked line's co2_t equals month-kpis' (one costlines figure) and the unbaked lines read None",
+   abs(_pmb["WS1"]["co2_t"]["9"] - _k2["WS1"]["co2_t"]) < 1e-9 and _pmb["WS2"]["co2_t"]["9"] is None
+   and _pmb["WS3"]["co2_t"]["9"] is None)
+ok("B2: the response shape is otherwise identical — the keys the detail table and the drawer read, plus co2_t, and no co2_error",
+   set(_pmb["WS1"]) == {"route_id", "discipline", "section_id", "material_type", "material_description", "vehicle_type",
+                        "monthly", "total", "co2_t"}
+   # NARROWED 12 Oct 2026 (the review and fix pass): plus the Carbon page's stamp, which the route drawer prints
+   and set(_pm) == {"unit", "from", "to", "working_days", "routes", "carbon_stamp"}
+   and _pm["carbon_stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures", str(sorted(_pmb["WS1"])))
+ok("B2: month-kpis carries no co2_error on the happy path", "co2_error" not in _kp)
+# the failure path: the costlines read raises → both feeds answer, every co2_t None, and SAY why.
+# Until today month-kpis caught the error and blanked every carbon figure silently (a null factor
+# saved on Config was one trigger); forecast-matrix had no carbon at all.
+_real_lines = costlines.lines
+
+
+def _boom(*a, **k):
+    raise RuntimeError("fixture: the costlines read failed")
+
+
+costlines.lines = _boom
+try:
+    _ke = main.public_month_kpis(month=9, unit="vehicles")
+    _pme = main.public_forecast_matrix(from_=9, to=9, unit="t")
+except Exception as e:                       # pragma: no cover — the assertion below reports it
+    _ke, _pme = {"raised": repr(e)}, {"raised": repr(e)}
+finally:
+    costlines.lines = _real_lines
+# NARROWED 12 Oct 2026 (the review and fix pass): co2_error is a fixed sentence naming the exception's class only —
+# both feeds are /api/public/ (anyone with the map password), and an exception's text can carry SQL or internal keys;
+# the message is printed to the server log instead
+ok("⭐ B2: when the costlines read fails month-kpis never raises — co2_error names the reason and every co2_t is None",
+   _ke.get("co2_error") == "The carbon figures could not be read (RuntimeError)." and "fixture" not in _ke.get("co2_error", "")
+   and _ke.get("lines") and all(l["co2_t"] is None for l in _ke["lines"]) and _ke.get("co2_to_date") == []
+   and _ke.get("co2_to_date_unbaked_lines") == 0, str(_ke)[:200])
+ok("B2: ...the rest of the month-kpis answer is intact (the volumes are not carbon's hostage)",
+   len(_ke.get("lines") or []) == len(_kp["lines"]) and _ke["lines"][0]["vehicle_loads"] == _kp["lines"][0]["vehicle_loads"])
+ok("⭐ B2: forecast-matrix the same — answers, co2_error, every month's co2_t None, volumes intact",
+   _pme.get("co2_error") == "The carbon figures could not be read (RuntimeError)."
+   and all(v is None for r in _pme.get("routes") or [] for v in r["co2_t"].values())
+   and [r["monthly"] for r in _pme["routes"]] == [r["monthly"] for r in _pm["routes"]], str(_pme)[:200])
+ok("B2: the costlines read is restored and the happy path has no co2_error again",
+   costlines.lines is _real_lines and "co2_error" not in main.public_forecast_matrix(from_=9, to=9, unit="t"))
+_main_src_b2 = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
+ok("B2: both public feeds read ONE helper for carbon (_approved_co2) and main.py has no bare `except Exception:` left around the costlines read",
+   _main_src_b2.count("= _approved_co2(factors") == 2 and _main_src_b2.count("def _approved_co2(") == 1
+   and "co2_by_key, to_date = {}, {}" not in _main_src_b2)
 ok("§9: ...matching route_analysis exactly, so the dashboard, the form and the map agree",
    [r for r in network.route_analysis("R1", profiles=["Rigid 8-wheeler (32t)"])["rows"]
     if r["alt_index"] == 0][0]["trips_per_day"] == 5)
@@ -1343,7 +1436,7 @@ ok("2.5b: an unknown location is refused",
    "not found" in (network.update_route("R1", dest_id="L9", given={"dest_id"}).get("error") or ""))
 ok("2.5b: an unknown route is refused", network.update_route("R9", ipt="IPT1", given={"ipt"}).get("error") == "route not found")
 # the endpoint only writes what was sent
-main.update_route("R1", main.RoutePatch(ipt="IPT 6"), token=None)
+main.update_route("R1", main.RoutePatch(ipt="IPT 6"), token=os.environ["ADMIN_TOKEN"])
 row = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), "R1"))[0]
 ok("2.5b: PATCH writes only the fields sent", row["ipt"] == "IPT 6" and row["origin_id"] == "L2" and row["dest_id"] == "L3")
 
@@ -1386,6 +1479,15 @@ for rid in ("R1", "R2"):
 # happened to be pointing somewhere else.
 _geom("R1", P8, "loaded", tenant="other")
 
+# 12 Oct 2026 (map review §2.5 row 2): the typed daily cap rides on every public route line, both legs,
+# None while nobody has typed one (this schema has no planning columns at all — .get, never [])
+_pm = {(f["properties"]["route_id"], f["properties"]["leg"]): f["properties"]
+       for f in network.public_map_data()["features"] if f["geometry"]["type"] == "LineString"}
+ok("§2.5: every public route line (both legs, both routes) carries max_vehicles_per_day — None, nobody typed a cap",
+   len(_pm) == 4 and all(p.get("max_vehicles_per_day", "missing") is None for p in _pm.values()), str(sorted(_pm)))
+ok("§2.5: ...and so does every meta_routes row",
+   all(r.get("max_vehicles_per_day", "missing") is None for r in network.meta_routes()))
+
 ok("09-09: one route, one profile — BOTH legs go",
    (network.clear_geometry(profile=P8, route_id="R1") is True)
    and _rows("R1") == [(P6, "loaded"), (P6, "return")])
@@ -1408,7 +1510,24 @@ ok("09-09: 🔴 ...and still not the other tenant's", _rows("R1", tenant="other"
 
 # the endpoint, not just the function: route_id has to survive the signature
 _geom("R1", P8)
-main.clear_geometry(profile=P8, route_id="R1", token=None)
+# 12 Oct 2026 (C11 closed): no token → 403; the right token with ADMIN_TOKEN UNSET → 403 too (it used to pass)
+_e = None
+try:
+    main.clear_geometry(profile=P8, route_id="R1", token=None)
+except Exception as e:
+    _e = e
+ok("C11: 🔴 clear-geometry without the admin token is refused (403) and clears nothing",
+   getattr(_e, "status_code", None) == 403 and _rows("R1") == [(P8, "loaded")], repr(_e)[:120])
+_saved_tok = os.environ.pop("ADMIN_TOKEN")
+_e = None
+try:
+    main.clear_geometry(profile=P8, route_id="R1", token=_saved_tok)
+except Exception as e:
+    _e = e
+os.environ["ADMIN_TOKEN"] = _saved_tok
+ok("C11: 🔴 with ADMIN_TOKEN unset the admin surface is CLOSED, not open — even the right token is refused (403)",
+   getattr(_e, "status_code", None) == 403 and _rows("R1") == [(P8, "loaded")], repr(_e)[:120])
+main.clear_geometry(profile=P8, route_id="R1", token=os.environ["ADMIN_TOKEN"])
 ok("09-09: the endpoint passes route_id through", _rows("R1") == [])
 
 # --- what a drop COSTS, so the UI can say it before doing it ----------------- #
@@ -1472,6 +1591,15 @@ ok("cfg: ⭐ a non-positive payload is refused", not cfg.save(bad, network=netwo
 bad = json.loads(json.dumps(FILE)); del bad["vehicles"]["Artic Tipper (44t)"]
 ok("cfg: ⭐ deleting the default routing profile is refused",
    any("default routing profile" in p for p in cfg.save(bad, network=network)["problems"]))
+# 12 Oct 2026 (B2): the blank kg CO2e/km cell — the Config page writes null for it — is refused at save,
+# naming the vehicle; until today it saved, and the live document then made every carbon figure vanish
+bad = json.loads(json.dumps(FILE)); bad["vehicles"]["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km"] = None
+_res_null = cfg.save(bad, network=network)
+ok("cfg: ⭐ B2: a BLANK (null) emissions factor is refused at save, naming the vehicle",
+   _res_null["ok"] is False and any("vehicle 'Rigid 8-wheeler (32t)'" in p and "blank" in p for p in _res_null["problems"]),
+   str(_res_null["problems"]))
+ok("cfg: ...and the live document is untouched by the refused save",
+   conversions.load_factors()["vehicles"]["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km"] == 0.99773)
 db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L1", "a", 58.5, 24.0))
 db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L2", "b", 58.6, 24.4))
 db.execute("INSERT INTO routes (id, origin_id, dest_id) VALUES (?, ?, ?)", ("R1", "L1", "L2"))
@@ -1493,7 +1621,7 @@ ok("cfg: ⭐ reset to file puts the file back", cfg.reset_to_file(conversions, b
 # the endpoint refuses a bad doc with the problems
 _as("admin123")
 try:
-    main.put_factors_config(main.FactorsIn(doc={"vehicles": {}}, updated_by="x"), token=None)
+    main.put_factors_config(main.FactorsIn(doc={"vehicles": {}}, updated_by="x"), token=os.environ["ADMIN_TOKEN"])
     ok("cfg: PUT refuses a bad document", False)
 except Exception as e:
     ok("cfg: PUT refuses a bad document with 400", getattr(e, "status_code", None) == 400)

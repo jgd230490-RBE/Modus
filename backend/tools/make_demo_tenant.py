@@ -2,6 +2,18 @@
 tools/make_demo_tenant.py — the synthetic UK demo tenant, as a package. Wayscope (G2, 16 Sep 2026).
 
     python3 backend/tools/make_demo_tenant.py            # writes demo/uk-corridor.package.json
+    python3 backend/tools/make_demo_tenant.py --with-areas --out demo/with-areas.package.json
+
+OPTION --with-areas (12 Oct 2026, public map review §2.2b, D27). Also loads the council
+boundaries in backend/data/areas_demo.geojson (the eight ONS local authority districts round
+the corridor, May 2026, and Leicestershire, Dec 2025 — OGL v3, with the two licence lines)
+into the package's `areas` table, through areas.import_collection, the app's own path. OFF
+by default: the shipped demo package carries no areas, and a deployment loads them with
+POST /api/admin/areas/import?token= (the same file as the body). --out writes elsewhere,
+so the shipped package is not rewritten by trying the option. The clip (route_area_km)
+needs baked geometry, so it is empty here and fills on the first bake after import.
+The seed file is 25,878 bytes (one line of JSON, 1,044 vertices), fetched 12 Oct 2026 from
+the ONS ArcGIS FeatureServer's BSC layers named in its `sources`; areas.py says more.
 
 WHAT IT MAKES
 -------------
@@ -85,6 +97,7 @@ import tenant_package        # noqa: E402
 random.seed(20260916)
 
 OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
+AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
 TENANT_NAME = "Wolds Link dualling — demo scheme"
 DEMO_NOTICE = "Fictional demo scheme · nothing here is real"
 START_YEAR = 2026
@@ -183,7 +196,8 @@ assert [s for s in SECTIONS if s[0] == PROVISIONAL_WS][0][4] == PROVISIONAL_AT
 BAND_COLOURS = {"IPT1": "#4C1D95", "IPT2": "#155E75", "IPT3": "#57534E"}
 
 
-def build():
+def build(with_areas=False, out=None):
+    out = out or OUT
     # --- schema, seeds -----------------------------------------------------------
     db.init_db(); db.init_network_db(); db.init_taxonomy_db(); db.init_zones_db()
     db.init_gates_db(); db.init_weeks_db(); db.init_lookahead_db(); db.init_config_db()
@@ -612,6 +626,13 @@ def build():
     res = tenant_package.set_overlay(overlay, by="tools/make_demo_tenant.py")
     assert res["ok"], res
 
+    # --- council areas, only when asked (--with-areas; §2.2b) -------------------------
+    if with_areas:
+        import areas
+        with open(AREAS_SEED, encoding="utf-8") as f:
+            res = areas.import_collection(json.load(f), replace=True)
+        assert res["ok"] and res["imported"] == 9, res
+
     # --- export -----------------------------------------------------------------------
     pkg = tenant_package.export_tenant(app_version="modus-g2")
     pkg["_readme"] = ("Synthetic demo tenant v2 — the Wolds Link, a fictional ~32 km A-road dualling scheme in the East "
@@ -631,14 +652,21 @@ def build():
     pkg["fuel_index"] = [{"country": "GB", "eur_per_l": 1.955, "bulletin_date": "2026-09-21",
                           "note": "typed placeholder from a second-hand reading of the DESNZ weekly road fuel "
                                   "prices (ULSD pump price incl. VAT); the automatic DESNZ fetch replaces it"}]
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
         json.dump(pkg, f, ensure_ascii=False, indent=1)
     return pkg
 
 
 if __name__ == "__main__":
-    pkg = build()
+    import argparse
+    ap = argparse.ArgumentParser(description="Write the synthetic UK demo tenant package.")
+    ap.add_argument("--with-areas", action="store_true",
+                    help="also load backend/data/areas_demo.geojson into the package's areas table (off by default)")
+    ap.add_argument("--out", default=None, help="where to write the package (default demo/uk-corridor.package.json)")
+    args = ap.parse_args()
+    OUT = args.out or OUT
+    pkg = build(with_areas=args.with_areas, out=OUT)
     c = tenant_package.counts(pkg)
     print(f"wrote {OUT}")
     print("corridor length %.1f km" % (LENGTH_M / 1000))

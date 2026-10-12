@@ -249,7 +249,11 @@ reset_db()
 # before they were registered.
 # ...and 15 from 2.5b's config table, which tripped this line too before it was registered.
 # ...and 16 from Look-ahead v2's forecast_days (2026-09-09). Tripped again. The pin works.
-ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 16,
+# NARROWED 12 Oct 2026: seventeen with route_sections (public map review §2.2d); the Phase 4.5
+# sixteen are still exactly the set without it.
+# NARROWED again 12 Oct 2026: nineteen with areas and route_area_km (public map review §2.2b, D27).
+ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 19
+   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km"}) == 16,
    f"got {len(db.TENANTED_TABLES)}")
 
 for t in sorted(db.TENANTED_TABLES):

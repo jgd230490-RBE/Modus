@@ -396,12 +396,60 @@ ok("...a stored figure on an electric entry (a fleet's measured one) wins",
    near(conversions._emissions({"vehicles": {"E": {"fuel": "electric", "kwh_per_km": 2.0, "emissions_kg_co2e_per_km": 0.3}}}, "E"), 0.3))
 ok("...a live document with no carbon block still derives it from the file's electricity rows",
    near(conversions._emissions({"vehicles": {"E": {"fuel": "electric", "kwh_per_km": 1.0}}}, "E"), 0.14395, 1e-9))
-ok("diesel is untouched: artic 0.93939, rigid 0.99773, the fallback chain unchanged",
+# NARROWED 12 Oct 2026 (B2): the literal fallback is the published Average-HGV figure 0.89743
+# (conversions.FALLBACK_KG_CO2E_PER_KM), not the 0.90 no document ever said
+ok("diesel is untouched: artic 0.93939, rigid 0.99773; a document with no vehicles reads the ONE fallback 0.89743",
    conversions._emissions(FILE, ART) == 0.93939 and conversions._emissions(FILE, R8) == 0.99773
-   and conversions._emissions({"vehicles": {}}, "nothing") == 0.90)
+   and conversions._emissions({"vehicles": {}}, "nothing") == conversions.FALLBACK_KG_CO2E_PER_KM == 0.89743)
 ff = conversions.flat_factors(FILE)["vehicle_emissions_kg_co2e_per_km"]
-ok("the map's flat factors carry the derived electric figure, diesel unchanged",
-   near(ff[EA], 0.1799375, 1e-9) and ff[ART] == 0.93939 and ff["_default"] == 0.97)
+# NARROWED 12 Oct 2026 (B2): the file's `_default` is the published figure too (was the unpublished 0.97)
+ok("the map's flat factors carry the derived electric figure, diesel unchanged, _default the published 0.89743",
+   near(ff[EA], 0.1799375, 1e-9) and ff[ART] == 0.93939 and ff["_default"] == 0.89743)
+
+# ---- 12 Oct 2026 (B2): ONE fallback rule for an unknown or null per-km factor -------------------
+_B2 = {"vehicles": {"D": {"payload_t": 20, "emissions_kg_co2e_per_km": None},
+                    "B": {"payload_t": 20, "emissions_kg_co2e_per_km": ""},
+                    "Z": {"payload_t": 20, "emissions_kg_co2e_per_km": 0},
+                    "M": {"payload_t": 20},
+                    "_default": {"payload_t": 20, "emissions_kg_co2e_per_km": 0.5}}}
+ok("⭐ B2: a NULL stored factor no longer raises — it reads the document's _default figure (was float(None) → TypeError)",
+   conversions._emissions(_B2, "D") == 0.5 and conversions._emissions(_B2, "B") == 0.5 and conversions._emissions(_B2, "M") == 0.5)
+ok("B2: an unknown vehicle reads the same _default figure", conversions._emissions(_B2, "nothing") == 0.5)
+_B2n = {"vehicles": {k: dict(v) for k, v in _B2["vehicles"].items() if k != "_default"}}
+ok("B2: ...and with no _default entry every one of them reads FALLBACK_KG_CO2E_PER_KM, 0.89743",
+   all(conversions._emissions(_B2n, k) == 0.89743 for k in ("D", "B", "M", "nothing")))
+ok("B2: a stored 0 is a figure, not a gap — 0.0, not the fallback (the zero-factor divergence closed)",
+   conversions._emissions(_B2, "Z") == 0.0 and conversions._emissions(_B2n, "Z") == 0.0)
+_B2d = {"vehicles": dict(_B2["vehicles"], _default={"payload_t": 20, "emissions_kg_co2e_per_km": None})}
+ok("B2: a null _default figure falls through to the literal as well", conversions._emissions(_B2d, "D") == 0.89743
+   and conversions._emissions(_B2d, "nothing") == 0.89743)
+_ffn = conversions.flat_factors(_B2)["vehicle_emissions_kg_co2e_per_km"]
+ok("⭐ B2: the flat factors /api/meta serves the map carry the RESOLVED figure for a null entry, never null",
+   _ffn["D"] == 0.5 and _ffn["B"] == 0.5 and _ffn["Z"] == 0.0 and _ffn["_default"] == 0.5
+   and conversions.flat_factors(_B2n)["vehicle_emissions_kg_co2e_per_km"]["_default"] == 0.89743)
+_net_src = read("backend/network.py")
+ok("⭐ B2: network.route_analysis reads conversions._emissions for EVERY profile — no `or _default or 0` chain of its own",
+   "co2_per_km = conversions._emissions(factors, prof)" in _net_src
+   and 'or default_veh.get("emissions_kg_co2e_per_km")' not in _net_src)
+ok("B2: factors_diagnostics shows the resolved figure through the same function",
+   '"emissions_kg_co2e_per_km": conversions._emissions(factors, prof)' in _net_src)
+_conv_src = read("backend/conversions.py")
+ok("B2: the two stale '0.90' notes are gone from conversions.py and neither 0.90 code literal remains",
+   'emissions_kg_co2e_per_km", 0.90)' not in _conv_src and 'setdefault("_default", 0.90)' not in _conv_src
+   and "else 0.90." not in _conv_src and "0.90 kg/km" not in _conv_src
+   and "FALLBACK_KG_CO2E_PER_KM = 0.89743" in _conv_src)
+ok("B2: the file's _default names the published row, the same figure as the constant, and no longer a 'mid figure'",
+   V["_default"]["emissions_kg_co2e_per_km"] == conversions.FALLBACK_KG_CO2E_PER_KM
+   and "All HGVs" in V["_default"]["_emissions_basis"] and "mid figure between" not in V["_default"]["_emissions_basis"]
+   and "0.89743" in V["_default"]["_emissions_basis"])
+_demo_pkg = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
+_demo_doc = json.loads([r for r in _demo_pkg["tables"]["config"] if r["key"] == "factors"][0]["value"])
+ok("B2: the demo package's config row carries the same _default (the live row changes only on re-import or a Config save)",
+   _demo_doc["vehicles"]["_default"] == V["_default"], str(_demo_doc["vehicles"]["_default"].get("emissions_kg_co2e_per_km")))
+import fairprice  # noqa: E402
+_fp_src = read("backend/fairprice.py")
+ok("B2: fairprice.py's unused 2.68 kg/L diesel constant is deleted; the diesel factor lives in factors.json only",
+   not hasattr(fairprice, "KG_CO2E_PER_L_DIESEL") and "2.68" not in _fp_src and "2.58354" in _fp_src)
 d = carbon.ev_day(75, 80, 10, 1.25, 500, 350)
 # 100 kWh a trip; 8 cycles need 300 kWh more = 51.4 min → 651 > 600; 7 need 200 kWh = 34.3 min → 559 ≤ 600
 ok("⭐ electric shift: 75-min cycle, 80 km a trip, 500 kWh, 350 kW → 7 cycles (not 8), one charge of 34.3 min",
@@ -432,6 +480,17 @@ def _v(mut):
 ok("validate: a fuel other than diesel/electric is refused", any("fuel must be" in x for x in _v(lambda d: d["vehicles"][ART].__setitem__("fuel", "petrol"))))
 ok("validate: an electric vehicle without kwh_per_km is refused", any("kwh_per_km" in x for x in _v(lambda d: d["vehicles"][EA].pop("kwh_per_km"))))
 ok("validate: a geometry twin that is not another vehicle is refused", any("geometry_twin" in x for x in _v(lambda d: d["vehicles"][EA].__setitem__("geometry_twin", EA))))
+# 12 Oct 2026 (B2) — the show-risk bug of 9 Oct: a blank kg CO2e/km cell saved on Config was accepted
+# (null passed `em is not None`) and then every costlines read raised and the map blanked all carbon
+_null = _v(lambda d: d["vehicles"][ART].__setitem__("emissions_kg_co2e_per_km", None))
+ok("⭐ B2: validate REFUSES a null (blank Config cell) emissions factor on a diesel vehicle (it passed until today)",
+   bool(_null), str(_null))
+ok("B2: ...and the message names the vehicle and the cell", any(f"vehicle '{ART}'" in x and "blank" in x for x in _null), str(_null))
+ok("B2: a blank string is refused the same way", any(f"vehicle '{ART}'" in x for x in _v(lambda d: d["vehicles"][ART].__setitem__("emissions_kg_co2e_per_km", ""))))
+ok("B2: an electric entry with NO stored figure is still the derived case — accepted", _v(lambda d: d["vehicles"][EA].__setitem__("emissions_kg_co2e_per_km", None)) == [])
+ok("B2: a 0 figure (no tailpipe carbon) is accepted", _v(lambda d: d["vehicles"][ART].__setitem__("emissions_kg_co2e_per_km", 0)) == [])
+ok("B2: a vehicle entry that never had the key still passes (it reads the fallback; not a Config edit)",
+   _v(lambda d: d["vehicles"][ART].pop("emissions_kg_co2e_per_km")) == [])
 ok("validate: a carbon_material the block does not carry is refused", any("carbon_material" in x for x in _v(lambda d: d["material_categories"]["Small aggregate"].__setitem__("carbon_material", "granite"))))
 ok("validate: a negative material factor is refused", any("carbon.materials.aggregates" in x for x in _v(lambda d: d["carbon"]["materials"]["aggregates"]["kg_co2e_per_t"].__setitem__("primary", -1))))
 ok("validate: a carbon block that is not an object is refused", any("carbon must be an object" in x for x in _v(lambda d: d.__setitem__("carbon", 3))))
@@ -993,14 +1052,39 @@ ok("...every SQL it runs carries the tenant", _code.count("WHERE tenant_id = ?")
    and "UPDATE " not in _code and "DELETE" not in _code)
 ok("🔴 no ICE and no invented factor in the code: every kg figure comes from the factor document",
    not any(x in _code for x in ("7.80307", "118.80307", "19.55376", "0.13096", "0.93939", "0.99773")))
+# NARROWED 12 Oct 2026 (B2): network now calls conversions._emissions for EVERY profile, not only the electric
+# ones, so the literal it is pinned to is the unconditional call
 ok("conversions._emissions is the one place an electric figure is derived (network and the map's flat factors call it)",
    "electric_kg_per_km(factors, v)" in read("backend/conversions.py")
-   and 'conversions._emissions(factors, prof) if v.get("fuel") == "electric"' in read("backend/network.py"))
+   and "co2_per_km = conversions._emissions(factors, prof)" in read("backend/network.py")
+   and 'if v.get("fuel") == "electric"' not in read("backend/network.py"))
 ok("the cost lines carry the one-way and return km the planner reads", '"distance_km": ctx.get("distance_km"), "return_km": ctx.get("return_km")'
    in read("backend/costlines.py"))
 ok("🔴 the forecast pickers never offer a scenario-only profile (it joins HIDDEN_VEHICLES from /api/meta's vehicle_details)",
    "Object.entries((m && m.vehicle_details) || {}).forEach(([k, v]) => { if(v && v.scenario_only && !HIDDEN_VEHICLES.includes(k)) HIDDEN_VEHICLES.push(k); });"
    in read("frontend/index.html"))
+
+# 12 Oct 2026 (the review and fix pass): a tenant's STORED factors are read before the file, so the live demo keeps its
+# old _default (0.97) until its Config is reset to file or its package re-imported — factors_diagnostics says so
+import network  # noqa: E402
+_real_lf = conversions.load_factors
+_old_doc = json.loads(json.dumps(conversions.load_factors()))
+_old_doc["vehicles"]["_default"]["emissions_kg_co2e_per_km"] = 0.97
+try:
+    conversions.load_factors = lambda *a, **k: _old_doc
+    _fd_old = network.factors_diagnostics()
+    conversions.load_factors = lambda *a, **k: json.loads(json.dumps(_real_lf()))
+    _fd_new = network.factors_diagnostics()
+finally:
+    conversions.load_factors = _real_lf
+ok("⭐ factors_diagnostics warns when the stored _default (0.97, a config saved before 12 Oct) is not the published fallback",
+   any("_default carries 0.97" in w and "0.89743" in w and "reset the Config page to file" in w for w in _fd_old["warnings"]),
+   str(_fd_old["warnings"]))
+ok("...and says nothing about it when the _default is the published figure",
+   not any("_default carries" in w for w in _fd_new["warnings"]), str(_fd_new["warnings"]))
+ok("the constant's note no longer claims a stored config resolves alike (the live demo keeps 0.97 until a reset or re-import)",
+   "resolves alike." not in read("backend/conversions.py") and "keeps its stored" in read("backend/conversions.py")
+   and "cannot disagree" not in V["_default"]["_emissions_basis"])
 
 print()
 for f_ in FAIL:

@@ -23,6 +23,8 @@ function ok(label, cond, extra) {
   if (cond) pass++;
   else fail.push(label + (extra ? "  " + extra : ""));
 }
+// 12 Oct 2026 (fix pass): the sandboxes at the end resolve promises; the summary waits for these
+const ASYNC_PINS = [];
 
 // ---- every inline script must be valid JS ------------------------------------
 const blocks = [];
@@ -126,10 +128,20 @@ ok("the overlay does NOT ride on /public/map-data",
   !code.includes("zones-source', { type: 'geojson', data: a1_data"));
 ok("a zones source and fill layer exist",
   code.includes("zones-source") && code.includes("'zone-fill'"));
-ok("the sidebar has a zones toggle", html.includes('id="layer-zones"'));
-ok("the toggle is wired to a handler", code.includes("function toggleZones"));
-ok("routing zones and advisory zones are coloured differently",
-  code.includes("['case', ['get', 'affects_routing']"));
+// 12 Oct 2026 (D24) — REVERSED: the zones toggle is no longer ONE switch. The group master
+// keeps its id (layer-zones) and under it sits one checkbox per kind.
+ok("D24: the sidebar's zones toggle is the group master, with one checkbox per kind under it",
+  html.includes('id="layer-zones"')
+  && ["closure", "works", "weight_limit", "haul_road", "other"].every(k => html.includes(`id="layer-zone-${k}"`))
+  && (html.match(/onchange="toggleZoneKind\('/g) || []).length === 5);
+ok("the toggle is wired to a handler", code.includes("function toggleZones") && code.includes("function toggleZoneKind(kind, on)"));
+// 12 Oct 2026 (D24) — REVERSED: the colour says what KIND of zone it is, not whether the
+// router avoids it (that is still said in the popup). Amber #D97706 for a closure per
+// colour-system-1010.md line 24; red is kept for a cap breach or a clash.
+ok("D24: zones are coloured per KIND, not by affects_routing",
+  !code.includes("['case', ['get', 'affects_routing']")
+  && /const ZONE_FILL_COLOUR = \['match', \['get', 'kind'\], 'closure', ZONE_AMBER, 'works', ZONE_AMBER_LIGHT, 'weight_limit', ZONE_INK, ZONE_GREY\];/.test(code)
+  && code.includes("const ZONE_AMBER = '#D97706'"));
 ok("zones re-add after a basemap switch, like every other layer",
   code.includes("if (ZONES.loaded) ensureZoneLayers(); else loadZones();"));
 ok("the overlay follows the forecast timeline", code.includes("applyZoneMonth"));
@@ -229,11 +241,47 @@ ok("the Mapbox zoom stack is pushed below the bar", /\.mapboxgl-ctrl-top-right\{
 ok("⭐ 2026-10-06: six numbers, the last two CO2e a day and to date",
   /id="kpi-co2-day"/.test(html) && /id="kpi-co2-total"/.test(html)
   && /set\('kpi-co2-day', /.test(code) && /set\('kpi-co2-total', fmtN\(co2ToDate, 0\) \+ ' t'\)/.test(code));
-ok("⭐ CO2e sums per line AFTER the same filters, and unbaked lines are named, not zeroed",
+// NARROWED 12 Oct 2026 (the base merge of Track A and Track B): the caption names them as lines "with no stored road
+// route", not "unbaked" (the team's word); the behaviour is pinned in the F1 sandbox below
+ok("⭐ CO2e sums per line AFTER the same filters, and lines with no stored road route are named, not zeroed",
   /if \(l\.co2_t != null\) co2 \+= l\.co2_t; else co2Unbaked\+\+;/.test(code)
-  && /excl\. \$\{co2Unbaked\} unbaked/.test(code));
+  && /excl\. \$\{noRoute\(co2Unbaked\)\}/.test(code)
+  && code.includes("const noRoute = k => `${k} line${k === 1 ? '' : 's'} with no stored road route`;")
+  && !/excl\. \$\{co2Unbaked\} unbaked/.test(code) && !/\$\{last\.co2_to_date_unbaked_lines\} unbaked/.test(code));
+// 12 Oct 2026 (the base merge; Track B's merge-time item): month-kpis' co2_error reaches the bar
+ok("⭐ the figures bar reads month-kpis' co2_error and prints 'carbon could not be read', with a dash, in both carbon cards",
+  code.includes("const co2Err = payloads.some(p => p && p.co2_error);")
+  && /if \(co2Err\) \{\s*set\('kpi-co2-day', '—'\); set\('kpi-co2-total', '—'\);\s*set\('kpi-co2-day-label', 'CO\\u2082e a day \(carbon could not be read\)'\);\s*set\('kpi-co2-total-label', 'CO\\u2082e to date \(carbon could not be read\)'\);/.test(code));
 ok("⭐ CO2e to date follows the sidebar filters through the route's props",
   /\(last\.co2_to_date \|\| \[\]\)\.forEach\(c => \{[\s\S]{0,400}discFilter !== 'ALL' && c\.discipline !== discFilter/.test(code));
+// 12 Oct 2026 (B2): ONE carbon fallback (conversions.FALLBACK_KG_CO2E_PER_KM, the published 0.89743) and the
+// route drawer reads the SERVER's co2_t from forecast-matrix instead of multiplying its own trips × km × factor
+ok("⭐ B2: the map's only emissions fallback literal is the published 0.89743 — no 0.90 / 0.9 remains",
+  /vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.89743 \}/.test(code)
+  && !/vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.9\b/.test(code)
+  && !/pick\(F\.vehicle_emissions_kg_co2e_per_km,\s*veh\)\s*\|\|\s*0\.9/.test(code));
+// NARROWED 12 Oct 2026 (the review and fix pass): the drawer sums EVERY forecast-matrix row of the route (one row per
+// discipline and section) — it read the first row only, under a caption that called it the bar's figure
+ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix for EVERY line of the route and sums the baked line-months",
+  /const rows=\(mtx\.routes\|\|\[\]\)\.filter\(r=>\(r\.route_id\|\|''\)\.toString\(\)\.trim\(\)\.toLowerCase\(\)===rl\);/.test(code)
+  && /rows\.forEach\(rw=>\{[\s\S]{0,400}const co2m=rw\.co2_t\|\|\{\};[\s\S]{0,400}if\(c==null\)\{ unbakedMonths\[k\]=true; \} else \{ co2t\+=c; bakedT\+=mt; co2LineMonths\+\+; \}/.test(code)
+  && !/const row=\(mtx\.routes\|\|\[\]\)\.find\(/.test(code)
+  && !/trips\*round\*emis\/1000/.test(code) && !/const emis=/.test(code));
+// NARROWED 12 Oct 2026 (the review and fix pass): "(est.)" is back on the label, the server's planning-estimate stamp is
+// printed under the cards, a failed carbon read says so (it used to blame a missing route), and the wording says
+// "no stored road route" instead of the team's word "baked"
+ok("B2: no stored route shows a dash and says so, never an estimate; a partly stored window names the months it excludes",
+  /card\('—','CO₂e \(est\.\)','no road route stored for this vehicle yet'\)/.test(code)
+  && /' · excl\. '\+unbakedM\+' month'\+\(unbakedM>1\?'s':''\)\+' with no stored road route'/.test(code)
+  && /Read from the server: the costlines figure the bar above and the Dashboard use, summed over every line on this route\./.test(code)
+  && !/The same figure as the bar above and the Dashboard, read from the server\./.test(code)
+  && !/route not baked for this vehicle/.test(code));
+ok("⭐ the drawer's CO2e card is labelled an estimate and carries the server's planning-estimate stamp (forecast-matrix carbon_stamp)",
+  /card\(co2t\.toFixed\(1\)\+' t','CO₂e \(est\.\)'/.test(code)
+  && /\(mtx\.carbon_stamp\?' '\+mtx\.carbon_stamp\+'\.':''\)/.test(code));
+ok("⭐ a failed carbon read (forecast-matrix co2_error) reads 'carbon could not be read', never 'not stored'",
+  /const co2Card=mtx\.co2_error\s*\n\s*\? card\('—','CO₂e \(est\.\)','carbon could not be read'\)/.test(code)
+  && /const anyBaked=co2LineMonths>0 && !mtx\.co2_error;/.test(code));
 ok("no label in the bar is uppercase microtext", !/\.kpi-label\{[^}]*text-transform:uppercase/.test(html)
   && !/\.kpi-label\{[^}]*font-size:9/.test(html));
 ok("the KPI block is outside the sidebar element",
@@ -244,8 +292,14 @@ ok("and calculateKPIs writes to ids that are really there",
 ok("KPIs follow the timeline, not just the filters",
   /if \(typeof TL !== 'undefined' && TL\.on\) return \[TL\.month\]/.test(code));
 // §9 — the four cards
-ok("§9: the month comes from the playhead, else the Show-forecast window, else nothing",
-  /function kpiMonthsOnScreen\(\)/.test(code) && code.includes("forecast-from") && /return \[\];\s*\}/.test(code));
+// 12 Oct 2026 — REVERSED (D14, review 2.3): the From / To selects are gone; the Show-forecast window is the span of
+// months with volume (forecastWindow(), from the timeline matrix), and a month chip shows one month
+ok("§9: the month comes from the playhead, else the Show-forecast window (the span with volume, no From / To), else nothing",
+  /function kpiMonthsOnScreen\(\)/.test(code) && !code.includes("forecast-from") && !code.includes("forecast-to")
+  // NARROWED 12 Oct 2026 (Track C review): forecastWindow() may be null (no matrix), so the line reads `|| []` and an
+  // empty window returns no month
+  && /const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(code.slice(code.indexOf("function kpiMonthsOnScreen"), code.indexOf("async function kpiFetchMonth")))
+  && /return \[\];\s*\}/.test(code));
 ok("§9: figures come from /api/public/month-kpis, cached per month",
   code.includes("/public/month-kpis?month=") && /KPI\.cache\[m\] = j/.test(code));
 ok("§9: working days come from the server payload", /const wd = payloads\[0\]\.working_days \|\| 22/.test(code));
@@ -261,8 +315,15 @@ ok("§9: two-way movements/day is the loads-per-working-day figure, not doubled"
   && />Two-way movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code));
 ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per line, from the route's cycle",
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
-ok("§9: ⭐ an unbaked line is counted as unknown, never as zero vehicles",
-  /else unbakedLines\+\+;/.test(code) && code.includes("'not baked'") && code.includes("unbaked)"));
+// NARROWED 12 Oct 2026 (the base merge): the words a person reads are "no stored route" / "with no stored road route"
+ok("§9: ⭐ a line with no stored road route is counted as unknown, never as zero vehicles",
+  /else unbakedLines\+\+;/.test(code) && code.includes("'no stored route'")
+  && code.includes("line${unbakedLines === 1 ? '' : 's'} with no stored road route)")
+  && !code.includes("'not baked'") && !code.includes("'s'} unbaked)"));
+ok("the bar's method note and the alternatives note say 'stored road route', not 'baked'",
+  code.includes("Active routes = every route with a stored road route that matches the filters.")
+  && code.includes("(the cycle time of its stored road route)") && code.includes("'none stored — a route through a haul road has no alternatives'")
+  && !code.includes("every baked route matching") && !code.includes("(baked cycle)") && !code.includes("'none baked"));
 ok("§9: the fleet figure is the busiest month's, not the average", /const fleet = Math\.max\(\.\.\.mFleet\)/.test(code));
 ok("§9: no card says trips equal vehicles", !code.includes("Trips = vehicle loads on every line"));
 ok("§9: material/day is in the map unit", /qtyDay = avg\(mQty\) \/ wd/.test(code) && code.includes("kpi-material-label"));
@@ -292,10 +353,17 @@ ok("§D: ONE chip row, with a Discipline | IPT | Work section switcher",
 ok("§D: discipline is the default", /by: 'discipline'/.test(code));
 ok("§D: the switch recomputes rather than re-rendering a cached grouping",
   /function setKpiBy\(k\) \{[\s\S]{0,320}applyFilters\(\);/.test(code));
-ok("§D: IPT comes from the route, discipline and section from the line",
+// 12 Oct 2026 (review §3 row 3) — NARROWED: the section chip prints the work section's NAME
+// from WS_NAMES, and falls back to the code only when the package has not named it
+ok("§D: IPT comes from the route, discipline and section from the line (named via WS_NAMES, code as the fallback)",
   /KPI\.by === 'ipt' \? \(teamText\(rp\.ipt\) \|\| 'no ' \+ TEAM\.toLowerCase\(\)\)/.test(code)
-  && /KPI\.by === 'section' \? \(l\.section_id \|\| 'no work section'\)/.test(code));
-ok("§9: a stale fetch cannot overwrite a newer month", /if \(seq !== KPI\.seq\) return;/.test(code));
+  && /KPI\.by === 'section' \? \(l\.section_id \? \(\(\(\(window\.WS_NAMES \|\| \{\}\)\[l\.section_id\]\) \|\| \{\}\)\.name \|\| l\.section_id\) : 'no work section'\)/.test(code)
+  && !/KPI\.by === 'section' \? \(l\.section_id \|\| 'no work section'\)/.test(code));
+// 12 Oct 2026 (fix pass, F1) — NARROWED: the guard is the months AND filters on screen, no longer a call counter (the
+// counter dropped every fetch that took longer than one tick, so the bar never rendered during Play)
+ok("§9: a stale fetch cannot overwrite a newer month (guarded by the months and filters on screen, not a call counter)",
+  /if \(KPI\.onScreen !== onScreen\) return;/.test(code) && /KPI\.onScreen = onScreen;/.test(code)
+  && !/if \(seq !== KPI\.seq\) return;/.test(code));
 ok("§9: the forecast toggle recomputes the cards",
   /src\.setData\(currentData\);\s*applyRailHighlight\(\);\s*applyFilters\(\);/.test(code)
   || /applyRailHighlight\(\);[\s\S]{0,120}applyFilters\(\);[\s\S]{0,60}\/\/ §9/.test(src));
@@ -1282,9 +1350,13 @@ ok("§8 (2026-10-06): every row has Show on map", /class="show" onclick="showCon
   && /function showCondition\(kind, id\)/.test(code));
 ok("§8: rebuilt on every tick and cleared when the timeline closes",
   /applyFilters\(\);\s*renderTimelineWarnings\(m\);/.test(code) && /TL\.on=false;\s*renderTimelineWarnings\(null\)/.test(code));
-ok("§8: three sources and no new ones — Tark Tee, stockpile over, seasonal",
+// 12 Oct 2026 (D21/D33) — RENAMED: a fourth source, the route's planning flag, joined the three.
+// Still no weather API. (This pin asserts the endpoint strings, not a count — the count is
+// pinned by the cap-source block near the end of this file.)
+ok("§8: four sources and no others — Tark Tee / NH, stockpile over, seasonal, planning flag; no weather API",
   code.includes("/routes/restrictions") && code.includes("/public/stockpile-timeline")
-  && code.includes("META.seasonal") && !/weather|openweather|forecast\.io/i.test(code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"))));
+  && code.includes("META.seasonal") && code.includes("Number(p.max_vehicles_per_day)")
+  && !/weather|openweather|forecast\.io/i.test(code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"))));
 ok("§8: only routes carrying volume THIS month, inside the filter",
   /if \(!f\.properties\.is_forecast \|\| !routePassesFilters\(f\.properties\)\) return;/.test(code));
 ok("§8: a stale month cannot paint over the current one", /if \(TL\.month !== month \|\| !TL\.on\) return;/.test(code));
@@ -1509,9 +1581,10 @@ ok("⭐ §E: the missing Clash source is written down, not invented",
   src.includes("THE SECOND CLASH SOURCE THE BRIEF NAMES DOES NOT EXIST")
   && /TIME model, which is Phase 7/.test(src)
   && /gate_blockers` is a deactivated gate refusing/.test(src));
-ok("§E: still no new sources and no weather API",
+// 12 Oct 2026 — RENAMED (see the §8 twin above): the planning-flag source is the fourth and last
+ok("§E: four sources, the planning flag the fourth, and no weather API",
   code.includes("/routes/restrictions") && code.includes("/public/stockpile-timeline")
-  && code.includes("META.seasonal")
+  && code.includes("META.seasonal") && code.includes("noun: 'Over a planning flag'") && !code.includes("planning cap")   // 12 Oct fix pass: one noun
   && !/weather|openweather|forecast\.io/i.test(code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"))));
 // the brief's own test: the stack is NOT in the KPI card
 ok("⭐ §E: the stack is its own element, outside #kpi-hud",
@@ -1542,7 +1615,10 @@ ok("§0915-1: the label's figure is per working day, never the month's total",
   /f\.properties\.f_avg=perWorkingDay\(vol\)/.test(code)
   && !/f\.properties\.f_avg=Math\.round\(vol\)/.test(code)
   // window path: the server's per_day, with avg only as a fallback
-  && /f\.properties\.f_avg = \(m\.per_day != null\) \? m\.per_day : m\.avg;/.test(code));
+  // 12 Oct second fix pass — NARROWED: the fallback is the monthly avg put through perWorkingDay(), never the bare
+  // monthly figure (it printed under "Two-way / day" and drew the line at full width by volume)
+  && /f\.properties\.f_avg = \(m\.per_day != null\) \? m\.per_day : perWorkingDay\(m\.avg\);/.test(code)
+  && !/f\.properties\.f_avg = \(m\.per_day != null\) \? m\.per_day : m\.avg;/.test(code));
 ok("§0915-2: the month figure is KEPT on the feature, not thrown away",
   /f\.properties\.f_month_total=Math\.round\(vol\)/.test(code)
   && /f\.properties\.f_month_avg = m\.avg/.test(code));
@@ -1554,7 +1630,7 @@ ok("§0915-3: the divisor comes from the feed, and there is exactly one of it",
   && !/\/\s*22\b/.test(code.replace(/FORECAST_WORKING_DAYS > 0 \? FORECAST_WORKING_DAYS : 22/g, "")));
 ok("§0915-4: the timeline bar says trips, not vehicles — and only for the loads unit",
   /TL_UNIT_WORD = \{ vehicles: 'trips'/.test(code)
-  && /' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\)/.test(code)
+  && /\(count===1\?' route · ':' routes · '\)\+Math\.round\(sum\)\+' '\+unitWord\(unit\)/.test(code)   // 12 Oct fix pass: "1 route"
   && !/' routes · '\+Math\.round\(sum\)\+' '\+unit;/.test(code)
   // a tonnage must NOT be called trips
   && /t: 't', m3: 'm³'/.test(code));
@@ -1599,8 +1675,11 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const ids = [...new Set([...(gs ? gs[1] : "").matchAll(/(?:anchor|alt): "([a-z-]+)"/g)].map(m => m[1]))];
   for (const id of ids)
     ok(`⭐ every anchor the map's guide names exists as an id: ${id}`, html.includes(`id="${id}"`));
-  ok("the Play step has a fallback: the timeline's button when the bar is open, else the sidebar's Play forecast timeline",
-     /anchor: "tl-play", alt: "tl-open"/.test(code) && /id="tl-open" onclick="openTimeline\(\)"/.test(code)
+  // ⚠️ 12 Oct 2026 — REVERSED (live A4): the sidebar button said Play and only OPENED the bar at an empty
+  // January. It now calls startTimeline(), which opens the bar and plays; openTimeline() stays for the bar.
+  ok("the Play step has a fallback: the timeline's button when the bar is open, else the sidebar's Play forecast timeline — and that button PLAYS",
+     /anchor: "tl-play", alt: "tl-open"/.test(code) && /id="tl-open" onclick="startTimeline\(\)"/.test(code)
+     && !/id="tl-open" onclick="openTimeline\(\)"/.test(code)
      && /for \(const id of \[step\.anchor, step\.alt\]\)/.test(code));
   ok("the copy is §5's: the bar, Press Play, Conditions with Show on map, the side panel",
      /title: "The bar along the top"/.test(code) && /title: "Press Play"/.test(code)
@@ -1653,8 +1732,13 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
   ok("the anchor is scrolled into view before measuring, and the card is clamped into the window (seen live: an off-screen card)",
      /el\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(code) && /top = Math\.min\(Math\.max\(12, top\), Math\.max\(12, vh - 232\)\);/.test(code));
-  ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = step\.title;/.test(code)
-     && /card\.querySelector\('p'\)\.textContent = step\.body;/.test(code));
+  // 12 Oct 2026 — NARROWED (review 2.8 row 2): the words go through guideTitle() / guideBody(), which pick a step's phone
+  // words on a phone; still textContent, and the helpers return the step's own strings and nothing else
+  ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = guideTitle\(step\);/.test(code)
+     && /card\.querySelector\('p'\)\.textContent = guideBody\(step\);/.test(code)
+     && code.includes("function guideTitle(step){ return (guideOnPhone() && step.phoneTitle) || step.title; }")
+     && code.includes("function guideBody(step){ return (guideOnPhone() && step.phoneBody) || step.body; }")
+     && !/card\.innerHTML[^;]*step\./.test(code));
   ok("🔴 no team id in the map guide's copy", !/IPT/.test(gs ? gs[0] : "x"));
 }
 // ---- 11 Oct 2026: the demo bar (the user: the map's strip and Guide "on every page") -------------------------
@@ -1840,7 +1924,8 @@ ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fol
   && !/<details class="layers-box" id="layers-box" open/.test(html) && /\.sidebar \{ position:absolute; top:0; bottom:0; left:0; width:300px;/.test(html));
 ok("busiest routes: the five largest by two-way movements a day (not doubled), each a button that selects the route, cleared with the month",
   html.includes('<div id="kpi-busiest"></div>') && code.includes(".sort((a, b) => b[2] - a[2]).slice(0, 5)")
-  && code.includes("onclick=\"selectRoute(") && (code.match(/setHTML\('kpi-busiest', ''\)/g) || []).length === 2);
+  // 12 Oct second fix pass — NARROWED: cleared in THREE places now (no forecast, an empty month, and a month still loading)
+  && code.includes("onclick=\"selectRoute(") && (code.match(/setHTML\('kpi-busiest', ''\)/g) || []).length === 3);
 ok("11 Oct: below 1024 px the zoom buttons sit under the measured bar (a fixed 180 px overlapped it at 950 px), set on resize and whenever the bar changes height",
   code.includes("if (ctrl) ctrl.style.top = (window.innerWidth > 1023 || !kpi) ? '' : (Math.round(kpi.getBoundingClientRect().bottom) + 8) + 'px';")
   && code.includes("new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud'))"));
@@ -1916,7 +2001,2141 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();"));
 }
 
-console.log();
-for (const f of fail) console.log("  FAIL:", f);
-console.log(`\n${pass} passed, ${fail.length} failed`);
-process.exit(fail.length ? 1 : 0);
+// ---- 12 Oct 2026 — Play and the timeline (review §2.4 / D22, live A4 A5 A8; branch claude/mr1-play) ----------
+// Source-level pins for each of the seven items, then the timeline block run against a fake DOM and a
+// hand-built matrix so the loop, the pause flag, the setData guard and the keys are exercised, not just grepped.
+{
+  // (1) A4 — the sidebar button plays (the reversed guide pin above carries the id/onclick); openTimeline stays
+  ok("A4: startTimeline() still opens the bar when it is shut, and openTimeline() is still its own function",
+     /function startTimeline\(\)\{[\s\S]{0,400}if\(!TL\.on\) openTimeline\(\);/.test(code) && /function openTimeline\(\)\{/.test(code));
+  ok("A4: a second press while playing is a no-op (no second interval)",
+     /if\(!TL\.on\) openTimeline\(\);\s*if\(TL\.playing\) return;/.test(code));
+  // (2) A5 / D22 — start month, loop within the span, full-horizon switch, once-per-loop pause, empty label
+  ok("D22: the matrix carries the months with volume and their span, built from EVERY line the API returned",
+     /const volMonths = new Set\(\);/.test(code) && /\(j\.routes\|\|\[\]\)\.forEach\(rt=>\{ Object\.keys\(rt\.monthly\|\|\{\}\)\.forEach\(k=>\{[^\n]*volMonths\.add\(mm\)/.test(code)
+     && /const span = volMonths\.size \? \[Math\.min\(\.\.\.volMonths\), Math\.max\(\.\.\.volMonths\)\] : null;/.test(code)
+     // NARROWED 12 Oct 2026 (C1, review §2.2a): the matrix also carries the programme's carbon maximum and the feed's
+     // co2_error, after the span - the carbon ramp's fixed stops come from it
+     // NARROWED 12 Oct 2026 (wording review): and, last, the feed's carbon stamp (carbonStamp), which the carbon legend prints
+     // NARROWED 12 Oct 2026 (Track C review): and the largest section-month (sectionCo2Max), the section ramp's stops
+     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, (sectionCo2Max, )?co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null \};/.test(code));
+  ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
+     /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
+     && /return span \? span\[0\] : 1;/.test(code)
+     && /ensureTimelineMatrix\(\)\.then\(\(\)=>\{\s*if\(!monthHasVolume\(TL\.month\)\) TL\.month = tlStartMonth\(\);\s*setTimelineMonth\(TL\.month\);/.test(code)
+     && /return \(d\.getFullYear\(\) - CONFIG\.START_YEAR\) \* 12 \+ d\.getMonth\(\) \+ 1;/.test(code));
+  ok("D22: the loop runs within the span with volume; the old 1..MONTH_COUNT wrap is gone from tickTimeline",
+     /function tickTimeline\(\)\{\s*const \[lo, hi\] = tlLoopBounds\(\);\s*const wrap = TL\.month >= hi \|\| TL\.month < lo;/.test(code)
+     && !/TL\.month = TL\.month>=CONFIG\.MONTH_COUNT \? 1 : TL\.month\+1;/.test(code));
+  ok("D22: the planners' Full horizon switch restores 1..MONTH_COUNT, and it is a checkbox in the bar",
+     /function tlLoopBounds\(\)\{[\s\S]{0,200}if\(TL\.full \|\| !span\) return \[1, CONFIG\.MONTH_COUNT \|\| 60\];/.test(code)
+     && /<label class="tl-full"[^>]*><input type="checkbox" id="tl-full" onchange="setTimelineFull\(this\.checked\)"> Full horizon<\/label>/.test(html)
+     && /function setTimelineFull\(on\)\{\s*TL\.full = !!on;/.test(code)
+     && /const fl=document\.getElementById\('tl-full'\); if\(fl\) fl\.checked=TL\.full;/.test(code));
+  ok("D22: playback stops once per loop on the first red month it TICKS into, panel open; the wrap re-arms it",
+     /if \(TL\.playing && TL\.ticked === month && !TL\.clashPaused && live\.some\(i => i\.lvl === 'clash'\)\) \{\s*TL\.clashPaused = true; WARN\.open = true;\s*stopTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code)
+     && /if\(wrap && lo !== hi\) TL\.clashPaused = false;/.test(code) && /TL\.ticked = TL\.month;\s*setTimelineMonth\(TL\.month\);/.test(code)
+     // resuming on a red month counts as this loop's pause; the month Play was pressed on can never stop it
+     && /if\(WARN\.countsMonth === TL\.month && WARN\.counts\.clash > 0\) TL\.clashPaused = true;\s*TL\.ticked = null;/.test(code)
+     && /WARN\.countsMonth = month;/.test(code));
+  ok("D22: the auto-open-once rule and the pill are untouched by the pause",
+     /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened/.test(code) && /function renderConditionsPill\(live\)/.test(code));
+  ok("D22: an empty month reads '<Month> · nothing approved', never '0 routes · 0 trips'",
+     /if\(lbl\) lbl\.textContent = count===0 \? monthLabel\(m\)\+' · nothing approved' : monthLabel\(m\)\+' · '\+count\+\(count===1\?' route · ':' routes · '\)\+Math\.round\(sum\)\+' '\+unitWord\(unit\);/.test(code)
+     && !/' · '\+count\+' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\);\s*\}/.test(code.replace(/count===0 \?[^\n]*/, "")));
+  // (3) A8 — the loaded leg only
+  ok("⭐ A8: the timeline label counts the LOADED leg only (one load = one two-way movement, never doubled)",
+     /if\(f\.properties\.type==='Inbound Highway'\)\{ count\+\+; sum\+=vol; \}/.test(code)
+     && !/f_time=monthLabel\(m\); count\+\+; sum\+=vol;/.test(code));
+  ok("⭐ A8: 'Showing N route(s)' counts the loaded leg only",
+     /if \(f\.properties\.type === 'Inbound Highway'\) matchCount\+\+;/.test(code)
+     && (code.match(/matchCount\+\+/g) || []).length === 1
+     && /status\.innerHTML = `Showing \$\{matchCount\} route\(s\) with approved forecasts\.`;/.test(code));
+  // (4) the changed-guard on the per-month setData; markRouteEnds' own guard untouched
+  ok("⭐ renderMonthFrame re-sends the source only when a feature's is_forecast / f_avg / f_month_total changed",
+     /const wasForecast=f\.properties\.is_forecast, wasAvg=f\.properties\.f_avg, wasTotal=f\.properties\.f_month_total;/.test(code)
+     && /if\(f\.properties\.is_forecast!==wasForecast \|\| f\.properties\.f_avg!==wasAvg \|\| f\.properties\.f_month_total!==wasTotal\) changed=true;/.test(code)
+     && /if\(changed\) src\.setData\(data\);\s*ensureForecastLayers\(\); ensureFlowLayer\(\);/.test(code)
+     && !/src\.setData\(data\); ensureForecastLayers\(\);/.test(code));
+  ok("...and markRouteEnds' second setData keeps its own guard, exactly once",
+     (code.match(/if \(changed\) src\.setData\(a1_data\);/g) || []).length === 1);
+  // (5) prefers-reduced-motion
+  ok("reduced motion: one helper reads the media query, in a try/catch",
+     /function reducedMotion\(\)\{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\); \} catch\(e\)\{ return false; \}/.test(code));
+  ok("reduced motion: the dash march stays DASH_SOLID while playing when it matches",
+     /function startFlowAnimation\(\)\{\s*applyRailFlow\(\);\s*if\(reducedMotion\(\)\)\{ setFlowDash\(DASH_SOLID\); setRailFlowDash\(DASH_SOLID\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
+  ok("reduced motion: Show on map jumps instead of flying when it matches",
+     /if \(reducedMotion\(\)\) map\.jumpTo\(cam\); else map\.flyTo\(\{ \.\.\.cam, duration: 700 \}\);/.test(code)
+     && !/map\.flyTo\(\{ center: f\.geometry\.coordinates/.test(code));
+  // (6) KPI prefetch
+  ok("KPI prefetch: kicked off when the matrix lands, never awaited, through the existing cache, one month at a time",
+     /TL\.matrix = \{ byRoute:byR[^\n]*\};\s*prefetchSpanKpis\(\);\s*return TL\.matrix;/.test(code)
+     && /function prefetchSpanKpis\(\)\{\s*setTimeout\(async \(\)=>\{\s*for\(const m of tlPrefetchOrder\(\)\)\{\s*if\(KPI\.cache\[m\]\) continue;\s*try \{ await kpiFetchMonth\(m\); \} catch\(e\)\{\}/.test(code)   // 12 Oct fix pass (F1)
+     && /function tlPrefetchOrder\(\)\{\s*const span = TL\.matrix && TL\.matrix\.span;\s*if\(!span\) return \[\];/.test(code)
+     && !/Promise\.all\([^)]*kpiFetchMonth/.test(code.slice(code.indexOf("function prefetchSpanKpis"), code.indexOf("function renderMonthFrame"))));
+  // (7) keyboard and ARIA
+  // 12 Oct fix pass — NARROWED: on the map canvas the arrows are Mapbox's pan keys; they step the month on the bar only
+  ok("keyboard: Space toggles Play on the bar or the map; the arrows step a month on the bar only; never inside an input or select",
+     /document\.addEventListener\('keydown', function\(e\)\{\s*if\(!TL\.on \|\| e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey\) return;/.test(code)
+     && /if\(tag === 'INPUT' \|\| tag === 'SELECT' \|\| tag === 'TEXTAREA'\) return;/.test(code)
+     && /if\(!inBar && !inMap\) return;/.test(code)
+     && /if\(e\.key === ' ' \|\| e\.key === 'Spacebar'\)\{ if\(tag === 'BUTTON' && inBar\) return; e\.preventDefault\(\); toggleTimeline\(\); \}/.test(code)
+     && /else if\(e\.key === 'ArrowLeft' && inBar\)\{ e\.preventDefault\(\); stepTimeline\(-1\); \}/.test(code)
+     && /else if\(e\.key === 'ArrowRight' && inBar\)\{ e\.preventDefault\(\); stepTimeline\(1\); \}/.test(code)
+     && !/else if\(e\.key === 'Arrow(Left|Right)'\)\{/.test(code));
+  ok("ARIA: the bar is a focusable named group; Play carries aria-pressed; the slider is named Month and speaks the month",
+     /<div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">/.test(html)
+     && /<button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline\(\)" title="Play \/ pause" aria-label="Play" aria-pressed="false">/.test(html)   // 12 Oct fix pass: was "Play or pause"
+     && /<input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub\(this\.value\)" aria-label="Month" aria-valuetext="Jan 2026">/.test(html)
+     && /b\.setAttribute\('aria-pressed', 'true'\)/.test(code) && /b\.setAttribute\('aria-pressed', 'false'\)/.test(code)
+     && /r\.setAttribute\('aria-valuetext', monthLabel\(m\)\)/.test(code));
+  ok("ARIA: a polite live region announces the month when playback stops (and the reason when it is a clash)",
+     /<div id="tl-live" class="sr-only" aria-live="polite" aria-atomic="true"><\/div>/.test(html)
+     && /\.sr-only\{ position:absolute; width:1px; height:1px;/.test(html)
+     && /function announceTimeline\(text\)\{\s*const el=document\.getElementById\('tl-live'\); if\(el\) el\.textContent = text;/.test(code)
+     && /const was = TL\.playing;[\s\S]{0,400}if\(was\) announceTimeline\(typeof reason === 'string' \? reason : 'Paused at ' \+ monthLabel\(TL\.month\)\);/.test(code)
+     && /stopTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code)
+     && !/announceTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code));   // 12 Oct fix pass: one write, not two
+  {
+    // 12 Oct 2026 (fix pass; both reviewers) — NARROWED: it read the bar's markup plus a string typed into the test, so
+    // it passed on the old file. It now reads the STRING LITERALS of every block the review touched, and the legend
+    // markup, and must find the new strings in them.
+    const lits = t => (t.match(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|"(?:[^"\\\n]|\\.)*"/g) || []).join(" ");
+    const cut = (t, a, b) => { const i = t.indexOf(a), j = t.indexOf(b, i + 1); return i >= 0 && j > i ? t.slice(i, j) : ""; };
+    const readable = [
+      lits(cut(code, "function tlLoopBounds", "const WARN")), lits(cut(code, "const WARN", "(function initAnalysis")),
+      lits(cut(code, "function calculateKPIs", "function applyFilters")), lits(cut(code, "const kindLabels", "</script>")),
+      cut(html, '<div id="timeline-bar"', '<div id="tl-live"'), cut(html, '<div id="zone-kinds"', "Existing rail network"),
+    ].join(" ");
+    const must = ["nothing approved", "loading figures", "Paused at ", "playback paused: ", "Over a planning flag",
+                  "two-way movements a day against a planning flag of", "routes over planning flags", "nothing recorded since",
+                  "Full horizon", "Advisory", "Weight / height limit"];
+    const missing = must.filter(w => !readable.includes(w));
+    ok("wording: nothing a person reads in the new strings says truck, real-time, live tracking, AI, optimise, predict or secure",
+       readable.length > 2000 && missing.length === 0
+       && !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(readable) && !/\bAI\b/.test(readable),
+       "missing: " + JSON.stringify(missing) + " length " + readable.length);
+  }
+
+  // ---- run the timeline block against a fake DOM ------------------------------------------------------------
+  const tStart = src.indexOf("const TL_UNIT_WORD = { vehicles: 'trips'");
+  const tEnd = src.indexOf("// ===== 2026-09-02 (§8)");
+  ok("the timeline block is one contiguous slice (TL_UNIT_WORD … the keydown listener)", tStart > 0 && tEnd > tStart);
+  if (tStart > 0 && tEnd > tStart) {
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const CONFIG = { MONTH_COUNT: 60, START_YEAR: 2026, FORECAST_UNIT: 'vehicles', API_BASE: '' };
+    const monthLabel = i => names[(i - 1) % 12] + ' ' + (CONFIG.START_YEAR + Math.floor((i - 1) / 12));
+    const mkEl = (tag) => ({ tagName: tag, attrs: {}, style: {}, textContent: "", value: "", checked: false, children: [],
+      setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
+      contains(x) { return x === this || this.children.includes(x); } });
+    const byId = {};
+    for (const [id, tag] of [["timeline-bar", "DIV"], ["tl-play", "BUTTON"], ["tl-range", "INPUT"], ["tl-label", "SPAN"], ["tl-speed", "SELECT"],
+                             ["tl-full", "INPUT"], ["tl-live", "DIV"], ["map", "DIV"], ["toggle-forecast", "INPUT"]]) { byId[id] = mkEl(tag); byId[id].id = id; }
+    for (const id of ["tl-play", "tl-range", "tl-speed", "tl-full"]) byId["timeline-bar"].children.push(byId[id]);
+    const canvas = mkEl("CANVAS"); byId["map"].children.push(canvas);
+    const listeners = {};
+    const document = { getElementById: id => byId[id] || null, addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); } };
+    const calls = { setInterval: 0, clearInterval: 0, setData: 0, months: [], warnings: [] };
+    const features = [];
+    for (const [rid, type] of [["R1", "Inbound Highway"], ["R1", "Outbound Highway"], ["R2", "Inbound Highway"], ["R2", "Outbound Highway"], ["R3", "Inbound Highway"], ["R3", "Outbound Highway"]])
+      features.push({ geometry: { type: "LineString" }, properties: { route_id: rid, type } });
+    features.push({ geometry: { type: "Point" }, properties: { type: "Node", id: "N1" } });
+    const map = { getSource: () => ({ _data: { features }, setData() { calls.setData++; } }) };
+    const WARN = { counts: { clash: 0, warn: 0, caution: 0 }, countsMonth: null, open: false };
+    const KPI = { cache: {} };
+    const f = new Function("document", "window", "localStorage", "setInterval", "clearInterval", "setTimeout", "CONFIG", "map",
+      "perWorkingDay", "monthLabel", "ensureForecastLayers", "ensureFlowLayer", "applyZoneMonth", "applyFilters", "renderTimelineWarnings",
+      "startFlowAnimation", "stopFlowAnimation", "WARN", "KPI", "kpiFetchMonth", "fetch", "FORECAST_WORKING_DAYS",
+      src.slice(tStart, tEnd) + "\nreturn { TL, tickTimeline, tlLoopBounds, setTimelineFull, tlStartMonth, monthHasVolume, renderMonthFrame, startTimeline, stopTimeline, setTimelineMonth, toggleTimeline, stepTimeline, tlPrefetchOrder, ensureTimelineMatrix };");
+    // 12 Oct fix pass: the fetch is a delegate (it still throws unless a pin installs one) so the matrix dedupe can be run
+    let fakeFetch = () => { throw new Error("fetch must not be called"); };
+    let api = null, err = "";
+    try {
+      api = f(document, { matchMedia: null }, { getItem: () => null, setItem() {} }, () => { calls.setInterval++; return 7; }, () => { calls.clearInterval++; }, () => {},
+              CONFIG, map, v => Math.round(v / 22), monthLabel, () => {}, () => {}, () => {}, () => {}, m => { calls.warnings.push(m); },
+              () => {}, () => {}, WARN, KPI, () => Promise.resolve({}), (...a) => fakeFetch(...a), 22);
+    } catch (e) { err = e.message; }
+    ok("⭐ the timeline block runs against a fake DOM", !!api, err);
+    if (api) {
+      const TL = api.TL;
+      const cur = (new Date().getFullYear() - 2026) * 12 + new Date().getMonth() + 1;
+      const matrix = (months) => {
+        const monthly = {}; months.forEach(([m, v]) => { monthly[String(m)] = v; });
+        return { byRoute: { r1: { monthly }, r2: { monthly: { "10": 30 } } }, unit: "vehicles", working_days: 22,
+                 volMonths: new Set(months.map(x => x[0]).concat([10])), span: [Math.min(...months.map(x => x[0]), 10), Math.max(...months.map(x => x[0]), 10)] };
+      };
+      ok("TL starts on the full-horizon switch OFF, unpaused, month 1", TL.full === false && TL.clashPaused === false && TL.month === 1 && TL.ticked === null);
+      TL.matrix = matrix([[9, 100], [10, 200], [12, 50]]);
+      ok("the loop bounds are the span with volume [9, 12]; Full horizon makes them [1, 60]; off again restores the span",
+         JSON.stringify(api.tlLoopBounds()) === "[9,12]"
+         && (api.setTimelineFull(true), JSON.stringify(api.tlLoopBounds()) === "[1,60]" && byId["tl-full"].checked === true)
+         && (api.setTimelineFull(false), JSON.stringify(api.tlLoopBounds()) === "[9,12]"));
+      // 12 Oct fix pass — NARROWED: it returned true without calling tlStartMonth() whenever today's month carried volume
+      // (October 2026 does, in this fixture); the matrix here has no volume in today's month, whatever today is
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set([cur + 3, cur + 5]), span: [cur + 3, cur + 5] };
+        ok("the start month is the first month with volume when today's month has none", api.tlStartMonth() === cur + 3);
+        TL.matrix = keep; }
+      { const m2 = matrix([[cur, 5], [9, 100], [12, 50]]); const keep = TL.matrix; TL.matrix = m2;
+        ok("...and today's calendar month when it carries volume", api.tlStartMonth() === cur && api.monthHasVolume(cur));
+        TL.matrix = keep; }
+      // the loop: 10 -> 11 (empty month inside the span keeps its dwell) -> 12 -> wraps to 9 and re-arms the pause
+      TL.month = 10; TL.clashPaused = true; calls.warnings.length = 0;
+      api.tickTimeline(); const a = TL.month; api.tickTimeline(); const b = TL.month; api.tickTimeline(); const c = TL.month;
+      ok("⭐ ticks run 10 → 11 → 12 → 9: within the span, the empty November is shown, the wrap re-arms the clash pause and marks the month as ticked",
+         a === 11 && b === 12 && c === 9 && TL.clashPaused === false && TL.ticked === 9 && calls.warnings.join(",") === "11,12,9");
+      TL.month = 3; api.tickTimeline();
+      ok("a month outside the span (scrubbed there) goes back to the first month with volume", TL.month === 9);
+      TL.month = 59; api.setTimelineFull(true); api.tickTimeline(); const d = TL.month; api.tickTimeline(); const e2 = TL.month; api.setTimelineFull(false);
+      ok("with Full horizon on the loop is 1..60 again", d === 60 && e2 === 1);
+      // 12 Oct fix pass (F2, seen in Chrome as 10, 11, 12, 10 …): the loop from the month Play was pressed on wraps to the
+      // span's FIRST month. A guard — tickTimeline already did this; the Chrome sequence came from figures and conditions
+      // landing a tick late (F1), not from the wrap.
+      TL.month = 10; api.tickTimeline(); const f1 = TL.month; api.tickTimeline(); const f2 = TL.month; api.tickTimeline(); const f3 = TL.month; api.tickTimeline(); const f4 = TL.month;
+      ok("F2: from the start month (Oct) the loop runs 11, 12, then the span's first month (Sep), then Oct", [f1, f2, f3, f4].join(",") === "11,12,9,10");
+      // one-month span: every tick is a wrap; it must not re-arm the pause on every tick
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set([10]), span: [10, 10] };
+        TL.month = 10; TL.clashPaused = true; api.tickTimeline(); const once = TL.month; api.tickTimeline();
+        ok("⭐ a one-month span keeps its pause spent across ticks (it used to stop 750 ms after every press of Play)",
+           once === 10 && TL.month === 10 && TL.clashPaused === true);
+        TL.matrix = keep; TL.clashPaused = false; }
+      // F3: the wrap ends the "month Play was pressed on"
+      TL.month = 12; TL.startedOn = 10; api.tickTimeline();
+      ok("F3: the wrap clears the month Play was pressed on", TL.month === 9 && TL.startedOn === null);
+      // 12 Oct second fix pass: a one-month span "wraps" onto the same month every tick; that must not forget the
+      // month Play was pressed on, or late conditions for it stop playback one tick in
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set([10]), span: [10, 10] };
+        TL.month = 10; TL.startedOn = 10; api.tickTimeline(); api.tickTimeline();
+        ok("⭐ F3: a one-month span keeps the month Play was pressed on across its every-tick wraps", TL.month === 10 && TL.startedOn === 10);
+        TL.matrix = keep; TL.startedOn = null; }
+      // the prefetch order: the month on screen first, then the span in the order Play reaches it; the span only
+      TL.month = 11;
+      const po = typeof api.tlPrefetchOrder === "function" ? api.tlPrefetchOrder() : null;
+      ok("⭐ F1: the KPI prefetch warms the month on screen first, then the rest of the span in play order (11, 12, 9, 10)",
+         JSON.stringify(po) === "[11,12,9,10]");
+      api.setTimelineFull(true);
+      ok("...and with Full horizon on it still warms the span with volume only (it fired 60 GETs)", JSON.stringify(api.tlPrefetchOrder()) === "[11,12,9,10]");
+      api.setTimelineFull(false);
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set(), span: null };
+        ok("...and nothing at all for a tenant with nothing approved (it fired 60 GETs)", JSON.stringify(api.tlPrefetchOrder()) === "[]");
+        TL.matrix = keep; }
+      // a double press fetches the matrix once
+      { const keep = TL.matrix; let n = 0; TL.matrix = null;
+        fakeFetch = () => { n++; return new Promise(() => {}); };
+        api.ensureTimelineMatrix(); api.ensureTimelineMatrix();
+        ok("⭐ a double press on Play fetches the forecast matrix once (the second waits on the first)", n === 1 && !!TL.matrixPending);
+        fakeFetch = () => { throw new Error("fetch must not be called"); }; TL.matrixPending = null; TL.matrix = keep; }
+      // renderMonthFrame: loaded leg only, the empty label, and the setData guard
+      calls.setData = 0; TL.full = false;
+      api.renderMonthFrame(10);
+      ok("⭐ A8: Oct 2026 labels 2 routes · 230 trips — the two return legs are not counted — and the source is sent once",
+         byId["tl-label"].textContent === "Oct 2026 · 2 routes · 230 trips" && calls.setData === 1
+         && features.filter(x => x.properties.is_forecast).length === 4);
+      api.renderMonthFrame(10);
+      ok("⭐ the same month again does not re-send the source", calls.setData === 1);
+      api.renderMonthFrame(11);
+      ok("⭐ an empty month reads 'Nov 2026 · nothing approved' and sends the source once (the lines flipped off)",
+         byId["tl-label"].textContent === "Nov 2026 · nothing approved" && calls.setData === 2);
+      api.renderMonthFrame(1);
+      ok("⭐ a second empty month in a row does NOT re-send the source", calls.setData === 2 && byId["tl-label"].textContent === "Jan 2026 · nothing approved");
+      api.renderMonthFrame(12);
+      // 12 Oct fix pass — REVERSED: it asserted "1 routes"
+      ok("...and a month with volume after it does (R1 only: 1 route · 50 trips)", calls.setData === 3 && byId["tl-label"].textContent === "Dec 2026 · 1 route · 50 trips");
+      // play / stop: aria-pressed, the announcer, the resume-on-a-red-month rule, the slider's valuetext
+      TL.on = true; TL.month = 10; api.setTimelineMonth(10);
+      ok("the slider speaks the month", byId["tl-range"].attrs["aria-valuetext"] === "Oct 2026" && byId["tl-range"].value === 10);
+      WARN.countsMonth = 10; WARN.counts.clash = 1; calls.setInterval = 0;
+      api.startTimeline();
+      ok("⭐ Play on a red month: aria-pressed true, one interval, the clash pause already spent for this loop, nothing ticked yet",
+         TL.playing === true && byId["tl-play"].attrs["aria-pressed"] === "true" && calls.setInterval === 1 && TL.clashPaused === true && TL.ticked === null);
+      ok("F3: Play remembers the month it was pressed on", TL.startedOn === 10);
+      api.startTimeline();
+      ok("a second Play while playing starts no second interval", calls.setInterval === 1);
+      byId["tl-live"].textContent = "";
+      api.stopTimeline();
+      // 12 Oct fix pass — NARROWED: the announcement says what happened, not a bare month
+      ok("⭐ stopping announces the month and drops aria-pressed", TL.playing === false && byId["tl-play"].attrs["aria-pressed"] === "false" && byId["tl-live"].textContent === "Paused at Oct 2026");
+      byId["tl-live"].textContent = ""; api.stopTimeline();
+      ok("stopping an already-stopped timeline announces nothing (scrubbing does not chatter)", byId["tl-live"].textContent === "");
+      WARN.counts.clash = 0; TL.clashPaused = false; api.startTimeline();
+      ok("Play on a month with no red condition leaves the pause armed", TL.clashPaused === false && TL.playing === true);
+      api.stopTimeline();
+      // keyboard
+      const kd = (listeners.keydown || [])[0];
+      ok("one keydown listener is registered on the document", (listeners.keydown || []).length === 1);
+      if (kd) {
+        const ev = (key, target, mods) => { const e = Object.assign({ key, target, altKey: false, ctrlKey: false, metaKey: false, prevented: false, preventDefault() { this.prevented = true; } }, mods || {}); kd(e); return e; };
+        TL.on = true; TL.month = 10; TL.playing = false;
+        const e1 = ev(" ", byId["timeline-bar"]);
+        ok("⭐ Space on the bar starts playback and is swallowed", TL.playing === true && e1.prevented === true);
+        const e2b = ev(" ", byId["timeline-bar"]);
+        ok("...Space again pauses it", TL.playing === false && e2b.prevented === true);
+        const e3 = ev(" ", byId["tl-play"]);
+        ok("Space on the Play BUTTON is left to the button's own click (no double toggle)", TL.playing === false && e3.prevented === false);
+        const e4 = ev("ArrowRight", canvas);
+        // 12 Oct fix pass — REVERSED: on the map the arrows are Mapbox's pan keys; a press panned AND stepped the month
+        ok("⭐ ArrowRight with the map focused is left to the map (it pans; the month does not step)", TL.month === 10 && e4.prevented === false);
+        const e4b = ev("ArrowRight", byId["timeline-bar"]);
+        ok("ArrowRight on the bar steps to the next month", TL.month === 11 && e4b.prevented === true);
+        const e4c = ev(" ", canvas);
+        ok("Space with the map focused still plays", TL.playing === true && e4c.prevented === true);
+        ev(" ", canvas);
+        const e5 = ev("ArrowLeft", byId["timeline-bar"]);
+        ok("ArrowLeft on the bar steps back", TL.month === 10 && e5.prevented === true);
+        const e6 = ev("ArrowRight", byId["tl-range"]);
+        ok("the slider keeps its own arrow keys", TL.month === 10 && e6.prevented === false);
+        const e7 = ev("ArrowRight", byId["tl-speed"]);
+        ok("...and so does the speed select", TL.month === 10 && e7.prevented === false);
+        const e8 = ev("ArrowRight", byId["timeline-bar"], { ctrlKey: true });
+        ok("a modified key is ignored", TL.month === 10 && e8.prevented === false);
+        TL.on = false; const e9 = ev(" ", byId["timeline-bar"]);
+        ok("with the bar shut the keys do nothing", TL.playing === false && e9.prevented === false);
+        const e10 = ev("ArrowRight", mkEl("DIV"));
+        ok("a key elsewhere on the page is ignored", TL.month === 10 && e10.prevented === false);
+      }
+    }
+  }
+}
+
+// ---- 12 Oct 2026 — public map review (notes/map-review-1011): conditions, closures, zones,
+// the forecast overlay. Each pin would fail on main 1cea4e3.
+{
+  const warnBlock = code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"));
+  // 1. live A1 — the restriction condition is month-aware, deduped, highlighted, flown to
+  // 12 Oct fix pass — RENAMED (the tests reviewer): the query string is what is asserted; this branch's server ignores it,
+  // claude/public-map-backend's /api/routes/restrictions honours it
+  ok("A1: the restriction check sends include_expired=1 (honoured by the Track B server, ignored before it); the client filters by month",
+     code.includes("fetch(CONFIG.API_BASE + '/routes/restrictions?include_expired=1')"));
+  ok("A1: a hit is in the month when its from/to window overlaps monthSpan (dnum; no dates = always)",
+     /function hitInMonth\(h, month\)/.test(code) && /const \[lo, hi\] = monthSpan\(month\);/.test(code)
+     && code.includes("return dnum(day(h.from), 0) <= hi && dnum(day(h.to), 99999999) >= lo;"));
+  ok("A1: the panel only lists hits in force this month, one row per closure per route",
+     code.includes("const inMonth = dedupeHits(hit.hits.filter(h => hitInMonth(h, month)));")
+     && /function dedupeHits\(hits\)/.test(code) && code.includes("const k = h.event_number ? 'e|' + h.event_number : 'd|' + [h.kind, h.what, h.from, h.to].join('|');")
+     && !code.includes("const worst = hit.hits[0];"));
+  ok("A1: the matched NH closure is drawn on its own amber layer, keyed by event_number",
+     /id:'restriction-hit', type:'line', source:'restrictions-source'/.test(code)
+     && /function restrictionHitFilter\(evs\)/.test(code)
+     && code.includes("['in', ['to-string', ['get','event_number']], ['literal', evs]]")
+     && /id:'restriction-hit'[\s\S]{0,400}'line-color':'#D97706'/.test(code));
+  ok("A1: ...shown whether or not the closures toggle is on (the toggle filter never touches it)",
+     /id:'restriction-hit'[\s\S]{0,300}visibility:'visible'/.test(code)
+     && !/\['restriction-hit', \[/.test(code)
+     && code.includes("applyRestrictionFilter();\n        applyRestrictionHits();"));
+  ok("A1: a row's Show on map flies to the closure's bounds (and selects its route), not the whole route",
+     code.includes("if (kind === 'h') { showRestrictionHit(id); return; }")
+     && /function showRestrictionHit\(id\) \{\s*const \{ ev, rid: own \} = splitHitRowId\(id\);/.test(code)   // 12 Oct fix pass: takes the row id (event|route)
+     && /String\(x\.properties\.event_number\) === String\(ev\)/.test(code)
+     && /map\.fitBounds\(\[\[b\[0\], b\[1\]\], \[b\[2\], b\[3\]\]\], \{ padding: 90, maxZoom: 14, duration: reducedMotion\(\) \? 0 : 700 \}\)/.test(code)
+     // 12 Oct fix pass — NARROWED: the row's id is event|route, so each row selects its OWN route (six routes share one A46 closure)
+     && code.includes("kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? hitRowId(worst.event_number, p.route_id) : p.route_id")
+     && !code.includes("WARN.hitRoute[String(h.event_number)] = p.route_id"));
+  ok("A1: the highlight follows the live rows and is cleared with the timeline",
+     // 12 Oct fix pass — NARROWED: an event maps to EVERY route it was found on; the highlight stays while any of their rows is live
+     code.includes("setRestrictionHits(liveHitEvents(hitEvents, WARN.hitRoute, live));")
+     && code.includes("return hitEvents.filter(ev => live.some(i => i.kind === 'h' && (hitRoute[ev] || []).includes(i.who)));")
+     && !code.includes("WARN.hitRoute[ev] === i.who")
+     && /renderConditionsPill\(\[\]\); setCondRing\(\[\]\); setRestrictionHits\(\[\]\); setCapBadges\(\[\]\);/.test(code));
+
+  // 2. live A2 — a basemap switch brings the forecast overlay, the ring and the hit layer back
+  const styleLoad = code.slice(code.indexOf("map.on('style.load', async () => {"), code.indexOf("let ALIGNMENT_POPUP_WIRED"));
+  ok("A2: the style.load handler re-renders the open month and its conditions after the sources are back",
+     styleLoad.includes("if (typeof TL !== 'undefined' && TL.on && TL.matrix) { renderMonthFrame(TL.month); renderTimelineWarnings(TL.month); }")
+     && styleLoad.indexOf("renderMonthFrame(TL.month)") > styleLoad.indexOf("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();"));
+  ok("A2: the hit layer and the cap badge are re-added from their builders with the filter they had",
+     code.includes("const evs = (typeof WARN !== 'undefined' && WARN.hitEvents) || [];")
+     && code.includes("const ids = (typeof WARN !== 'undefined' && WARN.capRoutes) || [];")
+     && /function ensureCapBadgeLayer\(\)/.test(code) && code.includes("raiseMarks();\n        ensureCapBadgeLayer();"));
+
+  // 3. live A7 — the closures feed is asked for the tenant's bbox, clipped client-side as the fallback, not deferred
+  ok("A7: /api/restrictions is asked with ?bbox=w,s,e,n from the network's bounds plus 20 km",
+     code.includes("const RESTR_MARGIN_KM = 20;") && /async function restrictionBbox\(\)/.test(code)
+     && code.includes("const q = bb ? '?bbox=' + bb.map(v => v.toFixed(4)).join(',') : '';")
+     && code.includes("fetch(CONFIG.API_BASE + '/restrictions' + q)"));
+  ok("A7: the same box is applied client-side when the server returns the national set",
+     /function clipToBbox\(fc, bb\)/.test(code) && code.includes("RESTR.data = bb ? clipToBbox(fc, bb) : fc;")
+     && code.includes("return g && g[0] <= bb[2] && g[2] >= bb[0] && g[1] <= bb[3] && g[3] >= bb[1];"));
+  ok("A7: the network's bounds are settled once, on success AND failure, and waited on for at most 20 s",
+     (code.match(/settleNetworkBounds\(/g) || []).length >= 3
+     && code.includes("settleNetworkBounds(null);") && code.includes("fitToNetworkOnce(fc) {\n        settleNetworkBounds(fc);")
+     && /Promise\.race\(\[NETWORK_BOUNDS, new Promise\(res => setTimeout\(\(\) => res\(NET_BBOX\), 20000\)\)\]\)/.test(code));
+  ok("A7: the download is still NOT deferred to the first toggle (style.load loads it when there is no data)",
+     styleLoad.includes("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();")
+     && code.includes("if(!RESTR.data){ loadRestrictions(); return; }"));
+
+  // 4. D24 — zones per kind
+  ok("D24: the five kinds are a list, unknown kinds fold into 'other', haul roads stay excluded from the overlay",
+     code.includes("const ZONE_KINDS = ['closure', 'works', 'weight_limit', 'haul_road', 'other'];")
+     && code.includes("kind: ZONE_KINDS.includes(z.kind) ? z.kind : 'other'")
+     && code.includes("const kindsOn = ZONE_KINDS.filter(k => k !== 'haul_road' && zoneKindVisible(k));")
+     && code.includes("['in', ['get', 'kind'], ['literal', kindsOn]]"));
+  ok("D24: closure = amber 25% fill with a solid 2 px amber edge; works = lighter amber, dashed edge",
+     code.includes("const ZONE_FILL_OPACITY = ['match', ['get', 'kind'], 'closure', 0.25, 'works', 0.18, 'weight_limit', 0.06, 0.15];")
+     && code.includes("'line-width': ['match', ['get', 'kind'], 'closure', 2, 1.5]")
+     && /id: 'zone-outline-works', type: 'line', source: 'zones-source'[\s\S]{0,200}'line-color': ZONE_AMBER, 'line-width': 2, 'line-dasharray': \[2, 1\.5\]/.test(code)
+     && code.includes("['zone-outline-works', ['==', ['get', 'kind'], 'works']]"));
+  ok("D24: a weight/height limit is a boxed label carrying the limit text read from the name or note",
+     /function zoneLimitText\(z\)/.test(code) && code.includes("limit_text: zoneLimitText(z)")
+     && /id: 'zone-limit', type: 'symbol', source: 'zones-source'[\s\S]{0,300}'icon-image': 'zone-limit-badge', 'icon-text-fit': 'both'/.test(code)
+     // 12 Oct fix pass — NARROWED: no limit text, no box (the name used to fill it and print again under it); m³ is not a height
+     && code.includes("['zone-limit', ['all', ['==', ['get', 'kind'], 'weight_limit'], ['!=', ['get', 'limit_text'], '']]]")
+     && !code.includes("return z.name || '';") && code.includes("(t|tonnes?|m)(?![\\w\\u00b2\\u00b3])")
+     && code.includes("if (!map.hasImage('zone-limit-badge')) map.addImage('zone-limit-badge', zoneBadgeImage()"));
+  ok("D24: advisory is grey, and the red that meant 'avoided by routing' is gone from the zone rows and the note",
+     code.includes("ZONE_GREY = '#64748B'") && !/id="layer-zones"[^\n]*#DC2626/.test(html)
+     && !html.includes("red = avoided by routing"));
+  ok("D24: the legend is month-aware — a kind's row dims when none of it is in force in the month on screen",
+     code.includes("row.classList.toggle('dim', !inForce[k]);")
+     && /\.zone-kind\.dim label, \.zone-kind\.dim \.color-dot \{ opacity:\.4; \}/.test(html)
+     && code.includes("if (!span || (p.start_n <= span[1] && p.end_n >= span[0])) inForce[p.kind] = (inForce[p.kind] || 0) + 1;")
+     // 12 Oct fix pass: the haul-road row drives a layer drawn from the network with no month filter, so it never dims
+     && code.includes("if (k === 'haul_road') { row.classList.remove('dim'); row.title = 'drawn from the network; not filtered by month'; return; }"));
+  ok("D24: the Haul road row is the Temporary haul switch, kept in step both ways (never a second layer)",
+     code.includes("if (kind === 'haul_road') {\n            const t = document.getElementById('layer-temp');")
+     && code.includes("const z = document.getElementById('layer-zone-haul_road');"));
+  ok("D24: the group master still hides every zone layer, including the new ones",
+     code.includes("const ZONE_LAYERS = ['zone-fill', 'zone-outline', 'zone-outline-works', 'zone-label', 'zone-limit'];")
+     && code.includes("ZONE_LAYERS.forEach(l => toggleLayer(l, visible));"));
+
+  // 5. D21 / D33 — the planning-flag condition
+  // 12 Oct fix pass — NARROWED: the sentence names its unit and is built by capSentence()
+  const capWhat = (code.match(/return `\$\{rid\}: \$\{shown\} two-way movements a day against a planning flag of \$\{cap\}`;/) || [""])[0];
+  ok("D21: a fourth source compares the month's loaded-leg movements a day with max_vehicles_per_day",
+     code.includes("const cap = Number(p.max_vehicles_per_day);")
+     && code.includes("loadsByRoute[l.route_id] = (loadsByRoute[l.route_id] || 0) + (Number(l.vehicle_loads) || 0);")
+     && code.includes("const perDay = loadsByRoute[p.route_id] / wdm;") && code.includes("if (perDay <= cap) return;"));
+  ok("D21: working days come from the API (kp.working_days), never a literal 22, and the loaded leg only (linesOnScreen)",
+     code.includes("const wdm = (kp && kp.working_days > 0) ? kp.working_days : FORECAST_WORKING_DAYS;")
+     && !/\/\s*22\b/.test(warnBlock)
+     && /f\.properties\.type === 'Inbound Highway'\)\) return;/.test(code));
+  ok("D33: the row is warn level, says 'planning flag', and never 'limit'",
+     code.includes("noun: 'Over a planning flag'") && code.includes("what: capSentence(p.route_id, perDay, cap)") && capWhat.length > 0 && !/limit/i.test(capWhat)
+     && /key: `c\|\$\{p\.route_id\}\|\$\{month\}`, lvl: 'warn', src: 'cap'/.test(code));
+  ok("D33: the pill counts it under its own noun, not as a route limit",
+     code.includes("const k = i.src === 'cap' ? 'cap' : i.lvl;")
+     // 12 Oct fix pass — NARROWED: a correct plural ("2 over a planning flag" read as a count of flags)
+     && code.includes("c.cap === 1 ? '1 route over a planning flag' : c.cap + ' routes over planning flags'")
+     && !code.includes(".replace(/flags/, 'flag')"));
+  ok("D33: a small badge sits on the route label of every route over its flag — loaded leg, amber, cleared on close",
+     /id:'forecast-cap-badge',type:'symbol',source:'routes-source'/.test(code)
+     && code.includes("['concat', 'over planning flag ', ['to-string', ['get', 'max_vehicles_per_day']]]")
+     && code.includes("return ['all', ['==', ['get', 'type'], 'Inbound Highway'], ['in', ['get', 'route_id'], ['literal', ids]]];")
+     && (code.match(/'forecast-flow','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2
+     && code.includes("setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));"));
+
+  // 6. review §3 row 3 — the overlay honours the filters; per-route roll-up; WS names; the stockpile sentence
+  ok("row 3: the four forecast overlay layers are filtered by the leg toggles and the routes passing routePassesFilters",
+     /function forecastLayerFilter\(\)/.test(code)
+     && code.includes("&& f.properties.route_id && routePassesFilters(f.properties)) rids.push(f.properties.route_id);")
+     && code.includes("['in', ['get', 'type'], ['literal', legs]],")
+     && code.includes("['in', ['get', 'route_id'], ['literal', rids]]];")
+     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','forecast-flow'];")
+     && !/filter:\['==','is_forecast',true\]/.test(code));
+  ok("row 3: applyFilters() re-applies it, and so do both overlay adders",
+     code.includes("if (typeof applyForecastFilter === 'function') applyForecastFilter();")
+     && (code.match(/applyForecastFilter\(\);/g) || []).length >= 2
+     && code.includes("ensureFlowLayer();\n                applyForecastFilter();"));
+  ok("row 3: the timeline matrix sums the monthly figures per route across its per-line entries",
+     code.includes("acc.monthly[k] = (acc.monthly[k]||0) + (Number(rt.monthly[k])||0);")
+     && !code.includes("byR[(rt.route_id||'').toString().trim().toLowerCase()]=rt;"));
+  // 12 Oct 2026 (the base merge): the capacity is "has a capacity of", as the bulletin's stockpile_wording says it
+  ok("the map's stockpile sentence says 'has a capacity of N; M recorded', the bulletin's words, never 'holds'",
+     code.includes("const head = `${sp.name} has a capacity of ${Math.round(sp.capacity_qty).toLocaleString()} ${u}; ${Math.round(mm.balance_end).toLocaleString()} ${u}`;")
+     && !code.includes("${sp.name} holds "));
+  ok("row 3 / D23: the stockpile sentence says what is recorded at month end, not what 'the plan puts'",
+     code.includes("recorded in it at the end of ${monthLabel(month)}.") && !code.includes("The plan puts")
+     // 12 Oct fix pass: a month after the last recorded movement carries the balance forward and says so
+     && code.includes("recorded at the end of ${monthLabel(last)}; nothing recorded since.") && code.includes("what: pileSentence(sp, month, u), sort: 0"));
+}
+
+// ---- 12 Oct 2026 — the mobile hotfix (review 2.8, live A6), names and the small bugs (claude/mr1-mobile) -------
+// Source-level pins on the phone overrides. Every phone rule is an override INSIDE a media block, so the base
+// `.sidebar … width:300px`, the base #tl-label / #tl-speed rules and the base @media (max-width:1023px) pins above
+// keep passing untouched. No browser here: what the rules do at 385 / 768 / 667x375 px was checked by hand.
+{
+  const phone = (html.match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}\n        @media \(min-width:701px\)/) || ["", ""])[1];
+  const narrow = (html.match(/@media \(max-width:700px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const landscape = (html.match(/@media \(max-width:1023px\) and \(max-height:480px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  // the timeline bar's phone blocks come AFTER its base rules (same specificity: order decides — the first build put them
+  // before and the base `body.sidebar-closed #timeline-bar{ left:50%; }` won, measured live as a half-width bar at 385 px)
+  const tlBase = html.indexOf("#tl-speed{ border:1px solid var(--line);");
+  const tlPhone = (html.slice(tlBase).match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const tlNarrow = (html.slice(tlBase).match(/@media \(max-width:700px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  ok("mobile: the phone media blocks exist — stacked (≤1023), phone (≤700), landscape (≤1023 and ≤480 high), and the timeline bar's two after its base rules",
+     phone.length > 0 && narrow.length > 0 && landscape.length > 0 && tlBase > 0 && tlPhone.length > 0 && tlNarrow.length > 0,
+     `${phone.length}/${narrow.length}/${landscape.length}/${tlPhone.length}/${tlNarrow.length}`);
+  ok("...and no timeline-bar rule sits in the early (pre-base) phone blocks, where the base would override it",
+     !/#timeline-bar|#tl-label|#tl-speed/.test(phone) && !/#timeline-bar|#tl-label|#tl-speed/.test(narrow));
+  // 2. viewport and touch
+  ok("mobile: the viewport meta no longer forbids pinch-zoom (no maximum-scale, no user-scalable=no)",
+     html.includes('<meta name="viewport" content="width=device-width, initial-scale=1">')
+     && (html.match(/<meta name="viewport"/g) || []).length === 1
+     && !/<meta[^>]*(maximum-scale|user-scalable)/.test(html));
+  ok("mobile: touch-action:manipulation on the panel, the menu button, the bar, the conditions panel, the timeline bar and the drawer",
+     /\.sidebar, #menu-toggle, #kpi-hud, #tl-warnings, #timeline-bar, #route-drawer\{ touch-action:manipulation; \}/.test(html));
+  // 1a / 1f. the JS threshold matches the CSS; the toggle never re-opens
+  ok("mobile: the sidebar auto-closes below 1024 (the CSS breakpoint), not 768, and nothing else tests 768",
+     code.includes("if (window.innerWidth <= 1023) closeSidebar();") && !/innerWidth <= 768/.test(code));
+  ok("mobile: closeSidebar() closes only an OPEN panel, and filterByNode uses it (the old toggle re-opened a closed panel on a phone)",
+     code.includes("function sidebarIsOpen() { return !document.getElementById('main-sidebar').classList.contains('closed'); }")
+     && code.includes("function closeSidebar() { if (sidebarIsOpen()) toggleSidebar(); }")
+     && code.includes("applyFilters(); if(window.innerWidth <= 1023) closeSidebar();")
+     && !/if\(window\.innerWidth <= \d+\) toggleSidebar\(\)/.test(code));
+  // 1b. the panel is a drawer over the map below 1024, above the bar, with its own close control; full width on a phone
+  ok("mobile: below 1024 the panel sits above the bar (15), the conditions panel (24) and the timeline (25), under the demo strip (30)",
+     /\.sidebar\{ z-index:28; \}/.test(phone) && /\.sidebar \{[^}]*z-index:10;/.test(html) && /#demo-notice\{[^}]*z-index:30;/.test(html));
+  ok("mobile: below 1024 the map is not pushed 300 px right, nor is the route drawer",
+     /#map, \.sidebar ~ #map\{ left:0; \}/.test(phone) && /#route-drawer, body\.sidebar-closed #route-drawer\{ left:0; \}/.test(tlPhone)
+     && !/#route-drawer/.test(phone)   // its base rule comes after the early block, so the override lives after the base
+     && /#map \{ position:absolute; top:0; bottom:0; right:0; left:300px;/.test(html));   // the desktop base is untouched
+  ok("mobile: the panel carries its own 44 px close control, first in the panel, shown below 1024 only, where the menu button hides while the panel is open",
+     /<div class="sidebar" id="main-sidebar">\n\s+<button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar\(\)" aria-label="Close the control panel"/.test(html)
+     && /\.sidebar-close\{ display:none; position:absolute; top:10px; left:10px; width:44px; height:44px;/.test(html)
+     && /\.sidebar-close\{ display:flex; \}/.test(phone) && /body:not\(\.sidebar-closed\) #menu-toggle\{ display:none; \}/.test(phone)
+     && /body\.has-demo-notice \.sidebar\{ top:var\(--notice-h, 26px\); \}/.test(phone));
+  ok("mobile: on a phone (≤700) the panel is the full width; the base stays 300 px",
+     /\.sidebar\{ width:100%; border-right:none; \}/.test(narrow) && /\.sidebar \{ position:absolute; top:0; bottom:0; left:0; width:300px;/.test(html));
+  // 1c. the timeline bar and the bar's lead labels
+  ok("mobile: below 1024 the timeline bar is full width with 44 px buttons, the label wraps (no 190 px min-width), the speed select and close stay on screen",
+     /#timeline-bar, body\.sidebar-closed #timeline-bar\{ left:12px; right:12px; transform:none; max-width:none; flex-wrap:wrap;/.test(tlPhone)
+     && /#timeline-bar \.tl-btn\{ width:44px; height:44px;/.test(tlPhone) && /#timeline-bar \.tl-close\{ width:44px; height:44px;[^}]*margin-left:auto; \}/.test(tlPhone)
+     && /#tl-label\{ min-width:0; white-space:normal; flex:1 1 120px;/.test(tlPhone)
+     && /#tl-label\{ font-size:12px;[^}]*min-width:190px; white-space:nowrap; flex:0 0 auto; \}/.test(html));   // the base rule is untouched
+  ok("mobile: on a phone the bar runs on two rows — label, speed, close above; the three buttons and the slider below (a ::after line break)",
+     /#tl-label\{ order:1; \}/.test(tlNarrow) && /#tl-speed\{ order:2; \}/.test(tlNarrow) && /#timeline-bar \.tl-close\{ order:3; \}/.test(tlNarrow)
+     && /#timeline-bar::after\{ content:""; flex:0 0 100%; height:0; order:4; \}/.test(tlNarrow)
+     && /#timeline-bar \.tl-btn\{ order:5; \}/.test(tlNarrow) && /#timeline-bar input\[type=range\]\{ order:6; flex:1 1 60px; width:auto; \}/.test(tlNarrow));
+  ok("mobile: the two lead labels cannot collide — below 1024 a label wraps inside its card and a card can shrink (the base keeps nowrap)",
+     /#kpi-cards \.kpi-card\{ min-width:0; \}/.test(phone) && /#kpi-cards \.kpi-label\{ white-space:normal; \}/.test(phone)
+     && /\.kpi-label\{[^}]*white-space:nowrap; \}/.test(html));
+  // 1d. the conditions panel is capped by the viewport
+  ok("mobile: the conditions panel's max-height is measured from the bar's bottom to the timeline bar's top (or the viewport's bottom edge), and cleared on the desktop",
+     code.includes("const floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;")
+     && code.includes("box.style.maxHeight = Math.max(120, floor - (Math.round(kpi.getBoundingClientRect().bottom) + 8)) + 'px';")
+     && code.includes("{ box.style.top = ''; box.style.maxHeight = ''; return; }"));
+  // 1e. landscape
+  ok("mobile: landscape (≤480 px high) collapses the bar to one row of the two lead figures, and the block comes after the tablet row so it wins",
+     /#kpi-cards\{ grid-template-columns:repeat\(2, minmax\(0, 1fr\)\); \}/.test(landscape) && /#kpi-cards \.kpi-card:not\(\.lead\)\{ display:none; \}/.test(landscape)
+     && html.indexOf("@media (max-width:1023px) and (max-height:480px)") > html.indexOf("@media (min-width:701px) and (max-width:1023px)"));
+  // 3. names
+  ok("names: #menu-toggle is a button that names and reports its panel (was a div); toggleSidebar keeps aria-expanded true",
+     html.includes('<button type="button" id="menu-toggle" onclick="toggleSidebar()" aria-controls="main-sidebar" aria-expanded="true">☰ Control Panel</button>')
+     && !/<div id="menu-toggle"/.test(html)
+     && code.includes("if (mt) mt.setAttribute('aria-expanded', String(sidebarIsOpen()));"));
+  ok("names: the month slider is named 'Month' (aria-label) and the timeline's aria-valuetext sits beside it",
+     /<input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub\(this\.value\)" aria-label="Month" aria-valuetext="Jan 2026">/.test(html));
+  {
+    // every icon-only button (no letters in its text) carries an aria-label — static markup and the buttons built in JS
+    const re = /<button\b([^>]*)>([^<]*)<\/button>/g;
+    const bare = [];
+    // (a button empty at source, #kpi-conditions, is filled with words at run time)
+    for (const s of [html, code]) { let b; while ((b = re.exec(s)) !== null) { if (b[2].trim() && !/[A-Za-z]/.test(b[2]) && !/aria-label="/.test(b[1])) bare.push(b[0].slice(0, 80)); } }
+    ok("names: every icon-only button has an aria-label (timeline ◀ ▶ ▶▶ ×, drawer ×, panel ×, basemap widget, conditions × ×)",
+       bare.length === 0 && (html.match(/aria-label="/g) || []).length >= 8, JSON.stringify(bare));
+    ok("...and the speed select is named", /<select id="tl-speed" onchange="setTimelineSpeed\(this\.value\)" title="[^"]*" aria-label="Play speed, months per second">/.test(html));
+  }
+  // 4. one hover handler
+  ok("hover: ONE mousemove handler queries the three route layers (the forEach registered it three times and never used its argument)",
+     (code.match(/map\.on\('mousemove'/g) || []).length === 1 && !code.includes("interactiveLayers.forEach")
+     && code.includes("map.on('mousemove', (e) => {\n                    let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });"));
+  // 5. the demo strip on a phone
+  ok("mobile: the demo strip is 14 px below 1024 (was 9.5), wrapping, and the offsets under it follow its MEASURED height (--notice-h, 26 px floor)",
+     /body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; white-space:normal; text-align:center; font-size:14px;/.test(phone)
+     && !/#demo-notice\{[^}]*font-size:9\.5px/.test(html)
+     && /body\.has-demo-notice #menu-toggle\{ top:calc\(var\(--notice-h, 26px\) \+ 14px\); \}/.test(phone)
+     && /body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:calc\(var\(--notice-h, 26px\) \+ 58px\); \}/.test(phone)
+     && /body\.has-demo-notice #guide-btn\{ top:calc\(var\(--notice-h, 26px\) \+ 10px\); \}/.test(phone)
+     // the calc rules follow the 40 / 84 / 36 floors inside the same block, so they win
+     && phone.indexOf("#menu-toggle{ top:calc(") > phone.indexOf("#menu-toggle{ top:40px; }"));
+  ok("mobile: measureNotice() reads the strip's height into --notice-h below 1024, removes it otherwise, watches the strip, and runs with every bar measurement",
+     /function measureNotice\(\) \{/.test(code) && code.includes("document.body.style.setProperty('--notice-h', nh + 'px');")
+     && code.includes("if (!on) { document.body.style.removeProperty('--notice-h'); return; }")
+     && code.includes("dn._ro = new ResizeObserver(() => positionWarnStack()); dn._ro.observe(dn);")
+     && /function positionWarnStack\(\) \{\n\s+measureNotice\(\);/.test(code)
+     // and after the strip is created at tenant load, and when the app's bar takes it away
+     && /setupGuide\(\);[^\n]*\n\s+if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);/.test(code)
+     && /document\.body\.classList\.toggle\('has-demo-notice', false\);\n\s+if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);/.test(code));
+}
+
+// ---- 12 Oct 2026 — the Track A fix pass (three reviews of 07a522b + four defects seen in Chrome, F1-F4) ----------------
+// Source pins for the CSS and the layers, then two sandboxes that RUN the code: the figures bar (calculateKPIs, F1) and
+// the conditions (the whole warn block: closures on several routes, the planning flag, the stockpile sentence, F3).
+// Both resolve promises, so they are collected in ASYNC_PINS and the summary waits for them.
+{
+  const phone = (html.match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}\n        @media \(min-width:701px\)/) || ["", ""])[1];
+  // F4 + the Guide pill (spec review): nothing of the guide floats over the open drawer on a phone or tablet
+  ok("⭐ F4: below 1024, while the drawer is open, the guide strip, its dots and tips and the Guide pill are hidden",
+     /body:not\(\.sidebar-closed\) \.guide-strip, body:not\(\.sidebar-closed\) \.guide-dot, body:not\(\.sidebar-closed\) \.guide-tip,\s*body:not\(\.sidebar-closed\) #guide-btn\{ display:none; \}/.test(phone)
+     // the desktop is untouched: the rule lives only in the stacked block
+     && (html.match(/body:not\(\.sidebar-closed\) \.guide-strip/g) || []).length === 1);
+  // the 14 px floor on the new text
+  ok("14 px: the zone-kind rows, the zone legend note and the Full horizon switch are 14 px (were 12.5, 12 and 11)",
+     /#zone-kinds \.control-item \{ padding:4px 2px; font-size:14px; \}/.test(html)
+     && /#timeline-bar \.tl-full\{[^}]*font-size:14px;/.test(html)
+     && /<span style="font-size:14px;color:var\(--note\);">amber = closure or works/.test(html)
+     && !/#zone-kinds \.control-item \{[^}]*font-size:12\.5px/.test(html));
+  ok("14 px: the map's new badges (over planning flag, the boxed weight/height limit) are 14 px (were 10.5 and 11.5)",
+     /id:'forecast-cap-badge'[\s\S]{0,400}'text-size':14,/.test(code)
+     && /'text-field': \['get', 'limit_text'\], 'text-size': 14,/.test(code)
+     && !/'text-size':10\.5/.test(code));
+  // width by volume
+  ok("⭐ width by volume: the forecast line and its casing widen with f_avg on FIXED stops; the old 3.5 / 6 px are the floor",
+     code.includes("const FORECAST_VOL_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? [100, 600, 2000] : [5, 30, 100];")
+     && code.includes("return ['interpolate', ['linear'], ['to-number', ['get', 'f_avg'], 0], s[0], base, s[1], base + 2.5, s[2], base + 5];")
+     && code.includes("const FORECAST_LINE_WIDTH = forecastWidth(3.5);") && code.includes("const FORECAST_CASING_WIDTH = forecastWidth(6);")
+     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 2
+     && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
+  ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
+  // the drawer's half of review bug (d)
+  ok("⭐ row 3 (d), the drawer: a route's analysis counts EVERY approved line of the route, not the first one find() met",
+     code.includes("const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);")
+     && code.includes("const totalT=rows.reduce((a,r)=>a+(r.total||0),0);")
+     // NARROWED 12 Oct 2026 (the base merge of Track A and Track B): the per-line carbon is no longer worked out in the
+     // page (trips × round trip × factor); every line's trips use its own payload and its CO2e is the server's co2_t
+     && code.includes("trips+=pl>0?Math.ceil((rw.total||0)/pl):0;") && code.includes("const co2m=rw.co2_t||{};")
+     && !code.includes("co2t+=t*round*em/1000")
+     && code.includes("rows.length+' approved lines: '")
+     && !code.includes("const row=(mtx.routes||[]).find(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);"));
+  // the zone popup speaks the legend's words, and its routing line is not red
+  {
+    const kl = (code.match(/const kindLabels = \{([^}]*)\}/) || ["", ""])[1];
+    const popup = {}; kl.replace(/(\w+): '([^']*)'/g, (_, k, v) => { popup[k] = v; return ""; });
+    const legend = {}; html.replace(/data-kind="(\w+)"><label><input[^>]*>\s*([^<]+)<\/label>/g, (_, k, v) => { legend[k] = v.trim(); return ""; });
+    const keys = ["closure", "works", "weight_limit", "haul_road", "other"];
+    ok("⭐ the zone popup's kind names are the legend's (the popup said 'Zone' where the legend says 'Advisory')",
+       keys.every(k => popup[k] && popup[k] === legend[k]), JSON.stringify({ popup, legend }));
+    ok("...and 'Routing avoids this area' is ink, not the selection red (red is kept for a clash or a cap breach)",
+       code.includes("(p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : '#6b7280')")
+       && !code.includes("p.affects_routing === 'true' ? CONFIG.COLORS.selection"));
+  }
+  // the matrix fetch in flight is shared
+  ok("ensureTimelineMatrix shares the fetch in flight (TL.matrixPending), cleared when it settles",
+     /if\(TL\.matrixPending\) return TL\.matrixPending;\s*TL\.matrixPending = loadTimelineMatrix\(\)\.finally\(\(\)=>\{ TL\.matrixPending = null; \}\);/.test(code));
+  ok("F3: openTimeline records the month Play started on once it has moved off an empty month",
+     /setTimelineMonth\(TL\.month\);\s*if\(TL\.playing && TL\.ticked === null\) TL\.startedOn = TL\.month;/.test(code));
+
+  const flush = () => new Promise(r => setTimeout(r, 0));
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel = i => names[(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12));
+  const mkEl = id => ({ id, innerText: "", innerHTML: "", textContent: "", hidden: false, title: "", style: {},
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); }, toggle(c, on) { if (on) this._s.add(c); else this._s.delete(c); } },
+    getBoundingClientRect() { return { top: 0, bottom: 72, left: 0, right: 1000, width: 1000, height: 72 }; },
+    setAttribute() {}, querySelector() { return null; } });
+  const mkDoc = () => { const els = {}; return { els, getElementById: id => els[id] || (els[id] = mkEl(id)), querySelector: () => null,
+    body: { classList: { contains: () => false, toggle() {} }, style: { setProperty() {}, removeProperty() {} } }, addEventListener() {} }; };
+
+  // ---- (1) F1: the figures bar during Play ----------------------------------------------------------------------------
+  {
+    const a = src.indexOf("    function kpiMonthsOnScreen() {"), b = src.indexOf("    function applyFilters() {");
+    ok("F1 sandbox: the figures-bar slice (kpiMonthsOnScreen … calculateKPIs) is found", a > 0 && b > a);
+    if (a > 0 && b > a) {
+      const document = mkDoc();
+      const TL = { on: true, month: 10 };
+      const KPI = { cache: {}, pending: {}, onScreen: null, seq: 0, by: 'discipline' };
+      const deferred = {};
+      const fetch = url => { const m = Number(/month=(\d+)/.exec(url)[1]);
+        return new Promise(res => { deferred[m] = p => res({ ok: true, json: () => p }); }); };
+      const a1_data = { features: [{ geometry: { type: "LineString" }, properties: { route_id: "R1", type: "Inbound Highway", origin: "Q", dest: "C", ipt: "IPT1" } }] };
+      const pay = (m, loads) => ({ month: m, working_days: 20, payload_fallback_vehicle: "x", co2_to_date: [],
+        lines: [{ route_id: "R1", vehicle_loads: loads, qty_unit: loads, qty_t: loads * 20, trips_per_vehicle_day: 4, discipline: "Earthworks", co2_t: 2 }] });
+      let api = null, err = "", moving = null;
+      try {
+        api = new Function("document", "window", "TL", "KPI", "CONFIG", "fetch", "a1_data", "routePassesFilters", "monthLabel", "teamText", "TEAM",
+          "renderKpiSwitch", "showMoving", "positionWarnStack", "selectRoute",
+          src.slice(a, b) + "\nreturn { calculateKPIs, kpiFetchMonth };")(
+          document, { WS_NAMES: {} }, TL, KPI, { FORECAST_UNIT: "vehicles", API_BASE: "" }, fetch, a1_data, () => true, monthLabel, x => x, "Team",
+          () => {}, on => { moving = !!on; }, () => {}, () => {});
+      } catch (e) { err = e.message; }
+      ok("F1 sandbox: the figures bar runs against a fake DOM", !!api, err);
+      if (api) {
+        const el = id => document.getElementById(id);
+        KPI.cache[10] = pay(10, 400);
+        api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+        ok("⭐ F1: a month already in the cache renders in the same tick (title and figures), not a promise later",
+           el("kpi-title").innerHTML.includes("Oct 2026") && el("kpi-trips").innerText === "20", el("kpi-title").innerHTML + " / " + el("kpi-trips").innerText);
+        TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+        ok("⭐ F1: a month still loading says so at once — '<Month> · loading figures' — and the previous month's figures are cleared",
+           el("kpi-title").innerText === "Nov 2026 · loading figures" && el("kpi-trips").innerText === "—", el("kpi-title").innerText);
+        // 12 Oct second fix pass (the sceptic): the rest of the bar named October under "Nov 2026 · loading figures"
+        { const oct = (TL.month = 10, api.calculateKPIs("ALL", "ALL", "ALL", "ALL"),
+                       { chips: el("kpi-breakdown").innerHTML, busy: el("kpi-busiest").innerHTML, moving, tip: el("kpi-title").title });
+          ok("F1 sandbox: October renders its chips, its busiest routes, 'What's moving' and the method tooltip (so the next pin means something)",
+             oct.chips.includes("Earthworks") && oct.busy.includes("busy-row") && oct.moving === true && oct.tip.includes("Approved forecast, Oct 2026")
+             && el("kpi-moving-title").innerText === "What’s moving in Oct 2026");
+          TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("⭐ F1: while Nov loads nothing of October is left in the bar — no chips, no busiest routes, 'What's moving' hidden, labels and note say Nov or loading, no Oct tooltip",
+             el("kpi-breakdown").innerHTML === "" && el("kpi-busiest").innerHTML === "" && el("kpi-switch").innerHTML === "" && moving === false
+             && el("kpi-routes-label").innerText === "Routes in Nov 2026" && el("kpi-vehicles-label").innerText === "Vehicles needed"
+             && el("kpi-note").innerText === "Loading the figures for Nov 2026." && el("kpi-title").title === "",
+             JSON.stringify({ b: el("kpi-breakdown").innerHTML.slice(0, 60), moving, note: el("kpi-note").innerText, tip: el("kpi-title").title.slice(0, 40) })); }
+        // 12 Oct 2026 (the base merge, Track B's merge-time items): a failed carbon read and a line with no stored road route
+        { const p20 = Object.assign(pay(20, 400), { co2_error: "The carbon figures could not be read (OperationalError)." });
+          p20.lines[0].co2_t = null; KPI.cache[20] = p20;
+          TL.month = 20; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("⭐ base merge: month-kpis' co2_error puts a dash in both carbon cards and 'carbon could not be read' in their labels, never '0.0 t' or '(excl. N …)'",
+             el("kpi-co2-day").innerText === "—" && el("kpi-co2-total").innerText === "—"
+             && el("kpi-co2-day-label").innerText === "CO\u2082e a day (carbon could not be read)"
+             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (carbon could not be read)" && el("kpi-trips").innerText === "20",
+             JSON.stringify([el("kpi-co2-day").innerText, el("kpi-co2-day-label").innerText, el("kpi-co2-total-label").innerText]));
+          const p21 = pay(21, 400);
+          p21.lines.push({ route_id: "R1", vehicle_loads: 40, qty_unit: 40, qty_t: 800, trips_per_vehicle_day: 0, discipline: "Drainage", co2_t: null });
+          p21.co2_to_date_unbaked_lines = 3; KPI.cache[21] = p21;
+          TL.month = 21; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("⭐ base merge: a line with no stored road route is named in those words on the bar (vehicles, CO2e a day, CO2e to date), never 'unbaked'",
+             el("kpi-vehicles-label").innerText === "Vehicles needed (1 line with no stored road route)"
+             && el("kpi-co2-day-label").innerText === "CO\u2082e a day (excl. 1 line with no stored road route)"
+             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (excl. 3 lines with no stored road route)"
+             && el("kpi-co2-day").innerText !== "—" && !/baked/.test(el("kpi-note").innerText + el("kpi-vehicles-label").innerText),
+             JSON.stringify([el("kpi-vehicles-label").innerText, el("kpi-co2-day-label").innerText, el("kpi-co2-total-label").innerText]));
+          const p22 = pay(22, 400); p22.lines[0].trips_per_vehicle_day = 0; KPI.cache[22] = p22;
+          TL.month = 22; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("...and a month whose every line lacks a stored road route reads 'no stored route' for vehicles, never 'not baked' or 0",
+             el("kpi-vehicles").innerText === "no stored route", el("kpi-vehicles").innerText); }
+        TL.month = 12; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+        ASYNC_PINS.push((async () => {
+          deferred[11](pay(11, 200)); await flush(); await flush();
+          ok("F1: a fetch that lands after the playhead moved on does not overwrite the month on screen",
+             el("kpi-title").innerText === "Dec 2026 · loading figures" && KPI.cache[11] && el("kpi-trips").innerText === "—");
+          deferred[12](pay(12, 600)); await flush(); await flush();
+          ok("⭐ F1: the fetch for the month on screen renders it when it lands", el("kpi-title").innerHTML.includes("Dec 2026") && el("kpi-trips").innerText === "30",
+             el("kpi-title").innerHTML + " / " + el("kpi-trips").innerText);
+          // the second loop: every month is cached now, so every tick renders in the same tick
+          TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("F1: on the next loop a month fetched earlier renders at once", el("kpi-title").innerHTML.includes("Nov 2026") && el("kpi-trips").innerText === "10");
+          // a filter change on the same month: the older call's late fetch cannot paint the old filter over the new one
+          TL.month = 13; api.calculateKPIs("ALL", "ALL", "ALL", "ALL"); api.calculateKPIs("Q", "ALL", "ALL", "ALL");
+          const keyNow = KPI.onScreen; deferred[13](pay(13, 400)); await flush(); await flush();
+          ok("F1: two calls for one month and different filters: only the one on screen renders", keyNow.endsWith("|Q|ALL|ALL|ALL") && el("kpi-title").innerHTML.includes("Jan 2027"));
+        })());
+      }
+    }
+  }
+
+  // ---- (2) the conditions: the whole warn block against plain data --------------------------------------------------
+  {
+    const a = src.indexOf("    const WARN = { restr: null"), b = src.indexOf("    (function initAnalysis(){");
+    ok("warn sandbox: the warn block (const WARN … initAnalysis) is found", a > 0 && b > a);
+    if (a > 0 && b > a) {
+      const document = mkDoc();
+      const TL = { on: true, month: 10, playing: false, ticked: null, clashPaused: false, startedOn: null, matrix: {} };
+      const rec = { hits: [], caps: [], select: [], fit: 0, stops: [], announced: [] };
+      const feat = (rid, extra) => ({ geometry: { type: "LineString" }, properties: Object.assign({ route_id: rid, type: "Inbound Highway", is_forecast: true }, extra || {}) });
+      const a1_data = { features: [feat("R2", { max_vehicles_per_day: 20 }), feat("R5")] };
+      const kp = { working_days: 20, lines: [{ route_id: "R2", vehicle_loads: 640, vehicle_type: "Artic Tipper (44t)" }, { route_id: "R5", vehicle_loads: 100, vehicle_type: "Artic Tipper (44t)" }] };
+      const monthSpan = i => { const y = 2026 + Math.floor((i - 1) / 12), m = ((i - 1) % 12) + 1, last = new Date(Date.UTC(y, m, 0)).getUTCDate(); return [y * 10000 + m * 100 + 1, y * 10000 + m * 100 + last]; };
+      const dnum = (s, f) => (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) ? f : parseInt(s.replace(/-/g, ""), 10);
+      const RESTR = { data: { features: [{ properties: { event_number: "E1" }, geometry: { coordinates: [[0, 0], [1, 1]] } }] } };
+      const map = { getSource: () => ({}), getLayer: () => true, addLayer() {}, setFilter() {}, fitBounds() { rec.fit++; }, jumpTo() {}, flyTo() {}, getZoom: () => 10 };
+      let api = null, err = "";
+      // 12 Oct second fix pass: the month's KPI fetch is a delegate (a pin can hold it pending, as a cold Play does) and the
+      // page's KPI cache is passed in (the conditions read it so a cached month builds every row at once)
+      const KPI = { cache: {} }; let kpiCalls = 0, kpiFetch = () => Promise.resolve(kp);
+      try {
+        api = new Function("document", "window", "ResizeObserver", "setTimeout", "CONFIG", "fetch", "a1_data", "routePassesFilters", "TL", "map", "RESTR",
+          "coordsBounds", "selectRoute", "reducedMotion", "monthSpan", "dnum", "stopTimeline", "announceTimeline", "monthLabel", "kpiFetchMonth",
+          "FORECAST_WORKING_DAYS", "META", "setRestrictionHits", "setCapBadges", "KPI",
+          src.slice(a, b) + "\nreturn { WARN, renderTimelineWarnings, dismissWarning, showRestrictionHit, renderConditionsPill, capSentence, pileSentence, pileLastRecorded, splitHitRowId };")(
+          document, { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
+          { API_BASE: "", MONTH_COUNT: 60, START_YEAR: 2026 }, () => { throw new Error("fetch must not be called"); }, a1_data, () => true, TL, map, RESTR,
+          () => [0, 0, 1, 1], rid => rec.select.push(rid), () => false, monthSpan, dnum,
+          reason => { rec.stops.push(reason); TL.playing = false; }, t => rec.announced.push(t), monthLabel, m => { kpiCalls++; return kpiFetch(m); },
+          22, { seasonal: [] }, evs => rec.hits.push(evs.slice()), ids => rec.caps.push(ids.slice()), KPI);
+      } catch (e) { err = e.message; }
+      ok("warn sandbox: the warn block runs against plain data", !!api, err);
+      if (api) {
+        const W = api.WARN, box = () => document.getElementById("tl-warnings").innerHTML, pill = () => document.getElementById("kpi-conditions").innerHTML;
+        const hit = { event_number: "E1", from: "2026-10-16T00:00:00", to: "2026-10-17T23:59:00", label: "Planned road closures", what: "A46 closure", severity: "hit" };
+        W.restr = { R2: { hits: [hit] }, R5: { hits: [hit] } };
+        W.piles = [{ location_id: "L1", name: "Langton stockpile", capacity_qty: 40000, unit: "t",
+                     months: { "9": { balance_end: 30000, over: false }, "10": { balance_end: 40510, over: true }, "11": { balance_end: 40510, over: true }, "12": { balance_end: 40510, over: true } } }];
+        // the pure helpers
+        ok("⭐ the cap sentence names its unit and the flag: 'R016: 32 two-way movements a day against a planning flag of 20'",
+           api.capSentence("R016", 32.2, 20) === "R016: 32 two-way movements a day against a planning flag of 20");
+        ok("...and keeps a decimal when the round would land on the flag (20.3 over 20 never reads '20 … of 20')",
+           api.capSentence("R1", 20.3, 20) === "R1: 20.3 two-way movements a day against a planning flag of 20");
+        // 12 Oct second fix pass (the sceptic): 441 loads / 22 days = 20.045 printed "20.0 … against a planning flag of 20"
+        ok("⭐ ...nor '20.0 … of 20': a figure just over the flag takes the decimals it needs (20.045 → 20.05, 20.04 → 20.04)",
+           api.capSentence("R1", 441 / 22, 20) === "R1: 20.05 two-way movements a day against a planning flag of 20"
+           && api.capSentence("R1", 20.04, 20) === "R1: 20.04 two-way movements a day against a planning flag of 20",
+           api.capSentence("R1", 441 / 22, 20));
+        ok("...and a figure too close to show reads 'just over 20', never '20.000'",
+           api.capSentence("R1", 20.0001, 20) === "R1: just over 20 two-way movements a day against a planning flag of 20");
+        ok("the last month anything was recorded against a pile is the last month its balance moved (Oct here)", api.pileLastRecorded(W.piles[0]) === 10);
+        ok("a row id splits into its event and its route; an old bare event id still works",
+           JSON.stringify(api.splitHitRowId("00525419-001|R002")) === '{"ev":"00525419-001","rid":"R002"}' && api.splitHitRowId("E9").rid === null);
+        api.renderConditionsPill([{ src: "cap", lvl: "warn" }, { src: "cap", lvl: "warn" }]);
+        ok("⭐ the pill's plural: '2 routes over planning flags' (it printed '2 over a planning flag')", pill().includes("2 routes over planning flags"), pill());
+        ok("browser check 12 Oct: each pill item is one unit, dot and words together, so the wrapping desktop pill never parts them",
+           (pill().match(/<span class="cond-part"><span class="cond-dot /g) || []).length === 1, pill());
+        ASYNC_PINS.push((async () => {
+          api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("⭐ one closure on two routes: two rows, each carrying its OWN route (E1|R2, E1|R5)",
+             box().includes("showCondition('h','E1|R2')") && box().includes("showCondition('h','E1|R5')"), box().slice(0, 300));
+          ok("...the event maps to both routes and is highlighted once", JSON.stringify(W.hitRoute.E1) === '["R2","R5"]' && JSON.stringify(rec.hits[rec.hits.length - 1]) === '["E1"]');
+          ok("⭐ the planning-flag row: one noun, the unit in the sentence", box().includes("<b>Over a planning flag</b>")
+             && box().includes("R2: 32 two-way movements a day against a planning flag of 20") && !box().includes("planning cap"));
+          ok("...and the pill counts it as '1 route over a planning flag'", pill().includes("1 route over a planning flag"), pill());
+          // NARROWED 12 Oct 2026 (the base merge; Track B's bulletin wording): "has a capacity of N t;", not "holds N t."
+          ok("the stockpile sentence in a month with a record: '… has a capacity of 40,000 t; 40,510 t recorded in it at the end of Oct 2026.'",
+             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t recorded in it at the end of Oct 2026.`)   // the page formats with the reader's locale
+             && !box().includes("stockpile holds"), box());
+          api.showRestrictionHit("E1|R5"); api.showRestrictionHit("E1|R2"); api.showRestrictionHit("E1");
+          ok("⭐ Show on map on each row selects THAT row's route (R5, then R2); a bare event id falls back to its first route",
+             rec.select.join(",") === "R5,R2,R2" && rec.fit === 3, rec.select.join(","));
+          api.dismissWarning("r|R5|10"); await flush(); await flush();
+          ok("⭐ dismissing one route's row keeps the closure highlighted while another route's row is live",
+             JSON.stringify(rec.hits[rec.hits.length - 1]) === '["E1"]');
+          api.dismissWarning("r|R2|10"); await flush(); await flush();
+          ok("...and dismissing the last one clears it", JSON.stringify(rec.hits[rec.hits.length - 1]) === "[]");
+          TL.month = 11; api.renderTimelineWarnings(11); await flush(); await flush();
+          ok("⭐ D23: a month after the last record carries the balance forward and says so",
+             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t recorded at the end of Oct 2026; nothing recorded since.`)   // NARROWED 12 Oct (base merge): "has a capacity of"
+             && !box().includes("stockpile holds"), box());
+          ok("...and the October closure is not listed in November", !box().includes("E1|"));
+          // F3: Play pressed on a red month counts as the loop's pause even when its conditions land after the first tick
+          TL.playing = true; TL.startedOn = 10; TL.month = 11; TL.clashPaused = false; TL.ticked = 11;
+          api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("⭐ F3: Play pressed on a red month (Oct) counts as this loop's pause even when Oct's conditions land after the tick",
+             TL.clashPaused === true && rec.stops.length === 0);
+          TL.startedOn = null; TL.clashPaused = false; api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("...and only for the month it was pressed on, before the wrap", TL.clashPaused === false);
+          // the clash pause writes the live region once, with the reason
+          TL.month = 10; TL.ticked = 10; TL.playing = true; TL.clashPaused = false; rec.announced.length = 0;
+          api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("⭐ a clash pause stops ONCE and passes its reason to the one announcement (no second write)",
+             rec.stops.length === 1 && rec.stops[0] === "Oct 2026 · playback paused: 1 over capacity" && rec.announced.length === 0 && TL.clashPaused === true,
+             JSON.stringify(rec));
+          // 12 Oct second fix pass (the sceptic): a cold tick — the month's KPI fetch still in flight — must not hold up
+          // the over-capacity row, the pause or the pill; the planning-flag row joins when the figures land
+          { const pend = {}; kpiFetch = m => new Promise(res => { pend[m] = res; });
+            rec.stops.length = 0; TL.month = 11; TL.ticked = 11; TL.playing = true; TL.clashPaused = false; TL.startedOn = 10;
+            api.renderTimelineWarnings(11); await flush(); await flush();
+            ok("⭐ a red month whose KPI figures are still loading pauses Play on the tick that reaches it (it waited on the fetch and missed the first loop)",
+               rec.stops.length === 1 && rec.stops[0] === "Nov 2026 · playback paused: 1 over capacity" && TL.clashPaused === true, JSON.stringify(rec.stops));
+            ok("...the pill already describes Nov (1 over capacity) and carries no planning-flag count before the figures land",
+               pill().includes("1 over capacity") && !pill().includes("planning flag") && W.countsMonth === 11, pill());
+            ok("...and the panel says Nov with the stockpile row", box().includes("Conditions in Nov 2026") && box().includes("Over capacity") && !box().includes("Over a planning flag"));
+            pend[11] && pend[11](kp); await flush(); await flush();
+            ok("⭐ when Nov's figures land the planning-flag row and its pill count join, without a second stop",
+               box().includes("Over a planning flag") && pill().includes("1 route over a planning flag") && rec.stops.length === 1, pill());
+            // a late fetch for a month the playhead has left paints nothing
+            TL.month = 11; TL.ticked = 11; TL.playing = false; api.renderTimelineWarnings(11); await flush(); await flush();
+            const before = box(); TL.month = 12; pend[11] && pend[11](kp); await flush(); await flush();
+            ok("...a month the playhead has left is not painted when its figures land", box() === before);
+            // a month already in the page's KPI cache builds every row at once and fetches nothing
+            KPI.cache[12] = kp; kpiCalls = 0; api.renderTimelineWarnings(12); await flush(); await flush();
+            ok("⭐ a month already in the KPI cache builds its planning-flag row at once and does not fetch",
+               kpiCalls === 0 && box().includes("Conditions in Dec 2026") && box().includes("Over a planning flag"), String(kpiCalls));
+            kpiFetch = () => Promise.resolve(kp); }
+        })());
+      }
+    }
+  }
+}
+
+// 12 Oct 2026 (§2.2b, D27): movements and carbon per council — the "By council" group, its ramp, its card
+{
+  const start = code.indexOf("    const AREAS = { cache: {}");
+  // `code` is comment-stripped, so the block ends at its last statement, not at the next banner comment
+  const end = code.indexOf("\n    }\n", code.indexOf("map.on('mouseleave', 'area-fill'", start)) + 7;
+  const blk = start >= 0 && end > start ? code.slice(start, end) : "";
+  ok("§2.2b: the council block is in the page (AREAS, the ramp, the layers, the card)", blk.length > 2000
+     && /function areaFillExpr\(mode\)/.test(blk) && /function areaCardHTML\(a, payload, when\)/.test(blk)
+     && /function ensureAreaLayers\(\)/.test(blk) && /function setupAreaCard\(\)/.test(blk));
+  // its OWN group and boxes, outside "Disruption zones", off by default
+  const gStart = html.indexOf('<div class="control-group" id="council-group" hidden>');
+  const layersEnd = html.indexOf("</details>", html.indexOf('<details class="layers-box" id="layers-box">'));
+  const zonesBox = html.indexOf('id="layer-zones"'), zoneKinds = html.indexOf('<div id="zone-kinds"');
+  const group = gStart >= 0 ? html.slice(gStart, html.indexOf("</div>\n\n", gStart)) : "";
+  ok("⭐ §2.2b: a 'By council' group of its own, AFTER the layers box closes — not inside 'Disruption zones' or its kinds",
+     gStart > layersEnd && layersEnd > zonesBox && zonesBox > 0 && zoneKinds > 0 && gStart > zoneKinds
+     && /<h3>By council<\/h3>/.test(group), String(gStart) + " " + String(layersEnd));
+  ok("⭐ §2.2b: its own checkboxes, districts and county, each with its own handler — and both OFF by default",
+     /<input type="checkbox" id="layer-areas-district" onchange="toggleAreaTier\('district', this\.checked\)">/.test(group)
+     && /<input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier\('county', this\.checked\)">/.test(group)
+     && !/id="layer-areas-(district|county)"[^>]*\schecked[\s>]/.test(group));
+  ok("§2.2b: the group is hidden until the tenant has areas (a map with none is correct, not broken)",
+     /if \(group\) group\.hidden = !has;/.test(blk));
+  ok("§2.2b: the zone toggle does not drive the council layers, nor the council toggle the zones",
+     !/AREA_LAYERS|area-fill/.test(code.slice(code.indexOf("    function toggleZones(visible) {"), code.indexOf("    function toggleZoneKind(")))
+     && !/ZONE_LAYERS|zone-fill/.test(code.slice(code.indexOf("    function toggleAreaTier("), code.indexOf("    function toggleArea(id, on)"))));
+  ok("§2.2b: one box per district (each its own layer: the fill, outline and label go, the routes stay)",
+     /onchange="toggleArea\(\\'' \+ esc\(a\.area_id\)/.test(blk) && /\['!', \['get', 'off'\]\]/.test(blk)
+     && /if \(on\) AREAS\.off\.delete\(id\); else AREAS\.off\.add\(id\);/.test(blk));
+  // the ramp: ONE hue, the plan blue (D26), fixed stops, ascending
+  const rampM = blk.match(/const AREA_RAMP = \[([^\]]+)\]/);
+  const ramp = rampM ? rampM[1].match(/#[0-9A-Fa-f]{6}/g) : [];
+  const hsl = h => { const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    let hh = 0; if (d) { hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; hh *= 60; if (hh < 0) hh += 360; }
+    return [hh, l]; };
+  const H = ramp.map(hsl);
+  ok("⭐ §2.2b (D26): the fill ramp is ONE hue — four steps of the plan blue (#4A72C9 among them), light to dark",
+     ramp.length === 4 && ramp.map(x => x.toUpperCase()).includes("#4A72C9")
+     && H.every(([h]) => Math.abs(h - 221) < 3) && H.every(([, l], i) => i === 0 || l < H[i - 1][1]), JSON.stringify(ramp));
+  ok("🔴 §2.2b: no orange in the council block (the routes are blue, the return leg amber; orange is not used on the map)",
+     !/#FF8C14|#C97A2E|#E0770C|#D97706|#F59E0B/i.test(blk));
+  const AREA_NONE = "#E7E5E4";
+  const fillExpr = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE",
+    (blk.match(/function areaFillExpr\(mode\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaFillExpr;")(
+    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE);
+  const fm = fillExpr("movements"), fc = fillExpr("carbon");
+  const stops = e => e.slice(3).filter((x, i) => i % 2 === 0);
+  ok("⭐ §2.2b: a Mapbox step on FIXED literal stops in ascending order, the neutral below the first",
+     fm[0] === "step" && JSON.stringify(fm[1]) === '["get","v"]' && fm[2] === AREA_NONE
+     && JSON.stringify(stops(fm)) === "[0.01,50,100,200]" && JSON.stringify(stops(fc)) === "[0.01,50,100,200]"
+     && JSON.stringify(fm.slice(4).filter((x, i) => i % 2 === 0)) === JSON.stringify(ramp), JSON.stringify(fm));
+  ok("§2.2b: the stops are literals in the source, not worked out from the data (no max, no quantiles)",
+     /const AREA_STOPS = \{ movements: \[50, 100, 200\], carbon: \[50, 100, 200\] \};/.test(blk)
+     && !/Math\.max\(|quantile|percentile/.test(blk.slice(blk.indexOf("function areaFillExpr"), blk.indexOf("function areaFigureText"))));
+  ok("§2.2b: the fill is drawn UNDER every layer of ours (routes, sites, zones), so the routes stay on top",
+     /map\.addLayer\(\{ id: 'area-fill', type: 'fill'[\s\S]*?\}, before\);/.test(blk) && /const before = areaBeforeId\(\);/.test(blk)
+     && /'routes-source'/.test(blk.slice(blk.indexOf("function areaBeforeId"), blk.indexOf("function ensureAreaLayers"))));
+  ok("§2.2b: a fill, an outline and a label per district; the county a dashed outline of its own",
+     /id: 'area-fill', type: 'fill'/.test(blk) && /id: 'area-outline', type: 'line'/.test(blk)
+     && /id: 'area-label', type: 'symbol'/.test(blk) && /id: 'area-county-outline', type: 'line'/.test(blk)
+     && /filter: \['==', \['get', 'tier'\], 'county'\]/.test(blk) && /'line-dasharray': \[3, 2\]/.test(blk));
+  ok("§2.2b: the label is 14 px (the floor) with a white halo", /'text-field': \['get', 'label'\], 'text-size': 14,/.test(blk));
+  ok("§2.2b: the colour-by switch has two modes, movements first (D27: movements first, carbon second)",
+     /mode: 'movements'/.test(blk) && /\[\['movements', 'Two-way movements a day'\], \['carbon', 't CO(?:₂|\\u2082)e this month'\]\]/.test(blk)
+     && /function setAreaMode\(mode\)/.test(blk));
+  // the legend, as the page builds it
+  const legend = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE",
+    (blk.match(/function areaLegendHTML\(mode, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaLegendHTML;")(
+    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE);
+  const lgM = legend("movements", "Oct 2026"), lgC = legend("carbon", "Oct 2026");
+  ok("⭐ §2.2b: the legend row per mode — movements titled for laden legs, five rows (four blues and the neutral)",
+     lgM.includes("Two-way movements a day on roads a laden leg uses") && (lgM.match(/class="area-lg"/g) || []).length === 5
+     && lgM.includes("under 50") && lgM.includes("200 and over") && lgM.includes("no approved laden route")
+     && ramp.every(c => lgM.includes(c)), lgM);
+  ok("⭐ §2.2b: ...and carbon titled with the month and the split, in t (never kg per tonne)",
+     lgC.includes("t CO₂e in Oct 2026, split by the km inside each district") && lgC.includes("200 t and over")
+     && lgC.includes("under 50 t") && !/\bkg\b|per tonne/.test(lgC), lgC);
+  // the attribution: the source carries the dataset's licence lines; the group prints them
+  const seedTxt = fs.readFileSync(path.join(ROOT, "backend", "data", "areas_demo.geojson"), "utf8");
+  const seed = JSON.parse(seedTxt);
+  ok("⭐ §2.2b: the seed's two licence lines, word for word (ONS licence page)",
+     JSON.stringify(seed.attribution) === JSON.stringify([
+       "Source: Office for National Statistics licensed under the Open Government Licence v.3.0",
+       "Contains OS data © Crown copyright and database right 2026"]), JSON.stringify(seed.attribution));
+  ok("⭐ §2.2b: the map prints the lines the server sends: on the source's attribution (beside Mapbox's) and in the group",
+     /attribution: \(AREAS\.data\.attribution \|\| \[\]\)\.join\(' (?:·|\\u00b7) '\)/.test(blk)
+     && /if \(at\) at\.textContent = \(j\.attribution \|\| \[\]\)\.join\(' (?:·|\\u00b7) '\);/.test(blk)
+     && /<div class="area-note" id="area-attribution"><\/div>/.test(html));
+  ok("🔴 §2.2b: ...and never a hard-coded dataset's lines (another tenant's boundaries must not be credited to ONS)",
+     !/Office for National Statistics|Crown copyright/.test(code));
+  // the card, as the page builds it
+  const card = new Function((blk.match(/function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaCardHTML;")();
+  const A = { area_id: "E07000131", name: "Harborough", tier: "district", tier_words: "local authority district",
+              source: "ONS Local Authority Districts (May 2026) Boundaries UK BSC", highway_authority: "Leicestershire County Council",
+              movements_per_day: 12.34, routes: ["R001", "R002"], return_only_routes: ["R009"], co2_t: 30.5, co2_t_per_day: 1.39,
+              lorry_km: 12345.6, sites: ["Harborough Compound", "<b>x</b>"], sites_count: 2 };
+  const P = { totals: { routes_with_volume: 18, co2_t: 482 }, carbon: { stamp: "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" } };
+  const ch = card(A, P, "Oct 2026");
+  ok("⭐ §2.2b: the per-council card: the name, the tier and the highway authority, movements with the rule, CO2e of the month's total",
+     ch.includes("Harborough") && ch.includes("Local authority district") && ch.includes("highway authority: Leicestershire County Council")
+     && ch.includes("Two-way movements a day") && ch.includes("<b>12.3</b>") && ch.includes("2 of the 18 routes with approved volume in Oct 2026 enter it laden")
+     && ch.includes("1 more run back through it empty") && ch.includes("one load = one two-way movement")
+     && ch.includes("30.5 t of 482 t") && ch.includes("split by the km inside") && ch.includes("Lorry-km in Oct 2026"), ch);
+  ok("§2.2b: ...the planning-estimate stamp from the server, and every name escaped",
+     ch.includes(P.carbon.stamp) && ch.includes("&lt;b>x&lt;/b>") && !ch.includes("<b>x</b>"));
+  ok("§2.2b: ...a carbon the server could not give reads 'no figure', never 0 t",
+     card(Object.assign({}, A, { co2_t: null }), P, "Oct 2026").includes("<b>no figure</b>")
+     && !card(Object.assign({}, A, { co2_t: null }), P, "Oct 2026").includes("<b>0 t"));
+  ok("🔴 §2.2b: no team id in the card or the block (no team is named here at all)",
+     !/\bIPT ?[1-6]\b|\bipt\b/i.test(blk) && !/IPT/.test(ch));
+  ok("§2.2b: the card's click yields to a route, site or zone on top (queryRenderedFeatures over our GeoJSON layers)",
+     /if \(above\.length\) return;/.test(blk) && /map\.on\('click', 'area-fill'/.test(blk) && /let AREA_CARD_WIRED = false;/.test(blk));
+  ok("§2.2b: every figure is the server's — no working-day count, no division by days in the page",
+     !/working_days|\b22\b|\/ ?wd\b/.test(blk));
+  // REVERSED 12 Oct 2026 (Track C review): the areas show the month Road load and Carbon show (mapModeMonth) — never the
+  // first month of an averaged Show-forecast span, nor the calendar month beside a bar that shows something else
+  ok("§2.2b: the areas follow the ONE month on screen (mapModeMonth, the rule Road load and Carbon use), else no figure",
+     /function areasMonth\(\) \{\s*return \(typeof mapModeMonth === 'function'\) \? mapModeMonth\(\) : null;\s*\}/.test(blk)
+     && !/forecastWindow\(\)\[0\]|currentMonthIndex\(\)/.test(blk)
+     && /if\(typeof refreshAreas==='function'\) refreshAreas\(\);/.test(code) && /if \(typeof refreshAreas === 'function'\) refreshAreas\(\);/.test(code)
+     && /if \(m !== areasMonth\(\)\) return;/.test(blk));
+  ok("§2.2b: off means off — no fetch while both boxes are clear (after the one probe that shows the group)",
+     /if \(AREAS\.probed && !areaTierOn\('district'\) && !areaTierOn\('county'\)\) return;/.test(blk));
+  ok("§2.2b: a basemap switch re-adds the layers from the cached month (style.load)",
+     /if \(AREAS\.data\) \{ AREAS\.drawn = ''; ensureAreaLayers\(\); renderAreas\(\); \} else refreshAreas\(\);/.test(code));
+  // the county tier (the highway authority's figure, D27's county/UA toggle): its own figure, its card, its label
+  ok("⭐ §2.2b: the group carries the mockup's two sub-heads and the county's own figure on a line under its box",
+     /<div class="area-legend-title area-sub" id="area-mode-title">Colour the districts by<\/div>\s*<div class="kpi-switch area-mode" id="area-mode"><\/div>/.test(group)
+     && /<div class="area-legend-title area-sub">Highway authority<\/div>\s*<div class="control-item"><label><input type="checkbox" id="layer-areas-county"[^\n]*<\/div>\s*<div class="area-county-fig" id="area-county-fig"><\/div>/.test(group)
+     && /if \(cf\) cf\.textContent = counties\.length === 1 \? areaRowFigure\(counties\[0\]\.name \+ ' (?:·|\\u00b7) ' \+ areaFigureText\(counties\[0\], AREAS\.mode, ''\)\)/.test(blk));
+  ok("§2.2b: the colour-by switch belongs to the districts — hidden with their box, and the hidden attribute beats .kpi-switch's flex",
+     /if \(sw\) sw\.hidden = !areaTierOn\('district'\);/.test(blk) && /if \(swT\) swT\.hidden = !areaTierOn\('district'\);/.test(blk)
+     && /#council-group \[hidden\]\{ display:none; \}/.test(html));
+  ok("🔴 §2.2b: a figure beside a district wraps inside the panel (Chrome, 12 Oct: '16 routes' ran off its edge)",
+     /\.area-fig\{[^}]*text-align:right;[^}]*\}/.test(html) && !/\.area-fig\{[^}]*white-space:nowrap/.test(html)
+     && /#area-district-rows \.control-item label\{ width:auto; flex:1 1 auto; min-width:0; \}/.test(html));
+  {
+    const rf = new Function((blk.match(/function areaRowFigure\(t\) \{[^\n]*\}/) || ["function areaRowFigure(){}"])[0] + "; return areaRowFigure;")();
+    ok("§2.2b: ...and breaks only at its ' · ', never inside a figure ('130 t CO2e' stays whole)",
+       rf("257 a day · 16 routes") === "257 a day · 16 routes" && rf("130 t CO₂e") === "130 t CO₂e"
+       && /esc\(areaRowFigure\(areaFigureText\(a, AREAS\.mode, ''\)\)\)/.test(blk));
+  }
+  ok("⭐ §2.2b: ONE label per area, on the server's label point (a polygon label repeats on every tile: Harborough twice in Chrome)",
+     /if \(Array\.isArray\(a\.label_point\)\) feats\.push\(\{ type: 'Feature', geometry: \{ type: 'Point', coordinates: a\.label_point \}, properties: props \}\);/.test(blk)
+     && /const labelPt = \['==', \['geometry-type'\], 'Point'\];/.test(blk)
+     && /id: 'area-label', type: 'symbol', source: 'areas-source', filter: district\.concat\(\[labelPt\]\),/.test(blk)
+     && /filter: \['all', \['==', \['get', 'tier'\], 'county'\], labelPt\],/.test(blk));
+  {
+    const af = new Function("areaFigureText", (blk.match(/function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaFeatures;")(() => "x");
+    const fc = af({ areas: [{ area_id: "A", name: "Alpha", tier: "district", movements_per_day: 3, geometry: { type: "Polygon", coordinates: [] }, label_point: [-0.9, 52.5] },
+                            { area_id: "B", name: "Beta", tier: "district", movements_per_day: 0, geometry: { type: "Polygon", coordinates: [] } }] }, "movements", new Set(), "");
+    ok("§2.2b: ...a polygon per area plus one point where the server gave one (none invented where it did not)",
+       fc.features.length === 3 && fc.features.filter(f => f.geometry.type === "Point").length === 1
+       && fc.features[1].geometry.coordinates[0] === -0.9 && fc.features[1].properties.label === "ALPHA\nx");
+  }
+  ok("§2.2b: the card leads with the figure the map is coloured by (carbon mode: CO2e first, as mockup 4's frame B)",
+     /const carbonFirst = typeof AREAS !== 'undefined' && AREAS\.mode === 'carbon';/.test(blk) && /h \+= carbonFirst \? co \+ mv : mv \+ co;/.test(blk));
+  ok("⭐ §2.2b: the county answers a click with its own card — a fill with no paint under it, on while its box is",
+     /const AREA_COUNTY_LAYERS = \['area-county-outline', 'area-county-fill', 'area-county-label'\];/.test(blk)
+     && /id: 'area-county-fill', type: 'fill', source: 'areas-source',\s*filter: \['==', \['get', 'tier'\], 'county'\],\s*layout: \{ visibility: cVis \}, paint: \{ 'fill-color': AREA_INK, 'fill-opacity': 0 \} \}, before\);/.test(blk)
+     && /map\.on\('click', 'area-county-fill', \(e\) => \{[\s\S]*?setHTML\(areaCardHTML\(a, AREAS\.data, when\)\)/.test(blk));
+  ok("🔴 §2.2b: ...but never over a district: a district (or a route, site or zone) under the click answers instead",
+     /f\.layer\.id === 'area-fill' \|\| \(!String\(f\.layer\.id\)\.startsWith\('area-'\)[\s\S]*?if \(above\.length\) return;/.test(
+       blk.slice(blk.indexOf("map.on('click', 'area-county-fill'"))));
+  {
+    const visFn = new Function("areaTierOn", "AREA_LAYERS", "AREA_COUNTY_LAYERS",
+      (blk.match(/function areaVisibility\(\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaVisibility;");
+    const AL = ["area-fill", "area-outline", "area-label"], CL = ["area-county-outline", "area-county-fill", "area-county-label"];
+    const vis = (d, c) => visFn(t => (t === "district" ? d : c), AL, CL)();
+    const both = vis(true, true), cOnly = vis(false, true), dOnly = vis(true, false), none = vis(false, false);
+    ok("⭐ §2.2b: which layer shows, from the two boxes: the county's label only while the districts are off",
+       both["area-fill"] === "visible" && both["area-county-outline"] === "visible" && both["area-county-label"] === "none"
+       && cOnly["area-fill"] === "none" && cOnly["area-county-fill"] === "visible" && cOnly["area-county-label"] === "visible"
+       && dOnly["area-county-fill"] === "none" && dOnly["area-label"] === "visible"
+       && Object.values(none).every(v => v === "none") && Object.keys(none).length === 6, JSON.stringify([both, cOnly]));
+    ok("§2.2b: both boxes go through the one rule (toggleAreaTier and ensureAreaLayers read areaVisibility)",
+       /const vis = areaVisibility\(\);\s*AREA_LAYERS\.concat\(AREA_COUNTY_LAYERS\)\.forEach\(l => toggleLayer\(l, vis\[l\] === 'visible'\)\);/.test(blk)
+       && /const vis = areaVisibility\(\), dVis = vis\['area-fill'\], cVis = vis\['area-county-outline'\];/.test(blk)
+       && /visibility: vis\['area-county-label'\]/.test(blk));
+  }
+  ok("⭐ §2.2b: the card counts the sites as the mockup does — '8 of 13' from the server's total",
+     card(Object.assign({}, A, { sites_count: 8 }), { totals: { routes_with_volume: 18, co2_t: 482, sites: 13 } }, "Oct 2026").includes("<b>8 of 13</b>")
+     && card(Object.assign({}, A, { sites_count: 8 }), { totals: { routes_with_volume: 18 } }, "Oct 2026").includes("<b>8</b>"));
+  ok("§2.2b: an unticked district gets a legend row of its own ('layer off'), only while one is off",
+     /\+ \(AREAS\.off\.size\s*\? '<div class="area-lg"><span class="area-sw" style="background:transparent; border:1px dashed ' \+ AREA_INK \+ '"><\/span>layer off \(unticked above\)<\/div>' : ''\)/.test(blk));
+  // US spellings as words a person reads: Mapbox's own paint keys ('fill-color') and the page's class names
+  // ('color-dot') are hyphenated identifiers, not wording, so a hyphen on either side is not a match
+  ok("§2.2b: UK wording and none of the banned words in the block or the group",
+     !/\b(truck|real[- ]time|live tracking|telematics|optimi[sz]e|predict|secure)\b/i.test(blk + group)
+     && !/(?<!-)\b(color|center)\b(?!-)/i.test(blk + group));
+  // the 14 px floor on every new rule
+  const css = html.slice(html.indexOf("/* §2.2b / D27 (12 Oct 2026)"), html.indexOf(String.fromCharCode(10), html.indexOf(".area-cf{")));
+  const sizes = (css.match(/font-size:(\d+(?:\.\d+)?)px/g) || []).map(s => parseFloat(s.replace(/[^\d.]/g, "")));
+  ok("⭐ §2.2b: the 14 px floor on the new text (every font-size in the group's and the card's rules is 14 px or more)",
+     sizes.length >= 8 && sizes.every(v => v >= 14), JSON.stringify(sizes));
+  ok("🔴 §2.2b: ...including the group's heading and its two boxes, which the shared h3 (13 px) and .control-item (13.5 px) rules set below it (Chrome, 12 Oct)",
+     /#council-group h3, #council-group \.control-item\{ font-size:14px; \}/.test(css));
+}
+
+// 12 Oct second fix pass: source pins for the conditions' timing and the 14 px floor on the row sentence
+{
+  const rtw = code.slice(code.indexOf("    function renderTimelineWarnings(m) {"), code.indexOf("    function buildConditions("));
+  ok("⭐ the conditions wait on the closures and stockpiles only, never on the month's KPI fetch (a cold tick missed the pause)",
+     rtw.length > 0 && /Promise\.all\(\[warnRestrictions\(\), warnPiles\(\)\]\)\.then/.test(rtw)
+     && !/Promise\.all\(\[warnRestrictions\(\), warnPiles\(\), kpiFetchMonth/.test(code)
+     && /kpiFetchMonth\(month\)\.catch\(\(\) => null\)\.then\(kp => \{\s*if \(!kp \|\| TL\.month !== month \|\| !TL\.on\) return;/.test(rtw));
+  ok("the condition row's sentence is 14 px (new text; the row is 13 px)", /\.tl-warn \.what\{ color:var\(--muted\); font-size:14px; \}/.test(html));
+  ok("F3: only a wrap over more than one month forgets the month Play was pressed on",
+     /if\(wrap && lo !== hi\) TL\.startedOn = null;/.test(code) && !/if\(wrap\) TL\.startedOn = null;/.test(code));
+}
+
+// ===== 12 Oct 2026 (C1) — ROAD LOAD AND CARBON on the public map (review §2.2d map half, mockup 1; §2.2a, mockup 5) =====
+// Every pin below fails on the base (d9e5cb1): none of these names, ids, layers or words existed there.
+{
+  const blkA = src.indexOf("    // ===== 12 Oct 2026 — ROAD LOAD AND CARBON");
+  const blkB = src.indexOf("    // ===== end of road load and carbon =====");
+  ok("C1: the road-load and carbon block is one contiguous slice", blkA > 0 && blkB > blkA);
+  const blk = blkA > 0 && blkB > blkA ? src.slice(blkA, blkB) : "";
+  // the block without its comments, for the source pins
+  const blkCode = blk.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
+
+  // ---- the controls: two checkboxes, off by default, under Forecast traffic volume ----
+  ok("⭐ C1: a 'Road load' checkbox and a 'Carbon' checkbox sit in the forecast box, both OFF by default (no checked attribute)",
+     code.includes('<label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-road-load" onchange="toggleRoadLoad()"> Road load</label>')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month</span></label>')
+     && !/id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code)
+     && code.indexOf('id="toggle-road-load"') > code.indexOf('id="toggle-forecast"') && code.indexOf('id="toggle-carbon"') > code.indexOf('id="toggle-road-load"'));
+  ok("C1: each mode has a legend box, hidden until its checkbox is ticked",
+     code.includes('<div class="mode-legend" id="road-load-legend" hidden></div>') && code.includes('<div class="mode-legend" id="carbon-legend" hidden></div>'));
+  ok("C1: the new notes and legends are 14 px (the floor for new text)",
+     /\.mode-note\{ margin:6px 0 0; font-size:14px;/.test(html) && /\.mode-legend\{ margin:8px 0 2px; font-size:14px;/.test(html));
+
+  // ---- road load: the fetch, per month, cached; the loaded leg (the endpoint's default) ----
+  ok("⭐ C1: Road load reads /api/public/road-load for the month on screen, cached per month, one fetch in flight per month",
+     blkCode.includes("RL.pending[m] = fetch(CONFIG.API_BASE + '/public/road-load?month=' + m)")
+     && blkCode.includes("if (RL.cache[m]) return Promise.resolve(RL.cache[m]);")
+     && blkCode.includes(".then(j => { RL.cache[m] = j; delete RL.error[m]; return j; })"));
+  ok("C1: the loaded leg only — the page never asks for leg=return, so empties are never added to the figure",
+     !/road-load\?[^'"]*leg=/.test(code) && !/leg=return/.test(code));
+  ok("C1: the month is the playhead's (once the matrix is read), or the sidebar window when From = To; else none",
+     blkCode.includes("if (typeof TL !== 'undefined' && TL.on) return TL.matrix ? TL.month : null;")
+     && blkCode.includes("if (f > 0 && f === t) return f;"));
+
+  // ---- road load: the source, the line, the label, the card ----
+  ok("⭐ C1: a road-load SOURCE and a line layer whose width is data-driven by two-way movements a day on FIXED, ascending stops",
+     blkCode.includes("map.addSource('road-load-source', { type: 'geojson'")
+     && blkCode.includes("const ROAD_LOAD_STOPS = [5, 30, 120];")
+     && blkCode.includes("return ['interpolate', ['linear'], ['to-number', ['get', 'rl_mv'], 0], s[0], base, s[1], base + 4, s[2], base + 9];")
+     && /id: 'road-load-line', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_LINE_WIDTH/.test(blkCode)
+     && /id: 'road-load-casing', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_CASING_WIDTH/.test(blkCode));
+  ok("⭐ C1: routes stay blue — the road-load line is the plan blue (CONFIG.COLORS.brand) under an ink casing",
+     /id: 'road-load-line'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.brand,/.test(blkCode)
+     && /id: 'road-load-casing'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.forecastCasing,/.test(blkCode));
+  ok("⭐ C1: ONE label per run with its OWN text expression ('N two-way / day · R routes'), never the per-route f_avg concat",
+     blkCode.includes("const ROAD_LOAD_LABEL = ['concat', ['get', 'rl_mv_text'], ' two-way / day · ', ['get', 'rl_routes_text']];")
+     // NARROWED 12 Oct 2026 (browser check): the label sits on its own point source, placed as a level point label;
+     // the line-placed version ('line-center' on road-load-source) never rendered on bent roads
+     && /id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,[\s\S]{0,120}'symbol-placement': 'point', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14,/.test(blkCode)
+     && !/\['get', 'f_avg'\]/.test(blkCode));
+  ok("⭐ browser check 12 Oct: the run label is NOT placed along the line (Mapbox drops a line-placed label wherever the road bends past the text's angle)",
+     !/id: 'road-load-labels'[\s\S]{0,200}'symbol-placement': 'line/.test(blkCode)
+     && blkCode.includes("const ROAD_LOAD_LABEL_SOURCE = 'road-load-label-source';")
+     && blkCode.includes("if (!map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.addSource(ROAD_LOAD_LABEL_SOURCE, { type: 'geojson'")
+     && blkCode.includes("if (map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.removeSource(ROAD_LOAD_LABEL_SOURCE);")
+     && blkCode.includes("if (lsrc) lsrc.setData({ type: 'FeatureCollection', features: roadLoadLabelPoints(feats) });"));
+  ok("browser check 12 Oct: the run label keeps to one line (text-max-width 30 ems) and is never forced over other labels",
+     /id: 'road-load-labels'[\s\S]{0,300}'text-max-width': 30,/.test(blkCode)
+     && !/id: 'road-load-labels'[\s\S]{0,400}'text-allow-overlap': true/.test(blkCode));
+  // the four count pins of review §2.2d, honoured (asserted above unchanged; these say WHY they still hold)
+  ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
+     (blkCode.match(/layout: \{ 'line-cap': 'round', 'line-join': 'round' \}/g) || []).length === 2
+     && !/'line-cap': 'butt'/.test(blkCode) && !/line-dasharray/.test(blkCode)
+     && (code.match(/'line-cap': 'butt'/g) || []).length === 5
+     && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 4);
+  ok("C1: both lazy adders re-raise the marks (raiseMarks count is additive)",
+     /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*raiseMarks\(\);/.test(blkCode)
+     && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,400}raiseMarks\(\);/.test(blkCode)
+     && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
+  ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
+  ok("⭐ C1: re-added on style.load (setStyle drops every source and layer): the handler calls refreshMapModes() after the month re-render",
+     (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
+              const sl = a > 0 && b > a ? code.slice(a, b) : "";
+              return sl.indexOf("if (typeof refreshMapModes === 'function') refreshMapModes();") > sl.indexOf("renderMonthFrame(TL.month); renderTimelineWarnings(TL.month);"); })()
+     && code.includes("if(typeof refreshMapModes === 'function') refreshMapModes();\n    }\n    function openTimeline(){"));
+  ok("C1: every month on the playhead, the overlay switching off and closing the bar refresh the modes",
+     /applyFilters\(\);\s*if\(typeof refreshMapModes === 'function'\) refreshMapModes\(\);[^\n]*\n    \}\n    function toggleTimeline/.test(code)
+     && src.includes("if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow\n                return;"));
+  ok("⭐ C1: in either mode the per-route forecast labels HIDE, so two figures never show for one road",
+     blkCode.includes("map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');")
+     && blkCode.includes("setForecastLabelsVisible(!(m && (rl || co2)));"));
+  ok("⭐ C1: the section card lists the routes, their teams through teamText (never the raw id) and their shares; registered ONCE",
+     blkCode.includes("rlEsc(teamText((sh.teams || []).join(', ')) || '—')")
+     && !/\.ipt\b/.test(blkCode) && !/\bipt\b/.test(blkCode)
+     && blkCode.includes("if (RL.wired) return;") && blkCode.includes("map.on('click', 'road-load-line', (e) => {")
+     && blkCode.includes("Loaded leg counted once (one load = one two-way movement)."));
+  ok("C1: a click on a shared section answers with the section card, not the route card underneath",
+     code.includes("if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;"));
+  ok("C1: the sidebar filters re-cut the cached month (no fetch) through applyForecastFilter",
+     code.includes("if (typeof refreshMapModeFilters === 'function') refreshMapModeFilters();"));
+
+  // ---- carbon ----
+  ok("⭐ C1 (D26): the carbon ramp is ONE hue, the plan blue, five steps light to dark — no orange, no rainbow",
+     (() => {
+       const m = /const CARBON_RAMP = \[([^\]]*)\];/.exec(blkCode);
+       if (!m) return false;
+       const hex = m[1].match(/#[0-9A-Fa-f]{6}/g) || [];
+       const hsl = hex.map(h => { const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255;
+         const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let hu = 0;
+         if (d) hu = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+         return { h: (hu + 360) % 360, l: (mx + mn) / 2 }; });
+       return hex.length === 5 && hsl.every(x => x.h >= 214 && x.h <= 220) && hsl.every((x, i) => i === 0 || x.l < hsl[i - 1].l);
+     })()
+     && !/#FF8C14/i.test(blk) && !/#F97316/i.test(blk));
+  ok("⭐ C1: the stops are FIXED from the programme maximum (forecast-matrix co2_t), ascending, and the step takes them as literals",
+     blkCode.includes("const CARBON_STEP_FRACTIONS = [0.2, 0.4, 0.6, 0.8];")
+     // NARROWED 12 Oct 2026 (Track C review): the stops come through carbonScale — the route-month maximum for the routes,
+     // the section-month maximum for the shared sections
+     && blkCode.includes("const scale = carbonScale(rl), stops = scale.stops;")
+     && blkCode.includes("const max = mtx ? (sec ? mtx.sectionCo2Max : (mtx.co2Max || 0)) : 0;")
+     && blkCode.includes("['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]],")
+     && code.includes("const c = (rt.co2_t||{})[k];")
+     && code.includes("Object.keys(byR).forEach(rid=>{ Object.keys(byR[rid].co2||{}).forEach(k=>{ if(byR[rid].co2[k] > co2Max) co2Max = byR[rid].co2[k]; }); });"));
+  ok("C1: a route-month with no figure paints grey and is COUNTED, never a zero dressed as a figure",
+     blkCode.includes("const CARBON_NONE = '#A8A29E';")
+     && code.includes("if(c == null || j.co2_error) acc.co2Missing[k] = (acc.co2Missing[k]||0) + 1;")
+     // REVERSED 12 Oct 2026 (wording review): the label on a DRAWN route with no figure says 'no carbon figure' - the
+     // route is on the map, so 'no stored road route' contradicted it (and a failed carbon read is not that either)
+     && blkCode.includes("'no carbon figure'") && !blkCode.includes("'no stored road route'"));
+  ok("⭐ C1: Carbon paints the road-load runs when Road load is on, else the forecast routes; colour only (fixed width, rule 1)",
+     blkCode.includes("const paintRoutes = co2 && !rl;") && blkCode.includes("const paintRuns = co2 && rl;")
+     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-color', paintRoutes ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast);")
+     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', paintRoutes ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);")
+     && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', paintRuns ? carbonColor('rl_co2', stops) : CONFIG.COLORS.brand);")
+     // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
+     && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
+  ok("⭐ C1: the route label switches to 't CO₂e' in carbon mode (its own layer, on the loaded leg: one label per route)",
+     // REVERSED 12 Oct 2026 (wording review): the fallback reads 'no carbon figure' (was 'no stored road route')
+     blkCode.includes("['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];")
+     && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway']];")
+     && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', paintRuns ? ROAD_LOAD_CARBON_LABEL : ROAD_LOAD_LABEL);"));
+  ok("⭐ C1: the carbon legend is a stepped gradient with the note 'Approved plan only, average-laden factor on both legs, excludes N …'",
+     blkCode.includes("'<div class=\"ml-steps\">' + CARBON_RAMP.map(c => '<i style=\"background:' + c + '\"></i>').join('') + '</div>'")
+     // NARROWED 12 Oct 2026 (browser check): the excluded-line clause is written only when a line is excluded; the demo
+     // read "excludes 0 lines with no stored road route"
+     && blkCode.includes("'<div class=\"ml-foot\">Approved plan only, average-laden factor on both legs' +")
+     && blkCode.includes("(miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +")
+     && !blkCode.includes("on both legs, excludes ' + miss")
+     // NARROWED 12 Oct 2026 (Track C review): the legend names the maximum used, route-month or section-month
+     && blkCode.includes("'. Stops are fixed from the programme\\'s largest ' + sc.what + ' ('"));
+  ok("browser check 12 Oct: on the desktop bar the conditions pill wraps inside 300 px (at 1280 px it covered the last figure card by 91 px)",
+     /@media \(min-width:1024px\)\{ #kpi-conditions\{ flex-wrap:wrap; max-width:300px; flex-shrink:0;/.test(html)
+     && html.includes(".cond-part{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }")
+     && code.includes("const part = (lvl, n, noun) => (n ? `<span class=\"cond-part\"><span class=\"cond-dot ${lvl}\"></span>")
+     && code.includes("+ (c.cap ? `<span class=\"cond-part\"><span class=\"cond-dot warn\"></span>"));
+  ok("browser check 12 Oct: while the timeline bar is open the map's attribution (with the ONS / OS licence lines) rides above it on the desktop",
+     /@media \(min-width:768px\)\{\s*body\.timeline-on \.mapboxgl-ctrl-bottom-left, body\.timeline-on \.mapboxgl-ctrl-bottom-right\{ bottom:var\(--tl-foot, 0px\); \}/.test(html)
+     && code.includes("document.body.classList.toggle('timeline-on', open);")
+     && code.includes("const h = open ? Math.round((bar.offsetHeight || 0) + 18 + 8) : 0;")
+     && code.includes("window.addEventListener('resize', syncTimelineFoot);")
+     && (code.match(/bar\.style\.display='(flex|none)';\n        syncTimelineFoot\(\);/g) || []).length === 2);
+  ok("⭐ browser check 12 Oct (phone): the section click opens the sheet card on the phone shell and the map popup only above it",
+     code.includes("if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openRunCard === 'function') { openRunCard(run.id); return; }\n            new mapboxgl.Popup({ offset: 10, maxWidth: '360px' })")
+     && code.includes("box.innerHTML = String(SHEET.card).indexOf('run:') === 0 ? runCardHTML(String(SHEET.card).slice(4)) : routeCardHTML(SHEET.card);"));
+  ok("⭐ browser check 12 Oct (phone): a near-miss tap is answered — exact hits and other clickable layers keep their own click, then a section, then a route",
+     code.includes("if ((runL.length || routeL.length) && map.queryRenderedFeatures(e.point, { layers: runL.concat(routeL) }).length) return;")
+     && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;")
+     && /const runs = runL\.length \? map\.queryRenderedFeatures\(box, \{ layers: runL \}\) : \[\];\s*if \(runs\.length\) \{ openRunCard\(runs\[0\]\.properties\.id\); return; \}/.test(code)
+     && code.includes("if (map && typeof map.on === 'function') map.on('click', phoneTapNear);")
+     && /function phoneTapNear\(e\) \{\s*if \(!isPhoneShell\(\) \|\| !e \|\| !e\.point\) return;/.test(code));
+  {
+    const a = html.indexOf("#month-text{ width:100%; border-left:none; z-index:29; }");
+    const mq = a > 0 ? html.lastIndexOf("@media", a) : -1;
+    const blockCss = a > 0 ? html.slice(a, html.indexOf("\n        }", a)) : "";
+    ok("browser check 12 Oct (phone): the text view fits 390 px (number headings wrap, 4 px cell padding) and the Guide button gives way to its close button",
+       mq > 0 && /@media \(max-width:767px\)/.test(html.slice(mq, mq + 40))
+       && blockCss.includes("table.mt-table th, table.mt-table td{ padding:7px 4px; }")
+       && blockCss.includes("table.mt-table th.num{ white-space:normal; }")
+       && blockCss.includes(".mt-body{ padding:12px 14px 18px; }")
+       && blockCss.includes("body.month-text-open #guide-btn{ display:none; }"), html.slice(mq, mq + 40));
+  }
+  ok("browser check 12 Oct: a junction stub is drawn but not labelled (12 of 47 demo runs were 19 to 181 m)",
+     blkCode.includes("const ROAD_LOAD_LABEL_MIN_KM = 0.2;")
+     && blkCode.includes("properties: { id: r.id, rl_km: (r.length_km == null ? null : Number(r.length_km)),")
+     && blkCode.includes("return feats.filter(f => f.properties.rl_km == null || f.properties.rl_km >= ROAD_LOAD_LABEL_MIN_KM)"));
+  ok("C1: f_co2 is stamped on BOTH legs (both colour) and the excluded-line count sums the routes the filters pass, once each",
+     /src\._data\.features\.forEach\(f => \{[\s\S]{0,500}if \(f\.properties\.f_co2 !== c\) \{ f\.properties\.f_co2 = c; changed = true; \}/.test(blkCode)
+     && !/f\.properties\.type === 'Inbound Highway'/.test(blkCode.slice(blkCode.indexOf("function stampCarbon"), blkCode.indexOf("function carbonMissingLines"))));
+  // ---- the drawer: one carbon number, the server's ----
+  ok("⭐ C1: the drawer reads the server's co2_t for the sidebar window and works out no carbon of its own (no factor read)",
+     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("const MAT_PALETTE=");
+              const d = a > 0 && b > a ? code.slice(a, b) : "";
+              return d.includes("const mtx=await fetchMatrix('t');") && d.includes("const co2m=rw.co2_t||{};")
+                     && !/vehicle_emissions_kg_co2e_per_km/.test(d) && !/round\s*\*\s*em/.test(d) && !/\*\s*emis/.test(d); })());
+  // ---- the product rules ----
+  ok("C1: no literal working-day divisor in the block (the server's movements_per_day; never 22)", !/\b22\b/.test(blkCode));
+  {
+    const strings = (blkCode.match(/'[^'\n]*'/g) || []).join(" ");
+    ok("C1: nothing a person reads in the block says truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
+       !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(strings) && !/\bAI\b/.test(strings));
+  }
+  ok("C1: every new symbol layer is 14 px", (blkCode.match(/'text-size': (\d+)/g) || []).length === 2 && !/'text-size': (1[0-3]|[0-9])\b/.test(blkCode));
+
+  // ---- the block, run against a fake map and DOM ----
+  const tA = src.indexOf("    const TEAM_LABELS = {};"), tB = src.indexOf("    // ===== The overlay package");
+  ok("C1 sandbox: the teamText slice is found", tA > 0 && tB > tA);
+  if (blk && tA > 0 && tB > tA) {
+    let teamApi = null;
+    try { teamApi = new Function("TEAM", src.slice(tA, tB) + "\nreturn { teamText, TEAM_LABELS };")("Team"); } catch (e) {}
+    teamApi && (teamApi.TEAM_LABELS.IPT3 = "North Team", teamApi.TEAM_LABELS.IPT1 = "South Team");
+    const mkMap = () => {
+      const layers = {}, sources = {}, log = [];
+      return { layers, sources, log,
+        getLayer: id => layers[id], getSource: id => sources[id],
+        addSource(id, spec) { sources[id] = { spec, _data: spec.data, setData(d) { this._data = d; log.push("setData:" + id); } }; },
+        removeSource(id) { delete sources[id]; log.push("removeSource:" + id); },
+        addLayer(spec) { if (layers[spec.id]) throw new Error("layer exists " + spec.id); layers[spec.id] = { spec, paint: Object.assign({}, spec.paint), layout: Object.assign({}, spec.layout), filter: spec.filter }; log.push("add:" + spec.id); },
+        removeLayer(id) { delete layers[id]; log.push("remove:" + id); },
+        setPaintProperty(id, k, v) { layers[id].paint[k] = v; }, setLayoutProperty(id, k, v) { layers[id].layout[k] = v; },
+        setFilter(id, f) { layers[id].filter = f; },
+        on(type, layer) { log.push("on:" + type + ":" + layer); }, queryRenderedFeatures: () => [], getCanvas: () => ({ style: {} }) };
+    };
+    const els = {};
+    const el = id => els[id] || (els[id] = { id, checked: false, value: "", hidden: true, innerHTML: "" });
+    const document = { getElementById: el };
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthLabel = i => names[(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12));
+    const CONFIG = { API_BASE: "/api", COLORS: { brand: "#2563EB", forecast: "#3B82F6", forecastCasing: "#1F2024", brandDark: "#1F2024" } };
+    const L = [[0, 0], [1, 1]];
+    const a1_data = { features: [["R1", "Inbound Highway"], ["R1", "Outbound Highway"], ["R2", "Inbound Highway"], ["R2", "Outbound Highway"], ["R3", "Inbound Highway"]]
+      .map(([rid, type]) => ({ geometry: { type: "LineString", coordinates: L }, properties: { route_id: rid, type, origin: "Q", dest: "C" } })) };
+    let passFilter = () => true;
+    const TL = { on: true, playing: false, month: 10, matrix: null };
+    const fetches = [];
+    let fetchImpl = url => { fetches.push(url); return Promise.resolve({ ok: true, json: () => Promise.resolve(RUNS[Number(/month=(\d+)/.exec(url)[1])] || { runs: [], notes: [] }) }); };
+    let opened = 0;
+    const RUNS = {
+      10: { month: 10, notes: [], runs: [{ id: "S1", routes: ["R1", "R2"], movements_per_day: 46.27, co2_t: 3.21, length_km: 3.1, geometry: [[0, 0], [1, 1], [2, 2]],
+              route_shares: [{ route_id: "R1", teams: ["IPT3"], movements_per_day: 22.1, co2_t: 2.0 }, { route_id: "R2", teams: ["South Team"], movements_per_day: 24.17, co2_t: 1.21 }] },
+            { id: "S2", routes: ["R2", "R3"], movements_per_day: 0.4, co2_t: null, length_km: 1, geometry: [[0, 0], [1, 1]],
+              route_shares: [{ route_id: "R2", teams: [], movements_per_day: 0.2, co2_t: null }, { route_id: "R3", teams: [], movements_per_day: 0.2, co2_t: null }] },
+            { id: "S3", routes: ["R1", "R3"], movements_per_day: 5, co2_t: 1, length_km: 1, geometry: [[0, 0]], route_shares: [] }] },
+      11: { month: 11, notes: ["Approved volume this month runs on no shared road section."], runs: [] } };
+    let blkApi = null, blkErr = "";
+    const fmap = mkMap();
+    try {
+      blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks",
+        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
+        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, ROAD_LOAD_CARBON_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes };")(
+        document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
+        () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
+        { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
+        // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume; NARROWED 12 Oct 2026 (Track C
+        // review): else no window (null), as the page now says
+        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null);
+    } catch (e) { blkErr = e.message; }
+    ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
+    if (blkApi) {
+      const mp = blkApi.runMidpoint;
+      const near = (a, b) => !!a && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
+      ok("browser check 12 Oct: runMidpoint is half way by LENGTH, not the middle vertex (a 3 + 1 run's middle sits on the long leg)",
+         near(mp([[0, 0], [0, 3], [0, 4]]), [0, 2]) && near(mp([[0, 0], [0, 1]]), [0, 0.5]) && near(mp([[5, 5]]), [5, 5])
+         && mp([]) === null && near(mp([[1, 1], [1, 1]]), [1, 1]));
+      ok("browser check 12 Oct: a figure above zero that rounds to nothing reads 'under 0.1 t', never '0 t'; a true zero stays '0 t'",
+         blkApi.fmtTonnes(0.018) === "under 0.1 t" && blkApi.fmtTonnes(0.049) === "under 0.1 t" && blkApi.fmtTonnes(0.05) === "0.1 t"
+         && blkApi.fmtTonnes(0) === "0 t" && blkApi.fmtTonnes(12.66) === "12.7 t" && blkApi.fmtTonnes(1234) === (1234).toLocaleString() + " t",
+         [0.018, 0.05, 0, 1234].map(blkApi.fmtTonnes).join(" | "));
+      const stub = km => ({ type: "Feature", geometry: { type: "LineString", coordinates: [[0, 0], [0, 1]] }, properties: { id: "x" + km, rl_km: km } });
+      ok("browser check 12 Oct: runs under 0.2 km get no label point; 0.2 km and over, and a run with no length from the server, do",
+         blkApi.roadLoadLabelPoints([stub(0.019), stub(0.199), stub(0.2), stub(3.1), stub(null)]).map(f => f.properties.id).join(",") === "x0.2,x3.1,xnull");
+    }
+    if (blkApi) {
+      const B = blkApi;
+      // the stops
+      const asc = a => a.length === 4 && a.every((x, i) => i === 0 || x > a[i - 1]);
+      ok("⭐ C1: carbonStops(55.5) is [11, 22, 33, 44] (two significant figures of 20/40/60/80 % of the programme maximum)",
+         JSON.stringify(B.carbonStops(55.5)) === "[11,22,33,44]", JSON.stringify(B.carbonStops(55.5)));
+      ok("⭐ C1: the stops are strictly ascending for any maximum, including none and tiny ones (Mapbox refuses others)",
+         [0, null, 0.0004, 0.37, 1, 7.77, 99.9, 482, 12345.6].every(x => asc(B.carbonStops(x))),
+         JSON.stringify([0, 0.0004, 0.37, 7.77].map(x => B.carbonStops(x))));
+      const cc = B.carbonColor("f_co2", [11, 22, 33, 44]);
+      ok("C1: the colour expression: a number steps through the five blues at the fixed stops, anything else is the grey 'no figure'",
+         cc[0] === "case" && JSON.stringify(cc[1]) === JSON.stringify(["==", ["typeof", ["get", "f_co2"]], "number"])
+         && JSON.stringify(cc[2]) === JSON.stringify(["step", ["to-number", ["get", "f_co2"], 0], "#94BBF9", 11, "#5A96F6", 22, "#2071F3", 33, "#0B55CB", 44, "#073888"])
+         && cc[3] === B.CARBON_NONE);
+      // the features: two overlapping routes, summed once
+      const all = B.roadLoadFeatures(RUNS[10], null);
+      const s1 = all.find(f => f.properties.id === "S1");
+      ok("⭐ C1: two overlapping routes (22.1 + 24.17 a day) give ONE run of 46 two-way a day — their sum, never doubled — and '2 routes'",
+         !!s1 && s1.properties.rl_mv === 46.27 && Math.abs(s1.properties.rl_mv - (22.1 + 24.17)) < 0.01
+         && s1.properties.rl_mv_text === "46" && s1.properties.rl_routes_text === "2 routes" && s1.properties.rl_co2 === 3.2,
+         JSON.stringify(s1 && s1.properties));
+      ok("C1: a run under one a day reads 'under 1', a run with no carbon reads 'no carbon figure', a one-point run is not drawn",
+         all.length === 2 && all[1].properties.rl_mv_text === "under 1" && all[1].properties.rl_co2 === null
+         && all[1].properties.rl_co2_text === "no carbon figure");
+      const one = B.roadLoadFeatures(RUNS[10], { R1: true });
+      ok("C1: with the filters passing R1 only, the run carries R1's own share ('22 … 1 route') and the run R1 is not on disappears",
+         one.length === 1 && one[0].properties.rl_mv_text === "22" && one[0].properties.rl_routes_text === "1 route" && one[0].properties.rl_co2 === 2);
+      // the card: names, never ids
+      const pop = B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null);
+      ok("⭐ C1: the section card lists both routes with origin → destination and team NAMES; no team id reaches it",
+         pop.includes("R1") && pop.includes("R2") && pop.includes("Kilby Ridge Quarry → Harborough Compound") && pop.includes("North Team")
+         && pop.includes("South Team") && !/IPT\s*\d/i.test(pop) && pop.includes("46 two-way movements a day · 2 routes")
+         && pop.indexOf("R2") < pop.indexOf("R1"), pop.slice(0, 300));
+      ok("C1: ...and names the routes on the section that the filters leave out", B.roadLoadPopupHTML(RUNS[10].runs[0], 10, { R1: true }).includes("outside the filters: R2"));
+      // the month
+      TL.on = true; TL.matrix = null;
+      ok("C1: the bar open before its matrix is read is NO month (not the default January)", B.mapModeMonth() === null);
+      // merged with C3 (D14), narrowed: From / To are gone, so the window is forecastWindow() (the span with volume)
+      TL.on = false; el("toggle-forecast").checked = true; TL.matrix = { span: [10, 12] };
+      ok("C1: Show forecast over three months is no month; a window of one month is that month (the span with volume, no From / To)",
+         B.mapModeMonth() === null && (TL.matrix = { span: [10, 10] }, B.mapModeMonth() === 10));
+      TL.matrix = null;
+      ok("C1 (merge with C3): with no matrix there is no window, so no month", B.mapModeMonth() === null);
+      el("toggle-forecast").checked = false;
+      // a tick with no month opens the timeline
+      el("toggle-road-load").checked = true; B.toggleRoadLoad();
+      ok("C1: ticking Road load with no month on screen opens the timeline (it has the month)", opened === 1 && fetches.length === 0);
+      // the timeline open on October
+      TL.on = true; TL.month = 10;
+      TL.matrix = { co2Max: 55.5, co2Error: null, byRoute: { r1: { route_id: "R1", co2: { "10": 47.34 }, co2Missing: {} }, r2: { route_id: "R2", co2: {}, co2Missing: { "10": 1 } }, r3: { route_id: "R3", co2: { "10": 5 }, co2Missing: { "10": 2 } } } };
+      fmap.addSource("routes-source", { type: "geojson", data: a1_data });
+      fmap.addLayer({ id: "forecast-casing", paint: { "line-color": "#1F2024", "line-width": "FCW" } });
+      fmap.addLayer({ id: "forecast-layer", paint: { "line-color": "#3B82F6", "line-width": "FLW" } });
+      fmap.addLayer({ id: "forecast-labels", layout: { "text-field": "f_avg concat" } });
+      ASYNC_PINS.push((async () => {
+        const flush = () => new Promise(r => setTimeout(r, 0));
+        B.refreshMapModes(); await flush(); await flush();
+        ok("⭐ C1: Road load on, October: one fetch of road-load?month=10, the source and three layers added, the per-route labels hidden",
+           JSON.stringify(fetches) === JSON.stringify(["/api/public/road-load?month=10"]) && !!fmap.layers["road-load-line"] && !!fmap.layers["road-load-casing"]
+           && !!fmap.layers["road-load-labels"] && fmap.layers["forecast-labels"].layout.visibility === "none"
+           && fmap.sources["road-load-source"]._data.features.length === 2, JSON.stringify(fetches));
+        {
+          const lp = fmap.sources["road-load-label-source"] ? fmap.sources["road-load-label-source"]._data.features : [];
+          ok("⭐ browser check 12 Oct: one label POINT per drawn run, at the run's middle by length, carrying the run's own figures",
+             lp.length === 2 && lp.every(f => f.geometry.type === "Point")
+             && Math.abs(lp[0].geometry.coordinates[0] - 1) < 1e-9 && Math.abs(lp[0].geometry.coordinates[1] - 1) < 1e-9
+             && Math.abs(lp[1].geometry.coordinates[0] - 0.5) < 1e-9 && Math.abs(lp[1].geometry.coordinates[1] - 0.5) < 1e-9
+             && lp[0].properties.rl_mv_text === "46" && lp[1].properties.rl_mv_text === "under 1"
+             && fmap.layers["road-load-labels"].spec.source === "road-load-label-source", JSON.stringify(lp.map(f => f.geometry.coordinates)));
+        }
+        ok("C1: the card is wired once (click, enter, leave on road-load-line)",
+           fmap.log.filter(x => x.startsWith("on:")).join(",") === "on:mouseenter:road-load-line,on:mouseleave:road-load-line,on:click:road-load-line");
+        ok("C1: the legend says the month, the three width stops and the counting rule",
+           el("road-load-legend").hidden === false && el("road-load-legend").innerHTML.includes("Road load · Oct 2026")
+           && el("road-load-legend").innerHTML.includes("120 and over two-way movements a day") && el("road-load-legend").innerHTML.includes("the loaded leg is counted once"));
+        B.refreshMapModes(); await flush(); B.refreshMapModes(); await flush();
+        ok("⭐ C1: the same month again is read from the cache — no second fetch, no second set of layers", fetches.length === 1);
+        TL.month = 11; B.refreshMapModes(); await flush(); await flush();
+        ok("⭐ C1: the next month on the playhead re-fetches (road-load?month=11) and the server's note reaches the legend",
+           fetches[1] === "/api/public/road-load?month=11" && fmap.sources["road-load-source"]._data.features.length === 0
+           && el("road-load-legend").innerHTML.includes("Approved volume this month runs on no shared road section."));
+        TL.month = 10; B.refreshMapModes(); await flush();
+        ok("C1: back to October: from the cache, the runs drawn again", fetches.length === 2 && fmap.sources["road-load-source"]._data.features.length === 2);
+        // filters
+        passFilter = p => p.route_id === "R1"; B.refreshMapModeFilters();
+        ok("C1: a filter change re-cuts the cached month with no fetch", fetches.length === 2 && fmap.sources["road-load-source"]._data.features.length === 1
+           && fmap.sources["road-load-source"]._data.features[0].properties.rl_mv_text === "22");
+        ok("browser check 12 Oct: ...and the label points follow the same cut (one point, the filtered figure)",
+           fmap.sources["road-load-label-source"]._data.features.length === 1
+           && fmap.sources["road-load-label-source"]._data.features[0].properties.rl_mv_text === "22");
+        passFilter = () => true; B.refreshMapModeFilters();
+        // carbon on, with road load on: the runs are painted, the forecast routes stay blue
+        el("toggle-carbon").checked = true; B.toggleCarbon(); await flush(); await flush();
+        ok("⭐ C1: Carbon with Road load on paints the RUNS by rl_co2 on the blue ramp, fixed width; the forecast routes stay plan blue",
+           fmap.layers["road-load-line"].paint["line-color"][0] === "case" && fmap.layers["road-load-line"].paint["line-color"][2][1][1][1] === "rl_co2"
+           && fmap.layers["road-load-line"].paint["line-width"] === 5 && fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6"
+           && JSON.stringify(fmap.layers["road-load-labels"].layout["text-field"]) === JSON.stringify(B.ROAD_LOAD_CARBON_LABEL)
+           && !fmap.layers["carbon-route-labels"]);
+        ok("⭐ C1: the carbon legend: per shared section, the five ranges from the fixed stops, 'excludes 3 lines with no stored road route'",
+           el("carbon-legend").hidden === false && el("carbon-legend").innerHTML.includes("Carbon · t CO₂e in Oct 2026, per shared section")
+           && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
+           && el("carbon-legend").innerHTML.includes("Approved plan only, average-laden factor on both legs, excludes 3 lines with no stored road route.")
+           && el("carbon-legend").innerHTML.includes("(55.5 t)"), el("carbon-legend").innerHTML.slice(0, 400));
+        // Track C review: with the server's largest SECTION-month, the section ramp's stops come from it, not from co2Max
+        TL.matrix.sectionCo2Max = 9.1; B.refreshMapModes(); await flush();
+        const rlc = fmap.layers["road-load-line"].paint["line-color"][2];
+        ok("⭐ Track C review: Road load + Carbon cut the section stops from the largest SECTION-month (9.1 t), not the route-month 55.5 t",
+           JSON.stringify([rlc[3], rlc[5], rlc[7], rlc[9]]) === JSON.stringify(B.carbonStops(9.1)) && B.carbonStops(9.1)[3] < 11
+           && el("carbon-legend").innerHTML.includes("largest section-month (9.1 t)") && !el("carbon-legend").innerHTML.includes("(55.5 t)"),
+           JSON.stringify(rlc) + " " + el("carbon-legend").innerHTML.slice(0, 200));
+        delete TL.matrix.sectionCo2Max; B.refreshMapModes(); await flush();
+        ok("Track C review: ...and with no section figure from the server, the route-month maximum, named as such",
+           el("carbon-legend").innerHTML.includes("largest route-month (55.5 t)")
+           && JSON.stringify(fmap.layers["road-load-line"].paint["line-color"][2].filter((x, i) => i >= 3 && i % 2 === 1)) === JSON.stringify(B.carbonStops(55.5)));
+        // road load off: the forecast routes carry the carbon
+        el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
+        const fl = fmap.layers["forecast-layer"].paint;
+        ok("⭐ C1: Road load off, Carbon on: the road-load source and layers go, the FORECAST routes are painted by f_co2 at a fixed width",
+           !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && fl["line-color"][2][1][1][1] === "f_co2" && fl["line-width"] === 5
+           && fmap.layers["forecast-casing"].paint["line-width"] === 7.5);
+        ok("browser check 12 Oct: Road load off removes the label-point source too", !fmap.sources["road-load-label-source"] && !fmap.layers["road-load-labels"]);
+        ok("⭐ C1: ...the route label switches to t CO₂e (its own layer on the loaded leg) and the per-route figure label stays hidden",
+           !!fmap.layers["carbon-route-labels"] && JSON.stringify(fmap.layers["carbon-route-labels"].filter) === JSON.stringify(["all", ["all"], ["==", ["get", "type"], "Inbound Highway"]])
+           && fmap.layers["forecast-labels"].layout.visibility === "none");
+        const fco2 = a1_data.features.map(f => f.properties.route_id + "/" + f.properties.type.split(" ")[0] + "=" + f.properties.f_co2).join(",");
+        ok("⭐ C1: f_co2 is the route's month figure on BOTH legs (rounded to 0.1 t); a route with no figure is null, never 0",
+           fco2 === "R1/Inbound=47.3,R1/Outbound=47.3,R2/Inbound=null,R2/Outbound=null,R3/Inbound=5", fco2);
+        ok("C1: the legend says per route now", el("carbon-legend").innerHTML.includes("per route</b>"));
+        // 12 Oct 2026 (wording review): a CO2e figure a person reads carries the Carbon page's stamp, from the feed
+        ok("⭐ wording: with no stamp in the feed the carbon legend prints none (never retyped on the page)",
+           !el("carbon-legend").innerHTML.includes("Carbon Tool"));
+        TL.matrix.carbonStamp = "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"; B.refreshMapModes(); await flush();
+        ok("⭐ wording: the carbon legend ends with the Carbon page's stamp from forecast-matrix (carbon_stamp), word for word",
+           el("carbon-legend").innerHTML.includes(" Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures.</div>"),
+           el("carbon-legend").innerHTML.slice(-200));
+        B.RL.cache[10].carbon = { stamp: "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" };
+        ok("⭐ wording: the shared-section card prints the road-load feed's carbon stamp while Carbon is on",
+           B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null).includes("Approved plan only. Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures.</div>"));
+        el("toggle-carbon").checked = false;
+        ok("wording: ...and not while Carbon is off (the card then shows no CO2e figure)",
+           !B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null).includes("Carbon Tool"));
+        el("toggle-carbon").checked = true; B.refreshMapModes(); await flush();
+        // a failed carbon read
+        TL.matrix.co2Error = "The carbon figures could not be read (OperationalError)."; B.refreshMapModes(); await flush();
+        ok("C1: a failed carbon read paints every route grey (no figure) and says so in the legend",
+           a1_data.features.every(f => f.properties.f_co2 === null) && el("carbon-legend").innerHTML.includes("could not be read"));
+        TL.matrix.co2Error = null;
+        // everything off
+        el("toggle-carbon").checked = false; B.toggleCarbon(); await flush();
+        ok("⭐ C1: both off: the forecast routes are plan blue at their volume widths again, the carbon labels gone, the route labels back",
+           fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6" && fmap.layers["forecast-layer"].paint["line-width"] === "FLW"
+           && fmap.layers["forecast-casing"].paint["line-width"] === "FCW" && !fmap.layers["carbon-route-labels"]
+           && fmap.layers["forecast-labels"].layout.visibility === "visible" && el("carbon-legend").hidden === true && el("road-load-legend").hidden === true);
+        // closing the bar with Road load ticked: no month, nothing drawn, the legend says why
+        el("toggle-road-load").checked = true; B.refreshMapModes(); await flush();
+        TL.on = false; B.refreshMapModes(); await flush();
+        ok("C1: the bar closed with Road load ticked: no layers, no source, and the legend says it shows one month",
+           !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && el("road-load-legend").innerHTML.includes("Shows one month")
+           && fmap.layers["forecast-labels"].layout.visibility === "visible");
+        // 12 Oct 2026 (wording review): it said "set From and To to the same month" - controls D14 removed
+        ok("⭐ wording: the 'one month' note tells a person to press Play or pick a month, never to set the removed From / To",
+           el("road-load-legend").innerHTML.includes("Shows one month: press Play or pick a month.")
+           && !/From and To/.test(el("road-load-legend").innerHTML), el("road-load-legend").innerHTML);
+        el("toggle-road-load").checked = false;
+      })());
+    }
+  }
+
+  // ---- the matrix sums each route's lines' co2_t per month (loadTimelineMatrix, run) ----
+  {
+    const a = src.indexOf("    async function loadTimelineMatrix(){"), b = src.indexOf("    // 12 Oct 2026 (review §2.4): Play used to fire one month-kpis GET");
+    ok("C1 sandbox: loadTimelineMatrix is found", a > 0 && b > a);
+    if (a > 0 && b > a) {
+      const TLm = {};
+      let body = null;
+      const run = new Function("TL", "CONFIG", "fetch", "prefetchSpanKpis", "FORECAST_WORKING_DAYS",
+        src.slice(a, b) + "\nreturn loadTimelineMatrix;")(TLm, { MONTH_COUNT: 60, FORECAST_UNIT: "vehicles", API_BASE: "" },
+        () => Promise.resolve({ ok: true, json: () => Promise.resolve(body) }), () => {}, 22);
+      ASYNC_PINS.push((async () => {
+        body = { unit: "vehicles", working_days: 21, routes: [
+          { route_id: "R1", monthly: { "10": 100, "11": 50 }, total: 150, co2_t: { "10": 2.5, "11": 1.0 } },
+          { route_id: "R1", monthly: { "10": 40 }, total: 40, co2_t: { "10": 3.0 } },
+          { route_id: "R2", monthly: { "10": 30, "12": 0 }, total: 30, co2_t: { "10": null, "12": null } } ] };
+        await run();
+        const r1 = TLm.matrix.byRoute.r1, r2 = TLm.matrix.byRoute.r2;
+        ok("⭐ C1: the matrix sums a route's lines' server co2_t per month (2.5 + 3.0 = 5.5) and keeps the programme maximum",
+           Math.abs(r1.co2["10"] - 5.5) < 1e-9 && r1.co2["11"] === 1 && TLm.matrix.co2Max === 5.5 && TLm.matrix.co2Error === null, JSON.stringify(r1.co2));
+        ok("C1: a line-month with volume and no figure is counted missing, never summed as zero; a month with no volume is not counted",
+           r2.co2["10"] === undefined && r2.co2Missing["10"] === 1 && r2.co2Missing["12"] === undefined);
+        body = Object.assign({}, body, { co2_error: "The carbon figures could not be read (OperationalError)." });
+        await run();
+        ok("C1: forecast-matrix's co2_error: every line-month counted missing, no maximum, the error kept for the legend",
+           TLm.matrix.co2Max === 0 && TLm.matrix.byRoute.r1.co2Missing["10"] === 2 && /could not be read/.test(TLm.matrix.co2Error));
+      })());
+    }
+  }
+}
+// ==== 12 Oct 2026 — C3: the phone shell (review 2.8 row 2, mockup 7, D30) and the interactivity pass (review 2.3, D14, D29) ====
+// Source pins on the CSS and the markup, then the new script block run against a fake DOM: the month chips, the hover
+// card's words, the deep link, the QR code (decoded back by an independent reader below), "Report a concern", the text
+// view's table and the sheet's state. What this does NOT prove: anything a browser draws (checked by hand in Chrome at
+// 390 x 844, 800 and 1280 x 800 against a local server with synthetic route lines — not a real phone, not touch).
+{
+  // ---- (1) the phone shell's CSS: one block at 767 px and below, after the timeline bar's rules -----------------------
+  const secA = html.indexOf("===== 12 Oct 2026 — the interactivity pass (review 2.3, D14, D29) and the phone shell");
+  const secB = html.indexOf("/* H10 (8 Oct 2026): the map's guide");
+  const sec = secA > 0 && secB > secA ? html.slice(secA, secB) : "";
+  const shell = (sec.match(/@media \(max-width:767px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const tlNarrowAt = html.indexOf("#timeline-bar input[type=range]{ order:6; flex:1 1 60px; width:auto; }");
+  ok("C3 phone: the new CSS section exists, after the timeline bar's phone rules (so its overrides win), with ONE block at max-width:767px",
+     sec.length > 0 && shell.length > 0 && secA > tlNarrowAt && tlNarrowAt > 0 && (html.match(/@media \(max-width:767px\)/g) || []).length === 1);
+  ok("C3 phone (D30): the JS breakpoint is the CSS one — PHONE_SHELL_MQ is '(max-width:767px)' and isPhoneShell() reads it with matchMedia",
+     code.includes("const PHONE_SHELL_MQ = '(max-width:767px)';") && /function isPhoneShell\(\) \{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\(PHONE_SHELL_MQ\)\.matches\); \}/.test(code));
+  ok("C3 phone: below 768 the map is full-screen — the figures bar, the menu button, the timeline bar, the conditions panel, the drawer and the detail-table button are hidden",
+     shell.includes("#kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }"));
+  ok("C3 phone: the basemap widget is off on phones (the Layers sheet carries the basemap)",
+     shell.includes(".custom-map-widget{ display:none !important; }") && code.includes("this._container.className = 'mapboxgl-ctrl custom-map-widget';"));
+  ok("C3 phone: the shell's pieces are hidden at every other width (one rule before the block)",
+     sec.indexOf("#m-layers-btn, #m-sheet, .m-done{ display:none; }") >= 0 && sec.indexOf("#m-layers-btn, #m-sheet, .m-done{ display:none; }") < sec.indexOf("@media (max-width:767px)"));
+  ok("C3 phone: 44-48 px targets — the Layers button 48, the handle 48, Play 48, a month chip 48, the panel's selects / buttons / rows 48, the zoom buttons 44",
+     /#m-layers-btn\{ display:flex;[^}]*height:48px;/.test(shell) && /\.m-handle\{[^}]*flex:0 0 48px; height:48px;/.test(shell)
+     && /\.m-play\{ flex:0 0 48px; width:48px; height:48px;/.test(shell) && /\.month-chip\{ min-height:48px; min-width:56px;/.test(shell)
+     && /\.m-chips-row \.month-chip\{ min-width:48px;/.test(shell)
+     && shell.includes(".sidebar select, .sidebar .btn, .sidebar .fc-toggle{ min-height:48px; }") && shell.includes(".sidebar .control-item{ min-height:48px; }")
+     && shell.includes(".mapboxgl-ctrl-group button{ width:44px; height:44px; }") && /\.m-body \.tl-warn \.show, \.m-body \.tl-warn \.x\{ min-height:44px; min-width:44px;/.test(shell));
+  ok("C3 phone: the panel IS the full-screen layers sheet below 768 (full width, rises from the bottom, hidden from focus when shut), above the bottom sheet (28 over 26), under the demo strip (30)",
+     /\.sidebar\{ width:100%; border-right:none; z-index:28; transform:none; visibility:visible;/.test(shell)
+     && /\.sidebar\.closed\{ transform:translateY\(105%\); visibility:hidden;/.test(shell) && /#m-sheet\{ display:flex;[^}]*z-index:26;/.test(shell)
+     && /#demo-notice\{[^}]*z-index:30;/.test(html) && /\.m-done\{ display:flex; order:99; position:sticky;/.test(shell));
+  ok("C3 phone: the sheet's states — the body is hidden at peek and scrolls at half (about 62 % of the screen)",
+     shell.includes('#m-sheet[data-state="peek"] .m-body{ display:none; }') && /#m-sheet\[data-state="half"\]\{ height:min\(62vh,/.test(shell)
+     && /\.m-body\{ overflow:auto;/.test(shell));
+  // above 767 nothing changes: the base pins above still pass, and the section's desktop rules touch only the text view
+  const wide = (sec.match(/@media \(min-width:1024px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const wideSel = wide.split("\n").map(l => l.trim()).filter(Boolean).map(l => l.slice(0, l.indexOf("{")).trim());
+  ok("C3: above 767 the only new layout rules are the text view's (each desktop selector names #month-text or body.month-text-open)",
+     wideSel.length >= 5 && wideSel.every(s => /#month-text|body\.month-text-open/.test(s)), JSON.stringify(wideSel));
+  // the 14 px floor on everything new
+  const sizes = [...sec.matchAll(/font(?:-size)?:\s*(?:[0-9]{3}\s+)?([0-9.]+)px/g)].map(m => Number(m[1]));
+  ok("C3: the 14 px floor — every font size in the new CSS section is 14 px or more", sizes.length >= 20 && sizes.every(n => n >= 14), JSON.stringify(sizes));
+  // ---- (2) the markup ---------------------------------------------------------------------------------------------
+  ok("C3 phone: ONE Layers button, a real button that names and reports its sheet",
+     html.includes('<button type="button" id="m-layers-btn" onclick="openLayersSheet()" aria-controls="main-sidebar" aria-expanded="false">&#8779; Layers</button>')
+     && (html.match(/id="m-layers-btn"/g) || []).length === 1);
+  const sheetHtml = cut0(html, '<section id="m-sheet"', "</section>");
+  ok("C3 phone: ONE bottom sheet with a 48 px handle that toggles on a tap and carries aria-expanded (and aria-controls its body)",
+     (html.match(/<section id="m-sheet"/g) || []).length === 1 && /<section id="m-sheet" data-state="peek" aria-label="This month on the map">/.test(html)
+     && sheetHtml.includes('<button type="button" class="m-handle" id="m-handle" onclick="toggleSheet()" aria-controls="m-body" aria-expanded="false"')
+     && sheetHtml.includes('<div class="m-body" id="m-body">'));
+  ok("C3 phone: the peek is the month, the two lead figures and the conditions count; the half is the busiest routes and the conditions",
+     sheetHtml.indexOf('id="m-month"') > 0 && sheetHtml.indexOf('id="m-trips"') > sheetHtml.indexOf('id="m-month"')
+     && sheetHtml.indexOf('id="m-vehicles"') > sheetHtml.indexOf('id="m-trips"') && sheetHtml.indexOf('id="m-cond"') > sheetHtml.indexOf('id="m-vehicles"')
+     && sheetHtml.indexOf('id="m-busiest"') > sheetHtml.indexOf('id="m-body"') && sheetHtml.indexOf('id="m-conditions"') > sheetHtml.indexOf('id="m-busiest"')
+     && sheetHtml.includes(">two-way movements a day<") && sheetHtml.includes(">vehicles needed<"));
+  ok("C3 phone: the full detent is the filters and layers (sheetTo('full') opens the panel as the layers sheet)",
+     sheetHtml.includes(`onclick="sheetTo('full')">Filters and layers</button>`) && /if \(state === 'full'\) \{ openLayersSheet\(\); return; \}/.test(code));
+  ok("C3 phone: the month chips and Play sit at the BOTTOM of the sheet (the last row), Play named and pressed-state",
+     sheetHtml.lastIndexOf('class="m-chips-row"') > sheetHtml.indexOf('id="m-body"')
+     && sheetHtml.includes('<button type="button" class="m-play" id="m-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>')
+     && sheetHtml.includes('<div class="month-chips" id="m-chips" role="group" aria-label="Month"></div>'));
+  ok("C3 phone: touchPitch and dragRotate are off on a phone only — at construction, and switched with the breakpoint",
+     code.includes("touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell() });")
+     && code.includes("try { if (on) { map.touchPitch.disable(); map.dragRotate.disable(); } else { map.touchPitch.enable(); map.dragRotate.enable(); } } catch (e) {}"));
+  ok("C3 phone (D14): a tap on a route opens the route card in the sheet INSTEAD of the popup and the drawer",
+     /selectRoute\(rid\);\s*if\(typeof isPhoneShell==='function' && isPhoneShell\(\) && typeof openRouteCard==='function'\)\{ openRouteCard\(rid\); return; \}\s*const info=ROUTEINFO/.test(code));
+  ok("C3 phone: the guide works on the sheet — every step's phone anchor exists as an id, and guideAnchor tries it first on a phone",
+     ["m-peek", "m-play", "m-handle", "m-layers-btn"].every(id => html.includes(`id="${id}"`))
+     && (code.match(/phone: "(m-peek|m-play|m-handle|m-layers-btn)"/g) || []).length === 4
+     && /function guideAnchor\(step\)\{\s*if \(guideOnPhone\(\) && step\.phone\) \{/.test(code)
+     && code.includes("function guideOnPhone(){ return typeof isPhoneShell === 'function' && isPhoneShell(); }"));
+  // ---- (3) D14: the month chips replace From / To at every width ---------------------------------------------------
+  ok("C3 (D14): the From / To selects and the function that filled them are gone from the page — markup and code",
+     !/forecast-from|forecast-to|populateForecastMonths/.test(html));
+  ok("C3 (D14): the forecast box carries the month chips (desktop) and the sheet the same chips (phone); both are .month-chips groups",
+     html.includes('<div><label id="fc-chips-label">Month</label><div class="month-chips" id="fc-chips" role="group" aria-labelledby="fc-chips-label"></div></div>')
+     && /document\.querySelectorAll\('\.month-chips'\)\.forEach\(box =>/.test(code));
+  ok("C3 (D14): Show forecast routes, the route analysis and the detail table read the span with volume (forecastWindow), after the matrix",
+     // NARROWED 12 Oct 2026 (Track C review): `|| []` (the window may be null); REVERSED: no matrix is NO window, never
+     // the whole horizon (which made the bar ask for up to 60 months)
+     /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*let \[fromM, toM\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
+     && /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
+     && code.includes("return span ? [span[0], span[1]] : null;") && !code.includes("return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];"));
+  // ---- (4) the hover card's plumbing --------------------------------------------------------------------------------
+  ok("C3 hover: routes-source carries generated feature ids (generateId), so a hover can set a feature-state",
+     code.includes("map.addSource('routes-source', { type: 'geojson', data: a1_data, generateId: true });")
+     && (code.match(/addSource\('routes-source'/g) || []).length === 1);
+  ok("C3 hover: the ONE mousemove handler drives the card (setRouteHover) from its own query, and the glow brightens the hovered leg by feature-state",
+     (code.match(/map\.on\('mousemove'/g) || []).length === 1
+     && code.includes("if (typeof setRouteHover === 'function') setRouteHover(features.length ? features[0] : null, e);")
+     && code.includes("'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.85, 0.6],")
+     && code.includes("map.setFeatureState({ source: 'routes-source', id: id }, { hover: true });"));
+  ok("C3 hover: the card is a tooltip outside the canvas, never on a phone or a touch-only screen, and goes when the pointer leaves the map",
+     html.includes('<div id="route-hover-card" role="tooltip" hidden></div>') && /#route-hover-card\{ display:none !important; \}/.test(shell)
+     && code.includes("if (!f || !e || !e.point || isPhoneShell() || !canHover()) { card.hidden = true; HOVER.key = ''; return; }")
+     && code.includes("if (mapEl) mapEl.addEventListener('mouseleave', () => setRouteHover(null, null));"));
+  // ---- (5) the deep link, the share card and the hooks ---------------------------------------------------------------
+  ok("C3 link: written on change — applyFilters ends with the write; a layer box or Show forecast schedules it; a stop of playback writes it",
+     /markRouteEnds\(\);\s*raiseMarks\(\);\s*if \(typeof scheduleViewWrite === 'function'\) scheduleViewWrite\(\);\s*\}/.test(code)
+     // narrowed at the merge with C1: the change hook may also name the Road load / Carbon boxes (LINK_MODE_BOXES)
+     && /if \(\/\^\(layer-\|restr-\)\/\.test\(id\) \|\| id === 'toggle-forecast'( \|\| LINK_MODE_BOXES\.includes\(id\))?\) scheduleViewWrite\(\);/.test(code)
+     && code.includes("observeEl('tl-play', { attributes: true, attributeFilter: ['aria-pressed'] }, () => { syncPlayButtons(); if (!TL.playing) scheduleViewWrite(); });"));
+  ok("C3 link: never written during Play (Safari caps replaceState); written with history.replaceState; the app's embed / v kept in the frame, stripped from the shared link",
+     code.includes("if (!VIEW.ready || TL.playing) return;") && code.includes("try { history.replaceState(history.state, '', url); } catch (e) {}")
+     && code.includes("['embed', 'v'].forEach(k => { if (keep.has(k)) out.set(k, keep.get(k)); });")
+     && code.includes("return location.origin + location.pathname + (qs ? '?' + qs : '');"));
+  ok("C3 link: read on load — initNetwork calls onNetworkReady once the network and the filters are in, which applies the link",
+     /populateFilters\(\);\s*buildNodeMarkers\(\);\s*buildRouteInfo\(\);\s*applyFilters\(\);\s*if \(typeof onNetworkReady === 'function'\) onNetworkReady\(\);/.test(code)
+     && /function onNetworkReady\(\) \{[\s\S]{0,300}applyViewFromUrl\(\);/.test(code));
+  ok("C3 share: 'Copy link' and the share card (a dialog with the QR, the link and a polite status); the card says the link still asks for the map password",
+     /onclick="openSharePanel\(\)">Link and QR code<\/button>/.test(code) && /onclick="copyViewLink\(\)">Copy link to this view<\/button>/.test(html)
+     && html.includes('<div id="share-panel" role="dialog" aria-labelledby="share-title" hidden>') && html.includes('<div id="share-status" role="status" aria-live="polite"></div>')
+     && html.includes("It still asks for the map password."));
+  ok("C3 (D29): no PNG export — no preserveDrawingBuffer, no map canvas toDataURL, no toBlob, no download (the legend's swatch canvas is not the map)",
+     !/preserveDrawingBuffer|getCanvas\(\)\.toDataURL|toBlob|\bdownload=/.test(code + html) && (code.match(/toDataURL\(/g) || []).length === 1 && code.includes("return c.toDataURL();"));
+  ok("C3 QR: drawn in the page — no QR library, no new <script src>",
+     (html.match(/<script src=/g) || []).length === 3 && !/qrcode|qrious|kjua/i.test(html.replace(/qrSvg|qrMatrix|share-qr|QR code|QR_M_/g, "")));
+  // ---- (6) the text view and "Report a concern" ---------------------------------------------------------------------
+  ok("C3 text view: an aside beside the map, named by its heading; on the desktop the map gives it its width (the map is BESIDE it, not under it)",
+     html.includes('<aside id="month-text" aria-labelledby="mt-title" hidden>') && wide.includes("body.month-text-open #map{ right:420px; }")
+     && /<h2 id="mt-title" tabindex="-1">This month as text<\/h2>/.test(html) && code.includes("setTimeout(() => { try { map.resize(); } catch (e) {} }, 0);"));
+  ok("C3 text view: the figures are COPIED from the bar's own elements (one source), and the table's four columns are route, two-way a day, vehicles, conditions",
+     /const pairs = \[\['Two-way movements a day', txt\('kpi-trips'\)\], \[txt\('kpi-vehicles-label'\), txt\('kpi-vehicles'\)\]\];/.test(code)
+     && code.includes("pairs.push([txt('kpi-routes-label'), txt('kpi-routes')], [txt('kpi-co2-day-label'), txt('kpi-co2-day')], [txt('kpi-co2-total-label'), txt('kpi-co2-total')]);")
+     && code.includes('<th scope="col">Route</th><th scope="col" class="num">Two-way a day</th><th scope="col" class="num">Vehicles</th><th scope="col">Conditions</th>'));
+  ok("C3 text view: working days from the month's API figure, never a literal 22 in the new block",
+     code.includes("const wd = kp.working_days > 0 ? kp.working_days : FORECAST_WORKING_DAYS;") && !/\b22\b/.test(newBlockCode().replace(/const QR_M_ECC = \[[^\]]*\];/, "")));   // (the QR code's EC table is not a day count)
+  ok("C3 concern: no address is typed into the page — no mailto: with an address in the source, the address comes from TENANT.concern_email only",
+     !/mailto:[^'"?\s]*@/.test(html) && code.includes("const a = t && typeof t.concern_email === 'string' ? t.concern_email.trim() : '';")
+     && code.includes("const addr = concernAddress(TENANT);"));
+  // ---- (7) the wording of everything new ---------------------------------------------------------------------------
+  {
+    const lits = t => (t.match(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|"(?:[^"\\\n]|\\.)*"/g) || []).join(" ");
+    const readable = lits(newBlockCode()) + " " + sec + " " + sheetHtml + " " + cut0(html, '<aside id="month-text"', '<div id="map"></div>')
+      + " " + cut0(code, "<h3>Forecast traffic volume</h3>", "sidebar.insertAdjacentHTML");
+    ok("C3 wording: nothing new a person reads says truck, real-time, live tracking, telematics, AI, optimise, predict or secure; it says lorry and two-way movements",
+       readable.length > 5000 && !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(readable) && !/\bAI\b/.test(readable)
+       && /Lorry registration/.test(readable) && /two-way movements a day/.test(readable));
+    ok("C3 wording: a team is shown by its name (teamText), never its slot id — no 'IPT' in the new block's words",
+       !/IPT[1-6]/.test(lits(newBlockCode())) && (newBlockCode().match(/teamText\(/g) || []).length >= 3);
+  }
+}
+// the new script block, and a cut helper that does not need a second index
+function cut0(t, a, b) { const i = t.indexOf(a), j = t.indexOf(b, i + 1); return i >= 0 && j > i ? t.slice(i, j) : ""; }
+function newBlockSrc() { return blocks.find(b => b.includes("THE INTERACTIVITY PASS (review 2.3, D14, D29) AND THE PHONE SHELL")) || ""; }
+function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, ""); }
+
+// ---- C3: the new block, run against a fake DOM -------------------------------------------------------------------------
+{
+  const nb = newBlockSrc();
+  ok("C3: the new block is ONE inline script, the last on the page, after initAnalysis (outside every sandbox slice above)",
+     nb.length > 20000 && blocks[blocks.length - 1] === nb && src.indexOf(nb) > src.indexOf("(function initAnalysis(){"));
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const CONFIG = { MONTH_COUNT: 60, START_YEAR: 2026, FORECAST_UNIT: 'vehicles', API_BASE: '' };
+  const monthLabel = i => names[(i - 1) % 12] + ' ' + (CONFIG.START_YEAR + Math.floor((i - 1) / 12));
+  const byId = {};
+  const mkEl = (id, tag) => {
+    const el = { id, tagName: tag || 'DIV', hidden: false, dataset: {}, style: {}, attrs: {}, innerHTML: '', textContent: '', value: '', checked: false,
+      options: [], selectedIndex: 0, pressed: {}, open: false,
+      setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; }, focus() {}, addEventListener() {},
+      getBoundingClientRect() { return { left: 0, top: 0, width: 300, height: 100, right: 300, bottom: 100 }; },
+      querySelector() { return null; },
+      // chips: the buttons are read back from the markup this element was given
+      querySelectorAll(sel) { const box = this; return sel === '.month-chip' ? [...box.innerHTML.matchAll(/data-month="(\d+)"/g)].map(m => ({ dataset: { month: m[1] }, setAttribute(k, v) { box.pressed[m[1]] = v; } })) : []; },
+      dispatchEvent() { return true; } };
+    if (id) byId[id] = el;
+    return el;
+  };
+  for (const id of ['m-sheet', 'm-handle', 'm-layers-btn', 'm-month', 'm-trips', 'm-vehicles', 'm-cond', 'm-busiest', 'm-conditions', 'm-card', 'm-main',
+                    'm-play', 'kpi-title', 'kpi-trips', 'kpi-vehicles', 'kpi-busiest', 'month-text', 'toggle-forecast', 'layers-box', 'sidebar-close']) mkEl(id);
+  const chipBoxes = [mkEl('fc-chips'), mkEl('m-chips')];
+  const concernSlots = [mkEl(null), mkEl(null)];
+  const layerEls = [['layer-alignment', true], ['layer-chainage', false], ['layer-gates', true], ['layer-zones', true]].map(([id, on]) => { const e = mkEl(id, 'INPUT'); e.checked = on; return e; });
+  const sel = (id, opts) => { const e = mkEl(id, 'SELECT'); e.options = opts.map(([value, textContent]) => ({ value, textContent })); e.value = 'ALL'; return e; };
+  sel('filter-origin', [['ALL', 'All origins'], ['Brook Pit', 'Brook Pit']]); sel('filter-dest', [['ALL', 'All destinations']]);
+  sel('filter-discipline', [['ALL', 'All disciplines'], ['earthworks', 'earthworks']]); sel('filter-ipt', [['ALL', 'All teams'], ['IPT2', 'Central Team']]);
+  let sidebarOpen = false;
+  const document = {
+    getElementById: id => byId[id] || null,
+    querySelectorAll: s => s === '.month-chips' ? chipBoxes : s === '.concern-slot' ? concernSlots
+      : /layer-/.test(s) ? layerEls : [],
+    addEventListener() {}, createElement: t => mkEl(null, t), body: { appendChild() {}, classList: { add() {}, remove() {} } }, activeElement: null,
+  };
+  const TL = { on: false, playing: false, month: 1, matrix: null };
+  const WARN = { counts: { clash: 0, warn: 0, caution: 0, cap: 0 }, live: [], liveMonth: null };
+  const KPI = { cache: {} };
+  const calls = { open: 0, set: [], stop: 0, sel: [], clear: 0 };
+  const TENANT = { name: 'Wolds Link (fictional)', demo_notice: 'Fictional demo scheme · nothing here is real', concern_email: null };
+  const teamText = v => String(v).replace(/\bipt\s*[-_ ]?\s*([1-6])\b/gi, (m, n) => ({ 1: 'North Team', 2: 'Central Team', 3: 'South Team' }[n] || 'Team ' + n));
+  const fmtN = (n, d) => (Math.round(n * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toLocaleString();
+  const map = { touchPitch: { disable() {}, enable() {} }, dragRotate: { disable() {}, enable() {} }, setFeatureState() {}, getContainer: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0 }) }), resize() {} };
+  const location = { origin: 'https://app.wayscope.test', pathname: '/map/', search: '', hash: '' };
+  const history = { replaceState(s, t, u) { const q = u.indexOf('?'); location.search = q >= 0 ? u.slice(q) : ''; } };
+  const window = { matchMedia: () => ({ matches: false, addEventListener() {} }), innerWidth: 1280, innerHeight: 800 };
+  let api = null, err = '';
+  try {
+    api = new Function("document", "window", "TL", "KPI", "WARN", "CONFIG", "monthLabel", "map", "teamText", "TENANT", "fmtN", "fmtDist", "DU", "ROUTEINFO",
+      "routePropsById", "FORECAST_WORKING_DAYS", "forecastWindow", "ensureTimelineMatrix", "openTimeline", "setTimelineMonth", "stopTimeline", "tlStartMonth",
+      "applyFilters", "selectRoute", "clearSelection", "kpiFetchMonth", "sidebarIsOpen", "toggleSidebar", "closeSidebar", "isPhoneShell", "PHONE_SHELL_MQ",
+      "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout",
+      nb + "\nreturn { renderMonthChips, pickMonth, chipLabel, routeHoverView, runHoverView, encodeView, decodeView, monthParam, monthFromParam, layersFromChanges, shareUrl, writeView, currentView, VIEW, "
+         + "qrGfMul, qrRsDivisor, qrRsRemainder, qrFormatBits, qrVersionBits, qrMatrix, qrSvg, qrDataCodewords, qrAlignPositions, concernAddress, concernMailto, renderConcernLinks, "
+         + "monthTableRows, routeFigures, condSummary, sheetTo, toggleSheet, SHEET, CHIPS, openRunCard, runCardHTML, TAP_SLOP };")(
+      document, window, TL, KPI, WARN, CONFIG, monthLabel, map, teamText, TENANT, fmtN, (km) => String(km), () => 'km', {},
+      () => ({}), 21, () => [9, 12], () => Promise.resolve(TL.matrix), () => { calls.open++; TL.on = true; }, m => { calls.set.push(m); TL.month = m; },
+      () => { calls.stop++; TL.playing = false; }, () => 9, () => {}, r => calls.sel.push(r), () => { calls.clear++; }, () => Promise.resolve(null),
+      () => sidebarOpen, () => { sidebarOpen = !sidebarOpen; }, () => { sidebarOpen = false; }, () => false, '(max-width:767px)',
+      location, history, {}, () => 0, undefined, () => 0, () => {});
+  } catch (e) { err = String(e && e.stack || e); }
+  ok("C3: the new block runs against a fake DOM (every global it reads is one the page defines)", !!api, err.slice(0, 400));
+  if (api) {
+    // ---- month chips (D14) ----
+    api.renderMonthChips();
+    ok("C3 chips: before the matrix the chips say they are loading (both groups), never an empty row", chipBoxes.every(b => /Loading the months/.test(b.innerHTML)));
+    TL.matrix = { volMonths: new Set([12, 9, 10, 11]), span: [9, 12] };
+    api.renderMonthChips();
+    const chipTexts = b => [...b.innerHTML.matchAll(/>([^<]+)<\/button>/g)].map(m => m[1]);
+    ok("⭐ C3 chips: ONE chip per month with volume, in order, short names in one year, each named by its full month, in BOTH groups",
+       chipBoxes.every(b => JSON.stringify(chipTexts(b)) === '["Sep","Oct","Nov","Dec"]') && /aria-label="Oct 2026" onclick="pickMonth\(10\)"/.test(chipBoxes[0].innerHTML)
+       && (chipBoxes[1].innerHTML.match(/class="month-chip"/g) || []).length === 4, chipBoxes[0].innerHTML.slice(0, 200));
+    ok("C3 chips: with no month on screen no chip is pressed", chipBoxes.every(b => Object.values(b.pressed).every(v => v === 'false')));
+    api.pickMonth(10);
+    ok("⭐ C3 chips: a chip with the timeline shut opens it ON that month (openTimeline with TL.month already set)", calls.open === 1 && TL.month === 10 && calls.set.length === 0);
+    api.renderMonthChips();
+    ok("...and that chip, and only that chip, is pressed", chipBoxes.every(b => b.pressed['10'] === 'true' && b.pressed['9'] === 'false' && b.pressed['12'] === 'false'));
+    TL.playing = true; api.pickMonth(12);
+    ok("C3 chips: a chip during Play stops playback and shows its month", calls.stop === 1 && calls.set.join() === '12' && TL.month === 12);
+    api.pickMonth(0); api.pickMonth(61); api.pickMonth('x');
+    ok("C3 chips: a month outside the horizon is ignored", calls.set.join() === '12' && calls.open === 1);
+    ok("C3 chips: across a year end the chips carry the year", api.chipLabel(12, [12, 13]) === 'Dec 2026' && api.chipLabel(13, [12, 13]) === 'Jan 2027' && api.chipLabel(9, [9, 10]) === 'Sep');
+    TL.matrix = { volMonths: new Set(), span: null }; chipBoxes.forEach(b => { b.dataset.sig = ''; }); api.renderMonthChips();
+    ok("C3 chips: a tenant with nothing approved says so", chipBoxes.every(b => /No approved month yet/.test(b.innerHTML)));
+    TL.matrix = { volMonths: new Set([9, 10, 11, 12]), span: [9, 12] };
+    // ---- the hover card's words ----
+    const hv = api.routeHoverView({ route_id: 'R014', origin: 'Brook Pit', dest: 'Langton Compound', ipt: 'IPT2', type: 'Inbound Highway', is_forecast: true, f_avg: 35 }, 'Oct 2026', 'vehicles');
+    ok("⭐ C3 hover: the card names the route, its team by NAME and the leg, and prints the route's movements a day ONCE (one load = one two-way movement)",
+       hv.title === 'Brook Pit → Langton Compound' && hv.sub === 'R014 · Central Team · laden' && hv.fig === '35 two-way movements a day · Oct 2026'
+       && !/IPT/.test(JSON.stringify(hv)) && hv.hint === 'Click for the route analysis', JSON.stringify(hv));
+    const hvR = api.routeHoverView({ route_id: 'R014', origin: 'A', dest: 'B', ipt: 'IPT2', type: 'Outbound Highway', is_forecast: true, f_avg: 35 }, 'Oct 2026', 'vehicles');
+    ok("C3 hover: the return leg shows the SAME figure (never doubled, never 70) and says it is the empty return", hvR.fig === hv.fig && /empty return/.test(hvR.sub));
+    ok("C3 hover: no month on screen asks for one; a route with nothing approved says so; tonnes say t a day",
+       api.routeHoverView({ route_id: 'R1' }, null, 'vehicles').fig === 'Pick a month to see its movements a day'
+       && api.routeHoverView({ route_id: 'R1', is_forecast: false }, 'Oct 2026', 'vehicles').fig === 'Nothing approved on this route · Oct 2026'
+       && api.routeHoverView({ route_id: 'R1', is_forecast: true, f_avg: 120 }, 'Oct 2026', 't').fig === '120 t a day · Oct 2026'
+       && api.routeHoverView({ route_id: 'R1', ipt: 'Unknown_IPT' }, null).sub === 'R1');
+    // Track C review: a shared section under the pointer gets the SECTION's card, never one route's
+    const rv = api.runHoverView({ id: 'S1', rl_mv: 46.27, rl_mv_text: '46', rl_routes_text: '2 routes', rl_co2_text: '3.2 t CO₂e' }, 'Oct 2026', true);
+    ok("⭐ Track C review: the hover over a shared section is the section's: its two-way figure, its routes, the month, 'Click for the routes on this section'",
+       rv.title === 'Shared road section' && rv.sub === '2 routes · Oct 2026' && rv.fig === '46 two-way movements a day · 3.2 t CO₂e'
+       && rv.hint === 'Click for the routes on this section' && rv.hint !== 'Click for the route analysis', JSON.stringify(rv));
+    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 two-way movements a day');
+    // ---- the deep link ----
+    // Track C review: "Show forecast routes" travels as layers=forecast (a link from the forecast view opened bare)
+    {
+      const defsF = ['alignment', 'gates', 'zones'];
+      const encF = api.encodeView({ month: null, layers: ['alignment', 'forecast', 'gates', 'zones'], filters: {} }, defsF);
+      ok("⭐ Track C review link: Show forecast round-trips — encoded as layers=forecast, decoded back into the ticked set",
+         encF === 'layers=forecast' && JSON.stringify(api.layersFromChanges(defsF, api.decodeView('?' + encF).layers)) === '["alignment","forecast","gates","zones"]', encF);
+    }
+    ok("C3 link: the month reads as YYYY-MM both ways, and a month outside the horizon or malformed is dropped",
+       api.monthParam(10) === '2026-10' && api.monthParam(13) === '2027-01' && api.monthFromParam('2026-10') === 10 && api.monthFromParam('2027-1') === 13
+       && api.monthFromParam('2025-12') === null && api.monthFromParam('2031-01') === null && api.monthFromParam('2026-13') === null && api.monthFromParam('oct') === null);
+    const defs = ['alignment', 'gates', 'zones'];
+    const enc = api.encodeView({ month: 10, layers: ['alignment', 'chainage', 'zones'], filters: { origin: 'Brook Pit', team: 'Central Team', dest: null } }, defs);
+    ok("⭐ C3 link: encode — the month, the layer CHANGES against the defaults (dots, no escaping), the filters with the team's NAME",
+       enc === 'month=2026-10&layers=chainage.-gates&filters=origin%3ABrook+Pit%7Cteam%3ACentral+Team', enc);
+    const dec = api.decodeView('?' + enc);
+    ok("⭐ C3 link: decode gives the same view back (round trip), and the layers come back as the defaults plus the changes",
+       dec.month === 10 && JSON.stringify(dec.layers) === '["chainage","-gates"]' && dec.filters.origin === 'Brook Pit' && dec.filters.team === 'Central Team'
+       && JSON.stringify(api.layersFromChanges(defs, dec.layers)) === '["alignment","chainage","zones"]', JSON.stringify(dec));
+    ok("C3 link: the default view writes no parameters at all; a closed timeline writes no month",
+       api.encodeView({ month: null, layers: defs.slice(), filters: {} }, defs) === '' && !/month=/.test(api.encodeView({ month: null, layers: ['alignment'], filters: {} }, defs)));
+    const junk = api.decodeView('?month=2026-10&layers=chainage.%3Cscript%3E.-gates&filters=origin:X|evil:Y|team:|dest');
+    ok("C3 link: unknown filter keys, empty values and a layer name that is not a plain key are dropped",
+       JSON.stringify(junk.filters) === '{"origin":"X"}' && JSON.stringify(junk.layers) === '["chainage","-gates"]', JSON.stringify(junk));
+    // the page's own state, written and shared
+    api.VIEW.defaults = ['alignment', 'gates', 'zones'];
+    TL.on = true; TL.month = 11; TL.playing = false;
+    byId['filter-ipt'].value = 'IPT2'; byId['filter-ipt'].selectedIndex = 1;
+    const cv = api.currentView();
+    ok("⭐ C3 link: the current view carries the team as the option's NAME, never the slot id", cv.filters.team === 'Central Team' && cv.month === 11 && !/IPT/.test(JSON.stringify(cv.filters)));
+    location.search = '?embed=1&v=123';
+    api.VIEW.ready = true; api.writeView();
+    ok("C3 link: written into the address with the app's embed / v kept; the shared link has neither",
+       /month=2026-11/.test(location.search) && /embed=1/.test(location.search) && /v=123/.test(location.search)
+       && api.shareUrl() === 'https://app.wayscope.test/map/?month=2026-11&filters=team%3ACentral+Team' && api.shareUrl(true) === 'https://app.wayscope.test/map/?month=2026-11');
+    const before = location.search; TL.playing = true; TL.month = 12; api.writeView();
+    ok("⭐ C3 link: nothing is written while Play runs (it would be one write a tick)", location.search === before);
+    TL.playing = false;
+    // ---- the QR code, decoded back by an independent reader ----
+    ok("C3 QR: Reed-Solomon against two published vectors (HELLO WORLD 1-M, 01234567 1-M)",
+       JSON.stringify(api.qrRsRemainder([32,91,11,120,209,114,220,77,67,64,236,17,236,17,236,17], api.qrRsDivisor(10))) === '[196,35,39,119,235,215,231,226,93,23]'
+       && JSON.stringify(api.qrRsRemainder([16,32,12,86,97,128,236,17,236,17,236,17,236,17,236,17], api.qrRsDivisor(10))) === '[165,36,212,193,237,54,199,135,44,85]');
+    ok("C3 QR: the format bits (M, mask 0 = 101010000010010), the version 7 bits (000111110010010100), the alignment centres and the data capacity of versions 1-10 (level M)",
+       api.qrFormatBits(0).toString(2).padStart(15, '0') === '101010000010010' && api.qrVersionBits(7).toString(2).padStart(18, '0') === '000111110010010100'
+       && JSON.stringify([2, 7, 10].map(api.qrAlignPositions)) === '[[6,18],[6,22,38],[6,28,50]]'
+       && [1,2,3,4,5,6,7,8,9,10].map(api.qrDataCodewords).join() === '16,28,44,64,86,108,124,154,182,216');
+    const texts = ['https://app.wayscope.co.uk/map/',
+                   'https://app.wayscope.co.uk/map/?month=2026-10&layers=chainage.-gates&filters=origin%3AKilby+Ridge+Quarry%7Cteam%3ACentral+Team',
+                   'https://app.wayscope.co.uk/map/?month=2026-10&filters=' + 'x'.repeat(150), 'Wolds Link · £ ₂'];
+    const results = texts.map(t => { const q = api.qrMatrix(t); return { t, q, back: q ? qrRead(q.modules) : { err: 'null' } }; });
+    ok("⭐ C3 QR: what is drawn decodes back to the text — finders, timing, format and version bits, every block's RS syndromes zero, byte mode",
+       results.every(r => r.back.text === r.t && r.back.version === r.q.version), JSON.stringify(results.map(r => [r.q && r.q.version, r.back.err || r.back.text.slice(0, 40)])));
+    ok("C3 QR: the versions used span 1 to 10 (a version 7+ code carries the version blocks; 10 carries a 16-bit count)",
+       results[0].q.version <= 3 && results[1].q.version >= 7 && results[2].q.version === 10, results.map(r => r.q.version).join());
+    ok("C3 QR: a link too long for version 10 returns null (the card then draws the month-only link)", api.qrMatrix('x'.repeat(214)) === null && api.qrSvg('x'.repeat(214)) === null);
+    const svg = api.qrSvg(texts[0], 220);
+    ok("C3 QR: the SVG is inline and self-contained — the quiet zone of four, crisp edges, named, no external reference",
+       /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 (\d+) \1" width="220" height="220" shape-rendering="crispEdges" role="img" aria-label="QR code for the link to this view">/.test(svg)
+       && Number(svg.match(/viewBox="0 0 (\d+)/)[1]) === results[0].q.size + 8 && !/href|<image|url\(/.test(svg));
+    // ---- Report a concern ----
+    ok("⭐ C3 concern: only a typed, plain address is used — none, a bare word, a list, a query or a header injection is refused",
+       api.concernAddress({}) === null && api.concernAddress({ concern_email: null }) === null && api.concernAddress({ concern_email: 'nope' }) === null
+       && api.concernAddress({ concern_email: 'a@b.example, c@d.example' }) === null && api.concernAddress({ concern_email: 'a@b.example?cc=x@y.example' }) === null
+       && api.concernAddress({ concern_email: ' contact@scheme.example ' }) === 'contact@scheme.example');
+    const mt = api.concernMailto('contact@scheme.example', 'Wolds Link (fictional)', 'Oct 2026', 'https://x.example/map/?month=2026-10');
+    ok("C3 concern: the mailto keeps the address, and its subject and body (date, time, place, registration, the month and the link) are encoded",
+       mt.startsWith('mailto:contact@scheme.example?subject=Report%20a%20concern%3A%20Wolds%20Link%20(fictional)&body=What%20happened%3A')
+       && /Date%3A%0ATime%3A%0APlace/.test(mt) && /Lorry%20registration/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt));
+    api.renderConcernLinks();
+    ok("⭐ C3 concern: the demo (no typed address) says so in every slot, as a placeholder — no link, no invented address",
+       concernSlots.every(s => s.innerHTML === '<span class="concern-unset">Report a concern: no contact address has been typed for this scheme (a placeholder on the fictional demo scheme).</span>'));
+    TENANT.concern_email = 'contact@scheme.example'; api.renderConcernLinks();
+    ok("C3 concern: a typed address becomes a 'Report a concern by email' link", concernSlots.every(s => /^<a class="concern-link" href="mailto:contact@scheme\.example\?subject=/.test(s.innerHTML) && />Report a concern by email<\/a>$/.test(s.innerHTML)));
+    TENANT.concern_email = null;
+    // ---- the text view's table: the bar's rules ----
+    const routes = { R1: { origin: 'Pit', dest: 'Site A', ipt: 'IPT2' }, R2: { origin: 'Pit', dest: 'Site B', ipt: 'IPT1' }, R3: { origin: 'Quarry', dest: 'Site A', ipt: 'IPT3' } };
+    const lines = [
+      { route_id: 'R1', vehicle_loads: 10.5, trips_per_vehicle_day: 4, discipline: 'earthworks' },
+      { route_id: 'R1', vehicle_loads: 10.5, trips_per_vehicle_day: 4, discipline: 'structures' },
+      { route_id: 'R2', vehicle_loads: 42, trips_per_vehicle_day: 0, discipline: 'earthworks' },
+      { route_id: 'R3', vehicle_loads: 21, trips_per_vehicle_day: 3, discipline: 'earthworks' },
+      { route_id: 'R9', vehicle_loads: 99, trips_per_vehicle_day: 3, discipline: 'earthworks' } ];
+    const all = { o: 'ALL', d: 'ALL', disc: 'ALL', i: 'ALL' };
+    const live = [{ who: 'R1', noun: 'Over a planning flag' }, { who: 'R1', noun: 'Over a planning flag' }, { who: 'Stockpile X', noun: 'Over capacity' }];
+    const tb = api.monthTableRows(lines, routes, all, 21, live);
+    const r1 = tb.rows.find(r => r.rid === 'R1'), r2 = tb.rows.find(r => r.rid === 'R2'), r3 = tb.rows.find(r => r.rid === 'R3');
+    ok("⭐ C3 text view: two-way a day = the route's loads (fractional, summed) ÷ the month's working days from the API (21 here, never 22)",
+       r1 && Math.abs(r1.twoWay - 1) < 1e-9 && Math.abs(r3.twoWay - 1) < 1e-9 && Math.abs(r2.twoWay - 2) < 1e-9, JSON.stringify(tb.rows));
+    ok("⭐ C3 text view: vehicles are ceil PER LINE (R1: two lines of 0.5 a day at 4 trips = 1 + 1 = 2, not ceil(1 / 4) = 1)", r1.vehicles === 2 && r3.vehicles === 1);
+    ok("C3 text view: a line with no stored road route is counted in the movements and named, never zeroed; a route the map does not draw is named, not counted",
+       r2.unbaked === 1 && r2.vehicles === 0 && r2.loads === 42 && JSON.stringify(tb.undrawn) === '["R9"]' && !tb.rows.some(r => r.rid === 'R9'));
+    ok("C3 text view: busiest first; each route's own conditions, once each; a site's condition is not a route's", tb.rows[0].rid === 'R2'
+       && JSON.stringify(r1.conditions) === '["Over a planning flag"]' && r2.conditions.length === 0);
+    const tbF = api.monthTableRows(lines, routes, { o: 'ALL', d: 'Site A', disc: 'earthworks', i: 'ALL' }, 21, []);
+    ok("C3 text view: the panel's filters apply as they do to the bar (destination on the route, discipline on the LINE)",
+       JSON.stringify(tbF.rows.map(r => [r.rid, r.loads])) === '[["R3",21],["R1",10.5]]', JSON.stringify(tbF.rows.map(r => [r.rid, r.loads])));
+    const fig = api.routeFigures(lines, 'R1', 21);
+    ok("C3 route card: the route's figures by the same rules (two lines, 1 two-way a day, 2 vehicles)", fig.lines === 2 && Math.abs(fig.twoWay - 1) < 1e-9 && fig.vehicles === 2 && fig.unbaked === 0);
+    // ---- the sheet ----
+    ok("C3 sheet: the conditions count is in the pill's words — a planning flag is never called a limit",
+       api.condSummary({ clash: 1, warn: 6, cap: 1, caution: 0 }) === '1 over capacity · 6 route limits · 1 route over a planning flag'
+       && api.condSummary({ cap: 2 }) === '2 routes over planning flags' && api.condSummary({}) === '');
+    api.sheetTo('peek');
+    ok("C3 sheet: at peek the handle says collapsed (aria-expanded false) and offers more", byId['m-handle'].attrs['aria-expanded'] === 'false' && byId['m-sheet'].dataset.state === 'peek'
+       && byId['m-handle'].attrs['aria-label'] === 'Show the busiest routes and conditions');
+    api.toggleSheet();
+    ok("⭐ C3 sheet: a tap on the handle raises it to half and says so (aria-expanded true)", byId['m-sheet'].dataset.state === 'half' && byId['m-handle'].attrs['aria-expanded'] === 'true'
+       && byId['m-handle'].attrs['aria-label'] === 'Show less');
+    api.toggleSheet();
+    ok("...and a second tap lowers it to peek again", byId['m-sheet'].dataset.state === 'peek' && byId['m-handle'].attrs['aria-expanded'] === 'false');
+    api.openRunCard('S9');
+    ok("⭐ browser check 12 Oct (phone): a shared section's card opens IN THE SHEET at half, with a close button, never a map popup",
+       api.SHEET.card === 'run:S9' && byId['m-sheet'].dataset.state === 'half' && byId['m-card'].hidden === false && byId['m-main'].hidden === true
+       && byId['m-card'].innerHTML.includes('onclick="closeRouteCard()">Close the card</button>'), byId['m-card'].innerHTML.slice(0, 300));
+    ok("browser check 12 Oct (phone): ...and with no road-load month on screen it says so instead of an empty card",
+       byId['m-card'].innerHTML.includes('This shared road section is not on the map for the month on screen.'));
+    api.sheetTo('peek');
+    ok("browser check 12 Oct (phone): lowering the sheet to peek closes the section card like a route card", api.SHEET.card === null && byId['m-card'].hidden === true && byId['m-main'].hidden === false);
+    ok("browser check 12 Oct (phone): a tap looks 10 px round itself for a line", api.TAP_SLOP === 10);
+    api.sheetTo('full');
+    ok("C3 sheet: full opens the panel as the layers sheet; the Layers button reports it", sidebarOpen === true && api.SHEET.state === 'full'
+       && byId['m-layers-btn'].attrs['aria-expanded'] === 'true' && byId['m-handle'].attrs['aria-expanded'] === 'true');
+  }
+}
+// An independent QR reader for the pins above (ISO/IEC 18004, byte mode, level M only): it finds the function modules
+// itself, reads and checks the format and version bits, unmasks, reads the codewords in the zigzag, de-interleaves the
+// blocks, requires every block's syndromes S0..S(n-1) to be zero (polynomial evaluation at alpha^i, not the encoder's
+// division) and parses the byte segment.
+function qrRead(mod) {
+  const n = mod.length, ver = (n - 17) / 4;
+  if (!Number.isInteger(ver) || ver < 1 || ver > 10) return { err: 'size ' + n };
+  const EXP = [], LOG = new Array(256).fill(0);
+  for (let i = 0, x = 1; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11D; }
+  const mul = (a, b) => (a && b) ? EXP[(LOG[a] + LOG[b]) % 255] : 0;
+  // finders and timing, read off the matrix
+  const finderOk = (cx, cy) => { for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)); if (mod[cy + dy][cx + dx] !== (d !== 2)) return false; } return true; };
+  if (!finderOk(3, 3) || !finderOk(n - 4, 3) || !finderOk(3, n - 4)) return { err: 'finder' };
+  for (let i = 8; i < n - 8; i++) if (mod[6][i] !== (i % 2 === 0) || mod[i][6] !== (i % 2 === 0)) return { err: 'timing' };
+  // format: both copies, the BCH code checked by brute force over the 32 valid words
+  const bits1 = []; for (let i = 0; i <= 5; i++) bits1.push(mod[i][8]); bits1.push(mod[7][8], mod[8][8], mod[8][7]); for (let i = 9; i < 15; i++) bits1.push(mod[8][14 - i]);
+  const bits2 = []; for (let i = 0; i < 8; i++) bits2.push(mod[8][n - 1 - i]); for (let i = 8; i < 15; i++) bits2.push(mod[n - 15 + i][8]);
+  const word = b => b.reduce((a, bit, i) => a | ((bit ? 1 : 0) << i), 0);
+  const w1 = word(bits1), w2 = word(bits2);
+  if (w1 !== w2) return { err: 'format copies differ' };
+  let fmt = null;
+  for (let d = 0; d < 32; d++) { let r = d; for (let i = 0; i < 10; i++) r = (r << 1) ^ ((r >> 9) * 0x537); if ((((d << 10) | r) ^ 0x5412) === w1) fmt = d; }
+  if (fmt === null) return { err: 'format bch' };
+  if ((fmt >> 3) !== 0) return { err: 'level is not M' };
+  const mask = fmt & 7;
+  if (!mod[n - 8][8]) return { err: 'dark module' };
+  // version blocks (7+), both copies, BCH(18,6)
+  if (ver >= 7) {
+    let vb = 0, vb2 = 0; for (let i = 0; i < 18; i++) { const a = n - 11 + i % 3, c = Math.floor(i / 3); if (mod[c][a]) vb |= 1 << i; if (mod[a][c]) vb2 |= 1 << i; }
+    let r = ver; for (let i = 0; i < 12; i++) r = (r << 1) ^ ((r >> 11) * 0x1F25);
+    if (vb !== vb2 || vb !== ((ver << 12) | r)) return { err: 'version bits' };
+  }
+  // the function modules, worked out again here
+  const fn = Array.from({ length: n }, () => new Array(n).fill(false));
+  const box = (x0, y0, x1, y1) => { for (let y = Math.max(0, y0); y <= Math.min(n - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(n - 1, x1); x++) fn[y][x] = true; };
+  box(0, 0, 8, 8); box(n - 8, 0, n - 1, 8); box(0, n - 8, 8, n - 1);           // finders, separators, format
+  for (let i = 0; i < n; i++) { fn[6][i] = true; fn[i][6] = true; }            // timing
+  if (ver >= 2) {
+    const k = Math.floor(ver / 7) + 2, last = n - 7, pos = [6];
+    const step = Math.ceil((last - 6) / (k - 1) / 2) * 2;                         // the spec's table, by its rule: even steps, packed to the far end
+    for (let p = last; pos.length < k; p -= step) pos.splice(1, 0, p);
+    for (const ay of pos) for (const ax of pos) { if ((ax === 6 && ay === 6) || (ax === 6 && ay === last) || (ax === last && ay === 6)) continue; box(ax - 2, ay - 2, ax + 2, ay + 2); }
+  }
+  if (ver >= 7) { box(n - 11, 0, n - 9, 5); box(0, n - 11, 5, n - 9); }
+  const M = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+             (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0,
+             (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0][mask];
+  const stream = [];
+  for (let right = n - 1, upward = true; right >= 1; right -= 2, upward = !upward) {
+    if (right === 6) right = 5;
+    for (let k = 0; k < n; k++) { const y = upward ? n - 1 - k : k; for (const x of [right, right - 1]) if (!fn[y][x]) stream.push(mod[y][x] !== M(x, y) ? 1 : 0); }
+  }
+  // de-interleave (level M: EC per block and block count for versions 1-10)
+  const ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26][ver], NB = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5][ver];
+  const total = Math.floor(stream.length / 8), cw = [];
+  for (let i = 0; i < total; i++) { let b = 0; for (let j = 0; j < 8; j++) b = (b << 1) | stream[i * 8 + j]; cw.push(b); }
+  const nLong = total % NB, shortData = Math.floor(total / NB) - ECC;
+  const blocks = Array.from({ length: NB }, (_, i) => ({ data: [], ecc: [], len: shortData + (i >= NB - nLong ? 1 : 0) }));
+  let p = 0;
+  for (let i = 0; i < shortData + 1; i++) for (const b of blocks) if (i < b.len) b.data.push(cw[p++]);
+  for (let i = 0; i < ECC; i++) for (const b of blocks) b.ecc.push(cw[p++]);
+  for (const b of blocks) {
+    const c = b.data.concat(b.ecc);
+    for (let i = 0; i < ECC; i++) { let s = 0; const a = EXP[i]; for (const v of c) s = mul(s, a) ^ v; if (s !== 0) return { err: 'syndrome' }; }
+  }
+  const data = [].concat(...blocks.map(b => b.data));
+  let bit = 0; const rd = k => { let v = 0; for (let i = 0; i < k; i++) { v = (v << 1) | ((data[bit >> 3] >> (7 - (bit & 7))) & 1); bit++; } return v; };
+  if (rd(4) !== 4) return { err: 'not byte mode' };
+  const len = rd(ver < 10 ? 8 : 16), bytes = [];
+  for (let i = 0; i < len; i++) bytes.push(rd(8));
+  return { version: ver, mask, text: Buffer.from(bytes).toString('utf8') };
+}
+
+// ===== 12 Oct 2026 — Track C integration (claude/map-review-2): the seams between C1, C2 and C3 =====
+// Each pin fails on the four builder branches taken alone: they were built side by side and never saw each other.
+{
+  const mm = code.slice(code.indexOf("function mapModeMonth(){"), code.indexOf("function niceStop(v){"));
+  const am = code.slice(code.indexOf("function areasMonth() {"), code.indexOf("function areaTierOn(tier) {"));
+  // NARROWED / REVERSED 12 Oct 2026 (Track C review): mapModeMonth reads `forecastWindow() || []`; the council areas no
+  // longer take the window's first month — they read mapModeMonth itself (one rule for the three month layers)
+  ok("⭐ Track C: Road load / Carbon read the Show-forecast window from forecastWindow(), and the council areas read mapModeMonth; never the removed From / To selects",
+     mm.length > 0 && am.length > 0 && /const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(mm) && /mapModeMonth\(\)/.test(am)
+     && !/forecastWindow\(\)\[0\]/.test(am) && !/forecast-from|forecast-to/.test(mm + am));
+  const af = code.slice(code.indexOf("function applyFilters()"), code.indexOf("function resetFilters()"));
+  ok("Track C: applyFilters refreshes the council areas AND ends with the address-bar write (both sides kept, the write last)",
+     /if \(typeof refreshAreas === 'function'\) refreshAreas\(\);[\s\S]*markRouteEnds\(\);\s*raiseMarks\(\);\s*if \(typeof scheduleViewWrite === 'function'\) scheduleViewWrite\(\);\s*\}\s*$/.test(af));
+  const rmf = code.slice(code.indexOf("ensureForecastLayers(); ensureFlowLayer();"), code.indexOf("function openTimeline(){"));
+  ok("Track C: each month on the playhead refreshes the council areas and then Road load / Carbon (one call each)",
+     (rmf.match(/refreshAreas\(\);/g) || []).length === 1 && (rmf.match(/refreshMapModes\(\);/g) || []).length === 1
+     && rmf.indexOf("refreshAreas();") < rmf.indexOf("refreshMapModes();"));
+  ok("Track C: still ONE mousemove handler and ONE generateId on routes-source after the merge (no second hover path)",
+     (code.match(/map\.on\('mousemove'/g) || []).length === 1 && (code.match(/generateId: true/g) || []).length === 1
+     && !/promoteId/.test(code));
+  ok("Track C: the two removal lists are the one list, unchanged by the merge (Road load, Carbon and the forecast layers; the council areas are their own group and stay)",
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'\]\.forEach/g) || []).length === 2
+     && !/'area-fill','forecast/.test(code));
+  // the deep link carries Road load and Carbon
+  ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
+     // NARROWED 12 Oct 2026 (Track C review): the list and the selector may also name "Show forecast routes"
+     /const LINK_MODE_BOXES = \['toggle-road-load', 'toggle-carbon'(, 'toggle-forecast')?\];/.test(code)
+     && /input\[type=checkbox\]\[id\^="restr-"\], #toggle-road-load, #toggle-carbon(, #toggle-forecast)?'\)\]/.test(code)
+     && code.includes("|| LINK_MODE_BOXES.includes(id)) scheduleViewWrite();"));
+  let lk = null;
+  try { lk = new Function(/function layerKey\(id\) \{[^\n]*\}/.exec(code)[0] + "\nreturn layerKey;")(); } catch (e) {}
+  ok("Track C link: their keys are short and collide with no layer box ('road-load', 'carbon'); layer- and restr- keys unchanged",
+     !!lk && lk('toggle-road-load') === 'road-load' && lk('toggle-carbon') === 'carbon' && lk('layer-chainage') === 'chainage'
+     && lk('restr-closures') === 'restr-closures' && !/id="layer-(road-load|carbon)"/.test(html));
+  ok("Track C: the council group's tier boxes are layer- ids, so the link carries them without a change (areas-district, areas-county)",
+     html.includes('id="layer-areas-district"') && html.includes('id="layer-areas-county"'));
+}
+
+// ===== 12 Oct 2026 — the wording / rules / licences review of Track C =====
+// Each pin fails on f50731b (the Track C integration before the review).
+{
+  ok("⭐ wording: no text on the page names the removed From / To selects as something to set",
+     !/From and To/.test(code) && !/set From/.test(code));
+  ok("⭐ the 14 px floor: the Road load and Carbon checkbox labels (.fc-toggle is 13.5 px) and the chips' Month label (.fc-row label is 12.5 px) are 14 px",
+     /\.fc-toggle\.fc-mode\{ font-size:14px; \}/.test(html) && /#fc-chips-label\{ font-size:14px; \}/.test(html)
+     && html.includes('<label id="fc-chips-label">Month</label>'));
+  // the phone sheet and the map's foot: Mapbox's logo and attribution carry the ONS / OS lines of a council layer
+  const phoneCss = (() => { const i = html.indexOf("@media (max-width:767px){\n            #kpi-hud, #menu-toggle"); return i > 0 ? html.slice(i, html.indexOf("\n        }\n", i)) : ""; })();
+  ok("⭐ licences (phone): the bottom controls (Mapbox logo, attribution with the ONS / OS lines) ride above the sheet, never under it",
+     phoneCss.length > 0 && phoneCss.includes(".mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right{ bottom:var(--m-sheet-h, 0px); }")
+     && !/\.mapboxgl-ctrl-attrib[^{]*\{[^}]*display:\s*none/.test(html) && !/attributionControl:\s*false/.test(code));
+  ok("licences (phone): the sheet's height is measured on every state change, at the breakpoint and on every resize of the sheet",
+     /function sheetAria\(\) \{[\s\S]*?syncSheetHeight\(\);\s*\}/.test(code)
+     && code.includes("syncSheetWithPanel(); renderSheet(); syncSheetHeight();")
+     && code.includes("new ResizeObserver(syncSheetHeight).observe(document.getElementById('m-sheet'))"));
+  const fsrc = /function syncSheetHeight\(\) \{[\s\S]*?\n    \}/.exec(code);
+  const props = {};
+  let phone = true;
+  const sheet = { offsetHeight: 212.4 };
+  const doc = { getElementById: id => id === 'm-sheet' ? sheet : null, documentElement: { style: { setProperty(k, v) { props[k] = v; } } } };
+  let sync = null;
+  try { sync = new Function("document", "isPhoneShell", fsrc[0] + "\nreturn syncSheetHeight;")(doc, () => phone); } catch (e) {}
+  ok("⭐ licences (phone): syncSheetHeight sets --m-sheet-h to the sheet's height on a phone, and 0 above 767 px",
+     !!sync && (sync(), props['--m-sheet-h'] === '212px') && (phone = false, sync(), props['--m-sheet-h'] === '0px'), JSON.stringify(props));
+  // the council layer's licence lines: the area card is not where they live, the attribution and the group are (pinned at §2.2b)
+  ok("licences: the council areas' source is the only place besides the group that prints the ONS / OS lines, and it is never emptied",
+     (code.match(/attribution: \(AREAS\.data\.attribution \|\| \[\]\)\.join/g) || []).length === 1);
+}
+
+// ===== 12 Oct 2026 — the Track C review fixes (reviews of claude/map-review-2) =====
+// Each pin fails on 25bb1b3 (Track C after its wording review).
+{
+  ok("⭐ Track C review: no comment or text names the removed From / To as a way to get one month ('From = To')",
+     !/From = To/.test(src) && !/From and To/.test(src));
+  // the deep link carries Show forecast
+  let lkF = null;
+  try { lkF = new Function(/function layerKey\(id\) \{[^\n]*\}/.exec(code)[0] + "\nreturn layerKey;")(); } catch (e) {}
+  ok("⭐ Track C review link: 'Show forecast routes' is in the link's box list and its selector, keyed 'forecast' (no layer box has that key)",
+     code.includes("const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon', 'toggle-forecast'];")
+     && code.includes(`input[type=checkbox][id^="restr-"], #toggle-road-load, #toggle-carbon, #toggle-forecast')]`)
+     && !!lkF && lkF('toggle-forecast') === 'forecast' && !/id="layer-forecast"/.test(html));
+  // the hover over a shared section, and the cursor
+  ok("⭐ Track C review hover: the ONE mousemove handler lets a shared section answer (features = [run]) before it drives the card, and glows no route under it",
+     /const run = \(typeof roadLoadFeatureAt === 'function'\) \? roadLoadFeatureAt\(e\.point\) : null;\s*if \(run\) features = \[run\];[\s\S]{0,200}setRouteHover\(features\.length \? features\[0\] : null, e\);/.test(code)
+     && code.includes("let idMatch = run ? null : (p.Route_ID || p.route_id || p.name || p.ID || p.id);")
+     && /const isRun = f\.source === 'road-load-source' \|\| !!\(f\.layer && f\.layer\.id === 'road-load-line'\);\s*const v = isRun\s*\? runHoverView\(/.test(code));
+  ok("⭐ Track C review cursor: a move with no route under it keeps the hand over a council area, a site, a zone or a closure (clickableAt), never a blind reset",
+     code.includes("map.getCanvas().style.cursor = (typeof clickableAt === 'function' && clickableAt(e.point)) ? 'pointer' : '';")
+     && /const CLICKABLE_LAYERS = \[[^\]]*'area-fill', 'area-county-fill'\];/.test(code) && /'locations'/.test((/const CLICKABLE_LAYERS = \[[^\]]*\]/.exec(code) || [""])[0])
+     && !/\} else \{\s*map\.getCanvas\(\)\.style\.cursor = '';\s*if \(map\.getLayer\('global-route-hover'\)\)/.test(code));
+  {
+    const fa = /function roadLoadFeatureAt\(point\)\{[\s\S]*?\n    \}/.exec(code), fc = /function clickableAt\(point\)\{[\s\S]*?\n    \}/.exec(code);
+    const layers = { 'road-load-line': 1, 'area-fill': 1, 'locations': 1 };
+    let under = [];
+    const fm = { getLayer: id => layers[id], queryRenderedFeatures: (pt, o) => under.filter(f => o.layers.includes(f.layer.id)) };
+    let RF = null, CA = null;
+    try { RF = new Function("map", fa[0] + "\nreturn roadLoadFeatureAt;")(fm); CA = new Function("map", "CLICKABLE_LAYERS", fc[0] + "\nreturn clickableAt;")(fm, ['area-fill', 'locations', 'zone-fill']); } catch (e) {}
+    under = [{ layer: { id: 'road-load-line' }, properties: { id: 'S1' } }, { layer: { id: 'forecast-layer' }, properties: { route_id: 'R1' } }];
+    const r1 = RF && RF({});
+    under = [{ layer: { id: 'area-fill' } }];
+    const c1 = CA && CA({});
+    under = [];
+    ok("Track C review: a point on road-load-line yields the RUN (not the route under it); a council area under the pointer is clickable; nothing is not",
+       !!r1 && r1.properties.id === 'S1' && c1 === true && CA({}) === false && RF({}) === null);
+  }
+  // the carbon ramps: the comment is true, the council legend names the difference
+  ok("Track C review: the carbon ramp's comment no longer calls #2071F3's family 'the plan blue'; the council legend says its stops differ from the Carbon legend's",
+     !/the plan blue at five lightness steps/.test(src) && /NOT the plan blue #4A72C9/.test(src)
+     && code.includes("These stops are fixed for districts (t in the month) and differ from the Carbon legend\\'s for routes and sections."));
+  // forecastWindow: no matrix, no window, no burst of month reads
+  {
+    const fw = /function forecastWindow\(\) \{[\s\S]*?\n    \}/.exec(code), km = /function kpiMonthsOnScreen\(\) \{[\s\S]*?\n    \}/.exec(code);
+    const TLx = { on: false, matrix: null };
+    const box = { checked: true };
+    let FW = null, KM = null;
+    try {
+      FW = new Function("TL", "CONFIG", fw[0] + "\nreturn forecastWindow;")(TLx, { MONTH_COUNT: 60 });
+      KM = new Function("TL", "document", "forecastWindow", km[0] + "\nreturn kpiMonthsOnScreen;")(TLx, { getElementById: () => box }, () => FW());
+    } catch (e) {}
+    ok("⭐ Track C review: with no timeline matrix (its read failed) there is no window and Show forecast asks for NO month (was all 60)",
+       !!FW && FW() === null && JSON.stringify(KM()) === "[]" && (TLx.matrix = { span: [9, 11] }, JSON.stringify(KM()) === "[9,10,11]"));
+    ok("Track C review: ...and Show forecast routes says the months could not be loaded instead of reading the whole horizon",
+       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!f) throw new Error('The months could not be loaded');"));
+  }
+  // the section ramp's maximum comes from the server
+  ok("⭐ Track C review: the timeline asks forecast-matrix for sections=1 and keeps section_co2_max as sectionCo2Max",
+     code.includes("'/public/forecast-matrix?from=1&to='+CONFIG.MONTH_COUNT+'&unit='+unit+'&sections=1'")
+     && code.includes("const sectionCo2Max = (Number(j.section_co2_max) > 0 && !j.co2_error) ? Number(j.section_co2_max) : null;"));
+  // the council layer: shapes once, figures per month, gaps named, the shared month rule
+  const ab = (() => { const i = code.indexOf("    const AREAS = { cache: {}"); return i > 0 ? code.slice(i, code.indexOf("// ===== Phase 2.5a", i) > 0 ? code.indexOf("// ===== Phase 2.5a", i) : i + 40000) : ""; })();
+  ok("⭐ Track C review areas: the polygons are read ONCE (/public/areas/shapes, no month roll-up); each month's figures without them (&geometry=0)",
+     ab.includes("fetch(CONFIG.API_BASE + '/public/areas/shapes')") && ab.includes("'/public/areas?month=' + m + '&geometry=0'")
+     && /if \(!AREAS\.shapes\) \{[\s\S]{0,200}fetchAreaShapes\(\)/.test(ab));
+  {
+    const fj = /function areaJoin\(shapes, figs\) \{[\s\S]*?\n    \}/.exec(ab), ft = /function areaFigureText\(a, mode, when\) \{[\s\S]*?\n    \}/.exec(ab);
+    const ff = /function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/.exec(ab), fcard = /function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/.exec(ab);
+    let J = null, T = null, F = null, C = null;
+    try {
+      J = new Function(fj[0] + "\nreturn areaJoin;")();
+      T = new Function(ft[0] + "\nreturn areaFigureText;")();
+      F = new Function("areaFigureText", ff[0] + "\nreturn areaFeatures;")(T);
+      C = new Function("AREAS", fcard[0] + "\nreturn areaCardHTML;")({ mode: 'movements' });
+    } catch (e) {}
+    const shapes = { areas: [{ area_id: "A", name: "Alpha", tier: "district", geometry: { type: "Polygon", coordinates: [] }, label_point: [0, 0] },
+                             { area_id: "B", name: "Beta", tier: "district", geometry: { type: "Polygon", coordinates: [] } }], attribution: ["L1"] };
+    const figs = { areas: [{ area_id: "A", movements_per_day: 12, co2_t: 3, routes: ["R1"], co2_routes_unbaked: ["R2"], edge_routes: ["R3"], return_only_routes: [] },
+                           { area_id: "B", movements_per_day: 0, co2_t: 0, routes: [], return_only_routes: [] }],
+                   routes_not_clipped: ["R4", "R5"], notes: ["2 route(s) with volume have no clipped road route yet"], totals: { routes_with_volume: 5 } };
+    const jd = J && J(shapes, figs), jn = J && J(shapes, null);
+    ok("⭐ Track C review areas: the join keeps the polygons and adds the month's figures by area_id; with no month every area is 'no figure'",
+       !!jd && jd.areas[0].geometry && jd.areas[0].movements_per_day === 12 && jd.areas[0].unclipped === 2 && jd.attribution[0] === "L1"
+       && jd.notes[0].startsWith("2 route(s)") && jn.areas.every(a => a.nofig) && jn.areas[0].geometry);
+    const fcD = F && F(jd, "movements", new Set(), "Oct 2026"), fcN = F && F(jn, "movements", new Set(), "");
+    ok("⭐ Track C review areas: a district with routes not clipped yet is 'no figure yet' and hatched (v = -1), never 'no approved route'; a figure stays a figure",
+       !!fcD && fcD.features.find(f => f.properties.area_id === "B").properties.v === -1
+       && /BETA\nno figure yet/.test(fcD.features.find(f => f.properties.area_id === "B").properties.label)
+       && fcD.features.find(f => f.properties.area_id === "A").properties.v === 12 && !/no approved route/.test(JSON.stringify(fcD)));
+    ok("Track C review areas: with no month on screen no figure is drawn (v = -2, the name alone) — not the first month of a span",
+       !!fcN && fcN.features.every(f => f.properties.v === -2) && fcN.features[0].properties.label === "ALPHA" && T(jn.areas[0], "movements", "") === "—");
+    const cd = C && C(jd.areas[0], jd, "Oct 2026");
+    ok("⭐ Track C review areas: the card names what a partial figure leaves out — 'excludes 1 route with no carbon figure', the edge route, the routes not clipped",
+       !!cd && cd.includes("excludes 1 route with no carbon figure") && cd.includes("1 more only cross its edge (under 200 m inside)")
+       && cd.includes("2 routes with volume not clipped yet"), (cd || "").slice(0, 300));
+    ok("Track C review areas: ...and with no month the card says to pick one, with no zero", C && /Shows one month: press Play or pick a month\./.test(C(jn.areas[0], jn, "")) && !/<b>0<\/b>/.test(C(jn.areas[0], jn, "")));
+  }
+  ok("⭐ Track C review areas: the server's notes are printed in the group (a gap reads as a gap); a failed read says so",
+     /<div class="area-note" id="area-notes"><\/div>/.test(html) && ab.includes("if (nt) nt.textContent = AREAS.error || (noMonth ? '' : (j.notes || []).join(' '));"));
+  ok("Track C review areas: the hatch is a layer of its own over the neutral (v = -1), its image re-added after a basemap switch, and it toggles with the districts",
+     /id: 'area-nofig', type: 'fill', source: 'areas-source',\s*filter: \['all', \['==', \['get', 'tier'\], 'district'\], \['!', \['get', 'off'\]\], \['==', \['get', 'v'\], -1\]\],/.test(ab)
+     && ab.includes("'fill-pattern': 'area-hatch'") && ab.includes("if (map.hasImage && !map.hasImage('area-hatch')) map.addImage('area-hatch', areaHatchImage());")
+     && ab.includes("const AREA_LAYERS = ['area-fill', 'area-nofig', 'area-outline', 'area-label'];"));
+  ok("Track C review areas: with no month the fill is off (outlines only) and the legend says to pick a month; a tick with no month opens the timeline",
+     ab.includes("map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : 0.42);") && ab.includes("'fill-opacity': AREAS.month ? 0.42 : 0")
+     && ab.includes("lg.innerHTML = noMonth ? '<div class=\"area-note\">Shows one month: press Play or pick a month.</div>'")
+     && /if \(on && !areasMonth\(\) && typeof TL !== 'undefined' && !TL\.on && typeof openTimeline === 'function'\) openTimeline\(\);/.test(ab));
+  // a phone on its side
+  ok("Track C review phone: a short landscape phone (767 px or less wide, 480 px or less tall) folds the chips row into the half state and puts the figures inline",
+     (() => { const i = html.indexOf("@media (max-height:480px) and (max-width:767px){"); const b = i > 0 ? html.slice(i, html.indexOf("\n        }\n", i)) : "";
+              return b.includes('#m-sheet[data-state="peek"] .m-chips-row{ display:none; }') && b.includes(".m-fig b{ display:inline; font-size:20px;"); })());
+}
+
+// 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
+Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
+  console.log();
+  for (const f of fail) console.log("  FAIL:", f);
+  console.log(`\n${pass} passed, ${fail.length} failed`);
+  process.exit(fail.length ? 1 : 0);
+});

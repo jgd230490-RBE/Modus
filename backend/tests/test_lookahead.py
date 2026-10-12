@@ -656,7 +656,11 @@ ok("🔴 computed, NOT stored — the read created exactly the day rows slice 1 
    db.query("SELECT COUNT(*) AS n FROM forecast_days WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
    == len(DATES) * 4 and n_days_before == 0)
 ok("...no new table, no new column: sixteen tenanted tables, forecast_days' DDL unchanged",
-   len(db.TENANTED_TABLES) == 16 and "trips" not in db._TENANT_DDL["forecast_days"].lower())
+   # NARROWED 12 Oct 2026: the sixteen are counted without route_sections (§2.2d), the one
+   # table added since; slice 2 itself still added none
+   # NARROWED again 12 Oct 2026: and without areas / route_area_km (§2.2b), the two added after it
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km"}) == 16 and {"route_sections", "areas", "route_area_km"} <= db.TENANTED_TABLES
+   and "trips" not in db._TENANT_DDL["forecast_days"].lower())
 
 # ---- context chips
 c1 = L["WS1"]["context"]
@@ -889,7 +893,9 @@ ok("routes gained the five planning columns (DDL and live table)",
 ok("forecast_weeks gained actual_cost_eur, calibrated_at, calibrated_qty",
    all(c in [x.lower() for x in db._columns_of(db.get_conn().cursor(), "forecast_weeks")]
        for c in ("actual_cost_eur", "calibrated_at", "calibrated_qty")))
-ok("...and still sixteen tenanted tables — no new table for slices 3-6", len(db.TENANTED_TABLES) == 16)
+ok("...and still sixteen tenanted tables — no new table for slices 3-6 (NARROWED 12 Oct 2026: counted without "
+   "route_sections, §2.2d, and NARROWED again the same day without areas and route_area_km, §2.2b)",
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km"}) == 16 and {"route_sections", "areas", "route_area_km"} <= db.TENANTED_TABLES)
 db.init_lookahead_db()
 ok("init_lookahead_db() is idempotent on a table that already has the columns", True)
 
@@ -906,11 +912,20 @@ ok("...km_basis must be round_trip or loaded",
    "km_basis" in (network.set_route_planning("R1", {"km_basis"}, km_basis="both").get("error") or ""))
 ok("...a negative rate is refused",
    "negative" in (network.set_route_planning("R1", {"rate_eur_per_t"}, rate_eur_per_t=-1).get("error") or ""))
+# 12 Oct 2026 (C11 closed): the planning write needs the admin token; with none it is a 403 before the route lookup
 try:
     main.set_route_planning("R9", main.RoutePlanning(rate_eur_per_t=1.0))
+    ok("C11: the planning endpoint refuses a call with no admin token", False)
+except Exception as e:
+    ok("C11: the planning endpoint refuses a call with no admin token (403)", getattr(e, "status_code", None) == 403)
+os.environ["ADMIN_TOKEN"] = "la-admin-token"
+try:
+    main.set_route_planning("R9", main.RoutePlanning(rate_eur_per_t=1.0), token="la-admin-token")
     ok("the planning endpoint 404s an unknown route", False)
 except Exception as e:
     ok("the planning endpoint 404s an unknown route", getattr(e, "status_code", None) == 404)
+finally:
+    os.environ.pop("ADMIN_TOKEN", None)
 network.set_route_planning("R3", {"rate_eur_per_t", "km_basis"}, rate_eur_per_t=3.0, km_basis="loaded")
 ok("routes_status carries the planning fields",
    {x["id"]: x for x in network.routes_status()}["R1"].get("rate_eur_per_km") == 1.5)

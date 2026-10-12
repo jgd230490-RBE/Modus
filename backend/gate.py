@@ -40,9 +40,9 @@ the map on their own dashboard.
 FAILING CLOSED
 --------------
 With no MAP_PASSWORD configured, an unauthenticated request for /map/ is REFUSED, not
-allowed. That is deliberate, and it is the opposite of what ADMIN_TOKEN does — an unset
-ADMIN_TOKEN opens every admin endpoint, which is open question C11 and is not a pattern
-worth repeating.
+allowed. That is deliberate. Until 12 Oct 2026 it was the opposite of what ADMIN_TOKEN did —
+an unset ADMIN_TOKEN opened every admin endpoint (open question C11); main._check_admin()
+now fails closed the same way, so C11 is closed.
 
 Staff are never affected by a missing password: a valid code, or a staff cookie, opens
 the map either way. A forgotten MAP_PASSWORD costs you external viewers, never your own
@@ -79,10 +79,22 @@ UNCONFIGURED = "unconfigured"
 # would be theatre — the data is the thing worth protecting, and it is all readable
 # without the page.
 #
+# 12 Oct 2026 (map review D18): the tenant's NETWORK joins the list. Until then twelve data
+# reads needed no credential at all — route geometry, geometries, analysis, analysis-batch,
+# locations/geojson, gates, haul-roads (two), routes status/summary, a route's restriction
+# check — so the whole corridor was readable by anyone who guessed a path. Now
+# /api/routes/, /api/locations/, /api/gates and /api/haul-roads open only to a valid access
+# code or the map cookie. These are PREFIXES (scope_for matches by prefix), so the two
+# staff writes under them — PUT /api/routes/{id}/status and PUT /api/locations/{id}/capacity
+# — are wrapped too: a valid code passes unchanged (ALLOW), and without one the refusal is
+# the map's 401 before the body's own check would have run. The /api/admin/* writes are NOT
+# under these prefixes and stay keyed on the admin token alone.
+#
 # /api/meta is deliberately NOT here: the staff app fetches it on mount, BEFORE anyone
-# signs in, to build its dropdowns. Gating it would empty the sign-in screen. It carries
-# units, material names and vehicle labels out of factors.json — no location, no route,
-# no forecast, nothing about the project.
+# signs in, to build its dropdowns, and the public map reads its factors and seasonal
+# windows. Gating it would empty the sign-in screen. Instead (12 Oct 2026, D31) it answers
+# two SHAPES: the route list, the team list and the work sections only to a valid code or a
+# staff cookie — see main.meta().
 #
 # /api/health is deliberately NOT here: Render polls it.
 # 8 Oct 2026 (H9): the ONE path under /api/public/ an OUTSIDER must reach without the map
@@ -96,6 +108,13 @@ MAP_DATA_PREFIXES = (
     "/api/zones",
     "/api/restrictions/",
     "/api/routes/restrictions",
+    # 12 Oct 2026 (D18): the network. A trailing slash makes each a path SEGMENT — scope_for
+    # matches the bare path too (`p == pref.rstrip("/")`), so /api/gates and /api/gates/… are
+    # the map's while /api/gatesx is not.
+    "/api/routes/",
+    "/api/locations/",
+    "/api/gates/",
+    "/api/haul-roads/",
     "/api/streetview",
 )
 
@@ -172,7 +191,9 @@ def password_ok(supplied):
     want = map_password()
     if not want or not supplied:
         return False
-    return hmac.compare_digest(want, str(supplied).strip())
+    # bytes (12 Oct 2026): compare_digest raises TypeError on a non-ASCII str, which turned
+    # a password with an accent into a 500 instead of a refusal
+    return hmac.compare_digest(want.encode("utf-8"), str(supplied).strip().encode("utf-8"))
 
 
 def cookie_kwargs(level, now=None):
@@ -190,8 +211,36 @@ def cookie_kwargs(level, now=None):
     }
 
 
+def downgrade_kwargs(token, now=None):
+    """
+    12 Oct 2026 (the review and fix pass): what the app's Sign out sets in place of a STAFF
+    cookie — a MAP cookie that expires when the staff one would have, never later. Signing
+    out of the app used to clear only the code in the tab: the 12-hour staff cookie stayed,
+    so on a shared machine (the stand laptop) the next person still got the staff shape of
+    /api/meta, `staff` from whoami, the network reads and /help/. The public map keeps
+    working on that machine (whoever signed out could open it), the staff surface does not.
+    None when the token is not a valid staff cookie: the caller leaves it alone.
+    """
+    if verify(token, now=now) != LEVEL_STAFF:
+        return None
+    now_i = int(now if now is not None else time.time())
+    try:
+        exp = int(str(token).split(".")[1])
+    except (IndexError, ValueError):
+        return None
+    ttl = min(max(1, exp - now_i), MAP_TTL_S)
+    value = sign(LEVEL_MAP, now=now_i, ttl_s=ttl)
+    if not value:
+        return None
+    return {"key": COOKIE, "value": value, "max_age": ttl, "path": "/", "httponly": True,
+            "samesite": "lax", "secure": True}
+
+
 def scope_for(path):
-    """"map", "help", or None for anything this gate does not police."""
+    """"map", "help", "bulletin", or None for anything this gate does not police.
+
+    12 Oct 2026 (C4): "bulletin" — the monthly bulletin's HTML page at /bulletin/. Staff only, the
+    same rule as the guide (D10): a valid code or the STAFF cookie, never the map password."""
     if not path:
         return None
     p = path.split("?", 1)[0].split("#", 1)[0]
@@ -201,6 +250,8 @@ def scope_for(path):
         return "map"
     if p == "/help" or p.startswith("/help/"):
         return "help"
+    if p == "/bulletin" or p.startswith("/bulletin/"):
+        return "bulletin"
     if p in OPEN_PATHS:
         return None
     for pref in MAP_DATA_PREFIXES:
@@ -228,7 +279,7 @@ def decide(path, has_valid_code=False, cookie=None, now=None):
     level = verify(cookie, now=now)
     if level == LEVEL_STAFF:
         return ALLOW
-    if scope == "help":
+    if scope in ("help", "bulletin"):       # staff only: the map cookie does not open these
         return NEED_STAFF
     if level == LEVEL_MAP:
         return ALLOW

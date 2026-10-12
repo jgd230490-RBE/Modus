@@ -39,7 +39,7 @@ IS_PG = bool(DATABASE_URL)
 
 TENANT_DEFAULT = os.environ.get("TENANT_ID", "default").strip() or "default"
 
-# The twelve tenanted tables. test_tenant_audit.py cross-checks this set against
+# The tenanted tables. test_tenant_audit.py cross-checks this set against
 # every CREATE TABLE in this file, so it cannot drift from the schema.
 TENANTED_TABLES = {
     "forecasts", "locations", "routes", "route_geometry",
@@ -59,6 +59,14 @@ TENANTED_TABLES = {
     # Look-ahead v2 slice 1, 2026-09-09. A day layer on forecast_weeks, same rule, same
     # edit. Keyed by the week's line key plus a date; visibility is the parent line's ipt.
     "forecast_days",
+    # 12 Oct 2026 (public map review §2.2d). The shared-road-section index built from
+    # route_geometry: derived data, but derived from one tenant's baked routes and
+    # carried in its package, so tenanted like the geometry it comes from.
+    "route_sections",
+    # 12 Oct 2026 (public map review §2.2b, D27). The council boundaries a tenant imports
+    # (one row per polygon) and the per-route clip against them: both one tenant's data,
+    # both carried in its package. Registered in the same edit as the tables.
+    "areas", "route_area_km",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -244,6 +252,50 @@ def execute(sql, params=()):
     _run(sql, params, fetch=False)
 
 
+def execute_atomic(steps):
+    """
+    12 Oct 2026 (the road-sections review): several writes on ONE connection, committed
+    ONCE, rolled back together on any error — so a reader never sees half of a replace
+    (a DELETE without its INSERTs) and a replace that fails leaves the old rows in place.
+
+    `steps` is a list of (sql, params) for one statement, or (sql, [params, ...]) with a
+    third item True for one statement over many rows (executemany; on Postgres
+    psycopg2.extras.execute_batch, which sends the rows in pages rather than one round
+    trip each). A dead pooled connection is retried once, as _run does: nothing was
+    committed, so the retry repeats the whole set.
+    """
+    for attempt in (0, 1):
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            for step in steps:
+                sql, params = step[0], step[1]
+                many = len(step) > 2 and step[2]
+                if many:
+                    rows = list(params or [])
+                    if not rows:
+                        continue
+                    if IS_PG:
+                        psycopg2.extras.execute_batch(cur, _adapt(sql), rows, page_size=200)
+                    else:
+                        cur.executemany(_adapt(sql), rows)
+                else:
+                    cur.execute(_adapt(sql), params)
+            conn.commit()
+            return None
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            if attempt == 0 and _is_conn_error(e) and isinstance(conn, _PooledConn):
+                conn.discard()
+                continue
+            raise
+        finally:
+            conn.close()
+
+
 # FORECASTS_DDL was here. Phase 4.5 made _TENANT_DDL["forecasts"] the single source
 # for this table, so a second copy of the DDL could only ever drift out of it — and a
 # drifted copy without tenant_id is precisely the "column present, isolation absent"
@@ -391,6 +443,13 @@ def init_network_db():
                 conn.rollback()  # column already present — fine
         _create_tenanted(cur, "routes")
         _create_tenanted(cur, "route_geometry")
+        # 12 Oct 2026 (§2.2d): the shared-section index. Born with tenant_id in the
+        # key, so no migration; a plain CREATE IF NOT EXISTS on both backends.
+        _create_tenanted(cur, "route_sections")
+        # 12 Oct 2026 (§2.2b): the council areas and the route clip. Born with tenant_id
+        # in the key, so no migration; a plain CREATE IF NOT EXISTS on both backends.
+        _create_tenanted(cur, "areas")
+        _create_tenanted(cur, "route_area_km")
         conn.commit()
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
@@ -978,6 +1037,56 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, route_id, vehicle_profile, leg, alt_index)
         )
     """,
+    # 12 Oct 2026 (§2.2d). One row per shared RUN of road: the routes that own it (a JSON
+    # list of route ids), its polyline (a JSON lon/lat list), its haversine length and
+    # when it was built. Derived from route_geometry by road_sections.rebuild() and
+    # rewritten whole on every rebuild — never edited by hand, never typed.
+    "route_sections": """
+        CREATE TABLE route_sections (
+            tenant_id     TEXT NOT NULL DEFAULT 'default',
+            section_id    TEXT NOT NULL,
+            leg           TEXT NOT NULL DEFAULT 'loaded',
+            routes_json   TEXT NOT NULL,
+            geometry_json TEXT NOT NULL,
+            length_km     REAL,
+            built_at      TEXT,
+            PRIMARY KEY (tenant_id, leg, section_id)
+        )
+    """,
+    # 12 Oct 2026 (§2.2b, D27). One row per council boundary polygon a tenant imported
+    # (POST /api/admin/areas/import): the id (an ONS code for ONS data), the name, the tier
+    # ('district' or 'county'), the GeoJSON Polygon / MultiPolygon as text, the dataset, the
+    # licence lines the map must print beside it (a JSON list) and the highway authority
+    # where the import names one.
+    "areas": """
+        CREATE TABLE areas (
+            tenant_id         TEXT NOT NULL DEFAULT 'default',
+            area_id           TEXT NOT NULL,
+            name              TEXT NOT NULL,
+            tier              TEXT NOT NULL,
+            geometry_json     TEXT NOT NULL,
+            source            TEXT,
+            attribution_json  TEXT,
+            highway_authority TEXT,
+            imported_at       TEXT,
+            PRIMARY KEY (tenant_id, area_id)
+        )
+    """,
+    # 12 Oct 2026 (§2.2b). Km of each route's PRIMARY polyline (per vehicle profile and leg)
+    # inside each area, and one row per leg with area_id '*' carrying the leg's whole length.
+    # Derived by areas.rebuild() and rewritten whole — never typed.
+    "route_area_km": """
+        CREATE TABLE route_area_km (
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            route_id        TEXT NOT NULL,
+            vehicle_profile TEXT NOT NULL,
+            leg             TEXT NOT NULL DEFAULT 'loaded',
+            area_id         TEXT NOT NULL,
+            km              REAL,
+            built_at        TEXT,
+            PRIMARY KEY (tenant_id, route_id, vehicle_profile, leg, area_id)
+        )
+    """,
     "disciplines": """
         CREATE TABLE disciplines (
             tenant_id  TEXT NOT NULL DEFAULT 'default',
@@ -1277,6 +1386,9 @@ _TENANT_PK = {
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",
+    "route_sections": "(tenant_id, leg, section_id)",
+    "areas": "(tenant_id, area_id)",
+    "route_area_km": "(tenant_id, route_id, vehicle_profile, leg, area_id)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

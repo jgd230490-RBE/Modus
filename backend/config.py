@@ -25,6 +25,7 @@ whether 18 t is the right payload. That stays with the person editing.
 import datetime
 import json
 import os
+import re
 
 import db
 
@@ -71,7 +72,11 @@ TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", 
                    # H2 (5 Oct 2026): a short notice every screen and export carries when set —
                    # the demo tenant says "Fictional demo scheme · nothing here is real". A real
                    # tenant leaves it null and nothing is shown. Validated as text or null.
-                   "demo_notice": None}
+                   "demo_notice": None,
+                   # 12 Oct 2026 (map review 2.1 / 2.3): the address the public map's "Report a concern" link
+                   # writes to. TYPED by the tenant, never invented: null (the demo) and the map says that no
+                   # contact address has been typed. Validated as one plain email address or null.
+                   "concern_email": None}
 
 CURRENCIES = {
     "EUR": {"symbol": "€", "name": "euro"},
@@ -137,7 +142,17 @@ def tenant_settings(conversions=None, doc=None):
     t["distance_unit"] = du if du in DISTANCE_UNITS else "km"
     dn = (block or {}).get("demo_notice") if isinstance(block, dict) else None
     t["demo_notice"] = dn.strip() if isinstance(dn, str) and dn.strip() else None
+    ce = (block or {}).get("concern_email") if isinstance(block, dict) else None
+    t["concern_email"] = ce.strip() if is_concern_email(ce) else None
     return t
+
+
+# one plain address: something@domain.tld, no spaces, no second address, nothing a mailto: could be bent with
+_CONCERN_EMAIL_RE = re.compile(r"^[^\s@<>\"',;:?&]+@[^\s@<>\"',;:?&]+\.[^\s@<>\"',;:?&]+$")
+
+
+def is_concern_email(v):
+    return isinstance(v, str) and 0 < len(v.strip()) <= 254 and bool(_CONCERN_EMAIL_RE.match(v.strip()))
 # a small in-process cache so the many load_factors() calls inside one request do not
 # each hit the database. Invalidated on every write through this module; a write made
 # by another process (another Render instance) shows up within TTL seconds.
@@ -236,7 +251,17 @@ def validate(doc, network=None):
             if not num(pl) or pl <= 0:
                 p.append(f"vehicle '{k}': payload_t must be a positive number")
             em = v.get("emissions_kg_co2e_per_km")
-            if em is not None and (not num(em) or em < 0):
+            # 12 Oct 2026 (B2): a BLANK cell saved on the Config page arrives as null (the page
+            # writes num("") = null; it deletes the key only for load/unload minutes). Until
+            # today that passed, and float(None) then raised inside every costlines read and
+            # silently blanked every carbon figure on the map. Refused here, naming the vehicle.
+            # An electric entry with no stored figure is the derived case and stays allowed;
+            # a key that is absent altogether reads the fallback and is not a Config edit.
+            if "emissions_kg_co2e_per_km" in v and (em is None or em == "") and v.get("fuel") != "electric":
+                p.append(f"vehicle '{k}': the kg CO2e per km cell is blank — type its figure "
+                         f"(0 for a vehicle with no tailpipe carbon) or put the stored one back; "
+                         f"a blank would send every carbon figure on this vehicle to the fallback")
+            elif em is not None and (not num(em) or em < 0):
                 p.append(f"vehicle '{k}': emissions_kg_co2e_per_km must be a number >= 0")
             for f in ("load_minutes", "unload_minutes", "gvw_t"):
                 if v.get(f) is not None and (not num(v[f]) or v[f] < 0):
@@ -414,6 +439,9 @@ def validate(doc, network=None):
             dn = tb.get("demo_notice")
             if dn is not None and (not isinstance(dn, str) or len(dn) > 120):
                 p.append("tenant.demo_notice must be text of at most 120 characters, or null")
+            ce = tb.get("concern_email")
+            if ce is not None and ce != "" and not is_concern_email(ce):
+                p.append("tenant.concern_email must be one email address, or null")
     for w in doc.get("seasonal_restrictions") or []:
         if not isinstance(w, dict) or not w.get("name"):
             p.append("every seasonal restriction needs a name")

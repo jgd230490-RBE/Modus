@@ -37,8 +37,11 @@ Sources (read 2026-09-10 through the human's browser pane):
   * artic 40-44 t laden ~34 L/100 km (ICCT EU HDV baseline 2018, regional cycle) and
     +0.4-0.95 L/100 km per tonne of payload (UK DfT payload study) — both via
     lkw-control.com's sourced summary. The LOW end, 0.4, is used.
-  * 32 t rigid ~35 L/100 km average-laden — DERIVED from the DEFRA/BEIS 0.95 kg CO2e/km
-    already in factors.json ÷ 2.68 kg CO2e per litre of diesel. The weakest figure.
+  * 32 t rigid average-laden L/100 km — DERIVED from the DESNZ per-km factor already in
+    factors.json ÷ the DESNZ 2026 diesel factor, 2.58354 kg CO2e per litre (the figure's
+    own `_source` line in factors.json shows the arithmetic: 38.6 L/100 km from 0.99773).
+    The weakest figure. 12 Oct 2026: the module's unused kg-per-litre diesel constant (a
+    pre-2026 figure nothing read) was deleted; the diesel factor lives in factors.json only.
   * winter +8 % (Nov-Mar): US DOE fueleconomy.gov puts cars 15 % worse at -7 °C in city
     driving; the HGV effect is smaller. An assumption inside a sourced range.
   * spring thaw: Transpordiamet's 8 t load limit on many state and most municipal roads,
@@ -59,7 +62,6 @@ import json
 import os
 
 DEFAULTS_PATH = os.path.join(os.path.dirname(__file__), "factors.json")
-KG_CO2E_PER_L_DIESEL = 2.68
 
 _FILE_CACHE = {"doc": None}
 

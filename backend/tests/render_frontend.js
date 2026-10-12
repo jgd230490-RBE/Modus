@@ -351,6 +351,11 @@ if (loaded) {
       (dOut.match(/<div title="[^"]+" class="min-w-0 cursor-help">/g) || []).length >= 16);
     ok("...the Today strip renders its loading state without the week, and the stock chart card is there (no stock table)",
       dOut.includes("Loading this week") && dOut.includes("Stockpile capacity") && !dOut.includes("Stock held") && dOut.includes("Big screen"));
+    // 12 Oct 2026 (C4): the Monthly bulletin menu renders on the working view, closed, with the month and the two actions
+    ok("...the Dashboard's working view carries the Monthly bulletin menu: the month select, Download the PDF, Open the page (/bulletin/?month=N)",
+      dOut.includes('<details class="row-menu bulletin-menu">') && dOut.includes(">Monthly bulletin ▾</summary>")
+      && dOut.includes(">Download the PDF</button>") && /<a href="\/bulletin\/\?month=\d+" target="_blank" rel="noopener">Open the page<\/a>/.test(dOut)
+      && dOut.includes('aria-label="Bulletin month"'));
     ok("...the route table has a Delivered column with a % on the reported line and — elsewhere",
       dOut.includes(">Delivered") && / %<\/span>/.test(dOut));
     // with the week fixture: today's deliveries, this week to date, last week, the map card

@@ -292,6 +292,45 @@ ok("🔴 the UNBAKED line has no km, t·km, CO₂, vehicles or fair € — and 
    byk[("R3", 9)]["baked"] is False and byk[("R3", 9)]["km"] is None and byk[("R3", 9)]["co2_t"] is None
    and byk[("R3", 9)]["vehicles"] is None and byk[("R3", 9)]["fair"]["eur"] is None and "UNBAKED" in byk[("R3", 9)]["flags"]
    and byk[("R3", 9)]["trips"] == 45)
+# 12 Oct 2026 (B2): a NULL stored factor (the blank Config cell) used to make this whole read raise
+# (float(None)) and the map blank every carbon figure; it now reads the ONE fallback, and a stored 0 is 0
+_nul = json.loads(json.dumps(conversions.load_factors()))
+_nul["vehicles"][V8]["emissions_kg_co2e_per_km"] = None
+try:
+    _r1n = [l for l in costlines.lines(acc={"role": "planner"}, factors=_nul)["lines"] if (l["route_id"], l["month_index"]) == ("R1", 9)][0]
+except Exception as e:                       # the old code lands here
+    _r1n = {"co2_t": repr(e)}
+ok("⭐ B2: a null factor on the 32 t rigid no longer raises — the line reads the document's _default, 0.89743 (= the literal fallback)",
+   _r1n["co2_t"] == round(201 * 60.0 * 0.89743 / 1000.0, 3), str(_r1n["co2_t"]))
+del _nul["vehicles"]["_default"]
+_r1n2 = [l for l in costlines.lines(acc={"role": "planner"}, factors=_nul)["lines"] if (l["route_id"], l["month_index"]) == ("R1", 9)][0]
+ok("B2: ...and with no _default entry either, conversions.FALLBACK_KG_CO2E_PER_KM — the same number",
+   _r1n2["co2_t"] == round(201 * 60.0 * conversions.FALLBACK_KG_CO2E_PER_KM / 1000.0, 3) == _r1n["co2_t"])
+_nul["vehicles"][V8]["emissions_kg_co2e_per_km"] = 0
+_r1z = [l for l in costlines.lines(acc={"role": "planner"}, factors=_nul)["lines"] if (l["route_id"], l["month_index"]) == ("R1", 9)][0]
+_ra = [r for r in network.route_analysis("R1", profiles=[V8])["rows"] if r["alt_index"] == 0]
+ok("B2: a stored 0 reads 0.0 here (a figure, not a gap)", _r1z["co2_t"] == 0.0 and _r1z["baked"] is True)
+ok("B2: route_analysis reads the SAME function — its kg CO2e/km for the 32 t rigid is the line's 0.99773, through conversions._emissions",
+   bool(_ra) and _ra[0]["co2_kg_per_km"] == 0.99773 == conversions._emissions(conversions.load_factors(), V8),
+   str(_ra[0].get("co2_kg_per_km") if _ra else None))
+# 12 Oct 2026 (the tests-and-regressions review): the line above cannot tell the old `or` chain from the one
+# function — both give 0.99773 for a stored figure. The case that separates them is a stored 0 WITH a
+# _default entry present: the old chain sent it to _default (0.97 then), so the Routes table and the
+# Dashboard disagreed; now it is 0.0 in both. route_analysis reads conversions.load_factors(), so that is
+# what is swapped here (test_carbon pins the same rule at source level).
+_z = json.loads(json.dumps(conversions.load_factors()))
+_z["vehicles"][V8]["emissions_kg_co2e_per_km"] = 0
+_real_lf = conversions.load_factors
+conversions.load_factors = lambda *a, **k: _z
+try:
+    _ra0 = [r for r in network.route_analysis("R1", profiles=[V8])["rows"] if r["alt_index"] == 0]
+finally:
+    conversions.load_factors = _real_lf
+ok("⭐ B2: route_analysis with a STORED 0 on the 32 t rigid (and a _default entry present) reads 0.0 kg CO2e/km, not _default",
+   bool(_ra0) and _ra0[0]["co2_kg_per_km"] == 0.0 and _z["vehicles"]["_default"]["emissions_kg_co2e_per_km"] > 0,
+   str(_ra0[0].get("co2_kg_per_km") if _ra0 else None))
+ok("B2: ...and load_factors is restored (the rigid reads 0.99773 again)",
+   conversions.load_factors is _real_lf and conversions._emissions(conversions.load_factors(), V8) == 0.99773)
 # the three prices in four units
 p1, f1 = r1["planned"], r1["fair"]
 ok("R1 (no route rate) is planned at the TARGET: trips × 45 + trips × 60 km × 1.5, source 'target'",

@@ -131,6 +131,8 @@ for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT
            "PLANNER_CODE", "ADMIN_CODE", "ADMIN_TOKEN"):
     os.environ.pop(_v, None)
 os.environ["ALLOW_DEMO_CODES"] = "1"
+# 12 Oct 2026 (C11 closed): the tenant endpoints REFUSE when ADMIN_TOKEN is unset, so the harness sets one
+os.environ["ADMIN_TOKEN"] = "modus-admin-token"
 
 import db  # noqa: E402
 db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
@@ -374,15 +376,31 @@ ok("a factors row that fails config.validate() is refused",
 out2 = tenant_package.import_tenant(pkg, replace=True)
 ok("replace=True re-imports over a populated tenant", out2["ok"] and out2["replaced"] and db.count_locations() == 2)
 
-# the endpoints, as functions
-st = main.tenant_status(token=None)
+# the endpoints, as functions. 12 Oct 2026 (C11 closed): each needs the admin token now — token=None is a 403.
+_TOK = os.environ["ADMIN_TOKEN"]
+for _fn, _label in ((lambda: main.tenant_status(token=None), "status"), (lambda: main.tenant_export(token=None), "export"),
+                    (lambda: main.tenant_import(pkg, replace=0, token=None), "import")):
+    try:
+        _fn()
+        ok(f"C11: 🔴 /api/admin/tenant/{_label} without the admin token is refused", False)
+    except _HTTPException as e:
+        ok(f"C11: 🔴 /api/admin/tenant/{_label} without the admin token is refused (403)", e.status_code == 403)
+_saved_tok = os.environ.pop("ADMIN_TOKEN")
+try:
+    main.tenant_export(token=_saved_tok)
+    ok("C11: 🔴 with ADMIN_TOKEN unset the export is refused even with the right token — the tenant never leaves an unconfigured deployment", False)
+except _HTTPException as e:
+    ok("C11: 🔴 with ADMIN_TOKEN unset the export is refused even with the right token — the tenant never leaves an unconfigured deployment",
+       e.status_code == 403)
+os.environ["ADMIN_TOKEN"] = _saved_tok
+st = main.tenant_status(token=_TOK)
 ok("GET /api/admin/tenant/status reports counts and emptiness", st["empty"] is False and st["counts"]["locations"] == 2)
-ex = main.tenant_export(token=None)
+ex = main.tenant_export(token=_TOK)
 ok("GET /api/admin/tenant/export is a JSON attachment",
    ex.media_type == "application/json" and "attachment" in ex.headers.get("Content-Disposition", ""))
 ok("…whose body is a valid package", tenant_package.validate(json.loads(ex.body)) == [])
 try:
-    main.tenant_import(pkg, replace=0, token=None)
+    main.tenant_import(pkg, replace=0, token=_TOK)
     ok("POST /api/admin/tenant/import refuses a non-empty tenant with 400", False)
 except _HTTPException as e:
     ok("POST /api/admin/tenant/import refuses a non-empty tenant with 400", e.status_code == 400)

@@ -193,6 +193,23 @@ ok("11 Oct 2026: the offered languages come off /api/meta (vehicle_labels.langs)
   code.includes('VEH.langs = (Array.isArray(vl.langs) && vl.langs.length) ? vl.langs : ["en"];'));
 ok("labels come off /api/meta, not a second list in the client",
   code.includes("m.vehicle_labels") && code.includes("VEH.labels = vl.labels"));
+// 12 Oct 2026 (map review D31): /api/meta answers two shapes — routes, teams and sections only to a code or a staff
+// cookie. The mount fetch runs before a fresh sign-in, so the app fetches again once `role` is set, unless the mount
+// fetch already carried a code (a resume).
+// NARROWED 12 Oct 2026 (the review and fix pass): the "already staff" flag is set from the ANSWER's shape (m.scope),
+// never from whether a code was stored — a stale stored code got the public shape, and the re-fetch after a fresh
+// sign-in was then skipped (no routes, no teams in the portal). Only the latest fetch's answer is applied.
+ok("D31: /api/meta is loaded through one function, on mount and again after a sign-in, unless the answer already was the staff shape",
+  /const loadMeta = \(\) => \{\s*\n\s*const seq = \+\+metaSeq\.current;\s*\n\s*return fetch\(`\$\{API\}\/meta`\)\.then\(r => r\.json\(\)\)\.then\(m => \{\s*\n\s*if\(seq !== metaSeq\.current\) return;\s*\n\s*metaHadCode\.current = !!\(m && m\.scope === "staff"\);/.test(code)
+  && !/metaHadCode\.current = !!ACCESS\.code/.test(code)
+  && /\.catch\(\(\) => \{ if\(seq === metaSeq\.current\) setMetaErr\(true\); \}\);/.test(code)
+  && /useEffect\(\(\) => \{ loadMeta\(\); \}, \[\]\);/.test(code)
+  && /useEffect\(\(\) => \{ if\(role && !metaHadCode\.current\) loadMeta\(\); \}, \[role\]\);/.test(code)
+  && (code.match(/fetch\(`\$\{API\}\/meta`\)/g) || []).length === 1);
+// 12 Oct 2026 (the review and fix pass): Sign out asks the server to swap the 12-hour staff cookie for a map-only one
+// (gate.downgrade_kwargs) — clearing the tab's code alone left the staff surface open to the next person at the machine
+ok("Sign out POSTs /api/gate-signout?keep=map and forgets the staff shape, so the next sign-in fetches /api/meta again",
+  /const signOut = \(\) => \{[\s\S]{0,500}fetch\(`\$\{API\}\/gate-signout\?keep=map`, \{ method: "POST" \}\)\.catch\(\(\) => \{\}\);\s*\n\s*metaHadCode\.current = false;/.test(code));
 // ⭐ THE INVARIANT. The <option value> is the canonical id; only the text changes.
 ok("⭐ the picker's option VALUE is the canonical id, the text is the label",
   /<option key=\{v\} value=\{v\} disabled=[\s\S]{0,160}\{vehLabel\(v\)\}/.test(code));
@@ -2107,6 +2124,43 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      src.includes("approved lines feed the public map, the Look-ahead and the Dashboard.")
      && src.includes("Material colouring lives on the Dashboard and the public map.")
      && !/approved lines feed the route map|the KPI cards\."|forecasting dashboard and the public route map/.test(src));
+}
+
+// ---- 12 Oct 2026 (C4, map review §2.6, mockup 9) — the Monthly bulletin on the Dashboard -----------------
+// Source-level. What it proves: the menu sits on the Dashboard's working view (not the big screen), the PDF is
+// fetched from /api/bulletin/month.pdf with the month (the access code rides on the wrapped fetch), the page
+// link is /bulletin/?month=N in a new tab, the default month is the calendar month inside the programme, the
+// words meet the 14 px floor, and nothing is computed in the browser. Not covered here: the click and the
+// error line (dom_frontend.js), the server (test_bulletin.py, http_smoke.py), a real browser download.
+{
+  const bm = code.slice(code.indexOf("function BulletinMenu({ months })"), code.indexOf("function BulletinMenu({ months })") + 3200);
+  const bmc = bm.slice(0, bm.indexOf("\n}\n") + 3);
+  ok("⭐ BULLETIN: one BulletinMenu component, outside the Dashboard's own body (the carbon-target pins slice it), used ONCE, in the working view's actions",
+    bmc.length > 500 && (code.match(/<BulletinMenu months=\{months\} \/>/g) || []).length === 1
+    && _dbBody.includes("            <BulletinMenu months={months} />\n          </>}\n          <button type=\"button\" data-guide=\"dash-wall\"")
+    && !_dbBody.includes("function BulletinMenu(") && code.indexOf("function BulletinMenu(") > code.indexOf("function DashboardStockChart("));
+  ok("⭐ BULLETIN: the PDF is fetched from /api/bulletin/month.pdf for the chosen month and saved as bulletin-YYYY-MM.pdf",
+    bmc.includes("const r = await fetch(`${API}/bulletin/month.pdf?month=${m}`);") && bmc.includes("const blob = await r.blob();")
+    && bmc.includes('a.download = `bulletin-${months.start_year + Math.floor((m - 1) / 12)}-${String((m - 1) % 12 + 1).padStart(2, "0")}.pdf`;')
+    && bmc.includes("URL.revokeObjectURL(a.href)"));
+  ok("⭐ BULLETIN: the HTML page opens in a new tab at /bulletin/?month=N (the staff cookie opens it; no code in the address)",
+    bmc.includes('<a href={`/bulletin/?month=${m}`} target="_blank" rel="noopener">Open the page</a>') && !/access_code|X-Access-Code|code=/.test(bmc));
+  ok("BULLETIN: the month defaults to this calendar month, clamped to the programme; every month is offered by its label",
+    bmc.includes("const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));")
+    && bmc.includes("const [m, setM] = useState(cur);") && bmc.includes("monthLabelAbs(i, months.start_year)"));
+  ok("BULLETIN: a failed PDF says so under the button in the server's words, never silently",
+    bmc.includes('setErr("The bulletin could not be made: " + (e.message || e));') && bmc.includes('<div className="bm-err" role="alert">{err}</div>')
+    && bmc.includes('{busy ? "Making the bulletin…" : "Download the PDF"}'));
+  ok("🔴 BULLETIN: nothing is computed in the browser — no working-day divisor, no movements arithmetic, no team id",
+    !/working_days|\/ 22|vehicle_loads|two_way|IPT/.test(bmc));
+  ok("🔴 BULLETIN: the 14 px floor for the menu's words (its label, its link, its error line)",
+    /\.bulletin-menu label span\{font-size:14px;\}/.test(html) && /\.bulletin-menu \.row-menu-list a\{[^}]*font-size:14px;/.test(html)
+    && /\.bulletin-menu \.bm-err\{[^}]*font-size:14px;/.test(html));
+  ok("BULLETIN: the house words — lorry movements, never truck; none of the banned words in the menu",
+    // NARROWED 12 Oct 2026 (browser check): the demo's October bulletin is THREE pages (19 routes), so the menu no
+    // longer promises two; the PDF is two pages or more (test_bulletin: "at least two A4 pages")
+    bmc.includes("The month's lorry movements as a PDF and a web page, from the approved plan") && !bmc.includes("two-page PDF")
+    && !/\btrucks?\b|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(bmc) && !/\bAI\b/.test(bmc));
 }
 
 // ---- report ------------------------------------------------------------------

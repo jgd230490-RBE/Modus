@@ -626,7 +626,7 @@ def fetch_nh_closures(current_only=True):
     return out
 
 
-_SERIALISED = {}     # (keys, current_only) -> (id(fc), body)
+_SERIALISED = {}     # (keys, current_only) -> (fc, body)
 
 
 def serialised(fc, keys=None, current_only=True):
@@ -634,13 +634,18 @@ def serialised(fc, keys=None, current_only=True):
     The feature collection as a JSON string, cached against the object identity of the
     collection fetch_all() returned (it lives CACHE_TTL_S; a new fetch is a new object,
     so the body follows it). See main.get_restrictions for why.
+
+    12 Oct 2026: the cache HOLDS the collection it serialised and compares with `is`. It
+    compared `id(fc)` of an object it did not hold, and CPython reuses the id of a freed
+    dict for the next one — so after clear_cache() (the admin refresh) a fresh fetch could
+    land on the old id and the stale body would have been served until the next TTL.
     """
     k = (tuple(keys) if keys else None, bool(current_only))
     hit = _SERIALISED.get(k)
-    if hit and hit[0] == id(fc):
+    if hit and hit[0] is fc:
         return hit[1]
     body = json.dumps(fc, ensure_ascii=False, separators=(",", ":"))
-    _SERIALISED[k] = (id(fc), body)
+    _SERIALISED[k] = (fc, body)
     return body
 
 
@@ -1017,15 +1022,20 @@ def check_route(route_id, profile=None, layers=None, _fc=None):
     }
 
 
-def check_all(profile=None, layers=None):
+def check_all(profile=None, layers=None, current_only=True):
     """
     Every baked route against every restriction layer, one fetch shared across all of
     them. Returns only routes with at least one hit — a clean route is the normal case
     and listing 107 of them buries the four that matter.
+
+    12 Oct 2026 (map review §2.2c (c)): `current_only=False` keeps the records whose date
+    window has ENDED, so a past month can list the closures that applied then. The default
+    is unchanged — fetch_all(current_only=True) drops them at fetch time, which is why the
+    public map's timeline could never show September's closures in October.
     """
     if not enabled():
         return {"routes": {}, "route_count": 0, "provider": None, "note": NO_PROVIDER_NOTE}
-    fc = fetch_all(layers)
+    fc = fetch_all(layers, current_only=current_only)
     if not fc.get("features") and fc.get("errors"):
         return {"error": "no restriction data could be fetched", "detail": fc["errors"]}
     out = {}
@@ -1036,8 +1046,56 @@ def check_all(profile=None, layers=None):
             out[r["id"]] = res
     return {"routes": out, "route_count": len(out),
             "features_checked": len(fc.get("features") or []),
+            "current_only": bool(fc.get("current_only", current_only)),
+            "expired_or_future_excluded": fc.get("expired_or_future", 0),
             "layers": fc.get("layers"), "fetch_errors": fc.get("errors") or {},
             "attribution": fc.get("attribution")}
+
+
+# --------------------------------------------------------------------------- #
+#  Clipping a collection to a window (12 Oct 2026, map review §2.3)            #
+# --------------------------------------------------------------------------- #
+def parse_bbox(value):
+    """
+    'west,south,east,north' in degrees → (w, s, e, n), or None when it is not four finite
+    numbers with west < east and south < north inside the world. Never raises: the
+    endpoint turns None into a 400.
+    """
+    try:
+        parts = [float(p) for p in str(value or "").split(",")]
+    except (TypeError, ValueError):
+        return None
+    if len(parts) != 4 or any(p != p or p in (float("inf"), float("-inf")) for p in parts):
+        return None
+    w, s, e, n = parts
+    if not (-180.0 <= w < e <= 180.0 and -90.0 <= s < n <= 90.0):
+        return None
+    return (w, s, e, n)
+
+
+def clip_bbox(fc, box):
+    """
+    A COPY of a feature collection holding only the features whose own bounding box
+    intersects `box` (touching counts), with `bbox` echoed, `clipped` = how many were
+    dropped, and `counts` recounted per layer kind. Everything else on the collection is
+    carried unchanged, so a clipped answer still says what it was fetched from.
+    """
+    w, s, e, n = box
+    kept, dropped, counts = [], 0, {}
+    for f in (fc.get("features") or []):
+        fb = _bbox(_geom_points((f or {}).get("geometry")))
+        if fb is None or fb[0] > e or fb[2] < w or fb[1] > n or fb[3] < s:
+            dropped += 1
+            continue
+        kept.append(f)
+        kind = ((f.get("properties") or {}).get("_kind")) or "unknown"
+        counts[kind] = counts.get(kind, 0) + 1
+    out = dict(fc)
+    out["features"] = kept
+    out["bbox"] = [w, s, e, n]
+    out["clipped"] = dropped
+    out["counts"] = counts
+    return out
 
 
 # --------------------------------------------------------------------------- #
