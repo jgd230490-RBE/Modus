@@ -2096,7 +2096,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /else if\(e\.key === 'ArrowRight' && inBar\)\{ e\.preventDefault\(\); stepTimeline\(1\); \}/.test(code)
      && !/else if\(e\.key === 'Arrow(Left|Right)'\)\{/.test(code));
   ok("ARIA: the bar is a focusable named group; Play carries aria-pressed; the slider is named Month and speaks the month",
-     /<div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">/.test(html)
+     // NARROWED 12 Oct 2026 (night): the bar ships minimal (class="tl-compact")
+     /<div id="timeline-bar" class="tl-compact" role="group" aria-label="Forecast timeline" tabindex="0">/.test(html)
      && /<button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline\(\)" title="Play \/ pause" aria-label="Play" aria-pressed="false">/.test(html)   // 12 Oct fix pass: was "Play or pause"
      && /<input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub\(this\.value\)" aria-label="Month" aria-valuetext="Jan 2026">/.test(html)
      && /b\.setAttribute\('aria-pressed', 'true'\)/.test(code) && /b\.setAttribute\('aria-pressed', 'false'\)/.test(code)
@@ -3156,7 +3157,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
               const sl = a > 0 && b > a ? code.slice(a, b) : "";
               return sl.indexOf("if (typeof refreshMapModes === 'function') refreshMapModes();") > sl.indexOf("renderMonthFrame(TL.month); renderTimelineWarnings(TL.month);"); })()
-     && code.includes("if(typeof refreshMapModes === 'function') refreshMapModes();\n    }\n    function openTimeline(){"));
+     // NARROWED 12 Oct 2026 (night): setTimelineExpanded now sits between the month frame and openTimeline
+     && /if\(typeof refreshMapModes === 'function'\) refreshMapModes\(\);\n    \}\n[^\n]*\n?    function setTimelineExpanded\(on\)\{/.test(code));
   ok("C1: every month on the playhead, the overlay switching off and closing the bar refresh the modes",
      /applyFilters\(\);\s*if\(typeof refreshMapModes === 'function'\) refreshMapModes\(\);[^\n]*\n    \}\n    function toggleTimeline/.test(code)
      && src.includes("if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow\n                return;"));
@@ -4201,11 +4203,30 @@ function qrRead(mod) {
 // message; "Pause on clash"; the "Plan months / Full horizon" pair; the seconds a month on the speed; wall mode.
 {
   const barHtml = (() => { const i = html.indexOf('<div id="timeline-bar"'); return i > 0 ? html.slice(i, html.indexOf('<div id="route-drawer">', i)) : ""; })();
-  const order = ['class="tl-row1"', 'id="tl-label"', 'id="tl-figs"', 'id="tl-pause-clash"', 'id="tl-seg-plan"', 'id="tl-speed"', 'id="tl-wall"',
+  // REVERSED 12 Oct 2026 (night, the user: remove "290 two-way movements a day · 18 routes · 21.1 t CO₂e a day" from the bar):
+  // no tl-figs in row 1; the Horizon button (tl-more) sits between the speed and Wall mode
+  const order = ['class="tl-row1"', 'id="tl-label"', 'id="tl-pause-clash"', 'id="tl-seg-plan"', 'id="tl-speed"', 'id="tl-more"', 'id="tl-wall"',
                  'class="tl-close"', 'id="tl-looplbl"', 'id="tl-loop"', 'id="tl-rail"', 'id="tl-playhead"', 'id="tl-range"', 'id="tl-years"', 'class="tl-hints"', 'id="tl-live"'];
   const pos = order.map(k => barHtml.indexOf(k));
-  ok("⭐ M3: the bar holds, in order, row 1 (month, figures, Pause on clash, Plan months / Full horizon, speed, Wall mode, close), the loop sentence, the bracket, the rail, the playhead, the month slider, the years, the keys, the announcer",
+  ok("⭐ M3: the bar holds, in order, row 1 (month, Pause on clash, Plan months / Full horizon, speed, Horizon, Wall mode, close), the loop sentence, the bracket, the rail, the playhead, the month slider, the years, the keys, the announcer",
      pos.every(p => p > 0) && pos.every((p, i) => i === 0 || p > pos[i - 1]), JSON.stringify(pos));
+  // 12 Oct 2026 (night, the user: "horizon opens automatically - minimal should show first"; "the bar takes up too much space")
+  ok("⭐ minimal first: the bar ships with class tl-compact, every openTimeline starts minimal, and 'Horizon' toggles the full view (aria-expanded)",
+     barHtml.includes('<div id="timeline-bar" class="tl-compact" role="group"')
+     && barHtml.includes('<button type="button" class="tl-ghost" id="tl-more" aria-expanded="false" onclick="setTimelineExpanded(!TL.expanded)"')
+     && code.includes("function openTimeline(){\n        TL.on=true;\n        setTimelineExpanded(false);")
+     && code.includes("if(bar) bar.classList.toggle('tl-compact', !TL.expanded);")
+     && code.includes("b.setAttribute('aria-expanded', String(TL.expanded)); b.textContent = TL.expanded ? 'Minimal ▾' : 'Horizon ▴';")
+     && code.includes("expanded:false };"));
+  ok("⭐ minimal first: the compact bar hides the switch, the pair, Wall mode, the loop sentence and bracket, the years and the keys, keeps a 12 px month strip — never in wall mode",
+     /body:not\(\.wall-mode\) #timeline-bar\.tl-compact \.tl-sw, body:not\(\.wall-mode\) #timeline-bar\.tl-compact \.tl-seg,\s*body:not\(\.wall-mode\) #timeline-bar\.tl-compact #tl-wall, body:not\(\.wall-mode\) #timeline-bar\.tl-compact \.tl-looplbl,\s*body:not\(\.wall-mode\) #timeline-bar\.tl-compact \.tl-loop, body:not\(\.wall-mode\) #timeline-bar\.tl-compact \.tl-years,\s*body:not\(\.wall-mode\) #timeline-bar\.tl-compact \.tl-hints\{ display:none; \}/.test(html)
+     && html.includes("body:not(.wall-mode) #timeline-bar.tl-compact .tl-rail{ height:12px; }")
+     && !/#timeline-bar\.tl-compact \.tl-rail\{ display:none/.test(html)
+     && !/#timeline-bar\.tl-compact[^{]*(#tl-play|#tl-speed|\.tl-close|#tl-more)[^{]*\{ display:none/.test(html));
+  ok("⭐ the figures line is gone from the bar (markup, CSS); wall mode keeps its own figures (syncTlFigs tolerates no tl-figs)",
+     !barHtml.includes('id="tl-figs"') && !/#tl-figs\{/.test(html)
+     && code.includes("if (figs && figs.textContent !== line) figs.textContent = line;")
+     && code.includes("if (wf && wf.textContent !== line) wf.textContent = line;"));
   ok("M3: the rail's legend names its three marks; the keys are Space, the two arrows and Esc",
      barHtml.includes('<i class="sq"></i>Approved volume') && barHtml.includes('<i class="tri"></i>Closure affecting a route') && barHtml.includes('<i class="dot"></i>Over capacity')
      && barHtml.includes('<kbd>Space</kbd> play / pause') && barHtml.includes('<kbd>←</kbd><kbd>→</kbd> one month') && barHtml.includes('<kbd>Esc</kbd> close'));
