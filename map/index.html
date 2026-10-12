@@ -3884,6 +3884,11 @@
     const AREAS = { cache: {}, pending: {}, month: null, mode: 'movements', data: null, off: new Set(), probed: false, drawn: '',
                     shapes: null, shapesPending: null, error: null };
     const AREA_RAMP = ['#89A3DC', '#6A8BD2', '#4A72C9', '#2D4E95'];     // the plan blue #4A72C9, one hue, light to dark; the light end 2.5:1 on white
+    // 12 Oct 2026 (night, the user: "movements in blue hue and carbon in orange hue"): the carbon colouring of the councils
+    // is ONE orange hue, light to dark, the light end 2.4:1 on white (rule: an ordinal ramp starts no lighter than 2:1).
+    // A knowing change to D26 for the council layer only: By council switches the road network off, so the amber return
+    // leg is not drawn beside it unless ticked back by hand. The routes' own carbon heat map stays blue.
+    const AREA_RAMP_CARBON = ['#EE9150', '#E8590C', '#B8470A', '#7C2D06'];
     const AREA_NONE = '#E7E5E4';                                         // no approved laden route, or no figure
     const AREA_STOPS = { movements: [50, 100, 200], carbon: [50, 100, 200] };   // fixed, ascending: a day / t in the month
     const AREA_INK = '#1F2024';
@@ -3895,7 +3900,8 @@
     function areaFillExpr(mode) {
         const s = AREA_STOPS[mode] || AREA_STOPS.movements;
         // a Mapbox step: below 0.01 (none, or no figure = -1) the neutral, then the four blues
-        return ['step', ['get', 'v'], AREA_NONE, 0.01, AREA_RAMP[0], s[0], AREA_RAMP[1], s[1], AREA_RAMP[2], s[2], AREA_RAMP[3]];
+        const r = mode === 'carbon' ? AREA_RAMP_CARBON : AREA_RAMP;
+        return ['step', ['get', 'v'], AREA_NONE, 0.01, r[0], s[0], r[1], s[1], r[2], s[2], r[3]];
     }
     function areaFigureText(a, mode, when) {
         if (a.nofig) return '—';                         // no month on screen: no figure (the group says to pick one)
@@ -3930,8 +3936,9 @@
     }
     function areaLegendHTML(mode, when) {
         const s = AREA_STOPS[mode] || AREA_STOPS.movements, t = mode === 'carbon' ? ' t' : '';
-        const rows = [['under ' + s[0] + t, AREA_RAMP[0]], [s[0] + ' – ' + (s[1] - 1) + t, AREA_RAMP[1]],
-                      [s[1] + ' – ' + (s[2] - 1) + t, AREA_RAMP[2]], [s[2] + t + ' and over', AREA_RAMP[3]],
+        const r = mode === 'carbon' ? AREA_RAMP_CARBON : AREA_RAMP;
+        const rows = [['under ' + s[0] + t, r[0]], [s[0] + ' – ' + (s[1] - 1) + t, r[1]],
+                      [s[1] + ' – ' + (s[2] - 1) + t, r[2]], [s[2] + t + ' and over', r[3]],
                       [mode === 'carbon' ? 'no approved route or no figure' : 'no approved laden route', AREA_NONE]];
         const title = mode === 'carbon'
             ? 't CO₂e' + (when ? ' in ' + when : ' in the month') + ', split by the km inside each district'

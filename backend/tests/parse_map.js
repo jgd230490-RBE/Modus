@@ -2900,13 +2900,24 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ §2.2b (D26): the fill ramp is ONE hue — four steps of the plan blue (#4A72C9 among them), light to dark",
      ramp.length === 4 && ramp.map(x => x.toUpperCase()).includes("#4A72C9")
      && H.every(([h]) => Math.abs(h - 221) < 3) && H.every(([, l], i) => i === 0 || l < H[i - 1][1]), JSON.stringify(ramp));
-  ok("🔴 §2.2b: no orange in the council block (the routes are blue, the return leg amber; orange is not used on the map)",
-     !/#FF8C14|#C97A2E|#E0770C|#D97706|#F59E0B/i.test(blk));
+  // REVERSED 12 Oct 2026 (night, the user: "movements in blue hue and carbon in orange hue"): the council carbon ramp is
+  // orange, knowingly, for this layer only; the movements stay blue; the brand orange and the amber of the return leg
+  // and of closures are still not used as a council colour
+  const rampC = ((blk.match(/const AREA_RAMP_CARBON = \[([^\]]+)\]/) || [])[1] || "").match(/#[0-9A-Fa-f]{6}/g) || [];
+  const HC = rampC.map(hsl);
+  ok("⭐ council carbon: ONE orange hue (hue 18-30), four steps light to dark, the light end at least 2:1 on white; movements keep the blue",
+     rampC.length === 4 && HC.every(([h]) => h >= 18 && h <= 30) && HC.every(([, l], i) => i === 0 || l < HC[i - 1][1])
+     && (() => { const lum = h => { const c = [1, 3, 5].map(i => { const v = parseInt(h.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+                 return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }; return 1.05 / (lum(rampC[0]) + 0.05) >= 2; })()
+     && !/#FF8C14|#C97A2E|#E0770C|#D97706|#F59E0B/i.test(blk), JSON.stringify(rampC));
   const AREA_NONE = "#E7E5E4";
-  const fillExpr = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE",
+  const fillExpr = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE", "AREA_RAMP_CARBON",
     (blk.match(/function areaFillExpr\(mode\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaFillExpr;")(
-    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE);
+    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE, rampC);
   const fm = fillExpr("movements"), fc = fillExpr("carbon");
+  ok("⭐ council carbon: the carbon fill steps through the orange ramp, the movements fill through the blue",
+     JSON.stringify(fc.slice(4).filter((x, i) => i % 2 === 0)) === JSON.stringify(rampC)
+     && JSON.stringify(fm.slice(4).filter((x, i) => i % 2 === 0)) === JSON.stringify(ramp));
   const stops = e => e.slice(3).filter((x, i) => i % 2 === 0);
   ok("⭐ §2.2b: a Mapbox step on FIXED literal stops in ascending order, the neutral below the first",
      fm[0] === "step" && JSON.stringify(fm[1]) === '["get","v"]' && fm[2] === AREA_NONE
@@ -2927,9 +2938,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /mode: 'movements'/.test(blk) && /\[\['movements', 'Two-way movements a day'\], \['carbon', 't CO(?:₂|\\u2082)e this month'\]\]/.test(blk)
      && /function setAreaMode\(mode\)/.test(blk));
   // the legend, as the page builds it
-  const legend = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE",
+  const legend = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE", "AREA_RAMP_CARBON",
     (blk.match(/function areaLegendHTML\(mode, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaLegendHTML;")(
-    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE);
+    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE, rampC);
   const lgM = legend("movements", "Oct 2026"), lgC = legend("carbon", "Oct 2026");
   ok("⭐ §2.2b: the legend row per mode — movements titled for laden legs, five rows (four blues and the neutral)",
      lgM.includes("Two-way movements a day on roads a laden leg uses") && (lgM.match(/class="area-lg"/g) || []).length === 5
@@ -2937,7 +2948,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && ramp.every(c => lgM.includes(c)), lgM);
   ok("⭐ §2.2b: ...and carbon titled with the month and the split, in t (never kg per tonne)",
      lgC.includes("t CO₂e in Oct 2026, split by the km inside each district") && lgC.includes("200 t and over")
-     && lgC.includes("under 50 t") && !/\bkg\b|per tonne/.test(lgC), lgC);
+     && lgC.includes("under 50 t") && !/\bkg\b|per tonne/.test(lgC) && rampC.every(c => lgC.includes(c)) && !ramp.some(c => lgC.includes(c)), lgC);
   // the attribution: the source carries the dataset's licence lines; the group prints them
   const seedTxt = fs.readFileSync(path.join(ROOT, "backend", "data", "areas_demo.geojson"), "utf8");
   const seed = JSON.parse(seedTxt);
