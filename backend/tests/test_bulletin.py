@@ -919,8 +919,13 @@ ok("…the routes are blue, the bars in the print treatment (light fill, solid e
    'stroke="#4A72C9"' in HTML10 and 'fill="#D7E0F3" stroke="#4A72C9" stroke-width="2"' in HTML10
    and 'stroke="#DC2626" stroke-width="2" stroke-dasharray="4 3"><title>planning flag 60 a day</title>' in HTML10
    and "Dashed red mark: the planning flag typed on the route." in HTML10)
+# NARROWED 12 Oct 2026 (wording review): 640 px let the 14 px labels of the 720-unit chart render at 12.4 px on a phone
 ok("…the chart scrolls on a phone rather than shrinking its labels; the map is an inline schematic, not a second Mapbox",
-   ".chartwrap svg{min-width:640px}" in HTML10 and "mapbox" not in HTML10.lower())
+   ".chartwrap svg{min-width:720px}" in HTML10 and "mapbox" not in HTML10.lower())
+_cw = re.search(r'<svg viewBox="0 0 (\d+) \d+" role="img" aria-label="Two-way movements a day by route" class="chart">', HTML10)
+_mw = re.search(r"\.chartwrap svg\{min-width:(\d+)px\}", HTML10)
+ok("🔴 the 14 px floor on a phone: the chart never draws narrower than its viewBox, so its 14 px labels never render below 14 px",
+   bool(_cw and _mw) and int(_mw.group(1)) >= int(_cw.group(1)), str((_cw and _cw.group(1), _mw and _mw.group(1))))
 ok("…every place a person reads text is escaped (a zone typed with markup prints as text)",
    "<script" not in bulletin_doc.html(dict(S10, title="<script>x</script>")).split("<style>")[1].split("</style>")[1]
    .replace("&lt;script&gt;", ""))

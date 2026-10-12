@@ -2014,7 +2014,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /const span = volMonths\.size \? \[Math\.min\(\.\.\.volMonths\), Math\.max\(\.\.\.volMonths\)\] : null;/.test(code)
      // NARROWED 12 Oct 2026 (C1, review §2.2a): the matrix also carries the programme's carbon maximum and the feed's
      // co2_error, after the span - the carbon ramp's fixed stops come from it
-     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, co2Error: j\.co2_error \|\| null \};/.test(code));
+     // NARROWED 12 Oct 2026 (wording review): and, last, the feed's carbon stamp (carbonStamp), which the carbon legend prints
+     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null \};/.test(code));
   ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
      /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
      && /return span \? span\[0\] : 1;/.test(code)
@@ -3136,7 +3137,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("C1: a route-month with no figure paints grey and is COUNTED, never a zero dressed as a figure",
      blkCode.includes("const CARBON_NONE = '#A8A29E';")
      && code.includes("if(c == null || j.co2_error) acc.co2Missing[k] = (acc.co2Missing[k]||0) + 1;")
-     && blkCode.includes("'no stored road route'"));
+     // REVERSED 12 Oct 2026 (wording review): the label on a DRAWN route with no figure says 'no carbon figure' - the
+     // route is on the map, so 'no stored road route' contradicted it (and a failed carbon read is not that either)
+     && blkCode.includes("'no carbon figure'") && !blkCode.includes("'no stored road route'"));
   ok("⭐ C1: Carbon paints the road-load runs when Road load is on, else the forecast routes; colour only (fixed width, rule 1)",
      blkCode.includes("const paintRoutes = co2 && !rl;") && blkCode.includes("const paintRuns = co2 && rl;")
      && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-color', paintRoutes ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast);")
@@ -3145,7 +3148,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
      && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   ok("⭐ C1: the route label switches to 't CO₂e' in carbon mode (its own layer, on the loaded leg: one label per route)",
-     blkCode.includes("['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no stored road route'];")
+     // REVERSED 12 Oct 2026 (wording review): the fallback reads 'no carbon figure' (was 'no stored road route')
+     blkCode.includes("['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];")
      && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway']];")
      && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', paintRuns ? ROAD_LOAD_CARBON_LABEL : ROAD_LOAD_LABEL);"));
   ok("⭐ C1: the carbon legend is a stepped gradient with the note 'Approved plan only, average-laden factor on both legs, excludes N …'",
@@ -3327,6 +3331,20 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("⭐ C1: f_co2 is the route's month figure on BOTH legs (rounded to 0.1 t); a route with no figure is null, never 0",
            fco2 === "R1/Inbound=47.3,R1/Outbound=47.3,R2/Inbound=null,R2/Outbound=null,R3/Inbound=5", fco2);
         ok("C1: the legend says per route now", el("carbon-legend").innerHTML.includes("per route</b>"));
+        // 12 Oct 2026 (wording review): a CO2e figure a person reads carries the Carbon page's stamp, from the feed
+        ok("⭐ wording: with no stamp in the feed the carbon legend prints none (never retyped on the page)",
+           !el("carbon-legend").innerHTML.includes("Carbon Tool"));
+        TL.matrix.carbonStamp = "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"; B.refreshMapModes(); await flush();
+        ok("⭐ wording: the carbon legend ends with the Carbon page's stamp from forecast-matrix (carbon_stamp), word for word",
+           el("carbon-legend").innerHTML.includes(" Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures.</div>"),
+           el("carbon-legend").innerHTML.slice(-200));
+        B.RL.cache[10].carbon = { stamp: "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" };
+        ok("⭐ wording: the shared-section card prints the road-load feed's carbon stamp while Carbon is on",
+           B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null).includes("Approved plan only. Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures.</div>"));
+        el("toggle-carbon").checked = false;
+        ok("wording: ...and not while Carbon is off (the card then shows no CO2e figure)",
+           !B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null).includes("Carbon Tool"));
+        el("toggle-carbon").checked = true; B.refreshMapModes(); await flush();
         // a failed carbon read
         TL.matrix.co2Error = "The carbon figures could not be read (OperationalError)."; B.refreshMapModes(); await flush();
         ok("C1: a failed carbon read paints every route grey (no figure) and says so in the legend",
@@ -3344,6 +3362,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("C1: the bar closed with Road load ticked: no layers, no source, and the legend says it shows one month",
            !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && el("road-load-legend").innerHTML.includes("Shows one month")
            && fmap.layers["forecast-labels"].layout.visibility === "visible");
+        // 12 Oct 2026 (wording review): it said "set From and To to the same month" - controls D14 removed
+        ok("⭐ wording: the 'one month' note tells a person to press Play or pick a month, never to set the removed From / To",
+           el("road-load-legend").innerHTML.includes("Shows one month: press Play or pick a month.")
+           && !/From and To/.test(el("road-load-legend").innerHTML), el("road-load-legend").innerHTML);
         el("toggle-road-load").checked = false;
       })());
     }
@@ -3837,6 +3859,37 @@ function qrRead(mod) {
      && lk('restr-closures') === 'restr-closures' && !/id="layer-(road-load|carbon)"/.test(html));
   ok("Track C: the council group's tier boxes are layer- ids, so the link carries them without a change (areas-district, areas-county)",
      html.includes('id="layer-areas-district"') && html.includes('id="layer-areas-county"'));
+}
+
+// ===== 12 Oct 2026 — the wording / rules / licences review of Track C =====
+// Each pin fails on f50731b (the Track C integration before the review).
+{
+  ok("⭐ wording: no text on the page names the removed From / To selects as something to set",
+     !/From and To/.test(code) && !/set From/.test(code));
+  ok("⭐ the 14 px floor: the Road load and Carbon checkbox labels (.fc-toggle is 13.5 px) and the chips' Month label (.fc-row label is 12.5 px) are 14 px",
+     /\.fc-toggle\.fc-mode\{ font-size:14px; \}/.test(html) && /#fc-chips-label\{ font-size:14px; \}/.test(html)
+     && html.includes('<label id="fc-chips-label">Month</label>'));
+  // the phone sheet and the map's foot: Mapbox's logo and attribution carry the ONS / OS lines of a council layer
+  const phoneCss = (() => { const i = html.indexOf("@media (max-width:767px){\n            #kpi-hud, #menu-toggle"); return i > 0 ? html.slice(i, html.indexOf("\n        }\n", i)) : ""; })();
+  ok("⭐ licences (phone): the bottom controls (Mapbox logo, attribution with the ONS / OS lines) ride above the sheet, never under it",
+     phoneCss.length > 0 && phoneCss.includes(".mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right{ bottom:var(--m-sheet-h, 0px); }")
+     && !/\.mapboxgl-ctrl-attrib[^{]*\{[^}]*display:\s*none/.test(html) && !/attributionControl:\s*false/.test(code));
+  ok("licences (phone): the sheet's height is measured on every state change, at the breakpoint and on every resize of the sheet",
+     /function sheetAria\(\) \{[\s\S]*?syncSheetHeight\(\);\s*\}/.test(code)
+     && code.includes("syncSheetWithPanel(); renderSheet(); syncSheetHeight();")
+     && code.includes("new ResizeObserver(syncSheetHeight).observe(document.getElementById('m-sheet'))"));
+  const fsrc = /function syncSheetHeight\(\) \{[\s\S]*?\n    \}/.exec(code);
+  const props = {};
+  let phone = true;
+  const sheet = { offsetHeight: 212.4 };
+  const doc = { getElementById: id => id === 'm-sheet' ? sheet : null, documentElement: { style: { setProperty(k, v) { props[k] = v; } } } };
+  let sync = null;
+  try { sync = new Function("document", "isPhoneShell", fsrc[0] + "\nreturn syncSheetHeight;")(doc, () => phone); } catch (e) {}
+  ok("⭐ licences (phone): syncSheetHeight sets --m-sheet-h to the sheet's height on a phone, and 0 above 767 px",
+     !!sync && (sync(), props['--m-sheet-h'] === '212px') && (phone = false, sync(), props['--m-sheet-h'] === '0px'), JSON.stringify(props));
+  // the council layer's licence lines: the area card is not where they live, the attribution and the group are (pinned at §2.2b)
+  ok("licences: the council areas' source is the only place besides the group that prints the ONS / OS lines, and it is never emptied",
+     (code.match(/attribution: \(AREAS\.data\.attribution \|\| \[\]\)\.join/g) || []).length === 1);
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

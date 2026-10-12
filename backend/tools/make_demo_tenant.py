@@ -12,6 +12,8 @@ by default: the shipped demo package carries no areas, and a deployment loads th
 POST /api/admin/areas/import?token= (the same file as the body). --out writes elsewhere,
 so the shipped package is not rewritten by trying the option. The clip (route_area_km)
 needs baked geometry, so it is empty here and fills on the first bake after import.
+The seed file is 25,878 bytes (one line of JSON, 1,044 vertices), fetched 12 Oct 2026 from
+the ONS ArcGIS FeatureServer's BSC layers named in its `sources`; areas.py says more.
 
 WHAT IT MAKES
 -------------

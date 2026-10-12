@@ -285,6 +285,10 @@
         /* 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon. Off by default; their notes and legends are new
            text, so 14 px (the floor). The carbon swatches are the ramp itself, the words beside them ink (rule 4). */
         .fc-mode{ margin-top:8px; }
+        /* wording review (12 Oct): the two new checkbox labels and the chips' "Month" label are new text too, so 14 px;
+           .fc-toggle (13.5) and .fc-row label (12.5) stay as they were for the older controls */
+        .fc-toggle.fc-mode{ font-size:14px; }
+        #fc-chips-label{ font-size:14px; }
         .fc-mode .mode-sub{ font-weight:400; color:var(--muted); }
         .mode-note{ margin:6px 0 0; font-size:14px; color:var(--muted); line-height:1.45; }
         .mode-legend{ margin:8px 0 2px; font-size:14px; color:var(--navy-deep); line-height:1.45; }
@@ -439,6 +443,10 @@
             .custom-map-widget{ display:none !important; }   /* the basemap widget is off on phones; the Layers sheet has the basemap */
             .mapboxgl-ctrl-top-right{ top:calc(var(--notice-h, 0px) + 64px) !important; }
             .mapboxgl-ctrl-group button{ width:44px; height:44px; }
+            /* wording review (12 Oct): the bottom sheet sits over the map's foot, where Mapbox draws its logo and the
+               attribution (Mapbox, OpenStreetMap and, with a council layer on, the ONS / OS licence lines): both ride
+               above the sheet, at its measured height (syncSheetHeight) */
+            .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right{ bottom:var(--m-sheet-h, 0px); }
             #m-layers-btn{ display:flex; align-items:center; gap:8px; position:absolute; left:12px; top:12px; z-index:27; height:48px; padding:0 18px;
                            border:1px solid var(--line); border-radius:24px; background:#fff; color:var(--navy-deep); font:600 15px Inter,system-ui,sans-serif;
                            box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
@@ -4940,7 +4948,7 @@
     const ROAD_LOAD_CARBON_LABEL = ['concat', ['get', 'rl_co2_text'], ' · ', ['get', 'rl_routes_text']];
     //: the route label in carbon mode: the route's t CO2e in the month, from the server
     const CARBON_ROUTE_LABEL = ['case', ['==', ['typeof', ['get', 'f_co2']], 'number'],
-                                ['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no stored road route'];
+                                ['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];
     //: the plan blue at five lightness steps (HSL hue 217, mockup 5), light to dark; the light end may recede (rule 5)
     const CARBON_RAMP = ['#94BBF9', '#5A96F6', '#2071F3', '#0B55CB', '#073888'];
     //: no stored road route for the line's vehicle: no figure, painted grey, never a zero dressed as a figure
@@ -5120,7 +5128,7 @@
     function renderModeLegends(m){
         const rlBox = document.getElementById('road-load-legend'), coBox = document.getElementById('carbon-legend');
         const rl = modeOn('toggle-road-load'), co2 = modeOn('toggle-carbon');
-        const needMonth = 'Shows one month: press Play, or set From and To to the same month.';
+        const needMonth = 'Shows one month: press Play or pick a month.';
         if (rlBox) {
             rlBox.hidden = !rl;
             if (rl) {
@@ -5156,7 +5164,8 @@
                         '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>No stored road route · no figure</div>' +
                         '<div class="ml-foot">Approved plan only, average-laden factor on both legs, excludes ' + miss + ' line' + (miss === 1 ? '' : 's') +
                         ' with no stored road route. Stops are fixed from the programme\'s largest route-month (' + fmtTonnes(mtx.co2Max || 0) + '), so a colour means the same tonnes in every month.' +
-                        (rl ? ' A section carries each route\'s month CO₂e × the section\'s length ÷ that route\'s two-way length.' : '') + '</div>';
+                        (rl ? ' A section carries each route\'s month CO₂e × the section\'s length ÷ that route\'s two-way length.' : '') +
+                        (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '') + '</div>';
                 }
             }
         }
@@ -5230,7 +5239,8 @@
             '<tbody>' + rows + '</tbody></table>' +
             (left.length ? '<div style="color:#6b7280;margin-top:6px;">Also on this section, outside the filters: ' + left.map(rlEsc).join(', ') + '.</div>' : '') +
             '<div style="color:#6b7280;margin-top:6px;">Loaded leg counted once (one load = one two-way movement). ' +
-            (Number(run.length_km) > 0 ? 'Section ' + fmtDist(Number(run.length_km), 1) + ' ' + DU() + '. ' : '') + 'Approved plan only.</div></div>';
+            (Number(run.length_km) > 0 ? 'Section ' + fmtDist(Number(run.length_km), 1) + ' ' + DU() + '. ' : '') + 'Approved plan only.' +
+            (co2On && RL.cache[m] && RL.cache[m].carbon && RL.cache[m].carbon.stamp ? ' ' + rlEsc(RL.cache[m].carbon.stamp) + '.' : '') + '</div></div>';
     }
     function roadLoadHitAt(point){
         if (!map.getLayer('road-load-line')) return false;
@@ -5411,7 +5421,8 @@
         const volMonths = new Set();
         (j.routes||[]).forEach(rt=>{ Object.keys(rt.monthly||{}).forEach(k=>{ const mm=parseInt(k); if(mm>=1 && mm<=(CONFIG.MONTH_COUNT||60) && (rt.monthly[k]||0)>0) volMonths.add(mm); }); });
         const span = volMonths.size ? [Math.min(...volMonths), Math.max(...volMonths)] : null;
-        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span, co2Max, co2Error: j.co2_error || null };
+        // wording review (12 Oct): carbonStamp is the Carbon page's stamp from the feed, printed beside the carbon legend
+        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span, co2Max, co2Error: j.co2_error || null, carbonStamp: j.carbon_stamp || null };
         prefetchSpanKpis();     // in the background, one month at a time; never awaited
         return TL.matrix;
     }
@@ -6530,6 +6541,14 @@
             h.setAttribute('aria-label', SHEET.state === 'peek' ? 'Show the busiest routes and conditions' : 'Show less');
         }
         if (lb) lb.setAttribute('aria-expanded', String(sidebarIsOpen()));
+        syncSheetHeight();
+    }
+    // wording review (12 Oct): Mapbox's logo and attribution, with the ONS / OS lines of a council layer, sit ABOVE the
+    // sheet on a phone (the CSS reads --m-sheet-h); 0 above 767 px, where there is no sheet
+    function syncSheetHeight() {
+        const sh = document.getElementById('m-sheet');
+        const h = (sh && isPhoneShell()) ? Math.round(sh.offsetHeight || 0) : 0;
+        try { document.documentElement.style.setProperty('--m-sheet-h', h + 'px'); } catch (e) {}
     }
     // peek | half | full. Full is the filters and layers: the panel opened as a full-screen sheet.
     function sheetTo(state) {
@@ -6719,7 +6738,7 @@
             const on = isPhoneShell();
             try { if (on) { map.touchPitch.disable(); map.dragRotate.disable(); } else { map.touchPitch.enable(); map.dragRotate.enable(); } } catch (e) {}
             if (!on && SHEET.card) closeRouteCard();
-            syncSheetWithPanel(); renderSheet();
+            syncSheetWithPanel(); renderSheet(); syncSheetHeight();
         };
         try {
             const mql = window.matchMedia(PHONE_SHELL_MQ);
@@ -6749,6 +6768,8 @@
         renderSheet();
     }
     renderMonthChips(); renderSheet(); sheetAria();
+    // the sheet's height changes with its state and its content (a route card, the conditions): follow it
+    try { if (typeof ResizeObserver !== 'undefined' && document.getElementById('m-sheet')) new ResizeObserver(syncSheetHeight).observe(document.getElementById('m-sheet')); } catch (e) {}
     </script>
 </body>
 </html>

@@ -546,7 +546,7 @@ p,li,dd,td,th{{font-size:15px}}
 .nav{{display:flex;justify-content:space-between;margin:6px 0}} .nav a{{min-height:44px;display:inline-flex;align-items:center;color:#1D4ED8}}
 svg{{width:100%;height:auto;display:block}} svg .pin{{fill:#fff;font:700 14px Inter,Arial,sans-serif}}
 svg .lab,svg .val{{fill:var(--ink);font:14px Inter,Arial,sans-serif}}
-.chartwrap{{overflow-x:auto}} .chartwrap svg{{min-width:640px}}
+.chartwrap{{overflow-x:auto}} .chartwrap svg{{min-width:720px}}   /* the chart's 14 px labels never scale below 14 px: it scrolls instead */
 .legend{{font-size:14px;color:var(--muted);margin:6px 0}}
 .tw{{overflow-x:auto}} table{{border-collapse:collapse;width:100%}} th,td{{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line)}}
 th{{font-size:14px;color:var(--muted);font-weight:600}} td.n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}

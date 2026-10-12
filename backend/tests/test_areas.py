@@ -354,6 +354,19 @@ ok("3. ...the OGL v3 and both FeatureServer layers it came from (May 2026 distri
    and any("Local_Authority_Districts_May_2026_Boundaries_UK_BSC" in s for s in seed["sources"])
    and any("Counties_and_Unitary_Authorities_December_2025_Boundaries_UK_BSC" in s for s in seed["sources"]))
 ok("3. it is under 300 KB (the BSC edition)", len(seed_raw.encode("utf-8")) < 300 * 1024, str(len(seed_raw)))
+# 12 Oct 2026 (wording review): the seed's size and provenance are stated in a comment, and the comment matches the file
+_asrc = read("backend/areas.py")
+_n_bytes = len(seed_raw.encode("utf-8"))
+_n_vert = sum(len(r) for f in seed["features"] for r in areas.rings_of(f["geometry"]))
+ok("3. ⭐ areas.py states the seed's size (its exact byte count and vertex count) and where it came from (both ONS layers, the date)",
+   f"is {_n_bytes:,} bytes" in _asrc and f"{_n_vert:,} vertices" in _asrc
+   and "Local_Authority_Districts_May_2026_Boundaries_UK_BSC" in _asrc
+   and "Counties_and_Unitary_Authorities_December_2025_Boundaries_UK_BSC" in _asrc
+   and "Fetched 12 Oct 2026" in _asrc and seed.get("fetched") == "2026-10-12"
+   and "Open Government Licence v3.0" in _asrc,
+   f"{_n_bytes:,} bytes / {_n_vert:,} vertices")
+ok("3. ...and the demo generator that loads it says the same size",
+   f"The seed file is {_n_bytes:,} bytes" in read("backend/tools/make_demo_tenant.py"))
 ok("3. ids are the ONS codes (E06 unitary, E07 district, E10 county)",
    all(re.fullmatch(r"E(06|07|10)\d{6}", f["properties"]["area_id"]) for f in seed["features"]))
 ok("3. LF endings and one line of JSON", "\r" not in seed_raw and seed_raw.endswith("\n"))

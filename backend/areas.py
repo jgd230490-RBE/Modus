@@ -20,6 +20,14 @@ THE DATA
     demo's file, backend/data/areas_demo.geojson (the eight ONS districts round the
     corridor and Leicestershire), is imported by hand or by the demo generator's
     --with-areas option.
+    THE SEED FILE, size and provenance: backend/data/areas_demo.geojson is 25,878 bytes, one
+    line of JSON, nine Polygons, 1,044 vertices, WGS84 coordinates at most 6 decimal places.
+    Fetched 12 Oct 2026 from the ONS Open Geography Portal's ArcGIS FeatureServer, BSC
+    (super generalised, 200 m, clipped) editions: Local_Authority_Districts_May_2026_Boundaries_UK_BSC for
+    the eight districts and Counties_and_Unitary_Authorities_December_2025_Boundaries_UK_BSC
+    for Leicestershire (the file names both layer URLs in `sources` and the date in
+    `fetched`). Open Government Licence v3.0; its `attribution` is the ONS licence page's two
+    lines word for word, which the map prints wherever the polygons are drawn.
   * `route_area_km` (tenanted, derived, in the package): per (route, vehicle profile, leg,
     area) the kilometres of the PRIMARY (alt 0) polyline inside the area, and one row per
     (route, profile, leg) with area_id '*' carrying the leg's whole length — the divisor.
