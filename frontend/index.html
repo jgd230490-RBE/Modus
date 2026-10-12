@@ -308,6 +308,14 @@
   .ct-more{margin-top:6px;font-size:14px;color:var(--ink);}
   .ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;}
   .ct-more ul{margin:4px 0 0 18px;list-style:disc;}
+  /* 11 Oct 2026 — the Gate arrivals panel on the Dashboard (tokens only; 14 px table text; the .ct-* family's strip) */
+  .ga-strip{margin-top:12px;}
+  .ga-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .ga-table th{font-size:14px;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
+  .ga-table td{font-size:14px;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line);}
+  .ga-table tr.ga-notes td{border-bottom:1px solid var(--line);padding-top:0;}
+  .ga-sel{font-size:14px;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);margin-left:6px;}
+  @media (max-width:720px){.ga-table thead{display:none;}.ga-table td{display:block;border-bottom:0;}.ga-table td[data-label]::before{content:attr(data-label) ": ";font-weight:600;}.ga-table tr{display:block;border-bottom:1px solid var(--line);padding:6px 0;}}
   /* 10 Oct 2026 — the Look-ahead grid (mockup 3): sticky first column, click-to-edit cells, a totals row */
   .tbl .la-stick{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
   .tbl th.la-stick{background:var(--surface-2);z-index:3;}
@@ -573,6 +581,75 @@ function WallSection({ show, divider, title, children }){
   );
 }
 
+// ---- 11 Oct 2026: Gate arrivals on the Dashboard --------------------------------------------
+// GET /api/gates/arrivals?month=N (any signed-in code). The SERVER sums every team's lorries at the
+// gate each lorry ARRIVES by — laden at the destination's entry gate, empty (coming to load) at the
+// origin's — divides by the working days, and works out the average gap from the shift's minutes.
+// Red only when that gap is shorter than the gate's typed check-in; no amber; a gate with no check-in
+// typed is never compared. Nothing here derives: the browser reads and formats. The data holds daily
+// totals and no hourly peak, so every figure says "if arrivals are spread evenly". A team code is
+// given the totals and the team NAMES, never another team's figure (the server strips per_team).
+// Not on the big screen before the freeze: a 5th DASH_SECTIONS entry means narrowing parse_frontend's
+// four-section pins (1178-1183, 1776) and the "All four" / "#dashboard/1 … /4" texts in the wall bar.
+const gaMonthToday = (months) => {
+  const sy = (months && months.start_year) || 2026, n = (months && months.count) || 60, d = new Date();
+  return Math.max(1, Math.min(n, (d.getFullYear() - sy) * 12 + d.getMonth() + 1));
+};
+const GA_SPREAD = "if arrivals are spread evenly";
+// the chip's word, in the server's order of reasons: red; nothing approved yet (a gate listed for its pending
+// lines only: gap null); no check-in typed (nothing compared); otherwise the average holds
+const gaFlagWord = (g) => g.flag === "red" ? "Queue likely" : (g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds"));
+const gaMin = (m) => m == null ? "—" : `${(+m).toFixed(1)} min`;
+const gaN1 = (n) => n == null ? "—" : (+n).toFixed(1);
+function GateArrivalsPanel({ ga, err, month, months, onMonth }){
+  if(!ga) return err
+    ? <div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>
+    : null;
+  const gates = ga.gates || [];
+  const state = gates.length === 0 ? "none" : "set";
+  const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
+  return (
+    <section className="ct-strip ga-strip" data-gate-arrivals={state} data-guide="dash-gates" aria-label="Gate arrivals">
+      <div className="ct-row">
+        <h3 className="ct-h">Gate arrivals</h3>
+        <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => onMonth(+e.target.value)} aria-label="Month">
+          {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}
+        </select></label>
+      </div>
+      <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across the {ga.shift_hours} h shift.</div>
+      {state === "none" && <EmptyState kind="none" title={`No approved lines in ${ga.label}`} body="Pick another month. Pending lines appear as a note until they are approved, then in the figures." />}
+      {state === "set" && (
+        <table className="ga-table">
+          <thead><tr><th scope="col">Gate</th><th scope="col">Arrivals a day</th><th scope="col">Average gap</th><th scope="col">Check-in</th><th scope="col">Status</th></tr></thead>
+          <tbody>
+            {gates.map(g => (
+              <React.Fragment key={g.gate_id}>
+                <tr data-ga-gate={g.gate_id} data-ga-flag={g.flag || "none"}>
+                  <td><b>{g.location_name}</b> · {g.gate_name}
+                    <div className="ct-note">{(g.teams || []).map(t => teamText(t) || "—").join(" · ")}</div></td>
+                  <td data-label="Arrivals a day">{gaN1(g.arrivals_per_day)}
+                    <div className="ct-note">{gaN1(g.laden_per_day)} laden · {gaN1(g.empty_per_day)} coming to load</div>
+                    {(g.per_team || []).map((t, i) => <div key={i} className="ct-note">{teamText(t.team) || "—"} {gaN1(t.arrivals_per_day)}</div>)}</td>
+                  <td data-label="Average gap">{g.gap_minutes == null ? "no approved arrivals" : `one every ${gaMin(g.gap_minutes)} ${GA_SPREAD}`}</td>
+                  <td data-label="Check-in">{g.gate_minutes == null ? "not typed" : `${+g.gate_minutes} min a lorry`}</td>
+                  <td data-label="Status" title={g.reason}><span className="chip-st"><i style={{ background: g.flag === "red" ? "var(--red)" : "var(--chart-none)" }} aria-hidden="true"></i><span className="font-semibold">{gaFlagWord(g)}</span></span></td>
+                </tr>
+                {(g.origin_share_note || g.pending_lines > 0) && (
+                  <tr className="ga-notes"><td colSpan={5}>
+                    {g.origin_share_note && <div className="ct-note">{g.origin_share_note}</div>}
+                    {g.pending_lines > 0 && <div className="ct-note">{g.pending_lines} pending line{g.pending_lines === 1 ? "" : "s"} would add {gaN1(g.pending_per_day)} a day here once approved.</div>}
+                  </td></tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {(ga.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
+    </section>
+  );
+}
+
 // ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast ------------
 // A planner sets the target on the Carbon planner. Each page reads it with ONE call,
 // GET /api/carbon/target (any signed-in code; the progress is worked out on the lines that code
@@ -705,7 +782,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOpen }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -713,6 +790,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOp
   const [weekErr, setWeekErr] = useState("");
   const [ct, setCt] = useState(initialTarget || null);    // 11 Oct 2026: the carbon target (GET /api/carbon/target)
   const [ctErr, setCtErr] = useState(false);
+  const [ga, setGa] = useState(initialGates || null);    // 11 Oct 2026: gate arrivals (GET /api/gates/arrivals?month=)
+  const [gaErr, setGaErr] = useState(false);
+  const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));
   const [status, setStatus] = useState("Approved");
   const [unit, setUnit] = useState("t");
   const [material, setMaterial] = useState("All");
@@ -790,6 +870,19 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOp
     }).catch(() => { if(live) setCtErr(true); });
     return () => { live = false; };
   }, [tick]);
+  // 11 Oct 2026: gate arrivals — its own read, so a failure never hides the programme figures; the month
+  // is the panel's own select (default: this month). Not read on the big screen: the panel is not on it
+  // before the freeze, so the 5-minute tick would fetch for nothing there.
+  useEffect(() => {
+    if(initialGates) return;
+    if(wall) return;
+    let live = true;
+    setGaErr(false);
+    fetch(`${API}/gates/arrivals?month=${gaMonth}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+      if(live){ setGa(j); setGaErr(false); }
+    }).catch(() => { if(live) setGaErr(true); });
+    return () => { live = false; };
+  }, [tick, gaMonth, wall]);
   useEffect(() => {
     if(!wall) return;
     const id = setInterval(() => setTick(t => t + 1), REFRESH_MS);
@@ -1081,6 +1174,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOp
                   title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
           </div>
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
+          <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
           <div className="grid lg:grid-cols-5 gap-4">
             <div className="card p-4 lg:col-span-3">
@@ -1313,7 +1407,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, onWall, onOp
       )}
 
 
-      {!wall && <p className="text-xs text-slate-400 px-1">Planning estimates and typed actuals — no live tracking. Every planning figure on this page comes from <code>/api/costing/lines</code>, the same functions the Look-ahead uses: trips = tonnes ÷ planning payload rounded up per line-month; {DU()}, cycle and vehicles from the baked HERE route for the line's vehicle (an unbaked line has none and is excluded from those totals, never estimated); CO₂e = km × the vehicle's per-km factor on Config → Vehicles (stored per km whatever the tenant reads). Planned {CUR()} = the route`s typed rates (summed), or the Config target rate where the route has none. Fair {CUR()} = the cost model on Config → Costing · fuel — a floor for negotiation, never a quote. Peak fleet = the largest same-month sum of vehicles needed (trips ÷ working days ÷ what one vehicle does in a shift). Delivered = the week actuals typed on Look-ahead → Account (a day actual rolls into its week); a week nobody reported counts as nothing. Today and this week come from the Look-ahead`s own read.</p>}
+      {!wall && <p className="text-xs text-slate-400 px-1">Planning estimates and typed actuals — no live tracking. Every planning figure on this page comes from <code>/api/costing/lines</code>, the same functions the Look-ahead uses: trips = tonnes ÷ planning payload rounded up per line-month; {DU()}, cycle and vehicles from the baked HERE route for the line's vehicle (an unbaked line has none and is excluded from those totals, never estimated); CO₂e = km × the vehicle's per-km factor on Config → Vehicles (stored per km whatever the tenant reads). Planned {CUR()} = the route`s typed rates (summed), or the Config target rate where the route has none. Fair {CUR()} = the cost model on Config → Costing · fuel — a floor for negotiation, never a quote. Peak fleet = the largest same-month sum of vehicles needed (trips ÷ working days ÷ what one vehicle does in a shift). Delivered = the week actuals typed on Look-ahead → Account (a day actual rolls into its week); a week nobody reported counts as nothing. Today and this week come from the Look-ahead`s own read. Gate arrivals come from <code>/api/gates/arrivals</code>: the same trips rule, all {TEAMS().toLowerCase()} summed at the gate a lorry arrives by, ÷ working days; the gap is the shift's minutes ÷ arrivals, an average with no hourly peak.</p>}
     </div>
   );
 }
@@ -1627,6 +1721,8 @@ const GUIDE_STEPS = {
     { anchor: "page-header", title: "The plan at a glance.", body: "Pick the months, team and status here; the cards and charts follow, except this week's plan and the carbon target. Today's figures are under This week and today, further down." },
     { anchor: "dash-figures", title: "Six cards.", body: "Material in view, deliveries a day, vehicles needed, delivered against plan and transport carbon for the lines in view, and this week's plan from the Look-ahead. Point at a card to see how it is worked out." },
     { anchor: "dash-figures", title: "Carbon.", body: "Transport carbon counts transport only. The strip under the cards shows the scheme's all-in carbon target, once a planner has set one. Cost is in the Cost over time chart." },
+    // 11 Oct 2026 (gate arrivals): the panel under the carbon strip has its own step
+    { anchor: "dash-gates", title: "Gate arrivals.", body: "Lorries a day at each gate, every team together, and the average gap if arrivals are spread evenly." },
     { anchor: "dash-wall", title: "Big screen.", body: "Opens a version made for a site-office TV." },
   ],
   submit: GUIDE_FORECAST_STEPS,

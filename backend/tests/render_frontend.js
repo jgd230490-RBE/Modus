@@ -511,6 +511,77 @@ if (loaded) {
       && dTc.includes("<b>Target: a fixed cap of 43.4 tCO2e for the whole scheme, not split by team</b>")
       && !/IPT\d/.test(seg(dTp, "data-carbon-target", "Material demand") + seg(dTc, "data-carbon-target", "Material demand"))
       && !/undefined|NaN/.test(dTp + dTc));
+    // ---- 11 Oct 2026: Gate arrivals on the Dashboard, from fixtures/gate_arrivals.json (test_gate_arrivals.py writes it:
+    // the planner's month 9 of the §2.6 seed — three gates, one red, one with no check-in typed, one holding). The page shows
+    // what the server sends and adds nothing; a team code's response (per_team already stripped) is the same fixture masked here.
+    // The panel's own markup is sliced (gaSeg): the carbon target on the same page carries 161.4 too.
+    const gaPath = path.join(__dirname, "fixtures", "gate_arrivals.json");
+    ok("the gate-arrivals fixture exists (written by test_gate_arrivals.py)", fs.existsSync(gaPath));
+    if (fs.existsSync(gaPath)) {
+      const GA = JSON.parse(fs.readFileSync(gaPath, "utf8"));
+      const gaSeg = (out) => seg(out, 'data-gate-arrivals="', "</section>");
+      const gOut = render("the Dashboard renders POPULATED with gate arrivals (initialGates)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GA, onOpen(){} }));
+      const gP = gaSeg(gOut);
+      const red = GA.gates.filter(g => g.flag === "red"), untyped = GA.gates.filter(g => g.gate_minutes == null);
+      ok("⭐ GATE ARRIVALS: three gates, one red, one untyped, one holding, each a row with its data attribute",
+        GA.gates.length === 3 && red.length === 1 && untyped.length === 1 && GA.gates.every(g => gP.includes(`data-ga-gate="${g.gate_id}"`) && gP.includes(`data-ga-flag="${g.flag || "none"}"`))
+        && gOut.includes('data-gate-arrivals="set"') && gP.includes(">Gate arrivals</h3>"));
+      ok("🔴 the red gate reads 'Queue likely' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
+        (gP.match(/>Queue likely</g) || []).length === 1 && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
+        && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gP.match(/background:var\(--red\)/g) || []).length === 1);
+      ok("⭐ every figure is the server's, formatted to 1 dp, with the gap in the contract's words; the check-in is a word, never a bare 0",
+        GA.gates.every(g => gP.includes(`>${g.arrivals_per_day.toFixed(1)}<`) && (g.gap_minutes == null || gP.includes(`one every ${g.gap_minutes.toFixed(1)} min if arrivals are spread evenly`)))
+        && gP.includes(">not typed<") && gP.includes(">2 min a lorry<") && gP.includes(">3 min a lorry<") && !gP.includes(">0 min a lorry<")
+        && gP.includes("0.0 laden · 252.3 coming to load") && gP.includes("227.3 laden · 4.5 coming to load") && !/undefined|NaN/.test(gP));
+      ok("the origin gate carries the share note and the pending gates their pending line; the compound carries neither",
+        gP.includes("West pit serves other customers too; Wayscope sees only this scheme&#x27;s share of this gate&#x27;s traffic.")
+        && (gP.match(/serves other customers too/g) || []).length === 1
+        && (gP.match(/>1 pending line would add 5\.0 a day here once approved\.</g) || []).length === 2
+        && (gP.match(/<tr class="ga-notes">/g) || []).length === 2);
+      ok("⭐ team NAMES, every team at the gate, the planner's per-team split (Team 1 161.4 / Team 2 90.9)",
+        gP.includes(">Team 1 · Team 2<") && gP.includes(">Team 1<") && gP.includes(">Team 1 161.4<") && gP.includes(">Team 2 90.9<") && gP.includes(">Team 1 140.9<")
+        // the gate id is the row's data attribute for these harnesses and nothing else: stripped, no id, location id, route id or scope is left on the page
+        && !/IPT ?[1-6]/.test(gP) && !/G00[1-9]|\bL[1-9]\b|\bR[1-9]\b|scheme</.test(gP.replace(/data-ga-gate="G00\d"/g, "")));
+      ok("the month's words under the header, and the two notes under the table, in the server's words",
+        // NARROWED 11 Oct 2026 (review): "every teams" was ungrammatical — "all teams together"
+        gP.includes("Sep 2026: lorries a day at each gate, all teams together, if arrivals are spread evenly across the 10 h shift.") && !gP.includes("every teams")
+        && GA.notes.every(n => gP.includes(n.replace(/'/g, "&#x27;"))) && gP.indexOf("</table>") < gP.indexOf("Averages only, if arrivals are spread evenly"));
+      const GAT = { ...GA, scope: "team", gates: GA.gates.map(g => ({ ...g, per_team: g.per_team.filter(t => t.team === "Team 2") })) };
+      const tOut = render("the Dashboard renders a team code's gate arrivals (per_team already stripped by the server)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAT, onOpen(){} }));
+      const tP = gaSeg(tOut);
+      ok("🔴 a team code's page shows the totals and both names but never the other team's figure",
+        tP.includes(">252.3<") && tP.includes(">231.8<") && tP.includes(">Team 1 · Team 2<") && !tP.includes("161.4") && !tP.includes("140.9")
+        && (tP.match(/>Team 2 90\.9</g) || []).length === 2 && !/>Team 1 \d/.test(tP) && !/undefined|NaN/.test(tP));
+      const eOut = render("the Dashboard renders an EMPTY month of gate arrivals", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: { ...GA, month: 11, label: "Nov 2026", gates: [], notes: ["No approved lines in Nov 2026.", GA.notes[GA.notes.length - 1]] }, onOpen(){} }));
+      const eP = gaSeg(eOut);
+      ok("the empty state names the month and keeps the averages note; no table",
+        eOut.includes('data-gate-arrivals="none"') && eP.includes("No approved lines in Nov 2026") && eP.includes('data-empty="none"')
+        // NARROWED 11 Oct 2026 (review): the body had the pending rule backwards
+        && eP.includes("Pick another month. Pending lines appear as a note until they are approved, then in the figures.") && eP.includes("No hourly peak is typed") && !eP.includes("<table"));
+      // a gate listed for its PENDING lines only (nothing approved there this month): the chip says so and claims no spacing
+      const pOnly = { ...GA.gates[1], laden_per_day: 0.0, empty_per_day: 0.0, arrivals_per_day: 0.0, gap_minutes: null, flag: null,
+                      reason: "No approved arrivals this month.", pending_lines: 1, pending_per_day: 5.0, per_team: [], teams: [] };
+      const pOut = render("the Dashboard renders a pending-only gate", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: { ...GA, gates: [pOnly] }, onOpen(){} }));
+      const pP = gaSeg(pOut);
+      ok("🔴 a pending-only gate reads 'No approved arrivals' as the chip's word and 'no approved arrivals' as its gap; never 'Spacing holds' or 'one every —'",
+        (pP.match(/>No approved arrivals</g) || []).length === 1 && pP.includes(">no approved arrivals<") && !pP.includes("Spacing holds") && !pP.includes("one every")
+        && !pP.includes("—") && pP.includes('data-ga-flag="none"') && pP.includes(">1 pending line would add 5.0 a day here once approved.<") && !/undefined|NaN/.test(pP));
+      const selP = seg(gP, '<select class="ga-sel"', "</select>");
+      ok("the month select shows the fixture's month in the Dashboard's words (Sep 26), 24 months of the horizon",
+        /<option value="9" selected="">Sep 26<\/option>/.test(selP) && (selP.match(/<option/g) || []).length === ctMeta.months.count && (selP.match(/selected/g) || []).length === 1
+        && /<select class="ga-sel"[^>]*aria-label="Month"/.test(eP) && /<option value="11" selected="">Nov 26<\/option>/.test(eP));
+      ok("🔴 none of the banned words in the rendered panel",
+        !/\b(real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure|booking|peak hour)\b/i.test(gP + tP + eP) && !/\bAI\b/.test(gP + tP + eP));
+      // REVERSED 11 Oct 2026 (review): the page once rendered an `unbaked_note` the server never sends. A field the
+      // contract does not carry is ignored: no extra note row, nothing of it on the page.
+      const uOut = render("the Dashboard renders a gate carrying a field outside the contract", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT,
+        initialGates: { ...GA, gates: GA.gates.map((g, i) => i === 1 ? { ...g, unbaked_note: "One route here is not baked yet." } : g) }, onOpen(){} }));
+      ok("a field outside the contract is ignored: the same two note rows, nothing of it on the page",
+        (gaSeg(uOut).match(/<tr class="ga-notes">/g) || []).length === 2 && !gaSeg(uOut).includes("not baked yet") && !gP.includes("unbaked"));
+      ok("🔴 without initialGates the panel renders nothing (the Dashboard's other render tests keep their shape); the footnote still names the read",
+        !dSet.includes("data-gate-arrivals") && !dSet.includes(">Gate arrivals</h3>") && !dNone.includes("data-gate-arrivals") && !dNone.includes("ga-table")
+        && dSet.includes("Gate arrivals come from <code>/api/gates/arrivals</code>"));
+    }
     // R2: a cap 2.0 tCO2e over (approved 7 361.1, with the decisions 7 002.8, cap 7 000.8) reads OVER on the Dashboard, as on the
     // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
     const dCap2 = dash(CAP2);

@@ -660,6 +660,61 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.delete("/api/carbon/target", headers=PLAN)
     ok("⭐ a planner clears it: target null, and GET agrees", r.status_code == 200 and r.json()["target"] is None
        and c.get("/api/carbon/target", headers=PLAN).json() == {"target": None, "status": None}, r.text[:160])
+    # ---- 11 Oct 2026: Gate arrivals (the staff Dashboard panel) ----------------------------
+    r = c.get("/api/gates/arrivals?month=9")
+    ok("🔴 gate arrivals without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/gates/arrivals?month=9", headers=PLAN)
+    ga = r.json() if r.status_code == 200 else {}
+    ok("⭐ the planner reads month 9 of the demo: scope scheme, 22 days, 10 h, Sep 2026",
+       r.status_code == 200 and ga.get("scope") == "scheme" and ga.get("working_days") == 22.0
+       and ga.get("shift_hours") == 10.0 and ga.get("label") == "Sep 2026", r.text[:200])
+    byname = {(g["location_name"], g["gate_name"]): g for g in ga.get("gates", [])}
+    hb = byname.get(("Harborough Compound", "Station Road entrance (in)")) or {}
+    lg = byname.get(("Langton Compound", "Compound gate")) or {}
+    ok("⭐ Harborough Compound's Station Road entrance: 65–95 laden arrivals a day, one every 6–9 min, check-in 5, NOT red (honest: averages alone do not queue)",
+       65 <= hb.get("arrivals_per_day", 0) <= 95 and 6 <= hb.get("gap_minutes", 0) <= 9 and hb.get("gate_minutes") == 5.0
+       and hb.get("flag") is None and "if arrivals are spread evenly" in hb.get("reason", ""), str(hb)[:300])
+    ok("⭐ Langton Compound's gate: 65–95 a day (laden plus the muck-away lorries coming to load, role both), check-in 3, not red",
+       65 <= lg.get("arrivals_per_day", 0) <= 95 and lg.get("role") == "both" and lg.get("empty_per_day", 0) > 0
+       and lg.get("gate_minutes") == 3.0 and lg.get("flag") is None, str(lg)[:300])
+    ok("the quarry gates carry the origin-share note; the compounds do not",
+       # NARROWED 11 Oct 2026 (review): the all() over a filter was vacuous with no quarry listed; at least one must be
+       any(g["loc_type"] in ("Quarry", "Railhead") for g in ga.get("gates", []))
+       and all(g.get("origin_share_note") for g in ga.get("gates", []) if g["loc_type"] in ("Quarry", "Railhead"))
+       and not hb.get("origin_share_note") and not lg.get("origin_share_note"))
+    ok("the demo's exit gates are not listed: every quarry route is counted at the Weighbridge (in) by fall-through",
+       not any(g["gate_name"] in ("Main road exit", "A46 exit", "Mill Lane exit") for g in ga.get("gates", []))
+       and any(g["gate_name"] == "Weighbridge (in)" and g.get("fallthrough_routes") for g in ga.get("gates", [])))
+    ok("🔴 nothing in month 9 is red, and the response says so in words rather than inventing a peak",
+       all(g.get("flag") is None for g in ga.get("gates", [])) and any("No hourly peak is typed" in n for n in ga.get("notes", [])))
+    ok("🔴 the banned words appear nowhere in the planner's response",
+       not re.search(r"real-time|live tracking|telematics|optimi[sz]|predict|\bAI\b|\btrucks?\b|booking|peak hour", r.text, re.I))
+    r = c.get("/api/gates/arrivals?month=10", headers=PLAN)
+    ok("month 10 carries the Pending line (R013) as a note, never in a figure",
+       r.status_code == 200 and any(n.startswith("1 pending line in Oct 2026") for n in r.json().get("notes", [])))
+    r = c.get("/api/gates/arrivals?month=9", headers=NORTH)
+    gn = r.json() if r.status_code == 200 else {}
+    ok("🔴 the North Team code: scope team, the SAME totals and team names as the planner, per_team holding only North Team",
+       r.status_code == 200 and gn.get("scope") == "team"
+       and [(g["gate_id"], g["arrivals_per_day"], g["teams"]) for g in gn.get("gates", [])] == [(g["gate_id"], g["arrivals_per_day"], g["teams"]) for g in ga.get("gates", [])]
+       and all(all(t["team"] == "North Team" for t in g.get("per_team", [])) for g in gn.get("gates", []))
+       and any(g["per_team"] == [] and "South Team" in g["teams"] for g in gn.get("gates", [])), r.text[:300])
+    # the other teams' per-team figures from the planner's view, minus any value that is ALSO a gate total or North's own
+    # figure (those may legitimately appear); none of what is left may appear anywhere in North's per_team rows
+    _shown = {t["arrivals_per_day"] for g in gn.get("gates", []) for t in g.get("per_team", [])}
+    _others = {t["arrivals_per_day"] for g in ga.get("gates", []) for t in g.get("per_team", []) if t["team"] != "North Team"}
+    ok("🔴 ...and no other team's per-team figure reaches it", bool(_others) and not (_others & _shown), str(_others & _shown))
+    r = c.get("/api/gates/arrivals?month=0", headers=PLAN)
+    ok("month 0 is refused — 400", r.status_code == 400, str(r.status_code))
+    r = c.get("/api/gates/arrivals", headers=PLAN)
+    ok("no month -> today's month, clamped to the horizon, 200", r.status_code == 200 and 1 <= r.json().get("month", 0) <= 60, str(r.status_code))
+    # the demo figures for the session report (not asserted beyond the ranges above)
+    print("  gate arrivals, month 9 (demo package):")
+    for g in ga.get("gates", []):
+        print(f"    {g['location_name']} · {g['gate_name']}: {g['arrivals_per_day']}/day "
+              f"(laden {g['laden_per_day']}, empty {g['empty_per_day']}), gap {g['gap_minutes']} min, "
+              f"check-in {g['gate_minutes']}, flag {g['flag']}, role {g['role']}, teams {g['teams']}")
+
     # the Submit forecast preview's all-in carbon, over HTTP: 1,000 t of cut to the landfill = 1000 × 19.55376
     r = c.post("/api/costing/preview", headers=PLAN, json={"route_id": "R019", "vehicle_type": "Artic Tipper (44t)",
                                                           "material_type": "Earthworks / soil", "unit": "t",
