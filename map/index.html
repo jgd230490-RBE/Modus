@@ -63,7 +63,7 @@
         .control-item input[type=checkbox]{ accent-color:var(--navy); width:14px; height:14px; }
         .color-dot { width:11px; height:11px; border-radius:50%; display:inline-block; margin-left:auto; box-sizing:border-box; }
         /* D24: a zone kind with nothing in force in the month on screen reads as dimmed, not gone */
-        #zone-kinds .control-item { padding:4px 2px; font-size:12.5px; }
+        #zone-kinds .control-item { padding:4px 2px; font-size:14px; }   /* 12 Oct fix pass: the 14 px floor on new text (was 12.5) */
         #zone-kinds .control-item + .control-item { border-top:none; }
         .zone-kind.dim label, .zone-kind.dim .color-dot { opacity:.4; }
         /* 2026-10-06 — THE KPI BAR. The floating glass card (blur, shadow, 9.5 px uppercase
@@ -220,6 +220,11 @@
             body.has-demo-notice .sidebar{ top:var(--notice-h, 26px); }
             .sidebar-close{ display:flex; }
             body:not(.sidebar-closed) #menu-toggle{ display:none; }
+            /* 12 Oct 2026 (fix pass, F4 seen in Chrome at 385 px): while the drawer is open the guide's strip, its hint dots
+               and tips and the Guide pill drew over the drawer's selects. They hide while it is open and come back when it
+               closes (the Guide's steps and text are unchanged; the tour itself is not hidden) */
+            body:not(.sidebar-closed) .guide-strip, body:not(.sidebar-closed) .guide-dot, body:not(.sidebar-closed) .guide-tip,
+            body:not(.sidebar-closed) #guide-btn{ display:none; }
             /* (the route drawer's left:0 is with the timeline bar's phone rules below: its base rule comes after this block) */
             /* the bar's two lead labels ("Two-way movements a day", "Vehicles needed") ran into each other at 385 and 768 px:
                a label wraps inside its card and a card can shrink to its column */
@@ -300,7 +305,7 @@
         #tl-speed{ border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
         /* 12 Oct 2026 (D22): the "full horizon" switch — Play loops within the months that carry volume
            unless this is ticked; the announcer is visually hidden but read by a screen reader */
-        #timeline-bar .tl-full{ flex:0 0 auto; display:flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap; cursor:pointer; }
+        #timeline-bar .tl-full{ flex:0 0 auto; display:flex; align-items:center; gap:4px; font-size:14px; font-weight:600; color:var(--muted); white-space:nowrap; cursor:pointer; }
         #timeline-bar .tl-full input{ margin:0; accent-color:var(--navy); }
         #timeline-bar:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
         .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
@@ -446,7 +451,7 @@
             <div class="control-item zone-kind" data-kind="haul_road"><label><input type="checkbox" id="layer-zone-haul_road" checked onchange="toggleZoneKind('haul_road', this.checked)"> Haul road</label><span class="color-dot" style="background:#C2790B;"></span></div>
             <div class="control-item zone-kind" data-kind="other"><label><input type="checkbox" id="layer-zone-other" checked onchange="toggleZoneKind('other', this.checked)"> Advisory</label><span class="color-dot" style="background:rgba(100,116,139,.3); border:2px solid #64748B;"></span></div>
         </div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">amber = closure or works · boxed = a weight or height limit · grey = advisory · a dimmed row has none in force in the month on screen</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:14px;color:var(--note);">amber = closure or works · boxed = a weight or height limit · grey = advisory · a dimmed row has none in force in the month on screen</span></div>
         <!-- The EXISTING railway (the package's `rail`), not the alignment being built.
              Dim until an origin filter picks a Railhead, then bold. Default ON. -->
         <div class="control-item"><label><input type="checkbox" id="layer-rail" checked onchange="toggleRail(this.checked)"> Existing rail network</label><span class="color-dot" style="background:repeating-linear-gradient(90deg,#64748B 0 2px,transparent 2px 6px); border-radius:0; width:13px; height:3px;"></span></div>
@@ -552,7 +557,7 @@
      type="button" and named (review 2.8). -->
 <div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">
   <button type="button" class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month" aria-label="Previous month">◀</button>
-  <button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause" aria-label="Play or pause" aria-pressed="false">▶</button>
+  <button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause" aria-label="Play" aria-pressed="false">▶</button>
   <button type="button" class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month" aria-label="Next month">▶▶</button>
   <input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub(this.value)" aria-label="Month" aria-valuetext="Jan 2026">
   <span id="tl-label">Jan 2026</span>
@@ -1095,6 +1100,16 @@
     // 🔴 The division is the SERVER's (`per_day` / `working_days` on both public feeds),
     // not this file's: lesson 25, one config value one reader.
     const FORECAST_LABEL_UNIT = 'Two-way / day';
+    // 12 Oct 2026 (fix pass; the review's "plus width by volume"): the forecast line widens with the route's
+    // movements a day (f_avg). FIXED stops, so one width means one volume in every month; the old widths
+    // (3.5 px line, 6 px casing) are the floor. Tonnes / m³ use stops twenty times larger (about a 20 t load).
+    const FORECAST_VOL_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? [100, 600, 2000] : [5, 30, 100];
+    function forecastWidth(base){
+        const s = FORECAST_VOL_STOPS;
+        return ['interpolate', ['linear'], ['to-number', ['get', 'f_avg'], 0], s[0], base, s[1], base + 2.5, s[2], base + 5];
+    }
+    const FORECAST_LINE_WIDTH = forecastWidth(3.5);     // 3.5 px to 5 a day, 6 at 30, 8.5 at 100 and over
+    const FORECAST_CASING_WIDTH = forecastWidth(6);     // always 2.5 px wider than the line it sits under
     //: working days in a planning month, as the public feed reports it. 22 only until
     //: the first feed answers — never a second copy of the figure.
     let FORECAST_WORKING_DAYS = 22;
@@ -1872,7 +1887,7 @@
     // 2026-09-08 (§D). `by` is which breakdown the one chip row is showing. Discipline
     // by default — it is the answer most people are looking for and the only one that was
     // there before.
-    const KPI = { cache: {}, pending: {}, seq: 0, by: 'discipline' };
+    const KPI = { cache: {}, pending: {}, onScreen: null, by: 'discipline' };
     const KPI_BY = [['discipline', 'Discipline'], ['ipt', 'Team'], ['section', 'Work section']];
     function setKpiBy(k) {
         KPI.by = k;
@@ -1923,7 +1938,11 @@
     const fmtN = (n, d) => (Math.round(n * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toLocaleString();
     function calculateKPIs(oFilter, dFilter, discFilter, iFilter) {
         const months = kpiMonthsOnScreen();
-        const seq = ++KPI.seq;              // a stale fetch must not overwrite a newer month
+        // 12 Oct 2026 (fix pass, F1 seen in Chrome): a stale fetch must not overwrite a newer month, but the guard is
+        // now the months AND filters on screen, not a call counter. With a counter, every fetch that took longer than
+        // one tick was dropped, so during Play the bar kept "No month on screen" and dashes for whole loops.
+        const onScreen = months.join(',') + '|' + [oFilter, dFilter, discFilter, iFilter].join('|');
+        KPI.onScreen = onScreen;
         const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
         const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
         const unitLbl = (CONFIG.FORECAST_UNIT === 'm3') ? 'm³' : (CONFIG.FORECAST_UNIT || 'vehicles');
@@ -1956,8 +1975,8 @@
             return;
         }
 
-        Promise.all(months.map(kpiFetchMonth)).then(payloads => {
-            if (seq !== KPI.seq) return;
+        const label = months.length === 1 ? monthLabel(months[0]) : `${monthLabel(months[0])}–${monthLabel(months[months.length - 1])}`;
+        const render = payloads => {
             const routes = routePropsById();
             const wd = payloads[0].working_days || 22;
             const fbName = payloads[0].payload_fallback_vehicle;
@@ -2029,7 +2048,6 @@
                     || (discFilter !== 'ALL' && c.discipline !== discFilter)) return;
                 co2ToDate += c.co2_t || 0;
             });
-            const label = months.length === 1 ? monthLabel(months[0]) : `${monthLabel(months[0])}–${monthLabel(months[months.length - 1])}`;
             if (!mVeh.length) {
                 set('kpi-title', label + ' \u00b7 nothing approved');
                 set('kpi-vehicles', '—'); set('kpi-trips', '—'); set('kpi-material', '—'); set('kpi-routes', '—');
@@ -2100,8 +2118,19 @@
                 + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload because their vehicle is not in factors.json.` : ''));
             // the method note reads as a tooltip on the month, not as a paragraph in the bar
             const tt = document.getElementById('kpi-title'); if (tt) tt.title = document.getElementById('kpi-note').innerText;
+        };
+        // every month on screen is in the cache: render NOW, in this tick, not a promise later
+        if (months.every(m => KPI.cache[m])) { render(months.map(m => KPI.cache[m])); return; }
+        // still loading: say which month at once, and never leave the previous month's figures under it
+        set('kpi-title', label + ' \u00b7 loading figures');
+        set('kpi-vehicles', '—'); set('kpi-trips', '—'); set('kpi-material', '—'); set('kpi-routes', '—');
+        set('kpi-co2-day', '—'); set('kpi-co2-total', '—');
+        Promise.all(months.map(kpiFetchMonth)).then(payloads => {
+            if (KPI.onScreen !== onScreen) return;     // the playhead or the filters moved on
+            render(payloads);
         }).catch(() => {
-            if (seq !== KPI.seq) return;
+            if (KPI.onScreen !== onScreen) return;
+            set('kpi-title', label);
             set('kpi-vehicles', '—'); set('kpi-trips', '—'); set('kpi-material', '—');
             set('kpi-note', 'Could not load the month figures.');
         });
@@ -3217,14 +3246,15 @@
     const ZONE_FILL_OPACITY = ['match', ['get', 'kind'], 'closure', 0.25, 'works', 0.18, 'weight_limit', 0.06, 0.15];
     const ZONE_EDGE_COLOUR = ['match', ['get', 'kind'], 'closure', ZONE_AMBER, 'works', ZONE_AMBER, 'weight_limit', ZONE_INK, ZONE_GREY];
     const ZONE_LAYERS = ['zone-fill', 'zone-outline', 'zone-outline-works', 'zone-label', 'zone-limit'];
-    // "7.5 t" / "4.1 m" out of the zone's name, then its note; the name when neither carries one
+    // "7.5 t" / "4.1 m" out of the zone's name, then its note. 12 Oct fix pass: nothing when neither carries one (the
+    // name used to fill the box and then print again as the label under it), and "40 m³" is a volume, not a height.
     function zoneLimitText(z) {
-        const re = /(\d+(?:[.,]\d+)?)\s?(t|tonnes?|m)\b/i;
+        const re = /(\d+(?:[.,]\d+)?)\s?(t|tonnes?|m)(?![\w\u00b2\u00b3])/i;
         for (const s of [z.name, z.note]) {
             const m = re.exec(s || '');
             if (m) return m[1].replace(',', '.') + ' ' + (m[2].toLowerCase().startsWith('t') ? 't' : 'm');
         }
-        return z.name || '';
+        return '';
     }
     // the bordered box behind a limit label: white, 2 px ink edge, stretched to the text.
     // Images are dropped with the style on a basemap switch, so it is re-added behind hasImage.
@@ -3276,7 +3306,7 @@
         // the limit itself, boxed, above the name — "7.5 t" is the whole point of the zone
         if (!map.getLayer('zone-limit')) map.addLayer({
             id: 'zone-limit', type: 'symbol', source: 'zones-source', minzoom: 9,
-            layout: { visibility: vis, 'text-field': ['get', 'limit_text'], 'text-size': 11.5, 'text-offset': [0, -1.7],
+            layout: { visibility: vis, 'text-field': ['get', 'limit_text'], 'text-size': 14, 'text-offset': [0, -1.7],
                       'icon-image': 'zone-limit-badge', 'icon-text-fit': 'both', 'icon-text-fit-padding': [2, 6, 2, 6],
                       'text-allow-overlap': true, 'icon-allow-overlap': true },
             paint: { 'text-color': ZONE_INK },
@@ -3301,6 +3331,9 @@
         ZONE_KINDS.forEach(k => {
             const row = document.querySelector('.zone-kind[data-kind="' + k + '"]');
             if (!row) return;
+            // 12 Oct fix pass: the haul-road row drives the Temporary haul layer, which is drawn from the network
+            // and does not follow the month — dimming it by the zones' dates said "none in force" over a drawn road
+            if (k === 'haul_road') { row.classList.remove('dim'); row.title = 'drawn from the network; not filtered by month'; return; }
             row.classList.toggle('dim', !inForce[k]);
             row.title = inForce[k] ? inForce[k] + ' in force' + when : 'none in force' + (when || ' in this plan');
         });
@@ -3316,7 +3349,7 @@
         if (span) base.push(['<=', ['get', 'start_n'], span[1]], ['>=', ['get', 'end_n'], span[0]]);
         const f = base;
         [['zone-fill', null], ['zone-outline', ['!=', ['get', 'kind'], 'works']], ['zone-outline-works', ['==', ['get', 'kind'], 'works']],
-         ['zone-label', null], ['zone-limit', ['==', ['get', 'kind'], 'weight_limit']]].forEach(([l, extra]) => {
+         ['zone-label', null], ['zone-limit', ['all', ['==', ['get', 'kind'], 'weight_limit'], ['!=', ['get', 'limit_text'], '']]]].forEach(([l, extra]) => {
             if (map.getLayer(l)) map.setFilter(l, extra ? ['all', ...f.slice(1), extra] : f);
         });
     }
@@ -3733,7 +3766,7 @@
 
     function zonePopupHTML(p) {
         const kindLabels = { closure: 'Road closure', weight_limit: 'Weight / height limit',
-                             works: 'Works area', haul_road: 'Haul road', other: 'Zone' };
+                             works: 'Works area', haul_road: 'Haul road', other: 'Advisory' };   // the legend's words (12 Oct fix pass)
         const when = (p.starts_on || p.ends_on)
             ? (p.starts_on || 'open') + ' → ' + (p.ends_on || 'open')
             : 'no dates set';
@@ -3741,7 +3774,7 @@
             '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:13px;">' + (p.name || p.id) + '</h4>' +
             '<div style="font-size:11.5px;color:#6b7280;">' + (kindLabels[p.kind] || p.kind) + ' · ' + when + '</div>' +
             '<div style="font-size:11.5px;margin-top:6px;color:' +
-                (p.affects_routing === true || p.affects_routing === 'true' ? CONFIG.COLORS.selection : '#6b7280') + ';font-weight:600;">' +
+                (p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : '#6b7280') + ';font-weight:600;">' +   // ink, not red: red is kept for a clash or a cap breach
                 (p.affects_routing === true || p.affects_routing === 'true'
                     ? 'Routing avoids this area' : 'Advisory only — routing unaffected') + '</div>' +
             (p.note ? '<div style="font-size:11.5px;margin-top:6px;color:#374151;">' + p.note + '</div>' : '') +
@@ -3974,12 +4007,12 @@
                     map.addLayer({
                         id: 'forecast-casing', type: 'line', source: 'routes-source',
                         filter: ['==', 'is_forecast', true],
-                        paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': 6, 'line-opacity': 0.9 }
+                        paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': FORECAST_CASING_WIDTH, 'line-opacity': 0.9 }
                     });
                     map.addLayer({
                         id: 'forecast-layer', type: 'line', source: 'routes-source',
                         filter: ['==', 'is_forecast', true],
-                        paint: { 'line-color': CONFIG.COLORS.forecast, 'line-width': 3.5, 'line-opacity': 0.95 }
+                        paint: { 'line-color': CONFIG.COLORS.forecast, 'line-width': FORECAST_LINE_WIDTH, 'line-opacity': 0.95 }
                     });
                     map.addLayer({
                         id: 'forecast-labels', type: 'symbol', source: 'routes-source',
@@ -4140,22 +4173,38 @@
             '<div id="an-fc-slot" class="an-sub" style="margin-top:12px;">Loading forecast…</div>';
         try{
             const mtx=await fetchMatrix('t');
-            const row=(mtx.routes||[]).find(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);
+            // 12 Oct 2026 (fix pass; the review's bug (d), the drawer's half): the matrix is one entry per LINE, so a route
+            // with two approved lines has two rows. find() took the first (the largest) and the drawer under-read the
+            // route the map label had summed. Every line of the route now counts: tonnes and the monthly profile summed,
+            // trips and CO2e per line on that line's own vehicle (payload and factor), then added.
+            const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);
+            const row=rows.length?rows[0]:null;
             let extra;
             if(row){
                 const veh=row.vehicle_type, mat=row.material_type;
-                const payload=pick(F.vehicle_payload_t,veh)||20;
-                const emis=pick(F.vehicle_emissions_kg_co2e_per_km,veh)||0.9;
-                const totalT=row.total||0;
-                const months=Object.values(row.monthly||{});
+                const payloadOf=v=>pick(F.vehicle_payload_t,v)||20;
+                const payload=payloadOf(veh);
+                const totalT=rows.reduce((a,r)=>a+(r.total||0),0);
+                const monthly={};
+                rows.forEach(r=>Object.keys(r.monthly||{}).forEach(k=>{ monthly[k]=(monthly[k]||0)+(Number(r.monthly[k])||0); }));
+                const months=Object.values(monthly);
                 const peakT=months.length?Math.max.apply(null,months):0;
-                const trips=payload>0?Math.ceil(totalT/payload):0;
-                const co2t=trips*round*emis/1000;
+                const peakKey=Object.keys(monthly).find(k=>monthly[k]===peakT);
+                let trips=0, co2t=0, peakTrips=0;
+                rows.forEach(r=>{
+                    const pl=payloadOf(r.vehicle_type), em=pick(F.vehicle_emissions_kg_co2e_per_km,r.vehicle_type)||0.9;
+                    const t=pl>0?Math.ceil((r.total||0)/pl):0;
+                    trips+=t; co2t+=t*round*em/1000;
+                    if(pl>0&&peakKey!=null) peakTrips+=(Number((r.monthly||{})[peakKey])||0)/pl;
+                });
                 const intensity=totalT>0?(co2t*1000/totalT):0;
-                const trucksPeak=(tripsPerDay>0&&payload>0)?Math.ceil((peakT/payload)/(tripsPerDay*P.working_days_per_month)):0;
+                const trucksPeak=(tripsPerDay>0)?Math.ceil(peakTrips/(tripsPerDay*P.working_days_per_month)):0;
+                const what=rows.length>1
+                    ? rows.length+' approved lines: '+[...new Set(rows.map(r=>(r.material_type||'—')+' · '+(r.vehicle_type||'—')))].join('; ')
+                    : mat+' · '+veh+' · payload '+payload+' t';
                 extra =
                     '<div class="an-title" style="margin-top:16px;">Forecast · '+monthLabel(mtx.from)+' – '+monthLabel(mtx.to)+'</div>'+
-                    '<div class="an-route">'+mat+' · '+veh+' · payload '+payload+' t</div>'+
+                    '<div class="an-route">'+what+'</div>'+
                     '<div class="an-grid">'+
                         card(Math.round(totalT).toLocaleString()+' t','Total material','over selected window')+
                         card(trips.toLocaleString(),'Total trips','one-way loaded runs')+
@@ -4233,8 +4282,8 @@
     function ensureForecastLayers(){
         if(map.getLayer('forecast-layer')) return;
         const f = forecastLayerFilter();
-        map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':6,'line-opacity':0.9}});
-        map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':3.5,'line-opacity':0.95}});
+        map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':FORECAST_CASING_WIDTH,'line-opacity':0.9}});
+        map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':FORECAST_LINE_WIDTH,'line-opacity':0.95}});
         map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:f,layout:{'symbol-placement':'line-center','text-field':['concat', ['get', 'f_avg'], ' ', FORECAST_LABEL_UNIT],'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
         raiseMarks();
         ensureCapBadgeLayer();
@@ -4257,7 +4306,7 @@
         const ids = (typeof WARN !== 'undefined' && WARN.capRoutes) || [];
         map.addLayer({id:'forecast-cap-badge',type:'symbol',source:'routes-source',filter:capBadgeFilter(ids),
             layout:{'symbol-placement':'line-center','text-field':['concat', 'over planning flag ', ['to-string', ['get', 'max_vehicles_per_day']]],
-                    'text-size':10.5,'text-offset':[0,1.1],'text-allow-overlap':true},
+                    'text-size':14,'text-offset':[0,1.1],'text-allow-overlap':true},
             paint:{'text-color':'#ffffff','text-halo-color':'#D97706','text-halo-width':2}});
         raiseMarks();
     }
@@ -4329,7 +4378,9 @@
     // otherwise Play loops within the span of months that carry volume. `clashPaused` = this loop has
     // already stopped on a red month; reset when the loop wraps. `ticked` = the month on screen was
     // reached by a tick (only those can pause — never the month Play was pressed on).
-    const TL = { on:false, playing:false, month:1, timer:null, matrix:null, speed:1, full:false, clashPaused:false, ticked:null };
+    // 12 Oct fix pass: `startedOn` = the month Play was pressed on, until the loop first wraps (F3); `matrixPending` = the
+    // matrix fetch in flight, so a double press does not fetch it twice.
+    const TL = { on:false, playing:false, month:1, timer:null, matrix:null, matrixPending:null, speed:1, full:false, clashPaused:false, ticked:null, startedOn:null };
     try { const sp = parseFloat(localStorage.getItem('modus_tl_speed')); if(sp > 0){ TL.speed = sp; } } catch(e){}
     function setTimelineFull(on){
         TL.full = !!on;
@@ -4367,16 +4418,24 @@
     // D22: the loop runs within tlLoopBounds(); a month outside them (the visitor scrubbed there, or the
     // horizon switch was just turned off) goes back to the first month of the span. Wrapping resets the
     // once-per-loop clash pause. A month inside the span with no volume keeps the normal dwell.
+    // 12 Oct fix pass: a one-month span wraps on every tick; it must not re-arm the pause every tick (it would stop
+    // 750 ms after every press of Play), so the pause is re-armed only by a wrap over more than one month.
     function tickTimeline(){
         const [lo, hi] = tlLoopBounds();
         const wrap = TL.month >= hi || TL.month < lo;
-        if(wrap) TL.clashPaused = false;
+        if(wrap && lo !== hi) TL.clashPaused = false;
+        if(wrap) TL.startedOn = null;
         TL.month = wrap ? lo : TL.month+1;
         TL.ticked = TL.month;
         setTimelineMonth(TL.month);
     }
     async function ensureTimelineMatrix(){
         if(TL.matrix) return TL.matrix;
+        if(TL.matrixPending) return TL.matrixPending;     // a double press waits on the same fetch
+        TL.matrixPending = loadTimelineMatrix().finally(()=>{ TL.matrixPending = null; });
+        return TL.matrixPending;
+    }
+    async function loadTimelineMatrix(){
         const unit = CONFIG.FORECAST_UNIT || 'vehicles';
         const r = await fetch(CONFIG.API_BASE+'/public/forecast-matrix?from=1&to='+CONFIG.MONTH_COUNT+'&unit='+unit);
         if(!r.ok) throw new Error('API '+r.status);
@@ -4405,10 +4464,20 @@
     // 12 Oct 2026 (review §2.4): Play used to fire one month-kpis GET on each month's first tick. Once the
     // matrix is here the months in the loop are warmed sequentially through the existing cache
     // (kpiFetchMonth dedupes against an in-flight fetch), after the first paint has been scheduled.
+    // 12 Oct fix pass (F1): the month on screen first, then the rest of the span in the order Play will reach them;
+    // only the span with volume (a tenant with nothing approved used to fire 60 GETs, and Full horizon as many).
+    function tlPrefetchOrder(){
+        const span = TL.matrix && TL.matrix.span;
+        if(!span) return [];
+        const [lo, hi] = span, out = [];
+        const start = (TL.month >= lo && TL.month <= hi) ? TL.month : lo;
+        for(let m=start; m<=hi; m++) out.push(m);
+        for(let m=lo; m<start; m++) out.push(m);
+        return out;
+    }
     function prefetchSpanKpis(){
         setTimeout(async ()=>{
-            const [lo, hi] = tlLoopBounds();
-            for(let m=lo; m<=hi; m++){
+            for(const m of tlPrefetchOrder()){
                 if(KPI.cache[m]) continue;
                 try { await kpiFetchMonth(m); } catch(e){}
             }
@@ -4442,7 +4511,7 @@
         // uses (the Dashboard's TRIPS card, the KPI card's "101 trips/d").
         // 12 Oct (D22): an empty month says so, instead of "0 routes · 0 trips".
         const lbl=document.getElementById('tl-label');
-        if(lbl) lbl.textContent = count===0 ? monthLabel(m)+' · nothing approved' : monthLabel(m)+' · '+count+' routes · '+Math.round(sum)+' '+unitWord(unit);
+        if(lbl) lbl.textContent = count===0 ? monthLabel(m)+' · nothing approved' : monthLabel(m)+' · '+count+(count===1?' route · ':' routes · ')+Math.round(sum)+' '+unitWord(unit);
     }
     function openTimeline(){
         TL.on=true;
@@ -4456,6 +4525,7 @@
             // D22: never open on an empty January \u2014 the current month if it carries volume, else the first that does
             if(!monthHasVolume(TL.month)) TL.month = tlStartMonth();
             setTimelineMonth(TL.month);
+            if(TL.playing && TL.ticked === null) TL.startedOn = TL.month;   // F3: Play opened the bar; this is the month it started on
         }).catch(()=>{ if(lbl) lbl.textContent='No forecast data'; });
     }
     function closeTimeline(){
@@ -4476,17 +4546,19 @@
         if(TL.playing) return;
         // D22: resuming on a red month counts as this loop's pause \u2014 it does not stop again until the loop wraps
         if(WARN.countsMonth === TL.month && WARN.counts.clash > 0) TL.clashPaused = true;
-        TL.ticked = null;
+        TL.ticked = null; TL.startedOn = TL.month;
         TL.playing=true; const b=document.getElementById('tl-play'); if(b){ b.textContent='\u23F8'; b.setAttribute('aria-pressed', 'true'); }
         startFlowAnimation();          // dashes march only while playing
         TL.timer=setInterval(tickTimeline, TL_STEP_MS / TL.speed);
     }
-    function stopTimeline(){
+    // 12 Oct fix pass: the live region is written ONCE per stop — "Paused at <month>", or the reason the caller passes
+    // (a clash pause used to write the bare month and then overwrite it)
+    function stopTimeline(reason){
         const was = TL.playing;
         TL.playing=false; const b=document.getElementById('tl-play'); if(b){ b.textContent='\u25B6'; b.setAttribute('aria-pressed', 'false'); }
         if(TL.timer){ clearInterval(TL.timer); TL.timer=null; }
         stopFlowAnimation();           // and go solid the moment it stops
-        if(was) announceTimeline(monthLabel(TL.month));   // a screen reader hears where playback stopped
+        if(was) announceTimeline(typeof reason === 'string' ? reason : 'Paused at ' + monthLabel(TL.month));   // a screen reader hears where playback stopped
     }
     function setTimelineMonth(m){
         TL.month=m; const r=document.getElementById('tl-range'); if(r){ r.value=m; r.setAttribute('aria-valuetext', monthLabel(m)); }
@@ -4509,9 +4581,10 @@
         const max = CONFIG.MONTH_COUNT || 60;
         setTimelineMonth(Math.min(max, Math.max(1, (TL.month || 1) + delta)));
     }
-    // 12 Oct 2026 (review §2.4, WCAG 2.1.1): keyboard. With the bar open, Space toggles Play and the arrow
-    // keys step a month when the focus is on the bar itself, one of its buttons, or the map — not inside
-    // an input or a select (the slider and the speed select keep their own keys).
+    // 12 Oct 2026 (review §2.4, WCAG 2.1.1): keyboard. With the bar open, Space toggles Play when the focus is on the
+    // bar itself, one of its buttons, or the map — not inside an input or a select (the slider and the speed select keep
+    // their own keys). Fix pass: the ARROWS step a month on the bar only; on the map they are Mapbox's pan keys, and a
+    // press used to pan the map AND step the month.
     document.addEventListener('keydown', function(e){
         if(!TL.on || e.altKey || e.ctrlKey || e.metaKey) return;
         const t = e.target, tag = t && t.tagName;
@@ -4520,8 +4593,8 @@
         const inBar = !!(bar && t && bar.contains(t)), inMap = !!(mapEl && t && mapEl.contains(t));
         if(!inBar && !inMap) return;
         if(e.key === ' ' || e.key === 'Spacebar'){ if(tag === 'BUTTON' && inBar) return; e.preventDefault(); toggleTimeline(); }
-        else if(e.key === 'ArrowLeft'){ e.preventDefault(); stepTimeline(-1); }
-        else if(e.key === 'ArrowRight'){ e.preventDefault(); stepTimeline(1); }
+        else if(e.key === 'ArrowLeft' && inBar){ e.preventDefault(); stepTimeline(-1); }
+        else if(e.key === 'ArrowRight' && inBar){ e.preventDefault(); stepTimeline(1); }
     });
 
     // ===== 2026-09-02 (§8) — warnings for the month on the playhead ==================
@@ -4539,6 +4612,41 @@
     // No weather API. Dismissing hides that warning for that month only. Rebuilt on every tick.
     const WARN = { restr: null, restrPending: null, piles: null, pilesPending: null, dismissed: {},
                    hitEvents: [], hitRoute: {}, capRoutes: [] };
+    // ---- 12 Oct 2026 fix pass: the warn block's pure helpers (run against plain data in parse_map.js) ----
+    // A closure can sit on several routes (live A1: one A46 closure on six). WARN.hitRoute maps an event to EVERY
+    // route it was found on, and a row's id carries its event AND its route, so each row's "Show on map" selects
+    // its own route, and the highlight stays while any route's row for that closure is still live.
+    function hitRowId(ev, rid) { return String(ev) + '|' + rid; }
+    function splitHitRowId(id) {
+        const s = String(id), cut = s.indexOf('|');
+        return cut < 0 ? { ev: s, rid: null } : { ev: s.slice(0, cut), rid: s.slice(cut + 1) };
+    }
+    function liveHitEvents(hitEvents, hitRoute, live) {
+        return hitEvents.filter(ev => live.some(i => i.kind === 'h' && (hitRoute[ev] || []).includes(i.who)));
+    }
+    // D21 / D33: one noun ("planning flag") and the unit in the sentence. A figure that rounds down onto the flag
+    // keeps one decimal, so the row can never read "20 ... against a planning flag of 20".
+    function capSentence(rid, perDay, cap) {
+        const r = Math.round(perDay);
+        const shown = r > cap ? String(r) : perDay.toFixed(1);
+        return `${rid}: ${shown} two-way movements a day against a planning flag of ${cap}`;
+    }
+    // the last month whose end-of-month balance differs from the month before it: the last month anything was
+    // recorded against the pile (the stockpile timeline carries the balance forward to month 60 from actuals only)
+    function pileLastRecorded(sp) {
+        const ms = Object.keys((sp && sp.months) || {}).map(Number).filter(n => n > 0).sort((a, b) => a - b);
+        let last = null, prev = null;
+        ms.forEach(m => { const b = Number(sp.months[String(m)].balance_end) || 0; if (prev === null ? b !== 0 : b !== prev) last = m; prev = b; });
+        return last;
+    }
+    function pileSentence(sp, month, u) {
+        const mm = sp.months[String(month)];
+        const head = `${sp.name} holds ${Math.round(sp.capacity_qty).toLocaleString()} ${u}. ${Math.round(mm.balance_end).toLocaleString()} ${u}`;
+        const last = pileLastRecorded(sp);
+        if (last !== null && month > last) return `${head} recorded at the end of ${monthLabel(last)}; nothing recorded since.`;
+        return `${head} recorded in it at the end of ${monthLabel(month)}.`;
+    }
+    // ---- end of the fix-pass helpers ----
     // 12 Oct 2026 (live A1): every hit carries from / to and is filtered to the month on screen
     // client-side, so the check is asked for expired closures too — a past month must be able
     // to list what applied then. The server may not know the parameter yet; it is ignored then.
@@ -4588,12 +4696,13 @@
         // 12 Oct (WCAG 2.3.3): a visitor who asked the system for less motion is not flown across the map
         if (reducedMotion()) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 700 });
     }
-    function showRestrictionHit(ev) {
-        const rid = WARN.hitRoute[String(ev)];
+    function showRestrictionHit(id) {
+        const { ev, rid: own } = splitHitRowId(id);
+        const rid = own || (WARN.hitRoute[ev] || [])[0];
         if (rid && typeof selectRoute === 'function') selectRoute(rid);
         const f = ((RESTR.data || {}).features || []).find(x => x.properties && String(x.properties.event_number) === String(ev));
         const b = f && f.geometry ? coordsBounds(f.geometry.coordinates) : null;
-        if (b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 90, maxZoom: 14, duration: 700 });
+        if (b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 90, maxZoom: 14, duration: reducedMotion() ? 0 : 700 });
     }
     // does a hit's date window overlap the month? No dates (a standing limit) always does.
     function hitInMonth(h, month) {
@@ -4670,7 +4779,8 @@
         if (!live.length) { pill.classList.remove('on'); pill.innerHTML = ''; return; }
         const part = (lvl, n, noun) => (n ? `<span class="cond-dot ${lvl}"></span><span>${n} ${noun}${n === 1 ? '' : 's'}</span>` : '');
         pill.innerHTML = part('clash', c.clash, 'over capacity').replace(/capacitys/, 'capacity')
-            + part('warn', c.warn, 'route limit') + part('warn', c.cap, 'over a planning flag').replace(/flags/, 'flag')
+            + part('warn', c.warn, 'route limit')
+            + (c.cap ? `<span class="cond-dot warn"></span><span>${c.cap === 1 ? '1 route over a planning flag' : c.cap + ' routes over planning flags'}</span>` : '')
             + part('caution', c.caution, 'seasonal window')
             + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6470" stroke-width="2" aria-hidden="true"><path d="${WARN.open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}"></path></svg>`;
         pill.classList.add('on');
@@ -4681,6 +4791,12 @@
         if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; renderConditionsPill([]); setCondRing([]); setRestrictionHits([]); setCapBadges([]); positionWarnStack(); return; }
         const month = m;
         Promise.all([warnRestrictions(), warnPiles(), kpiFetchMonth(month).catch(() => null)]).then(([restr, piles, kp]) => {
+            // 12 Oct fix pass (F3 seen in Chrome): Play pressed on a month that itself carries a clash counts as this
+            // loop's pause, even when the month's conditions land after Play was pressed (or after the first tick) —
+            // before, the first loop stopped again on the NEXT red month. The wrap clears startedOn.
+            if (TL.playing && month === TL.startedOn && (piles || []).some(sp => {
+                    const mm = sp.months && sp.months[String(month)];
+                    return mm && mm.over && !WARN.dismissed[`s|${sp.location_id}|${month}`]; })) TL.clashPaused = true;
             if (TL.month !== month || !TL.on) return;     // the playhead moved on
             const items = [];
             const routes = linesOnScreen(month);
@@ -4715,13 +4831,19 @@
                 if (!inMonth.length) return;
                 const worst = inMonth[0];
                 const n = inMonth.length;
-                inMonth.forEach(h => { if (h.event_number) { hitEvents.push(String(h.event_number)); WARN.hitRoute[String(h.event_number)] = p.route_id; } });
+                inMonth.forEach(h => {
+                    if (!h.event_number) return;
+                    const ev = String(h.event_number);
+                    if (!hitEvents.includes(ev)) hitEvents.push(ev);
+                    const rs = WARN.hitRoute[ev] || (WARN.hitRoute[ev] = []);
+                    if (!rs.includes(p.route_id)) rs.push(p.route_id);
+                });
                 items.push({ key: `r|${p.route_id}|${month}`,
                     // ⚠️ a Tark Tee 'breach' is still a WARNING, not a Clash. It is a
                     // vehicle-versus-limit verdict on a drivable road, not an impossibility
                     // — and the weak-bridge class it cannot judge at all (§A2) means this
                     // source must never be the loudest thing on screen.
-                    lvl: 'warn', who: p.route_id, kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? String(worst.event_number) : p.route_id,
+                    lvl: 'warn', who: p.route_id, kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? hitRowId(worst.event_number, p.route_id) : p.route_id,
                     // "Mass limits" + breach -> "Exceeds a mass limit"; a non-breach hit
                     // on a layer ("Planned road closures") keeps the layer's own noun
                     noun: (worst.severity === 'breach'
@@ -4739,7 +4861,7 @@
                 const u = sp.unit === 'm3' ? 'm³' : (sp.unit || 't');
                 items.push({ key: `s|${sp.location_id}|${month}`, lvl: 'clash', who: sp.name, kind: 's', id: sp.location_id,
                     noun: 'Over capacity',
-                    what: `${sp.name} holds ${Math.round(sp.capacity_qty).toLocaleString()} ${u}. ${Math.round(mm.balance_end).toLocaleString()} ${u} recorded in it at the end of ${monthLabel(month)}.`, sort: 0 });
+                    what: pileSentence(sp, month, u), sort: 0 });
             });
             // 4. the route's planning flag against this month's movements a day -> WARNING
             // D21: movements a day = the loaded leg's vehicle loads (one load = one two-way
@@ -4757,8 +4879,8 @@
                 if (perDay <= cap) return;
                 overCap.push(p.route_id);
                 items.push({ key: `c|${p.route_id}|${month}`, lvl: 'warn', src: 'cap', who: p.route_id, kind: 'r', id: p.route_id,
-                    noun: 'Over the planning cap',
-                    what: `${p.route_id} ${Math.round(perDay)} a day against a planning flag of ${cap}`, sort: 1.5 });
+                    noun: 'Over a planning flag',
+                    what: capSentence(p.route_id, perDay, cap), sort: 1.5 });
             });
             // 3. seasonal windows, per visible line's vehicle
             const vehByRoute = {};
@@ -4783,7 +4905,7 @@
             setCondRing(live.filter(i => i.kind === 's').map(i => i.id));
             // the closures the live rows are about, drawn amber whether or not the layer is on;
             // the badge on every route over its planning flag (dismissing a row clears both)
-            setRestrictionHits(hitEvents.filter(ev => live.some(i => i.kind === 'h' && WARN.hitRoute[ev] === i.who)));
+            setRestrictionHits(liveHitEvents(hitEvents, WARN.hitRoute, live));
             setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));
             // a month with a red condition opens the panel once, by itself
             if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
@@ -4792,8 +4914,7 @@
             // Only a month reached by a tick can stop it — never the month Play was pressed on.
             if (TL.playing && TL.ticked === month && !TL.clashPaused && live.some(i => i.lvl === 'clash')) {
                 TL.clashPaused = true; WARN.open = true;
-                stopTimeline();
-                announceTimeline(monthLabel(month) + ' · playback paused: ' + live.filter(i => i.lvl === 'clash').length + ' over capacity');
+                stopTimeline(monthLabel(month) + ' · playback paused: ' + live.filter(i => i.lvl === 'clash').length + ' over capacity');
                 renderConditionsPill(live);
             }
             if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }

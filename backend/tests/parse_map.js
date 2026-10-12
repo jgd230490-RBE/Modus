@@ -23,6 +23,8 @@ function ok(label, cond, extra) {
   if (cond) pass++;
   else fail.push(label + (extra ? "  " + extra : ""));
 }
+// 12 Oct 2026 (fix pass): the sandboxes at the end resolve promises; the summary waits for these
+const ASYNC_PINS = [];
 
 // ---- every inline script must be valid JS ------------------------------------
 const blocks = [];
@@ -308,7 +310,11 @@ ok("§D: IPT comes from the route, discipline and section from the line (named v
   /KPI\.by === 'ipt' \? \(teamText\(rp\.ipt\) \|\| 'no ' \+ TEAM\.toLowerCase\(\)\)/.test(code)
   && /KPI\.by === 'section' \? \(l\.section_id \? \(\(\(\(window\.WS_NAMES \|\| \{\}\)\[l\.section_id\]\) \|\| \{\}\)\.name \|\| l\.section_id\) : 'no work section'\)/.test(code)
   && !/KPI\.by === 'section' \? \(l\.section_id \|\| 'no work section'\)/.test(code));
-ok("§9: a stale fetch cannot overwrite a newer month", /if \(seq !== KPI\.seq\) return;/.test(code));
+// 12 Oct 2026 (fix pass, F1) — NARROWED: the guard is the months AND filters on screen, no longer a call counter (the
+// counter dropped every fetch that took longer than one tick, so the bar never rendered during Play)
+ok("§9: a stale fetch cannot overwrite a newer month (guarded by the months and filters on screen, not a call counter)",
+  /if \(KPI\.onScreen !== onScreen\) return;/.test(code) && /KPI\.onScreen = onScreen;/.test(code)
+  && !/if \(seq !== KPI\.seq\) return;/.test(code));
 ok("§9: the forecast toggle recomputes the cards",
   /src\.setData\(currentData\);\s*applyRailHighlight\(\);\s*applyFilters\(\);/.test(code)
   || /applyRailHighlight\(\);[\s\S]{0,120}applyFilters\(\);[\s\S]{0,60}\/\/ §9/.test(src));
@@ -1529,7 +1535,7 @@ ok("⭐ §E: the missing Clash source is written down, not invented",
 // 12 Oct 2026 — RENAMED (see the §8 twin above): the planning-flag source is the fourth and last
 ok("§E: four sources, the planning flag the fourth, and no weather API",
   code.includes("/routes/restrictions") && code.includes("/public/stockpile-timeline")
-  && code.includes("META.seasonal") && code.includes("noun: 'Over the planning cap'")
+  && code.includes("META.seasonal") && code.includes("noun: 'Over a planning flag'") && !code.includes("planning cap")   // 12 Oct fix pass: one noun
   && !/weather|openweather|forecast\.io/i.test(code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"))));
 // the brief's own test: the stack is NOT in the KPI card
 ok("⭐ §E: the stack is its own element, outside #kpi-hud",
@@ -1572,7 +1578,7 @@ ok("§0915-3: the divisor comes from the feed, and there is exactly one of it",
   && !/\/\s*22\b/.test(code.replace(/FORECAST_WORKING_DAYS > 0 \? FORECAST_WORKING_DAYS : 22/g, "")));
 ok("§0915-4: the timeline bar says trips, not vehicles — and only for the loads unit",
   /TL_UNIT_WORD = \{ vehicles: 'trips'/.test(code)
-  && /' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\)/.test(code)
+  && /\(count===1\?' route · ':' routes · '\)\+Math\.round\(sum\)\+' '\+unitWord\(unit\)/.test(code)   // 12 Oct fix pass: "1 route"
   && !/' routes · '\+Math\.round\(sum\)\+' '\+unit;/.test(code)
   // a tonnage must NOT be called trips
   && /t: 't', m3: 'm³'/.test(code));
@@ -1965,15 +1971,15 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /function setTimelineFull\(on\)\{\s*TL\.full = !!on;/.test(code)
      && /const fl=document\.getElementById\('tl-full'\); if\(fl\) fl\.checked=TL\.full;/.test(code));
   ok("D22: playback stops once per loop on the first red month it TICKS into, panel open; the wrap re-arms it",
-     /if \(TL\.playing && TL\.ticked === month && !TL\.clashPaused && live\.some\(i => i\.lvl === 'clash'\)\) \{\s*TL\.clashPaused = true; WARN\.open = true;\s*stopTimeline\(\);/.test(code)
-     && /if\(wrap\) TL\.clashPaused = false;/.test(code) && /TL\.ticked = TL\.month;\s*setTimelineMonth\(TL\.month\);/.test(code)
+     /if \(TL\.playing && TL\.ticked === month && !TL\.clashPaused && live\.some\(i => i\.lvl === 'clash'\)\) \{\s*TL\.clashPaused = true; WARN\.open = true;\s*stopTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code)
+     && /if\(wrap && lo !== hi\) TL\.clashPaused = false;/.test(code) && /TL\.ticked = TL\.month;\s*setTimelineMonth\(TL\.month\);/.test(code)
      // resuming on a red month counts as this loop's pause; the month Play was pressed on can never stop it
      && /if\(WARN\.countsMonth === TL\.month && WARN\.counts\.clash > 0\) TL\.clashPaused = true;\s*TL\.ticked = null;/.test(code)
      && /WARN\.countsMonth = month;/.test(code));
   ok("D22: the auto-open-once rule and the pill are untouched by the pause",
      /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened/.test(code) && /function renderConditionsPill\(live\)/.test(code));
   ok("D22: an empty month reads '<Month> · nothing approved', never '0 routes · 0 trips'",
-     /if\(lbl\) lbl\.textContent = count===0 \? monthLabel\(m\)\+' · nothing approved' : monthLabel\(m\)\+' · '\+count\+' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\);/.test(code)
+     /if\(lbl\) lbl\.textContent = count===0 \? monthLabel\(m\)\+' · nothing approved' : monthLabel\(m\)\+' · '\+count\+\(count===1\?' route · ':' routes · '\)\+Math\.round\(sum\)\+' '\+unitWord\(unit\);/.test(code)
      && !/' · '\+count\+' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\);\s*\}/.test(code.replace(/count===0 \?[^\n]*/, "")));
   // (3) A8 — the loaded leg only
   ok("⭐ A8: the timeline label counts the LOADED leg only (one load = one two-way movement, never doubled)",
@@ -2002,19 +2008,22 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // (6) KPI prefetch
   ok("KPI prefetch: kicked off when the matrix lands, never awaited, through the existing cache, one month at a time",
      /TL\.matrix = \{ byRoute:byR[^\n]*\};\s*prefetchSpanKpis\(\);\s*return TL\.matrix;/.test(code)
-     && /function prefetchSpanKpis\(\)\{\s*setTimeout\(async \(\)=>\{\s*const \[lo, hi\] = tlLoopBounds\(\);\s*for\(let m=lo; m<=hi; m\+\+\)\{\s*if\(KPI\.cache\[m\]\) continue;\s*try \{ await kpiFetchMonth\(m\); \} catch\(e\)\{\}/.test(code)
+     && /function prefetchSpanKpis\(\)\{\s*setTimeout\(async \(\)=>\{\s*for\(const m of tlPrefetchOrder\(\)\)\{\s*if\(KPI\.cache\[m\]\) continue;\s*try \{ await kpiFetchMonth\(m\); \} catch\(e\)\{\}/.test(code)   // 12 Oct fix pass (F1)
+     && /function tlPrefetchOrder\(\)\{\s*const span = TL\.matrix && TL\.matrix\.span;\s*if\(!span\) return \[\];/.test(code)
      && !/Promise\.all\([^)]*kpiFetchMonth/.test(code.slice(code.indexOf("function prefetchSpanKpis"), code.indexOf("function renderMonthFrame"))));
   // (7) keyboard and ARIA
-  ok("keyboard: Space toggles Play, the arrows step a month — on the bar or the map, never inside an input or select",
+  // 12 Oct fix pass — NARROWED: on the map canvas the arrows are Mapbox's pan keys; they step the month on the bar only
+  ok("keyboard: Space toggles Play on the bar or the map; the arrows step a month on the bar only; never inside an input or select",
      /document\.addEventListener\('keydown', function\(e\)\{\s*if\(!TL\.on \|\| e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey\) return;/.test(code)
      && /if\(tag === 'INPUT' \|\| tag === 'SELECT' \|\| tag === 'TEXTAREA'\) return;/.test(code)
      && /if\(!inBar && !inMap\) return;/.test(code)
      && /if\(e\.key === ' ' \|\| e\.key === 'Spacebar'\)\{ if\(tag === 'BUTTON' && inBar\) return; e\.preventDefault\(\); toggleTimeline\(\); \}/.test(code)
-     && /else if\(e\.key === 'ArrowLeft'\)\{ e\.preventDefault\(\); stepTimeline\(-1\); \}/.test(code)
-     && /else if\(e\.key === 'ArrowRight'\)\{ e\.preventDefault\(\); stepTimeline\(1\); \}/.test(code));
+     && /else if\(e\.key === 'ArrowLeft' && inBar\)\{ e\.preventDefault\(\); stepTimeline\(-1\); \}/.test(code)
+     && /else if\(e\.key === 'ArrowRight' && inBar\)\{ e\.preventDefault\(\); stepTimeline\(1\); \}/.test(code)
+     && !/else if\(e\.key === 'Arrow(Left|Right)'\)\{/.test(code));
   ok("ARIA: the bar is a focusable named group; Play carries aria-pressed; the slider is named Month and speaks the month",
      /<div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">/.test(html)
-     && /<button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline\(\)" title="Play \/ pause" aria-label="Play or pause" aria-pressed="false">/.test(html)
+     && /<button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline\(\)" title="Play \/ pause" aria-label="Play" aria-pressed="false">/.test(html)   // 12 Oct fix pass: was "Play or pause"
      && /<input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub\(this\.value\)" aria-label="Month" aria-valuetext="Jan 2026">/.test(html)
      && /b\.setAttribute\('aria-pressed', 'true'\)/.test(code) && /b\.setAttribute\('aria-pressed', 'false'\)/.test(code)
      && /r\.setAttribute\('aria-valuetext', monthLabel\(m\)\)/.test(code));
@@ -2022,11 +2031,29 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /<div id="tl-live" class="sr-only" aria-live="polite" aria-atomic="true"><\/div>/.test(html)
      && /\.sr-only\{ position:absolute; width:1px; height:1px;/.test(html)
      && /function announceTimeline\(text\)\{\s*const el=document\.getElementById\('tl-live'\); if\(el\) el\.textContent = text;/.test(code)
-     && /const was = TL\.playing;[\s\S]{0,400}if\(was\) announceTimeline\(monthLabel\(TL\.month\)\);/.test(code)
-     && /announceTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code));
-  ok("wording: nothing a person reads in the new strings says truck, real-time, live tracking, AI, optimise, predict or secure",
-     !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b|\bAI\b/i.test(
-       (html.match(/<div id="timeline-bar"[\s\S]*?<\/div>\n<\/div>/) || [""])[0] + " Full horizon nothing approved playback paused over capacity"));
+     && /const was = TL\.playing;[\s\S]{0,400}if\(was\) announceTimeline\(typeof reason === 'string' \? reason : 'Paused at ' \+ monthLabel\(TL\.month\)\);/.test(code)
+     && /stopTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code)
+     && !/announceTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code));   // 12 Oct fix pass: one write, not two
+  {
+    // 12 Oct 2026 (fix pass; both reviewers) — NARROWED: it read the bar's markup plus a string typed into the test, so
+    // it passed on the old file. It now reads the STRING LITERALS of every block the review touched, and the legend
+    // markup, and must find the new strings in them.
+    const lits = t => (t.match(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|"(?:[^"\\\n]|\\.)*"/g) || []).join(" ");
+    const cut = (t, a, b) => { const i = t.indexOf(a), j = t.indexOf(b, i + 1); return i >= 0 && j > i ? t.slice(i, j) : ""; };
+    const readable = [
+      lits(cut(code, "function tlLoopBounds", "const WARN")), lits(cut(code, "const WARN", "(function initAnalysis")),
+      lits(cut(code, "function calculateKPIs", "function applyFilters")), lits(cut(code, "const kindLabels", "</script>")),
+      cut(html, '<div id="timeline-bar"', '<div id="tl-live"'), cut(html, '<div id="zone-kinds"', "Existing rail network"),
+    ].join(" ");
+    const must = ["nothing approved", "loading figures", "Paused at ", "playback paused: ", "Over a planning flag",
+                  "two-way movements a day against a planning flag of", "routes over planning flags", "nothing recorded since",
+                  "Full horizon", "Advisory", "Weight / height limit"];
+    const missing = must.filter(w => !readable.includes(w));
+    ok("wording: nothing a person reads in the new strings says truck, real-time, live tracking, AI, optimise, predict or secure",
+       readable.length > 2000 && missing.length === 0
+       && !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(readable) && !/\bAI\b/.test(readable),
+       "missing: " + JSON.stringify(missing) + " length " + readable.length);
+  }
 
   // ---- run the timeline block against a fake DOM ------------------------------------------------------------
   const tStart = src.indexOf("const TL_UNIT_WORD = { vehicles: 'trips'");
@@ -2057,12 +2084,14 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     const f = new Function("document", "window", "localStorage", "setInterval", "clearInterval", "setTimeout", "CONFIG", "map",
       "perWorkingDay", "monthLabel", "ensureForecastLayers", "ensureFlowLayer", "applyZoneMonth", "applyFilters", "renderTimelineWarnings",
       "startFlowAnimation", "stopFlowAnimation", "WARN", "KPI", "kpiFetchMonth", "fetch", "FORECAST_WORKING_DAYS",
-      src.slice(tStart, tEnd) + "\nreturn { TL, tickTimeline, tlLoopBounds, setTimelineFull, tlStartMonth, monthHasVolume, renderMonthFrame, startTimeline, stopTimeline, setTimelineMonth, toggleTimeline, stepTimeline };");
+      src.slice(tStart, tEnd) + "\nreturn { TL, tickTimeline, tlLoopBounds, setTimelineFull, tlStartMonth, monthHasVolume, renderMonthFrame, startTimeline, stopTimeline, setTimelineMonth, toggleTimeline, stepTimeline, tlPrefetchOrder, ensureTimelineMatrix };");
+    // 12 Oct fix pass: the fetch is a delegate (it still throws unless a pin installs one) so the matrix dedupe can be run
+    let fakeFetch = () => { throw new Error("fetch must not be called"); };
     let api = null, err = "";
     try {
       api = f(document, { matchMedia: null }, { getItem: () => null, setItem() {} }, () => { calls.setInterval++; return 7; }, () => { calls.clearInterval++; }, () => {},
               CONFIG, map, v => Math.round(v / 22), monthLabel, () => {}, () => {}, () => {}, () => {}, m => { calls.warnings.push(m); },
-              () => {}, () => {}, WARN, KPI, () => Promise.resolve({}), () => { throw new Error("fetch must not be called"); }, 22);
+              () => {}, () => {}, WARN, KPI, () => Promise.resolve({}), (...a) => fakeFetch(...a), 22);
     } catch (e) { err = e.message; }
     ok("⭐ the timeline block runs against a fake DOM", !!api, err);
     if (api) {
@@ -2079,8 +2108,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
          JSON.stringify(api.tlLoopBounds()) === "[9,12]"
          && (api.setTimelineFull(true), JSON.stringify(api.tlLoopBounds()) === "[1,60]" && byId["tl-full"].checked === true)
          && (api.setTimelineFull(false), JSON.stringify(api.tlLoopBounds()) === "[9,12]"));
-      ok("the start month is the first month with volume when today's month has none",
-         (TL.matrix.volMonths.has(cur) ? true : api.tlStartMonth() === 9));
+      // 12 Oct fix pass — NARROWED: it returned true without calling tlStartMonth() whenever today's month carried volume
+      // (October 2026 does, in this fixture); the matrix here has no volume in today's month, whatever today is
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set([cur + 3, cur + 5]), span: [cur + 3, cur + 5] };
+        ok("the start month is the first month with volume when today's month has none", api.tlStartMonth() === cur + 3);
+        TL.matrix = keep; }
       { const m2 = matrix([[cur, 5], [9, 100], [12, 50]]); const keep = TL.matrix; TL.matrix = m2;
         ok("...and today's calendar month when it carries volume", api.tlStartMonth() === cur && api.monthHasVolume(cur));
         TL.matrix = keep; }
@@ -2093,6 +2125,37 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       ok("a month outside the span (scrubbed there) goes back to the first month with volume", TL.month === 9);
       TL.month = 59; api.setTimelineFull(true); api.tickTimeline(); const d = TL.month; api.tickTimeline(); const e2 = TL.month; api.setTimelineFull(false);
       ok("with Full horizon on the loop is 1..60 again", d === 60 && e2 === 1);
+      // 12 Oct fix pass (F2, seen in Chrome as 10, 11, 12, 10 …): the loop from the month Play was pressed on wraps to the
+      // span's FIRST month. A guard — tickTimeline already did this; the Chrome sequence came from figures and conditions
+      // landing a tick late (F1), not from the wrap.
+      TL.month = 10; api.tickTimeline(); const f1 = TL.month; api.tickTimeline(); const f2 = TL.month; api.tickTimeline(); const f3 = TL.month; api.tickTimeline(); const f4 = TL.month;
+      ok("F2: from the start month (Oct) the loop runs 11, 12, then the span's first month (Sep), then Oct", [f1, f2, f3, f4].join(",") === "11,12,9,10");
+      // one-month span: every tick is a wrap; it must not re-arm the pause on every tick
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set([10]), span: [10, 10] };
+        TL.month = 10; TL.clashPaused = true; api.tickTimeline(); const once = TL.month; api.tickTimeline();
+        ok("⭐ a one-month span keeps its pause spent across ticks (it used to stop 750 ms after every press of Play)",
+           once === 10 && TL.month === 10 && TL.clashPaused === true);
+        TL.matrix = keep; TL.clashPaused = false; }
+      // F3: the wrap ends the "month Play was pressed on"
+      TL.month = 12; TL.startedOn = 10; api.tickTimeline();
+      ok("F3: the wrap clears the month Play was pressed on", TL.month === 9 && TL.startedOn === null);
+      // the prefetch order: the month on screen first, then the span in the order Play reaches it; the span only
+      TL.month = 11;
+      const po = typeof api.tlPrefetchOrder === "function" ? api.tlPrefetchOrder() : null;
+      ok("⭐ F1: the KPI prefetch warms the month on screen first, then the rest of the span in play order (11, 12, 9, 10)",
+         JSON.stringify(po) === "[11,12,9,10]");
+      api.setTimelineFull(true);
+      ok("...and with Full horizon on it still warms the span with volume only (it fired 60 GETs)", JSON.stringify(api.tlPrefetchOrder()) === "[11,12,9,10]");
+      api.setTimelineFull(false);
+      { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set(), span: null };
+        ok("...and nothing at all for a tenant with nothing approved (it fired 60 GETs)", JSON.stringify(api.tlPrefetchOrder()) === "[]");
+        TL.matrix = keep; }
+      // a double press fetches the matrix once
+      { const keep = TL.matrix; let n = 0; TL.matrix = null;
+        fakeFetch = () => { n++; return new Promise(() => {}); };
+        api.ensureTimelineMatrix(); api.ensureTimelineMatrix();
+        ok("⭐ a double press on Play fetches the forecast matrix once (the second waits on the first)", n === 1 && !!TL.matrixPending);
+        fakeFetch = () => { throw new Error("fetch must not be called"); }; TL.matrixPending = null; TL.matrix = keep; }
       // renderMonthFrame: loaded leg only, the empty label, and the setData guard
       calls.setData = 0; TL.full = false;
       api.renderMonthFrame(10);
@@ -2107,7 +2170,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       api.renderMonthFrame(1);
       ok("⭐ a second empty month in a row does NOT re-send the source", calls.setData === 2 && byId["tl-label"].textContent === "Jan 2026 · nothing approved");
       api.renderMonthFrame(12);
-      ok("...and a month with volume after it does (R1 only: 1 route · 50 trips)", calls.setData === 3 && byId["tl-label"].textContent === "Dec 2026 · 1 routes · 50 trips");
+      // 12 Oct fix pass — REVERSED: it asserted "1 routes"
+      ok("...and a month with volume after it does (R1 only: 1 route · 50 trips)", calls.setData === 3 && byId["tl-label"].textContent === "Dec 2026 · 1 route · 50 trips");
       // play / stop: aria-pressed, the announcer, the resume-on-a-red-month rule, the slider's valuetext
       TL.on = true; TL.month = 10; api.setTimelineMonth(10);
       ok("the slider speaks the month", byId["tl-range"].attrs["aria-valuetext"] === "Oct 2026" && byId["tl-range"].value === 10);
@@ -2115,11 +2179,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       api.startTimeline();
       ok("⭐ Play on a red month: aria-pressed true, one interval, the clash pause already spent for this loop, nothing ticked yet",
          TL.playing === true && byId["tl-play"].attrs["aria-pressed"] === "true" && calls.setInterval === 1 && TL.clashPaused === true && TL.ticked === null);
+      ok("F3: Play remembers the month it was pressed on", TL.startedOn === 10);
       api.startTimeline();
       ok("a second Play while playing starts no second interval", calls.setInterval === 1);
       byId["tl-live"].textContent = "";
       api.stopTimeline();
-      ok("⭐ stopping announces the month and drops aria-pressed", TL.playing === false && byId["tl-play"].attrs["aria-pressed"] === "false" && byId["tl-live"].textContent === "Oct 2026");
+      // 12 Oct fix pass — NARROWED: the announcement says what happened, not a bare month
+      ok("⭐ stopping announces the month and drops aria-pressed", TL.playing === false && byId["tl-play"].attrs["aria-pressed"] === "false" && byId["tl-live"].textContent === "Paused at Oct 2026");
       byId["tl-live"].textContent = ""; api.stopTimeline();
       ok("stopping an already-stopped timeline announces nothing (scrubbing does not chatter)", byId["tl-live"].textContent === "");
       WARN.counts.clash = 0; TL.clashPaused = false; api.startTimeline();
@@ -2138,7 +2204,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         const e3 = ev(" ", byId["tl-play"]);
         ok("Space on the Play BUTTON is left to the button's own click (no double toggle)", TL.playing === false && e3.prevented === false);
         const e4 = ev("ArrowRight", canvas);
-        ok("⭐ ArrowRight with the map focused steps to the next month", TL.month === 11 && e4.prevented === true);
+        // 12 Oct fix pass — REVERSED: on the map the arrows are Mapbox's pan keys; a press panned AND stepped the month
+        ok("⭐ ArrowRight with the map focused is left to the map (it pans; the month does not step)", TL.month === 10 && e4.prevented === false);
+        const e4b = ev("ArrowRight", byId["timeline-bar"]);
+        ok("ArrowRight on the bar steps to the next month", TL.month === 11 && e4b.prevented === true);
+        const e4c = ev(" ", canvas);
+        ok("Space with the map focused still plays", TL.playing === true && e4c.prevented === true);
+        ev(" ", canvas);
         const e5 = ev("ArrowLeft", byId["timeline-bar"]);
         ok("ArrowLeft on the bar steps back", TL.month === 10 && e5.prevented === true);
         const e6 = ev("ArrowRight", byId["tl-range"]);
@@ -2161,7 +2233,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
 {
   const warnBlock = code.slice(code.indexOf("const WARN"), code.indexOf("(function initAnalysis"));
   // 1. live A1 — the restriction condition is month-aware, deduped, highlighted, flown to
-  ok("A1: the restriction check is asked for expired closures too (client filters by month)",
+  // 12 Oct fix pass — RENAMED (the tests reviewer): the query string is what is asserted; this branch's server ignores it,
+  // claude/public-map-backend's /api/routes/restrictions honours it
+  ok("A1: the restriction check sends include_expired=1 (honoured by the Track B server, ignored before it); the client filters by month",
      code.includes("fetch(CONFIG.API_BASE + '/routes/restrictions?include_expired=1')"));
   ok("A1: a hit is in the month when its from/to window overlaps monthSpan (dnum; no dates = always)",
      /function hitInMonth\(h, month\)/.test(code) && /const \[lo, hi\] = monthSpan\(month\);/.test(code)
@@ -2181,12 +2255,17 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes("applyRestrictionFilter();\n        applyRestrictionHits();"));
   ok("A1: a row's Show on map flies to the closure's bounds (and selects its route), not the whole route",
      code.includes("if (kind === 'h') { showRestrictionHit(id); return; }")
-     && /function showRestrictionHit\(ev\)/.test(code)
+     && /function showRestrictionHit\(id\) \{\s*const \{ ev, rid: own \} = splitHitRowId\(id\);/.test(code)   // 12 Oct fix pass: takes the row id (event|route)
      && /String\(x\.properties\.event_number\) === String\(ev\)/.test(code)
-     && /map\.fitBounds\(\[\[b\[0\], b\[1\]\], \[b\[2\], b\[3\]\]\], \{ padding: 90, maxZoom: 14/.test(code)
-     && code.includes("kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? String(worst.event_number) : p.route_id"));
+     && /map\.fitBounds\(\[\[b\[0\], b\[1\]\], \[b\[2\], b\[3\]\]\], \{ padding: 90, maxZoom: 14, duration: reducedMotion\(\) \? 0 : 700 \}\)/.test(code)
+     // 12 Oct fix pass — NARROWED: the row's id is event|route, so each row selects its OWN route (six routes share one A46 closure)
+     && code.includes("kind: worst.event_number ? 'h' : 'r', id: worst.event_number ? hitRowId(worst.event_number, p.route_id) : p.route_id")
+     && !code.includes("WARN.hitRoute[String(h.event_number)] = p.route_id"));
   ok("A1: the highlight follows the live rows and is cleared with the timeline",
-     code.includes("setRestrictionHits(hitEvents.filter(ev => live.some(i => i.kind === 'h' && WARN.hitRoute[ev] === i.who)));")
+     // 12 Oct fix pass — NARROWED: an event maps to EVERY route it was found on; the highlight stays while any of their rows is live
+     code.includes("setRestrictionHits(liveHitEvents(hitEvents, WARN.hitRoute, live));")
+     && code.includes("return hitEvents.filter(ev => live.some(i => i.kind === 'h' && (hitRoute[ev] || []).includes(i.who)));")
+     && !code.includes("WARN.hitRoute[ev] === i.who")
      && /renderConditionsPill\(\[\]\); setCondRing\(\[\]\); setRestrictionHits\(\[\]\); setCapBadges\(\[\]\);/.test(code));
 
   // 2. live A2 — a basemap switch brings the forecast overlay, the ring and the hit layer back
@@ -2229,7 +2308,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("D24: a weight/height limit is a boxed label carrying the limit text read from the name or note",
      /function zoneLimitText\(z\)/.test(code) && code.includes("limit_text: zoneLimitText(z)")
      && /id: 'zone-limit', type: 'symbol', source: 'zones-source'[\s\S]{0,300}'icon-image': 'zone-limit-badge', 'icon-text-fit': 'both'/.test(code)
-     && code.includes("['zone-limit', ['==', ['get', 'kind'], 'weight_limit']]")
+     // 12 Oct fix pass — NARROWED: no limit text, no box (the name used to fill it and print again under it); m³ is not a height
+     && code.includes("['zone-limit', ['all', ['==', ['get', 'kind'], 'weight_limit'], ['!=', ['get', 'limit_text'], '']]]")
+     && !code.includes("return z.name || '';") && code.includes("(t|tonnes?|m)(?![\\w\\u00b2\\u00b3])")
      && code.includes("if (!map.hasImage('zone-limit-badge')) map.addImage('zone-limit-badge', zoneBadgeImage()"));
   ok("D24: advisory is grey, and the red that meant 'avoided by routing' is gone from the zone rows and the note",
      code.includes("ZONE_GREY = '#64748B'") && !/id="layer-zones"[^\n]*#DC2626/.test(html)
@@ -2237,7 +2318,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("D24: the legend is month-aware — a kind's row dims when none of it is in force in the month on screen",
      code.includes("row.classList.toggle('dim', !inForce[k]);")
      && /\.zone-kind\.dim label, \.zone-kind\.dim \.color-dot \{ opacity:\.4; \}/.test(html)
-     && code.includes("if (!span || (p.start_n <= span[1] && p.end_n >= span[0])) inForce[p.kind] = (inForce[p.kind] || 0) + 1;"));
+     && code.includes("if (!span || (p.start_n <= span[1] && p.end_n >= span[0])) inForce[p.kind] = (inForce[p.kind] || 0) + 1;")
+     // 12 Oct fix pass: the haul-road row drives a layer drawn from the network with no month filter, so it never dims
+     && code.includes("if (k === 'haul_road') { row.classList.remove('dim'); row.title = 'drawn from the network; not filtered by month'; return; }"));
   ok("D24: the Haul road row is the Temporary haul switch, kept in step both ways (never a second layer)",
      code.includes("if (kind === 'haul_road') {\n            const t = document.getElementById('layer-temp');")
      && code.includes("const z = document.getElementById('layer-zone-haul_road');"));
@@ -2246,7 +2329,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes("ZONE_LAYERS.forEach(l => toggleLayer(l, visible));"));
 
   // 5. D21 / D33 — the planning-flag condition
-  const capWhat = (code.match(/what: `\$\{p\.route_id\} \$\{Math\.round\(perDay\)\} a day against a planning flag of \$\{cap\}`/) || [""])[0];
+  // 12 Oct fix pass — NARROWED: the sentence names its unit and is built by capSentence()
+  const capWhat = (code.match(/return `\$\{rid\}: \$\{shown\} two-way movements a day against a planning flag of \$\{cap\}`;/) || [""])[0];
   ok("D21: a fourth source compares the month's loaded-leg movements a day with max_vehicles_per_day",
      code.includes("const cap = Number(p.max_vehicles_per_day);")
      && code.includes("loadsByRoute[l.route_id] = (loadsByRoute[l.route_id] || 0) + (Number(l.vehicle_loads) || 0);")
@@ -2256,11 +2340,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && !/\/\s*22\b/.test(warnBlock)
      && /f\.properties\.type === 'Inbound Highway'\)\) return;/.test(code));
   ok("D33: the row is warn level, says 'planning flag', and never 'limit'",
-     code.includes("noun: 'Over the planning cap'") && capWhat.length > 0 && !/limit/i.test(capWhat)
+     code.includes("noun: 'Over a planning flag'") && code.includes("what: capSentence(p.route_id, perDay, cap)") && capWhat.length > 0 && !/limit/i.test(capWhat)
      && /key: `c\|\$\{p\.route_id\}\|\$\{month\}`, lvl: 'warn', src: 'cap'/.test(code));
   ok("D33: the pill counts it under its own noun, not as a route limit",
      code.includes("const k = i.src === 'cap' ? 'cap' : i.lvl;")
-     && code.includes("part('warn', c.cap, 'over a planning flag')"));
+     // 12 Oct fix pass — NARROWED: a correct plural ("2 over a planning flag" read as a count of flags)
+     && code.includes("c.cap === 1 ? '1 route over a planning flag' : c.cap + ' routes over planning flags'")
+     && !code.includes(".replace(/flags/, 'flag')"));
   ok("D33: a small badge sits on the route label of every route over its flag — loaded leg, amber, cleared on close",
      /id:'forecast-cap-badge',type:'symbol',source:'routes-source'/.test(code)
      && code.includes("['concat', 'over planning flag ', ['to-string', ['get', 'max_vehicles_per_day']]]")
@@ -2284,7 +2370,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      code.includes("acc.monthly[k] = (acc.monthly[k]||0) + (Number(rt.monthly[k])||0);")
      && !code.includes("byR[(rt.route_id||'').toString().trim().toLowerCase()]=rt;"));
   ok("row 3 / D23: the stockpile sentence says what is recorded at month end, not what 'the plan puts'",
-     code.includes("recorded in it at the end of ${monthLabel(month)}.") && !code.includes("The plan puts"));
+     code.includes("recorded in it at the end of ${monthLabel(month)}.") && !code.includes("The plan puts")
+     // 12 Oct fix pass: a month after the last recorded movement carries the balance forward and says so
+     && code.includes("recorded at the end of ${monthLabel(last)}; nothing recorded since.") && code.includes("what: pileSentence(sp, month, u), sort: 0"));
 }
 
 // ---- 12 Oct 2026 — the mobile hotfix (review 2.8, live A6), names and the small bugs (claude/mr1-mobile) -------
@@ -2396,7 +2484,210 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /document\.body\.classList\.toggle\('has-demo-notice', false\);\n\s+if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);/.test(code));
 }
 
-console.log();
-for (const f of fail) console.log("  FAIL:", f);
-console.log(`\n${pass} passed, ${fail.length} failed`);
-process.exit(fail.length ? 1 : 0);
+// ---- 12 Oct 2026 — the Track A fix pass (three reviews of 07a522b + four defects seen in Chrome, F1-F4) ----------------
+// Source pins for the CSS and the layers, then two sandboxes that RUN the code: the figures bar (calculateKPIs, F1) and
+// the conditions (the whole warn block: closures on several routes, the planning flag, the stockpile sentence, F3).
+// Both resolve promises, so they are collected in ASYNC_PINS and the summary waits for them.
+{
+  const phone = (html.match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}\n        @media \(min-width:701px\)/) || ["", ""])[1];
+  // F4 + the Guide pill (spec review): nothing of the guide floats over the open drawer on a phone or tablet
+  ok("⭐ F4: below 1024, while the drawer is open, the guide strip, its dots and tips and the Guide pill are hidden",
+     /body:not\(\.sidebar-closed\) \.guide-strip, body:not\(\.sidebar-closed\) \.guide-dot, body:not\(\.sidebar-closed\) \.guide-tip,\s*body:not\(\.sidebar-closed\) #guide-btn\{ display:none; \}/.test(phone)
+     // the desktop is untouched: the rule lives only in the stacked block
+     && (html.match(/body:not\(\.sidebar-closed\) \.guide-strip/g) || []).length === 1);
+  // the 14 px floor on the new text
+  ok("14 px: the zone-kind rows, the zone legend note and the Full horizon switch are 14 px (were 12.5, 12 and 11)",
+     /#zone-kinds \.control-item \{ padding:4px 2px; font-size:14px; \}/.test(html)
+     && /#timeline-bar \.tl-full\{[^}]*font-size:14px;/.test(html)
+     && /<span style="font-size:14px;color:var\(--note\);">amber = closure or works/.test(html)
+     && !/#zone-kinds \.control-item \{[^}]*font-size:12\.5px/.test(html));
+  ok("14 px: the map's new badges (over planning flag, the boxed weight/height limit) are 14 px (were 10.5 and 11.5)",
+     /id:'forecast-cap-badge'[\s\S]{0,400}'text-size':14,/.test(code)
+     && /'text-field': \['get', 'limit_text'\], 'text-size': 14,/.test(code)
+     && !/'text-size':10\.5/.test(code));
+  // width by volume
+  ok("⭐ width by volume: the forecast line and its casing widen with f_avg on FIXED stops; the old 3.5 / 6 px are the floor",
+     code.includes("const FORECAST_VOL_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? [100, 600, 2000] : [5, 30, 100];")
+     && code.includes("return ['interpolate', ['linear'], ['to-number', ['get', 'f_avg'], 0], s[0], base, s[1], base + 2.5, s[2], base + 5];")
+     && code.includes("const FORECAST_LINE_WIDTH = forecastWidth(3.5);") && code.includes("const FORECAST_CASING_WIDTH = forecastWidth(6);")
+     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 2
+     && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
+  ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
+  // the drawer's half of review bug (d)
+  ok("⭐ row 3 (d), the drawer: a route's analysis counts EVERY approved line of the route, not the first one find() met",
+     code.includes("const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);")
+     && code.includes("const totalT=rows.reduce((a,r)=>a+(r.total||0),0);")
+     && code.includes("trips+=t; co2t+=t*round*em/1000;")
+     && !code.includes("const row=(mtx.routes||[]).find(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);"));
+  // the zone popup speaks the legend's words, and its routing line is not red
+  {
+    const kl = (code.match(/const kindLabels = \{([^}]*)\}/) || ["", ""])[1];
+    const popup = {}; kl.replace(/(\w+): '([^']*)'/g, (_, k, v) => { popup[k] = v; return ""; });
+    const legend = {}; html.replace(/data-kind="(\w+)"><label><input[^>]*>\s*([^<]+)<\/label>/g, (_, k, v) => { legend[k] = v.trim(); return ""; });
+    const keys = ["closure", "works", "weight_limit", "haul_road", "other"];
+    ok("⭐ the zone popup's kind names are the legend's (the popup said 'Zone' where the legend says 'Advisory')",
+       keys.every(k => popup[k] && popup[k] === legend[k]), JSON.stringify({ popup, legend }));
+    ok("...and 'Routing avoids this area' is ink, not the selection red (red is kept for a clash or a cap breach)",
+       code.includes("(p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : '#6b7280')")
+       && !code.includes("p.affects_routing === 'true' ? CONFIG.COLORS.selection"));
+  }
+  // the matrix fetch in flight is shared
+  ok("ensureTimelineMatrix shares the fetch in flight (TL.matrixPending), cleared when it settles",
+     /if\(TL\.matrixPending\) return TL\.matrixPending;\s*TL\.matrixPending = loadTimelineMatrix\(\)\.finally\(\(\)=>\{ TL\.matrixPending = null; \}\);/.test(code));
+  ok("F3: openTimeline records the month Play started on once it has moved off an empty month",
+     /setTimelineMonth\(TL\.month\);\s*if\(TL\.playing && TL\.ticked === null\) TL\.startedOn = TL\.month;/.test(code));
+
+  const flush = () => new Promise(r => setTimeout(r, 0));
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel = i => names[(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12));
+  const mkEl = id => ({ id, innerText: "", innerHTML: "", textContent: "", hidden: false, title: "", style: {},
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); }, toggle(c, on) { if (on) this._s.add(c); else this._s.delete(c); } },
+    getBoundingClientRect() { return { top: 0, bottom: 72, left: 0, right: 1000, width: 1000, height: 72 }; },
+    setAttribute() {}, querySelector() { return null; } });
+  const mkDoc = () => { const els = {}; return { els, getElementById: id => els[id] || (els[id] = mkEl(id)), querySelector: () => null,
+    body: { classList: { contains: () => false, toggle() {} }, style: { setProperty() {}, removeProperty() {} } }, addEventListener() {} }; };
+
+  // ---- (1) F1: the figures bar during Play ----------------------------------------------------------------------------
+  {
+    const a = src.indexOf("    function kpiMonthsOnScreen() {"), b = src.indexOf("    function applyFilters() {");
+    ok("F1 sandbox: the figures-bar slice (kpiMonthsOnScreen … calculateKPIs) is found", a > 0 && b > a);
+    if (a > 0 && b > a) {
+      const document = mkDoc();
+      const TL = { on: true, month: 10 };
+      const KPI = { cache: {}, pending: {}, onScreen: null, seq: 0, by: 'discipline' };
+      const deferred = {};
+      const fetch = url => { const m = Number(/month=(\d+)/.exec(url)[1]);
+        return new Promise(res => { deferred[m] = p => res({ ok: true, json: () => p }); }); };
+      const a1_data = { features: [{ geometry: { type: "LineString" }, properties: { route_id: "R1", type: "Inbound Highway", origin: "Q", dest: "C", ipt: "IPT1" } }] };
+      const pay = (m, loads) => ({ month: m, working_days: 20, payload_fallback_vehicle: "x", co2_to_date: [],
+        lines: [{ route_id: "R1", vehicle_loads: loads, qty_unit: loads, qty_t: loads * 20, trips_per_vehicle_day: 4, discipline: "Earthworks", co2_t: 2 }] });
+      let api = null, err = "";
+      try {
+        api = new Function("document", "window", "TL", "KPI", "CONFIG", "fetch", "a1_data", "routePassesFilters", "monthLabel", "teamText", "TEAM",
+          "renderKpiSwitch", "showMoving", "positionWarnStack", "selectRoute",
+          src.slice(a, b) + "\nreturn { calculateKPIs, kpiFetchMonth };")(
+          document, { WS_NAMES: {} }, TL, KPI, { FORECAST_UNIT: "vehicles", API_BASE: "" }, fetch, a1_data, () => true, monthLabel, x => x, "Team",
+          () => {}, () => {}, () => {}, () => {});
+      } catch (e) { err = e.message; }
+      ok("F1 sandbox: the figures bar runs against a fake DOM", !!api, err);
+      if (api) {
+        const el = id => document.getElementById(id);
+        KPI.cache[10] = pay(10, 400);
+        api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+        ok("⭐ F1: a month already in the cache renders in the same tick (title and figures), not a promise later",
+           el("kpi-title").innerHTML.includes("Oct 2026") && el("kpi-trips").innerText === "20", el("kpi-title").innerHTML + " / " + el("kpi-trips").innerText);
+        TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+        ok("⭐ F1: a month still loading says so at once — '<Month> · loading figures' — and the previous month's figures are cleared",
+           el("kpi-title").innerText === "Nov 2026 · loading figures" && el("kpi-trips").innerText === "—", el("kpi-title").innerText);
+        TL.month = 12; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+        ASYNC_PINS.push((async () => {
+          deferred[11](pay(11, 200)); await flush(); await flush();
+          ok("F1: a fetch that lands after the playhead moved on does not overwrite the month on screen",
+             el("kpi-title").innerText === "Dec 2026 · loading figures" && KPI.cache[11] && el("kpi-trips").innerText === "—");
+          deferred[12](pay(12, 600)); await flush(); await flush();
+          ok("⭐ F1: the fetch for the month on screen renders it when it lands", el("kpi-title").innerHTML.includes("Dec 2026") && el("kpi-trips").innerText === "30",
+             el("kpi-title").innerHTML + " / " + el("kpi-trips").innerText);
+          // the second loop: every month is cached now, so every tick renders in the same tick
+          TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("F1: on the next loop a month fetched earlier renders at once", el("kpi-title").innerHTML.includes("Nov 2026") && el("kpi-trips").innerText === "10");
+          // a filter change on the same month: the older call's late fetch cannot paint the old filter over the new one
+          TL.month = 13; api.calculateKPIs("ALL", "ALL", "ALL", "ALL"); api.calculateKPIs("Q", "ALL", "ALL", "ALL");
+          const keyNow = KPI.onScreen; deferred[13](pay(13, 400)); await flush(); await flush();
+          ok("F1: two calls for one month and different filters: only the one on screen renders", keyNow.endsWith("|Q|ALL|ALL|ALL") && el("kpi-title").innerHTML.includes("Jan 2027"));
+        })());
+      }
+    }
+  }
+
+  // ---- (2) the conditions: the whole warn block against plain data --------------------------------------------------
+  {
+    const a = src.indexOf("    const WARN = { restr: null"), b = src.indexOf("    (function initAnalysis(){");
+    ok("warn sandbox: the warn block (const WARN … initAnalysis) is found", a > 0 && b > a);
+    if (a > 0 && b > a) {
+      const document = mkDoc();
+      const TL = { on: true, month: 10, playing: false, ticked: null, clashPaused: false, startedOn: null, matrix: {} };
+      const rec = { hits: [], caps: [], select: [], fit: 0, stops: [], announced: [] };
+      const feat = (rid, extra) => ({ geometry: { type: "LineString" }, properties: Object.assign({ route_id: rid, type: "Inbound Highway", is_forecast: true }, extra || {}) });
+      const a1_data = { features: [feat("R2", { max_vehicles_per_day: 20 }), feat("R5")] };
+      const kp = { working_days: 20, lines: [{ route_id: "R2", vehicle_loads: 640, vehicle_type: "Artic Tipper (44t)" }, { route_id: "R5", vehicle_loads: 100, vehicle_type: "Artic Tipper (44t)" }] };
+      const monthSpan = i => { const y = 2026 + Math.floor((i - 1) / 12), m = ((i - 1) % 12) + 1, last = new Date(Date.UTC(y, m, 0)).getUTCDate(); return [y * 10000 + m * 100 + 1, y * 10000 + m * 100 + last]; };
+      const dnum = (s, f) => (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) ? f : parseInt(s.replace(/-/g, ""), 10);
+      const RESTR = { data: { features: [{ properties: { event_number: "E1" }, geometry: { coordinates: [[0, 0], [1, 1]] } }] } };
+      const map = { getSource: () => ({}), getLayer: () => true, addLayer() {}, setFilter() {}, fitBounds() { rec.fit++; }, jumpTo() {}, flyTo() {}, getZoom: () => 10 };
+      let api = null, err = "";
+      try {
+        api = new Function("document", "window", "ResizeObserver", "setTimeout", "CONFIG", "fetch", "a1_data", "routePassesFilters", "TL", "map", "RESTR",
+          "coordsBounds", "selectRoute", "reducedMotion", "monthSpan", "dnum", "stopTimeline", "announceTimeline", "monthLabel", "kpiFetchMonth",
+          "FORECAST_WORKING_DAYS", "META", "setRestrictionHits", "setCapBadges",
+          src.slice(a, b) + "\nreturn { WARN, renderTimelineWarnings, dismissWarning, showRestrictionHit, renderConditionsPill, capSentence, pileSentence, pileLastRecorded, splitHitRowId };")(
+          document, { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
+          { API_BASE: "", MONTH_COUNT: 60, START_YEAR: 2026 }, () => { throw new Error("fetch must not be called"); }, a1_data, () => true, TL, map, RESTR,
+          () => [0, 0, 1, 1], rid => rec.select.push(rid), () => false, monthSpan, dnum,
+          reason => { rec.stops.push(reason); TL.playing = false; }, t => rec.announced.push(t), monthLabel, () => Promise.resolve(kp),
+          22, { seasonal: [] }, evs => rec.hits.push(evs.slice()), ids => rec.caps.push(ids.slice()));
+      } catch (e) { err = e.message; }
+      ok("warn sandbox: the warn block runs against plain data", !!api, err);
+      if (api) {
+        const W = api.WARN, box = () => document.getElementById("tl-warnings").innerHTML, pill = () => document.getElementById("kpi-conditions").innerHTML;
+        const hit = { event_number: "E1", from: "2026-10-16T00:00:00", to: "2026-10-17T23:59:00", label: "Planned road closures", what: "A46 closure", severity: "hit" };
+        W.restr = { R2: { hits: [hit] }, R5: { hits: [hit] } };
+        W.piles = [{ location_id: "L1", name: "Langton stockpile", capacity_qty: 40000, unit: "t",
+                     months: { "9": { balance_end: 30000, over: false }, "10": { balance_end: 40510, over: true }, "11": { balance_end: 40510, over: true }, "12": { balance_end: 40510, over: true } } }];
+        // the pure helpers
+        ok("⭐ the cap sentence names its unit and the flag: 'R016: 32 two-way movements a day against a planning flag of 20'",
+           api.capSentence("R016", 32.2, 20) === "R016: 32 two-way movements a day against a planning flag of 20");
+        ok("...and keeps a decimal when the round would land on the flag (20.3 over 20 never reads '20 … of 20')",
+           api.capSentence("R1", 20.3, 20) === "R1: 20.3 two-way movements a day against a planning flag of 20");
+        ok("the last month anything was recorded against a pile is the last month its balance moved (Oct here)", api.pileLastRecorded(W.piles[0]) === 10);
+        ok("a row id splits into its event and its route; an old bare event id still works",
+           JSON.stringify(api.splitHitRowId("00525419-001|R002")) === '{"ev":"00525419-001","rid":"R002"}' && api.splitHitRowId("E9").rid === null);
+        api.renderConditionsPill([{ src: "cap", lvl: "warn" }, { src: "cap", lvl: "warn" }]);
+        ok("⭐ the pill's plural: '2 routes over planning flags' (it printed '2 over a planning flag')", pill().includes("2 routes over planning flags"), pill());
+        ASYNC_PINS.push((async () => {
+          api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("⭐ one closure on two routes: two rows, each carrying its OWN route (E1|R2, E1|R5)",
+             box().includes("showCondition('h','E1|R2')") && box().includes("showCondition('h','E1|R5')"), box().slice(0, 300));
+          ok("...the event maps to both routes and is highlighted once", JSON.stringify(W.hitRoute.E1) === '["R2","R5"]' && JSON.stringify(rec.hits[rec.hits.length - 1]) === '["E1"]');
+          ok("⭐ the planning-flag row: one noun, the unit in the sentence", box().includes("<b>Over a planning flag</b>")
+             && box().includes("R2: 32 two-way movements a day against a planning flag of 20") && !box().includes("planning cap"));
+          ok("...and the pill counts it as '1 route over a planning flag'", pill().includes("1 route over a planning flag"), pill());
+          ok("the stockpile sentence in a month with a record: '… 40,510 t recorded in it at the end of Oct 2026.'",
+             box().includes(`Langton stockpile holds ${(40000).toLocaleString()} t. ${(40510).toLocaleString()} t recorded in it at the end of Oct 2026.`));   // the page formats with the reader's locale
+          api.showRestrictionHit("E1|R5"); api.showRestrictionHit("E1|R2"); api.showRestrictionHit("E1");
+          ok("⭐ Show on map on each row selects THAT row's route (R5, then R2); a bare event id falls back to its first route",
+             rec.select.join(",") === "R5,R2,R2" && rec.fit === 3, rec.select.join(","));
+          api.dismissWarning("r|R5|10"); await flush(); await flush();
+          ok("⭐ dismissing one route's row keeps the closure highlighted while another route's row is live",
+             JSON.stringify(rec.hits[rec.hits.length - 1]) === '["E1"]');
+          api.dismissWarning("r|R2|10"); await flush(); await flush();
+          ok("...and dismissing the last one clears it", JSON.stringify(rec.hits[rec.hits.length - 1]) === "[]");
+          TL.month = 11; api.renderTimelineWarnings(11); await flush(); await flush();
+          ok("⭐ D23: a month after the last record carries the balance forward and says so",
+             box().includes(`Langton stockpile holds ${(40000).toLocaleString()} t. ${(40510).toLocaleString()} t recorded at the end of Oct 2026; nothing recorded since.`), box());
+          ok("...and the October closure is not listed in November", !box().includes("E1|"));
+          // F3: Play pressed on a red month counts as the loop's pause even when its conditions land after the first tick
+          TL.playing = true; TL.startedOn = 10; TL.month = 11; TL.clashPaused = false; TL.ticked = 11;
+          api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("⭐ F3: Play pressed on a red month (Oct) counts as this loop's pause even when Oct's conditions land after the tick",
+             TL.clashPaused === true && rec.stops.length === 0);
+          TL.startedOn = null; TL.clashPaused = false; api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("...and only for the month it was pressed on, before the wrap", TL.clashPaused === false);
+          // the clash pause writes the live region once, with the reason
+          TL.month = 10; TL.ticked = 10; TL.playing = true; TL.clashPaused = false; rec.announced.length = 0;
+          api.renderTimelineWarnings(10); await flush(); await flush();
+          ok("⭐ a clash pause stops ONCE and passes its reason to the one announcement (no second write)",
+             rec.stops.length === 1 && rec.stops[0] === "Oct 2026 · playback paused: 1 over capacity" && rec.announced.length === 0 && TL.clashPaused === true,
+             JSON.stringify(rec));
+        })());
+      }
+    }
+  }
+}
+
+// 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
+Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
+  console.log();
+  for (const f of fail) console.log("  FAIL:", f);
+  console.log(`\n${pass} passed, ${fail.length} failed`);
+  process.exit(fail.length ? 1 : 0);
+});
