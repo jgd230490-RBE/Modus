@@ -2003,7 +2003,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("D22: the matrix carries the months with volume and their span, built from EVERY line the API returned",
      /const volMonths = new Set\(\);/.test(code) && /\(j\.routes\|\|\[\]\)\.forEach\(rt=>\{ Object\.keys\(rt\.monthly\|\|\{\}\)\.forEach\(k=>\{[^\n]*volMonths\.add\(mm\)/.test(code)
      && /const span = volMonths\.size \? \[Math\.min\(\.\.\.volMonths\), Math\.max\(\.\.\.volMonths\)\] : null;/.test(code)
-     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span \};/.test(code));
+     // NARROWED 12 Oct 2026 (C1, review §2.2a): the matrix also carries the programme's carbon maximum and the feed's
+     // co2_error, after the span - the carbon ramp's fixed stops come from it
+     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, co2Error: j\.co2_error \|\| null \};/.test(code));
   ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
      /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
      && /return span \? span\[0\] : 1;/.test(code)
@@ -2825,6 +2827,345 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("the condition row's sentence is 14 px (new text; the row is 13 px)", /\.tl-warn \.what\{ color:var\(--muted\); font-size:14px; \}/.test(html));
   ok("F3: only a wrap over more than one month forgets the month Play was pressed on",
      /if\(wrap && lo !== hi\) TL\.startedOn = null;/.test(code) && !/if\(wrap\) TL\.startedOn = null;/.test(code));
+}
+
+// ===== 12 Oct 2026 (C1) — ROAD LOAD AND CARBON on the public map (review §2.2d map half, mockup 1; §2.2a, mockup 5) =====
+// Every pin below fails on the base (d9e5cb1): none of these names, ids, layers or words existed there.
+{
+  const blkA = src.indexOf("    // ===== 12 Oct 2026 — ROAD LOAD AND CARBON");
+  const blkB = src.indexOf("    // ===== end of road load and carbon =====");
+  ok("C1: the road-load and carbon block is one contiguous slice", blkA > 0 && blkB > blkA);
+  const blk = blkA > 0 && blkB > blkA ? src.slice(blkA, blkB) : "";
+  // the block without its comments, for the source pins
+  const blkCode = blk.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
+
+  // ---- the controls: two checkboxes, off by default, under Forecast traffic volume ----
+  ok("⭐ C1: a 'Road load' checkbox and a 'Carbon' checkbox sit in the forecast box, both OFF by default (no checked attribute)",
+     code.includes('<label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-road-load" onchange="toggleRoadLoad()"> Road load</label>')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month</span></label>')
+     && !/id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code)
+     && code.indexOf('id="toggle-road-load"') > code.indexOf('id="toggle-forecast"') && code.indexOf('id="toggle-carbon"') > code.indexOf('id="toggle-road-load"'));
+  ok("C1: each mode has a legend box, hidden until its checkbox is ticked",
+     code.includes('<div class="mode-legend" id="road-load-legend" hidden></div>') && code.includes('<div class="mode-legend" id="carbon-legend" hidden></div>'));
+  ok("C1: the new notes and legends are 14 px (the floor for new text)",
+     /\.mode-note\{ margin:6px 0 0; font-size:14px;/.test(html) && /\.mode-legend\{ margin:8px 0 2px; font-size:14px;/.test(html));
+
+  // ---- road load: the fetch, per month, cached; the loaded leg (the endpoint's default) ----
+  ok("⭐ C1: Road load reads /api/public/road-load for the month on screen, cached per month, one fetch in flight per month",
+     blkCode.includes("RL.pending[m] = fetch(CONFIG.API_BASE + '/public/road-load?month=' + m)")
+     && blkCode.includes("if (RL.cache[m]) return Promise.resolve(RL.cache[m]);")
+     && blkCode.includes(".then(j => { RL.cache[m] = j; delete RL.error[m]; return j; })"));
+  ok("C1: the loaded leg only — the page never asks for leg=return, so empties are never added to the figure",
+     !/road-load\?[^'"]*leg=/.test(code) && !/leg=return/.test(code));
+  ok("C1: the month is the playhead's (once the matrix is read), or the sidebar window when From = To; else none",
+     blkCode.includes("if (typeof TL !== 'undefined' && TL.on) return TL.matrix ? TL.month : null;")
+     && blkCode.includes("if (f > 0 && f === t) return f;"));
+
+  // ---- road load: the source, the line, the label, the card ----
+  ok("⭐ C1: a road-load SOURCE and a line layer whose width is data-driven by two-way movements a day on FIXED, ascending stops",
+     blkCode.includes("map.addSource('road-load-source', { type: 'geojson'")
+     && blkCode.includes("const ROAD_LOAD_STOPS = [5, 30, 120];")
+     && blkCode.includes("return ['interpolate', ['linear'], ['to-number', ['get', 'rl_mv'], 0], s[0], base, s[1], base + 4, s[2], base + 9];")
+     && /id: 'road-load-line', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_LINE_WIDTH/.test(blkCode)
+     && /id: 'road-load-casing', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_CASING_WIDTH/.test(blkCode));
+  ok("⭐ C1: routes stay blue — the road-load line is the plan blue (CONFIG.COLORS.brand) under an ink casing",
+     /id: 'road-load-line'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.brand,/.test(blkCode)
+     && /id: 'road-load-casing'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.forecastCasing,/.test(blkCode));
+  ok("⭐ C1: ONE label per run with its OWN text expression ('N two-way / day · R routes'), never the per-route f_avg concat",
+     blkCode.includes("const ROAD_LOAD_LABEL = ['concat', ['get', 'rl_mv_text'], ' two-way / day · ', ['get', 'rl_routes_text']];")
+     && /id: 'road-load-labels', type: 'symbol', source: 'road-load-source',[\s\S]{0,120}'symbol-placement': 'line-center', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14,/.test(blkCode)
+     && !/\['get', 'f_avg'\]/.test(blkCode));
+  // the four count pins of review §2.2d, honoured (asserted above unchanged; these say WHY they still hold)
+  ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
+     (blkCode.match(/layout: \{ 'line-cap': 'round', 'line-join': 'round' \}/g) || []).length === 2
+     && !/'line-cap': 'butt'/.test(blkCode) && !/line-dasharray/.test(blkCode)
+     && (code.match(/'line-cap': 'butt'/g) || []).length === 5
+     && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 4);
+  ok("C1: both lazy adders re-raise the marks (raiseMarks count is additive)",
+     /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*raiseMarks\(\);/.test(blkCode)
+     && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,400}raiseMarks\(\);/.test(blkCode)
+     && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
+  ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
+  ok("⭐ C1: re-added on style.load (setStyle drops every source and layer): the handler calls refreshMapModes() after the month re-render",
+     (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
+              const sl = a > 0 && b > a ? code.slice(a, b) : "";
+              return sl.indexOf("if (typeof refreshMapModes === 'function') refreshMapModes();") > sl.indexOf("renderMonthFrame(TL.month); renderTimelineWarnings(TL.month);"); })()
+     && code.includes("if(typeof refreshMapModes === 'function') refreshMapModes();\n    }\n    function openTimeline(){"));
+  ok("C1: every month on the playhead, the overlay switching off and closing the bar refresh the modes",
+     /applyFilters\(\);\s*if\(typeof refreshMapModes === 'function'\) refreshMapModes\(\);[^\n]*\n    \}\n    function toggleTimeline/.test(code)
+     && src.includes("if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow\n                return;"));
+  ok("⭐ C1: in either mode the per-route forecast labels HIDE, so two figures never show for one road",
+     blkCode.includes("map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');")
+     && blkCode.includes("setForecastLabelsVisible(!(m && (rl || co2)));"));
+  ok("⭐ C1: the section card lists the routes, their teams through teamText (never the raw id) and their shares; registered ONCE",
+     blkCode.includes("rlEsc(teamText((sh.teams || []).join(', ')) || '—')")
+     && !/\.ipt\b/.test(blkCode) && !/\bipt\b/.test(blkCode)
+     && blkCode.includes("if (RL.wired) return;") && blkCode.includes("map.on('click', 'road-load-line', (e) => {")
+     && blkCode.includes("Loaded leg counted once (one load = one two-way movement)."));
+  ok("C1: a click on a shared section answers with the section card, not the route card underneath",
+     code.includes("if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;"));
+  ok("C1: the sidebar filters re-cut the cached month (no fetch) through applyForecastFilter",
+     code.includes("if (typeof refreshMapModeFilters === 'function') refreshMapModeFilters();"));
+
+  // ---- carbon ----
+  ok("⭐ C1 (D26): the carbon ramp is ONE hue, the plan blue, five steps light to dark — no orange, no rainbow",
+     (() => {
+       const m = /const CARBON_RAMP = \[([^\]]*)\];/.exec(blkCode);
+       if (!m) return false;
+       const hex = m[1].match(/#[0-9A-Fa-f]{6}/g) || [];
+       const hsl = hex.map(h => { const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255;
+         const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let hu = 0;
+         if (d) hu = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+         return { h: (hu + 360) % 360, l: (mx + mn) / 2 }; });
+       return hex.length === 5 && hsl.every(x => x.h >= 214 && x.h <= 220) && hsl.every((x, i) => i === 0 || x.l < hsl[i - 1].l);
+     })()
+     && !/#FF8C14/i.test(blk) && !/#F97316/i.test(blk));
+  ok("⭐ C1: the stops are FIXED from the programme maximum (forecast-matrix co2_t), ascending, and the step takes them as literals",
+     blkCode.includes("const CARBON_STEP_FRACTIONS = [0.2, 0.4, 0.6, 0.8];")
+     && blkCode.includes("const stops = carbonStops(typeof TL !== 'undefined' && TL.matrix ? TL.matrix.co2Max : 0);")
+     && blkCode.includes("['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]],")
+     && code.includes("const c = (rt.co2_t||{})[k];")
+     && code.includes("Object.keys(byR).forEach(rid=>{ Object.keys(byR[rid].co2||{}).forEach(k=>{ if(byR[rid].co2[k] > co2Max) co2Max = byR[rid].co2[k]; }); });"));
+  ok("C1: a route-month with no figure paints grey and is COUNTED, never a zero dressed as a figure",
+     blkCode.includes("const CARBON_NONE = '#A8A29E';")
+     && code.includes("if(c == null || j.co2_error) acc.co2Missing[k] = (acc.co2Missing[k]||0) + 1;")
+     && blkCode.includes("'no stored road route'"));
+  ok("⭐ C1: Carbon paints the road-load runs when Road load is on, else the forecast routes; colour only (fixed width, rule 1)",
+     blkCode.includes("const paintRoutes = co2 && !rl;") && blkCode.includes("const paintRuns = co2 && rl;")
+     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-color', paintRoutes ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast);")
+     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', paintRoutes ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);")
+     && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', paintRuns ? carbonColor('rl_co2', stops) : CONFIG.COLORS.brand);")
+     // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
+     && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
+  ok("⭐ C1: the route label switches to 't CO₂e' in carbon mode (its own layer, on the loaded leg: one label per route)",
+     blkCode.includes("['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no stored road route'];")
+     && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway']];")
+     && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', paintRuns ? ROAD_LOAD_CARBON_LABEL : ROAD_LOAD_LABEL);"));
+  ok("⭐ C1: the carbon legend is a stepped gradient with the note 'Approved plan only, average-laden factor on both legs, excludes N …'",
+     blkCode.includes("'<div class=\"ml-steps\">' + CARBON_RAMP.map(c => '<i style=\"background:' + c + '\"></i>').join('') + '</div>'")
+     && blkCode.includes("'<div class=\"ml-foot\">Approved plan only, average-laden factor on both legs, excludes ' + miss + ' line' + (miss === 1 ? '' : 's') +")
+     && blkCode.includes("' with no stored road route. Stops are fixed from the programme\\'s largest route-month ('"));
+  ok("C1: f_co2 is stamped on BOTH legs (both colour) and the excluded-line count sums the routes the filters pass, once each",
+     /src\._data\.features\.forEach\(f => \{[\s\S]{0,500}if \(f\.properties\.f_co2 !== c\) \{ f\.properties\.f_co2 = c; changed = true; \}/.test(blkCode)
+     && !/f\.properties\.type === 'Inbound Highway'/.test(blkCode.slice(blkCode.indexOf("function stampCarbon"), blkCode.indexOf("function carbonMissingLines"))));
+  // ---- the drawer: one carbon number, the server's ----
+  ok("⭐ C1: the drawer reads the server's co2_t for the sidebar window and works out no carbon of its own (no factor read)",
+     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("const MAT_PALETTE=");
+              const d = a > 0 && b > a ? code.slice(a, b) : "";
+              return d.includes("const mtx=await fetchMatrix('t');") && d.includes("const co2m=rw.co2_t||{};")
+                     && !/vehicle_emissions_kg_co2e_per_km/.test(d) && !/round\s*\*\s*em/.test(d) && !/\*\s*emis/.test(d); })());
+  // ---- the product rules ----
+  ok("C1: no literal working-day divisor in the block (the server's movements_per_day; never 22)", !/\b22\b/.test(blkCode));
+  {
+    const strings = (blkCode.match(/'[^'\n]*'/g) || []).join(" ");
+    ok("C1: nothing a person reads in the block says truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
+       !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(strings) && !/\bAI\b/.test(strings));
+  }
+  ok("C1: every new symbol layer is 14 px", (blkCode.match(/'text-size': (\d+)/g) || []).length === 2 && !/'text-size': (1[0-3]|[0-9])\b/.test(blkCode));
+
+  // ---- the block, run against a fake map and DOM ----
+  const tA = src.indexOf("    const TEAM_LABELS = {};"), tB = src.indexOf("    // ===== The overlay package");
+  ok("C1 sandbox: the teamText slice is found", tA > 0 && tB > tA);
+  if (blk && tA > 0 && tB > tA) {
+    let teamApi = null;
+    try { teamApi = new Function("TEAM", src.slice(tA, tB) + "\nreturn { teamText, TEAM_LABELS };")("Team"); } catch (e) {}
+    teamApi && (teamApi.TEAM_LABELS.IPT3 = "North Team", teamApi.TEAM_LABELS.IPT1 = "South Team");
+    const mkMap = () => {
+      const layers = {}, sources = {}, log = [];
+      return { layers, sources, log,
+        getLayer: id => layers[id], getSource: id => sources[id],
+        addSource(id, spec) { sources[id] = { spec, _data: spec.data, setData(d) { this._data = d; log.push("setData:" + id); } }; },
+        removeSource(id) { delete sources[id]; log.push("removeSource:" + id); },
+        addLayer(spec) { if (layers[spec.id]) throw new Error("layer exists " + spec.id); layers[spec.id] = { spec, paint: Object.assign({}, spec.paint), layout: Object.assign({}, spec.layout), filter: spec.filter }; log.push("add:" + spec.id); },
+        removeLayer(id) { delete layers[id]; log.push("remove:" + id); },
+        setPaintProperty(id, k, v) { layers[id].paint[k] = v; }, setLayoutProperty(id, k, v) { layers[id].layout[k] = v; },
+        setFilter(id, f) { layers[id].filter = f; },
+        on(type, layer) { log.push("on:" + type + ":" + layer); }, queryRenderedFeatures: () => [], getCanvas: () => ({ style: {} }) };
+    };
+    const els = {};
+    const el = id => els[id] || (els[id] = { id, checked: false, value: "", hidden: true, innerHTML: "" });
+    const document = { getElementById: el };
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthLabel = i => names[(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12));
+    const CONFIG = { API_BASE: "/api", COLORS: { brand: "#2563EB", forecast: "#3B82F6", forecastCasing: "#1F2024", brandDark: "#1F2024" } };
+    const L = [[0, 0], [1, 1]];
+    const a1_data = { features: [["R1", "Inbound Highway"], ["R1", "Outbound Highway"], ["R2", "Inbound Highway"], ["R2", "Outbound Highway"], ["R3", "Inbound Highway"]]
+      .map(([rid, type]) => ({ geometry: { type: "LineString", coordinates: L }, properties: { route_id: rid, type, origin: "Q", dest: "C" } })) };
+    let passFilter = () => true;
+    const TL = { on: true, playing: false, month: 10, matrix: null };
+    const fetches = [];
+    let fetchImpl = url => { fetches.push(url); return Promise.resolve({ ok: true, json: () => Promise.resolve(RUNS[Number(/month=(\d+)/.exec(url)[1])] || { runs: [], notes: [] }) }); };
+    let opened = 0;
+    const RUNS = {
+      10: { month: 10, notes: [], runs: [{ id: "S1", routes: ["R1", "R2"], movements_per_day: 46.27, co2_t: 3.21, length_km: 3.1, geometry: [[0, 0], [1, 1], [2, 2]],
+              route_shares: [{ route_id: "R1", teams: ["IPT3"], movements_per_day: 22.1, co2_t: 2.0 }, { route_id: "R2", teams: ["South Team"], movements_per_day: 24.17, co2_t: 1.21 }] },
+            { id: "S2", routes: ["R2", "R3"], movements_per_day: 0.4, co2_t: null, length_km: 1, geometry: [[0, 0], [1, 1]],
+              route_shares: [{ route_id: "R2", teams: [], movements_per_day: 0.2, co2_t: null }, { route_id: "R3", teams: [], movements_per_day: 0.2, co2_t: null }] },
+            { id: "S3", routes: ["R1", "R3"], movements_per_day: 5, co2_t: 1, length_km: 1, geometry: [[0, 0]], route_shares: [] }] },
+      11: { month: 11, notes: ["Approved volume this month runs on no shared road section."], runs: [] } };
+    let blkApi = null, blkErr = "";
+    const fmap = mkMap();
+    try {
+      blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks",
+        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl",
+        blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, ROAD_LOAD_CARBON_LABEL };")(
+        document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
+        () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
+        { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {});
+    } catch (e) { blkErr = e.message; }
+    ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
+    if (blkApi) {
+      const B = blkApi;
+      // the stops
+      const asc = a => a.length === 4 && a.every((x, i) => i === 0 || x > a[i - 1]);
+      ok("⭐ C1: carbonStops(55.5) is [11, 22, 33, 44] (two significant figures of 20/40/60/80 % of the programme maximum)",
+         JSON.stringify(B.carbonStops(55.5)) === "[11,22,33,44]", JSON.stringify(B.carbonStops(55.5)));
+      ok("⭐ C1: the stops are strictly ascending for any maximum, including none and tiny ones (Mapbox refuses others)",
+         [0, null, 0.0004, 0.37, 1, 7.77, 99.9, 482, 12345.6].every(x => asc(B.carbonStops(x))),
+         JSON.stringify([0, 0.0004, 0.37, 7.77].map(x => B.carbonStops(x))));
+      const cc = B.carbonColor("f_co2", [11, 22, 33, 44]);
+      ok("C1: the colour expression: a number steps through the five blues at the fixed stops, anything else is the grey 'no figure'",
+         cc[0] === "case" && JSON.stringify(cc[1]) === JSON.stringify(["==", ["typeof", ["get", "f_co2"]], "number"])
+         && JSON.stringify(cc[2]) === JSON.stringify(["step", ["to-number", ["get", "f_co2"], 0], "#94BBF9", 11, "#5A96F6", 22, "#2071F3", 33, "#0B55CB", 44, "#073888"])
+         && cc[3] === B.CARBON_NONE);
+      // the features: two overlapping routes, summed once
+      const all = B.roadLoadFeatures(RUNS[10], null);
+      const s1 = all.find(f => f.properties.id === "S1");
+      ok("⭐ C1: two overlapping routes (22.1 + 24.17 a day) give ONE run of 46 two-way a day — their sum, never doubled — and '2 routes'",
+         !!s1 && s1.properties.rl_mv === 46.27 && Math.abs(s1.properties.rl_mv - (22.1 + 24.17)) < 0.01
+         && s1.properties.rl_mv_text === "46" && s1.properties.rl_routes_text === "2 routes" && s1.properties.rl_co2 === 3.2,
+         JSON.stringify(s1 && s1.properties));
+      ok("C1: a run under one a day reads 'under 1', a run with no carbon reads 'no carbon figure', a one-point run is not drawn",
+         all.length === 2 && all[1].properties.rl_mv_text === "under 1" && all[1].properties.rl_co2 === null
+         && all[1].properties.rl_co2_text === "no carbon figure");
+      const one = B.roadLoadFeatures(RUNS[10], { R1: true });
+      ok("C1: with the filters passing R1 only, the run carries R1's own share ('22 … 1 route') and the run R1 is not on disappears",
+         one.length === 1 && one[0].properties.rl_mv_text === "22" && one[0].properties.rl_routes_text === "1 route" && one[0].properties.rl_co2 === 2);
+      // the card: names, never ids
+      const pop = B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null);
+      ok("⭐ C1: the section card lists both routes with origin → destination and team NAMES; no team id reaches it",
+         pop.includes("R1") && pop.includes("R2") && pop.includes("Kilby Ridge Quarry → Harborough Compound") && pop.includes("North Team")
+         && pop.includes("South Team") && !/IPT\s*\d/i.test(pop) && pop.includes("46 two-way movements a day · 2 routes")
+         && pop.indexOf("R2") < pop.indexOf("R1"), pop.slice(0, 300));
+      ok("C1: ...and names the routes on the section that the filters leave out", B.roadLoadPopupHTML(RUNS[10].runs[0], 10, { R1: true }).includes("outside the filters: R2"));
+      // the month
+      TL.on = true; TL.matrix = null;
+      ok("C1: the bar open before its matrix is read is NO month (not the default January)", B.mapModeMonth() === null);
+      TL.on = false; el("toggle-forecast").checked = true; el("forecast-from").value = "10"; el("forecast-to").value = "12";
+      ok("C1: Show forecast over three months is no month; From = To is that month",
+         B.mapModeMonth() === null && (el("forecast-to").value = "10", B.mapModeMonth() === 10));
+      el("toggle-forecast").checked = false;
+      // a tick with no month opens the timeline
+      el("toggle-road-load").checked = true; B.toggleRoadLoad();
+      ok("C1: ticking Road load with no month on screen opens the timeline (it has the month)", opened === 1 && fetches.length === 0);
+      // the timeline open on October
+      TL.on = true; TL.month = 10;
+      TL.matrix = { co2Max: 55.5, co2Error: null, byRoute: { r1: { route_id: "R1", co2: { "10": 47.34 }, co2Missing: {} }, r2: { route_id: "R2", co2: {}, co2Missing: { "10": 1 } }, r3: { route_id: "R3", co2: { "10": 5 }, co2Missing: { "10": 2 } } } };
+      fmap.addSource("routes-source", { type: "geojson", data: a1_data });
+      fmap.addLayer({ id: "forecast-casing", paint: { "line-color": "#1F2024", "line-width": "FCW" } });
+      fmap.addLayer({ id: "forecast-layer", paint: { "line-color": "#3B82F6", "line-width": "FLW" } });
+      fmap.addLayer({ id: "forecast-labels", layout: { "text-field": "f_avg concat" } });
+      ASYNC_PINS.push((async () => {
+        const flush = () => new Promise(r => setTimeout(r, 0));
+        B.refreshMapModes(); await flush(); await flush();
+        ok("⭐ C1: Road load on, October: one fetch of road-load?month=10, the source and three layers added, the per-route labels hidden",
+           JSON.stringify(fetches) === JSON.stringify(["/api/public/road-load?month=10"]) && !!fmap.layers["road-load-line"] && !!fmap.layers["road-load-casing"]
+           && !!fmap.layers["road-load-labels"] && fmap.layers["forecast-labels"].layout.visibility === "none"
+           && fmap.sources["road-load-source"]._data.features.length === 2, JSON.stringify(fetches));
+        ok("C1: the card is wired once (click, enter, leave on road-load-line)",
+           fmap.log.filter(x => x.startsWith("on:")).join(",") === "on:mouseenter:road-load-line,on:mouseleave:road-load-line,on:click:road-load-line");
+        ok("C1: the legend says the month, the three width stops and the counting rule",
+           el("road-load-legend").hidden === false && el("road-load-legend").innerHTML.includes("Road load · Oct 2026")
+           && el("road-load-legend").innerHTML.includes("120 and over two-way movements a day") && el("road-load-legend").innerHTML.includes("the loaded leg is counted once"));
+        B.refreshMapModes(); await flush(); B.refreshMapModes(); await flush();
+        ok("⭐ C1: the same month again is read from the cache — no second fetch, no second set of layers", fetches.length === 1);
+        TL.month = 11; B.refreshMapModes(); await flush(); await flush();
+        ok("⭐ C1: the next month on the playhead re-fetches (road-load?month=11) and the server's note reaches the legend",
+           fetches[1] === "/api/public/road-load?month=11" && fmap.sources["road-load-source"]._data.features.length === 0
+           && el("road-load-legend").innerHTML.includes("Approved volume this month runs on no shared road section."));
+        TL.month = 10; B.refreshMapModes(); await flush();
+        ok("C1: back to October: from the cache, the runs drawn again", fetches.length === 2 && fmap.sources["road-load-source"]._data.features.length === 2);
+        // filters
+        passFilter = p => p.route_id === "R1"; B.refreshMapModeFilters();
+        ok("C1: a filter change re-cuts the cached month with no fetch", fetches.length === 2 && fmap.sources["road-load-source"]._data.features.length === 1
+           && fmap.sources["road-load-source"]._data.features[0].properties.rl_mv_text === "22");
+        passFilter = () => true; B.refreshMapModeFilters();
+        // carbon on, with road load on: the runs are painted, the forecast routes stay blue
+        el("toggle-carbon").checked = true; B.toggleCarbon(); await flush(); await flush();
+        ok("⭐ C1: Carbon with Road load on paints the RUNS by rl_co2 on the blue ramp, fixed width; the forecast routes stay plan blue",
+           fmap.layers["road-load-line"].paint["line-color"][0] === "case" && fmap.layers["road-load-line"].paint["line-color"][2][1][1][1] === "rl_co2"
+           && fmap.layers["road-load-line"].paint["line-width"] === 5 && fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6"
+           && JSON.stringify(fmap.layers["road-load-labels"].layout["text-field"]) === JSON.stringify(B.ROAD_LOAD_CARBON_LABEL)
+           && !fmap.layers["carbon-route-labels"]);
+        ok("⭐ C1: the carbon legend: per shared section, the five ranges from the fixed stops, 'excludes 3 lines with no stored road route'",
+           el("carbon-legend").hidden === false && el("carbon-legend").innerHTML.includes("Carbon · t CO₂e in Oct 2026, per shared section")
+           && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
+           && el("carbon-legend").innerHTML.includes("Approved plan only, average-laden factor on both legs, excludes 3 lines with no stored road route.")
+           && el("carbon-legend").innerHTML.includes("(55.5 t)"), el("carbon-legend").innerHTML.slice(0, 400));
+        // road load off: the forecast routes carry the carbon
+        el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
+        const fl = fmap.layers["forecast-layer"].paint;
+        ok("⭐ C1: Road load off, Carbon on: the road-load source and layers go, the FORECAST routes are painted by f_co2 at a fixed width",
+           !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && fl["line-color"][2][1][1][1] === "f_co2" && fl["line-width"] === 5
+           && fmap.layers["forecast-casing"].paint["line-width"] === 7.5);
+        ok("⭐ C1: ...the route label switches to t CO₂e (its own layer on the loaded leg) and the per-route figure label stays hidden",
+           !!fmap.layers["carbon-route-labels"] && JSON.stringify(fmap.layers["carbon-route-labels"].filter) === JSON.stringify(["all", ["all"], ["==", ["get", "type"], "Inbound Highway"]])
+           && fmap.layers["forecast-labels"].layout.visibility === "none");
+        const fco2 = a1_data.features.map(f => f.properties.route_id + "/" + f.properties.type.split(" ")[0] + "=" + f.properties.f_co2).join(",");
+        ok("⭐ C1: f_co2 is the route's month figure on BOTH legs (rounded to 0.1 t); a route with no figure is null, never 0",
+           fco2 === "R1/Inbound=47.3,R1/Outbound=47.3,R2/Inbound=null,R2/Outbound=null,R3/Inbound=5", fco2);
+        ok("C1: the legend says per route now", el("carbon-legend").innerHTML.includes("per route</b>"));
+        // a failed carbon read
+        TL.matrix.co2Error = "The carbon figures could not be read (OperationalError)."; B.refreshMapModes(); await flush();
+        ok("C1: a failed carbon read paints every route grey (no figure) and says so in the legend",
+           a1_data.features.every(f => f.properties.f_co2 === null) && el("carbon-legend").innerHTML.includes("could not be read"));
+        TL.matrix.co2Error = null;
+        // everything off
+        el("toggle-carbon").checked = false; B.toggleCarbon(); await flush();
+        ok("⭐ C1: both off: the forecast routes are plan blue at their volume widths again, the carbon labels gone, the route labels back",
+           fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6" && fmap.layers["forecast-layer"].paint["line-width"] === "FLW"
+           && fmap.layers["forecast-casing"].paint["line-width"] === "FCW" && !fmap.layers["carbon-route-labels"]
+           && fmap.layers["forecast-labels"].layout.visibility === "visible" && el("carbon-legend").hidden === true && el("road-load-legend").hidden === true);
+        // closing the bar with Road load ticked: no month, nothing drawn, the legend says why
+        el("toggle-road-load").checked = true; B.refreshMapModes(); await flush();
+        TL.on = false; B.refreshMapModes(); await flush();
+        ok("C1: the bar closed with Road load ticked: no layers, no source, and the legend says it shows one month",
+           !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && el("road-load-legend").innerHTML.includes("Shows one month")
+           && fmap.layers["forecast-labels"].layout.visibility === "visible");
+        el("toggle-road-load").checked = false;
+      })());
+    }
+  }
+
+  // ---- the matrix sums each route's lines' co2_t per month (loadTimelineMatrix, run) ----
+  {
+    const a = src.indexOf("    async function loadTimelineMatrix(){"), b = src.indexOf("    // 12 Oct 2026 (review §2.4): Play used to fire one month-kpis GET");
+    ok("C1 sandbox: loadTimelineMatrix is found", a > 0 && b > a);
+    if (a > 0 && b > a) {
+      const TLm = {};
+      let body = null;
+      const run = new Function("TL", "CONFIG", "fetch", "prefetchSpanKpis", "FORECAST_WORKING_DAYS",
+        src.slice(a, b) + "\nreturn loadTimelineMatrix;")(TLm, { MONTH_COUNT: 60, FORECAST_UNIT: "vehicles", API_BASE: "" },
+        () => Promise.resolve({ ok: true, json: () => Promise.resolve(body) }), () => {}, 22);
+      ASYNC_PINS.push((async () => {
+        body = { unit: "vehicles", working_days: 21, routes: [
+          { route_id: "R1", monthly: { "10": 100, "11": 50 }, total: 150, co2_t: { "10": 2.5, "11": 1.0 } },
+          { route_id: "R1", monthly: { "10": 40 }, total: 40, co2_t: { "10": 3.0 } },
+          { route_id: "R2", monthly: { "10": 30, "12": 0 }, total: 30, co2_t: { "10": null, "12": null } } ] };
+        await run();
+        const r1 = TLm.matrix.byRoute.r1, r2 = TLm.matrix.byRoute.r2;
+        ok("⭐ C1: the matrix sums a route's lines' server co2_t per month (2.5 + 3.0 = 5.5) and keeps the programme maximum",
+           Math.abs(r1.co2["10"] - 5.5) < 1e-9 && r1.co2["11"] === 1 && TLm.matrix.co2Max === 5.5 && TLm.matrix.co2Error === null, JSON.stringify(r1.co2));
+        ok("C1: a line-month with volume and no figure is counted missing, never summed as zero; a month with no volume is not counted",
+           r2.co2["10"] === undefined && r2.co2Missing["10"] === 1 && r2.co2Missing["12"] === undefined);
+        body = Object.assign({}, body, { co2_error: "The carbon figures could not be read (OperationalError)." });
+        await run();
+        ok("C1: forecast-matrix's co2_error: every line-month counted missing, no maximum, the error kept for the legend",
+           TLm.matrix.co2Max === 0 && TLm.matrix.byRoute.r1.co2Missing["10"] === 2 && /could not be read/.test(TLm.matrix.co2Error));
+      })());
+    }
+  }
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

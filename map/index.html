@@ -255,6 +255,20 @@
         .fc-toggle{ font-size:13.5px; cursor:pointer; display:flex; align-items:center; gap:9px; font-weight:500; background:var(--surface-2); border:1px solid var(--line); padding:9px 11px; border-radius:6px; }
         .fc-toggle input{ accent-color:var(--navy); }
         #forecast-status{ margin-top:9px; font-size:12.5px; font-weight:500; color:var(--muted); line-height:1.5; }
+        /* 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon. Off by default; their notes and legends are new
+           text, so 14 px (the floor). The carbon swatches are the ramp itself, the words beside them ink (rule 4). */
+        .fc-mode{ margin-top:8px; }
+        .fc-mode .mode-sub{ font-weight:400; color:var(--muted); }
+        .mode-note{ margin:6px 0 0; font-size:14px; color:var(--muted); line-height:1.45; }
+        .mode-legend{ margin:8px 0 2px; font-size:14px; color:var(--navy-deep); line-height:1.45; }
+        .mode-legend[hidden]{ display:none; }
+        .mode-legend b{ display:block; font-weight:600; margin-bottom:4px; }
+        .mode-legend .ml-row{ display:flex; align-items:center; gap:10px; padding:2px 0; }
+        .mode-legend .ml-w{ display:inline-block; width:34px; flex:0 0 34px; border-radius:7px; background:#2563EB; box-shadow:0 0 0 1px #1F2024; }
+        .mode-legend .ml-steps{ display:flex; gap:2px; margin:4px 0 2px; }
+        .mode-legend .ml-steps i{ flex:1; height:14px; display:block; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
+        .mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:2px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
+        .mode-legend .ml-foot{ margin-top:6px; color:var(--muted); }
         #btn-detail{ margin-top:8px; display:none; }
 
         .mapboxgl-popup-content { border-radius:10px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:'Inter',sans-serif !important; }
@@ -2917,6 +2931,9 @@
         // while the bar's figures stayed. routes-source is back (above, with the is_forecast
         // stamps still on a1_data), so the month is re-rendered and its conditions rebuilt.
         if (typeof TL !== 'undefined' && TL.on && TL.matrix) { renderMonthFrame(TL.month); renderTimelineWarnings(TL.month); }
+        // 12 Oct 2026 (review §2.2d / §2.2a): the road-load source and layers, the carbon paint and labels are re-added
+        // from the cached month (no second fetch) - setStyle drops every source and layer
+        if (typeof refreshMapModes === 'function') refreshMapModes();
     });
 
     // Click an alignment segment for its IPT, work sections and chainage extent.
@@ -3833,6 +3850,11 @@
                         <div><label>To</label><select id="forecast-to" onchange="if(document.getElementById('toggle-forecast').checked) toggleForecastPlugin();"></select></div>
                     </div>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
+                    <label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-road-load" onchange="toggleRoadLoad()"> Road load</label>
+                    <div class="mode-note" id="road-load-note">One figure per stretch of road two or more routes share: the routes using it, summed.</div>
+                    <div class="mode-legend" id="road-load-legend" hidden></div>
+                    <label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month</span></label>
+                    <div class="mode-legend" id="carbon-legend" hidden></div>
                     <button class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
                     <button class="btn btn-ghost" id="tl-open" onclick="startTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
                     <div id="forecast-status">Approved forecasts only.</div>
@@ -3960,7 +3982,7 @@
             let status = document.getElementById('forecast-status');
 
             if (!isChecked) {
-                ['forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
+                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyRailHighlight();      // §6b: forecast off -> dim, unless a railhead origin is selected
@@ -3969,6 +3991,7 @@
                 status.style.color = "#6b7280";
                 const bd = document.getElementById('btn-detail'); if(bd) bd.style.display = 'none';
                 if (typeof closeDrawer === 'function' && drawerTab === 'detail') closeDrawer();
+                if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow
                 return;
             }
 
@@ -4049,6 +4072,8 @@
                 }
                 ensureFlowLayer();
                 applyForecastFilter();     // the overlay follows the sidebar filters and the leg toggles
+                // 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon need ONE month; From = To gives one
+                if (typeof refreshMapModes === 'function') refreshMapModes();
 
                 const bd = document.getElementById('btn-detail');
                 if (matchCount > 0) {
@@ -4329,6 +4354,7 @@
     function applyForecastFilter(){
         const f = forecastLayerFilter();
         FORECAST_OVERLAY_LAYERS.forEach(l => { if(map.getLayer(l)) map.setFilter(l, f); });
+        if (typeof refreshMapModeFilters === 'function') refreshMapModeFilters();   // 12 Oct: Road load / Carbon too
     }
     function ensureForecastLayers(){
         if(map.getLayer('forecast-layer')) return;
@@ -4366,6 +4392,346 @@
         ensureCapBadgeLayer();
         if(map.getLayer('forecast-cap-badge')) map.setFilter('forecast-cap-badge', capBadgeFilter(WARN.capRoutes));
     }
+    // ===== 12 Oct 2026 — ROAD LOAD AND CARBON (review §2.2d map half, mockup 1; §2.2a, mockup 5) =====
+    // ROAD LOAD: one figure per stretch of road two or more routes share, read from /api/public/road-load (the server's
+    // shared-section index, Track B). The LOADED leg only: one load = one two-way movement, never doubled; the return
+    // leg is the same loads coming back empty and is never added. One line per run, its width by two-way movements a
+    // day on FIXED stops, ONE label per run with its own text expression, and a card listing the routes, their teams
+    // (through teamText, never an id) and their shares. While it is on, the per-route forecast labels hide, so two
+    // figures never show for one road.
+    // CARBON: the shared sections (Road load on) or the forecast routes (Road load off) painted by t CO2e in the month
+    // on ONE hue, the plan blue (D26; config.js keeps orange off the map), with FIXED stops from the programme's
+    // largest route-month (forecast-matrix co2_t), so one colour means the same tonnes in every month. In carbon mode
+    // the line's colour is carbon and nothing else (colour-system rule 1): no width by volume at the same time.
+    // Both are OFF by default and both need ONE month on screen: the timeline's, or Show forecast with From = To.
+    // Round caps and no dasharray: the route layers' butt caps and dash constants are counted by parse_map.js.
+    const ROAD_LOAD_LAYERS = ['road-load-casing', 'road-load-line', 'road-load-labels'];
+    const CARBON_LABEL_LAYER = 'carbon-route-labels';
+    //: two-way movements a day at which the road-load line reaches its three widths (fixed: one width, one volume)
+    const ROAD_LOAD_STOPS = [5, 30, 120];
+    function roadLoadWidth(base){
+        const s = ROAD_LOAD_STOPS;
+        return ['interpolate', ['linear'], ['to-number', ['get', 'rl_mv'], 0], s[0], base, s[1], base + 4, s[2], base + 9];
+    }
+    const ROAD_LOAD_LINE_WIDTH = roadLoadWidth(4);       // 4 px to 5 a day, 8 at 30, 13 at 120 and over
+    const ROAD_LOAD_CASING_WIDTH = roadLoadWidth(6.5);   // always 2.5 px wider than the line it sits under
+    //: the run's label: "118 two-way / day · 7 routes" (its OWN expression, not the per-route f_avg one)
+    const ROAD_LOAD_LABEL = ['concat', ['get', 'rl_mv_text'], ' two-way / day · ', ['get', 'rl_routes_text']];
+    const ROAD_LOAD_CARBON_LABEL = ['concat', ['get', 'rl_co2_text'], ' · ', ['get', 'rl_routes_text']];
+    //: the route label in carbon mode: the route's t CO2e in the month, from the server
+    const CARBON_ROUTE_LABEL = ['case', ['==', ['typeof', ['get', 'f_co2']], 'number'],
+                                ['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no stored road route'];
+    //: the plan blue at five lightness steps (HSL hue 217, mockup 5), light to dark; the light end may recede (rule 5)
+    const CARBON_RAMP = ['#94BBF9', '#5A96F6', '#2071F3', '#0B55CB', '#073888'];
+    //: no stored road route for the line's vehicle: no figure, painted grey, never a zero dressed as a figure
+    const CARBON_NONE = '#A8A29E';
+    //: the four stops as fractions of the programme's largest route-month, rounded to two significant figures
+    const CARBON_STEP_FRACTIONS = [0.2, 0.4, 0.6, 0.8];
+    const CARBON_LINE_WIDTH = 5, CARBON_CASING_WIDTH = 7.5;
+    const RL = { cache: {}, pending: {}, error: {}, month: null, wired: false };
+
+    function modeOn(id){ const cb = document.getElementById(id); return !!(cb && cb.checked); }
+    function rlEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+    // the ONE month Road load and Carbon show: the playhead's, or the sidebar window when it is one month; else none
+    function mapModeMonth(){
+        // the bar open but its matrix not read yet: no month yet (TL.month is still the default January)
+        if (typeof TL !== 'undefined' && TL.on) return TL.matrix ? TL.month : null;
+        if (modeOn('toggle-forecast')) {
+            const f = parseInt((document.getElementById('forecast-from') || {}).value);
+            const t = parseInt((document.getElementById('forecast-to') || {}).value);
+            if (f > 0 && f === t) return f;
+        }
+        return null;
+    }
+    function niceStop(v){
+        if (!(v > 0)) return 0;
+        const p = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+        return Number((Math.round(v / p) * p).toPrecision(12));
+    }
+    // fixed, ascending stops from the programme maximum (Mapbox's step takes literal stops in ascending order)
+    function carbonStops(max){
+        const top = (max > 0) ? max : 1, out = [];
+        CARBON_STEP_FRACTIONS.forEach(fr => {
+            let s = niceStop(top * fr);
+            if (out.length && !(s > out[out.length - 1])) s = Number((out[out.length - 1] * 1.25).toPrecision(12));
+            out.push(s);
+        });
+        return out;
+    }
+    function carbonColor(prop, stops){
+        const s = stops, c = CARBON_RAMP;
+        return ['case', ['==', ['typeof', ['get', prop]], 'number'],
+                ['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]],
+                CARBON_NONE];
+    }
+    function fmtTonnes(t){ return (t >= 100 ? Math.round(t).toLocaleString() : (Math.round(t * 10) / 10).toString()) + ' t'; }
+    // the routes the sidebar filters let through, by id (the same routePassesFilters() the overlay and the bar use)
+    function modeRoutesPassing(){
+        const out = {};
+        ((typeof a1_data !== 'undefined' && a1_data && a1_data.features) || []).forEach(f => {
+            if (f.geometry && f.geometry.type === 'LineString' && f.properties && f.properties.type === 'Inbound Highway'
+                && f.properties.route_id && routePassesFilters(f.properties)) out[f.properties.route_id] = true;
+        });
+        return out;
+    }
+    // One feature per run. The figure is the sum over the run's routes that pass the sidebar filters (all of them when
+    // no filter is set, which is the server's own run figure): two-way movements a day (loaded leg, never doubled) and
+    // the run's t CO2e share. A run none of whose routes pass is not drawn.
+    function roadLoadFeatures(data, passing){
+        const feats = [];
+        ((data && data.runs) || []).forEach(r => {
+            const coords = r.geometry || [];
+            if (coords.length < 2) return;
+            const shares = (r.route_shares || []).filter(sh => !passing || passing[sh.route_id]);
+            if (!shares.length) return;
+            const all = shares.length === (r.route_shares || []).length;
+            const mv = all ? Number(r.movements_per_day) || 0 : shares.reduce((a, sh) => a + (Number(sh.movements_per_day) || 0), 0);
+            const known = shares.filter(sh => sh.co2_t != null);
+            const co2 = all ? (r.co2_t == null ? null : Number(r.co2_t))
+                            : (known.length ? known.reduce((a, sh) => a + Number(sh.co2_t), 0) : null);
+            const n = shares.length;
+            feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords },
+                properties: { id: r.id, rl_mv: mv, rl_mv_text: (mv > 0 && mv < 1) ? 'under 1' : String(Math.round(mv)),
+                              rl_routes: n, rl_routes_text: n + (n === 1 ? ' route' : ' routes'),
+                              rl_co2: (co2 == null ? null : Math.round(co2 * 10) / 10),
+                              rl_co2_text: (co2 == null ? 'no carbon figure' : fmtTonnes(co2) + ' CO₂e') } });
+        });
+        return feats;
+    }
+    function fetchRoadLoad(m){
+        if (RL.cache[m]) return Promise.resolve(RL.cache[m]);
+        if (!RL.pending[m]) {
+            RL.pending[m] = fetch(CONFIG.API_BASE + '/public/road-load?month=' + m)
+                .then(r => r.ok ? r.json() : Promise.reject(new Error('API ' + r.status)))
+                .then(j => { RL.cache[m] = j; delete RL.error[m]; return j; })
+                .finally(() => { delete RL.pending[m]; });
+        }
+        return RL.pending[m];
+    }
+    function ensureRoadLoadLayers(){
+        if (!map.getSource('road-load-source')) map.addSource('road-load-source', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        if (map.getLayer('road-load-line')) return;
+        map.addLayer({ id: 'road-load-casing', type: 'line', source: 'road-load-source',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': ROAD_LOAD_CASING_WIDTH, 'line-opacity': 0.9 } });
+        map.addLayer({ id: 'road-load-line', type: 'line', source: 'road-load-source',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': CONFIG.COLORS.brand, 'line-width': ROAD_LOAD_LINE_WIDTH, 'line-opacity': 0.95 } });
+        map.addLayer({ id: 'road-load-labels', type: 'symbol', source: 'road-load-source',
+            layout: { 'symbol-placement': 'line-center', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14, 'text-offset': [0, -1.2] },
+            paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
+        wireRoadLoadPopup();
+        raiseMarks();
+    }
+    function removeRoadLoadLayers(){
+        ROAD_LOAD_LAYERS.slice().reverse().forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
+        if (map.getSource('road-load-source')) map.removeSource('road-load-source');
+    }
+    function drawRoadLoad(m){
+        ensureRoadLoadLayers();
+        const data = RL.cache[m];
+        const src = map.getSource('road-load-source');
+        if (src) src.setData({ type: 'FeatureCollection', features: data ? roadLoadFeatures(data, modeRoutesPassing()) : [] });
+    }
+    function ensureCarbonLabelLayer(){
+        if (map.getLayer(CARBON_LABEL_LAYER) || !map.getSource('routes-source')) return;
+        map.addLayer({ id: CARBON_LABEL_LAYER, type: 'symbol', source: 'routes-source', filter: carbonLabelFilter(),
+            layout: { 'symbol-placement': 'line-center', 'text-field': CARBON_ROUTE_LABEL, 'text-size': 14, 'text-offset': [0, -1] },
+            paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
+        raiseMarks();
+    }
+    // the overlay's own filter, on the LOADED leg only: one carbon label per route, never one per carriageway
+    function carbonLabelFilter(){
+        return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway']];
+    }
+    // f_co2 on BOTH legs of each route (both colour), from the timeline matrix: the route's t CO2e in month m (the sum
+    // of its lines' server co2_t), null when no line carries a figure or the carbon read failed
+    function stampCarbon(m){
+        const src = map.getSource('routes-source');
+        if (!src || !src._data || typeof TL === 'undefined' || !TL.matrix) return;
+        const byR = TL.matrix.byRoute || {};
+        let changed = false;
+        src._data.features.forEach(f => {
+            if (!f.geometry || (f.geometry.type !== 'LineString' && f.geometry.type !== 'MultiLineString')) return;
+            const rid = (f.properties.route_id || '').toString().trim().toLowerCase();
+            const rt = rid && byR[rid];
+            const c = (!TL.matrix.co2Error && rt && rt.co2 && rt.co2[m] != null) ? Math.round(rt.co2[m] * 10) / 10 : null;
+            if (f.properties.f_co2 !== c) { f.properties.f_co2 = c; changed = true; }
+        });
+        if (changed) src.setData(src._data);
+    }
+    // the lines in month m with volume and no carbon figure, over the routes the filters let through - the count the
+    // legend's "excludes N" names (the bar's rule: named, never counted as zero)
+    function carbonMissingLines(m){
+        if (typeof TL === 'undefined' || !TL.matrix) return 0;
+        const passing = modeRoutesPassing(), byR = TL.matrix.byRoute || {};
+        let n = 0;
+        Object.keys(byR).forEach(rid => {
+            const rt = byR[rid];
+            if (rt.route_id && !passing[rt.route_id]) return;
+            n += (rt.co2Missing && rt.co2Missing[m]) || 0;
+        });
+        return n;
+    }
+    // the per-route forecast labels: hidden while either mode is on (two figures never show for one road)
+    function setForecastLabelsVisible(on){
+        if (map.getLayer('forecast-labels')) map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');
+    }
+    function applyCarbonMode(m){
+        const rl = !!m && modeOn('toggle-road-load'), co2 = !!m && modeOn('toggle-carbon');
+        const stops = carbonStops(typeof TL !== 'undefined' && TL.matrix ? TL.matrix.co2Max : 0);
+        const paintRoutes = co2 && !rl;
+        if (map.getLayer('forecast-layer')) {
+            map.setPaintProperty('forecast-layer', 'line-color', paintRoutes ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast);
+            map.setPaintProperty('forecast-layer', 'line-width', paintRoutes ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
+        }
+        if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', paintRoutes ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
+        if (paintRoutes) ensureCarbonLabelLayer();
+        else if (map.getLayer(CARBON_LABEL_LAYER)) map.removeLayer(CARBON_LABEL_LAYER);
+        if (map.getLayer('road-load-line')) {
+            const paintRuns = co2 && rl;
+            map.setPaintProperty('road-load-line', 'line-color', paintRuns ? carbonColor('rl_co2', stops) : CONFIG.COLORS.brand);
+            map.setPaintProperty('road-load-line', 'line-width', paintRuns ? CARBON_LINE_WIDTH : ROAD_LOAD_LINE_WIDTH);
+            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', paintRuns ? CARBON_CASING_WIDTH : ROAD_LOAD_CASING_WIDTH);
+            if (map.getLayer('road-load-labels')) map.setLayoutProperty('road-load-labels', 'text-field', paintRuns ? ROAD_LOAD_CARBON_LABEL : ROAD_LOAD_LABEL);
+        }
+    }
+    function renderModeLegends(m){
+        const rlBox = document.getElementById('road-load-legend'), coBox = document.getElementById('carbon-legend');
+        const rl = modeOn('toggle-road-load'), co2 = modeOn('toggle-carbon');
+        const needMonth = 'Shows one month: press Play, or set From and To to the same month.';
+        if (rlBox) {
+            rlBox.hidden = !rl;
+            if (rl) {
+                const data = m ? RL.cache[m] : null;
+                if (!m) rlBox.innerHTML = '<div class="mode-note">' + needMonth + '</div>';
+                else if (RL.error[m]) rlBox.innerHTML = '<div class="mode-note">Road load could not be read for ' + rlEsc(monthLabel(m)) + ' (' + rlEsc(RL.error[m]) + ').</div>';
+                else if (!data) rlBox.innerHTML = '<div class="mode-note">Reading road load for ' + rlEsc(monthLabel(m)) + '…</div>';
+                else {
+                    const n = roadLoadFeatures(data, modeRoutesPassing()).length;
+                    rlBox.innerHTML = '<b>Road load · ' + rlEsc(monthLabel(m)) + '</b>' +
+                        ROAD_LOAD_STOPS.map((s, i) => '<div class="ml-row"><span class="ml-w" style="height:' + [4, 8, 13][i] + 'px"></span>' +
+                            (i === ROAD_LOAD_STOPS.length - 1 ? s + ' and over' : s) + ' two-way movements a day</div>').join('') +
+                        '<div class="ml-foot">' + n + ' shared section' + (n === 1 ? '' : 's') + ' with volume. One load = one two-way movement; the loaded leg is counted once. ' +
+                        'A stretch one route uses alone has no label here: turn Road load off to read that route\'s own figure.' +
+                        ((data.notes || []).length ? ' ' + data.notes.map(rlEsc).join(' ') : '') + '</div>';
+                }
+            }
+        }
+        if (coBox) {
+            coBox.hidden = !co2;
+            if (co2) {
+                const mtx = (typeof TL !== 'undefined') ? TL.matrix : null;
+                if (!m) coBox.innerHTML = '<div class="mode-note">' + needMonth + '</div>';
+                else if (!mtx) coBox.innerHTML = '<div class="mode-note">Reading carbon for ' + rlEsc(monthLabel(m)) + '…</div>';
+                else if (mtx.co2Error) coBox.innerHTML = '<div class="mode-note">' + rlEsc(mtx.co2Error) + ' Every line is grey: no figure.</div>';
+                else {
+                    const s = carbonStops(mtx.co2Max), per = rl ? 'per shared section' : 'per route';
+                    const ranges = ['under ' + s[0] + ' t', s[0] + ' to ' + s[1] + ' t', s[1] + ' to ' + s[2] + ' t', s[2] + ' to ' + s[3] + ' t', s[3] + ' t and over'];
+                    const miss = carbonMissingLines(m);
+                    coBox.innerHTML = '<b>Carbon · t CO₂e in ' + rlEsc(monthLabel(m)) + ', ' + per + '</b>' +
+                        '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
+                        ranges.map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
+                        '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>No stored road route · no figure</div>' +
+                        '<div class="ml-foot">Approved plan only, average-laden factor on both legs, excludes ' + miss + ' line' + (miss === 1 ? '' : 's') +
+                        ' with no stored road route. Stops are fixed from the programme\'s largest route-month (' + fmtTonnes(mtx.co2Max || 0) + '), so a colour means the same tonnes in every month.' +
+                        (rl ? ' A section carries each route\'s month CO₂e × the section\'s length ÷ that route\'s two-way length.' : '') + '</div>';
+                }
+            }
+        }
+    }
+    // the one entry point: every month change, every toggle, the style.load re-add and the overlay switching off
+    function refreshMapModes(){
+        if (typeof map === 'undefined' || !map || !map.getLayer) return;
+        const m = mapModeMonth(), rl = modeOn('toggle-road-load'), co2 = modeOn('toggle-carbon');
+        RL.month = m;
+        setForecastLabelsVisible(!(m && (rl || co2)));
+        if (!m || !rl) removeRoadLoadLayers();
+        if (m && rl) {
+            drawRoadLoad(m);    // the cached month at once, or an empty source while it is read
+            if (!RL.cache[m]) fetchRoadLoad(m).then(() => {
+                if (RL.month === m && modeOn('toggle-road-load')) { drawRoadLoad(m); applyCarbonMode(m); renderModeLegends(m); }
+            }).catch(e => { RL.error[m] = e.message || String(e); if (RL.month === m) renderModeLegends(m); });
+            // while Play runs, the next month in the loop is read ahead, so its sections are there when it is reached
+            if (typeof TL !== 'undefined' && TL.playing && typeof tlLoopBounds === 'function') {
+                const [lo, hi] = tlLoopBounds(), nx = (m >= hi || m < lo) ? lo : m + 1;
+                if (!RL.cache[nx] && !RL.pending[nx]) fetchRoadLoad(nx).catch(() => {});
+            }
+        }
+        if (m && co2) {
+            const go = () => { if (RL.month !== m) return; stampCarbon(m); applyCarbonMode(m); renderModeLegends(m); };
+            if (typeof TL !== 'undefined' && TL.matrix) stampCarbon(m);
+            else if (typeof ensureTimelineMatrix === 'function') ensureTimelineMatrix().then(go).catch(() => {});
+        }
+        applyCarbonMode(m);
+        renderModeLegends(m);
+    }
+    // the sidebar filters changed: re-cut the cached month (no fetch) and re-filter the carbon labels
+    function refreshMapModeFilters(){
+        if (typeof map === 'undefined' || !map || !map.getLayer) return;
+        const m = RL.month;
+        if (m && modeOn('toggle-road-load') && RL.cache[m] && map.getSource('road-load-source')) drawRoadLoad(m);
+        if (map.getLayer(CARBON_LABEL_LAYER)) map.setFilter(CARBON_LABEL_LAYER, carbonLabelFilter());
+        if (m && (modeOn('toggle-road-load') || modeOn('toggle-carbon'))) renderModeLegends(m);
+    }
+    // a tick with no month on screen opens the timeline (its month), as the mockups show the month on the bar
+    // (the bar's first frame calls refreshMapModes() once its month is known)
+    function toggleRoadLoad(){
+        if (modeOn('toggle-road-load') && !mapModeMonth() && typeof TL !== 'undefined' && !TL.on) { openTimeline(); return; }
+        refreshMapModes();
+    }
+    function toggleCarbon(){
+        if (modeOn('toggle-carbon') && !mapModeMonth() && typeof TL !== 'undefined' && !TL.on) { openTimeline(); return; }
+        refreshMapModes();
+    }
+    // the section card: the run's figure, then each route with its origin → destination, team NAMES and share
+    function roadLoadPopupHTML(run, m, passing){
+        const shares = (run.route_shares || []).filter(sh => !passing || passing[sh.route_id])
+            .slice().sort((a, b) => (Number(b.movements_per_day) || 0) - (Number(a.movements_per_day) || 0));
+        const left = (run.route_shares || []).filter(sh => passing && !passing[sh.route_id]).map(sh => sh.route_id);
+        const f = roadLoadFeatures({ runs: [run] }, passing)[0];
+        const co2On = modeOn('toggle-carbon');
+        const rows = shares.map(sh => {
+            const info = (typeof ROUTEINFO !== 'undefined' && ROUTEINFO[(sh.route_id || '').toString().trim().toLowerCase()]) || {};
+            const mv = Number(sh.movements_per_day) || 0;
+            return '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">' + rlEsc(sh.route_id) + '</td>' +
+                '<td style="padding:2px 8px 2px 0;">' + rlEsc(info.origin || '—') + ' → ' + rlEsc(info.dest || '—') +
+                '<div style="color:#6b7280;">' + rlEsc(teamText((sh.teams || []).join(', ')) || '—') + '</div></td>' +
+                '<td style="padding:2px 0;text-align:right;font-variant-numeric:tabular-nums;">' + (mv > 0 && mv < 1 ? 'under 1' : Math.round(mv)) +
+                (co2On ? '<div style="color:#6b7280;">' + (sh.co2_t == null ? 'no figure' : fmtTonnes(Number(sh.co2_t))) + '</div>' : '') + '</td></tr>';
+        }).join('');
+        return '<div style="min-width:240px;max-width:340px;font-size:14px;">' +
+            '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:14px;">Shared road section · ' + rlEsc(monthLabel(m)) + '</h4>' +
+            '<div style="margin-bottom:6px;">' + (f ? f.properties.rl_mv_text : '0') + ' two-way movements a day · ' + (f ? f.properties.rl_routes_text : '') +
+            (co2On && f ? ' · ' + rlEsc(f.properties.rl_co2_text) : '') + '</div>' +
+            '<table style="border-collapse:collapse;width:100%;font-size:14px;"><thead><tr style="color:#6b7280;text-align:left;">' +
+            '<th style="font-weight:500;">Route</th><th style="font-weight:500;">From → to · team</th><th style="font-weight:500;text-align:right;">Two-way / day</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table>' +
+            (left.length ? '<div style="color:#6b7280;margin-top:6px;">Also on this section, outside the filters: ' + left.map(rlEsc).join(', ') + '.</div>' : '') +
+            '<div style="color:#6b7280;margin-top:6px;">Loaded leg counted once (one load = one two-way movement). ' +
+            (Number(run.length_km) > 0 ? 'Section ' + fmtDist(Number(run.length_km), 1) + ' ' + DU() + '. ' : '') + 'Approved plan only.</div></div>';
+    }
+    function roadLoadHitAt(point){
+        if (!map.getLayer('road-load-line')) return false;
+        try { return map.queryRenderedFeatures(point, { layers: ['road-load-line'] }).length > 0; } catch (e) { return false; }
+    }
+    // registered ONCE: a layer-scoped handler survives setStyle, and one per basemap switch would stack popups
+    function wireRoadLoadPopup(){
+        if (RL.wired) return;
+        RL.wired = true;
+        map.on('mouseenter', 'road-load-line', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'road-load-line', () => { map.getCanvas().style.cursor = ''; });
+        map.on('click', 'road-load-line', (e) => {
+            if (!e.features || !e.features.length || !RL.month) return;
+            const id = e.features[0].properties.id;
+            const run = ((RL.cache[RL.month] || {}).runs || []).find(r => String(r.id) === String(id));
+            if (!run) return;
+            new mapboxgl.Popup({ offset: 10, maxWidth: '360px' }).setLngLat(e.lngLat)
+                .setHTML(roadLoadPopupHTML(run, RL.month, modeRoutesPassing())).addTo(map);
+        });
+    }
+    // ===== end of road load and carbon =====
+
     // Animated "ant-march" dashes convey haul direction (origin -> destination, in
     // geometry order).
     //
@@ -4503,14 +4869,28 @@
             const acc = byR[rid] || (byR[rid] = { route_id: rt.route_id, monthly: {}, total: 0, lines: 0 });
             Object.keys(rt.monthly||{}).forEach(k=>{ acc.monthly[k] = (acc.monthly[k]||0) + (Number(rt.monthly[k])||0); });
             acc.total += Number(rt.total)||0; acc.lines++;
+            // 12 Oct 2026 (review §2.2a): the route's t CO2e per month is the SUM of its lines' server co2_t (B2, the
+            // costlines figure the bar reads); a line-month with volume and no figure (no stored road route for its
+            // vehicle) is COUNTED in co2Missing, never a zero. A route-month with no line carrying a figure stays absent.
+            acc.co2 = acc.co2 || {}; acc.co2Missing = acc.co2Missing || {};
+            Object.keys(rt.monthly||{}).forEach(k=>{
+                if(!((Number(rt.monthly[k])||0) > 0)) return;
+                const c = (rt.co2_t||{})[k];
+                if(c == null || j.co2_error) acc.co2Missing[k] = (acc.co2Missing[k]||0) + 1;
+                else acc.co2[k] = (acc.co2[k]||0) + Number(c);
+            });
         });
+        // the programme's largest route-month of carbon: the carbon ramp's FIXED stops come from it, so one colour means
+        // the same tonnes in every month
+        let co2Max = 0;
+        Object.keys(byR).forEach(rid=>{ Object.keys(byR[rid].co2||{}).forEach(k=>{ if(byR[rid].co2[k] > co2Max) co2Max = byR[rid].co2[k]; }); });
         if(j.working_days > 0) FORECAST_WORKING_DAYS = j.working_days;   // 15 Sep — the label's divisor
         // D22: the months that carry ANY volume, over every line the API returned (not the collapsed
         // byRoute, which keeps one line per route), and the span they cover
         const volMonths = new Set();
         (j.routes||[]).forEach(rt=>{ Object.keys(rt.monthly||{}).forEach(k=>{ const mm=parseInt(k); if(mm>=1 && mm<=(CONFIG.MONTH_COUNT||60) && (rt.monthly[k]||0)>0) volMonths.add(mm); }); });
         const span = volMonths.size ? [Math.min(...volMonths), Math.max(...volMonths)] : null;
-        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span };
+        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span, co2Max, co2Error: j.co2_error || null };
         prefetchSpanKpis();     // in the background, one month at a time; never awaited
         return TL.matrix;
     }
@@ -4565,6 +4945,9 @@
         // 12 Oct (D22): an empty month says so, instead of "0 routes · 0 trips".
         const lbl=document.getElementById('tl-label');
         if(lbl) lbl.textContent = count===0 ? monthLabel(m)+' · nothing approved' : monthLabel(m)+' · '+count+(count===1?' route · ':' routes · ')+Math.round(sum)+' '+unitWord(unit);
+        // 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon follow the month on the playhead (re-fetched per
+        // month, cached), and are re-added with the overlay after a basemap switch
+        if(typeof refreshMapModes === 'function') refreshMapModes();
     }
     function openTimeline(){
         TL.on=true;
@@ -4587,9 +4970,12 @@
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='none';
         const src=map.getSource('routes-source');
         if(src){ const d=src._data; d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
-        ['forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
+        // left the month's shared sections on the map
+        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
         applyZoneMonth(null);   // no month on screen: show every active zone again
         applyFilters();         // KPI cards and the rail rule follow the timeline closing
+        if(typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon say they need a month
     }
     function toggleTimeline(){ if(TL.playing) stopTimeline(); else startTimeline(); }
     // 12 Oct (A4): the sidebar's "Play forecast timeline" calls THIS, so a press opens the bar AND plays.
@@ -5015,6 +5401,7 @@
         routeLayers.forEach(lid=>{
             map.on('click', lid, (e)=>{
                 if(!e.features||!e.features.length) return;
+                if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;   // 12 Oct: the section card answers
                 const p=e.features[0].properties, rid=p.route_id||'Route';
                 selectRoute(rid);
                 const info=ROUTEINFO[(rid||'').toString().trim().toLowerCase()]||{};
