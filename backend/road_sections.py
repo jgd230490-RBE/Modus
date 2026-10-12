@@ -578,6 +578,37 @@ def drawn_route_ids():
     return set(bulletin.drawn_routes())
 
 
+def section_co2_max(route_month_co2, leg="loaded", profile=None, drawn=None):
+    """
+    12 Oct 2026 (Track C review). The programme's largest SECTION-month of CO2e: over every
+    stored run of `leg` and every month in `route_month_co2` ({route_id: {month: t CO2e}},
+    the routes' month figures as forecast-matrix carries them), the most any run carries by
+    road_load's own rule — Σ over its owners the map draws of the route's month CO2e × run
+    length ÷ the route's two-way length. The map's carbon ramp on the shared sections takes
+    its fixed stops from this, not from a whole route's month (a run carries a fraction of
+    each route). None when no run carries a figure.
+    """
+    drawn = drawn_route_ids() if drawn is None else set(drawn)
+    lens = route_lengths(profile or index_profile())
+    best = None
+    for run in stored_runs(leg):
+        per_month = {}
+        for r in run["routes"]:
+            if r not in drawn:
+                continue
+            tw = (lens.get(r) or {}).get("two_way") or 0.0
+            if tw <= 0:
+                continue
+            for m, c in (route_month_co2.get(r) or {}).items():
+                if c is None:
+                    continue
+                per_month[m] = per_month.get(m, 0.0) + float(c) * run["length_km"] / tw
+        for v in per_month.values():
+            if v > 0 and (best is None or v > best):
+                best = v
+    return None if best is None else round(best, 3)
+
+
 def road_load(month, factors=None, working_days=None, leg="loaded", profile=None, drawn=None):
     """
     One entry per stored run of `leg` that carries volume in `month`.

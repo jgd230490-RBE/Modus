@@ -58,7 +58,12 @@ browser's routePropsById). Per area:
                      One load = one two-way movement, never doubled; the empty return leg
                      never adds a movement. A route counts in EVERY area its laden leg
                      enters, so the district figures add up to more than the scheme's —
-                     the basis sentence says so.
+                     the basis sentence says so. "Enters" means at least ENTER_KM (200 m)
+                     of the laden leg inside (12 Oct 2026, Track C review): the seed is the
+                     ONS BSC edition, generalised to 200 m, so a road running beside a
+                     boundary can stray a few metres over the drawn line; a leg inside by
+                     less than that is an EDGE route — its km and carbon still count in
+                     the area (they are split by km), its movements do not.
   laden_lorry_km     Σ loads × the laden leg's km inside.
   lorry_km           Σ loads × (laden km inside + return km inside): every lorry-km driven
                      in the area, empties included.
@@ -93,6 +98,12 @@ WHOLE_LEG = "*"           # the route_area_km row that carries the leg's whole l
 GRID_DEG = 0.01           # the edge grid: about 1.1 km north-south
 ON_EDGE_DEG = 1e-9        # a piece's midpoint this close to an edge runs along the boundary
 MIN_KM = 0.0005           # half a metre: a polyline that only touches a corner does not enter
+# 12 Oct 2026 (Track C review): a route's movements count in an area only when at least this
+# much of its laden leg is inside. The seed boundaries are ONS BSC (generalised to 200 m), so a
+# road beside a boundary can cross the drawn line for a few metres; that must not add the
+# route's whole daily movements to the neighbour. The km and the carbon are split by km and
+# keep every piece above MIN_KM.
+ENTER_KM = 0.2
 MAX_FEATURES = 1000
 MAX_VERTICES = 400000
 
@@ -550,7 +561,7 @@ def list_areas():
         xs = [x for r in rings for (x, _) in r]
         ys = [y for r in rings for (_, y) in r]
         entering = sorted({rid for rid, per in clips.items() for prof in per.values()
-                           if (prof.get("loaded") or {}).get(a["area_id"], 0) > 0})
+                           if (prof.get("loaded") or {}).get(a["area_id"], 0) >= ENTER_KM})
         out.append({k: a[k] for k in ("area_id", "name", "tier", "source", "attribution", "highway_authority", "imported_at")}
                    | {"vertices": sum(len(r) for r in rings), "rings": len(rings),
                       "bbox": ([round(min(xs), 5), round(min(ys), 5), round(max(xs), 5), round(max(ys), 5)] if xs else None),
@@ -593,11 +604,36 @@ def _sites_in(prepared):
     return out, placed
 
 
-def area_load(month, working_days=None, drawn=None):
+def shapes():
+    """
+    12 Oct 2026 (Track C review): the polygons, their label points and the licence lines,
+    with NO month roll-up — what the map reads once to learn whether the tenant has areas
+    and to draw them. The month's figures come from area_load(month, geometry=False) and
+    are joined on area_id in the browser, so Play does not re-send every polygon each month.
+    """
+    areas = stored_areas()
+    attribution = []
+    for a in areas:
+        for line in a["attribution"]:
+            if line not in attribution:
+                attribution.append(line)
+    return {
+        "areas": [{"area_id": a["area_id"], "name": a["name"], "tier": a["tier"],
+                   "tier_words": TIER_WORDS.get(a["tier"], a["tier"]),
+                   "highway_authority": a["highway_authority"], "source": a["source"],
+                   "geometry": a["geometry"], "label_point": label_point(a["geometry"])}
+                  for a in areas],
+        "attribution": attribution,
+    }
+
+
+def area_load(month, working_days=None, drawn=None, geometry=True):
     """
     One entry per stored area with the month's figures (see the module docstring), the
     polygon and the licence lines. `working_days` is main._working_days()'s figure handed
     in; when not given the payload's own (the same reader). `drawn` is {route_id: profile}.
+    `geometry=False` leaves out each area's polygon and label point (the map has them from
+    shapes()).
     """
     month = int(month)
     payload = road_sections.month_lines(month)
@@ -650,18 +686,20 @@ def area_load(month, working_days=None, drawn=None):
         aid = a["area_id"]
         loads = laden_km = lorry_km = co2 = 0.0
         co2_known, co2_unbaked = False, []
-        routes, return_only = [], []
+        routes, return_only, edge = [], [], []
         for rid, prof in legs_of.items():
             lin = (prof.get("loaded") or {}).get(aid, 0.0)
             rin = (prof.get("return") or {}).get(aid, 0.0)
             if lin <= 0 and rin <= 0:
                 continue
             ld = per_route[rid]["loads"]
-            if lin > 0:
+            if lin >= ENTER_KM:
                 routes.append(rid)
                 loads += ld                         # one load = one two-way movement, laden leg only
-            else:
+            elif lin <= 0 and rin >= ENTER_KM:
                 return_only.append(rid)             # empties only: no movement added
+            else:
+                edge.append(rid)                    # under 200 m inside: km and carbon, no movement
             laden_km += ld * lin
             lorry_km += ld * (lin + rin)
             c = route_co2(rid)
@@ -672,7 +710,7 @@ def area_load(month, working_days=None, drawn=None):
             if two_way > 0:
                 co2 += c * (lin + rin) / two_way
                 co2_known = True
-        has_volume = bool(routes or return_only)
+        has_volume = bool(routes or return_only or edge)
         co2_val = None if co2_failed else (round(co2, 3) if (co2_known or not has_volume) else None)
         out_areas.append({
             "area_id": aid, "name": a["name"], "tier": a["tier"],
@@ -682,15 +720,17 @@ def area_load(month, working_days=None, drawn=None):
             "loads": round(loads, 3),
             "routes": sorted(routes), "routes_count": len(routes),
             "return_only_routes": sorted(return_only),
+            "edge_routes": sorted(edge),
             "laden_lorry_km": round(laden_km, 1),
             "lorry_km": round(lorry_km, 1),
             "co2_t": co2_val,
             "co2_t_per_day": (None if co2_val is None else round(co2_val / wd, 3)),
             "co2_routes_unbaked": sorted(co2_unbaked),
             "sites": sites.get(aid, []), "sites_count": len(sites.get(aid, [])),
-            "geometry": a["geometry"],
-            "label_point": label_point(a["geometry"]),
         })
+        if geometry:
+            out_areas[-1]["geometry"] = a["geometry"]
+            out_areas[-1]["label_point"] = label_point(a["geometry"])
 
     total_loads = sum(per_route[r]["loads"] for r in with_volume)
     co2_lines = sum(per_route[r]["co2_lines"] for r in with_volume)
@@ -724,10 +764,13 @@ def area_load(month, working_days=None, drawn=None):
     out = {
         "month": month,
         "working_days": wd,
+        "enter_km": ENTER_KM,
         "basis": "Two-way movements a day: one load = one two-way movement. An area counts the month's approved "
                  "loads of every route whose laden leg enters it, divided by the working days; the empty return "
                  "adds none. A route counts in every area its laden leg enters, so the areas' figures add up to "
-                 "more than the scheme's.",
+                 "more than the scheme's. A laden leg enters an area when at least 200 m of it is inside (the "
+                 "boundaries are generalised to 200 m); a route inside by less adds its km and carbon there, "
+                 "not its movements.",
         "co2_basis": "CO2e in an area = each route's month CO2e (routed km × the vehicle's kg CO2e/km, both legs) × "
                      "its km inside the area (laden and return) ÷ its two-way length: the carbon emitted inside "
                      "the area, the DESNZ split by boundary. Over the areas of one tier that cover a route it adds "

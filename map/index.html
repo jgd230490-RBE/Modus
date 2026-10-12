@@ -86,6 +86,8 @@
         .area-sw{ width:14px; height:14px; border-radius:3px; flex:none; border:1px solid rgba(0,0,0,.08); }
         .area-note{ font-size:14px; color:var(--note); line-height:1.4; padding:2px 2px; }
         .area-note:empty{ display:none; }
+        /* Track C review (12 Oct): "no figure" (routes not clipped yet, or no carbon figure) is hatched on the map, never a zero */
+        .area-sw-hatch{ background:repeating-linear-gradient(45deg, #F3F1EC 0 3px, #B8B2A8 3px 5px); }
         .area-card{ font-size:14px; line-height:1.35; color:var(--ink); }
         .area-ch{ font-weight:600; font-size:16px; }
         .area-csub{ font-size:14px; color:var(--muted); margin:2px 0 6px; }
@@ -491,6 +493,16 @@
             #route-hover-card{ display:none !important; }
             body .guide-strip{ max-width:calc(100vw - 100px); }   /* clear of the 44 px zoom buttons on the right */
         }
+        @media (max-height:480px) and (max-width:767px){
+            /* Track C review (12 Oct): a phone on its side (740 x 360): the peek is one row — the month and the two
+               figures inline — and the chips row with Play folds into the half state, so the peek takes about a third of
+               the screen, not half. Targets stay 44-48 px. Not yet checked on a device. */
+            .m-peek{ flex-wrap:nowrap; align-items:center; padding:0 16px 6px; }
+            .m-month{ flex:0 0 auto; }
+            .m-fig b{ display:inline; font-size:20px; margin-right:6px; }
+            #m-sheet[data-state="peek"] .m-chips-row{ display:none; }
+            #m-sheet[data-state="half"]{ height:calc(100% - var(--notice-h, 0px) - 24px); }
+        }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
@@ -654,6 +666,7 @@
         <div class="area-county-fig" id="area-county-fig"></div>
         <div class="area-note" id="area-unitary-note"></div>
         <div class="area-note" id="area-when"></div>
+        <div class="area-note" id="area-notes"></div>
         <div class="area-note" id="area-attribution"></div>
     </div>
 
@@ -2166,17 +2179,20 @@
         if (cb && cb.checked) {
             // 12 Oct 2026 (D14): the From/To selects are gone. "Show forecast routes" averages over the months that carry
             // volume — the month chips' first to last — and a chip shows one month (it opens the timeline on it).
-            const [f, t] = forecastWindow();
+            const [f, t] = forecastWindow() || [];
+            if (!f) return [];          // Track C review: no matrix, no window — never a burst of 60 month reads
             const out = []; for (let m = Math.min(f, t); m <= Math.max(f, t); m++) out.push(m);
             return out;
         }
         return [];
     }
     // the window "Show forecast routes", the route analysis and the detail table read: the span of months with volume
-    // from the timeline matrix (loaded at start for the chips), else the whole horizon
+    // from the timeline matrix (loaded at start for the chips). 12 Oct 2026 (Track C review): with no matrix (its read
+    // failed) or no month with volume there is NO window (null), not the whole horizon — which made the bar ask for
+    // every month's figures, up to 60 reads, whose server cost grows with the month.
     function forecastWindow() {
         const span = (typeof TL !== 'undefined' && TL.matrix && TL.matrix.span) || null;
-        return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];
+        return span ? [span[0], span[1]] : null;
     }
     async function kpiFetchMonth(m) {
         if (KPI.cache[m]) return KPI.cache[m];
@@ -3679,12 +3695,15 @@
     // fill is ONE hue (the plan blue, D26) on FIXED stops, light to dark, drawn UNDER the
     // routes so the routes stay on top. The licence lines ride on the source's
     // attribution (they print with Mapbox's whenever the layer is on) and in the group.
-    const AREAS = { cache: {}, pending: {}, month: null, mode: 'movements', data: null, off: new Set(), probed: false, drawn: '' };
+    // Track C review: `shapes` (the polygons, read ONCE from /api/public/areas/shapes) and the month's figures
+    // (/api/public/areas?geometry=0, cached per month) are joined on area_id, so Play does not re-send every polygon
+    const AREAS = { cache: {}, pending: {}, month: null, mode: 'movements', data: null, off: new Set(), probed: false, drawn: '',
+                    shapes: null, shapesPending: null, error: null };
     const AREA_RAMP = ['#89A3DC', '#6A8BD2', '#4A72C9', '#2D4E95'];     // the plan blue #4A72C9, one hue, light to dark; the light end 2.5:1 on white
     const AREA_NONE = '#E7E5E4';                                         // no approved laden route, or no figure
     const AREA_STOPS = { movements: [50, 100, 200], carbon: [50, 100, 200] };   // fixed, ascending: a day / t in the month
     const AREA_INK = '#1F2024';
-    const AREA_LAYERS = ['area-fill', 'area-outline', 'area-label'];
+    const AREA_LAYERS = ['area-fill', 'area-nofig', 'area-outline', 'area-label'];
     const AREA_COUNTY_LAYERS = ['area-county-outline', 'area-county-fill', 'area-county-label'];
     function areaFillExpr(mode) {
         const s = AREA_STOPS[mode] || AREA_STOPS.movements;
@@ -3692,11 +3711,14 @@
         return ['step', ['get', 'v'], AREA_NONE, 0.01, AREA_RAMP[0], s[0], AREA_RAMP[1], s[1], AREA_RAMP[2], s[2], AREA_RAMP[3]];
     }
     function areaFigureText(a, mode, when) {
+        if (a.nofig) return '—';                         // no month on screen: no figure (the group says to pick one)
         if (mode === 'carbon') {
             if (a.co2_t === null || a.co2_t === undefined) return 'no carbon figure';
+            if (!(a.co2_t > 0) && a.unclipped) return 'no figure yet';    // routes not clipped yet: not a zero
             if (!(a.co2_t > 0)) return 'no approved route';
             return (a.co2_t >= 10 ? Math.round(a.co2_t) : Math.round(a.co2_t * 10) / 10).toLocaleString('en-GB') + ' t CO₂e' + (when ? ' in ' + when : '');
         }
+        if (!(a.movements_per_day > 0) && a.unclipped) return 'no figure yet';   // Track C review: never 'no approved route'
         if (!(a.movements_per_day > 0)) return (a.return_only_routes || []).length ? 'empties only' : 'no approved route';
         const n = a.routes_count || 0;
         return (a.movements_per_day >= 10 ? Math.round(a.movements_per_day) : Math.round(a.movements_per_day * 10) / 10).toLocaleString('en-GB')
@@ -3707,9 +3729,11 @@
     function areaFeatures(payload, mode, off, when) {
         const feats = [];
         ((payload && payload.areas) || []).forEach(a => {
-            const v = mode === 'carbon' ? (a.co2_t === null || a.co2_t === undefined ? -1 : a.co2_t) : (a.movements_per_day || 0);
+            let v = mode === 'carbon' ? (a.co2_t === null || a.co2_t === undefined ? -1 : a.co2_t) : (a.movements_per_day || 0);
+            // Track C review: -1 = no figure (hatched: routes not clipped yet, or no carbon figure), -2 = no month on screen
+            if (a.nofig) v = -2; else if (a.unclipped && !(v > 0)) v = -1;
             const props = { area_id: a.area_id, name: a.name, tier: a.tier, v: v, off: off.has(a.area_id),
-                            label: String(a.name || '').toUpperCase() + '\n' + areaFigureText(a, mode, when) };
+                            label: String(a.name || '').toUpperCase() + (a.nofig ? '' : '\n' + areaFigureText(a, mode, when)) };
             feats.push({ type: 'Feature', geometry: a.geometry, properties: props });
             // the label rides on ONE point inside the area (the server's label_point): a label on the polygon
             // itself is repeated by Mapbox on every tile the polygon crosses (Chrome, 12 Oct: Harborough twice)
@@ -3726,7 +3750,9 @@
             ? 't CO₂e' + (when ? ' in ' + when : ' in the month') + ', split by the km inside each district'
             : 'Two-way movements a day on roads a laden leg uses';
         return '<div class="area-legend-title">' + title + '</div>'
-            + rows.map(r => '<div class="area-lg"><span class="area-sw" style="background:' + r[1] + '"></span>' + r[0] + '</div>').join('');
+            + rows.map(r => '<div class="area-lg"><span class="area-sw" style="background:' + r[1] + '"></span>' + r[0] + '</div>').join('')
+            // Track C review: two carbon ramps can be on the map at once; this one is not the route / section legend's
+            + (mode === 'carbon' ? '<div class="area-note">These stops are fixed for districts (t in the month) and differ from the Carbon legend\'s for routes and sections.</div>' : '');
     }
     function areaCardHTML(a, payload, when) {
         const esc = s => String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -3737,15 +3763,21 @@
         const row = (k, v, note) => '<div class="area-cr"><span>' + k + '</span><b>' + v + '</b></div>' + (note ? '<div class="area-cs">' + note + '</div>' : '');
         const nRoutes = (a.routes || []).length, nAll = tot.routes_with_volume || 0;
         let h = '<div class="area-card"><div class="area-ch">' + esc(a.name) + '</div><div class="area-csub">' + sub + '</div>';
+        // Track C review: no month on screen, no figure (the timeline's month chips or Play give one)
+        if (a.nofig) return h + '<div class="area-cs">Shows one month: press Play or pick a month.</div></div>';
         const carbonFirst = typeof AREAS !== 'undefined' && AREAS.mode === 'carbon';   // lead with what the map is coloured by
         let mv = '', co = '';
         mv += row('Two-way movements a day', a.movements_per_day > 0 ? fmt(a.movements_per_day, 1) : '0',
                  nRoutes + ' of the ' + nAll + ' routes with approved volume' + (when ? ' in ' + esc(when) : '') + ' enter it laden'
                  + ((a.return_only_routes || []).length ? ' · ' + a.return_only_routes.length + ' more run back through it empty' : '')
+                 + ((a.edge_routes || []).length ? ' · ' + a.edge_routes.length + ' more only cross its edge (under 200 m inside): their km and carbon count here, not their movements' : '')
+                 + (a.unclipped ? ' · ' + a.unclipped + ' route' + (a.unclipped === 1 ? '' : 's') + ' with volume not clipped yet: in no area until the clip runs' : '')
                  + ' · one load = one two-way movement');
         if (a.co2_t === null || a.co2_t === undefined) co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), 'no figure', 'no carbon for the routes here (not stored for the lines’ vehicle, or the read failed)');
         else co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), fmt(a.co2_t, 1) + ' t' + (tot.co2_t ? ' of ' + fmt(tot.co2_t, 0) + ' t' : ''),
-                      fmt(a.co2_t_per_day || 0, 2) + ' t a day · split by the km inside');
+                      fmt(a.co2_t_per_day || 0, 2) + ' t a day · split by the km inside'
+                      // Track C review: a partial figure names what it leaves out (the bar's rule), never silently
+                      + ((a.co2_routes_unbaked || []).length ? ' · excludes ' + a.co2_routes_unbaked.length + ' route' + (a.co2_routes_unbaked.length === 1 ? '' : 's') + ' with no carbon figure' : ''));
         h += carbonFirst ? co + mv : mv + co;
         h += row('Lorry-km' + (when ? ' in ' + esc(when) : ''), fmt(a.lorry_km || 0, 0), 'laden and empty, on the km inside');
         h += row('Sites inside', String(a.sites_count || 0) + (tot.sites ? ' of ' + tot.sites : ''), (a.sites || []).slice(0, 4).map(esc).join(' · ') + ((a.sites || []).length > 4 ? ' …' : ''));
@@ -3753,20 +3785,40 @@
             + ((payload && payload.carbon && payload.carbon.stamp) ? ' · ' + esc(payload.carbon.stamp) : '') + '</div></div>';
         return h;
     }
+    // Track C review: the council figures describe the month Road load and Carbon show (mapModeMonth): the playhead's, or
+    // the Show-forecast window when it is ONE month. With no single month on screen there is no figure (null), never
+    // the first month of an averaged span or the calendar month beside a bar that shows something else.
     function areasMonth() {
-        if (typeof TL !== 'undefined' && TL.on && TL.month) return TL.month;
-        const cb = document.getElementById('toggle-forecast');
-        if (cb && cb.checked) return forecastWindow()[0] || 1;     // merge with C3 (D14): no From select; the window's first month
-        const cur = (typeof currentMonthIndex === 'function') ? currentMonthIndex() : 1;
-        return Math.min(Math.max(cur, 1), CONFIG.MONTH_COUNT || 60);
+        return (typeof mapModeMonth === 'function') ? mapModeMonth() : null;
     }
     function areaTierOn(tier) {
         const cb = document.getElementById('layer-areas-' + tier);
         return !!(cb && cb.checked);
     }
+    // the polygons, once a page (no month roll-up): whether the tenant has areas, and what to draw
+    function fetchAreaShapes() {
+        if (AREAS.shapes) return Promise.resolve(AREAS.shapes);
+        if (!AREAS.shapesPending) AREAS.shapesPending = fetch(CONFIG.API_BASE + '/public/areas/shapes')
+            .then(r => r.ok ? r.json() : Promise.reject(r.status))
+            .then(j => { AREAS.shapes = j; return j; })
+            .finally(() => { AREAS.shapesPending = null; });
+        return AREAS.shapesPending;
+    }
+    // the shapes with one month's figures joined on area_id (figs null: no month on screen, every area "no figure");
+    // `unclipped` = the routes with volume the server could not place yet (named, and never read as a zero)
+    function areaJoin(shapes, figs) {
+        const byId = {};
+        ((figs && figs.areas) || []).forEach(a => { byId[a.area_id] = a; });
+        const nc = ((figs && figs.routes_not_clipped) || []).length;
+        const out = Object.assign({}, figs || {});
+        out.areas = ((shapes && shapes.areas) || []).map(s => Object.assign({}, byId[s.area_id] || { nofig: true }, s,
+            figs && nc ? { unclipped: nc } : {}, figs ? {} : { nofig: true }));
+        out.attribution = (shapes && shapes.attribution) || (figs && figs.attribution) || [];
+        return out;
+    }
     async function fetchAreas(m) {
         if (AREAS.cache[m]) return AREAS.cache[m];
-        if (!AREAS.pending[m]) AREAS.pending[m] = fetch(CONFIG.API_BASE + '/public/areas?month=' + m)
+        if (!AREAS.pending[m]) AREAS.pending[m] = fetch(CONFIG.API_BASE + '/public/areas?month=' + m + '&geometry=0')
             .then(r => r.ok ? r.json() : Promise.reject(r.status))
             .then(j => { AREAS.cache[m] = j; return j; })
             .finally(() => { delete AREAS.pending[m]; });
@@ -3774,14 +3826,31 @@
     }
     // the month on screen changed, or a box was ticked: fetch the month (cached) and paint it
     function refreshAreas() {
+        if (!AREAS.shapes) {                           // once a page: the polygons (no month roll-up), then the month
+            fetchAreaShapes().then(() => { AREAS.probed = true; refreshAreas(); })
+                .catch(e => { AREAS.probed = true; console.warn('council areas unavailable', e); });
+            return;
+        }
         const m = areasMonth();
+        if (!AREAS.data) { AREAS.data = areaJoin(AREAS.shapes, null); AREAS.month = null; renderAreas(); }   // the group shows
         if (AREAS.probed && !areaTierOn('district') && !areaTierOn('county')) return;   // off: nothing to fetch
-        fetchAreas(m).then(j => {
-            AREAS.probed = true;
-            if (m !== areasMonth()) return;            // the playhead has moved on: paint only the month on screen
-            AREAS.data = j; AREAS.month = m;
+        if (!m) {                                      // no single month on screen: the polygons, no figure, a note
+            AREAS.error = null;
+            if (AREAS.month !== null || !AREAS.data.areas.every(a => a.nofig)) { AREAS.data = areaJoin(AREAS.shapes, null); AREAS.month = null; }
             renderAreas();
-        }).catch(e => { AREAS.probed = true; console.warn('council areas unavailable', e); });
+            return;
+        }
+        fetchAreas(m).then(j => {
+            if (m !== areasMonth()) return;            // the playhead has moved on: paint only the month on screen
+            AREAS.data = areaJoin(AREAS.shapes, j); AREAS.month = m; AREAS.error = null;
+            renderAreas();
+        }).catch(e => {
+            console.warn('council areas: the month could not be read', e);
+            if (m !== areasMonth()) return;
+            AREAS.data = areaJoin(AREAS.shapes, null); AREAS.month = null;
+            AREAS.error = 'The council figures could not be read for ' + ((typeof monthLabel === 'function') ? monthLabel(m) : 'this month') + '.';
+            renderAreas();
+        });
     }
     function renderAreas() {
         const j = AREAS.data;
@@ -3791,10 +3860,12 @@
         if (!has) return;
         const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
         const key = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(',')].join('|');
+        const noMonth = !AREAS.month;                  // Track C review: no single month on screen, no figure, no fill
         ensureAreaLayers();
         if (key !== AREAS.drawn && map.getSource('areas-source')) {
             map.getSource('areas-source').setData(areaFeatures(j, AREAS.mode, AREAS.off, when));
             if (map.getLayer('area-fill')) map.setPaintProperty('area-fill', 'fill-color', areaFillExpr(AREAS.mode));
+            if (map.getLayer('area-fill')) map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : 0.42);
             AREAS.drawn = key;
         }
         // the group: the colour-by switch, one row per district with its own box and figure, the legend, the lines
@@ -3817,7 +3888,11 @@
         const lg = document.getElementById('area-legend');
         if (lg) {
             // a district unticked by its own box has no fill and no outline: the legend says what that blank means
-            lg.innerHTML = areaLegendHTML(AREAS.mode, when) + (AREAS.off.size
+            const hatched = j.areas.some(a => a.tier === 'district' && !a.nofig
+                && (a.unclipped && !((AREAS.mode === 'carbon' ? a.co2_t : a.movements_per_day) > 0) || (AREAS.mode === 'carbon' && a.co2_t === null)));
+            lg.innerHTML = noMonth ? '<div class="area-note">Shows one month: press Play or pick a month.</div>'
+                : areaLegendHTML(AREAS.mode, when) + (hatched
+                ? '<div class="area-lg"><span class="area-sw area-sw-hatch"></span>no figure (the note below says why)</div>' : '') + (AREAS.off.size
                 ? '<div class="area-lg"><span class="area-sw" style="background:transparent; border:1px dashed ' + AREA_INK + '"></span>layer off (unticked above)</div>' : '');
             lg.hidden = !areaTierOn('district');
         }
@@ -3835,6 +3910,10 @@
         if (at) at.textContent = (j.attribution || []).join(' · ');
         const st = document.getElementById('area-when');
         if (st) st.textContent = when ? 'Approved plan, ' + when + (j.totals && j.totals.routes_with_volume === 0 ? ' · nothing approved on a drawn route' : '') : '';
+        // Track C review: the server's notes (routes not clipped yet, lines with no CO2e, routes not drawn) are printed,
+        // so a gap reads as a gap and never as a zero; a failed read says so
+        const nt = document.getElementById('area-notes');
+        if (nt) nt.textContent = AREAS.error || (noMonth ? '' : (j.notes || []).join(' '));
     }
     // drawn UNDER every layer of ours, so the routes, sites and zones stay on top of the fill
     function areaBeforeId() {
@@ -3849,6 +3928,8 @@
         if (!AREAS.data || !(AREAS.data.areas || []).length) return;
         if (!map.isStyleLoaded()) { map.once('idle', ensureAreaLayers); return; }
         const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
+        // the hatch for "no figure" (an image of our own: re-added after a basemap switch, which drops images)
+        try { if (map.hasImage && !map.hasImage('area-hatch')) map.addImage('area-hatch', areaHatchImage()); } catch (e) {}
         if (!map.getSource('areas-source')) {
             map.addSource('areas-source', { type: 'geojson', data: areaFeatures(AREAS.data, AREAS.mode, AREAS.off, when),
                                             attribution: (AREAS.data.attribution || []).join(' · ') });
@@ -3859,7 +3940,11 @@
         const district = ['all', ['==', ['get', 'tier'], 'district'], ['!', ['get', 'off']]];
         const labelPt = ['==', ['geometry-type'], 'Point'];          // the labels read the label points only
         if (!map.getLayer('area-fill')) map.addLayer({ id: 'area-fill', type: 'fill', source: 'areas-source', filter: district,
-            layout: { visibility: dVis }, paint: { 'fill-color': areaFillExpr(AREAS.mode), 'fill-opacity': 0.42 } }, before);
+            layout: { visibility: dVis }, paint: { 'fill-color': areaFillExpr(AREAS.mode), 'fill-opacity': AREAS.month ? 0.42 : 0 } }, before);
+        // Track C review: a district with no figure (v = -1) is hatched over its neutral fill, never shown as a zero
+        if (!map.getLayer('area-nofig')) map.addLayer({ id: 'area-nofig', type: 'fill', source: 'areas-source',
+            filter: ['all', ['==', ['get', 'tier'], 'district'], ['!', ['get', 'off']], ['==', ['get', 'v'], -1]],
+            layout: { visibility: dVis }, paint: { 'fill-pattern': 'area-hatch', 'fill-opacity': 0.8 } }, before);
         if (!map.getLayer('area-outline')) map.addLayer({ id: 'area-outline', type: 'line', source: 'areas-source', filter: district,
             layout: { visibility: dVis }, paint: { 'line-color': AREA_INK, 'line-width': 1, 'line-opacity': 0.55 } }, before);
         if (!map.getLayer('area-county-outline')) map.addLayer({ id: 'area-county-outline', type: 'line', source: 'areas-source',
@@ -3878,6 +3963,15 @@
             layout: { visibility: dVis, 'text-field': ['get', 'label'], 'text-size': 14, 'text-max-width': 14, 'symbol-placement': 'point' },
             paint: { 'text-color': AREA_INK, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } }, before);
     }
+    // 8 x 8 px: a diagonal stroke two pixels wide on a warm grey, mockup 4's hatch (#B8B2A8 on #F3F1EC)
+    function areaHatchImage() {
+        const n = 8, data = new Uint8Array(n * n * 4);
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const i = (y * n + x) * 4, on = ((x + y) % n) < 2;
+            data[i] = on ? 0xB8 : 0xF3; data[i + 1] = on ? 0xB2 : 0xF1; data[i + 2] = on ? 0xA8 : 0xEC; data[i + 3] = 255;
+        }
+        return { width: n, height: n, data: data };
+    }
     // which council layer shows, from the two boxes: the county's label only while the districts are off
     function areaVisibility() {
         const d = areaTierOn('district'), c = areaTierOn('county'), v = b => b ? 'visible' : 'none';
@@ -3888,6 +3982,8 @@
         return out;
     }
     function toggleAreaTier(tier, on) {
+        // Track C review: a tick with no single month on screen opens the timeline (its month), as Road load and Carbon do
+        if (on && !areasMonth() && typeof TL !== 'undefined' && !TL.on && typeof openTimeline === 'function') openTimeline();
         const vis = areaVisibility();
         AREA_LAYERS.concat(AREA_COUNTY_LAYERS).forEach(l => toggleLayer(l, vis[l] === 'visible'));
         if (on) refreshAreas(); else renderAreas();
@@ -4467,13 +4563,19 @@
                 // the layer list is filtered at each move, in case a layer is added later
                 map.on('mousemove', (e) => {
                     let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });
+                    // 12 Oct 2026 (Track C review): over a shared section (Road load on) the SECTION answers the hover, as it
+                    // answers the click (the route click yields to roadLoadHitAt): its own figure and "Click for the routes on
+                    // this section". One route's card under it put a second figure on the same road.
+                    const run = (typeof roadLoadFeatureAt === 'function') ? roadLoadFeatureAt(e.point) : null;
+                    if (run) features = [run];
                     // 12 Oct 2026 (review 2.3): the hover card and the hovered leg's feature-state, from this same query
                     if (typeof setRouteHover === 'function') setRouteHover(features.length ? features[0] : null, e);
                     if (features.length > 0) {
                         map.getCanvas().style.cursor = 'pointer';
                         let p = features[0].properties;
-                        // Match using whatever ID field exists
-                        let idMatch = p.Route_ID || p.route_id || p.name || p.ID || p.id;
+                        // Match using whatever ID field exists (a shared section glows no route under it)
+                        let idMatch = run ? null : (p.Route_ID || p.route_id || p.name || p.ID || p.id);
+                        if (run && map.getLayer('global-route-hover')) map.setFilter('global-route-hover', ['==', 'name', 'IMPOSSIBLE_VALUE']);
 
                         if (map.getLayer('global-route-hover') && idMatch) {
                             map.setFilter('global-route-hover', [
@@ -4486,7 +4588,9 @@
                             ]);
                         }
                     } else {
-                        map.getCanvas().style.cursor = '';
+                        // Track C review: a site, a zone, a closure or a council area under the pointer keeps its hand; the
+                        // reset on every move used to undo the 'pointer' their mouseenter set
+                        map.getCanvas().style.cursor = (typeof clickableAt === 'function' && clickableAt(e.point)) ? 'pointer' : '';
                         if (map.getLayer('global-route-hover')) {
                             map.setFilter('global-route-hover', ['==', 'name', 'IMPOSSIBLE_VALUE']);
                         }
@@ -4533,7 +4637,12 @@
 
             // 12 Oct 2026 (D14): no From / To any more — the window is the span of months with volume (forecastWindow)
             try { await ensureTimelineMatrix(); } catch (e) {}
-            let [fromM, toM] = forecastWindow();
+            let [fromM, toM] = forecastWindow() || [];
+            if (!fromM) {               // Track C review: no window (the months could not be read, or none has volume)
+                status.innerHTML = (typeof TL !== 'undefined' && TL.matrix) ? "No approved forecasts yet." : "The months could not be loaded, so no forecast is shown.";
+                status.style.color = CONFIG.COLORS.peak;
+                return;
+            }
 
             const unit = CONFIG.FORECAST_UNIT || 'vehicles';
             status.innerHTML = "Fetching approved forecasts\u2026";
@@ -4604,7 +4713,7 @@
                 }
                 ensureFlowLayer();
                 applyForecastFilter();     // the overlay follows the sidebar filters and the leg toggles
-                // 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon need ONE month; From = To gives one
+                // 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon need ONE month: a month chip or Play gives one
                 if (typeof refreshMapModes === 'function') refreshMapModes();
 
                 const bd = document.getElementById('btn-detail');
@@ -4688,7 +4797,8 @@
     async function fetchMatrix(unit){
         // 12 Oct 2026 (D14): the route analysis and the detail table cover the months with volume (no From / To any more)
         try { await ensureTimelineMatrix(); } catch (e) {}
-        const [f, t] = forecastWindow();
+        const [f, t] = forecastWindow() || [];
+        if (!f) throw new Error('The months could not be loaded');   // Track C review: no window, no 60-month read
         const lo=Math.min(f,t), hi=Math.max(f,t), key=lo+'-'+hi+'-'+unit;
         if(FCACHE[key]) return FCACHE[key];
         const r=await fetch(CONFIG.API_BASE+'/public/forecast-matrix?from='+lo+'&to='+hi+'&unit='+unit);
@@ -4928,10 +5038,12 @@
     // (through teamText, never an id) and their shares. While it is on, the per-route forecast labels hide, so two
     // figures never show for one road.
     // CARBON: the shared sections (Road load on) or the forecast routes (Road load off) painted by t CO2e in the month
-    // on ONE hue, the plan blue (D26; config.js keeps orange off the map), with FIXED stops from the programme's
-    // largest route-month (forecast-matrix co2_t), so one colour means the same tonnes in every month. In carbon mode
+    // on ONE hue (D26; config.js keeps orange off the map), with FIXED stops from the programme's largest route-month
+    // (forecast-matrix co2_t) or, on the shared sections, its largest SECTION-month (forecast-matrix section_co2_max,
+    // Track C review), so one colour means the same tonnes in every month. In carbon mode
     // the line's colour is carbon and nothing else (colour-system rule 1): no width by volume at the same time.
-    // Both are OFF by default and both need ONE month on screen: the timeline's, or Show forecast with From = To.
+    // Both are OFF by default and both need ONE month on screen: the timeline's (a month chip or Play), or Show forecast
+    // when the programme's volume sits in one month.
     // Round caps and no dasharray: the route layers' butt caps and dash constants are counted by parse_map.js.
     const ROAD_LOAD_LAYERS = ['road-load-casing', 'road-load-line', 'road-load-labels'];
     const CARBON_LABEL_LAYER = 'carbon-route-labels';
@@ -4949,7 +5061,9 @@
     //: the route label in carbon mode: the route's t CO2e in the month, from the server
     const CARBON_ROUTE_LABEL = ['case', ['==', ['typeof', ['get', 'f_co2']], 'number'],
                                 ['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];
-    //: the plan blue at five lightness steps (HSL hue 217, mockup 5), light to dark; the light end may recede (rule 5)
+    //: a blue at five lightness steps (HSL hue 217, mockup 5's #2071F3 family), light to dark; the light end may recede
+    //: (rule 5). Track C review: this is NOT the plan blue #4A72C9 (hue 221) that the council fill (AREA_RAMP) is built
+    //: on, and the two carry different stops; the council legend says so. One ramp for both is a D26 follow-up.
     const CARBON_RAMP = ['#94BBF9', '#5A96F6', '#2071F3', '#0B55CB', '#073888'];
     //: no stored road route for the line's vehicle: no figure, painted grey, never a zero dressed as a figure
     const CARBON_NONE = '#A8A29E';
@@ -4967,7 +5081,7 @@
         // 12 Oct (merge with C3, D14): From / To are gone; Show forecast covers forecastWindow(), the span with volume.
         // It is one month only when the programme carries volume in one month; a month chip opens the bar on one month.
         if (modeOn('toggle-forecast')) {
-            const [f, t] = forecastWindow();
+            const [f, t] = forecastWindow() || [];
             if (f > 0 && f === t) return f;
         }
         return null;
@@ -4986,6 +5100,17 @@
             out.push(s);
         });
         return out;
+    }
+    // Track C review: the stops for the picture on screen. A shared section carries each route's CO2e × its length ÷
+    // that route's two-way length — a fraction of a route — so stops cut from the largest ROUTE-month put most sections
+    // in the lightest steps. With Road load on, the stops come from the largest SECTION-month the server works out by
+    // road_load's own rule (section_co2_max); the route-month maximum stays for the routes, and is the fallback when the
+    // section figure is missing. `what` names the maximum the legend prints.
+    function carbonScale(rl){
+        const mtx = (typeof TL !== 'undefined') ? TL.matrix : null;
+        const sec = !!(rl && mtx && mtx.sectionCo2Max > 0);
+        const max = mtx ? (sec ? mtx.sectionCo2Max : (mtx.co2Max || 0)) : 0;
+        return { max: max, stops: carbonStops(max), what: sec ? 'section-month' : 'route-month' };
     }
     function carbonColor(prop, stops){
         const s = stops, c = CARBON_RAMP;
@@ -5108,7 +5233,7 @@
     }
     function applyCarbonMode(m){
         const rl = !!m && modeOn('toggle-road-load'), co2 = !!m && modeOn('toggle-carbon');
-        const stops = carbonStops(typeof TL !== 'undefined' && TL.matrix ? TL.matrix.co2Max : 0);
+        const scale = carbonScale(rl), stops = scale.stops;     // Track C review: section stops with Road load on
         const paintRoutes = co2 && !rl;
         if (map.getLayer('forecast-layer')) {
             map.setPaintProperty('forecast-layer', 'line-color', paintRoutes ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast);
@@ -5155,7 +5280,7 @@
                 else if (!mtx) coBox.innerHTML = '<div class="mode-note">Reading carbon for ' + rlEsc(monthLabel(m)) + '…</div>';
                 else if (mtx.co2Error) coBox.innerHTML = '<div class="mode-note">' + rlEsc(mtx.co2Error) + ' Every line is grey: no figure.</div>';
                 else {
-                    const s = carbonStops(mtx.co2Max), per = rl ? 'per shared section' : 'per route';
+                    const sc = carbonScale(rl), s = sc.stops, per = rl ? 'per shared section' : 'per route';
                     const ranges = ['under ' + s[0] + ' t', s[0] + ' to ' + s[1] + ' t', s[1] + ' to ' + s[2] + ' t', s[2] + ' to ' + s[3] + ' t', s[3] + ' t and over'];
                     const miss = carbonMissingLines(m);
                     coBox.innerHTML = '<b>Carbon · t CO₂e in ' + rlEsc(monthLabel(m)) + ', ' + per + '</b>' +
@@ -5163,7 +5288,7 @@
                         ranges.map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
                         '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>No stored road route · no figure</div>' +
                         '<div class="ml-foot">Approved plan only, average-laden factor on both legs, excludes ' + miss + ' line' + (miss === 1 ? '' : 's') +
-                        ' with no stored road route. Stops are fixed from the programme\'s largest route-month (' + fmtTonnes(mtx.co2Max || 0) + '), so a colour means the same tonnes in every month.' +
+                        ' with no stored road route. Stops are fixed from the programme\'s largest ' + sc.what + ' (' + fmtTonnes(sc.max || 0) + '), so a colour means the same tonnes in every month.' +
                         (rl ? ' A section carries each route\'s month CO₂e × the section\'s length ÷ that route\'s two-way length.' : '') +
                         (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '') + '</div>';
                 }
@@ -5241,6 +5366,19 @@
             '<div style="color:#6b7280;margin-top:6px;">Loaded leg counted once (one load = one two-way movement). ' +
             (Number(run.length_km) > 0 ? 'Section ' + fmtDist(Number(run.length_km), 1) + ' ' + DU() + '. ' : '') + 'Approved plan only.' +
             (co2On && RL.cache[m] && RL.cache[m].carbon && RL.cache[m].carbon.stamp ? ' ' + rlEsc(RL.cache[m].carbon.stamp) + '.' : '') + '</div></div>';
+    }
+    // Track C review: the run under the pointer (the hover answers with the section, as the click does), else null
+    function roadLoadFeatureAt(point){
+        if (!map.getLayer('road-load-line')) return null;
+        try { const fs = map.queryRenderedFeatures(point, { layers: ['road-load-line'] }); return fs.length ? fs[0] : null; } catch (e) { return null; }
+    }
+    // the layers with a click of their own that the route query does not cover: the cursor shows a hand over them
+    const CLICKABLE_LAYERS = ['rail-alignment', 'ws-boundary-ticks', 'ws-boundary-labels', 'zone-fill', 'zone-outline', 'site-gates',
+                              'evr-rail-line', 'locations', 'restriction-points', 'restriction-lines', 'area-fill', 'area-county-fill'];
+    function clickableAt(point){
+        const ls = CLICKABLE_LAYERS.filter(l => map.getLayer(l));
+        if (!ls.length) return false;
+        try { return map.queryRenderedFeatures(point, { layers: ls }).length > 0; } catch (e) { return false; }
     }
     function roadLoadHitAt(point){
         if (!map.getLayer('road-load-line')) return false;
@@ -5387,7 +5525,8 @@
     }
     async function loadTimelineMatrix(){
         const unit = CONFIG.FORECAST_UNIT || 'vehicles';
-        const r = await fetch(CONFIG.API_BASE+'/public/forecast-matrix?from=1&to='+CONFIG.MONTH_COUNT+'&unit='+unit);
+        // Track C review: sections=1 adds the programme's largest section-month of CO2e (the section ramp's stops)
+        const r = await fetch(CONFIG.API_BASE+'/public/forecast-matrix?from=1&to='+CONFIG.MONTH_COUNT+'&unit='+unit+'&sections=1');
         if(!r.ok) throw new Error('API '+r.status);
         const j = await r.json();
         // 12 Oct 2026 (review §3 row 3): the matrix is one entry per LINE (route × discipline ×
@@ -5422,7 +5561,9 @@
         (j.routes||[]).forEach(rt=>{ Object.keys(rt.monthly||{}).forEach(k=>{ const mm=parseInt(k); if(mm>=1 && mm<=(CONFIG.MONTH_COUNT||60) && (rt.monthly[k]||0)>0) volMonths.add(mm); }); });
         const span = volMonths.size ? [Math.min(...volMonths), Math.max(...volMonths)] : null;
         // wording review (12 Oct): carbonStamp is the Carbon page's stamp from the feed, printed beside the carbon legend
-        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span, co2Max, co2Error: j.co2_error || null, carbonStamp: j.carbon_stamp || null };
+        // Track C review: sectionCo2Max, the largest section-month from the server (null when it gave none)
+        const sectionCo2Max = (Number(j.section_co2_max) > 0 && !j.co2_error) ? Number(j.section_co2_max) : null;
+        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span, co2Max, sectionCo2Max, co2Error: j.co2_error || null, carbonStamp: j.carbon_stamp || null };
         prefetchSpanKpis();     // in the background, one month at a time; never awaited
         return TL.matrix;
     }
@@ -6020,7 +6161,8 @@
     function monthOnScreenLabel() {
         if (TL.on) return monthLabel(TL.month);
         const cb = document.getElementById('toggle-forecast');
-        if (cb && cb.checked) { const [a, b] = forecastWindow(); return 'average, ' + monthLabel(a) + ' – ' + monthLabel(b); }
+        const w = (cb && cb.checked) ? forecastWindow() : null;
+        if (w) return 'average, ' + monthLabel(w[0]) + ' – ' + monthLabel(w[1]);
         return null;
     }
     // the card's four lines for a route feature (pure: the harness runs it). One load = one two-way movement, never
@@ -6039,6 +6181,15 @@
                  sub: [p.route_id, team, leg].filter(Boolean).join(' · '),
                  fig, hint: 'Click for the route analysis' };
     }
+    // the card's four lines for a shared section under the pointer (pure: the harness runs it): the RUN's figure — the
+    // sum over the routes on it, the loaded leg once — and the hint the section's own click answers
+    function runHoverView(p, when, co2On) {
+        p = p || {};
+        return { title: 'Shared road section',
+                 sub: [p.rl_routes_text, when].filter(Boolean).join(' · '),
+                 fig: (p.rl_mv_text != null ? p.rl_mv_text : '0') + ' two-way movements a day' + (co2On && p.rl_co2_text ? ' · ' + p.rl_co2_text : ''),
+                 hint: 'Click for the routes on this section' };
+    }
     function setRouteHover(f, e) {
         // the hovered leg's feature-state (ids from generateId on routes-source); the glow layer brightens it
         const id = (f && f.source === 'routes-source' && f.id != null) ? f.id : null;
@@ -6050,7 +6201,12 @@
         const card = document.getElementById('route-hover-card');
         if (!card) return;
         if (!f || !e || !e.point || isPhoneShell() || !canHover()) { card.hidden = true; HOVER.key = ''; return; }
-        const v = routeHoverView(f.properties, monthOnScreenLabel(), CONFIG.FORECAST_UNIT || 'vehicles');
+        // Track C review: a shared section (Road load on) gets the section's card, never one route's
+        const isRun = f.source === 'road-load-source' || !!(f.layer && f.layer.id === 'road-load-line');
+        const v = isRun
+            ? runHoverView(f.properties, (typeof RL !== 'undefined' && RL.month) ? monthLabel(RL.month) : null,
+                           typeof modeOn === 'function' && modeOn('toggle-carbon'))
+            : routeHoverView(f.properties, monthOnScreenLabel(), CONFIG.FORECAST_UNIT || 'vehicles');
         const key = [v.title, v.sub, v.fig].join('|');
         if (key !== HOVER.key) {
             HOVER.key = key;
@@ -6078,10 +6234,11 @@
     // playback) with history.replaceState — never during Play, which would write the address every tick.
     const VIEW = { ready: false, timer: null, defaults: [], pendingRestr: [] };
     // merge of C1 with C3: the Road load and Carbon boxes travel in the link too (&layers=road-load.carbon), so a shared
-    // link opens on the same picture; both are off by default, so a plain link is unchanged
-    const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon'];
+    // link opens on the same picture; both are off by default, so a plain link is unchanged. Track C review: so does
+    // "Show forecast routes" (&layers=forecast) — a link copied from the forecast view opened on the bare network.
+    const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon', 'toggle-forecast'];
     function layerBoxes() {
-        return [...document.querySelectorAll('input[type=checkbox][id^="layer-"], input[type=checkbox][id^="restr-"], #toggle-road-load, #toggle-carbon')];
+        return [...document.querySelectorAll('input[type=checkbox][id^="layer-"], input[type=checkbox][id^="restr-"], #toggle-road-load, #toggle-carbon, #toggle-forecast')];
     }
     function layerKey(id) { return id.indexOf('layer-') === 0 ? id.slice(6) : id.indexOf('toggle-') === 0 ? id.slice(7) : id; }
     function layersOn() { return layerBoxes().filter(cb => cb.checked).map(cb => layerKey(cb.id)).sort(); }

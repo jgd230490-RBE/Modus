@@ -883,6 +883,24 @@ ok("⭐ the report-a-lorry block with the typed fields as placeholders (no inven
    "Report a lorry off route: the date, time, place, direction of travel and registration, to [contact line and email: "
    "a typed field this scheme has not set yet]." in T10J and "Working hours: [a typed field this scheme has not set yet]." in T10J
    and "@" not in S10["report"]["lorry"])
+# 12 Oct 2026 (Track C review): the typed tenant.concern_email (the map's "Report a concern" address) is the
+# bulletin's report-a-lorry address too; the placeholder prints only while it is not typed
+_real_ts3 = config.tenant_settings
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE,
+                                              concern_email="haulage.concerns@example.org")
+try:
+    S10C = bulletin_doc.sheet(10, PLANNER, now=datetime.datetime(2026, 10, 12, 9, 0, tzinfo=datetime.timezone.utc))
+    HTML10C = bulletin_doc.html(S10C)
+    T10CJ = " ".join(pdf_text(export.build_bulletin_pdf(S10C)).split())
+finally:
+    config.tenant_settings = _real_ts3
+ok("⭐ report a lorry: a typed concern_email is printed (page and PDF), the placeholder is not",
+   S10C["report"]["lorry"] == "Report a lorry off route: the date, time, place, direction of travel and registration, to "
+   "haulage.concerns@example.org." and "haulage.concerns@example.org" in HTML10C and "haulage.concerns@example.org" in T10CJ
+   and "[contact line and email:" not in S10C["report"]["lorry"], S10C["report"]["lorry"])
+ok("…and with none typed the same block keeps the placeholder (no invented contact)",
+   S10["report"]["lorry"].endswith("[contact line and email: a typed field this scheme has not set yet].")
+   and "concern_email" not in S10["report"]["lorry"])
 ok("…the frame: the title, the as-at stamp, the plan-only foot", "Lorry movements in October 2026" in PAGES[0]
    and "Approved plan as at 12 October 2026" in PAGES[0] and "A planning forecast, not a monitoring report" in PAGES[1])
 ok("…the map is the schematic offline, and the caption says so", "schematic from the stored road routes, not to scale" in PAGES[0]
@@ -926,6 +944,15 @@ _cw = re.search(r'<svg viewBox="0 0 (\d+) \d+" role="img" aria-label="Two-way mo
 _mw = re.search(r"\.chartwrap svg\{min-width:(\d+)px\}", HTML10)
 ok("🔴 the 14 px floor on a phone: the chart never draws narrower than its viewBox, so its 14 px labels never render below 14 px",
    bool(_cw and _mw) and int(_mw.group(1)) >= int(_cw.group(1)), str((_cw and _cw.group(1), _mw and _mw.group(1))))
+# 12 Oct 2026 (Track C review): the schematic map is 720 units wide with 14 px pin letters; at width:100% on a 375 px
+# phone they drew at about 6.7 px. It now sits in a scrolling wrapper and never draws narrower than its viewBox.
+_mv = re.search(r'<div class="mapwrap" data-bulletin="map"><svg viewBox="0 0 (\d+) \d+" role="img"', HTML10)
+_mm = re.search(r"\.mapwrap svg\{min-width:(\d+)px\}", HTML10)
+ok("🔴 the 14 px floor on a phone: the schematic map never draws narrower than its viewBox (it scrolls instead)",
+   bool(_mv and _mm) and int(_mm.group(1)) >= int(_mv.group(1)) and ".mapwrap{overflow-x:auto}" in HTML10,
+   str((_mv and _mv.group(1), _mm and _mm.group(1))))
+ok("…and on paper both figures take the page width (the phone's minimum is reset for print)",
+   ".chartwrap svg,.mapwrap svg{min-width:0}" in HTML10.split("@media print")[1])
 ok("…every place a person reads text is escaped (a zone typed with markup prints as text)",
    "<script" not in bulletin_doc.html(dict(S10, title="<script>x</script>")).split("<style>")[1].split("</style>")[1]
    .replace("&lt;script&gt;", ""))

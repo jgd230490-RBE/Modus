@@ -656,11 +656,56 @@ except Exception as e:  # pragma: no cover
 finally:
     costlines.lines = _real_lines
 
+# 12 Oct 2026 (Track C review): a laden leg that grazes an area — inside by under ENTER_KM (200 m), as a road beside a
+# generalised (BSC, 200 m) boundary does — adds its km and carbon there but NOT the route's whole daily movements
+_dip = areas.Area("D", poly(box(0.0, 0.0, 1.0, 1.0)))
+_graze = [[-0.001, 0.5], [0.0003, 0.5003], [-0.001, 0.5006]]          # about 20 m over the line and back
+ok("5. the clip of a road that strays 20 m over a boundary is under ENTER_KM (and over MIN_KM, so its km still count)",
+   areas.MIN_KM <= areas.clip_km(_graze, _dip) < areas.ENTER_KM, str(areas.clip_km(_graze, _dip)))
+_before = {a["area_id"]: a for a in areas.area_load(M, working_days=WD)["areas"]}
+_e_r1 = db.query("SELECT km FROM route_area_km WHERE tenant_id = ? AND route_id = 'R001' AND leg = 'loaded' AND area_id = 'E'",
+                 (db.current_tenant(),))
+db.execute("UPDATE route_area_km SET km = 0.05 WHERE tenant_id = ? AND route_id = 'R001' AND leg = 'loaded' AND area_id = 'E'",
+           (db.current_tenant(),))
+_g = {a["area_id"]: a for a in areas.area_load(M, working_days=WD)["areas"]}
+ok("5. ⭐ a laden leg inside an area by 50 m adds NO movements there: the route is an edge route, not one that enters",
+   bool(_e_r1) and "R001" in _before["E"]["routes"] and "R001" not in _g["E"]["routes"] and _g["E"]["edge_routes"] == ["R001"]
+   and _g["E"]["loads"] < _before["E"]["loads"] and _g["W"]["loads"] == _before["W"]["loads"],
+   str((_g["E"]["routes"], _g["E"]["edge_routes"], _g["E"]["loads"], _before["E"]["loads"])))
+ok("5. ...its carbon there still counts, split by its km inside (the DESNZ split is by km, not by entry)",
+   _g["E"]["co2_t"] is not None and _g["E"]["co2_t"] > 0 and "R001" not in _g["E"]["co2_routes_unbaked"])
+ok("5. ...and the basis sentence says which threshold applies", "at least 200 m" in areas.area_load(M, working_days=WD)["basis"]
+   and areas.area_load(M, working_days=WD)["enter_km"] == 0.2)
+areas.rebuild()
+ok("5. (the clip restored)", {a["area_id"]: a["routes"] for a in areas.area_load(M, working_days=WD)["areas"]}
+   == {a["area_id"]: a["routes"] for a in _before.values()})
+# the polygons once, the figures per month (Play no longer re-sends every polygon)
+_real_ml = road_sections.month_lines
+road_sections.month_lines = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("shapes must not read a month"))
+try:
+    _sh = areas.shapes()
+    ok("5. ⭐ shapes(): every area's polygon, label point and licence lines, with NO month roll-up (month_lines never called)",
+       [a["area_id"] for a in _sh["areas"]] == [a["area_id"] for a in areas.stored_areas()]
+       and all(a["geometry"]["type"] in ("Polygon", "MultiPolygon") and isinstance(a["label_point"], list) for a in _sh["areas"])
+       and "movements_per_day" not in _sh["areas"][0] and _sh["attribution"] == ["Test boundaries, made up"])
+except Exception as e:  # pragma: no cover
+    ok("5. ⭐ shapes(): every area's polygon, label point and licence lines, with NO month roll-up (month_lines never called)", False, repr(e))
+finally:
+    road_sections.month_lines = _real_ml
+_ng = areas.area_load(M, working_days=WD, geometry=False)
+ok("5. area_load(geometry=False): the same figures without the polygons or label points",
+   all("geometry" not in a and "label_point" not in a for a in _ng["areas"])
+   and [(a["area_id"], a["movements_per_day"], a["co2_t"]) for a in _ng["areas"]]
+   == [(a["area_id"], a["movements_per_day"], a["co2_t"]) for a in areas.area_load(M, working_days=WD)["areas"]])
+
 # =========================================================================== #
 #  6. The endpoints (bodies) and the gate scope                                #
 # =========================================================================== #
 ok("6. ⭐ /api/public/areas is behind the map scope", gate.scope_for("/api/public/areas?month=10") == "map"
    and gate.scope_for("/api/public/areas") == "map")
+ok("6. ⭐ /api/public/areas/shapes is behind the map scope too, and its body is shapes()",
+   gate.scope_for("/api/public/areas/shapes") == "map" and main.public_area_shapes() == areas.shapes()
+   and '@app.get("/api/public/areas/shapes")' in read("backend/main.py"))
 ok("6. the admin paths are not the map's (they are token-protected)",
    gate.scope_for("/api/admin/areas/import?token=x") is None and gate.scope_for("/api/admin/areas") is None)
 body = main.public_areas(month=M)
@@ -700,8 +745,9 @@ os.environ.pop("ADMIN_TOKEN", None)
 src_main = read("backend/main.py")
 ok("6. main.py registers the three routes", all(s in src_main for s in (
     '@app.get("/api/public/areas")', '@app.post("/api/admin/areas/import")', '@app.get("/api/admin/areas")')))
+# NARROWED 12 Oct 2026 (Track C review): the call may also pass geometry=bool(geometry) (the figures-only month read)
 ok("6. the public endpoint hands _working_days() in — one reader of the figure",
-   "areas.area_load(int(month), working_days=_working_days(factors))" in src_main)
+   re.search(r"areas\.area_load\(int\(month\), working_days=_working_days\(factors\)(, geometry=bool\(geometry\))?\)", src_main) is not None)
 
 # =========================================================================== #
 #  7. The package round trip                                                   #
@@ -761,8 +807,11 @@ ok("8. the month read takes the bar's payload through road_sections.month_lines 
 ok("8. ⭐ the carbon divisor is the two-way length, the laden km plus the stored return",
    '(prof.get("loaded") or {}).get(WHOLE_LEG, 0.0) + (prof.get("return") or {}).get(WHOLE_LEG, 0.0)' in src
    and "co2 += c * (lin + rin) / two_way" in src)
-ok("8. ⭐ movements: the loads of routes whose LADEN leg enters, the return adds none",
-   "if lin > 0:\n                routes.append(rid)\n                loads += ld" in src)
+# NARROWED 12 Oct 2026 (Track C review): "enters" is at least ENTER_KM (200 m, the BSC generalisation) of the laden leg,
+# not any length over half a metre; the return still adds none
+ok("8. ⭐ movements: the loads of routes whose LADEN leg enters (200 m or more inside), the return adds none",
+   "if lin >= ENTER_KM:\n                routes.append(rid)\n                loads += ld" in src and "ENTER_KM = 0.2" in src
+   and src.count("loads += ld") == 1)
 ok("8. no US spelling in the module's sentences", not re.search(r"\b(color|center|meter|kilometer|neighbor|analyze|optimize)\b", src, re.I))
 ok("8. the module says what it does not do", "WHAT THIS DOES NOT DO" in src)
 

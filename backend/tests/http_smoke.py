@@ -447,6 +447,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("B2: ...an UNBAKED route's months read None, never a zero (the rest of the demo is not baked here)",
            any(all(v is None for v in x["co2_t"].values()) for x in fm.get("routes") or [] if x["route_id"] != "R001"))
         ok("B2: ...and co2_error is absent on the happy path", "co2_error" not in fm and "working_days" in fm)
+        # 12 Oct 2026 (Track C review): sections=1 adds the largest section-month (the map's section ramp); absent without it
+        r = c.get("/api/public/forecast-matrix", params={"from": 1, "to": 60, "unit": "t", "sections": 1})
+        ok("Track C review: forecast-matrix with sections=1 answers 200 and carries section_co2_max (None or a positive figure); without it the key is absent",
+           r.status_code == 200 and "section_co2_max" in r.json()
+           and (r.json()["section_co2_max"] is None or r.json()["section_co2_max"] > 0) and "section_co2_max" not in fm, r.text[:200])
         _m001 = sorted({x["month_index"] for x in _r001})[0]
         r = c.get("/api/public/month-kpis", params={"month": _m001, "unit": "t"})
         mk = r.json() if r.status_code == 200 else {}
@@ -836,6 +841,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and all(isinstance(a.get("label_point"), list) and len(a["label_point"]) == 2 for a in ar.get("areas", [])), r.text[:200])
     ok("...and the October lines are named as undrawn, never counted in an area",
        len(ar.get("routes_not_drawn", [])) == 19 and ar.get("totals", {}).get("loads") == 0)
+    # 12 Oct 2026 (Track C review): the polygons once (no month roll-up), the month's figures without them
+    r = c.get("/api/public/areas/shapes")
+    sh = r.json() if r.status_code == 200 else {}
+    ok("⭐ Track C review: /api/public/areas/shapes serves the nine polygons, their label points and the two licence lines, and no month figure",
+       r.status_code == 200 and len(sh.get("areas", [])) == 9 and sh.get("attribution") == AREAS_SEED["attribution"]
+       and all(a["geometry"]["type"] in ("Polygon", "MultiPolygon") and len(a.get("label_point") or []) == 2 for a in sh["areas"])
+       and all("movements_per_day" not in a for a in sh["areas"]), r.text[:200])
+    r = c.get("/api/public/areas", params={"month": 10, "geometry": 0})
+    ok("Track C review: /api/public/areas?geometry=0 gives the same figures without the polygons",
+       r.status_code == 200 and len(r.json().get("areas", [])) == 9 and all("geometry" not in a and "label_point" not in a for a in r.json()["areas"])
+       and [(a["area_id"], a["movements_per_day"]) for a in r.json()["areas"]] == [(a["area_id"], a["movements_per_day"]) for a in ar["areas"]], r.text[:200])
     # ------------------------------------------- 3d. the network behind the gate (12 Oct 2026, map review D18)
     # The twelve reads that needed no credential until today, read three ways: the staff COOKIE (this client, no
     # header), the planner CODE in the header with no cookie, and — at the end of this file — the MAP cookie and
@@ -1016,6 +1032,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
            c.get("/api/public/road-load", params={"month": 10}).status_code == 401)
         ok("🔴 ...and so is /api/public/areas (12 Oct 2026, §2.2b)",
            c.get("/api/public/areas", params={"month": 10}).status_code == 401)
+        ok("🔴 ...and so is /api/public/areas/shapes (Track C review, 12 Oct 2026)",
+           c.get("/api/public/areas/shapes").status_code == 401)
         r = c.get("/api/admin/diagnostics/smtp")
         ok("the SMTP probe is refused without the admin token", r.status_code == 403, str(r.status_code))
         r = c.get("/api/admin/diagnostics/smtp", params=TOKEN)

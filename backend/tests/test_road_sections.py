@@ -606,6 +606,22 @@ ok("5. ...A's share on the two runs is in the ratio of their lengths",
    and shareA_ab["route_length_km"] == round(LA, 3), f"{shareA_ab} {shareA_abc}")
 ok("5. ...and a route's shares over all its runs never exceed its month CO2e",
    shareA_ab["co2_t"] + shareA_abc["co2_t"] <= per_route["R001"]["co2_t"] + 1e-6)
+# 12 Oct 2026 (Track C review): the carbon ramp on the shared sections takes its stops from the largest SECTION-month,
+# worked out by road_load's own rule from the routes' month figures (forecast-matrix carries them with sections=1)
+_rm = {"R001": {M: per_route["R001"]["co2_t"]}, "R002": {M: per_route["R002"]["co2_t"]}}
+_smax = road_sections.section_co2_max(_rm)
+ok("5. ⭐ section_co2_max = the most any run carries in any month, by road_load's own rule (here the A+B / A+B+C runs)",
+   _smax is not None and abs(_smax - max(ab["co2_t"], abc["co2_t"])) < 2e-3, f"{_smax} vs {ab['co2_t']}, {abc['co2_t']}")
+ok("5. 🔴 ...and NOT the largest route-month (a run carries a fraction of each route; stops from a route's month put every run in the lightest steps)",
+   _smax < max(per_route["R001"]["co2_t"], per_route["R002"]["co2_t"]) - 1e-3, f"{_smax}")
+ok("5. ...a month of another route's figure adds to a run only by that route's share; no figure at all gives None",
+   road_sections.section_co2_max({}) is None and road_sections.section_co2_max({"R001": {M: None}}) is None
+   and abs(road_sections.section_co2_max({"R001": {M: per_route["R001"]["co2_t"]}}) - max(shareA_ab["co2_t"], shareA_abc["co2_t"])) < 2e-3)
+_fm = main.public_forecast_matrix(from_=1, to=main.MONTH_COUNT, unit="vehicles", sections=1)
+_fm0 = main.public_forecast_matrix(from_=1, to=main.MONTH_COUNT, unit="vehicles", sections=0)
+ok("5. ⭐ forecast-matrix with sections=1 carries section_co2_max (the map's section stops); without it the key is absent",
+   _fm.get("section_co2_max") is not None and _fm["section_co2_max"] >= max(ab["co2_t"], abc["co2_t"]) - 2e-3
+   and "section_co2_max" not in _fm0, str(_fm.get("section_co2_max")))
 ok("5. the run carries its geometry, length and vertex count for the map",
    ab["geometry"] == A[2:5] and abc["geometry"] == A[4:7] and ab["vertices"] == 3 and abc["vertices"] == 3
    and ab["length_km"] > 0 and ab["first"] == A[2])

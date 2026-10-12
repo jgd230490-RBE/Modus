@@ -1955,6 +1955,7 @@ def public_forecast_matrix(
     from_: int = Query(1, alias="from", ge=1, le=MONTH_COUNT),
     to: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT),
     unit: str = Query("vehicles"),
+    sections: int = Query(0),
 ):
     """
     Approved forecasts as a month-by-month grid (for the map's detail table).
@@ -2009,6 +2010,22 @@ def public_forecast_matrix(
            "routes": out, "carbon_stamp": carbon.SUMMARY_STAMP}
     if co2_error:
         res["co2_error"] = co2_error
+    # 12 Oct 2026 (Track C review): sections=1 (the timeline asks) adds the programme's largest
+    # SECTION-month of CO2e over the window, so the carbon ramp on the shared sections has stops
+    # from what a section carries, not from a whole route's month. None when there is no figure.
+    if sections:
+        route_month = {}
+        if not co2_error:
+            for g in out:
+                for m, c in (g.get("co2_t") or {}).items():
+                    if c is not None:
+                        rm = route_month.setdefault(g["route_id"], {})
+                        rm[int(m)] = rm.get(int(m), 0.0) + float(c)
+        try:
+            res["section_co2_max"] = (None if co2_error else road_sections.section_co2_max(route_month))
+        except Exception as e:                   # noqa: BLE001 — the matrix must answer
+            print(f"⚠️  section carbon maximum not worked out: {e.__class__.__name__}: {str(e)[:300]}")
+            res["section_co2_max"] = None
     return res
 
 
@@ -2164,8 +2181,18 @@ def diagnostics_road_sections(top: int = Query(10, ge=1, le=100), leg: str = Que
     return road_sections.diagnostics(top=int(top), leg=leg)
 
 
+@app.get("/api/public/areas/shapes")
+def public_area_shapes():
+    """
+    12 Oct 2026 (Track C review). The council polygons, their label points and licence lines,
+    with no month roll-up: the map reads this ONCE to learn whether the tenant has areas and
+    to draw them, then reads each month's figures with geometry=0. Behind the map gate.
+    """
+    return areas.shapes()
+
+
 @app.get("/api/public/areas")
-def public_areas(month: int = Query(..., ge=1, le=MONTH_COUNT)):
+def public_areas(month: int = Query(..., ge=1, le=MONTH_COUNT), geometry: int = Query(1)):
     """
     12 Oct 2026 (public map review §2.2b, D27). The month per council area: two-way movements
     a day (the approved loads of the routes whose LADEN leg enters the area ÷ working days —
@@ -2173,10 +2200,11 @@ def public_areas(month: int = Query(..., ge=1, le=MONTH_COUNT)):
     by the km inside each area (the DESNZ method), the sites inside, the polygon and the
     licence lines the map prints beside it. Behind the map gate like the rest of /api/public/.
 
-    Working days come from _working_days(), the one reader of that figure.
+    Working days come from _working_days(), the one reader of that figure. geometry=0 leaves
+    out the polygons (the map has them from /api/public/areas/shapes).
     """
     factors = conversions.load_factors()
-    return areas.area_load(int(month), working_days=_working_days(factors))
+    return areas.area_load(int(month), working_days=_working_days(factors), geometry=bool(geometry))
 
 
 @app.post("/api/admin/areas/import")

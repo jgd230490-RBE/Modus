@@ -296,7 +296,9 @@ ok("KPIs follow the timeline, not just the filters",
 // months with volume (forecastWindow(), from the timeline matrix), and a month chip shows one month
 ok("§9: the month comes from the playhead, else the Show-forecast window (the span with volume, no From / To), else nothing",
   /function kpiMonthsOnScreen\(\)/.test(code) && !code.includes("forecast-from") && !code.includes("forecast-to")
-  && /const \[f, t\] = forecastWindow\(\);/.test(code.slice(code.indexOf("function kpiMonthsOnScreen"), code.indexOf("async function kpiFetchMonth")))
+  // NARROWED 12 Oct 2026 (Track C review): forecastWindow() may be null (no matrix), so the line reads `|| []` and an
+  // empty window returns no month
+  && /const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(code.slice(code.indexOf("function kpiMonthsOnScreen"), code.indexOf("async function kpiFetchMonth")))
   && /return \[\];\s*\}/.test(code));
 ok("§9: figures come from /api/public/month-kpis, cached per month",
   code.includes("/public/month-kpis?month=") && /KPI\.cache\[m\] = j/.test(code));
@@ -2015,7 +2017,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      // NARROWED 12 Oct 2026 (C1, review §2.2a): the matrix also carries the programme's carbon maximum and the feed's
      // co2_error, after the span - the carbon ramp's fixed stops come from it
      // NARROWED 12 Oct 2026 (wording review): and, last, the feed's carbon stamp (carbonStamp), which the carbon legend prints
-     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null \};/.test(code));
+     // NARROWED 12 Oct 2026 (Track C review): and the largest section-month (sectionCo2Max), the section ramp's stops
+     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, (sectionCo2Max, )?co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null \};/.test(code));
   ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
      /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
      && /return span \? span\[0\] : 1;/.test(code)
@@ -2942,8 +2945,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /if \(above\.length\) return;/.test(blk) && /map\.on\('click', 'area-fill'/.test(blk) && /let AREA_CARD_WIRED = false;/.test(blk));
   ok("§2.2b: every figure is the server's — no working-day count, no division by days in the page",
      !/working_days|\b22\b|\/ ?wd\b/.test(blk));
-  ok("§2.2b: the areas follow the month on screen: the playhead's, the forecast window's start, else this month",
-     /if \(typeof TL !== 'undefined' && TL\.on && TL\.month\) return TL\.month;/.test(blk)
+  // REVERSED 12 Oct 2026 (Track C review): the areas show the month Road load and Carbon show (mapModeMonth) — never the
+  // first month of an averaged Show-forecast span, nor the calendar month beside a bar that shows something else
+  ok("§2.2b: the areas follow the ONE month on screen (mapModeMonth, the rule Road load and Carbon use), else no figure",
+     /function areasMonth\(\) \{\s*return \(typeof mapModeMonth === 'function'\) \? mapModeMonth\(\) : null;\s*\}/.test(blk)
+     && !/forecastWindow\(\)\[0\]|currentMonthIndex\(\)/.test(blk)
      && /if\(typeof refreshAreas==='function'\) refreshAreas\(\);/.test(code) && /if \(typeof refreshAreas === 'function'\) refreshAreas\(\);/.test(code)
      && /if \(m !== areasMonth\(\)\) return;/.test(blk));
   ok("§2.2b: off means off — no fetch while both boxes are clear (after the one probe that shows the group)",
@@ -3130,7 +3136,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && !/#FF8C14/i.test(blk) && !/#F97316/i.test(blk));
   ok("⭐ C1: the stops are FIXED from the programme maximum (forecast-matrix co2_t), ascending, and the step takes them as literals",
      blkCode.includes("const CARBON_STEP_FRACTIONS = [0.2, 0.4, 0.6, 0.8];")
-     && blkCode.includes("const stops = carbonStops(typeof TL !== 'undefined' && TL.matrix ? TL.matrix.co2Max : 0);")
+     // NARROWED 12 Oct 2026 (Track C review): the stops come through carbonScale — the route-month maximum for the routes,
+     // the section-month maximum for the shared sections
+     && blkCode.includes("const scale = carbonScale(rl), stops = scale.stops;")
+     && blkCode.includes("const max = mtx ? (sec ? mtx.sectionCo2Max : (mtx.co2Max || 0)) : 0;")
      && blkCode.includes("['step', ['to-number', ['get', prop], 0], c[0], s[0], c[1], s[1], c[2], s[2], c[3], s[3], c[4]],")
      && code.includes("const c = (rt.co2_t||{})[k];")
      && code.includes("Object.keys(byR).forEach(rid=>{ Object.keys(byR[rid].co2||{}).forEach(k=>{ if(byR[rid].co2[k] > co2Max) co2Max = byR[rid].co2[k]; }); });"));
@@ -3155,7 +3164,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ C1: the carbon legend is a stepped gradient with the note 'Approved plan only, average-laden factor on both legs, excludes N …'",
      blkCode.includes("'<div class=\"ml-steps\">' + CARBON_RAMP.map(c => '<i style=\"background:' + c + '\"></i>').join('') + '</div>'")
      && blkCode.includes("'<div class=\"ml-foot\">Approved plan only, average-laden factor on both legs, excludes ' + miss + ' line' + (miss === 1 ? '' : 's') +")
-     && blkCode.includes("' with no stored road route. Stops are fixed from the programme\\'s largest route-month ('"));
+     // NARROWED 12 Oct 2026 (Track C review): the legend names the maximum used, route-month or section-month
+     && blkCode.includes("' with no stored road route. Stops are fixed from the programme\\'s largest ' + sc.what + ' ('"));
   ok("C1: f_co2 is stamped on BOTH legs (both colour) and the excluded-line count sums the routes the filters pass, once each",
      /src\._data\.features\.forEach\(f => \{[\s\S]{0,500}if \(f\.properties\.f_co2 !== c\) \{ f\.properties\.f_co2 = c; changed = true; \}/.test(blkCode)
      && !/f\.properties\.type === 'Inbound Highway'/.test(blkCode.slice(blkCode.indexOf("function stampCarbon"), blkCode.indexOf("function carbonMissingLines"))));
@@ -3223,8 +3233,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
-        // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume, else the whole horizon
-        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : [1, 60]);
+        // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume; NARROWED 12 Oct 2026 (Track C
+        // review): else no window (null), as the page now says
+        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null);
     } catch (e) { blkErr = e.message; }
     ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
     if (blkApi) {
@@ -3269,7 +3280,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       ok("C1: Show forecast over three months is no month; a window of one month is that month (the span with volume, no From / To)",
          B.mapModeMonth() === null && (TL.matrix = { span: [10, 10] }, B.mapModeMonth() === 10));
       TL.matrix = null;
-      ok("C1 (merge with C3): with no matrix the window is the whole horizon, so no month", B.mapModeMonth() === null);
+      ok("C1 (merge with C3): with no matrix there is no window, so no month", B.mapModeMonth() === null);
       el("toggle-forecast").checked = false;
       // a tick with no month opens the timeline
       el("toggle-road-load").checked = true; B.toggleRoadLoad();
@@ -3318,6 +3329,17 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
            && el("carbon-legend").innerHTML.includes("Approved plan only, average-laden factor on both legs, excludes 3 lines with no stored road route.")
            && el("carbon-legend").innerHTML.includes("(55.5 t)"), el("carbon-legend").innerHTML.slice(0, 400));
+        // Track C review: with the server's largest SECTION-month, the section ramp's stops come from it, not from co2Max
+        TL.matrix.sectionCo2Max = 9.1; B.refreshMapModes(); await flush();
+        const rlc = fmap.layers["road-load-line"].paint["line-color"][2];
+        ok("⭐ Track C review: Road load + Carbon cut the section stops from the largest SECTION-month (9.1 t), not the route-month 55.5 t",
+           JSON.stringify([rlc[3], rlc[5], rlc[7], rlc[9]]) === JSON.stringify(B.carbonStops(9.1)) && B.carbonStops(9.1)[3] < 11
+           && el("carbon-legend").innerHTML.includes("largest section-month (9.1 t)") && !el("carbon-legend").innerHTML.includes("(55.5 t)"),
+           JSON.stringify(rlc) + " " + el("carbon-legend").innerHTML.slice(0, 200));
+        delete TL.matrix.sectionCo2Max; B.refreshMapModes(); await flush();
+        ok("Track C review: ...and with no section figure from the server, the route-month maximum, named as such",
+           el("carbon-legend").innerHTML.includes("largest route-month (55.5 t)")
+           && JSON.stringify(fmap.layers["road-load-line"].paint["line-color"][2].filter((x, i) => i >= 3 && i % 2 === 1)) === JSON.stringify(B.carbonStops(55.5)));
         // road load off: the forecast routes carry the carbon
         el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
         const fl = fmap.layers["forecast-layer"].paint;
@@ -3480,9 +3502,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      html.includes('<div><label id="fc-chips-label">Month</label><div class="month-chips" id="fc-chips" role="group" aria-labelledby="fc-chips-label"></div></div>')
      && /document\.querySelectorAll\('\.month-chips'\)\.forEach\(box =>/.test(code));
   ok("C3 (D14): Show forecast routes, the route analysis and the detail table read the span with volume (forecastWindow), after the matrix",
-     /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*let \[fromM, toM\] = forecastWindow\(\);/.test(code)
-     && /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*const \[f, t\] = forecastWindow\(\);/.test(code)
-     && code.includes("return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];"));
+     // NARROWED 12 Oct 2026 (Track C review): `|| []` (the window may be null); REVERSED: no matrix is NO window, never
+     // the whole horizon (which made the bar ask for up to 60 months)
+     /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*let \[fromM, toM\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
+     && /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
+     && code.includes("return span ? [span[0], span[1]] : null;") && !code.includes("return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];"));
   // ---- (4) the hover card's plumbing --------------------------------------------------------------------------------
   ok("C3 hover: routes-source carries generated feature ids (generateId), so a hover can set a feature-state",
      code.includes("map.addSource('routes-source', { type: 'geojson', data: a1_data, generateId: true });")
@@ -3600,7 +3624,7 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
       "routePropsById", "FORECAST_WORKING_DAYS", "forecastWindow", "ensureTimelineMatrix", "openTimeline", "setTimelineMonth", "stopTimeline", "tlStartMonth",
       "applyFilters", "selectRoute", "clearSelection", "kpiFetchMonth", "sidebarIsOpen", "toggleSidebar", "closeSidebar", "isPhoneShell", "PHONE_SHELL_MQ",
       "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout",
-      nb + "\nreturn { renderMonthChips, pickMonth, chipLabel, routeHoverView, encodeView, decodeView, monthParam, monthFromParam, layersFromChanges, shareUrl, writeView, currentView, VIEW, "
+      nb + "\nreturn { renderMonthChips, pickMonth, chipLabel, routeHoverView, runHoverView, encodeView, decodeView, monthParam, monthFromParam, layersFromChanges, shareUrl, writeView, currentView, VIEW, "
          + "qrGfMul, qrRsDivisor, qrRsRemainder, qrFormatBits, qrVersionBits, qrMatrix, qrSvg, qrDataCodewords, qrAlignPositions, concernAddress, concernMailto, renderConcernLinks, "
          + "monthTableRows, routeFigures, condSummary, sheetTo, toggleSheet, SHEET, CHIPS };")(
       document, window, TL, KPI, WARN, CONFIG, monthLabel, map, teamText, TENANT, fmtN, (km) => String(km), () => 'km', {},
@@ -3645,7 +3669,20 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        && api.routeHoverView({ route_id: 'R1', is_forecast: false }, 'Oct 2026', 'vehicles').fig === 'Nothing approved on this route · Oct 2026'
        && api.routeHoverView({ route_id: 'R1', is_forecast: true, f_avg: 120 }, 'Oct 2026', 't').fig === '120 t a day · Oct 2026'
        && api.routeHoverView({ route_id: 'R1', ipt: 'Unknown_IPT' }, null).sub === 'R1');
+    // Track C review: a shared section under the pointer gets the SECTION's card, never one route's
+    const rv = api.runHoverView({ id: 'S1', rl_mv: 46.27, rl_mv_text: '46', rl_routes_text: '2 routes', rl_co2_text: '3.2 t CO₂e' }, 'Oct 2026', true);
+    ok("⭐ Track C review: the hover over a shared section is the section's: its two-way figure, its routes, the month, 'Click for the routes on this section'",
+       rv.title === 'Shared road section' && rv.sub === '2 routes · Oct 2026' && rv.fig === '46 two-way movements a day · 3.2 t CO₂e'
+       && rv.hint === 'Click for the routes on this section' && rv.hint !== 'Click for the route analysis', JSON.stringify(rv));
+    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 two-way movements a day');
     // ---- the deep link ----
+    // Track C review: "Show forecast routes" travels as layers=forecast (a link from the forecast view opened bare)
+    {
+      const defsF = ['alignment', 'gates', 'zones'];
+      const encF = api.encodeView({ month: null, layers: ['alignment', 'forecast', 'gates', 'zones'], filters: {} }, defsF);
+      ok("⭐ Track C review link: Show forecast round-trips — encoded as layers=forecast, decoded back into the ticked set",
+         encF === 'layers=forecast' && JSON.stringify(api.layersFromChanges(defsF, api.decodeView('?' + encF).layers)) === '["alignment","forecast","gates","zones"]', encF);
+    }
     ok("C3 link: the month reads as YYYY-MM both ways, and a month outside the horizon or malformed is dropped",
        api.monthParam(10) === '2026-10' && api.monthParam(13) === '2027-01' && api.monthFromParam('2026-10') === 10 && api.monthFromParam('2027-1') === 13
        && api.monthFromParam('2025-12') === null && api.monthFromParam('2031-01') === null && api.monthFromParam('2026-13') === null && api.monthFromParam('oct') === null);
@@ -3831,9 +3868,11 @@ function qrRead(mod) {
 {
   const mm = code.slice(code.indexOf("function mapModeMonth(){"), code.indexOf("function niceStop(v){"));
   const am = code.slice(code.indexOf("function areasMonth() {"), code.indexOf("function areaTierOn(tier) {"));
-  ok("⭐ Track C: Road load / Carbon and the council areas read the Show-forecast window from forecastWindow(), never the removed From / To selects",
-     mm.length > 0 && am.length > 0 && /const \[f, t\] = forecastWindow\(\);/.test(mm) && /forecastWindow\(\)\[0\]/.test(am)
-     && !/forecast-from|forecast-to/.test(mm + am));
+  // NARROWED / REVERSED 12 Oct 2026 (Track C review): mapModeMonth reads `forecastWindow() || []`; the council areas no
+  // longer take the window's first month — they read mapModeMonth itself (one rule for the three month layers)
+  ok("⭐ Track C: Road load / Carbon read the Show-forecast window from forecastWindow(), and the council areas read mapModeMonth; never the removed From / To selects",
+     mm.length > 0 && am.length > 0 && /const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(mm) && /mapModeMonth\(\)/.test(am)
+     && !/forecastWindow\(\)\[0\]/.test(am) && !/forecast-from|forecast-to/.test(mm + am));
   const af = code.slice(code.indexOf("function applyFilters()"), code.indexOf("function resetFilters()"));
   ok("Track C: applyFilters refreshes the council areas AND ends with the address-bar write (both sides kept, the write last)",
      /if \(typeof refreshAreas === 'function'\) refreshAreas\(\);[\s\S]*markRouteEnds\(\);\s*raiseMarks\(\);\s*if \(typeof scheduleViewWrite === 'function'\) scheduleViewWrite\(\);\s*\}\s*$/.test(af));
@@ -3849,8 +3888,9 @@ function qrRead(mod) {
      && !/'area-fill','forecast/.test(code));
   // the deep link carries Road load and Carbon
   ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
-     code.includes("const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon'];")
-     && code.includes(`input[type=checkbox][id^="restr-"], #toggle-road-load, #toggle-carbon')]`)
+     // NARROWED 12 Oct 2026 (Track C review): the list and the selector may also name "Show forecast routes"
+     /const LINK_MODE_BOXES = \['toggle-road-load', 'toggle-carbon'(, 'toggle-forecast')?\];/.test(code)
+     && /input\[type=checkbox\]\[id\^="restr-"\], #toggle-road-load, #toggle-carbon(, #toggle-forecast)?'\)\]/.test(code)
      && code.includes("|| LINK_MODE_BOXES.includes(id)) scheduleViewWrite();"));
   let lk = null;
   try { lk = new Function(/function layerKey\(id\) \{[^\n]*\}/.exec(code)[0] + "\nreturn layerKey;")(); } catch (e) {}
@@ -3890,6 +3930,118 @@ function qrRead(mod) {
   // the council layer's licence lines: the area card is not where they live, the attribution and the group are (pinned at §2.2b)
   ok("licences: the council areas' source is the only place besides the group that prints the ONS / OS lines, and it is never emptied",
      (code.match(/attribution: \(AREAS\.data\.attribution \|\| \[\]\)\.join/g) || []).length === 1);
+}
+
+// ===== 12 Oct 2026 — the Track C review fixes (reviews of claude/map-review-2) =====
+// Each pin fails on 25bb1b3 (Track C after its wording review).
+{
+  ok("⭐ Track C review: no comment or text names the removed From / To as a way to get one month ('From = To')",
+     !/From = To/.test(src) && !/From and To/.test(src));
+  // the deep link carries Show forecast
+  let lkF = null;
+  try { lkF = new Function(/function layerKey\(id\) \{[^\n]*\}/.exec(code)[0] + "\nreturn layerKey;")(); } catch (e) {}
+  ok("⭐ Track C review link: 'Show forecast routes' is in the link's box list and its selector, keyed 'forecast' (no layer box has that key)",
+     code.includes("const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon', 'toggle-forecast'];")
+     && code.includes(`input[type=checkbox][id^="restr-"], #toggle-road-load, #toggle-carbon, #toggle-forecast')]`)
+     && !!lkF && lkF('toggle-forecast') === 'forecast' && !/id="layer-forecast"/.test(html));
+  // the hover over a shared section, and the cursor
+  ok("⭐ Track C review hover: the ONE mousemove handler lets a shared section answer (features = [run]) before it drives the card, and glows no route under it",
+     /const run = \(typeof roadLoadFeatureAt === 'function'\) \? roadLoadFeatureAt\(e\.point\) : null;\s*if \(run\) features = \[run\];[\s\S]{0,200}setRouteHover\(features\.length \? features\[0\] : null, e\);/.test(code)
+     && code.includes("let idMatch = run ? null : (p.Route_ID || p.route_id || p.name || p.ID || p.id);")
+     && /const isRun = f\.source === 'road-load-source' \|\| !!\(f\.layer && f\.layer\.id === 'road-load-line'\);\s*const v = isRun\s*\? runHoverView\(/.test(code));
+  ok("⭐ Track C review cursor: a move with no route under it keeps the hand over a council area, a site, a zone or a closure (clickableAt), never a blind reset",
+     code.includes("map.getCanvas().style.cursor = (typeof clickableAt === 'function' && clickableAt(e.point)) ? 'pointer' : '';")
+     && /const CLICKABLE_LAYERS = \[[^\]]*'area-fill', 'area-county-fill'\];/.test(code) && /'locations'/.test((/const CLICKABLE_LAYERS = \[[^\]]*\]/.exec(code) || [""])[0])
+     && !/\} else \{\s*map\.getCanvas\(\)\.style\.cursor = '';\s*if \(map\.getLayer\('global-route-hover'\)\)/.test(code));
+  {
+    const fa = /function roadLoadFeatureAt\(point\)\{[\s\S]*?\n    \}/.exec(code), fc = /function clickableAt\(point\)\{[\s\S]*?\n    \}/.exec(code);
+    const layers = { 'road-load-line': 1, 'area-fill': 1, 'locations': 1 };
+    let under = [];
+    const fm = { getLayer: id => layers[id], queryRenderedFeatures: (pt, o) => under.filter(f => o.layers.includes(f.layer.id)) };
+    let RF = null, CA = null;
+    try { RF = new Function("map", fa[0] + "\nreturn roadLoadFeatureAt;")(fm); CA = new Function("map", "CLICKABLE_LAYERS", fc[0] + "\nreturn clickableAt;")(fm, ['area-fill', 'locations', 'zone-fill']); } catch (e) {}
+    under = [{ layer: { id: 'road-load-line' }, properties: { id: 'S1' } }, { layer: { id: 'forecast-layer' }, properties: { route_id: 'R1' } }];
+    const r1 = RF && RF({});
+    under = [{ layer: { id: 'area-fill' } }];
+    const c1 = CA && CA({});
+    under = [];
+    ok("Track C review: a point on road-load-line yields the RUN (not the route under it); a council area under the pointer is clickable; nothing is not",
+       !!r1 && r1.properties.id === 'S1' && c1 === true && CA({}) === false && RF({}) === null);
+  }
+  // the carbon ramps: the comment is true, the council legend names the difference
+  ok("Track C review: the carbon ramp's comment no longer calls #2071F3's family 'the plan blue'; the council legend says its stops differ from the Carbon legend's",
+     !/the plan blue at five lightness steps/.test(src) && /NOT the plan blue #4A72C9/.test(src)
+     && code.includes("These stops are fixed for districts (t in the month) and differ from the Carbon legend\\'s for routes and sections."));
+  // forecastWindow: no matrix, no window, no burst of month reads
+  {
+    const fw = /function forecastWindow\(\) \{[\s\S]*?\n    \}/.exec(code), km = /function kpiMonthsOnScreen\(\) \{[\s\S]*?\n    \}/.exec(code);
+    const TLx = { on: false, matrix: null };
+    const box = { checked: true };
+    let FW = null, KM = null;
+    try {
+      FW = new Function("TL", "CONFIG", fw[0] + "\nreturn forecastWindow;")(TLx, { MONTH_COUNT: 60 });
+      KM = new Function("TL", "document", "forecastWindow", km[0] + "\nreturn kpiMonthsOnScreen;")(TLx, { getElementById: () => box }, () => FW());
+    } catch (e) {}
+    ok("⭐ Track C review: with no timeline matrix (its read failed) there is no window and Show forecast asks for NO month (was all 60)",
+       !!FW && FW() === null && JSON.stringify(KM()) === "[]" && (TLx.matrix = { span: [9, 11] }, JSON.stringify(KM()) === "[9,10,11]"));
+    ok("Track C review: ...and Show forecast routes says the months could not be loaded instead of reading the whole horizon",
+       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!f) throw new Error('The months could not be loaded');"));
+  }
+  // the section ramp's maximum comes from the server
+  ok("⭐ Track C review: the timeline asks forecast-matrix for sections=1 and keeps section_co2_max as sectionCo2Max",
+     code.includes("'/public/forecast-matrix?from=1&to='+CONFIG.MONTH_COUNT+'&unit='+unit+'&sections=1'")
+     && code.includes("const sectionCo2Max = (Number(j.section_co2_max) > 0 && !j.co2_error) ? Number(j.section_co2_max) : null;"));
+  // the council layer: shapes once, figures per month, gaps named, the shared month rule
+  const ab = (() => { const i = code.indexOf("    const AREAS = { cache: {}"); return i > 0 ? code.slice(i, code.indexOf("// ===== Phase 2.5a", i) > 0 ? code.indexOf("// ===== Phase 2.5a", i) : i + 40000) : ""; })();
+  ok("⭐ Track C review areas: the polygons are read ONCE (/public/areas/shapes, no month roll-up); each month's figures without them (&geometry=0)",
+     ab.includes("fetch(CONFIG.API_BASE + '/public/areas/shapes')") && ab.includes("'/public/areas?month=' + m + '&geometry=0'")
+     && /if \(!AREAS\.shapes\) \{[\s\S]{0,200}fetchAreaShapes\(\)/.test(ab));
+  {
+    const fj = /function areaJoin\(shapes, figs\) \{[\s\S]*?\n    \}/.exec(ab), ft = /function areaFigureText\(a, mode, when\) \{[\s\S]*?\n    \}/.exec(ab);
+    const ff = /function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/.exec(ab), fcard = /function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/.exec(ab);
+    let J = null, T = null, F = null, C = null;
+    try {
+      J = new Function(fj[0] + "\nreturn areaJoin;")();
+      T = new Function(ft[0] + "\nreturn areaFigureText;")();
+      F = new Function("areaFigureText", ff[0] + "\nreturn areaFeatures;")(T);
+      C = new Function("AREAS", fcard[0] + "\nreturn areaCardHTML;")({ mode: 'movements' });
+    } catch (e) {}
+    const shapes = { areas: [{ area_id: "A", name: "Alpha", tier: "district", geometry: { type: "Polygon", coordinates: [] }, label_point: [0, 0] },
+                             { area_id: "B", name: "Beta", tier: "district", geometry: { type: "Polygon", coordinates: [] } }], attribution: ["L1"] };
+    const figs = { areas: [{ area_id: "A", movements_per_day: 12, co2_t: 3, routes: ["R1"], co2_routes_unbaked: ["R2"], edge_routes: ["R3"], return_only_routes: [] },
+                           { area_id: "B", movements_per_day: 0, co2_t: 0, routes: [], return_only_routes: [] }],
+                   routes_not_clipped: ["R4", "R5"], notes: ["2 route(s) with volume have no clipped road route yet"], totals: { routes_with_volume: 5 } };
+    const jd = J && J(shapes, figs), jn = J && J(shapes, null);
+    ok("⭐ Track C review areas: the join keeps the polygons and adds the month's figures by area_id; with no month every area is 'no figure'",
+       !!jd && jd.areas[0].geometry && jd.areas[0].movements_per_day === 12 && jd.areas[0].unclipped === 2 && jd.attribution[0] === "L1"
+       && jd.notes[0].startsWith("2 route(s)") && jn.areas.every(a => a.nofig) && jn.areas[0].geometry);
+    const fcD = F && F(jd, "movements", new Set(), "Oct 2026"), fcN = F && F(jn, "movements", new Set(), "");
+    ok("⭐ Track C review areas: a district with routes not clipped yet is 'no figure yet' and hatched (v = -1), never 'no approved route'; a figure stays a figure",
+       !!fcD && fcD.features.find(f => f.properties.area_id === "B").properties.v === -1
+       && /BETA\nno figure yet/.test(fcD.features.find(f => f.properties.area_id === "B").properties.label)
+       && fcD.features.find(f => f.properties.area_id === "A").properties.v === 12 && !/no approved route/.test(JSON.stringify(fcD)));
+    ok("Track C review areas: with no month on screen no figure is drawn (v = -2, the name alone) — not the first month of a span",
+       !!fcN && fcN.features.every(f => f.properties.v === -2) && fcN.features[0].properties.label === "ALPHA" && T(jn.areas[0], "movements", "") === "—");
+    const cd = C && C(jd.areas[0], jd, "Oct 2026");
+    ok("⭐ Track C review areas: the card names what a partial figure leaves out — 'excludes 1 route with no carbon figure', the edge route, the routes not clipped",
+       !!cd && cd.includes("excludes 1 route with no carbon figure") && cd.includes("1 more only cross its edge (under 200 m inside)")
+       && cd.includes("2 routes with volume not clipped yet"), (cd || "").slice(0, 300));
+    ok("Track C review areas: ...and with no month the card says to pick one, with no zero", C && /Shows one month: press Play or pick a month\./.test(C(jn.areas[0], jn, "")) && !/<b>0<\/b>/.test(C(jn.areas[0], jn, "")));
+  }
+  ok("⭐ Track C review areas: the server's notes are printed in the group (a gap reads as a gap); a failed read says so",
+     /<div class="area-note" id="area-notes"><\/div>/.test(html) && ab.includes("if (nt) nt.textContent = AREAS.error || (noMonth ? '' : (j.notes || []).join(' '));"));
+  ok("Track C review areas: the hatch is a layer of its own over the neutral (v = -1), its image re-added after a basemap switch, and it toggles with the districts",
+     /id: 'area-nofig', type: 'fill', source: 'areas-source',\s*filter: \['all', \['==', \['get', 'tier'\], 'district'\], \['!', \['get', 'off'\]\], \['==', \['get', 'v'\], -1\]\],/.test(ab)
+     && ab.includes("'fill-pattern': 'area-hatch'") && ab.includes("if (map.hasImage && !map.hasImage('area-hatch')) map.addImage('area-hatch', areaHatchImage());")
+     && ab.includes("const AREA_LAYERS = ['area-fill', 'area-nofig', 'area-outline', 'area-label'];"));
+  ok("Track C review areas: with no month the fill is off (outlines only) and the legend says to pick a month; a tick with no month opens the timeline",
+     ab.includes("map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : 0.42);") && ab.includes("'fill-opacity': AREAS.month ? 0.42 : 0")
+     && ab.includes("lg.innerHTML = noMonth ? '<div class=\"area-note\">Shows one month: press Play or pick a month.</div>'")
+     && /if \(on && !areasMonth\(\) && typeof TL !== 'undefined' && !TL\.on && typeof openTimeline === 'function'\) openTimeline\(\);/.test(ab));
+  // a phone on its side
+  ok("Track C review phone: a short landscape phone (767 px or less wide, 480 px or less tall) folds the chips row into the half state and puts the figures inline",
+     (() => { const i = html.indexOf("@media (max-height:480px) and (max-width:767px){"); const b = i > 0 ? html.slice(i, html.indexOf("\n        }\n", i)) : "";
+              return b.includes('#m-sheet[data-state="peek"] .m-chips-row{ display:none; }') && b.includes(".m-fig b{ display:inline; font-size:20px;"); })());
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

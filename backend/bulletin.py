@@ -623,6 +623,9 @@ def month_page(month_index, acc):
                   "note": (SCOPE_NOTE_TEAM if acc and acc.get("ipt") else None)},
         "demo_notice": tenant.get("demo_notice") or None,
         "tenant_name": tenant.get("name"),
+        # 12 Oct 2026 (Track C review): the typed, validated address the map's "Report a concern"
+        # link uses, so the bulletin's report-a-lorry block prints the same one (None until typed)
+        "concern_email": tenant.get("concern_email") or None,
         "plan_only": True,
         "terms": {
             "two_way_movements": rollup["headline"].get("rule") if not rollup.get("empty") else

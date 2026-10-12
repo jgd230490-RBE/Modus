@@ -373,8 +373,11 @@ def sheet(month_index, acc=None, now=None):
         "works": works, "checks": checks, "others": others,
         "change_rows": change_rows, "change_text": change_text,
         "terms": terms, "caveats": [c for c in caveats if c],
+        # 12 Oct 2026 (Track C review): the tenant's typed concern_email (the map's "Report a concern"
+        # address) when set; the placeholder only while it is not
         "report": {"lorry": f"Report a lorry off route: the date, time, place, direction of travel and registration, to "
-                            f"[contact line and email: {PLACEHOLDER}].",
+                            + (f"{page['concern_email']}." if page.get("concern_email")
+                               else f"[contact line and email: {PLACEHOLDER}]."),
                    "hours": f"Working hours: [{PLACEHOLDER}].",
                    "formats": f"Large print and other formats: [{PLACEHOLDER}]."},
         "carbon_stamp": carbon.get("stamp"),
@@ -547,6 +550,7 @@ p,li,dd,td,th{{font-size:15px}}
 svg{{width:100%;height:auto;display:block}} svg .pin{{fill:#fff;font:700 14px Inter,Arial,sans-serif}}
 svg .lab,svg .val{{fill:var(--ink);font:14px Inter,Arial,sans-serif}}
 .chartwrap{{overflow-x:auto}} .chartwrap svg{{min-width:720px}}   /* the chart's 14 px labels never scale below 14 px: it scrolls instead */
+.mapwrap{{overflow-x:auto}} .mapwrap svg{{min-width:720px}}   /* the schematic's 14 px pin letters likewise (Track C review, 12 Oct) */
 .legend{{font-size:14px;color:var(--muted);margin:6px 0}}
 .tw{{overflow-x:auto}} table{{border-collapse:collapse;width:100%}} th,td{{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line)}}
 th{{font-size:14px;color:var(--muted);font-weight:600}} td.n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
@@ -560,6 +564,7 @@ footer{{margin:28px 0 12px;font-size:14px;color:var(--muted)}}
   body{{font-size:11pt}} main{{max-width:none;padding:0}}
   .actions,.nav{{display:none}}
   h2{{break-after:avoid}} table,svg,.fig,.report{{break-inside:avoid}}
+  .chartwrap svg,.mapwrap svg{{min-width:0}}   /* on paper the page width, not a phone's scroll */
   .figs{{grid-template-columns:repeat(4,1fr)}}
   a{{color:inherit;text-decoration:none}}
 }}
@@ -575,7 +580,7 @@ footer{{margin:28px 0 12px;font-size:14px;color:var(--muted)}}
 <div class="figs" data-bulletin="headline">{head}</div>
 
 <h2>The month's routes</h2>
-{svg_map}
+<div class="mapwrap" data-bulletin="map">{svg_map}</div>
 <p class="legend">Haul routes in the plan blue: thicker = more two-way movements. Schematic, not to scale; positions
 indicative. {places}{controls_text}</p>
 
