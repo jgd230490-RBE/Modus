@@ -251,8 +251,9 @@ reset_db()
 # ...and 16 from Look-ahead v2's forecast_days (2026-09-09). Tripped again. The pin works.
 # NARROWED 12 Oct 2026: seventeen with route_sections (public map review §2.2d); the Phase 4.5
 # sixteen are still exactly the set without it.
-ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 17
-   and len(db.TENANTED_TABLES - {"route_sections"}) == 16,
+# NARROWED again 12 Oct 2026: nineteen with areas and route_area_km (public map review §2.2b, D27).
+ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 19
+   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km"}) == 16,
    f"got {len(db.TENANTED_TABLES)}")
 
 for t in sorted(db.TENANTED_TABLES):

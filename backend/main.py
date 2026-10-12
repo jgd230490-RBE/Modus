@@ -50,6 +50,7 @@ import demo_request  # H9, 8 Oct — the landing page's demo-request form: store
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
 import road_sections  # 12 Oct 2026 — shared road sections (public map review §2.2d): the index and the month read
+import areas         # 12 Oct 2026 — movements and carbon per council (public map review §2.2b, D27)
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
@@ -2094,6 +2095,43 @@ def diagnostics_road_sections(top: int = Query(10, ge=1, le=100), leg: str = Que
     if leg not in road_sections.LEGS:
         raise HTTPException(400, road_sections.leg_error())
     return road_sections.diagnostics(top=int(top), leg=leg)
+
+
+@app.get("/api/public/areas")
+def public_areas(month: int = Query(..., ge=1, le=MONTH_COUNT)):
+    """
+    12 Oct 2026 (public map review §2.2b, D27). The month per council area: two-way movements
+    a day (the approved loads of the routes whose LADEN leg enters the area ÷ working days —
+    one load = one two-way movement, never doubled), lorry-km inside, the month's CO2e split
+    by the km inside each area (the DESNZ method), the sites inside, the polygon and the
+    licence lines the map prints beside it. Behind the map gate like the rest of /api/public/.
+
+    Working days come from _working_days(), the one reader of that figure.
+    """
+    factors = conversions.load_factors()
+    return areas.area_load(int(month), working_days=_working_days(factors))
+
+
+@app.post("/api/admin/areas/import")
+def areas_import(body: dict, replace: int = 0, token: Optional[str] = None):
+    """
+    Load council boundaries for the current tenant from a GeoJSON FeatureCollection (WGS84
+    Polygons / MultiPolygons, each with an id, a name and a tier, and the dataset's licence
+    lines in `attribution`), then re-clip every route. An area with the same id is replaced;
+    replace=1 clears every area first. No external call: the file is the source.
+    """
+    _check_admin(token)
+    try:
+        return areas.import_collection(body, replace=bool(replace))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/admin/areas")
+def areas_list(token: Optional[str] = None):
+    """The tenant's council areas (no geometry) with the clip counts and which routes' laden legs enter each."""
+    _check_admin(token)
+    return areas.list_areas()
 
 
 # --------------------------------------------------------------------------- #

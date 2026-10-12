@@ -66,6 +66,33 @@
         #zone-kinds .control-item { padding:4px 2px; font-size:14px; }   /* 12 Oct fix pass: the 14 px floor on new text (was 12.5) */
         #zone-kinds .control-item + .control-item { border-top:none; }
         .zone-kind.dim label, .zone-kind.dim .color-dot { opacity:.4; }
+        /* §2.2b / D27 (12 Oct 2026): the "By council" group and its card. New text, so 14 px (the floor). */
+        #council-group .area-mode{ margin:2px 0 4px; }
+        #council-group .area-sub{ margin:6px 0 2px; }
+        #council-group h3, #council-group .control-item{ font-size:14px; }   /* the shared 13 / 13.5 px group styles, lifted to the floor for this group (Chrome, 12 Oct) */
+        #council-group [hidden]{ display:none; }   /* .kpi-switch is display:flex, which beats the hidden attribute */
+        #council-group .area-mode button{ font-size:14px; white-space:normal; }
+        #area-district-rows{ padding-left:23px; margin:0 0 4px; }
+        #area-district-rows .control-item{ padding:4px 2px; font-size:14px; }
+        #area-district-rows .control-item label{ width:auto; flex:1 1 auto; min-width:0; }   /* the name gives way to the figure (Chrome, 12 Oct) */
+        #area-district-rows .control-item + .control-item{ border-top:none; }
+        #area-district-rows .area-row.dim label, #area-district-rows .area-row.dim .area-fig{ opacity:.45; }
+        .area-fig{ flex:0 1 auto; margin-left:auto; padding-left:8px; color:var(--muted); font-size:14px; font-variant-numeric:tabular-nums; text-align:right; }   /* wraps: the panel is narrow (Chrome, 12 Oct) */
+        .area-county-fig{ padding:0 2px 4px 23px; color:var(--muted); font-size:14px; font-variant-numeric:tabular-nums; }
+        .area-county-fig:empty{ display:none; }
+        #area-legend{ padding-left:23px; margin:0 0 6px; font-size:14px; color:var(--ink); }
+        .area-legend-title{ font-size:14px; color:var(--muted); margin:2px 0 4px; line-height:1.35; }
+        .area-lg{ display:flex; align-items:center; gap:8px; font-size:14px; padding:1px 0; }
+        .area-sw{ width:14px; height:14px; border-radius:3px; flex:none; border:1px solid rgba(0,0,0,.08); }
+        .area-note{ font-size:14px; color:var(--note); line-height:1.4; padding:2px 2px; }
+        .area-note:empty{ display:none; }
+        .area-card{ font-size:14px; line-height:1.35; color:var(--ink); }
+        .area-ch{ font-weight:600; font-size:16px; }
+        .area-csub{ font-size:14px; color:var(--muted); margin:2px 0 6px; }
+        .area-cr{ display:flex; justify-content:space-between; gap:10px; padding-top:5px; border-top:1px solid var(--line); }
+        .area-cr b{ font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .area-cs{ font-size:14px; color:var(--muted); padding:1px 0 4px; }
+        .area-cf{ font-size:14px; color:var(--muted); border-top:1px solid var(--line); margin-top:4px; padding-top:6px; }
         /* 2026-10-06 — THE KPI BAR. The floating glass card (blur, shadow, 9.5 px uppercase
            labels) is gone. The glance layer is a flat white strip docked to the TOP of the
            map pane, full pane width: month on the left, six numbers, and the month's standing
@@ -476,6 +503,24 @@
         <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:12px;color:var(--note);">loading…</span></div>
     </div>
     </details>
+
+    <!-- §2.2b / D27 (12 Oct 2026): movements and carbon per council. Its OWN group and boxes, outside
+         "Disruption zones"; off by default; hidden when the tenant has loaded no council areas. The fill is
+         one hue (the plan blue) on fixed stops; the figures come from /api/public/areas. -->
+    <div class="control-group" id="council-group" hidden>
+        <h3>By council</h3>
+        <div class="control-item"><label><input type="checkbox" id="layer-areas-district" onchange="toggleAreaTier('district', this.checked)"> Local authority districts</label><span class="color-dot" style="background:#6A8BD2; border-radius:3px;"></span></div>
+        <div class="area-legend-title area-sub" id="area-mode-title">Colour the districts by</div>
+        <div class="kpi-switch area-mode" id="area-mode"></div>
+        <div id="area-district-rows" hidden></div>
+        <div id="area-legend" hidden></div>
+        <div class="area-legend-title area-sub">Highway authority</div>
+        <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:2px;"></span></div>
+        <div class="area-county-fig" id="area-county-fig"></div>
+        <div class="area-note" id="area-unitary-note"></div>
+        <div class="area-note" id="area-when"></div>
+        <div class="area-note" id="area-attribution"></div>
+    </div>
 
     <!-- Phase 2.5a — road-restriction layers from the tenant country's road authority
          (Estonia's Tark Tee; since H1 also National Highways' planned closures for
@@ -2206,6 +2251,8 @@
         // filter just removed — every filter change comes through this function.
         markRouteEnds();
         raiseMarks();
+        // §2.2b: the council areas follow the month on screen (a no-op while their boxes are off)
+        if (typeof refreshAreas === 'function') refreshAreas();
     }
 
     function resetFilters() {
@@ -2908,6 +2955,9 @@
         setupWsBoundaryPopup();
         // zones ride on style.load like everything else, so a basemap switch re-adds them
         if (ZONES.loaded) ensureZoneLayers(); else loadZones();
+        // §2.2b: the council areas ride on style.load too — re-added from the cached month, or probed once
+        setupAreaCard();
+        if (AREAS.data) { AREAS.drawn = ''; ensureAreaLayers(); renderAreas(); } else refreshAreas();
         // and so do the Tark Tee restriction layers. Already-fetched data is re-added
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
@@ -3390,6 +3440,272 @@
             return;
         }
         applyZoneMonth((typeof TL !== 'undefined' && TL.on) ? TL.month : null);
+    }
+
+    // ===== §2.2b / D27 (12 Oct 2026): movements and carbon per council =================
+    // The tenant's council boundaries (ONS districts and the county for the demo) from
+    // /api/public/areas?month=, which also does the arithmetic: per area the two-way
+    // movements a day of the routes whose LADEN leg enters it (one load = one two-way
+    // movement, never doubled), the lorry-km inside and the month's CO2e split by the km
+    // inside (the DESNZ method). This page only paints and words what the server worked
+    // out. Its OWN group and checkboxes, outside "Disruption zones"; OFF by default; the
+    // fill is ONE hue (the plan blue, D26) on FIXED stops, light to dark, drawn UNDER the
+    // routes so the routes stay on top. The licence lines ride on the source's
+    // attribution (they print with Mapbox's whenever the layer is on) and in the group.
+    const AREAS = { cache: {}, pending: {}, month: null, mode: 'movements', data: null, off: new Set(), probed: false, drawn: '' };
+    const AREA_RAMP = ['#89A3DC', '#6A8BD2', '#4A72C9', '#2D4E95'];     // the plan blue #4A72C9, one hue, light to dark; the light end 2.5:1 on white
+    const AREA_NONE = '#E7E5E4';                                         // no approved laden route, or no figure
+    const AREA_STOPS = { movements: [50, 100, 200], carbon: [50, 100, 200] };   // fixed, ascending: a day / t in the month
+    const AREA_INK = '#1F2024';
+    const AREA_LAYERS = ['area-fill', 'area-outline', 'area-label'];
+    const AREA_COUNTY_LAYERS = ['area-county-outline', 'area-county-fill', 'area-county-label'];
+    function areaFillExpr(mode) {
+        const s = AREA_STOPS[mode] || AREA_STOPS.movements;
+        // a Mapbox step: below 0.01 (none, or no figure = -1) the neutral, then the four blues
+        return ['step', ['get', 'v'], AREA_NONE, 0.01, AREA_RAMP[0], s[0], AREA_RAMP[1], s[1], AREA_RAMP[2], s[2], AREA_RAMP[3]];
+    }
+    function areaFigureText(a, mode, when) {
+        if (mode === 'carbon') {
+            if (a.co2_t === null || a.co2_t === undefined) return 'no carbon figure';
+            if (!(a.co2_t > 0)) return 'no approved route';
+            return (a.co2_t >= 10 ? Math.round(a.co2_t) : Math.round(a.co2_t * 10) / 10).toLocaleString('en-GB') + ' t CO₂e' + (when ? ' in ' + when : '');
+        }
+        if (!(a.movements_per_day > 0)) return (a.return_only_routes || []).length ? 'empties only' : 'no approved route';
+        const n = a.routes_count || 0;
+        return (a.movements_per_day >= 10 ? Math.round(a.movements_per_day) : Math.round(a.movements_per_day * 10) / 10).toLocaleString('en-GB')
+            + ' a day · ' + n + (n === 1 ? ' route' : ' routes');
+    }
+    // a district row's figure breaks only at its ' · ' ("257 a day ·" over "16 routes"), never inside a figure
+    function areaRowFigure(t) { return String(t).split(' · ').map(x => x.replace(/ /g, ' ')).join(' · '); }
+    function areaFeatures(payload, mode, off, when) {
+        const feats = [];
+        ((payload && payload.areas) || []).forEach(a => {
+            const v = mode === 'carbon' ? (a.co2_t === null || a.co2_t === undefined ? -1 : a.co2_t) : (a.movements_per_day || 0);
+            const props = { area_id: a.area_id, name: a.name, tier: a.tier, v: v, off: off.has(a.area_id),
+                            label: String(a.name || '').toUpperCase() + '\n' + areaFigureText(a, mode, when) };
+            feats.push({ type: 'Feature', geometry: a.geometry, properties: props });
+            // the label rides on ONE point inside the area (the server's label_point): a label on the polygon
+            // itself is repeated by Mapbox on every tile the polygon crosses (Chrome, 12 Oct: Harborough twice)
+            if (Array.isArray(a.label_point)) feats.push({ type: 'Feature', geometry: { type: 'Point', coordinates: a.label_point }, properties: props });
+        });
+        return { type: 'FeatureCollection', features: feats };
+    }
+    function areaLegendHTML(mode, when) {
+        const s = AREA_STOPS[mode] || AREA_STOPS.movements, t = mode === 'carbon' ? ' t' : '';
+        const rows = [['under ' + s[0] + t, AREA_RAMP[0]], [s[0] + ' – ' + (s[1] - 1) + t, AREA_RAMP[1]],
+                      [s[1] + ' – ' + (s[2] - 1) + t, AREA_RAMP[2]], [s[2] + t + ' and over', AREA_RAMP[3]],
+                      [mode === 'carbon' ? 'no approved route or no figure' : 'no approved laden route', AREA_NONE]];
+        const title = mode === 'carbon'
+            ? 't CO₂e' + (when ? ' in ' + when : ' in the month') + ', split by the km inside each district'
+            : 'Two-way movements a day on roads a laden leg uses';
+        return '<div class="area-legend-title">' + title + '</div>'
+            + rows.map(r => '<div class="area-lg"><span class="area-sw" style="background:' + r[1] + '"></span>' + r[0] + '</div>').join('');
+    }
+    function areaCardHTML(a, payload, when) {
+        const esc = s => String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        const fmt = (n, d) => (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('en-GB');
+        const tot = (payload && payload.totals) || {};
+        const sub = [a.tier_words ? a.tier_words.charAt(0).toUpperCase() + a.tier_words.slice(1) : '', a.source || '',
+                     a.highway_authority ? 'highway authority: ' + a.highway_authority : ''].filter(Boolean).map(esc).join(' · ');
+        const row = (k, v, note) => '<div class="area-cr"><span>' + k + '</span><b>' + v + '</b></div>' + (note ? '<div class="area-cs">' + note + '</div>' : '');
+        const nRoutes = (a.routes || []).length, nAll = tot.routes_with_volume || 0;
+        let h = '<div class="area-card"><div class="area-ch">' + esc(a.name) + '</div><div class="area-csub">' + sub + '</div>';
+        const carbonFirst = typeof AREAS !== 'undefined' && AREAS.mode === 'carbon';   // lead with what the map is coloured by
+        let mv = '', co = '';
+        mv += row('Two-way movements a day', a.movements_per_day > 0 ? fmt(a.movements_per_day, 1) : '0',
+                 nRoutes + ' of the ' + nAll + ' routes with approved volume' + (when ? ' in ' + esc(when) : '') + ' enter it laden'
+                 + ((a.return_only_routes || []).length ? ' · ' + a.return_only_routes.length + ' more run back through it empty' : '')
+                 + ' · one load = one two-way movement');
+        if (a.co2_t === null || a.co2_t === undefined) co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), 'no figure', 'no carbon for the routes here (not stored for the lines’ vehicle, or the read failed)');
+        else co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), fmt(a.co2_t, 1) + ' t' + (tot.co2_t ? ' of ' + fmt(tot.co2_t, 0) + ' t' : ''),
+                      fmt(a.co2_t_per_day || 0, 2) + ' t a day · split by the km inside');
+        h += carbonFirst ? co + mv : mv + co;
+        h += row('Lorry-km' + (when ? ' in ' + esc(when) : ''), fmt(a.lorry_km || 0, 0), 'laden and empty, on the km inside');
+        h += row('Sites inside', String(a.sites_count || 0) + (tot.sites ? ' of ' + tot.sites : ''), (a.sites || []).slice(0, 4).map(esc).join(' · ') + ((a.sites || []).length > 4 ? ' …' : ''));
+        h += '<div class="area-cf">Approved plan' + (when ? ' · ' + esc(when) : '') + ' · a route counts in every area its laden leg enters'
+            + ((payload && payload.carbon && payload.carbon.stamp) ? ' · ' + esc(payload.carbon.stamp) : '') + '</div></div>';
+        return h;
+    }
+    function areasMonth() {
+        if (typeof TL !== 'undefined' && TL.on && TL.month) return TL.month;
+        const cb = document.getElementById('toggle-forecast');
+        if (cb && cb.checked) return parseInt(document.getElementById('forecast-from').value) || 1;
+        const cur = (typeof currentMonthIndex === 'function') ? currentMonthIndex() : 1;
+        return Math.min(Math.max(cur, 1), CONFIG.MONTH_COUNT || 60);
+    }
+    function areaTierOn(tier) {
+        const cb = document.getElementById('layer-areas-' + tier);
+        return !!(cb && cb.checked);
+    }
+    async function fetchAreas(m) {
+        if (AREAS.cache[m]) return AREAS.cache[m];
+        if (!AREAS.pending[m]) AREAS.pending[m] = fetch(CONFIG.API_BASE + '/public/areas?month=' + m)
+            .then(r => r.ok ? r.json() : Promise.reject(r.status))
+            .then(j => { AREAS.cache[m] = j; return j; })
+            .finally(() => { delete AREAS.pending[m]; });
+        return AREAS.pending[m];
+    }
+    // the month on screen changed, or a box was ticked: fetch the month (cached) and paint it
+    function refreshAreas() {
+        const m = areasMonth();
+        if (AREAS.probed && !areaTierOn('district') && !areaTierOn('county')) return;   // off: nothing to fetch
+        fetchAreas(m).then(j => {
+            AREAS.probed = true;
+            if (m !== areasMonth()) return;            // the playhead has moved on: paint only the month on screen
+            AREAS.data = j; AREAS.month = m;
+            renderAreas();
+        }).catch(e => { AREAS.probed = true; console.warn('council areas unavailable', e); });
+    }
+    function renderAreas() {
+        const j = AREAS.data;
+        const group = document.getElementById('council-group');
+        const has = !!(j && (j.areas || []).length);
+        if (group) group.hidden = !has;                 // a tenant with no areas: no group, nothing on the map
+        if (!has) return;
+        const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
+        const key = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(',')].join('|');
+        ensureAreaLayers();
+        if (key !== AREAS.drawn && map.getSource('areas-source')) {
+            map.getSource('areas-source').setData(areaFeatures(j, AREAS.mode, AREAS.off, when));
+            if (map.getLayer('area-fill')) map.setPaintProperty('area-fill', 'fill-color', areaFillExpr(AREAS.mode));
+            AREAS.drawn = key;
+        }
+        // the group: the colour-by switch, one row per district with its own box and figure, the legend, the lines
+        const sw = document.getElementById('area-mode');
+        if (sw) sw.innerHTML = [['movements', 'Two-way movements a day'], ['carbon', 't CO₂e this month']].map(([k, l]) =>
+            '<button type="button" class="' + (AREAS.mode === k ? 'on' : '') + '" onclick="setAreaMode(\'' + k + '\')">' + l + '</button>').join('');
+        if (sw) sw.hidden = !areaTierOn('district');
+        const swT = document.getElementById('area-mode-title');
+        if (swT) swT.hidden = !areaTierOn('district');
+        const rowsEl = document.getElementById('area-district-rows');
+        if (rowsEl) {
+            const ds = j.areas.filter(a => a.tier === 'district').slice()
+                .sort((a, b) => (AREAS.mode === 'carbon' ? ((b.co2_t || 0) - (a.co2_t || 0)) : (b.movements_per_day - a.movements_per_day)) || a.name.localeCompare(b.name));
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            rowsEl.innerHTML = ds.map(a => '<div class="control-item area-row' + (AREAS.off.has(a.area_id) ? ' dim' : '') + '"><label><input type="checkbox" '
+                + (AREAS.off.has(a.area_id) ? '' : 'checked ') + 'onchange="toggleArea(\'' + esc(a.area_id).replace(/'/g, '') + '\', this.checked)"> '
+                + esc(a.name) + '</label><span class="area-fig">' + esc(areaRowFigure(areaFigureText(a, AREAS.mode, ''))) + '</span></div>').join('');
+            rowsEl.hidden = !areaTierOn('district');
+        }
+        const lg = document.getElementById('area-legend');
+        if (lg) {
+            // a district unticked by its own box has no fill and no outline: the legend says what that blank means
+            lg.innerHTML = areaLegendHTML(AREAS.mode, when) + (AREAS.off.size
+                ? '<div class="area-lg"><span class="area-sw" style="background:transparent; border:1px dashed ' + AREA_INK + '"></span>layer off (unticked above)</div>' : '');
+            lg.hidden = !areaTierOn('district');
+        }
+        // the county's own figure beside its box (one county: its figure; several: how many)
+        const counties = j.areas.filter(a => a.tier === 'county');
+        const cf = document.getElementById('area-county-fig');
+        if (cf) cf.textContent = counties.length === 1 ? areaRowFigure(counties[0].name + ' · ' + areaFigureText(counties[0], AREAS.mode, ''))
+            : (counties.length ? counties.length + ' counties' : '');
+        // the unitary note, from the data: a district whose highway authority is no county's
+        const countyHA = new Set(j.areas.filter(a => a.tier === 'county').map(a => a.highway_authority).filter(Boolean));
+        const unitary = j.areas.filter(a => a.tier === 'district' && a.highway_authority && countyHA.size && !countyHA.has(a.highway_authority)).map(a => a.name);
+        const un = document.getElementById('area-unitary-note');
+        if (un) un.textContent = unitary.length ? unitary.join(' and ') + (unitary.length === 1 ? ' is' : ' are') + ' unitary: there the district is the highway authority.' : '';
+        const at = document.getElementById('area-attribution');
+        if (at) at.textContent = (j.attribution || []).join(' · ');
+        const st = document.getElementById('area-when');
+        if (st) st.textContent = when ? 'Approved plan, ' + when + (j.totals && j.totals.routes_with_volume === 0 ? ' · nothing approved on a drawn route' : '') : '';
+    }
+    // drawn UNDER every layer of ours, so the routes, sites and zones stay on top of the fill
+    function areaBeforeId() {
+        const own = new Set(['evr-rail', 'routes-source', 'route-alts-source', 'alignment-source', 'alignment-survey-source',
+                             'chainage-source', 'ws-boundary-source', 'zones-source']);
+        let layers = [];
+        try { layers = map.getStyle().layers || []; } catch (e) { return undefined; }
+        const first = layers.find(l => l.source && own.has(l.source));
+        return first ? first.id : undefined;
+    }
+    function ensureAreaLayers() {
+        if (!AREAS.data || !(AREAS.data.areas || []).length) return;
+        if (!map.isStyleLoaded()) { map.once('idle', ensureAreaLayers); return; }
+        const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
+        if (!map.getSource('areas-source')) {
+            map.addSource('areas-source', { type: 'geojson', data: areaFeatures(AREAS.data, AREAS.mode, AREAS.off, when),
+                                            attribution: (AREAS.data.attribution || []).join(' · ') });
+            AREAS.drawn = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(',')].join('|');
+        }
+        const before = areaBeforeId();
+        const vis = areaVisibility(), dVis = vis['area-fill'], cVis = vis['area-county-outline'];
+        const district = ['all', ['==', ['get', 'tier'], 'district'], ['!', ['get', 'off']]];
+        const labelPt = ['==', ['geometry-type'], 'Point'];          // the labels read the label points only
+        if (!map.getLayer('area-fill')) map.addLayer({ id: 'area-fill', type: 'fill', source: 'areas-source', filter: district,
+            layout: { visibility: dVis }, paint: { 'fill-color': areaFillExpr(AREAS.mode), 'fill-opacity': 0.42 } }, before);
+        if (!map.getLayer('area-outline')) map.addLayer({ id: 'area-outline', type: 'line', source: 'areas-source', filter: district,
+            layout: { visibility: dVis }, paint: { 'line-color': AREA_INK, 'line-width': 1, 'line-opacity': 0.55 } }, before);
+        if (!map.getLayer('area-county-outline')) map.addLayer({ id: 'area-county-outline', type: 'line', source: 'areas-source',
+            filter: ['==', ['get', 'tier'], 'county'],
+            layout: { visibility: cVis }, paint: { 'line-color': AREA_INK, 'line-width': 2, 'line-dasharray': [3, 2] } }, before);
+        // the county's card needs something to click: a fill with no paint, on while the county box is
+        if (!map.getLayer('area-county-fill')) map.addLayer({ id: 'area-county-fill', type: 'fill', source: 'areas-source',
+            filter: ['==', ['get', 'tier'], 'county'],
+            layout: { visibility: cVis }, paint: { 'fill-color': AREA_INK, 'fill-opacity': 0 } }, before);
+        // its label only while the districts are off (with them on, their labels sit where it would)
+        if (!map.getLayer('area-county-label')) map.addLayer({ id: 'area-county-label', type: 'symbol', source: 'areas-source',
+            filter: ['all', ['==', ['get', 'tier'], 'county'], labelPt],
+            layout: { visibility: vis['area-county-label'], 'text-field': ['get', 'label'], 'text-size': 14, 'text-max-width': 14, 'symbol-placement': 'point' },
+            paint: { 'text-color': AREA_INK, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } }, before);
+        if (!map.getLayer('area-label')) map.addLayer({ id: 'area-label', type: 'symbol', source: 'areas-source', filter: district.concat([labelPt]),
+            layout: { visibility: dVis, 'text-field': ['get', 'label'], 'text-size': 14, 'text-max-width': 14, 'symbol-placement': 'point' },
+            paint: { 'text-color': AREA_INK, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } }, before);
+    }
+    // which council layer shows, from the two boxes: the county's label only while the districts are off
+    function areaVisibility() {
+        const d = areaTierOn('district'), c = areaTierOn('county'), v = b => b ? 'visible' : 'none';
+        const out = {};
+        AREA_LAYERS.forEach(l => { out[l] = v(d); });
+        AREA_COUNTY_LAYERS.forEach(l => { out[l] = v(c); });
+        out['area-county-label'] = v(c && !d);
+        return out;
+    }
+    function toggleAreaTier(tier, on) {
+        const vis = areaVisibility();
+        AREA_LAYERS.concat(AREA_COUNTY_LAYERS).forEach(l => toggleLayer(l, vis[l] === 'visible'));
+        if (on) refreshAreas(); else renderAreas();
+    }
+    // one district at a time: its fill, outline and label go; the routes stay
+    function toggleArea(id, on) {
+        if (on) AREAS.off.delete(id); else AREAS.off.add(id);
+        renderAreas();
+    }
+    function setAreaMode(mode) {
+        AREAS.mode = mode === 'carbon' ? 'carbon' : 'movements';
+        renderAreas();
+    }
+    // the card: a click on a district, or on the county where no district is drawn, when nothing of ours is on top
+    let AREA_CARD_WIRED = false;
+    function setupAreaCard() {
+        if (AREA_CARD_WIRED) return;
+        AREA_CARD_WIRED = true;
+        map.on('click', 'area-fill', (e) => {
+            if (!e.features || !e.features.length || !AREAS.data) return;
+            let above = [];
+            try { above = map.queryRenderedFeatures(e.point).filter(f => f.layer && !String(f.layer.id).startsWith('area-')
+                && f.source && f.source !== 'composite' && map.getSource(f.source) && map.getSource(f.source).type === 'geojson'); } catch (err) {}
+            if (above.length) return;                    // a route, a site or a zone answers its own click
+            const id = e.features[0].properties.area_id;
+            const a = (AREAS.data.areas || []).find(x => x.area_id === id);
+            if (!a) return;
+            const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
+            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(areaCardHTML(a, AREAS.data, when)).addTo(map);
+        });
+        map.on('mouseenter', 'area-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'area-fill', () => { map.getCanvas().style.cursor = ''; });
+        // the county (the highway authority's figure): its card where no district answers the click
+        map.on('click', 'area-county-fill', (e) => {
+            if (!e.features || !e.features.length || !AREAS.data) return;
+            let above = [];
+            try { above = map.queryRenderedFeatures(e.point).filter(f => f.layer && (f.layer.id === 'area-fill' || (!String(f.layer.id).startsWith('area-')
+                && f.source && f.source !== 'composite' && map.getSource(f.source) && map.getSource(f.source).type === 'geojson'))); } catch (err) {}
+            if (above.length) return;                    // a district, a route, a site or a zone answers its own click
+            const id = e.features[0].properties.area_id;
+            const a = (AREAS.data.areas || []).find(x => x.area_id === id);
+            if (!a) return;
+            const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
+            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(areaCardHTML(a, AREAS.data, when)).addTo(map);
+        });
     }
 
     // ===== Phase 2.5a: Google Street View =========================================
@@ -4565,6 +4881,7 @@
         // 12 Oct (D22): an empty month says so, instead of "0 routes · 0 trips".
         const lbl=document.getElementById('tl-label');
         if(lbl) lbl.textContent = count===0 ? monthLabel(m)+' · nothing approved' : monthLabel(m)+' · '+count+(count===1?' route · ':' routes · ')+Math.round(sum)+' '+unitWord(unit);
+        if(typeof refreshAreas==='function') refreshAreas();     // §2.2b: the council areas follow the playhead (cached per month)
     }
     function openTimeline(){
         TL.on=true;

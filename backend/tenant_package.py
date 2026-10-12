@@ -70,8 +70,10 @@ ORDER = [
     "ipts", "design_sections", "work_sections",
     "locations", "location_gates",
     "zones",
+    "areas",                # 12 Oct 2026 (§2.2b): the council boundaries the tenant imported
     "routes", "route_haul_roads", "route_geometry",
     "route_sections",       # 12 Oct 2026 (§2.2d): derived from route_geometry, so after it
+    "route_area_km",        # 12 Oct 2026 (§2.2b): derived from route_geometry and areas, so after both
     "forecasts", "forecast_weeks", "forecast_days",
     "stockpile_weeks",
 ]
@@ -296,7 +298,9 @@ def import_tenant(pkg, replace=False):
         pass
     # 12 Oct 2026 (§2.2d): the shared-section index is rebuilt from the geometry that
     # just arrived, so a package written before the table existed indexes on import and
-    # a package that carries the table cannot disagree with its own geometry.
+    # a package that carries the table cannot disagree with its own geometry. The same
+    # hook re-clips the routes against the package's council areas (§2.2b), so
+    # route_area_km cannot disagree with its geometry or its areas either.
     try:
         import road_sections as _road_sections
         _road_sections._rebuild_quietly("tenant import")
