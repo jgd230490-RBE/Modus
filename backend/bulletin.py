@@ -46,11 +46,10 @@ the same payload the browser gets and assert equality)
 ACCESS
 ------
 The figures are the scheme's (they are the public map's figures). A team code gets the
-same headline, routes and carbon; only the per-team rows of the breakdown are limited to
-its own team, and the page's scope note says so in those words (SCOPE_NOTE_TEAM) — the
-headline less the team's own row is the other teams' total, so the limit hides nothing a
-team code could not work out. Team ids never leave this module: `taxonomy.team_text`
-names them.
+same page as a planner: the headline, routes, carbon AND every team's breakdown row (D37,
+decided 12 Oct 2026: the per-team limit hid nothing a team code could not work out, since
+the headline less its own row is the other teams' total). The page's scope note says so
+(SCOPE_NOTE_TEAM). Team ids never leave this module: `taxonomy.team_text` names them.
 
 WHAT THIS DOES NOT DO
 ---------------------
@@ -79,8 +78,8 @@ NO_CAP_WORDING = "no planning cap typed"
 NEVER_CHECKED = "never checked"
 BUSIEST_N = 5
 SCOPE_NOTE_TEAM = ("The figures are the whole scheme's, as the public map shows them to anyone with the map "
-                   "password: the headline, the busiest routes and the discipline and section rows include "
-                   "every team. Only the per-team rows are limited to your team.")
+                   "password: the headline, the busiest routes and the discipline, section and team rows "
+                   "include every team.")
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 _MONTHS_LONG = ("January", "February", "March", "April", "May", "June", "July", "August",
@@ -601,7 +600,8 @@ def month_page(month_index, acc):
         names = {r["section_id"]: (r.get("name") or r["section_id"]) for r in taxonomy.list_work_sections()}
     except Exception:
         names = {}
-    rollup = rollup_payloads([payload], routes, wd, acc=acc, section_names=names)
+    # D37 (12 Oct 2026): the whole scheme for every code, team rows included (acc=None: no per-team limit)
+    rollup = rollup_payloads([payload], routes, wd, acc=None, section_names=names)
     rollup["months"] = [mi]
     span_from, span_to = weeks.month_span(mi)
     try:
@@ -614,11 +614,9 @@ def month_page(month_index, acc):
         "working_days": wd,
         "rollup": rollup,
         "conditions": conditions_of_month(mi, payload=payload, factors=factors),
-        # 12 Oct 2026 (the review and fix pass): the note says plainly what a team code sees.
-        # Only the per-team breakdown rows are limited; the headline, the busiest routes and the
-        # discipline and section rows are the whole scheme's — the public map's own figures,
-        # which /api/public/month-kpis gives anyone with the map password. Whether a team code
-        # should see less is the user's decision (build note, Track B review pass).
+        # 12 Oct 2026: the note says plainly what a team code sees — everything, every team's row
+        # included (D37, the user's decision: the public map's own figures, which
+        # /api/public/month-kpis gives anyone with the map password).
         "scope": {"team": taxonomy.team_name(acc.get("ipt")) if acc and acc.get("ipt") else None,
                   "note": (SCOPE_NOTE_TEAM if acc and acc.get("ipt") else None)},
         "demo_notice": tenant.get("demo_notice") or None,

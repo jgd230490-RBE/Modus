@@ -545,10 +545,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("…no seasonal window on the demo (the seed has none)", _cn["seasonal"] == [])
         r2 = c.get("/api/bulletin/month?month=10", headers=NORTH)
         pn = r2.json() if r2.status_code == 200 else {}
-        ok("⭐ the North Team code gets the SCHEME's figures (the public map's) with the per-team rows limited to its own team — "
-           "none here, the one drawn route is South Team's",
+        # REVERSED 12 Oct 2026 (D37): a team code gets every team's row too — here South Team's, the one drawn route
+        ok("⭐ the North Team code gets the SCHEME's figures (the public map's), every team's row included (D37)",
            r2.status_code == 200 and pn["rollup"]["headline"] == hl and pn["rollup"]["busiest_routes"] == _b
-           and pn["rollup"]["breakdown"]["team"] == [] and pn["scope"]["team"] == "North Team"
+           and pn["rollup"]["breakdown"]["team"] == pg["rollup"]["breakdown"]["team"] and len(pn["rollup"]["breakdown"]["team"]) == 1
+           and pn["scope"]["team"] == "North Team"
            and pn["rollup"]["breakdown"]["discipline"] == pg["rollup"]["breakdown"]["discipline"], f"{r2.status_code} {str(pn.get('scope'))}")
         # 12 Oct 2026 (C4): the bulletin as people read it, over HTTP — the PDF and the page, from the same roll-up.
         # Mapbox is never called: portable.offline() refuses the static-image fetch, so the map is the schematic.
@@ -560,7 +561,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
             _bt = pdf_text(r.content) if r.status_code == 200 else ""
             _bp = [" ".join(x.split()) for x in _bt.split("\f") if x.strip()]
             _bj = " ".join(_bt.split())
-            _figs = (f"{hl['two_way_a_day']:,.0f}", f"{hl['movements_in_month']:,.1f}", f"{hl['routes_in_use']:,}", f"{hl['tonnes']:,.0f} t")
+            # NARROWED 12 Oct 2026 (the user, evening): movements in the month print whole ("583", was "582.8")
+            _figs = (f"{hl['two_way_a_day']:,.0f}", f"{hl['movements_in_month']:,.0f}", f"{hl['routes_in_use']:,}", f"{hl['tonnes']:,.0f} t")
             ok("⭐ the bulletin PDF over HTTP: a PDF named for the month, not cached, \"fictional demo scheme\" on every page",
                r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-"
                and r.headers.get("content-disposition") == 'attachment; filename="bulletin-2026-10.pdf"'

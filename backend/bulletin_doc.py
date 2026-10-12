@@ -212,7 +212,9 @@ def sheet(month_index, acc=None, now=None):
                 (f"{n0(pr['two_way_a_day'])} a day" if pr else "none planned"))
         return {"route_id": r["route_id"], "label": r.get("label") or r["route_id"], "letters": letters_of(r),
                 "a_day": r.get("two_way_a_day"), "a_day_text": n0(r.get("two_way_a_day")),
-                "in_month_text": n1(r.get("movements_in_month")), "last_month_text": last,
+                # 12 Oct 2026 (the user, evening): a page people read prints WHOLE movements ("6,874", never
+                # "6,873.8"); the figure is still the fractional sum, rounded once for display
+                "in_month_text": n0(r.get("movements_in_month")), "last_month_text": last,
                 "cap": r.get("cap"), "flag_text": _flag_text(r),
                 "over_flag": bool(r.get("cap") is not None and (r.get("two_way_a_day") or 0) > r["cap"])}
 
@@ -226,7 +228,7 @@ def sheet(month_index, acc=None, now=None):
     headline = [
         {"key": "two_way_a_day", "value": n0(H.get("two_way_a_day")),
          "label": "two-way movements a day, all routes, approved plan"},
-        {"key": "movements_in_month", "value": n1(H.get("movements_in_month")),
+        {"key": "movements_in_month", "value": n0(H.get("movements_in_month")),
          "label": f"movements in the month ({wd_text(wd)} working days, from the scheme's settings)"},
         {"key": "routes_in_use", "value": n0(H.get("routes_in_use")) if H.get("routes_in_use") is not None else "—",
          "label": "routes in use, approved, with a stored road route"},
@@ -325,7 +327,7 @@ def sheet(month_index, acc=None, now=None):
          + two_way_sentence(wd) + " " + page["terms"]["other_schemes"]),
         ("Forecast", f"the approved plan for the month divided by its working days ({wd_text(wd)}, from the "
                      "scheme's settings): a planning figure, not a count. The month's loads are summed as typed "
-                     "(fractional), not rounded per line."),
+                     "(fractional), not rounded per line; the total is then shown to the nearest whole movement."),
         ("Vehicles needed", veh.get("rule") or ""),
         # the roll-up writes CO₂e; the view model keeps one spelling (Helvetica has no subscript two)
         # and the HTML page puts the subscript back
