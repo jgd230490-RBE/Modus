@@ -1655,7 +1655,8 @@ ok("§F4: only re-added on style.load when the checkbox is on",
 
 // ---- 2026-09-11 pm — the timeline's play speed ---------------------------------------
 ok("a play-speed select sits in the timeline bar (¼× to 4×, 1× selected by default)",
-  /<select id="tl-speed" onchange="setTimelineSpeed\(this\.value\)"/.test(html) && html.includes('<option value="1" selected>1×</option>')
+  // NARROWED 12 Oct 2026 evening (M3 bar): each option also says the seconds a month ("1× · 0.75 s a month")
+  /<select id="tl-speed" onchange="setTimelineSpeed\(this\.value\)"/.test(html) && html.includes('<option value="1" selected>1× · 0.75 s a month</option>')
   && html.includes('<option value="0.25">') && html.includes('<option value="4">'));
 ok("one step length at 1×, divided by the speed — the ONLY interval the timeline uses",
   code.includes("const TL_STEP_MS = 750;") && (code.match(/setInterval\(tickTimeline, TL_STEP_MS \/ TL\.speed\)/g) || []).length === 2
@@ -2027,21 +2028,32 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("D22: the loop runs within the span with volume; the old 1..MONTH_COUNT wrap is gone from tickTimeline",
      /function tickTimeline\(\)\{\s*const \[lo, hi\] = tlLoopBounds\(\);\s*const wrap = TL\.month >= hi \|\| TL\.month < lo;/.test(code)
      && !/TL\.month = TL\.month>=CONFIG\.MONTH_COUNT \? 1 : TL\.month\+1;/.test(code));
-  ok("D22: the planners' Full horizon switch restores 1..MONTH_COUNT, and it is a checkbox in the bar",
+  // REVERSED 12 Oct 2026 evening (M3 bar, the user: "the full horizon tick box does nothing"): the checkbox is the
+  // "Plan months / Full horizon" radio pair of mockup 3; setTimelineFull sets aria-checked on both, and the bar's
+  // opening shows the state (setTimelineFull(TL.full)); no checkbox is left
+  ok("D22 / M3: the Full horizon switch restores 1..MONTH_COUNT, and it is the 'Plan months / Full horizon' pair in the bar",
      /function tlLoopBounds\(\)\{[\s\S]{0,200}if\(TL\.full \|\| !span\) return \[1, CONFIG\.MONTH_COUNT \|\| 60\];/.test(code)
-     && /<label class="tl-full"[^>]*><input type="checkbox" id="tl-full" onchange="setTimelineFull\(this\.checked\)"> Full horizon<\/label>/.test(html)
+     && /<div class="tl-seg" role="radiogroup" aria-label="Months Play loops over">/.test(html)
+     && /<button type="button" id="tl-seg-plan" role="radio" aria-checked="true" onclick="setTimelineFull\(false\)"[^>]*>Plan months<\/button>/.test(html)
+     && /<button type="button" id="tl-seg-full" role="radio" aria-checked="false" onclick="setTimelineFull\(true\)"[^>]*>Full horizon<\/button>/.test(html)
      && /function setTimelineFull\(on\)\{\s*TL\.full = !!on;/.test(code)
-     && /const fl=document\.getElementById\('tl-full'\); if\(fl\) fl\.checked=TL\.full;/.test(code));
+     && /if\(sp\) sp\.setAttribute\('aria-checked', String\(!TL\.full\)\);\s*if\(sf\) sf\.setAttribute\('aria-checked', String\(TL\.full\)\);/.test(code)
+     && /setTimelineFull\(TL\.full\); setPauseOnClash\(TL\.pauseOnClash\);/.test(code)
+     && !html.includes('id="tl-full"') && !code.includes("getElementById('tl-full')"));
   ok("D22: playback stops once per loop on the first red month it TICKS into, panel open; the wrap re-arms it",
-     /if \(TL\.playing && TL\.ticked === month && !TL\.clashPaused && live\.some\(i => i\.lvl === 'clash'\)\) \{\s*TL\.clashPaused = true; WARN\.open = true;\s*stopTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code)
+     // NARROWED 12 Oct 2026 evening (M3 bar): only while the "Pause on clash" switch is on (absent = on)
+     /if \(TL\.playing && TL\.pauseOnClash !== false && TL\.ticked === month && !TL\.clashPaused && live\.some\(i => i\.lvl === 'clash'\)\) \{\s*TL\.clashPaused = true; WARN\.open = true;\s*stopTimeline\(monthLabel\(month\) \+ ' · playback paused: '/.test(code)
      && /if\(wrap && lo !== hi\) TL\.clashPaused = false;/.test(code) && /TL\.ticked = TL\.month;\s*setTimelineMonth\(TL\.month\);/.test(code)
      // resuming on a red month counts as this loop's pause; the month Play was pressed on can never stop it
      && /if\(WARN\.countsMonth === TL\.month && WARN\.counts\.clash > 0\) TL\.clashPaused = true;\s*TL\.ticked = null;/.test(code)
      && /WARN\.countsMonth = month;/.test(code));
   ok("D22: the auto-open-once rule and the pill are untouched by the pause",
      /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened/.test(code) && /function renderConditionsPill\(live\)/.test(code));
-  ok("D22: an empty month reads '<Month> · nothing approved', never '0 routes · 0 trips'",
-     /if\(lbl\) lbl\.textContent = count===0 \? monthLabel\(m\)\+' · nothing approved' : monthLabel\(m\)\+' · '\+count\+\(count===1\?' route · ':' routes · '\)\+Math\.round\(sum\)\+' '\+unitWord\(unit\);/.test(code)
+  // NARROWED 12 Oct 2026 evening (M3 bar): the heading is the month in full; "nothing approved" and the routes and trips
+  // moved to the line under it (TL.figsFallback, until the figures bar's own numbers land: syncTlFigs)
+  ok("D22: an empty month reads 'nothing approved this month', never '0 routes · 0 trips'",
+     /if\(lbl\) lbl\.textContent = monthLong\(m\);/.test(code)
+     && /TL\.figsFallback = count===0 \? 'nothing approved this month' : count\+\(count===1\?' route · ':' routes · '\)\+Math\.round\(sum\)\+' '\+unitWord\(unit\)\+' this month';/.test(code)
      && !/' · '\+count\+' routes · '\+Math\.round\(sum\)\+' '\+unitWord\(unit\);\s*\}/.test(code.replace(/count===0 \?[^\n]*/, "")));
   // (3) A8 — the loaded leg only
   ok("⭐ A8: the timeline label counts the LOADED leg only (one load = one two-way movement, never doubled)",
@@ -2130,8 +2142,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       contains(x) { return x === this || this.children.includes(x); } });
     const byId = {};
     for (const [id, tag] of [["timeline-bar", "DIV"], ["tl-play", "BUTTON"], ["tl-range", "INPUT"], ["tl-label", "SPAN"], ["tl-speed", "SELECT"],
-                             ["tl-full", "INPUT"], ["tl-live", "DIV"], ["map", "DIV"], ["toggle-forecast", "INPUT"]]) { byId[id] = mkEl(tag); byId[id].id = id; }
-    for (const id of ["tl-play", "tl-range", "tl-speed", "tl-full"]) byId["timeline-bar"].children.push(byId[id]);
+                             ["tl-seg-plan", "BUTTON"], ["tl-seg-full", "BUTTON"], ["tl-live", "DIV"], ["map", "DIV"], ["toggle-forecast", "INPUT"]]) { byId[id] = mkEl(tag); byId[id].id = id; }
+    for (const id of ["tl-play", "tl-range", "tl-speed", "tl-seg-plan", "tl-seg-full"]) byId["timeline-bar"].children.push(byId[id]);
     const canvas = mkEl("CANVAS"); byId["map"].children.push(canvas);
     const listeners = {};
     const document = { getElementById: id => byId[id] || null, addEventListener(t, fn) { (listeners[t] = listeners[t] || []).push(fn); } };
@@ -2168,8 +2180,19 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       TL.matrix = matrix([[9, 100], [10, 200], [12, 50]]);
       ok("the loop bounds are the span with volume [9, 12]; Full horizon makes them [1, 60]; off again restores the span",
          JSON.stringify(api.tlLoopBounds()) === "[9,12]"
-         && (api.setTimelineFull(true), JSON.stringify(api.tlLoopBounds()) === "[1,60]" && byId["tl-full"].checked === true)
-         && (api.setTimelineFull(false), JSON.stringify(api.tlLoopBounds()) === "[9,12]"));
+         // NARROWED 12 Oct 2026 evening (M3 bar): the pair says which is on (was the checkbox's `checked`)
+         && (api.setTimelineFull(true), JSON.stringify(api.tlLoopBounds()) === "[1,60]"
+             && byId["tl-seg-full"].attrs["aria-checked"] === "true" && byId["tl-seg-plan"].attrs["aria-checked"] === "false")
+         && (api.setTimelineFull(false), JSON.stringify(api.tlLoopBounds()) === "[9,12]"
+             && byId["tl-seg-full"].attrs["aria-checked"] === "false" && byId["tl-seg-plan"].attrs["aria-checked"] === "true"));
+      // 12 Oct 2026 evening (M3 bar): wall mode's hold - a tick inside TL.holdUntil leaves the month where it is
+      { const keepM = TL.month; TL.month = 10; TL.holdUntil = Date.now() + 60000; api.tickTimeline(); const held = TL.month;
+        TL.holdUntil = 0; api.tickTimeline(); const moved = TL.month; TL.month = keepM;
+        ok("⭐ M3 wall mode: a tick inside the hold leaves the month (10 stays 10); after it the loop moves on (10 to 11)", held === 10 && moved === 11, held + " " + moved); }
+      // ...and moving the month by hand starts a new loop: the once-per-loop pause is re-armed (seen live: Play from September
+      // ran through a red October because the last loop's pause was still spent)
+      { TL.clashPaused = true; api.stepTimeline(1); const a = TL.clashPaused === false; api.stopTimeline();
+        ok("⭐ M3: a step by hand re-arms the once-per-loop clash pause (it stayed spent from the last loop)", a); }
       // 12 Oct fix pass — NARROWED: it returned true without calling tlStartMonth() whenever today's month carried volume
       // (October 2026 does, in this fixture); the matrix here has no volume in today's month, whatever today is
       { const keep = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set([cur + 3, cur + 5]), span: [cur + 3, cur + 5] };
@@ -2227,19 +2250,20 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       // renderMonthFrame: loaded leg only, the empty label, and the setData guard
       calls.setData = 0; TL.full = false;
       api.renderMonthFrame(10);
+      // NARROWED 12 Oct 2026 evening (M3 bar): the heading is "October 2026"; the routes and trips are the line under it
       ok("⭐ A8: Oct 2026 labels 2 routes · 230 trips — the two return legs are not counted — and the source is sent once",
-         byId["tl-label"].textContent === "Oct 2026 · 2 routes · 230 trips" && calls.setData === 1
+         byId["tl-label"].textContent === "October 2026" && TL.figsFallback === "2 routes · 230 trips this month" && calls.setData === 1
          && features.filter(x => x.properties.is_forecast).length === 4);
       api.renderMonthFrame(10);
       ok("⭐ the same month again does not re-send the source", calls.setData === 1);
       api.renderMonthFrame(11);
-      ok("⭐ an empty month reads 'Nov 2026 · nothing approved' and sends the source once (the lines flipped off)",
-         byId["tl-label"].textContent === "Nov 2026 · nothing approved" && calls.setData === 2);
+      ok("⭐ an empty month reads 'November 2026' / 'nothing approved this month' and sends the source once (the lines flipped off)",
+         byId["tl-label"].textContent === "November 2026" && TL.figsFallback === "nothing approved this month" && calls.setData === 2);
       api.renderMonthFrame(1);
-      ok("⭐ a second empty month in a row does NOT re-send the source", calls.setData === 2 && byId["tl-label"].textContent === "Jan 2026 · nothing approved");
+      ok("⭐ a second empty month in a row does NOT re-send the source", calls.setData === 2 && byId["tl-label"].textContent === "January 2026" && TL.figsFallback === "nothing approved this month");
       api.renderMonthFrame(12);
       // 12 Oct fix pass — REVERSED: it asserted "1 routes"
-      ok("...and a month with volume after it does (R1 only: 1 route · 50 trips)", calls.setData === 3 && byId["tl-label"].textContent === "Dec 2026 · 1 route · 50 trips");
+      ok("...and a month with volume after it does (R1 only: 1 route · 50 trips)", calls.setData === 3 && byId["tl-label"].textContent === "December 2026" && TL.figsFallback === "1 route · 50 trips this month");
       // play / stop: aria-pressed, the announcer, the resume-on-a-red-month rule, the slider's valuetext
       TL.on = true; TL.month = 10; api.setTimelineMonth(10);
       ok("the slider speaks the month", byId["tl-range"].attrs["aria-valuetext"] === "Oct 2026" && byId["tl-range"].value === 10);
@@ -2568,9 +2592,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      // the desktop is untouched: the rule lives only in the stacked block
      && (html.match(/body:not\(\.sidebar-closed\) \.guide-strip/g) || []).length === 1);
   // the 14 px floor on the new text
+  // NARROWED 12 Oct 2026 evening (M3 bar): the Full horizon switch is the pair's buttons (.tl-seg button), 14 px
   ok("14 px: the zone-kind rows, the zone legend note and the Full horizon switch are 14 px (were 12.5, 12 and 11)",
      /#zone-kinds \.control-item \{ padding:4px 2px; font-size:14px; \}/.test(html)
-     && /#timeline-bar \.tl-full\{[^}]*font-size:14px;/.test(html)
+     && /\.tl-seg button\{[^}]*font:500 14px/.test(html) && !/#timeline-bar \.tl-full\{/.test(html)
      && /<span style="font-size:14px;color:var\(--note\);">amber = closure or works/.test(html)
      && !/#zone-kinds \.control-item \{[^}]*font-size:12\.5px/.test(html));
   ok("14 px: the map's new badges (over planning flag, the boxed weight/height limit) are 14 px (were 10.5 and 11.5)",
@@ -4130,6 +4155,198 @@ function qrRead(mod) {
   ok("Track C review phone: a short landscape phone (767 px or less wide, 480 px or less tall) folds the chips row into the half state and puts the figures inline",
      (() => { const i = html.indexOf("@media (max-height:480px) and (max-width:767px){"); const b = i > 0 ? html.slice(i, html.indexOf("\n        }\n", i)) : "";
               return b.includes('#m-sheet[data-state="peek"] .m-chips-row{ display:none; }') && b.includes(".m-fig b{ display:inline; font-size:20px;"); })());
+}
+
+// ===== 12 Oct 2026 (evening) — the M3 timeline bar (review §2.4, mockup 3; the user: "build full m3 bar") ==============
+// Seen live on 12 Oct before this: the "Full horizon" tick box changed nothing on screen and Play stopped on October after
+// ~6 s with nothing visible saying why. The bar is now mockup 3: row 1, the loop sentence over a bracket, the rail of every
+// month (shaded volume, closure triangle, over-capacity dot; click / drag), the years, the keys and the legend; the pause
+// message; "Pause on clash"; the "Plan months / Full horizon" pair; the seconds a month on the speed; wall mode.
+{
+  const barHtml = (() => { const i = html.indexOf('<div id="timeline-bar"'); return i > 0 ? html.slice(i, html.indexOf('<div id="route-drawer">', i)) : ""; })();
+  const order = ['class="tl-row1"', 'id="tl-label"', 'id="tl-figs"', 'id="tl-pause-clash"', 'id="tl-seg-plan"', 'id="tl-speed"', 'id="tl-wall"',
+                 'class="tl-close"', 'id="tl-looplbl"', 'id="tl-loop"', 'id="tl-rail"', 'id="tl-playhead"', 'id="tl-range"', 'id="tl-years"', 'class="tl-hints"', 'id="tl-live"'];
+  const pos = order.map(k => barHtml.indexOf(k));
+  ok("⭐ M3: the bar holds, in order, row 1 (month, figures, Pause on clash, Plan months / Full horizon, speed, Wall mode, close), the loop sentence, the bracket, the rail, the playhead, the month slider, the years, the keys, the announcer",
+     pos.every(p => p > 0) && pos.every((p, i) => i === 0 || p > pos[i - 1]), JSON.stringify(pos));
+  ok("M3: the rail's legend names its three marks; the keys are Space, the two arrows and Esc",
+     barHtml.includes('<i class="sq"></i>Approved volume') && barHtml.includes('<i class="tri"></i>Closure affecting a route') && barHtml.includes('<i class="dot"></i>Over capacity')
+     && barHtml.includes('<kbd>Space</kbd> play / pause') && barHtml.includes('<kbd>←</kbd><kbd>→</kbd> one month') && barHtml.includes('<kbd>Esc</kbd> close'));
+  ok("M3: Pause on clash is a named switch (role=switch, on by default) wired to setPauseOnClash; the speed options say the seconds a month",
+     /<input type="checkbox" id="tl-pause-clash" role="switch" checked onchange="setPauseOnClash\(this\.checked\)">/.test(barHtml) && barHtml.includes(">Pause on clash</label>")
+     && barHtml.includes('<option value="0.25">¼× · 3 s a month</option>') && barHtml.includes('<option value="4">4× · 0.2 s a month</option>'));
+  ok("M3: the rail and its marks are hidden from a screen reader; the month slider stays as the keyboard's and the reader's control",
+     /<div class="tl-rail" id="tl-rail" aria-hidden="true"/.test(barHtml) && /<div class="tl-years" id="tl-years" aria-hidden="true">/.test(barHtml)
+     && /#timeline-bar \.tl-railwrap input\[type=range\]\{ position:absolute; width:1px; height:1px;[^}]*clip:rect\(0,0,0,0\);/.test(html));
+  // the switch, stored per browser, and read by the pause
+  ok("⭐ M3: the switch is remembered in this browser (modus_tl_pause) and the clash pause happens only while it is on; wall mode dwells instead",
+     code.includes("try { if(localStorage.getItem('modus_tl_pause') === '0') TL.pauseOnClash = false; } catch(e){}")
+     && code.includes("try { localStorage.setItem('modus_tl_pause', TL.pauseOnClash ? '1' : '0'); } catch(e){}")
+     && /if \(TL\.playing && TL\.wall && TL\.ticked === month && live\.some\(i => i\.lvl === 'clash'\)\) \{ if \(typeof wallDwell === 'function'\) wallDwell\(month\); \}\s*else if \(TL\.playing && TL\.pauseOnClash !== false/.test(code));
+  ok("⭐ M3: the pause says why — the message is shown by the pause and hidden by Play, by closing the bar and by any other month",
+     /if \(typeof showClashToast === 'function'\) showClashToast\(month, live\.filter\(i => i\.lvl === 'clash'\)\);/.test(code)
+     && /TL\.ticked = null; TL\.startedOn = TL\.month;\s*if\(typeof hideClashToast === 'function'\) hideClashToast\(\);/.test(code)
+     && /renderTimelineWarnings\(null\);[^\n]*\n\s*if\(typeof hideClashToast === 'function'\) hideClashToast\(\);/.test(code)
+     && code.includes("if(typeof TOAST !== 'undefined' && TOAST.month !== m) hideClashToast();")
+     && /<div id="tl-toast" role="status" hidden>/.test(html) && html.includes('<button type="button" class="tl-act" onclick="startTimeline()">▶ Resume</button>')
+     && html.includes('onclick="stopPausingOnClash()">Stop pausing on clashes</button>')
+     && /function stopPausingOnClash\(\)\{ setPauseOnClash\(false\); startTimeline\(\); \}/.test(code));
+  ok("⭐ M3: moving the month by hand (the slider, the step buttons, a month chip, the rail) re-arms the once-per-loop pause",
+     /function onTimelineScrub\(v\)\{ stopTimeline\(\); TL\.clashPaused = false; setTimelineMonth/.test(code) && /function stepTimeline\(delta\)\{\s*stopTimeline\(\); TL\.clashPaused = false;/.test(code)
+     && /TL\.month = m; TL\.clashPaused = false;\s*if \(!TL\.on\) openTimeline\(\); else setTimelineMonth\(m\);/.test(code)
+     && code.includes("RAIL.drag = true; stopTimeline(); TL.clashPaused = false;"));
+  ok("M3: Esc on the bar closes it (the keys row says so); wall mode has its own Esc",
+     code.includes("else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); closeTimeline(); }")
+     && code.includes("if (TL.wall && e.key === 'Escape') { e.preventDefault(); exitWallMode(); }"));
+  // wall mode
+  ok("⭐ M3 wall mode: the bar's button and ?wall=1 open it; the address keeps wall=1 while it is on; leaving drops it",
+     html.includes('<button type="button" class="tl-ghost" id="tl-wall" onclick="enterWallMode()"')
+     && code.includes("if (new URLSearchParams(location.search).get('wall') === '1' && typeof enterWallMode === 'function') enterWallMode();")
+     && code.includes("if (TL.wall) out.set('wall', '1');") && /if \(q\.has\('wall'\)\) \{ q\.delete\('wall'\);/.test(code));
+  ok("⭐ M3 wall mode: chrome off — the panel, the figures bar, the conditions, the pause message, the guide, row 1 and the keys are hidden; the map takes the width",
+     ["#main-sidebar", "#menu-toggle", "#kpi-hud", "#tl-warnings", "#tl-toast", "#guide-btn", "#route-drawer", ".custom-map-widget", "#timeline-bar .tl-row1", "#timeline-bar .tl-hints", ".guide-strip"]
+       .every(sel => html.includes("body.wall-mode " + sel))
+     && html.includes("body.wall-mode #map{ left:0 !important; right:0 !important; transition:none !important; }")
+     && /body\.wall-mode #wall-hud \.m\{ font-size:64px;/.test(html));
+  ok("M3 wall mode: it dwells WALL_DWELL_MS = 3 s on a red month through a hold in tickTimeline (no third setInterval); the phone shell is left alone",
+     code.includes("const WALL_DWELL_MS = 3000;") && code.includes("if(TL.holdUntil && Date.now() < TL.holdUntil) return;")
+     && (code.match(/setInterval\(tickTimeline/g) || []).length === 2
+     && /function enterWallMode\(\)\{\s*if \(typeof isPhoneShell === 'function' && isPhoneShell\(\)\) return;/.test(code));
+  // layout
+  ok("⭐ M3: from 1024 px the bar spans the map (324 px with the panel, 24 px without, 24 px from the right; beside the text view too)",
+     html.includes('#timeline-bar[role="group"]{ left:324px; right:24px; transform:none; max-width:none; }')
+     && html.includes('body.sidebar-closed #timeline-bar[role="group"]{ left:24px; }')
+     && html.includes('body.month-text-open #timeline-bar[role="group"]{ left:324px; right:444px; }'));
+  ok("M3: the conditions panel stops above the taller bar and its rows never squash; the pause message sits above the bar at its left",
+     html.includes("body.timeline-on #tl-warnings{ max-height:min(60vh, 520px, calc(100vh - 130px - var(--tl-foot, 0px))); }")
+     && html.includes("body.timeline-on #tl-warnings > *{ flex:0 0 auto; }")
+     && /#tl-toast\{ position:absolute; z-index:26; left:324px; bottom:var\(--tl-foot, 200px\);/.test(html));
+  ok("⭐ M3: the playhead is .tl-playhead — the conditions panel's .tl-head is its own (a shared name squashed the panel's heading, seen in the browser)",
+     (html.match(/\.tl-head\{/g) || []).length === 1 && html.includes('<div class="tl-playhead" id="tl-playhead" aria-hidden="true"></div>')
+     && !/body\.wall-mode \.tl-head/.test(html));
+  ok("M3: the phone shell hides the pause message and wall mode inside its ONE 767 px block (the sheet carries the month and Play)",
+     html.includes("            #tl-toast, #wall-hud, #wall-hint{ display:none !important; }   /* M3 (12 Oct evening): the sheet carries the month and Play */"));
+  {
+    const a = html.indexOf("the M3 bar (review §2.4, mockup 3"), b = html.indexOf("===== 12 Oct 2026 — the interactivity pass");
+    const css = a > 0 && b > a ? html.slice(a, b) : "";
+    const sizes = [...css.matchAll(/font-size:(\d+(?:\.\d+)?)px/g), ...css.matchAll(/font:(?:\d+ )?(\d+(?:\.\d+)?)px/g)].map(m => Number(m[1]));
+    ok("M3: every font size in the M3 CSS is 14 px or more (the 14 px floor; the mockup used 11-13)", css.length > 2000 && sizes.length > 10 && sizes.every(n => n >= 14), JSON.stringify(sizes));
+  }
+
+  // ---- the M3 functions against a fake page --------------------------------------------------------------------
+  const mA = src.indexOf("// ===== 12 Oct 2026 (evening) — the M3 bar: the rail, the figures line");
+  const mB = src.indexOf("(function initAnalysis", mA);
+  ok("M3: the bar's functions are one block, after the conditions code and before initAnalysis", mA > 0 && mB > mA);
+  if (mA > 0 && mB > mA) {
+    const els = {};
+    const mk = id => (els[id] = { id, style: {}, innerHTML: "", textContent: "", hidden: true, children: [], scrollHeight: 18, attrs: {},
+      setAttribute(k, v) { this.attrs[k] = String(v); }, querySelector() { return null; },
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); }, toggle(c, on) { if (on) this._s.add(c); else this._s.delete(c); } } });
+    ["tl-rail", "tl-years", "tl-loop", "tl-looplbl", "tl-playhead", "tl-figs", "wall-month", "wall-figs", "wall-hint-text", "wall-hud", "wall-hint",
+     "tl-toast", "tl-toast-body", "tl-toast-show", "kpi-trips", "kpi-routes", "kpi-co2-day", "kpi-title", "kpi-hud", "timeline-bar"].forEach(mk);
+    const body = { classList: mk("body").classList };
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const CONFIG = { MONTH_COUNT: 60, START_YEAR: 2026 };
+    const monthLabel = i => names[(i - 1) % 12] + ' ' + (CONFIG.START_YEAR + Math.floor((i - 1) / 12));
+    const TL = { on: true, month: 10, full: false, wall: false, playing: false, matrix: null, figsFallback: "" };
+    const WARN = { piles: null, restr: null };
+    const calls = { start: 0, stop: 0, replace: [], shown: [] };
+    const document = { getElementById: id => els[id] || null, body, addEventListener() {} };
+    const window = { addEventListener() {} };
+    const location = { search: "?month=2026-10&wall=1", pathname: "/map/", hash: "" };
+    const history = { state: null, replaceState(s, t, u) { calls.replace.push(u); } };
+    let phone = false;
+    const f = new Function("document", "window", "location", "history", "CONFIG", "TL", "WARN", "monthLabel", "tlLoopBounds", "monthHasVolume", "hitInMonth",
+      "warnRestrictions", "warnPiles", "showCondition", "startTimeline", "stopTimeline", "setTimelineMonth", "syncTimelineFoot", "positionWarnStack",
+      "map", "scheduleViewWrite", "isPhoneShell", "getComputedStyle", "setTimeout", "monthLong",
+      src.slice(mA, mB) + "\nreturn { monthRangeText, countWord, tlRailMarks, renderTlRail, renderTlLoop, syncTlRail, syncTlFigs, showClashToast, hideClashToast, wallDwell, enterWallMode, exitWallMode, TOAST, WALL_DWELL_MS };");
+    let M = null, err = "";
+    try {
+      M = f(document, window, location, history, CONFIG, TL, WARN, monthLabel,
+            () => (TL.full || !(TL.matrix && TL.matrix.span)) ? [1, 60] : TL.matrix.span,
+            m => !!(TL.matrix && TL.matrix.volMonths.has(m)),
+            (h, m) => m === 10,
+            () => new Promise(() => {}), () => new Promise(() => {}),
+            (k, id) => calls.shown.push(k + ":" + id), () => { calls.start++; TL.playing = true; }, () => { calls.stop++; TL.playing = false; },
+            () => {}, () => {}, () => {}, { resize() {} }, () => {}, () => phone, () => ({ lineHeight: "18px" }), () => 0,
+            i => ['January','February','March','April','May','June','July','August','September','October','November','December'][(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12)));
+    } catch (e) { err = e.stack || e.message; }
+    ok("⭐ M3: the bar's block runs against a fake page", !!M, err);
+    if (M) {
+      ok("M3: month ranges read 'Sep to Dec 2026', 'Nov 2026 to Feb 2027' across a year, 'Sep – Dec 2026' for wall mode",
+         M.monthRangeText(9, 12) === "Sep to Dec 2026" && M.monthRangeText(11, 14) === "Nov 2026 to Feb 2027" && M.monthRangeText(9, 12, ' – ') === "Sep – Dec 2026"
+         && M.monthRangeText(10, 10) === "Oct 2026" && M.countWord(4) === "four" && M.countWord(24) === "24");
+      // the matrix: R1 carries Sep-Dec, R2 only Sep; a closure in force only in October (the fake hitInMonth) on BOTH
+      TL.matrix = { byRoute: { r1: { route_id: "R1", monthly: { "9": 5, "10": 5, "11": 5, "12": 5 } }, r2: { route_id: "R2", monthly: { "9": 3, "10": 0 } } },
+                    volMonths: new Set([9, 10, 11, 12]), span: [9, 12] };
+      WARN.restr = { R1: { hits: [{ from: "2026-10-16" }] }, R2: { hits: [{ from: "2026-10-16" }] } };
+      WARN.piles = [{ months: { "10": { over: true }, "11": { over: true }, "12": { over: false } } }, { months: { "9": { over: false } } }];
+      const mk1 = M.tlRailMarks();
+      ok("⭐ M3 rail marks: a closure triangle only where the closure is in force on a route carrying volume that month; a red dot where a stockpile is recorded over",
+         JSON.stringify([...mk1.cl]) === "[10]" && JSON.stringify([...mk1.oc].sort()) === "[10,11]", JSON.stringify([[...mk1.cl], [...mk1.oc]]));
+      WARN.restr = { R2: { hits: [{ from: "2026-10-16" }] } };
+      ok("M3 rail marks: ...and none for a closure on a route with nothing in that month (R2 carries 0 in October)", M.tlRailMarks().cl.size === 0);
+      WARN.restr = { R1: { hits: [{ from: "2026-10-16" }] } };
+      M.renderTlRail();
+      const cells = (els["tl-rail"].innerHTML.match(/<i /g) || []).length;
+      ok("⭐ M3 rail: one cell per month (60), a year mark each January, Sep-Dec shaded, October with all three marks",
+         cells === 60 && els["tl-rail"].innerHTML.startsWith('<i data-m="1" class="yr"></i>') && els["tl-rail"].innerHTML.includes('<i data-m="13" class="yr"></i>')
+         && els["tl-rail"].innerHTML.includes('<i data-m="9" class="vol"></i>') && els["tl-rail"].innerHTML.includes('<i data-m="10" class="vol cl oc"></i>')
+         && els["tl-rail"].innerHTML.includes('<i data-m="11" class="vol oc"></i>') && els["tl-rail"].innerHTML.includes('<i data-m="12" class="vol"></i>')
+         && els["tl-years"].innerHTML === "<span>2026</span><span>2027</span><span>2028</span><span>2029</span><span>2030</span>", cells);
+      ok("⭐ M3 loop: the bracket covers Sep-Dec (from 13.3 % for 6.7 %) and the sentence names them, the 56 others shown, not played",
+         Math.abs(parseFloat(els["tl-loop"].style.left) - 13.333) < 0.01 && Math.abs(parseFloat(els["tl-loop"].style.width) - 6.667) < 0.01
+         && els["tl-looplbl"].innerHTML === "<b>Play loops over these four months</b> — Sep to Dec 2026, the ones with approved volume. The other 56 are shown, not played.",
+         els["tl-looplbl"].innerHTML);
+      TL.full = true; M.renderTlLoop();
+      ok("⭐ M3 loop: Full horizon brackets all 60 and says how many of them have nothing approved",
+         els["tl-loop"].style.width === "100%" && els["tl-looplbl"].innerHTML === "<b>Play loops over all 60 months</b> — Jan 2026 to Dec 2030, including the 56 with nothing approved.");
+      TL.full = false; TL.wall = true; M.renderTlLoop();
+      ok("M3 loop: wall mode prints just the range, and its hint says it dwells instead of pausing",
+         els["tl-looplbl"].innerHTML === "<b>Sep – Dec 2026</b>" && els["wall-hint-text"].innerHTML === "Wall mode · loops Sep – Dec 2026<br>dwells 3 s on a clash month instead of pausing");
+      TL.wall = false;
+      const keepM = TL.matrix; TL.matrix = { byRoute: {}, volMonths: new Set(), span: null }; M.renderTlLoop();
+      ok("M3 loop: a tenant with nothing approved is told so (no bracket over nothing)", els["tl-looplbl"].innerHTML.startsWith("<b>Nothing approved yet</b>"));
+      TL.matrix = keepM; M.renderTlLoop();
+      // the figures line
+      els["kpi-trips"].textContent = "303"; els["kpi-routes"].textContent = "18"; els["kpi-co2-day"].textContent = "21.9 t"; els["kpi-title"].textContent = "Oct 2026Approved plan · forecast";
+      TL.month = 10; TL.figsFallback = "18 routes · 6664 trips this month"; M.syncTlFigs();
+      ok("⭐ M3 figures: the line under the month copies the figures bar — '303 two-way movements a day · 18 routes · 21.9 t CO₂e a day'",
+         els["tl-figs"].textContent === "303 two-way movements a day · 18 routes · 21.9 t CO₂e a day", els["tl-figs"].textContent);
+      els["kpi-title"].textContent = "Sep 2026 · loading figures"; M.syncTlFigs();
+      ok("M3 figures: ...never another month's figures: until the bar reaches this month the line is the month's routes and trips",
+         els["tl-figs"].textContent === "18 routes · 6664 trips this month");
+      TL.month = 20; M.syncTlFigs();
+      ok("M3 figures: a month with nothing approved says so", els["tl-figs"].textContent === "Nothing approved this month");
+      TL.month = 10; els["kpi-title"].textContent = "Oct 2026 · nothing approved"; M.syncTlFigs();
+      ok("M3 figures: the figures bar finding nothing in a month with volume (the filters, no stored route) reads 'Nothing approved in this view'",
+         els["tl-figs"].textContent === "Nothing approved in this view");
+      els["kpi-title"].textContent = "Oct 2026Approved plan"; els["kpi-routes"].textContent = "1"; els["kpi-co2-day"].textContent = "—"; M.syncTlFigs();
+      ok("M3 figures: one route is '1 route'; a carbon dash is left out, never printed as a figure",
+         els["tl-figs"].textContent === "303 two-way movements a day · 1 route" && els["wall-figs"].textContent === els["tl-figs"].textContent && els["wall-month"].textContent === "October 2026");
+      // the pause message
+      M.showClashToast(10, [{ noun: "Over capacity", what: "Stockpile <Tilton> 40,510 t", kind: "s", id: "N7" }]);
+      ok("⭐ M3 pause message: names the condition (escaped), shows itself, and its Show on map goes to that condition",
+         els["tl-toast"].hidden === false && els["tl-toast-body"].innerHTML === "<b>Over capacity</b> — Stockpile &lt;Tilton> 40,510 t" && M.TOAST.month === 10
+         && (els["tl-toast-show"].onclick(), calls.shown[0] === "s:N7"));
+      M.hideClashToast();
+      ok("M3 pause message: hidden again, and it belongs to no month", els["tl-toast"].hidden === true && M.TOAST.month === null);
+      TL.wall = true; M.showClashToast(10, [{ noun: "Over capacity", what: "x", kind: "s", id: "N7" }]);
+      ok("M3 pause message: never in wall mode", els["tl-toast"].hidden === true);
+      TL.wall = false;
+      // wall mode
+      const t0 = Date.now(); M.wallDwell(10); const h1 = TL.holdUntil; M.wallDwell(10); const h2 = TL.holdUntil;
+      ok("⭐ M3 wall mode: a red month holds Play for 3 s; the second build of the same month does not stretch the hold",
+         h1 >= t0 + M.WALL_DWELL_MS && h1 <= Date.now() + M.WALL_DWELL_MS && h2 === h1);
+      phone = true; M.enterWallMode();
+      ok("M3 wall mode: not on the phone shell (the sheet stays)", TL.wall === false && calls.start === 0);
+      phone = false; M.enterWallMode();
+      ok("⭐ M3 wall mode: entering sets the body class, starts Play and shows the big month", TL.wall === true && body.classList.contains("wall-mode") && calls.start === 1 && els["wall-hud"].hidden === false);
+      M.exitWallMode();
+      ok("⭐ M3 wall mode: leaving stops Play, drops the class and takes wall=1 out of the address (the month stays)",
+         TL.wall === false && !body.classList.contains("wall-mode") && calls.stop === 1 && calls.replace[0] === "/map/?month=2026-10" && els["wall-hud"].hidden === true);
+    }
+  }
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
