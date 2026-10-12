@@ -741,9 +741,11 @@ try:
     PAGE_T = main.bulletin_month(month=10)
 finally:
     access._ACCESS.reset(_tok)
-ok("⭐ a team code's page: the scheme's figures, its own team's rows only, the scope named by the tenant's label",
-   PAGE_T["rollup"]["headline"] == H and [r["key"] for r in PAGE_T["rollup"]["breakdown"]["team"]] == ["North Team"]
-   and PAGE_T["scope"]["team"] == "North Team" and "limited to your team" in PAGE_T["scope"]["note"]
+# REVERSED 12 Oct 2026 (D37, the user: "all as recommended", option (a)): a team code sees every team's row, as a planner does
+ok("⭐ a team code's page: the scheme's figures, EVERY team's rows (the planner's), the scope named by the tenant's label",
+   PAGE_T["rollup"]["headline"] == H and PAGE_T["rollup"]["breakdown"]["team"] == PAGE["rollup"]["breakdown"]["team"]
+   and len(PAGE_T["rollup"]["breakdown"]["team"]) >= 2
+   and PAGE_T["scope"]["team"] == "North Team" and "limited to your team" not in PAGE_T["scope"]["note"]
    and PAGE_T["conditions"]["restrictions"]["hits"] == PAGE["conditions"]["restrictions"]["hits"], str(PAGE_T["scope"]))
 # 12 Oct 2026 (the review and fix pass): the per-team limit hides nothing (the headline less the team's own row is the
 # other teams' total, and the busiest routes and the other rows are the scheme's) — the note says so, in plain words.
@@ -811,15 +813,17 @@ ok("⭐ the bulletin PDF: a PDF of at least two A4 pages", PDF10[:5] == b"%PDF-"
 ok("⭐ \"fictional demo scheme\" on EVERY page of the PDF (the frame draws the tenant's notice on each)",
    all("fictional demo scheme" in p.lower() for p in PAGES), str([("fictional demo scheme" in p.lower()) for p in PAGES]))
 # the four headline figures, formatted here independently of the module: the hand loads, not the roll-up
-_fig = {"two_way": f"{LOADS / WD:,.0f}", "month": f"{LOADS:,.1f}", "routes": "2", "tonnes": f"{40000 + 4400 + 1500 + 14500:,.0f} t"}
+# REVERSED 12 Oct 2026 (the user, evening): movements in the month print whole ("2,151", was "2,151.0")
+_fig = {"two_way": f"{LOADS / WD:,.0f}", "month": f"{LOADS:,.0f}", "routes": "2", "tonnes": f"{40000 + 4400 + 1500 + 14500:,.0f} t"}
 ok("⭐ page 1 carries the four headline figures equal to the roll-up: two-way a day, movements in the month, routes, tonnes",
-   _fig["two_way"] == "98" and _fig["month"] == "2,151.0" and _fig["tonnes"] == "60,400 t"
+   _fig["two_way"] == "98" and _fig["month"] == "2,151" and _fig["tonnes"] == "60,400 t"
    and all(v in PAGES[0] for v in _fig.values())
    and [f["value"] for f in S10["headline"]] == [_fig["two_way"], _fig["month"], _fig["routes"], _fig["tonnes"]],
    f"{_fig} | {[f['value'] for f in S10['headline']]}")
 ok("…each figure is the roll-up's (the sheet reads the same headline the JSON serves)",
    S10["rollup"]["headline"] == H and S10["headline"][0]["value"] == f"{H['two_way_a_day']:,.0f}"
-   and S10["headline"][1]["value"] == f"{H['movements_in_month']:,.1f}")
+   # REVERSED 12 Oct 2026 (the user, evening): whole movements on the page, rounded once from the fractional sum
+   and S10["headline"][1]["value"] == f"{H['movements_in_month']:,.0f}" and "." not in S10["headline"][1]["value"])
 ok("…the movements in the month name the working days from the scheme's settings (the roll-up's day count)",
    S10["headline"][1]["label"] == f"movements in the month ({WD:g} working days, from the scheme's settings)"
    and f"movements in the month ({WD:g}" in PAGES[0] and "working days, from the scheme's" in PAGES[0])
@@ -874,7 +878,12 @@ ok("⭐ what changed since last month is plan against plan, and says so; October
    and f"Since October 2026: Two-way movements a day 98 to {(V11) / WD:,.0f}" in T11J
    and [c["label"] for c in S10["change_rows"]] == ["September 2026", "October 2026", "November 2026 (next)"], S10["change_text"])
 ok("⭐ the D28 rule is named: the month's loads summed as typed (fractional), not rounded per line",
-   "The month's loads are summed as typed (fractional), not rounded per line." in T10J)
+   "The month's loads are summed as typed (fractional), not rounded per line" in T10J)
+ok("⭐ whole movements (12 Oct, evening): the terms say the total is shown to the nearest whole movement, and no movement "
+   "count on the page carries a decimal (the fractional sum stays in the JSON)",
+   "the total is then shown to the nearest whole movement." in T10J
+   and all("." not in r["in_month_text"] for r in S10["routes"])
+   and any(abs(r["a_day"] or 0) > 0 for r in S10["routes"]))
 ok("⭐ carbon carries the stamp: planning estimate, DESNZ 2026 basis, not Carbon Tool figures; CO2e spelled so Helvetica prints it",
    "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in T10J and "CO2e = routed km" in T10J
    and "₂" not in "".join(v for _, v in S10["terms"]) and "CO₂e = routed km" in HTML_TEXT

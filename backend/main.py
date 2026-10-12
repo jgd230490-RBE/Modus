@@ -1653,7 +1653,7 @@ def bulletin_month(month: int = Query(..., ge=1, le=MONTH_COUNT)):
     restriction hits overlapping the calendar month ("never checked" where no check is stored),
     stockpiles over at month end, the seasonal windows for the month, and typed caps exceeded
     (a "planning flag", never a block). A team code gets the scheme's figures (they are the
-    public map's) with the per-team rows limited to its own team.
+    public map's), every team's row included (D37, 12 Oct 2026).
     """
     acc = _require_access()
     return bulletin.month_page(month, acc)
