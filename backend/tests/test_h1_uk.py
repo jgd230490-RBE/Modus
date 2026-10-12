@@ -344,6 +344,22 @@ ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validate
    main.meta()["tenant"]["demo_notice"] == "Fictional demo scheme · nothing here is real"
    and config.validate(dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]), tenant={"name": "x", "demo_notice": "y" * 121})) != []
    and "demo_notice" in config.TENANT_DEFAULTS)
+# 12 Oct 2026 (map review 2.1 / 2.3): "Report a concern" on the public map writes to a TYPED tenant address. The demo
+# types none, so the map says no address has been typed; nothing invents one. One plain address or null.
+_fac = dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]))
+ok("concern_email: a tenant field defaulting to null, and the demo tenant types none (the map shows a placeholder, never an invented address)",
+   "concern_email" in config.TENANT_DEFAULTS and config.TENANT_DEFAULTS["concern_email"] is None
+   and main.meta()["tenant"]["concern_email"] is None
+   and not (_fac.get("tenant") or {}).get("concern_email"))
+ok("concern_email: validated as ONE plain address or null — a list, a query string or a bare word is refused",
+   config.validate(dict(_fac, tenant={"name": "x", "concern_email": "contact@scheme.example"})) == []
+   and config.validate(dict(_fac, tenant={"name": "x", "concern_email": None})) == []
+   and all(any("concern_email" in m for m in config.validate(dict(_fac, tenant={"name": "x", "concern_email": bad})))
+           for bad in ("not an address", "a@b.example, c@d.example", "a@b.example?cc=x@y.example", "a@b", "x" * 250 + "@b.example", 7)))
+ok("concern_email: tenant_settings serves a valid address trimmed, and drops an invalid one to null (the map then shows the placeholder)",
+   config.tenant_settings(doc={"tenant": {"concern_email": "  contact@scheme.example "}})["concern_email"] == "contact@scheme.example"
+   and config.tenant_settings(doc={"tenant": {"concern_email": "a@b.example; c@d.example"}})["concern_email"] is None
+   and config.tenant_settings(doc={})["concern_email"] is None)
 # NARROWED 11 Oct 2026 (the demo bar): the app carries the notice in the bar under its header on every view
 # (DemoBar), not in a header badge, which is gone
 ok("H2: the notice is on both exports (XLSX About row, PDF footer) and the app's demo bar under the header, and the map hides an empty rail layer",

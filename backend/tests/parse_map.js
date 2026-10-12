@@ -292,8 +292,12 @@ ok("and calculateKPIs writes to ids that are really there",
 ok("KPIs follow the timeline, not just the filters",
   /if \(typeof TL !== 'undefined' && TL\.on\) return \[TL\.month\]/.test(code));
 // §9 — the four cards
-ok("§9: the month comes from the playhead, else the Show-forecast window, else nothing",
-  /function kpiMonthsOnScreen\(\)/.test(code) && code.includes("forecast-from") && /return \[\];\s*\}/.test(code));
+// 12 Oct 2026 — REVERSED (D14, review 2.3): the From / To selects are gone; the Show-forecast window is the span of
+// months with volume (forecastWindow(), from the timeline matrix), and a month chip shows one month
+ok("§9: the month comes from the playhead, else the Show-forecast window (the span with volume, no From / To), else nothing",
+  /function kpiMonthsOnScreen\(\)/.test(code) && !code.includes("forecast-from") && !code.includes("forecast-to")
+  && /const \[f, t\] = forecastWindow\(\);/.test(code.slice(code.indexOf("function kpiMonthsOnScreen"), code.indexOf("async function kpiFetchMonth")))
+  && /return \[\];\s*\}/.test(code));
 ok("§9: figures come from /api/public/month-kpis, cached per month",
   code.includes("/public/month-kpis?month=") && /KPI\.cache\[m\] = j/.test(code));
 ok("§9: working days come from the server payload", /const wd = payloads\[0\]\.working_days \|\| 22/.test(code));
@@ -1726,8 +1730,13 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
   ok("the anchor is scrolled into view before measuring, and the card is clamped into the window (seen live: an off-screen card)",
      /el\.scrollIntoView\(\{ block: 'nearest' \}\)/.test(code) && /top = Math\.min\(Math\.max\(12, top\), Math\.max\(12, vh - 232\)\);/.test(code));
-  ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = step\.title;/.test(code)
-     && /card\.querySelector\('p'\)\.textContent = step\.body;/.test(code));
+  // 12 Oct 2026 — NARROWED (review 2.8 row 2): the words go through guideTitle() / guideBody(), which pick a step's phone
+  // words on a phone; still textContent, and the helpers return the step's own strings and nothing else
+  ok("the step text is set as textContent, never as HTML", /card\.querySelector\('h4'\)\.textContent = guideTitle\(step\);/.test(code)
+     && /card\.querySelector\('p'\)\.textContent = guideBody\(step\);/.test(code)
+     && code.includes("function guideTitle(step){ return (guideOnPhone() && step.phoneTitle) || step.title; }")
+     && code.includes("function guideBody(step){ return (guideOnPhone() && step.phoneBody) || step.body; }")
+     && !/card\.innerHTML[^;]*step\./.test(code));
   ok("🔴 no team id in the map guide's copy", !/IPT/.test(gs ? gs[0] : "x"));
 }
 // ---- 11 Oct 2026: the demo bar (the user: the map's strip and Guide "on every page") -------------------------
@@ -3205,11 +3214,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     const fmap = mkMap();
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks",
-        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl",
+        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
         blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, ROAD_LOAD_CARBON_LABEL };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
-        { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {});
+        { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
+        // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume, else the whole horizon
+        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : [1, 60]);
     } catch (e) { blkErr = e.message; }
     ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
     if (blkApi) {
@@ -3249,9 +3260,12 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       // the month
       TL.on = true; TL.matrix = null;
       ok("C1: the bar open before its matrix is read is NO month (not the default January)", B.mapModeMonth() === null);
-      TL.on = false; el("toggle-forecast").checked = true; el("forecast-from").value = "10"; el("forecast-to").value = "12";
-      ok("C1: Show forecast over three months is no month; From = To is that month",
-         B.mapModeMonth() === null && (el("forecast-to").value = "10", B.mapModeMonth() === 10));
+      // merged with C3 (D14), narrowed: From / To are gone, so the window is forecastWindow() (the span with volume)
+      TL.on = false; el("toggle-forecast").checked = true; TL.matrix = { span: [10, 12] };
+      ok("C1: Show forecast over three months is no month; a window of one month is that month (the span with volume, no From / To)",
+         B.mapModeMonth() === null && (TL.matrix = { span: [10, 10] }, B.mapModeMonth() === 10));
+      TL.matrix = null;
+      ok("C1 (merge with C3): with no matrix the window is the whole horizon, so no month", B.mapModeMonth() === null);
       el("toggle-forecast").checked = false;
       // a tick with no month opens the timeline
       el("toggle-road-load").checked = true; B.toggleRoadLoad();
@@ -3363,6 +3377,430 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       })());
     }
   }
+}
+// ==== 12 Oct 2026 — C3: the phone shell (review 2.8 row 2, mockup 7, D30) and the interactivity pass (review 2.3, D14, D29) ====
+// Source pins on the CSS and the markup, then the new script block run against a fake DOM: the month chips, the hover
+// card's words, the deep link, the QR code (decoded back by an independent reader below), "Report a concern", the text
+// view's table and the sheet's state. What this does NOT prove: anything a browser draws (checked by hand in Chrome at
+// 390 x 844, 800 and 1280 x 800 against a local server with synthetic route lines — not a real phone, not touch).
+{
+  // ---- (1) the phone shell's CSS: one block at 767 px and below, after the timeline bar's rules -----------------------
+  const secA = html.indexOf("===== 12 Oct 2026 — the interactivity pass (review 2.3, D14, D29) and the phone shell");
+  const secB = html.indexOf("/* H10 (8 Oct 2026): the map's guide");
+  const sec = secA > 0 && secB > secA ? html.slice(secA, secB) : "";
+  const shell = (sec.match(/@media \(max-width:767px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const tlNarrowAt = html.indexOf("#timeline-bar input[type=range]{ order:6; flex:1 1 60px; width:auto; }");
+  ok("C3 phone: the new CSS section exists, after the timeline bar's phone rules (so its overrides win), with ONE block at max-width:767px",
+     sec.length > 0 && shell.length > 0 && secA > tlNarrowAt && tlNarrowAt > 0 && (html.match(/@media \(max-width:767px\)/g) || []).length === 1);
+  ok("C3 phone (D30): the JS breakpoint is the CSS one — PHONE_SHELL_MQ is '(max-width:767px)' and isPhoneShell() reads it with matchMedia",
+     code.includes("const PHONE_SHELL_MQ = '(max-width:767px)';") && /function isPhoneShell\(\) \{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\(PHONE_SHELL_MQ\)\.matches\); \}/.test(code));
+  ok("C3 phone: below 768 the map is full-screen — the figures bar, the menu button, the timeline bar, the conditions panel, the drawer and the detail-table button are hidden",
+     shell.includes("#kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }"));
+  ok("C3 phone: the basemap widget is off on phones (the Layers sheet carries the basemap)",
+     shell.includes(".custom-map-widget{ display:none !important; }") && code.includes("this._container.className = 'mapboxgl-ctrl custom-map-widget';"));
+  ok("C3 phone: the shell's pieces are hidden at every other width (one rule before the block)",
+     sec.indexOf("#m-layers-btn, #m-sheet, .m-done{ display:none; }") >= 0 && sec.indexOf("#m-layers-btn, #m-sheet, .m-done{ display:none; }") < sec.indexOf("@media (max-width:767px)"));
+  ok("C3 phone: 44-48 px targets — the Layers button 48, the handle 48, Play 48, a month chip 48, the panel's selects / buttons / rows 48, the zoom buttons 44",
+     /#m-layers-btn\{ display:flex;[^}]*height:48px;/.test(shell) && /\.m-handle\{[^}]*flex:0 0 48px; height:48px;/.test(shell)
+     && /\.m-play\{ flex:0 0 48px; width:48px; height:48px;/.test(shell) && /\.month-chip\{ min-height:48px; min-width:56px;/.test(shell)
+     && /\.m-chips-row \.month-chip\{ min-width:48px;/.test(shell)
+     && shell.includes(".sidebar select, .sidebar .btn, .sidebar .fc-toggle{ min-height:48px; }") && shell.includes(".sidebar .control-item{ min-height:48px; }")
+     && shell.includes(".mapboxgl-ctrl-group button{ width:44px; height:44px; }") && /\.m-body \.tl-warn \.show, \.m-body \.tl-warn \.x\{ min-height:44px; min-width:44px;/.test(shell));
+  ok("C3 phone: the panel IS the full-screen layers sheet below 768 (full width, rises from the bottom, hidden from focus when shut), above the bottom sheet (28 over 26), under the demo strip (30)",
+     /\.sidebar\{ width:100%; border-right:none; z-index:28; transform:none; visibility:visible;/.test(shell)
+     && /\.sidebar\.closed\{ transform:translateY\(105%\); visibility:hidden;/.test(shell) && /#m-sheet\{ display:flex;[^}]*z-index:26;/.test(shell)
+     && /#demo-notice\{[^}]*z-index:30;/.test(html) && /\.m-done\{ display:flex; order:99; position:sticky;/.test(shell));
+  ok("C3 phone: the sheet's states — the body is hidden at peek and scrolls at half (about 62 % of the screen)",
+     shell.includes('#m-sheet[data-state="peek"] .m-body{ display:none; }') && /#m-sheet\[data-state="half"\]\{ height:min\(62vh,/.test(shell)
+     && /\.m-body\{ overflow:auto;/.test(shell));
+  // above 767 nothing changes: the base pins above still pass, and the section's desktop rules touch only the text view
+  const wide = (sec.match(/@media \(min-width:1024px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const wideSel = wide.split("\n").map(l => l.trim()).filter(Boolean).map(l => l.slice(0, l.indexOf("{")).trim());
+  ok("C3: above 767 the only new layout rules are the text view's (each desktop selector names #month-text or body.month-text-open)",
+     wideSel.length >= 5 && wideSel.every(s => /#month-text|body\.month-text-open/.test(s)), JSON.stringify(wideSel));
+  // the 14 px floor on everything new
+  const sizes = [...sec.matchAll(/font(?:-size)?:\s*(?:[0-9]{3}\s+)?([0-9.]+)px/g)].map(m => Number(m[1]));
+  ok("C3: the 14 px floor — every font size in the new CSS section is 14 px or more", sizes.length >= 20 && sizes.every(n => n >= 14), JSON.stringify(sizes));
+  // ---- (2) the markup ---------------------------------------------------------------------------------------------
+  ok("C3 phone: ONE Layers button, a real button that names and reports its sheet",
+     html.includes('<button type="button" id="m-layers-btn" onclick="openLayersSheet()" aria-controls="main-sidebar" aria-expanded="false">&#8779; Layers</button>')
+     && (html.match(/id="m-layers-btn"/g) || []).length === 1);
+  const sheetHtml = cut0(html, '<section id="m-sheet"', "</section>");
+  ok("C3 phone: ONE bottom sheet with a 48 px handle that toggles on a tap and carries aria-expanded (and aria-controls its body)",
+     (html.match(/<section id="m-sheet"/g) || []).length === 1 && /<section id="m-sheet" data-state="peek" aria-label="This month on the map">/.test(html)
+     && sheetHtml.includes('<button type="button" class="m-handle" id="m-handle" onclick="toggleSheet()" aria-controls="m-body" aria-expanded="false"')
+     && sheetHtml.includes('<div class="m-body" id="m-body">'));
+  ok("C3 phone: the peek is the month, the two lead figures and the conditions count; the half is the busiest routes and the conditions",
+     sheetHtml.indexOf('id="m-month"') > 0 && sheetHtml.indexOf('id="m-trips"') > sheetHtml.indexOf('id="m-month"')
+     && sheetHtml.indexOf('id="m-vehicles"') > sheetHtml.indexOf('id="m-trips"') && sheetHtml.indexOf('id="m-cond"') > sheetHtml.indexOf('id="m-vehicles"')
+     && sheetHtml.indexOf('id="m-busiest"') > sheetHtml.indexOf('id="m-body"') && sheetHtml.indexOf('id="m-conditions"') > sheetHtml.indexOf('id="m-busiest"')
+     && sheetHtml.includes(">two-way movements a day<") && sheetHtml.includes(">vehicles needed<"));
+  ok("C3 phone: the full detent is the filters and layers (sheetTo('full') opens the panel as the layers sheet)",
+     sheetHtml.includes(`onclick="sheetTo('full')">Filters and layers</button>`) && /if \(state === 'full'\) \{ openLayersSheet\(\); return; \}/.test(code));
+  ok("C3 phone: the month chips and Play sit at the BOTTOM of the sheet (the last row), Play named and pressed-state",
+     sheetHtml.lastIndexOf('class="m-chips-row"') > sheetHtml.indexOf('id="m-body"')
+     && sheetHtml.includes('<button type="button" class="m-play" id="m-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>')
+     && sheetHtml.includes('<div class="month-chips" id="m-chips" role="group" aria-label="Month"></div>'));
+  ok("C3 phone: touchPitch and dragRotate are off on a phone only — at construction, and switched with the breakpoint",
+     code.includes("touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell() });")
+     && code.includes("try { if (on) { map.touchPitch.disable(); map.dragRotate.disable(); } else { map.touchPitch.enable(); map.dragRotate.enable(); } } catch (e) {}"));
+  ok("C3 phone (D14): a tap on a route opens the route card in the sheet INSTEAD of the popup and the drawer",
+     /selectRoute\(rid\);\s*if\(typeof isPhoneShell==='function' && isPhoneShell\(\) && typeof openRouteCard==='function'\)\{ openRouteCard\(rid\); return; \}\s*const info=ROUTEINFO/.test(code));
+  ok("C3 phone: the guide works on the sheet — every step's phone anchor exists as an id, and guideAnchor tries it first on a phone",
+     ["m-peek", "m-play", "m-handle", "m-layers-btn"].every(id => html.includes(`id="${id}"`))
+     && (code.match(/phone: "(m-peek|m-play|m-handle|m-layers-btn)"/g) || []).length === 4
+     && /function guideAnchor\(step\)\{\s*if \(guideOnPhone\(\) && step\.phone\) \{/.test(code)
+     && code.includes("function guideOnPhone(){ return typeof isPhoneShell === 'function' && isPhoneShell(); }"));
+  // ---- (3) D14: the month chips replace From / To at every width ---------------------------------------------------
+  ok("C3 (D14): the From / To selects and the function that filled them are gone from the page — markup and code",
+     !/forecast-from|forecast-to|populateForecastMonths/.test(html));
+  ok("C3 (D14): the forecast box carries the month chips (desktop) and the sheet the same chips (phone); both are .month-chips groups",
+     html.includes('<div><label id="fc-chips-label">Month</label><div class="month-chips" id="fc-chips" role="group" aria-labelledby="fc-chips-label"></div></div>')
+     && /document\.querySelectorAll\('\.month-chips'\)\.forEach\(box =>/.test(code));
+  ok("C3 (D14): Show forecast routes, the route analysis and the detail table read the span with volume (forecastWindow), after the matrix",
+     /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*let \[fromM, toM\] = forecastWindow\(\);/.test(code)
+     && /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*const \[f, t\] = forecastWindow\(\);/.test(code)
+     && code.includes("return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];"));
+  // ---- (4) the hover card's plumbing --------------------------------------------------------------------------------
+  ok("C3 hover: routes-source carries generated feature ids (generateId), so a hover can set a feature-state",
+     code.includes("map.addSource('routes-source', { type: 'geojson', data: a1_data, generateId: true });")
+     && (code.match(/addSource\('routes-source'/g) || []).length === 1);
+  ok("C3 hover: the ONE mousemove handler drives the card (setRouteHover) from its own query, and the glow brightens the hovered leg by feature-state",
+     (code.match(/map\.on\('mousemove'/g) || []).length === 1
+     && code.includes("if (typeof setRouteHover === 'function') setRouteHover(features.length ? features[0] : null, e);")
+     && code.includes("'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.85, 0.6],")
+     && code.includes("map.setFeatureState({ source: 'routes-source', id: id }, { hover: true });"));
+  ok("C3 hover: the card is a tooltip outside the canvas, never on a phone or a touch-only screen, and goes when the pointer leaves the map",
+     html.includes('<div id="route-hover-card" role="tooltip" hidden></div>') && /#route-hover-card\{ display:none !important; \}/.test(shell)
+     && code.includes("if (!f || !e || !e.point || isPhoneShell() || !canHover()) { card.hidden = true; HOVER.key = ''; return; }")
+     && code.includes("if (mapEl) mapEl.addEventListener('mouseleave', () => setRouteHover(null, null));"));
+  // ---- (5) the deep link, the share card and the hooks ---------------------------------------------------------------
+  ok("C3 link: written on change — applyFilters ends with the write; a layer box or Show forecast schedules it; a stop of playback writes it",
+     /markRouteEnds\(\);\s*raiseMarks\(\);\s*if \(typeof scheduleViewWrite === 'function'\) scheduleViewWrite\(\);\s*\}/.test(code)
+     && code.includes("if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast') scheduleViewWrite();")
+     && code.includes("observeEl('tl-play', { attributes: true, attributeFilter: ['aria-pressed'] }, () => { syncPlayButtons(); if (!TL.playing) scheduleViewWrite(); });"));
+  ok("C3 link: never written during Play (Safari caps replaceState); written with history.replaceState; the app's embed / v kept in the frame, stripped from the shared link",
+     code.includes("if (!VIEW.ready || TL.playing) return;") && code.includes("try { history.replaceState(history.state, '', url); } catch (e) {}")
+     && code.includes("['embed', 'v'].forEach(k => { if (keep.has(k)) out.set(k, keep.get(k)); });")
+     && code.includes("return location.origin + location.pathname + (qs ? '?' + qs : '');"));
+  ok("C3 link: read on load — initNetwork calls onNetworkReady once the network and the filters are in, which applies the link",
+     /populateFilters\(\);\s*buildNodeMarkers\(\);\s*buildRouteInfo\(\);\s*applyFilters\(\);\s*if \(typeof onNetworkReady === 'function'\) onNetworkReady\(\);/.test(code)
+     && /function onNetworkReady\(\) \{[\s\S]{0,300}applyViewFromUrl\(\);/.test(code));
+  ok("C3 share: 'Copy link' and the share card (a dialog with the QR, the link and a polite status); the card says the link still asks for the map password",
+     /onclick="openSharePanel\(\)">Link and QR code<\/button>/.test(code) && /onclick="copyViewLink\(\)">Copy link to this view<\/button>/.test(html)
+     && html.includes('<div id="share-panel" role="dialog" aria-labelledby="share-title" hidden>') && html.includes('<div id="share-status" role="status" aria-live="polite"></div>')
+     && html.includes("It still asks for the map password."));
+  ok("C3 (D29): no PNG export — no preserveDrawingBuffer, no map canvas toDataURL, no toBlob, no download (the legend's swatch canvas is not the map)",
+     !/preserveDrawingBuffer|getCanvas\(\)\.toDataURL|toBlob|\bdownload=/.test(code + html) && (code.match(/toDataURL\(/g) || []).length === 1 && code.includes("return c.toDataURL();"));
+  ok("C3 QR: drawn in the page — no QR library, no new <script src>",
+     (html.match(/<script src=/g) || []).length === 3 && !/qrcode|qrious|kjua/i.test(html.replace(/qrSvg|qrMatrix|share-qr|QR code|QR_M_/g, "")));
+  // ---- (6) the text view and "Report a concern" ---------------------------------------------------------------------
+  ok("C3 text view: an aside beside the map, named by its heading; on the desktop the map gives it its width (the map is BESIDE it, not under it)",
+     html.includes('<aside id="month-text" aria-labelledby="mt-title" hidden>') && wide.includes("body.month-text-open #map{ right:420px; }")
+     && /<h2 id="mt-title" tabindex="-1">This month as text<\/h2>/.test(html) && code.includes("setTimeout(() => { try { map.resize(); } catch (e) {} }, 0);"));
+  ok("C3 text view: the figures are COPIED from the bar's own elements (one source), and the table's four columns are route, two-way a day, vehicles, conditions",
+     /const pairs = \[\['Two-way movements a day', txt\('kpi-trips'\)\], \[txt\('kpi-vehicles-label'\), txt\('kpi-vehicles'\)\]\];/.test(code)
+     && code.includes("pairs.push([txt('kpi-routes-label'), txt('kpi-routes')], [txt('kpi-co2-day-label'), txt('kpi-co2-day')], [txt('kpi-co2-total-label'), txt('kpi-co2-total')]);")
+     && code.includes('<th scope="col">Route</th><th scope="col" class="num">Two-way a day</th><th scope="col" class="num">Vehicles</th><th scope="col">Conditions</th>'));
+  ok("C3 text view: working days from the month's API figure, never a literal 22 in the new block",
+     code.includes("const wd = kp.working_days > 0 ? kp.working_days : FORECAST_WORKING_DAYS;") && !/\b22\b/.test(newBlockCode().replace(/const QR_M_ECC = \[[^\]]*\];/, "")));   // (the QR code's EC table is not a day count)
+  ok("C3 concern: no address is typed into the page — no mailto: with an address in the source, the address comes from TENANT.concern_email only",
+     !/mailto:[^'"?\s]*@/.test(html) && code.includes("const a = t && typeof t.concern_email === 'string' ? t.concern_email.trim() : '';")
+     && code.includes("const addr = concernAddress(TENANT);"));
+  // ---- (7) the wording of everything new ---------------------------------------------------------------------------
+  {
+    const lits = t => (t.match(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|"(?:[^"\\\n]|\\.)*"/g) || []).join(" ");
+    const readable = lits(newBlockCode()) + " " + sec + " " + sheetHtml + " " + cut0(html, '<aside id="month-text"', '<div id="map"></div>')
+      + " " + cut0(code, "<h3>Forecast traffic volume</h3>", "sidebar.insertAdjacentHTML");
+    ok("C3 wording: nothing new a person reads says truck, real-time, live tracking, telematics, AI, optimise, predict or secure; it says lorry and two-way movements",
+       readable.length > 5000 && !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(readable) && !/\bAI\b/.test(readable)
+       && /Lorry registration/.test(readable) && /two-way movements a day/.test(readable));
+    ok("C3 wording: a team is shown by its name (teamText), never its slot id — no 'IPT' in the new block's words",
+       !/IPT[1-6]/.test(lits(newBlockCode())) && (newBlockCode().match(/teamText\(/g) || []).length >= 3);
+  }
+}
+// the new script block, and a cut helper that does not need a second index
+function cut0(t, a, b) { const i = t.indexOf(a), j = t.indexOf(b, i + 1); return i >= 0 && j > i ? t.slice(i, j) : ""; }
+function newBlockSrc() { return blocks.find(b => b.includes("THE INTERACTIVITY PASS (review 2.3, D14, D29) AND THE PHONE SHELL")) || ""; }
+function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, ""); }
+
+// ---- C3: the new block, run against a fake DOM -------------------------------------------------------------------------
+{
+  const nb = newBlockSrc();
+  ok("C3: the new block is ONE inline script, the last on the page, after initAnalysis (outside every sandbox slice above)",
+     nb.length > 20000 && blocks[blocks.length - 1] === nb && src.indexOf(nb) > src.indexOf("(function initAnalysis(){"));
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const CONFIG = { MONTH_COUNT: 60, START_YEAR: 2026, FORECAST_UNIT: 'vehicles', API_BASE: '' };
+  const monthLabel = i => names[(i - 1) % 12] + ' ' + (CONFIG.START_YEAR + Math.floor((i - 1) / 12));
+  const byId = {};
+  const mkEl = (id, tag) => {
+    const el = { id, tagName: tag || 'DIV', hidden: false, dataset: {}, style: {}, attrs: {}, innerHTML: '', textContent: '', value: '', checked: false,
+      options: [], selectedIndex: 0, pressed: {}, open: false,
+      setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; }, focus() {}, addEventListener() {},
+      getBoundingClientRect() { return { left: 0, top: 0, width: 300, height: 100, right: 300, bottom: 100 }; },
+      querySelector() { return null; },
+      // chips: the buttons are read back from the markup this element was given
+      querySelectorAll(sel) { const box = this; return sel === '.month-chip' ? [...box.innerHTML.matchAll(/data-month="(\d+)"/g)].map(m => ({ dataset: { month: m[1] }, setAttribute(k, v) { box.pressed[m[1]] = v; } })) : []; },
+      dispatchEvent() { return true; } };
+    if (id) byId[id] = el;
+    return el;
+  };
+  for (const id of ['m-sheet', 'm-handle', 'm-layers-btn', 'm-month', 'm-trips', 'm-vehicles', 'm-cond', 'm-busiest', 'm-conditions', 'm-card', 'm-main',
+                    'm-play', 'kpi-title', 'kpi-trips', 'kpi-vehicles', 'kpi-busiest', 'month-text', 'toggle-forecast', 'layers-box', 'sidebar-close']) mkEl(id);
+  const chipBoxes = [mkEl('fc-chips'), mkEl('m-chips')];
+  const concernSlots = [mkEl(null), mkEl(null)];
+  const layerEls = [['layer-alignment', true], ['layer-chainage', false], ['layer-gates', true], ['layer-zones', true]].map(([id, on]) => { const e = mkEl(id, 'INPUT'); e.checked = on; return e; });
+  const sel = (id, opts) => { const e = mkEl(id, 'SELECT'); e.options = opts.map(([value, textContent]) => ({ value, textContent })); e.value = 'ALL'; return e; };
+  sel('filter-origin', [['ALL', 'All origins'], ['Brook Pit', 'Brook Pit']]); sel('filter-dest', [['ALL', 'All destinations']]);
+  sel('filter-discipline', [['ALL', 'All disciplines'], ['earthworks', 'earthworks']]); sel('filter-ipt', [['ALL', 'All teams'], ['IPT2', 'Central Team']]);
+  let sidebarOpen = false;
+  const document = {
+    getElementById: id => byId[id] || null,
+    querySelectorAll: s => s === '.month-chips' ? chipBoxes : s === '.concern-slot' ? concernSlots
+      : /layer-/.test(s) ? layerEls : [],
+    addEventListener() {}, createElement: t => mkEl(null, t), body: { appendChild() {}, classList: { add() {}, remove() {} } }, activeElement: null,
+  };
+  const TL = { on: false, playing: false, month: 1, matrix: null };
+  const WARN = { counts: { clash: 0, warn: 0, caution: 0, cap: 0 }, live: [], liveMonth: null };
+  const KPI = { cache: {} };
+  const calls = { open: 0, set: [], stop: 0, sel: [], clear: 0 };
+  const TENANT = { name: 'Wolds Link (fictional)', demo_notice: 'Fictional demo scheme · nothing here is real', concern_email: null };
+  const teamText = v => String(v).replace(/\bipt\s*[-_ ]?\s*([1-6])\b/gi, (m, n) => ({ 1: 'North Team', 2: 'Central Team', 3: 'South Team' }[n] || 'Team ' + n));
+  const fmtN = (n, d) => (Math.round(n * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toLocaleString();
+  const map = { touchPitch: { disable() {}, enable() {} }, dragRotate: { disable() {}, enable() {} }, setFeatureState() {}, getContainer: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0 }) }), resize() {} };
+  const location = { origin: 'https://app.wayscope.test', pathname: '/map/', search: '', hash: '' };
+  const history = { replaceState(s, t, u) { const q = u.indexOf('?'); location.search = q >= 0 ? u.slice(q) : ''; } };
+  const window = { matchMedia: () => ({ matches: false, addEventListener() {} }), innerWidth: 1280, innerHeight: 800 };
+  let api = null, err = '';
+  try {
+    api = new Function("document", "window", "TL", "KPI", "WARN", "CONFIG", "monthLabel", "map", "teamText", "TENANT", "fmtN", "fmtDist", "DU", "ROUTEINFO",
+      "routePropsById", "FORECAST_WORKING_DAYS", "forecastWindow", "ensureTimelineMatrix", "openTimeline", "setTimelineMonth", "stopTimeline", "tlStartMonth",
+      "applyFilters", "selectRoute", "clearSelection", "kpiFetchMonth", "sidebarIsOpen", "toggleSidebar", "closeSidebar", "isPhoneShell", "PHONE_SHELL_MQ",
+      "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout",
+      nb + "\nreturn { renderMonthChips, pickMonth, chipLabel, routeHoverView, encodeView, decodeView, monthParam, monthFromParam, layersFromChanges, shareUrl, writeView, currentView, VIEW, "
+         + "qrGfMul, qrRsDivisor, qrRsRemainder, qrFormatBits, qrVersionBits, qrMatrix, qrSvg, qrDataCodewords, qrAlignPositions, concernAddress, concernMailto, renderConcernLinks, "
+         + "monthTableRows, routeFigures, condSummary, sheetTo, toggleSheet, SHEET, CHIPS };")(
+      document, window, TL, KPI, WARN, CONFIG, monthLabel, map, teamText, TENANT, fmtN, (km) => String(km), () => 'km', {},
+      () => ({}), 21, () => [9, 12], () => Promise.resolve(TL.matrix), () => { calls.open++; TL.on = true; }, m => { calls.set.push(m); TL.month = m; },
+      () => { calls.stop++; TL.playing = false; }, () => 9, () => {}, r => calls.sel.push(r), () => { calls.clear++; }, () => Promise.resolve(null),
+      () => sidebarOpen, () => { sidebarOpen = !sidebarOpen; }, () => { sidebarOpen = false; }, () => false, '(max-width:767px)',
+      location, history, {}, () => 0, undefined, () => 0, () => {});
+  } catch (e) { err = String(e && e.stack || e); }
+  ok("C3: the new block runs against a fake DOM (every global it reads is one the page defines)", !!api, err.slice(0, 400));
+  if (api) {
+    // ---- month chips (D14) ----
+    api.renderMonthChips();
+    ok("C3 chips: before the matrix the chips say they are loading (both groups), never an empty row", chipBoxes.every(b => /Loading the months/.test(b.innerHTML)));
+    TL.matrix = { volMonths: new Set([12, 9, 10, 11]), span: [9, 12] };
+    api.renderMonthChips();
+    const chipTexts = b => [...b.innerHTML.matchAll(/>([^<]+)<\/button>/g)].map(m => m[1]);
+    ok("⭐ C3 chips: ONE chip per month with volume, in order, short names in one year, each named by its full month, in BOTH groups",
+       chipBoxes.every(b => JSON.stringify(chipTexts(b)) === '["Sep","Oct","Nov","Dec"]') && /aria-label="Oct 2026" onclick="pickMonth\(10\)"/.test(chipBoxes[0].innerHTML)
+       && (chipBoxes[1].innerHTML.match(/class="month-chip"/g) || []).length === 4, chipBoxes[0].innerHTML.slice(0, 200));
+    ok("C3 chips: with no month on screen no chip is pressed", chipBoxes.every(b => Object.values(b.pressed).every(v => v === 'false')));
+    api.pickMonth(10);
+    ok("⭐ C3 chips: a chip with the timeline shut opens it ON that month (openTimeline with TL.month already set)", calls.open === 1 && TL.month === 10 && calls.set.length === 0);
+    api.renderMonthChips();
+    ok("...and that chip, and only that chip, is pressed", chipBoxes.every(b => b.pressed['10'] === 'true' && b.pressed['9'] === 'false' && b.pressed['12'] === 'false'));
+    TL.playing = true; api.pickMonth(12);
+    ok("C3 chips: a chip during Play stops playback and shows its month", calls.stop === 1 && calls.set.join() === '12' && TL.month === 12);
+    api.pickMonth(0); api.pickMonth(61); api.pickMonth('x');
+    ok("C3 chips: a month outside the horizon is ignored", calls.set.join() === '12' && calls.open === 1);
+    ok("C3 chips: across a year end the chips carry the year", api.chipLabel(12, [12, 13]) === 'Dec 2026' && api.chipLabel(13, [12, 13]) === 'Jan 2027' && api.chipLabel(9, [9, 10]) === 'Sep');
+    TL.matrix = { volMonths: new Set(), span: null }; chipBoxes.forEach(b => { b.dataset.sig = ''; }); api.renderMonthChips();
+    ok("C3 chips: a tenant with nothing approved says so", chipBoxes.every(b => /No approved month yet/.test(b.innerHTML)));
+    TL.matrix = { volMonths: new Set([9, 10, 11, 12]), span: [9, 12] };
+    // ---- the hover card's words ----
+    const hv = api.routeHoverView({ route_id: 'R014', origin: 'Brook Pit', dest: 'Langton Compound', ipt: 'IPT2', type: 'Inbound Highway', is_forecast: true, f_avg: 35 }, 'Oct 2026', 'vehicles');
+    ok("⭐ C3 hover: the card names the route, its team by NAME and the leg, and prints the route's movements a day ONCE (one load = one two-way movement)",
+       hv.title === 'Brook Pit → Langton Compound' && hv.sub === 'R014 · Central Team · laden' && hv.fig === '35 two-way movements a day · Oct 2026'
+       && !/IPT/.test(JSON.stringify(hv)) && hv.hint === 'Click for the route analysis', JSON.stringify(hv));
+    const hvR = api.routeHoverView({ route_id: 'R014', origin: 'A', dest: 'B', ipt: 'IPT2', type: 'Outbound Highway', is_forecast: true, f_avg: 35 }, 'Oct 2026', 'vehicles');
+    ok("C3 hover: the return leg shows the SAME figure (never doubled, never 70) and says it is the empty return", hvR.fig === hv.fig && /empty return/.test(hvR.sub));
+    ok("C3 hover: no month on screen asks for one; a route with nothing approved says so; tonnes say t a day",
+       api.routeHoverView({ route_id: 'R1' }, null, 'vehicles').fig === 'Pick a month to see its movements a day'
+       && api.routeHoverView({ route_id: 'R1', is_forecast: false }, 'Oct 2026', 'vehicles').fig === 'Nothing approved on this route · Oct 2026'
+       && api.routeHoverView({ route_id: 'R1', is_forecast: true, f_avg: 120 }, 'Oct 2026', 't').fig === '120 t a day · Oct 2026'
+       && api.routeHoverView({ route_id: 'R1', ipt: 'Unknown_IPT' }, null).sub === 'R1');
+    // ---- the deep link ----
+    ok("C3 link: the month reads as YYYY-MM both ways, and a month outside the horizon or malformed is dropped",
+       api.monthParam(10) === '2026-10' && api.monthParam(13) === '2027-01' && api.monthFromParam('2026-10') === 10 && api.monthFromParam('2027-1') === 13
+       && api.monthFromParam('2025-12') === null && api.monthFromParam('2031-01') === null && api.monthFromParam('2026-13') === null && api.monthFromParam('oct') === null);
+    const defs = ['alignment', 'gates', 'zones'];
+    const enc = api.encodeView({ month: 10, layers: ['alignment', 'chainage', 'zones'], filters: { origin: 'Brook Pit', team: 'Central Team', dest: null } }, defs);
+    ok("⭐ C3 link: encode — the month, the layer CHANGES against the defaults (dots, no escaping), the filters with the team's NAME",
+       enc === 'month=2026-10&layers=chainage.-gates&filters=origin%3ABrook+Pit%7Cteam%3ACentral+Team', enc);
+    const dec = api.decodeView('?' + enc);
+    ok("⭐ C3 link: decode gives the same view back (round trip), and the layers come back as the defaults plus the changes",
+       dec.month === 10 && JSON.stringify(dec.layers) === '["chainage","-gates"]' && dec.filters.origin === 'Brook Pit' && dec.filters.team === 'Central Team'
+       && JSON.stringify(api.layersFromChanges(defs, dec.layers)) === '["alignment","chainage","zones"]', JSON.stringify(dec));
+    ok("C3 link: the default view writes no parameters at all; a closed timeline writes no month",
+       api.encodeView({ month: null, layers: defs.slice(), filters: {} }, defs) === '' && !/month=/.test(api.encodeView({ month: null, layers: ['alignment'], filters: {} }, defs)));
+    const junk = api.decodeView('?month=2026-10&layers=chainage.%3Cscript%3E.-gates&filters=origin:X|evil:Y|team:|dest');
+    ok("C3 link: unknown filter keys, empty values and a layer name that is not a plain key are dropped",
+       JSON.stringify(junk.filters) === '{"origin":"X"}' && JSON.stringify(junk.layers) === '["chainage","-gates"]', JSON.stringify(junk));
+    // the page's own state, written and shared
+    api.VIEW.defaults = ['alignment', 'gates', 'zones'];
+    TL.on = true; TL.month = 11; TL.playing = false;
+    byId['filter-ipt'].value = 'IPT2'; byId['filter-ipt'].selectedIndex = 1;
+    const cv = api.currentView();
+    ok("⭐ C3 link: the current view carries the team as the option's NAME, never the slot id", cv.filters.team === 'Central Team' && cv.month === 11 && !/IPT/.test(JSON.stringify(cv.filters)));
+    location.search = '?embed=1&v=123';
+    api.VIEW.ready = true; api.writeView();
+    ok("C3 link: written into the address with the app's embed / v kept; the shared link has neither",
+       /month=2026-11/.test(location.search) && /embed=1/.test(location.search) && /v=123/.test(location.search)
+       && api.shareUrl() === 'https://app.wayscope.test/map/?month=2026-11&filters=team%3ACentral+Team' && api.shareUrl(true) === 'https://app.wayscope.test/map/?month=2026-11');
+    const before = location.search; TL.playing = true; TL.month = 12; api.writeView();
+    ok("⭐ C3 link: nothing is written while Play runs (it would be one write a tick)", location.search === before);
+    TL.playing = false;
+    // ---- the QR code, decoded back by an independent reader ----
+    ok("C3 QR: Reed-Solomon against two published vectors (HELLO WORLD 1-M, 01234567 1-M)",
+       JSON.stringify(api.qrRsRemainder([32,91,11,120,209,114,220,77,67,64,236,17,236,17,236,17], api.qrRsDivisor(10))) === '[196,35,39,119,235,215,231,226,93,23]'
+       && JSON.stringify(api.qrRsRemainder([16,32,12,86,97,128,236,17,236,17,236,17,236,17,236,17], api.qrRsDivisor(10))) === '[165,36,212,193,237,54,199,135,44,85]');
+    ok("C3 QR: the format bits (M, mask 0 = 101010000010010), the version 7 bits (000111110010010100), the alignment centres and the data capacity of versions 1-10 (level M)",
+       api.qrFormatBits(0).toString(2).padStart(15, '0') === '101010000010010' && api.qrVersionBits(7).toString(2).padStart(18, '0') === '000111110010010100'
+       && JSON.stringify([2, 7, 10].map(api.qrAlignPositions)) === '[[6,18],[6,22,38],[6,28,50]]'
+       && [1,2,3,4,5,6,7,8,9,10].map(api.qrDataCodewords).join() === '16,28,44,64,86,108,124,154,182,216');
+    const texts = ['https://app.wayscope.co.uk/map/',
+                   'https://app.wayscope.co.uk/map/?month=2026-10&layers=chainage.-gates&filters=origin%3AKilby+Ridge+Quarry%7Cteam%3ACentral+Team',
+                   'https://app.wayscope.co.uk/map/?month=2026-10&filters=' + 'x'.repeat(150), 'Wolds Link · £ ₂'];
+    const results = texts.map(t => { const q = api.qrMatrix(t); return { t, q, back: q ? qrRead(q.modules) : { err: 'null' } }; });
+    ok("⭐ C3 QR: what is drawn decodes back to the text — finders, timing, format and version bits, every block's RS syndromes zero, byte mode",
+       results.every(r => r.back.text === r.t && r.back.version === r.q.version), JSON.stringify(results.map(r => [r.q && r.q.version, r.back.err || r.back.text.slice(0, 40)])));
+    ok("C3 QR: the versions used span 1 to 10 (a version 7+ code carries the version blocks; 10 carries a 16-bit count)",
+       results[0].q.version <= 3 && results[1].q.version >= 7 && results[2].q.version === 10, results.map(r => r.q.version).join());
+    ok("C3 QR: a link too long for version 10 returns null (the card then draws the month-only link)", api.qrMatrix('x'.repeat(214)) === null && api.qrSvg('x'.repeat(214)) === null);
+    const svg = api.qrSvg(texts[0], 220);
+    ok("C3 QR: the SVG is inline and self-contained — the quiet zone of four, crisp edges, named, no external reference",
+       /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 (\d+) \1" width="220" height="220" shape-rendering="crispEdges" role="img" aria-label="QR code for the link to this view">/.test(svg)
+       && Number(svg.match(/viewBox="0 0 (\d+)/)[1]) === results[0].q.size + 8 && !/href|<image|url\(/.test(svg));
+    // ---- Report a concern ----
+    ok("⭐ C3 concern: only a typed, plain address is used — none, a bare word, a list, a query or a header injection is refused",
+       api.concernAddress({}) === null && api.concernAddress({ concern_email: null }) === null && api.concernAddress({ concern_email: 'nope' }) === null
+       && api.concernAddress({ concern_email: 'a@b.example, c@d.example' }) === null && api.concernAddress({ concern_email: 'a@b.example?cc=x@y.example' }) === null
+       && api.concernAddress({ concern_email: ' contact@scheme.example ' }) === 'contact@scheme.example');
+    const mt = api.concernMailto('contact@scheme.example', 'Wolds Link (fictional)', 'Oct 2026', 'https://x.example/map/?month=2026-10');
+    ok("C3 concern: the mailto keeps the address, and its subject and body (date, time, place, registration, the month and the link) are encoded",
+       mt.startsWith('mailto:contact@scheme.example?subject=Report%20a%20concern%3A%20Wolds%20Link%20(fictional)&body=What%20happened%3A')
+       && /Date%3A%0ATime%3A%0APlace/.test(mt) && /Lorry%20registration/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt));
+    api.renderConcernLinks();
+    ok("⭐ C3 concern: the demo (no typed address) says so in every slot, as a placeholder — no link, no invented address",
+       concernSlots.every(s => s.innerHTML === '<span class="concern-unset">Report a concern: no contact address has been typed for this scheme (a placeholder on the fictional demo scheme).</span>'));
+    TENANT.concern_email = 'contact@scheme.example'; api.renderConcernLinks();
+    ok("C3 concern: a typed address becomes a 'Report a concern by email' link", concernSlots.every(s => /^<a class="concern-link" href="mailto:contact@scheme\.example\?subject=/.test(s.innerHTML) && />Report a concern by email<\/a>$/.test(s.innerHTML)));
+    TENANT.concern_email = null;
+    // ---- the text view's table: the bar's rules ----
+    const routes = { R1: { origin: 'Pit', dest: 'Site A', ipt: 'IPT2' }, R2: { origin: 'Pit', dest: 'Site B', ipt: 'IPT1' }, R3: { origin: 'Quarry', dest: 'Site A', ipt: 'IPT3' } };
+    const lines = [
+      { route_id: 'R1', vehicle_loads: 10.5, trips_per_vehicle_day: 4, discipline: 'earthworks' },
+      { route_id: 'R1', vehicle_loads: 10.5, trips_per_vehicle_day: 4, discipline: 'structures' },
+      { route_id: 'R2', vehicle_loads: 42, trips_per_vehicle_day: 0, discipline: 'earthworks' },
+      { route_id: 'R3', vehicle_loads: 21, trips_per_vehicle_day: 3, discipline: 'earthworks' },
+      { route_id: 'R9', vehicle_loads: 99, trips_per_vehicle_day: 3, discipline: 'earthworks' } ];
+    const all = { o: 'ALL', d: 'ALL', disc: 'ALL', i: 'ALL' };
+    const live = [{ who: 'R1', noun: 'Over a planning flag' }, { who: 'R1', noun: 'Over a planning flag' }, { who: 'Stockpile X', noun: 'Over capacity' }];
+    const tb = api.monthTableRows(lines, routes, all, 21, live);
+    const r1 = tb.rows.find(r => r.rid === 'R1'), r2 = tb.rows.find(r => r.rid === 'R2'), r3 = tb.rows.find(r => r.rid === 'R3');
+    ok("⭐ C3 text view: two-way a day = the route's loads (fractional, summed) ÷ the month's working days from the API (21 here, never 22)",
+       r1 && Math.abs(r1.twoWay - 1) < 1e-9 && Math.abs(r3.twoWay - 1) < 1e-9 && Math.abs(r2.twoWay - 2) < 1e-9, JSON.stringify(tb.rows));
+    ok("⭐ C3 text view: vehicles are ceil PER LINE (R1: two lines of 0.5 a day at 4 trips = 1 + 1 = 2, not ceil(1 / 4) = 1)", r1.vehicles === 2 && r3.vehicles === 1);
+    ok("C3 text view: a line with no stored road route is counted in the movements and named, never zeroed; a route the map does not draw is named, not counted",
+       r2.unbaked === 1 && r2.vehicles === 0 && r2.loads === 42 && JSON.stringify(tb.undrawn) === '["R9"]' && !tb.rows.some(r => r.rid === 'R9'));
+    ok("C3 text view: busiest first; each route's own conditions, once each; a site's condition is not a route's", tb.rows[0].rid === 'R2'
+       && JSON.stringify(r1.conditions) === '["Over a planning flag"]' && r2.conditions.length === 0);
+    const tbF = api.monthTableRows(lines, routes, { o: 'ALL', d: 'Site A', disc: 'earthworks', i: 'ALL' }, 21, []);
+    ok("C3 text view: the panel's filters apply as they do to the bar (destination on the route, discipline on the LINE)",
+       JSON.stringify(tbF.rows.map(r => [r.rid, r.loads])) === '[["R3",21],["R1",10.5]]', JSON.stringify(tbF.rows.map(r => [r.rid, r.loads])));
+    const fig = api.routeFigures(lines, 'R1', 21);
+    ok("C3 route card: the route's figures by the same rules (two lines, 1 two-way a day, 2 vehicles)", fig.lines === 2 && Math.abs(fig.twoWay - 1) < 1e-9 && fig.vehicles === 2 && fig.unbaked === 0);
+    // ---- the sheet ----
+    ok("C3 sheet: the conditions count is in the pill's words — a planning flag is never called a limit",
+       api.condSummary({ clash: 1, warn: 6, cap: 1, caution: 0 }) === '1 over capacity · 6 route limits · 1 route over a planning flag'
+       && api.condSummary({ cap: 2 }) === '2 routes over planning flags' && api.condSummary({}) === '');
+    api.sheetTo('peek');
+    ok("C3 sheet: at peek the handle says collapsed (aria-expanded false) and offers more", byId['m-handle'].attrs['aria-expanded'] === 'false' && byId['m-sheet'].dataset.state === 'peek'
+       && byId['m-handle'].attrs['aria-label'] === 'Show the busiest routes and conditions');
+    api.toggleSheet();
+    ok("⭐ C3 sheet: a tap on the handle raises it to half and says so (aria-expanded true)", byId['m-sheet'].dataset.state === 'half' && byId['m-handle'].attrs['aria-expanded'] === 'true'
+       && byId['m-handle'].attrs['aria-label'] === 'Show less');
+    api.toggleSheet();
+    ok("...and a second tap lowers it to peek again", byId['m-sheet'].dataset.state === 'peek' && byId['m-handle'].attrs['aria-expanded'] === 'false');
+    api.sheetTo('full');
+    ok("C3 sheet: full opens the panel as the layers sheet; the Layers button reports it", sidebarOpen === true && api.SHEET.state === 'full'
+       && byId['m-layers-btn'].attrs['aria-expanded'] === 'true' && byId['m-handle'].attrs['aria-expanded'] === 'true');
+  }
+}
+// An independent QR reader for the pins above (ISO/IEC 18004, byte mode, level M only): it finds the function modules
+// itself, reads and checks the format and version bits, unmasks, reads the codewords in the zigzag, de-interleaves the
+// blocks, requires every block's syndromes S0..S(n-1) to be zero (polynomial evaluation at alpha^i, not the encoder's
+// division) and parses the byte segment.
+function qrRead(mod) {
+  const n = mod.length, ver = (n - 17) / 4;
+  if (!Number.isInteger(ver) || ver < 1 || ver > 10) return { err: 'size ' + n };
+  const EXP = [], LOG = new Array(256).fill(0);
+  for (let i = 0, x = 1; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11D; }
+  const mul = (a, b) => (a && b) ? EXP[(LOG[a] + LOG[b]) % 255] : 0;
+  // finders and timing, read off the matrix
+  const finderOk = (cx, cy) => { for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)); if (mod[cy + dy][cx + dx] !== (d !== 2)) return false; } return true; };
+  if (!finderOk(3, 3) || !finderOk(n - 4, 3) || !finderOk(3, n - 4)) return { err: 'finder' };
+  for (let i = 8; i < n - 8; i++) if (mod[6][i] !== (i % 2 === 0) || mod[i][6] !== (i % 2 === 0)) return { err: 'timing' };
+  // format: both copies, the BCH code checked by brute force over the 32 valid words
+  const bits1 = []; for (let i = 0; i <= 5; i++) bits1.push(mod[i][8]); bits1.push(mod[7][8], mod[8][8], mod[8][7]); for (let i = 9; i < 15; i++) bits1.push(mod[8][14 - i]);
+  const bits2 = []; for (let i = 0; i < 8; i++) bits2.push(mod[8][n - 1 - i]); for (let i = 8; i < 15; i++) bits2.push(mod[n - 15 + i][8]);
+  const word = b => b.reduce((a, bit, i) => a | ((bit ? 1 : 0) << i), 0);
+  const w1 = word(bits1), w2 = word(bits2);
+  if (w1 !== w2) return { err: 'format copies differ' };
+  let fmt = null;
+  for (let d = 0; d < 32; d++) { let r = d; for (let i = 0; i < 10; i++) r = (r << 1) ^ ((r >> 9) * 0x537); if ((((d << 10) | r) ^ 0x5412) === w1) fmt = d; }
+  if (fmt === null) return { err: 'format bch' };
+  if ((fmt >> 3) !== 0) return { err: 'level is not M' };
+  const mask = fmt & 7;
+  if (!mod[n - 8][8]) return { err: 'dark module' };
+  // version blocks (7+), both copies, BCH(18,6)
+  if (ver >= 7) {
+    let vb = 0, vb2 = 0; for (let i = 0; i < 18; i++) { const a = n - 11 + i % 3, c = Math.floor(i / 3); if (mod[c][a]) vb |= 1 << i; if (mod[a][c]) vb2 |= 1 << i; }
+    let r = ver; for (let i = 0; i < 12; i++) r = (r << 1) ^ ((r >> 11) * 0x1F25);
+    if (vb !== vb2 || vb !== ((ver << 12) | r)) return { err: 'version bits' };
+  }
+  // the function modules, worked out again here
+  const fn = Array.from({ length: n }, () => new Array(n).fill(false));
+  const box = (x0, y0, x1, y1) => { for (let y = Math.max(0, y0); y <= Math.min(n - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(n - 1, x1); x++) fn[y][x] = true; };
+  box(0, 0, 8, 8); box(n - 8, 0, n - 1, 8); box(0, n - 8, 8, n - 1);           // finders, separators, format
+  for (let i = 0; i < n; i++) { fn[6][i] = true; fn[i][6] = true; }            // timing
+  if (ver >= 2) {
+    const k = Math.floor(ver / 7) + 2, last = n - 7, pos = [6];
+    const step = Math.ceil((last - 6) / (k - 1) / 2) * 2;                         // the spec's table, by its rule: even steps, packed to the far end
+    for (let p = last; pos.length < k; p -= step) pos.splice(1, 0, p);
+    for (const ay of pos) for (const ax of pos) { if ((ax === 6 && ay === 6) || (ax === 6 && ay === last) || (ax === last && ay === 6)) continue; box(ax - 2, ay - 2, ax + 2, ay + 2); }
+  }
+  if (ver >= 7) { box(n - 11, 0, n - 9, 5); box(0, n - 11, 5, n - 9); }
+  const M = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+             (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0,
+             (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0][mask];
+  const stream = [];
+  for (let right = n - 1, upward = true; right >= 1; right -= 2, upward = !upward) {
+    if (right === 6) right = 5;
+    for (let k = 0; k < n; k++) { const y = upward ? n - 1 - k : k; for (const x of [right, right - 1]) if (!fn[y][x]) stream.push(mod[y][x] !== M(x, y) ? 1 : 0); }
+  }
+  // de-interleave (level M: EC per block and block count for versions 1-10)
+  const ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26][ver], NB = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5][ver];
+  const total = Math.floor(stream.length / 8), cw = [];
+  for (let i = 0; i < total; i++) { let b = 0; for (let j = 0; j < 8; j++) b = (b << 1) | stream[i * 8 + j]; cw.push(b); }
+  const nLong = total % NB, shortData = Math.floor(total / NB) - ECC;
+  const blocks = Array.from({ length: NB }, (_, i) => ({ data: [], ecc: [], len: shortData + (i >= NB - nLong ? 1 : 0) }));
+  let p = 0;
+  for (let i = 0; i < shortData + 1; i++) for (const b of blocks) if (i < b.len) b.data.push(cw[p++]);
+  for (let i = 0; i < ECC; i++) for (const b of blocks) b.ecc.push(cw[p++]);
+  for (const b of blocks) {
+    const c = b.data.concat(b.ecc);
+    for (let i = 0; i < ECC; i++) { let s = 0; const a = EXP[i]; for (const v of c) s = mul(s, a) ^ v; if (s !== 0) return { err: 'syndrome' }; }
+  }
+  const data = [].concat(...blocks.map(b => b.data));
+  let bit = 0; const rd = k => { let v = 0; for (let i = 0; i < k; i++) { v = (v << 1) | ((data[bit >> 3] >> (7 - (bit & 7))) & 1); bit++; } return v; };
+  if (rd(4) !== 4) return { err: 'not byte mode' };
+  const len = rd(ver < 10 ? 8 : 16), bytes = [];
+  for (let i = 0; i < len; i++) bytes.push(rd(8));
+  return { version: ver, mask, text: Buffer.from(bytes).toString('utf8') };
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

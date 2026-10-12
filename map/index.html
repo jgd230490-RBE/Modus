@@ -372,6 +372,117 @@
             #timeline-bar .tl-btn{ order:5; }
             #timeline-bar input[type=range]{ order:6; flex:1 1 60px; width:auto; }
         }
+        /* ===== 12 Oct 2026 — the interactivity pass (review 2.3, D14, D29) and the phone shell (review 2.8 row 2,
+           mockup 7, D30). Every font size in this section is 14 px or more (the staff bar's floor).
+           Desktop first: the month chips (they replace the From/To selects), the hover card on a route, the text view
+           of the month beside the map, the share card (link + QR). */
+        .month-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+        .month-chip{ border:1px solid #D6D3D1; background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
+                     font:500 14px/1.2 Inter,system-ui,sans-serif; cursor:pointer; white-space:nowrap; }
+        .month-chip:hover{ border-color:var(--navy); }
+        .month-chip[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
+        .month-chips .chips-none{ font-size:14px; color:var(--note); }
+        .share-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+        .share-row .btn{ flex:1 1 auto; width:auto; }
+        .concern-link{ display:block; margin-top:8px; font-size:14px; font-weight:500; color:var(--navy); }
+        .concern-unset{ display:block; margin-top:8px; font-size:14px; color:var(--note); line-height:1.45; }
+        #route-hover-card{ position:fixed; z-index:35; pointer-events:none; max-width:300px; background:#fff; border:1px solid var(--line);
+                           border-radius:10px; box-shadow:0 8px 28px rgba(16,24,40,.14); padding:10px 12px; font:14px/1.4 Inter,system-ui,sans-serif; color:var(--ink); }
+        #route-hover-card[hidden]{ display:none; }
+        #route-hover-card .hc-title{ display:block; font-weight:600; color:var(--navy-deep); }
+        #route-hover-card .hc-sub, #route-hover-card .hc-hint{ display:block; color:var(--muted); }
+        #route-hover-card .hc-fig{ display:block; font-weight:600; color:var(--navy-deep); margin-top:4px; }
+        /* the month as text, BESIDE the map (desktop: the map gives up the panel's width; a tablet: over the map's right) */
+        #month-text{ position:absolute; top:0; right:0; bottom:0; width:min(420px, 100vw); z-index:27; background:#fff; border-left:1px solid var(--line);
+                     display:flex; flex-direction:column; font-size:14px; line-height:1.45; color:var(--ink); }
+        #month-text[hidden]{ display:none; }
+        .mt-head{ display:flex; align-items:center; gap:8px; padding:12px 12px 10px 18px; border-bottom:1px solid var(--line); }
+        .mt-head h2{ margin:0; font-size:16px; font-weight:600; color:var(--navy-deep); flex:1; }
+        .mt-close, .share-close{ width:44px; height:44px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; flex:0 0 auto; }
+        .mt-body{ overflow:auto; padding:12px 18px 18px; }
+        .mt-body p{ margin:0 0 10px; font-size:14px; }
+        .mt-figs{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:0 0 14px; }
+        .mt-figs dt{ font-size:14px; color:var(--muted); } .mt-figs dd{ margin:0; font-size:14px; font-weight:600; text-align:right; color:var(--navy-deep); font-variant-numeric:tabular-nums; }
+        table.mt-table{ border-collapse:collapse; width:100%; font-size:14px; }
+        table.mt-table caption{ text-align:left; font-weight:600; color:var(--navy-deep); padding:4px 0 8px; font-size:14px; }
+        table.mt-table th, table.mt-table td{ padding:7px 6px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; }
+        table.mt-table th{ font-weight:600; color:var(--muted); }
+        table.mt-table td.num, table.mt-table th.num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .mt-note{ color:var(--note); font-size:14px; }
+        @media (min-width:1024px){
+            body.has-demo-notice #month-text{ top:26px; }
+            body.month-text-open #map{ right:420px; }
+            body.month-text-open #kpi-hud{ right:420px; }
+            body.month-text-open #tl-warnings{ right:432px; }
+            body.month-text-open #timeline-bar{ left:calc(50% + 150px - 210px); }
+            body.month-text-open.sidebar-closed #timeline-bar{ left:calc(50% - 210px); }
+        }
+        @media (max-width:1023px){ body.has-demo-notice #month-text{ top:var(--notice-h, 26px); } }
+        #share-panel{ position:fixed; z-index:40; left:50%; top:50%; transform:translate(-50%, -50%); width:min(340px, calc(100vw - 24px));
+                      max-height:calc(100vh - 24px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:12px;
+                      box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
+        #share-panel[hidden]{ display:none; }
+        #share-panel .share-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+        #share-panel .share-head b{ flex:1; font-size:16px; color:var(--navy-deep); }
+        #share-qr{ display:flex; justify-content:center; margin:6px 0 10px; }
+        #share-qr svg{ width:220px; height:220px; }
+        #share-url{ width:100%; font:14px Inter,system-ui,sans-serif; padding:8px 10px; border:1px solid #D6D3D1; border-radius:6px; color:var(--ink); }
+        #share-status{ min-height:20px; font-size:14px; color:var(--green); margin-top:6px; }
+        /* ---- the PHONE SHELL (D30: the sheet at 767 and below; the stacked bar stays for 768-1023; 1024 and up unchanged) ----
+           A full-screen map, one Layers button, one bottom sheet (peek: the month, the two lead figures, the conditions
+           count; half: busiest routes and conditions; full: the filters and layers, which is the panel opened as a
+           full-screen sheet) with a 48 px handle, the month chips and Play at the bottom, a route card instead of the
+           drawer, 44-48 px targets. */
+        #m-layers-btn, #m-sheet, .m-done{ display:none; }
+        @media (max-width:767px){
+            #kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }
+            .custom-map-widget{ display:none !important; }   /* the basemap widget is off on phones; the Layers sheet has the basemap */
+            .mapboxgl-ctrl-top-right{ top:calc(var(--notice-h, 0px) + 64px) !important; }
+            .mapboxgl-ctrl-group button{ width:44px; height:44px; }
+            #m-layers-btn{ display:flex; align-items:center; gap:8px; position:absolute; left:12px; top:12px; z-index:27; height:48px; padding:0 18px;
+                           border:1px solid var(--line); border-radius:24px; background:#fff; color:var(--navy-deep); font:600 15px Inter,system-ui,sans-serif;
+                           box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
+            body.has-demo-notice #m-layers-btn{ top:calc(var(--notice-h, 26px) + 10px); }
+            /* the panel IS the full-screen layers sheet: it rises from the bottom, under the demo strip */
+            .sidebar{ width:100%; border-right:none; z-index:28; transform:none; visibility:visible; transition:transform .25s ease, visibility 0s; }
+            .sidebar.closed{ transform:translateY(105%); visibility:hidden; transition:transform .25s ease, visibility 0s .25s; }
+            .sidebar select, .sidebar .btn, .sidebar .fc-toggle{ min-height:48px; }
+            .sidebar .control-item{ min-height:48px; }
+            .sidebar .control-item input[type=checkbox]{ width:20px; height:20px; }
+            .sidebar .busy-row, .sidebar .kpi-chip{ min-height:48px; align-items:center; }
+            .month-chip{ min-height:48px; min-width:56px; padding:0 14px; }
+            .m-done{ display:flex; order:99; position:sticky; bottom:-24px; margin:auto -18px -24px; padding:10px 18px 14px; background:#fff; border-top:1px solid var(--line); }
+            .m-done .btn{ min-height:48px; }
+            #m-sheet{ display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; z-index:26; background:#fff;
+                      border-top:1px solid var(--line); border-radius:16px 16px 0 0; box-shadow:0 -8px 28px rgba(16,24,40,.14);
+                      max-height:calc(100% - var(--notice-h, 0px) - 72px); font-size:14px; color:var(--ink); padding-bottom:env(safe-area-inset-bottom, 0px); }
+            .m-handle{ display:flex; align-items:center; justify-content:center; flex:0 0 48px; height:48px; width:100%; border:0; background:none; cursor:pointer; padding:0; }
+            .m-grip{ width:40px; height:5px; border-radius:3px; background:#A8A29E; }
+            .m-peek{ display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px 16px; padding:0 16px 8px; }
+            .m-month{ flex:1 0 100%; font-size:15px; font-weight:600; color:var(--navy-deep); }
+            .m-fig{ flex:1 1 0; min-width:0; }   /* the two lead figures side by side at any phone width; a label wraps */
+            .m-fig b{ display:block; font-size:24px; font-weight:600; color:var(--navy-deep); font-variant-numeric:tabular-nums; line-height:1.1; }
+            .m-fig span{ font-size:14px; color:var(--muted); }
+            .m-cond{ margin-left:auto; min-height:44px; border:1px solid var(--line); border-radius:22px; background:#fff; padding:0 14px; font:500 14px Inter,system-ui,sans-serif; color:var(--navy-deep); cursor:pointer; display:flex; align-items:center; gap:6px; }
+            .m-cond[hidden]{ display:none; }
+            .m-body{ overflow:auto; padding:0 16px 8px; flex:1 1 auto; min-height:0; }
+            #m-sheet[data-state="half"]{ height:min(62vh, calc(100% - var(--notice-h, 0px) - 72px)); }   /* half: about half the screen; the body scrolls */
+            #m-sheet[data-state="peek"] .m-body{ display:none; }
+            .m-body h3{ margin:10px 0 6px; font-size:14px; font-weight:600; color:var(--navy-deep); }
+            .m-body .btn{ min-height:48px; margin-top:8px; }
+            .m-body .tl-warn .show, .m-body .tl-warn .x{ min-height:44px; min-width:44px; font-size:14px; }
+            .m-chips-row{ display:flex; gap:8px; align-items:center; padding:8px 12px 12px; border-top:1px solid var(--line); overflow-x:auto; }
+            .m-chips-row .month-chips{ flex-wrap:nowrap; }
+            .m-chips-row .month-chip{ min-width:48px; padding:0 10px; flex:0 0 auto; }   /* 48 px targets; a long tenant scrolls the row */
+            .m-play{ flex:0 0 48px; width:48px; height:48px; border-radius:24px; border:0; background:var(--navy); color:#fff; font-size:18px; cursor:pointer; }
+            .route-card h3{ margin:4px 0 2px; font-size:16px; }
+            .route-card .rc-sub{ color:var(--muted); margin-bottom:8px; }
+            .route-card dl{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:0 0 10px; }
+            .route-card dt{ color:var(--muted); } .route-card dd{ margin:0; font-weight:600; text-align:right; }
+            #month-text{ width:100%; border-left:none; z-index:29; }
+            #route-hover-card{ display:none !important; }
+            body .guide-strip{ max-width:calc(100vw - 100px); }   /* clear of the 44 px zoom buttons on the right */
+        }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
@@ -407,6 +518,8 @@
 <body>
 <!-- 12 Oct 2026 (review 2.8): a real button, named to its panel (was a div) -->
 <button type="button" id="menu-toggle" onclick="toggleSidebar()" aria-controls="main-sidebar" aria-expanded="true">☰ Control Panel</button>
+<!-- 12 Oct 2026 (review 2.8 row 2, mockup 7): on a phone the ONE Layers button opens the panel as a full-screen sheet -->
+<button type="button" id="m-layers-btn" onclick="openLayersSheet()" aria-controls="main-sidebar" aria-expanded="false">&#8779; Layers</button>
 <div class="sidebar" id="main-sidebar">
     <button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar()" aria-label="Close the control panel" title="Close the control panel">&times;</button>
     <div style="height:44px;flex:none"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button -->
@@ -562,6 +675,8 @@
         </div>
     </div>
 
+    <!-- 12 Oct 2026 (mockup 7): on a phone the sheet ends with "Show map" (CSS order puts it last, after the forecast box) -->
+    <div class="m-done"><button type="button" class="btn" id="m-done-btn" onclick="closeLayersSheet()">Show map</button></div>
 </div>
 
 <!-- 2026-10-06 — the KPI BAR, docked to the top of the map pane (see the CSS note). Six
@@ -637,6 +752,61 @@
   <div class="drawer-body" id="drawer-analysis"></div>
   <div class="drawer-body" id="drawer-detail" style="display:none;"></div>
 </div>
+
+<!-- 12 Oct 2026 (review 2.8 row 2, mockup 7, D30) — THE PHONE SHELL's one bottom sheet, shown at 767 px and below only.
+     Peek: the month, the two lead figures, the conditions count. Half: the busiest routes, the conditions, the text
+     view, the link and "Report a concern" (or a route card after a tap on a route). Full: the filters and layers — the
+     panel opened as a full-screen sheet. The 48 px handle toggles peek / half on a tap and says so in aria-expanded.
+     The month chips and Play sit at the bottom, where a thumb rests. Every figure is COPIED from the bar (one source). -->
+<section id="m-sheet" data-state="peek" aria-label="This month on the map">
+  <button type="button" class="m-handle" id="m-handle" onclick="toggleSheet()" aria-controls="m-body" aria-expanded="false" aria-label="Show the busiest routes and conditions"><span class="m-grip"></span></button>
+  <div class="m-peek" id="m-peek">
+    <div class="m-month" id="m-month">No month on screen</div>
+    <div class="m-fig"><b id="m-trips">&mdash;</b><span>two-way movements a day</span></div>
+    <div class="m-fig"><b id="m-vehicles">&mdash;</b><span>vehicles needed</span></div>
+    <button type="button" class="m-cond" id="m-cond" onclick="sheetTo('half')" hidden></button>
+  </div>
+  <div class="m-body" id="m-body">
+    <div id="m-card" class="route-card" hidden></div>
+    <div id="m-main">
+      <h3>Busiest routes</h3>
+      <div id="m-busiest"></div>
+      <h3>Conditions</h3>
+      <div id="m-conditions"></div>
+      <button type="button" class="btn btn-ghost" onclick="openMonthText()">This month as a list</button>
+      <button type="button" class="btn btn-ghost" onclick="copyViewLink()">Copy link to this view</button>
+      <button type="button" class="btn btn-ghost" onclick="sheetTo('full')">Filters and layers</button>
+      <div class="concern-slot"></div>
+    </div>
+  </div>
+  <div class="m-chips-row">
+    <button type="button" class="m-play" id="m-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>
+    <div class="month-chips" id="m-chips" role="group" aria-label="Month"></div>
+  </div>
+</section>
+
+<!-- 12 Oct 2026 (review 2.1 third row, 2.3): the month AS TEXT, beside the map — the bar's figures (copied from the
+     bar, so the two cannot disagree) and a table: route, two-way movements a day, vehicles, conditions. -->
+<aside id="month-text" aria-labelledby="mt-title" hidden>
+  <div class="mt-head"><h2 id="mt-title" tabindex="-1">This month as text</h2>
+    <button type="button" class="mt-close" onclick="closeMonthText()" aria-label="Close the text view" title="Close the text view">&times;</button></div>
+  <div class="mt-body" id="mt-body"></div>
+</aside>
+
+<!-- 12 Oct 2026 (review 2.3, D29): a link to THIS view (month, layers, filters) and its QR code for the stand card.
+     The QR is drawn here, in the page, by qrSvg() — no library. No PNG export (D29: staff-only, later). -->
+<div id="share-panel" role="dialog" aria-labelledby="share-title" hidden>
+  <div class="share-head"><b id="share-title">Share this view</b>
+    <button type="button" class="share-close" onclick="closeSharePanel()" aria-label="Close the share card" title="Close">&times;</button></div>
+  <div id="share-qr"></div>
+  <input type="text" id="share-url" readonly aria-label="Link to this view">
+  <div class="share-row"><button type="button" class="btn" onclick="copyViewLink()">Copy link</button></div>
+  <div id="share-status" role="status" aria-live="polite"></div>
+  <p class="mt-note" id="share-note">The link opens the map on this month with these layers and filters. It still asks for the map password.</p>
+</div>
+
+<!-- 12 Oct 2026 (review 2.3): the hover card on a route (desktop; a phone taps for the route card instead) -->
+<div id="route-hover-card" role="tooltip" hidden></div>
 
 <div id="map"></div>
 
@@ -762,16 +932,25 @@
     // the app the app's demo bar has the button, see EMBED). In-page, no library; the Mapbox instance is
     // never touched — the cards are plain fixed divs over it.
     const MAP_GUIDE_KEY = "wayscope_guide_map";
+    // 12 Oct 2026 (review 2.8 row 2): on a phone (the sheet, 767 px and below) each step anchors on the sheet instead —
+    // `phone` names that anchor, `phoneTitle` / `phoneBody` the words, because the bar and the side panel are not there
     const MAP_GUIDE_STEPS = [
-        { anchor: "kpi-hud", title: "The bar along the top", body: "shows the month in view: two-way movements a day, vehicles needed, routes in use and CO₂e." },
-        { anchor: "tl-play", alt: "tl-open", title: "Press Play", body: "to step through the programme month by month." },
-        { anchor: "kpi-conditions", title: "Conditions", body: "appears while the timeline is open and lists anything that needs attention that month, such as an over-capacity stockpile or a road closure or limit on a route. Use \"Show on map\" to jump to it." },
-        { anchor: "kpi-moving", title: "The side panel", body: "shows what's moving this month by discipline and team." },
+        { anchor: "kpi-hud", phone: "m-peek", phoneTitle: "The sheet along the bottom", title: "The bar along the top", body: "shows the month in view: two-way movements a day, vehicles needed, routes in use and CO₂e." },
+        { anchor: "tl-play", alt: "tl-open", phone: "m-play", title: "Press Play", body: "to step through the programme month by month." },
+        { anchor: "kpi-conditions", phone: "m-handle", phoneBody: "appears while a month is on screen: tap the handle to list anything that needs attention that month, such as an over-capacity stockpile or a road closure on a route. Use \"Show on map\" to jump to it.", title: "Conditions", body: "appears while the timeline is open and lists anything that needs attention that month, such as an over-capacity stockpile or a road closure or limit on a route. Use \"Show on map\" to jump to it." },
+        { anchor: "kpi-moving", phone: "m-layers-btn", phoneTitle: "Layers", phoneBody: "opens the filters, the map layers and what's moving this month by discipline and team.", title: "The side panel", body: "shows what's moving this month by discipline and team." },
     ];
+    function guideOnPhone(){ return typeof isPhoneShell === 'function' && isPhoneShell(); }
+    function guideTitle(step){ return (guideOnPhone() && step.phoneTitle) || step.title; }
+    function guideBody(step){ return (guideOnPhone() && step.phoneBody) || step.body; }
     let guideIndex = -1;
     function guideRead(){ try { return localStorage.getItem(MAP_GUIDE_KEY); } catch (e) { return null; } }
     function guideWrite(v){ try { localStorage.setItem(MAP_GUIDE_KEY, v); } catch (e) {} }
     function guideAnchor(step){
+        if (guideOnPhone() && step.phone) {
+            const el = document.getElementById(step.phone);
+            if (el && (el.offsetWidth || el.offsetHeight)) return el;
+        }
         for (const id of [step.anchor, step.alt]) {
             const el = id && document.getElementById(id);
             if (el && (el.offsetWidth || el.offsetHeight)) return el;
@@ -808,8 +987,8 @@
             + (last ? '<button type="button" class="guide-next" onclick="guideEnd()">Got it</button>'
                     : '<button type="button" class="guide-next" onclick="guideStep(1)">Next</button>')
             + '</div><button type="button" class="guide-off" onclick="guideOff()">Don\'t show again</button>';
-        card.querySelector('h4').textContent = step.title;
-        card.querySelector('p').textContent = step.body;
+        card.querySelector('h4').textContent = guideTitle(step);
+        card.querySelector('p').textContent = guideBody(step);
         card.querySelector('.guide-step').textContent = (guideIndex + 1) + ' of ' + MAP_GUIDE_STEPS.length;
     }
     function guideStart(){ guideIndex = 0; placeGuideHints(); guideRender(); }
@@ -824,7 +1003,8 @@
     function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }
     function placeGuideHints(){
         const on = guideHintsOn() && guideIndex < 0;
-        const kpi = document.getElementById('kpi-hud');
+        // 12 Oct 2026: on a phone the bar is not drawn; the strip goes under the Layers button instead
+        const kpi = (guideOnPhone() && document.getElementById('m-layers-btn')) || document.getElementById('kpi-hud');
         let strip = document.getElementById('guide-strip');
         if (on && guideRead() !== 'done' && kpi) {
             if (!strip) {
@@ -862,7 +1042,7 @@
         if (!dot || !st) return;
         tip = guideEl('guide-tip'); tip.className = 'guide-tip'; tip.setAttribute('role', 'tooltip');
         tip.innerHTML = '<b></b> <span></span>';
-        tip.querySelector('b').textContent = st.title; tip.querySelector('span').textContent = st.body;
+        tip.querySelector('b').textContent = guideTitle(st); tip.querySelector('span').textContent = guideBody(st);
         const r = dot.getBoundingClientRect();
         tip.style.top = Math.round(r.bottom + 8) + 'px';
         tip.style.left = Math.round(Math.max(12, Math.min(r.left - (r.left > window.innerWidth / 2 ? 236 : 0), window.innerWidth - 272))) + 'px';
@@ -1136,7 +1316,15 @@
     }
 
     mapboxgl.accessToken = CONFIG.MAPBOX_TOKEN;
-    const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/light-v11', center: [10, 54], zoom: 4 });
+    // 12 Oct 2026 (review 2.8 row 2, D30): THE PHONE SHELL is at 767 px and below — one media query, read here and in CSS.
+    // On a phone the map neither tilts (touchPitch) nor rotates on a drag (dragRotate): both are switched off there only,
+    // and back on if the window widens past 767 (wirePhoneShell, at the end of the page). Above 767 nothing changes.
+    const PHONE_SHELL_MQ = '(max-width:767px)';
+    function isPhoneShell() {
+        try { return !!(window.matchMedia && window.matchMedia(PHONE_SHELL_MQ).matches); } catch (e) { return false; }
+    }
+    const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/light-v11', center: [10, 54], zoom: 4,
+                                   touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell() });
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     
     let hoveredRouteId = null;
@@ -1968,12 +2156,19 @@
         if (typeof TL !== 'undefined' && TL.on) return [TL.month];
         const cb = document.getElementById('toggle-forecast');
         if (cb && cb.checked) {
-            const f = parseInt(document.getElementById('forecast-from').value) || 1;
-            const t = parseInt(document.getElementById('forecast-to').value) || f;
+            // 12 Oct 2026 (D14): the From/To selects are gone. "Show forecast routes" averages over the months that carry
+            // volume — the month chips' first to last — and a chip shows one month (it opens the timeline on it).
+            const [f, t] = forecastWindow();
             const out = []; for (let m = Math.min(f, t); m <= Math.max(f, t); m++) out.push(m);
             return out;
         }
         return [];
+    }
+    // the window "Show forecast routes", the route analysis and the detail table read: the span of months with volume
+    // from the timeline matrix (loaded at start for the chips), else the whole horizon
+    function forecastWindow() {
+        const span = (typeof TL !== 'undefined' && TL.matrix && TL.matrix.span) || null;
+        return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];
     }
     async function kpiFetchMonth(m) {
         if (KPI.cache[m]) return KPI.cache[m];
@@ -2255,6 +2450,9 @@
         // leg toggles. It used to be filtered on is_forecast alone, so an origin filter left
         // every other route's blue overlay and label on the map.
         if (typeof applyForecastFilter === 'function') applyForecastFilter();
+        // §2.2b: the council areas follow the month on screen (a no-op while their boxes are off). Merge with C3: here,
+        // so that the address-bar write stays the last line of applyFilters
+        if (typeof refreshAreas === 'function') refreshAreas();
 
         // Week 1, Task E. The road filter above is untouched: selecting a railhead as
         // the origin still isolates the road hauls that start there. This only changes
@@ -2265,8 +2463,8 @@
         // filter just removed — every filter change comes through this function.
         markRouteEnds();
         raiseMarks();
-        // §2.2b: the council areas follow the month on screen (a no-op while their boxes are off)
-        if (typeof refreshAreas === 'function') refreshAreas();
+        // 12 Oct 2026 (review 2.3, D29): every filter, leg and month change ends here, so the address bar follows it
+        if (typeof scheduleViewWrite === 'function') scheduleViewWrite();
     }
 
     function resetFilters() {
@@ -2292,7 +2490,9 @@
     map.on('style.load', async () => {
         await OVERLAY_READY;          // the alignment, chainage, bands and rail come from the tenant package
         applyOverlayView();
-        if (!map.getSource('routes-source')) map.addSource('routes-source', { type: 'geojson', data: a1_data });
+        // 12 Oct 2026 (review 2.3): generateId gives every feature an id, so the hover can set a feature-state on the leg
+        // under the pointer (the route has no unique property to promote: both legs carry its route_id)
+        if (!map.getSource('routes-source')) map.addSource('routes-source', { type: 'geojson', data: a1_data, generateId: true });
         // ⚠️ ITS OWN SOURCE, and that is the whole point. Five separate things walk
         // routes-source per feature matching "LineString with a route_id" — the KPI
         // count, the leg filters, buildRouteInfo(), the forecast timeline's
@@ -3230,6 +3430,8 @@
         buildNodeMarkers();
         buildRouteInfo();
         applyFilters();
+        // 12 Oct 2026 (review 2.3): the month chips, then the deep link (?month=&layers=&filters=) is read and applied
+        if (typeof onNetworkReady === 'function') onNetworkReady();
 
         const lines = a1_data.features.filter(f => f.geometry.type === 'LineString');
         const routes = new Set(lines.map(f => f.properties.route_id));
@@ -3546,7 +3748,7 @@
     function areasMonth() {
         if (typeof TL !== 'undefined' && TL.on && TL.month) return TL.month;
         const cb = document.getElementById('toggle-forecast');
-        if (cb && cb.checked) return parseInt(document.getElementById('forecast-from').value) || 1;
+        if (cb && cb.checked) return forecastWindow()[0] || 1;     // merge with C3 (D14): no From select; the window's first month
         const cur = (typeof currentMonthIndex === 'function') ? currentMonthIndex() : 1;
         return Math.min(Math.max(cur, 1), CONFIG.MONTH_COUNT || 60);
     }
@@ -4161,9 +4363,9 @@
                 let pluginUI = `
                 <div class="control-group fc-box">
                     <h3>Forecast traffic volume</h3>
+                    <!-- 12 Oct 2026 (D14): one chip per month that carries volume replaces the 60-entry From / To selects -->
                     <div class="fc-row">
-                        <div><label>From</label><select id="forecast-from" onchange="if(document.getElementById('toggle-forecast').checked) toggleForecastPlugin();"></select></div>
-                        <div><label>To</label><select id="forecast-to" onchange="if(document.getElementById('toggle-forecast').checked) toggleForecastPlugin();"></select></div>
+                        <div><label id="fc-chips-label">Month</label><div class="month-chips" id="fc-chips" role="group" aria-labelledby="fc-chips-label"></div></div>
                     </div>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
                     <label class="fc-toggle fc-mode"><input type="checkbox" id="toggle-road-load" onchange="toggleRoadLoad()"> Road load</label>
@@ -4174,9 +4376,16 @@
                     <button class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
                     <button class="btn btn-ghost" id="tl-open" onclick="startTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
                     <div id="forecast-status">Approved forecasts only.</div>
+                    <!-- 12 Oct 2026 (review 2.1, 2.3): the month as text, a link to this view and its QR, and "Report a concern" -->
+                    <div class="share-row">
+                        <button type="button" class="btn btn-ghost" id="btn-month-text" onclick="openMonthText()">Month as text</button>
+                        <button type="button" class="btn btn-ghost" id="btn-share" onclick="openSharePanel()">Link and QR code</button>
+                    </div>
+                    <div class="concern-slot"></div>
                 </div>`;
                 sidebar.insertAdjacentHTML('beforeend', pluginUI);
-                populateForecastMonths();
+                if (typeof renderMonthChips === 'function') renderMonthChips();
+                if (typeof renderConcernLinks === 'function') renderConcernLinks();
             }
         });
 
@@ -4232,7 +4441,8 @@
                             paint: {
                                 'line-color': '#ffffff',
                                 'line-width': 12,       /* Wide for glow effect */
-                                'line-opacity': 0.6,
+                                /* 12 Oct 2026 (review 2.3): the leg under the pointer glows brighter than its twin (feature-state) */
+                                'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.85, 0.6],
                                 'line-blur': 4          /* Softens the edges */
                             },
                             filter: ['==', 'name', 'IMPOSSIBLE_VALUE'] // Hidden initially
@@ -4249,6 +4459,8 @@
                 // the layer list is filtered at each move, in case a layer is added later
                 map.on('mousemove', (e) => {
                     let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });
+                    // 12 Oct 2026 (review 2.3): the hover card and the hovered leg's feature-state, from this same query
+                    if (typeof setRouteHover === 'function') setRouteHover(features.length ? features[0] : null, e);
                     if (features.length > 0) {
                         map.getCanvas().style.cursor = 'pointer';
                         let p = features[0].properties;
@@ -4311,13 +4523,9 @@
                 return;
             }
 
-            let fromM = parseInt(document.getElementById('forecast-from').value);
-            let toM = parseInt(document.getElementById('forecast-to').value);
-            if (fromM > toM) {
-                status.innerHTML = "\u274c 'From' month must be before 'To' month!";
-                status.style.color = CONFIG.COLORS.peak;
-                return;
-            }
+            // 12 Oct 2026 (D14): no From / To any more — the window is the span of months with volume (forecastWindow)
+            try { await ensureTimelineMatrix(); } catch (e) {}
+            let [fromM, toM] = forecastWindow();
 
             const unit = CONFIG.FORECAST_UNIT || 'vehicles';
             status.innerHTML = "Fetching approved forecasts\u2026";
@@ -4428,13 +4636,8 @@
         const y = CONFIG.START_YEAR + Math.floor((i-1)/12);
         return names[(i-1)%12] + ' ' + y;
     }
-    function populateForecastMonths(){
-        const from=document.getElementById('forecast-from'), to=document.getElementById('forecast-to');
-        if(!from||!to) return;
-        let opts='';
-        for(let i=1;i<=CONFIG.MONTH_COUNT;i++) opts+='<option value="'+i+'">'+monthLabel(i)+'</option>';
-        from.innerHTML=opts; to.innerHTML=opts; from.value='1'; to.value='12';
-    }
+    // 12 Oct 2026 (D14): the function that filled the From / To selects is gone with them; renderMonthChips() (at the
+    // end of the page) draws one chip per month with volume instead
 
     function havKm(a,b){
         const R=6371, rad=Math.PI/180;
@@ -4475,8 +4678,9 @@
         META.ready=true;
     }
     async function fetchMatrix(unit){
-        const f=parseInt(document.getElementById('forecast-from').value)||1;
-        const t=parseInt(document.getElementById('forecast-to').value)||12;
+        // 12 Oct 2026 (D14): the route analysis and the detail table cover the months with volume (no From / To any more)
+        try { await ensureTimelineMatrix(); } catch (e) {}
+        const [f, t] = forecastWindow();
         const lo=Math.min(f,t), hi=Math.max(f,t), key=lo+'-'+hi+'-'+unit;
         if(FCACHE[key]) return FCACHE[key];
         const r=await fetch(CONFIG.API_BASE+'/public/forecast-matrix?from='+lo+'&to='+hi+'&unit='+unit);
@@ -4752,9 +4956,10 @@
     function mapModeMonth(){
         // the bar open but its matrix not read yet: no month yet (TL.month is still the default January)
         if (typeof TL !== 'undefined' && TL.on) return TL.matrix ? TL.month : null;
+        // 12 Oct (merge with C3, D14): From / To are gone; Show forecast covers forecastWindow(), the span with volume.
+        // It is one month only when the programme carries volume in one month; a month chip opens the bar on one month.
         if (modeOn('toggle-forecast')) {
-            const f = parseInt((document.getElementById('forecast-from') || {}).value);
-            const t = parseInt((document.getElementById('forecast-to') || {}).value);
+            const [f, t] = forecastWindow();
             if (f > 0 && f === t) return f;
         }
         return null;
@@ -5550,7 +5755,8 @@
     function renderTimelineWarnings(m) {
         const box = document.getElementById('tl-warnings');
         if (!box) return;
-        if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; renderConditionsPill([]); setCondRing([]); setRestrictionHits([]); setCapBadges([]); positionWarnStack(); return; }
+        if (!m || !TL.on) { box.innerHTML = ''; box.style.display = 'none'; renderConditionsPill([]); setCondRing([]); setRestrictionHits([]); setCapBadges([]); positionWarnStack();
+                            WARN.live = []; WARN.liveMonth = null; if (typeof onConditionsChanged === 'function') onConditionsChanged(); return; }
         const month = m;
         // 12 Oct second fix pass: the conditions no longer wait on the month's KPI fetch. The over-capacity rows (and so
         // the clash pause, the pill, the ring and the closures) need only the stockpile and closure data, which are
@@ -5681,6 +5887,8 @@
             });
         });
         const live = items.filter(i => !WARN.dismissed[i.key]).sort((a, b) => a.sort - b.sort);
+        // 12 Oct 2026 (review 2.8, 2.1): the rows are kept for the phone sheet, the text view and the route card
+        WARN.live = live; WARN.liveMonth = month;
         renderConditionsPill(live);
         WARN.countsMonth = month;      // which month the pill's counts describe (startTimeline reads it)
         setCondRing(live.filter(i => i.kind === 's').map(i => i.id));
@@ -5698,6 +5906,7 @@
             stopTimeline(monthLabel(month) + ' · playback paused: ' + live.filter(i => i.lvl === 'clash').length + ' over capacity');
             renderConditionsPill(live);
         }
+        if (typeof onConditionsChanged === 'function') onConditionsChanged();
         if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
         const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
         box.innerHTML = `<div class="tl-head"><b>Conditions in ${esc(monthLabel(month))}</b>` +
@@ -5721,6 +5930,8 @@
                 if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;   // 12 Oct: the section card answers
                 const p=e.features[0].properties, rid=p.route_id||'Route';
                 selectRoute(rid);
+                // 12 Oct 2026 (review 2.8 row 2, D14): on a phone a tap opens the route card in the sheet instead of the drawer
+                if(typeof isPhoneShell==='function' && isPhoneShell() && typeof openRouteCard==='function'){ openRouteCard(rid); return; }
                 const info=ROUTEINFO[(rid||'').toString().trim().toLowerCase()]||{};
                 const safe=(rid||'').toString().replace(/\\/g,'\\\\').replace(/'/g,"\\'");
                 const html='<div style="min-width:210px;">'+
@@ -5738,6 +5949,803 @@
         map.on('style.load', ()=>{ ensureSelectionLayers(); if(selectedRouteId) selectRoute(selectedRouteId); });
         if(map.isStyleLoaded()) ensureSelectionLayers();
     })();
+    </script>
+    <script>
+    // ===== 12 Oct 2026 — THE INTERACTIVITY PASS (review 2.3, D14, D29) AND THE PHONE SHELL (review 2.8 row 2, mockup 7, D30) =====
+    // Everything new lives in this block, after the blocks parse_map.js runs in its sandboxes. The older functions call
+    // in here only through `typeof … === 'function'` guards, so a sandbox without this block runs exactly as before.
+    //   · month chips (one per month with volume) replace the From / To selects at every width (D14)
+    //   · a hover card on a route, from the one mousemove handler; the hovered leg carries a feature-state (generateId)
+    //   · a deep link ?month=&layers=&filters= read on load and written on change, "Copy link", and a QR code drawn here
+    //   · "Report a concern": a mailto to the TYPED tenant address (tenant.concern_email); none is ever invented
+    //   · the month as text beside the map: the bar's figures (copied from the bar) and a table per route
+    //   · below 768 px: one Layers button, one bottom sheet (peek / half / full), the chips and Play at the bottom,
+    //     a route card instead of the drawer. Above 767 px the page is as it was.
+    const escHtml = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    // ---------------------------------------------------------------- the month chips (D14)
+    const CHIPS = { failed: false, sig: '' };
+    function chipMonths() {
+        const vm = TL.matrix && TL.matrix.volMonths;
+        return vm ? [...vm].sort((a, b) => a - b) : [];
+    }
+    // "Sep" while every chip is in one year; "Sep 2026" once the chips cross a year end
+    function chipLabel(m, months) {
+        const years = new Set(months.map(x => monthLabel(x).slice(-4)));
+        return years.size > 1 ? monthLabel(m) : monthLabel(m).slice(0, 3);
+    }
+    function renderMonthChips() {
+        const months = chipMonths();
+        const cur = TL.on ? TL.month : null;
+        const sig = (TL.matrix ? 'm' : (CHIPS.failed ? 'f' : 'l')) + months.join(',');
+        document.querySelectorAll('.month-chips').forEach(box => {
+            if (box.dataset.sig !== sig) {
+                box.dataset.sig = sig;
+                if (!TL.matrix) box.innerHTML = '<span class="chips-none">' + (CHIPS.failed ? 'The months could not be loaded' : 'Loading the months…') + '</span>';
+                else if (!months.length) box.innerHTML = '<span class="chips-none">No approved month yet</span>';
+                else box.innerHTML = months.map(m => '<button type="button" class="month-chip" data-month="' + m + '" aria-pressed="false" aria-label="'
+                    + escHtml(monthLabel(m)) + '" onclick="pickMonth(' + m + ')">' + escHtml(chipLabel(m, months)) + '</button>').join('');
+            }
+            // the month on screen is the pressed chip; updated in place, so a focused chip keeps its focus during Play
+            box.querySelectorAll('.month-chip').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.month) === cur)));
+        });
+    }
+    // a chip shows ONE month: it stops playback and opens the timeline on that month (the bar, the map and the
+    // conditions all follow it, exactly as a scrub does)
+    function pickMonth(m) {
+        m = parseInt(m, 10);
+        if (!(m >= 1 && m <= (CONFIG.MONTH_COUNT || 60))) return;
+        if (TL.playing) stopTimeline();
+        TL.month = m;
+        if (!TL.on) openTimeline(); else setTimelineMonth(m);
+    }
+
+    // ---------------------------------------------------------------- the hover card (review 2.3)
+    const HOVER = { id: null, key: '' };
+    function canHover() {
+        try { return !window.matchMedia || window.matchMedia('(hover: hover)').matches; } catch (e) { return true; }
+    }
+    // which month the route figures on screen describe: the playhead's, or the Show-forecast window's average
+    function monthOnScreenLabel() {
+        if (TL.on) return monthLabel(TL.month);
+        const cb = document.getElementById('toggle-forecast');
+        if (cb && cb.checked) { const [a, b] = forecastWindow(); return 'average, ' + monthLabel(a) + ' – ' + monthLabel(b); }
+        return null;
+    }
+    // the card's four lines for a route feature (pure: the harness runs it). One load = one two-way movement, never
+    // doubled; the figure is the route's own (both legs carry the same f_avg), and the leg is named.
+    function routeHoverView(p, when, unit) {
+        p = p || {};
+        const team = p.ipt && p.ipt !== 'Unknown_IPT' ? teamText(p.ipt) : '';
+        const leg = p.type === 'Outbound Highway' ? 'empty return' : (p.type === 'Inbound Highway' ? 'laden' : '');
+        const word = (!unit || unit === 'vehicles') ? 'two-way movements a day' : (unit === 'm3' ? 'm³ a day' : unit + ' a day');
+        const on = p.is_forecast === true || p.is_forecast === 'true';
+        let fig;
+        if (!when) fig = 'Pick a month to see its movements a day';
+        else if (on && p.f_avg != null) fig = Number(p.f_avg).toLocaleString() + ' ' + word + ' · ' + when;
+        else fig = 'Nothing approved on this route · ' + when;
+        return { title: (p.origin || '—') + ' → ' + (p.dest || '—'),
+                 sub: [p.route_id, team, leg].filter(Boolean).join(' · '),
+                 fig, hint: 'Click for the route analysis' };
+    }
+    function setRouteHover(f, e) {
+        // the hovered leg's feature-state (ids from generateId on routes-source); the glow layer brightens it
+        const id = (f && f.source === 'routes-source' && f.id != null) ? f.id : null;
+        if (HOVER.id !== id) {
+            if (HOVER.id != null) { try { map.setFeatureState({ source: 'routes-source', id: HOVER.id }, { hover: false }); } catch (err) {} }
+            if (id != null) { try { map.setFeatureState({ source: 'routes-source', id: id }, { hover: true }); } catch (err) {} }
+            HOVER.id = id;
+        }
+        const card = document.getElementById('route-hover-card');
+        if (!card) return;
+        if (!f || !e || !e.point || isPhoneShell() || !canHover()) { card.hidden = true; HOVER.key = ''; return; }
+        const v = routeHoverView(f.properties, monthOnScreenLabel(), CONFIG.FORECAST_UNIT || 'vehicles');
+        const key = [v.title, v.sub, v.fig].join('|');
+        if (key !== HOVER.key) {
+            HOVER.key = key;
+            card.innerHTML = '<span class="hc-title"></span><span class="hc-sub"></span><span class="hc-fig"></span><span class="hc-hint"></span>';
+            card.querySelector('.hc-title').textContent = v.title;
+            card.querySelector('.hc-sub').textContent = v.sub;
+            card.querySelector('.hc-fig').textContent = v.fig;
+            card.querySelector('.hc-hint').textContent = v.hint;
+        }
+        card.hidden = false;
+        const r = map.getContainer().getBoundingClientRect(), w = card.offsetWidth, h = card.offsetHeight;
+        let x = r.left + e.point.x + 16, y = r.top + e.point.y + 16;
+        if (x + w > window.innerWidth - 8) x = r.left + e.point.x - w - 16;
+        if (y + h > window.innerHeight - 8) y = r.top + e.point.y - h - 16;
+        card.style.left = Math.max(8, Math.round(x)) + 'px';
+        card.style.top = Math.max(8, Math.round(y)) + 'px';
+    }
+
+    // ---------------------------------------------------------------- the deep link (review 2.3, D29)
+    // ?month=2026-10 (the timeline's month; absent when no month is on screen)
+    // &layers=chainage.-gates (what differs from the page's defaults: a box ticked, or "-" a default box unticked; dots,
+    //   so the link needs no escaping and stays short enough for a QR code)
+    // &filters=origin:<name>|dest:<name>|discipline:<name>|team:<the team's NAME, never its id>
+    // Read once the network is in (onNetworkReady), written on every change (applyFilters, a layer box, a stop of
+    // playback) with history.replaceState — never during Play, which would write the address every tick.
+    const VIEW = { ready: false, timer: null, defaults: [], pendingRestr: [] };
+    function layerBoxes() {
+        return [...document.querySelectorAll('input[type=checkbox][id^="layer-"], input[type=checkbox][id^="restr-"]')];
+    }
+    function layerKey(id) { return id.indexOf('layer-') === 0 ? id.slice(6) : id; }
+    function layersOn() { return layerBoxes().filter(cb => cb.checked).map(cb => layerKey(cb.id)).sort(); }
+    VIEW.defaults = layersOn();          // the static boxes as the page ships them (the closures' boxes start off)
+    function monthParam(m) {
+        const y = CONFIG.START_YEAR + Math.floor((m - 1) / 12), mm = ((m - 1) % 12) + 1;
+        return y + '-' + String(mm).padStart(2, '0');
+    }
+    function monthFromParam(s) {
+        const r = /^(\d{4})-(\d{1,2})$/.exec(String(s || '').trim());
+        if (!r) return null;
+        const mm = Number(r[2]);
+        if (mm < 1 || mm > 12) return null;
+        const m = (Number(r[1]) - CONFIG.START_YEAR) * 12 + mm;
+        return (m >= 1 && m <= (CONFIG.MONTH_COUNT || 60)) ? m : null;
+    }
+    const VIEW_FILTER_KEYS = ['origin', 'dest', 'discipline', 'team'];
+    function encodeView(v, defaults) {
+        const q = new URLSearchParams();
+        if (v.month) q.set('month', monthParam(v.month));
+        const on = new Set(v.layers || []), def = new Set(defaults || []);
+        const changes = [...on].filter(k => !def.has(k)).sort().concat([...def].filter(k => !on.has(k)).sort().map(k => '-' + k));
+        if (changes.length) q.set('layers', changes.join('.'));
+        const f = VIEW_FILTER_KEYS.filter(k => v.filters && v.filters[k] && v.filters[k] !== 'ALL').map(k => k + ':' + v.filters[k]);
+        if (f.length) q.set('filters', f.join('|'));
+        return q.toString();
+    }
+    function decodeView(search) {
+        const q = new URLSearchParams(search || '');
+        const out = { month: null, layers: null, filters: {} };
+        if (q.has('month')) out.month = monthFromParam(q.get('month'));
+        if (q.has('layers')) out.layers = (q.get('layers') || '').split('.').map(x => x.trim()).filter(x => /^-?[a-z0-9_-]+$/i.test(x));
+        (q.get('filters') || '').split('|').forEach(part => {
+            const i = part.indexOf(':');
+            if (i <= 0) return;
+            const k = part.slice(0, i).trim(), val = part.slice(i + 1).trim();
+            if (VIEW_FILTER_KEYS.includes(k) && val) out.filters[k] = val;
+        });
+        return out;
+    }
+    function selectedText(id) {
+        const el = document.getElementById(id);
+        if (!el || el.value === 'ALL') return null;
+        const o = el.options[el.selectedIndex];
+        return o ? o.textContent : null;
+    }
+    function currentView() {
+        const val = id => { const el = document.getElementById(id); return el && el.value !== 'ALL' ? el.value : null; };
+        return { month: TL.on ? TL.month : null, layers: layersOn(),
+                 filters: { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'),
+                            team: selectedText('filter-ipt') } };      // the team's NAME as the option shows it
+    }
+    // the link a person shares: this page's address with the view, without the app's embed / cache-buster parameters;
+    // monthOnly = the short form for a QR code that cannot hold the whole view
+    function shareUrl(monthOnly) {
+        const v = currentView();
+        const qs = monthOnly ? encodeView({ month: v.month, layers: VIEW.defaults, filters: {} }, VIEW.defaults) : encodeView(v, VIEW.defaults);
+        return location.origin + location.pathname + (qs ? '?' + qs : '');
+    }
+    function writeView() {
+        VIEW.timer = null;
+        if (!VIEW.ready || TL.playing) return;
+        const out = new URLSearchParams(encodeView(currentView(), VIEW.defaults));
+        const keep = new URLSearchParams(location.search);
+        ['embed', 'v'].forEach(k => { if (keep.has(k)) out.set(k, keep.get(k)); });
+        const qs = out.toString();
+        const url = location.pathname + (qs ? '?' + qs : '') + location.hash;
+        if (url !== location.pathname + location.search + location.hash) {
+            try { history.replaceState(history.state, '', url); } catch (e) {}
+        }
+        renderConcernLinks();          // the mailto carries the link to this view
+    }
+    function scheduleViewWrite() {
+        if (!VIEW.ready) return;
+        if (VIEW.timer) clearTimeout(VIEW.timer);
+        VIEW.timer = setTimeout(writeView, 300);
+    }
+    // the ticked boxes the link asks for: the defaults with its changes applied
+    function layersFromChanges(defaults, changes) {
+        const on = new Set(defaults || []);
+        (changes || []).forEach(c => { if (c.charAt(0) === '-') on.delete(c.slice(1)); else on.add(c); });
+        return [...on].sort();
+    }
+    function applyViewFromUrl() {
+        const v = decodeView(location.search);
+        const setSel = (id, want, byText) => {
+            const el = document.getElementById(id);
+            if (!el || !want) return;
+            const o = [...el.options].find(op => op.value === want || (byText && op.textContent === want));
+            if (o) el.value = o.value;
+        };
+        setSel('filter-origin', v.filters.origin); setSel('filter-dest', v.filters.dest);
+        setSel('filter-discipline', v.filters.discipline); setSel('filter-ipt', v.filters.team, true);
+        if (v.layers) {
+            const want = new Set(layersFromChanges(VIEW.defaults, v.layers));
+            layerBoxes().forEach(cb => {
+                const on = want.has(layerKey(cb.id));
+                if (cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+            });
+            // the closures' boxes are built when their catalogue answers; they are ticked then (applyPendingRestr)
+            VIEW.pendingRestr = [...want].filter(k => k.indexOf('restr-') === 0 && !document.getElementById(k));
+        }
+        applyFilters();
+        const done = () => { VIEW.ready = true; scheduleViewWrite(); };
+        if (v.month) ensureTimelineMatrix().then(() => pickMonth(v.month)).catch(() => {}).then(done);
+        else done();
+    }
+    function applyPendingRestr() {
+        if (!VIEW.pendingRestr.length) return;
+        VIEW.pendingRestr = VIEW.pendingRestr.filter(k => {
+            const cb = document.getElementById(k);
+            if (!cb) return true;
+            if (!cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+            return false;
+        });
+    }
+    document.addEventListener('change', (e) => {
+        const id = (e.target && e.target.id) || '';
+        if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast') scheduleViewWrite();
+    });
+
+    // ---------------------------------------------------------------- "Copy link" and the share card with its QR
+    const SHARE = { opener: null };
+    function toast(text) {
+        let t = document.getElementById('copy-toast');
+        if (!t) {
+            t = document.createElement('div'); t.id = 'copy-toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite');
+            t.style.cssText = 'position:fixed;left:50%;top:calc(var(--notice-h, 0px) + 70px);transform:translateX(-50%);z-index:41;background:#1F2024;color:#fff;'
+                + 'border-radius:8px;padding:8px 14px;font:500 14px Inter,system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.2);pointer-events:none;';
+            document.body.appendChild(t);
+        }
+        t.textContent = text; t.hidden = false;
+        clearTimeout(t._h); t._h = setTimeout(() => { t.hidden = true; }, 2600);
+    }
+    async function copyViewLink() {
+        writeView();
+        const url = shareUrl();
+        let ok = false;
+        try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(url); ok = true; } } catch (e) {}
+        if (!ok) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove();
+            } catch (e) {}
+        }
+        const msg = ok ? 'Link copied' : 'Could not copy: select the link and copy it';
+        const st = document.getElementById('share-status'), sp = document.getElementById('share-panel');
+        if (st && sp && !sp.hidden) st.textContent = msg; else toast(msg);
+    }
+    function openSharePanel() {
+        const p = document.getElementById('share-panel');
+        if (!p) return;
+        SHARE.opener = document.activeElement;
+        writeView();
+        const url = shareUrl();
+        const field = document.getElementById('share-url'); if (field) field.value = url;
+        let svg = qrSvg(url, 220), note = '';
+        if (!svg) { svg = qrSvg(shareUrl(true), 220); note = 'This view’s link is too long for a QR code, so the code opens the month only; the link above carries everything.'; }
+        const box = document.getElementById('share-qr');
+        if (box) box.innerHTML = svg || '<p class="mt-note">The link is too long for a QR code.</p>';
+        const n = document.getElementById('share-note');
+        if (n) n.textContent = (note ? note + ' ' : '') + 'The link opens the map on this month with these layers and filters. It still asks for the map password.';
+        const st = document.getElementById('share-status'); if (st) st.textContent = '';
+        p.hidden = false;
+        const c = p.querySelector('.share-close'); if (c) c.focus();
+    }
+    function closeSharePanel() {
+        const p = document.getElementById('share-panel');
+        if (p) p.hidden = true;
+        if (SHARE.opener && SHARE.opener.focus) { try { SHARE.opener.focus(); } catch (e) {} }
+    }
+
+    // ---------------------------------------------------------------- the QR code, drawn here (ISO/IEC 18004; no library)
+    // Byte mode, error correction level M, versions 1-10 (up to 213 bytes of link). The harness decodes what this draws
+    // and checks every block's Reed-Solomon syndromes, the format and version bits and the text that comes back.
+    const QR_M_ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];     // EC codewords per block, level M, versions 1-10
+    const QR_M_BLOCKS = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];            // blocks, level M
+    function qrGfMul(x, y) {
+        let z = 0;
+        for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; }
+        return z & 0xFF;
+    }
+    function qrRsDivisor(degree) {
+        const r = new Array(degree).fill(0); r[degree - 1] = 1;
+        let root = 1;
+        for (let i = 0; i < degree; i++) {
+            for (let j = 0; j < degree; j++) { r[j] = qrGfMul(r[j], root); if (j + 1 < degree) r[j] ^= r[j + 1]; }
+            root = qrGfMul(root, 0x02);
+        }
+        return r;
+    }
+    function qrRsRemainder(data, div) {
+        const r = new Array(div.length).fill(0);
+        data.forEach(b => { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= qrGfMul(c, f); }); });
+        return r;
+    }
+    function qrRawModules(ver) {
+        let r = (16 * ver + 128) * ver + 64;
+        if (ver >= 2) { const n = Math.floor(ver / 7) + 2; r -= (25 * n - 10) * n - 55; if (ver >= 7) r -= 36; }
+        return r;
+    }
+    function qrDataCodewords(ver) { return Math.floor(qrRawModules(ver) / 8) - QR_M_ECC[ver] * QR_M_BLOCKS[ver]; }
+    function qrAlignPositions(ver) {
+        if (ver === 1) return [];
+        const n = Math.floor(ver / 7) + 2, step = Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2, out = [6];
+        for (let pos = ver * 4 + 17 - 7; out.length < n; pos -= step) out.splice(1, 0, pos);
+        return out;
+    }
+    function qrFormatBits(mask) {           // level M is 00, so the data is the mask number alone
+        let rem = mask;
+        for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+        return ((mask << 10) | rem) ^ 0x5412;
+    }
+    function qrVersionBits(ver) {
+        let rem = ver;
+        for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+        return (ver << 12) | rem;
+    }
+    const QR_MASKS = [
+        (x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+        (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0,
+        (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0,
+    ];
+    function qrPenalty(mod) {
+        const n = mod.length;
+        let score = 0, dark = 0;
+        const lines = [];
+        for (let y = 0; y < n; y++) lines.push(mod[y].map(b => (b ? '1' : '0')).join(''));
+        for (let x = 0; x < n; x++) { let s = ''; for (let y = 0; y < n; y++) s += mod[y][x] ? '1' : '0'; lines.push(s); }
+        lines.forEach(s => {
+            (s.match(/0{5,}|1{5,}/g) || []).forEach(run => { score += 3 + run.length - 5; });                      // N1
+            const pad = '0000' + s + '0000';
+            for (let i = 0; i + 11 <= pad.length; i++) { const w = pad.slice(i, i + 11); if (w === '10111010000' || w === '00001011101') score += 40; }   // N3
+        });
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            if (mod[y][x]) dark++;
+            if (x < n - 1 && y < n - 1 && mod[y][x] === mod[y][x + 1] && mod[y][x] === mod[y + 1][x] && mod[y][x] === mod[y + 1][x + 1]) score += 3;   // N2
+        }
+        const total = n * n;
+        score += (Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1) * 10;                                   // N4
+        return score;
+    }
+    // the module matrix for `text`: { version, size, modules[y][x] (true = dark), mask }, or null when it does not fit
+    function qrMatrix(text) {
+        const bytes = Array.from(new TextEncoder().encode(String(text)));
+        let ver = 0;
+        for (let v = 1; v <= 10; v++) { if (4 + (v < 10 ? 8 : 16) + bytes.length * 8 <= qrDataCodewords(v) * 8) { ver = v; break; } }
+        if (!ver) return null;
+        const bits = [], put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+        put(4, 4); put(bytes.length, ver < 10 ? 8 : 16); bytes.forEach(b => put(b, 8));
+        const capBits = qrDataCodewords(ver) * 8;
+        put(0, Math.min(4, capBits - bits.length));
+        put(0, (8 - bits.length % 8) % 8);
+        for (let pad = 0xEC; bits.length < capBits; pad ^= 0xEC ^ 0x11) put(pad, 8);
+        const data = [];
+        for (let i = 0; i < bits.length; i += 8) { let b = 0; for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j]; data.push(b); }
+        // split into blocks, add each block's error correction, interleave
+        const nb = QR_M_BLOCKS[ver], ecl = QR_M_ECC[ver], raw = Math.floor(qrRawModules(ver) / 8);
+        const nShort = nb - raw % nb, shortLen = Math.floor(raw / nb), div = qrRsDivisor(ecl), blocks = [];
+        for (let i = 0, k = 0; i < nb; i++) {
+            const dat = data.slice(k, k + shortLen - ecl + (i < nShort ? 0 : 1));
+            k += dat.length;
+            const ecc = qrRsRemainder(dat, div);
+            if (i < nShort) dat.push(0);
+            blocks.push(dat.concat(ecc));
+        }
+        const cw = [];
+        for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - ecl || j >= nShort) cw.push(b[i]); });
+        // the function patterns
+        const size = ver * 4 + 17;
+        const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+        const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+        const set = (x, y, d) => { mod[y][x] = !!d; fn[y][x] = true; };
+        for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+        const finder = (cx, cy) => {
+            for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+                const x = cx + dx, y = cy + dy;
+                if (x < 0 || y < 0 || x >= size || y >= size) continue;
+                const d = Math.max(Math.abs(dx), Math.abs(dy));
+                set(x, y, d !== 2 && d !== 4);
+            }
+        };
+        finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+        const al = qrAlignPositions(ver), na = al.length;
+        for (let i = 0; i < na; i++) for (let j = 0; j < na; j++) {
+            if ((i === 0 && j === 0) || (i === 0 && j === na - 1) || (i === na - 1 && j === 0)) continue;
+            for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(al[i] + dx, al[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+        }
+        const drawFormat = (mask) => {
+            const fb = qrFormatBits(mask), bit = i => ((fb >>> i) & 1) !== 0;
+            for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+            set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+            for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+            for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+            for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+            set(8, size - 8, true);                                  // the dark module
+        };
+        drawFormat(0);                                               // reserves the format areas
+        if (ver >= 7) {
+            const vb = qrVersionBits(ver);
+            for (let i = 0; i < 18; i++) { const b = ((vb >>> i) & 1) !== 0, a = size - 11 + i % 3, c = Math.floor(i / 3); set(a, c, b); set(c, a, b); }
+        }
+        // the codewords, two columns at a time from the right, zigzagging up and down, skipping the timing column
+        let bi = 0;
+        for (let right = size - 1; right >= 1; right -= 2) {
+            if (right === 6) right = 5;
+            for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+                const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert;
+                if (!fn[y][x] && bi < cw.length * 8) { mod[y][x] = ((cw[bi >>> 3] >>> (7 - (bi & 7))) & 1) !== 0; bi++; }
+            }
+        }
+        const flip = (k) => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y][x] && QR_MASKS[k](x, y)) mod[y][x] = !mod[y][x]; };
+        let best = 0, bestScore = Infinity;
+        for (let k = 0; k < 8; k++) { flip(k); drawFormat(k); const sc = qrPenalty(mod); if (sc < bestScore) { bestScore = sc; best = k; } flip(k); }
+        flip(best); drawFormat(best);
+        return { version: ver, size, modules: mod, mask: best };
+    }
+    // the matrix as an inline SVG with the four-module quiet zone, or null when the text does not fit
+    function qrSvg(text, px) {
+        const q = qrMatrix(text);
+        if (!q) return null;
+        const n = q.size + 8;
+        let d = '';
+        for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.modules[y][x]) d += 'M' + (x + 4) + ' ' + (y + 4) + 'h1v1h-1z';
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + n + ' ' + n + '" width="' + (px || n * 4) + '" height="' + (px || n * 4)
+            + '" shape-rendering="crispEdges" role="img" aria-label="QR code for the link to this view"><rect width="' + n + '" height="' + n
+            + '" fill="#FFFFFF"/><path d="' + d + '" fill="#1F2024"/></svg>';
+    }
+
+    // ---------------------------------------------------------------- "Report a concern" (review 2.1 third row)
+    // The address is the tenant's TYPED tenant.concern_email. A tenant without one (the demo) says so; no address is
+    // ever made up. The email asks for what councils ask a resident for: date, time, place, registration.
+    function concernAddress(t) {
+        const a = t && typeof t.concern_email === 'string' ? t.concern_email.trim() : '';
+        // the server's own test (config.is_concern_email): one plain address, nothing a mailto: could be bent with
+        return /^[^\s@<>"',;:?&]+@[^\s@<>"',;:?&]+\.[^\s@<>"',;:?&]+$/.test(a) && a.length <= 254 ? a : null;
+    }
+    function concernMailto(addr, schemeName, monthLbl, link) {
+        const subject = 'Report a concern: ' + (schemeName || 'construction lorries');
+        const body = 'What happened:\n\nDate:\nTime:\nPlace (road and nearest landmark):\nLorry registration, if seen:\n\n'
+            + (monthLbl ? 'Month on the map: ' + monthLbl + '\n' : '') + (link ? 'The map view: ' + link + '\n' : '');
+        return 'mailto:' + encodeURIComponent(addr).replace(/%40/g, '@') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    }
+    function renderConcernLinks() {
+        const addr = concernAddress(TENANT);
+        document.querySelectorAll('.concern-slot').forEach(slot => {
+            const html = addr
+                ? '<a class="concern-link" href="' + escHtml(concernMailto(addr, TENANT.name, TL.on ? monthLabel(TL.month) : null, VIEW.ready ? shareUrl() : null)) + '">Report a concern by email</a>'
+                : '<span class="concern-unset">Report a concern: no contact address has been typed for this scheme'
+                  + (TENANT.demo_notice ? ' (a placeholder on the fictional demo scheme)' : '') + '.</span>';
+            if (slot.innerHTML !== html) slot.innerHTML = html;
+        });
+    }
+
+    // ---------------------------------------------------------------- the month as text (review 2.1 third row, 2.3)
+    const MT = { opener: null };
+    function currentFilters() {
+        const v = id => { const el = document.getElementById(id); return el ? el.value : 'ALL'; };
+        return { o: v('filter-origin'), d: v('filter-dest'), disc: v('filter-discipline'), i: v('filter-ipt') };
+    }
+    // one row per drawn route in the month, with the bar's rules (pure: the harness runs it): two-way movements a day =
+    // the route's loads ÷ the month's working days (fractional loads summed, one load = one two-way movement, never
+    // doubled); vehicles = Σ per LINE of ceil(movements a day ÷ trips one vehicle makes a day on that route); a line
+    // with no stored road route is counted in the movements and named, never zeroed; a route the map does not draw is
+    // left out of the rows and named (`undrawn`); the four sidebar filters apply as they do to the bar.
+    function monthTableRows(lines, routes, flt, wd, live) {
+        const acc = {}, undrawn = new Set();
+        (lines || []).forEach(l => {
+            const rp = routes[l.route_id];
+            if (!rp) { if (l.route_id) undrawn.add(l.route_id); return; }
+            if ((flt.o !== 'ALL' && rp.origin !== flt.o) || (flt.d !== 'ALL' && rp.dest !== flt.d)
+                || (flt.i !== 'ALL' && rp.ipt !== flt.i) || (flt.disc !== 'ALL' && l.discipline !== flt.disc)) return;
+            const a = acc[l.route_id] || (acc[l.route_id] = { rid: l.route_id, origin: rp.origin || '', dest: rp.dest || '', ipt: rp.ipt || '',
+                                                              loads: 0, vehicles: 0, unbaked: 0 });
+            const vl = Number(l.vehicle_loads) || 0;
+            a.loads += vl;
+            if (l.trips_per_vehicle_day > 0) a.vehicles += Math.ceil((vl / wd) / l.trips_per_vehicle_day);
+            else a.unbaked++;
+        });
+        const rows = Object.values(acc).map(a => Object.assign(a, {
+            twoWay: wd > 0 ? a.loads / wd : 0,
+            conditions: [...new Set((live || []).filter(i => i.who === a.rid).map(i => i.noun))] }))
+            .sort((x, y) => (y.twoWay - x.twoWay) || String(x.rid).localeCompare(String(y.rid)));
+        return { rows, undrawn: [...undrawn].sort() };
+    }
+    function vehiclesText(r) {
+        if (r.unbaked && !r.vehicles) return 'no stored road route';
+        return fmtN(r.vehicles, 0) + (r.unbaked ? '+' : '');
+    }
+    function openMonthText() {
+        const el = document.getElementById('month-text');
+        if (!el) return;
+        MT.opener = document.activeElement;
+        el.hidden = false;
+        document.body.classList.add('month-text-open');
+        // with no month on screen the text view opens the timeline on the first month with volume (or this month)
+        if (!TL.on) ensureTimelineMatrix().then(() => { if (!TL.on) pickMonth(tlStartMonth()); }).catch(() => {});
+        renderMonthText();
+        setTimeout(() => { try { map.resize(); } catch (e) {} }, 0);
+        const h = document.getElementById('mt-title'); if (h) h.focus();
+    }
+    function closeMonthText() {
+        const el = document.getElementById('month-text');
+        if (!el || el.hidden) return;
+        el.hidden = true;
+        document.body.classList.remove('month-text-open');
+        setTimeout(() => { try { map.resize(); } catch (e) {} }, 0);
+        if (MT.opener && MT.opener.focus) { try { MT.opener.focus(); } catch (e) {} }
+    }
+    function renderMonthText() {
+        const el = document.getElementById('month-text');
+        if (!el || el.hidden) return;
+        const body = document.getElementById('mt-body'), title = document.getElementById('mt-title');
+        const month = TL.on ? TL.month : null;
+        if (title) title.textContent = month ? monthLabel(month) + ' as text' : 'This month as text';
+        if (!body) return;
+        if (!month) { body.innerHTML = '<p>Pick a month (the chips) or press Play: the month on screen is listed here as text.</p>'; return; }
+        const kp = KPI.cache[month];
+        // the bar's figures, COPIED from the bar: the text and the bar cannot disagree
+        const txt = id => { const e = document.getElementById(id); return e ? e.textContent.trim() : ''; };
+        const pairs = [['Two-way movements a day', txt('kpi-trips')], [txt('kpi-vehicles-label'), txt('kpi-vehicles')]];
+        const mc = document.getElementById('kpi-material-card');
+        if (mc && !mc.hidden) pairs.push([txt('kpi-material-label'), txt('kpi-material')]);
+        pairs.push([txt('kpi-routes-label'), txt('kpi-routes')], [txt('kpi-co2-day-label'), txt('kpi-co2-day')], [txt('kpi-co2-total-label'), txt('kpi-co2-total')]);
+        let html = '<p>Approved plan for ' + escHtml(monthLabel(month)) + ': the same figures as the bar, with the panel’s filters.'
+            + (TENANT.demo_notice ? ' ' + escHtml(TENANT.demo_notice) + '.' : '') + '</p>';
+        html += '<dl class="mt-figs">' + pairs.map(([k, v]) => '<dt>' + escHtml(k) + '</dt><dd>' + escHtml(v || '—') + '</dd>').join('') + '</dl>';
+        if (!kp) { body.innerHTML = html + '<p>Loading the routes for ' + escHtml(monthLabel(month)) + '…</p>'; return; }
+        const wd = kp.working_days > 0 ? kp.working_days : FORECAST_WORKING_DAYS;
+        const live = WARN.liveMonth === month ? (WARN.live || []) : [];
+        const t = monthTableRows(kp.lines, routePropsById(), currentFilters(), wd, live);
+        if (!t.rows.length) html += '<p>No approved movements on the routes in the filter in ' + escHtml(monthLabel(month)) + '.</p>';
+        else html += '<table class="mt-table"><caption>Routes in ' + escHtml(monthLabel(month)) + ', busiest first</caption>'
+            + '<thead><tr><th scope="col">Route</th><th scope="col" class="num">Two-way a day</th><th scope="col" class="num">Vehicles</th><th scope="col">Conditions</th></tr></thead><tbody>'
+            + t.rows.map(r => '<tr><th scope="row">' + escHtml(r.origin + ' → ' + r.dest) + '<br><span class="mt-note">' + escHtml([r.rid, r.ipt && r.ipt !== 'Unknown_IPT' ? teamText(r.ipt) : ''].filter(Boolean).join(' · ')) + '</span></th>'
+                + '<td class="num">' + escHtml(fmtN(r.twoWay, 0)) + '</td><td class="num">' + escHtml(vehiclesText(r)) + '</td>'
+                + '<td>' + escHtml(r.conditions.length ? r.conditions.join('; ') : 'none') + '</td></tr>').join('')
+            + '</tbody></table>';
+        const sites = live.filter(i => i.kind === 's');
+        if (sites.length) html += '<p><b>Sites:</b> ' + sites.map(i => escHtml(i.noun + ' — ' + i.what)).join(' ') + '</p>';
+        if (t.undrawn.length) html += '<p class="mt-note">Not on the map and not counted (no stored road route): ' + escHtml(t.undrawn.join(', ')) + '.</p>';
+        html += '<p class="mt-note">Two-way movements a day = loads (deliveries) ÷ ' + escHtml(String(wd)) + ' working days in the month, from the plan; each is a lorry out laden and back empty, counted once. '
+            + 'Vehicles = per line, movements a day ÷ what one vehicle can do in a day on that route, rounded up. Rows are rounded, so they may not add to the bar.</p>';
+        html += '<div class="concern-slot"></div>';
+        body.innerHTML = html;
+        renderConcernLinks();
+    }
+
+    // ---------------------------------------------------------------- the phone shell's sheet (review 2.8 row 2)
+    const SHEET = { state: 'peek', before: 'peek', card: null, busySrc: null };
+    function sheetAria() {
+        const sheet = document.getElementById('m-sheet'), h = document.getElementById('m-handle'), lb = document.getElementById('m-layers-btn');
+        if (sheet) sheet.dataset.state = SHEET.state;
+        if (h) {
+            h.setAttribute('aria-expanded', String(SHEET.state !== 'peek'));
+            h.setAttribute('aria-label', SHEET.state === 'peek' ? 'Show the busiest routes and conditions' : 'Show less');
+        }
+        if (lb) lb.setAttribute('aria-expanded', String(sidebarIsOpen()));
+    }
+    // peek | half | full. Full is the filters and layers: the panel opened as a full-screen sheet.
+    function sheetTo(state) {
+        if (state === 'full') { openLayersSheet(); return; }
+        if (SHEET.state === 'full' && sidebarIsOpen()) { SHEET.before = state; closeSidebar(); }   // syncSheetWithPanel sets the state
+        SHEET.state = state;
+        if (state === 'peek' && SHEET.card) { SHEET.card = null; renderRouteCard(); }
+        sheetAria();
+        renderSheet();
+    }
+    // the handle: a tap toggles peek and half
+    function toggleSheet() { sheetTo(SHEET.state === 'peek' ? 'half' : 'peek'); }
+    function openLayersSheet() {
+        if (SHEET.state !== 'full') SHEET.before = SHEET.state;
+        if (!sidebarIsOpen()) toggleSidebar();
+        // the Layers sheet opens on its layers: the fold that keeps them out of the way on the desktop is opened here
+        const lbx = document.getElementById('layers-box'); if (lbx && isPhoneShell()) lbx.open = true;
+        SHEET.state = 'full';
+        sheetAria();
+        const c = document.getElementById('sidebar-close'); if (c && isPhoneShell()) { try { c.focus(); } catch (e) {} }
+    }
+    function closeLayersSheet() {
+        if (sidebarIsOpen()) toggleSidebar();
+        const lb = document.getElementById('m-layers-btn'); if (lb && isPhoneShell()) { try { lb.focus(); } catch (e) {} }
+    }
+    // the panel opened or closed by any control (its own ×, "Show map", the Layers button): the sheet follows
+    function syncSheetWithPanel() {
+        if (isPhoneShell()) {
+            if (sidebarIsOpen() && SHEET.state !== 'full') { SHEET.before = SHEET.state; SHEET.state = 'full'; }
+            else if (!sidebarIsOpen() && SHEET.state === 'full') SHEET.state = SHEET.before === 'full' ? 'peek' : (SHEET.before || 'peek');
+        }
+        sheetAria();
+    }
+    // the conditions counts in the pill's own words (a planning flag is never called a limit)
+    function condSummary(c) {
+        c = c || {};
+        const out = [];
+        if (c.clash) out.push(c.clash + ' over capacity');
+        if (c.warn) out.push(c.warn + ' route limit' + (c.warn === 1 ? '' : 's'));
+        if (c.cap) out.push(c.cap === 1 ? '1 route over a planning flag' : c.cap + ' routes over planning flags');
+        if (c.caution) out.push(c.caution + ' seasonal window' + (c.caution === 1 ? '' : 's'));
+        return out.join(' · ');
+    }
+    // the condition rows, in the panel's markup; on a phone "Show on map" also lowers the sheet so the map shows
+    function condRowsHTML(live) {
+        return live.map(i =>
+            '<div class="tl-warn ' + i.lvl + '"><span class="cond-dot"></span><span class="body"><b>' + escHtml(i.noun) + '</b><span class="what">' + escHtml(i.what) + '</span><br>'
+            + '<button type="button" class="show" onclick="showCondition(\'' + i.kind + '\',\'' + escHtml(i.id).replace(/'/g, '') + '\'); sheetTo(\'peek\')">Show on map</button></span>'
+            + '<button type="button" class="x" title="Dismiss for this month" aria-label="Dismiss for this month" onclick="dismissWarning(\'' + escHtml(i.key).replace(/'/g, '') + '\')">&times;</button></div>').join('');
+    }
+    function barHead() {
+        const t = document.getElementById('kpi-title');
+        if (!t) return '';
+        const first = t.firstChild && t.firstChild.nodeType === 3 ? t.firstChild.nodeValue.trim() : t.textContent.trim();
+        return t.querySelector('.kpi-sub') ? first + ' · approved plan' : first;
+    }
+    function renderSheet() {
+        const sheet = document.getElementById('m-sheet');
+        if (!sheet) return;
+        const set = (id, v) => { const el = document.getElementById(id); if (el && el.textContent !== v) el.textContent = v; };
+        const txt = id => { const el = document.getElementById(id); return el ? el.textContent.trim() : ''; };
+        set('m-month', TL.on ? (barHead() || monthLabel(TL.month)) : 'No month on screen: pick a month or press Play');
+        set('m-trips', TL.on ? (txt('kpi-trips') || '—') : '—');
+        set('m-vehicles', TL.on ? (txt('kpi-vehicles') || '—') : '—');
+        const cond = document.getElementById('m-cond'), s = TL.on ? condSummary(WARN.counts) : '';
+        if (cond) {
+            cond.hidden = !s;
+            set('m-cond', s ? s + ' ›' : '');
+            cond.setAttribute('aria-label', s ? 'Conditions: ' + s : 'Conditions');
+        }
+        // the busiest routes, copied from the panel's list; a tap opens the route card
+        const bz = document.getElementById('kpi-busiest'), mb = document.getElementById('m-busiest');
+        if (bz && mb && bz.innerHTML !== SHEET.busySrc) {
+            SHEET.busySrc = bz.innerHTML;
+            mb.innerHTML = SHEET.busySrc ? SHEET.busySrc.replace(/onclick="selectRoute\(/g, 'onclick="openRouteCard(')
+                                         : '<p class="mt-note">Pick a month to see the busiest routes.</p>';
+        }
+        const mc = document.getElementById('m-conditions');
+        if (mc) {
+            const live = (TL.on && WARN.liveMonth === TL.month) ? (WARN.live || []) : null;
+            const html = live === null ? '<p class="mt-note">Conditions are listed while a month is on screen.</p>'
+                       : live.length ? condRowsHTML(live) : '<p class="mt-note">Nothing needs attention in ' + escHtml(monthLabel(TL.month)) + '.</p>';
+            if (mc._src !== html) { mc._src = html; mc.innerHTML = html; }
+        }
+    }
+    function syncPlayButtons() {
+        const b = document.getElementById('m-play');
+        if (!b) return;
+        b.setAttribute('aria-pressed', String(!!TL.playing));
+        const t = TL.playing ? '⏸' : '▶';
+        if (b.textContent !== t) b.textContent = t;
+    }
+    function onConditionsChanged() {
+        renderSheet();
+        if (SHEET.card) renderRouteCard();
+        renderMonthText();
+    }
+
+    // ---------------------------------------------------------------- the route card (a phone's tap on a route)
+    // The figures for the month on screen from the same month-kpis lines as the bar (one load = one two-way movement;
+    // vehicles per line, rounded up). The authority fields (hours, responsible organisation, consent reference) are
+    // typed fields this tenant does not have yet: the card says so and never invents them.
+    function routeFigures(lines, rid, wd) {
+        let n = 0, loads = 0, t = 0, vehicles = 0, unbaked = 0;
+        (lines || []).forEach(l => {
+            if (l.route_id !== rid) return;
+            const vl = Number(l.vehicle_loads) || 0;
+            n++; loads += vl; t += Number(l.qty_t) || 0;
+            if (l.trips_per_vehicle_day > 0) vehicles += Math.ceil((vl / wd) / l.trips_per_vehicle_day); else unbaked++;
+        });
+        return { lines: n, loads, twoWay: wd > 0 ? loads / wd : 0, tonnesDay: wd > 0 ? t / wd : 0, vehicles, unbaked };
+    }
+    function routeCardHTML(rid) {
+        const rp = routePropsById()[rid] || {};
+        const info = ROUTEINFO[String(rid).trim().toLowerCase()] || {};
+        const team = rp.ipt && rp.ipt !== 'Unknown_IPT' ? teamText(rp.ipt) : '';
+        const month = TL.on ? TL.month : null, kp = month ? KPI.cache[month] : null;
+        let html = '<h3>' + escHtml((rp.origin || info.origin || '—') + ' → ' + (rp.dest || info.dest || '—')) + '</h3>'
+            + '<div class="rc-sub">' + escHtml([rid, team, (rp.disciplines || []).join(', ')].filter(Boolean).join(' · ')) + '</div>';
+        if (!month) html += '<p class="mt-note">Pick a month to see this route’s movements a day.</p>';
+        else if (!kp) html += '<p class="mt-note">Loading the figures for ' + escHtml(monthLabel(month)) + '…</p>';
+        else {
+            const wd = kp.working_days > 0 ? kp.working_days : FORECAST_WORKING_DAYS, f = routeFigures(kp.lines, rid, wd);
+            html += f.lines
+                ? '<dl><dt>Two-way movements a day, ' + escHtml(monthLabel(month)) + '</dt><dd>' + escHtml(fmtN(f.twoWay, 0)) + '</dd>'
+                  + '<dt>Vehicles needed</dt><dd>' + escHtml(vehiclesText(f)) + '</dd>'
+                  + '<dt>Material a day</dt><dd>' + escHtml(fmtN(f.tonnesDay, 0)) + ' t</dd>'
+                  + (info.distance_km ? '<dt>One way</dt><dd>' + escHtml(fmtDist(info.distance_km, 1) + ' ' + DU()) + '</dd>' : '') + '</dl>'
+                : '<p class="mt-note">Nothing approved on this route in ' + escHtml(monthLabel(month)) + '.</p>';
+        }
+        const conds = (month && WARN.liveMonth === month ? (WARN.live || []) : []).filter(i => i.who === rid);
+        html += conds.length ? '<h3>Conditions on this route</h3>' + condRowsHTML(conds) : '';
+        html += '<p class="mt-note">Hours, the responsible organisation and the consent reference have not been typed for this scheme'
+              + (TENANT.demo_notice ? ' (placeholders on the fictional demo scheme)' : '') + '.</p>'
+              + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the route card</button>';
+        return html;
+    }
+    function renderRouteCard() {
+        const box = document.getElementById('m-card'), main = document.getElementById('m-main');
+        if (!box || !main) return;
+        if (!SHEET.card) { box.hidden = true; box.innerHTML = ''; main.hidden = false; return; }
+        box.innerHTML = routeCardHTML(SHEET.card);
+        box.hidden = false; main.hidden = true;
+    }
+    function openRouteCard(rid) {
+        if (!rid) return;
+        SHEET.card = String(rid);
+        if (typeof selectRoute === 'function') selectRoute(rid);
+        renderRouteCard();
+        if (SHEET.state !== 'half') sheetTo('half');
+        if (TL.on && !KPI.cache[TL.month]) kpiFetchMonth(TL.month).then(renderRouteCard).catch(() => {});
+    }
+    function closeRouteCard() {
+        if (!SHEET.card) return;
+        SHEET.card = null;
+        renderRouteCard();
+        if (typeof clearSelection === 'function') clearSelection();
+    }
+
+    // ---------------------------------------------------------------- wiring
+    let _soon = null;
+    function refreshShell() {
+        if (_soon) return;
+        _soon = requestAnimationFrame(() => {
+            _soon = null;
+            renderMonthChips(); renderSheet(); syncPlayButtons(); renderMonthText();
+            if (SHEET.card) renderRouteCard();
+        });
+    }
+    function observeEl(id, opts, fn) {
+        const el = document.getElementById(id);
+        if (!el || typeof MutationObserver === 'undefined') return;
+        new MutationObserver(fn).observe(el, opts);
+    }
+    // the bar, the panel's lists, the month slider and the timeline bar's open / shut are what the sheet, the chips and
+    // the text view copy from; watching them means none of the timeline's functions had to learn about the sheet
+    observeEl('kpi-hud', { subtree: true, childList: true, characterData: true }, refreshShell);
+    observeEl('kpi-moving', { subtree: true, childList: true, characterData: true }, refreshShell);
+    observeEl('tl-range', { attributes: true, attributeFilter: ['aria-valuetext'] }, refreshShell);
+    observeEl('timeline-bar', { attributes: true, attributeFilter: ['style'] }, refreshShell);
+    observeEl('tl-play', { attributes: true, attributeFilter: ['aria-pressed'] }, () => { syncPlayButtons(); if (!TL.playing) scheduleViewWrite(); });
+    observeEl('main-sidebar', { attributes: true, attributeFilter: ['class'] }, syncSheetWithPanel);
+    observeEl('restriction-toggles', { childList: true }, applyPendingRestr);
+    // the phone breakpoint: the map's tilt and drag-rotate are off on a phone and back on above it
+    function wirePhoneShell() {
+        const apply = () => {
+            const on = isPhoneShell();
+            try { if (on) { map.touchPitch.disable(); map.dragRotate.disable(); } else { map.touchPitch.enable(); map.dragRotate.enable(); } } catch (e) {}
+            if (!on && SHEET.card) closeRouteCard();
+            syncSheetWithPanel(); renderSheet();
+        };
+        try {
+            const mql = window.matchMedia(PHONE_SHELL_MQ);
+            if (mql.addEventListener) mql.addEventListener('change', apply); else if (mql.addListener) mql.addListener(apply);
+        } catch (e) {}
+        apply();
+    }
+    wirePhoneShell();
+    const mapEl = document.getElementById('map');
+    if (mapEl) mapEl.addEventListener('mouseleave', () => setRouteHover(null, null));
+    // Escape closes the top-most of: the share card, the text view, the layers sheet, a raised sheet
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const sp = document.getElementById('share-panel');
+        if (sp && !sp.hidden) { closeSharePanel(); return; }
+        const mt = document.getElementById('month-text');
+        if (mt && !mt.hidden) { closeMonthText(); return; }
+        if (isPhoneShell() && sidebarIsOpen()) { closeLayersSheet(); return; }
+        if (isPhoneShell() && SHEET.state !== 'peek') sheetTo('peek');
+    });
+    // once the network is in (initNetwork): the chips need the months with volume, then the deep link is applied
+    function onNetworkReady() {
+        renderMonthChips();
+        ensureTimelineMatrix().then(() => { CHIPS.failed = false; renderMonthChips(); }, () => { CHIPS.failed = true; renderMonthChips(); });
+        applyViewFromUrl();
+        renderConcernLinks();
+        renderSheet();
+    }
+    renderMonthChips(); renderSheet(); sheetAria();
     </script>
 </body>
 </html>
