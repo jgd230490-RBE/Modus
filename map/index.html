@@ -362,10 +362,8 @@
         #tl-label{ font-size:12px; font-weight:600; color:var(--navy-deep); min-width:190px; white-space:nowrap; flex:0 0 auto; }
         /* and the select was far bigger than five two-character options need */
         #tl-speed{ border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
-        /* 12 Oct 2026 (D22): the "full horizon" switch — Play loops within the months that carry volume
-           unless this is ticked; the announcer is visually hidden but read by a screen reader */
-        #timeline-bar .tl-full{ flex:0 0 auto; display:flex; align-items:center; gap:4px; font-size:14px; font-weight:600; color:var(--muted); white-space:nowrap; cursor:pointer; }
-        #timeline-bar .tl-full input{ margin:0; accent-color:var(--navy); }
+        /* 12 Oct 2026 (D22): the announcer is visually hidden but read by a screen reader. (The "full horizon" checkbox
+           that sat here is the M3 bar's "Plan months / Full horizon" pair now, styled with the M3 rules below.) */
         #timeline-bar:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
         .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
         /* 12 Oct 2026 (review 2.8, live A6) — the timeline bar below 1024: full width, 44 px targets, the label wraps instead
@@ -385,11 +383,126 @@
             #tl-label{ order:1; }
             #tl-speed{ order:2; }
             #timeline-bar .tl-close{ order:3; }
-            #timeline-bar .tl-full{ order:2; }   /* the "Full horizon" switch (D22) sits with the speed select on the top row */
             #timeline-bar::after{ content:""; flex:0 0 100%; height:0; order:4; }
             #timeline-bar .tl-btn{ order:5; }
             #timeline-bar input[type=range]{ order:6; flex:1 1 60px; width:auto; }
         }
+        /* ===== 12 Oct 2026 (evening) — the M3 bar (review §2.4, mockup 3; the user: "build full m3 bar"). These come after
+           the base and the narrow rules above and win by specificity ([role="group"] / #timeline-bar …), so the rules
+           above stay as they were. Every font here is 14 px or more (the 14 px floor), against the mockup's 11-13. */
+        #timeline-bar[role="group"]{ flex-direction:column; align-items:stretch; gap:0; padding:12px 16px 10px; border-radius:12px; }
+        @media (min-width:1024px){
+            #timeline-bar[role="group"]{ left:324px; right:24px; transform:none; max-width:none; }
+            body.sidebar-closed #timeline-bar[role="group"]{ left:24px; }
+            body.month-text-open #timeline-bar[role="group"]{ left:324px; right:444px; }
+            body.month-text-open.sidebar-closed #timeline-bar[role="group"]{ left:24px; }
+            /* the conditions panel stops above the bar, which is taller now */
+            body.timeline-on #tl-warnings{ max-height:min(60vh, 520px, calc(100vh - 130px - var(--tl-foot, 0px))); }
+            body.timeline-on #tl-warnings > *{ flex:0 0 auto; }   /* shortened, the panel scrolls; its rows never squash */
+        }
+        .tl-row1{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+        #timeline-bar .tl-btn{ width:40px; height:40px; border:1px solid #D6D3D1; background:#fff; color:var(--ink); font-size:14px; display:inline-flex; align-items:center; justify-content:center; }
+        #timeline-bar #tl-play{ width:48px; background:#C2410C; border-color:#C2410C; color:#fff; font-size:17px; font-weight:700; }
+        #timeline-bar .tl-btn:focus-visible, .tl-seg button:focus-visible, .tl-ghost:focus-visible, #tl-toast button:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+        .tl-lbl{ line-height:1.2; min-width:0; flex:0 1 auto; }
+        #timeline-bar #tl-label{ display:block; font-size:17px; font-weight:600; color:var(--ink); min-width:0; white-space:nowrap; }
+        #tl-figs{ display:block; font-size:14px; color:#44403C; font-variant-numeric:tabular-nums; margin-top:2px; white-space:nowrap; }
+        .tl-ctl{ margin-left:auto; display:flex; align-items:center; gap:12px 14px; font-size:14px; white-space:nowrap; flex-wrap:wrap; justify-content:flex-end; color:var(--ink); }
+        .tl-sw{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; position:relative; }
+        .tl-sw input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
+        .tl-sw i{ width:34px; height:20px; border-radius:999px; background:#A8A29E; position:relative; display:inline-block; flex:none; }
+        .tl-sw i:after{ content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
+        .tl-sw input:checked + i{ background:#1F2024; }
+        .tl-sw input:checked + i:after{ left:16px; }
+        .tl-sw input:focus-visible + i{ outline:2px solid var(--navy); outline-offset:2px; }
+        .tl-seg{ display:inline-flex; border:1px solid #D6D3D1; border-radius:7px; overflow:hidden; }
+        .tl-seg button{ border:0; background:#fff; color:var(--ink); font:500 14px Inter,system-ui,sans-serif; padding:6px 10px; cursor:pointer; }
+        .tl-seg button + button{ border-left:1px solid #D6D3D1; }
+        .tl-seg button[aria-checked="true"]{ background:#1F2024; color:#fff; }
+        #timeline-bar #tl-speed{ width:auto; font:500 14px Inter,system-ui,sans-serif; padding:6px 6px; color:var(--ink); border-color:#D6D3D1; text-align:left; text-align-last:auto; }
+        .tl-ghost{ border:1px solid #D6D3D1; border-radius:7px; padding:6px 10px; background:#fff; color:var(--ink); font:500 14px Inter,system-ui,sans-serif; cursor:pointer; }
+        #timeline-bar .tl-close{ font-size:22px; padding:0 4px; line-height:1; }
+        /* the loop label sits over the bracket of the months Play loops over; JS sets its indent and the bracket */
+        .tl-looplbl{ margin-top:10px; font-size:14px; color:var(--ink); line-height:1.3; min-height:18px; }
+        .tl-looplbl b{ font-weight:600; }
+        .tl-railwrap{ position:relative; margin-top:18px; }
+        .tl-loop{ position:absolute; top:-14px; height:11px; border:1.5px solid #1F2024; border-bottom:0; border-radius:3px 3px 0 0; pointer-events:none; }
+        .tl-rail{ display:flex; height:30px; border:1px solid #D6D3D1; border-radius:4px; overflow:hidden; background:#FAFAF9; cursor:pointer; touch-action:none; user-select:none; }
+        .tl-rail i{ flex:1; position:relative; border-left:1px solid #EFEDEA; display:block; }
+        .tl-rail i:first-child{ border-left:0; }
+        .tl-rail i.yr{ border-left:1px solid #A8A29E; }
+        .tl-rail i.vol{ background:rgba(37,99,235,.28); }
+        .tl-rail i.now{ background:rgba(37,99,235,.62); }
+        .tl-rail i.now:not(.vol){ background:rgba(31,32,36,.18); }
+        .tl-rail i.cl:before{ content:""; position:absolute; left:50%; top:3px; margin-left:-5px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:8px solid #D97706; }
+        .tl-rail i.oc:after{ content:""; position:absolute; left:50%; bottom:3px; margin-left:-4px; width:8px; height:8px; border-radius:50%; background:#DC2626; }
+        .tl-playhead{ position:absolute; top:-8px; width:0; height:48px; border-left:2px solid #1F2024; margin-left:-1px; pointer-events:none; transition:left .2s ease; }
+        .tl-playhead:before{ content:""; position:absolute; left:-8px; top:-9px; border-left:7px solid transparent; border-right:7px solid transparent; border-top:9px solid #1F2024; }
+        @media (prefers-reduced-motion:reduce){ .tl-playhead{ transition:none; } }
+        /* the range is the keyboard's and the screen reader's control of the month; the rail above is the pointer's */
+        #timeline-bar .tl-railwrap input[type=range]{ position:absolute; width:1px; height:1px; min-width:0; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; flex:none; }
+        #timeline-bar .tl-railwrap:focus-within .tl-rail{ outline:2px solid var(--navy); outline-offset:2px; }
+        .tl-years{ display:flex; font-size:14px; color:#78716C; margin-top:3px; }
+        .tl-years span{ flex:1; padding-left:4px; }
+        .tl-hints{ display:flex; align-items:center; gap:6px 12px; margin-top:8px; font-size:14px; color:#57534E; flex-wrap:wrap; }
+        .tl-hints kbd{ font-family:inherit; font-size:14px; border:1px solid #D6D3D1; border-bottom-width:2px; border-radius:4px; padding:0 6px; background:#fff; color:var(--ink); margin-right:2px; }
+        .tl-hints .sep{ color:#D6D3D1; }
+        .tl-leg{ margin-left:auto; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+        .tl-leg i{ display:inline-block; vertical-align:middle; margin-right:5px; }
+        .tl-leg .sq{ width:12px; height:12px; background:rgba(37,99,235,.28); border:1px solid #D6D3D1; }
+        .tl-leg .tri{ width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:8px solid #D97706; }
+        .tl-leg .dot{ width:8px; height:8px; border-radius:50%; background:#DC2626; }
+        /* a short screen keeps the map: the keys go first, then the reduced-motion note; the rail's legend stays */
+        @media (max-width:1439px){ .tl-hints .tl-rm{ display:none; } }
+        @media (max-height:720px){ .tl-hints .tl-keys{ display:none; } .tl-looplbl{ margin-top:6px; } .tl-railwrap{ margin-top:16px; } }
+        /* 768-1023: the bar is full width already (the rule above); 44 px targets, the controls wrap under the month */
+        @media (max-width:1023px){
+            #timeline-bar .tl-btn{ width:44px; height:44px; }
+            #timeline-bar #tl-play{ width:52px; }
+            .tl-ctl{ margin-left:0; justify-content:flex-start; }
+            .tl-seg button, .tl-ghost, #timeline-bar #tl-speed{ min-height:44px; }
+            .tl-hints .tl-keys{ display:none; }
+        }
+        /* paused on a clash: above the bar, at its left (the conditions panel holds the right) */
+        #tl-toast{ position:absolute; z-index:26; left:324px; bottom:var(--tl-foot, 200px); width:min(450px, calc(100vw - 48px)); background:#fff;
+                   border:1px solid #E7E5E4; border-left:4px solid #DC2626; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.18);
+                   padding:12px 14px; font-size:14px; line-height:1.4; color:var(--ink); }
+        #tl-toast[hidden]{ display:none; }
+        body.sidebar-closed #tl-toast{ left:24px; }
+        @media (max-width:1023px){ #tl-toast, body.sidebar-closed #tl-toast{ left:12px; } }
+        #tl-toast .h{ font-weight:600; font-size:15px; color:#B91C1C; }
+        #tl-toast .h span{ color:#78716C; font-weight:400; font-size:14px; margin-left:8px; }
+        #tl-toast p{ margin:4px 0 10px; }
+        #tl-toast .acts{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        #tl-toast .tl-act{ border:0; background:#C2410C; color:#fff; border-radius:7px; padding:7px 12px; font:600 14px Inter,system-ui,sans-serif; cursor:pointer; }
+        #tl-toast .tl-lnk{ margin-left:auto; border:0; background:none; color:#57534E; text-decoration:underline; font:14px Inter,system-ui,sans-serif; cursor:pointer; padding:4px 0; }
+        /* WALL MODE: chrome off — the fictional strip, the map, the month and its figures, the rail */
+        #wall-hud, #wall-hint{ display:none; }
+        body.wall-mode #main-sidebar, body.wall-mode #menu-toggle, body.wall-mode #kpi-hud, body.wall-mode #tl-warnings, body.wall-mode #tl-toast,
+        body.wall-mode #guide-btn, body.wall-mode #route-drawer, body.wall-mode #btn-detail, body.wall-mode .custom-map-widget,
+        body.wall-mode .mapboxgl-ctrl-top-right, body.wall-mode #month-text, body.wall-mode #route-hover-card,
+        body.wall-mode #timeline-bar .tl-row1, body.wall-mode #timeline-bar .tl-hints,
+        body.wall-mode .guide-strip, body.wall-mode .guide-dot, body.wall-mode .guide-tip, body.wall-mode #guide-ring, body.wall-mode #guide-card{ display:none !important; }
+        body.wall-mode #map{ left:0 !important; right:0 !important; transition:none !important; }
+        body.wall-mode #timeline-bar[role="group"]{ left:40px; right:40px; bottom:36px; background:none; border:0; box-shadow:none; padding:0; transform:none; max-width:none; }
+        body.wall-mode .tl-looplbl{ font-size:22px; margin-top:0; }
+        body.wall-mode .tl-railwrap{ margin-top:26px; }
+        body.wall-mode .tl-loop{ top:-22px; height:16px; border-width:2.5px; }
+        body.wall-mode .tl-rail{ height:44px; background:rgba(255,255,255,.85); }
+        body.wall-mode .tl-playhead{ height:66px; top:-12px; border-left-width:4px; margin-left:-2px; }
+        body.wall-mode .tl-playhead:before{ left:-11px; top:-12px; border-left-width:10px; border-right-width:10px; border-top-width:13px; }
+        body.wall-mode .tl-years{ font-size:20px; margin-top:6px; }
+        body.wall-mode .tl-years span{ text-shadow:0 0 4px #fff; }
+        body.wall-mode .tl-rail i.cl:before{ border-left-width:8px; border-right-width:8px; border-bottom-width:13px; margin-left:-8px; }
+        body.wall-mode .tl-rail i.oc:after{ width:12px; height:12px; margin-left:-6px; }
+        body.wall-mode #wall-hud{ display:block; position:absolute; z-index:26; left:28px; bottom:calc(var(--tl-foot, 160px) + 12px); color:#1F2024;
+                                  background:rgba(255,255,255,.9); padding:10px 14px 12px; border-radius:12px; }
+        body.wall-mode #wall-hud .m{ font-size:64px; font-weight:700; letter-spacing:-.01em; line-height:1; }
+        body.wall-mode #wall-hud .f{ font-size:26px; font-weight:500; margin-top:10px; font-variant-numeric:tabular-nums; }
+        body.wall-mode #wall-hint{ display:block; position:absolute; z-index:26; right:28px; top:calc(var(--notice-h, 26px) + 24px); font-size:20px; color:#57534E;
+                                   text-align:right; line-height:1.3; background:rgba(255,255,255,.9); padding:10px 14px; border-radius:12px; }
+        body.wall-mode #wall-hint button{ margin-top:8px; border:1px solid #D6D3D1; border-radius:7px; background:#fff; color:#1F2024; font:500 16px Inter,system-ui,sans-serif; padding:6px 12px; cursor:pointer; }
+        body.wall-mode.has-demo-notice #demo-notice{ font-size:22px; height:auto; padding:8px 22px; }
         /* ===== 12 Oct 2026 — the interactivity pass (review 2.3, D14, D29) and the phone shell (review 2.8 row 2,
            mockup 7, D30). Every font size in this section is 14 px or more (the staff bar's floor).
            Desktop first: the month chips (they replace the From/To selects), the hover card on a route, the text view
@@ -454,6 +567,7 @@
         #m-layers-btn, #m-sheet, .m-done{ display:none; }
         @media (max-width:767px){
             #kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }
+            #tl-toast, #wall-hud, #wall-hint{ display:none !important; }   /* M3 (12 Oct evening): the sheet carries the month and Play */
             .custom-map-widget{ display:none !important; }   /* the basemap widget is off on phones; the Layers sheet has the basemap */
             .mapboxgl-ctrl-top-right{ top:calc(var(--notice-h, 0px) + 64px) !important; }
             .mapboxgl-ctrl-group button{ width:44px; height:44px; }
@@ -768,19 +882,55 @@
      on it; the Play button carries aria-pressed; the slider is named "Month" and speaks the month name
      (aria-valuetext); #tl-live is the polite announcer for "playback stopped at <month>". Every control is
      type="button" and named (review 2.8). -->
+<!-- 12 Oct 2026 (evening, the user: "build full m3 bar") — mockup 3 of the review: row 1 (the buttons, the month and its
+     figures, Pause on clash, Plan months / Full horizon, the speed, Wall mode, close), the loop label, the RAIL of every
+     month of the horizon (approved volume shaded, a triangle for a closure on a route in use, a red dot for over capacity;
+     click or drag to go to a month), the year marks, and the keys and the rail's legend. The range input stays as the
+     keyboard and screen-reader control of the month; the rail is the pointer's. -->
 <div id="timeline-bar" role="group" aria-label="Forecast timeline" tabindex="0">
+  <div class="tl-row1">
   <button type="button" class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month" aria-label="Previous month">◀</button>
   <button type="button" class="tl-btn" id="tl-play" onclick="toggleTimeline()" title="Play / pause" aria-label="Play" aria-pressed="false">▶</button>
   <button type="button" class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month" aria-label="Next month">▶▶</button>
-  <input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub(this.value)" aria-label="Month" aria-valuetext="Jan 2026">
-  <span id="tl-label">Jan 2026</span>
+  <div class="tl-lbl"><span id="tl-label">Jan 2026</span><span id="tl-figs"></span></div>
+  <div class="tl-ctl">
+  <label class="tl-sw" title="Stop once per loop on the first month with a red condition (over capacity)"><input type="checkbox" id="tl-pause-clash" role="switch" checked onchange="setPauseOnClash(this.checked)"><i aria-hidden="true"></i>Pause on clash</label>
+  <div class="tl-seg" role="radiogroup" aria-label="Months Play loops over">
+    <button type="button" id="tl-seg-plan" role="radio" aria-checked="true" onclick="setTimelineFull(false)" title="Loop over the months with approved volume">Plan months</button><button type="button" id="tl-seg-full" role="radio" aria-checked="false" onclick="setTimelineFull(true)" title="Play every month of the horizon, including the months with nothing approved">Full horizon</button>
+  </div>
   <select id="tl-speed" onchange="setTimelineSpeed(this.value)" title="Play speed — months per second" aria-label="Play speed, months per second">
-    <option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
+    <option value="0.25">¼× · 3 s a month</option><option value="0.5">½× · 1.5 s a month</option><option value="1" selected>1× · 0.75 s a month</option><option value="2">2× · 0.4 s a month</option><option value="4">4× · 0.2 s a month</option>
   </select>
-  <label class="tl-full" title="Play every month of the horizon, including the months with nothing approved"><input type="checkbox" id="tl-full" onchange="setTimelineFull(this.checked)"> Full horizon</label>
+  <button type="button" class="tl-ghost" id="tl-wall" onclick="enterWallMode()" title="Full screen for a stand: plays by itself, no buttons or panels; Esc to leave">Wall mode</button>
   <button type="button" class="tl-close" onclick="closeTimeline()" title="Close timeline" aria-label="Close the timeline">&times;</button>
+  </div>
+  </div>
+  <div class="tl-looplbl" id="tl-looplbl"></div>
+  <div class="tl-railwrap">
+    <div class="tl-loop" id="tl-loop" aria-hidden="true"></div>
+    <div class="tl-rail" id="tl-rail" aria-hidden="true" title="Click or drag to go to a month"></div>
+    <div class="tl-playhead" id="tl-playhead" aria-hidden="true"></div>
+    <input type="range" id="tl-range" min="1" max="60" value="1" oninput="onTimelineScrub(this.value)" aria-label="Month" aria-valuetext="Jan 2026">
+    <div class="tl-years" id="tl-years" aria-hidden="true"></div>
+  </div>
+  <div class="tl-hints">
+    <span class="tl-keys"><kbd>Space</kbd> play / pause</span><span class="tl-keys sep">·</span>
+    <span class="tl-keys"><kbd>←</kbd><kbd>→</kbd> one month</span><span class="tl-keys sep">·</span>
+    <span class="tl-keys"><kbd>Esc</kbd> close</span><span class="tl-keys tl-rm sep">·</span>
+    <span class="tl-keys tl-rm">Dashes stop marching under reduced motion</span>
+    <span class="tl-leg"><span><i class="sq"></i>Approved volume</span><span><i class="tri"></i>Closure affecting a route</span><span><i class="dot"></i>Over capacity</span></span>
+  </div>
   <div id="tl-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 </div>
+<!-- paused on a clash (M3): what stopped Play, and the three ways on -->
+<div id="tl-toast" role="status" hidden>
+  <div class="h">Paused on a clash <span>once per loop · Space resumes</span></div>
+  <p id="tl-toast-body"></p>
+  <div class="acts"><button type="button" class="tl-ghost" id="tl-toast-show">Show on map</button><button type="button" class="tl-act" onclick="startTimeline()">▶ Resume</button><button type="button" class="tl-lnk" onclick="stopPausingOnClash()">Stop pausing on clashes</button></div>
+</div>
+<!-- wall mode (M3, review §2.4 last row): the month and its figures readable across a room -->
+<div id="wall-hud" hidden><div class="m" id="wall-month"></div><div class="f" id="wall-figs"></div></div>
+<div id="wall-hint" hidden><span id="wall-hint-text"></span><br><button type="button" onclick="exitWallMode()">Leave wall mode (Esc)</button></div>
 
 <div id="route-drawer">
   <div class="drawer-head">
@@ -5537,10 +5687,25 @@
     // matrix fetch in flight, so a double press does not fetch it twice.
     const TL = { on:false, playing:false, month:1, timer:null, matrix:null, matrixPending:null, speed:1, full:false, clashPaused:false, ticked:null, startedOn:null };
     try { const sp = parseFloat(localStorage.getItem('modus_tl_speed')); if(sp > 0){ TL.speed = sp; } } catch(e){}
+    // 12 Oct 2026 (evening, M3): `pauseOnClash` = the bar's "Pause on clash" switch (on unless the visitor turned it off,
+    // remembered in this browser); `wall` = wall mode is on (it dwells on a red month instead of pausing)
+    TL.pauseOnClash = true; TL.wall = false;
+    try { if(localStorage.getItem('modus_tl_pause') === '0') TL.pauseOnClash = false; } catch(e){}
     function setTimelineFull(on){
         TL.full = !!on;
-        const cb=document.getElementById('tl-full'); if(cb && cb.checked !== TL.full) cb.checked = TL.full;
+        // M3: the "Plan months / Full horizon" pair is the switch now; the rail's bracket and label follow it
+        const sp=document.getElementById('tl-seg-plan'), sf=document.getElementById('tl-seg-full');
+        if(sp) sp.setAttribute('aria-checked', String(!TL.full));
+        if(sf) sf.setAttribute('aria-checked', String(TL.full));
+        if(typeof renderTlLoop === 'function') renderTlLoop();
     }
+    function setPauseOnClash(on){
+        TL.pauseOnClash = !!on;
+        try { localStorage.setItem('modus_tl_pause', TL.pauseOnClash ? '1' : '0'); } catch(e){}
+        const cb=document.getElementById('tl-pause-clash'); if(cb && cb.checked !== TL.pauseOnClash) cb.checked = TL.pauseOnClash;
+    }
+    // the pause message's "Stop pausing on clashes": the switch goes off and Play carries on
+    function stopPausingOnClash(){ setPauseOnClash(false); startTimeline(); }
     // the first and last month with any route volume, from the matrix; [1, MONTH_COUNT] when the
     // tenant has nothing approved or the planner asked for the full horizon
     function tlLoopBounds(){
@@ -5575,9 +5740,16 @@
     // once-per-loop clash pause. A month inside the span with no volume keeps the normal dwell.
     // 12 Oct fix pass: a one-month span wraps on every tick; it must not re-arm the pause every tick (it would stop
     // 750 ms after every press of Play), so the pause is re-armed only by a wrap over more than one month.
+    // 12 Oct evening (M3): the bar's heading names the month in full ("October 2026")
+    function monthLong(i){
+        const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+        return names[(i-1)%12] + ' ' + (CONFIG.START_YEAR + Math.floor((i-1)/12));
+    }
     function tickTimeline(){
         const [lo, hi] = tlLoopBounds();
         const wrap = TL.month >= hi || TL.month < lo;
+        // 12 Oct evening (M3): wall mode holds a red month for WALL_DWELL_MS instead of pausing (wallDwell sets the hold)
+        if(TL.holdUntil && Date.now() < TL.holdUntil) return;
         if(wrap && lo !== hi) TL.clashPaused = false;
         // second fix pass: and the same for the month Play was pressed on — a one-month span "wraps" onto that same
         // month every tick, so clearing it there let late conditions for it stop playback after one tick (F3)
@@ -5685,8 +5857,12 @@
         // unit is renamed, and it is renamed to the word the rest of the product already
         // uses (the Dashboard's TRIPS card, the KPI card's "101 trips/d").
         // 12 Oct (D22): an empty month says so, instead of "0 routes · 0 trips".
+        // 12 Oct evening (M3): the bar's heading is the month in full ("October 2026"); the line under it carries the
+        // bar's own figures (syncTlFigs, from the figures bar at the top) and, until they land, the month's routes and trips
         const lbl=document.getElementById('tl-label');
-        if(lbl) lbl.textContent = count===0 ? monthLabel(m)+' · nothing approved' : monthLabel(m)+' · '+count+(count===1?' route · ':' routes · ')+Math.round(sum)+' '+unitWord(unit);
+        if(lbl) lbl.textContent = monthLong(m);
+        TL.figsFallback = count===0 ? 'nothing approved this month' : count+(count===1?' route · ':' routes · ')+Math.round(sum)+' '+unitWord(unit)+' this month';
+        if(typeof syncTlFigs === 'function') syncTlFigs();
         if(typeof refreshAreas==='function') refreshAreas();     // §2.2b: the council areas follow the playhead (cached per month)
         // 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon follow the month on the playhead (re-fetched per
         // month, cached), and are re-added with the overlay after a basemap switch
@@ -5699,18 +5875,22 @@
         syncTimelineFoot();
         const rng=document.getElementById('tl-range'); if(rng) rng.max=CONFIG.MONTH_COUNT;
         const sel=document.getElementById('tl-speed'); if(sel) sel.value=String(TL.speed);
-        const fl=document.getElementById('tl-full'); if(fl) fl.checked=TL.full;
+        setTimelineFull(TL.full); setPauseOnClash(TL.pauseOnClash);     // M3: the pair and the switch show the state
         const lbl=document.getElementById('tl-label'); if(lbl) lbl.textContent='Loading\u2026';
+        if(typeof renderTlRail === 'function') renderTlRail();
         ensureTimelineMatrix().then(()=>{
             // D22: never open on an empty January \u2014 the current month if it carries volume, else the first that does
             if(!monthHasVolume(TL.month)) TL.month = tlStartMonth();
             setTimelineMonth(TL.month);
             if(TL.playing && TL.ticked === null) TL.startedOn = TL.month;   // F3: Play opened the bar; this is the month it started on
+            if(typeof renderTlRail === 'function') renderTlRail();     // M3: the shaded months need the matrix
         }).catch(()=>{ if(lbl) lbl.textContent='No forecast data'; });
     }
     function closeTimeline(){
+        if(TL.wall && typeof exitWallMode === 'function') exitWallMode();
         stopTimeline(); TL.on=false;
         renderTimelineWarnings(null);      // §8: no month on screen, no warnings
+        if(typeof hideClashToast === 'function') hideClashToast();     // M3: and no pause message
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='none';
         syncTimelineFoot();
         const src=map.getSource('routes-source');
@@ -5731,6 +5911,7 @@
         // D22: resuming on a red month counts as this loop's pause \u2014 it does not stop again until the loop wraps
         if(WARN.countsMonth === TL.month && WARN.counts.clash > 0) TL.clashPaused = true;
         TL.ticked = null; TL.startedOn = TL.month;
+        if(typeof hideClashToast === 'function') hideClashToast();
         TL.playing=true; const b=document.getElementById('tl-play'); if(b){ b.textContent='\u23F8'; b.setAttribute('aria-pressed', 'true'); }
         startFlowAnimation();          // dashes march only while playing
         TL.timer=setInterval(tickTimeline, TL_STEP_MS / TL.speed);
@@ -5746,6 +5927,8 @@
     }
     function setTimelineMonth(m){
         TL.month=m; const r=document.getElementById('tl-range'); if(r){ r.value=m; r.setAttribute('aria-valuetext', monthLabel(m)); }
+        if(typeof syncTlRail === 'function') syncTlRail(m);
+        if(typeof TOAST !== 'undefined' && TOAST.month !== m) hideClashToast();
         renderMonthFrame(m);
         // the zone overlay follows the month too: a closure that ended in March must not
         // still be sitting over the map in April while the routes beneath it have moved on
@@ -5757,11 +5940,13 @@
         // §8: and the warnings. Rebuilt for THIS month, every tick.
         renderTimelineWarnings(m);
     }
-    function onTimelineScrub(v){ stopTimeline(); setTimelineMonth(parseInt(v)); }
+    // 12 Oct evening (M3): moving the month by hand starts a NEW loop, so the once-per-loop pause is re-armed (it used to
+    // stay spent from the last loop, and Play from September then ran through a red October without stopping)
+    function onTimelineScrub(v){ stopTimeline(); TL.clashPaused = false; setTimelineMonth(parseInt(v)); }
     // step one month at a time — scrubbing a 60-wide slider by hand cannot reliably
     // land on a single month
     function stepTimeline(delta){
-        stopTimeline();
+        stopTimeline(); TL.clashPaused = false;
         const max = CONFIG.MONTH_COUNT || 60;
         setTimelineMonth(Math.min(max, Math.max(1, (TL.month || 1) + delta)));
     }
@@ -5779,6 +5964,7 @@
         if(e.key === ' ' || e.key === 'Spacebar'){ if(tag === 'BUTTON' && inBar) return; e.preventDefault(); toggleTimeline(); }
         else if(e.key === 'ArrowLeft' && inBar){ e.preventDefault(); stepTimeline(-1); }
         else if(e.key === 'ArrowRight' && inBar){ e.preventDefault(); stepTimeline(1); }
+        else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); closeTimeline(); }
     });
 
     // ===== 2026-09-02 (§8) — warnings for the month on the playhead ==================
@@ -6135,10 +6321,14 @@
         // 12 Oct 2026 (D22): playback stops ONCE PER LOOP on the first red month it ticks into, with the
         // panel open; the next press of Play carries on and does not stop again until the loop wraps.
         // Only a month reached by a tick can stop it — never the month Play was pressed on.
-        if (TL.playing && TL.ticked === month && !TL.clashPaused && live.some(i => i.lvl === 'clash')) {
+        // 12 Oct evening (M3): only while "Pause on clash" is on; wall mode never stops, it DWELLS 3 s on every red month;
+        // the pause now says why in a message over the bar (Show on map, Resume, Stop pausing on clashes)
+        if (TL.playing && TL.wall && TL.ticked === month && live.some(i => i.lvl === 'clash')) { if (typeof wallDwell === 'function') wallDwell(month); }
+        else if (TL.playing && TL.pauseOnClash !== false && TL.ticked === month && !TL.clashPaused && live.some(i => i.lvl === 'clash')) {
             TL.clashPaused = true; WARN.open = true;
             stopTimeline(monthLabel(month) + ' · playback paused: ' + live.filter(i => i.lvl === 'clash').length + ' over capacity');
             renderConditionsPill(live);
+            if (typeof showClashToast === 'function') showClashToast(month, live.filter(i => i.lvl === 'clash'));
         }
         if (typeof onConditionsChanged === 'function') onConditionsChanged();
         if (!live.length || !WARN.open) { box.innerHTML = ''; box.style.display = 'none'; positionWarnStack(); return; }
@@ -6153,6 +6343,186 @@
         box.style.display = 'flex';
         positionWarnStack();
     }
+
+    // ===== 12 Oct 2026 (evening) — the M3 bar: the rail, the figures line, the pause message, wall mode ==========
+    // (review §2.4, mockup 3; the user: "build full m3 bar"). Nothing here changes what a month IS: the rail draws the
+    // matrix's months with volume and the same two sources the Conditions panel reads (the closures in force on a route
+    // carrying volume that month; a stockpile recorded over capacity), and the figures line copies the figures bar.
+    const WALL_DWELL_MS = 3000;          // wall mode stays this long on a red month instead of pausing
+    var TOAST = { month: null };         // var: setTimelineMonth may ask before this line has run
+    const RAIL = { asked: false, drag: false };
+    // "Sep to Dec 2026"; "Nov 2026 to Feb 2027" across a year
+    function monthRangeText(lo, hi, sep){
+        sep = sep || ' to ';
+        if(lo === hi) return monthLabel(lo);
+        const yl = CONFIG.START_YEAR + Math.floor((lo-1)/12), yh = CONFIG.START_YEAR + Math.floor((hi-1)/12);
+        return yl === yh ? monthLabel(lo).split(' ')[0] + sep + monthLabel(hi) : monthLabel(lo) + sep + monthLabel(hi);
+    }
+    function countWord(n){ return ['no','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve'][n] || String(n); }
+    // the months the rail marks: a closure in force on a route that carries volume that month (the triangle), a
+    // stockpile recorded over capacity at the month's end (the red dot). Same data and tests as buildConditions, without
+    // the sidebar filters: the rail is the programme's, the panel is the view's.
+    function tlRailMarks(){
+        const cl = new Set(), oc = new Set();
+        (WARN.piles || []).forEach(sp => { Object.keys(sp.months || {}).forEach(k => { if (sp.months[k] && sp.months[k].over) oc.add(parseInt(k, 10)); }); });
+        const restr = WARN.restr || {}, byR = (TL.matrix && TL.matrix.byRoute) || {};
+        Object.keys(byR).forEach(rid => {
+            const rt = byR[rid], hit = restr[rt.route_id] || restr[rid];
+            if (!hit || !hit.hits || !hit.hits.length) return;
+            Object.keys(rt.monthly || {}).forEach(k => {
+                const m = parseInt(k, 10);
+                if ((Number(rt.monthly[k]) || 0) > 0 && hit.hits.some(h => hitInMonth(h, m))) cl.add(m);
+            });
+        });
+        return { cl, oc };
+    }
+    // one cell per month of the horizon; a year mark on each January; the year labels under it
+    function renderTlRail(){
+        const rail = document.getElementById('tl-rail');
+        if (!rail) return;
+        const N = CONFIG.MONTH_COUNT || 60, vol = (TL.matrix && TL.matrix.volMonths) || new Set(), mk = tlRailMarks();
+        let h = '';
+        for (let m = 1; m <= N; m++) {
+            const c = [];
+            if ((m - 1) % 12 === 0) c.push('yr');
+            if (vol.has(m)) c.push('vol');
+            if (mk.cl.has(m)) c.push('cl');
+            if (mk.oc.has(m)) c.push('oc');
+            h += '<i data-m="' + m + '"' + (c.length ? ' class="' + c.join(' ') + '"' : '') + '></i>';
+        }
+        rail.innerHTML = h;
+        const yrs = document.getElementById('tl-years');
+        if (yrs) { let y = ''; for (let k = 0; k < Math.ceil(N / 12); k++) y += '<span>' + (CONFIG.START_YEAR + k) + '</span>'; yrs.innerHTML = y; }
+        renderTlLoop(); syncTlRail(TL.month);
+        // the marks need the closures and the stockpiles, fetched once for the Conditions panel too: draw again when in
+        if (!RAIL.asked) { RAIL.asked = true; Promise.all([warnRestrictions(), warnPiles()]).then(() => renderTlRail()).catch(() => {}); }
+    }
+    // the bracket over the months Play loops over, and the sentence that names them
+    function renderTlLoop(){
+        const N = CONFIG.MONTH_COUNT || 60, box = document.getElementById('tl-loop'), lbl = document.getElementById('tl-looplbl');
+        const span = TL.matrix && TL.matrix.span, vol = (TL.matrix && TL.matrix.volMonths) || new Set();
+        const [lo, hi] = tlLoopBounds(), n = hi - lo + 1;
+        if (box) { box.style.left = ((lo - 1) / N * 100) + '%'; box.style.width = (n / N * 100) + '%'; box.style.display = TL.matrix ? '' : 'none'; }
+        let html = '';
+        if (!TL.matrix) html = '';
+        else if (!span) html = '<b>Nothing approved yet</b> — Play runs every month of the horizon.';
+        else if (TL.wall) html = '<b>' + monthRangeText(lo, hi, ' – ') + '</b>';
+        else if (TL.full) html = '<b>Play loops over all ' + N + ' months</b> — ' + monthRangeText(1, N) + ', including the ' + (N - vol.size) + ' with nothing approved.';
+        else html = '<b>Play loops over ' + (n === 1 ? 'this month' : 'these ' + countWord(n) + ' months') + '</b> — ' + monthRangeText(lo, hi)
+                  + (n === vol.size ? (n === 1 ? ', the only one with approved volume.' : ', the ones with approved volume.') : ', the span with approved volume.')
+                  + ' The other ' + (N - n) + ' are shown, not played.';
+        if (lbl) {
+            lbl.innerHTML = html;
+            // the sentence starts over the bracket while it fits; past the middle it ends at the bracket's right edge
+            const start = (lo - 1) / N * 100;
+            lbl.style.paddingLeft = start <= 45 ? start + '%' : '0';
+            lbl.style.textAlign = start <= 45 ? 'left' : 'right';
+            lbl.style.paddingRight = start <= 45 ? '0' : (100 - hi / N * 100) + '%';
+            // and when the indent would wrap it onto a second line, it starts at the bar's left edge instead
+            const line = parseFloat(getComputedStyle(lbl).lineHeight) || 18;
+            if (lbl.scrollHeight > line * 1.5) { lbl.style.paddingLeft = '0'; lbl.style.paddingRight = '0'; lbl.style.textAlign = 'left'; }
+        }
+        const wt = document.getElementById('wall-hint-text');
+        if (wt) wt.innerHTML = span ? 'Wall mode · loops ' + monthRangeText(lo, hi, ' – ') + '<br>dwells 3 s on a clash month instead of pausing' : 'Wall mode';
+    }
+    // the playhead and the month on screen
+    function syncTlRail(m){
+        const N = CONFIG.MONTH_COUNT || 60, head = document.getElementById('tl-playhead'), rail = document.getElementById('tl-rail');
+        if (head) head.style.left = ((m - 0.5) / N * 100) + '%';
+        if (rail) { const was = rail.querySelector('i.now'); if (was) was.classList.remove('now'); const c = rail.children[m - 1]; if (c) c.classList.add('now'); }
+    }
+    // a click or a drag on the rail goes to that month (and stops Play, as the slider does)
+    function railMonthAt(x){
+        const rail = document.getElementById('tl-rail'), N = CONFIG.MONTH_COUNT || 60;
+        const r = rail.getBoundingClientRect();
+        if (!(r.width > 0)) return null;
+        return Math.min(N, Math.max(1, Math.floor((x - r.left) / r.width * N) + 1));
+    }
+    (function wireRail(){
+        const rail = document.getElementById('tl-rail');
+        if (!rail || typeof rail.addEventListener !== 'function') return;
+        const go = e => { const m = railMonthAt(e.clientX); if (m && m !== TL.month) { TL.clashPaused = false; setTimelineMonth(m); } };
+        rail.addEventListener('pointerdown', e => { if (TL.wall) return; RAIL.drag = true; stopTimeline(); TL.clashPaused = false; try { rail.setPointerCapture(e.pointerId); } catch (err) {} go(e); });
+        rail.addEventListener('pointermove', e => { if (RAIL.drag) go(e); });
+        const end = () => { RAIL.drag = false; };
+        rail.addEventListener('pointerup', end); rail.addEventListener('pointercancel', end);
+    })();
+    // the line under the month: the figures bar's own numbers for this month, once they are in
+    function syncTlFigs(){
+        const figs = document.getElementById('tl-figs');
+        if (!figs) return;
+        const m = TL.month, txt = id => { const e = document.getElementById(id); return e ? (e.textContent || '').trim() : ''; };
+        let line = TL.figsFallback || '';
+        const trips = txt('kpi-trips'), routes = txt('kpi-routes'), co2 = txt('kpi-co2-day');
+        if (TL.matrix && !monthHasVolume(m)) line = 'nothing approved this month';
+        else if (txt('kpi-title').indexOf(monthLabel(m)) === 0 && txt('kpi-title').indexOf('nothing approved') >= 0) line = 'nothing approved in this view';
+        else if (TL.matrix && line === 'nothing approved this month') line = 'loading figures';   // the month has volume: never "nothing" while it loads
+        else if (trips && trips !== '—' && txt('kpi-title').indexOf(monthLabel(m)) === 0) {
+            const parts = [trips + ' two-way movements a day', routes + (routes === '1' ? ' route' : ' routes')];
+            if (co2 && co2 !== '—') parts.push(co2 + ' CO₂e a day');
+            line = parts.join(' · ');
+        }
+        line = line ? line.charAt(0).toUpperCase() + line.slice(1) : '';
+        if (figs.textContent !== line) figs.textContent = line;
+        const wm = document.getElementById('wall-month'), wf = document.getElementById('wall-figs');
+        if (wm) wm.textContent = TL.on ? monthLong(m) : '';
+        if (wf && wf.textContent !== line) wf.textContent = line;
+    }
+    window.addEventListener('resize', () => { if (TL.on) renderTlLoop(); });   // the loop sentence re-measures its indent
+    try { new MutationObserver(syncTlFigs).observe(document.getElementById('kpi-hud'), { subtree: true, childList: true, characterData: true }); } catch (e) {}
+    // the bar's height changes with its content (the figures, a wrapped row, wall mode): the map's foot follows it
+    try { new ResizeObserver(() => { if (TL.on) syncTimelineFoot(); }).observe(document.getElementById('timeline-bar')); } catch (e) {}
+    // ---- paused on a clash: what stopped Play, and the ways on ----
+    function showClashToast(month, rows){
+        const box = document.getElementById('tl-toast'), body = document.getElementById('tl-toast-body');
+        if (!box || !body || TL.wall) return;
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        body.innerHTML = rows.map(i => '<b>' + esc(i.noun) + '</b> — ' + esc(i.what)).join('<br>');
+        const show = document.getElementById('tl-toast-show');
+        if (show) { const first = rows[0]; show.hidden = !first; show.onclick = first ? () => showCondition(first.kind, first.id) : null; }
+        TOAST.month = month; box.hidden = false;
+    }
+    function hideClashToast(){
+        const box = document.getElementById('tl-toast');
+        TOAST.month = null; if (box) box.hidden = true;
+    }
+    // ---- wall mode (?wall=1 or the bar's button): opens and plays by itself, chrome off, Esc to leave ----
+    function wallDwell(month){
+        if (TL.dwelt === month && Date.now() - (TL.dweltAt || 0) < WALL_DWELL_MS + 2000) return;   // the second build of the same month
+        TL.dwelt = month; TL.dweltAt = Date.now(); TL.holdUntil = Date.now() + WALL_DWELL_MS;
+    }
+    function enterWallMode(){
+        if (typeof isPhoneShell === 'function' && isPhoneShell()) return;   // the phone keeps its sheet
+        TL.wall = true; TL.holdUntil = 0;
+        document.body.classList.add('wall-mode');
+        hideClashToast();
+        ['wall-hud', 'wall-hint'].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = false; });
+        renderTlLoop(); syncTlFigs();
+        startTimeline();
+        wallResize();
+        if (typeof scheduleViewWrite === 'function') scheduleViewWrite();
+    }
+    function exitWallMode(){
+        if (!TL.wall) return;
+        TL.wall = false; TL.holdUntil = 0;
+        document.body.classList.remove('wall-mode');
+        ['wall-hud', 'wall-hint'].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
+        stopTimeline();
+        renderTlLoop();
+        try {
+            const q = new URLSearchParams(location.search);
+            if (q.has('wall')) { q.delete('wall'); const qs = q.toString(); history.replaceState(history.state, '', location.pathname + (qs ? '?' + qs : '') + location.hash); }
+        } catch (e) {}
+        wallResize();
+    }
+    // the map's box changes when the panel goes (and back, with its .25 s slide): the canvas is measured again after both
+    function wallResize(){
+        const fit = () => { try { map.resize(); } catch (e) {} syncTimelineFoot(); if (typeof positionWarnStack === 'function') positionWarnStack(); renderTlLoop(); };
+        setTimeout(fit, 60); setTimeout(fit, 400);
+    }
+    document.addEventListener('keydown', function(e){
+        if (TL.wall && e.key === 'Escape') { e.preventDefault(); exitWallMode(); }
+    });
 
     (function initAnalysis(){
         buildRouteInfo();
@@ -6230,7 +6600,7 @@
         m = parseInt(m, 10);
         if (!(m >= 1 && m <= (CONFIG.MONTH_COUNT || 60))) return;
         if (TL.playing) stopTimeline();
-        TL.month = m;
+        TL.month = m; TL.clashPaused = false;     // M3: a month picked by hand starts a new loop
         if (!TL.on) openTimeline(); else setTimelineMonth(m);
     }
 
@@ -6386,6 +6756,7 @@
         const out = new URLSearchParams(encodeView(currentView(), VIEW.defaults));
         const keep = new URLSearchParams(location.search);
         ['embed', 'v'].forEach(k => { if (keep.has(k)) out.set(k, keep.get(k)); });
+        if (TL.wall) out.set('wall', '1');
         const qs = out.toString();
         const url = location.pathname + (qs ? '?' + qs : '') + location.hash;
         if (url !== location.pathname + location.search + location.hash) {
@@ -7041,6 +7412,7 @@
         applyViewFromUrl();
         renderConcernLinks();
         renderSheet();
+        try { if (new URLSearchParams(location.search).get('wall') === '1' && typeof enterWallMode === 'function') enterWallMode(); } catch (e) {}
     }
     renderMonthChips(); renderSheet(); sheetAria();
     // the sheet's height changes with its state and its content (a route card, the conditions): follow it
