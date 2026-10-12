@@ -363,7 +363,7 @@ const TENANT = { name: "Wayscope", team_label: "Team", currency: "EUR", symbol: 
 const CUR = () => TENANT.symbol || "€";
 const TEAM = () => TENANT.team_label || "Team";
 // H1 (29 Sep 2026): the vehicle names the pickers do not offer this tenant (its country's
-// `vehicle_sets[..].hide` — the EU N-category names for GB). They stay in `vehicles`, so a
+// `vehicle_sets[..].hide` — Rigid 7.5t for GB). They stay in `vehicles`, so a
 // saved line or a baked route on one still resolves; a picker keeps such a value visible
 // when it is the CURRENT one (`keep`) rather than silently swapping it.
 const HIDDEN_VEHICLES = [];
@@ -1878,7 +1878,8 @@ function App(){
   useEffect(() => {
     fetch(`${API}/meta`).then(r => r.json()).then(m => {
       const vl = m && m.vehicle_labels;
-      if(vl){ VEH.labels = vl.labels || {}; VEH.fallbacks = vl.fallbacks || {}; }
+      // 11 Oct 2026: `langs` is what the server OFFERS this tenant (English, plus any label language one of its vehicles still carries)
+      if(vl){ VEH.labels = vl.labels || {}; VEH.fallbacks = vl.fallbacks || {}; VEH.langs = (Array.isArray(vl.langs) && vl.langs.length) ? vl.langs : ["en"]; }
       HIDDEN_VEHICLES.length = 0; (m && m.hidden_vehicles || []).forEach(v => HIDDEN_VEHICLES.push(v));
       // 10 Oct 2026 (carbon planner): a scenario-only profile (the electric variants) is tested on
       // the Carbon page and never offered on a forecast — it has no baked geometry of its own
@@ -1892,8 +1893,10 @@ function App(){
                                       restrictions: tn.restrictions || null,
                                       distance_unit: (tn.distance_unit === "mi" ? "mi" : "km"),
                                       demo_notice: (tn.demo_notice || null) });   // H2: the demo label
-              try { document.title = (TENANT.name && TENANT.name !== "Wayscope") ? TENANT.name + " · Wayscope" : "Wayscope"; } catch(e){}
-              if(!vehLangShown(VEH.lang)){ VEH.lang = "eu"; setVehLangState("eu"); } }
+              try { document.title = (TENANT.name && TENANT.name !== "Wayscope") ? TENANT.name + " · Wayscope" : "Wayscope"; } catch(e){} }
+      // 11 Oct 2026: a stored or default label language this tenant is not offered falls back to ENGLISH. Until then it
+      // fell back to "eu", which a GB tenant is not offered either, so its one button was never lit.
+      if(!vehLangShown(VEH.lang)){ VEH.lang = "en"; setVehLangState("en"); }
       (m && m.ipts || []).forEach(i => { if(i && i.id) TEAM_LABELS[iptKey(i.id)] = i.label || i.id; });
       setMeta(m);
     }).catch(() => setMetaErr(true));
@@ -1980,7 +1983,10 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
           )}
           {role && (
             <>
-              {/* Vehicle names: EN / EU / EE. Label only — see vehLabel(). */}
+              {/* Vehicle names, one button per language offered. Label only — see vehLabel(). 11 Oct 2026: shown
+                  only when there is a CHOICE — the seed's vehicles carry English alone, so a new organisation and
+                  the GB demo get no buttons (until then the GB demo showed a lone "English" button). */}
+              {VEH_LANGS.filter(([k]) => vehLangShown(k)).length > 1 && (
               <span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg text-[11px] mr-2"
                 title="How vehicle names are shown. Changes the label only; nothing stored changes.">
                 {VEH_LANGS.filter(([k]) => vehLangShown(k)).map(([k, l]) => (
@@ -1989,7 +1995,7 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
                     {l}
                   </button>
                 ))}
-              </span>
+              </span>)}
               <span className="hidden sm:inline hdr-muted mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>
               {/* 11 Oct 2026: the Guide button moved to the right end of the demo bar (DemoBar). It was shown
                   only to a demo tenant, and the bar shows exactly then, so a real tenant loses nothing. */}
@@ -2454,10 +2460,12 @@ function vehOption(v, suggested, current){
   const fits = suggested.includes(v);
   // value = the canonical id, ALWAYS. Only the text follows the language toggle, and a
   // slot that fell back to the id is marked so a fallback is not mistaken for a
-  // translation.
+  // translation. 11 Oct 2026: English is the default now, and an id IS a name in English
+  // (and in the European slot, whose strings were ids) — so only another language's
+  // fallback is marked; until then English fallbacks were starred and European ones not.
   return <option key={v} value={v} disabled={!fits && v !== current}
     style={{ color: fits ? undefined : "#cbd5e1" }}>
-    {vehLabel(v)}{vehIsFallback(v) && VEH.lang !== "eu" ? " *" : ""}{fits ? "" : " · not used for this material"}
+    {vehLabel(v)}{vehIsFallback(v) && !["en", "eu"].includes(VEH.lang) ? " *" : ""}{fits ? "" : " · not used for this material"}
   </option>;
 }
 
@@ -2467,8 +2475,9 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
           material_categories = {}, seasonal_restrictions = [],
           disciplines = [], work_sections = [], planning_vehicles = [] } = meta;
 
-  // The four EU-named planning vehicles lead every picker; the six older entries stay
-  // below them as legacy. Kept as two lists rather than a re-ordered `vehicles`,
+  // The planning vehicles (the country's lead list, else the document's own — in the
+  // seed the six UK haulage trade names since 11 Oct 2026) lead every picker; the rest
+  // stay below them. Kept as two lists rather than a re-ordered `vehicles`,
   // because every saved forecast and every baked route names a vehicle by string and
   // the full set has to remain complete. Defaults to empty, so an older /api/meta that
   // does not send planning_vehicles renders exactly the pre-2026-09-01 single list.
@@ -2535,10 +2544,11 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const [caution, setCaution] = useState(null);   // returned by the save
 
   // ---- vehicle (exactly one per line) ----
-  // 29 Sep 2026 first look (GB demo): the material categories list the EU N-category
-  // entries FIRST, so the form defaulted to a vehicle the tenant hides — and the picker
-  // then showed it as "current". A hidden vehicle is never a default: take the first one
-  // the tenant shows; a saved line's own value is still kept (vehShown keeps `current`).
+  // 29 Sep 2026 first look (GB demo): the material categories then listed the EU type-
+  // approval entries FIRST (they left the seed on 11 Oct 2026), so the form defaulted to
+  // a vehicle the tenant hides — and the picker then showed it as "current". A hidden
+  // vehicle is never a default: take the first one the tenant shows; a saved line's own
+  // value is still kept (vehShown keeps `current`).
   const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v)) || (list || [])[0] || "";
   const [vehicle, setVehicle] = useState(firstShown(vehicles));
   const [unit, setUnit] = useState(units[0] || "m3");
@@ -3462,7 +3472,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
 // The editable copy of factors.json. Once the config row exists, THIS is what every
 // payload, density and cycle time reads; the file is only the seed. Four tabs of
 // form-backed editing plus a raw JSON tab for everything the forms do not cover
-// (routing dimensions, aliases, notes). Save sends the WHOLE document; the server
+// (routing dimensions, notes). Save sends the WHOLE document; the server
 // validates it and refuses with the list of problems rather than storing a bad one.
 // ---- 10 Sep evening: the Costing tab — the TARGET rates and the fuel widget ----------
 // The target rates are the Planned € for every route that has no rate of its own: typed
@@ -3712,7 +3722,7 @@ function ConfigPage({ meta, who, access }){
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangShown("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -3720,19 +3730,21 @@ function ConfigPage({ meta, who, access }){
                     <tr key={k}>
                       <td><div className="font-medium text-slate-800 leading-tight">{k}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
                       <td className="min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={k} aria-label={`${k} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
-                      {vehLangShown("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder="falls back to EU" onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
+                      {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={k} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
                       <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${k} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
                       <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${k} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
                       <td className="num w-28"><input className={inp + " text-right"} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km ?? ""} aria-label={`${k} kg CO2e per km`} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
                       <td className="num w-20"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${k} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
                       <td className="num w-20"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${k} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
-                      <td className="text-center"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${k} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; d.planning_vehicles = Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle); })} /></td>
+                      {/* 11 Oct 2026: a tick keeps the planning list's ORDER (the first is the payload fallback) and adds a
+                          newly ticked vehicle at the end; until then every tick rebuilt the list in file order */}
+                      <td className="text-center"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${k} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle && !kept.includes(x))]; })} /></td>
                     </tr>
                   ); })}
                 </tbody>
               </table>
               <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">
-                The id is what a forecast line stores and what baked routes are keyed on — it cannot be renamed here. A vehicle the network is baked for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions and aliases are on the JSON section.
+                The id is what a forecast line stores and what baked routes are keyed on — it cannot be renamed here. A vehicle the network is baked for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions are on the JSON section.
               </p>
             </div>
           )}
@@ -3833,7 +3845,7 @@ function ConfigPage({ meta, who, access }){
 
           {tab === "raw" && (
             <div className="px-6 pb-6">
-              <p className="text-sm text-slate-500 mb-2">The whole document. Anything the other sections do not cover — routing dimensions, aliases, the notes — is here. Saving from this section sends exactly this text.</p>
+              <p className="text-sm text-slate-500 mb-2">The whole document. Anything the other sections do not cover — routing dimensions, the notes — is here. Saving from this section sends exactly this text.</p>
               <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw}
                 onChange={e => { setRaw(e.target.value); setRawErr(""); try { setDoc(JSON.parse(e.target.value)); } catch(err){} }} />
               {rawErr && <div className="text-sm mt-1" style={{ color: "var(--red)" }}>{rawErr}</div>}
@@ -5846,20 +5858,31 @@ const ROLE_LABEL = { origin: "Origin", destination: "Destination", both: "Both" 
 const asArray = (v) => Array.isArray(v) ? v : (() => { try { return JSON.parse(v || "[]"); } catch(e){ return []; } })();
 
 // "Artic Tipper (44t)" -> "Tipper (44t)". Full name stays in the chip's tooltip.
-// ---- 2026-09-02: one vehicle, three labels ------------------------------------
-// VEH.lang is the toggle (en | eu | ee); VEH.labels comes off /api/meta. vehLabel()
+// ---- 2026-09-02: one vehicle, several labels -----------------------------------
+// VEH.lang is the label language; VEH.labels and VEH.langs come off /api/meta. vehLabel()
 // changes ONLY what is shown — the string a forecast line stores, the payload it
-// converts on and the emissions factor are all keyed on the canonical id, which is
-// the EU string for the four planning vehicles and the trade name for the six legacy
-// ones. A missing label falls back to that id, never to an invented name.
-const VEH = { lang: "eu", labels: {}, fallbacks: {} };
+// converts on and the emissions factor are all keyed on the canonical id, the vehicle's
+// name in factors.json. A missing label falls back to that id, never to an invented name.
+// 11 Oct 2026 (the EU type-approval vehicles removed from the seed): English is the
+// default (it was "eu"), and VEH.langs is what the server OFFERS — English, plus any other
+// label language a vehicle the tenant is offered still carries. The seed's vehicles carry
+// English alone. VEH_LANGS still names the three slots, because a document saved before
+// then carries labels.eu on those four entries and keeps that option for a tenant that is
+// offered them; a stored "eu"/"ee" that is not offered falls back to English (App).
+const VEH = { lang: "en", langs: ["en"], labels: {}, fallbacks: {} };
 try { const l = localStorage.getItem("modus_veh_lang"); if(["en","eu","ee"].includes(l)) VEH.lang = l; } catch(e){}
 const VEH_LANGS = [["en", "English"], ["eu", "European"], ["ee", "Estonian"]];
+// 11 Oct 2026: a language is shown only when the server offers it (a vehicle carries it), AND
 // G2: the local-language option is offered only where it is local — a tenant in Estonia.
-// H1: the EU-string option is pointless for a GB tenant (its EU-named vehicles are hidden)
-const vehLangShown = (k) => k === "en"
-  || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE")
-  || (k === "eu" && String(TENANT.country || "").toUpperCase() !== "GB");
+// H1: the EU-string option is never offered to a GB tenant.
+const vehLangShown = (k) => k === "en" || ((VEH.langs || []).includes(k) && (
+     (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE")
+  || (k === "eu" && String(TENANT.country || "").toUpperCase() !== "GB")));
+// 11 Oct 2026 (review): the Config page's Estonian label COLUMN follows the country alone. The header's
+// buttons need a vehicle to carry the language (vehLangShown), but the column is where an Estonian
+// organisation types its FIRST Estonian name, and gating it on what is offered left no way in but the
+// raw JSON. The column only edits labels.ee; nothing a forecast stores changes.
+const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");
 const vehLabel = (v, lang) => ((VEH.labels[v] || {})[lang || VEH.lang]) || v || "";
 const vehIsFallback = (v, lang) => ((VEH.fallbacks[v] || []).includes(lang || VEH.lang));
 // short form for tables: the label, minus the leading 'Artic'/'Rigid' of the trade names

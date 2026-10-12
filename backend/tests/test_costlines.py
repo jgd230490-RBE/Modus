@@ -233,7 +233,10 @@ db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L
 for _rid in ("R1", "R2", "R3", "R4"):
     db.execute("INSERT INTO routes (id, origin_id, dest_id, ipt) VALUES (?, ?, ?, ?)", (_rid, "L1", "L2", "IPT 1"))
 V8 = "Rigid 8-wheeler (32t)"
-V12 = "N3 tractor (BC) + O4 tipping semi (DA) GCW 40/44 t"
+# NARROWED 11 Oct 2026 (EU vehicles removed): R2's artic is the UK Artic Tipper (44t), 29 t (it was the
+# EU tipping semi, V12, 26 t, until it left the seed). Every figure pinned below is per line and computed,
+# so none moves except through the payload; the name V12 stays so every use reads the same.
+V12 = "Artic Tipper (44t)"
 
 
 def _geom(rid, prof, leg, km, hr):

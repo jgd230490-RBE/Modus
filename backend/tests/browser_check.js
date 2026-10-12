@@ -58,9 +58,11 @@ const meta = {
              vehicle_emissions_kg_co2e_per_km: { _default: 0.9 },
              planning: { working_days_per_month: 21, shift_hours_per_day: 10 } },
   mapbox_token: "", disciplines: [{ id: "Earthworks", label: "Earthworks" }, { id: "Track", label: "Track" }], work_sections: [{ section_id: "S1", name: "Rapla–Tootsi" }],
-  vehicle_labels: { labels: { "Artic Tipper (44t)": { en: "Artic Tipper (44t)", eu: "Artic Tipper (44t)", ee: "Sadulveok kallur" },
-                              "Rigid Tipper (32t)": { en: "Rigid Tipper (32t)", eu: "Rigid Tipper (32t)", ee: "Kallur" } },
-                    fallbacks: {}, langs: ["en", "eu", "ee"] },
+  // NARROWED 11 Oct 2026 (EU vehicles removed): what the server sends for the seed now — English alone, the only
+  // language any vehicle carries (it sent every slot, ["en", "eu", "ee"], with an Estonian label here, until then)
+  vehicle_labels: { labels: { "Artic Tipper (44t)": { en: "Artic Tipper (44t)" },
+                              "Rigid Tipper (32t)": { en: "Rigid Tipper (32t)" } },
+                    fallbacks: {}, langs: ["en"] },
 };
 const mk = (route, mi, status, disc, ipt, by, qty) => ({
   route_id: route, month_index: mi, discipline: disc, section_id: "S1", quantity: qty, unit: "m3",

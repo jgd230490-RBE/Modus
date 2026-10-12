@@ -282,9 +282,15 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/forecast-weeks/tark-tee?bucket=commit", headers=PLAN)
     ok("...and the pre-H1 path still answers (an alias, hidden from the schema)", r.status_code == 200)
     r = c.get("/api/meta")
-    ok("GB (H1) → /api/meta carries hidden_vehicles (the EU names) and the tenant's distance unit (miles)",
-       r.json().get("hidden_vehicles") and all(v.startswith("N3 ") or v == "Rigid 7.5t" for v in r.json()["hidden_vehicles"])
+    # NARROWED 11 Oct 2026 (EU vehicles removed): the four EU names left the product, so the GB demo hides
+    # Rigid 7.5t alone — asserted exactly, since "N3 or Rigid 7.5t" would now pass on the one name and prove nothing.
+    ok("GB (H1) → /api/meta carries hidden_vehicles (Rigid 7.5t alone, no EU name) and the tenant's distance unit (miles)",
+       r.json().get("hidden_vehicles") == ["Rigid 7.5t"]
+       and not any(v.startswith("N3 ") for v in r.json().get("vehicles") or [])
        and r.json()["tenant"].get("distance_unit") == "mi", str(r.json().get("hidden_vehicles"))[:200])
+    ok("11 Oct 2026: GB → /api/meta offers English vehicle names only, and leads with the UK trade names",
+       r.json()["vehicle_labels"]["langs"] == ["en"] and (r.json().get("planning_vehicles") or [None])[0] == "Rigid 8-wheeler (32t)",
+       str(r.json().get("vehicle_labels", {}).get("langs")))
 
     # ------------------------------------------------------- 3. the data, as people read it
     r = c.get("/api/forecasts", headers=PLAN)

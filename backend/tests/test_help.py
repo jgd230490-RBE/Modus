@@ -254,9 +254,17 @@ ok("...the staff sign-in keeps the map and the guide open for 12 hours, past Sig
 ok("the menu as it is: four groups with the Carbon planner under PLAN, Find a page, Ctrl K, User guide, Collapse",
    "<strong>PLAN</strong> (Dashboard, Submit forecast, Forecasts, Carbon planner)" in src
    and "Find a page…" in src and "Ctrl K" in src and "<strong>User guide</strong>" in src and "‹ Collapse" in src)
-ok("...the header: vehicle names by country, the Appearance looks Ink, Light and Dark",
+# NARROWED 11 Oct 2026 (EU vehicles removed): the header no longer offers vehicle names "by country" (English
+# always, European everywhere except Great Britain, Estonian in Estonia). The vehicles are named in English and
+# the buttons appear only when a vehicle carries another language — the guide says that, and the old sentence is gone.
+ok("...the header: vehicle names in English (buttons only when the list carries another language), the Appearance looks Ink, Light and Dark",
    "<strong>Appearance</strong>" in src and all(s in src for s in ("<strong>Ink</strong>", "<strong>Light</strong>", "<strong>Dark</strong>"))
-   and "everywhere except Great Britain" in src)
+   and "vehicles are named in English" in src and "only when your organisation's vehicle" in src
+   and "everywhere except Great Britain" not in src and "<strong>European</strong>" not in src and "<strong>Estonian</strong>" not in src)
+ok("11 Oct 2026: ⭐ the guide names none of the four EU type-approval vehicles, their codes or their 'EU planning vehicles' row",
+   not any(t in src for t in ("V07", "V10", "V11", "V12", "V-category", "EU-category", "EU planning vehicles", "N3 lorry", "N3 tractor", "TPMLM"))
+   and "Rigid 7.5t is hidden" in src and "a vehicle without its own figures 12 + 8 (the default)" in src
+   and "UK trade names such as Rigid 8-wheeler and Artic Tipper" in src)
 ok("⭐ the demo bar and its Guide button, the New here? box, the dots, Don't show again; nothing opens by itself",
    "FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL" in src and "<strong>Guide</strong>, at the right-hand end of the bar" in src
    and "Nothing opens by itself." in src and "<strong>Take the tour</strong>" in src and "pulsing orange dots" in src
