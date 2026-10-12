@@ -526,6 +526,13 @@
         .month-chip:hover{ border-color:var(--navy); }
         .month-chip[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
         .month-chips .chips-none{ font-size:14px; color:var(--note); }
+        /* 13 Oct 2026: the preset views, chips like the month chips; pressed = the map matches that view */
+        .preset-views{ display:flex; flex-wrap:wrap; gap:6px; }
+        .preset-chip{ border:1px solid #D6D3D1; background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
+                      font:500 14px/1.2 Inter,system-ui,sans-serif; cursor:pointer; }
+        .preset-chip:hover{ border-color:var(--navy); }
+        .preset-chip[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
+        .preset-note{ margin-top:6px; font-size:14px; color:var(--note); line-height:1.45; }
         .share-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
         .share-row .btn{ flex:1 1 auto; width:auto; }
         .concern-link{ display:block; margin-top:8px; font-size:14px; font-weight:500; color:var(--navy); }
@@ -600,6 +607,7 @@
             .sidebar .control-item input[type=checkbox]{ width:20px; height:20px; }
             .sidebar .busy-row, .sidebar .kpi-chip{ min-height:48px; align-items:center; }
             .month-chip{ min-height:48px; min-width:56px; padding:0 14px; }
+            .preset-chip{ min-height:48px; padding:0 14px; }
             .m-done{ display:flex; order:99; position:sticky; bottom:-24px; margin:auto -18px -24px; padding:10px 18px 14px; background:#fff; border-top:1px solid var(--line); }
             .m-done .btn{ min-height:48px; }
             #m-sheet{ display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; z-index:26; background:#fff;
@@ -688,6 +696,14 @@
 <div class="sidebar" id="main-sidebar">
     <button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar()" aria-label="Close the control panel" title="Close the control panel">&times;</button>
     <div style="height:44px;flex:none"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button -->
+
+    <!-- 13 Oct 2026 (the user): preset views at the top of the panel, one click each. The buttons are built by
+         renderPresets() in the last script block; on a phone this panel IS the Layers sheet, so they reach it too. -->
+    <div class="control-group" id="preset-group">
+        <h3>Views</h3>
+        <div class="preset-views" id="preset-views" role="group" aria-label="Preset views"></div>
+        <div class="preset-note">Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>
+    </div>
 
     <div class="control-group">
         <h3>Route filtering</h3>
@@ -4051,6 +4067,7 @@
         const group = document.getElementById('council-group');
         const has = !!(j && (j.areas || []).length);
         if (group) group.hidden = !has;                 // a tenant with no areas: no group, nothing on the map
+        if (typeof schedulePresetRender === 'function') schedulePresetRender();   // 13 Oct: the council views show with the group
         if (!has) return;
         const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
         const key = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(',')].join('|');
@@ -4217,6 +4234,9 @@
     function setAreaMode(mode) {
         AREAS.mode = mode === 'carbon' ? 'carbon' : 'movements';
         renderAreas();
+        // 13 Oct 2026: the colouring travels in the link (&council=carbon) and the preset views follow it
+        if (typeof scheduleViewWrite === 'function') scheduleViewWrite();
+        if (typeof schedulePresetRender === 'function') schedulePresetRender();
     }
     // the card: a click on a district, or on the county where no district is drawn, when nothing of ours is on top
     let AREA_CARD_WIRED = false;
@@ -6865,11 +6885,12 @@
         if (changes.length) q.set('layers', changes.join('.'));
         const f = VIEW_FILTER_KEYS.filter(k => v.filters && v.filters[k] && v.filters[k] !== 'ALL').map(k => k + ':' + v.filters[k]);
         if (f.length) q.set('filters', f.join('|'));
+        if (v.council === 'carbon') q.set('council', 'carbon');     // 13 Oct 2026: the districts' colouring (movements is the default)
         return q.toString();
     }
     function decodeView(search) {
         const q = new URLSearchParams(search || '');
-        const out = { month: null, layers: null, filters: {} };
+        const out = { month: null, layers: null, filters: {}, council: q.get('council') === 'carbon' ? 'carbon' : null };
         if (q.has('month')) out.month = monthFromParam(q.get('month'));
         if (q.has('layers')) out.layers = (q.get('layers') || '').split('.').map(x => x.trim()).filter(x => /^-?[a-z0-9_-]+$/i.test(x));
         (q.get('filters') || '').split('|').forEach(part => {
@@ -6890,7 +6911,9 @@
         const val = id => { const el = document.getElementById(id); return el && el.value !== 'ALL' ? el.value : null; };
         return { month: TL.on ? TL.month : null, layers: layersOn(),
                  filters: { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'),
-                            team: selectedText('filter-ipt') } };      // the team's NAME as the option shows it
+                            team: selectedText('filter-ipt') },       // the team's NAME as the option shows it
+                 // 13 Oct 2026: the districts' colouring, only while By council is on (a carbon colouring left behind is not a view)
+                 council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null };
     }
     // the link a person shares: this page's address with the view, without the app's embed / cache-buster parameters;
     // monthOnly = the short form for a QR code that cannot hold the whole view
@@ -6934,6 +6957,8 @@
         };
         setSel('filter-origin', v.filters.origin); setSel('filter-dest', v.filters.dest);
         setSel('filter-discipline', v.filters.discipline); setSel('filter-ipt', v.filters.team, true);
+        // 13 Oct 2026: the colouring before the boxes, so the districts' first paint is the shared one
+        if (v.council === 'carbon' && typeof AREAS !== 'undefined') AREAS.mode = 'carbon';
         if (v.layers) {
             const want = new Set(layersFromChanges(VIEW.defaults, v.layers));
             layerBoxes().forEach(cb => {
@@ -6944,7 +6969,7 @@
             VIEW.pendingRestr = [...want].filter(k => k.indexOf('restr-') === 0 && !document.getElementById(k));
         }
         applyFilters();
-        const done = () => { VIEW.ready = true; scheduleViewWrite(); };
+        const done = () => { VIEW.ready = true; scheduleViewWrite(); schedulePresetRender(); };
         if (v.month) ensureTimelineMatrix().then(() => pickMonth(v.month)).catch(() => {}).then(done);
         else done();
     }
@@ -6960,7 +6985,95 @@
     document.addEventListener('change', (e) => {
         const id = (e.target && e.target.id) || '';
         if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || LINK_MODE_BOXES.includes(id)) scheduleViewWrite();
+        if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || id === 'heat-off' || LINK_MODE_BOXES.includes(id)) schedulePresetRender();
     });
+
+    // ---------------------------------------------------------------- preset views (13 Oct 2026, the user)
+    // One click sets the layer boxes, the heat map and the council colouring together. Every box it changes dispatches
+    // 'change', so the box's own handler and the link listener run exactly as for a click by hand, and the link carries the
+    // result (no preset name in the link: the view itself is shared). A button shows pressed while the map matches it.
+    const PRESETS = [
+        { key: 'councils-movements', label: 'Councils: movements', council: 'movements' },
+        { key: 'councils-carbon', label: 'Councils: carbon', council: 'carbon' },
+        { key: 'busiest-roads', label: 'Busiest roads', heat: 'volume' },
+        { key: 'route-carbon', label: 'Route carbon', heat: 'carbon' },
+        { key: 'closures', label: 'Closures and restrictions', closures: true },
+        { key: 'everything', label: 'Everything' },
+    ];
+    const PRESET = { busy: false, timer: null };
+    const HEAT_RADIO_IDS = ['toggle-road-load', 'toggle-carbon'];
+    function presetCouncilMode() { return typeof AREAS !== 'undefined' && AREAS ? AREAS.mode : null; }
+    function presetCouncilOn() { return typeof councilFocus === 'function' && councilFocus(); }
+    // the boxes a view outside the council view ticks: the page's own defaults with the forecast routes, plus (closures)
+    // every disruption-zone kind and every road-authority box the catalogue built
+    function presetLayers(p) {
+        const on = new Set(VIEW.defaults);
+        on.add('forecast');
+        if (p.closures) layerBoxes().forEach(cb => {
+            const k = layerKey(cb.id);
+            if (k === 'zones' || k.indexOf('zone-') === 0 || k.indexOf('restr-') === 0) on.add(k);
+        });
+        return on;
+    }
+    function presetMatches(p) {
+        const council = presetCouncilOn();
+        if (p.council) return council && presetCouncilMode() === p.council;
+        if (council) return false;
+        const heat = typeof heatMode === 'function' ? heatMode() : null;
+        if ((p.heat || null) !== heat) return false;
+        const want = presetLayers(p);
+        return layerBoxes().filter(cb => !HEAT_RADIO_IDS.includes(cb.id)).every(cb => !!cb.checked === want.has(layerKey(cb.id)));
+    }
+    function presetCouncilAvailable() {
+        const g = document.getElementById('council-group');
+        return !!document.getElementById('layer-areas-district') && !!g && !g.hidden;
+    }
+    function renderPresets() {
+        PRESET.timer = null;
+        const box = document.getElementById('preset-views');
+        if (!box) return;
+        const list = PRESETS.filter(p => !p.council || presetCouncilAvailable());     // a tenant with no council areas: no council views
+        box.innerHTML = list.map(p => '<button type="button" class="preset-chip" data-preset="' + p.key + '" aria-pressed="'
+            + (presetMatches(p) ? 'true' : 'false') + '" onclick="applyPreset(\'' + p.key + '\')">' + p.label + '</button>').join('');
+    }
+    function schedulePresetRender() {
+        if (PRESET.busy) return;
+        if (PRESET.timer) clearTimeout(PRESET.timer);
+        PRESET.timer = setTimeout(renderPresets, 60);
+    }
+    function applyPreset(key) {
+        const p = PRESETS.find(x => x.key === key);
+        if (!p || (p.council && !presetCouncilAvailable())) return;
+        const flip = (cb, v) => { if (cb && !!cb.checked !== v) { cb.checked = v; cb.dispatchEvent(new Event('change', { bubbles: true })); } };
+        PRESET.busy = true;
+        try {
+            if (p.council) {
+                // the colouring first, so the first paint after the tick is already the right one; the council view's own
+                // handler does the rest (every other box off and remembered, the heat map Off, a month on screen)
+                if (typeof setAreaMode === 'function') setAreaMode(p.council);
+                flip(document.getElementById('layer-areas-district'), true);
+                flip(document.getElementById('layer-areas-county'), true);
+                // the forecast routes are not one of the council view's boxes: off here, so the same button always gives
+                // the same picture (picked after Everything they stayed on, thin and grey)
+                flip(document.getElementById('toggle-forecast'), false);
+            } else {
+                // leave the council view FIRST: its restore ticks the remembered boxes back, which would fight the boxes set here
+                if (typeof leaveCouncilView === 'function') leaveCouncilView();
+                const want = presetLayers(p);
+                layerBoxes().filter(cb => !HEAT_RADIO_IDS.includes(cb.id)).forEach(cb => flip(cb, want.has(layerKey(cb.id))));
+                // the heat map last: Volume and Carbon open the timeline on a month when none is on screen
+                const radio = document.getElementById(p.heat === 'volume' ? 'toggle-road-load' : p.heat === 'carbon' ? 'toggle-carbon' : 'heat-off');
+                if (radio && !radio.checked) {
+                    HEAT_RADIO_IDS.concat(['heat-off']).forEach(id => { const r = document.getElementById(id); if (r && r !== radio) r.checked = false; });
+                    radio.checked = true; radio.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        } finally { PRESET.busy = false; }
+        scheduleViewWrite();
+        renderPresets();
+        // a phone: the view is picked in the Layers sheet, so the sheet goes down and the map shows
+        if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof closeLayersSheet === 'function') closeLayersSheet();
+    }
 
     // ---------------------------------------------------------------- "Copy link" and the share card with its QR
     const SHARE = { opener: null };
