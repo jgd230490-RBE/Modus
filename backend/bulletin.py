@@ -161,7 +161,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
 
     m_veh, m_qty, m_t, m_fleet, m_co2 = [], [], [], [], []
     routes_in, not_drawn = set(), {}
-    unbaked_lines = co2_unbaked = fell_back = lines_counted = 0
+    unbaked_lines = co2_unbaked = co2_lines = fell_back = lines_counted = 0
     groups = {"discipline": {}, "team": {}, "section": {}}
     by_route = {}
 
@@ -185,6 +185,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             routes_in.add(rid)
             if l.get("co2_t") is not None:                       # rule 7
                 co2 += float(l["co2_t"])
+                co2_lines += 1
             else:
                 co2_unbaked += 1
             tpv = l.get("trips_per_vehicle_day")
@@ -247,7 +248,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
                 "vehicles": {"fleet": None, "excludes_unbaked_lines": 0, "label": "Vehicles needed",
                              "not_baked": False},
                 "material": {"shown": unit != "vehicles", "unit": unit, "per_day": None},
-                "carbon": _carbon_block(None, 0.0, 0, payloads, routes, wd),
+                "carbon": _carbon_block(None, None, 0, payloads, routes, wd, co2_lines=0),
                 "busiest_routes": [], "breakdown": {"discipline": [], "team": [], "section": []},
                 "routes_not_drawn": not_drawn_block, "payload_fallback": {"lines": 0, "vehicle": fb_name},
                 "note": empty_note}
@@ -328,7 +329,8 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             "note": ("In a vehicles unit loads a day is the two-way movements figure, so the card is shown "
                      "for tonnes / m³ only."),
         },
-        "carbon": _carbon_block(_avg(m_co2), _avg(m_co2) / wd, co2_unbaked, payloads, routes, wd),
+        "carbon": _carbon_block(_avg(m_co2), _avg(m_co2) / wd, co2_unbaked, payloads, routes, wd,
+                                co2_lines=co2_lines),
         "busiest_routes": busiest,
         "breakdown": breakdown,
         "routes_in_use": sorted(routes_in),
@@ -348,18 +350,32 @@ def _cap_of(rp):
         return None
 
 
-def _carbon_block(co2_month, co2_day, co2_unbaked, payloads, routes, wd):
-    """The costlines figure (co2_t per line is costlines' own) with the Carbon page's stamp."""
+def _carbon_block(co2_month, co2_day, co2_unbaked, payloads, routes, wd, co2_lines=None):
+    """
+    The costlines figure (co2_t per line is costlines' own) with the Carbon page's stamp.
+
+    12 Oct 2026 (the tests-and-regressions review): when NO counted line carries carbon —
+    every drawn route unbaked for its vehicle, or the costlines read failed and the payload
+    says so in `co2_error` — the figures are None and `not_baked` is True, as the fleet
+    block already does for a fleet with no cycle. A sum of zero baked lines is not 0.0 t of
+    carbon. The payload's `co2_error` rides along as `error` so the page can say why.
+    """
     last = payloads[-1] if payloads else {}
     to_date = 0.0
     for c in (last.get("co2_to_date") or []):
         if c.get("route_id") in routes:
             to_date += float(c.get("co2_t") or 0.0)
+    errors = [p.get("co2_error") for p in payloads if isinstance(p, dict) and p.get("co2_error")]
+    not_baked = bool(co2_unbaked and not co2_lines)
+    if not_baked:
+        co2_month = co2_day = None
     return {
         "co2_t_a_day": _r(co2_day),
         "co2_t_in_month": _r(co2_month),
         "co2_t_to_date": _r(to_date),
         "excludes_unbaked_lines": co2_unbaked,
+        "not_baked": not_baked,
+        "error": (errors[0] if errors else None),
         "to_date_excludes_unbaked_lines": int(last.get("co2_to_date_unbaked_lines") or 0),
         "label_day": ("CO₂e a day" + (f" (excl. {co2_unbaked} unbaked)" if co2_unbaked else "")),
         "stamp": carbon.SUMMARY_STAMP,

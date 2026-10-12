@@ -357,6 +357,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and _pe["rollup"]["note"] == ("No approved forecast on a route the map draws in this month: 19 lines on 19 routes "
                                      "not yet baked, listed below and not counted.")
        and _pe["conditions"]["route_caps"]["wording"] == "planning flag", f"{r.status_code} {str(_pe)[:300]}")
+    # NARROWED 12 Oct 2026 (the tests-and-regressions review): the carbon figures on that empty roll-up are
+    # BOTH None (co2_t_a_day used to read 0.0), and there is no co2_error to carry
+    ok("…its carbon block: both figures None, not_baked False (no counted line at all), no error",
+       _pe["rollup"]["carbon"]["co2_t_a_day"] is None and _pe["rollup"]["carbon"]["co2_t_in_month"] is None
+       and _pe["rollup"]["carbon"]["not_baked"] is False and _pe["rollup"]["carbon"]["error"] is None, str(_pe["rollup"].get("carbon")))
 
     _r001 = [x for x in rows if x["route_id"] == "R001" and x["status"] == "Approved"]
     db.execute("INSERT INTO route_geometry (tenant_id, route_id, vehicle_profile, leg, alt_index, geometry, distance_km, "
@@ -454,6 +459,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
            abs(pg["rollup"]["carbon"]["co2_t_in_month"] - _cl10) < 0.002 and _cl10 > 0
            and pg["rollup"]["carbon"]["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures",
            f"{pg['rollup']['carbon']} vs {_cl10}")
+        ok("…and the block is a figure, not a gap: not_baked False, no error (12 Oct 2026 review)",
+           pg["rollup"]["carbon"]["not_baked"] is False and pg["rollup"]["carbon"]["error"] is None)
         _b = pg["rollup"]["busiest_routes"]
         ok("…the busiest route is R001 by its places, with \"no planning cap typed\"; the team row reads the tenant's name, never an id",
            len(_b) == 1 and _b[0]["label"] == "Kilby Ridge Quarry → Harborough Compound" and _b[0]["cap_wording"] == "no planning cap typed"
@@ -465,6 +472,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("⭐ …Stockpile Tilton over at the end of October by 510 t (40,510 against 40,000 — the figure the live map showed on 11 Oct)",
            [(p["name"], p["capacity_qty"], p["balance_end"], p["over_by"]) for p in _cn["stockpiles_over"]]
            == [("Stockpile Tilton", 40000.0, 40510.0, 510.0)], str(_cn["stockpiles_over"]))
+        ok("⭐ …and its sentence says the balance is RECORDED (typed week actuals carried forward), never \"the plan puts\" (D23)",
+           _cn["stockpiles_over"][0]["wording"] == ("Stockpile Tilton holds 40,000 t. 40,510 t recorded in it at the end of Oct 2026, "
+                                                    "from the week actuals typed so far, carried forward.")
+           and "plan puts" not in r.text, str(_cn["stockpiles_over"][0].get("wording")))
         _cap = _cn["route_caps"]
         ok("⭐ …the typed cap on R016 (20 a day) is exceeded by October's loaded trips a day and reads \"planning flag\", never a block",
            _cap["wording"] == "planning flag" and _cap["routes_with_cap"] == 2 and [e["route_id"] for e in _cap["exceeded"]] == ["R016"]
@@ -658,7 +669,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and rl.get("totals", {}).get("unbaked_lines", 0) == rl.get("totals", {}).get("lines", -1), str(rl.get("totals")))
     ok("...the return leg answers too, with its 'never added' note",
        c.get("/api/public/road-load", params={"month": 10, "leg": "return"}).json().get("notes", [None])[-1].startswith("Return leg"))
-    ok("an unknown leg is a 400", c.get("/api/public/road-load", params={"month": 10, "leg": "x"}).status_code == 400)
+    # NARROWED 12 Oct 2026 (the tenancy / wording review): the 400 reads as words, not a Python list
+    _bad = c.get("/api/public/road-load", params={"month": 10, "leg": "x"})
+    ok("an unknown leg is a 400 whose reason reads \"leg must be one of 'loaded' or 'return'\"",
+       _bad.status_code == 400 and _bad.json().get("detail") == "leg must be one of 'loaded' or 'return'", _bad.text[:120])
+    ok("⭐ the feed carries the Carbon page's planning-estimate stamp beside its CO2e figures (12 Oct 2026 review)",
+       rl.get("carbon", {}).get("stamp") == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
+       and "approved plan only" in rl.get("carbon", {}).get("rule", ""), str(rl.get("carbon")))
     ok("a month out of range is a 422", c.get("/api/public/road-load", params={"month": 99}).status_code == 422)
     r = c.post("/api/admin/road-sections/rebuild")
     ok("🔴 the admin rebuild is 403 without the token", r.status_code == 403, str(r.status_code))
@@ -669,6 +686,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and r.json().get("routes_indexed") == 0 and r.json().get("runs") == 0 and r.json().get("stale") is False, r.text[:200])
     r = c.get("/api/admin/diagnostics/road-sections", params=TOKEN)
     ok("the diagnostic prints the status text", r.status_code == 200 and "0 routes indexed" in r.json().get("text", ""), r.text[:200])
+    # 12 Oct 2026 (the tests-and-regressions review): status had only its 403 here; the 200 and the
+    # diagnostic's leg check over the real transport
+    r = c.get("/api/admin/road-sections/status", params=TOKEN)
+    ok("with the token status answers 200: 0 routes indexed, both legs listed with 0 runs, not stale",
+       r.status_code == 200 and r.json().get("routes_indexed") == 0 and r.json().get("stale") is False
+       and set(r.json().get("legs", {})) == {"loaded", "return"} and r.json()["legs"]["return"]["runs"] == 0, r.text[:200])
+    ok("the diagnostic refuses an unknown leg with 400 (token accepted)",
+       c.get("/api/admin/diagnostics/road-sections", params=dict(TOKEN, leg="x")).status_code == 400)
 
     # ------------------------------------------------------------ 4. export and replace
     r = c.get("/api/admin/tenant/export", params=TOKEN)

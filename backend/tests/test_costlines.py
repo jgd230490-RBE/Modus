@@ -313,6 +313,24 @@ ok("B2: a stored 0 reads 0.0 here (a figure, not a gap)", _r1z["co2_t"] == 0.0 a
 ok("B2: route_analysis reads the SAME function — its kg CO2e/km for the 32 t rigid is the line's 0.99773, through conversions._emissions",
    bool(_ra) and _ra[0]["co2_kg_per_km"] == 0.99773 == conversions._emissions(conversions.load_factors(), V8),
    str(_ra[0].get("co2_kg_per_km") if _ra else None))
+# 12 Oct 2026 (the tests-and-regressions review): the line above cannot tell the old `or` chain from the one
+# function — both give 0.99773 for a stored figure. The case that separates them is a stored 0 WITH a
+# _default entry present: the old chain sent it to _default (0.97 then), so the Routes table and the
+# Dashboard disagreed; now it is 0.0 in both. route_analysis reads conversions.load_factors(), so that is
+# what is swapped here (test_carbon pins the same rule at source level).
+_z = json.loads(json.dumps(conversions.load_factors()))
+_z["vehicles"][V8]["emissions_kg_co2e_per_km"] = 0
+_real_lf = conversions.load_factors
+conversions.load_factors = lambda *a, **k: _z
+try:
+    _ra0 = [r for r in network.route_analysis("R1", profiles=[V8])["rows"] if r["alt_index"] == 0]
+finally:
+    conversions.load_factors = _real_lf
+ok("⭐ B2: route_analysis with a STORED 0 on the 32 t rigid (and a _default entry present) reads 0.0 kg CO2e/km, not _default",
+   bool(_ra0) and _ra0[0]["co2_kg_per_km"] == 0.0 and _z["vehicles"]["_default"]["emissions_kg_co2e_per_km"] > 0,
+   str(_ra0[0].get("co2_kg_per_km") if _ra0 else None))
+ok("B2: ...and load_factors is restored (the rigid reads 0.99773 again)",
+   conversions.load_factors is _real_lf and conversions._emissions(conversions.load_factors(), V8) == 0.99773)
 # the three prices in four units
 p1, f1 = r1["planned"], r1["fair"]
 ok("R1 (no route rate) is planned at the TARGET: trips × 45 + trips × 60 km × 1.5, source 'target'",

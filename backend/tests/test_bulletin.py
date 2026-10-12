@@ -152,6 +152,7 @@ import tenant_package  # noqa: E402
 import stockpiles  # noqa: E402
 import clashes  # noqa: E402
 import weeks  # noqa: E402
+import costlines  # noqa: E402
 import bulletin  # noqa: E402
 for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT6_CODE",
            "PLANNER_CODE", "ADMIN_CODE"):
@@ -318,6 +319,40 @@ ok("⭐ rule 7 (carbon): CO₂e a day = Σ co2_t ÷ wd, the month's total, 1 unb
    and CO2 > 0, str(R["carbon"]))
 ok("…co2 to date follows the payload's programme-to-date list over the drawn routes",
    near(R["carbon"]["co2_t_to_date"], sum(c["co2_t"] for c in P10["co2_to_date"] if c["route_id"] in ROUTES), 1e-3))
+ok("…with three of four counted lines carrying carbon the block is a figure: not_baked False, no error",
+   R["carbon"]["not_baked"] is False and R["carbon"]["error"] is None)
+# 12 Oct 2026 (the tests-and-regressions review): a month where NO counted line carries carbon is not
+# "0.0 t (excl. 4 unbaked)" — the figures are None and the block says not_baked, as the fleet block does
+R_NOCO2 = bulletin.rollup_payloads([dict(P10, lines=[dict(l, co2_t=None) for l in P10["lines"]])], ROUTES, WD)
+ok("⭐ when no counted line carries carbon the figures read None and not_baked True — a sum of zero baked lines is "
+   "not 0.0 t; the volumes are untouched",
+   R_NOCO2["carbon"]["co2_t_a_day"] is None and R_NOCO2["carbon"]["co2_t_in_month"] is None
+   and R_NOCO2["carbon"]["not_baked"] is True and R_NOCO2["carbon"]["excludes_unbaked_lines"] == 4
+   and R_NOCO2["carbon"]["label_day"] == "CO₂e a day (excl. 4 unbaked)" and R_NOCO2["headline"] == H
+   and R_NOCO2["vehicles"] == R["vehicles"], str(R_NOCO2["carbon"]))
+_real_cl = costlines.lines
+
+
+def _boom(*a, **k):
+    raise RuntimeError("fixture: the costlines read failed")
+
+
+costlines.lines = _boom
+try:
+    P10_ERR = bulletin.month_payload(10)
+finally:
+    costlines.lines = _real_cl
+R_ERR = bulletin.rollup_payloads([P10_ERR], ROUTES, WD)
+ok("⭐ …and when the costlines read fails, the payload's co2_error rides on the carbon block as `error`, the figures None, "
+   "the headline and fleet the same (volumes are not carbon's hostage)",
+   P10_ERR.get("co2_error") == "RuntimeError: fixture: the costlines read failed"
+   and R_ERR["carbon"]["error"] == P10_ERR["co2_error"] and R_ERR["carbon"]["not_baked"] is True
+   and R_ERR["carbon"]["co2_t_in_month"] is None and R_ERR["carbon"]["co2_t_a_day"] is None
+   and R_ERR["carbon"]["excludes_unbaked_lines"] == 4 and R_ERR["headline"] == H and R_ERR["vehicles"] == R["vehicles"],
+   f"{P10_ERR.get('co2_error')} {R_ERR['carbon']}")
+ok("…the read is restored: the next payload carries carbon and no co2_error again",
+   costlines.lines is _real_cl and "co2_error" not in bulletin.month_payload(10)
+   and bulletin.rollup_payloads([bulletin.month_payload(10)], ROUTES, WD)["carbon"]["error"] is None)
 
 # rule 8: the material card
 # qty_unit in a vehicles unit is rounded to WHOLE loads per line by the payload (round_for_unit), so the
@@ -400,9 +435,13 @@ ok("…each breakdown group divides by the months IT appeared in: structures ran
    and [r for r in R3M["breakdown"]["discipline"] if r["key"] == "structures"][0]["months_with_volume"] == 1)
 ok("…a route that appeared in both months divides by two", R3M["busiest_routes"][0]["months_with_volume"] == 2)
 R_EMPTY = bulletin.rollup_payloads([P12], ROUTES, WD)
-ok("an empty month says so: empty, four headline figures null, routes 0, no busiest rows",
+# NARROWED 12 Oct 2026 (the tests-and-regressions review): the carbon figures are BOTH None on an empty
+# month — co2_t_a_day used to read 0.0 beside a None co2_t_in_month
+ok("an empty month says so: empty, four headline figures null, routes 0, no busiest rows, both carbon figures None",
    R_EMPTY["empty"] is True and R_EMPTY["headline"]["two_way_a_day"] is None and R_EMPTY["headline"]["routes_in_use"] == 0
-   and R_EMPTY["busiest_routes"] == [] and R_EMPTY["note"] == "No approved forecast in this month.")
+   and R_EMPTY["busiest_routes"] == [] and R_EMPTY["note"] == "No approved forecast in this month."
+   and R_EMPTY["carbon"]["co2_t_a_day"] is None and R_EMPTY["carbon"]["co2_t_in_month"] is None
+   and R_EMPTY["carbon"]["not_baked"] is False and R_EMPTY["carbon"]["error"] is None)
 R_UNDRAWN = bulletin.rollup_payloads([dict(P10, lines=[l for l in P10["lines"] if l["route_id"] == "R3"])], ROUTES, WD)
 ok("…a month whose only lines sit on undrawn routes is empty too, but the note NAMES them rather than saying there is no forecast",
    R_UNDRAWN["empty"] is True and R_UNDRAWN["routes_not_drawn"] == {"lines": 1, "routes": ["R3"], "note": R_UNDRAWN["routes_not_drawn"]["note"]}
@@ -493,6 +532,26 @@ ok("bulletin.py reads the carbon stamp from carbon.py, not a copy", "carbon.SUMM
    and "planning estimate, DESNZ" not in SRC)
 ok("every SQL in bulletin.py carries the tenant predicate (test_tenant_audit checks the AST; this pins the count)",
    SRC.count("tenant_id = ?") == 2 and SRC.count("db.query(") == 2)
+# 12 Oct 2026 (the tenancy / wording review): rollup_payloads promises no database read, but team_text() without
+# a `word` read the tenant settings for every line — with the word handed in it reads nothing
+_real_word = taxonomy._team_word
+
+
+def _no_db(*a, **k):
+    raise AssertionError("rollup_payloads read the tenant settings")
+
+
+taxonomy._team_word = _no_db
+try:
+    R_PURE = bulletin.rollup_payloads([P10], ROUTES, WD, acc=PLANNER, labels=taxonomy.team_labels(), team_word="Team")
+    _pure_ok = [r["key"] for r in R_PURE["breakdown"]["team"]] == [r["key"] for r in R["breakdown"]["team"]] and R_PURE["headline"] == H
+except AssertionError as e:
+    _pure_ok = False
+finally:
+    taxonomy._team_word = _real_word
+ok("⭐ rollup_payloads with labels and the team word handed in reads no tenant setting (pure, as its docstring says)",
+   _pure_ok and "taxonomy.team_text(rp.get(\"ipt\"), labels, word)" in SRC)
+ok("bulletin.py stamps generated_at from an aware UTC clock (utcnow is deprecated in Python 3.12)", "utcnow" not in SRC)
 MAP = read("map/index.html")
 ok("the map's rules the module mirrors are still the map's: ceil per line, the fractional sum, max over months, months with volume",
    "Math.ceil((l.vehicle_loads / wd) / l.trips_per_vehicle_day)" in MAP and "const fleet = Math.max(...mFleet)" in MAP
@@ -566,6 +625,15 @@ _c10 = bulletin.conditions_of_month(10, payload=P10, factors=FACTORS)["stockpile
 ok("…the breaking case: 300 t consumed in October's first week brings it under by month END, so October lists nothing",
    _c10 == [] and bulletin.conditions_of_month(9, payload=P10, factors=FACTORS)["stockpiles_over"], str(_c10))
 ok("…and a location with no capacity is never 'over'", all(x["location_id"] != "L4" for x in _c9))
+# 12 Oct 2026 (the tenancy / wording review; D23): the sentence a person reads says the balance is RECORDED —
+# typed week actuals carried forward — never "the plan puts", which is what the map says today (`map/index.html`)
+ok("⭐ the stockpile sentence reads \"recorded in it at the end of Sep 2026\", names the capacity and the unit, and never \"the plan puts\"",
+   _c9[0]["wording"] == ("Mill Compound holds 1,000 t. 1,200 t recorded in it at the end of Sep 2026, from the week actuals "
+                         "typed so far, carried forward.")
+   and _c9[0]["wording"] == bulletin.stockpile_wording("Mill Compound", 1000, 1200, "t", 9)
+   and "plan puts" not in _c9[0]["wording"], str(_c9[0].get("wording")))
+ok("…the wording is one function and bulletin.py never says \"The plan puts\"",
+   "The plan puts" not in read("backend/bulletin.py") and "recorded in it at the end of" in read("backend/bulletin.py"))
 
 # seasonal windows: the calendar month and the vehicle
 F_SEAS = dict(FACTORS, seasonal_restrictions=[
@@ -609,6 +677,8 @@ ok("⭐ the page: rollup, conditions, month label, working days, demo notice, ge
    set(PAGE) >= {"rollup", "conditions", "month", "working_days", "demo_notice", "generated_at", "terms", "scope", "plan_only"}
    and PAGE["month"] == {"index": 10, "label": "Oct 2026", "label_long": "October 2026", "from": "2026-10-01", "to": "2026-10-31"}
    and PAGE["working_days"] == WD and PAGE["plan_only"] is True and PAGE["generated_at"].endswith("Z"), str(PAGE["month"]))
+ok("…generated_at is an ISO UTC instant to the second (YYYY-MM-DDTHH:MM:SSZ)",
+   bool(re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", PAGE["generated_at"])), PAGE["generated_at"])
 ok("…the roll-up on the page is the hand-computed one, with the typed cap on the busiest route and the section NAMES ready",
    PAGE["rollup"]["headline"] == H and PAGE["rollup"]["vehicles"] == R["vehicles"]
    and PAGE["rollup"]["busiest_routes"][0]["cap_wording"] == "planning flag" and PAGE["rollup"]["months"] == [10])
