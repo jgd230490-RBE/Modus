@@ -236,7 +236,17 @@ def validate(doc, network=None):
             if not num(pl) or pl <= 0:
                 p.append(f"vehicle '{k}': payload_t must be a positive number")
             em = v.get("emissions_kg_co2e_per_km")
-            if em is not None and (not num(em) or em < 0):
+            # 12 Oct 2026 (B2): a BLANK cell saved on the Config page arrives as null (the page
+            # writes num("") = null; it deletes the key only for load/unload minutes). Until
+            # today that passed, and float(None) then raised inside every costlines read and
+            # silently blanked every carbon figure on the map. Refused here, naming the vehicle.
+            # An electric entry with no stored figure is the derived case and stays allowed;
+            # a key that is absent altogether reads the fallback and is not a Config edit.
+            if "emissions_kg_co2e_per_km" in v and (em is None or em == "") and v.get("fuel") != "electric":
+                p.append(f"vehicle '{k}': the kg CO2e per km cell is blank — type its figure "
+                         f"(0 for a vehicle with no tailpipe carbon) or put the stored one back; "
+                         f"a blank would send every carbon figure on this vehicle to the fallback")
+            elif em is not None and (not num(em) or em < 0):
                 p.append(f"vehicle '{k}': emissions_kg_co2e_per_km must be a number >= 0")
             for f in ("load_minutes", "unload_minutes", "gvw_t"):
                 if v.get(f) is not None and (not num(v[f]) or v[f] < 0):

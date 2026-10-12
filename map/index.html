@@ -1061,7 +1061,7 @@
             const note = document.getElementById('alts-note');
             if (note) note.textContent = n
                 ? n + ' alternative leg(s) HERE offered but the plan does not use'
-                : 'none baked — a route through a haul road has no alternatives';
+                : 'none stored — a route through a haul road has no alternatives';
             console.log('[alts] ' + n + ' alternative geometries');
         } catch(e){
             console.warn('route alternatives unavailable', e);
@@ -1971,7 +1971,7 @@
             set('kpi-vehicles-label', 'Vehicles needed');
             set('kpi-routes', n); set('kpi-routes-label', 'Active routes');
             setHTML('kpi-breakdown', ''); setHTML('kpi-switch', ''); setHTML('kpi-busiest', '');
-            set('kpi-note', 'Turn on Show forecast or the timeline for daily rates. Active routes = every baked route matching the filters.');
+            set('kpi-note', 'Turn on Show forecast or the timeline for daily rates. Active routes = every route with a stored road route that matches the filters.');
             return;
         }
 
@@ -2073,17 +2073,30 @@
             // fleet = the busiest month's requirement, not the average: a fleet that
             // is one truck short in the peak month is short
             const fleet = Math.max(...mFleet);
-            set('kpi-vehicles', unbakedLines && !fleet ? 'not baked' : fmtN(fleet, 0) + (unbakedLines ? '+' : ''));
-            set('kpi-vehicles-label', unbakedLines ? `Vehicles needed (${unbakedLines} line${unbakedLines === 1 ? '' : 's'} unbaked)` : 'Vehicles needed');
+            // 12 Oct 2026 (the base merge, Track B's merge-time item): what a person reads says "no stored road route",
+            // never the team's word "baked" / "unbaked"
+            set('kpi-vehicles', unbakedLines && !fleet ? 'no stored route' : fmtN(fleet, 0) + (unbakedLines ? '+' : ''));
+            set('kpi-vehicles-label', unbakedLines ? `Vehicles needed (${unbakedLines} line${unbakedLines === 1 ? '' : 's'} with no stored road route)` : 'Vehicles needed');
             set('kpi-material', fmtN(qtyDay, unitLbl === 'vehicles' ? 1 : 0));
             set('kpi-routes', mRoutes.size); set('kpi-routes-label', 'Routes in ' + label);
             // CO2e: tonnes a day for the month(s), and the programme to the end of the last
             // month on screen. Unbaked lines carry no km and are named, never zeroed.
+            // 12 Oct 2026 (the base merge, Track B's merge-time item): month-kpis says `co2_error` when the server could
+            // not read the carbon; every co2_t is then null. The bar prints a dash and says so, never a zero dressed as a
+            // figure and never "(excl. N …)", which would blame a missing road route for a failed read.
+            const co2Err = payloads.some(p => p && p.co2_error);
+            const noRoute = k => `${k} line${k === 1 ? '' : 's'} with no stored road route`;
             const co2Day = avg(mCo2) / wd;
-            set('kpi-co2-day', co2Day >= 100 ? fmtN(co2Day, 0) + ' t' : fmtN(co2Day, 1) + ' t');
-            set('kpi-co2-total', fmtN(co2ToDate, 0) + ' t');
-            set('kpi-co2-day-label', co2Unbaked ? `CO\u2082e a day (excl. ${co2Unbaked} unbaked)` : 'CO\u2082e a day');
-            set('kpi-co2-total-label', (last.co2_to_date_unbaked_lines ? `CO\u2082e to date (excl. ${last.co2_to_date_unbaked_lines} unbaked)` : 'CO\u2082e to date'));
+            if (co2Err) {
+                set('kpi-co2-day', '—'); set('kpi-co2-total', '—');
+                set('kpi-co2-day-label', 'CO\u2082e a day (carbon could not be read)');
+                set('kpi-co2-total-label', 'CO\u2082e to date (carbon could not be read)');
+            } else {
+                set('kpi-co2-day', co2Day >= 100 ? fmtN(co2Day, 0) + ' t' : fmtN(co2Day, 1) + ' t');
+                set('kpi-co2-total', fmtN(co2ToDate, 0) + ' t');
+                set('kpi-co2-day-label', co2Unbaked ? `CO\u2082e a day (excl. ${noRoute(co2Unbaked)})` : 'CO\u2082e a day');
+                set('kpi-co2-total-label', (last.co2_to_date_unbaked_lines ? `CO\u2082e to date (excl. ${noRoute(last.co2_to_date_unbaked_lines)})` : 'CO\u2082e to date'));
+            }
             // 2026-09-07 — the title says which month these numbers are, so the bar is
             // readable without also reading the timeline label at the bottom of the screen.
             // 2026-10-06 — month on the first line, "Approved plan · forecast" under it.
@@ -2115,7 +2128,7 @@
                 .map(([rid, b, mv]) => `<button type="button" class="busy-row" onclick="selectRoute('${esc(rid)}')" title="Show ${esc(rid)} on the map">` +
                     `<span>${esc((b.rp.origin || rid) + ' \u2192 ' + (b.rp.dest || ''))}</span><span class="chip-n">${fmtN(mv, 0)} two-way a day</span></button>`).join('');
             setHTML('kpi-busiest', busiest);
-            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, averaged over ${n} months with volume` : ''}. Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty. Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle), rounded up per line${n > 1 ? ', busiest month' : ''}. CO\u2082e = routed km × the vehicle's kg CO\u2082e/km, approved plan only.`
+            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, averaged over ${n} months with volume` : ''}. Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty. Vehicles = movements ÷ what one vehicle can do per day on that route (the cycle time of its stored road route), rounded up per line${n > 1 ? ', busiest month' : ''}. CO\u2082e = routed km × the vehicle's kg CO\u2082e/km, approved plan only.`
                 + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload because their vehicle is not in factors.json.` : ''));
             // the method note reads as a tooltip on the month, not as a paragraph in the bar
             const tt = document.getElementById('kpi-title'); if (tt) tt.title = document.getElementById('kpi-note').innerText;
@@ -4063,7 +4076,7 @@
 
     const FALLBACK_FACTORS = {
         vehicle_payload_t: { "_default": 20 },
-        vehicle_emissions_kg_co2e_per_km: { "_default": 0.90 },
+        vehicle_emissions_kg_co2e_per_km: { "_default": 0.89743 },   // 12 Oct 2026 (B2): conversions.FALLBACK_KG_CO2E_PER_KM — one rule, server and map
         planning: { avg_haul_speed_kmh:45, load_minutes:12, unload_minutes:8, working_days_per_month:22, shift_hours_per_day:10 }
     };
     function fac(){ return META.factors || FALLBACK_FACTORS; }
@@ -4186,32 +4199,56 @@
             '<div id="an-fc-slot" class="an-sub" style="margin-top:12px;">Loading forecast…</div>';
         try{
             const mtx=await fetchMatrix('t');
-            // 12 Oct 2026 (fix pass; the review's bug (d), the drawer's half): the matrix is one entry per LINE, so a route
-            // with two approved lines has two rows. find() took the first (the largest) and the drawer under-read the
-            // route the map label had summed. Every line of the route now counts: tonnes and the monthly profile summed,
-            // trips and CO2e per line on that line's own vehicle (payload and factor), then added.
+            // 12 Oct 2026 (both tracks' fix passes, merged on the base branch): EVERY line of the route, not the first
+            // one find() met. forecast-matrix is one row per (route, discipline, section), so a route with two approved
+            // lines is two rows; the drawer used to print one line's tonnes and carbon under a caption that called it
+            // the bar's figure. Tonnes, trips and the monthly profile are summed over every row, trips on each line's
+            // own payload.
             const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);
             const row=rows.length?rows[0]:null;
             let extra;
             if(row){
                 const veh=row.vehicle_type, mat=row.material_type;
-                const payloadOf=v=>pick(F.vehicle_payload_t,v)||20;
-                const payload=payloadOf(veh);
+                const payload=pick(F.vehicle_payload_t,veh)||20;
+                // 12 Oct 2026 (B2): carbon is the SERVER's figure. forecast-matrix carries co2_t per month,
+                // keyed like monthly, from the same costlines read as the KPI bar and the Dashboard (km × the
+                // vehicle's kg CO2e/km, both legs). Nothing is worked out here any more — the drawer used to
+                // multiply its own trips × round trip × a factor with a 0.9 fallback, so two carbon numbers
+                // could sit on one screen. A line-month with no road route stored for its vehicle is null: it is
+                // counted and named, never estimated.
                 const totalT=rows.reduce((a,r)=>a+(r.total||0),0);
-                const monthly={};
-                rows.forEach(r=>Object.keys(r.monthly||{}).forEach(k=>{ monthly[k]=(monthly[k]||0)+(Number(r.monthly[k])||0); }));
-                const months=Object.values(monthly);
-                const peakT=months.length?Math.max.apply(null,months):0;
-                const peakKey=Object.keys(monthly).find(k=>monthly[k]===peakT);
-                let trips=0, co2t=0, peakTrips=0;
-                rows.forEach(r=>{
-                    const pl=payloadOf(r.vehicle_type), em=pick(F.vehicle_emissions_kg_co2e_per_km,r.vehicle_type)||0.9;
-                    const t=pl>0?Math.ceil((r.total||0)/pl):0;
-                    trips+=t; co2t+=t*round*em/1000;
-                    if(pl>0&&peakKey!=null) peakTrips+=(Number((r.monthly||{})[peakKey])||0)/pl;
+                let trips=0, co2t=0, bakedT=0, co2LineMonths=0;
+                const monthT={}, monthLoads={}, unbakedMonths={};
+                rows.forEach(rw=>{
+                    const pl=pick(F.vehicle_payload_t,rw.vehicle_type)||20;
+                    trips+=pl>0?Math.ceil((rw.total||0)/pl):0;
+                    const co2m=rw.co2_t||{};
+                    Object.keys(rw.monthly||{}).forEach(k=>{
+                        const mt=rw.monthly[k]||0;
+                        monthT[k]=(monthT[k]||0)+mt;
+                        monthLoads[k]=(monthLoads[k]||0)+(pl>0?mt/pl:0);
+                        const c=co2m[k];
+                        if(c==null){ unbakedMonths[k]=true; } else { co2t+=c; bakedT+=mt; co2LineMonths++; }
+                    });
                 });
-                const intensity=totalT>0?(co2t*1000/totalT):0;
-                const trucksPeak=(tripsPerDay>0)?Math.ceil(peakTrips/(tripsPerDay*P.working_days_per_month)):0;
+                const peakT=Object.keys(monthT).length?Math.max.apply(null,Object.values(monthT)):0;
+                const peakLoads=Object.keys(monthLoads).length?Math.max.apply(null,Object.values(monthLoads)):0;
+                const unbakedM=Object.keys(unbakedMonths).length;
+                const anyBaked=co2LineMonths>0 && !mtx.co2_error;
+                const intensity=bakedT>0?(co2t*1000/bakedT):0;
+                // the carbon read failed on the server: say so, never blame a missing road route
+                const co2Card=mtx.co2_error
+                    ? card('—','CO₂e (est.)','carbon could not be read')
+                    : anyBaked
+                    ? card(co2t.toFixed(1)+' t','CO₂e (est.)','both legs'+(unbakedM?' · excl. '+unbakedM+' month'+(unbakedM>1?'s':'')+' with no stored road route':''))
+                    : card('—','CO₂e (est.)','no road route stored for this vehicle yet');
+                const intCard=mtx.co2_error
+                    ? card('—','Carbon intensity','carbon could not be read')
+                    : anyBaked
+                    ? card(intensity.toFixed(1)+' kg/t','Carbon intensity','per tonne, months with a stored route')
+                    : card('—','Carbon intensity','needs a stored road route');
+                const trucksPeak=(tripsPerDay>0)?Math.ceil(peakLoads/(tripsPerDay*P.working_days_per_month)):0;
+                // Track A's caption: a route with several approved lines names each material · vehicle pair
                 const what=rows.length>1
                     ? rows.length+' approved lines: '+[...new Set(rows.map(r=>(r.material_type||'—')+' · '+(r.vehicle_type||'—')))].join('; ')
                     : mat+' · '+veh+' · payload '+payload+' t';
@@ -4221,12 +4258,13 @@
                     '<div class="an-grid">'+
                         card(Math.round(totalT).toLocaleString()+' t','Total material','over selected window')+
                         card(trips.toLocaleString(),'Total trips','one-way loaded runs')+
-                        card(co2t.toFixed(1)+' t','CO₂e (est.)','round-trip diesel')+
-                        card(intensity.toFixed(1)+' kg/t','Carbon intensity','per tonne delivered')+
+                        co2Card+
+                        intCard+
                         card(Math.round(peakT).toLocaleString()+' t','Peak month','busiest month in window')+
                         card(trucksPeak,'Lorries for peak','to clear peak month')+
                     '</div>'+
-                    '<div class="an-sub" style="margin-top:10px;">Carbon: DESNZ 2026 kg CO₂e per vehicle-km, average laden, applied to both legs, tailpipe only; set per vehicle on the Config page.</div>';
+                    '<div class="an-sub" style="margin-top:10px;">Carbon: DESNZ 2026 kg CO₂e per vehicle-km, average laden, applied to both legs, tailpipe only; set per vehicle on the Config page. Read from the server: the costlines figure the bar above and the Dashboard use, summed over every line on this route.'+
+                    (mtx.carbon_stamp?' '+mtx.carbon_stamp+'.':'')+'</div>';
             } else {
                 extra='<div class="an-sub" style="margin-top:12px;">No approved forecast for this route in the selected window, so tonnage &amp; carbon are hidden. Distance and cycle time above come from the road geometry.</div>';
             }
@@ -4660,7 +4698,9 @@
     }
     function pileSentence(sp, month, u) {
         const mm = sp.months[String(month)];
-        const head = `${sp.name} holds ${Math.round(sp.capacity_qty).toLocaleString()} ${u}. ${Math.round(mm.balance_end).toLocaleString()} ${u}`;
+        // 12 Oct 2026 (the base merge; Track B's bulletin wording): "has a capacity of", not "holds" — "holds" read as
+        // what is in the pile now, and the next figure is the recorded balance, a different number
+        const head = `${sp.name} has a capacity of ${Math.round(sp.capacity_qty).toLocaleString()} ${u}; ${Math.round(mm.balance_end).toLocaleString()} ${u}`;
         const last = pileLastRecorded(sp);
         if (last !== null && month > last) return `${head} recorded at the end of ${monthLabel(last)}; nothing recorded since.`;
         return `${head} recorded in it at the end of ${monthLabel(month)}.`;

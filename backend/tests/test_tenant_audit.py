@@ -84,6 +84,10 @@ TENANTED = {
     # Look-ahead v2 slice 1, 2026-09-09. And this one — the fourth registration, tripped
     # before it was made, exactly as the comment above predicts. Four for four.
     "forecast_days",
+    # 12 Oct 2026 (public map review §2.2d). The shared-section index: derived from one
+    # tenant's geometry and carried in its package. Registered in the same edit as the
+    # table — five for five.
+    "route_sections",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

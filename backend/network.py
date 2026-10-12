@@ -15,6 +15,7 @@ import here_routing
 import stockpiles   # Week 1, Task D2 — the stockpile balance read model
 import zones          # Phase 3 — supplies the avoid[areas] the bake path sends to HERE
 import haul           # Phase 4 — threads temporary haul roads into the bake path
+import road_sections  # 12 Oct 2026 (§2.2d) — the shared-section index, rebuilt when a primary geometry changes
 import gates          # Phase 5a — resolves which gate each leg enters and leaves by
 
 DEFAULT_PROFILE = "Artic Tipper (44t)"
@@ -388,6 +389,10 @@ def _upsert_geom(route_id, profile, geometry, dist, dur, error, leg="loaded", al
         "UPDATE routes SET restrictions_hits = NULL, restrictions_checked_at = NULL, "
         "restrictions_status = NULL WHERE tenant_id = ? AND id = ?",
         (db.current_tenant(), route_id))
+    # 12 Oct 2026 (§2.2d): a new PRIMARY geometry changes which roads are shared, so the
+    # section index is rebuilt here. Alternatives are not indexed and do not trigger it.
+    if int(alt_index or 0) == 0:
+        road_sections._rebuild_quietly("geometry upsert")
 
 
 def clear_geometry(profile=None, leg=None, route_id=None):
@@ -421,6 +426,7 @@ def clear_geometry(profile=None, leg=None, route_id=None):
     if clauses:
         sql += " AND " + " AND ".join(clauses)
     db.execute(sql, (db.current_tenant(),) + tuple(params))
+    road_sections._rebuild_quietly("geometry clear")     # 12 Oct 2026 (§2.2d)
     return True
 
 
@@ -516,6 +522,10 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
     return len(opts), None
 
 
+# 12 Oct 2026 (the review and fix pass): every leg the batch upserts marks the shared-section
+# index dirty and it is rebuilt ONCE when the batch ends — it used to be rebuilt after every
+# primary upsert, about 25 full rebuilds a batch
+@road_sections.rebuild_once("bake batch")
 def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERNATIVES):
     """
     Route up to `limit` not-yet-attempted (route, leg) pairs for a profile and cache
@@ -779,6 +789,10 @@ def public_map_data(profile=None):
                     "cycle_hr": round(cycle_hr, 2) if cycle_hr else None,
                     "trips_per_day": trips,
                     "disciplines": sorted(disc.get(r["id"], [])),
+                    # 12 Oct 2026 (map review §2.5 row 2): the route's typed daily cap, so
+                    # the public map can show a plan against it as a planning flag. On BOTH
+                    # legs (a filter on either must find it); None when nobody typed one.
+                    "max_vehicles_per_day": r.get("max_vehicles_per_day"),
                 },
                 "geometry": {"type": "LineString",
                              "coordinates": json.loads(g["geometry"])},
@@ -1313,6 +1327,7 @@ def delete_route(route_id):
                (db.current_tenant(), route_id))
     db.execute("DELETE FROM routes WHERE tenant_id = ? AND id = ?",
                (db.current_tenant(), route_id))
+    road_sections._rebuild_quietly("route delete")       # 12 Oct 2026 (§2.2d)
     return {"id": route_id}
 
 
@@ -1321,9 +1336,11 @@ def clear_routes():
     n = len(db.query("SELECT id FROM routes WHERE tenant_id = ?", (db.current_tenant(),)))
     db.execute("DELETE FROM route_geometry WHERE tenant_id = ?", (db.current_tenant(),))
     db.execute("DELETE FROM routes WHERE tenant_id = ?", (db.current_tenant(),))
+    road_sections._rebuild_quietly("routes clear")       # 12 Oct 2026 (§2.2d)
     return {"cleared": n}
 
 
+@road_sections.rebuild_once("route bake")      # 12 Oct 2026: both legs, one index rebuild
 def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERNATIVES):
     """
     Route + cache geometry for a single route (used to bake a freshly authored route).
@@ -1608,6 +1625,8 @@ def meta_routes(profile=None):
             "distance_km": round(km, 2) if km is not None else None,
             "distance_profile": used,
             "baked_profiles": sorted(per_profile),
+            # 12 Oct 2026 (map review §2.5 row 2): the typed daily cap; None when untyped
+            "max_vehicles_per_day": r.get("max_vehicles_per_day"),
         })
     return out
 
@@ -1737,6 +1756,7 @@ def promote_alternative(route_id, profile, alt_index, leg="loaded"):
         "UPDATE route_geometry SET alt_index = ? WHERE tenant_id = ? AND route_id = ? "
         "AND vehicle_profile = ? AND leg = ? AND alt_index = ?",
         (alt_index, db.current_tenant(), route_id, profile, leg, TMP))
+    road_sections._rebuild_quietly("alternative promoted")   # 12 Oct 2026: a new primary
     return {"route_id": route_id, "profile": profile, "leg": leg,
             "promoted": alt_index, "swapped_with": 0,
             "note": "Re-baking this route will restore HERE's own ranking."}
@@ -1780,8 +1800,9 @@ def factors_diagnostics():
             "in_factors": matched,
             "in_database": prof in used,
             "payload_t": v.get("payload_t", default.get("payload_t")),
-            "emissions_kg_co2e_per_km": v.get("emissions_kg_co2e_per_km",
-                                              default.get("emissions_kg_co2e_per_km")),
+            # the RESOLVED figure (12 Oct 2026, B2): what route_analysis and costlines will
+            # use for this profile, fallback included — never a raw null
+            "emissions_kg_co2e_per_km": conversions._emissions(factors, prof),
             "gross_weight_kg": (v.get("routing", {}) or {}).get("gross_weight_kg"),
             "tare_weight_kg": here_routing.tare_weight_kg(prof, factors) if matched else None,
             "load_minutes": load_m, "unload_minutes": unload_m,
@@ -1812,6 +1833,13 @@ def factors_diagnostics():
                 "the version you think it is."])
             + ([] if len(set(pay)) > 1 else
                ["Every vehicle in factors.json carries the same payload."])
+            # 12 Oct 2026 (the review and fix pass): a tenant's stored config is read before the
+            # file, so a config saved before the one-fallback rule keeps its own _default figure
+            + ([] if conversions._stored_factor(default) in (None, conversions.FALLBACK_KG_CO2E_PER_KM) else
+               [f"_default carries {conversions._stored_factor(default)} kg CO2e/km, not the published "
+                f"fallback {conversions.FALLBACK_KG_CO2E_PER_KM} (DESNZ 2026, all HGVs, average laden). "
+                "This tenant's stored factors predate 12 Oct 2026: reset the Config page to file, or "
+                "re-import the package, to use the published figure."])
         ),
     }
 
@@ -2271,9 +2299,10 @@ def route_analysis(route_id, profiles=None):
         loaded, ret = legs.get("loaded", {}), legs.get("return", {})
         v = veh.get(prof, {}) or {}
         payload_t = float(v.get("payload_t") or default_veh.get("payload_t") or 0)
-        co2_per_km = (conversions._emissions(factors, prof) if v.get("fuel") == "electric"   # 10 Oct: derived, one place
-                      else float(v.get("emissions_kg_co2e_per_km")
-                                 or default_veh.get("emissions_kg_co2e_per_km") or 0))
+        # 12 Oct 2026 (B2): the one lookup for every caller — own figure, derived electric,
+        # the document's _default, else conversions.FALLBACK_KG_CO2E_PER_KM; a stored 0 stays 0
+        # (the `or` chain here used to send it to _default while costlines read 0)
+        co2_per_km = conversions._emissions(factors, prof)
         # turnaround varies by vehicle — a flatbed strapping a load is not a tipper
         load_m, unload_m = _turnaround_minutes(prof, factors)
         for alt in sorted(loaded):

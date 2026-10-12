@@ -298,7 +298,8 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
   ok("the vehicles card is a fleet size, not the movement count", /\d/.test(vehicles), vehicles);
   // the fixture leaves R-004 with no cycle time on purpose
   const vehLabel = await page.evaluate(() => document.getElementById("kpi-vehicles-label").textContent);
-  ok("⭐ an unbaked line is declared, not counted as zero", /unbaked/.test(vehLabel), vehLabel);
+  // NARROWED 12 Oct 2026 (the base merge): the label says "with no stored road route", not "unbaked"
+  ok("⭐ a line with no stored road route is declared, not counted as zero", /with no stored road route/.test(vehLabel) && !/unbaked/.test(vehLabel), vehLabel);
 
   // the panel must not have grown into the map
   k = await vis("#kpi-hud");

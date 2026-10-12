@@ -227,7 +227,10 @@ _audit = open(os.path.join(HERE, "test_tenant_audit.py"), encoding="utf-8").read
 ok("...and the audit lists it as untenanted WITH a reason (not silently exempt)",
    re.search(r'"fuel_index":\s*"[^"]{20,}"', _audit) is not None)
 ok("the tenant's settings live in the tenanted config table under one key, no new table",
-   costing.KEY == "costing" and len(db.TENANTED_TABLES) == 16)
+   # NARROWED 12 Oct 2026: route_sections (public map review §2.2d) is the one table added
+   # since; costing itself still added none, which is what this pins.
+   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections"}) == 16
+   and "route_sections" in db.TENANTED_TABLES)
 ok("nothing is seeded: no target rate, no share, no base, no yard, no index row",
    costing.settings()["target"] == {k: None for k in costing.TARGET_FIELDS}
    and costing.settings()["fuel"]["share_pct"] is None and costing.settings()["fuel"]["baf_base_eur_per_l"] is None
@@ -767,16 +770,27 @@ try:
     main.get_fuel_index(lazy=0)
     ok("...lazy=0 never touches the feed", _calls["n"] == 0)
     _calls["mode"] = "ok"
-    r = main.refresh_fuel_index(sync=1)
-    ok("POST /api/admin/fuel-index/refresh (token unset ⇒ open, as every admin endpoint is today — C11) fetches and stores 1.922",
+    # REVERSED 12 Oct 2026 (C11 closed): this read "token unset ⇒ open, as every admin endpoint is today — C11" and
+    # asserted that the refresh RAN with no token configured. An unset ADMIN_TOKEN now REFUSES every admin call, and
+    # the refused refresh never touches the feed.
+    e = _raises(lambda: main.refresh_fuel_index(sync=1))
+    ok("🔴 C11 closed: POST /api/admin/fuel-index/refresh with ADMIN_TOKEN unset is refused (403) and the feed is not called",
+       getattr(e, "status_code", None) == 403 and _calls["n"] == 0, repr(e)[:120])
+    os.environ["ADMIN_TOKEN"] = "s3cret"
+    e = _raises(lambda: main.refresh_fuel_index(sync=1))
+    ok("C11: ...and with a token configured, a call that sends none is refused too (403)",
+       getattr(e, "status_code", None) == 403 and _calls["n"] == 0, repr(e)[:120])
+    r = main.refresh_fuel_index(sync=1, token="s3cret")
+    ok("POST /api/admin/fuel-index/refresh with the admin token fetches and stores 1.922",
        r["index"]["eur_per_l"] == 1.922 and r["index"]["source"] == fuel.SOURCE_BULLETIN)
-    r = main.put_fuel_manual(main.ManualIndexIn(eur_per_l=1.95, bulletin_date="2026-09-14", updated_by="a"))
+    r = main.put_fuel_manual(main.ManualIndexIn(eur_per_l=1.95, bulletin_date="2026-09-14", updated_by="a"), token="s3cret")
     ok("PUT manual writes source 'manual' and the widget state says so", r["index"]["source"] == "manual" and r["index"]["eur_per_l"] == 1.95)
-    r = main.reset_fuel_base(updated_by="a")
+    r = main.reset_fuel_base(updated_by="a", token="s3cret")
     ok("POST reset-base clears the base; the next confirm may lock again", r["fuel"]["baf_base_eur_per_l"] is None
        and r["summary"]["baf_reason"] == "no base")
 finally:
     fuel.urllib.request.urlopen = _real_urlopen
+    os.environ.pop("ADMIN_TOKEN", None)
 
 # =========================================================================== #
 #  6. Export — the columns, the Fuel sheet, and what is NOT on the supplier's  #
@@ -836,9 +850,12 @@ ok("...and the PDF still names the diesel index with no € column", "Diesel EE"
 #  7. What must NOT exist                                                      #
 # =========================================================================== #
 _map = open(os.path.join(ROOT, "map", "index.html"), encoding="utf-8").read().lower()
-ok("🔴 no fuel on the public map: no 'fuel-index', no 'baf', no '€/l'; 'diesel' only where it always was (the CO₂e caption, once)",
+# NARROWED 12 Oct 2026 (B2): the drawer's CO₂e card read the server's figure from then on and its caption
+# "round-trip diesel" went ("both legs" — the figure covers whatever fuel the vehicle entry says), so the
+# public map now carries NO fuel word at all: 'diesel' zero times, not once
+ok("🔴 no fuel on the public map: no 'fuel-index', no 'baf', no '€/l', and 'diesel' nowhere (the CO₂e caption dropped it on 12 Oct 2026)",
    "fuel-index" not in _map and "fuel index" not in _map and re.search(r"\bbaf\b", _map) is None
-   and "€/l" not in _map and _map.count("diesel") == 1 and "round-trip diesel" in _map)
+   and "€/l" not in _map and _map.count("diesel") == 0 and "round-trip diesel" not in _map)
 ok("no new upload endpoint: main.py has no UploadFile / File( import", "UploadFile" not in _src["main.py"] and "from fastapi import File" not in _src["main.py"])
 ok("no paid or station API named in fuel.py", all(x not in _src["fuel.py"].lower().split("what this does not do")[1]
    for x in ("oilpriceapi.com", "fuelo.", "alexela.", "circlek.")) and "energy.ec.europa.eu" not in _src["fuel.py"])

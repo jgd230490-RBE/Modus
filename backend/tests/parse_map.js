@@ -241,11 +241,47 @@ ok("the Mapbox zoom stack is pushed below the bar", /\.mapboxgl-ctrl-top-right\{
 ok("⭐ 2026-10-06: six numbers, the last two CO2e a day and to date",
   /id="kpi-co2-day"/.test(html) && /id="kpi-co2-total"/.test(html)
   && /set\('kpi-co2-day', /.test(code) && /set\('kpi-co2-total', fmtN\(co2ToDate, 0\) \+ ' t'\)/.test(code));
-ok("⭐ CO2e sums per line AFTER the same filters, and unbaked lines are named, not zeroed",
+// NARROWED 12 Oct 2026 (the base merge of Track A and Track B): the caption names them as lines "with no stored road
+// route", not "unbaked" (the team's word); the behaviour is pinned in the F1 sandbox below
+ok("⭐ CO2e sums per line AFTER the same filters, and lines with no stored road route are named, not zeroed",
   /if \(l\.co2_t != null\) co2 \+= l\.co2_t; else co2Unbaked\+\+;/.test(code)
-  && /excl\. \$\{co2Unbaked\} unbaked/.test(code));
+  && /excl\. \$\{noRoute\(co2Unbaked\)\}/.test(code)
+  && code.includes("const noRoute = k => `${k} line${k === 1 ? '' : 's'} with no stored road route`;")
+  && !/excl\. \$\{co2Unbaked\} unbaked/.test(code) && !/\$\{last\.co2_to_date_unbaked_lines\} unbaked/.test(code));
+// 12 Oct 2026 (the base merge; Track B's merge-time item): month-kpis' co2_error reaches the bar
+ok("⭐ the figures bar reads month-kpis' co2_error and prints 'carbon could not be read', with a dash, in both carbon cards",
+  code.includes("const co2Err = payloads.some(p => p && p.co2_error);")
+  && /if \(co2Err\) \{\s*set\('kpi-co2-day', '—'\); set\('kpi-co2-total', '—'\);\s*set\('kpi-co2-day-label', 'CO\\u2082e a day \(carbon could not be read\)'\);\s*set\('kpi-co2-total-label', 'CO\\u2082e to date \(carbon could not be read\)'\);/.test(code));
 ok("⭐ CO2e to date follows the sidebar filters through the route's props",
   /\(last\.co2_to_date \|\| \[\]\)\.forEach\(c => \{[\s\S]{0,400}discFilter !== 'ALL' && c\.discipline !== discFilter/.test(code));
+// 12 Oct 2026 (B2): ONE carbon fallback (conversions.FALLBACK_KG_CO2E_PER_KM, the published 0.89743) and the
+// route drawer reads the SERVER's co2_t from forecast-matrix instead of multiplying its own trips × km × factor
+ok("⭐ B2: the map's only emissions fallback literal is the published 0.89743 — no 0.90 / 0.9 remains",
+  /vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.89743 \}/.test(code)
+  && !/vehicle_emissions_kg_co2e_per_km: \{ "_default": 0\.9\b/.test(code)
+  && !/pick\(F\.vehicle_emissions_kg_co2e_per_km,\s*veh\)\s*\|\|\s*0\.9/.test(code));
+// NARROWED 12 Oct 2026 (the review and fix pass): the drawer sums EVERY forecast-matrix row of the route (one row per
+// discipline and section) — it read the first row only, under a caption that called it the bar's figure
+ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix for EVERY line of the route and sums the baked line-months",
+  /const rows=\(mtx\.routes\|\|\[\]\)\.filter\(r=>\(r\.route_id\|\|''\)\.toString\(\)\.trim\(\)\.toLowerCase\(\)===rl\);/.test(code)
+  && /rows\.forEach\(rw=>\{[\s\S]{0,400}const co2m=rw\.co2_t\|\|\{\};[\s\S]{0,400}if\(c==null\)\{ unbakedMonths\[k\]=true; \} else \{ co2t\+=c; bakedT\+=mt; co2LineMonths\+\+; \}/.test(code)
+  && !/const row=\(mtx\.routes\|\|\[\]\)\.find\(/.test(code)
+  && !/trips\*round\*emis\/1000/.test(code) && !/const emis=/.test(code));
+// NARROWED 12 Oct 2026 (the review and fix pass): "(est.)" is back on the label, the server's planning-estimate stamp is
+// printed under the cards, a failed carbon read says so (it used to blame a missing route), and the wording says
+// "no stored road route" instead of the team's word "baked"
+ok("B2: no stored route shows a dash and says so, never an estimate; a partly stored window names the months it excludes",
+  /card\('—','CO₂e \(est\.\)','no road route stored for this vehicle yet'\)/.test(code)
+  && /' · excl\. '\+unbakedM\+' month'\+\(unbakedM>1\?'s':''\)\+' with no stored road route'/.test(code)
+  && /Read from the server: the costlines figure the bar above and the Dashboard use, summed over every line on this route\./.test(code)
+  && !/The same figure as the bar above and the Dashboard, read from the server\./.test(code)
+  && !/route not baked for this vehicle/.test(code));
+ok("⭐ the drawer's CO2e card is labelled an estimate and carries the server's planning-estimate stamp (forecast-matrix carbon_stamp)",
+  /card\(co2t\.toFixed\(1\)\+' t','CO₂e \(est\.\)'/.test(code)
+  && /\(mtx\.carbon_stamp\?' '\+mtx\.carbon_stamp\+'\.':''\)/.test(code));
+ok("⭐ a failed carbon read (forecast-matrix co2_error) reads 'carbon could not be read', never 'not stored'",
+  /const co2Card=mtx\.co2_error\s*\n\s*\? card\('—','CO₂e \(est\.\)','carbon could not be read'\)/.test(code)
+  && /const anyBaked=co2LineMonths>0 && !mtx\.co2_error;/.test(code));
 ok("no label in the bar is uppercase microtext", !/\.kpi-label\{[^}]*text-transform:uppercase/.test(html)
   && !/\.kpi-label\{[^}]*font-size:9/.test(html));
 ok("the KPI block is outside the sidebar element",
@@ -273,8 +309,15 @@ ok("§9: two-way movements/day is the loads-per-working-day figure, not doubled"
   && />Two-way movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code));
 ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per line, from the route's cycle",
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
-ok("§9: ⭐ an unbaked line is counted as unknown, never as zero vehicles",
-  /else unbakedLines\+\+;/.test(code) && code.includes("'not baked'") && code.includes("unbaked)"));
+// NARROWED 12 Oct 2026 (the base merge): the words a person reads are "no stored route" / "with no stored road route"
+ok("§9: ⭐ a line with no stored road route is counted as unknown, never as zero vehicles",
+  /else unbakedLines\+\+;/.test(code) && code.includes("'no stored route'")
+  && code.includes("line${unbakedLines === 1 ? '' : 's'} with no stored road route)")
+  && !code.includes("'not baked'") && !code.includes("'s'} unbaked)"));
+ok("the bar's method note and the alternatives note say 'stored road route', not 'baked'",
+  code.includes("Active routes = every route with a stored road route that matches the filters.")
+  && code.includes("(the cycle time of its stored road route)") && code.includes("'none stored — a route through a haul road has no alternatives'")
+  && !code.includes("every baked route matching") && !code.includes("(baked cycle)") && !code.includes("'none baked"));
 ok("§9: the fleet figure is the busiest month's, not the average", /const fleet = Math\.max\(\.\.\.mFleet\)/.test(code));
 ok("§9: no card says trips equal vehicles", !code.includes("Trips = vehicle loads on every line"));
 ok("§9: material/day is in the map unit", /qtyDay = avg\(mQty\) \/ wd/.test(code) && code.includes("kpi-material-label"));
@@ -2379,6 +2422,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("row 3: the timeline matrix sums the monthly figures per route across its per-line entries",
      code.includes("acc.monthly[k] = (acc.monthly[k]||0) + (Number(rt.monthly[k])||0);")
      && !code.includes("byR[(rt.route_id||'').toString().trim().toLowerCase()]=rt;"));
+  // 12 Oct 2026 (the base merge): the capacity is "has a capacity of", as the bulletin's stockpile_wording says it
+  ok("the map's stockpile sentence says 'has a capacity of N; M recorded', the bulletin's words, never 'holds'",
+     code.includes("const head = `${sp.name} has a capacity of ${Math.round(sp.capacity_qty).toLocaleString()} ${u}; ${Math.round(mm.balance_end).toLocaleString()} ${u}`;")
+     && !code.includes("${sp.name} holds "));
   ok("row 3 / D23: the stockpile sentence says what is recorded at month end, not what 'the plan puts'",
      code.includes("recorded in it at the end of ${monthLabel(month)}.") && !code.includes("The plan puts")
      // 12 Oct fix pass: a month after the last recorded movement carries the balance forward and says so
@@ -2527,7 +2574,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ row 3 (d), the drawer: a route's analysis counts EVERY approved line of the route, not the first one find() met",
      code.includes("const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);")
      && code.includes("const totalT=rows.reduce((a,r)=>a+(r.total||0),0);")
-     && code.includes("trips+=t; co2t+=t*round*em/1000;")
+     // NARROWED 12 Oct 2026 (the base merge of Track A and Track B): the per-line carbon is no longer worked out in the
+     // page (trips × round trip × factor); every line's trips use its own payload and its CO2e is the server's co2_t
+     && code.includes("trips+=pl>0?Math.ceil((rw.total||0)/pl):0;") && code.includes("const co2m=rw.co2_t||{};")
+     && !code.includes("co2t+=t*round*em/1000")
+     && code.includes("rows.length+' approved lines: '")
      && !code.includes("const row=(mtx.routes||[]).find(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);"));
   // the zone popup speaks the legend's words, and its routing line is not red
   {
@@ -2601,6 +2652,29 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
              && el("kpi-routes-label").innerText === "Routes in Nov 2026" && el("kpi-vehicles-label").innerText === "Vehicles needed"
              && el("kpi-note").innerText === "Loading the figures for Nov 2026." && el("kpi-title").title === "",
              JSON.stringify({ b: el("kpi-breakdown").innerHTML.slice(0, 60), moving, note: el("kpi-note").innerText, tip: el("kpi-title").title.slice(0, 40) })); }
+        // 12 Oct 2026 (the base merge, Track B's merge-time items): a failed carbon read and a line with no stored road route
+        { const p20 = Object.assign(pay(20, 400), { co2_error: "The carbon figures could not be read (OperationalError)." });
+          p20.lines[0].co2_t = null; KPI.cache[20] = p20;
+          TL.month = 20; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("⭐ base merge: month-kpis' co2_error puts a dash in both carbon cards and 'carbon could not be read' in their labels, never '0.0 t' or '(excl. N …)'",
+             el("kpi-co2-day").innerText === "—" && el("kpi-co2-total").innerText === "—"
+             && el("kpi-co2-day-label").innerText === "CO\u2082e a day (carbon could not be read)"
+             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (carbon could not be read)" && el("kpi-trips").innerText === "20",
+             JSON.stringify([el("kpi-co2-day").innerText, el("kpi-co2-day-label").innerText, el("kpi-co2-total-label").innerText]));
+          const p21 = pay(21, 400);
+          p21.lines.push({ route_id: "R1", vehicle_loads: 40, qty_unit: 40, qty_t: 800, trips_per_vehicle_day: 0, discipline: "Drainage", co2_t: null });
+          p21.co2_to_date_unbaked_lines = 3; KPI.cache[21] = p21;
+          TL.month = 21; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("⭐ base merge: a line with no stored road route is named in those words on the bar (vehicles, CO2e a day, CO2e to date), never 'unbaked'",
+             el("kpi-vehicles-label").innerText === "Vehicles needed (1 line with no stored road route)"
+             && el("kpi-co2-day-label").innerText === "CO\u2082e a day (excl. 1 line with no stored road route)"
+             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (excl. 3 lines with no stored road route)"
+             && el("kpi-co2-day").innerText !== "—" && !/baked/.test(el("kpi-note").innerText + el("kpi-vehicles-label").innerText),
+             JSON.stringify([el("kpi-vehicles-label").innerText, el("kpi-co2-day-label").innerText, el("kpi-co2-total-label").innerText]));
+          const p22 = pay(22, 400); p22.lines[0].trips_per_vehicle_day = 0; KPI.cache[22] = p22;
+          TL.month = 22; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
+          ok("...and a month whose every line lacks a stored road route reads 'no stored route' for vehicles, never 'not baked' or 0",
+             el("kpi-vehicles").innerText === "no stored route", el("kpi-vehicles").innerText); }
         TL.month = 12; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
         ASYNC_PINS.push((async () => {
           deferred[11](pay(11, 200)); await flush(); await flush();
@@ -2683,8 +2757,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
           ok("⭐ the planning-flag row: one noun, the unit in the sentence", box().includes("<b>Over a planning flag</b>")
              && box().includes("R2: 32 two-way movements a day against a planning flag of 20") && !box().includes("planning cap"));
           ok("...and the pill counts it as '1 route over a planning flag'", pill().includes("1 route over a planning flag"), pill());
-          ok("the stockpile sentence in a month with a record: '… 40,510 t recorded in it at the end of Oct 2026.'",
-             box().includes(`Langton stockpile holds ${(40000).toLocaleString()} t. ${(40510).toLocaleString()} t recorded in it at the end of Oct 2026.`));   // the page formats with the reader's locale
+          // NARROWED 12 Oct 2026 (the base merge; Track B's bulletin wording): "has a capacity of N t;", not "holds N t."
+          ok("the stockpile sentence in a month with a record: '… has a capacity of 40,000 t; 40,510 t recorded in it at the end of Oct 2026.'",
+             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t recorded in it at the end of Oct 2026.`)   // the page formats with the reader's locale
+             && !box().includes("stockpile holds"), box());
           api.showRestrictionHit("E1|R5"); api.showRestrictionHit("E1|R2"); api.showRestrictionHit("E1");
           ok("⭐ Show on map on each row selects THAT row's route (R5, then R2); a bare event id falls back to its first route",
              rec.select.join(",") === "R5,R2,R2" && rec.fit === 3, rec.select.join(","));
@@ -2695,7 +2771,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
           ok("...and dismissing the last one clears it", JSON.stringify(rec.hits[rec.hits.length - 1]) === "[]");
           TL.month = 11; api.renderTimelineWarnings(11); await flush(); await flush();
           ok("⭐ D23: a month after the last record carries the balance forward and says so",
-             box().includes(`Langton stockpile holds ${(40000).toLocaleString()} t. ${(40510).toLocaleString()} t recorded at the end of Oct 2026; nothing recorded since.`), box());
+             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t recorded at the end of Oct 2026; nothing recorded since.`)   // NARROWED 12 Oct (base merge): "has a capacity of"
+             && !box().includes("stockpile holds"), box());
           ok("...and the October closure is not listed in November", !box().includes("E1|"));
           // F3: Play pressed on a red month counts as the loop's pause even when its conditions land after the first tick
           TL.playing = true; TL.startedOn = 10; TL.month = 11; TL.clashPaused = false; TL.ticked = 11;

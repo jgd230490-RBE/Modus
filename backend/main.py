@@ -9,6 +9,7 @@ Serves three things from one process:
 The Public Route Map reads /api/public/route-forecasts, so the map and the
 forecasting app are always in sync — no CSV files to keep up to date.
 """
+import hmac
 import json
 import os
 from html import escape as _html_escape
@@ -48,6 +49,8 @@ import costlines     # 11 Sep — one read of every forecast line's volume, haul
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
+import road_sections  # 12 Oct 2026 — shared road sections (public map review §2.2d): the index and the month read
+import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -395,10 +398,24 @@ def map_auth(body: MapAuthIn):
 
 
 @app.post("/api/gate-signout")
-def gate_signout():
-    """Drop the gate cookie — for testing the gate, and for a shared machine."""
+def gate_signout(request: Request = None, keep: Optional[str] = None):
+    """
+    Drop the gate cookie — for testing the gate, and for a shared machine.
+
+    12 Oct 2026 (the review and fix pass): `keep=map` is what the app's Sign out sends. A
+    STAFF cookie is replaced by a MAP cookie that expires no later than the staff one did
+    (gate.downgrade_kwargs), so the public map still opens on that machine and the staff
+    surface (the full /api/meta, the network reads, /help/) does not. Any other cookie is
+    left as it is under keep=map; without `keep` the cookie is dropped, as before.
+    """
     from fastapi.responses import JSONResponse as _J
     r = _J({"ok": True})
+    if keep == "map":
+        cookies = getattr(request, "cookies", None) or {}
+        kw = gate.downgrade_kwargs(cookies.get(gate.COOKIE))
+        if kw:
+            r.set_cookie(**kw)
+        return r
     r.delete_cookie(gate.COOKIE, path="/")
     return r
 
@@ -470,12 +487,45 @@ def health():
     return {"ok": True, "backend": "postgres" if db.IS_PG else "sqlite"}
 
 
+def _staff_request(request=None):
+    """
+    Is this caller staff? True on a valid X-Access-Code (the middleware resolved it into
+    access.current()) or a STAFF gate cookie (the app's iframe and a signed-in tab send the
+    cookie but no header). The MAP cookie is not staff. Pure read: no I/O.
+    """
+    if access.current():
+        return True
+    cookies = getattr(request, "cookies", None) or {}
+    try:
+        return gate.verify(cookies.get(gate.COOKIE)) == gate.LEVEL_STAFF
+    except Exception:
+        return False
+
+
 @app.get("/api/meta")
-def meta():
-    """Everything the UI needs to build its dropdowns — kept in sync with factors.json."""
+def meta(request: Request = None):
+    """
+    Everything the UI needs to build its dropdowns — kept in sync with factors.json.
+
+    12 Oct 2026 (map review D31) — TWO SHAPES, one path, still ungated (test_gate pins that:
+    the sign-in screen and the public map read this before anyone has a credential):
+
+        public   no valid code and no staff cookie: units, materials, vehicles and their
+                 labels, the tenant's words, the months, the flat factors and the seasonal
+                 windows — what the sign-in screen and the public map read. `routes`, `ipts`
+                 and `work_sections` are EMPTY LISTS: the tenant's network, its team names
+                 and its section names are not for a visitor who has not signed in.
+        staff    a valid X-Access-Code or a staff cookie: unchanged — `routes`
+                 (network.meta_routes) feeds the submission matrix, `ipts` the team pickers.
+
+    `scope` says which shape this is, so a client that fetched before signing in knows to
+    fetch again (frontend/index.html does, in App). Keys are the same in both shapes.
+    """
+    staff = _staff_request(request)
     factors = conversions.load_factors()
     strip = lambda d: {k: v for k, v in d.items() if not k.startswith("_")}
     return {
+        "scope": "staff" if staff else "public",
         "units": conversions.UNITS,
         "materials": conversions.material_names(factors),
         # every vehicle in the live document, unchanged and in its own order: baked
@@ -500,14 +550,17 @@ def meta():
         # rich taxonomy for the new submission matrix (Commit 2)
         "material_categories": strip(factors.get("material_categories", {})),
         "vehicle_details": strip(factors.get("vehicles", {})),
-        # live network, not the retired legacy file — carries real distances
-        "routes": network.meta_routes(),
+        # live network, not the retired legacy file — carries real distances. Staff only
+        # (D31): the public shape carries an empty list.
+        "routes": network.meta_routes() if staff else [],
         # Phase 2 taxonomy for the discipline / section pickers.
         # work_sections is empty until the tenant's package or admin supplies rows;
-        # the UI must cope with an empty list rather than assume rows exist.
+        # the UI must cope with an empty list rather than assume rows exist. The
+        # disciplines are the generic seed (Earthworks, Drainage…) and stay in both shapes;
+        # the sections name the scheme's geography and the teams its contractors — staff.
         "disciplines": taxonomy.list_disciplines(),
-        "work_sections": taxonomy.list_work_sections(in_scope_only=True),
-        "ipts": taxonomy.list_ipts(),
+        "work_sections": taxonomy.list_work_sections(in_scope_only=True) if staff else [],
+        "ipts": taxonomy.list_ipts() if staff else [],
         # G2: the tenant's own words and units — name, team_label, currency (+ symbol),
         # country, and which country-specific providers that switches on. Read BEFORE
         # sign-in by the app, so the sign-in screen already carries the tenant's name.
@@ -1568,6 +1621,24 @@ def delete_carbon_target():
     return carbon_target.payload(acc)
 
 
+# ------------------------------------------------------------------ the monthly bulletin (B4, 12 Oct 2026)
+@app.get("/api/bulletin/month")
+def bulletin_month(month: int = Query(..., ge=1, le=MONTH_COUNT)):
+    """
+    The monthly bulletin's figures as JSON (review §2.6; the HTML / PDF composition is another
+    track). Staff only — any valid code. `rollup` is the public map bar's month roll-up
+    reproduced on the server from the same per-line payload `/api/public/month-kpis` serves,
+    whole scheme, no map filters (bulletin.rollup_payloads carries the bar's eleven rules);
+    `conditions` is what the map's Conditions panel assembles, read from what is STORED:
+    restriction hits overlapping the calendar month ("never checked" where no check is stored),
+    stockpiles over at month end, the seasonal windows for the month, and typed caps exceeded
+    (a "planning flag", never a block). A team code gets the scheme's figures (they are the
+    public map's) with the per-team rows limited to its own team.
+    """
+    acc = _require_access()
+    return bulletin.month_page(month, acc)
+
+
 # ------------------------------------------------------------------ public feed (map)
 def _working_days(factors):
     """
@@ -1724,26 +1795,64 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
     # `co2_to_date` is the same per-line figure summed over months 1..month, keyed the way
     # the map filters (route, discipline, section), so "CO2e to date" follows the sidebar
     # filters exactly as the month figures do. Approved only; never actuals.
+    # 12 Oct 2026 (B2): the read is _approved_co2(); when it fails the response SAYS so in
+    # `co2_error` and every co2_t is None — until today the except blanked every carbon
+    # figure silently (a null factor saved on Config was one trigger) and the map showed
+    # the month with no carbon and no reason.
+    table, co2_error = _approved_co2(factors, 1, int(month))
     co2_by_key, to_date, unbaked_to_date = {}, {}, 0
-    try:
-        for cl in costlines.lines(acc={"role": "planner"}, from_month=1, to_month=int(month),
-                                  status="Approved", factors=factors)["lines"]:
-            k = (cl["route_id"], cl["discipline"] or "", cl["section_id"] or "")
-            if int(cl["month_index"]) == int(month):
-                co2_by_key[k] = cl["co2_t"]
-            if cl["co2_t"] is None:
-                unbaked_to_date += 1
-                continue
-            to_date[k] = to_date.get(k, 0.0) + float(cl["co2_t"])
-    except Exception:
-        co2_by_key, to_date = {}, {}
+    for (rid, disc, sec, mi), co2 in table.items():
+        if mi == int(month):
+            co2_by_key[(rid, disc, sec)] = co2
+        if co2 is None:
+            unbaked_to_date += 1
+            continue
+        to_date[(rid, disc, sec)] = to_date.get((rid, disc, sec), 0.0) + float(co2)
     for l in lines:
         l["co2_t"] = co2_by_key.get((l["route_id"], l["discipline"], l["section_id"]))
     co2_to_date = [{"route_id": k[0], "discipline": k[1], "section_id": k[2], "co2_t": round(v, 3)}
                    for k, v in sorted(to_date.items())]
-    return {"month": int(month), "unit": unit, "working_days": wd,
-            "payload_fallback_vehicle": fb_name, "lines": lines,
-            "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
+    out = {"month": int(month), "unit": unit, "working_days": wd,
+           "payload_fallback_vehicle": fb_name, "lines": lines,
+           "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
+    if co2_error:
+        out["co2_error"] = co2_error
+    return out
+
+
+def _approved_co2(factors, from_month, to_month):
+    """
+    12 Oct 2026 (B2). The public map's carbon, per APPROVED line-month, from the ONE costlines
+    read the Dashboard uses (km × the vehicle's kg CO2e/km ÷ 1000, both legs): a table
+    {(route_id, discipline, section_id, month_index): co2_t}, co2_t None where the route is
+    not baked for the line's vehicle (no km, no carbon — never a zero dressed as a figure).
+
+    Returns (table, error). NEVER raises: on any failure the table is empty and `error` is
+    a fixed sentence naming the exception's class, so the two feeds that read it
+    (/api/public/month-kpis and /api/public/forecast-matrix) can set every co2_t to None
+    AND carry `co2_error`, instead of a month that silently shows no carbon. `error` is
+    None on the happy path and the feeds then carry no `co2_error` key at all.
+
+    12 Oct 2026 (the review and fix pass): the exception's MESSAGE is logged here and never
+    put in the feed. Both feeds sit under /api/public/, which anyone with the shared map
+    password reads, and a database error's text can carry SQL fragments (a KeyError names
+    internal keys).
+    """
+    try:
+        table = {}
+        for cl in costlines.lines(acc={"role": "planner"}, from_month=int(from_month),
+                                  to_month=int(to_month), status="Approved", factors=factors)["lines"]:
+            table[(cl["route_id"], cl["discipline"] or "", cl["section_id"] or "",
+                   int(cl["month_index"]))] = cl["co2_t"]
+        return table, None
+    except Exception as e:                       # noqa: BLE001 — the feed must answer
+        print(f"⚠️  carbon read failed (months {from_month}-{to_month}): "
+              f"{e.__class__.__name__}: {str(e).strip()[:500]}")
+        return {}, CO2_ERROR_SENTENCE.format(cls=e.__class__.__name__)[:200]
+
+
+#: what a person reads when the carbon read fails — never the exception's own text
+CO2_ERROR_SENTENCE = "The carbon figures could not be read ({cls})."
 
 
 @app.get("/api/public/stockpile-timeline")
@@ -1814,10 +1923,25 @@ def public_forecast_matrix(
     for g in out:
         g["total"] = conversions.round_for_unit(g["total"], unit)
     out.sort(key=lambda x: x["total"], reverse=True)
+    # 12 Oct 2026 (B2): carbon per line per month rides along — `co2_t` is a {month_index:
+    # t CO2e} map keyed exactly as `monthly`, None where the route is not baked for the
+    # line's vehicle — from the SAME costlines figure month-kpis and the Dashboard carry, so
+    # the map's timeline has one call for a carbon paint and its KPI prefetch, and the route
+    # drawer reads the server's figure instead of working out its own. Every other key is
+    # unchanged. When the read fails, every co2_t is None and `co2_error` says why.
+    table, co2_error = _approved_co2(factors, lo, hi)
+    for g in out:
+        g["co2_t"] = {m: table.get((g["route_id"], g["discipline"], g["section_id"], int(m)))
+                      for m in g["monthly"]}
     # ⭐ 2026-09-15 — `working_days` rides along so the timeline can print a DAILY rate on
     # the route label instead of the month's total. One divisor, one source: factors.json.
-    return {"unit": unit, "from": lo, "to": hi, "working_days": _working_days(factors),
-            "routes": out}
+    # 12 Oct 2026 (the review and fix pass): the Carbon page's planning-estimate stamp rides
+    # along, so the route drawer prints it under its CO2e card from the server's own words
+    res = {"unit": unit, "from": lo, "to": hi, "working_days": _working_days(factors),
+           "routes": out, "carbon_stamp": carbon.SUMMARY_STAMP}
+    if co2_error:
+        res["co2_error"] = co2_error
+    return res
 
 
 # ------------------------------------------------------------------ routing network (Phase 0)
@@ -1886,6 +2010,35 @@ def route_analysis(route_id: str, profile: Optional[str] = None):
     return network.route_analysis(route_id, profiles=[profile] if profile else None)
 
 
+@app.get("/api/public/whoami")
+def public_whoami(request: Request = None):
+    """
+    What the gate makes of this caller, for the public map's view flag (map review §1,
+    option A — one file, two views). Under the existing /api/public/ prefix, so a visitor
+    with no credential never reaches it: the gate's 401 comes first.
+
+        level        "staff"  a valid X-Access-Code, or a staff gate cookie (the app's
+                              iframe sends the cookie and no header)
+                     "map"    the shared map password's cookie
+                     null     nothing recognised (only with MAP_GATE=off, which lets the
+                              call through at all)
+        team_label   the team's NAME as a person reads it, when the header carries a team
+                     code; null for a planner, an admin, a cookie-only staff caller and the
+                     map. Never a code and never a team id: a slot the tenant has not named
+                     reads "<team word> <n>", the way the app prints it.
+    """
+    acc = access.current()
+    cookies = getattr(request, "cookies", None) or {}
+    level = gate.LEVEL_STAFF if acc else gate.verify(cookies.get(gate.COOKIE))
+    team = None
+    if acc and acc.get("ipt"):
+        team = acc.get("label") or ""
+        if not team or access.canonical_ipt(team) == acc["ipt"]:
+            word = (config.tenant_settings(conversions).get("team_label") or "Team").strip()
+            team = f"{word} {acc['ipt'][3:]}"
+    return {"level": level, "team_label": team}
+
+
 @app.get("/api/public/map-data")
 def public_map_data(profile: Optional[str] = None):
     """
@@ -1897,6 +2050,50 @@ def public_map_data(profile: Optional[str] = None):
     would just look like a road that isn't there.
     """
     return network.public_map_data(profile=profile)
+
+
+@app.get("/api/public/road-load")
+def public_road_load(month: int = Query(..., ge=1, le=MONTH_COUNT), leg: str = Query("loaded")):
+    """
+    12 Oct 2026 (public map review §2.2d). The month's approved volume per SHARED road
+    section: one entry per run of road two or more routes have in common, with two-way
+    movements a day (one load = one two-way movement, the routes' Approved trips in the
+    month ÷ working days, summed over the routes that share the run), vehicles, the
+    month's CO2e share by length, the routes and their team names, and the run's
+    polyline. The loaded leg by default; leg=return serves the same loads running back
+    empty, separately and never added. Behind the map gate like the rest of /api/public/.
+
+    Working days come from _working_days(), the one reader of that figure.
+    """
+    if leg not in road_sections.LEGS:
+        raise HTTPException(400, road_sections.leg_error())
+    factors = conversions.load_factors()
+    return road_sections.road_load(int(month), factors=factors,
+                                   working_days=_working_days(factors), leg=leg)
+
+
+@app.post("/api/admin/road-sections/rebuild")
+def road_sections_rebuild(token: Optional[str] = None):
+    """Rebuild the shared-section index from the stored geometry. No external call."""
+    _check_admin(token)
+    return road_sections.rebuild()
+
+
+@app.get("/api/admin/road-sections/status")
+def road_sections_status(token: Optional[str] = None):
+    """Counts: routes indexed, runs, vertices shared — per leg — and whether the stored index is stale."""
+    _check_admin(token)
+    return road_sections.status()
+
+
+@app.get("/api/admin/diagnostics/road-sections")
+def diagnostics_road_sections(top: int = Query(10, ge=1, le=100), leg: str = Query("loaded"),
+                              token: Optional[str] = None):
+    """Read-only: the status and the longest stored runs with their route sets."""
+    _check_admin(token)
+    if leg not in road_sections.LEGS:
+        raise HTTPException(400, road_sections.leg_error())
+    return road_sections.diagnostics(top=int(top), leg=leg)
 
 
 # --------------------------------------------------------------------------- #
@@ -2046,14 +2243,13 @@ def bake_routes(profile: str = network.DEFAULT_PROFILE,
                 token: Optional[str] = None):
     """
     Compute + cache HERE truck geometry for a batch of routes. Call repeatedly
-    until 'remaining' is 0. Protected by ADMIN_TOKEN if that env var is set.
+    until 'remaining' is 0. Protected by ADMIN_TOKEN — and refused when that env var is
+    unset (12 Oct 2026, C11): a bake spends HERE calls, so it is never open.
 
     'limit' counts legs rather than routes — each leg is one HERE call. Pass
     legs='loaded' to skip the unladen return and halve the call count.
     """
-    admin_token = os.getenv("ADMIN_TOKEN", "").strip()
-    if admin_token and token != admin_token:
-        raise HTTPException(403, "bad or missing admin token")
+    _check_admin(token)
     want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else network.LEGS
     return network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS)
 
@@ -2069,9 +2265,7 @@ def clear_geometry(profile: Optional[str] = None, leg: Optional[str] = None,
     is optional and omitting all three still means ALL geometry for the tenant, which is
     what "Clear all routes" wants -- so a caller that means one route must say so.
     """
-    admin_token = os.getenv("ADMIN_TOKEN", "").strip()
-    if admin_token and token != admin_token:
-        raise HTTPException(403, "bad or missing admin token")
+    _check_admin(token)
     network.clear_geometry(profile, leg=leg, route_id=route_id)
     return {"status": "cleared", "profile": profile or "all", "leg": leg or "all",
             "route_id": route_id or "all"}
@@ -2102,8 +2296,23 @@ def _fields_set(model):
 
 
 def _check_admin(token):
+    """
+    Every /api/admin/* call and every write to master data. 403 unless the supplied token
+    matches ADMIN_TOKEN.
+
+    12 Oct 2026 — C11 closed: with NO ADMIN_TOKEN configured this REFUSES. Until then the
+    check only ran when a token was configured, so an unset token opened every admin
+    endpoint — the one place the product failed open while gate.py failed closed on an
+    unset MAP_PASSWORD.
+    A deployment whose ADMIN_TOKEN has gone missing now loses its admin surface, never its
+    data — the same choice access.resolve() makes for the access codes.
+    """
     admin_token = os.getenv("ADMIN_TOKEN", "").strip()
-    if admin_token and token != admin_token:
+    if not admin_token:
+        raise HTTPException(403, "admin access is not configured — set ADMIN_TOKEN")
+    # bytes, not str (12 Oct 2026): hmac.compare_digest raises TypeError on a str holding a
+    # non-ASCII character, so ?token=é answered 500 instead of 403
+    if not token or not hmac.compare_digest(admin_token.encode("utf-8"), str(token).strip().encode("utf-8")):
         raise HTTPException(403, "bad or missing admin token")
 
 
@@ -2787,11 +2996,18 @@ def diagnostics_haul_roads(route_id: Optional[str] = None,
 
 # ------------------------------------- Road restrictions (Phase 2.5a Tark Tee; H1 a provider per country)
 @app.get("/api/restrictions")
-def get_restrictions(layers: Optional[str] = None, include_expired: bool = False):
+def get_restrictions(layers: Optional[str] = None, include_expired: bool = False,
+                     bbox: Optional[str] = None):
     """
     The tenant's country's road-restriction layers as WGS84 GeoJSON — Tark Tee's six
     for EE, National Highways' planned closures for GB, an empty collection with a note
     for a country without a provider. The rest of this docstring is Tark Tee's.
+
+    12 Oct 2026 (map review §2.3): `bbox=w,s,e,n` (degrees) keeps only the features whose
+    own bounding box intersects it and reports how many were `clipped`. The National
+    Highways feed is national (~8 MB, 2,900 closures) and a corridor needs a few dozen of
+    them. Four comma-separated numbers, west < east and south < north, or 400. The clipped
+    body is built per request, not cached: the cache below is for the whole collection.
 
     Proxied rather than fetched from the browser for three reasons, in order: it is
     somebody else's public service and this caches it to one request per layer per half
@@ -2808,7 +3024,17 @@ def get_restrictions(layers: Optional[str] = None, include_expired: bool = False
     dropped.
     """
     keys = [k.strip() for k in (layers or "").split(",") if k.strip()] or None
+    box = None
+    if bbox is not None and str(bbox).strip():
+        box = restrictions.parse_bbox(bbox)
+        if box is None:
+            raise HTTPException(400, "bbox must be west,south,east,north in degrees, west < east and south < north")
     fc = restrictions.fetch_all(keys, current_only=not include_expired)
+    if box is not None:
+        # built per request — a clipped body is one visitor's window, not the collection
+        return Response(content=json.dumps(restrictions.clip_bbox(fc, box), ensure_ascii=False,
+                                           separators=(",", ":")),
+                        media_type="application/json")
     # 30 Sep 2026: serialised here, not by FastAPI's encoder. The National Highways feed
     # is ~8 MB of GeoJSON (2,920 closures, 170,000 vertices); jsonable_encoder walks
     # every vertex in Python (~4 s of the starter's half CPU per map load) before
@@ -2856,13 +3082,18 @@ def route_restrictions(route_id: str, profile: Optional[str] = None):
 
 
 @app.get("/api/routes/restrictions")
-def all_route_restrictions(profile: Optional[str] = None):
+def all_route_restrictions(profile: Optional[str] = None, include_expired: bool = False):
     """
     Every baked route checked in one pass, sharing a single fetch. Only routes with a hit
     are returned — a clean route is the normal case and listing all 107 buries the ones
     that matter.
+
+    12 Oct 2026 (map review §2.2c (c)): `include_expired=1` keeps closures that have
+    already ENDED in the check, so the public map's timeline can list, for a past month,
+    the closures that applied then. The default drops them, as before — every hit carries
+    `from` / `to`, and the caller filters by month.
     """
-    return restrictions.check_all(profile=profile)
+    return restrictions.check_all(profile=profile, current_only=not include_expired)
 
 
 @app.get("/api/admin/diagnostics/restrictions")

@@ -75,8 +75,35 @@ for p in ("/api/public/month-kpis", "/api/public/route-forecasts?from=1&to=4",
     ok(f"scope_for({p!r}) is map — the map's DATA is gated, not just its page",
        gate.scope_for(p) == "map")
 
+# 12 Oct 2026 (map review D18): the tenant's NETWORK. Twelve data reads needed no credential at
+# all; now they are the map's, readable with a valid code or the map cookie and nothing without.
+for p in ("/api/routes/status", "/api/routes/summary", "/api/routes/geojson?profile=Artic",
+          "/api/routes/R001/geometries", "/api/routes/R001/analysis",
+          "/api/routes/analysis-batch?route_ids=R001,R002", "/api/locations/geojson",
+          "/api/gates", "/api/gates?location_id=L001", "/api/haul-roads",
+          "/api/routes/R001/haul-roads", "/api/routes/R001/restrictions",
+          "/api/routes/restrictions?include_expired=1", "/api/public/whoami"):
+    ok(f"🔴 D18: scope_for({p!r}) is map — the network is readable only with a code or the map cookie",
+       gate.scope_for(p) == "map", repr(gate.scope_for(p)))
+ok("D18: the four network prefixes are declared in MAP_DATA_PREFIXES",
+   all(x in gate.MAP_DATA_PREFIXES for x in ("/api/routes/", "/api/locations/", "/api/gates/", "/api/haul-roads/")))
+# the two staff WRITES under those prefixes are wrapped by the same prefix match: a valid code
+# ALLOWs them unchanged (the body's own approver / admin check still runs); with no code the
+# refusal is the map's 401 before the body is reached
+for p in ("/api/routes/R001/status", "/api/locations/L001/capacity"):
+    ok(f"D18: the staff write {p!r} sits under a map prefix — a valid code passes unchanged, nothing without one reaches its body",
+       gate.scope_for(p) == "map" and gate.decide(p, has_valid_code=True) == gate.ALLOW
+       and gate.decide(p) == gate.NEED_MAP_PASSWORD)
+for p in ("/api/gatesx", "/api/haul-roadsy", "/api/routesz", "/api/locationsq"):
+    ok(f"D18: {p!r} is not under a prefix — each prefix is a path segment, not a substring",
+       gate.scope_for(p) is None, repr(gate.scope_for(p)))
+for p in ("/api/admin/routes", "/api/admin/routes/R001", "/api/admin/gates", "/api/admin/locations",
+          "/api/admin/bake-routes", "/api/admin/haul-roads/refresh-temp-km", "/api/admin/clear-geometry"):
+    ok(f"D18: {p!r} is NOT the map's — the admin writes stay keyed on ADMIN_TOKEN alone",
+       gate.scope_for(p) is None, repr(gate.scope_for(p)))
+
 ok("🔴 /api/meta is NOT gated — the staff app fetches it on mount, before sign-in; "
-   "gating it would empty the login screen",
+   "gating it would empty the login screen (12 Oct 2026, D31: it answers two SHAPES instead — see §6 below)",
    gate.scope_for("/api/meta") is None)
 ok("🔴 /api/health is NOT gated — Render polls it", gate.scope_for("/api/health") is None)
 # 8 Oct 2026 (H9): the demo-request form on wayscope.co.uk posts here from a visitor who
@@ -176,6 +203,17 @@ ok("map, MAP cookie -> allowed", gate.decide("/map/", cookie=map_c) == gate.ALLO
 ok("map data endpoint behaves the same as the map page",
    gate.decide("/api/public/month-kpis", cookie=map_c) == gate.ALLOW
    and gate.decide("/api/public/month-kpis") == gate.NEED_MAP_PASSWORD)
+ok("🔴 D18: the network behaves the same — nothing: the password page; map cookie, staff cookie or a code: allowed",
+   gate.decide("/api/gates") == gate.NEED_MAP_PASSWORD and gate.decide("/api/haul-roads") == gate.NEED_MAP_PASSWORD
+   and gate.decide("/api/routes/status") == gate.NEED_MAP_PASSWORD
+   and gate.decide("/api/locations/geojson") == gate.NEED_MAP_PASSWORD
+   and gate.decide("/api/gates", cookie=map_c) == gate.ALLOW
+   and gate.decide("/api/routes/R001/geometries", cookie=staff_c) == gate.ALLOW
+   and gate.decide("/api/locations/geojson", has_valid_code=True) == gate.ALLOW)
+ok("D18: the view flag /api/public/whoami is reached only with a credential — a visitor with none learns nothing",
+   gate.decide("/api/public/whoami") == gate.NEED_MAP_PASSWORD
+   and gate.decide("/api/public/whoami", cookie=map_c) == gate.ALLOW
+   and gate.decide("/api/public/whoami", cookie=staff_c) == gate.ALLOW)
 
 # help
 ok("🔴 help, MAP cookie -> refused. The map password does not open the staff guide",
@@ -188,9 +226,12 @@ ok("help, valid access code -> allowed",
 # failing closed
 clean(password=None)
 ok("🔴 THE ONE THAT MATTERS: gate on, no MAP_PASSWORD, no credential -> CLOSED, not "
-   "open. ADMIN_TOKEN fails the other way and that is open question C11",
+   "open. ADMIN_TOKEN failed the other way until 12 Oct 2026 (C11, now closed in main._check_admin — §6)",
    gate.decide("/map/") == gate.UNCONFIGURED)
 ok("...and the same for the map's data", gate.decide("/api/zones") == gate.UNCONFIGURED)
+ok("D18: ...and for the network — closed to outsiders, open to a code",
+   gate.decide("/api/gates") == gate.UNCONFIGURED and gate.decide("/api/routes/status") == gate.UNCONFIGURED
+   and gate.decide("/api/routes/status", has_valid_code=True) == gate.ALLOW)
 ok("⭐ ...but a signed-in staff member still gets the map with no password configured — "
    "a forgotten MAP_PASSWORD costs you outside viewers, never your own team",
    gate.decide("/map/", has_valid_code=True) == gate.ALLOW)
@@ -272,6 +313,82 @@ ok("gate.password_ok uses a constant-time comparison",
 ok("env.example documents MAP_PASSWORD, MAP_GATE and GATE_SECRET",
    all(k in open(os.path.join(ROOT, "env.example"), encoding="utf-8").read()
        for k in ("MAP_PASSWORD", "MAP_GATE", "GATE_SECRET")))
+
+
+# ---------------------------------------------------------------- 7. 12 Oct 2026 — C11, D31, whoami (source level)
+def _body(name):
+    """The text of one function in main.py, up to the next top-level decorator, def or class."""
+    rest = MAIN.split(f"def {name}(", 1)[1]
+    cut = min(i for i in (rest.find("\n@app."), rest.find("\ndef "), rest.find("\nclass "), len(rest)) if i >= 0)
+    return rest[:cut]
+
+
+ok("🔴 C11 CLOSED: _check_admin refuses when ADMIN_TOKEN is unset — the admin surface fails closed like the gate",
+   re.search(r"def _check_admin\(token\):[\s\S]{0,1200}?if not admin_token:\s*\n\s*raise HTTPException\(403", MAIN) is not None
+   and "if admin_token and token != admin_token" not in MAIN)
+ok("C11: the token is compared in constant time", "hmac.compare_digest(admin_token" in MAIN)
+ok("C11: bake-routes and clear-geometry go through _check_admin like every other admin write — no private check left",
+   "_check_admin(token)" in _body("bake_routes") and "_check_admin(token)" in _body("clear_geometry")
+   and "admin_token" not in _body("bake_routes") and "admin_token" not in _body("clear_geometry"))
+ok("D31: /api/meta takes the request, reads the STAFF cookie through gate.verify, and answers two shapes",
+   "def meta(request: Request = None)" in MAIN
+   and "gate.verify(cookies.get(gate.COOKIE)) == gate.LEVEL_STAFF" in _body("_staff_request")
+   and '"scope": "staff" if staff else "public"' in _body("meta")
+   and '"routes": network.meta_routes() if staff else []' in _body("meta")
+   and '"ipts": taxonomy.list_ipts() if staff else []' in _body("meta")
+   and '"work_sections": taxonomy.list_work_sections(in_scope_only=True) if staff else []' in _body("meta"))
+ok("D31: the public shape keeps what the sign-in screen and the public map read — units, vehicles, labels, tenant, factors, seasonal windows",
+   all(s in _body("meta") for s in ('"units": conversions.UNITS', '"vehicles": conversions.vehicle_names(factors)',
+                                     '"vehicle_labels": conversions.vehicle_labels(factors)',
+                                     '"tenant": config.tenant_settings(conversions)',
+                                     '"factors": conversions.flat_factors(factors)',
+                                     '"seasonal_restrictions": factors.get("seasonal_restrictions", [])'))
+   and not re.search(r'"(units|vehicles|vehicle_labels|tenant|factors|seasonal_restrictions)":[^\n]*if staff', _body("meta")))
+ok("whoami: GET /api/public/whoami exists under the gated prefix, reads the cookie level and the header, returns level + team_label only",
+   '@app.get("/api/public/whoami")' in MAIN and "def public_whoami(request: Request = None)" in MAIN
+   and "gate.verify(cookies.get(gate.COOKIE))" in _body("public_whoami")
+   and 'return {"level": level, "team_label": team}' in _body("public_whoami"))
+ok("🔴 whoami never returns a code or a team id: the label falls back to '<team word> n' when the slot is unnamed, "
+   "and the body reads no environment and no code variable",
+   "access.canonical_ipt(team) == acc[\"ipt\"]" in _body("public_whoami")
+   and not re.search(r"environ|_CODE|X-Access-Code|body\.code", _body("public_whoami").split('"""')[2]))
+
+
+# ---------------------------------------------------------------- 8. 12 Oct 2026 — the review and fix pass
+# non-ASCII: hmac.compare_digest raises TypeError on a str with a non-ASCII character, which made ?token=é a 500
+clean()
+try:
+    ok("🔴 a password with a non-ASCII character is refused (False), never a TypeError (a 500)",
+       gate.password_ok("corridor-2026é") is False and gate.password_ok("é") is False)
+except TypeError as e:
+    ok("🔴 a password with a non-ASCII character is refused (False), never a TypeError (a 500)", False, repr(e))
+env(MAP_PASSWORD="corrédor")
+ok("...and a non-ASCII password itself still matches exactly", gate.password_ok("corrédor") is True
+   and gate.password_ok("corredor") is False)
+clean()
+ok("C11: _check_admin compares BYTES, so a non-ASCII token is a 403, not a 500",
+   "hmac.compare_digest(admin_token.encode(\"utf-8\"), str(token).strip().encode(\"utf-8\"))" in _body("_check_admin"))
+
+# Sign out on a shared machine: the 12-hour STAFF cookie is swapped for a MAP cookie that ends no later
+clean()
+_now = 1_800_000_000
+_staff = gate.sign(gate.LEVEL_STAFF, now=_now)
+_kw = gate.downgrade_kwargs(_staff, now=_now + 3600)
+ok("⭐ downgrade_kwargs turns a valid STAFF cookie into a MAP cookie (the public map still opens, the staff surface does not)",
+   _kw is not None and _kw["key"] == gate.COOKIE and gate.verify(_kw["value"], now=_now + 3600) == gate.LEVEL_MAP
+   and _kw["httponly"] is True and _kw["path"] == "/", str(_kw))
+ok("⭐ ...expiring when the staff cookie would have, never later (11 h left of 12, not the map's 30 days)",
+   _kw["max_age"] == gate.STAFF_TTL_S - 3600
+   and gate.verify(_kw["value"], now=_now + gate.STAFF_TTL_S + 1) is None, str(_kw.get("max_age")))
+ok("...a MAP cookie, a forged one, an expired one or none is left alone (None)",
+   gate.downgrade_kwargs(gate.sign(gate.LEVEL_MAP, now=_now), now=_now) is None
+   and gate.downgrade_kwargs("staff.9999999999.forged", now=_now) is None
+   and gate.downgrade_kwargs(_staff, now=_now + gate.STAFF_TTL_S + 5) is None
+   and gate.downgrade_kwargs(None) is None and gate.downgrade_kwargs("") is None)
+ok("/api/gate-signout?keep=map sets the downgraded cookie; without keep it drops the cookie as before",
+   "def gate_signout(request: Request = None, keep: Optional[str] = None)" in MAIN
+   and "gate.downgrade_kwargs(cookies.get(gate.COOKIE))" in _body("gate_signout")
+   and "r.delete_cookie(gate.COOKIE, path=\"/\")" in _body("gate_signout"))
 
 print()
 for f in FAIL:

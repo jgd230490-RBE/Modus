@@ -226,10 +226,10 @@
     },
     "_default": {
       "payload_t": 20,
-      "emissions_kg_co2e_per_km": 0.97,
+      "emissions_kg_co2e_per_km": 0.89743,
       "load_minutes": 12,
       "unload_minutes": 8,
-      "_emissions_basis": "a mid figure between the 2026 rigid (0.99773) and artic (0.93939) average-laden factors; a fallback, never a vehicle",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — All HGVs', the published AVERAGE across the rigid and articulated classes, average laden, kg CO2e per vehicle-km: 0.89743. Read from the gov.uk flat file v1.2 on 9 Oct 2026 (notes carbon-check-1009.md §2; its row ID was not recorded). A FALLBACK, never a vehicle: what a per-km figure reads when a forecast line names a vehicle this document does not carry, or an entry's stored figure is blank. The same figure as conversions.FALLBACK_KG_CO2E_PER_KM, which a document without this entry reads. A tenant whose stored config predates 12 Oct 2026 keeps the _default it stored (0.97) until its Config is reset to file or its package re-imported; factors diagnostics flags the difference. Replaced the unpublished mid figure 0.97 on 12 Oct 2026 (B2).",
       "fuel": "diesel"
     },
     "Truck mixer 8 m³ (32t)": {
