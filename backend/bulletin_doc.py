@@ -30,6 +30,23 @@ which routes were never checked); what changed since last month (plan against pl
 approved plan for each month as it stands today — no earlier issue is stored); terms explained;
 caveats; the report-a-lorry block, with the scheme's typed fields as placeholders.
 
+13 Oct 2026 (the user): two additions, after a read of real UK construction-traffic monitoring
+reports (Sizewell C's Transport Monitoring Report, Hinkley Point C's Transport Forum packs, CLOCS
+Standard v4, TfL's CLP guidance, FORS v6, DESNZ's local authority emissions statistics;
+notes/bulletin-research-1013.md):
+  * "This month at a glance" — the Sizewell C tracker's shape: each item, this month's figure and
+    the KIND of data (Forecast / Stored check / Not reported). The items a monitoring report fills
+    from observed records (lorries counted, route adherence and hours, FORS / CLOCS / Euro VI / DVS
+    shares, collisions, complaints) are listed as NOT REPORTED, never filled: this is a plan.
+  * "Carbon by council" — the districts alone, each in the council layer's orange ramp (the map's
+    AREA_RAMP_CARBON and AREA_STOPS.carbon, the same colours and stops) with its t CO2e in the
+    month, drawn from the stored boundary polygons (areas.area_load): no routes, no road network,
+    no Mapbox call. "No figure" is hatched, never a zero; a district with no approved route is the
+    neutral grey. A table beside it (district, highway authority, t CO2e, share of the scheme's),
+    the tally against the scheme's carbon (what is driven outside the districts loaded is named),
+    the basis sentence, the ONS / OS licence lines and the Carbon page's stamp. A tenant with no
+    council areas: no section at all.
+
 RULES KEPT
 ----------
 * One load = one two-way movement, never doubled: every figure here is bulletin.py's.
@@ -68,6 +85,13 @@ COUNTING_LINE = ("Counts are two-way movements: one lorry out laden and back emp
 PLACEHOLDER = "a typed field this scheme has not set yet"
 CHART_MAX_ROUTES = 24
 ZONE_WORDS = {"closure": "closure", "weight_limit": "weight limit", "works": "works area", "other": "local control"}
+# 13 Oct 2026: the council layer's carbon colouring, the public map's own (map/index.html AREA_RAMP_CARBON,
+# AREA_NONE, AREA_STOPS.carbon and the hatch of areaHatchImage) — test_bulletin.py reads the map and holds them equal
+COUNCIL_RAMP = ("#EE9150", "#E8590C", "#B8470A", "#7C2D06")
+COUNCIL_NONE = "#E7E5E4"
+COUNCIL_STOPS = (50, 100, 200)               # t CO2e in the month, fixed, so a colour means the same tonnes every month
+HATCH_INK, HATCH_PAPER = "#B8B2A8", "#F3F1EC"
+NOT_REPORTED = "Not reported"
 
 
 # --------------------------------------------------------------------------- #
@@ -153,6 +177,156 @@ def _controls(span_from, span_to):
                     "when": _span_text(s, e),
                     "at": (((bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2) if bb else None)})
     return out
+
+
+def council_class(v, unclipped=False):
+    """The map's step for a district's t CO2e: 'nofig' (hatched), 'none' (grey) or 0-3 (the orange ramp)."""
+    if v is None or (unclipped and not v > 0):
+        return "nofig"
+    if v < 0.01:
+        return "none"
+    return sum(1 for s in COUNCIL_STOPS if v >= s)
+
+
+def council_fill(cls):
+    return COUNCIL_NONE if cls == "none" else (HATCH_PAPER if cls == "nofig" else COUNCIL_RAMP[cls])
+
+
+def _t(v):
+    """t CO2e as the map's district label prints it: whole tonnes from 10 t, one decimal below."""
+    return f"{v:,.0f} t" if v >= 10 else f"{v:,.1f} t"
+
+
+def _share(v, whole):
+    """A district's share of the scheme's carbon: whole per cent, "under 1%" for a sliver, "—" with no figure."""
+    if v is None or not whole or not v > 0:
+        return "—"
+    pc = 100 * v / whole
+    return "under 1%" if pc < 0.5 else f"{pc:.0f}%"
+
+
+def _council_legend():
+    s = COUNCIL_STOPS
+    return [{"label": f"under {s[0]} t", "fill": COUNCIL_RAMP[0], "hatch": False},
+            {"label": f"{s[0]} to {s[1] - 1} t", "fill": COUNCIL_RAMP[1], "hatch": False},
+            {"label": f"{s[1]} to {s[2] - 1} t", "fill": COUNCIL_RAMP[2], "hatch": False},
+            {"label": f"{s[2]} t and over", "fill": COUNCIL_RAMP[3], "hatch": False},
+            {"label": "no approved route", "fill": COUNCIL_NONE, "hatch": False},
+            {"label": "no figure (never a zero)", "fill": HATCH_PAPER, "hatch": True}]
+
+
+def _council_carbon(mi, wd, month_long):
+    """
+    The districts' t CO2e in the month (areas.area_load, the map's figures), formatted; None when the
+    tenant has no council districts (then the bulletin prints nothing about them).
+    """
+    import areas
+    stored = areas.stored_areas()
+    if not any(a["tier"] == "district" for a in stored):
+        return None
+    try:
+        A = areas.area_load(mi, working_days=wd, geometry=True)
+    except Exception as e:                       # the section stays, and says why there is no figure
+        return {"error": f"The council figures could not be read for {month_long} ({type(e).__name__}).",
+                "title": f"Carbon by council in {month_long}", "districts": []}
+    unclipped = bool(A.get("routes_not_clipped"))
+    tot = A.get("totals") or {}
+    scheme = tot.get("co2_t")
+    districts = []
+    for a in A.get("areas") or []:
+        if a["tier"] != "district":
+            continue
+        v = a.get("co2_t")
+        cls = council_class(v, unclipped)
+        if cls == "nofig":
+            text = "no figure yet" if (v is not None and unclipped) else "no figure"
+        elif cls == "none":
+            text = ("no approved route" if not (a.get("routes") or a.get("return_only_routes") or a.get("edge_routes"))
+                    else "under 0.1 t")
+        else:
+            text = _t(v)
+        districts.append({"area_id": a["area_id"], "name": a["name"], "co2_t": v, "cls": cls, "text": text,
+                          "fill": council_fill(cls), "highway_authority": a.get("highway_authority") or "",
+                          "share": _share(v, scheme),
+                          "rings": areas.rings_of(a.get("geometry")), "label_at": a.get("label_point")})
+    districts.sort(key=lambda d: (-(d["co2_t"] or 0), d["name"]))
+    d_sum = (tot.get("co2_t_by_tier") or {}).get("district")
+    n = len(districts)
+    if scheme is None or d_sum is None:
+        tally = "No total is given: at least one district, or the scheme, has no carbon figure this month."
+    elif scheme <= 0:
+        tally = f"No approved haul carbon in {month_long}."
+    else:
+        out = scheme - d_sum
+        tally = (f"The {n} districts shown carry {_t(d_sum)} of the scheme's {_t(scheme)} CO2e in {month_long}"
+                 + (f"; the other {_t(out)} is driven on roads outside them, in council areas not loaded."
+                    if out >= 0.05 else ": all of it."))
+    county_lines = []
+    for a in A.get("areas") or []:
+        if a["tier"] == "county" and a.get("co2_t") is not None:
+            county_lines.append(f"{a['name']} ({a.get('tier_words') or 'county'}"
+                                + (f"; highway authority {a['highway_authority']}" if a.get("highway_authority") else "")
+                                + f"): {_t(a['co2_t'])} CO2e in {month_long} on its roads.")
+    notes = [x for x in (A.get("notes") or []) if any(k in x for k in ("CO2e", "clipped", "carbon"))]
+    sources = []
+    for a in stored:
+        if a["tier"] == "district" and a.get("source") and a["source"] not in sources:
+            sources.append(a["source"])
+    return {
+        "error": None,
+        "title": f"Carbon by council in {month_long}",
+        "lede": (f"The haul carbon emitted inside each local authority district in {month_long}, t CO2e: each route's "
+                 "carbon for the month split by the km it drives inside the district, laden and empty. Districts only: "
+                 "no routes or roads are drawn."),
+        "districts": districts,
+        "legend": _council_legend(),
+        "tally": tally,
+        "basis": ("Split by the km inside each district; across one tier it adds up to the scheme's carbon. "
+                  "These are this scheme's lorries only, a planning estimate: they are not comparable with the DESNZ "
+                  "local authority greenhouse gas statistics, which count every vehicle and every source."),
+        "county_lines": county_lines, "notes": notes,
+        "attribution": list(A.get("attribution") or []),
+        "sources": [f"Boundaries: {x}, generalised to 200 m." for x in sources],
+        "stamp": (A.get("carbon") or {}).get("stamp") or "",
+    }
+
+
+def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, month_long):
+    """
+    "This month at a glance" in the Sizewell C tracker's shape: the item, this month's figure and the kind of
+    data. What a monitoring report fills from observed records is listed, and marked Not reported.
+    """
+    import bulletin
+    c = R.get("carbon") or {}
+    flagged = [r for r in routes_view if r["cap"] is not None]
+    over = [r for r in flagged if r["over_flag"]]
+    fc = "Forecast: the approved plan"
+    listed = f"{len(works) + len(controls)} listed"
+    if rs_status == bulletin.NEVER_CHECKED:
+        rw = (f"{len(controls)} local control{'s' if len(controls) != 1 else ''}",
+              "Road works never checked for this month's routes")
+    elif never:
+        rw = (listed, f"Stored check; {len(never)} route{'s' if len(never) != 1 else ''} never checked")
+    else:
+        rw = (listed, f"Stored check of {_iso_short(checked_at)}" if checked_at else "Stored check")
+    rows = [
+        ("Two-way lorry movements a day", n0(H.get("two_way_a_day")), fc),
+        ("Lorry movements in the month", n0(H.get("movements_in_month")), fc),
+        ("Routes in use", n0(H.get("routes_in_use")) if H.get("routes_in_use") is not None else "—", fc),
+        ("Routes planned above their planning flag",
+         (f"{len(over)} of {len(flagged)}" if flagged else "no planning flag typed"), "Forecast against the scheme's typed flags"),
+        ("Haul carbon in the month",
+         (n1(c["co2_t_in_month"]) + " t CO2e") if c.get("co2_t_in_month") is not None else "—",
+         "Forecast: a planning estimate on DESNZ 2026 factors"),
+        (f"Road works, closures and local controls in {month_long}", rw[0], rw[1]),
+        ("Lorries counted on the roads or at the site gates", NOT_REPORTED, "This bulletin is a plan: no lorry was counted"),
+        ("Lorries kept to the approved routes and working hours", NOT_REPORTED, "Needs observed records; not in this bulletin"),
+        ("Vehicle and operator standards (FORS, CLOCS, Euro VI, Direct Vision Standard)", NOT_REPORTED,
+         "Not in this bulletin"),
+        ("Collisions and near misses", NOT_REPORTED, "Not in this bulletin"),
+        ("Enquiries and complaints", NOT_REPORTED, "Not in this bulletin; how to report a lorry is at the end"),
+    ]
+    return [{"item": a, "figure": b, "data": d, "not_reported": b == NOT_REPORTED} for a, b, d in rows]
 
 
 def _flag_text(row):
@@ -320,6 +494,9 @@ def sheet(month_index, acc=None, now=None):
                          + (f" (finished: {', '.join(gone)})" if gone else ""))
         change_text = f"Since {prev_long}: " + "; ".join(parts) + "."
 
+    glance = _glance(H, R, routes_view, works, controls, rs.get("status"), never, rs.get("checked_at"), month_long)
+    council = _council_carbon(mi, wd, month_long)
+
     carbon = R.get("carbon") or {}
     veh = R.get("vehicles") or {}
     terms = [
@@ -373,6 +550,7 @@ def sheet(month_index, acc=None, now=None):
         "moved_total": {"a_day": n0(H.get("two_way_a_day")), "vehicles": n0(veh.get("fleet")),
                         "t_day": n0((H.get("tonnes") / wd) if H.get("tonnes") is not None and wd else None)},
         "works": works, "checks": checks, "others": others,
+        "glance": glance, "council": council,
         "change_rows": change_rows, "change_text": change_text,
         "terms": terms, "caveats": [c for c in caveats if c],
         # 12 Oct 2026 (Track C review): the tenant's typed concern_email (the map's "Report a concern"
@@ -405,6 +583,10 @@ def projector(points, w, h, pad):
     scale = min((w - 2 * pad) / span_x, (h - 2 * pad) / span_y)
     ox, oy = (w - span_x * scale) / 2, (h - span_y * scale) / 2
     return lambda lon, lat: (ox + (lon - lo_x) * kx * scale, oy + (lat - lo_y) * scale)
+
+
+def council_points(C):
+    return [p for d in (C or {}).get("districts") or [] for ring in d["rings"] for p in ring]
 
 
 def map_points(S):
@@ -447,6 +629,59 @@ def _svg_map(S, w=720, h=340):
                    f'<text x="{x:.1f}" y="{h - y + 4.5:.1f}" text-anchor="middle" class="pin">{z["n"]}</text>')
     out.append("</svg>")
     return "".join(out)
+
+
+def _sw_style(fill, hatch):
+    return (f"repeating-linear-gradient(45deg,{HATCH_INK} 0 2px,{HATCH_PAPER} 2px 6px)" if hatch else fill)
+
+
+def _svg_council(C, w=720, h=560):
+    """The districts alone in the orange ramp, a white 2.5 px border between them, one label each."""
+    proj = projector(council_points(C), w, h, 16)
+    if proj is None:
+        return '<p class="muted">No district boundary to draw.</p>'
+    out = [f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="Haul carbon by local authority district, t CO2e in the month" class="map">',
+           f'<defs><pattern id="cc-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+           f'<rect width="8" height="8" fill="{HATCH_PAPER}"/><rect width="2" height="8" fill="{HATCH_INK}"/></pattern></defs>']
+    for d in C["districts"]:
+        path = " ".join("M" + " L".join(f"{x:.1f},{h - y:.1f}" for x, y in (proj(*p) for p in ring)) + " Z" for ring in d["rings"])
+        fill = "url(#cc-hatch)" if d["cls"] == "nofig" else d["fill"]
+        out.append(f'<path d="{path}" fill="{fill}" fill-rule="evenodd" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round">'
+                   f'<title>{_e(d["name"])}: {_e(_co2(d["text"]))}</title></path>')
+    for d in C["districts"]:
+        if not d.get("label_at"):
+            continue
+        x, y = proj(*d["label_at"])
+        out.append(f'<text x="{x:.1f}" y="{h - y - 2:.1f}" text-anchor="middle" class="cl"><tspan class="cn">{_e(d["name"])}</tspan>'
+                   f'<tspan x="{x:.1f}" dy="17">{_e(_co2(d["text"]))}</tspan></text>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def _council_html(C):
+    """The carbon-by-council section of the page; empty for a tenant with no council districts."""
+    if not C:
+        return ""
+    e = _e
+    if C.get("error"):
+        return f'<h2>{e(C["title"])}</h2><p class="empty">{e(C["error"])}</p>'
+    sw = "".join(f'<span class="lg"><span class="sw" style="background:{_sw_style(g["fill"], g["hatch"])}"></span>{e(g["label"])}</span>'
+                 for g in C["legend"])
+    rows = "".join(f'<tr><td><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
+                   f'{e(d["name"])}</td><td>{e(d["highway_authority"])}</td><td class="n">{e(_co2(d["text"]))}</td>'
+                   f'<td class="n">{e(d["share"])}</td></tr>' for d in C["districts"])
+    notes = "".join(f"<li>{e(_co2(x))}</li>" for x in C["county_lines"] + C["notes"])
+    lic = " ".join(e(x) for x in C["sources"] + C["attribution"])
+    return (f'<h2>{e(C["title"])}</h2>'
+            f'<p>{e(_co2(C["lede"]))}</p>'
+            f'<div class="mapwrap" data-bulletin="council-map">{_svg_council(C)}</div>'
+            f'<p class="legend cc-legend">t CO₂e in the month: {sw}</p>'
+            f'<div class="tw"><table data-bulletin="council"><thead><tr><th>District</th><th>Highway authority</th>'
+            f'<th>t CO₂e in the month</th><th>Share of the scheme&#39;s</th></tr></thead><tbody>{rows}</tbody></table></div>'
+            f'<p>{e(_co2(C["tally"]))}</p>'
+            + (f'<ul>{notes}</ul>' if notes else "")
+            + f'<p class="muted">{e(_co2(C["basis"]))} {e(_co2(C["stamp"]))}.</p>'
+            f'<p class="muted">{lic}</p>')
 
 
 def _svg_chart(S, w=720):
@@ -505,6 +740,8 @@ def html(S):
     nav = ((f'<a href="/bulletin/?month={mi - 1}">‹ {e(S["prev_long"])}</a>' if S["has_prev"] else "<span></span>")
            + (f'<a href="/bulletin/?month={mi + 1}">{e(S["next_long"])} ›</a>' if S["has_next"] else "<span></span>"))
     empty = (f'<p class="empty">{e(S["empty_note"])}</p>' if S["empty"] and S["empty_note"] else "")
+    glance = "".join(f'<tr class="{"nr" if g["not_reported"] else ""}"><td>{e(_co2(g["item"]))}</td><td class="n">{e(_co2(g["figure"]))}</td>'
+                     f'<td>{e(_co2(g["data"]))}</td></tr>' for g in S["glance"])
     v = {
         "page_title": e(S["title"]) + " · " + e(S["tenant"]) + ((" · " + e(S["demo_notice"])) if S["demo_notice"] else ""),
         "title": e(S["title"]), "tenant": e(S["tenant"]), "as_at": e(S["as_at"]), "pdf_href": e(S["pdf_href"]),
@@ -519,6 +756,7 @@ def html(S):
         "change_text": e(_co2(S["change_text"])),
         "rep_lorry": e(S["report"]["lorry"]), "rep_hours": e(S["report"]["hours"]), "rep_formats": e(S["report"]["formats"]),
         "foot": e(S["foot"]), "svg_map": _svg_map(S), "svg_chart": _svg_chart(S),
+        "glance": glance, "council": _council_html(S["council"]),
         "notice": notice, "nav": nav, "empty": empty, "head": head, "places": places, "busiest": busiest,
         "moved": moved, "checks": checks, "others": others, "change": change, "terms": terms, "caveats": caveats,
         "INK": INK, "MUTED": MUTED, "PLAN_BLUE": PLAN_BLUE, "PLAN_TINT": PLAN_TINT, "FLAG_RED": FLAG_RED,
@@ -561,6 +799,10 @@ dt{{font-weight:700;margin-top:8px}} dd{{margin:0}}
 .report{{border:2px solid var(--ink);border-radius:8px;padding:12px 14px;margin:16px 0}}
 .empty{{background:#FFFBEB;border-left:3px solid var(--amber);padding:10px 14px}}
 footer{{margin:28px 0 12px;font-size:14px;color:var(--muted)}}
+tr.nr td{{color:var(--muted)}} tr.nr td.n{{font-style:italic}}
+.sw{{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.08)}}
+.cc-legend .lg{{display:inline-block;margin-right:12px;white-space:nowrap}}
+svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}} svg .cn{{font-weight:700}}
 @media print{{
   @page{{size:A4;margin:14mm}}
   body{{font-size:11pt}} main{{max-width:none;padding:0}}
@@ -593,6 +835,12 @@ indicative. {places}{controls_text}</p>
 {flagged} of {n_routes} routes carry one. Every route is charted below.</p>
 <p><b>Terms explained.</b> {two_way_sentence} {other_schemes}</p>
 
+<h2>This month at a glance</h2>
+<div class="tw"><table data-bulletin="glance"><thead><tr><th>Item</th><th>This month</th><th>Data</th></tr></thead>
+<tbody>{glance}</tbody></table></div>
+<p class="muted">Forecast: from the approved plan. Not reported: what a monitoring report fills from observed records
+(counts, gate and camera records, operators' returns). A planning forecast has none, so the line is left empty, never estimated.</p>
+
 <h2>Two-way movements a day by route</h2>
 <div class="chartwrap" data-bulletin="chart">{svg_chart}</div>
 <p class="legend">Bars: two-way movements a day, approved plan. Dashed red mark: the planning flag typed on the route.</p>
@@ -612,6 +860,8 @@ indicative. {places}{controls_text}</p>
 <tbody>{change}</tbody></table></div>
 <p>{change_text}</p>
 <p class="muted">Plan against plan: each month's approved plan as it stands today. No earlier issue of this bulletin is stored.</p>
+
+{council}
 
 <h2>Terms explained</h2>
 <dl>{terms}</dl>
