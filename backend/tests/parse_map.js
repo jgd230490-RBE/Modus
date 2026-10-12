@@ -3477,7 +3477,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // ---- (5) the deep link, the share card and the hooks ---------------------------------------------------------------
   ok("C3 link: written on change — applyFilters ends with the write; a layer box or Show forecast schedules it; a stop of playback writes it",
      /markRouteEnds\(\);\s*raiseMarks\(\);\s*if \(typeof scheduleViewWrite === 'function'\) scheduleViewWrite\(\);\s*\}/.test(code)
-     && code.includes("if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast') scheduleViewWrite();")
+     // narrowed at the merge with C1: the change hook may also name the Road load / Carbon boxes (LINK_MODE_BOXES)
+     && /if \(\/\^\(layer-\|restr-\)\/\.test\(id\) \|\| id === 'toggle-forecast'( \|\| LINK_MODE_BOXES\.includes\(id\))?\) scheduleViewWrite\(\);/.test(code)
      && code.includes("observeEl('tl-play', { attributes: true, attributeFilter: ['aria-pressed'] }, () => { syncPlayButtons(); if (!TL.playing) scheduleViewWrite(); });"));
   ok("C3 link: never written during Play (Safari caps replaceState); written with history.replaceState; the app's embed / v kept in the frame, stripped from the shared link",
      code.includes("if (!VIEW.ready || TL.playing) return;") && code.includes("try { history.replaceState(history.state, '', url); } catch (e) {}")
@@ -3801,6 +3802,41 @@ function qrRead(mod) {
   const len = rd(ver < 10 ? 8 : 16), bytes = [];
   for (let i = 0; i < len; i++) bytes.push(rd(8));
   return { version: ver, mask, text: Buffer.from(bytes).toString('utf8') };
+}
+
+// ===== 12 Oct 2026 — Track C integration (claude/map-review-2): the seams between C1, C2 and C3 =====
+// Each pin fails on the four builder branches taken alone: they were built side by side and never saw each other.
+{
+  const mm = code.slice(code.indexOf("function mapModeMonth(){"), code.indexOf("function niceStop(v){"));
+  const am = code.slice(code.indexOf("function areasMonth() {"), code.indexOf("function areaTierOn(tier) {"));
+  ok("⭐ Track C: Road load / Carbon and the council areas read the Show-forecast window from forecastWindow(), never the removed From / To selects",
+     mm.length > 0 && am.length > 0 && /const \[f, t\] = forecastWindow\(\);/.test(mm) && /forecastWindow\(\)\[0\]/.test(am)
+     && !/forecast-from|forecast-to/.test(mm + am));
+  const af = code.slice(code.indexOf("function applyFilters()"), code.indexOf("function resetFilters()"));
+  ok("Track C: applyFilters refreshes the council areas AND ends with the address-bar write (both sides kept, the write last)",
+     /if \(typeof refreshAreas === 'function'\) refreshAreas\(\);[\s\S]*markRouteEnds\(\);\s*raiseMarks\(\);\s*if \(typeof scheduleViewWrite === 'function'\) scheduleViewWrite\(\);\s*\}\s*$/.test(af));
+  const rmf = code.slice(code.indexOf("ensureForecastLayers(); ensureFlowLayer();"), code.indexOf("function openTimeline(){"));
+  ok("Track C: each month on the playhead refreshes the council areas and then Road load / Carbon (one call each)",
+     (rmf.match(/refreshAreas\(\);/g) || []).length === 1 && (rmf.match(/refreshMapModes\(\);/g) || []).length === 1
+     && rmf.indexOf("refreshAreas();") < rmf.indexOf("refreshMapModes();"));
+  ok("Track C: still ONE mousemove handler and ONE generateId on routes-source after the merge (no second hover path)",
+     (code.match(/map\.on\('mousemove'/g) || []).length === 1 && (code.match(/generateId: true/g) || []).length === 1
+     && !/promoteId/.test(code));
+  ok("Track C: the two removal lists are the one list, unchanged by the merge (Road load, Carbon and the forecast layers; the council areas are their own group and stay)",
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'\]\.forEach/g) || []).length === 2
+     && !/'area-fill','forecast/.test(code));
+  // the deep link carries Road load and Carbon
+  ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
+     code.includes("const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon'];")
+     && code.includes(`input[type=checkbox][id^="restr-"], #toggle-road-load, #toggle-carbon')]`)
+     && code.includes("|| LINK_MODE_BOXES.includes(id)) scheduleViewWrite();"));
+  let lk = null;
+  try { lk = new Function(/function layerKey\(id\) \{[^\n]*\}/.exec(code)[0] + "\nreturn layerKey;")(); } catch (e) {}
+  ok("Track C link: their keys are short and collide with no layer box ('road-load', 'carbon'); layer- and restr- keys unchanged",
+     !!lk && lk('toggle-road-load') === 'road-load' && lk('toggle-carbon') === 'carbon' && lk('layer-chainage') === 'chainage'
+     && lk('restr-closures') === 'restr-closures' && !/id="layer-(road-load|carbon)"/.test(html));
+  ok("Track C: the council group's tier boxes are layer- ids, so the link carries them without a change (areas-district, areas-county)",
+     html.includes('id="layer-areas-district"') && html.includes('id="layer-areas-county"'));
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

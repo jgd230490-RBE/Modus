@@ -6066,10 +6066,13 @@
     // Read once the network is in (onNetworkReady), written on every change (applyFilters, a layer box, a stop of
     // playback) with history.replaceState — never during Play, which would write the address every tick.
     const VIEW = { ready: false, timer: null, defaults: [], pendingRestr: [] };
+    // merge of C1 with C3: the Road load and Carbon boxes travel in the link too (&layers=road-load.carbon), so a shared
+    // link opens on the same picture; both are off by default, so a plain link is unchanged
+    const LINK_MODE_BOXES = ['toggle-road-load', 'toggle-carbon'];
     function layerBoxes() {
-        return [...document.querySelectorAll('input[type=checkbox][id^="layer-"], input[type=checkbox][id^="restr-"]')];
+        return [...document.querySelectorAll('input[type=checkbox][id^="layer-"], input[type=checkbox][id^="restr-"], #toggle-road-load, #toggle-carbon')];
     }
-    function layerKey(id) { return id.indexOf('layer-') === 0 ? id.slice(6) : id; }
+    function layerKey(id) { return id.indexOf('layer-') === 0 ? id.slice(6) : id.indexOf('toggle-') === 0 ? id.slice(7) : id; }
     function layersOn() { return layerBoxes().filter(cb => cb.checked).map(cb => layerKey(cb.id)).sort(); }
     VIEW.defaults = layersOn();          // the static boxes as the page ships them (the closures' boxes start off)
     function monthParam(m) {
@@ -6186,7 +6189,7 @@
     }
     document.addEventListener('change', (e) => {
         const id = (e.target && e.target.id) || '';
-        if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast') scheduleViewWrite();
+        if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || LINK_MODE_BOXES.includes(id)) scheduleViewWrite();
     });
 
     // ---------------------------------------------------------------- "Copy link" and the share card with its QR
