@@ -966,6 +966,203 @@ ok("…every place a person reads text is escaped (a zone typed with markup prin
    "<script" not in bulletin_doc.html(dict(S10, title="<script>x</script>")).split("<style>")[1].split("</style>")[1]
    .replace("&lt;script&gt;", ""))
 
+# --------------------------------------------------------------------------- #
+#  8b. 13 Oct 2026 (the user): THIS MONTH AT A GLANCE and CARBON BY COUNCIL     #
+# --------------------------------------------------------------------------- #
+# The glance table is the Sizewell C monitoring report's tracker shape (item, figure, kind of data); what a monitoring
+# report fills from OBSERVED records is listed and marked Not reported, never filled. Carbon by council: the districts
+# alone in the map's orange ramp, from the stored polygons, no Mapbox call; a tenant with no districts prints nothing.
+_G = {g["item"]: g for g in S10["glance"]}
+ok("⭐ glance: the plan's figures equal the headline (two-way a day, movements in the month, routes) and say Forecast",
+   _G["Two-way lorry movements a day"]["figure"] == _fig["two_way"] and _G["Lorry movements in the month"]["figure"] == _fig["month"]
+   and _G["Routes in use"]["figure"] == _fig["routes"] and _G["Two-way lorry movements a day"]["data"] == "Forecast: the approved plan",
+   str(S10["glance"][:3]))
+ok("⭐ glance: the planning flag line counts the routes planned above their typed flag (R1 of the one route with a flag)",
+   _G["Routes planned above their planning flag"]["figure"] == "1 of 1")
+ok("⭐ glance: the month's haul carbon is the roll-up's t CO2e in the month, with the DESNZ basis named",
+   _G["Haul carbon in the month"]["figure"] == f"{R['carbon']['co2_t_in_month']:,.1f} t CO2e"
+   and "DESNZ 2026" in _G["Haul carbon in the month"]["data"])
+ok("glance: road works say two of the month's routes were never checked (the stored check's own state), never a clear road",
+   "never checked" in _G["Road works, closures and local controls in October 2026"]["data"])
+_NR = [g["item"] for g in S10["glance"] if g["not_reported"]]
+ok("⭐ glance: the five things a monitoring report fills from observed records are listed and marked Not reported, never a figure",
+   _NR == ["Lorries counted on the roads or at the site gates", "Lorries kept to the approved routes and working hours",
+           "Vehicle and operator standards (FORS, CLOCS, Euro VI, Direct Vision Standard)", "Collisions and near misses",
+           "Enquiries and complaints"]
+   and all(g["figure"] == "Not reported" for g in S10["glance"] if g["not_reported"]), str(_NR))
+# NARROWED in build 13 Oct (the rendered PDF): page 1 overflowed and split the table; it now opens page 2
+ok("⭐ glance: at the top of page 2 of the PDF (page 1 keeps its shape) and on the page, with its explanation",
+   "This month at a glance" in PAGES[1] and "This month at a glance" not in PAGES[0]
+   and PAGES[1].index("This month at a glance") < PAGES[1].index("Two-way movements a day by route") and "Not reported" in T10J and "FORS, CLOCS, Euro VI" in T10J and "Direct Vision" in T10J
+   and '<table data-bulletin="glance">' in HTML10 and "never estimated" in HTML_TEXT and "never estimated" in T10J
+   and HTML10.count('<tr class="nr">') == 5)
+ok("🔴 no council districts: no carbon-by-council section anywhere, and nothing printed about it",
+   S10["council"] is None and "Carbon by council" not in T10J and "Carbon by council" not in HTML10 and 'data-bulletin="council' not in HTML10)
+
+# the colours and stops are the public map's own (read from map/index.html, never retyped by hand)
+_mrc = re.search(r"const AREA_RAMP_CARBON = \[([^\]]+)\];", MAP)
+_mst = re.search(r"const AREA_STOPS = \{ movements: \[[^\]]+\], carbon: \[([^\]]+)\] \};", MAP)
+_mno = re.search(r"const AREA_NONE = '(#[0-9A-Fa-f]{6})';", MAP)
+ok("⭐ council colours: the bulletin's ramp, stops and neutral are the map's AREA_RAMP_CARBON, AREA_STOPS.carbon and AREA_NONE; the hatch is areaHatchImage's",
+   bool(_mrc and _mst and _mno)
+   and list(bulletin_doc.COUNCIL_RAMP) == [x.strip().strip("'") for x in _mrc.group(1).split(",")]
+   and list(bulletin_doc.COUNCIL_STOPS) == [int(x) for x in _mst.group(1).split(",")]
+   and bulletin_doc.COUNCIL_NONE == _mno.group(1)
+   and "on ? 0xB8 : 0xF3; data[i + 1] = on ? 0xB2 : 0xF1; data[i + 2] = on ? 0xA8 : 0xEC" in MAP
+   and (bulletin_doc.HATCH_INK, bulletin_doc.HATCH_PAPER) == ("#B8B2A8", "#F3F1EC"))
+_cc = bulletin_doc.council_class
+ok("⭐ council classes, the map's step: None is 'no figure' (hatched), under 0.01 t the grey, then 50 / 100 / 200 t; a zero with routes not clipped is no figure, never a zero",
+   _cc(None) == "nofig" and _cc(0) == "none" and _cc(0.004) == "none" and _cc(0.5) == 0 and _cc(49.99) == 0 and _cc(50) == 1
+   and _cc(99.9) == 2 - 1 and _cc(100) == 2 and _cc(199) == 2 and _cc(200) == 3 and _cc(5000) == 3 and _cc(0, unclipped=True) == "nofig"
+   and _cc(12, unclipped=True) == 0)
+
+# the fixture's districts: the laden and return legs of R1 and R2 both run (-1.0, 52.5) -> (-1.1, 52.6), so by the
+# segment's parameter: EAST holds lon -1.05..-1.0 = half, WEST lon -1.08..-1.05 = 0.3, the last 0.2 is in NO district
+# (a neighbour not loaded); FAR has no route; the county holds EAST and WEST (0.8) with a hole that touches nothing
+import areas  # noqa: E402
+_ATTR = ["Source: Office for National Statistics licensed under the Open Government Licence v.3.0",
+         "Contains OS data © Crown copyright and database right 2026"]
+_sq = lambda x0, x1, y0=52.4, y1=52.7: [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
+areas.import_collection({"type": "FeatureCollection", "attribution": _ATTR, "features": [
+    {"type": "Feature", "properties": {"area_id": "E1", "name": "Eastshire", "tier": "district", "source": "Test districts (May 2026)",
+                                        "highway_authority": "Test County Council"}, "geometry": {"type": "Polygon", "coordinates": [_sq(-1.05, -0.95)]}},
+    {"type": "Feature", "properties": {"area_id": "W1", "name": "Westvale", "tier": "district", "source": "Test districts (May 2026)",
+                                        "highway_authority": "Westvale City Council"}, "geometry": {"type": "Polygon", "coordinates": [_sq(-1.08, -1.05)]}},
+    {"type": "Feature", "properties": {"area_id": "F1", "name": "Farmoor", "tier": "district", "source": "Test districts (May 2026)",
+                                        "highway_authority": "Test County Council"}, "geometry": {"type": "Polygon", "coordinates": [_sq(0.0, 0.1)]}},
+    {"type": "Feature", "properties": {"area_id": "C1", "name": "Testshire", "tier": "county", "source": "Test counties (Dec 2025)",
+                                        "highway_authority": "Test County Council"},
+     "geometry": {"type": "Polygon", "coordinates": [_sq(-1.08, -0.95), _sq(-0.97, -0.96, 52.41, 52.42)]}}]})
+_CO2_ROUTE = {rid: sum(l["co2_t"] for l in P10["lines"] if l["route_id"] == rid and l["co2_t"] is not None) for rid in ("R1", "R2")}
+_CT = _CO2_ROUTE["R1"] + _CO2_ROUTE["R2"]
+_tt = lambda v: f"{v:,.0f} t" if v >= 10 else f"{v:,.1f} t"
+_real_ts4 = config.tenant_settings
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+_calls = []
+_real_open = export.urllib.request.urlopen
+
+
+def _count_open(req, timeout=0):
+    _calls.append(getattr(req, "full_url", str(req)))
+    raise OSError("harness: counted, not fetched")
+
+
+try:
+    export.urllib.request.urlopen = _count_open
+    _n0 = len(_calls); export.build_bulletin_pdf(S10); _no_council_calls = len(_calls) - _n0
+    S10A = bulletin_doc.sheet(10, PLANNER, now=datetime.datetime(2026, 10, 12, 9, 0, tzinfo=datetime.timezone.utc))
+    _n0 = len(_calls); PDF10A = export.build_bulletin_pdf(S10A); _council_calls = len(_calls) - _n0
+    HTML10A = bulletin_doc.html(S10A)
+finally:
+    export.urllib.request.urlopen = _real_open
+    config.tenant_settings = _real_ts4
+offline(export)
+T10A = pdf_text(PDF10A)
+T10AJ = " ".join(T10A.split())
+HTML_TEXT_A = _hm.unescape(" ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", " ", HTML10A, flags=re.S)).split()))
+CA = S10A["council"]
+_D = {d["name"]: d for d in (CA or {}).get("districts") or []}
+ok("⭐ council: with districts loaded the section is there, titled for the month, with the three DISTRICTS only (the county is not drawn)",
+   CA and CA["title"] == "Carbon by council in October 2026" and set(_D) == {"Eastshire", "Westvale", "Farmoor"}, str(CA and list(_D)))
+ok("⭐ council (hand): each district's t CO2e is the routes' month carbon split by the km inside — Eastshire half, Westvale 0.3; "
+   "largest first",
+   near(_D["Eastshire"]["co2_t"], 0.5 * _CT, 1e-3) and near(_D["Westvale"]["co2_t"], 0.3 * _CT, 1e-3) and _CT > 0
+   and _D["Eastshire"]["text"] == _tt(0.5 * _CT) and _D["Westvale"]["text"] == _tt(0.3 * _CT)
+   and [d["name"] for d in CA["districts"]] == ["Eastshire", "Westvale", "Farmoor"],
+   f"{_CT} {[(d['name'], d['co2_t'], d['text']) for d in CA['districts']]}")
+ok("⭐ council: a district with no approved route is the neutral grey with its words, never an orange zero",
+   _D["Farmoor"]["cls"] == "none" and _D["Farmoor"]["text"] == "no approved route" and _D["Farmoor"]["fill"] == "#E7E5E4"
+   and _D["Farmoor"]["share"] == "—")
+ok("council: each orange district's fill is the ramp step its tonnes fall in",
+   all(d["fill"] == bulletin_doc.COUNCIL_RAMP[bulletin_doc.council_class(d["co2_t"])] for d in CA["districts"] if d["cls"] not in ("none", "nofig")))
+ok("⭐ council: the tally names the carbon driven OUTSIDE the districts loaded (0.2 of the routes), never silently dropped",
+   CA["tally"] == f"The 3 districts shown carry {_tt(0.8 * _CT)} of the scheme's {_tt(_CT)} CO2e in October 2026; "
+                  f"the other {_tt(0.2 * _CT)} is driven on roads outside them, in council areas not loaded.", CA["tally"])
+ok("council: shares of the scheme's carbon (50% and 30%) and the highway authority per district",
+   _D["Eastshire"]["share"] == "50%" and _D["Westvale"]["share"] == "30%" and _D["Westvale"]["highway_authority"] == "Westvale City Council")
+ok("council: a sliver of the scheme's carbon reads 'under 1%', never 0%",
+   bulletin_doc._share(0.4, 100) == "under 1%" and bulletin_doc._share(0.6, 100) == "1%" and bulletin_doc._share(None, 100) == "—"
+   and bulletin_doc._share(0, 100) == "—" and bulletin_doc._share(5, None) == "—")
+ok("council: the county's figure is a line of text (its roads, its highway authority), not a second fill",
+   CA["county_lines"] == [f"Testshire (county or unitary authority; highway authority Test County Council): {_tt(0.8 * _CT)} CO2e "
+                          "in October 2026 on its roads."], str(CA["county_lines"]))
+ok("⭐ council: the basis sentence, the not-comparable-with-DESNZ line, the Carbon page's stamp, the boundary source and the ONS / OS licence lines",
+   "Split by the km inside each district; across one tier it adds up to the scheme's carbon." in CA["basis"]
+   and "not comparable with the DESNZ local authority greenhouse gas statistics" in CA["basis"]
+   and CA["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
+   and CA["sources"] == ["Boundaries: Test districts (May 2026), generalised to 200 m."] and CA["attribution"] == _ATTR)
+ok("⭐ council PDF: the section's title, each district and its figure, the tally, the stamp and both licence lines are in the PDF text",
+   "Carbon by council in October 2026" in T10AJ and all(n in T10AJ for n in ("Eastshire", "Westvale", "Farmoor"))
+   and _tt(0.5 * _CT) in T10AJ and "is driven on roads outside them" in T10AJ
+   and "Contains OS data © Crown copyright and database right 2026" in T10AJ
+   and "Source: Office for National Statistics licensed under the Open Government Licence v.3.0" in T10AJ
+   and "not Carbon Tool figures" in T10AJ, T10AJ[-1500:])
+ok("🔴 council PDF: drawing the districts makes NO network call (the same urlopen count as the bulletin without them)",
+   _council_calls == _no_council_calls, f"{_council_calls} vs {_no_council_calls} {_calls}")
+ok("⭐ council PDF: 'fictional demo scheme' still on every page, which now number at least three",
+   len([p for p in T10A.split("\f") if p.strip()]) >= 3 and all("fictional demo scheme" in p.lower() for p in T10A.split("\f") if p.strip()))
+ok("⭐ council page: an inline SVG of the districts (even-odd fill, white 2.5 px borders), each label with name and figure; no Mapbox",
+   '<div class="mapwrap" data-bulletin="council-map"><svg viewBox="0 0 720 560"' in HTML10A
+   and HTML10A.count('fill-rule="evenodd" stroke="#FFFFFF" stroke-width="2.5"') == 3
+   and f'<tspan class="cn">Eastshire</tspan>' in HTML10A and f'dy="17">{_tt(0.5 * _CT)}</tspan>' in HTML10A
+   and "mapbox" not in HTML10A.lower() and "<polyline" not in HTML10A.split('data-bulletin="council-map"')[1].split("</svg>")[0])
+ok("council page: the district fills are the ramp's and the grey; the legend lists the four steps, the grey and the hatched no figure",
+   f'fill="{_D["Eastshire"]["fill"]}" fill-rule="evenodd"' in HTML10A and 'fill="#E7E5E4" fill-rule="evenodd"' in HTML10A
+   and all(t in HTML_TEXT_A for t in ("under 50 t", "50 to 99 t", "100 to 199 t", "200 t and over", "no approved route", "no figure (never a zero)")))
+ok("council page: the table (district, highway authority, t CO₂e, share), the tally, the licence lines, the stamp",
+   '<table data-bulletin="council">' in HTML10A and "Westvale City Council" in HTML_TEXT_A and "is driven on roads outside them" in HTML_TEXT_A
+   and "Contains OS data © Crown copyright and database right 2026" in HTML_TEXT_A and "not Carbon Tool figures" in HTML_TEXT_A
+   and "t CO₂e in the month" in HTML_TEXT_A)
+_pxA = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", HTML10A)]
+ok("🔴 the 14 px floor holds with the council section (its labels 14 px; the 720-unit map scrolls on a phone, never shrinks)",
+   _pxA and min(_pxA) >= 14 and ".mapwrap svg{min-width:720px}" in HTML10A, str(sorted(set(_pxA))))
+ok("🔴 the banned-word scan over the council section and the glance, page and PDF",
+   not _BANNED.search(T10AJ + " " + HTML_TEXT_A) and not re.search(r"\bAI\b", T10AJ + " " + HTML_TEXT_A) and not _trucks(T10AJ + " " + HTML_TEXT_A))
+ok("🔴 the literal-22 ban and the no-SQL rule still hold for the composition with the new section",
+   "22" not in read("backend/bulletin_doc.py") and "db." not in read("backend/bulletin_doc.py")
+   and "areas.area_load(mi, working_days=wd, geometry=True)" in read("backend/bulletin_doc.py"))
+# a district with NO figure (its routes carry no carbon): hatched, never zero
+_real_al = areas.area_load
+
+
+def _al_nofig(*a, **k):
+    out = _real_al(*a, **k)
+    for x in out["areas"]:
+        if x["area_id"] == "W1":
+            x["co2_t"] = None
+    out["totals"]["co2_t_by_tier"]["district"] = None
+    return out
+
+
+areas.area_load = _al_nofig
+try:
+    CN = bulletin_doc._council_carbon(10, WD, "October 2026")
+finally:
+    areas.area_load = _real_al
+_DN = {d["name"]: d for d in CN["districts"]}
+ok("⭐ council: a district with no carbon figure is HATCHED and says 'no figure', and no total is claimed",
+   _DN["Westvale"]["cls"] == "nofig" and _DN["Westvale"]["text"] == "no figure" and _DN["Westvale"]["share"] == "—"
+   and 'fill="url(#cc-hatch)"' in bulletin_doc._svg_council(CN) and CN["tally"].startswith("No total is given"))
+_PN = export.build_bulletin_pdf(dict(S10A, council=CN))
+ok("council: ...and the PDF draws it (the hatch is a clipped pattern) with the words", "no figure" in " ".join(pdf_text(_PN).split()))
+
+
+def _al_boom(*a, **k):
+    raise RuntimeError("fixture: the areas read failed")
+
+
+areas.area_load = _al_boom
+try:
+    CE = bulletin_doc._council_carbon(10, WD, "October 2026")
+finally:
+    areas.area_load = _real_al
+ok("🔴 council: a failed areas read keeps the section and says the figures could not be read (never a blank map of zeros)",
+   CE["error"] == "The council figures could not be read for October 2026 (RuntimeError)." and CE["districts"] == []
+   and "could not be read" in bulletin_doc._council_html(CE) and "could not be read" in " ".join(pdf_text(export.build_bulletin_pdf(dict(S10A, council=CE))).split()))
+ok("council: the shared projection — one projector for the page and the PDF (bulletin_doc.projector over council_points)",
+   "bulletin_doc.projector(bulletin_doc.council_points(C), w, h, 3 * mm)" in read("backend/export.py")
+   and "proj = projector(council_points(C), w, h, 16)" in read("backend/bulletin_doc.py"))
+
 # the static map's URL (a capturing stub, never the network)
 _seen = []
 

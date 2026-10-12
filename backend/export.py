@@ -1157,6 +1157,107 @@ class _BulletinMapCaption(Flowable):
                                         "more two-way movements" + tail)
 
 
+def _hex_rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def _draw_council_map(c, C, x, y, w, h):
+    """
+    13 Oct 2026: the districts alone, each in the council layer's orange ramp (bulletin_doc.COUNCIL_RAMP, the
+    public map's), drawn from the stored boundary polygons — no routes, no roads, no Mapbox. Holes kept (even-odd
+    fill); "no figure" hatched; a white border between districts; one label per district at its label point.
+    """
+    import bulletin_doc
+    proj = bulletin_doc.projector(bulletin_doc.council_points(C), w, h, 3 * mm)
+    if proj is None:
+        c.setFont("Helvetica", 8); c.setFillColorRGB(*GREY)
+        c.drawString(x + 3 * mm, y + h / 2, "no district boundary to draw")
+        return
+    P = lambda lon, lat: tuple(a + b for a, b in zip((x, y), proj(lon, lat)))
+    even_odd = getattr(rl_canvas, "FILL_EVEN_ODD", 0)
+
+    def outline(d):
+        path = c.beginPath()
+        for ring in d["rings"]:
+            path.moveTo(*P(*ring[0]))
+            for pt in ring[1:]:
+                path.lineTo(*P(*pt))
+            path.close()
+        return path
+
+    for d in C["districts"]:
+        if d["cls"] == "nofig":
+            c.saveState()
+            c.setFillColorRGB(*_hex_rgb(bulletin_doc.HATCH_PAPER))
+            c.drawPath(outline(d), stroke=0, fill=1, fillMode=even_odd)
+            c.clipPath(outline(d), stroke=0, fill=0, fillMode=even_odd)
+            c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.HATCH_INK)); c.setLineWidth(0.8)
+            k = -h
+            while k < w:
+                c.line(x + k, y, x + k + h, y + h)
+                k += 2.4 * mm
+            c.restoreState()
+        else:
+            c.setFillColorRGB(*_hex_rgb(d["fill"]))
+            c.drawPath(outline(d), stroke=0, fill=1, fillMode=even_odd)
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(1.3); c.setLineJoin(1)
+    for d in C["districts"]:
+        c.drawPath(outline(d), stroke=1, fill=0)
+    for d in C["districts"]:
+        if not d.get("label_at"):
+            continue
+        px, py = P(*d["label_at"])
+        for txt, font, size, dy in ((_pdf_safe(d["name"]), "Helvetica-Bold", 7.5, 1.2), (_pdf_safe(d["text"]), "Helvetica", 7.5, -7.4)):
+            tw = c.stringWidth(txt, font, size)
+            # a white halo (the glyphs stroked), then the ink filled on top: the map's ink-on-white-halo labels. The
+            # stroke mode is graphics state and outlives ET (reportlab does not re-emit "0 Tr"), so the halo has its own q/Q
+            c.saveState()
+            c.setLineWidth(1.6); c.setLineJoin(1)
+            t = c.beginText(px - tw / 2, py + dy)
+            t.setFont(font, size); t.setStrokeColorRGB(1, 1, 1); t.setTextRenderMode(1)
+            t.textOut(txt)
+            c.drawText(t)
+            c.restoreState()
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(font, size)
+            c.drawString(px - tw / 2, py + dy, txt)
+
+
+class _CouncilMap(Flowable):
+    def __init__(self, C, width, height):
+        Flowable.__init__(self)
+        self.C, self.width, self.height = C, width, height
+
+    def wrap(self, aw, ah):
+        return self.width, self.height
+
+    def draw(self):
+        _draw_council_map(self.canv, self.C, 0, 0, self.width, self.height)
+
+
+def _council_legend(C, width):
+    """The six swatches in one row: the four orange steps, the neutral grey, the hatched "no figure"."""
+    from reportlab.graphics.shapes import Drawing, Line, Rect, String, Group
+    import bulletin_doc
+    items = C["legend"]
+    d = Drawing(width, 11)
+    d.add(String(0, 2.5, "t CO2e in the month:", fontName="Helvetica-Bold", fontSize=7, fillColor=colors.Color(*NAVY_RGB)))
+    x0, step = 30 * mm, (width - 30 * mm) / len(items)
+    for i, g in enumerate(items):
+        x = x0 + i * step
+        if g["hatch"]:
+            grp = Group()
+            grp.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_PAPER)), strokeColor=None))
+            for k in (0, 3, 6):
+                grp.add(Line(x + k, 1, x + min(8, k + 8), 1 + min(8, 8 - k), strokeColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_INK)), strokeWidth=0.8))
+            d.add(grp)
+            d.add(Rect(x, 1, 8, 8, fillColor=None, strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
+        else:
+            d.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
+        d.add(String(x + 10.5, 2.5, _pdf_safe(g["label"]), fontName="Helvetica", fontSize=6.8, fillColor=colors.Color(*NAVY_RGB)))
+    return d
+
+
 def _bulletin_chart(S, width):
     """Two-way movements a day by route, each typed cap a dashed red mark (reportlab.graphics)."""
     from reportlab.graphics.shapes import Drawing, Line, Rect, String
@@ -1293,6 +1394,19 @@ def build_bulletin_pdf(S):
 
     # ---- page 2
     story.append(PageBreak())
+    # 13 Oct 2026: the Sizewell C tracker's shape — item, this month, the kind of data; observed items Not reported
+    story.append(P("This month at a glance", st_sec))
+    st_nr = ParagraphStyle("nr", parent=st, textColor=colors.Color(*GREY), fontName="Helvetica-Oblique")
+    gl = [[P("Item", st_h), P("This month", st_hr), P("Data", st_h)]]
+    for g in S["glance"]:
+        gl.append([P(E(g["item"]), st_grey if g["not_reported"] else st),
+                   P(E(g["figure"]), ParagraphStyle("nrr", parent=st_nr, alignment=2) if g["not_reported"] else st_r),
+                   P(E(g["data"]), st_grey if g["not_reported"] else st)])
+    story.append(grid(gl, [usable * 0.47, usable * 0.17, usable * 0.36]))
+    story.append(P("Forecast: from the approved plan. Not reported: what a monitoring report fills from observed records "
+                   "(counts, gate and camera records, operators' returns). A planning forecast has none, so the line is "
+                   "left empty, never estimated.", st_grey))
+
     story.append(P("Two-way movements a day by route", st_sec))
     story.append(_bulletin_chart(S, usable))
     story.append(P("Bars: two-way movements a day, approved plan (light fill, solid edge). Dashed red mark: the "
@@ -1336,6 +1450,27 @@ def build_bulletin_pdf(S):
     story.append(P(E(S["change_text"])))
     story.append(P("Plan against plan: each month's approved plan as it stands today. No earlier issue of this "
                    "bulletin is stored.", st_grey))
+
+    # 13 Oct 2026: carbon by council — the districts alone, drawn from the boundary polygons (no Mapbox call)
+    C = S.get("council")
+    if C:
+        if C.get("error"):
+            story.append(P(E(C["title"]), st_sec))
+            story.append(P(E(C["error"]), st_grey))
+        else:
+            cc = [[P("District", st_h), P("Highway authority", st_h), P("t CO2e in the month", st_hr),
+                   P("Share of the scheme's", st_hr)]]
+            for d in C["districts"]:
+                cc.append([P(E(d["name"])), P(E(d["highway_authority"])), P(E(d["text"]), st_r), P(E(d["share"]), st_r)])
+            story.append(KeepTogether([P(E(C["title"]), st_sec), P(E(C["lede"])), Spacer(1, 1.5 * mm),
+                                       _CouncilMap(C, usable, 100 * mm), Spacer(1, 1 * mm), _council_legend(C, usable)]))
+            story.append(Spacer(1, 1.5 * mm))
+            story.append(grid(cc, [usable * 0.30, usable * 0.34, usable * 0.18, usable * 0.18]))
+            story.append(P(E(C["tally"])))
+            for line in C["county_lines"] + C["notes"]:
+                story.append(P(E(line), st_grey))
+            story.append(P(E(C["basis"] + " " + C["stamp"] + "."), st_grey))
+            story.append(P(E(" ".join(C["sources"] + C["attribution"])), st_grey))
 
     story.append(P("Terms explained", st_sec))
     for k, v in S["terms"]:
