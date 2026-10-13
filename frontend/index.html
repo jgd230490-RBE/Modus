@@ -9621,5 +9621,38 @@ function Stat({ label, value, tone }){
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
+<script>
+/* 13 Oct 2026 (speed): keep the compiled app in this browser. Babel used to compile the ~630 KB script
+   above on EVERY load: about 3.5 s on the live site before the first figure could be asked for. This
+   stops Babel's automatic pass, hashes the script, and runs the compiled code kept in localStorage when
+   the hash (and Babel's version) match; otherwise it compiles once, exactly as Babel would (the script's
+   data-presets, "react"), keeps it, and runs it the way Babel does (a script element appended to the
+   page). One entry, replaced whenever the app changes, so storage never grows. The first load after a
+   deploy is as slow as before; the loads after it skip the compile. Anything going wrong (no storage, a
+   full quota, an old Babel) falls back to Babel's own pass, so the page always renders. */
+(function () {
+  var el = document.querySelector('script[type="text/babel"]');
+  if (!el || !window.Babel || typeof Babel.disableScriptTags !== "function") return;
+  Babel.disableScriptTags();
+  try {
+    var src = el.textContent, h = 2166136261;
+    for (var i = 0; i < src.length; i++) { h ^= src.charCodeAt(i); h = Math.imul(h, 16777619); }
+    var key = (h >>> 0).toString(36) + ":" + src.length + ":" + Babel.version, code = null;
+    try { var kept = JSON.parse(localStorage.getItem("modus_app_js") || "null"); if (kept && kept.k === key) code = kept.code; } catch (e) {}
+    if (!code) {
+      code = Babel.transform(src, { presets: (el.getAttribute("data-presets") || "react").split(","), filename: "Inline Babel script" }).code;
+      try { localStorage.setItem("modus_app_js", JSON.stringify({ k: key, code: code })); }
+      catch (e) { try { localStorage.removeItem("modus_app_js"); } catch (e2) {} }
+    }
+    var run = document.createElement("script");
+    run.text = code;
+    document.body.appendChild(run);
+    window.MODUS_APP_FROM = kept && kept.k === key ? "kept" : "compiled";
+  } catch (e) {
+    window.MODUS_APP_FROM = "babel";
+    Babel.transformScriptTags();
+  }
+})();
+</script>
 </body>
 </html>

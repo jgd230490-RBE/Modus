@@ -173,6 +173,23 @@ def _days_of(route_id, month_index, discipline, section_id, week_index):
          section_id or "", *dates))
 
 
+def _days_in_bucket(month_index, week_index):
+    """13 Oct 2026 (speed): every day row of every line in one (month, week) bucket, in ONE read,
+    keyed by (route_id, discipline, section_id), each list oldest first — the same rows _days_of
+    returns line by line (one round trip a line, twice a line on the Look-ahead read)."""
+    dates = [_iso(d) for d in bucket_dates(month_index, week_index)]
+    if not dates:
+        return {}
+    marks = ",".join("?" * len(dates))
+    out = {}
+    for r in db.query(
+            f"SELECT {_COLS} FROM forecast_days WHERE tenant_id = ? AND month_index = ? "
+            f"AND day_date IN ({marks}) ORDER BY day_date",
+            (db.current_tenant(), int(month_index), *dates)):
+        out.setdefault((r["route_id"], r["discipline"] or "", r["section_id"] or ""), []).append(r)
+    return out
+
+
 def _decorate_day(row, week):
     """The derived fields no column holds: variance, and whether the week moved under it."""
     planned, actual = row.get("planned_qty"), row.get("actual_qty")
@@ -212,14 +229,14 @@ def list_days(from_date=None, to_date=None, route_id=None, start_year=None, toda
     hi = _date(to_date) if to_date else dates[-1]
 
     week_rows = weeks.list_weeks(mi, mi, route_id=route_id)
+    days_by = _days_in_bucket(mi, wi)      # one read for every line (13 Oct 2026, speed)
     out = []
     for w in week_rows:
         if int(w["week_index"]) != int(wi):
             continue
         if w.get("parent_status") != "Approved":
             continue
-        drows = _days_of(w["route_id"], w["month_index"], w["discipline"],
-                         w["section_id"], wi)
+        drows = days_by.get((w["route_id"], w["discipline"] or "", w["section_id"] or ""), [])
         days = [_decorate_day(d, w) for d in drows if lo <= _date(d["day_date"]) <= hi]
         total = sum(float(d["planned_qty"] or 0) for d in drows)
         out.append({
@@ -257,21 +274,26 @@ def _insert_day(route_id, month_index, discipline, section_id, day, planned, wee
          float(week_qty or 0), now, now))
 
 
-def materialise_week_days(route_id, month_index, discipline, section_id, week_index):
+def materialise_week_days(route_id, month_index, discipline, section_id, week_index,
+                          week=None, day_rows=None):
     """
     Create or refresh the days of ONE (line, week). Only called for the commit bucket.
 
     A `derived` day is rewritten to its share of the week's CURRENT planned_qty and its
     stamp refreshed. An `edited` or `confirmed` day is left exactly as it is, stamp
     included — not re-stamping it is what makes `week_changed` fire on the read.
+
+    13 Oct 2026 (speed): materialise_commit_week passes the week row and the line's day rows it
+    already read for the whole bucket; any other caller reads them here, as before.
     """
-    w = _week_row(route_id, month_index, discipline, section_id, week_index)
+    w = week if week is not None else _week_row(route_id, month_index, discipline, section_id, week_index)
     if not w:
         return {"created": 0, "refreshed": 0, "kept": 0}
     dates = bucket_dates(month_index, week_index)
     shares = split_week(w.get("planned_qty"), dates)
-    have = {r["day_date"]: r for r in _days_of(route_id, month_index, discipline,
-                                                section_id, week_index)}
+    if day_rows is None:
+        day_rows = _days_of(route_id, month_index, discipline, section_id, week_index)
+    have = {r["day_date"]: r for r in day_rows}
     created = refreshed = kept = 0
     wq = float(w.get("planned_qty") or 0)
     for d in dates:
@@ -328,11 +350,13 @@ def materialise_commit_week(start_year=None, today=None, bucket="commit"):
            "created": 0, "refreshed": 0, "kept": 0}
     if mi is None:
         return out
+    days_by = _days_in_bucket(mi, wi)      # one read for every line (13 Oct 2026, speed)
     for w in weeks.list_weeks(mi, mi):
         if int(w["week_index"]) != int(wi) or w.get("parent_status") != "Approved":
             continue
         r = materialise_week_days(w["route_id"], w["month_index"], w["discipline"],
-                                  w["section_id"], wi)
+                                  w["section_id"], wi, week=w,
+                                  day_rows=days_by.get((w["route_id"], w["discipline"] or "", w["section_id"] or ""), []))
         for k in ("created", "refreshed", "kept"):
             out[k] += r[k]
     return out

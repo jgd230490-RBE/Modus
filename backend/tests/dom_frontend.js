@@ -1072,6 +1072,58 @@ async function rowDetailsDom(){
   w.fetch = () => new Promise(() => {});
 }
 
+// ---- 13 Oct 2026 (speed): the compiled app kept in the browser ----------------------------------------------
+// The small plain script after the app compiles the app once and keeps it in localStorage (modus_app_js), keyed by
+// a hash of the app's text and Babel's version. Run here in a fresh jsdom per "page load", with a stand-in Babel
+// that counts its compiles: the first load compiles and keeps; the next one runs the kept code and compiles
+// nothing; a changed app compiles again and REPLACES the one entry; with storage refusing writes it still runs;
+// a compile that throws falls back to Babel's own pass. Not covered: the real Babel's output (the browser check,
+// 13 Oct: first load 1.4 s, later loads 0.14 s to the first read, every page working).
+function keptAppLoader(){
+  const loader = (html.match(/<\/script>\n<script>\n(\/\* 13 Oct 2026 \(speed\)[\s\S]*?)<\/script>\n<\/body>/) || [])[1];
+  ok("SPEED: the loader is the plain script right after the app, before </body>", !!loader && html.includes('<script type="text/babel" data-presets="react">'));
+  if (!loader) return;
+  const page = (appSrc, store, babelOpts) => {
+    const d = new JSDOM(`<!doctype html><html><body><div id="root"></div><script type="text/babel" data-presets="react">${appSrc}</script></body></html>`,
+                        { runScripts: "dangerously", url: "https://wayscope.test/" });   // the loader appends a <script>: it must run, as in a browser
+    const win = d.window;
+    const calls = { transform: 0, disabled: 0, fallback: 0, presets: null };
+    const realLs = win.localStorage;
+    Object.entries(store).forEach(([k, v]) => realLs.setItem(k, v));
+    if (babelOpts && babelOpts.refuseWrites) {
+      Object.defineProperty(win, "localStorage", { value: { getItem: (k) => realLs.getItem(k), setItem: () => { throw new Error("QuotaExceededError"); }, removeItem: (k) => realLs.removeItem(k) } });
+    }
+    win.Babel = { version: (babelOpts && babelOpts.version) || "7.23.10",
+      disableScriptTags(){ calls.disabled += 1; },
+      transformScriptTags(){ calls.fallback += 1; },
+      transform(src, opts){ calls.transform += 1; calls.presets = opts.presets;
+        if (babelOpts && babelOpts.throws) throw new Error("boom");
+        return { code: `window.RAN = (window.RAN || 0) + 1; window.SRC = ${JSON.stringify(src)};` }; } };
+    win.eval(loader);
+    const out = {}; for (let i = 0; i < realLs.length; i++) out[realLs.key(i)] = realLs.getItem(i === -1 ? "" : realLs.key(i));
+    return { win, calls, store: out };
+  };
+  const p1 = page("APP v1", {});
+  ok("SPEED: the first load compiles once with the script's presets, keeps the result, and runs it once (Babel's own pass is switched off)",
+     p1.calls.disabled === 1 && p1.calls.transform === 1 && JSON.stringify(p1.calls.presets) === '["react"]' && p1.win.RAN === 1
+     && p1.win.SRC === "APP v1" && p1.win.MODUS_APP_FROM === "compiled" && JSON.parse(p1.store.modus_app_js).code.includes("window.RAN"));
+  const p2 = page("APP v1", p1.store);
+  ok("⭐ SPEED: the next load runs the kept code and compiles nothing", p2.calls.transform === 0 && p2.win.RAN === 1 && p2.win.MODUS_APP_FROM === "kept");
+  const p3 = page("APP v2", p2.store);
+  ok("SPEED: a changed app (a deploy) compiles again and replaces the one entry: storage never grows",
+     p3.calls.transform === 1 && p3.win.SRC === "APP v2" && Object.keys(p3.store).filter(k => k.startsWith("modus_app")).length === 1
+     && JSON.parse(p3.store.modus_app_js).k !== JSON.parse(p2.store.modus_app_js).k);
+  const p4 = page("APP v2", p3.store, { version: "7.99.0" });
+  ok("SPEED: a different Babel version never reuses code compiled by another", p4.calls.transform === 1 && p4.win.MODUS_APP_FROM === "compiled");
+  const p5 = page("APP v3", {}, { refuseWrites: true });
+  ok("SPEED: with storage refusing the write (a full quota, a private window) the app still runs, compiled", p5.win.RAN === 1 && p5.calls.fallback === 0);
+  const p6 = page("APP v4", {}, { throws: true });
+  ok("SPEED: a compile that throws falls back to Babel's own pass, so the page behaves exactly as before",
+     p6.calls.fallback === 1 && !p6.win.RAN && p6.win.MODUS_APP_FROM === "babel");
+  const p7 = page("APP v1", { modus_app_js: "{not json" });
+  ok("SPEED: a damaged kept entry is ignored and replaced", p7.calls.transform === 1 && p7.win.RAN === 1 && JSON.parse(p7.store.modus_app_js).k);
+}
+
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
 (async () => {
@@ -1088,6 +1140,8 @@ async function rowDetailsDom(){
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await infoTipDom(); ok("INFO BOX: the section ran to the end", true); }
   catch (e) { ok("INFO BOX: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { keptAppLoader(); ok("SPEED: the loader section ran to the end", true); }
+  catch (e) { ok("SPEED: the loader section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await rowDetailsDom(); ok("ROW DETAILS: the section ran to the end", true); }
   catch (e) { ok("ROW DETAILS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);

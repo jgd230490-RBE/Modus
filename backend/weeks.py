@@ -306,61 +306,80 @@ def materialise_line(route_id, discipline, section_id, month_index=None):
         rows = [r for r in rows if r["month_index"] == int(month_index)]
 
     for p in rows:
-        n_weeks = weeks_in_month(p["month_index"])
-        share = float(p["quantity"] or 0) / n_weeks
         have = {r["week_index"]: r for r in db.query(
             "SELECT week_index, status, planned_qty, unit, parent_qty FROM forecast_weeks WHERE tenant_id = ? "
             "AND route_id = ? AND month_index = ? AND discipline = ? "
             "AND section_id = ?",
             (db.current_tenant(), p["route_id"], p["month_index"],
              p["discipline"] or "", p["section_id"] or ""))}
-        for w in range(1, n_weeks + 1):
-            cur = have.get(w)
-            if cur is None:
-                _insert_week(p["route_id"], p["month_index"], p["discipline"],
-                             p["section_id"], w, share, p["unit"], p["quantity"])
-                created += 1
-            elif cur["status"] == "derived":
-                # 09 Sep night: write ONLY when something moved — on Render every
-                # statement is a network round trip, and a read that rewrote every
-                # derived week it had just read paid for nothing. Unchanged ⇒ kept.
-                if (abs(float(cur.get("planned_qty") or 0) - float(share)) < 1e-9
-                        and (cur.get("unit") or "") == (p["unit"] or "")
-                        and cur.get("parent_qty") is not None
-                        and abs(float(cur["parent_qty"]) - float(p["quantity"] or 0)) < 1e-9):
-                    kept += 1
-                    continue
-                # ⭐ parent_qty is re-stamped HERE and nowhere else in this branch:
-                # a derived row is by definition in step with its parent again.
-                db.execute(
-                    "UPDATE forecast_weeks SET planned_qty = ?, unit = ?, "
-                    "parent_qty = ?, updated_at = ? WHERE tenant_id = ? "
-                    "AND route_id = ? AND month_index = ? AND discipline = ? "
-                    "AND section_id = ? AND week_index = ?",
-                    (share, p["unit"], float(p["quantity"] or 0), _now(),
-                     db.current_tenant(), p["route_id"], p["month_index"],
-                     p["discipline"] or "", p["section_id"] or "", w))
-                refreshed += 1
-            else:
-                # ⭐ edited / confirmed: left EXACTLY as it is, parent_qty included.
-                # Not re-stamping it is what makes parent_changed fire on the read.
-                kept += 1
+        c, r, k = _materialise_parent(p, have)
+        created += c; refreshed += r; kept += k
     return {"created": created, "refreshed": refreshed, "kept": kept}
 
 
+def _materialise_parent(p, have):
+    """One approved month's weeks against the rows it already has (`have`: week_index -> row).
+    Writes only what is missing or moved. Returns (created, refreshed, kept)."""
+    created = refreshed = kept = 0
+    n_weeks = weeks_in_month(p["month_index"])
+    share = float(p["quantity"] or 0) / n_weeks
+    for w in range(1, n_weeks + 1):
+        cur = have.get(w)
+        if cur is None:
+            _insert_week(p["route_id"], p["month_index"], p["discipline"],
+                         p["section_id"], w, share, p["unit"], p["quantity"])
+            created += 1
+        elif cur["status"] == "derived":
+            # 09 Sep night: write ONLY when something moved — on Render every
+            # statement is a network round trip, and a read that rewrote every
+            # derived week it had just read paid for nothing. Unchanged ⇒ kept.
+            if (abs(float(cur.get("planned_qty") or 0) - float(share)) < 1e-9
+                    and (cur.get("unit") or "") == (p["unit"] or "")
+                    and cur.get("parent_qty") is not None
+                    and abs(float(cur["parent_qty"]) - float(p["quantity"] or 0)) < 1e-9):
+                kept += 1
+                continue
+            # ⭐ parent_qty is re-stamped HERE and nowhere else in this branch:
+            # a derived row is by definition in step with its parent again.
+            db.execute(
+                "UPDATE forecast_weeks SET planned_qty = ?, unit = ?, "
+                "parent_qty = ?, updated_at = ? WHERE tenant_id = ? "
+                "AND route_id = ? AND month_index = ? AND discipline = ? "
+                "AND section_id = ? AND week_index = ?",
+                (share, p["unit"], float(p["quantity"] or 0), _now(),
+                 db.current_tenant(), p["route_id"], p["month_index"],
+                 p["discipline"] or "", p["section_id"] or "", w))
+            refreshed += 1
+        else:
+            # ⭐ edited / confirmed: left EXACTLY as it is, parent_qty included.
+            # Not re-stamping it is what makes parent_changed fire on the read.
+            kept += 1
+    return created, refreshed, kept
+
+
 def materialise_window(from_month, to_month):
-    """Materialise every Approved line in a month window. Idempotent."""
-    seen, out = set(), {"created": 0, "refreshed": 0, "kept": 0}
+    """Materialise every Approved line in a month window. Idempotent.
+
+    13 Oct 2026 (speed): TWO reads for the whole window (the approved months, every week row in the
+    window), then the same per-month rule as materialise_line (_materialise_parent). It used to call
+    materialise_line per month, which read its parent again and its weeks: two round trips a line
+    on every Look-ahead read (190 of the page's 531 queries on the demo)."""
+    out = {"created": 0, "refreshed": 0, "kept": 0}
+    have_by = {}
+    for r in db.query(
+            "SELECT route_id, month_index, discipline, section_id, week_index, status, planned_qty, unit, parent_qty "
+            "FROM forecast_weeks WHERE tenant_id = ? AND month_index BETWEEN ? AND ?",
+            (db.current_tenant(), int(from_month), int(to_month))):
+        k = (r["route_id"], r["discipline"] or "", r["section_id"] or "", int(r["month_index"]))
+        have_by.setdefault(k, {})[r["week_index"]] = r
+    seen = set()
     for p in _parent_lines(from_month, to_month):
-        key = (p["route_id"], p["discipline"] or "", p["section_id"] or "",
-               p["month_index"])
+        key = (p["route_id"], p["discipline"] or "", p["section_id"] or "", int(p["month_index"]))
         if key in seen:
             continue
         seen.add(key)
-        r = materialise_line(p["route_id"], p["discipline"], p["section_id"],
-                             month_index=p["month_index"])
-        for k in out:
-            out[k] += r[k]
+        c, r, k = _materialise_parent(p, have_by.get(key, {}))
+        out["created"] += c; out["refreshed"] += r; out["kept"] += k
     return out
 
 

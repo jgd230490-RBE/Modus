@@ -1564,6 +1564,68 @@ ok("⭐ a day whose bucket number is stale (the weeks moved to the calendar) is 
 
 
 # =========================================================================== #
+#  13 Oct 2026 (speed): the Look-ahead read's database round trips              #
+# =========================================================================== #
+# On Render every statement is a network round trip to Postgres. The read used to cost 531 on the demo
+# (19 lines): every location and every gate re-read for each (route, vehicle), the weeks re-created two
+# reads a line, each line's week and days read one by one. Now the routes, locations, gates and costing
+# context are read once a page, each route's geometry once, the weeks and the days of the bucket in one
+# read each. Pinned two ways: the count does not grow when lines are added on routes already in view,
+# and the shared preloads are passed where they must be (source level). The answers themselves are
+# unchanged: the rest of this harness, and a byte-for-byte comparison on the demo (notes, 13 Oct).
+_q = {"n": 0}
+_run0 = db._run
+def _counted(*a, **k):
+    _q["n"] += 1
+    return _run0(*a, **k)
+def _page_queries():
+    lookahead.page(bucket="commit")                    # a first read creates whatever is missing
+    _q["n"] = 0
+    db._run = _counted
+    try:
+        lookahead.page(bucket="commit")
+    finally:
+        db._run = _run0
+    return _q["n"]
+_before = _page_queries()
+_lines_before = len(lookahead.page(bucket="commit")["commit"]["lines"])
+_src = db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND month_index = ? AND status = 'Approved'", (db.current_tenant(), MI))
+_added = 0
+for _i, _r in enumerate(_src[:3]):
+    for _k in range(3):
+        _r2 = dict(_r); _r2["discipline"] = f"{_r['discipline'] or 'x'}-budget{_i}{_k}"
+        if "id" in _r2: _r2["id"] = f"budget-{_i}{_k}"
+        _cols = [c for c in _r2.keys()]
+        db.execute(f"INSERT INTO forecasts ({', '.join(_cols)}) VALUES ({', '.join('?' * len(_cols))})", tuple(_r2[c] for c in _cols))
+        _added += 1
+_after = _page_queries()
+_lines_after = len(lookahead.page(bucket="commit")["commit"]["lines"])
+ok(f"⭐ SPEED: {_added} more lines on routes already in view add no round trips to a Look-ahead read ({_before} → {_after} queries, {_lines_before} → {_lines_after} lines)",
+   _added >= 3 and _lines_after >= _lines_before + _added and _after <= _before + 2, f"{_before} -> {_after}")
+ok(f"SPEED: a Look-ahead read stays within 80 round trips on this harness ({_after})", _after <= 80, str(_after))
+for _r in db.query("SELECT route_id, discipline, section_id, month_index FROM forecasts WHERE tenant_id = ? AND discipline LIKE ?", (db.current_tenant(), "%-budget%")):
+    db.execute("DELETE FROM forecasts WHERE tenant_id = ? AND route_id = ? AND discipline = ? AND section_id = ? AND month_index = ?",
+               (db.current_tenant(), _r["route_id"], _r["discipline"], _r["section_id"], _r["month_index"]))
+_net = open(os.path.join(ROOT, "backend", "network.py"), encoding="utf-8").read()
+_drv = open(os.path.join(ROOT, "backend", "derived.py"), encoding="utf-8").read()
+_lka = open(os.path.join(ROOT, "backend", "lookahead.py"), encoding="utf-8").read()
+_wks = open(os.path.join(ROOT, "backend", "weeks.py"), encoding="utf-8").read()
+_dys = open(os.path.join(ROOT, "backend", "days.py"), encoding="utf-8").read()
+ok("SPEED: route_analysis reads routes, locations, gates and each route's geometry into the request's `pre`, and cycle_for passes it",
+   "def route_analysis(route_id, profiles=None, pre=None):" in _net and 'pre["routes"] = {x["id"]: x' in _net and 'pre["locs"] = locs' in _net
+   and 'pre["gates"] = gates_by_loc' in _net and 'geo_by = pre.setdefault("geom", {})' in _net
+   and 'pre = cache.setdefault("__route_analysis_pre__", {}) if cache is not None else None' in _drv)
+ok("SPEED: the page decorates twice and prices the Account week with ONE cache, routes and costing context",
+   _lka.count("derived.decorate(") >= 3 and _lka.count("cache=cache, routes=routes, cost=cost)") == 2
+   and "routes, cost, cache = derived._routes_and_names(), derived.costing_context(), {}" in _lka
+   and "def decorate(res, factors=None, cache=None, routes=None, cost=None):" in _drv)
+ok("SPEED: the weeks of a window and the days of a bucket are read once, not once a line; the per-line rule is one function",
+   "def _materialise_parent(p, have):" in _wks and "c, r, k = _materialise_parent(p, have_by.get(key, {}))" in _wks
+   and "materialise_line(p[" not in _wks and "def _days_in_bucket(month_index, week_index):" in _dys
+   and _dys.count("days_by = _days_in_bucket(mi, wi)") == 2 and "week=w," in _dys)
+
+
+# =========================================================================== #
 print()
 print(f"{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
