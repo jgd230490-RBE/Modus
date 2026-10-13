@@ -125,7 +125,8 @@ ok("the footnote's read and formulas live in the technical guide; the footer kee
 // ---- 3. per-line model -------------------------------------------------------
 ok("dashboard rows are keyed per line, not per route",
   _dbBody.includes("`${r.route_id}|${r.discipline || \"\"}|${r.section_id || \"\"}`"));
-ok("dashboard shows a discipline column", src.includes('setSort("discipline")'));
+// 13 Oct 2026 (W6, narrowed): the discipline is a chip on the route row and a "Sort by" choice, no longer its own column
+ok("dashboard shows a discipline column", src.includes('["discipline", "Discipline"]') && src.includes("r.discipline || null]}"));
 ok("matrix posts a discipline", /discipline\s*:/.test(src));
 ok("matrix posts a section_id", /section_id\s*:/.test(src));
 
@@ -229,8 +230,9 @@ ok("a fallback slot is marked, not passed off as a translation",
   && !/vehIsFallback\(v\) && VEH\.lang !== "eu" \? " \*"/.test(code));
 ok("vehLabel falls back to the id itself", /\|\| v \|\| ""/.test(code));
 ok("the save still posts the stored id", code.includes("vehicle_type: vehicle,"));
+// 13 Oct 2026 (W6, narrowed): the Forecasts vehicle is in the row's details: the label, and the stored name beside it when they differ
 ok("tables show the label with the stored id in the title",
-  code.includes('title={g.vehicle}>{vehLabel(g.vehicle)}'));
+  code.includes('<RdItem t="Vehicle">{vehLabel(g.vehicle)}</RdItem>') && code.includes('<RdItem t="Vehicle, full name">{g.vehicle && g.vehicle !== vehLabel(g.vehicle) ? g.vehicle : null}</RdItem>'));
 // NARROWED (G2): the header still carries the control, but offers the local-language
 // option only to a tenant whose country it is local to.
 ok("the header carries the control", /VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.map\(\(\[k, l\]\) =>/.test(code));
@@ -459,10 +461,12 @@ ok("...and the bucket switch offers exactly this week and next week — the Thur
   /\[\["commit", "this week"\], \["next", "next week"\]\]/.test(_laBody));
 // 10 Oct 2026 NARROWED: the day cell reads as a figure and is an input only once clicked (mockup 3) —
 // still editable exactly while the week is not confirmed, in this bucket or next
+// 13 Oct 2026 (W6, narrowed): the input sits behind the unit switch (typing is in Tonnes only: decision 2)
 ok("a planned day is editable while its week is not confirmed, this bucket or next",
-  /const locked = w\.status === "confirmed"/.test(_laBody) && /\{!locked && editing === k \? \(/.test(_laBody) && /\) : !locked \? \(/.test(_laBody)
+  /const locked = w\.status === "confirmed"/.test(_laBody) && /: !locked && editing === k \? \(/.test(_laBody) && /\) : !locked \? \(/.test(_laBody)
   && _laBody.includes('onClick={() => setEditing(k)}'));
-ok("a confirmed week's plan is read-only", code.includes("Confirmed — reopen it to change the plan"));
+// 13 Oct 2026 (W6, narrowed): the old cell title is the week's words in the row's details
+ok("a confirmed week's plan is read-only", code.includes('"Confirmed: reopen it to change the plan"'));
 ok("⭐ Confirm week is ONE button for the whole week, separate from editing (L6)",
   _laBody.includes(">Confirm week<") && _laBody.includes("/forecast-weeks/confirm")
   && /const doConfirm = async \(\) => \{[\s\S]*?for\(const l of lines\)/.test(_laBody));
@@ -509,8 +513,9 @@ ok("variance is blank rather than 0 until an actual is typed",
   /r\.variance == null \? "—"/.test(code));
 ok("an emptied actual box clears it back to null, not to zero",
   /actual_qty: \(v === "" \|\| v == null \? null/.test(code));
+// 13 Oct 2026 (W6, narrowed): the words moved from StatusChip to the row's status (MONTH CHANGED) and its details line
 ok("a week whose parent month changed says so",
-  code.includes("parent month changed") && code.includes("parent_changed"));
+  code.includes('<RdItem t="Parent month changed" wide bad>{w.parent_changed ?') && code.includes('return { word: "MONTH CHANGED", tone: "bad", more: 0 };') && code.includes("parent_changed"));
 ok("reopening a month is shown as a note, not by hiding its weeks",
   code.includes("month is now"));
 
@@ -579,18 +584,25 @@ ok("...creates ONE map and keeps it (the guard), and never draws an unbaked rout
   && /if\(r\.geometry && r\.geometry\.length > 1\)\{/.test(_cmBody) && _cmBody.includes("Not drawn (no route worked out)"));   // 13 Oct 2026 (W3, narrowed): plain words
 ok("...colours lines by IPT from palette C, and is not rendered under the render harness",
   _cmBody.includes("IPT_PALETTE_C[iptKey(") && _laBody.includes("!initialPage && <CommitMap"));
+// 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
 ok("today's column carries the wash and the '· today' suffix",
-  _laBody.includes('" · today"') && _laBody.includes('#eff6ff'));
+  _laBody.includes('", today"') && _laBody.includes('#eff6ff'));
 // NARROWED (H1): the unit word is DU() — km, or mi for a tenant that reads miles
+// 13 Oct 2026 (W6, narrowed): the ▶ row's string became the details row, one fact a line, labels in the tenant's unit
 ok("the expanded row prints km/trip, km/week, t·km, cycle and € or 'rate not set' — in the tenant's unit",
-  _laBody.includes("{grp(dist(c.km_trip))} {DU()}/trip") && _laBody.includes("{grp(dist(wd.tonne_km))} {TKM()} (") && _laBody.includes("cycle {grp(c.cycle_min)} min")
-  && _laBody.includes('"rate not set"'));
+  _laBody.includes("<RdItem t={`${DU()} a trip`}>{`${grp(dist(c.km_trip))}") && _laBody.includes("<RdItem t={`${DU()} this week`}>{grp(dist(wd.km))}")
+  && _laBody.includes("<RdItem t={TKM()}>{`${grp(dist(wd.tonne_km))}") && _laBody.includes('<RdItem t="Cycle">{`${grp(c.cycle_min)} min')
+  && _laBody.includes('"Rate not set"'));
+// 13 Oct 2026 (W6, narrowed): the sentence is in the details, with a full stop for the " · "
 ok("⭐ the honest-gap sentence for an unbaked line ships as written",
-  _laBody.includes("{DU()} — until the route is worked out · trips still from"));   // 13 Oct 2026 (W3, narrowed): "baked" reads "worked out" 
+  _laBody.includes("<RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload"));   // 13 Oct 2026 (W3, narrowed): "baked" reads "worked out" 
+// 13 Oct 2026 (W6, narrowed): the Lorries cell reads "—" and the details say why
 ok("an unbaked line shows trips and NO vehicle count (the human's rule), never a 1",
-  _laBody.includes("veh —") && _laBody.includes("Vehicles need this line's route worked out for its vehicle"));   // 13 Oct 2026 (W3, narrowed): plain words
+  _laBody.includes('(c.baked ? <span className="tabular-nums">{grp(f.vehicles)}</span> : <span className="text-amber-700">—</span>)')
+  && _laBody.includes('"Needs this line\'s route worked out for its vehicle"') && _laBody.includes('<td>{c.baked ? grp(f.vehicles) : "—"}</td>'));   // 13 Oct 2026 (W3, narrowed): plain words
+// 13 Oct 2026 (W6, narrowed): the trigger is RowDetails' chevron, a button with aria-expanded, open per row for the session
 ok("the expand trigger is the Routes table's ▶ toggle, reused",
-  _laBody.includes('{isOpen ? "▼" : "▶"}'));
+  _laBody.includes('isOpen={laOpen(lk)} onToggle={() => laToggle(lk)}') && _laBody.includes('const [laOpen, laToggle] = useRowOpen("lookahead");'));
 ok("the empty state uses EmptyState", _laBody.includes("<EmptyState title={`No approved forecast line in the commit week"));
 ok("planned days are saved through PUT /forecast-days with the day's key",
   /send\("\/forecast-days", \{ route_id: line\.route_id, month_index: line\.month_index,[\s\S]*?day_date: d\.day_date, planned_qty:/.test(_laBody)
@@ -985,7 +997,8 @@ ok("🔴 the route's other lines on Submit show the submitter through teamText (
 ok("🔴 the save caution, withdraw prompt, row title, row menu and CSV show teamText(submitter)",
   code.includes(', submitted by ${teamText(l.submitted_by)}') && !code.includes(', submitted by ${l.submitted_by}')
   && code.includes('(submitted by ${teamText(g.submittedBy)})') && !code.includes('(submitted by ${g.submittedBy})')
-  && code.includes('Submitted by ${teamText(g.submittedBy) || "—"}') && code.includes('Submitted by {teamText(g.submittedBy) || "—"}')
+  // 13 Oct 2026 (W6, narrowed): the row title is the details' "Submitted by" line
+  && code.includes('<RdItem t="Submitted by">{`${teamText(g.submittedBy) || "—"}') && code.includes('Submitted by {teamText(g.submittedBy) || "—"}')
   && !/Submitted by \$?\{g\.submittedBy/.test(code)
   && code.includes('g.months, g.status, teamText(g.submittedBy),'));
 ok("...the Forecasts search finds a line by its team NAME as well as the stored value",
@@ -1132,7 +1145,8 @@ ok("the Commit KPI strip is eight cards with the widget right of t·km, and the 
   && _laBody.indexOf('<FuelWidget mode="compact"') < _laBody.indexOf("planned ${CUR()} · no rate typed")
   && _laBody.includes("at target") && _laBody.includes("+ BAF ${CUR()} ${grp(totals.eur_adj)}"));
 ok("...the expanded Commit row and the Account cell print '+ BAF' as a SECOND figure and mark a target-priced line",
-  _laBody.includes("+ BAF ${CUR()} ${grp(wd.eur_adj)}") && _laBody.includes("+ BAF {CUR()} {grp(r.planned_eur_adj)}")
+  // 13 Oct 2026 (W6, narrowed): the Commit row's BAF is its own line in the details
+  _laBody.includes('<RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()} ${grp(wd.eur_adj)}` : null}</RdItem>') && _laBody.includes("+ BAF {CUR()} {grp(r.planned_eur_adj)}")
   && _laBody.includes('r.rate_source === "target"') && _laBody.includes('c.rate_source === "target"'));
 ok("...and the Account footer says the quote is never replaced and € var is against the quote",
   // 13 Oct 2026 (W3, narrowed): the Account footer moved to the Planned cost header's info box (la.cost_quote)
@@ -1169,11 +1183,13 @@ ok("...and says which three are assumptions", (_fpBody.match(/ASSUMPTION/g) || [
 ok("...a live document without the block shows the file's values and says so",
   _fpBody.includes("const fp = (doc && doc.fair_price) || fileFp") && _fpBody.includes("the live document has no fair_price block yet"));
 ok("the Look-ahead prints the fair figure as a THIRD figure, marked 'model': KPI caption, expanded row, Account column",
-  _laBody.includes("fair ${CUR()} ${grp(totals.fair_eur)} (model") && _laBody.includes("fair {CUR()} {grp(wd.fair_eur)}") && _laBody.includes("Fair {CUR()} <span")
+  // 13 Oct 2026 (W6, narrowed): the Commit row's fair figure is the details' "Fair cost (model)" line
+  _laBody.includes("fair ${CUR()} ${grp(totals.fair_eur)} (model") && _laBody.includes('<RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()} ${grp(wd.fair_eur)}') && _laBody.includes("Fair {CUR()} <span")
   && _laBody.includes("{CUR()} {grp(r.planned_fair_eur)}"));
 ok("...with the winter and thaw flags on the Account cell and the expanded row",
   _laBody.includes('(r.fair_flags || []).includes("WINTER")') && _laBody.includes('(r.fair_flags || []).includes("THAW")')
-  && _laBody.includes('c.fair.flags.includes("THAW") ? ", thaw restrictions may apply"'));
+  // 13 Oct 2026 (W6, narrowed): the expanded row's flags are words through fairWords (winter, thaw)
+  && _laBody.includes("fairWords(c.fair.flags)") && src.includes('(flags || []).includes("THAW") ? "thaw restrictions may apply"'));
 // 13 Oct 2026 (W3, narrowed): plain words
 ok("...an unbaked line prints — with the reason, never a number", _laBody.includes("No fair price: the route is not routed yet for this vehicle, or the diesel index is missing"));
 // 13 Oct 2026 (W3, narrowed): the footer moved to the Fair column's info box (la.cost_fair)
@@ -1217,7 +1233,8 @@ ok("big-screen mode: fullscreen requested (never required), filters and the tabl
   && _dbBody.includes('e.key === "Escape"') && _dbBody.includes("fullscreenchange"));
 ok("interactive: a route row (or a Top-routes bar) narrows the charts and figures to that line; the table stays whole; a chip clears it",
   _dbBody.includes("const narrowed = lineKey ? filtered.filter(r => keyOf(r) === lineKey) : filtered;")
-  && _dbBody.includes("onClick={() => pick(r.key)}") && _dbBody.includes("pick(topN[els[0].index].key)")
+  // 13 Oct 2026 (W6, narrowed): the click rides on RowDetails' rowProps; the chevron stops it (stopPropagation)
+  && _dbBody.includes("rowProps={{ onClick: () => pick(r.key),") && _dbBody.includes("pick(topN[els[0].index].key)") && src.includes("onClick={(e) => { e.stopPropagation(); onToggle(); }}")
   && _dbBody.includes("✕ show all") && _dbBody.includes("filtered.forEach(r => {") && _dbBody.includes("narrowed.forEach(r => {"));
 ok("a Delivered-against-plan chart (planned t as bars, reported t over them) and a Delivered column in the table",
   _dbBody.includes("Delivered against plan") && _dbBody.includes("actualM") && _dbBody.includes('setSort("deliveredPct")'));
@@ -1368,7 +1385,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      !/DEFRA/.test(src) && src.includes('source: "DESNZ greenhouse gas conversion factors, 2026"')
      && /DESNZ 2026 kg CO₂e per vehicle-km \(average laden, both legs, from Config\)/.test(_tg));
   ok("the Dashboard figure and the Routes table say lorry-<unit>, the bake table says HGV params",
-     /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && />Lorry-\{DU\(\)\}\{arrow\("km"\)\}<\/th>/.test(src) && />HGV params<\/th>/.test(src));
+     // 13 Oct 2026 (W6, narrowed): the route table's lorry-distance is a details line and a "Sort by" choice
+     /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && src.includes('<RdItem t={`Lorry-${DU()}`}>{r.baked ? grp(dist(r.km))') && src.includes('["km", `Lorry-${DU()}`]') && />HGV params<\/th>/.test(src));
 }
 
 // ---- 10 Oct 2026: the Carbon planner page (phase 3) ------------------------------
@@ -1638,7 +1656,9 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   const _cfBody = code.slice(code.indexOf("function ConfigPage("), code.indexOf("const dayName = (iso) => [", code.indexOf("function ConfigPage(")));
   const _dbWork = _dbBody.slice(_dbBody.indexOf("{!wall ? ("), _dbBody.indexOf("      ) : (\n        <>\n"));
   const _dbWall = _dbBody.slice(_dbBody.indexOf("      ) : (\n        <>\n"));
-  const _laGrid = _laBody.slice(_laBody.indexOf('<table className="tbl compact"'), _laBody.indexOf("</table>", _laBody.indexOf('<table className="tbl compact"')));
+  // 13 Oct 2026 (W6, narrowed): the grid now holds a small by-day table in each details row, so the slice ends at the
+  // </table> after the totals row, not the first one
+  const _laGrid = _laBody.slice(_laBody.indexOf('<table className="tbl compact'), _laBody.indexOf("</table>", _laBody.indexOf('<tr className="la-total')));
   // 8b. the data palette: six tokens, light and dark, read in fixed order, never a raw hex on a dataset
   // 11 Oct 2026 NARROWED: the user chose the orange-led palette (plan = brand orange, delivered = blue, model = violet)
   ok("the data palette is six tokens in the light look (plan orange, delivered blue, teal, model violet, gold, not-yet grey)",
@@ -1841,16 +1861,19 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && /\.tbl\.compact th,\.tbl\.compact td\{height:32px;\}/.test(html) && /\.tbl \.num\{text-align:right;\}/.test(html) && /\.tbl th\.sorted::after\{content:" ▾";\}/.test(html));
   // 2 + 4. Forecasts
   ok("Forecasts: one .tbl with a caption, the unit in the header, numbers in .num cells, the one visible sort",
-    _fcBody.includes('<table className="tbl">') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
-    && _fcBody.includes('th(units.size === 1 ? `Total (${unitLabel([...units][0])})` : "Total", "quantity", true)')
-    && _fcBody.includes('<td className="num">{fmt(g.quantity, g.unit)}') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
+    // 13 Oct 2026 (W6, narrowed): one unit for every line through the switch (the header names it); what was typed,
+    // in its own unit, is in the details
+    _fcBody.includes('<table className="tbl rd-table" data-rd-table="forecasts">') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
+    && _fcBody.includes('{th(qtyHead, "quantity", true)}') && _fcBody.includes('<td className="num" data-label={qtyHead}>')
+    && _fcBody.includes('<RdItem t="Typed">{`${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
   ok("...a filter row with applied-filter chips and Clear all above the table; the status chips left the page header",
     _fcBody.includes('<div className="filter-row" data-guide="forecast-status">') && _fcBody.includes("<AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}")
     && _fcBody.includes("const clearAll = () => setF({ status: \"ALL\", ipt: \"ALL\", discipline: \"ALL\", mine: false, q: \"\" });")
     && !_fcBody.includes("badge(s)"));
   ok("...Approve is the one visible action; Reject, Edit and Withdraw sit behind the row menu; status is a word with a dot",
     _fcBody.includes('<details className="row-menu">') && _fcBody.includes(">Reject…</button>") && _fcBody.includes(">Edit in Submit forecast</button>") && _fcBody.includes(">Withdraw…</button>")
-    && _fcBody.includes("<StatusWord status={g.status} />") && _fcBody.includes('className="btn-pri btn-sm mr-1">Approve</button>'));
+    // 13 Oct 2026 (W6, narrowed): the status is RowStatus, a word and an icon (Rejected, ROAD LIMIT, Pending, Mixed, Approved)
+    && _fcBody.includes("<RowStatus word={st.word} tone={st.tone} more={st.more} />") && _fcBody.includes('className="btn-pri btn-sm mr-1">Approve</button>'));
   ok("🔴 no 9, 10 or 11 px product text on the Forecasts page (the 13 px allowance only)",
     !/text-\[(9|10|11)px\]/.test(_fcBody));
   // 6. Configuration as a form
@@ -1899,15 +1922,21 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     _dbBody.includes(">More filters ▾</summary>") && _dbBody.includes('<div className="row-menu-list dash-filters">') && _dbBody.includes("{!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}"));
   // 3. the Look-ahead grid
   ok("Look-ahead: the commit grid is a compact .tbl with a caption, the row named in words, a Week column, a Status column and a totals row",
-    _laGrid.includes("<caption><b>Planned quantity by day</b>") && _laGrid.includes("Route · {TEAM().toLowerCase()} · section</th>")
-    && _laGrid.includes('<th className="num">Week</th>') && _laGrid.includes("<th>Status</th>") && _laGrid.includes('<tr className="la-total">')
-    && _laGrid.includes("<td><StatusChip s={w.status} parentChanged={w.parent_changed} /></td>"));
+    // 13 Oct 2026 (W6, narrowed): the caption follows the unit switch; the row is named by its two ends (team, section
+    // and the rest in the details); ONE status column, after the route (the flags win over the week's state: decision 1)
+    _laGrid.includes('"Planned quantity by day"}</b>') && _laGrid.includes('<th className="la-stick" style={{ minWidth: 280 }}>Route</th>')
+    && _laGrid.includes('<th className="num">Week</th>') && _laGrid.includes("<th>Status</th>") && _laGrid.includes('<tr className="la-total rd-card">')
+    && _laGrid.includes('<td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>'));
   ok("...the day cell is a figure until clicked, then an input that saves on blur, Enter or Escape",
-    _laGrid.includes('<button type="button" className={"la-cell"') && _laGrid.includes('onBlur={() => { saveDay(line, d); setEditing(null); }}')
+    // 13 Oct 2026 (W6, narrowed): the weekend greying went with the weekend days (the grid shows Mon–Fri only)
+    _laGrid.includes('<button type="button" className="la-cell"') && _laGrid.includes('onBlur={() => { saveDay(line, d); setEditing(null); }}')
     && _laGrid.includes('onKeyDown={e => { if(e.key === "Enter" || e.key === "Escape") e.currentTarget.blur(); }}'));
   ok("🔴 no 9, 10 or 11 px text in the commit grid; status and flags are words with dots",
-    !/text-\[(9|10|11)px\]/.test(_laGrid) && code.includes('<StatusWord status={s} label={s === "derived" ? "Derived"')
-    && /function LineFlags\(\{ flags \}\)\{[\s\S]*?className="chip-st whitespace-nowrap"/.test(code));
+    // 13 Oct 2026 (W6, narrowed): LineFlags and StatusChip gave way to ONE RowStatus a row; the flags are words in the
+    // status and in the details (flagWord with the grid's own word table)
+    !/text-\[(9|10|11)px\]/.test(_laGrid) && /function laStatus\(flags, w\)\{[\s\S]*?word: flagWord\(f, LINE_FLAG_LABEL\)/.test(code)
+    && _laGrid.includes("{laFlagGroups(lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === \"bad\"}>")
+    && /function laFlagGroups\(flags\)\{[\s\S]*?word: flagWord\(f, LINE_FLAG_LABEL\)[\s\S]*?const t = teamText\(f\.text \|\| ""\)/.test(code));
   ok("...the clash rail is a card that says how many flags, each a word with a dot; +N more kept",
     _laBody.includes('<span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>')
     && _laBody.includes("rail.flags.slice(0, 3)") && _laBody.includes("more`"));
@@ -2069,19 +2098,22 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && _dbc.indexOf("fetch(`${API}/gates/arrivals") < _dbc.indexOf("if(err) return"));
   ok("🔴 the words: 'if arrivals are spread evenly', 'Queue likely', 'Spacing holds', 'No check-in time typed', 'coming to load', lorries not trucks; none of the banned words; no small, uppercase or colour-only text",
     gac.includes('const GA_SPREAD = "if arrivals are spread evenly";') && gac.includes('"Queue likely"') && gac.includes('"Spacing holds"')
-    && gac.includes('"No check-in time typed"') && gac.includes("coming to load") && gac.includes('"not typed"') && gac.includes("min a lorry")
+    && gac.includes('"No check-in time typed"') && gac.includes("Coming to load") && gac.includes('"not typed"') && gac.includes("min a lorry")   // 13 Oct 2026 (W6, narrowed): "Coming to load a day" is a details label
     // 11 Oct 2026 (review): a pending-only gate (gap null) says so, before the check-in test, and never "one every —"
     && gac.includes('g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds")')
-    && gac.includes('{g.gap_minutes == null ? "no approved arrivals" : `one every ${gaMin(g.gap_minutes)} ${GA_SPREAD}`}')
+    // 13 Oct 2026 (W6, narrowed): the cell reads "2.6 min"; the full sentence is in the details
+    && gac.includes('{g.gap_minutes == null ? "No approved arrivals." : `One every ${gaMin(g.gap_minutes)} ${GA_SPREAD}.`}') && gac.includes('{g.gap_minutes == null ? "none" : gaMin(g.gap_minutes)}')
     && gac.includes("all {TEAMS().toLowerCase()} together") && !/every \{TEAMS\(\)/.test(code)
     && gac.includes("Pending lines appear as a note until they are approved, then in the figures.")
     && gac.includes("lorries a day at each gate") && gac.includes("The gate arrivals did not load.")
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?|booking|peak hour)\b/i.test(gac)
     && !/\bAI\b/.test(gac) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(gac) && !/style=\{\{ ?color/.test(gac));
   ok("🔴 red only, and always with a word: the chip's dot is var(--red) for flag 'red' and var(--chart-none) otherwise; no amber or gold token in the block",
-    gac.includes('g.flag === "red" ? "var(--red)" : "var(--chart-none)"') && !/--gold|--amber|amber/.test(gac)
-    && gac.includes('<span className="font-semibold">{gaFlagWord(g)}</span>') && gac.includes("title={g.reason}")
-    && gac.includes('g.flag === "red" ? "Queue likely"') && gac.includes('data-ga-flag={g.flag || "none"}'));
+    // 13 Oct 2026 (W6, narrowed): RowStatus — red ("bad") for flag red, grey ("none") otherwise; the server's reason
+    // (the old title) is the details' Status line
+    gac.includes('<RowStatus word={gaFlagWord(g)} tone={g.flag === "red" ? "bad" : "none"} />') && !/--gold|--amber|amber|"warn"|"ok"/.test(gac)
+    && gac.includes('<RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>') && !gac.includes("title={g.reason}")
+    && gac.includes('g.flag === "red" ? "Queue likely"') && gac.includes('"data-ga-flag": g.flag || "none"'));
   ok("the browser derives nothing: no division, ceil or payload arithmetic in the block; it formats the server's fields",
     !/Math\.ceil|\/ *60|payload|\* *60|working_days *[*\/]|[*\/] *working_days/.test(gac)
     // NARROWED 11 Oct 2026 (review): `unbaked_note` was a field the server never sends; the block renders only the contract's
@@ -2104,8 +2136,10 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && /\.ga-sel\{font-size:14px/.test(html) && !/\b(?:bg|text|border)-(?:white|black|slate|gray|red|amber|green|emerald|blue)\b/.test(gac) && !/\b(?:bg|text|border)-\[/.test(gac));
   // 11 Oct 2026 (review): under 720 px the header row is hidden, so each cell carries its column's label (the phone test)
   ok("on a phone every figure cell carries its column's label: data-label on the four figure cells and the ::before rule in the media query",
-    ["Arrivals a day", "Average gap", "Check-in", "Status"].every(l => gac.includes(`<td data-label="${l}"`))
-    && /@media \(max-width:720px\)\{\.ga-table thead\{display:none;\}[^\n]*\.ga-table td\[data-label\]::before\{content:attr\(data-label\) ": ";/.test(html));
+    // 13 Oct 2026 (W6, narrowed): the 720 px rule became the shared .rd-table cards below 768 px
+    ["Arrivals a day", "Average gap", "Check-in a lorry", "Status"].every(l => gac.includes(`data-label="${l}"`))
+    && /@media \(max-width:767px\)\{[\s\S]*?\.rd-table>thead\{display:none;\}[\s\S]*?\.rd-table tr\.rd-row>td\[data-label\]::before,\.rd-table tr\.rd-card>td\[data-label\]::before\{content:attr\(data-label\);/.test(html)
+    && gac.includes('<table className="ga-table rd-table" data-rd-table="gates">'));
   const gsGa = (src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1];
   ok("the guide names the panel and the anchor exists",
     gsGa.includes('{ anchor: "dash-gates", title: "Gate arrivals.", body: "Lorries a day at each gate, every team together, and the average gap if arrivals are spread evenly." },')
@@ -2256,6 +2290,67 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && (html.match(/framedRef\.current = true/g) || []).length === 1);
 }
 
+// ---- 13 Oct 2026 (W6, bundle F): row details on the four busy tables --------------------------------------
+// RowDetails, RowStatus, the unit switch, the cards below 768 px; the UI they replaced is gone. The behaviour (clicks,
+// the session, the switch, nothing lost, one " · " a cell) is in dom_frontend.js; the layout in the browser matrix.
+{
+  const rdc = (src.match(/\nfunction RowDetails\([\s\S]*?\n\}\n/) || [""])[0];
+  ok("⭐ W6: RowDetails — a native chevron button with aria-expanded and aria-controls, a stopped click, at most two chips, a details row always rendered and hidden while shut",
+     rdc.includes('<button type="button" className="rd-chev" aria-expanded={isOpen ? "true" : "false"} aria-controls={did} aria-label={label}')
+     && rdc.includes("onClick={(e) => { e.stopPropagation(); onToggle(); }}") && rdc.includes(".filter(Boolean).slice(0, 2)")
+     && rdc.includes('<tr className="rd-details" id={did} hidden={!isOpen} data-rd-details={rowKey}>') && rdc.includes('<dl className="rd-dl">{children}</dl>'));
+  ok("W6: the open rows are kept per table for the session (sessionStorage modus_rows_<table>); the unit per page for good (localStorage modus_units_<page>), Tonnes by default",
+     src.includes('const rdKey = (table) => "modus_rows_" + table;') && /window\.sessionStorage\.setItem\(rdKey\(table\)/.test(src)
+     && src.includes('window.localStorage.getItem("modus_units_" + page)') && src.includes('return UNIT_CHOICES.some(c => c[0] === v) ? v : "tonnes";')
+     && src.includes('const UNIT_CHOICES = [["loads", "Loads"], ["tonnes", "Tonnes"], ["lorries", "Lorries"]];'));
+  ok("W6: the switch is a labelled group of three aria-pressed buttons with its info box, on the Look-ahead, the Dashboard and Forecasts (not Gate arrivals: all lorries)",
+     src.includes('<span className="unit-sw-seg" role="group" aria-label="Show the figures as">') && src.includes('aria-pressed={value === k ? "true" : "false"}')
+     && src.includes('<InfoTip id="units" />') && ["lookahead", "dashboard", "forecasts"].every(p => src.includes(`useUnits("${p}")`))
+     && !/useUnits\("gates"\)/.test(src));
+  ok("W6: the status is a word and an icon whose shape says the tone (✓ circle, ! square, ! circle, – circle), never colour alone",
+     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
+     && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}'));
+  ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",
+     ["lookahead", "gates", "today", "dashboard", "forecasts"].every(n => src.includes(`data-rd-table="${n}"`))
+     && (src.match(/<RowDetails key=/g) || []).length === 5);
+  ok("⭐ W6: below 768 px the tables are cards in the brief's order (primary, status, then the figures) and every figure cell carries its label",
+     /@media \(max-width:767px\)\{[\s\S]*?\.rd-table tr\.rd-row>td\.rd-primary\{order:0;[\s\S]*?\.rd-table tr\.rd-row>td\.rd-status\{order:1;[\s\S]*?content:attr\(data-label\);/.test(html)
+     && /\.rd-table\{min-width:0 !important;/.test(html));
+  ok("W6: ROAD LIMIT ranks first among the Look-ahead flags, and the Dashboard and Forecasts read it from the cost lines (`limit`)",
+     src.includes("const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1,") && src.includes('const st = r.limit ? { word: "ROAD LIMIT", tone: "bad" }')
+     && src.includes('if(lim) return { word: "ROAD LIMIT", tone: "bad", more: 0 };') && src.includes("if(r.limit && !a.limit) a.limit = r.limit;") && src.includes("if(r.limit && !e.limit) e.limit = r.limit;"));
+  // removed UI: asserted gone at source level
+  ok("🔴 W6 removed: the Look-ahead's ▶/▼ toggle, its open-state object, the Flags column (LineFlags) and the week StatusChip",
+     !src.includes('{isOpen ? "▼" : "▶"}') && !src.includes("const [open, setOpen] = useState({});") && !/function LineFlags\(/.test(src)
+     && !/function StatusChip\(/.test(src) && !src.includes("<LineFlags") && !src.includes("<StatusChip") && !src.includes("Route · {TEAM().toLowerCase()} · section</th>"));
+  ok("🔴 W6 removed: the hover titles D left on the four tables and Today (grid cells, Today rows, the £/t · £/trip split, the gate's reason, the vehicle name)",
+     !src.includes("title={`Click to type ${dayName(d.day_date)}'s plan") && !src.includes('title="Confirmed — reopen it to change the plan"')
+     && !src.includes("planned today${r.actual != null") && !src.includes('title={c.plannedU ? unitTriple(c.plannedU)') && !src.includes('title={r.plannedU ? unitTriple(r.plannedU)')
+     && !src.includes("title={g.reason}") && !src.includes("title={g.vehicle}") && !src.includes("title={`Submitted by ${teamText(g.submittedBy)")
+     && !src.includes('title="An actual has been typed for today"') && !src.includes("trips/day per vehicle` : undefined}"));
+  ok("🔴 W6 removed: the route table's 'on hover' line and its four moved columns (distance a trip, cycle, lorry-distance, fair per tonne headers)",
+     !src.includes("/{DU()} on hover") && !src.includes('onClick={() => setSort("dist")}') && !src.includes('onClick={() => setSort("cycleH")}')
+     && !src.includes('onClick={() => setSort("km")}') && !src.includes('onClick={() => setSort("fairPerT")}'));
+  ok("🔴 W6 removed: the gate table's laden · coming-to-load line, its notes row and the 720 px rule; the Forecasts cost cell's two stacked figures",
+     !src.includes("{gaN1(g.laden_per_day)} laden · {gaN1(g.empty_per_day)} coming to load") && !src.includes('<tr className="ga-notes">')
+     && !/@media \(max-width:720px\)\{\.ga-table/.test(html) && !src.includes('<span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>'));
+  // found by the browser matrix (13 Oct): at 768 px an opened details row was as wide as its table, so on a table that
+  // scrolls sideways half of it sat off screen; the gate table had no scroll box and spilled out of its card; at 360 px
+  // the Look-ahead's first cell kept its inline 280 px and a long status word did not wrap
+  ok("W6: every row-details table sits in a scroll box that is a size container, and a details grid is never wider than that box",
+     (src.match(/className="[^"]*overflow-auto[^"]*rd-scroll[^"]*"/g) || []).length === 5 && /\.rd-scroll\{container-type:inline-size;\}/.test(html)
+     && /\.rd-dl\{position:sticky;left:0;max-width:min\(100cqw, 1100px\);/.test(html)
+     && src.includes('<div className="overflow-auto rd-scroll"><table className="ga-table rd-table" data-rd-table="gates">'));
+  ok("W6: the big screen hides the row chevrons as it hides the info boxes (a wall display is not clicked)",
+     /\.dash-wall \.ibtn\{display:none;\}\n  \.dash-wall \.rd-chev\{display:none;\}/.test(html));
+  ok("W6: in the cards, the first cell drops its inline minimum width, the totals cells too, and a status word wraps",
+     /\.rd-table tr\.rd-row>td\.rd-primary\{order:0;text-align:left;display:block;min-width:0 !important;/.test(html)
+     && /\.rd-table tr\.rd-card>td\{min-width:0 !important;\}/.test(html) && /\.rd-table \.row-st\{white-space:normal;/.test(html));
+  ok("W6: the info box words follow the move: the cost split is 'in the row's details', the commit grid's unit 'chosen above'",
+     src.includes("Each figure's per tonne, per trip and per mile or km is in the row's details.") && !src.includes("is in its tooltip")
+     && src.includes("in the unit chosen above. In Tonnes, click a day to type its plan"));
+}
+
 // ---- 13 Oct 2026 (W3): the word rule, the info box and its dictionary -----------------------
 // The rule (notes/w3-w4-inventory-1013.md): no screen says these words; they live in the technical guide.
 // Every piece of literal text in the Babel block is walked with the TypeScript parser (comments are not
@@ -2380,7 +2475,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      !src.includes("balance at the week's end = opening + typed week actuals") && !src.includes("· loads and vehicles in grey · Monday to Friday")
      && !src.includes("Calibrate never fires on save") && !src.includes("No day columns here.") && !src.includes("Type what came out of each stockpile this week. Opening ="));
   ok("🔴 ...and the Forecasts cost column and the carbon target line carry an info box, not a title",
-     src.includes('<th scope="col" className="num">Cost ({CUR()})<InfoTip id="fc.cost" /></th>') && !src.includes("Hover a figure for")
+     // 13 Oct 2026 (W6, narrowed): the cost cell became two columns; the info box rides on the Planned header
+     src.includes('<th scope="col" className="num">Planned ({CUR()})<InfoTip id="fc.cost" /></th>') && !src.includes("Hover a figure for")
      && !src.includes('data-carbon-target="set" title='));
   ok("W3 §1: the passages that left the screen read in plain words (each one's old text is in the technical guide)",
      src.includes("Needed to change routes, locations and zones. Remembered in this browser.") && !src.includes("ADMIN_TOKEN")

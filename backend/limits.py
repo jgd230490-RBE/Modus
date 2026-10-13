@@ -972,6 +972,29 @@ def stored_checks(route_ids=None):
     return out
 
 
+
+def exceeding(stored_entry, vehicle_type):
+    """The stored hits where THIS vehicle is over the limit (13 Oct 2026). One rule for the
+    Look-ahead's LIMIT flag (clashes.limit) and the Dashboard / Forecasts rows (costlines)."""
+    return [h for h in ((stored_entry or {}).get("hits") or [])
+            if isinstance(h, dict) and h.get("verdict") == "exceeds" and h.get("vehicle_profile") == vehicle_type]
+
+
+def breach_text(hits, vehicle_type=None):
+    """The words for the first breach and how many more: "<vehicle> (<value> <unit>, <leg>) is over
+    the <headline> (<source>) ...". The clash rail puts the line's name in front of it."""
+    h = hits[0]
+    leg = "going back empty" if h.get("leg") != "loaded" else "loaded"
+    text = (f"{h.get('vehicle_label') or vehicle_type} ({h.get('vehicle_value'):g} {h.get('unit')}, {leg}) "
+            f"is over the {h.get('headline')} ({SOURCES.get(h.get('source'), {}).get('short', h.get('source'))})")
+    if h.get("exceptions"):
+        text += f" — {h['exceptions'].lower()}"
+    if h.get("point"):
+        text += " — a point limit: check whether the route passes it or crosses over or under it"
+    if len(hits) > 1:
+        text += f" (+{len(hits) - 1} more)"
+    return text
+
 # --------------------------------------------------------------------------- #
 #  The map's collection                                                        #
 # --------------------------------------------------------------------------- #
