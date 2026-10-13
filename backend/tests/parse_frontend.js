@@ -24,6 +24,9 @@ const ts = require(G + "typescript");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const FILE = path.join(ROOT, "frontend", "index.html");
+// 13 Oct 2026 (W4): the technical guide, where the passages the screens no longer carry now live
+const TECH = path.join(ROOT, "frontend", "help", "technical", "index.html");
+const _tg = fs.existsSync(TECH) ? fs.readFileSync(TECH, "utf8").replace(/\r\n?/g, "\n") : "";
 const html = fs.readFileSync(FILE, "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 
 let pass = 0;
@@ -105,13 +108,19 @@ ok("an unbaked route renders 'not baked' rather than a number",
   src.includes("not baked"));
 ok("distance falls back to null, not 0",
   !src.includes("route.distance_km || 0"));
-ok("the dashboard says how many line-months the km / CO₂e / fair totals exclude, in the header",
-  _dbBody.includes("line-months on a baked route") && _dbBody.includes("exclude the {D.lines - D.baked} unbaked") && _dbBody.includes("No cached geometry for this vehicle"));
+// 13 Oct 2026 (W3, narrowed): the same count in plain words ("forecast months have a route", "leave out … not routed yet");
+// the routing detail is in the coverage info box and the technical guide (T2)
+ok("the dashboard says how many forecast months the km / CO₂e / fair totals exclude, in the header",
+  _dbBody.includes("forecast months have a route") && _dbBody.includes("leave out the {D.lines - D.baked} not routed yet") && _dbBody.includes("Not routed yet for this lorry")
+  && _dbBody.includes('<InfoTip id="dash.coverage" />'));
 ok("🔴 fleet size is the SERVER's `vehicles` (a monthly peak of it), never demand ÷ capacity here",
   _dbBody.includes("a.peakVeh = Math.max(a.peakVeh || 0, r.vehicles)") && !_dbBody.includes("peakPerDay / a.capacityPerDay")
   && !_dbBody.includes("/ payload(") && !_dbBody.includes("emisFactor(") && !_dbBody.includes("toTonnes("));
-ok("the footnote says every figure comes from /api/costing/lines and how each is made",
-  _dbBody.includes("Every planning figure on this page comes from <code>/api/costing/lines</code>") && _dbBody.includes("rounded up per line-month"));
+// 13 Oct 2026 (W3, narrowed): the method paragraph left the screen (inventory §1 rows 1-3): the read and the formulas are in the
+// technical guide, each figure's method in its info box, and the footer links there
+ok("the footnote's read and formulas live in the technical guide; the footer keeps one line and links to it",
+  !_dbBody.includes("<code>/api/costing/lines</code>") && _dbBody.includes('TECH_URL("t1-figures")') && _tg.includes("<code>GET /api/costing/lines</code>")
+  && _tg.includes("rounded up per line-month") && _dbBody.includes("Planning estimates and typed actuals — no live tracking."));
 
 // ---- 3. per-line model -------------------------------------------------------
 ok("dashboard rows are keyed per line, not per route",
@@ -1164,13 +1173,15 @@ ok("the Config page hands the file document to the tab (for the fallback values)
 
 // ---- 11 Sep pm: the big-screen Dashboard ---------------------------------------------
 const _tdBody = src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart("));
-ok("🔴 every KPI figure carries a title (hover) — none is bare",
-  _dbBody.split("<Fig ").slice(1).length >= 16 && _dbBody.split("<Fig ").slice(1).every(chunk => chunk.slice(0, chunk.indexOf("/>")).includes("title=")));
+// 13 Oct 2026 (W3, narrowed): the hover title became an info box; none is bare still
+ok("🔴 every KPI figure carries an info box (was: a hover title) — none is bare",
+  _dbBody.split("<Fig ").slice(1).length >= 16 && _dbBody.split("<Fig ").slice(1).every(chunk => chunk.slice(0, chunk.indexOf("/>")).includes("info={{ id: \"")));
 ok("🔴 no KPI figure is truncated: no `truncate` on a Fig, the value is nowrap with a clamp() size, two per row",
   !/kpi-num[^"]*truncate/.test(_dbBody) && _dbBody.includes('kpi-num font-bold whitespace-nowrap') && _dbBody.includes('fontSize: "clamp(')
   && _dbBody.includes('<div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>'));
-ok("millions print compact (bigNum) with the exact figure in the title",
-  /const bigNum = /.test(src) && _dbBody.includes("bigNum(K.totT)") && _dbBody.includes("`${grp(K.totT)} t —"));
+// 13 Oct 2026 (W3, narrowed): the exact figure rides in the info box's value line
+ok("millions print compact (bigNum) with the exact figure in the info box",
+  /const bigNum = /.test(src) && _dbBody.includes("bigNum(K.totT)") && _dbBody.includes("value: `Exactly ${grp(K.totT)} t`"));
 ok("the four KPI groups: Delivered to date · Volume · Cost · Carbon",
   ['title="Delivered to date"', 'title="Volume"', 'title="Cost"', 'title="Carbon"'].every(t => _dbBody.includes(t)));
 ok("🔴 delivered to date is the SERVER's actual_tonnes summed — never a share of the forecast, None until reported",
@@ -1343,8 +1354,10 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   const jsxText = (src.match(/>[^<>{}]*truck[^<>{}]*</gi) || []);
   const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s)).concat(jsxText);
   ok("🔴 no 'truck' in any string or JSX text the staff app prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
-  ok("the carbon tooltip and the Config sub-line say DESNZ 2026, not DEFRA (checked against gov.uk 9 Oct 2026)",
-     !/DEFRA/.test(src) && /DESNZ 2026 kg CO₂e per vehicle-km \(average laden, both legs, from Config\)/.test(src));
+  // 13 Oct 2026 (W3, narrowed): the carbon sentence moved from the tooltip to the info box (source line) and the technical guide
+  ok("the carbon info box and the Config sub-line say DESNZ 2026, not DEFRA (checked against gov.uk 9 Oct 2026)",
+     !/DEFRA/.test(src) && src.includes('source: "DESNZ greenhouse gas conversion factors, 2026"')
+     && /DESNZ 2026 kg CO₂e per vehicle-km \(average laden, both legs, from Config\)/.test(_tg));
   ok("the Dashboard figure and the Routes table say lorry-<unit>, the bake table says HGV params",
      /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && />Lorry-\{DU\(\)\}\{arrow\("km"\)\}<\/th>/.test(src) && />HGV params<\/th>/.test(src));
 }
@@ -1912,7 +1925,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
-    (_dbWl.match(/<Fig value=\{ctW\.value\} label="tCO2e target, all-in" sub=\{ctW\.sub\} title=\{ctW\.title\} \/>/g) || []).length === 1
+    // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
+    (_dbWl.match(/<Fig value=\{ctW\.value\} label="tCO2e target, all-in" sub=\{ctW\.sub\} info=\{\{ id: "dash\.target", value: ctW\.title \}\} \/>/g) || []).length === 1
     && !_dbW.includes("ctW.") && _dbc.includes("const ctW = ctFig(ct, ctErr);"));
   ok("⭐ Forecasts: the line sits under the PageHeader, before the list in every state; the pending count is the page's own (lines with a Pending month)",
     _fcc.includes("<CarbonTargetLine ct={ct} err={ctErr} pendingN={rows ? pendingN : null} />")
@@ -2065,9 +2079,12 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("the guide names the panel and the anchor exists",
     gsGa.includes('{ anchor: "dash-gates", title: "Gate arrivals.", body: "Lorries a day at each gate, every team together, and the average gap if arrivals are spread evenly." },')
     && src.includes('data-guide="dash-gates"'));
-  ok("the footnote names the read and how the figure is made",
-    _dbBody.includes("Gate arrivals come from <code>/api/gates/arrivals</code>") && _dbBody.includes("the gap is the shift's minutes ÷ arrivals, an average with no hourly peak")
-    && _dbBody.includes("all {TEAMS().toLowerCase()} summed at the gate a lorry arrives by") && !_dbBody.includes("every {TEAMS()"));
+  // 13 Oct 2026 (W3, narrowed): the footnote's gate sentence moved: the read and the rule to the technical guide (T1, T3),
+  // the rule in plain words to the panel's info box
+  ok("the gate arrivals read and how the figure is made: the technical guide and the panel's info box",
+    _tg.includes("<code>GET /api/gates/arrivals?month=N</code>") && _tg.includes("The gap is the shift's minutes ÷ arrivals, an average with no hourly")
+    && _tg.includes("all teams summed at the gate a lorry arrives by") && src.includes("the gap is the shift's minutes ÷ arrivals, an average with no peak hour")
+    && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);

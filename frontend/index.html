@@ -281,7 +281,29 @@
   .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;}
   @media (min-width:900px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
   @media (min-width:1280px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));}}
-  .dash-card{padding:14px 16px;cursor:help;}
+  .dash-card{padding:14px 16px;}
+  /* 13 Oct 2026 (W3) — the info box. An "i" in an 18 px ring with a 24 px hit area (44 px on a touch
+     screen, by the ::after, so the layout does not grow); the panel is the popover look; below 640 px
+     it opens as a sheet from the bottom. Opens on click / tap / Enter / Space, never on hover. */
+  .ibtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin:0 0 0 5px;padding:0;border:1.5px solid currentColor;border-radius:999px;background:transparent;color:var(--muted);font:600 11px/1 Georgia,"Times New Roman",serif;font-style:italic;cursor:pointer;vertical-align:-3px;flex:none;}
+  .ibtn::after{content:"";position:absolute;inset:-3px;}
+  @media (pointer:coarse){.ibtn::after{inset:-13px;}}
+  .ibtn:hover{color:var(--ink);}
+  .ibtn[aria-expanded="true"]{color:var(--navy);}
+  .ibtn:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  .info-pop{position:fixed;z-index:80;max-width:340px;width:max-content;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35);font-size:14px;line-height:1.45;text-align:left;font-weight:400;text-transform:none;letter-spacing:0;white-space:normal;}
+  .info-pop:focus{outline:none;}
+  .info-pop h6{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--popover-fg);text-transform:none;letter-spacing:0;padding-right:22px;}
+  .info-pop p{margin:0 0 6px;}
+  .info-pop .info-val{font-variant-numeric:tabular-nums;color:var(--popover-fg);font-weight:600;}
+  .info-pop details{margin:6px 0;border-top:1px solid var(--popover-line);padding-top:6px;}
+  .info-pop summary{cursor:pointer;color:var(--popover-fg);font-weight:500;}
+  .info-pop .info-src{font-size:12.5px;color:var(--popover-muted);margin-top:6px;}
+  .info-pop a{color:var(--popover-fg);text-decoration:underline;display:inline-block;margin-top:6px;margin-right:12px;font-size:13px;}
+  .info-pop .info-x{position:absolute;top:6px;right:6px;width:28px;height:28px;border:0;background:transparent;color:var(--popover-muted);font-size:18px;line-height:1;cursor:pointer;border-radius:6px;}
+  .info-pop .info-x:focus-visible{outline:2px solid var(--popover-fg);}
+  .info-pop.is-sheet{left:0 !important;right:0 !important;bottom:0 !important;top:auto !important;max-width:none;width:auto;border-radius:14px 14px 0 0;max-height:70vh;overflow:auto;padding:16px 16px 20px;}
+  .dash-wall .ibtn{display:none;}
   .dash-card-l{font-size:14px;color:var(--muted);font-weight:500;line-height:1.3;}
   .dash-card-v{font-size:clamp(1.3rem,1.6vw,1.75rem);font-weight:600;color:var(--navy-deep);line-height:1.15;margin:6px 0 4px;white-space:nowrap;}
   .dash-card-s{font-size:13px;color:var(--muted);line-height:1.3;}
@@ -476,6 +498,138 @@ const monthLabelAbs = (idx, startYear) => MONTHS[(idx-1)%12] + " " + String(star
 const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];
 const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");
 
+// ---- 13 Oct 2026 (W3): the info box and its one dictionary of words ------------------------
+// The rule (notes/w3-w4-inventory-1013.md): a label, a value or a status word stays on the screen;
+// what a figure means and how it is worked out, in a person's words, goes HERE, one tap away; the
+// steps to do a task go in the user guide (`guide`, an anchor in /help/); APIs, endpoints, stored
+// fields, routing internals and formulas in code terms go ONLY in the technical guide (`tech`, an
+// anchor in /help/technical/). The harness fails on an id with no entry, an entry nobody uses, a
+// `text` over 40 words, or a banned word anywhere in here. `value` (a prop, not an entry) carries
+// the exact, unrounded figure the old hover tooltip showed, so moving a figure here loses nothing.
+const INFO = {
+  "dash.material": { title: "Material in view", text: "The planned quantity of every forecast month in view, in tonnes. Cubic metres and lorry loads become tonnes through each line's own conversion.", guide: "3-1-filters-and-the-six-cards", tech: "t1-volume" },
+  "dash.deliveries": { title: "Deliveries a day", text: "Loaded trips in the months in view, divided by the working days in those months. Each delivery is a two-way movement: there loaded, back empty.",
+    how: "Trips are worked out for each month of each line: tonnes ÷ the vehicle's payload, rounded up. The working days in a month are set on Config → Planning.", guide: "3-1-filters-and-the-six-cards", tech: "t1-trips" },
+  "dash.vehicles": { title: "Vehicles needed", text: "The most vehicles any one month needs, adding up every line in view. A line whose route is not worked out yet has no figure, so it is left out, never guessed.",
+    how: "For each line: its trips a day ÷ the trips one vehicle can do in a shift on its route (there, back and the time to load and unload).", guide: "3-1-filters-and-the-six-cards", tech: "t1-vehicles" },
+  "dash.week": { title: "Planned this week", text: "The tonnes and loads planned for the commit week on the Look-ahead, and how many lines held their plan last week. It is the Look-ahead's own figure.", guide: "6-3-commit-view-this-week-by-day" },
+  "dash.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered, as a share of the tonnes planned in view. A month nobody has reported counts as not yet delivered: nothing is assumed.",
+    how: "Actuals are typed each week on Look-ahead → Account. A day's actual rolls into its week.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
+  "dash.carbon": { title: "Transport carbon", text: "The lorry carbon of the routed lines in view, in tonnes of CO₂e, both legs: there loaded and back empty. Lines with no route yet are left out.",
+    how: "Distance × each vehicle's government factor in kg CO₂e per vehicle-km (average laden), set on Config → Vehicles.", source: "DESNZ greenhouse gas conversion factors, 2026", guide: "3-1-filters-and-the-six-cards", tech: "t1-carbon" },
+  "dash.coverage": { title: "Lines with a route", text: "A line's distance, carbon and fair cost need its route worked out for its vehicle, on Data → Routes. Until then those totals leave the line out; they never guess.", tech: "t2-routing" },
+  "dash.diesel": { title: "Diesel price", text: "The diesel price the fair cost uses: the latest government weekly figure, or one typed on Config → Costing · fuel. With no price there is no fair cost.", guide: "9-5-money-settings", tech: "t1-fair" },
+  "dash.moved": { title: "Tonnes moved", text: "The tonnes reported delivered on the lines in view, from the week actuals typed on Look-ahead → Account. Nothing is assumed delivered.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
+  "dash.actual_cost": { title: "Actual cost typed", text: "The actual cost typed with the week actuals on Look-ahead → Account, for the weeks in view. It is typed, never worked out.", guide: "6-4-account-view-what-actually-happened-last-week" },
+  "dash.reported": { title: "On reported months", text: "Delivered ÷ planned, counting only the months that have an actual. It shows how close to plan the reported months ran.", tech: "t1-delivered" },
+  "dash.trips": { title: "Trips", text: "Loaded runs: tonnes ÷ the vehicle's payload, rounded up for each month of each line. The Look-ahead uses the same figure.", tech: "t1-trips" },
+  "dash.distance": { title: "Lorry distance", text: "Trips × the route distance for the line's vehicle, both legs. A line whose route is not worked out yet adds nothing.", tech: "t1-distance" },
+  "dash.planned": { title: "Planned cost", text: "The rates typed on each route, added up. A route with no rate of its own is priced at the target rate from Config → Costing and marked \"target\".", guide: "9-5-money-settings", tech: "t1-cost" },
+  "dash.fair": { title: "Fair cost (model)", text: "What the haulage should cost from the vehicle, distance, tonnage, month and diesel price. A floor for negotiation, never a quote.",
+    how: "Fuel at the diesel price, driver and vehicle time over the round trip, a running cost per mile or km and a margin, all set on Config → Costing · fuel. Winter months add a fuel uplift.", guide: "9-5-money-settings", tech: "t1-fair" },
+  "dash.fair_per_t": { title: "Fair cost per tonne", text: "The fair cost ÷ the tonnes on the lines the model can price.", tech: "t1-fair" },
+  "dash.fair_per_dist": { title: "Fair cost per mile or km", text: "The fair cost ÷ the distance the trips run: the round trip, unless the route says loaded only.", tech: "t1-fair" },
+  "dash.intensity": { title: "Carbon per tonne", text: "kg CO₂e per tonne moved: the carbon ÷ the tonnes on routed lines. A line with no route yet has no distance, so it is left out.", tech: "t1-carbon" },
+  "dash.tkm": { title: "Tonne-distance", text: "Tonnes × the route's distance, on routed lines: the usual measure of freight work.", tech: "t1-carbon" },
+  "dash.peak_month": { title: "Peak month", text: "The month with the most planned tonnes in view." },
+  "dash.target": { title: "Carbon target", text: "The scheme's carbon target and where the approved plan stands against it, with and without the agreed Carbon planner decisions. This figure is all-in: materials and transport.", guide: "6-5-reading-the-carbon-target", tech: "t1-carbon" },
+  "dash.gates": { title: "Gate arrivals", text: "Lorries a day at each gate in the month, every team together, and the average gap between them. Red when the gap is shorter than the gate's check-in time.",
+    how: "Each lorry counts at the gate it arrives by: loaded at the delivery site, empty at the loading site. Trips ÷ working days; the gap is the shift's minutes ÷ arrivals, an average with no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
+  "dash.today": { title: "Today", text: "What the Look-ahead plans for today. Each line says reported (an actual is typed), confirmed, edited (not yet confirmed) or planned (follows the week, not yet confirmed).", guide: "6-3-commit-view-this-week-by-day" },
+  "dash.today_t": { title: "Tonnes today", text: "Each line's planned quantity for today, in tonnes, from the Look-ahead's commit week.", guide: "6-3-commit-view-this-week-by-day" },
+  "dash.today_trips": { title: "Trips today", text: "Loaded trips today: tonnes ÷ payload, rounded up for each line, and the lorry distance on lines with a route.", tech: "t1-trips" },
+  "dash.today_veh": { title: "Vehicles today", text: "For each line, today's trips ÷ what one vehicle does in a shift on that route, added up. A line with no route yet needs an unknown number.", tech: "t1-vehicles" },
+  "dash.today_reported": { title: "Reported today", text: "Lines with a day actual typed for today on the Look-ahead.", guide: "6-3-commit-view-this-week-by-day" },
+  "dash.week_to_date": { title: "This week to date", text: "The week's planned tonnes up to today. The bar fills as day actuals are typed.", guide: "6-3-commit-view-this-week-by-day" },
+  "dash.last_week": { title: "Last week", text: "Last week's account: tonnes reported against tonnes planned on the reported lines, and how many lines held their plan.", guide: "6-4-account-view-what-actually-happened-last-week" },
+  "dash.stock": { title: "Stockpile capacity", text: "Each stockpile's balance at the end of each week against its capacity. Red past capacity, amber from 90 %. A week nobody reported counts as nothing.",
+    how: "Balance = the opening balance + the week actuals delivered there − the consumption typed on Look-ahead → Account.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
+  "dash.chart.demand": { title: "Material demand over time", text: "The planned quantity in each month, stacked by material, for the lines in view." },
+  "dash.chart.top": { title: "Top routes by tonnage", text: "The ten route lines with the most planned tonnes. Click a bar to narrow the page to that line; click it again to show every line." },
+  "dash.chart.progress": { title: "Delivered against plan", text: "Planned and reported tonnes, month by month. A month nobody has reported has no delivered bar: it is not counted as zero.", tech: "t1-delivered" },
+  "dash.chart.cost": { title: "Cost over time", text: "The planned cost (route rates or the target rate) beside the fair cost (the model), month by month.", tech: "t1-fair" },
+  "dash.chart.trips": { title: "Trips over time", text: "Loaded trips in each month, rounded up for each line.", tech: "t1-trips" },
+  "dash.chart.fleet": { title: "Vehicles needed over time", text: "The vehicles needed in each month, adding up the routed lines.", tech: "t1-vehicles" },
+  "dash.chart.co2": { title: "Carbon over time", text: "Transport carbon in each month, in tonnes of CO₂e, on routed lines.", tech: "t1-carbon" },
+  "dash.chart.split": { title: "Material split", text: "The share of the planned quantity taken by each material, for the lines in view." },
+  "dash.col.dist": { title: "Distance per trip", text: "The route's distance for one trip: the round trip, unless the route says loaded only.", tech: "t1-distance" },
+  "dash.col.delivered": { title: "Delivered", text: "Reported week actuals ÷ planned, over the months in view.", tech: "t1-delivered" },
+  "dash.col.peak": { title: "Peak vehicles", text: "The most vehicles any one month needs on this line.", tech: "t1-vehicles" },
+};
+const NO_ROUTES_YET = "No line in view has a route worked out yet: route them on Data → Routes.";
+// the user guide and the technical guide, as the info box links to them
+const GUIDE_URL = (a) => "/help/" + (a ? "#" + a : "");
+const TECH_URL = (a) => "/help/technical/" + (a ? "#" + a : "");
+// one info box open at a time: opening one closes the last
+let INFO_OPEN = null;
+function InfoTip({ id, label, value }){
+  const e = INFO[id];
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btn = useRef(null), pop = useRef(null);
+  const panelId = "info-" + id.replace(/[^a-z0-9]+/gi, "-");
+  const name = label || (e && e.title) || "";
+  const close = (refocus) => { setOpen(false); if(INFO_OPEN && INFO_OPEN.id === panelId) INFO_OPEN = null; if(refocus && btn.current) { try { btn.current.focus(); } catch(err){} } };
+  const place = () => {
+    const sheet = !!(window.matchMedia && window.matchMedia("(max-width: 639px)").matches);
+    if(sheet || !btn.current) return setPos({ sheet: true });
+    const r = btn.current.getBoundingClientRect(), vw = window.innerWidth || 1024, vh = window.innerHeight || 768;
+    const ph = (pop.current && pop.current.offsetHeight) || 180, pw = Math.min(340, vw - 16);
+    const left = Math.max(8, Math.min(r.left - 12, vw - pw - 8));
+    // flips above the "i" when there is no room under it
+    setPos(r.bottom + 6 + ph > vh && r.top - 6 - ph > 0 ? { left, bottom: vh - r.top + 6 } : { left, top: r.bottom + 6 });
+  };
+  const toggle = (ev) => {
+    if(ev) { ev.stopPropagation(); ev.preventDefault(); }
+    if(open) return close(true);
+    if(INFO_OPEN && INFO_OPEN.close) INFO_OPEN.close(false);
+    INFO_OPEN = { id: panelId, close };
+    place(); setOpen(true);
+  };
+  useEffect(() => {
+    if(!open) return;
+    const onKey = (ev) => { if(ev.key === "Escape") { ev.stopPropagation(); close(true); } };
+    const onDown = (ev) => { if(pop.current && pop.current.contains(ev.target)) return; if(btn.current && btn.current.contains(ev.target)) return; close(false); };
+    const onMove = () => place();
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onMove, true);
+    // a native <button>: Enter and Space already click it, so there is no key handler to double-toggle
+    (window.requestAnimationFrame || setTimeout)(() => { place(); if(pop.current) { try { pop.current.focus(); } catch(err){} } });
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onDown); document.removeEventListener("touchstart", onDown);
+                   window.removeEventListener("resize", onMove); window.removeEventListener("scroll", onMove, true); };
+  }, [open]);
+  useEffect(() => () => { if(INFO_OPEN && INFO_OPEN.id === panelId) INFO_OPEN = null; }, []);
+  if(!e) return null;
+  const vals = value == null ? [] : (Array.isArray(value) ? value : [value]).filter(Boolean);
+  const style = !pos || pos.sheet ? undefined : { left: pos.left, top: pos.top, bottom: pos.bottom };
+  const panel = open && (
+    <div ref={pop} id={panelId} role="dialog" aria-modal="false" aria-labelledby={panelId + "-t"} tabIndex={-1}
+         className={"info-pop" + (pos && pos.sheet ? " is-sheet" : "")} style={style}
+         onClick={ev => ev.stopPropagation()}
+         onBlur={ev => { if(ev.relatedTarget && pop.current && !pop.current.contains(ev.relatedTarget) && ev.relatedTarget !== btn.current) close(false); }}>
+      <button type="button" className="info-x" aria-label="Close" onClick={() => close(true)}>×</button>
+      <h6 id={panelId + "-t"}>{name}</h6>
+      <p>{e.text}</p>
+      {vals.map((v, i) => <p key={i} className="info-val">{v}</p>)}
+      {e.how && <details><summary>How it is worked out</summary><p style={{ marginTop: 6 }}>{e.how}</p></details>}
+      {e.source && <div className="info-src">Source: {e.source}</div>}
+      {e.guide && <a href={GUIDE_URL(e.guide)} target="_blank" rel="noopener noreferrer">Read more in the user guide →</a>}
+      {e.tech && <a href={TECH_URL(e.tech)} target="_blank" rel="noopener noreferrer">Technical detail →</a>}
+    </div>
+  );
+  return (
+    <>
+      <button ref={btn} type="button" className="ibtn" aria-label={`About: ${name}`} aria-expanded={open ? "true" : "false"}
+              aria-controls={panelId} data-info={id}
+              onClick={toggle}>i</button>
+      {panel && (ReactDOM.createPortal ? ReactDOM.createPortal(panel, document.body) : panel)}
+    </>
+  );
+}
+
 // Chart.js wrapper — recreates the chart when its serialised config changes.
 function ChartCanvas({ config, height=260 }){
   const ref = useRef(null);
@@ -620,7 +774,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
   return (
     <section className="ct-strip ga-strip" data-gate-arrivals={state} data-guide="dash-gates" aria-label="Gate arrivals">
       <div className="ct-row">
-        <h3 className="ct-h">Gate arrivals</h3>
+        <h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>
         <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => onMonth(+e.target.value)} aria-label="Month">
           {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}
         </select></label>
@@ -754,14 +908,14 @@ function CarbonTargetStrip({ ct, err, onOpen }){
   const words = t.lever_words || [];
   return (
     <section className="ct-strip" data-carbon-target="set" aria-label="Carbon target">
-      <div className="ct-row"><h3 className="ct-h">Carbon target</h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
+      <div className="ct-row"><h3 className="ct-h">Carbon target<InfoTip id="dash.target" /></h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
         {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}</div>
       <div className="ct-line"><b>{ctTargetLine(ct)}</b></div>
       <div className="ct-line">{p1}</div>
       <div className="ct-line">{p2}</div>
       {note && <div className="ct-note">{note}</div>}
-      <div className="ct-note" title={`Transport is ${ctT(s.approved_transport_t)} tCO2e of the approved plan as forecast: the Transport carbon card's figure with no filters.`}>
-        {CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : "the whole approved plan"}. The Transport carbon card above counts transport only.
+      <div className="ct-note">
+        {CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : "the whole approved plan"}. The Transport carbon card above counts transport only.<InfoTip id="dash.carbon" label="Transport in this target" value={`Transport is ${ctT(s.approved_transport_t)} tCO2e of the approved plan as forecast: the Transport carbon card's figure with no filters.`} />
       </div>
       {!ctTeam(ct) && words.length > 0 && (
         <details className="ct-more">
@@ -1065,10 +1219,12 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>
     </div>
   );
-  const Fig = ({ value, label, sub, title, tone }) => (
-    <div title={title} className="min-w-0 cursor-help">
+  // 13 Oct 2026 (W3): no hover tooltip and no cursor:help — the "i" opens the figure's info box,
+  // with the exact figure the tooltip used to carry (`info.value`)
+  const Fig = ({ value, label, sub, info, tone }) => (
+    <div className="min-w-0">
       <div className="kpi-num font-bold whitespace-nowrap" style={{ color: tone || "var(--navy-deep)", fontSize: "clamp(1.1rem, 1.45vw, 1.7rem)", lineHeight: 1.15 }}>{value}</div>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mt-0.5 fig-label">{label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mt-0.5 fig-label">{label}{info && <InfoTip id={info.id} label={info.label} value={info.value} />}</div>
       {sub && <div className="text-[11px] text-slate-400 fig-sub">{sub}</div>}
     </div>
   );
@@ -1086,9 +1242,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);
   const wkTot = (week && week.commit && week.commit.totals) || null;
   const acct = (week && week.account) || null;
-  const Card = ({ label, value, sub, title, tone }) => (
-    <div className="card dash-card min-w-0" title={title}>
-      <div className="dash-card-l">{label}</div>
+  const Card = ({ label, value, sub, info, tone }) => (
+    <div className="card dash-card min-w-0">
+      <div className="dash-card-l">{label}{info && <InfoTip id={info.id} label={label} value={info.value} />}</div>
       <div className="dash-card-v kpi-num" style={tone ? { color: tone } : undefined}>{value}</div>
       {sub && <div className="dash-card-s">{sub}</div>}
     </div>
@@ -1109,8 +1265,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 
   return (
     <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" : "max-w-7xl")}>
+      {/* 13 Oct 2026 (W3): the date range is shown ONCE, in the kicker; the scope is shown by the filter
+          chips under the header (the subtitle repeated both, "Strategic planning view · range · scope") */}
       <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
-        subtitle={`Strategic planning view · ${rangeLabel} · ${scopeNote}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
             <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
@@ -1134,13 +1291,13 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         </div>}>
         {/* coverage: what the totals include and exclude — the old amber box, moved to where the numbers are read */}
         <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> line-months on a baked route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} exclude the {D.lines - D.baked} unbaked ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}) — bake them on the Routes page</span> : null}</span>
-          <span>· diesel {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
+          <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> forecast months have a route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} leave out the {D.lines - D.baked} not routed yet ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}): route them on Data → Routes</span> : null}<InfoTip id="dash.coverage" /></span>
+          <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
           {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "rgba(37,99,235,.1)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
       </PageHeader>
-      {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} line-month${D.lines === 1 ? "" : "s"} in view`} />}
+      {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} forecast month${D.lines === 1 ? "" : "s"} in view`} />}
 
       {wall && <div className="dash-wallbar">
         <span className="dash-wallbar-lbl">Big screen</span>
@@ -1169,37 +1326,37 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       {!wall ? (
         <>
           <div className="dash-cards" data-guide="dash-figures">
-            <Card label="Material in view" value={`${bigNum(K.totT)} t`} sub={`${D.lines} line-month${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`}
-                  title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion`} />
+            <Card label="Material in view" value={`${bigNum(K.totT)} t`} sub={`${D.lines} forecast month${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`}
+                  info={{ id: "dash.material", value: `Exactly ${grp(K.totT)} t` }} />
             <Card label="Deliveries a day" value={grp(Math.round(loadsPerDay))} sub={`each a two-way movement · ${grp(K.totTrips)} over ${grp(nMonths * wdPerMonth)} working days`}
-                  title={`${grp(K.totTrips)} loaded trips (ceil of tonnes ÷ payload per line-month) ÷ ${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days (Config → Planning)`} />
-            <Card label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"} sub={K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs baked routes"}
-                  title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
+                  info={{ id: "dash.deliveries", value: `${grp(K.totTrips)} loaded trips ÷ (${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days)` }} />
+            <Card label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"} sub={K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs routes worked out"}
+                  info={{ id: "dash.vehicles", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
             <Card label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} sub={wkTot ? `${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · last week ${acct.delivered} of ${acct.lines} lines held` : ""}` : (weekErr ? "this week did not load" : "loading this week")}
-                  title={wkTot ? "The commit week's planned tonnes and loads from the Look-ahead, and last week's account" : "The Look-ahead's commit week"} />
+                  info={{ id: "dash.week" }} />
             <Card label="Delivered against plan" value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} sub={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t of ${bigNum(K.totT)} t`}
-                  title={K.deliveredPct == null ? "Delivered ÷ planned, once a week actual is typed on Look-ahead → Account" : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned across every line-month in view`} />
+                  info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned` }} />
             <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`} sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`} · DESNZ 2026`}
-                  title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
+                  info={{ id: "dash.carbon", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
           </div>
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
           <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
           <div className="grid lg:grid-cols-5 gap-4">
             <div className="card p-4 lg:col-span-3">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
           <ChartCanvas config={demandCfg} height={wall ? 320 : 260} />
         </div>
             <div className="card p-4 lg:col-span-2">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
           <ChartCanvas config={topCfg} height={wall ? 280 : 240} />
         </div>
             <div className="card p-4 lg:col-span-2">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
           <ChartCanvas config={progressCfg} height={wall ? 320 : 260} />
         </div>
             <div className="card p-4 lg:col-span-3">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
           <ChartCanvas config={costCfg} height={wall ? 280 : 220} />
         </div>
           </div>
@@ -1212,36 +1369,36 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             <div className="pt-3">
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-dash-figures="1">
         <Group title="Delivered to date" tone="var(--green)">
-          <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `${K.reportedN} of ${D.lines} line-months reported`} tone="var(--green)"
-               title={K.actualT == null ? "No week actual has been typed against any line in view (Look-ahead → Account). Nothing is assumed delivered." : `${grp(K.actualT)} t reported delivered — the sum of the typed week actuals on ${K.reportedN} line-months, through each line's payload. Typed on Look-ahead → Account; a day actual rolls into its week.`} />
+          <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `${K.reportedN} of ${D.lines} forecast months reported`} tone="var(--green)"
+               info={{ id: "dash.moved", value: K.actualT == null ? "No week actual typed yet against any line in view." : `${grp(K.actualT)} t reported on ${K.reportedN} forecast month${K.reportedN === 1 ? "" : "s"}` }} />
           <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : `${bigNum(K.totT)} t planned in view`} tone="var(--green)"
-               title={K.deliveredPct == null ? "Delivered ÷ planned, once something is reported" : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned across every line-month in view (a month nobody has reported counts as not yet delivered)`} />
+               info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned` }} />
           <Fig value={K.actualEur == null ? "—" : `${CUR()} ` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()} ${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
-               title={K.actualEur == null ? "The actual cost typed with a week actual (Look-ahead → Account) — none yet" : `${CUR()} ${grp(K.actualEur)} typed as actual cost on the account weeks in view`} />
+               info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()} ${grp(K.actualEur)} typed` }} />
           <Fig value={K.reportedT > 0 && K.actualT != null ? (K.actualT * 100 / K.reportedT).toFixed(0) + " %" : "—"} label="on reported months" sub="delivered ÷ planned, reported only"
-               title={K.reportedT > 0 && K.actualT != null ? `${grp(K.actualT)} t delivered ÷ ${grp(K.reportedT)} t planned on the ${K.reportedN} line-months that carry an actual — how close to plan the reported months ran` : "Once a month is reported, its delivered ÷ planned"} />
+               info={{ id: "dash.reported", value: K.reportedT > 0 && K.actualT != null ? `${grp(K.actualT)} t delivered ÷ ${grp(K.reportedT)} t planned on ${K.reportedN} reported forecast month${K.reportedN === 1 ? "" : "s"}` : "No month reported yet." }} />
         </Group>
         <Group title="Volume">
-          <Fig value={bigNum(K.totT)} label="tonnes" sub="all lines in view" title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion (m³ and vehicle loads included)`} />
-          <Fig value={bigNum(K.totTrips)} label="trips" sub="loaded runs, rounded up per month" title={`${grp(K.totTrips)} loaded trips — ceil(tonnes ÷ payload) per line-month, the Look-ahead's figure`} />
-          <Fig value={bigNum(dist(K.totKm))} label={`lorry-${DU()}`} sub="round trips · baked lines" title={`${grp(dist(K.totKm))} ${DU()} — trips × the baked route distance (both legs) for the line's vehicle; an unbaked line adds nothing`} />
-          <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs baked routes"} title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view: trips ÷ (working days × what one vehicle does in a shift)` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
+          <Fig value={bigNum(K.totT)} label="tonnes" sub="all lines in view" info={{ id: "dash.material", label: "Tonnes", value: `Exactly ${grp(K.totT)} t` }} />
+          <Fig value={bigNum(K.totTrips)} label="trips" sub="loaded runs, rounded up per month" info={{ id: "dash.trips", value: `Exactly ${grp(K.totTrips)} loaded trips` }} />
+          <Fig value={bigNum(dist(K.totKm))} label={`lorry-${DU()}`} sub="round trips · routed lines" info={{ id: "dash.distance", value: `Exactly ${grp(dist(K.totKm))} ${DU()}` }} />
+          <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs routes worked out"} info={{ id: "dash.vehicles", label: "Peak fleet", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
         </Group>
         <Group title="Cost" tone="var(--navy)">
           <Fig value={K.planned ? `${CUR()} ` + eurK(K.planned.eur) : "—"} label={`planned ${CUR()}`} sub={K.planned ? `${K.plannedN} of ${D.lines} priced${K.targetN ? ` · ${K.targetN} at target` : ""}` : "no rate typed, no target set"} tone="var(--navy)"
-               title={K.planned ? `${CUR()} ${grp(K.planned.eur)} = ${unitTriple(K.planned)} — the route's typed rates summed, or the Config target rate where the route has none (${K.targetN} line-months at target)` : "No route in view has typed rates and no target rate is set on Config → Costing"} />
-          <Fig value={K.fair ? `${CUR()} ` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no baked lines")} tone="var(--navy)"
-               title={K.fair ? `${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)} — the cost model (Config → Costing · fuel): fuel at the live diesel index, driver and vehicle time over the baked cycle, running cost per km, margin; winter months +${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel. A floor for negotiation, never a quote.` : (cost.index_eur_per_l == null ? "The fair price needs the diesel index — Config → Costing · fuel" : "The fair price needs a baked route for the line's vehicle")} />
+               info={{ id: "dash.planned", value: K.planned ? [`${CUR()} ${grp(K.planned.eur)} = ${unitTriple(K.planned)}`, K.targetN ? `${K.targetN} forecast month${K.targetN === 1 ? "" : "s"} at the target rate` : ""] : "No route in view has rates typed, and no target rate is set on Config → Costing." }} />
+          <Fig value={K.fair ? `${CUR()} ` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no routed lines")} tone="var(--navy)"
+               info={{ id: "dash.fair", value: K.fair ? [`${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)}`, `Winter months add ${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel.`] : (cost.index_eur_per_l == null ? "No diesel price: set one on Config → Costing · fuel." : "No line in view has a route worked out for its vehicle.") }} />
           <Fig value={K.fair && K.fair.per_t != null ? `${CUR()} ` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()} ${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
-               title={K.fair && K.fair.per_t != null ? `${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = fair ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t on the lines the model prices${K.planned && K.planned.per_t != null ? ` · planned ${CUR()} ${(+K.planned.per_t).toFixed(2)}/t the same way` : ""}` : `Fair ${CUR()} per tonne, once the model has a priced line`} />
+               info={{ id: "dash.fair_per_t", value: K.fair && K.fair.per_t != null ? [`${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t`, K.planned && K.planned.per_t != null ? `Planned: ${CUR()} ${(+K.planned.per_t).toFixed(2)} per tonne, worked out the same way` : ""] : "No line the model can price yet." }} />
           <Fig value={K.fair && K.fair.per_km != null ? `${CUR()} ` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()} ${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
-               title={K.fair && K.fair.per_km != null ? `${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()} = fair ${CUR()} ÷ the ${DU()} the trips run on each route's basis (round trip unless the route says loaded) · ${CUR()} ${grp(K.fair.per_trip)} per loaded trip${K.planned && K.planned.per_km != null ? ` · planned ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)}/${DU()}, ${CUR()} ${grp(K.planned.per_trip)}/trip` : ""}` : `Fair ${CUR()} per km, once the model has a priced line`} />
+               info={{ id: "dash.fair_per_dist", value: K.fair && K.fair.per_km != null ? [`${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.fair.per_trip)} per loaded trip`, K.planned && K.planned.per_km != null ? `Planned: ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.planned.per_trip)} per trip` : ""] : "No line the model can price yet." }} />
         </Group>
         <Group title="Carbon" tone="var(--green)">
-          <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="baked lines" tone="var(--green)" title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
-          <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over baked tonnes" title={K.intensity == null ? "Needs a baked line" : `${K.intensity.toFixed(2)} kg CO₂e per tonne moved — tCO₂e ÷ the tonnes on baked lines (the unbaked ones have no km)`} />
-          <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" title={`${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"} — tonnes × the route's basis ${DU()}, baked lines`} />
-          <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} title={K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned — the busiest month in view` : "The month with the most planned tonnes"} />
+          <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="routed lines" tone="var(--green)" info={{ id: "dash.carbon", label: "tCO₂e", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
+          <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over routed tonnes" info={{ id: "dash.intensity", value: K.intensity == null ? "Needs a routed line." : `${K.intensity.toFixed(2)} kg CO₂e per tonne` }} />
+          <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" info={{ id: "dash.tkm", value: `Exactly ${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"}` }} />
+          <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} info={{ id: "dash.peak_month", value: K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned` : "" }} />
         </Group>
       </div>
             </div>
@@ -1250,19 +1407,19 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             <summary>More charts: trips, vehicles needed, carbon over time, material split</summary>
             <div className="pt-3 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time</div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
           <ChartCanvas config={tripsCfg} height={wall ? 280 : 220} />
         </div>
               <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(baked lines)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
           <ChartCanvas config={fleetCfg} height={wall ? 280 : 220} />
         </div>
               <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
           <ChartCanvas config={co2Cfg} height={wall ? 280 : 220} />
         </div>
               <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
           <ChartCanvas config={splitCfg} height={wall ? 280 : 240} />
         </div>
             </div>
@@ -1283,16 +1440,16 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                 <th className="cursor-pointer select-none" onClick={() => setSort("route_id")}>Route{arrow("route_id")}</th>
                 <th className="cursor-pointer select-none" onClick={() => setSort("discipline")}>Discipline{arrow("discipline")}</th>
                 <th>{TEAM()}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("dist")} title={`${DU()} per trip on the route's basis (round trip unless the route says loaded)`}>{DU()}/trip{arrow("dist")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("dist")} >{DU()}/trip{arrow("dist")}<InfoTip id="dash.col.dist" /></th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("cycleH")}>Cycle h{arrow("cycleH")}</th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("t")}>Tonnes{arrow("t")}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("deliveredPct")} title="Reported week actuals ÷ planned, over the months in view">Delivered{arrow("deliveredPct")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("deliveredPct")} >Delivered{arrow("deliveredPct")}<InfoTip id="dash.col.delivered" /></th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("trips")}>Trips{arrow("trips")}</th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("km")}>Lorry-{DU()}{arrow("km")}</th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("co2")}>tCO₂e{arrow("co2")}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("peakVeh")} title="The most vehicles any one month needs on this line">Peak veh{arrow("peakVeh")}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("planned")} title="The route's typed rates, or the target rate from Config where it has none">Planned {CUR()}{arrow("planned")}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("fair")} title="The fair-price model: vehicle, distance, tonnage, month, the live diesel index">Fair {CUR()} (model){arrow("fair")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("peakVeh")} >Peak veh{arrow("peakVeh")}<InfoTip id="dash.col.peak" /></th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("planned")} >Planned {CUR()}{arrow("planned")}<InfoTip id="dash.planned" /></th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort("fair")} >Fair {CUR()} (model){arrow("fair")}<InfoTip id="dash.fair" /></th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("fairPerT")}>Fair {CUR()}/t{arrow("fairPerT")}</th>
               </tr>
             </thead>
@@ -1307,8 +1464,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   </td>
                   <td className="text-slate-500 whitespace-nowrap">{teamText(r.ipt)}</td>
                   {/* an unbaked route has NO distance, which is not the same as zero */}
-                  <td className={numTd}>{r.dist == null ? <span className="text-slate-300" title="No cached geometry for this vehicle — bake this route">—</span> : (+dist(r.dist)).toFixed(1)}</td>
-                  <td className={numTd}>{r.cycleH == null ? <span className="text-slate-300" title="Cycle time needs baked geometry for this vehicle">not baked</span> : r.cycleH.toFixed(2)}</td>
+                  <td className={numTd}>{r.dist == null ? <span className="text-slate-300" title="Not routed yet for this lorry: route it on Data → Routes">—</span> : (+dist(r.dist)).toFixed(1)}</td>
+                  <td className={numTd}>{r.cycleH == null ? <span className="text-slate-300" title="The cycle time needs this line's route worked out for its vehicle">not routed</span> : r.cycleH.toFixed(2)}</td>
                   <td className={numTd}>{grp(r.t)}</td>
                   <td className={numTd} title={r.actualT == null ? "No week actual reported on this line in the months in view" : `${grp(r.actualT)} t reported of ${grp(r.t)} t planned`}>{r.deliveredPct == null ? <span className="text-slate-300">—</span> : <span style={{ color: "var(--green)" }}>{r.deliveredPct.toFixed(0)} %</span>}</td>
                   <td className={numTd}>{grp(r.trips)}</td>
@@ -1316,7 +1473,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   <td className={numTd}>{r.baked ? r.co2.toFixed(1) : <span className="text-slate-300">—</span>}</td>
                   <td className={numTd} title={r.capacityPerDay ? `${r.capacityPerDay} trips/day per vehicle` : undefined}>{r.peakVeh == null ? <span className="text-slate-300">—</span> : r.peakVeh}</td>
                   <td className={numTd} title={r.plannedU ? unitTriple(r.plannedU) : "no rate typed on the route, no target set"}>{r.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(r.planned)}{srcChip(r.source)}</>}</td>
-                  <td className={numTd} style={{ color: "var(--navy)" }} title={r.fairU ? unitTriple(r.fairU) + (r.flags.length ? " · " + r.flags.join(", ") : "") : (r.baked ? "no diesel index" : "not baked — no distance")}>{r.fair == null ? <span className="text-slate-300">—</span> : <>{CUR()} {grp(r.fair)}{r.flags.includes("WINTER") && <span className="ml-1 text-[9px] text-slate-400">winter</span>}{r.flags.includes("THAW") && <span className="ml-1 text-[9px] text-amber-700">thaw</span>}</>}</td>
+                  <td className={numTd} style={{ color: "var(--navy)" }} title={r.fairU ? unitTriple(r.fairU) + (r.flags.length ? " · " + r.flags.join(", ") : "") : (r.baked ? "no diesel index" : "not routed yet, so no distance")}>{r.fair == null ? <span className="text-slate-300">—</span> : <>{CUR()} {grp(r.fair)}{r.flags.includes("WINTER") && <span className="ml-1 text-[9px] text-slate-400">winter</span>}{r.flags.includes("THAW") && <span className="ml-1 text-[9px] text-amber-700">thaw</span>}</>}</td>
                   <td className={numTd}>{r.fairPerT == null ? <span className="text-slate-300">—</span> : (+r.fairPerT).toFixed(2)}</td>
                 </tr>
               ))}
@@ -1337,37 +1494,37 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       <WallSection show={sectionShown(1)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[1].title}>
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-wall-figures="1">
         <Group title="Delivered to date" tone="var(--green)">
-          <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `${K.reportedN} of ${D.lines} line-months reported`} tone="var(--green)"
-               title={K.actualT == null ? "No week actual has been typed against any line in view (Look-ahead → Account). Nothing is assumed delivered." : `${grp(K.actualT)} t reported delivered — the sum of the typed week actuals on ${K.reportedN} line-months, through each line's payload. Typed on Look-ahead → Account; a day actual rolls into its week.`} />
+          <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `${K.reportedN} of ${D.lines} forecast months reported`} tone="var(--green)"
+               info={{ id: "dash.moved", value: K.actualT == null ? "No week actual typed yet against any line in view." : `${grp(K.actualT)} t reported on ${K.reportedN} forecast month${K.reportedN === 1 ? "" : "s"}` }} />
           <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : `${bigNum(K.totT)} t planned in view`} tone="var(--green)"
-               title={K.deliveredPct == null ? "Delivered ÷ planned, once something is reported" : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned across every line-month in view (a month nobody has reported counts as not yet delivered)`} />
+               info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned` }} />
           <Fig value={K.actualEur == null ? "—" : `${CUR()} ` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()} ${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
-               title={K.actualEur == null ? "The actual cost typed with a week actual (Look-ahead → Account) — none yet" : `${CUR()} ${grp(K.actualEur)} typed as actual cost on the account weeks in view`} />
+               info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()} ${grp(K.actualEur)} typed` }} />
           <Fig value={K.reportedT > 0 && K.actualT != null ? (K.actualT * 100 / K.reportedT).toFixed(0) + " %" : "—"} label="on reported months" sub="delivered ÷ planned, reported only"
-               title={K.reportedT > 0 && K.actualT != null ? `${grp(K.actualT)} t delivered ÷ ${grp(K.reportedT)} t planned on the ${K.reportedN} line-months that carry an actual — how close to plan the reported months ran` : "Once a month is reported, its delivered ÷ planned"} />
+               info={{ id: "dash.reported", value: K.reportedT > 0 && K.actualT != null ? `${grp(K.actualT)} t delivered ÷ ${grp(K.reportedT)} t planned on ${K.reportedN} reported forecast month${K.reportedN === 1 ? "" : "s"}` : "No month reported yet." }} />
         </Group>
         <Group title="Volume">
-          <Fig value={bigNum(K.totT)} label="tonnes" sub="all lines in view" title={`${grp(K.totT)} t — the planned quantity of every line-month in view, in tonnes through each line's conversion (m³ and vehicle loads included)`} />
-          <Fig value={bigNum(K.totTrips)} label="trips" sub="loaded runs, rounded up per month" title={`${grp(K.totTrips)} loaded trips — ceil(tonnes ÷ payload) per line-month, the Look-ahead's figure`} />
-          <Fig value={bigNum(dist(K.totKm))} label={`lorry-${DU()}`} sub="round trips · baked lines" title={`${grp(dist(K.totKm))} ${DU()} — trips × the baked route distance (both legs) for the line's vehicle; an unbaked line adds nothing`} />
-          <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs baked routes"} title={K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth} — the largest same-month sum of vehicles needed across the lines in view: trips ÷ (working days × what one vehicle does in a shift)` : "Vehicles needed come from the baked cycle time — bake the routes on the Routes page"} />
+          <Fig value={bigNum(K.totT)} label="tonnes" sub="all lines in view" info={{ id: "dash.material", label: "Tonnes", value: `Exactly ${grp(K.totT)} t` }} />
+          <Fig value={bigNum(K.totTrips)} label="trips" sub="loaded runs, rounded up per month" info={{ id: "dash.trips", value: `Exactly ${grp(K.totTrips)} loaded trips` }} />
+          <Fig value={bigNum(dist(K.totKm))} label={`lorry-${DU()}`} sub="round trips · routed lines" info={{ id: "dash.distance", value: `Exactly ${grp(dist(K.totKm))} ${DU()}` }} />
+          <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs routes worked out"} info={{ id: "dash.vehicles", label: "Peak fleet", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
         </Group>
         <Group title="Cost" tone="var(--navy)">
           <Fig value={K.planned ? `${CUR()} ` + eurK(K.planned.eur) : "—"} label={`planned ${CUR()}`} sub={K.planned ? `${K.plannedN} of ${D.lines} priced${K.targetN ? ` · ${K.targetN} at target` : ""}` : "no rate typed, no target set"} tone="var(--navy)"
-               title={K.planned ? `${CUR()} ${grp(K.planned.eur)} = ${unitTriple(K.planned)} — the route's typed rates summed, or the Config target rate where the route has none (${K.targetN} line-months at target)` : "No route in view has typed rates and no target rate is set on Config → Costing"} />
-          <Fig value={K.fair ? `${CUR()} ` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no baked lines")} tone="var(--navy)"
-               title={K.fair ? `${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)} — the cost model (Config → Costing · fuel): fuel at the live diesel index, driver and vehicle time over the baked cycle, running cost per km, margin; winter months +${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel. A floor for negotiation, never a quote.` : (cost.index_eur_per_l == null ? "The fair price needs the diesel index — Config → Costing · fuel" : "The fair price needs a baked route for the line's vehicle")} />
+               info={{ id: "dash.planned", value: K.planned ? [`${CUR()} ${grp(K.planned.eur)} = ${unitTriple(K.planned)}`, K.targetN ? `${K.targetN} forecast month${K.targetN === 1 ? "" : "s"} at the target rate` : ""] : "No route in view has rates typed, and no target rate is set on Config → Costing." }} />
+          <Fig value={K.fair ? `${CUR()} ` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no routed lines")} tone="var(--navy)"
+               info={{ id: "dash.fair", value: K.fair ? [`${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)}`, `Winter months add ${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel.`] : (cost.index_eur_per_l == null ? "No diesel price: set one on Config → Costing · fuel." : "No line in view has a route worked out for its vehicle.") }} />
           <Fig value={K.fair && K.fair.per_t != null ? `${CUR()} ` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()} ${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
-               title={K.fair && K.fair.per_t != null ? `${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = fair ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t on the lines the model prices${K.planned && K.planned.per_t != null ? ` · planned ${CUR()} ${(+K.planned.per_t).toFixed(2)}/t the same way` : ""}` : `Fair ${CUR()} per tonne, once the model has a priced line`} />
+               info={{ id: "dash.fair_per_t", value: K.fair && K.fair.per_t != null ? [`${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t`, K.planned && K.planned.per_t != null ? `Planned: ${CUR()} ${(+K.planned.per_t).toFixed(2)} per tonne, worked out the same way` : ""] : "No line the model can price yet." }} />
           <Fig value={K.fair && K.fair.per_km != null ? `${CUR()} ` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()} ${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
-               title={K.fair && K.fair.per_km != null ? `${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()} = fair ${CUR()} ÷ the ${DU()} the trips run on each route's basis (round trip unless the route says loaded) · ${CUR()} ${grp(K.fair.per_trip)} per loaded trip${K.planned && K.planned.per_km != null ? ` · planned ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)}/${DU()}, ${CUR()} ${grp(K.planned.per_trip)}/trip` : ""}` : `Fair ${CUR()} per km, once the model has a priced line`} />
+               info={{ id: "dash.fair_per_dist", value: K.fair && K.fair.per_km != null ? [`${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.fair.per_trip)} per loaded trip`, K.planned && K.planned.per_km != null ? `Planned: ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.planned.per_trip)} per trip` : ""] : "No line the model can price yet." }} />
         </Group>
         <Group title="Carbon" tone="var(--green)">
-          <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="baked lines" tone="var(--green)" title={`${grp(K.totCo2, 1)} t CO₂e — km × each vehicle's DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config), on the baked lines only`} />
-          <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over baked tonnes" title={K.intensity == null ? "Needs a baked line" : `${K.intensity.toFixed(2)} kg CO₂e per tonne moved — tCO₂e ÷ the tonnes on baked lines (the unbaked ones have no km)`} />
-          <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" title={`${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"} — tonnes × the route's basis ${DU()}, baked lines`} />
-          <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} title={K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned — the busiest month in view` : "The month with the most planned tonnes"} />
-          <Fig value={ctW.value} label="tCO2e target, all-in" sub={ctW.sub} title={ctW.title} />
+          <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="routed lines" tone="var(--green)" info={{ id: "dash.carbon", label: "tCO₂e", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
+          <Fig value={K.intensity == null ? "—" : K.intensity.toFixed(1)} label="kg / tonne" sub="over routed tonnes" info={{ id: "dash.intensity", value: K.intensity == null ? "Needs a routed line." : `${K.intensity.toFixed(2)} kg CO₂e per tonne` }} />
+          <Fig value={bigNum(dist(K.totTkm))} label={TKM()} sub="route basis" info={{ id: "dash.tkm", value: `Exactly ${grp(dist(K.totTkm))} ${DU() === "mi" ? "tonne-miles" : "tonne-kilometres"}` }} />
+          <Fig value={K.peakMonth} label="peak month" sub={K.peakMonthT ? `${bigNum(K.peakMonthT)} t` : "by tonnage"} info={{ id: "dash.peak_month", value: K.peakMonthT ? `${K.peakMonth}: ${grp(K.peakMonthT)} t planned` : "" }} />
+          <Fig value={ctW.value} label="tCO2e target, all-in" sub={ctW.sub} info={{ id: "dash.target", value: ctW.title }} />
         </Group>
       </div>
       </WallSection>
@@ -1375,35 +1532,35 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       <WallSection show={sectionShown(2)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[2].title}>
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="card p-4 lg:col-span-2">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
           <ChartCanvas config={demandCfg} height={wall ? 320 : 260} />
         </div>
         <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
           <ChartCanvas config={progressCfg} height={wall ? 320 : 260} />
         </div>
         <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
           <ChartCanvas config={costCfg} height={wall ? 280 : 220} />
         </div>
         <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time</div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
           <ChartCanvas config={tripsCfg} height={wall ? 280 : 220} />
         </div>
         <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(baked lines)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
           <ChartCanvas config={fleetCfg} height={wall ? 280 : 220} />
         </div>
         <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
           <ChartCanvas config={co2Cfg} height={wall ? 280 : 220} />
         </div>
         <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
           <ChartCanvas config={splitCfg} height={wall ? 280 : 240} />
         </div>
         <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span></div>
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
           <ChartCanvas config={topCfg} height={wall ? 280 : 240} />
         </div>
       </div>
@@ -1416,7 +1573,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       )}
 
 
-      {!wall && <p className="text-xs text-slate-400 px-1">Planning estimates and typed actuals — no live tracking. Every planning figure on this page comes from <code>/api/costing/lines</code>, the same functions the Look-ahead uses: trips = tonnes ÷ planning payload rounded up per line-month; {DU()}, cycle and vehicles from the baked HERE route for the line's vehicle (an unbaked line has none and is excluded from those totals, never estimated); CO₂e = km × the vehicle's per-km factor on Config → Vehicles (stored per km whatever the tenant reads). Planned {CUR()} = the route`s typed rates (summed), or the Config target rate where the route has none. Fair {CUR()} = the cost model on Config → Costing · fuel — a floor for negotiation, never a quote. Peak fleet = the largest same-month sum of vehicles needed (trips ÷ working days ÷ what one vehicle does in a shift). Delivered = the week actuals typed on Look-ahead → Account (a day actual rolls into its week); a week nobody reported counts as nothing. Today and this week come from the Look-ahead`s own read. Gate arrivals come from <code>/api/gates/arrivals</code>: the same trips rule, all {TEAMS().toLowerCase()} summed at the gate a lorry arrives by, ÷ working days; the gap is the shift's minutes ÷ arrivals, an average with no hourly peak.</p>}
+      {/* 13 Oct 2026 (W3): the method paragraph moved to the cards' info boxes and the technical guide (T1, T3) */}
+      {!wall && <p className="text-xs text-slate-400 px-1">Planning estimates and typed actuals — no live tracking. Each figure's <span aria-hidden="true">ⓘ</span> says how it is worked out; the formulas are in the <a href={TECH_URL("t1-figures")} target="_blank" rel="noopener noreferrer" className="underline">technical guide</a>.</p>}
     </div>
   );
 }
@@ -1459,10 +1617,11 @@ function DashboardToday({ meta, week, err, wall }){
   }, [lines, today]);
   const cw = (week && week.commit_week) || {};
   const dayName = (iso) => { const d = new Date(iso + "T00:00:00"); return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.getDay()]; };
-  const Big = ({ value, label, sub, title, tone }) => (
-    <div title={title} className="min-w-0 cursor-help">
+  // 13 Oct 2026 (W3): an info box, not a hover tooltip (see Fig)
+  const Big = ({ value, label, sub, info, tone }) => (
+    <div className="min-w-0">
       <div className="kpi-num font-bold whitespace-nowrap" style={{ color: tone || "var(--navy-deep)", fontSize: wall ? "clamp(1.6rem, 2.4vw, 3rem)" : "clamp(1.3rem, 1.8vw, 2rem)", lineHeight: 1.1 }}>{value}</div>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mt-0.5 fig-label">{label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mt-0.5 fig-label">{label}{info && <InfoTip id={info.id} value={info.value} />}</div>
       {sub && <div className="text-[11px] text-slate-400 fig-sub">{sub}</div>}
     </div>
   );
@@ -1481,7 +1640,7 @@ function DashboardToday({ meta, week, err, wall }){
     <div className="grid lg:grid-cols-5 gap-3">
       <div className="card p-4 lg:col-span-2 flex flex-col">
         <div className="flex items-baseline justify-between gap-2 flex-wrap">
-          <div className="text-[10px] font-semibold uppercase tracking-wide fig-group" style={{ color: "var(--navy)" }}>Today · {dayName(today)} {longDate(today)}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide fig-group" style={{ color: "var(--navy)" }}>Today · {dayName(today)} {longDate(today)}<InfoTip id="dash.today" /></div>
           <div className="text-[11px] text-slate-400">{cw.from ? `week ${cw.week_index} · ${longDate(cw.from)} – ${longDate(cw.to)}` : ""}</div>
         </div>
         {err && <div className="text-xs mt-2" style={{ color: "var(--red)" }}>{err}</div>}
@@ -1489,19 +1648,19 @@ function DashboardToday({ meta, week, err, wall }){
         {week && <>
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3 mt-3">
             <Big value={T.lines ? bigNum(T.t) : "—"} label="tonnes" sub={T.lines ? `today · ${T.lines} line${T.lines === 1 ? "" : "s"} · ${T.confirmed} confirmed` : (lines.length ? "nothing planned today" : "no lines this week")}
-                 title={T.lines ? `${grp(T.t)} t planned for today across ${T.lines} lines — each day's planned quantity through the line's payload, from the Look-ahead` : "No line has a planned quantity on today's date in the commit week"} />
-            <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(dist(T.km))} ${DU()}` : "—"} title={T.lines ? `${grp(T.trips)} loaded trips today (ceil of tonnes ÷ payload per line) · ${grp(dist(T.km))} lorry-${DU()} on the baked lines` : "—"} />
-            <Big value={T.lines ? grp(T.veh) : "—"} label="vehicles" sub={T.lines ? "on the road today" : "—"} tone="var(--navy)" title={T.lines ? `${grp(T.veh)} vehicles needed today — per line, trips ÷ what one vehicle does in a shift on that route, summed (an unbaked line needs an unknown number)` : "—"} />
-            <Big value={T.lines ? `${T.reported} / ${T.lines}` : "—"} label="reported" sub="day actuals typed today" title="Lines with a day actual typed for today on the Look-ahead" />
+                 info={{ id: "dash.today_t", value: T.lines ? `${grp(T.t)} t planned for today across ${T.lines} line${T.lines === 1 ? "" : "s"}` : "No line has a planned quantity on today's date in the commit week." }} />
+            <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(dist(T.km))} ${DU()}` : "—"} info={{ id: "dash.today_trips", value: T.lines ? `${grp(T.trips)} loaded trips, ${grp(dist(T.km))} lorry-${DU()}` : "" }} />
+            <Big value={T.lines ? grp(T.veh) : "—"} label="vehicles" sub={T.lines ? "on the road today" : "—"} tone="var(--navy)" info={{ id: "dash.today_veh", value: T.lines ? `${grp(T.veh)} vehicles needed today` : "" }} />
+            <Big value={T.lines ? `${T.reported} / ${T.lines}` : "—"} label="reported" sub="day actuals typed today" info={{ id: "dash.today_reported" }} />
           </div>
           <div className="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-3 text-xs text-slate-600">
-            <div title={wkPct != null ? `${grp(T.wkToDateActT)} t reported against ${grp(T.wkToDateT)} t planned on the ${T.wkToDateReported} reported line-days up to today` : "The week's planned tonnes to today; the bar fills as day actuals are typed"}>
-              <div className="flex justify-between"><span className="font-semibold text-slate-700">This week to date</span><span className="tabular-nums">{wkPct != null ? `${wkPct.toFixed(0)} % of plan` : `${bigNum(T.wkToDateT)} t planned`}</span></div>
+            <div>
+              <div className="flex justify-between"><span className="font-semibold text-slate-700">This week to date<InfoTip id="dash.week_to_date" value={wkPct != null ? `${grp(T.wkToDateActT)} t reported against ${grp(T.wkToDateT)} t planned on the ${T.wkToDateReported} reported line-days up to today` : ""} /></span><span className="tabular-nums">{wkPct != null ? `${wkPct.toFixed(0)} % of plan` : `${bigNum(T.wkToDateT)} t planned`}</span></div>
               <Bar pct={wkPct != null ? wkPct : 0} />
               <div className="text-[11px] text-slate-400 mt-1">{bigNum(T.wkPlanT)} t · {grp(T.wkTrips)} trips planned this week{T.wkToDateReported ? ` · ${T.wkToDateReported} of ${T.wkToDateDays} line-days reported` : " · no day actuals yet"}</div>
             </div>
-            <div title={acct && acct.week ? (acct.reported ? `${grp(acct.actual_t)} t reported against ${grp(acctReportedPlanT)} t planned on the ${acct.reported} reported lines · ${acct.delivered} of ${acct.lines} held (≥ ${Math.round((acct.hold_band || 0.98) * 100)} %)` : "Nothing reported for last week yet — type actuals on Look-ahead → Account") : "No account week yet"}>
-              <div className="flex justify-between"><span className="font-semibold text-slate-700">Last week{acct && acct.week ? ` · W${acct.week.week_index}` : ""}</span><span className="tabular-nums">{acctPct != null ? `${acctPct.toFixed(0)} % of plan` : (acct && acct.week ? "not reported" : "—")}</span></div>
+            <div>
+              <div className="flex justify-between"><span className="font-semibold text-slate-700">Last week{acct && acct.week ? ` · W${acct.week.week_index}` : ""}<InfoTip id="dash.last_week" value={acct && acct.week ? (acct.reported ? [`${grp(acct.actual_t)} t reported against ${grp(acctReportedPlanT)} t planned on the ${acct.reported} reported lines`, `${acct.delivered} of ${acct.lines} held (≥ ${Math.round((acct.hold_band || 0.98) * 100)} %)`] : "Nothing reported for last week yet: type actuals on Look-ahead → Account.") : "No account week yet."} /></span><span className="tabular-nums">{acctPct != null ? `${acctPct.toFixed(0)} % of plan` : (acct && acct.week ? "not reported" : "—")}</span></div>
               <Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />
               <div className="text-[11px] text-slate-400 mt-1">{acct && acct.week ? `${acct.reported} of ${acct.lines} lines reported · ${acct.delivered} held to plan${acct.shortfall ? ` · ${grp(acct.shortfall)} short` : ""}` : "—"}</div>
             </div>
@@ -1512,12 +1671,12 @@ function DashboardToday({ meta, week, err, wall }){
               <thead className="text-slate-400"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-left font-semibold py-1">Material</th><th className="text-right font-semibold py-1">t</th><th className="text-right font-semibold py-1">trips</th><th className="text-right font-semibold py-1">veh</th><th className="text-right font-semibold py-1"></th></tr></thead>
               <tbody>
                 {T.rows.map(r => (
-                  <tr key={r.key} className="border-t border-slate-100" title={`${grp(r.qty)} ${unitLbl(r.unit)} planned today${r.actual != null ? ` · ${grp(r.actual)} ${unitLbl(r.unit)} reported` : ""}${r.baked ? "" : " · route not baked — no km or vehicles"}`}>
+                  <tr key={r.key} className="border-t border-slate-100" title={`${grp(r.qty)} ${unitLbl(r.unit)} planned today${r.actual != null ? ` · ${grp(r.actual)} ${unitLbl(r.unit)} reported` : ""}${r.baked ? "" : " · route not worked out yet, so no distance or vehicles"}`}>
                     <td className="py-1 pr-2 whitespace-nowrap"><span className="font-semibold text-slate-800">{r.route_id}</span>{r.discipline && <span className="ml-1 text-[10px] text-slate-400">{r.discipline}</span>}<div className="text-[10px] text-slate-400">{r.origin || "—"} → {r.dest || "—"} · {r.vehicle}</div></td>
                     <td className="py-1 pr-2 text-slate-600">{r.material}</td>
                     <td className="py-1 text-right tabular-nums font-semibold">{grp(r.tonnes)}</td>
                     <td className="py-1 text-right tabular-nums">{r.trips == null ? "—" : grp(r.trips)}</td>
-                    <td className="py-1 text-right tabular-nums">{r.vehicles == null ? <span className="text-slate-300" title="not baked">—</span> : r.vehicles}</td>
+                    <td className="py-1 text-right tabular-nums">{r.vehicles == null ? <span className="text-slate-300" title="not routed yet">—</span> : r.vehicles}</td>
                     <td className="py-1 text-right">{statusChip(r.status, r.actual)}</td>
                   </tr>
                 ))}
@@ -1593,7 +1752,7 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
   return (
     <div className="card p-4">
       <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
-        <div className="text-sm font-semibold text-slate-700 chart-title">Stockpile capacity <span className="text-slate-400 font-normal">· how full each stockpile is at the end of {c ? `${MONTHS[(c.m - 1) % 12]} week ${c.w}` : "the week"}</span></div>
+        <div className="text-sm font-semibold text-slate-700 chart-title">Stockpile capacity <span className="text-slate-400 font-normal">· how full each stockpile is at the end of {c ? `${MONTHS[(c.m - 1) % 12]} week ${c.w}` : "the week"}</span><InfoTip id="dash.stock" /></div>
         <div className="flex flex-wrap gap-1">
           {cols.map(x => <button key={x.k} type="button" onClick={() => setWk(x.k)} className={"rounded-full px-2 py-0.5 text-[11px] font-semibold " + (x.k === selKey ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")} style={x.k === selKey ? { background: "var(--navy)" } : undefined} title={x.k === nowKey ? "this week" : undefined}>{x.w === 1 ? MONTHS[(x.m - 1) % 12] + " " : ""}W{x.w}{x.k === nowKey ? " · now" : ""}</button>)}
         </div>
@@ -1621,7 +1780,6 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
           </div>}
         </div>
       )}
-      <div className="text-[11px] text-slate-400 mt-2">balance at the week's end = opening + typed week actuals delivered there − typed consumption · a week nobody reported counts as nothing · consumption is typed on Look-ahead → Account · red past capacity, amber from 90 %</div>
     </div>
   );
 }
