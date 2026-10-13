@@ -9,6 +9,7 @@ Serves three things from one process:
 The Public Route Map reads /api/public/route-forecasts, so the map and the
 forecasting app are always in sync — no CSV files to keep up to date.
 """
+import hashlib
 import hmac
 import json
 import os
@@ -2348,23 +2349,34 @@ def public_alignment(request: Request):
     tenants without one get an empty object and the map draws no alignment.
 
     Same gate as the rest of /api/public/ (the map password or a staff session). The
-    row can be large (a surveyed 200 km alignment is ~9 MB), so it carries an ETag from
-    its updated_at and answers 304 to a matching If-None-Match.
+    row can be large (a surveyed 200 km alignment is ~9 MB), so it carries an ETag and
+    answers 304 to a matching If-None-Match.
+
+    13 Oct 2026: the ETag covers everything the body carries — the overlay row's updated_at
+    AND a short hash of the tenant block and the team names. Before, it was updated_at alone,
+    so after a Config save (distance unit, demo notice, team label...) or a team rename a
+    browser holding the old copy kept getting 304 and the map showed the old words. The 304
+    path reads updated_at only, never the overlay value.
     """
-    row = tenant_package.get_overlay_row()
-    tag = '"' + str((row or {}).get("updated_at") or "none") + '"'
+    stamp = tenant_package.get_overlay_stamp()
+    tenant = config.tenant_settings(conversions)
+    # the tenant's names for its team slots, so the map shows "North Team", not an id
+    teams = [{"id": r["id"], "label": r.get("label") or r["id"]}
+             for r in taxonomy.list_ipts(active_only=False)]
+    words = hashlib.sha1(json.dumps({"tenant": tenant, "teams": teams}, sort_keys=True, ensure_ascii=False,
+                                    default=str).encode("utf-8")).hexdigest()[:12]
+    tag = '"' + str(stamp or "none") + "-" + words + '"'
     if request.headers.get("if-none-match") == tag:
         return Response(status_code=304, headers={"ETag": tag})
+    row = tenant_package.get_overlay_row() if stamp else None
     doc = {}
     if row:
         try:
             doc = json.loads(row["value"])
         except Exception:
             doc = {}
-    doc["tenant"] = config.tenant_settings(conversions)
-    # the tenant's names for its team slots, so the map shows "North Team", not an id
-    doc["teams"] = [{"id": r["id"], "label": r.get("label") or r["id"]}
-                    for r in taxonomy.list_ipts(active_only=False)]
+    doc["tenant"] = tenant
+    doc["teams"] = teams
     return Response(content=json.dumps(doc, ensure_ascii=False), media_type="application/json",
                     headers={"ETag": tag, "Cache-Control": "no-cache"})
 

@@ -371,6 +371,13 @@ def get_overlay_row():
     return rows[0] if rows else None
 
 
+def get_overlay_stamp():
+    """The overlay row's updated_at alone (None without a row), so the alignment's 304 never reads the ~9 MB value."""
+    rows = db.query("SELECT updated_at FROM config WHERE tenant_id = ? AND key = ?",
+                    (db.current_tenant(), OVERLAY_KEY))
+    return rows[0]["updated_at"] if rows else None
+
+
 def set_overlay(doc, by=None):
     """Store the map overlay for the current tenant (see map/overlay.js for the shape)."""
     probs = validate_overlay(doc)
