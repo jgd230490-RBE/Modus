@@ -349,7 +349,9 @@ OVERPASS_URLS = (
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 )
-OSM_TILE_DEG = 0.25
+OSM_TILE_DEG = 0.15          # 13 Oct: 0.25 drew 504s on a busy day; lighter queries
+OSM_RETRY_ROUNDS = 2         # failed tiles are asked again this many times…
+OSM_RETRY_WAIT_S = 20        # …after this pause
 #: roads a lorry could be routed on; service roads, tracks and paths are left out (a 2 m
 #: car-park barrier is not a lorry limit worth drawing)
 OSM_HIGHWAYS = ("motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|"
@@ -659,31 +661,53 @@ def import_state():
         return json.loads(json.dumps(_STATE))
 
 
+def _in_box(anchor, box):
+    w, s, e, n = box
+    return w <= anchor[0] <= e and s <= anchor[1] <= n
+
+
 def import_osm(box=None):
-    """Fetch every OSM limit in the tenant's extent and replace the stored OSM rows there.
-    ANY failed tile aborts the replace: a half-fetched area must never read as 'no limits'."""
+    """Fetch every OSM limit in the tenant's extent, TILE BY TILE, and replace the stored OSM
+    rows tile by tile: a tile that answered replaces the rows whose sign sits in it; a tile that
+    did not answer (after OSM_RETRY_ROUNDS more rounds) keeps whatever it had — a failed tile
+    must never read as 'no limits there'. Status: ok · partial (some tiles failed, named) ·
+    unavailable (none answered).
+
+    13 Oct 2026: the first live run on the demo's extent got 4 of 6 tiles (504s from every
+    public server on the other two) and, all-or-nothing, stored none. Per-tile is the same
+    rule — never drop a limit on a failure — at the granularity the failure actually has."""
     box = box or tenant_extent()
     if not box:
         return {"status": "no_extent", "note": "the tenant has no locations or baked routes yet", "imported": 0}
     fetched_at = _now()
-    rows, dropped, errors, failed = [], {}, [], 0
+    dropped, errors, n = {}, [], 0
     tl = tiles(box, OSM_TILE_DEG)
-    for t in tl:
-        data, server, errs = _overpass(overpass_query(t))
-        errors += errs
-        if data is None:
-            failed += 1
-            continue
-        r, d = parse_osm(data.get("elements"), fetched_at)
-        rows += r
-        for k, v in d.items():
-            dropped[k] = dropped.get(k, 0) + v
-    if failed:
-        return {"status": "unavailable", "imported": 0, "tiles": len(tl), "tiles_failed": failed,
-                "errors": errors[-6:], "note": "nothing replaced: every tile must answer"}
-    n = replace_rows("osm", box, rows)
-    return {"status": "ok", "imported": n, "tiles": len(tl), "tiles_failed": 0, "dropped": dropped,
-            "errors": errors[-6:], "box": list(box), "fetched_at": fetched_at}
+    pending = list(tl)
+    for rnd in range(1 + OSM_RETRY_ROUNDS):
+        if rnd and pending:
+            time.sleep(OSM_RETRY_WAIT_S)
+        still = []
+        for t in pending:
+            data, server, errs = _overpass(overpass_query(t))
+            errors += errs
+            if data is None:
+                still.append(t)
+                continue
+            r, d = parse_osm(data.get("elements"), fetched_at)
+            n += replace_rows("osm", t, [x for x in r if _in_box(x["anchor"], t)])
+            for k, v in d.items():
+                dropped[k] = dropped.get(k, 0) + v
+        pending = still
+        if not pending:
+            break
+    status = "ok" if not pending else ("unavailable" if len(pending) == len(tl) else "partial")
+    out = {"status": status, "imported": n, "tiles": len(tl), "tiles_failed": len(pending),
+           "failed_tiles": [list(t) for t in pending], "dropped": dropped,
+           "errors": errors[-6:], "box": list(box), "fetched_at": fetched_at}
+    if pending:
+        out["note"] = ("the failed tiles kept their previous limits (nothing there was replaced); "
+                       "run the import again when Overpass is less busy")
+    return out
 
 
 def import_here(box=None):
@@ -732,7 +756,7 @@ def import_async(source, sync=False):
         tok = db.set_current_tenant(tenant)
         try:
             res = import_osm() if source == "osm" else import_here()
-            if res.get("status") == "ok":
+            if res.get("status") in ("ok", "partial"):
                 try:
                     store_checks()
                 except Exception as e:
@@ -741,7 +765,8 @@ def import_async(source, sync=False):
                 _STATE.update({"status": res.get("status"), "imported": res.get("imported", 0),
                                "dropped": res.get("dropped") or {}, "errors": res.get("errors") or [],
                                "tiles": res.get("tiles", res.get("calls", 0)),
-                               "tiles_failed": res.get("tiles_failed", 0), "note": res.get("note")})
+                               "tiles_failed": res.get("tiles_failed", 0), "note": res.get("note"),
+                               "failed_tiles": res.get("failed_tiles") or []})
         except Exception as e:
             with _LOCK:
                 _STATE.update({"status": "error", "errors": [str(e)[:200]]})

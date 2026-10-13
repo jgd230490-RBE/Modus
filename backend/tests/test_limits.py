@@ -221,6 +221,8 @@ ok("2. ways are limited to roads a lorry can use (no service, track, footway)",
 ok("2. out tags geom (the way's own geometry comes back)", Q.endswith("out tags geom;"))
 ok("2. tiles: a 0.6 x 0.3 degree box splits into 3 x 2 tiles of 0.25",
    len(limits.tiles((0.0, 0.0, 0.6, 0.3), 0.25)) == 6)
+ok("2. the import tiles at 0.15 degrees (13 Oct: 0.25 drew 504s) and retries failed tiles twice",
+   limits.OSM_TILE_DEG == 0.15 and limits.OSM_RETRY_ROUNDS == 2)
 
 
 def way(i, coords, **tags):
@@ -452,10 +454,30 @@ st = main.limits_import(source="osm", sync=1, token="t0k")
 ok("7. ⭐ an import (stubbed Overpass) stores the limits and re-checks every route",
    st["status"] == "ok" and st["imported"] == 7 and not st["running"] and len(limits.stored_checks([r1])[r1]["hits"]) > 0, str(st))
 ok("7. one Overpass call per tile of the extent", len(_calls) == len(limits.tiles(EXT, limits.OSM_TILE_DEG)))
-limits._overpass = lambda q: (None, None, ["https://overpass-api.de/api/interpreter: busy or error page"])
+limits.OSM_RETRY_WAIT_S = 0
+_busy = []
+limits._overpass = lambda q: (_busy.append(q) or (None, None, ["https://overpass-api.de/api/interpreter: busy or error page"]))
 st = main.limits_import(source="osm", sync=1, token="t0k")
-ok("7. ⭐ Overpass busy: status unavailable and NOTHING replaced (the stored limits survive)",
+ok("7. ⭐ Overpass busy everywhere: status unavailable and NOTHING replaced (the stored limits survive)",
    st["status"] == "unavailable" and len(limits.stored()) == 7, str(st))
+ok("7. ...each tile was asked three times (once, then two retry rounds)", len(_busy) == 3 * len(limits.tiles(EXT, limits.OSM_TILE_DEG)))
+# one tile busy for good, the rest answer: the busy tile keeps its rows, the others are replaced
+BIG = (-1.0, 52.4, -0.7, 52.6)                     # 2 x 2 tiles of 0.15
+_tl = limits.tiles(BIG, limits.OSM_TILE_DEG)
+_bad = next(t for t in _tl if any(limits._in_box(r["anchor"], t) for r in ROWS))
+_bad_q = limits.overpass_query(_bad)
+_kept = sorted(r["ext_id"] for r in limits.stored() if limits._in_box([r["anchor_lon"], r["anchor_lat"]], _bad))
+limits._overpass = lambda q: (None, None, ["busy"]) if q == _bad_q else ({"elements": []}, "stub", [])
+st = limits.import_osm(BIG)
+ok("7. the bigger box is 4 tiles", len(_tl) == 4)
+ok("7. ⭐ one tile failing: status partial, the failed tile named, its limits KEPT (never read as 'no limits')",
+   st["status"] == "partial" and st["failed_tiles"] == [list(_bad)] and _kept
+   and sorted(r["ext_id"] for r in limits.stored()) == _kept, str(st)[:300])
+ok("7. ...and the note says to run it again", "run the import again" in st["note"])
+limits._overpass = lambda q: ({"elements": ELEMENTS}, "stub", [])
+st = limits.import_osm(BIG)
+ok("7. a later full answer restores every limit, each stored once (a way across two tiles is claimed by its sign's tile)",
+   st["status"] == "ok" and len(limits.stored()) == 7 and st["imported"] == 7, str(st)[:200])
 limits._overpass = _real_overpass
 s2 = main.limits_status(token="t0k")
 ok("7. status reports what is stored per source and kind", s2["stored"]["osm"]["height"] == 4 and s2["extent"])
