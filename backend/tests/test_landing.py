@@ -175,7 +175,8 @@ ok("only Google Fonts is loaded from the network",
 # as the sound and pause buttons, playsinline for iOS, served from landing/films/.
 FILMS = os.path.join(ROOT, "landing", "films")
 videos = re.findall(r"<video\b[^>]*>", src)
-ok("page has three videos, the three films", len(videos) == 3)
+# NARROWED 13 Oct (second pass, the user): four videos, the hero explainer back in front of the three films.
+ok("page has four videos: the hero explainer and the three films", len(videos) == 4)
 ok("🔴 the old placeholder videos are gone from the page and from landing/media",
    "explainer-overview" not in src and "hero-overview" not in src
    and not os.path.exists(os.path.join(ROOT, "landing", "media", "explainer-overview.mp4"))
@@ -206,8 +207,39 @@ ok("the films come in page order, inside How it works",
 _body = " ".join(p.text)
 ok("no media placeholder text left on the page", "[SCREEN RECORDING" not in _body and "[EXPLAINER" not in src
    and "placeholder]" not in _body.lower())
-ok("the films note says all three are the fictional demo scheme",
-   "All three films are recorded on the fictional demo scheme. Nothing in them is a real project." in _body)
+# NARROWED 13 Oct (second pass, the user): a reader sees "walkthrough", never "film" (files keep their names).
+ok("the walkthroughs note says all three are the fictional demo scheme",
+   "All three walkthroughs are recorded on the fictional demo scheme. Nothing in them is a real project." in _body)
+_visible = re.sub(r"<style\b.*?</style>|<!--.*?-->|<[^>]+>", " ", src, flags=re.S)
+ok("🔴 no 'film' in anything a reader sees (text, alt, aria-label, captions)",
+   not re.search(r"\bfilms?\b", _visible, re.I)
+   and not re.search(r'\b(?:alt|aria-label|title|content)="[^"]*\bfilms?\b', src, re.I))
+ok("How it works says 'Three walkthroughs. One plan.' and labels each one",
+   "<h2>Three walkthroughs. One plan.</h2>" in src
+   and all(f'<p class="eyebrow">Walkthrough {n}</p>' in src for n in (1, 2, 3)))
+
+# --- the hero (13 Oct, second pass, the user): the 6 Oct explainer back, its wording corrected, over the
+# fictional scheme's route network as the band's background ---------------------------------------------------
+_hv = re.search(r'id="hero-media">\s*<div class="frame">(<video\b[^>]*>)', src)
+_hv = _hv.group(1) if _hv else ""
+ok("the hero holds the corrected explainer", 'src="./media/hero-explainer.mp4"' in _hv)
+for attr in ("autoplay", "muted", "loop", "playsinline", "controls"):
+    ok(f"hero video is {attr}", re.search(r"\b%s\b" % attr, _hv) is not None)
+ok("hero video: aria-label says the fictional demo scheme", re.search(r'aria-label="[^"]*fictional demo scheme', _hv) is not None)
+_hp = os.path.join(ROOT, "landing", "media", "hero-explainer.mp4")
+_hh = open(_hp, "rb").read(65536) if os.path.exists(_hp) else b""
+ok("hero video: an MP4 with faststart, under 5 MB", _hh[4:8] == b"ftyp"
+   and 0 < _hh.find(b"moov") < (_hh.find(b"mdat") if b"mdat" in _hh else 1 << 30)
+   and os.path.getsize(_hp) < 5 * 1024 * 1024)
+ok("hero video: its poster exists", 'poster="./media/hero-explainer.jpg"' in _hv
+   and os.path.exists(os.path.join(ROOT, "landing", "media", "hero-explainer.jpg")))
+ok("🔴 the hero no longer shows a still", '<figure class="shot" id="hero-media">' not in src)
+_bgp = os.path.join(ROOT, "landing", "media", "hero-routes.jpg")
+ok("the hero band's background is the route network image, and it exists as a JPEG under 100 KB",
+   src.count('url("./media/hero-routes.jpg")') >= 1 and 'id="top" class="hero-band' in src
+   and os.path.exists(_bgp) and open(_bgp, "rb").read(3) == b"\xff\xd8\xff" and os.path.getsize(_bgp) < 100 * 1024)
+ok("the header floats over the hero band, outside <main>",
+   '<header class="site-head' in src and src.find("<header") < src.find("<main") < src.find('id="top"'))
 # 11 Oct 2026 (the user): the map is the "public map" everywhere a person reads its name, landing page included.
 # NARROWED 13 Oct: the two 11 Oct sentences went with the old copy; the name rule stays.
 ok("the landing page says 'public map', never 'corridor map' (copy and the labels)",
@@ -216,19 +248,21 @@ ok("the landing page says 'public map', never 'corridor map' (copy and the label
 # Film 2 screens (forecast submissions, the Look-ahead clash rail). The two unused stills are deleted.
 import pathlib
 _still_path = lambda n: pathlib.Path(ROOT, "landing", "media", n + ".jpg")
-_STILLS = ("still-routes", "still-fairprice", "still-lookahead")
+# NARROWED 13 Oct (second pass): the hero still gave way to the explainer; still-routes stays as two posters.
+_STILLS = ("still-fairprice", "still-lookahead")
 _still_tags = re.findall(r'<figure class="shot"[^>]*>\s*<a href="\./media/([\w-]+)\.jpg"[^>]*><img ([^>]*)></a>', src)
-ok("three stills, each linking to its own full-size image, in page order",
+ok("two stills (the Film 2 screens), each linking to its own full-size image, in page order",
    [h for h, _ in _still_tags] == list(_STILLS)
    and all('src="./media/%s.jpg"' % h in t for h, t in _still_tags))
 _still_tags = [t for _, t in _still_tags]
 ok("⭐ every still's alt text says it is the fictional demo scheme",
-   len(_still_tags) == 3 and all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
-ok("...and the map still's alt text calls it the public map, not the route map",
-   'alt="The public map on the fictional demo scheme' in src and not re.search(r'alt="[^"]*route map', src, re.I))
-ok("every still has width and height (no layout jump); the two below the fold load lazily",
-   all('width="' in t and 'height="' in t for t in _still_tags)
-   and all('loading="lazy"' in t for t in _still_tags[1:]))
+   len(_still_tags) == 2 and all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
+# NARROWED 13 Oct (second pass): the public-map still left the hero; still no alt text says "route map".
+ok("...and no alt text calls the map the route map; still-routes survives as a poster",
+   not re.search(r'alt="[^"]*route map', src, re.I) and 'poster="./media/still-routes.jpg"' in src
+   and _still_path("still-routes").is_file())
+ok("every still has width and height (no layout jump) and loads lazily",
+   all('width="' in t and 'height="' in t and 'loading="lazy"' in t for t in _still_tags))
 ok("each still exists as a JPEG under 200 KB",
    all(_still_path(n).is_file() and _still_path(n).read_bytes()[:3] == b"\xff\xd8\xff"
        and _still_path(n).stat().st_size < 200 * 1024 for n in _STILLS))
@@ -434,7 +468,9 @@ ok("no prices on the page: no £, no 'per month', no 'pricing'",
 # The demo CTA: every "Request a demo" button goes to the form; the address is the fallback.
 ok("'Request a demo' is in the nav and the hero, and each one goes to #demo",
    len(re.findall(r'href="#demo">Request a demo</a>', src)) >= 2 and 'href="#demo"' in src)
-ok("'Watch the films' goes to How it works", 'href="#overview">Watch the films</a>' in src)
+# REVERSED 13 Oct (second pass, the user): "Watch the films" became "See how it works".
+ok("'See how it works' goes to How it works; no 'Watch the films'",
+   'href="#overview">See how it works</a>' in src and "Watch the films" not in src)
 ok("the demo band offers the email address beside the form", 'Or write to <a href="mailto:JDavis@wayscope.co.uk">' in src)
 ok("one <main> on the page", src.count("<main") == 1)
 
