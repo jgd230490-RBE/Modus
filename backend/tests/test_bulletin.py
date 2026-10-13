@@ -1245,6 +1245,67 @@ ok("🔴 W11 source: the schematic and the page draw the casing then the colour,
    and "ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5" in read("backend/bulletin_doc.py")
    and "const CARBON_LINE_WIDTH = 5, CARBON_CASING_WIDTH = 7.5;" in MAP)
 
+# W11 — the shared road sections, each by its routes summed (the map's Volume heat map: routes by their own figure,
+# shared sections summed on top). R1 and R2 run the same road in the fixture, so after the index is built it is ONE shared
+# section carrying both routes' loads (~98 a day, the 50-100 step), while each route alone is lighter.
+ok("W11: with no shared-section index the map draws the routes only, and the note says 0 shared sections in the map's words",
+   S10["map_sections"] == [] and S10["map_note"].startswith("Each route is painted by its own figure; 0 shared sections"))
+_mapfoot = re.search(r"'<div class=\"ml-foot\">Each route is painted by its own figure; ' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+\s*' \(a stretch of road two or more routes use\) by the routes using it, summed", MAP)
+ok("⭐ W11 held equal: the note is the map's Volume legend foot, word for word up to 'summed'",
+   bool(_mapfoot) and bulletin_doc.map_note(3) == "Each route is painted by its own figure; 3 shared sections (a stretch of road two or more routes use) by the routes using it, summed."
+   and bulletin_doc.map_note(1).startswith("Each route is painted by its own figure; 1 shared section ("))
+import road_sections  # noqa: E402
+_rb = road_sections.rebuild()
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    S10S = bulletin_doc.sheet(10, PLANNER)
+    PDF10S = export.build_bulletin_pdf(S10S)
+    HTML10S = bulletin_doc.html(S10S)
+finally:
+    config.tenant_settings = _real_ts4
+_RL10 = road_sections.road_load(10, working_days=WD)
+ok("⭐ W11 (hand): ONE shared section (R1 and R2's common road) at BOTH routes' loads ÷ working days = 98 a day, the 50-100 "
+   "colour, while R2 alone is the 10-25 colour; the figure is road_load's (the map's /api/public/road-load)",
+   len(S10S["map_sections"]) == 1 and near(S10S["map_sections"][0]["a_day"], LOADS / WD, 0.01)
+   and S10S["map_sections"][0]["color"] == "#0B55CB" and S10S["map_sections"][0]["routes"] == 2
+   and near(S10S["map_sections"][0]["a_day"], _RL10["runs"][0]["movements_per_day"], 1e-9)
+   and {r["route_id"]: r["color"] for r in S10S["map_routes"]}["R2"] == "#5A96F6", str((_rb, S10S["map_sections"][:1] and S10S["map_sections"][0]["a_day"])))
+_svgs = HTML10S.split('data-bulletin="map">')[1].split("</svg>")[0]
+ok("⭐ W11 page: the shared section is drawn ON TOP of the routes (after them), with its own casing, in its summed colour",
+   _svgs.count('class="sec"') == 2 and _svgs.rindex('stroke="#5A96F6"') < _svgs.index('class="sec"')
+   and 'stroke="#0B55CB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by 2 routes: 98 two-way movements a day</title>' in _svgs
+   and "Each route is painted by its own figure; 1 shared section (a stretch of road two or more routes use) by the routes using it, summed." in _hm.unescape(HTML10S))
+ok("W11 PDF: the note under the legend names the one shared section",
+   "1 shared section (a stretch of road two or more routes use) by the routes using it, summed." in " ".join(pdf_text(PDF10S).split()))
+_seen.clear(); export.urllib.request.urlopen = _capture
+export.bulletin_map_png(S10S["map_routes"], S10S["places"], S10S["controls"], token="pk.test", sections=S10S["map_sections"])
+export.urllib.request.urlopen = _real_urlopen; offline(export)
+_us = _seen[0] if _seen else ""
+ok("⭐ W11 static map: the section's casing and its summed colour come AFTER every route path (on top), within the URL limit",
+   _us.count("path-6+1F2024-0.9(") == 3 and _us.count("path-4+0B55CB-1(") == 2
+   and _us.rindex("path-4+5A96F6") < _us.rindex("path-6+1F2024") < _us.rindex("path-4+0B55CB") and len(_us) <= 8000, _us[:200])
+_real_rl = road_sections.road_load
+
+
+def _rl_boom(*a, **k):
+    raise RuntimeError("fixture: road load failed")
+
+
+road_sections.road_load = _rl_boom
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    S10F = bulletin_doc.sheet(10, PLANNER)
+finally:
+    road_sections.road_load = _real_rl
+    config.tenant_settings = _real_ts4
+ok("🔴 W11: a failed shared-section read keeps the routes on the map and SAYS the sections are missing (never a silent gap)",
+   S10F["map_sections"] == [] and len(S10F["map_routes"]) == 2
+   and S10F["sections_note"] == "The shared road sections could not be read (RuntimeError): each route is painted by its own figure only."
+   and "could not be read (RuntimeError)" in bulletin_doc._volume_legend_html(S10F))
+ok("W11: the caveat is NARROWED — the map now colours shared roads by their sum; the tables stay per route; no figure on a road",
+   "the route map colours each shared stretch by that sum, but prints no figure on it." in " ".join(S10S["caveats"])
+   and "does not yet print a figure per road" not in " ".join(S10S["caveats"]))
+
 # W12 — the council bands per scheme, in Config, read by the map and the bulletin
 ok("⭐ W12 default held equal three ways: config.COUNCIL_BREAKS_DEFAULT = the map's AREA_STOPS = the Config page's placeholder",
    config.council_breaks({}) == {"movements": [50, 100, 200], "carbon": [50, 100, 200]}

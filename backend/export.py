@@ -1065,7 +1065,7 @@ AMBER_HEX = "D97706"
 AMBER_RGB = (0xD9 / 255, 0x77 / 255, 0x06 / 255)
 
 
-def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, token=None):
+def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, token=None, sections=None):
     """
     The month's routes over Mapbox's light style, or None: REVERSED 13 Oct 2026 (W11) — each route
     in the public map's Volume colour for its two-way movements a day (bulletin_doc.VOLUME_RAMP on
@@ -1083,11 +1083,16 @@ def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, 
             + [f"pin-s-{z['n']}+{AMBER_HEX}({z['at'][0]:.5f},{z['at'][1]:.5f})"
                for z in controls if z.get("at") and z["n"] <= 99])
     url = None
-    order = sorted(map_routes, key=lambda r: (r.get("a_day") or 0, r.get("route_id") or ""))
+    # routes first (quietest at the bottom), then the shared sections on top, each by its routes summed (W11)
+    order = (sorted(map_routes, key=lambda r: (r.get("a_day") or 0, r.get("route_id") or ""))
+             + sorted(sections or [], key=lambda x: x.get("a_day") or 0))
     for n_pts in (100, 60, 35, 20, 10):
         enc = [urllib.parse.quote(_encode_polyline(_thin(r["coords"], n_pts)), safe="") for r in order]
-        paths = ([f"path-{BULLETIN_CASING_PX}+{bulletin_doc_casing()}-0.9({e})" for e in enc]
-                 + [f"path-{BULLETIN_LINE_PX}+{_route_color(r).lstrip('#')}-1({e})" for r, e in zip(order, enc)])
+        paths = ([f"path-{BULLETIN_CASING_PX}+{bulletin_doc_casing()}-0.9({e})" for e in enc[:len(map_routes)]]
+                 + [f"path-{BULLETIN_LINE_PX}+{_route_color(r).lstrip('#')}-1({e})" for r, e in zip(order[:len(map_routes)], enc)]
+                 + [p for r, e in zip(order[len(map_routes):], enc[len(map_routes):])
+                    for p in (f"path-{BULLETIN_CASING_PX}+{bulletin_doc_casing()}-0.9({e})",
+                              f"path-{BULLETIN_LINE_PX}+{_route_color(r).lstrip('#')}-1({e})")])
         for with_pins in (True, False):
             u = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(paths + (pins if with_pins else []))
                  + f"/auto/{size}@2x?padding=40&access_token=" + urllib.parse.quote(token))
@@ -1148,6 +1153,12 @@ def _draw_bulletin_schematic(c, S, x, y, w, h):
     for r in S["map_routes"]:
         c.setStrokeColorRGB(*_hex_rgb(r["color"]))
         c.drawPath(line(r), stroke=1, fill=0)
+    # the shared sections on top, each casing then its summed colour (the map's road-load layer)
+    for sct in S.get("map_sections") or []:
+        c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
+        c.drawPath(line(sct), stroke=1, fill=0)
+        c.setStrokeColorRGB(*_hex_rgb(sct["color"])); c.setLineWidth(2.2)
+        c.drawPath(line(sct), stroke=1, fill=0)
     for p in S["places"]:
         if p.get("at") and p.get("letter"):
             px, py = P(*p["at"])
@@ -1172,7 +1183,7 @@ class _BulletinMap(Flowable):
         return self.width, self.height
 
     def draw(self):
-        png = bulletin_map_png(self.S["map_routes"], self.S["places"], self.S["controls"])
+        png = bulletin_map_png(self.S["map_routes"], self.S["places"], self.S["controls"], sections=self.S.get("map_sections"))
         if png:
             try:
                 self.canv.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=self.width, height=self.height,
@@ -1465,6 +1476,7 @@ def build_bulletin_pdf(S):
     story.append(mp)
     story.append(_BulletinMapCaption(mp, len(S["map_routes"])))
     story.append(_volume_legend(S, usable))
+    story.append(P(E(S["map_note"] + ((" " + S["sections_note"]) if S.get("sections_note") else "")), st_grey))
     legend = " · ".join(f"<b>{E(p['letter'])}</b> {E(p['name'])}" for p in S["places"] if p["letter"])
     if S["controls"]:
         legend += (" · " if legend else "") + "Local controls (page 2): " + " · ".join(

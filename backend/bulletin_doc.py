@@ -168,6 +168,24 @@ def _geometries(route_ids):
     return out
 
 
+def _coords_of(geometry):
+    """A stored run's polyline as [(lon, lat), ...]: a list of pairs, or a GeoJSON LineString."""
+    g = geometry.get("coordinates") if isinstance(geometry, dict) else geometry
+    out = []
+    for c in g or []:
+        try:
+            out.append((float(c[0]), float(c[1])))
+        except (TypeError, ValueError, IndexError):
+            continue
+    return out
+
+
+def map_note(n_sections):
+    """The map's Volume legend foot, its first sentence word for word (map/index.html renderModeLegends)."""
+    return (f"Each route is painted by its own figure; {n_sections} shared section{'' if n_sections == 1 else 's'} "
+            "(a stretch of road two or more routes use) by the routes using it, summed.")
+
+
 def _controls(span_from, span_to):
     """The local controls in force in the month: active zones that are not haul roads, numbered."""
     import zones
@@ -543,6 +561,22 @@ def sheet(month_index, acc=None, now=None):
                           "step": volume_class(r["a_day"]), "color": VOLUME_RAMP[volume_class(r["a_day"])]}
                          for r in routes_view if r["route_id"] in geo), key=lambda r: (r["a_day"], r["route_id"]))
     controls = _controls(span_from, span_to)
+    # 13 Oct 2026 (W11, the map's Volume heat map held equal): the shared road sections — a stretch two or more routes
+    # use — drawn over the routes, each in the Volume colour of the routes using it, SUMMED (road_sections.road_load,
+    # the same read as /api/public/road-load), so a shared trunk road shows as the busiest stretch, as on the map.
+    map_sections, sections_note = [], None
+    try:
+        import road_sections
+        for run in (road_sections.road_load(mi, working_days=wd).get("runs") or []):
+            cs = _coords_of(run.get("geometry"))
+            if len(cs) >= 2:
+                v = float(run.get("movements_per_day") or 0.0)
+                map_sections.append({"coords": cs, "a_day": v, "step": volume_class(v),
+                                     "color": VOLUME_RAMP[volume_class(v)], "routes": len(run.get("routes") or [])})
+        map_sections.sort(key=lambda x: x["a_day"])
+    except Exception as e:
+        sections_note = (f"The shared road sections could not be read ({type(e).__name__}): each route is painted by its "
+                         "own figure only.")
 
     headline = [
         {"key": "two_way_a_day", "value": n0(H.get("two_way_a_day")),
@@ -673,8 +707,9 @@ def sheet(month_index, acc=None, now=None):
         ("Planning flag", page["terms"]["cap"] + " It is never a legal limit unless the scheme types it as agreed."),
     ]
     caveats = ["This bulletin is a planning forecast from the approved plan, not a monitoring report: no lorry was counted.",
-               "Every figure is per route. Where several routes share a road, the lorries on that road are their sum; "
-               "this bulletin does not yet print a figure per road.",
+               # NARROWED 13 Oct 2026 (W11): the route map now colours each shared road by its summed routes
+               "The tables are per route. Where several routes share a road, the lorries on that road are their sum: "
+               "the route map colours each shared stretch by that sum, but prints no figure on it.",
                "Other traffic, including local hauliers working for other customers, uses these roads too; "
                "the figures are this scheme's lorries only."]
     nd = R.get("routes_not_drawn") or {}
@@ -713,6 +748,7 @@ def sheet(month_index, acc=None, now=None):
         "works": works, "checks": checks, "others": others,
         "glance": glance, "council": council, "council_mv": council_mv,
         "volume_legend": volume_legend(),
+        "map_sections": map_sections, "sections_note": sections_note, "map_note": map_note(len(map_sections)),
         "map_legend_title": f"Two-way movements a day in {month_long}",
         "change_rows": change_rows, "change_text": change_text,
         "terms": terms, "caveats": [c for c in caveats if c],
@@ -783,6 +819,14 @@ def _svg_map(S, w=720, h=340):
         out.append(f'<polyline points="{pts}" fill="none" stroke="{r["color"]}" stroke-width="{ROUTE_LINE_W}" '
                    f'stroke-linecap="round" stroke-linejoin="round"><title>{_e(r["route_id"])}: '
                    f'{_e(n0(r["a_day"]))} two-way movements a day</title></polyline>')
+    # the shared sections on top, each by its routes summed (the map's road-load layer), quietest first
+    for sct in S.get("map_sections") or []:
+        pts = " ".join(f"{x:.1f},{h - y:.1f}" for x, y in (proj(*c) for c in sct["coords"]))
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{ROUTE_CASING}" stroke-width="{ROUTE_CASING_W}" '
+                   'stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round" class="sec"/>'
+                   f'<polyline points="{pts}" fill="none" stroke="{sct["color"]}" stroke-width="{ROUTE_LINE_W}" '
+                   f'stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by {sct["routes"]} routes: '
+                   f'{_e(n0(sct["a_day"]))} two-way movements a day</title></polyline>')
     for p in S["places"]:
         if not p.get("at") or not p["letter"]:
             continue
@@ -805,7 +849,8 @@ ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5          # the map's CARBON_LINE_WIDTH / C
 def _volume_legend_html(S):
     sw = "".join(f'<span class="lg"><span class="sw" style="background:{g["fill"]}"></span>{_e(g["label"])}</span>'
                  for g in S["volume_legend"])
-    return f'<p class="legend cc-legend" data-bulletin="map-legend"><b>{_e(S["map_legend_title"])}:</b> {sw}</p>'
+    return (f'<p class="legend cc-legend" data-bulletin="map-legend"><b>{_e(S["map_legend_title"])}:</b> {sw}</p>'
+            f'<p class="legend">{_e(S["map_note"])}' + (f' {_e(S["sections_note"])}' if S.get("sections_note") else "") + '</p>')
 
 
 def _sw_style(fill, hatch):
