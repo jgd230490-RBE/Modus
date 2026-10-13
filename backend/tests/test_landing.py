@@ -364,6 +364,22 @@ ok("the Carbon planner (PR #16) is named, by its menu name, on the landing page"
 ok("the look-ahead copy no longer promises that declared disruption is what occurs",
    "the disruption that occurs" not in _low and "how closely the week matched what was declared" in body)
 
+# --- 13 Oct (notes/for-grok.md, product reference §G): three lines that claimed more than the product does ---
+# Weight limits are never FLAGGED: the clash list has no zone or weight check; a drawn zone is avoided by
+# routing, and HERE plans each route for the vehicle's weight and size.
+ok("🔴 the Approve step no longer says weight limits are flagged",
+   "weight limits and route caps are flagged" not in _low and "weight limits" not in _low)
+ok("...it says the route is planned for the lorry's weight and size, closures and route caps flagged",
+   "Every route is planned for the lorry's weight and size, and closures and route caps are flagged" in body)
+# The public map opens with a shared map password; "no account" alone hid that.
+ok("🔴 'They don't need an account' is gone", "they don't need an account" not in _low)
+ok("...both public-map lines say it opens with one shared password",
+   body.count("It opens with one shared password") == 2)
+# Wayscope's carbon is a planning estimate, not a reportable figure.
+ok("🔴 no 'transport carbon you can report'", "carbon you can report" not in _low)
+ok("...the clients card says the carbon is estimated from the plan",
+   "transport carbon estimated from the planned lorries and routes" in body)
+
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
 print("placeholders still on the page:", ", ".join(placeholders) or "none")
