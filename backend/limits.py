@@ -200,15 +200,32 @@ def in_range(kind, value):
 
 
 def fmt_value(kind, value):
-    """'7.5 t', '4.4 m'."""
+    """'7.5 t', '4.4 m', '4.0 m' (heights and widths keep one decimal, as the sign does)."""
+    if kind in ("height", "width"):
+        return f"{float(value):.1f} m"
     return f"{value:g} {KINDS[kind]['unit']}"
 
 
 def icon_text(kind, value):
-    """The legend on the sign: '7.5T' for weight, '4.4m' for height and width."""
+    """The legend on the sign: '7.5T' for weight, '4.4m' / '4.0m' for height and width."""
     if kind in ("weight", "axle"):
         return f"{value:g}T"
-    return f"{value:g}m"
+    return f"{float(value):.1f}m"
+
+
+def signed_metric(raw):
+    """The metric figure a UK dual sign shows beside an imperial one, or None.
+
+    13 Oct 2026, checked on Street View: Melton Road, East Langton is signed **4.0 m and 13'0"**.
+    OSM carries only `maxheight=13'0"`; converted exactly that is 3.96 m, and a 4.0 m artic read
+    as OVER a limit it is exactly at. The metric on the sign is the imperial figure to the nearest
+    0.1 m (13'0" = 3.96 -> 4.0; 14'6" = 4.42 -> 4.4), so an imperial-only value is read as that.
+    One sign seen, not a published table: if a sign is ever found that disagrees, the signed
+    metric wins and this rule is wrong for it."""
+    if not is_imperial(raw):
+        return None
+    m = parse_length(raw)
+    return round(m, 1) if m is not None else None
 
 
 def imperial_text(value_m):
@@ -431,7 +448,7 @@ def parse_osm(elements, fetched_at=None):
             raw = next((tags[k] for k in keys if k in tags), None)
             if raw is None:
                 continue
-            val = parse_weight(raw) if kind in ("weight", "axle") else parse_length(raw)
+            val = parse_weight(raw) if kind in ("weight", "axle") else (signed_metric(raw) or parse_length(raw))
             if not in_range(kind, val):
                 dropped[kind] = dropped.get(kind, 0) + 1
                 continue
@@ -643,6 +660,12 @@ def stored(box=None, sources=None):
             d["tags"] = json.loads(d.pop("tags_json") or "{}")
         except Exception:
             d["tags"] = {}
+        # 13 Oct 2026: a row imported before signed_metric() existed holds the exact conversion
+        # (13'0" -> 3.96); read it as the signed metric so a re-check fixes it without a re-import
+        if d.get("kind") in ("height", "width") and d.get("signed"):
+            sm = signed_metric(d["signed"])
+            if sm is not None:
+                d["value"] = sm
         out.append(d)
     out.sort(key=lambda d: (d["source"], d["kind"], d["ext_id"]))
     return out
@@ -828,8 +851,13 @@ def assess(limit, profile, leg="loaded"):
     if have is None:
         return {"verdict": "unknown", "vehicle": None, "margin": None,
                 "note": f"factors.json has no {dim} for this vehicle"}
-    verdict = "exceeds" if have > float(limit["value"]) else "within"
-    return {"verdict": verdict, "vehicle": have, "margin": round(float(limit["value"]) - have, 2), "note": None}
+    lim = float(limit["value"])
+    # 13 Oct 2026: a vehicle exactly at the signed limit is legal, and is said, not counted as a breach or hidden
+    if abs(have - lim) < 0.005:
+        return {"verdict": "at_limit", "vehicle": have, "margin": 0.0,
+                "note": "exactly at the signed limit: legal, but check the vehicle's real height and the sign"}
+    verdict = "exceeds" if have > lim else "within"
+    return {"verdict": verdict, "vehicle": have, "margin": round(lim - have, 2), "note": None}
 
 
 def headline(limit):
@@ -898,7 +926,7 @@ def check_route(route_id, _limits=None):
                 "verdict": a["verdict"], "vehicle_value": a["vehicle"], "margin": a["margin"], "note": note,
                 "anchor": [L["anchor_lon"], L["anchor_lat"]],
             })
-    order = {"exceeds": 0, "unknown": 1, "within": 2}
+    order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "within": 3}
     # a limit the route runs ALONG outranks a point limit (which may be a crossing)
     hits.sort(key=lambda h: (order.get(h["verdict"], 3), bool(h["point"]), h["kind"], h["vehicle_profile"], h["leg"]))
     return {"route_id": route_id, "baked": True, "hits": hits,
