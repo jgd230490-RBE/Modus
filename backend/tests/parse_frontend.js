@@ -2678,6 +2678,35 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      _db.includes('{!wall && <span className="text-slate-400 font-normal">· click a bar to focus</span>}'));
 }
 
+// ---- 14 Oct 2026 (the user: "rather than having huge charts, size charts and KPIs appropriately; do a design UI and UX
+// quality check"). Found: charts stretched to fill with no message; four months as 180 px slabs; the carbon line's axis at
+// 370 (a 10 % dip looked like a cliff); "1,000,000" ticks. Now: a headline over each big-screen chart, bars capped,
+// axes from zero, compact ticks. Measured: fattest bar 68 px at 1080p (was ~180), every value axis min 0.
+{
+  const _db = (src.match(/function Dashboard\(\{[\s\S]*?\n\}\n/) || [""])[0];
+  const _sc = (src.match(/function DashboardStockChart\([\s\S]*?\n\}\n/) || [""])[0];
+  const _wall = _db.slice(_db.indexOf('<div className="wall-charts">'));
+  ok("DESIGN: every big-screen chart opens with its message (a ChartHead), only on a filled screen — eight charts, eight headlines",
+     (_wall.match(/\{fill && <ChartHead /g) || []).length === 8 && /const ChartHead = \(\{ value, label, note, tone \}\) => \(/.test(_db)
+     && ["demandCfg", "progressCfg", "costCfg", "topCfg", "tripsCfg", "fleetCfg", "co2Cfg", "splitCfg"].every(k => new RegExp("<ChartHead [^\\n]*\\n\\s*<ChartCanvas config=\\{" + k + "\\}").test(_wall))
+     && !_db.slice(0, _db.indexOf('<div className="wall-charts">')).includes("<ChartHead "));
+  ok("DESIGN: the headlines say what the number is measured against (delivered of plan, planned vs the model, share of tonnes, per tonne)",
+     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualT)} t reported of ${bigNum(K.totT)} t planned`')
+     && _wall.includes('"the fair-price model"') && _wall.includes("% of the tonnes in view`") && _wall.includes("kg for each tonne moved`"));
+  ok("DESIGN: the stockpile screen opens with how many are over capacity (red), nearly full, with room, and with no capacity recorded",
+     _sc.includes('{nOver ? `${nOver} over capacity` : "None over capacity"}') && _sc.includes("`${noCap.length} with no capacity recorded`")
+     && _sc.includes("maxBarThickness: fill ? Math.round(sf * 4.5) : 40"));
+  ok("DESIGN: every chart's value axis starts at zero, with compact ticks, and a bar is capped at 4.5 × its text (fitChartConfig)",
+     /if\(vax\.beginAtZero == null && vax\.min == null\) vax\.beginAtZero = true;/.test(src) && /if\(!vt\.callback\) vt\.callback = compactTick;/.test(src)
+     && /o\.datasets = \{ \.\.\.\(o\.datasets \|\| \{\}\), bar: \{ maxBarThickness: Math\.round\(fsz \* 4\.5\)/.test(src)
+     && /const compactTick = \(v\) => \{/.test(src));
+  ok("DESIGN: the headline type is from the screen height (number ~5 %, label 2 %, note 1.6 %), the label spaced from the number",
+     /\.chart-head \.ch-val\{font-weight:700;color:var\(--navy-deep\);font-size:clamp\(1\.6rem,min\(5\.2vh,2\.7vw\),6\.5rem\);/.test(html)
+     && /\.chart-head \.ch-lbl\{[^}]*margin-left:\.45em;\}/.test(html));
+  ok("DESIGN: series names at a chart's end keep 20 characters (were cut at 15: 'Large aggregat…'), with room for them",
+     src.includes('const t = m.label.length > 20 ? m.label.slice(0, 19) + "…" : m.label;') && /const SERIES_LABEL_PAD = 136;/.test(src));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

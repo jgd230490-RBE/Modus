@@ -388,6 +388,12 @@ async function chartBoxDom(){
      tk.maxRotation === 0 && tk.autoSkip === true && typeof tk.callback === "function"
      && tk.callback.call({ getLabelForValue: () => "Route R-001 · Earthworks and more" }, 0) === "Route R-001 · Ear…"
      && tk.callback.call({ getLabelForValue: () => "Short" }, 0) === "Short");
+  // 14 Oct 2026 (the design check): every value axis from zero, short tick labels, and no bar fatter than 4.5 × the text
+  const yv = ((b.options.scales || {}).y) || {}, bt = ((b.options.datasets || {}).bar) || {};
+  ok("CHART BOX: the value axis starts at zero and reads 1.5 M / 250 k / 85 (the tooltip keeps the exact figure)",
+     yv.beginAtZero === true && typeof (yv.ticks || {}).callback === "function"
+     && yv.ticks.callback(1500000) === "1.5 M" && yv.ticks.callback(250000) === "250 k" && yv.ticks.callback(85) === "85" && yv.ticks.callback(25000000) === "25 M");
+  ok("CHART BOX: a bar is never fatter than 4.5 × the chart's text (11 px text → 50 px)", bt.maxBarThickness === 50);
   ok("CHART BOX: the rule by width — a doughnut keeps its legend on the right only from 1024 px",
      w.__CHARTFIT.chartLegendPos("doughnut", 1100, "right") === "right" && w.__CHARTFIT.chartLegendPos("doughnut", 900, "right") === "bottom"
      && w.__CHARTFIT.chartLegendPos("bar", 700, "bottom") === "bottom" && w.__CHARTFIT.chartLegendPos("bar", 1400, "top") === "top");

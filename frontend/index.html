@@ -438,6 +438,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wall.dash-fill .stock-body{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr);}
   .dash-wall.dash-fill .stock-nocap{font-size:clamp(13px,1.6vh,26px);}
   .chart-box.is-fill{height:100%;min-height:0;}
+  /* the chart's headline on a filled big screen: the number, what it is, and what it is measured against */
+  .chart-head{margin:.1em 0 .5em;line-height:1.15;}
+  .chart-head .ch-val{font-weight:700;color:var(--navy-deep);font-size:clamp(1.6rem,min(5.2vh,2.7vw),6.5rem);letter-spacing:-.01em;}
+  .chart-head .ch-lbl{font-weight:600;color:var(--muted);font-size:clamp(14px,2vh,34px);margin-left:.45em;}
+  .chart-head .ch-note{color:var(--muted);font-size:clamp(13px,1.6vh,28px);margin-top:.2em;}
   /* the rotation: a thin line that fills while a section is on show, and what comes next (no motion if reduced) */
   .dash-rot{position:relative;display:inline-block;width:120px;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden;vertical-align:middle;}
   .dash-rot>i{position:absolute;inset:0 auto 0 0;width:0;background:var(--action);animation:dash-rot linear forwards;}
@@ -970,12 +975,16 @@ const chartLegendPos = (type, vw, asked) => {
   return asked || "bottom";
 };
 const cutLabel = (s) => { s = String(s == null ? "" : s); return s.length > CHART_LABEL_MAX ? s.slice(0, CHART_LABEL_MAX - 1) + "…" : s; };
+// 14 Oct 2026 (the design check): "1,000,000" on an axis is noise; 1.0 M / 200 k reads at a glance (the tooltip keeps the
+// exact figure). A value axis always starts at zero — the carbon line started at 370 and made a 10 % dip look like a cliff.
+const compactTick = (v) => { const a = Math.abs(+v); if(!isFinite(a)) return v;
+  return a >= 1e6 ? (+v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + " M" : a >= 1e3 ? Math.round(+v / 1e3) + " k" : String(Math.round(+v * 100) / 100); };
 // 13 Oct 2026 (W16, D39): series NAMED ON THE CHART, at the right-hand end of each series, a colour mark then the name
 // in ink (the colour system's rule 4). Opt-in per chart (options.plugins.seriesLabels = { on: true }) and only from
 // 768 px; the legend stays. Why every accent, not only the shades: compared pair by pair (not only neighbours), even
 // the default palette has a weak pair (blue and violet, 0.4 for a deuteranope), and the shade accents several. A
 // stacked segment thinner than 10 px is left to the legend; labels are pushed apart so none overlap.
-const SERIES_LABEL_PAD = 108;
+const SERIES_LABEL_PAD = 136;   // 14 Oct 2026: room for 20 characters (was 108 for 15)
 const SERIES_LABELS = { id: "seriesLabels", afterDatasetsDraw(chart, _args, opts){
   if(!opts || !opts.on) return;
   const ctx = chart.ctx, A = chart.chartArea; if(!A) return;
@@ -1001,7 +1010,7 @@ const SERIES_LABELS = { id: "seriesLabels", afterDatasetsDraw(chart, _args, opts
   marks.forEach(m => {
     ctx.fillStyle = m.col || "#A8A29E"; ctx.fillRect(x, m.y - fs * 0.36, fs * 0.72, fs * 0.72);
     ctx.fillStyle = tok("--ink", "#1E293B");
-    const t = m.label.length > 15 ? m.label.slice(0, 14) + "…" : m.label;
+    const t = m.label.length > 20 ? m.label.slice(0, 19) + "…" : m.label;   // 14 Oct: 20 (was 15; "Large aggregat…")
     ctx.fillText(t, x + fs * 1.1, m.y);
   });
   ctx.restore();
@@ -1028,7 +1037,18 @@ function fitChartConfig(config, vw){
     const ax = { ...(scales[cat] || {}) };
     const ticks = { ...(ax.ticks || {}), maxRotation: 0, autoSkip: true };
     if(!ticks.callback) ticks.callback = function(v){ return cutLabel(this.getLabelForValue(v)); };
-    ax.ticks = ticks; scales[cat] = ax; o.scales = scales;
+    ax.ticks = ticks; scales[cat] = ax;
+    // the value axis: from zero, compact labels (unless the chart set its own, e.g. "%")
+    const val = cat === "x" ? "y" : "x";
+    const vax = { ...(scales[val] || {}) };
+    if(vax.beginAtZero == null && vax.min == null) vax.beginAtZero = true;
+    const vt = { ...(vax.ticks || {}) };
+    if(!vt.callback) vt.callback = compactTick;
+    vax.ticks = vt; scales[val] = vax;
+    o.scales = scales;
+    // a bar is never fatter than ~4.5 × the chart's text: four months on a 1920 px TV were 180 px slabs
+    const fsz = (((ax.ticks || {}).font || {}).size) || 11;
+    o.datasets = { ...(o.datasets || {}), bar: { maxBarThickness: Math.round(fsz * 4.5), ...((o.datasets || {}).bar || {}) } };
   }
   return { ...config, options: o };
 }
@@ -1674,9 +1694,11 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C4, borderWidth: 0 }] }, options: { ...legendOpts, plugins: { ...legendOpts.plugins, ...named } } };
   const splitCfg  = { type: "doughnut", data: { labels: D.mats, datasets: [{ data: D.mats.map(m => D.split[m]), backgroundColor: D.mats.map((m, i) => colorOf(i)), borderWidth: 2, borderColor: tok("--surface", "#fff") }] }, options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 10, font: tf } } } } };
   const topN = [...D.routeRows].sort((a, b) => b.t - a.t).slice(0, 10);
+  const splitSum = D.mats.reduce((a, m) => a + (D.split[m] || 0), 0);
+  const splitTop = splitSum > 0 ? D.mats.map(m => ({ m, pct: (D.split[m] || 0) * 100 / splitSum })).sort((a, b) => b.pct - a.pct)[0] : null;
   const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => (lineKey && r.key !== lineKey) ? C1S : C1), borderWidth: 0 }] },
     options: { indexAxis: "y", ...commonOpts, onClick: (evt, els) => { if(els && els.length) pick(topN[els[0].index].key); },
-               scales: { x: { grid: { display: false }, ticks: { font: { size: wall ? 12 : 10 } } }, y: { ticks: { font: { size: wall ? 12 : 9 } } } } } };
+               scales: { x: { grid: { display: false }, ticks: { font: { size: wall ? tf.size : 10 } } }, y: { ticks: { font: { size: wall ? tf.size : 9 } } } } } };
 
   // width-capped: a vehicle name is 50 characters, and an uncapped <select> pushed the
   // whole filter row off the right of a 1440 px screen (the 11 Sep screenshot)
@@ -1697,6 +1719,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   );
   // 13 Oct 2026 (W3): no hover tooltip and no help cursor — the "i" opens the figure's info box,
   // with the exact figure the tooltip used to carry (`info.value`)
+  // 14 Oct 2026 (the design check): on a filled big screen each chart opens with its message — the number and what it is
+  // measured against — so nobody has to read the axes from across a room; the chart takes what is left.
+  const ChartHead = ({ value, label, note, tone }) => (
+    <div className="chart-head" data-chart-head="1">
+      <span className="ch-val kpi-num" style={tone ? { color: tone } : undefined}>{value}</span> <span className="ch-lbl">{label}</span>
+      {note && <div className="ch-note">{note}</div>}
+    </div>
+  );
   // 14 Oct 2026: the figure's size is CSS (.fig-val), so the big screen can scale it by the screen's height
   const Fig = ({ value, label, sub, info, tone }) => (
     <div className="min-w-0">
@@ -2042,18 +2072,22 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       <div className="wall-charts">
         <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
+          {fill && <ChartHead value={`${bigNum(K.totT)} t`} label="planned in view" note={K.peakMonthT ? `the busiest month is ${K.peakMonth}, ${bigNum(K.peakMonthT)} t` : null} />}
           <ChartCanvas config={demandCfg} size="lg" />
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
+          {fill && <ChartHead value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} label="of the plan delivered" tone="var(--chart-2)" note={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t reported of ${bigNum(K.totT)} t planned`} />}
           <ChartCanvas config={progressCfg} size="lg" />
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
+          {fill && <ChartHead value={plannedVsFair == null ? (K.planned ? `${CUR()} ${eurK(K.planned.eur)}` : "—") : `${Math.abs(plannedVsFair).toFixed(0)} % ${plannedVsFair < 0 ? "below" : "above"}`} label={plannedVsFair == null ? "planned" : "the fair-price model"} note={K.planned && K.fair ? `planned ${CUR()} ${eurK(K.planned.eur)} · the model ${CUR()} ${eurK(K.fair.eur)}` : "no planned or fair price to compare yet"} />}
           <ChartCanvas config={costCfg} />
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage {!wall && <span className="text-slate-400 font-normal">· click a bar to focus</span>}<InfoTip id="dash.chart.top" /></div>
+          {fill && <ChartHead value={topN[0] ? topN[0].route_id : "—"} label="carries the most" note={topN[0] && K.totT ? `${bigNum(topN[0].t)} t, ${(topN[0].t * 100 / K.totT).toFixed(0)} % of the tonnes in view` : null} />}
           <ChartCanvas config={topCfg} />
         </div>
       </div>
@@ -2067,18 +2101,22 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       <div className="wall-charts">
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
+          {fill && <ChartHead value={bigNum(K.totTrips)} label="loaded trips" note={`about ${grp(Math.round(K.totTrips / nMonths))} a month`} />}
           <ChartCanvas config={tripsCfg} />
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
+          {fill && <ChartHead value={K.peakFleet ? grp(K.peakFleet) : "—"} label="vehicles at the peak" note={K.peakFleet ? `in ${K.peakFleetMonth}` : "needs the routes worked out"} />}
           <ChartCanvas config={fleetCfg} />
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
+          {fill && <ChartHead value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(0)} t`} label="CO₂e" note={K.intensity == null ? null : `${K.intensity.toFixed(1)} kg for each tonne moved`} />}
           <ChartCanvas config={co2Cfg} />
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
+          {fill && <ChartHead value={splitTop ? `${splitTop.pct.toFixed(0)} %` : "—"} label={splitTop ? splitTop.m : ""} note="of the tonnes in view" />}
           <ChartCanvas config={splitCfg} />
         </div>
       </div>
@@ -2283,7 +2321,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
   const cfg = { type: "bar",
     data: { labels: bars.map(b => b.sp.name), datasets: [{ label: "% of capacity", data: bars.map(b => Math.round(b.pct * 10) / 10),
               backgroundColor: bars.map(b => b.over ? "#DC2626" : b.pct >= 90 ? "#D97706" : "#059669"), borderWidth: 0, borderRadius: 4, barPercentage: 0.7,
-              maxBarThickness: fill ? 96 : 40 }] },
+              maxBarThickness: fill ? Math.round(sf * 4.5) : 40 }] },
     options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14, right: wall ? sf * 13 : 0 } },
       plugins: { legend: { display: false }, tooltip: { callbacks: {
         title: (items) => items.length ? bars[items[0].dataIndex].sp.name : "",
@@ -2295,8 +2333,14 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
                 y: { ticks: { font: { size: wall ? sf + 1 : 11 } } } } },
     plugins: [capLine, barLabels] };
   const c = cols.find(x => x.k === selKey);
+  // 14 Oct 2026 (the design check): on a filled big screen the chart opens with its message
+  const nOver = bars.filter(b => b.over).length, nNear = bars.filter(b => !b.over && b.pct >= 90).length, nRoom = bars.length - nOver - nNear;
   return (
     <div className="card p-4 stock-card">
+      {fill && bars.length > 0 && <div className="chart-head" data-chart-head="1">
+        <span className="ch-val kpi-num" style={nOver ? { color: "var(--red)" } : undefined}>{nOver ? `${nOver} over capacity` : "None over capacity"}</span>
+        <div className="ch-note">{[nNear ? `${nNear} nearly full` : "", nRoom ? `${nRoom} with room` : "", noCap.length ? `${noCap.length} with no capacity recorded` : ""].filter(Boolean).join(" · ")}</div>
+      </div>}
       <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
         <div className="text-sm font-semibold text-slate-700 chart-title">Stockpile capacity <span className="text-slate-400 font-normal">· how full each stockpile is at the end of {c ? `${MONTHS[(c.m - 1) % 12]} week ${c.w}` : "the week"}</span><InfoTip id="dash.stock" /></div>
         <div className="flex flex-wrap gap-1">
