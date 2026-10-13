@@ -3292,7 +3292,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && (code.match(/bar\.style\.display='(flex|none)';\n        syncTimelineFoot\(\);/g) || []).length === 2);
   ok("⭐ browser check 12 Oct (phone): the section click opens the sheet card on the phone shell and the map popup only above it",
      code.includes("if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openRunCard === 'function') { openRunCard(run.id); return; }\n            new mapboxgl.Popup({ offset: 10, maxWidth: '360px' })")
-     && code.includes("box.innerHTML = String(SHEET.card).indexOf('run:') === 0 ? runCardHTML(String(SHEET.card).slice(4)) : routeCardHTML(SHEET.card);"));
+     // NARROWED 13 Oct 2026 (lorry limits): the sheet's card dispatch gained a third kind ('limit:'); a section ('run:')
+     // still opens its run card and anything else the route card
+     && /const sc = String\(SHEET\.card\);\s*box\.innerHTML = sc\.indexOf\('run:'\) === 0 \? runCardHTML\(sc\.slice\(4\)\)\s*: sc\.indexOf\('limit:'\) === 0 \? limitSheetHTML\(sc\.slice\(6\)\)\s*: routeCardHTML\(SHEET\.card\);/.test(code));
   ok("⭐ browser check 12 Oct (phone): a near-miss tap is answered — exact hits and other clickable layers keep their own click, then a section, then a route",
      code.includes("if ((runL.length || routeL.length) && map.queryRenderedFeatures(e.point, { layers: runL.concat(routeL) }).length) return;")
      && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;")
@@ -4486,6 +4488,288 @@ function qrRead(mod) {
   }
 }
 
+// ---- 13 Oct 2026: LORRY LIMITS (weight, height, width, axle) from OpenStreetMap and HERE (/api/public/limits) --------
+{
+  const SEC_A = "// ===== 13 Oct 2026: LORRY LIMITS", SEC_B = "// ===== end of lorry limits =====";
+  const sec = cut0(src, SEC_A, SEC_B);
+  const secCode = sec.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  const grpHtml = cut0(html, '<div class="control-group" id="limits-group" hidden>', '<!-- 12 Oct 2026 (mockup 7): on a phone the sheet ends');
+  ok("limits: the section is in the page, in the FIRST script block (with style.load and the restrictions)",
+     sec.length > 2000 && blocks[0].includes(SEC_A) && blocks[0].includes(SEC_B));
+  ok("⭐ limits panel: a 'Lorry limits' group, hidden until the endpoint answers, right after the closures group",
+     grpHtml.includes("<h3>Lorry limits</h3>")
+     && html.indexOf('id="restrictions-group"') < html.indexOf('id="limits-group"')
+     && html.indexOf('id="limits-group"') < html.indexOf('<div class="m-done">'));
+  ok("⭐ limits panel: three boxes Weight · Height · Width, layer-limit-*, OFF by default, each with its count",
+     ['weight', 'height', 'width'].every(k => new RegExp('<input type="checkbox" id="layer-limit-' + k + '" onchange="toggleLimits\\(\\)">').test(grpHtml)
+                                          && grpHtml.includes('id="limit-count-' + k + '"'))
+     && !/id="layer-limit-[a-z]+"[^>]*checked/.test(grpHtml)
+     && /> Weight </.test(grpHtml) && /> Height </.test(grpHtml) && /> Width </.test(grpHtml)
+     && !grpHtml.includes('layer-limit-axle'));
+  ok("limits panel: the source note and the 'none loaded' line are in the group",
+     grpHtml.includes("OpenStreetMap contributors and HERE · coverage is incomplete")
+     && grpHtml.includes('<div class="control-item" id="limit-empty" hidden>') && grpHtml.includes("No lorry limits loaded for this area yet"));
+  ok("⭐ limits: /api/public/limits is fetched (through CONFIG.API_BASE, like the other gated reads)",
+     secCode.includes("fetch(CONFIG.API_BASE + '/public/limits')"));
+  ok("⭐ limits: drawLimitSign (ONE pure drawing function) and limitCardHTML exist; the card's SVG is the same drawing",
+     /function drawLimitSign\(ctx, kind, iconText, imperial, size, breach\) \{/.test(secCode)
+     && /function limitCardHTML\(props\) \{/.test(secCode)
+     && secCode.includes("drawLimitSign(ctx, kind, iconText, imperial, 100, breach);")
+     && secCode.includes("drawLimitSign(ctx, p.kind, p.icon_text, p.imperial, LIMIT_SIGN_PX, Number(p.breach_count) > 0);"));
+  ok("⭐ limits: each sign is a canvas image registered with addImage at a pixelRatio of 2 or more",
+     secCode.includes("const dpr = Math.max(2, Math.ceil(window.devicePixelRatio || 1));")
+     && secCode.includes("map.addImage(name, ctx.getImageData(0, 0, px, px), { pixelRatio: dpr });"));
+  ok("⭐ limits zoom rule: clustered up to zoom 10 (radius 40), a plain ring below 13, the sign from 13, the label from 14, the stretch dashed red from 13",
+     secCode.includes("const LIMIT_CLUSTER_MAX_ZOOM = 10;") && secCode.includes("clusterMaxZoom: LIMIT_CLUSTER_MAX_ZOOM, clusterRadius: 40")
+     && secCode.includes("const LIMIT_SIGN_ZOOM = 13;") && secCode.includes("const LIMIT_LABEL_ZOOM = 14;")
+     && /id: 'limit-dots', type: 'circle', source: 'limits-points', maxzoom: LIMIT_SIGN_ZOOM/.test(secCode)
+     && /id: 'limit-signs', type: 'symbol', source: 'limits-points', minzoom: LIMIT_SIGN_ZOOM/.test(secCode)
+     && secCode.includes("'text-field': ['step', ['zoom'], '', LIMIT_LABEL_ZOOM, ['get', '_label']]")
+     && /id: 'limit-lines', type: 'line', source: 'limits-lines', minzoom: LIMIT_SIGN_ZOOM[\s\S]{0,120}'line-color': LIMIT_RED, 'line-width': 3\.5, 'line-dasharray': \[2, 1\.5\]/.test(secCode)
+     && secCode.includes("const LIMIT_RED = '#C8102E';"));
+  ok("limits: a clash wins a collision (symbol-sort-key, overlap off) and the label is the first thing dropped",
+     secCode.includes("'icon-allow-overlap': false") && secCode.includes("'symbol-sort-key': ['get', '_sort']")
+     && secCode.includes("_sort: p.breach_count > 0 ? 0 : 1") && secCode.includes("'text-optional': true"));
+  ok("⭐ limits attribution: the sources carry the attribution of every source in the loaded limits (Mapbox prints it while a limit layer shows)",
+     secCode.includes("const attribution = limitAttribution(fs);") && secCode.includes("attribution ? Object.assign(o, { attribution: attribution }) : o"));
+  ok("⭐ limits survive a basemap switch: style.load re-adds them from the cached collection (no second fetch)",
+     code.includes("if (LIM.data) ensureLimitLayers(); else loadLimits();"));
+  ok("limits: the layers ride over the routes and under the sites (raiseMarks raises them first)",
+     code.includes("if (typeof raiseLimits === 'function' && raiseLimits(ids)) {") && /function raiseLimits\(ids\) \{/.test(secCode));
+  ok("⭐ limits click: the sign, ring, stretch and cluster are clickable (hand cursor, phone tap) and the route click gives way",
+     /const CLICKABLE_LAYERS = \[[^\]]*'limit-signs', 'limit-dots', 'limit-lines', 'limit-clusters', 'area-fill', 'area-county-fill'\];/.test(code)
+     && code.includes("if(typeof limitHitAt === 'function' && limitHitAt(e.point)) return;"));
+  ok("⭐ limits phone: the card opens in the sheet (SHEET.card 'limit:<id>'), the desktop gets a popup",
+     code.includes("if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openLimitCard === 'function') { openLimitCard(p.id); return; }")
+     && /function openLimitCard\(id\) \{\s*if \(id == null \|\| id === ''\) return;\s*SHEET\.card = 'limit:' \+ id;/.test(code)
+     && code.includes("limitCardHTML(f.properties)") && code.includes("setHTML(limitCardHTML(p))"));
+  ok("⭐ limits conditions: buildConditions adds the limit rows for the routes on screen; 'Show on map' goes to showLimit",
+     code.includes("limitConditionRows(LIM.data.features, routes.map(p => p.route_id), month).forEach(i => items.push(i));")
+     && code.includes("if (kind === 'l') { if (typeof showLimit === 'function') showLimit(id); return; }")
+     && code.includes("if (LIM.data && typeof TL !== 'undefined' && TL.on && typeof renderTimelineWarnings === 'function') renderTimelineWarnings(TL.month);"));
+  ok("⭐ limits link / council view: the boxes are layer-* boxes, so layerBoxes() (the link) and councilOtherBoxes() (remember / restore) take them",
+     code.includes("return [...document.querySelectorAll('input[type=checkbox][id^=\"layer-\"], input[type=checkbox][id^=\"restr-\"], #toggle-road-load, #toggle-carbon, #toggle-forecast')];")
+     && code.includes(".filter(cb => cb.id.indexOf('layer-areas-') !== 0 && cb.id.indexOf('layer-zone-') !== 0);")
+     && code.includes("if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || LINK_MODE_BOXES.includes(id)) scheduleViewWrite();"));
+  ok("⭐ limits presets: 'Closures and restrictions' ticks the limit boxes while the group offers them; presetMatches reads the same presetLayers",
+     code.includes("if (k.indexOf('limit-') === 0 && presetLimitsAvailable()) on.add(k);")
+     && /function presetLimitsAvailable\(\) \{/.test(code) && code.includes("const want = presetLayers(p);\n        return layerBoxes()"));
+  ok("🔴 limits wording: no 'truck', no banned public words, no team id in the new code or the group",
+     !/truck/i.test(sec + grpHtml) && !/\b(optimi[sz]e|predict|real-time|AI|secure|live tracking|telematics)\b/.test(sec + grpHtml)
+     && !/IPT\d|'IPT|"IPT/.test(sec + grpHtml));
+
+  // ---- the sandbox: the section run against plain data, a recording 2D context and a fake map ----
+  const escSrc = (/const escHtml = (s => [^\n]+);/.exec(html) || [])[1];
+  let escHtml = null; try { escHtml = new Function("return " + escSrc)(); } catch (e) {}
+  ok("limits (sandbox): the page's own escHtml is read for the sandbox", typeof escHtml === 'function' && escHtml("<b>'") === '&lt;b&gt;&#39;');
+  let unit = 'km';
+  const KM_PER_MI = 1.609344;
+  const DU = () => unit, fmtDist = (km, dp) => (unit === 'mi' ? km / KM_PER_MI : km).toFixed(dp == null ? 1 : dp);
+  const byId = {};
+  const el = id => {
+    const o = { id, hidden: false, checked: false, textContent: '', classes: new Set(), dispatchEvent() { return true; } };
+    o.classList = { toggle: (c, on) => { if (on) o.classes.add(c); else o.classes.delete(c); } };
+    byId[id] = o;
+    return o;
+  };
+  ['limits-group', 'limit-boxes', 'limit-empty', 'limit-source', 'limit-count-weight', 'limit-count-height', 'limit-count-width',
+   'limit-row-weight', 'limit-row-height', 'limit-row-width', 'layer-limit-weight', 'layer-limit-height', 'layer-limit-width'].forEach(id => el(id));
+  byId['limits-group'].hidden = true;
+  function fakeCtx(noMeasure) {
+    const calls = [];
+    const c = { calls, fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textAlign: '', textBaseline: '',
+      beginPath() { calls.push(['beginPath']); }, arc(...a) { calls.push(['arc', ...a]); }, moveTo(...a) { calls.push(['moveTo', ...a]); },
+      lineTo(...a) { calls.push(['lineTo', ...a]); }, closePath() { calls.push(['closePath']); },
+      fill() { calls.push(['fill', this.fillStyle]); }, stroke() { calls.push(['stroke', this.strokeStyle, this.lineWidth]); },
+      fillText(t, x, y) { calls.push(['fillText', t, x, y, this.font, this.fillStyle]); },
+      scale(x, y) { calls.push(['scale', x, y]); }, getImageData(x, y, w, h) { return { width: w, height: h, data: new Uint8Array(4) }; } };
+    if (!noMeasure) c.measureText = function (t) { const m = /([\d.]+)px/.exec(this.font); return { width: String(t).length * (m ? +m[1] : 10) * 0.6 }; };
+    return c;
+  }
+  const canvases = [];
+  const document = { getElementById: id => byId[id] || null,
+                     createElement: t => { const cv = { tag: t, width: 0, height: 0, ctx: fakeCtx(), getContext() { return this.ctx; } }; canvases.push(cv); return cv; } };
+  const window = { devicePixelRatio: 1, innerHeight: 800 };
+  // the fake map: sources, layers, images, handlers
+  const M = { sources: {}, layers: {}, order: [], images: {}, handlers: [], vis: {}, moved: [] };
+  const map = {
+    isStyleLoaded: () => true, once() {}, hasImage: n => !!M.images[n], addImage: (n, img, o) => { M.images[n] = { img, o }; },
+    getSource: id => M.sources[id] ? { setData: d => { M.sources[id].data = d; }, getClusterExpansionZoom() {} } : undefined,
+    addSource: (id, o) => { M.sources[id] = Object.assign({}, o); },
+    getLayer: id => M.layers[id], addLayer: l => { M.layers[l.id] = l; M.order.push(l.id); M.vis[l.id] = l.layout && l.layout.visibility; },
+    setLayoutProperty: (id, k, v) => { if (k === 'visibility') M.vis[id] = v; },
+    on: (...a) => { M.handlers.push(a); }, getStyle: () => ({ layers: M.order.map(id => ({ id })) }), moveLayer: id => { M.moved.push(id); },
+    queryRenderedFeatures: () => [], getCanvas: () => ({ style: {} }), getZoom: () => 9,
+  };
+  let fetchAnswer = null;
+  const fetch = () => fetchAnswer;
+  const quiet = { warn() {}, log() {}, info() {} };
+  let L = null, lerr = '';
+  try {
+    L = new Function("escHtml", "DU", "fmtDist", "document", "window", "map", "mapboxgl", "CONFIG", "MARK_LAYERS", "raiseMarks", "fetch", "console",
+      sec + "\nreturn { drawLimitSign, limitSignSVG, limitCardHTML, limitConditionRows, limitChipText, limitAppliesText, limitValueText, limitLengthText, limitDate,"
+          + " limitPointFeatures, limitLineFeatures, limitAttribution, limitImageName, loadLimits, renderLimitGroup, ensureLimitLayers, toggleLimits, raiseLimits, LIM };")(
+      escHtml, DU, fmtDist, document, window, map, { Popup: function () { return { setLngLat() { return this; }, setHTML() { return this; }, addTo() { return this; } }; } },
+      { API_BASE: '/api' }, ['site-gates', 'locations', 'site-gates-label'], () => {}, fetch, quiet);
+  } catch (e) { lerr = String(e && e.stack || e); }
+  ok("limits (sandbox): the section runs against plain data, a recording context and a fake map", !!L, lerr.slice(0, 400));
+  if (L) {
+    // -- the sign --
+    const drawn = (kind, t, imp, breach, noMeasure) => { const c = fakeCtx(noMeasure); L.drawLimitSign(c, kind, t, imp, 34, breach); return c.calls; };
+    const texts = cs => cs.filter(c => c[0] === 'fillText').map(c => c[1]);
+    const w = drawn('weight', '7.5T', null, false);
+    ok("⭐ drawLimitSign (sandbox): the ring is stroked in the sign red #C8102E, over a white face",
+       w.some(c => c[0] === 'stroke' && c[1] === '#C8102E') && w.find(c => c[0] === 'fill')[1] === '#FFFFFF'
+       && w.filter(c => c[0] === 'arc').length === 1);
+    ok("⭐ drawLimitSign (sandbox): the weight legend '7.5T' is drawn in black, and nothing else (no triangles, no '!')",
+       JSON.stringify(texts(w)) === '["7.5T"]' && w.find(c => c[0] === 'fillText')[5] === '#111111' && !w.some(c => c[0] === 'lineTo'));
+    const h = drawn('height', '4.4m', "14'6\"", false);
+    const hTxt = h.filter(c => c[0] === 'fillText');
+    ok("⭐ drawLimitSign (sandbox): height draws two triangle PATHS (down at the top, up at the bottom) and imperial OVER metric",
+       h.filter(c => c[0] === 'moveTo').length === 2 && h.filter(c => c[0] === 'lineTo').length === 4 && h.filter(c => c[0] === 'closePath').length === 2
+       && (() => { const mv = h.filter(c => c[0] === 'moveTo'), ln = h.filter(c => c[0] === 'lineTo');
+                   return mv[0][2] < 17 && ln[1][2] > mv[0][2] && mv[1][2] > 17 && ln[3][2] < mv[1][2]; })()
+       && hTxt.length === 2 && hTxt[0][1] === "14'6\"" && hTxt[1][1] === '4.4m' && hTxt[0][3] < hTxt[1][3], JSON.stringify(h.slice(0, 12)));
+    const wd = drawn('width', '2.0m', "6'6\"", false);
+    ok("drawLimitSign (sandbox): width draws the triangles at the left and right pointing IN, imperial over metric",
+       (() => { const mv = wd.filter(c => c[0] === 'moveTo'), ln = wd.filter(c => c[0] === 'lineTo');
+                return mv.length === 2 && mv[0][1] < 17 && ln[1][1] > mv[0][1] && mv[1][1] > 17 && ln[3][1] < mv[1][1]; })()
+       && JSON.stringify(texts(wd)) === JSON.stringify(["6'6\"", '2.0m']));
+    ok("drawLimitSign (sandbox): height with no imperial figure draws the metric alone",
+       JSON.stringify(texts(drawn('height', '4.4m', null, false))) === '["4.4m"]');
+    ok("drawLimitSign (sandbox): axle draws its legend over 'per axle'", JSON.stringify(texts(drawn('axle', '10T', null, false))) === '["10T","per axle"]');
+    const b = drawn('weight', '7.5T', null, true);
+    ok("⭐ drawLimitSign (sandbox): a clash adds a solid red disc with a white '!' at the top right — and only a clash",
+       texts(b).includes('!') && !texts(w).includes('!') && !texts(h).includes('!')
+       && b.filter(c => c[0] === 'arc').length === 2 && b.filter(c => c[0] === 'arc')[1][1] > 17 && b.filter(c => c[0] === 'arc')[1][2] < 17
+       && b.some(c => c[0] === 'fill' && c[1] === '#C8102E') && b.find(c => c[0] === 'fillText' && c[1] === '!')[5] === '#FFFFFF');
+    ok("drawLimitSign (sandbox): a context with no measureText still draws", JSON.stringify(texts(drawn('weight', '7.5T', null, false, true))) === '["7.5T"]');
+    const svg = L.limitSignSVG('height', '4.4m', "14'6\"", true, 44);
+    ok("limits (sandbox): the card's SVG is the same drawing (ring in #C8102E, the legends escaped, the '!' for a clash)",
+       /^<svg [^>]*viewBox="0 0 100 100" width="44"/.test(svg) && svg.includes('stroke="#C8102E"') && svg.includes('>14&#39;6&quot;</text>')
+       && svg.includes('>4.4m</text>') && svg.includes('>!</text>') && (svg.match(/<path /g) || []).length === 2);
+    // -- the card --
+    const W = { id: 'osm:w1:weight', kind: 'weight', value: 7.5, unit: 't', label: 'Weight limit 7.5 t', headline: 'Weight limit 7.5 t · Back Lane',
+                icon_text: '7.5T', imperial: null, signed: null, name: 'Back Lane', ref: null, exceptions: 'Except for access', source: 'osm',
+                source_label: 'OpenStreetMap', attribution: '© OpenStreetMap contributors (ODbL)', fetched_at: '2026-10-13T10:00:00+00:00',
+                length_m: 240.5, geom_type: 'LineString', anchor: [-0.92, 52.47],
+                breaches: [{ route_id: 'R004', vehicle: 'Artic Tipper (44t)', vehicle_value: 44.0, leg: 'loaded' }], breach_count: 1 };
+    const H = { id: 'osm:n7:height', kind: 'height', value: 4.4, unit: 'm', label: 'Height limit 4.4 m', icon_text: '4.4m', imperial: "14'6\"",
+                name: 'Kettering Road', ref: 'A6', exceptions: null, source: 'here', source_label: 'HERE', attribution: '© HERE',
+                fetched_at: '2026-10-12T08:00:00+00:00', length_m: null, geom_type: 'Point', anchor: [-0.9, 52.48], breaches: [], breach_count: 0 };
+    const cw = L.limitCardHTML(W);
+    ok("⭐ limitCardHTML (sandbox): a weight limit with 'Except for access' and one breach",
+       cw.includes('7.5 t') && cw.includes('Except for access') && cw.includes('R004 · Artic Tipper (44t) · loaded')
+       && cw.includes('Advisory: check the signed limit on site') && cw.includes('© OpenStreetMap contributors')
+       && cw.includes('<div class="lim-title">Weight limit 7.5 t</div>') && cw.includes('Vehicles over 7.5 t')
+       && cw.includes('OpenStreetMap · fetched 13 Oct 2026') && cw.includes('Back Lane · 241 m of road') && cw.includes('lim-v over') && cw.includes('<svg '), cw);
+    ok("limitCardHTML (sandbox): Mapbox's stringified properties give the same card", L.limitCardHTML(Object.assign({}, W,
+       { breaches: JSON.stringify(W.breaches), anchor: JSON.stringify(W.anchor), breach_count: '1' })) === cw);
+    const ch = L.limitCardHTML(H);
+    ok("⭐ limitCardHTML (sandbox): a height limit says its imperial figure (14'6\", escaped) and who it applies to; no breach: 'None of the planned routes'",
+       ch.includes(escHtml("14'6\"")) && ch.includes('Vehicles taller than 4.4 m (' + escHtml("14'6\"") + ')') && ch.includes('None of the planned routes')
+       && ch.includes('None recorded') && ch.includes('Kettering Road (A6)') && ch.includes('HERE · fetched 12 Oct 2026') && ch.includes('© HERE')
+       && !ch.includes('lim-v over') && !ch.includes('of road'), ch);
+    const evil = L.limitCardHTML(Object.assign({}, W, { name: '<b>Evil</b> Lane', exceptions: '<img src=x onerror=alert(1)>',
+                                                        breaches: [{ route_id: '<i>R9</i>', vehicle: '"V"', leg: 'return' }] }));
+    ok("⭐ limitCardHTML (sandbox): every interpolated string is escaped (a road named '<b>Evil</b> Lane')",
+       !evil.includes('<b>Evil') && evil.includes('&lt;b&gt;Evil&lt;/b&gt; Lane') && !evil.includes('<img') && !evil.includes('<i>R9')
+       && evil.includes('&lt;i&gt;R9&lt;/i&gt; · &quot;V&quot; · going back empty'));
+    ok("limitCardHTML (sandbox): both legs of one route and vehicle read as one line ('loaded and going back empty')",
+       L.limitCardHTML(Object.assign({}, W, { breaches: [{ route_id: 'R004', vehicle: 'Artic Tipper (44t)', leg: 'return' }, W.breaches[0]], breach_count: 2 }))
+        .includes('R004 · Artic Tipper (44t) · loaded and going back empty'));
+    ok("limitCardHTML (sandbox): an axle limit applies 'per axle'; a width limit 'wider than' with its imperial figure",
+       L.limitAppliesText({ kind: 'axle', value: 10, unit: 't' }) === 'Vehicles over 10 t per axle'
+       && L.limitAppliesText({ kind: 'width', value: 2, unit: 'm', imperial: "6'6\"" }) === "Vehicles wider than 2.0 m (6'6\")");
+    unit = 'mi';
+    ok("limits (sandbox): the length is in the tenant's unit (DU): miles on a mi tenant", L.limitCardHTML(W).includes('Back Lane · 0.15 mi of road')
+       && L.limitLengthText(5000) === '3.1 mi');
+    unit = 'km';
+    ok("limits (sandbox): metres under a km, km above; nothing for no length", L.limitLengthText(240.5) === '241 m' && L.limitLengthText(2500) === '2.5 km'
+       && L.limitLengthText(null) === '' && L.limitLengthText(0) === '');
+    ok("limits (sandbox): the values read as the signs print them", L.limitValueText('weight', 7.5, 't') === '7.5 t' && L.limitValueText('weight', 18, 't') === '18 t'
+       && L.limitValueText('height', 4, 'm') === '4.0 m' && L.limitValueText('height', 4.27, 'm') === '4.27 m' && L.limitDate('2026-10-13T10:00:00+00:00') === '13 Oct 2026');
+    // -- the label chip --
+    ok("⭐ limits (sandbox): the label beside the sign — weight with its exception and road, height as low headroom with imperial, width",
+       L.limitChipText(W) === '7.5 t · except for access · Back Lane'
+       && L.limitChipText(H) === "Low headroom 4.4 m (14'6\") · Kettering Road"
+       && L.limitChipText({ kind: 'width', value: 2, unit: 'm', imperial: "6'6\"" }) === "Width 2.0 m (6'6\")"
+       && L.limitChipText({ kind: 'axle', value: 10, unit: 't' }) === '10 t per axle');
+    // -- the Conditions rows --
+    const F = p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p.anchor }, properties: p });
+    const R9 = Object.assign({}, W, { id: 'osm:w9:weight', breaches: [{ route_id: 'R009', vehicle: 'Rigid 8-wheel (32t)', leg: 'loaded' }] });
+    const AX = Object.assign({}, W, { id: 'osm:w5:axle', kind: 'axle', value: 10, icon_text: '10T', name: null, ref: 'B6047',
+                                      breaches: [{ route_id: 'R004', vehicle: 'Artic Tipper (44t)', leg: 'loaded' }, { route_id: 'R004', vehicle: 'Artic Tipper (44t)', leg: 'return' },
+                                                 { route_id: 'R001', vehicle: 'Rigid 8-wheel (32t)', leg: 'loaded' }], breach_count: 3 });
+    const rows = L.limitConditionRows([F(W), F(H), F(R9), F(AX)], ['R004', 'R001'], 10);
+    ok("⭐ limits conditions (sandbox): one WARNING row per limit a route in use is over; a route not in use this month gives none",
+       rows.length === 2 && rows[0].key === 'l|osm:w1:weight|10' && rows[0].lvl === 'warn' && rows[0].kind === 'l' && rows[0].id === 'osm:w1:weight'
+       && rows[0].who === 'R004' && rows[0].noun === 'Over a weight limit'
+       && rows[0].what === 'R004 · Artic Tipper (44t) is over the 7.5 t weight limit on Back Lane (OpenStreetMap)', JSON.stringify(rows));
+    ok("limits conditions (sandbox): an axle limit is 'an axle weight limit', on its ref when unnamed; two legs of one route count once, another route is '+1 more'",
+       rows[1].noun === 'Over an axle weight limit' && rows[1].what === 'R004 · Artic Tipper (44t) is over the 10 t axle weight limit on B6047 (OpenStreetMap) (+1 more)');
+    ok("limits conditions (sandbox): no route in use, no rows; a standing limit has no dates, so every month gets its row",
+       L.limitConditionRows([F(W)], [], 10).length === 0 && L.limitConditionRows([F(W)], ['R004'], 37)[0].key === 'l|osm:w1:weight|37');
+    // -- the map sources --
+    const LN = Object.assign({}, W, { id: 'osm:w2:height', kind: 'height', value: 4, icon_text: '4.0m', imperial: "13'1\"", breaches: [], breach_count: 0 });
+    const FC = { type: 'FeatureCollection', features: [
+      { type: 'Feature', geometry: { type: 'LineString', coordinates: [[-0.93, 52.47], [-0.91, 52.47]] }, properties: W },
+      F(H), { type: 'Feature', geometry: { type: 'LineString', coordinates: [[-0.8, 52.4], [-0.79, 52.41]] }, properties: LN }, F(AX)] };
+    const pw = L.limitPointFeatures(FC, { weight: true, height: false, width: false });
+    ok("⭐ limits (sandbox): the clustered source holds the ticked kinds only (axle rides with Weight), at each limit's anchor, a clash sorted first",
+       pw.features.length === 2 && pw.features.every(f => f.geometry.type === 'Point') && JSON.stringify(pw.features[0].geometry.coordinates) === '[-0.92,52.47]'
+       && pw.features.map(f => f.properties.kind).join(',') === 'weight,axle' && pw.features[0].properties._sort === 0
+       && pw.features[0].properties._img === L.limitImageName('weight', '7.5T', null, true) && pw.features[0].properties._label === '7.5 t · except for access · Back Lane');
+    ok("limits (sandbox): the dashed stretches are the LINE limits of the ticked kinds", L.limitLineFeatures(FC, { weight: false, height: true }).features.length === 1
+       && L.limitLineFeatures(FC, { weight: true, height: true }).features.length === 2 && L.limitLineFeatures(FC, {}).features.length === 0);
+    ok("⭐ limits attribution (sandbox): every source present, once each", L.limitAttribution(FC.features) === '© OpenStreetMap contributors (ODbL) · © HERE'
+       && L.limitAttribution([F(W)]) === '© OpenStreetMap contributors (ODbL)' && L.limitAttribution([]) === '');
+    ok("limits (sandbox): raiseLimits puts the limits under the marks, and does nothing when they already are",
+       L.raiseLimits(['a', 'limit-signs', 'b', 'locations']) === true && M.moved.join(',') === 'limit-signs'
+       && L.raiseLimits(['a', 'limit-lines', 'limit-signs', 'site-gates', 'locations']) === false && L.raiseLimits(['a', 'b']) === false);
+    M.moved.length = 0;
+    // -- the load: the group, the counts, the layers, the images, the attribution --
+    fetchAnswer = Promise.resolve({ ok: true, json: () => Promise.resolve(FC) });
+    ASYNC_PINS.push(L.loadLimits().then(() => {
+      ok("⭐ limits load (sandbox): the group shows with the counts (axle counted with Weight), the empty note hidden",
+         !byId['limits-group'].hidden && byId['limit-count-weight'].textContent === '2' && byId['limit-count-height'].textContent === '2'
+         && byId['limit-count-width'].textContent === '0' && byId['limit-row-width'].classes.has('dim') && !byId['limit-row-weight'].classes.has('dim')
+         && !byId['limit-boxes'].hidden && byId['limit-empty'].hidden
+         && byId['limit-source'].textContent === 'OpenStreetMap contributors and HERE · coverage is incomplete. Advisory: check the signed limit on site.');
+      const ps = M.sources['limits-points'], ls = M.sources['limits-lines'];
+      ok("⭐ limits load (sandbox): a clustered point source (max zoom 10, radius 40) and a line source, both carrying the attribution",
+         ps && ps.cluster === true && ps.clusterMaxZoom === 10 && ps.clusterRadius === 40 && ls
+         && ps.attribution === '© OpenStreetMap contributors (ODbL) · © HERE' && ls.attribution === ps.attribution);
+      ok("⭐ limits load (sandbox): OFF by default — five layers added, all hidden, nothing in the sources",
+         ['limit-lines', 'limit-clusters', 'limit-cluster-count', 'limit-dots', 'limit-signs'].every(id => M.layers[id] && M.vis[id] === 'none')
+         && ps.data.features.length === 0 && ls.data.features.length === 0);
+      const imgs = Object.keys(M.images);
+      ok("⭐ limits load (sandbox): one image per distinct sign, at pixelRatio 2 (a 1x screen), 68 px for a 34 px sign",
+         imgs.length === 4 && imgs.includes(L.limitImageName('weight', '7.5T', null, true)) && imgs.includes(L.limitImageName('height', '4.4m', "14'6\"", false))
+         && Object.values(M.images).every(i => i.o.pixelRatio === 2 && i.img.width === 68) && canvases.length === 4
+         && canvases.every(cv => cv.ctx.calls.some(c => c[0] === 'stroke' && c[1] === '#C8102E')));
+      byId['layer-limit-height'].checked = true; L.toggleLimits();
+      ok("⭐ limits toggle (sandbox): ticking Height shows the layers with the height limits only (point and stretch); no image drawn twice",
+         ['limit-lines', 'limit-signs', 'limit-dots', 'limit-clusters'].every(id => M.vis[id] === 'visible')
+         && M.sources['limits-points'].data.features.map(f => f.properties.kind).join(',') === 'height,height'
+         && M.sources['limits-lines'].data.features.length === 1 && canvases.length === 4);
+      byId['layer-limit-height'].checked = false; L.toggleLimits();
+      ok("limits toggle (sandbox): unticking the last box hides every limit layer (so its attribution goes too)",
+         ['limit-lines', 'limit-clusters', 'limit-cluster-count', 'limit-dots', 'limit-signs'].every(id => M.vis[id] === 'none'));
+      ok("limits (sandbox): the clicks are wired once (four layers, hand cursor and click)",
+         M.handlers.filter(h => h[0] === 'click' && /^limit-/.test(h[1])).length === 4 && M.handlers.filter(h => h[0] === 'mouseenter').length === 4);
+      // an empty collection: the note, no boxes; a failed read: no group
+      L.LIM.data = { type: 'FeatureCollection', features: [] }; L.renderLimitGroup();
+      ok("⭐ limits (sandbox): nothing loaded yet: the group shows 'No lorry limits loaded for this area yet' instead of the boxes",
+         !byId['limits-group'].hidden && byId['limit-boxes'].hidden && !byId['limit-empty'].hidden);
+      L.LIM.data = null; fetchAnswer = Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) });
+      return L.loadLimits().then(() => {
+        ok("⭐ limits (sandbox): the endpoint failing hides the group and nothing throws", byId['limits-group'].hidden === true && L.LIM.failed === true);
+      });
+    }));
+  }
+}
+
 // ---- 13 Oct 2026 (the user): PRESET VIEWS at the top of the panel ------------------------------------------------------
 {
   const nb = newBlockSrc(), nbc = newBlockCode();
@@ -4526,9 +4810,11 @@ function qrRead(mod) {
   // the page's boxes (defaults as shipped: the closures' box off, the council boxes off)
   [['layer-alignment', 1], ['layer-ws-bounds', 1], ['layer-chainage', 0], ['layer-nodes', 1], ['layer-gates', 1], ['layer-zones', 1], ['layer-zone-closure', 1],
    ['layer-zone-works', 1], ['layer-rail', 1], ['layer-inbound', 1], ['layer-outbound', 1], ['layer-temp', 1], ['layer-alts', 0],
-   ['layer-areas-district', 0], ['layer-areas-county', 0], ['restr-nh_closures', 0]].forEach(([id, on]) => order.push(mk(id, on)));
+   ['layer-areas-district', 0], ['layer-areas-county', 0], ['restr-nh_closures', 0],
+   // 13 Oct 2026: the lorry-limit boxes (off as shipped; their group shown, limits loaded)
+   ['layer-limit-weight', 0], ['layer-limit-height', 0], ['layer-limit-width', 0]].forEach(([id, on]) => order.push(mk(id, on)));
   const heatOff = mk('heat-off', 1, 'radio'), rl = mk('toggle-road-load', 0, 'radio'), co = mk('toggle-carbon', 0, 'radio'), fc = mk('toggle-forecast', 0);
-  ['preset-views', 'council-group', 'm-sheet', 'filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt', 'layers-box', 'sidebar-close', 'toggle-x'].forEach(id => mk(id, 0, 'div'));
+  ['preset-views', 'council-group', 'limits-group', 'limit-boxes', 'm-sheet', 'filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt', 'layers-box', 'sidebar-close', 'toggle-x'].forEach(id => mk(id, 0, 'div'));
   ['filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt'].forEach(id => { byId[id].value = 'ALL'; byId[id].options = [{ value: 'ALL', textContent: 'All' }]; });
   const COUNCIL = { saved: null }, calls = { leave: 0, timeline: 0, sheet: 0 };
   const AREAS = { mode: 'movements' };
@@ -4626,10 +4912,32 @@ function qrRead(mod) {
        && heatOff.checked && !rl.checked && !co.checked && !byId['layer-chainage'].checked && fc.checked && COUNCIL.saved === null, on());
     P.writeView();
     ok("presets (sandbox) Closures: the link carries the closures box; only it pressed", /restr-nh_closures/.test(location.search) && pressed() === 'closures', location.search + ' / ' + pressed());
+    const limBoxes = ['layer-limit-weight', 'layer-limit-height', 'layer-limit-width'];
+    ok("⭐ presets (sandbox) Closures and restrictions: the three lorry-limit boxes are ticked too, and the link carries them",
+       limBoxes.every(id => byId[id].checked) && /limit-height\.limit-weight\.limit-width/.test(location.search) && P.presetMatches(P.PRESETS.find(x => x.key === 'closures')),
+       location.search);
     // 6. Everything
     P.applyPreset('everything'); P.writeView();
     ok("⭐ presets (sandbox) Everything: the page's layers as shipped with the forecast routes; closures off, heat map Off, no council",
        on() === [DEF, 'forecast'].join(',').split(',').sort().join(',') && heatOff.checked && !councilOn() && location.search === '?layers=forecast' && pressed() === 'everything', location.search + ' ' + on());
+    ok("⭐ presets (sandbox) Everything: the lorry-limit boxes are left OFF, as the closures are", limBoxes.every(id => !byId[id].checked));
+    // the limits not offered (none loaded, or the endpoint failed): Closures leaves the hidden boxes alone and still matches
+    byId['limit-boxes'].hidden = true;
+    P.applyPreset('closures');
+    ok("presets (sandbox): with no lorry limits offered, Closures and restrictions does not tick the hidden boxes, and still shows pressed",
+       limBoxes.every(id => !byId[id].checked) && byId['restr-nh_closures'].checked && pressed() === 'closures');
+    byId['limit-boxes'].hidden = false; P.renderPresets();
+    ok("presets (sandbox): ...and once the limits are offered, the same map no longer matches Closures (presetMatches reads presetLayers)", pressed() === '');
+    P.applyPreset('everything');
+    // the link: a shared view with two lorry-limit boxes opens with exactly those ticked, and encodes back the same
+    location.search = '?layers=forecast.limit-weight.limit-width';
+    P.applyViewFromUrl(); P.writeView();
+    ok("⭐ limits link (sandbox): ?layers=limit-weight.limit-width ticks Weight and Width (not Height) and writes back the same link",
+       byId['layer-limit-weight'].checked && byId['layer-limit-width'].checked && !byId['layer-limit-height'].checked
+       && location.search === '?layers=forecast.limit-weight.limit-width', location.search);
+    ok("limits link: encodeView / decodeView round-trip the limit boxes",
+       JSON.stringify(P.decodeView('?' + P.encodeView({ month: null, layers: ['alignment', 'limit-height'], filters: {} }, ['alignment'])).layers) === '["limit-height"]');
+    byId['layer-limit-weight'].checked = false; byId['layer-limit-width'].checked = false;
     // a box changed by hand: the map no longer matches any view, no button pressed
     byId['layer-gates'].checked = false; P.renderPresets();
     ok("presets (sandbox): a box changed by hand afterwards: no view shows pressed", pressed() === '');

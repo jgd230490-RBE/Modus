@@ -4763,14 +4763,14 @@ function LaKpi({ value, caption, tone }){
 // the clash rail's names for each code — the same words as the user guide's §10.1
 const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKPILE_OVER: "STOCKPILE OVER",
                      ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
-                     UNBAKED: "UNBAKED", PARENT_CHANGED: "PARENT CHANGED" };
+                     LIMIT: "ROAD LIMIT", UNBAKED: "UNBAKED", PARENT_CHANGED: "PARENT CHANGED" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
 function LineFlags({ flags }){
   const codes = Array.from(new Set((flags || []).map(f => f.code)));
   const label = { UNBAKED: "NOT BAKED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
-                  STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
+                  STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
   const wordFor = (code) => { const f = (flags || []).find(x => x.code === code); return f ? flagWord(f, label) : (label[code] || code); };
   return (
     <span className="inline-flex flex-col gap-0.5 items-start">

@@ -393,6 +393,13 @@ def _upsert_geom(route_id, profile, geometry, dist, dur, error, leg="loaded", al
     # section index is rebuilt here. Alternatives are not indexed and do not trigger it.
     if int(alt_index or 0) == 0:
         road_sections._rebuild_quietly("geometry upsert")
+        # 13 Oct 2026: the lorry-limits check is a DB read against stored limits (no
+        # external call), so it is recomputed for this route straight away.
+        try:
+            import limits as _limits
+            _limits.store_checks([route_id])
+        except Exception as e:
+            print("limits: route check not stored:", str(e)[:120])
 
 
 def clear_geometry(profile=None, leg=None, route_id=None):
