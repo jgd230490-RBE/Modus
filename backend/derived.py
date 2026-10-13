@@ -216,7 +216,10 @@ def cycle_for(route_id, vehicle, cache=None):
         return cache[key]
     row = None
     try:
-        res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None)
+        # 13 Oct 2026 (speed): the request's shared preloads ride in the same cache (one key that is
+        # not a (route, vehicle) pair); see network.route_analysis(pre=)
+        pre = cache.setdefault("__route_analysis_pre__", {}) if cache is not None else None
+        res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None, pre=pre)
         for r in res.get("rows", []) or []:
             if r.get("alt_index") == 0 and (not vehicle or r.get("profile") == vehicle):
                 row = r
@@ -376,16 +379,20 @@ def day_figures(qty, ctx, factors):
 # --------------------------------------------------------------------------- #
 #  The read                                                                    #
 # --------------------------------------------------------------------------- #
-def decorate(res, factors=None):
+def decorate(res, factors=None, cache=None, routes=None, cost=None):
     """
     Add `context`, per-day `derived`, `week_derived` to every line of a
     days.list_days() response, and a `totals` block to the response. Mutates and returns
     `res`. Call it AFTER the access filter — totals are for what the caller can see.
+
+    13 Oct 2026 (speed): a caller that decorates more than once in one request (the Look-ahead
+    page does it twice, then prices the Account week) passes the same `cache`, `routes` and `cost`,
+    so the routes, the costing context and each route's cycle are read once per request.
     """
     factors = factors or conversions.load_factors()
-    routes = _routes_and_names()
-    cost = costing_context()
-    cache = {}
+    routes = routes if routes is not None else _routes_and_names()
+    cost = cost if cost is not None else costing_context()
+    cache = cache if cache is not None else {}
     by_day = {}                                  # date -> summed vehicles across lines
     tot = {"planned_t": 0.0, "trips": 0, "tonne_km": 0.0, "km": 0.0,
            "lines": 0, "unbaked_lines": 0, "eur": 0.0, "eur_lines": 0, "eur_partial": False,
