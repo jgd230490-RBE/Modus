@@ -1202,7 +1202,8 @@ const _tdBody = src.slice(src.indexOf("function DashboardToday("), src.indexOf("
 ok("🔴 every KPI figure carries an info box (was: a hover title) — none is bare",
   _dbBody.split("<Fig ").slice(1).length >= 16 && _dbBody.split("<Fig ").slice(1).every(chunk => chunk.slice(0, chunk.indexOf("/>")).includes("info={{ id: \"")));
 ok("🔴 no KPI figure is truncated: no `truncate` on a Fig, the value is nowrap with a clamp() size, two per row",
-  !/kpi-num[^"]*truncate/.test(_dbBody) && _dbBody.includes('kpi-num font-bold whitespace-nowrap') && _dbBody.includes('fontSize: "clamp(')
+  // 14 Oct 2026 (narrowed): the clamp() size moved from the inline style to CSS (.fig-val), so the big screen can scale it
+  !/kpi-num[^"]*truncate/.test(_dbBody) && _dbBody.includes('kpi-num font-bold whitespace-nowrap fig-val') && /\.fig-val\{font-size:clamp\(1\.1rem,1\.45vw,1\.7rem\);\}/.test(html)
   && _dbBody.includes('<div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>'));
 // 13 Oct 2026 (W3, narrowed): the exact figure rides in the info box's value line
 ok("millions print compact (bigNum) with the exact figure in the info box",
@@ -1220,7 +1221,8 @@ ok("...today's rows are the day rows whose date is the server's `today` — the 
 ok("...with this week to date and last week's account (the server's actual_t, reported, delivered, hold band)",
   _tdBody.includes("This week to date") && _tdBody.includes("acct.actual_t") && _tdBody.includes("acct.hold_band"));
 ok("...and the small map is the Look-ahead's CommitMap, title and height as props, defaults unchanged for the Look-ahead",
-  _tdBody.includes('<CommitMap meta={meta} bucket="commit"') && src.includes("function CommitMap({ meta, bucket, tick, lines, title, height, flush })")
+  // 14 Oct 2026 (narrowed): + `fill`, the big screen's map takes its whole card (the default is unchanged)
+  _tdBody.includes('<CommitMap meta={meta} bucket="commit"') && src.includes("function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill })")
   && src.includes('{title || "This week\'s movements"}') && src.includes("height: height || 380"));
 ok("🔴 cost never reaches the map: no €, eur, fair or rate anywhere in CommitMap (its hover carries quantity and trips only)",
   !/€|\beur\b|_eur|fair|rate_|\brates?\b|planned_units|eur_units/i.test(_cmBody) && _cmBody.includes("trips`).join"));
@@ -1827,7 +1829,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
         && /\n    function guideStart\(\)\{/.test(mapHtml) && mapHtml.includes("new URLSearchParams(location.search).get('embed') === '1'"));
     }
     ok("the app's own guide is not mounted on the Route map (the embedded map runs its own): one 'New here?' strip there, and the app never touches wayscope_guide_map",
-      portalFn.includes('{page !== "map" && <Guide page={page} groups={visible} />}') && (src.match(/<Guide /g) || []).length === 1
+      // 14 Oct 2026 (narrowed): nor over the Dashboard's big screen
+      portalFn.includes('{page !== "map" && !(page === "dashboard" && wallOn) && <Guide page={page} groups={visible} />}') && (src.match(/<Guide /g) || []).length === 1
       && !/\n  map: \[/.test((src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1]));
     ok("a page with no steps of its own (Config) replays the welcome, so the bar's Guide never does nothing",
       /const startTour = \(\) => \{ setTip\(null\); setSteps\(build\(guideRead\("welcome"\) !== "done" \|\| !\(GUIDE_STEPS\[key\] \|\| \[\]\)\.length\)\); setI\(0\); \};/.test(src));
@@ -1989,7 +1992,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />") && (_dbW.match(/<Card label=/g) || []).length === 6
     && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
-    && code.includes("<Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} onOpen={setPage} />")
+    // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
+    && code.includes("<Dashboard meta={meta} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature)
     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
@@ -2509,7 +2513,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("W5: every chart box is position:relative and sized by CSS clamp(), two sizes; the canvas is the box's only child",
      /\.chart-box\{position:relative;width:100%;min-width:0;height:clamp\(200px,28vh,420px\);\}/.test(html)
      && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
-     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
+     // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
+     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
   ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile chart, whose height follows its rows)",
      (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 1 && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
@@ -2524,7 +2529,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /o\.devicePixelRatio = Math\.min\(\(typeof window !== "undefined" && window\.devicePixelRatio\) \|\| 1, 2\);/.test(src));
   ok("W5: the working view is up to 1680 px wide (not max-w-7xl); the big screen's Charts section fills the height when shown alone",
      _db.includes('"max-w-[1680px]")}>') && !_db.includes('"max-w-7xl"')
-     && _db.includes('(wallLayout !== "all" && wallSection === 2 ? " dash-fill" : "")')
+     // 14 Oct 2026 (narrowed): EVERY section fills in Rotate / One section, not only Charts
+     && _db.includes('const fill = wall && wallLayout !== "all";') && _db.includes('(fill ? " dash-fill" : "")')
      && /\.dash-wall\.dash-fill\{height:100%;display:flex;flex-direction:column;\}/.test(html)
      && /\.dash-wall\.dash-fill \.wall-charts\{height:100%;grid-auto-rows:minmax\(0,1fr\);\}/.test(html));
   ok("W5: the four charts: one column, 3 + 2 from 1024 px, three columns from 1600 px (top routes down the right); More charts 1 / 2 / 4",
