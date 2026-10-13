@@ -51,6 +51,7 @@ import access
 import conversions
 import db
 import derived
+import limits
 
 
 def _num(v):
@@ -96,6 +97,18 @@ def _actuals():
     return out
 
 
+def _limit(stored_entry, vehicle_type, baked):
+    """{count, text, kind, checked_at} when this line's vehicle is over a limit its route runs
+    along; None otherwise. Only a routed line is checked (clashes.limit's rule)."""
+    if not baked:
+        return None
+    hits = limits.exceeding(stored_entry, vehicle_type)
+    if not hits:
+        return None
+    return {"count": len(hits), "text": limits.breach_text(hits, vehicle_type), "kind": hits[0].get("kind"),
+            "checked_at": (stored_entry or {}).get("checked_at")}
+
+
 def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
     """
     {lines: [...], totals: {...}, costing: {...}} for the caller's visible forecast rows.
@@ -111,6 +124,11 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
     actuals = _actuals()
     plan = factors.get("planning", {}) or {}
     work_days = float(plan.get("working_days_per_month") or 22)
+    # 13 Oct 2026 (W6): the stored lorry-limits check, ONE read for every route in view — the same
+    # rule and words as the Look-ahead's ROAD LIMIT flag (limits.exceeding / breach_text), so the
+    # Dashboard's route table and Forecasts can show it in their status column. A route not
+    # checked yet has no hits: `limit` is None, which says nothing either way (the flag's rule).
+    stored_limits = limits.stored_checks(sorted({r["route_id"] for r in rows}))
     out = []
     tot = {"lines": 0, "baked_lines": 0, "tonnes": 0.0, "trips": 0, "km": 0.0, "tonne_km": 0.0,
            "co2_t": 0.0, "planned_eur": 0.0, "planned_lines": 0, "planned_target_lines": 0,
@@ -164,6 +182,7 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
             "actual_qty": act["qty"], "actual_tonnes": actual_t, "actual_eur": act["eur"],
             "weeks_reported": act["weeks"],
             "flags": list(ctx.get("flags") or []),
+            "limit": _limit(stored_limits.get(r["route_id"]), r.get("vehicle_type"), baked),
         })
         if actual_t is not None:
             tot["actual_t"] = (tot["actual_t"] or 0.0) + actual_t; tot["reported_lines"] += 1

@@ -380,11 +380,11 @@ ok("5. the staff rail names it ROAD LIMIT in both label tables", fe.count('LIMIT
 M = 10
 
 
-def add_line(fid, rid, status="Approved", vehicle=PROFILE):
+def add_line(fid, rid, status="Approved", vehicle=PROFILE, discipline="superstructure"):
     db.execute("INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, quantity, unit, "
                "material_type, material_description, vehicle_type, submitted_by, status, reject_reason, ipt) "
                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-               (db.current_tenant(), fid, rid, M, "superstructure", "", 290.0, "t", BAL, "Type 1", vehicle,
+               (db.current_tenant(), fid, rid, M, discipline, "", 290.0, "t", BAL, "Type 1", vehicle,
                 "test", status, None, "IPT1"))
 
 
@@ -416,6 +416,31 @@ _copy = json.dumps([FC["note"], [s["note"] for s in limits.SOURCES.values()], [k
                     [f["properties"]["label"] for f in FC["features"]]])
 ok("6. no 'truck' in anything the map shows", "truck" not in _copy.lower())
 ok("6. no team id in the collection", not TEAM_ID.search(json.dumps(FC)))
+
+# =========================================================================== #
+#  6b. The Dashboard's route table and Forecasts (13 Oct 2026, W6 / bundle F)   #
+# =========================================================================== #
+# /api/costing/lines carries `limit` on each line-month: the same rule and the same words as the
+# Look-ahead's ROAD LIMIT flag (limits.exceeding / breach_text), so the two status columns agree.
+add_line("F2", r1, vehicle=RIGID, discipline="earthworks")
+add_line("F3", r2)
+CLL = {(l["route_id"], l["vehicle_type"]): l for l in costlines.lines(acc={"role": "planner"})["lines"]}
+_lim = CLL[(r1, PROFILE)]["limit"]
+_flag_text = clashes.limit([line(r1, PROFILE)])[0][0]["text"]
+ok("6b. ⭐ the artic line on R001 carries `limit` in the cost lines: a count, the kind and when it was checked",
+   bool(_lim) and _lim["count"] == len(limits.exceeding(limits.stored_checks([r1])[r1], PROFILE)) and _lim["count"] >= 2
+   and _lim["kind"] in limits.KINDS and _lim["checked_at"], str(_lim))
+ok("6b. ⭐ ...and its words are the Look-ahead flag's, without the line's name in front",
+   _flag_text == f"Pit West → Yard East: {_lim['text']}", f"{_flag_text!r} vs {_lim['text']!r}")
+ok("6b. a rigid on the same route was never checked as that vehicle: no limit (the verdict is per vehicle)",
+   CLL[(r1, RIGID)]["limit"] is None)
+ok("6b. a line whose route is not worked out yet gets no limit (only a routed line is checked)",
+   CLL[(r2, PROFILE)]["baked"] is False and CLL[(r2, PROFILE)]["limit"] is None)
+ok("6b. costlines reads the stored checks ONCE for every route in view, not per line",
+   read("backend/costlines.py").count("limits.stored_checks(") == 1)
+ok("6b. clashes.limit uses the shared rule and words (one source for both)",
+   "limits.exceeding(" in csrc and "limits.breach_text(" in csrc and 'h.get("verdict") == "exceeds"' not in csrc)
+db.execute("DELETE FROM forecasts WHERE tenant_id = ? AND id IN ('F2', 'F3')", (db.current_tenant(),))
 
 # =========================================================================== #
 #  7. Endpoints                                                                #
