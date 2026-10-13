@@ -555,6 +555,22 @@ const INFO = {
   "dash.col.dist": { title: "Distance per trip", text: "The route's distance for one trip: the round trip, unless the route says loaded only.", tech: "t1-distance" },
   "dash.col.delivered": { title: "Delivered", text: "Reported week actuals ÷ planned, over the months in view.", tech: "t1-delivered" },
   "dash.col.peak": { title: "Peak vehicles", text: "The most vehicles any one month needs on this line.", tech: "t1-vehicles" },
+  "la.commit": { title: "Planned quantity by day", text: "Each line's plan for each weekday of the commit week, with loads and vehicles in grey. Click a day to type its plan while the week is not confirmed. ✎ marks a day typed by hand.",
+    how: "A day follows the week ÷ 5 until it is typed. Monday to Friday only: Saturday and Sunday are held at 0 and not shown. Confirm locks the whole week as the haulier sheet. Figures are planning figures, not plated weights.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-trips" },
+  "la.variance": { title: "Variance", text: "Planned − actual. Green: held (within the 98 % band) or over-delivered. Red: short. An empty actual is not zero: it is not reported.",
+    how: "Calibrate never runs when you save an actual: only the navy button writes into the commit week, and only if that week is not already confirmed.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
+  "la.spread": { title: "Spread on this week", text: "Divides the shortage not yet carried across the remaining weekdays of the commit week (all of Monday to Friday when it has not started). A second press carries only what the first did not.",
+    how: "Saturday and Sunday stay 0 unless you type them. It is refused if the commit week is confirmed.", guide: "6-4-account-view-what-actually-happened-last-week" },
+  "la.cost_quote": { title: "Planned cost", text: "The route's own rates, or the target rate from Config where the route has none (marked target). + BAF is the same quote with the fuel surcharge; the quote is never replaced.",
+    how: "The cost variance compares the actual against the quote, not the surcharged figure. BAF = (diesel index ÷ base − 1) × fuel share.", guide: "9-5-money-settings", tech: "t1-cost" },
+  "la.cost_fair": { title: "Fair cost (model)", text: "What the job should cost from the vehicle, distance, tonnage, month and the diesel price, at the coefficients on Config. A floor for negotiation, never a quote.", guide: "9-5-money-settings", tech: "t1-fair" },
+  "la.cost_actual": { title: "Actual cost", text: "The confirmed cost of this week, as invoiced or agreed. Typed, never worked out.", guide: "6-4-account-view-what-actually-happened-last-week" },
+  "la.stock": { title: "Stockpiles", text: "Type what came out of each stockpile this week. Empty means not typed, which is not zero.",
+    how: "Opening = the balance at the end of the week before. In = the week actuals delivered here (a week nobody reported counts as nothing). Closing = opening + in − out.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
+  "la.horizon": { title: "The weeks ahead", text: "Week totals for the weeks after the commit week, so hauliers are not sent a four-week daily spreadsheet. Confirm lives on the Commit view.",
+    how: "The blue column is the commit week: the week that holds today, or next week by the switch above. It is the only week with daily rows.", guide: "6-5-horizon-view" },
+  "fc.cost": { title: "Planned and fair cost", text: "Planned: the route's typed rates, or the Config target rate. Fair: the cost model from the vehicle, distance, tonnage, month and diesel price. Each figure's per tonne, per trip and per mile or km is in its tooltip.",
+    guide: "9-5-money-settings", tech: "t1-fair" },
 };
 const NO_ROUTES_YET = "No line in view has a route worked out yet: route them on Data → Routes.";
 // the user guide and the technical guide, as the info box links to them
@@ -935,8 +951,8 @@ function CarbonTargetLine({ ct, err, pendingN }){
   // 11 Oct 2026: the same three things as the Dashboard, in its words (the target, as forecast, with the agreed decisions)
   const s = ct.status, [p1, p2] = ctProgress(ct, true);
   return (
-    <div className="ct-strip mb-4" data-carbon-target="set" title={`${CT_ALLIN}.`}>
-      <div className="ct-line"><b>Carbon (all-in):</b> {ctTargetLine(ct)}</div>
+    <div className="ct-strip mb-4" data-carbon-target="set">
+      <div className="ct-line"><b>Carbon (all-in):</b> {ctTargetLine(ct)}<InfoTip id="dash.target" value={`${CT_ALLIN}.`} /></div>
       <div className="ct-line">{p1} · {p2}</div>
       {s.invalid && <div className="ct-note">{s.invalid}</div>}
       {pendingN != null && <div className="ct-line">{pendingN === 0 ? "No lines are waiting for approval."
@@ -1219,7 +1235,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>
     </div>
   );
-  // 13 Oct 2026 (W3): no hover tooltip and no cursor:help — the "i" opens the figure's info box,
+  // 13 Oct 2026 (W3): no hover tooltip and no help cursor — the "i" opens the figure's info box,
   // with the exact figure the tooltip used to carry (`info.value`)
   const Fig = ({ value, label, sub, info, tone }) => (
     <div className="min-w-0">
@@ -1266,7 +1282,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   return (
     <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" : "max-w-7xl")}>
       {/* 13 Oct 2026 (W3): the date range is shown ONCE, in the kicker; the scope is shown by the filter
-          chips under the header (the subtitle repeated both, "Strategic planning view · range · scope") */}
+          chips under the header (the old subtitle repeated both) */}
       <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
@@ -2381,7 +2397,7 @@ function Login({ onSignIn, onBack, savedName }){
             them. Nothing here should tell a reader a credential that works. */}
         <p className="auth-note">
           Your {TEAM().toLowerCase()}'s code shows only your {TEAM().toLowerCase()}'s forecast lines. The planner code sees every {TEAM().toLowerCase()} and can
-          approve. Codes are checked by the server — ask your planner if you do not have one.
+          approve. Codes are checked by Wayscope — ask your planner if you do not have one.
         </p>
       </div>
     </div>
@@ -2597,7 +2613,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
 
   if(metaErr){
     return <div className="p-8 text-center text-slate-600">
-      Couldn't reach the forecasting service. Refresh the page; if it persists the server may still be starting.
+      Couldn't reach the forecasting service. Refresh the page; if it persists, Wayscope may still be starting up.
     </div>;
   }
   if(!meta) return <div className="p-8 text-center text-slate-400">Loading…</div>;
@@ -3109,7 +3125,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             {teamText(route.ipt) || "—"}
             {route.distance_km != null
               ? <> · {fmtDist(route.distance_km, 1)} {DU()} one-way{route.distance_profile ? ` (${vehShort(route.distance_profile)})` : ""}</>
-              : <span style={{color:"var(--red)"}}> · not baked — no routed distance yet</span>}
+              : <span style={{color:"var(--red)"}}> · not routed yet, so no distance</span>}
           </p>
         ) : null}
 
@@ -3308,8 +3324,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             {[
               ["Avg movements / day",  fmt(perDay.avgTrips, "vehicles"),  ""],
               ["Peak movements / day", fmt(perDay.peakTrips, "vehicles"), "peak"],
-              ["Vehicles needed (avg)",  fleetOf(perDay.avgTrips) == null ? "not baked" : String(fleetOf(perDay.avgTrips)),   ""],
-              ["Vehicles needed (peak)", fleetOf(perDay.peakTrips) == null ? "not baked" : String(fleetOf(perDay.peakTrips)), "peak"],
+              ["Vehicles needed (avg)",  fleetOf(perDay.avgTrips) == null ? "not routed" : String(fleetOf(perDay.avgTrips)),   ""],
+              ["Vehicles needed (peak)", fleetOf(perDay.peakTrips) == null ? "not routed" : String(fleetOf(perDay.peakTrips)), "peak"],
               [`Avg ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`,  fmt(perDay.avgQty, unit),  ""],
               [`Peak ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`, fmt(perDay.peakQty, unit), "peak"],
             ].map(([label, value, tone]) => (
@@ -3335,7 +3351,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             <span className="text-xs text-slate-400 self-center">
               {costErr ? <span style={{ color: "var(--red)" }}>{costErr}</span>
                : !cost ? "type a quantity to see the price"
-               : cost.fair_reason === "not baked" ? <span className="text-amber-700">no fair price — this route is not baked for {vehLabel(vehicle)}; bake it on the Routes page</span>
+               : cost.fair_reason === "not baked" ? <span className="text-amber-700">no fair price — this route is not routed for {vehLabel(vehicle)}; route it on Data → Routes</span>
                : cost.fair_reason === "no diesel index" ? <span className="text-amber-700">no fair price — the diesel index is unavailable (Config → Costing · fuel)</span>
                : cost.fair_reason ? `no fair price — ${cost.fair_reason}`
                : `the cost model on Config → Costing · fuel at diesel ${CUR()}${cost.index_eur_per_l != null ? (+cost.index_eur_per_l).toFixed(3) : "—"}/L${(cost.totals.fair_flags || []).includes("WINTER") ? " · winter months +fuel" : ""} · a floor for negotiation, never a quote · fair ${CUR()} under each cell`}
@@ -3358,8 +3374,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
           <div className="px-3 py-1.5 text-[10.5px] text-slate-400 bg-white">
             Movements = loads per working day ({perDay.wd}/month). Vehicles needed = movements ÷{" "}
             {tripsPerVehicleDay > 0
-              ? <>the <strong>{tripsPerVehicleDay}</strong> movements one {vehLabel(vehicle)} can make per day on this route (baked cycle), rounded up.</>
-              : <>what one vehicle can do per day on this route — <strong>not baked yet for {vehLabel(vehicle)}</strong>, so no fleet size can be given.</>}
+              ? <>the <strong>{tripsPerVehicleDay}</strong> movements one {vehLabel(vehicle)} can make per day on this route (routed cycle), rounded up.</>
+              : <>what one vehicle can do per day on this route — <strong>not routed yet for {vehLabel(vehicle)}</strong>, so no fleet size can be given.</>}
           </div>
         </div>
 
@@ -3593,7 +3609,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
         </>} />
       <CarbonTargetLine ct={ct} err={ctErr} pendingN={rows ? pendingN : null} />
 
-      {err ? <EmptyState kind="error" title="Forecasts did not load" body="The server did not answer in time. Nothing you typed is lost."
+      {err ? <EmptyState kind="error" title="Forecasts did not load" body="Wayscope did not answer in time. Nothing you typed is lost."
                action={<button onClick={() => setTick(t => t + 1)} className="btn-sec">Try again</button>} />
        : !rows ? <SkeletonTable cols={["Route", "From → to", TEAM(), "Material", "Vehicle", "Months", "Total", "Status"]} rows={6} caption="Forecast lines · loading" />
        : groups.length === 0 ? (
@@ -3639,7 +3655,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                     <th scope="col">Vehicle</th>
                     {th("Months", "months", true)}
                     {th(units.size === 1 ? `Total (${unitLabel([...units][0])})` : "Total", "quantity", true)}
-                    <th scope="col" className="num" title={`Planned ${CUR()} = the route's typed rates or the Config target; fair ${CUR()} = the cost model (vehicle, distance, tonnage, month, diesel index). Hover a figure for ${CUR()}/t · ${CUR()}/trip · ${CUR()}/${DU()}.`}>Cost ({CUR()})</th>
+                    <th scope="col" className="num">Cost ({CUR()})<InfoTip id="fc.cost" /></th>
                     <th scope="col">Status</th>
                     <th scope="col" className="num"><span className="sr-only">Actions</span></th>
                   </tr>
@@ -3664,7 +3680,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                         <td className="num text-[13px] leading-tight" data-cost-cell="1">
                           {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
                             <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[13px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
-                            <div style={{ color: "var(--chart-4)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not baked for this vehicle — no distance, no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
+                            <div style={{ color: "var(--chart-4)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not routed yet for this vehicle, so no distance and no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
                           </>); })()}
                         </td>
                         <td>
@@ -3762,7 +3778,7 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
                 <input className={inp + " mt-1"} inputMode="decimal" placeholder="—" value={draft[k] ?? (tg[k] == null ? "" : (k === "rate_eur_per_km" ? +(+distRate(tg[k])).toFixed(4) : tg[k]))} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} />
               </label>
             ))}
-            <button onClick={save} disabled={busy || !dirty} className="btn-pri" title="The target rate is stored on its own endpoint, separately from the configuration document">{busy ? "Saving…" : "Save target rate"}</button>
+            <button onClick={save} disabled={busy || !dirty} className="btn-pri" title="Saved on its own: the page's Save button does not save the target rate">{busy ? "Saving…" : "Save target rate"}</button>
           </div>
         )}
       </div>
@@ -3813,7 +3829,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
   return (
     <div data-fair-price-section="1">
       <div className="text-[15px] font-semibold text-slate-800">Fair price — the model</div>
-      <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + {DU()} × running, × (1 + margin). Shown on every baked line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
+      <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + {DU()} × running, × (1 + margin). Shown on every routed line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl">
         {FAIR_FIELDS_FOR().map(([k, l, help]) => (
           <label key={k} className="block">
@@ -3848,7 +3864,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         {monthsBox("winter_months", "Winter months (uplift applies)")}
         {monthsBox("thaw_months", "Thaw months (flag: 8 t road limits may apply)")}
       </div>
-      {summary && <p className="text-[11px] text-slate-400 mt-2">In force on the server now: driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "missing — no fair price until the bulletin is fetched" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
+      {summary && <p className="text-[11px] text-slate-400 mt-2">In use now (saved): driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "missing — no fair price until the bulletin is fetched" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
     </div>
   );
 }
@@ -3980,7 +3996,7 @@ function ConfigPage({ meta, who, access }){
                 </tbody>
               </table>
               <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">
-                The id is what a forecast line stores and what baked routes are keyed on — it cannot be renamed here. A vehicle the network is baked for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions are on the JSON section.
+                The id is what forecast lines and routes are stored under, so it cannot be renamed here. A vehicle the network is routed for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions are on the Everything tab.
               </p>
             </div>
           )}
@@ -4138,7 +4154,7 @@ const CARBON_TARGET_MODES = [["pct", "% below the approved plan"], ["cap", "Fixe
 const CARBON_TONE = { VERIFIED: "var(--green)", DERIVED: "var(--chart-none)", ASSUMPTION: "var(--gold)" };
 const CARBON_STATUS_WORD = { VERIFIED: "Verified", DERIVED: "Derived", ASSUMPTION: "Assumption" };
 const CARBON_FLAG_WORDS = {
-  UNBAKED: "no route distance yet, so transport is not counted (Bake on the Routes page)",
+  UNBAKED: "no route distance yet, so transport is not counted (route it on Data → Routes)",
   KM_FROM_BASELINE_VEHICLE: "distance taken from the forecast vehicle's route (the chosen vehicle has no route distance yet)",
   KM_SCALED: "distance scaled by the haul distance percentage",
   ALT_ROUTE_NOT_BAKED: "that alternative route has no distance yet, so it is unchanged",
@@ -4330,7 +4346,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
   const sw = data.scope_words || {};
   const fl0 = B.totals.flags || {};
   const leftOut = [
-    unrouted > 0 ? `${unrouted} plan line${unrouted === 1 ? " has" : "s have"} no route distance yet: transport not counted (Bake on the Routes page)` : "",
+    unrouted > 0 ? `${unrouted} plan line${unrouted === 1 ? " has" : "s have"} no route distance yet: transport not counted (route it on Data → Routes)` : "",
     (B.totals.material_excluded_tonnes || 0) > 0 ? `${grp(B.totals.material_excluded_tonnes)} t has no Government production factor: making it is not counted` : "",
     fl0.RETURN_NOT_BAKED ? `${fl0.RETURN_NOT_BAKED} plan line${fl0.RETURN_NOT_BAKED === 1 ? " has" : "s have"} no return route distance: loaded leg only` : "",
     fl0.NO_DISPOSAL_FACTOR ? `${fl0.NO_DISPOSAL_FACTOR} plan line${fl0.NO_DISPOSAL_FACTOR === 1 ? " has" : "s have"} no Government disposal factor: disposal not counted` : "",
@@ -4930,13 +4946,13 @@ function LaKpi({ value, caption, tone }){
 // the clash rail's names for each code — the same words as the user guide's §10.1
 const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKPILE_OVER: "STOCKPILE OVER",
                      ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
-                     UNBAKED: "UNBAKED", PARENT_CHANGED: "PARENT CHANGED" };
+                     UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
 function LineFlags({ flags }){
   const codes = Array.from(new Set((flags || []).map(f => f.code)));
-  const label = { UNBAKED: "NOT BAKED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
+  const label = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
   const wordFor = (code) => { const f = (flags || []).find(x => x.code === code); return f ? flagWord(f, label) : (label[code] || code); };
   return (
@@ -5329,7 +5345,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3">
             <LaKpi value={`${grp(totals.planned_t)} t`} caption="planned this week" />
             <LaKpi value={grp(totals.trips)} caption="trips" />
-            <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles / day peak" + (totals.excludes_unbaked ? " · unbaked lines excluded" : "")} />
+            <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles / day peak" + (totals.excludes_unbaked ? " · lines not routed yet left out" : "")} />
             <LaKpi value={grp(dist(totals.tonne_km))} caption={`${TKM()} · route basis`} />
             {/* 10 Sep evening: the diesel index, right of t·km — the same widget as Account and Config */}
             <FuelWidget mode="compact" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
@@ -5364,7 +5380,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               <span>
                 {ttRunning ? `checking ${ttName.toLowerCase()} — this takes a minute; the page will refresh when it finishes…`
                  : ttSrc.restrictions === "ok" ? `${ttName}: checked ${(ttSrc.restrictions_checked_at || "").replace("T", " ").slice(0, 16)} UTC${ttSrc.restrictions_week ? ` · flags shown for the week ${ttSrc.restrictions_week[0]} → ${ttSrc.restrictions_week[1]}` : ""}`
-                 : ttSrc.restrictions === "partial" ? `${ttName}: ${(ttSrc.restrictions_unchecked || []).join(", ")} not checked since baking — the rest as of ${(ttSrc.restrictions_checked_at || "").slice(0, 10)}`
+                 : ttSrc.restrictions === "partial" ? `${ttName}: ${(ttSrc.restrictions_unchecked || []).join(", ")} not checked since the route was worked out — the rest as of ${(ttSrc.restrictions_checked_at || "").slice(0, 10)}`
                  : `${ttName}: NOT checked for these routes — that is not the same as "no restrictions".`}
               </span>
               {!ttRunning && (
@@ -5385,7 +5401,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             <div className="card overflow-hidden">
               <div className="overflow-auto">
                 <table className="tbl compact" style={{ minWidth: `${520 + dates.length * 112}px` }}>
-                  <caption><b>Planned quantity by day</b> · loads and vehicles in grey · Monday to Friday · click a day to type its plan while the week is not confirmed</caption>
+                  <caption><b>Planned quantity by day</b><InfoTip id="la.commit" /></caption>
                   <thead>
                     <tr>
                       <th className="la-stick" style={{ minWidth: 330 }}>Route · {TEAM().toLowerCase()} · section</th>
@@ -5455,7 +5471,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                                   <div className="text-[13px] text-slate-500 tabular-nums whitespace-nowrap leading-tight">
                                     {we && !(+d.planned_qty) ? "" : c.baked
                                       ? `${grp(f.trips)} tr · ${grp(f.vehicles)} veh`
-                                      : <span title="Vehicles need a baked route for this vehicle">{grp(f.trips)} tr · <span className="text-amber-700">veh —</span></span>}
+                                      : <span title="Vehicles need this line's route worked out for its vehicle">{grp(f.trips)} tr · <span className="text-amber-700">veh —</span></span>}
                                     {d.status === "edited" && <span className="ml-1 text-amber-700" title="typed — this day no longer follows the week ÷ 5">✎</span>}
                                   </div>
                                 </td>
@@ -5469,13 +5485,13 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               <td colSpan={4 + dates.length} className="px-3 py-1.5 text-[13px] text-slate-600 tabular-nums" style={{ height: "auto", whiteSpace: "normal" }}>
                                 {c.baked ? (
                                   <>
-                                    {grp(dist(c.km_trip))} {DU()}/trip{c.return_baked ? "" : " (outbound only — return not baked)"} · {grp(dist(wd.km))} {DU()}/week
+                                    {grp(dist(c.km_trip))} {DU()}/trip{c.return_baked ? "" : " (outbound only — return not routed yet)"} · {grp(dist(wd.km))} {DU()}/week
                                     · {grp(wd.vehicles_peak)} veh peak · {grp(dist(wd.tonne_km))} {TKM()} ({c.km_basis === "loaded" ? "loaded leg" : "round trip"})
                                     · cycle {grp(c.cycle_min)} min {c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"}
                                     · {c.cycles_per_vehicle_day} cycles/veh/day · {wd.eur == null ? "rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? ` (per-${DU()} term missing)` : ""} this week${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}`}{wd.fair_eur != null && c.fair && <span title={`fair (model): ${grp(c.fair.litres_trip, 1)} L / trip at ${CUR()}${c.fair.index_eur_per_l} · fuel ${grp(c.fair.fuel_share_pct)} % of cost${c.fair.flags.length ? " · " + c.fair.flags.join(", ") : ""}`}> · <span className="text-[color:var(--navy)] font-semibold">fair {CUR()} {grp(wd.fair_eur)}</span> (model{c.fair.flags.includes("WINTER") ? ", winter" : ""}{c.fair.flags.includes("THAW") ? ", thaw restrictions may apply" : ""}){wd.fair_units && wd.fair_units.per_t != null ? ` = ${unitTriple(wd.fair_units)}` : ""}</span>}{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null && <span className="text-slate-500"> · {c.rate_source === "target" ? "target" : "quote"} = {unitTriple(wd.eur_units)}</span>}
                                   </>
                                 ) : (
-                                  <span className="text-amber-700">{DU()} — until the route is baked · trips still from {grp(c.payload_t, 1)} t planning payload{c.payload_fallback ? ` (${c.payload_fallback} fallback)` : ""}{wd.eur != null ? ` · ${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? ` without the per-${DU()} term` : ""}${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}` : ""}</span>
+                                  <span className="text-amber-700">{DU()} — until the route is worked out · trips still from {grp(c.payload_t, 1)} t planning payload{c.payload_fallback ? ` (${c.payload_fallback} fallback)` : ""}{wd.eur != null ? ` · ${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? ` without the per-${DU()} term` : ""}${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}` : ""}</span>
                                 )}
                               </td>
                             </tr>
@@ -5497,9 +5513,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                   </tbody>
                 </table>
               </div>
+              {/* 13 Oct 2026 (W3): the how-to under the grid moved to the caption's info box (la.commit) */}
               <div className="px-4 py-2 text-[13px] text-slate-500 border-t border-slate-100">
-                Click a day to type its plan while the week is not confirmed. Confirm locks the week as the haulier sheet.
-                Mon–Fri only — Sat/Sun are held at 0 and not shown. Figures are planning, not plated. ✎ = a typed day that no longer follows the week ÷ 5.
+                Figures are planning figures, not plated weights.
                 {busy && <span className="ml-2 text-slate-500">saving…</span>}
               </div>
             </div>
@@ -5531,13 +5547,13 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       <th className="px-3 py-2 text-left font-semibold">Line</th>
                       <th className="px-2 py-2 text-right font-semibold">Planned</th>
                       <th className="px-2 py-2 text-right font-semibold">Actual</th>
-                      <th className="px-2 py-2 text-right font-semibold">Variance</th>
-                      <th className="px-2 py-2 text-right font-semibold">Planned {CUR()}</th>
-                      <th className="px-2 py-2 text-right font-semibold" title="The fair-price model: vehicle, distance, tonnage, month and the live diesel index. Never a quote.">Fair {CUR()} <span className="normal-case tracking-normal text-slate-400">(model)</span></th>
-                      <th className="px-2 py-2 text-right font-semibold">Actual {CUR()}</th>
+                      <th className="px-2 py-2 text-right font-semibold">Variance<InfoTip id="la.variance" /></th>
+                      <th className="px-2 py-2 text-right font-semibold">Planned {CUR()}<InfoTip id="la.cost_quote" value={account.eur_target_lines ? `${account.eur_target_lines} line${account.eur_target_lines === 1 ? "" : "s"} at the target rate.` : ""} /></th>
+                      <th className="px-2 py-2 text-right font-semibold">Fair {CUR()} <span className="normal-case tracking-normal text-slate-400">(model)</span><InfoTip id="la.cost_fair" /></th>
+                      <th className="px-2 py-2 text-right font-semibold">Actual {CUR()}<InfoTip id="la.cost_actual" /></th>
                       <th className="px-2 py-2 text-right font-semibold">{CUR()} var</th>
                       <th className="px-2 py-2 text-left font-semibold">Note</th>
-                      <th className="px-2 py-2 text-right font-semibold">Action</th>
+                      <th className="px-2 py-2 text-right font-semibold">Action<InfoTip id="la.spread" /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5573,7 +5589,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             </>}
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums" style={{ color: "var(--navy)" }}>
-                            {r.planned_fair_eur == null ? <span className="text-slate-300" title="No fair price: the route is not baked for this vehicle, or the diesel index is missing">—</span>
+                            {r.planned_fair_eur == null ? <span className="text-slate-300" title="No fair price: the route is not routed yet for this vehicle, or the diesel index is missing">—</span>
                               : <>{CUR()} {grp(r.planned_fair_eur)}{(r.fair_flags || []).includes("WINTER") && <span className="ml-1 text-[9px] text-slate-400" title="winter consumption uplift applied">winter</span>}{(r.fair_flags || []).includes("THAW") && <span className="ml-1 text-[9px] text-amber-700" title="Spring load restrictions (8 t) may apply on gravel and municipal roads — permits are free">thaw</span>}
                                   {r.fair_units && r.fair_units.per_t != null && <div className="text-[10px] text-slate-400 whitespace-nowrap">{unitTriple(r.fair_units)}</div>}</>}
                           </td>
@@ -5611,11 +5627,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                   </tbody>
                 </table>
               </div>
+              {/* 13 Oct 2026 (W3): the three notes moved to the column headers' info boxes (la.variance, la.spread, la.cost_quote, la.cost_fair) */}
               <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 space-y-0.5">
-                <div>Variance = planned − actual. Green = held (within the 98 % band) or over-delivered. Red = short. Empty actual is not zero — it is "not reported".
-                  Calibrate never fires on save; only the navy button writes the commit week, and only if that week is not already confirmed.</div>
-                <div>"Spread on this week" divides the shortage not yet carried across the remaining weekdays of the commit week (all of Mon–Fri when that week has not started). Sat/Sun stay 0 unless you type them. A second press carries only what the first did not.</div>
-                <div>Planned {CUR()} is the route's own rates, or the target rate from Config where the route has none (marked "target"). "+ BAF" is the same quote with the fuel surcharge; the quote is never replaced. {CUR()} var compares the actual against the quote, not the surcharged figure. "Fair {CUR()} (model)" is what the job should cost from the vehicle, distance, tonnage, month and the live diesel index at the coefficients on Config — a floor for negotiation, never a quote.{account.eur_target_lines ? ` ${account.eur_target_lines} line${account.eur_target_lines === 1 ? "" : "s"} at the target rate.` : ""}</div>
                 {busy && <span className="text-slate-500">saving…</span>}
               </div>
             </div>
@@ -5625,8 +5638,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               reported counts as nothing). Over capacity is a flag, never a block. */}
           {account.week && (account.stock || []).length > 0 && (
             <div className="mt-4">
-              <div className="text-sm font-semibold text-slate-700 mb-1">Stockpiles · {spanLabel(account.week.from, account.week.to)}</div>
-              <p className="text-[11px] text-slate-400 mb-2">Type what came out of each stockpile this week. Opening = the balance at the end of the week before · in = typed week actuals delivered here (a week nobody reported counts as nothing) · closing = opening + in − out. Empty = not typed, which is not zero.</p>
+              <div className="text-sm font-semibold text-slate-700 mb-2">Stockpiles · {spanLabel(account.week.from, account.week.to)}<InfoTip id="la.stock" /></div>
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <table className="text-sm w-full" style={{ minWidth: 760 }}>
                   <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">
@@ -5700,7 +5712,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                     <thead className="bg-slate-50 text-slate-500 text-xs">
                       <tr>
                         <th className="px-3 py-2 text-left font-semibold border-r border-slate-200 sticky left-0 bg-slate-50 z-10" style={{ minWidth: 240 }}>
-                          Line<div className="text-[10px] font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)} · {monthLabelAbs(horizon.to_month, months.start_year)}</div>
+                          Line<InfoTip id="la.horizon" /><div className="text-[10px] font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)} · {monthLabelAbs(horizon.to_month, months.start_year)}</div>
                         </th>
                         {cols.map(({ m, w }) => {
                           const role = roleOf(m, w);
@@ -5750,10 +5762,6 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       ))}
                     </tbody>
                   </table>
-                </div>
-                <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100">
-                  No day columns here. Confirm lives on the Commit view. Weeks beyond the commit week stay week totals so hauliers are not sent a four-week daily spreadsheet.
-                  Blue column = the commit week{bucket === "next" ? " (next week, by the switch above)" : " — the week that contains today"}. That is the only week that materialises daily rows.
                 </div>
               </div>
             );
@@ -5898,8 +5906,8 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush }){
       <div className={flush ? "" : "bg-white rounded-xl border border-slate-200 overflow-hidden"}>
         <div ref={mapDiv} style={{ height: height || 380 }} />
         <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 flex flex-wrap gap-x-3">
-          <span>Baked loaded leg per line, coloured by {TEAM().toLowerCase()} · dark dot = origin · red dot = destination · hover a line for its week.</span>
-          {unbaked.length > 0 && <span className="text-amber-700">Not drawn (no baked route): {unbaked.join(", ")}</span>}
+          <span>Routed loaded leg per line, coloured by {TEAM().toLowerCase()} · dark dot = origin · red dot = destination · hover a line for its week.</span>
+          {unbaked.length > 0 && <span className="text-amber-700">Not drawn (no route worked out): {unbaked.join(", ")}</span>}
           {err && <span style={{ color: "var(--red)" }}>{err}</span>}
         </div>
       </div>
@@ -6130,7 +6138,7 @@ const vehShort = (v) => vehLabel(v).replace(/^(Artic|Rigid)\s+/, "");
 // enough to draw the map, not enough for a cycle time.
 function VehChips({ profiles }){
   const keys = Object.keys(profiles || {}).sort();
-  if(!keys.length) return <span className="text-xs text-slate-300">not baked</span>;
+  if(!keys.length) return <span className="text-xs text-slate-300">not routed</span>;
   return (
     <span className="flex flex-wrap gap-1">
       {keys.map(k => {
@@ -6142,9 +6150,9 @@ function VehChips({ profiles }){
                                  : ["#f1f5f9", "#94a3b8"];
         const alts = p.alt_count > 1 ? ` · ${p.alt_count} options` : "";
         const tip = p.error ? `${k} — ${p.error}`
-                  : !p.baked ? `${k} · not baked`
+                  : !p.baked ? `${k} · not routed`
                   : `${k} · ${fmtDist(p.distance_km, 1)} ${DU()} out` +
-                    (p.return_baked ? ", return baked" : ", return NOT baked") + alts;
+                    (p.return_baked ? ", return routed" : ", return NOT routed") + alts;
         return (
           <span key={k} title={tip}
             className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
@@ -6194,7 +6202,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
       const inv = j.invalidated || {};
       let m = label.replace(/…$/, " — done.");
       if(inv.leg_count){
-        m += ` ${inv.leg_count} baked leg(s) cleared, ${inv.here_calls} HERE call(s) to re-route.`;
+        m += ` ${inv.leg_count} routed leg(s) cleared, ${inv.here_calls} HERE call(s) to re-route.`;
         setMsg(m);
         if(onChanged) m += await onChanged(inv);
       }
@@ -6220,7 +6228,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
 
   const detach = (zid) => {
     const z = byId[zid];
-    if(!confirm(`Take ${(z && z.name) || zid} off ${routeId}?\n\nEvery baked leg of this route is cleared and re-routed.`)) return;
+    if(!confirm(`Take ${(z && z.name) || zid} off ${routeId}?\n\nEvery routed leg of this route is cleared and re-routed.`)) return;
     run(() => post(`${API}/admin/routes/${encodeURIComponent(routeId)}/haul-roads/${encodeURIComponent(zid)}${qs()}`,
                    { method: "DELETE" }), `Detaching ${(z && z.name) || zid}…`);
   };
@@ -6247,7 +6255,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
         </span>
         {plan && plan.here_calls_per_bake != null && !!attached.length && (
           <span className="text-[10px] text-slate-400">
-            a full re-bake of this route is {plan.here_calls_per_bake} HERE call(s)
+            routing this route again costs {plan.here_calls_per_bake} HERE call(s)
           </span>
         )}
       </div>
@@ -6339,7 +6347,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
       {!!attached.length && (
         <p className="text-[10px] text-slate-400 mt-1.5">
           Order is the outbound direction; the return leg meets them in reverse and enters each
-          road from the other end. Which end is entry is worked out per leg from the geometry, so
+          road from the other end. Which end is entry is worked out for each leg, so
           the order you drew a road in does not matter.
         </p>
       )}
@@ -6498,7 +6506,7 @@ function RouteRestrictions({ routeId }){
 
       <p className="text-[10px] text-slate-400 mt-1.5">
         Advisory only. The router is never given this data, and a match means the
-        {dated ? "closure" : "restriction"} sits within {data.match_m} m of the baked line — not that it is
+        {dated ? "closure" : "restriction"} sits within {data.match_m} m of the routed line — not that it is
         necessarily on your carriageway.{dated
           ? " A planned closure counts on the Look-ahead only in the weeks its dates overlap."
           : " Mass, height and width are compared for real; a weak bridge's load class is not a tonnage and is left for a human."}
@@ -6545,7 +6553,7 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
       const j = await res.json();
       if(!res.ok || j.error) throw new Error(j.error || res.status);
       setMsg(j.rebake_needed
-        ? "Saved — this route's cached geometry now points at the old gate. Re-bake it."
+        ? "Saved — this route still goes to the old gate until it is routed again. Re-route it."
         : "Saved.");
       if(j.rebake_needed && onChanged) onChanged();
     } catch(e){ setMsg("Couldn't save: " + e.message); }
@@ -6577,7 +6585,7 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
       <div className="text-sm font-medium text-slate-700 mb-1.5">Gates</div>
       {!!(blockers || []).length && (
         <p className="text-xs mb-2 font-semibold" style={{ color: "var(--red)" }}>
-          This route will not bake: {(blockers || []).join("; ")}.
+          This route cannot be routed: {(blockers || []).join("; ")}.
         </p>
       )}
       <div className="grid grid-cols-2 gap-2">
@@ -6587,7 +6595,7 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
       <p className="text-[11px] text-slate-400 mt-1.5">
         A one-way gate is used only for the direction it serves; the other direction falls
         back to the site&rsquo;s default. Changing a gate moves where HERE routes to, so the
-        cached geometry has to be re-baked before the distances mean anything.
+        stored route has to be re-routed before the distances mean anything.
       </p>
       {msg && <p className="text-[11px] text-slate-500 mt-1">{msg}</p>}
     </div>
@@ -6624,8 +6632,8 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
         {!data && !err && <p className="text-xs text-slate-400">Loading analysis…</p>}
         {data && !data.rows.length && (
           <p className="text-xs text-slate-500">
-            Nothing to analyse yet — this route has no cached geometry. Use the
-            <span className="font-semibold"> Bake</span> action on this row to route it.
+            Nothing to analyse yet — this route has no stored route. Use the
+            <span className="font-semibold"> Route</span> action on this row to route it.
           </p>
         )}
         {data && !!data.rows.length && (
@@ -6668,7 +6676,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                         : `Alt ${r.alt_index}`}
                     </td>
                     <td className={cell}>{fmtDist(r.loaded_km, 1)}</td>
-                    <td className={cell} title={r.return_estimated ? "Return leg not baked — assumed same as outbound" : undefined}>
+                    <td className={cell} title={r.return_estimated ? "Return leg not routed — assumed same as outbound" : undefined}>
                       {fmtDist(r.return_km, 1)}{r.return_estimated ? "*" : ""}
                     </td>
                     <td className={cell} title={(() => {
@@ -6718,10 +6726,10 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
             </table>
             <p className="text-[11px] text-slate-400 mt-2">
               Cycle = out + back + turnaround. Turnaround is the vehicle's own load and unload
-              time from factors.json, plus — where gates record them — induction at each gate
+              time from Config → Vehicles, plus — where gates record them — induction at each gate
               and gate-to-face travel (‡). Trips/day assumes a {data.planning.shift_hours_per_day} h
               shift; t/month assumes {data.planning.working_days_per_month} working days.
-              {data.rows.some(r => r.return_estimated) && " * return leg not baked — assumed to mirror the outbound."}
+              {data.rows.some(r => r.return_estimated) && " * return leg not routed — assumed to mirror the outbound."}
             </p>
             {data.rows.some(r => r.haul_speed_applied) && (
               <p className="text-[11px] mt-1" style={{ color: ZONE_HAUL }}>
@@ -6735,7 +6743,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
             <p className="text-[11px] text-slate-400 mt-1">
               Click a row to draw that option on the map — it turns red, the vehicle's other
               options stay grey. “Make primary” swaps an alternative into first place so it
-              becomes the route the network is planned around; re-baking restores HERE's ranking.
+              becomes the route the network is planned around; re-routing restores HERE's ranking.
             </p>
           </div>
         )}
@@ -7321,7 +7329,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       setSelGeoms(gj);
       setActiveGeom({ profile, leg: leg || showLeg, alt_index: 0 });
       await reloadNetwork();
-      setRouteMsg(`${selected}: alternative ${alt_index} is now the primary route for ${vehShort(profile)}. Re-baking restores HERE's ranking.`);
+      setRouteMsg(`${selected}: alternative ${alt_index} is now the primary route for ${vehShort(profile)}. Re-routing restores HERE's ranking.`);
     } catch(e){ setRouteMsg("Couldn't promote: " + e.message); }
     setPromoting("");
   };
@@ -7369,7 +7377,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const list = (affected || []).filter(a => a && a.profiles && a.profiles.length);
     let done = 0;
     for(const a of list){
-      setLocMsg(`Re-baking ${a.id} (${++done}/${list.length})…`);
+      setLocMsg(`Re-routing ${a.id} (${++done}/${list.length})…`);
       await bakeOneRoute(a.id, a.profiles);
     }
     return { rebaked: list.length, skipped: (affected || []).length - list.length };
@@ -7379,7 +7387,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const rebakeRoute = async (routeId, profiles) => {
     const profs = (profiles && profiles.length) ? profiles : [showProfile];
     setBakeBusy(routeId);
-    setRouteMsg(`Re-baking ${routeId} for ${profs.map(vehShort).join(", ")}…`);
+    setRouteMsg(`Re-routing ${routeId} for ${profs.map(vehShort).join(", ")}…`);
     const failed = await bakeOneRoute(routeId, profs);
     await reloadNetwork();
     if(selected === routeId){
@@ -7388,7 +7396,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       } catch(e){}
     }
     setRouteMsg(failed.length ? `${routeId}: ${failed.join(" · ")}`
-                              : `${routeId} re-baked for ${profs.length} vehicle(s).`);
+                              : `${routeId} re-routed for ${profs.length} vehicle(s).`);
     setBakeBusy("");
   };
 
@@ -7499,9 +7507,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         await reloadNetwork();
         setLocMsg(
           rebaked
-            ? `Saved — re-baked ${rebaked} affected route(s)` +
-              (skipped ? `. ${skipped} had no geometry to restore.` : ".")
-            : `Saved. ${affected.length} route(s) touched, none had cached geometry to restore.`
+            ? `Saved — re-routed ${rebaked} affected route(s)` +
+              (skipped ? `. ${skipped} had no stored route to restore.` : ".")
+            : `Saved. ${affected.length} route(s) touched, none had a stored route to restore.`
         );
       } else {
         setLocMsg(form.id ? "Saved." : "Location created.");
@@ -7552,7 +7560,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   const saveGate = async () => {
     if(!gateForm || !form || !form.id) return;
-    if(!gateForm.name.trim()){ setGateMsg("Give the gate a name — it is what a refused bake will say."); return; }
+    if(!gateForm.name.trim()){ setGateMsg("Give the gate a name — it is what a refused route will say."); return; }
     const lat = parseFloat(gateForm.lat), lon = parseFloat(gateForm.lon);
     if(!isFinite(lat) || !isFinite(lon)){ setGateMsg("Place the gate on the map, or type its coordinates."); return; }
     try { localStorage.setItem("modus_admin_token", token); } catch(e){}
@@ -7581,14 +7589,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       const affected = j.routes_affected || [];
       if(affected.length && confirm(
           `Moving this gate changes where routes start or end.\n\n` +
-          `${affected.length} baked route(s) use it: ${affected.join(", ")}.\n\n` +
-          `Re-bake them now? Each costs HERE calls.`)){
+          `${affected.length} worked-out route(s) use it: ${affected.join(", ")}.\n\n` +
+          `Re-route them now? Each costs HERE calls.`)){
         const { rebaked } = await rebakeAffected(affected);
         await reloadNetwork();
-        setGateMsg(`Saved — re-baked ${rebaked} route(s).`);
+        setGateMsg(`Saved — re-routed ${rebaked} route(s).`);
       } else {
         setGateMsg(affected.length
-          ? `Saved. ${affected.length} route(s) still hold geometry baked to the old point.`
+          ? `Saved. ${affected.length} route(s) still hold a route worked out to the old point.`
           : "Saved.");
       }
     } catch(e){ setGateMsg("Couldn't save gate: " + e.message); }
@@ -7654,8 +7662,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         const { rebaked, skipped } = await rebakeAffected(affected);
         await reloadNetwork();
         setLocMsg(rebaked
-          ? `Moved — re-baked ${rebaked} route(s)` + (skipped ? `, ${skipped} had none cached.` : ".")
-          : `Moved. ${affected.length} route(s) touched, none had cached geometry to restore.`);
+          ? `Moved — re-routed ${rebaked} route(s)` + (skipped ? `, ${skipped} had none stored.` : ".")
+          : `Moved. ${affected.length} route(s) touched, none had a stored route to restore.`);
       } else {
         await reloadNetwork();
         setLocMsg("Moved.");
@@ -7745,7 +7753,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(rVehicles.length){
         for(let i = 0; i < rVehicles.length; i++){
           const prof = rVehicles[i];
-          setRouteMsg(`Created ${newId} — baking ${prof} (${i + 1}/${rVehicles.length})…`);
+          setRouteMsg(`Created ${newId} — routing ${prof} (${i + 1}/${rVehicles.length})…`);
           const bqs = new URLSearchParams({ route_id: newId, profile: prof });
           if(tokenRef.current) bqs.set("token", tokenRef.current);
           try {
@@ -7758,9 +7766,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       await reloadNetwork();
       setSubTab("routes");
       setRouteMsg(
-        failed.length ? `Route ${newId} created — ${rVehicles.length - failed.length}/${rVehicles.length} baked. ${failed.join(" · ")}`
-        : rVehicles.length ? `Route ${newId} created and baked for ${rVehicles.length} vehicle(s).`
-        : `Route ${newId} created — no vehicles ticked, so it has no geometry yet.`
+        failed.length ? `Route ${newId} created — ${rVehicles.length - failed.length}/${rVehicles.length} routed. ${failed.join(" · ")}`
+        : rVehicles.length ? `Route ${newId} created and routed for ${rVehicles.length} vehicle(s).`
+        : `Route ${newId} created — no vehicles ticked, so it has no route yet.`
       );
       setRDest(""); setRIpt(""); setRIdTouched(false);   // next id repopulates
     } catch(e){ setRouteMsg("Couldn't create route: " + e.message); }
@@ -7814,7 +7822,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         if(moved){
           if(imp.forecast_lines) bits.push(`${imp.forecast_lines} forecast line(s) (${imp.forecast_rows} month rows) stay on this id and will now describe the NEW haul`);
           if(imp.week_rows) bits.push(`${imp.week_rows} look-ahead week row(s) likewise`);
-          if((imp.baked_profiles || []).length) bits.push(`baked geometry for ${imp.baked_profiles.map(vehShort).join(", ")} is cleared and re-baked (HERE calls)`);
+          if((imp.baked_profiles || []).length) bits.push(`stored route for ${imp.baked_profiles.map(vehShort).join(", ")} is cleared and re-routed (HERE calls)`);
           if((imp.haul_roads || []).length) bits.push(`${imp.haul_roads.length} haul road link(s) stay attached — check they still lie on the new route`);
           bits.push("the gate selection at the moved end is cleared");
         }
@@ -7823,12 +7831,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         // vehicle with no geometry left reads "not baked" where its km and cycle were.
         drop.forEach(v => {
           const use = fv[v];
-          const who = use ? ` — ${use.lines} forecast line(s) on this route name it${use.approved ? `, ${use.approved} of them Approved` : ""}, and will read “not baked”` : "";
+          const who = use ? ` — ${use.lines} forecast line(s) on this route name it${use.approved ? `, ${use.approved} of them Approved` : ""}, and will read “not routed”` : "";
           bits.push(`${vehShort(v)}: both legs and every alternative are deleted${who}`);
         });
         if(drop.length && !eVehicles.length)
-          bits.push("this route will have NO baked vehicle at all — its km, cycle time and vehicle count read “not baked” everywhere, including on the map");
-        if(!confirm(`${moved ? `Move ${editingRoute}'s endpoints` : `Change ${editingRoute}'s vehicles`}?\n\n• ${bits.join("\n• ")}\n\nContinue?`)){ setRouteBusy(false); return; }
+          bits.push("this route will have NO routed vehicle at all — its km, cycle time and vehicle count read “not routed” everywhere, including on the map");
+        if(!confirm(`${moved ? `Move ${editingRoute}'s ends` : `Change ${editingRoute}'s vehicles`}?\n\n• ${bits.join("\n• ")}\n\nContinue?`)){ setRouteBusy(false); return; }
       }
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(editingRoute)}${qs}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -7860,9 +7868,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           const failed = await bakeOneRoute(editingRoute, [prof]);
           if(failed.length) notes.push(failed.join(" · "));
         }
-        notes.push(`${moved ? "re-baked" : "baked"} ${toBake.length} vehicle(s)`);
+        notes.push(`${moved ? "re-baked" : "routed"} ${toBake.length} vehicle(s)`);
       } else if(moved){
-        notes.push("no vehicles ticked — geometry left cleared");
+        notes.push("no vehicles ticked — route left cleared");
       }
       await reloadNetwork();
       setRouteMsg(`Saved ${editingRoute}${notes.length ? " — " + notes.join("; ") : "."}`);
@@ -7873,7 +7881,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   };
 
   const deleteRoute = async (id) => {
-    if(!confirm(`Delete route ${id}? (Its cached geometry goes too.)`)) return;
+    if(!confirm(`Delete route ${id}? (Its stored route goes too.)`)) return;
     try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
@@ -7897,10 +7905,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const profs = rVehicles.length ? rVehicles : [showProfile];
     const legLabel = bakeLegs === "loaded" ? "laden leg only" : "both legs";
     if(!confirm(
-      `Bake ${profs.length} vehicle profile(s) across the whole network, ${legLabel}?\n\n` +
+      `Route ${profs.length} vehicle profile(s) across the whole network, ${legLabel}?\n\n` +
       `${profs.map(vehShort).join(", ")}\n\n` +
       `This calls HERE once per route per leg and can take several minutes. Routes that ` +
-      `already have geometry are re-routed, so a promoted alternative will be reset to ` +
+      `already have a route are re-routed, so a promoted alternative will be reset to ` +
       `HERE's own ranking.`)) return;
 
     setRouteBusy(true);
@@ -7918,21 +7926,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           }
           const j = await res.json();
           const left = j.remaining ?? 0;
-          setRouteMsg(`Baking ${vehShort(prof)} — ${left} leg(s) remaining…`);
+          setRouteMsg(`Routing ${vehShort(prof)} — ${left} leg(s) remaining…`);
           await reloadNetwork();
           if(left <= 0) break;
         }
       }
       await reloadNetwork();
-      setRouteMsg(`Bulk bake finished for ${profs.map(vehShort).join(", ")}. Check the Vehicles column for anything still amber or red.`);
+      setRouteMsg(`Routing the whole network finished for ${profs.map(vehShort).join(", ")}. Check the Vehicles column for anything still amber or red.`);
     } catch(e){
-      setRouteMsg("Bulk bake stopped: " + e.message + " — already-baked routes are kept, so you can run it again.");
+      setRouteMsg("Routing the whole network stopped: " + e.message + " — routes already worked out are kept, so you can run it again.");
     }
     setRouteBusy(false);
   };
 
   const clearRoutes = async () => {
-    if(!confirm("Clear ALL routes and their geometry? Locations are kept. This is for retiring the V2 seed and can't be undone.")) return;
+    if(!confirm("Clear ALL routes? Locations are kept. This cannot be undone.")) return;
     if(!confirm("Really clear every route? Type-check: this removes all of them.")) return;
     try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setRouteBusy(true); setRouteMsg("Clearing all routes…");
@@ -8108,10 +8116,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       await reloadZones();
       const inv = j.invalidated || {};
       let msg = `Saved ${(j.zone && j.zone.id) || ""}.`;
-      if(inv.leg_count) msg += ` ${inv.leg_count} baked leg(s) invalidated — re-routing now.`;
+      if(inv.leg_count) msg += ` ${inv.leg_count} routed leg(s) invalidated — re-routing now.`;
       setZoneMsg(msg);
       if(inv.leg_count) msg += await rebakeAfterZone(inv);
-      if(inv.approximate) msg += ` ${inv.approximate} of those were matched approximately (baked before zones existed, so there is no record of what they avoided).`;
+      if(inv.approximate) msg += ` ${inv.approximate} of those were matched approximately (routed before zones existed, so there is no record of what they avoided).`;
       setZoneMsg(msg);
       setZoneForm(null); setDrawPts([]); setZoneDraw(false);
     } catch(e){ setZoneMsg("Save failed: " + e.message); }
@@ -8129,9 +8137,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const calls = impact ? impact.here_calls : null;
     if(!confirm(
       `Delete zone ${z.id} "${z.name}"?\n\n` +
-      (calls === null ? "Could not check what this invalidates — the re-bake may be large.\n\n"
-                      : `${calls} baked leg(s) will be cleared and re-routed — that is ${calls} HERE call(s).\n\n`) +
-      "Deactivating instead (untick Active) stops it steering the router but keeps the record of why past bakes went the way they did.")) return;
+      (calls === null ? "Could not check what this invalidates — the re-route may be large.\n\n"
+                      : `${calls} routed leg(s) will be cleared and re-routed — that is ${calls} HERE call(s).\n\n`) +
+      "Deactivating instead (untick Active) stops it steering the router but keeps the record of why past routes went the way they did.")) return;
     setZoneBusy(true); setZoneMsg("Deleting…");
     try {
       const qs = tokenRef.current ? `?token=${encodeURIComponent(tokenRef.current)}` : "";
@@ -8261,7 +8269,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         subtitle={onLoc
           ? "Every site the network hauls from and to. Click the map to place one, drag a marker to move it; deleting a site also deletes every route that uses it."
           : onRoutes
-          ? "Origin → destination pairs, baked against HERE for real HGV geometry in both directions. Editing a route keeps its forecasts; moving an end clears the geometry until it is re-baked."
+          ? "Origin → destination pairs, routed by HERE for a lorry in both directions. Editing a route keeps its forecasts; moving an end clears the route until it is routed again."
           : "Haul roads, restricted areas and the other polygons routing is aware of. A haul road is a zone a route can be told to use."}
         actions={<>
           <span className="text-xs text-slate-400">Basemap</span>
@@ -8285,20 +8293,20 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           {/* every admin action reads this one field — routes are baked per route now,
               so there is no bulk-bake panel to hold it */}
           <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token"
-            title="Only needed if ADMIN_TOKEN is set on the server. Remembered in this browser."
+            title="Needed to change routes, locations and zones. Remembered in this browser."
             className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm w-36" />
         </>}>
         <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
           <span>{locs.length} locations</span><span className="text-slate-300">·</span>
           <span>{(status || []).length} routes</span><span className="text-slate-300">·</span>
           <span>{zoneList.length} zones</span><span className="text-slate-300">·</span>
-          <span>{bakedCount}/{totalRoutes || 0} baked for {showProfile}</span>
+          <span>{bakedCount}/{totalRoutes || 0} routed for {showProfile}</span>
         </div>
       </PageHeader>
 
       {summary && !summary.here_configured && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          HERE_API_KEY isn't set on the server yet — add it in Render → Environment, then bake.
+          Routing is not set up on this deployment yet, so no route can be worked out. Ask your admin.
         </div>
       )}
 
@@ -8326,7 +8334,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             </div>
 
             {mode === "view" && (
-              <p className="text-[11px] text-slate-400">Click a node to edit it, or drag it to move — routes it touches re-bake automatically for the profiles ticked below. Deleting a location also removes routes that use it.</p>
+              <p className="text-[11px] text-slate-400">Click a node to edit it, or drag it to move — routes it touches re-route automatically for the profiles ticked below. Deleting a location also removes routes that use it.</p>
             )}
 
             {form && (
@@ -8596,7 +8604,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         {" "}<strong>Gate → face</strong> — drive from this gate to the face; ignored if the
                         route uses a drawn haul road, so the minutes are not counted twice. Both are
                         planning assumptions; an empty box means 0. Deactivating a gate a route has
-                        selected makes that route refuse to bake, by name.
+                        selected makes that route refuse to route, by name.
                       </p>
                       <div className="flex items-center gap-2">
                         <button onClick={saveGate}
@@ -8629,7 +8637,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       className="ml-auto px-3 py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--red)" }}>Delete</button>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-400">Admin token (if set on the server) is taken from the bake panel below.</p>
+                <p className="text-[11px] text-slate-400">The admin token is taken from the field at the top of this page.</p>
               </div>
             )}
             {locMsg && <p className="text-xs text-slate-500 mt-2">{locMsg}</p>}
@@ -8655,7 +8663,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               <div className="space-y-2">
                 <p className="text-[11px] text-slate-400">
                   A zone is one drawn area with a date range. Tick <strong>Affects routing</strong> and HERE is
-                  told to avoid it, and every baked route crossing it is re-routed. Leave it unticked and the
+                  told to avoid it, and every worked-out route crossing it is re-routed. Leave it unticked and the
                   zone is drawn on both maps for information only — the router never hears about it.
                 </p>
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
@@ -8738,7 +8746,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <p className="text-[11px] text-amber-800">
                       A haul road does nothing until it is <strong>attached to a route</strong> —
                       expand a route on the Routes tab to do that. Drawing one near a route
-                      changes nothing on its own, deliberately: nothing gets re-baked by accident.
+                      changes nothing on its own, deliberately: nothing gets re-routed by accident.
                     </p>
                   </div>
                 )}
@@ -8751,7 +8759,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="block text-[11px] text-slate-400">
                       {isHaul(zoneForm)
                         ? "Untick and the road is drawn on both maps but no route is threaded through it — a haul road that is planned but not open yet."
-                        : "Sends this area to HERE as avoid-areas and re-routes every baked leg that crosses it."}
+                        : "Sends this area to HERE as avoid-areas and re-routes every routed leg that crosses it."}
                     </span>
                   </span>
                 </label>
@@ -8760,7 +8768,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     onChange={e => setZField("active", e.target.checked)} className="mt-1" />
                   <span>
                     <span className="font-medium">Active</span>
-                    <span className="block text-[11px] text-slate-400">Untick to retire a zone without deleting it — the record of why past bakes went the way they did survives.</span>
+                    <span className="block text-[11px] text-slate-400">Untick to retire a zone without deleting it — the record of why past routes went the way they did survives.</span>
                   </span>
                 </label>
                 <label className="block">
@@ -8834,14 +8842,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 </div>
                 {zoneForm.affects_routing && !isHaul(zoneForm) && (
                   <p className="text-[11px] text-amber-700">
-                    Saving clears the baked geometry this zone invalidates and immediately re-routes it — one
+                    Saving clears the stored route this zone invalidates and immediately re-routes it — one
                     HERE call per leg. The count is reported as it runs.
                   </p>
                 )}
                 {isHaul(zoneForm) && (
                   <p className="text-[11px] text-amber-700">
                     {zoneForm.id
-                      ? "Saving re-routes every leg baked through this road, and every leg of every route it is attached to. A spliced road costs two HERE calls per leg, not one — the count is reported before it runs."
+                      ? "Saving re-routes every leg routed through this road, and every leg of every route it is attached to. A spliced road costs two HERE calls per leg, not one — the count is reported before it runs."
                       : "A new haul road is attached to nothing, so saving re-routes nothing. Attach it to a route on the Routes tab to make it do something."}
                   </p>
                 )}
@@ -8906,16 +8914,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   (clear-geometry had no route filter). Both gaps are closed here. */}
               <div>
                 <span className="block text-sm font-medium text-slate-700 mb-1">
-                  {editingRoute ? "Vehicle(s) · tick to bake, untick to remove" : "Vehicle(s) · baked on create"}
+                  {editingRoute ? "Vehicle(s) · tick to route, untick to remove" : "Vehicle(s) · routed on create"}
                 </span>
                 <div className="mt-1 space-y-1">
                   {vehicles.filter(v => vehShown(v) || (editingRoute ? (eVehicles.includes(v) || editHad.includes(v)) : rVehicles.includes(v))).map(v => {
                     const on = editingRoute ? eVehicles.includes(v) : rVehicles.includes(v);
                     const has = editingRoute && editHad.includes(v);
                     const tag = !editingRoute ? null
-                      : (on && !has) ? ["will be baked", "var(--navy)"]
+                      : (on && !has) ? ["will be routed", "var(--navy)"]
                       : (!on && has) ? ["will be removed", "var(--red)"]
-                      : has ? ["baked", "var(--green)"] : null;
+                      : has ? ["routed", "var(--green)"] : null;
                     return (
                       <label key={v} className="flex items-center gap-2 text-xs text-slate-700">
                         <input type="checkbox" checked={on}
@@ -8965,7 +8973,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               ) : (
               <button onClick={createRoute} disabled={routeBusy || !rOrigin || !rDest || !destValid(rDest)}
                 className="w-full py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--navy)" }}>
-                {routeBusy ? "Working…" : (rVehicles.length ? `Create & route · ${rVehicles.length} vehicle(s)` : "Create route (no geometry)")}
+                {routeBusy ? "Working…" : (rVehicles.length ? `Create & route · ${rVehicles.length} vehicle(s)` : "Create route (not routed)")}
               </button>
               )}
               {routeMsg && <p className="text-xs text-slate-500">{routeMsg}</p>}
@@ -9003,7 +9011,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <p className="text-[11px] text-slate-400 mt-1">
               Every route is routed twice: laden out, empty back — the empty lorry is lighter,
               so it can use roads the loaded one legally can't. A green vehicle chip means both
-              directions are cached; <span className="font-semibold">amber ↦</span> means only the
+              directions are stored; <span className="font-semibold">amber ↦</span> means only the
               outbound is, which is enough to draw but not to work out a cycle time. Open a route
               row (▶) for the haul-cycle figures.
             </p>
@@ -9076,17 +9084,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             {/* Bulk bake. Vehicles come from the tick-boxes on the Create route panel so
                 there is one vehicle list on the tab rather than two that can disagree. */}
             <select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)} className={sel}
-              title="Both legs gives a cycle time. Laden only halves the HERE calls but leaves the return unbaked.">
+              title="Both legs gives a cycle time. Laden only halves the HERE calls but leaves the return not routed.">
               <option value="both">Both legs</option>
               <option value="loaded">Laden leg only</option>
             </select>
             <button onClick={bulkBake} disabled={routeBusy || !(status && status.length)}
               title={rVehicles.length
-                ? `Bake the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
+                ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
                 : `No vehicles ticked on the Create route panel — will use ${vehShort(showProfile)}`}
               className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40"
               style={{ background: "var(--navy)" }}>
-              {routeBusy ? "Baking…" : `Bake all · ${(rVehicles.length || 1)} vehicle(s)`}
+              {routeBusy ? "Routing…" : `Route all · ${(rVehicles.length || 1)} vehicle(s)`}
             </button>
             <button onClick={clearRoutes} disabled={routeBusy || !(status && status.length)}
               className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-200 text-[color:var(--red)] hover:bg-red-50 disabled:opacity-40">
@@ -9155,9 +9163,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         disabled={bakeBusy === r.id}
                         title={Object.keys(r.profiles || {}).length
                           ? `Re-route via HERE for ${Object.keys(r.profiles).map(vehShort).join(", ")}`
-                          : `Not baked yet — will route for ${vehShort(showProfile)}`}
+                          : `Not routed yet — will route for ${vehShort(showProfile)}`}
                         className="text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">
-                        {bakeBusy === r.id ? "Baking…" : "Bake"}
+                        {bakeBusy === r.id ? "Routing…" : "Route"}
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); startEditRoute(r); }}
                         className="text-[color:var(--navy)] hover:underline text-xs font-semibold mr-3">Edit</button>

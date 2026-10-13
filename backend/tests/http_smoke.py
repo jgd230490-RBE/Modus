@@ -124,6 +124,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 401 and "<title>Wayscope — map access</title>" in r.text, str(r.status_code))
     r = c.get("/help/")
     ok("🔴 the guide is closed without a staff sign-in — 401", r.status_code == 401, str(r.status_code))
+    # 13 Oct 2026 (W4): the technical guide sits under the same mount and the same staff gate
+    r = c.get("/help/technical/")
+    ok("🔴 W4: the technical guide is closed without a staff sign-in — 401, like the guide", r.status_code == 401
+       and "Technical guide" not in r.text, str(r.status_code))
     # 12 Oct 2026 (C4): the monthly bulletin's page is staff-only like the guide, with its own refusal page
     r = c.get("/bulletin/?month=10")
     ok("🔴 the monthly bulletin page is closed without a staff sign-in — 401, the bulletin's own sign-in page (the middleware's)",
@@ -174,6 +178,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/help/")
     ok("with the staff cookie the guide opens, as Wayscope", r.status_code == 200 and "Wayscope — User guide" in r.text,
        str(r.status_code))
+    r = c.get("/help/technical/")
+    ok("⭐ W4: ...and with it the technical guide opens at /help/technical/ (the mount serves its index.html), no-cache like the guide",
+       r.status_code == 200 and "<title>Wayscope — Technical guide</title>" in r.text and "GET /api/costing/lines" in r.text
+       and "no-cache" in (r.headers.get("cache-control") or ""), f"{r.status_code} {r.headers.get('cache-control')}")
 
     r = c.get("/api/public/alignment")
     b = r.json()

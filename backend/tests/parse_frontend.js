@@ -407,8 +407,9 @@ ok("⭐ trips-per-vehicle-per-day comes from the route's baked cycle, the same s
   code.includes("/analysis?profile=") && /setTpv\(row && row\.trips_per_day > 0 \? row\.trips_per_day : null\)/.test(code));
 ok("⭐ vehicles needed = movements ÷ trips-per-vehicle, rounded UP",
   /Math\.ceil\(movesPerDay \/ tripsPerVehicleDay\)/.test(code));
-ok("⭐ an unbaked route reads 'not baked', never a fleet size",
-  code.includes('"not baked" : String(fleetOf(') && code.includes("not baked yet for"));
+// 13 Oct 2026 (W3, narrowed): "not baked" reads "not routed"
+ok("⭐ an unbaked route reads 'not routed', never a fleet size",
+  code.includes('"not routed" : String(fleetOf(') && code.includes("not routed yet for") && !code.includes('"not baked" : String(fleetOf('));
 ok("the dashboard's fleet column is the server's model (costlines.vehicles), read not recomputed", _dbBody.includes("r.vehicles") && !code.includes("Math.ceil(peakPerDay / a.capacityPerDay)"));
 ok("...and avg / peak material in the CHOSEN unit",
   code.includes('`Avg ${unit === "m3" ? "m³"') && code.includes('`Peak ${unit === "m3" ? "m³"'));
@@ -549,7 +550,7 @@ ok("🔴 the page never fetches the live provider — the refresh is a POST the 
   && /fetch\(`\$\{API\}\/forecast-weeks\/restrictions\?bucket=\$\{bucket\}`\)/.test(_laBody)
   && _laBody.includes("setTimeout(tickPoll, 4000)") && !_laBody.includes("forecast-weeks/tark-tee"));
 ok("...the status line says checked-when, partial-with-names, or NOT checked — never a silent clean — in the provider's words",
-  _laBody.includes("${ttName}: checked") && _laBody.includes("not checked since baking")
+  _laBody.includes("${ttName}: checked") && _laBody.includes("not checked since the route was worked out")   // 13 Oct 2026 (W3, narrowed): was "since baking" 
   && _laBody.includes("NOT checked for these routes") && _laBody.includes("check now")
   && _laBody.includes('const ttName = ttSrc.restrictions_ui_label || "Road restrictions";')
   && !_laBody.includes("Tark Tee)") && _laBody.includes("could not reach {ttShort}"));
@@ -562,7 +563,8 @@ ok("...and the rail's flags come from the page read alone (no second rail, no cl
 ok("⭐ the Commit grid shows Mon–Fri only — weekend days are filtered out of the columns and the cells",
   /\.filter\(iso => !isWeekend\(iso\)\)/.test(_laBody) && _laBody.includes("const weekdaysOf = (line) =>")
   && _laBody.includes("{weekdaysOf(line).map(d => {") && !_laBody.includes("{line.days.map(d => {"));
-ok("...and the footer says so", _laBody.includes("Mon–Fri only — Sat/Sun are held at 0 and not shown"));
+// 13 Oct 2026 (W3, narrowed): the footer's rule moved to the commit caption's info box
+ok("...and the commit grid's info box says so", src.includes("Monday to Friday only: Saturday and Sunday are held at 0 and not shown") && _laBody.includes('<InfoTip id="la.commit" />'));
 // calendar weeks (10 Sep): nothing in the browser assumes four weeks a month
 ok("🔴 the four-week constant and the 1–7 / 8–14 labels are gone; the Horizon asks the server",
   !/const WEEK_NOS = \[1, 2, 3, 4\]/.test(code) && !code.includes('"8–14"')
@@ -574,7 +576,7 @@ ok("the Commit map reads /lookahead/geometry with the page's route ids — never
   _cmBody.includes("/lookahead/geometry?ids=") && !_cmBody.includes("/lookahead?") && !_cmBody.includes("map-data") && !_cmBody.includes("<iframe"));
 ok("...creates ONE map and keeps it (the guard), and never draws an unbaked route as a line",
   _cmBody.includes("if(mapObj.current || !mapDiv.current || !window.mapboxgl) return;")
-  && /if\(r\.geometry && r\.geometry\.length > 1\)\{/.test(_cmBody) && _cmBody.includes("Not drawn (no baked route)"));
+  && /if\(r\.geometry && r\.geometry\.length > 1\)\{/.test(_cmBody) && _cmBody.includes("Not drawn (no route worked out)"));   // 13 Oct 2026 (W3, narrowed): plain words
 ok("...colours lines by IPT from palette C, and is not rendered under the render harness",
   _cmBody.includes("IPT_PALETTE_C[iptKey(") && _laBody.includes("!initialPage && <CommitMap"));
 ok("today's column carries the wash and the '· today' suffix",
@@ -584,9 +586,9 @@ ok("the expanded row prints km/trip, km/week, t·km, cycle and € or 'rate not 
   _laBody.includes("{grp(dist(c.km_trip))} {DU()}/trip") && _laBody.includes("{grp(dist(wd.tonne_km))} {TKM()} (") && _laBody.includes("cycle {grp(c.cycle_min)} min")
   && _laBody.includes('"rate not set"'));
 ok("⭐ the honest-gap sentence for an unbaked line ships as written",
-  _laBody.includes("{DU()} — until the route is baked · trips still from"));
+  _laBody.includes("{DU()} — until the route is worked out · trips still from"));   // 13 Oct 2026 (W3, narrowed): "baked" reads "worked out" 
 ok("an unbaked line shows trips and NO vehicle count (the human's rule), never a 1",
-  _laBody.includes("veh —") && _laBody.includes("Vehicles need a baked route"));
+  _laBody.includes("veh —") && _laBody.includes("Vehicles need this line's route worked out for its vehicle"));   // 13 Oct 2026 (W3, narrowed): plain words
 ok("the expand trigger is the Routes table's ▶ toggle, reused",
   _laBody.includes('{isOpen ? "▼" : "▶"}'));
 ok("the empty state uses EmptyState", _laBody.includes("<EmptyState title={`No approved forecast line in the commit week"));
@@ -633,9 +635,11 @@ ok("the Horizon columns carry a ROLE label — account · commit · make-ready �
   ["ACCOUNT", "COMMIT", "MAKE-READY", "EARLY WARNING"].every(t => _laBody.includes(`"${t}"`)) && _laBody.includes("horizon.roles"));
 ok("...and no Confirm button lives on the Horizon view",
   (() => { const i = _laBody.indexOf("{horizon.rows.length === 0"); const j = _laBody.indexOf("{confirming && (", i);
-           const h = i > 0 && j > i ? _laBody.slice(i, j) : ""; return h.length > 0 && !h.includes("Confirm week") && h.includes("No day columns here"); })());
+           // 13 Oct 2026 (W3, narrowed): the "No day columns here" note moved to the Line header's info box (la.horizon)
+           const h = i > 0 && j > i ? _laBody.slice(i, j) : ""; return h.length > 0 && !h.includes("Confirm week") && h.includes('<InfoTip id="la.horizon" />'); })());
 ok("the Horizon footer states the weeks-not-days rule and the blue-column rule",
-  _laBody.includes("stay week totals so hauliers are not sent a four-week daily spreadsheet") && _laBody.includes("That is the only week that materialises daily rows"));
+  // 13 Oct 2026 (W3, narrowed): the footer's two rules are the Horizon info box's text and how
+  src.includes("Week totals for the weeks after the commit week, so hauliers are not sent a four-week daily spreadsheet") && src.includes("It is the only week with daily rows."));
 
 let _dsBody;
 // ---- 4e. Task D2 — stock held (moved on 10 Sep) --------------------------------------
@@ -902,10 +906,11 @@ ok("'no explicit choice' is an offered option, not an empty select",
   src.includes("Default for this site"));
 ok("B2: a blocked route says so on the collapsed row, not only when expanded",
   src.includes("gate blocked") && code.includes("r.gate_blockers"));
+// 13 Oct 2026 (W3, narrowed): plain words for the same two warnings
 ok("and the blocker text names what is wrong",
-  src.includes("This route will not bake"));
-ok("changing a gate warns that the cached geometry is now stale",
-  src.includes("cached geometry now points at the old gate"));
+  src.includes("This route cannot be routed"));
+ok("changing a gate warns that the stored route is now stale",
+  src.includes("this route still goes to the old gate until it is routed again"));
 
 ok("the turnaround cell reads the backend's total, never its own sum",
   code.includes("r.turnaround_hr") && !code.includes("load_minutes + r.unload_minutes"));
@@ -1028,7 +1033,7 @@ ok("the route id itself is not editable while editing",
 ok("🔴 the vehicle tick-boxes are no longer hidden while editing a route",
   !code.includes("{!editingRoute && ("));
 ok("...and the panel says what ticking and unticking now MEAN while editing",
-  src.includes("tick to bake, untick to remove"));
+  src.includes("tick to route, untick to remove"));   // 13 Oct 2026 (W3, narrowed): plain words
 
 // The edit set is separate state. Sharing rVehicles would have been one line shorter and
 // would have silently re-pointed the network-wide Bake all button at whatever the route
@@ -1062,13 +1067,14 @@ ok("⭐ the edited vehicle set is its OWN state, not rVehicles",
   ok("🔴 dropping a vehicle clears geometry for THIS ROUTE only",
     /clear-geometry/.test(body)
     && /route_id: editingRoute, profile: prof/.test(body));
-  ok("the confirm names the forecast lines a dropped vehicle leaves reading 'not baked'",
-    body.includes("forecast_vehicles") && body.includes("not baked"));
+  // 13 Oct 2026 (W3, narrowed): plain words
+  ok("the confirm names the forecast lines a dropped vehicle leaves reading 'not routed'",
+    body.includes("forecast_vehicles") && body.includes("not routed"));
   ok("...and warns when the last vehicle is being removed",
-    body.includes("NO baked vehicle at all"));
+    body.includes("NO routed vehicle at all"));
 }
 ok("each tick-box says whether it will be baked, removed, or is already baked",
-  code.includes('"will be baked"') && code.includes('"will be removed"'));
+  code.includes('"will be routed"') && code.includes('"will be removed"'));   // 13 Oct 2026 (W3, narrowed): plain words
 ok("the Save button shows the vehicle change before the confirm dialog does",
   code.includes("Save changes · "));
 
@@ -1129,7 +1135,8 @@ ok("...the expanded Commit row and the Account cell print '+ BAF' as a SECOND fi
   _laBody.includes("+ BAF ${CUR()} ${grp(wd.eur_adj)}") && _laBody.includes("+ BAF {CUR()} {grp(r.planned_eur_adj)}")
   && _laBody.includes('r.rate_source === "target"') && _laBody.includes('c.rate_source === "target"'));
 ok("...and the Account footer says the quote is never replaced and € var is against the quote",
-  _laBody.includes("the quote is never replaced") && _laBody.includes("{CUR()} var compares the actual against the quote"));
+  // 13 Oct 2026 (W3, narrowed): the Account footer moved to the Planned cost header's info box (la.cost_quote)
+  src.includes("the quote is never replaced") && src.includes("The cost variance compares the actual against the quote") && _laBody.includes('<InfoTip id="la.cost_quote"'));
 ok("the Account strip is mounted above the KPI grid; the widget is passed the page's own costing block",
   _laBody.indexOf('<FuelWidget mode="strip"') < _laBody.indexOf('caption="last week delivered · 98% band"')
   && (_laBody.match(/initial=\{page && page\.costing\}/g) || []).length === 2);
@@ -1167,8 +1174,10 @@ ok("the Look-ahead prints the fair figure as a THIRD figure, marked 'model': KPI
 ok("...with the winter and thaw flags on the Account cell and the expanded row",
   _laBody.includes('(r.fair_flags || []).includes("WINTER")') && _laBody.includes('(r.fair_flags || []).includes("THAW")')
   && _laBody.includes('c.fair.flags.includes("THAW") ? ", thaw restrictions may apply"'));
-ok("...an unbaked line prints — with the reason, never a number", _laBody.includes("No fair price: the route is not baked for this vehicle, or the diesel index is missing"));
-ok("...and the footer calls it a floor for negotiation, never a quote", _laBody.includes("a floor for negotiation, never a quote"));
+// 13 Oct 2026 (W3, narrowed): plain words
+ok("...an unbaked line prints — with the reason, never a number", _laBody.includes("No fair price: the route is not routed yet for this vehicle, or the diesel index is missing"));
+// 13 Oct 2026 (W3, narrowed): the footer moved to the Fair column's info box (la.cost_fair)
+ok("...and the Fair column's info box calls it a floor for negotiation, never a quote", src.includes("A floor for negotiation, never a quote.") && _laBody.includes('<InfoTip id="la.cost_fair" />'));
 ok("the Config page hands the file document to the tab (for the fallback values)", code.includes("setFileDoc(j.file || null)"));
 
 // ---- 11 Sep pm: the big-screen Dashboard ---------------------------------------------
@@ -1404,7 +1413,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   // NARROWED 11 Oct 2026 (the process layout: the header's line moved into step 1, as the first of the server-counted
   // left-out lines, in the words of the "Left out here" list)
   ok("the unbaked lines are named, never estimated",
-     cb.includes('unrouted > 0 ? `${unrouted} plan line${unrouted === 1 ? " has" : "s have"} no route distance yet: transport not counted (Bake on the Routes page)` : ""')
+     // 13 Oct 2026 (W3, narrowed): plain words
+     cb.includes('unrouted > 0 ? `${unrouted} plan line${unrouted === 1 ? " has" : "s have"} no route distance yet: transport not counted (route it on Data → Routes)` : ""')
      && cb.includes("const unrouted = (B.totals.lines || 0) - (B.totals.baked_lines || 0);")
      && cb.includes('{leftOut.length > 0 && <p className="text-sm text-amber-700 mt-2">{leftOut[0]}'));
   ok("🔴 the electric figures carry their basis: no Government electric HGV factor; the +2 t allowance is draft, not applied",
@@ -2223,6 +2233,140 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && /\.filter\(c => Array\.isArray\(c\) && isFinite\(c\[0\]\) && isFinite\(c\[1\]\)\)/.test(locFetch)
      && /if\(pts\.length\)\{ framedRef\.current = true; try \{ m\.fitBounds\(boundsOf\(pts\), \{ padding: 60, maxZoom: 12, duration: 0 \}\); \} catch\(e\)\{\} \}/.test(locFetch)
      && (html.match(/framedRef\.current = true/g) || []).length === 1);
+}
+
+// ---- 13 Oct 2026 (W3): the word rule, the info box and its dictionary -----------------------
+// The rule (notes/w3-w4-inventory-1013.md): no screen says these words; they live in the technical guide.
+// Every piece of literal text in the Babel block is walked with the TypeScript parser (comments are not
+// text, so they are never read): JSX text, every string and template piece, every attribute. A piece is
+// skipped only when it is code, not words: a fetch / storage / JSON call's argument, an object key, a
+// comparison or index, an identifier-like token (`route_geometry`, `/admin/...`, `POST`, `geometry-type`).
+// Exempt by decision B (13 Oct): the Diagnostics panel, the Config "Everything (JSON)" tab's own words,
+// and the phrase "admin token" wherever its field is named.
+{
+  const BANNED = /(\/api\b|\bendpoints?\b|\bservers?\b|\bJSON\b|\bcached?\b|\bgeometry\b|\bbak(?:e|ed|es|ing)\b|\bunbaked\b|\bre-?bak\w*|\bPOST\b|\bGET\b|\bHTTP\b|localStorage|\bschema\b|\btokens?\b|line-months?)/i;
+  const CASED = /\b(POST|GET|JSON|HTTP)\b/;
+  const EXEMPT_TEXT = ["Not valid JSON: ", "Everything (JSON)", "Saving from the JSON section sends the text as typed"];
+  const sfW = ts.createSourceFile("w.tsx", src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const K = ts.SyntaxKind;
+  const compOf = (n) => { for (let p = n.parent; p; p = p.parent) {
+    if (ts.isFunctionDeclaration(p) && p.name && /^[A-Z]/.test(p.name.text)) return p.name.text;
+    if (ts.isVariableDeclaration(p) && ts.isIdentifier(p.name) && /^[A-Z]/.test(p.name.text) && p.initializer && (ts.isArrowFunction(p.initializer) || ts.isFunctionExpression(p.initializer))) return p.name.text; }
+    return "(top)"; };
+  const ctxOf = (n) => {
+    let e = n; if (n.kind === K.TemplateHead || n.kind === K.TemplateMiddle || n.kind === K.TemplateTail) { e = n.parent; if (e && e.kind === K.TemplateSpan) e = e.parent; }
+    const p = e.parent;
+    if (ts.isJsxText(n)) return "jsx-text";
+    if (p && ts.isJsxAttribute(p)) return "attr:" + p.name.getText();
+    if (p && ts.isJsxExpression(p) && p.parent && ts.isJsxAttribute(p.parent)) return "attr:" + p.parent.name.getText();
+    if (p && ts.isCallExpression(p)) return "call:" + p.expression.getText().slice(0, 40);
+    if (p && ts.isPropertyAssignment(p)) return p.name === e ? "key" : "prop:" + p.name.getText();
+    if (p && ts.isElementAccessExpression(p)) return "index";
+    if (p && ts.isBinaryExpression(p) && /^(===|!==|==|!=)$/.test(p.operatorToken.getText())) return "compare";
+    if (p && ts.isCaseClause(p)) return "compare";
+    return K[p.kind]; };
+  const pieces = [];
+  (function walk(n) {
+    const a = n.getStart(sfW), b = n.getEnd();
+    let t = null;
+    if (n.kind === K.StringLiteral || n.kind === K.NoSubstitutionTemplateLiteral) t = src.slice(a + 1, b - 1);
+    else if (n.kind === K.TemplateHead || n.kind === K.TemplateMiddle) t = src.slice(a + 1, b - 2);
+    else if (n.kind === K.TemplateTail) t = src.slice(a + 1, b - 1);
+    else if (n.kind === K.JsxText && n.getText().trim()) t = n.getText();
+    if (t != null) pieces.push({ t, ctx: ctxOf(n), comp: compOf(n), line: src.slice(0, a).split("\n").length });
+    ts.forEachChild(n, walk);
+  })(sfW);
+  const isCode = (p) => {
+    const w = p.t.trim();
+    if (p.t.includes("?token=") || w.startsWith("/api/")) return true;
+    if (["key", "index", "compare"].includes(p.ctx) || /^call:(fetch|api|JSON\.|localStorage|sessionStorage)/.test(p.ctx) || p.ctx.includes("localStorage")) return true;
+    if (/^[a-z]+(-[a-z]+)+$/.test(w)) return true;                 // a Mapbox expression name, a CSS word
+    if (!/\s/.test(w) && ((p.ctx.startsWith("call:") && /^[a-z_]+$/.test(w)) || /[/_=?&]/.test(w) || ["POST", "GET", "PUT", "DELETE", "PATCH"].includes(w))) return true;
+    return false; };
+  const banOf = (t) => { const t2 = t.replace(/admin token/gi, ""); const m = t2.match(BANNED); if (!m) return null;
+    if (/^(POST|GET|JSON|HTTP)$/i.test(m[0]) && !CASED.test(t2)) return null; return m[0]; };
+  const hits = pieces.filter(p => banOf(p.t) && !isCode(p) && p.comp !== "Diagnostics" && !EXEMPT_TEXT.includes(p.t));
+  ok(`⭐ W3 word rule: no text a person reads on a staff screen says API / endpoint / server / JSON / cache / geometry / bake / POST / GET / HTTP / localStorage / schema / token / line-month (${pieces.length} pieces read)`,
+     pieces.length > 2000 && hits.length === 0,
+     hits.slice(0, 8).map(p => `line ${p.line} ${p.comp} [${banOf(p.t)}] ${JSON.stringify(p.t.trim().slice(0, 80))}`).join(" | "));
+  ok("...the scan is real: it reads JSX text, titles, aria-labels, placeholders, confirm() and message strings",
+     ["jsx-text", "attr:title", "attr:aria-label", "attr:placeholder"].every(c => pieces.some(p => p.ctx === c))
+     && pieces.some(p => p.ctx.startsWith("call:confirm")) && pieces.some(p => p.ctx.startsWith("call:setRouteMsg")));
+  ok("...and it would catch the old words: the exempt rows are the decided ones only (Diagnostics, the JSON tab's three strings, the admin token)",
+     banOf("line-months on a baked route") && banOf("No cached geometry") && banOf("The server did not answer") && !banOf("Admin token")
+     && pieces.filter(p => banOf(p.t) && p.comp === "Diagnostics" && !isCode(p)).length >= 1
+     && EXEMPT_TEXT.every(x => pieces.some(p => p.t === x)));
+  ok("...the internal codes and field names stay (only the words a person reads changed)",
+     src.includes('UNBAKED: "NOT ROUTED"') && src.includes("r.baked") && src.includes("excludes_unbaked") && src.includes("D.baked"));
+
+  // the INFO dictionary
+  const infoDecl = (() => { let d = null; (function f(n) { if (ts.isVariableDeclaration(n) && n.name.getText() === "INFO") d = n; ts.forEachChild(n, f); })(sfW); return d; })();
+  const INFOS = {};
+  if (infoDecl && infoDecl.initializer && ts.isObjectLiteralExpression(infoDecl.initializer)) {
+    for (const prop of infoDecl.initializer.properties) {
+      const key = prop.name.text, e = {};
+      for (const q of prop.initializer.properties) e[q.name.getText()] = q.initializer.text;
+      INFOS[key] = e;
+    }
+  }
+  const ids = Object.keys(INFOS);
+  const used = new Set([...src.matchAll(/<InfoTip id="([^"]+)"/g), ...src.matchAll(/info=\{\{ id: "([^"]+)"/g)].map(m => m[1]));
+  const words = (t) => (t || "").split(/\s+/).filter(Boolean).length;
+  const guideIds = new Set([...fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8").matchAll(/ id="([^"]+)"/g)].map(m => m[1]));
+  const techIds = new Set([..._tg.matchAll(/ id="([^"]+)"/g)].map(m => m[1]));
+  ok(`⭐ W3 INFO: one dictionary, every entry has a title and a text (${ids.length} entries)`,
+     ids.length >= 50 && ids.every(k => INFOS[k].title && INFOS[k].text));
+  ok("...every info box on a screen has its entry, and every entry is used (no orphan copy)",
+     [...used].every(k => INFOS[k]) && ids.every(k => used.has(k)), [...used].filter(k => !INFOS[k]).concat(ids.filter(k => !used.has(k))).join(", "));
+  ok("...each entry's plain text is at most 40 words (the brief's limit; the rest goes in 'how')",
+     ids.every(k => words(INFOS[k].text) <= 40), ids.filter(k => words(INFOS[k].text) > 40).join(", "));
+  ok("...and no entry breaks the word rule",
+     ids.every(k => ["title", "text", "how", "source"].every(f => !banOf(INFOS[k][f] || ""))), ids.filter(k => ["title", "text", "how", "source"].some(f => banOf(INFOS[k][f] || ""))).join(", "));
+  ok("...every 'Read more' anchor exists in the user guide, every 'Technical detail' anchor in the technical guide",
+     ids.every(k => !INFOS[k].guide || guideIds.has(INFOS[k].guide)) && ids.every(k => !INFOS[k].tech || techIds.has(INFOS[k].tech)) && techIds.has("t1-figures")
+     && ids.some(k => INFOS[k].guide) && ids.some(k => INFOS[k].tech),
+     ids.filter(k => (INFOS[k].guide && !guideIds.has(INFOS[k].guide)) || (INFOS[k].tech && !techIds.has(INFOS[k].tech))).join(", "));
+
+  // the component (the behaviour is exercised in dom_frontend.js and in a real browser)
+  const it = src.slice(src.indexOf("function InfoTip("), src.indexOf("// Chart.js wrapper"));
+  ok("⭐ W3 InfoTip: a native button (Enter and Space click it), named 'About: …', with aria-expanded and aria-controls",
+     it.includes('<button ref={btn} type="button" className="ibtn" aria-label={`About: ${name}`} aria-expanded={open ? "true" : "false"}')
+     && it.includes("aria-controls={panelId}") && !it.includes("onMouseEnter") && !it.includes("onMouseOver") && !it.includes("onKeyDown"));
+  ok("...the panel is a non-modal dialog labelled by its title, in title → text → value → how → source → links order",
+     it.includes('role="dialog" aria-modal="false" aria-labelledby={panelId + "-t"}')
+     && ["<h6 id=", "<p>{e.text}</p>", "info-val", "How it is worked out", "Source: {e.source}", "Read more in the user guide →", "Technical detail →"].every((x, i, a) => it.indexOf(x) > 0 && (i === 0 || it.indexOf(x) > it.indexOf(a[i - 1]))));
+  ok("...Esc closes it and gives focus back to the 'i'; an outside click or a touch closes it; one open at a time",
+     it.includes('if(ev.key === "Escape") { ev.stopPropagation(); close(true); }') && it.includes("if(refocus && btn.current)")
+     && it.includes('document.addEventListener("mousedown", onDown)') && it.includes('document.addEventListener("touchstart", onDown)')
+     && it.includes("if(INFO_OPEN && INFO_OPEN.close) INFO_OPEN.close(false);") && /^let INFO_OPEN = null;$/m.test(src));
+  ok("...below 640 px it opens as a sheet from the bottom; otherwise it flips above the 'i' when there is no room below",
+     it.includes('window.matchMedia("(max-width: 639px)")') && it.includes("is-sheet") && /\.info-pop\.is-sheet\{left:0 !important;right:0 !important;bottom:0 !important;top:auto !important;/.test(html)
+     && it.includes("r.bottom + 6 + ph > vh"));
+  ok("...it is drawn in a portal (a card's overflow:hidden would clip it) and its click never sorts a column or toggles a <details>",
+     it.includes("ReactDOM.createPortal(panel, document.body)") && it.includes("ev.stopPropagation(); ev.preventDefault();"));
+  ok("...24 px hit area, 44 px on a touch screen, a focus ring, and hidden on the big screen (a wall display has no pointer)",
+     /\.ibtn::after\{content:"";position:absolute;inset:-3px;\}/.test(html) && /@media \(pointer:coarse\)\{\.ibtn::after\{inset:-13px;\}\}/.test(html)
+     && /\.ibtn:focus-visible\{outline:2px solid var\(--navy\);/.test(html) && /\.dash-wall \.ibtn\{display:none;\}/.test(html));
+
+  // what W3 removed from the screens (source-level, so a revert is caught)
+  ok("🔴 W3 removed: no cursor:help and no hover title on a Dashboard card, figure or Today figure",
+     !/cursor-help/.test(src) && !/cursor:help/.test(html)
+     && ["const Card = ({ label, value, sub, info, tone })", "const Fig = ({ value, label, sub, info, tone })", "const Big = ({ value, label, sub, info, tone })"].every(x => src.includes(x))
+     && !/<Card [^>]*\btitle=/.test(src) && !/<Fig [^>]*\btitle=/.test(src) && !/<Big [^>]*\btitle=/.test(src));
+  ok("🔴 ...the Dashboard shows the date range once (the kicker): the subtitle that repeated it and the scope is gone",
+     !_dbBody.includes("Strategic planning view") && !_dbBody.includes("subtitle={`") && _dbBody.includes('<PageHeader title="Dashboard" kicker={`${rangeLabel} ·'));
+  ok("🔴 ...the dot-separated hints are gone from the screens: the stockpile chart's formula line, the commit caption's, the Account and Horizon footers",
+     !src.includes("balance at the week's end = opening + typed week actuals") && !src.includes("· loads and vehicles in grey · Monday to Friday")
+     && !src.includes("Calibrate never fires on save") && !src.includes("No day columns here.") && !src.includes("Type what came out of each stockpile this week. Opening ="));
+  ok("🔴 ...and the Forecasts cost column and the carbon target line carry an info box, not a title",
+     src.includes('<th scope="col" className="num">Cost ({CUR()})<InfoTip id="fc.cost" /></th>') && !src.includes("Hover a figure for")
+     && !src.includes('data-carbon-target="set" title='));
+  ok("W3 §1: the passages that left the screen read in plain words (each one's old text is in the technical guide)",
+     src.includes("Needed to change routes, locations and zones. Remembered in this browser.") && !src.includes("ADMIN_TOKEN")
+     && src.includes("Routing is not set up on this deployment yet") && !src.includes("HERE_API_KEY")
+     && src.includes("The admin token is taken from the field at the top of this page.") && !src.includes("taken from the bake panel")
+     && src.includes("Saved on its own: the page's Save button does not save the target rate") && src.includes("from Config → Vehicles, plus")
+     && src.includes("Codes are checked by Wayscope") && src.includes('confirm("Clear ALL routes? Locations are kept. This cannot be undone.")'));
 }
 
 // ---- report ------------------------------------------------------------------

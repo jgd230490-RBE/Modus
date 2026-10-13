@@ -70,7 +70,7 @@ function figNumbers() {
     ["Tonnes", "m³ × density of the<br>material category<br><span class=muted>(Config › Materials)</span>", ""],
     ["Trips", "tonnes ÷ payload of<br>the vehicle<br><span class=muted>(Config › Vehicles)</span>", ""],
     ["Trips per day", "÷ working days (22 per month), or week ÷ 5 on the Look-ahead", ""],
-    ["Vehicles", "trips per day ÷ what one lorry can do in a 10 h shift on that route's baked cycle", "accent"],
+    ["Vehicles", "trips per day ÷ what one lorry can do in a 10 h shift on that route's routed cycle", "accent"],
     ["km · t·km · CO₂e · cost", "trips × routed km; tonnes × km basis; km × kg CO₂e/km; typed route rates", "ok"],
   ];
   const boxes = steps.map(([h, p, cls], i) =>
@@ -81,8 +81,8 @@ function figNumbers() {
      <div class="card warn" style="margin-top:26px">
        <h3>What this means when you read a figure</h3>
        <p>Payloads are planning figures, not weighbridge values. Distances and drive times come from HGV routing for that
-       vehicle, both legs; the cycle includes load, unload and gate induction minutes. A route not baked for the vehicle
-       shows “not baked” or “—”, never an estimate. Carbon uses the emission factor per vehicle type in Config; treat it as a
+       vehicle, both legs; the cycle includes load, unload and gate induction minutes. A route not routed for the vehicle
+       shows “not routed” or “—”, never an estimate. Carbon uses the emission factor per vehicle type in Config; treat it as a
        planning figure. Money is in your organisation's currency — no exchange rate is ever applied.</p>
      </div>`,
     `.arrow{font-size:46px;color:${T.muted};font-weight:300;line-height:1;align-self:center}`);
@@ -106,7 +106,7 @@ function figAppMap() {
         ["Look-ahead", "Account (last week) · Commit (this / next week) · Horizon"]])}
       ${col("Data", "planners and admins only", [
         ["Locations", "sites, gates, stockpile capacity"],
-        ["Routes", "bake per vehicle, alternatives, planning rates, road-restriction check where connected"],
+        ["Routes", "routed per vehicle, alternatives, planning rates, road-restriction check where connected"],
         ["Zones", "disruption zones and temporary haul roads"],
         ["Config", "vehicles, materials, planning, costing and fuel, seasonal windows, everything else"]], "accent")}
       ${col("Map", "all roles", [["Route map", "the public map inside the app"]])}
@@ -224,7 +224,7 @@ const HOLDERS = {
   S09: ["Horizon — week totals for this month and next", "Look-ahead › Horizon", "app"],
   S10: ["The Confirm week dialog", "Look-ahead › Commit next week › Confirm week", "app"],
   S11: ["Locations — the map and the edit form with gates and stock held", "Locations, a stockpile selected", "app"],
-  S12: ["Routes — a route expanded: bake status, analysis, alternatives, planning block", "Routes, a baked route expanded", "app"],
+  S12: ["Routes — a route expanded: route status, analysis, alternatives, planning block", "Routes, a routed route expanded", "app"],
   S13: ["Zones — a disruption zone and a haul road with speed and mode", "Zones, the demo haul road selected", "app"],
   S14: ["Configuration — the Vehicles section", "Configuration › Vehicles", "app"],
   S15: ["The supplier PDF — one row per line, Monday to Friday, coordinates, route map", "Look-ahead › PDF, first page", "pdf"],

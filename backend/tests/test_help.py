@@ -402,14 +402,14 @@ ok("\U0001f534 sign-in: the guide never states the reload behaviour wrongly (tru
    "closing the tab signs you out; a reload is described only if the app does what it says",
    "The code is kept for this browser tab only: closing the tab signs you out, and you sign in again." in text
    and not (_claims_signout_on_reload and _restores) and not (_claims_kept_on_reload and not _restores)
-   and "Hard-refresh (empty cache and reload), or open a private window and sign in again." in text)
+   and "Hard-refresh (Ctrl+Shift+R), or open a private window and sign in again." in text)   # 13 Oct 2026 (W3, narrowed): no "cache" on a user page
 ok("...the Forecasts badge counts Pending or Mixed lines, and the guide says so (not 'waiting for approval')",
    'r.status === "Pending" || r.status === "Mixed"' in fe_src
    and "shows how many lines are Pending or Mixed" in text and "lines are waiting for approval while" not in text)
 
 # the demo bar and the tour
 ok("the shared demo: one callout names what not to press, and the map's first tour has no welcome",
-   "On the shared demo, show these but do not press them" in text and "Bake all</strong> (it spends routing calls)" in src
+   "On the shared demo, show these but do not press them" in text and "Route all</strong> (it spends routing calls)" in src   # 13 Oct 2026 (W3, narrowed): the button reads Route all
    and "Your first tour in the app starts with a two-step welcome; the map's tour has none." in text
    and "Opened at the site address followed by /map/, the map shows the notice at its top, with Guide beside it." in text)
 
@@ -446,9 +446,9 @@ ok("...step 3's controls are a list of their own; step 4 says a tip or recycling
 ok("the Look-ahead: weekends are held at 0 and not shown (the grid is Monday to Friday), nowhere 'unless typed'",
    "Saturday and Sunday are held at zero and not shown." in text and "Saturday and Sunday held at 0 and not shown" in text
    and "default to zero" not in text and "0 unless typed" not in text
-   and "Sat/Sun are held at 0 and not shown" in fe_src)
+   and "Saturday and Sunday are held at 0 and not shown" in fe_src)   # 13 Oct 2026 (W3, narrowed): the screen's note moved into the commit grid's info box
 ok("...the KPI strip is a list; the check line's two other states; Esc saves a day",
-   "The <strong>KPI strip</strong> reads:</p>\n<ul>" in src and "not checked since baking" in text
+   "The <strong>KPI strip</strong> reads:</p>\n<ul>" in src and "not checked since the route was worked out" in text and "not checked since the route was worked out" in fe_src   # 13 Oct 2026 (W3, narrowed): the screen's words
    and "the stored result stands" in text and "Esc, or clicking elsewhere, saves too" in text
    and 'e.key === "Enter" || e.key === "Escape") e.currentTarget.blur()' in fe_src)
 
@@ -462,9 +462,10 @@ ok("...the filters skip stockpiles; the quick buttons are named; the t / day fig
    and "Light, Dark, Satellite and Streets (Streets is not in the Basemap list)" in text
    and "Material a day appears too" not in text and "as shipped it counts in vehicles, so that figure is not shown" in text)
 ok("...an unbaked line is counted as unknown; a route with no geometry is left out of the bar",
-   "A line whose route is not baked for its vehicle is counted as unknown" in text
-   and "A line whose route has no drawn geometry at all is left out of the bar." in text
-   and "a route that is not baked is counted as unknown" not in text)
+   # 13 Oct 2026 (W3, narrowed): the same two rules in the screen's words
+   "A line whose route is not routed for its vehicle is counted as unknown" in text
+   and "A line whose route has no line drawn at all is left out of the bar." in text
+   and "a route that is not baked is counted as unknown" not in text and "a route that is not routed is counted as unknown" not in text)
 
 # Data pages and settings
 ok("Data pages: a tip keeps its imported type; the Planning tick does not lead a country with its own vehicle set",
@@ -534,6 +535,80 @@ ok("\U0001f534 ...and the drawn figures say lorry / HGV, never truck; figure 3 l
    _figs_fn and re.search(r"\btrucks?\b", _figs_fn, re.I) is None
    and '["Carbon planner",' in _figs_fn and '["Route map", "the public map inside the app"]' in _figs_fn
    and "drawn before the Carbon planner" not in src)
+
+# ---- 13 Oct 2026 (W4): the technical guide, /help/technical/ ---------------------------------------
+# Everything the words bundle (W3) took off a screen lives here (notes/w3-w4-inventory-1013.md §1). Each
+# row's key phrase is pinned, so dropping a passage from the guide fails here: nothing is lost.
+def ok3(label, cond, detail=""):
+    ok(label + ("" if cond else "  :: " + detail), cond)
+
+TECH = os.path.join(ROOT, "frontend", "help", "technical", "index.html")
+tg = open(TECH, encoding="utf-8").read() if os.path.exists(TECH) else ""
+ok("⭐ W4: the technical guide exists under the /help mount (frontend/help/technical/index.html), so the same staff gate applies",
+   bool(tg) and 'NoCacheStatic(directory=str(ROOT / "frontend" / "help"), html=True)' in main_src
+   and "<title>Wayscope — Technical guide</title>" in tg and '<meta name="robots" content="noindex">' in tg)
+sys.path.insert(0, os.path.join(ROOT, "backend"))
+import gate as _gate   # noqa: E402
+ok("...the gate polices it as staff-only help, like /help/ (the map cookie does not open it)",
+   _gate.scope_for("/help/technical/") == "help" and _gate.scope_for("/help/technical/index.html") == "help")
+_tids = set(re.findall(r' id="([^"]+)"', tg))
+ok("...sections T0–T7 and the figure anchors the info boxes link to",
+   {"t0-about", "t1-figures", "t1-volume", "t1-trips", "t1-distance", "t1-vehicles", "t1-delivered", "t1-carbon", "t1-cost", "t1-fair",
+    "t1-gates", "t1-stock", "t2-routing", "t3-sources", "t4-settings", "t5-errors", "t6-words", "t7-reference"} <= _tids
+   and all(('href="#%s"' % i) in tg for i in ("t1-figures", "t2-routing", "t3-sources", "t4-settings", "t5-errors", "t6-words", "t7-reference")))
+_moved = {   # inventory §1 row → its key phrase in the technical guide
+    "1 the Dashboard footer's read": "Every planning figure on the Dashboard comes from one read, <code>GET /api/costing/lines</code>",
+    "1 ...the trips formula": "rounded up per line-month",
+    "1 ...the CO₂e formula and the factor wording": "DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config)",
+    "1 ...peak fleet": "the largest same-month sum of vehicles needed across the lines in view",
+    "2 the gate arrivals read": "<code>GET /api/gates/arrivals?month=N</code>",
+    "2 ...and its rule": "The gap is the shift's minutes ÷ arrivals, an average with no hourly",
+    "3 stored per km": "stored per km whatever unit the tenant reads",
+    "4 the target rate's own endpoint": "its own endpoint, saved separately from the configuration document",
+    "5 ADMIN_TOKEN": "It is checked against <code>ADMIN_TOKEN</code> on Render",
+    "6 HERE_API_KEY": "<code>HERE_API_KEY</code> in Render → Environment",
+    "7 the bake panel that is gone": "it used to name a bake panel that no longer exists",
+    "8 vehicle ids as keys": "Vehicle ids are the keys forecast lines and stored routes are keyed",
+    "9 factors.json": "seeded from <code>backend/factors.json</code>",
+    "10 the entry end from the geometry": "Which end is the entry is worked out per leg from the geometry",
+    "11 HGV geometry from HERE": "a call to HERE Routing v8 with the vehicle's truck profile",
+    "12 the V2 seed": "It was built to retire the first seed (the V2 seed).",
+    "13 legs baked before zones": "Legs baked before zones existed are matched",
+    "15 cached geometry": "what the screens call &ldquo;cached geometry&rdquo; in older notes",
+    "16 in force on the server": "the configuration table",
+    "17 codes checked by the server": "Sign-in codes are checked on the server (<code>POST /api/auth</code>)",
+    "17 ...a cold start": "The Render service was starting or redeploying",
+}
+_lost = [k for k, v in _moved.items() if v not in tg]
+ok3("⭐ W4 nothing lost: every passage W3 took off a screen is in the technical guide (%d phrases)" % len(_moved),
+   not _lost, ", ".join(_lost))
+ok("...it maps the old screen words to the new ones, and says the exports keep the old words (decision A)",
+   "baked / not baked / unbaked</td><td>routed / not routed yet" in tg and "line-month</td><td>forecast month" in tg
+   and "UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED" in tg and "The XLSX and PDF exports and the clash text made on the server still say" in tg)
+ok("...and the user guide's Appendix D points at it (the first client's Word document is no longer mentioned)",
+   '<a href="/help/technical/">technical guide</a> (staff only)' in src and "Word document" not in src and "fifty pages" not in src
+   and '<a href="/help/#appendix-d-technical-reference">Open Appendix D</a>' in tg)
+
+# the word rule on the user guide's own text (the technical guide may use any word)
+_BAN = re.compile(r"(/api\b|\bendpoints?\b|\bservers?\b|\bJSON\b|\bcached?\b|\bgeometry\b|\bbak(?:e|ed|es|ing)\b|\bunbaked\b|\bre-?bak\w*|"
+                  r"\bPOST\b|\bGET\b|\bHTTP\b|localStorage|\bschema\b|\btokens?\b|line-months?)", re.I)
+_vis, _skip = [], 0
+for _part in re.split(r"(<[^>]+>)", src):
+    if _part.startswith("<"):
+        if re.match(r"<(code|pre|script|style)\b", _part, re.I): _skip += 1
+        elif re.match(r"</(code|pre|script|style)>", _part, re.I): _skip = max(0, _skip - 1)
+        continue
+    if not _skip: _vis.append(_part)
+_hits = []
+for _t in _vis:
+    _t2 = re.sub(r"(?i)admin token", "", _t).replace("Everything (JSON)", "")
+    _m = _BAN.search(_t2)
+    if _m and not (re.fullmatch(r"(POST|GET|JSON|HTTP)", _m.group(0), re.I) and not re.search(r"\b(POST|GET|JSON|HTTP)\b", _t2)):
+        _hits.append(_m.group(0) + ": " + " ".join(_t.split())[:80])
+ok3("⭐ W3 word rule on the user guide: no banned word in its text outside <code> (%d text pieces read)" % len(_vis),
+   len(_vis) > 500 and not _hits, " | ".join(_hits[:6]))
+ok("...the guide names the buttons the screens now show (Route all, not routed)",
+   "<strong>Route all</strong>" in src and "Bake all" not in src and "not routed" in src)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

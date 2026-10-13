@@ -434,7 +434,8 @@ if (loaded) {
     ok("...and says 'type a quantity to see the price' with fair — and 'rate not set'", mNone.includes("type a quantity to see the price") && mNone.includes("rate not set"));
     const mUnb = render("the matrix renders an UNBAKED preview", h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner,
       initialCost: { ...pv, baked: false, fair_reason: "not baked", cells: [], totals: { ...pv.totals, fair: { eur: null, per_t: null, per_trip: null, per_km: null } } } }));
-    ok("...which says why there is no fair price and where to fix it", mUnb.includes("not baked for") && mUnb.includes("bake it on the Routes page"));
+    // 13 Oct 2026 (W3, narrowed): plain words
+    ok("...which says why there is no fair price and where to fix it", mUnb.includes("not routed for") && mUnb.includes("route it on Data → Routes"));
   }
 
   // ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast, from the fixtures
@@ -744,8 +745,9 @@ if (loaded) {
       && acctOut.includes(">held<") && acctOut.includes("applied · ") && acctOut.includes(">waiting<"));
     ok("...the confirmed cost box is rendered next to the actual",
       acctOut.includes("The confirmed cost of this week"));
-    ok("...and the footer states the not-reported rule",
-      acctOut.includes("Empty actual is not zero"));
+    // 13 Oct 2026 (W3, narrowed): the footer's rule is in the Variance header's info box (dom_frontend opens it)
+    ok("...and the Variance header carries the not-reported rule's info box",
+      acctOut.includes('aria-label="About: Variance"') && !acctOut.includes("Empty actual is not zero"));
 
     const hzOut = render("the Horizon view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "horizon" }));
@@ -754,7 +756,7 @@ if (loaded) {
       && !hzOut.includes(">Confirm week<"));
     ok("...and NO stockpile grid under it any more (10 Sep)", !hzOut.includes("max · opening") && !hzOut.includes("Type what came out"));
     ok("...the Account view carries the account week's stockpiles with one 'out' box each",
-      acctOut.includes("Stockpiles · ") && acctOut.includes("Type what came out of each stockpile")
+      acctOut.includes("Stockpiles · ") && acctOut.includes('aria-label="About: Stockpiles"')   // 13 Oct 2026 (W3, narrowed): the how-to is in the info box
       && (acctOut.match(/placeholder="out —"/g) || []).length === fixture.account.stock.length && fixture.account.stock.length >= 1);
     ok("...and says the fixture's stockpile is OVER, with the same figure the server sent",
       acctOut.includes("OVER by " + Math.round(-fixture.account.stock[0].remaining).toLocaleString("en-US").replace(/,/g, " ")));
@@ -802,7 +804,7 @@ if (loaded) {
       const nFair = fuelFix.account.rows.filter(r => r.planned_fair_eur != null).length;
       ok("...the Account view has a 'Fair € (model)' column with a figure on every baked row and — on the unbaked one",
         fAcct.includes("Fair € <span") && nFair >= 1
-        && (fAcct.match(/title="No fair price: the route is not baked/g) || []).length === fuelFix.account.rows.length - nFair);
+        && (fAcct.match(/title="No fair price: the route is not routed yet/g) || []).length === fuelFix.account.rows.length - nFair);   // 13 Oct 2026 (W3, narrowed): plain words
       ok("...the KPI caption on Commit carries the fair total and how many lines it covers",
         fuelFix.commit.totals.fair_eur != null && fOut.includes(`(model, ${fuelFix.commit.totals.fair_lines} of ${fuelFix.commit.totals.lines})`));
       const fileDoc = { fair_price: { driver_eur_per_h: 20, vehicle_standing_eur_per_h: 16, running_eur_per_km: 0.12, margin_pct: 8,
