@@ -2256,7 +2256,7 @@ def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
 
 
 
-def route_analysis(route_id, profiles=None):
+def route_analysis(route_id, profiles=None, pre=None):
     """
     Haul-cycle figures for one route, per vehicle profile x alternative.
 
@@ -2267,9 +2267,21 @@ def route_analysis(route_id, profiles=None):
 
     Where a return leg hasn't been baked, the outbound duration stands in and the row
     is flagged 'return_estimated' rather than silently pretending to be measured.
+
+    13 Oct 2026 (speed): `pre` is an optional dict that lives for ONE request (derived.cycle_for
+    passes it). The routes, every location and every gate are read into it once, and each route's
+    geometry rows once, however many (route, vehicle) pairs the request asks about. The Look-ahead
+    read asked 57 pairs and re-read all locations and gates 57 times: 228 queries, each a network
+    round trip on Render. Same rows, same answer; without `pre` nothing changes.
     """
-    r = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?",
-                 (db.current_tenant(), route_id))
+    if pre is not None:
+        if "routes" not in pre:
+            pre["routes"] = {x["id"]: x for x in db.query("SELECT * FROM routes WHERE tenant_id = ?",
+                                                          (db.current_tenant(),))}
+        r = [pre["routes"][route_id]] if route_id in pre["routes"] else []
+    else:
+        r = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?",
+                     (db.current_tenant(), route_id))
     if not r:
         return {"error": "route not found", "route_id": route_id}
 
@@ -2284,18 +2296,31 @@ def route_analysis(route_id, profiles=None):
     # per route rather than per (profile x alternative) row — the gates do not vary
     # with the vehicle, and B3 says induction does not either.
     route_row = r[0]
-    locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?",
-                                        (db.current_tenant(),))}
+    if pre is not None and "locs" in pre:
+        locs = pre["locs"]
+    else:
+        locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?",
+                                            (db.current_tenant(),))}
+        if pre is not None:
+            pre["locs"] = locs
     o_loc = locs.get(route_row.get("origin_id"))
     d_loc = locs.get(route_row.get("dest_id"))
-    try:
-        gates_by_loc = gates.gates_by_location()
-    except Exception:
-        gates_by_loc = {}   # location_gates may not exist yet on a cold database
+    if pre is not None and "gates" in pre:
+        gates_by_loc = pre["gates"]
+    else:
+        try:
+            gates_by_loc = gates.gates_by_location()
+        except Exception:
+            gates_by_loc = {}   # location_gates may not exist yet on a cold database
+        if pre is not None:
+            pre["gates"] = gates_by_loc
 
     rows_by = {}
-    for g in db.query("SELECT * FROM route_geometry WHERE tenant_id = ? AND route_id = ?",
-                      (db.current_tenant(), route_id)):
+    geo_by = pre.setdefault("geom", {}) if pre is not None else {}
+    if route_id not in geo_by:
+        geo_by[route_id] = db.query("SELECT * FROM route_geometry WHERE tenant_id = ? AND route_id = ?",
+                                    (db.current_tenant(), route_id))
+    for g in geo_by[route_id]:
         if profiles and g["vehicle_profile"] not in profiles:
             continue
         rows_by.setdefault(g["vehicle_profile"], {}).setdefault(g["leg"], {})[g["alt_index"]] = g

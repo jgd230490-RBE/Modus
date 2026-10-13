@@ -250,7 +250,10 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     factors = None
     # the commit bucket's days, for EVERY line (clash sums), then filtered
     full = days.list_days(route_id=route_id, bucket=bucket, today=today)
-    derived.decorate(full)
+    # 13 Oct 2026 (speed): one set of routes, costing context and cycle cache for the whole page
+    # (two decorate passes and the Account pricing below used to build three)
+    routes, cost, cache = derived._routes_and_names(), derived.costing_context(), {}
+    derived.decorate(full, cache=cache, routes=routes, cost=cost)
     all_lines = full["lines"]
     visible = access.filter_lines(list(all_lines), acc)
     vis_keys = {clashes.line_key(l) for l in visible}
@@ -260,7 +263,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     commit = {k: v for k, v in full.items() if k != "lines"}
     commit["lines"] = visible
     # totals for what the caller can see — decorate() ran on the full set above
-    derived.decorate(commit)
+    derived.decorate(commit, cache=cache, routes=routes, cost=cost)
     commit["statuses"] = list(days.DAY_STATUSES)
 
     out = {"bucket": commit.get("bucket"), "commit_week": cw, "today_week": full.get("today_week"),
@@ -278,9 +281,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     import conversions
     factors = conversions.load_factors()
     t = 0.0
-    routes = derived._routes_and_names()
-    cache = {}
-    cost = derived.costing_context()          # once, not per row
+    # routes, cache and cost: the page's own, read once above (13 Oct 2026, speed)
     for r in acct["rows"]:
         if r.get("actual_qty") is not None:
             ctx = {"unit": r.get("unit"), "material_type": r.get("material_type"),
