@@ -1406,6 +1406,11 @@ ok("🔴 the map caption is two lines, each inside the page width (it ran off th
            "Helvetica", 7.5) <= _U
    and "A schematic from the stored road routes, not to scale (no map tiles)." in T10J)
 
+# 13 Oct 2026 (seen at 375 px in the built-in browser): the colour square wrapped above "Harborough"; it is now held to its name
+ok("🔴 both council tables keep each colour square beside its district name on a phone (inline-flex, the square never shrinks)",
+   HTML10B.count('<td><span class="dn"><span class="sw"') == 2 * len(MB["districts"])
+   and ".dn{display:inline-flex;align-items:baseline} .dn .sw{flex:none}" in HTML10B)
+
 # one areas read per month: sheet() reads this month once (both sections) and last month once
 _calls_al = []
 

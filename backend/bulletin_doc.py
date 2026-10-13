@@ -844,8 +844,8 @@ def _council_mv_html(M):
         return f'<h2>{e(M["title"])}</h2><p class="empty">{e(M["error"])}</p>'
     sw = "".join(f'<span class="lg"><span class="sw" style="background:{_sw_style(g["fill"], g["hatch"])}"></span>{e(g["label"])}</span>'
                  for g in M["legend"])
-    rows = "".join(f'<tr><td><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
-                   f'{e(d["name"])}</td><td class="n">{e(d["text"])}</td><td class="n">{d["routes"]}</td>'
+    rows = "".join(f'<tr><td><span class="dn"><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
+                   f'<span>{e(d["name"])}</span></span></td><td class="n">{e(d["text"])}</td><td class="n">{d["routes"]}</td>'
                    f'<td class="n">{e(d["distance_text"])}</td><td>{e(d["change"])}</td></tr>' for d in M["districts"])
     notes = "".join(f"<li>{e(x)}</li>" for x in M["county_lines"] + M["notes"])
     return (f'<h2>{e(M["title"])}</h2>'
@@ -868,8 +868,8 @@ def _council_html(C):
         return f'<h2>{e(C["title"])}</h2><p class="empty">{e(C["error"])}</p>'
     sw = "".join(f'<span class="lg"><span class="sw" style="background:{_sw_style(g["fill"], g["hatch"])}"></span>{e(g["label"])}</span>'
                  for g in C["legend"])
-    rows = "".join(f'<tr><td><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
-                   f'{e(d["name"])}</td><td>{e(d["highway_authority"])}</td><td class="n">{e(_co2(d["text"]))}</td>'
+    rows = "".join(f'<tr><td><span class="dn"><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
+                   f'<span>{e(d["name"])}</span></span></td><td>{e(d["highway_authority"])}</td><td class="n">{e(_co2(d["text"]))}</td>'
                    f'<td class="n">{e(d["share"])}</td></tr>' for d in C["districts"])
     notes = "".join(f"<li>{e(_co2(x))}</li>" for x in C["county_lines"] + C["notes"])
     lic = " ".join(e(x) for x in C["sources"] + C["attribution"])
@@ -1005,6 +1005,7 @@ footer{{margin:28px 0 12px;font-size:14px;color:var(--muted)}}
 tr.nr td{{color:var(--muted)}} tr.nr td.n{{font-style:italic}}
 .sw{{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.08)}}
 .cc-legend .lg{{display:inline-block;margin-right:12px;white-space:nowrap}}
+.dn{{display:inline-flex;align-items:baseline}} .dn .sw{{flex:none}}   /* 13 Oct 2026: the square never wraps away from its name */
 svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}} svg .cn{{font-weight:700}}
 @media print{{
   @page{{size:A4;margin:14mm}}
