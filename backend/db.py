@@ -805,6 +805,10 @@ def init_lookahead_db():
                                 ("routes", "restrictions_hits", "TEXT"),
                                 ("routes", "restrictions_checked_at", "TEXT"),
                                 ("routes", "restrictions_status", "TEXT"),
+                                # 13 Oct 2026: the STORED lorry-limits check (limits.py)
+                                ("routes", "limits_hits", "TEXT"),
+                                ("routes", "limits_checked_at", "TEXT"),
+                                ("routes", "limits_status", "TEXT"),
                                 ("forecast_weeks", "actual_cost_eur", "REAL"),
                                 ("forecast_weeks", "calibrated_at", "TEXT"),
                                 ("forecast_weeks", "calibrated_qty", "REAL")):
@@ -1015,6 +1019,11 @@ _TENANT_DDL = {
             restrictions_hits TEXT,
             restrictions_checked_at TEXT,
             restrictions_status TEXT,
+            -- 13 Oct 2026. The STORED lorry-limits check (limits.py): weight / height /
+            -- width limits each baked leg runs along, with a verdict per vehicle.
+            limits_hits TEXT,
+            limits_checked_at TEXT,
+            limits_status TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,

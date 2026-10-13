@@ -51,6 +51,7 @@ import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternati
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
 import road_sections  # 12 Oct 2026 — shared road sections (public map review §2.2d): the index and the month read
 import areas         # 12 Oct 2026 — movements and carbon per council (public map review §2.2b, D27)
+import limits        # 13 Oct 2026 — lorry limits (weight / height / width) from OpenStreetMap and HERE
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
@@ -89,6 +90,7 @@ async def lifespan(app: FastAPI):
         db.init_config_db()         # 2.5b. No ALTERs, so its position only needs to precede the seed.
         db.init_costing_db()        # 10 Sep evening. The GLOBAL fuel_index table (untenanted, by design).
         db.init_demo_requests_db()  # H9, 8 Oct. The GLOBAL demo_requests table (untenanted, by design).
+        limits.init_db()            # 13 Oct. The GLOBAL road_limits table (untenanted, by design: public road facts).
         # Phase 4.5. Must sit exactly here: init_tenant() migrates a pre-4.5 database by
         # rebuilding each table, copying the columns the table actually has — several of
         # which the init_* calls above add by ALTER. Run it before them and those columns
@@ -1183,6 +1185,10 @@ def forecast_week_restrictions_refresh(sync: int = 0):
     data and writes only the stored check.
     """
     _require_access()
+    try:                                  # 13 Oct 2026: the lorry-limits check is a DB read; re-run it too
+        limits.store_checks()
+    except Exception as e:
+        print("limits: route check not stored:", str(e)[:120])
     return restrictions.refresh_async(sync=bool(sync))
 
 
@@ -2183,6 +2189,72 @@ def diagnostics_road_sections(top: int = Query(10, ge=1, le=100), leg: str = Que
     if leg not in road_sections.LEGS:
         raise HTTPException(400, road_sections.leg_error())
     return road_sections.diagnostics(top=int(top), leg=leg)
+
+
+@app.get("/api/public/limits")
+def public_limits(bbox: Optional[str] = None):
+    """
+    13 Oct 2026. Lorry limits (weight, height, width, axle weight) in the tenant's extent, from
+    OpenStreetMap and HERE (limits.py), as GeoJSON: each with its value, the sign's legend, the
+    road's name, "except for access" where tagged, the source and fetch date, and `breaches`,
+    the routes whose baked vehicle is over it (from the stored check). Advisory, and the
+    collection says so. Behind the map gate like the rest of /api/public/. `bbox`
+    ('w,s,e,n') narrows it; without it, the tenant's extent.
+    """
+    box = None
+    if bbox:
+        box = restrictions.parse_bbox(bbox)
+        if box is None:
+            raise HTTPException(400, "bbox must be 'west,south,east,north' in degrees")
+    return limits.feature_collection(box)
+
+
+@app.get("/api/routes/{route_id}/limits")
+def route_limits(route_id: str):
+    """13 Oct 2026. The stored lorry-limits check for one route (every baked vehicle and leg)."""
+    _require_access()
+    st = limits.stored_checks([route_id]).get(route_id) or {"hits": [], "checked_at": None, "status": None}
+    return dict(st, route_id=route_id)
+
+
+@app.post("/api/admin/limits/import")
+def limits_import(source: str = "osm", sync: int = 0, token: Optional[str] = None):
+    """
+    13 Oct 2026. Import lorry limits for the tenant's extent from `source` = osm | here, in
+    a background thread, then re-check every route. Returns the import state at once
+    (`sync=1` waits). Any failed tile or call replaces NOTHING. HERE: read
+    /api/admin/diagnostics/limits?source=here&probe=true first — that path is unverified.
+    """
+    _check_admin(token)
+    if source not in limits.SOURCES:
+        raise HTTPException(400, f"source must be one of {sorted(limits.SOURCES)}")
+    return limits.import_async(source, sync=bool(sync))
+
+
+@app.get("/api/admin/limits/status")
+def limits_status(token: Optional[str] = None):
+    """The running or last import, and what is stored per source and kind."""
+    _check_admin(token)
+    d = limits.diagnostics(probe=False)
+    return {"import": d["import"], "stored": d["stored"], "extent": d["extent"]}
+
+
+@app.post("/api/admin/limits/recheck")
+def limits_recheck(token: Optional[str] = None):
+    """Re-check every route against the stored limits (no external call)."""
+    _check_admin(token)
+    return limits.store_checks()
+
+
+@app.get("/api/admin/diagnostics/limits")
+def diagnostics_limits(source: str = "osm", probe: bool = False, token: Optional[str] = None):
+    """
+    What the limits import would ask for, what is stored, and with probe=true one small live
+    read: OSM = a ~10 km box at the extent's centre through Overpass; HERE = one level-12 tile
+    of TRUCK_RESTR_FC4 + ROAD_GEOM_FC4 with the raw answer (key redacted) and what parsed.
+    """
+    _check_admin(token)
+    return limits.diagnostics(source=source, probe=probe)
 
 
 @app.get("/api/public/areas/shapes")

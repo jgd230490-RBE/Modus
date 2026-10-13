@@ -95,6 +95,23 @@
         .area-cr b{ font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; }
         .area-cs{ font-size:14px; color:var(--muted); padding:1px 0 4px; }
         .area-cf{ font-size:14px; color:var(--muted); border-top:1px solid var(--line); margin-top:4px; padding-top:6px; }
+        /* 13 Oct 2026: the "Lorry limits" group and a limit's card. New text, so 14 px (the floor). The swatch is the
+           sign's red ring on its white face (#C8102E, the UK regulatory sign red). */
+        #limits-group h3, #limits-group .control-item{ font-size:14px; }
+        #limits-group [hidden]{ display:none; }
+        #limit-boxes .control-item.dim label{ opacity:.45; }
+        .lim-n{ margin-left:auto; padding-left:8px; color:var(--muted); font-weight:400; font-variant-numeric:tabular-nums; }
+        .lim-sw{ flex:none; width:13px; height:13px; margin-left:8px; border-radius:50%; background:#fff; border:2.5px solid #C8102E; box-sizing:border-box; }
+        .lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; max-height:min(52vh, 380px); overflow-y:auto; }   /* 13 Oct, seen in Chrome: a card with three routes ran off the map */
+        .lim-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+        .lim-head svg{ flex:none; }
+        .lim-title{ font-weight:600; font-size:16px; }
+        .lim-sub{ font-size:14px; color:var(--muted); }
+        .lim-row{ padding:5px 0; border-top:1px solid var(--line); }
+        .lim-k{ font-size:14px; color:var(--muted); }
+        .lim-v{ font-size:14px; }
+        .lim-v.over{ color:#C8102E; font-weight:600; }
+        .lim-foot{ font-size:14px; color:var(--note); border-top:1px solid var(--line); margin-top:4px; padding-top:6px; }
         /* 2026-10-06 — THE KPI BAR. The floating glass card (blur, shadow, 9.5 px uppercase
            labels) is gone. The glance layer is a flat white strip docked to the TOP of the
            map pane, full pane width: month on the left, six numbers, and the month's standing
@@ -857,6 +874,24 @@
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
         <div class="control-item" style="padding-left:2px;margin-top:-2px;">
             <span id="restriction-source" style="font-size:12px;color:var(--note);">Advisory — the router is not given this data.</span>
+        </div>
+    </div>
+
+    <!-- 13 Oct 2026: LORRY LIMITS (weight, height, width; axle weight rides with Weight) from OpenStreetMap and HERE,
+         served by /api/public/limits (backend/limits.py). Next to the closures group, off by default like them. The
+         boxes are layer-limit-* so they take part in the link (?layers=limit-weight), the preset views and the council
+         view's remember / restore exactly as the other layer boxes do. Hidden when the endpoint fails; the boxes give way
+         to a one-line note when nothing is loaded. Drawn by ensureLimitLayers() in the first script block. -->
+    <div class="control-group" id="limits-group" hidden>
+        <h3>Lorry limits</h3>
+        <div id="limit-boxes">
+            <div class="control-item" id="limit-row-weight"><label title="Weight limits, and axle weight limits with them"><input type="checkbox" id="layer-limit-weight" onchange="toggleLimits()"> Weight <span class="lim-n" id="limit-count-weight"></span></label><span class="lim-sw" aria-hidden="true"></span></div>
+            <div class="control-item" id="limit-row-height"><label title="Height limits (low headroom)"><input type="checkbox" id="layer-limit-height" onchange="toggleLimits()"> Height <span class="lim-n" id="limit-count-height"></span></label><span class="lim-sw" aria-hidden="true"></span></div>
+            <div class="control-item" id="limit-row-width"><label title="Width limits"><input type="checkbox" id="layer-limit-width" onchange="toggleLimits()"> Width <span class="lim-n" id="limit-count-width"></span></label><span class="lim-sw" aria-hidden="true"></span></div>
+        </div>
+        <div class="control-item" id="limit-empty" hidden><span style="font-size:14px;color:var(--note);">No lorry limits loaded for this area yet</span></div>
+        <div class="control-item" style="padding-left:2px;margin-top:-2px;">
+            <span id="limit-source" style="font-size:14px;color:var(--note);">OpenStreetMap contributors and HERE · coverage is incomplete. Advisory: check the signed limit on site.</span>
         </div>
     </div>
 
@@ -1951,6 +1986,8 @@
         if (!map || !map.getStyle) return;
         let ids;
         try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
+        // 13 Oct 2026: the lorry limits go over the routes first, so the marks then land on top of them
+        if (typeof raiseLimits === 'function' && raiseLimits(ids)) { try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; } }
         const present = MARK_LAYERS.filter(id => ids.indexOf(id) >= 0);
         if (!present.length) return;
         // already the last N layers, in order? then there is nothing to do
@@ -3402,6 +3439,8 @@
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
         if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();
+        // 13 Oct 2026: and the lorry limits, re-added from the cached collection (setStyle drops their images and layers)
+        if (LIM.data) ensureLimitLayers(); else loadLimits();
         // 12 Oct 2026 (live A2): with the timeline open, a basemap switch used to re-draw the
         // base routes only — the forecast overlay, its labels and the condition ring were gone
         // while the bar's figures stayed. routes-source is back (above, with the is_forecast
@@ -4685,6 +4724,452 @@
             (p.note ? '<div style="font-size:11.5px;margin-top:6px;color:#374151;">' + p.note + '</div>' : '') +
             '</div>';
     }
+
+    // ===== 13 Oct 2026: LORRY LIMITS (weight, height, width, axle weight) ==============================================
+    // From /api/public/limits (backend/limits.py): OpenStreetMap and HERE, ADVISORY, behind the map gate like every
+    // /api/public/ read. Drawn in the style of the UK regulatory signs: a white face, a red ring (#C8102E), a black
+    // legend. One canvas image per distinct sign (kind, legend, clash), made lazily from the features loaded and re-added
+    // after a basemap switch (setStyle drops images). The zoom rule keeps it tidy: a cluster (a red ring with the count)
+    // below zoom 11, a small plain red ring from 11 to 13, the full sign from 13 (a clash wins a collision), the restricted
+    // stretch of a LINE limit as a red dashed line from 13, a label beside the sign from 14. Off by default, like the
+    // National Highways closures. Which planned routes are over a limit comes from the server (`breaches`): this page
+    // only draws and words it.
+    const LIMIT_RED = '#C8102E';
+    const LIMIT_INK = '#111111';
+    const LIMIT_BOXES = ['weight', 'height', 'width'];                       // the three boxes; axle weight rides with Weight
+    const LIMIT_BOX_OF = { weight: 'weight', axle: 'weight', height: 'height', width: 'width' };
+    const LIMIT_LAYERS = ['limit-lines', 'limit-clusters', 'limit-cluster-count', 'limit-dots', 'limit-signs'];
+    const LIMIT_CLICK_LAYERS = ['limit-signs', 'limit-dots', 'limit-lines', 'limit-clusters'];
+    const LIMIT_SIGN_PX = 34;                 // the sign on screen at zoom 13 and over, CSS px
+    const LIMIT_CLUSTER_MAX_ZOOM = 10;        // clustered up to zoom 10, so from 11 every limit stands alone
+    const LIMIT_SIGN_ZOOM = 13;
+    const LIMIT_LABEL_ZOOM = 14;
+    const LIM = { data: null, byId: {}, loading: false, failed: false, popup: null, wired: false, lastClick: null };
+
+    // THE SIGN, drawn into any 2D context in a size x size box (the canvas image, and through limitSignSVG() the card's
+    // SVG, so the map and the card cannot draw two designs). Pure: it only calls the context.
+    //   weight: the legend ("7.5T"); axle: the legend over "per axle"; height: a triangle at the top pointing DOWN and one
+    //   at the bottom pointing UP (the UK headroom sign), imperial over metric; width: triangles at the left and right
+    //   pointing IN, imperial over metric. With no imperial figure, the metric alone. A clash (`breach`): a small solid red
+    //   disc with a white "!" at the top right.
+    function drawLimitSign(ctx, kind, iconText, imperial, size, breach) {
+        const c = size / 2, lw = Math.max(2, size * 0.1);
+        const r = c - lw / 2 - Math.max(0.5, size * 0.03);
+        const ri = r - lw / 2;                                   // the white face inside the ring
+        const font = px => '600 ' + (Math.round(px * 100) / 100) + 'px Arial, Helvetica, sans-serif';
+        // the largest font from `px` down at which `t` fits `w` (a context with no measureText keeps `px`)
+        const fit = (t, px, w) => {
+            if (typeof ctx.measureText !== 'function') return px;
+            ctx.font = font(px);
+            const tw = Number((ctx.measureText(String(t)) || {}).width) || 0;
+            return tw > w ? Math.max(px * 0.5, px * w / tw) : px;
+        };
+        const text = (t, x, y, px) => { ctx.font = font(px); ctx.fillText(String(t), x, y); };
+        const tri = pts => { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); ctx.lineTo(pts[2], pts[3]); ctx.lineTo(pts[4], pts[5]); ctx.closePath(); ctx.fill(); };
+        // the face, then the ring
+        ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFFFFF'; ctx.fill();
+        ctx.lineWidth = lw; ctx.strokeStyle = LIMIT_RED; ctx.stroke();
+        ctx.fillStyle = LIMIT_INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const metric = String(iconText == null ? '' : iconText);
+        const imp = imperial ? String(imperial) : '';
+        if (kind === 'height' || kind === 'width') {
+            const t = ri * 0.26;                                 // a triangle's half-base
+            if (kind === 'height') {
+                const yT = c - ri * 0.86, yB = c + ri * 0.86;
+                tri([c - t, yT, c + t, yT, c, yT + t * 1.1]);    // at the top, pointing down
+                tri([c - t, yB, c + t, yB, c, yB - t * 1.1]);    // at the bottom, pointing up
+            } else {
+                const xL = c - ri * 0.86, xR = c + ri * 0.86;
+                tri([xL, c - t, xL, c + t, xL + t * 1.1, c]);    // at the left, pointing in
+                tri([xR, c - t, xR, c + t, xR - t * 1.1, c]);    // at the right, pointing in
+            }
+            const w = kind === 'width' ? ri * 1.15 : ri * 1.5;  // the room the triangles leave the legend
+            if (imp) {
+                const px = Math.min(fit(imp, ri * 0.5, w), fit(metric, ri * 0.5, w));
+                text(imp, c, c - px * 0.58, px);
+                text(metric, c, c + px * 0.62, px);
+            } else text(metric, c, c, fit(metric, ri * 0.62, w));
+        } else if (kind === 'axle') {
+            text(metric, c, c - ri * 0.16, fit(metric, ri * 0.7, ri * 1.55));
+            text('per axle', c, c + ri * 0.42, fit('per axle', ri * 0.3, ri * 1.3));
+        } else {
+            text(metric, c, c, fit(metric, ri * 0.72, ri * 1.6));
+        }
+        if (breach) {
+            const bx = size * 0.81, by = size * 0.19, br = size * 0.16;
+            ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fillStyle = LIMIT_RED; ctx.fill();
+            ctx.lineWidth = Math.max(1, size * 0.035); ctx.strokeStyle = '#FFFFFF'; ctx.stroke();
+            ctx.fillStyle = '#FFFFFF';
+            text('!', bx, by + br * 0.06, br * 1.45);
+        }
+    }
+    // the same drawing as SVG markup, for the card: drawLimitSign() run against a context that writes elements
+    function limitSignSVG(kind, iconText, imperial, breach, px) {
+        const out = [], n = v => String(Math.round(v * 100) / 100);
+        let circles = [], d = '';
+        const ctx = {
+            fillStyle: '#000000', strokeStyle: '#000000', lineWidth: 1, font: '', textAlign: 'center', textBaseline: 'middle',
+            beginPath() { circles = []; d = ''; },
+            arc(x, y, r) { circles.push([x, y, r]); },
+            moveTo(x, y) { d += 'M' + n(x) + ' ' + n(y); },
+            lineTo(x, y) { d += 'L' + n(x) + ' ' + n(y); },
+            closePath() { d += 'Z'; },
+            fill() {
+                circles.forEach(q => out.push('<circle cx="' + n(q[0]) + '" cy="' + n(q[1]) + '" r="' + n(q[2]) + '" fill="' + escHtml(this.fillStyle) + '"/>'));
+                if (d) out.push('<path d="' + d + '" fill="' + escHtml(this.fillStyle) + '"/>');
+            },
+            stroke() {
+                circles.forEach(q => out.push('<circle cx="' + n(q[0]) + '" cy="' + n(q[1]) + '" r="' + n(q[2]) + '" fill="none" stroke="'
+                    + escHtml(this.strokeStyle) + '" stroke-width="' + n(this.lineWidth) + '"/>'));
+            },
+            // Arial's figures and capitals run about 0.6 of the font size wide; near enough to choose a size
+            measureText(t) { const m = /([\d.]+)px/.exec(this.font); return { width: String(t).length * (m ? Number(m[1]) : 10) * 0.6 }; },
+            fillText(t, x, y) {
+                const m = /^(\d+)\s+([\d.]+)px/.exec(this.font) || [];
+                out.push('<text x="' + n(x) + '" y="' + n(y) + '" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="'
+                    + (m[1] || '600') + '" font-size="' + (m[2] || '10') + '" fill="' + escHtml(this.fillStyle) + '">' + escHtml(t) + '</text>');
+            },
+        };
+        drawLimitSign(ctx, kind, iconText, imperial, 100, breach);
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="' + (px || 44) + '" height="' + (px || 44) + '" aria-hidden="true" focusable="false">'
+            + out.join('') + '</svg>';
+    }
+    // one image name per distinct sign: the kind, the legend, the imperial line and the clash badge
+    function limitImageName(kind, iconText, imperial, breach) {
+        return 'limit-sign|' + kind + '|' + (iconText == null ? '' : iconText) + '|' + (imperial || '') + '|' + (breach ? 1 : 0);
+    }
+    // the properties as the server sent them; a Mapbox feature hands nested values back as strings, so they are parsed
+    function limitPropsOf(p) {
+        const q = Object.assign({}, p || {});
+        ['breaches', 'anchor'].forEach(k => { if (typeof q[k] === 'string') { try { q[k] = JSON.parse(q[k]); } catch (e) { q[k] = null; } } });
+        if (!Array.isArray(q.breaches)) q.breaches = [];
+        q.breach_count = Number(q.breach_count) || q.breaches.length;
+        return q;
+    }
+    // "7.5 t", "18 t", "4.4 m", "4.0 m": metres keep one decimal at least, the way the signs print them
+    function limitValueText(kind, value, unit) {
+        const v = Number(value);
+        const u = unit || ((kind === 'height' || kind === 'width') ? 'm' : 't');
+        if (!isFinite(v)) return String(value == null ? '' : value) + ' ' + u;
+        let s = String(Math.round(v * 100) / 100);
+        if (u === 'm' && s.indexOf('.') < 0) s += '.0';
+        return s + ' ' + u;
+    }
+    function limitKindWord(kind) { return kind === 'axle' ? 'axle weight' : (kind === 'height' || kind === 'width') ? kind : 'weight'; }
+    // a length in the tenant's unit (DU): metres under a kilometre on a km tenant, two decimals under a mile on a mi one
+    function limitLengthText(m) {
+        const v = Number(m);
+        if (m == null || m === '' || !isFinite(v) || v <= 0) return '';
+        if (DU() === 'km') return v < 1000 ? Math.round(v) + ' m' : fmtDist(v / 1000, 1) + ' km';
+        return fmtDist(v / 1000, v < 1609.344 ? 2 : 1) + ' mi';
+    }
+    // "13 Oct 2026" from the server's ISO stamp
+    function limitDate(s) {
+        const r = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+        if (!r) return '';
+        const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(r[2]) - 1];
+        return mon ? Number(r[3]) + ' ' + mon + ' ' + r[1] : '';
+    }
+    // the label beside the sign from zoom 14: "7.5 t · except for access · Back Lane", "Low headroom 4.4 m (14'6") · ..."
+    function limitChipText(p) {
+        p = p || {};
+        const v = limitValueText(p.kind, p.value, p.unit), imp = p.imperial ? ' (' + p.imperial + ')' : '';
+        const head = p.kind === 'height' ? 'Low headroom ' + v + imp
+                   : p.kind === 'width' ? 'Width ' + v + imp
+                   : p.kind === 'axle' ? v + ' per axle' : v;
+        return [head, p.exceptions ? String(p.exceptions).toLowerCase() : '', p.name || ''].filter(Boolean).join(' · ');
+    }
+    // who the limit is for, in the card's words
+    function limitAppliesText(p) {
+        const v = limitValueText(p.kind, p.value, p.unit), imp = p.imperial ? ' (' + p.imperial + ')' : '';
+        if (p.kind === 'height') return 'Vehicles taller than ' + v + imp;
+        if (p.kind === 'width') return 'Vehicles wider than ' + v + imp;
+        if (p.kind === 'axle') return 'Vehicles over ' + v + ' per axle';
+        return 'Vehicles over ' + v;
+    }
+    // the planned routes over it, one line per route and vehicle with its legs ("loaded", "going back empty")
+    function limitBreachLines(breaches) {
+        const by = {}, order = [];
+        (breaches || []).forEach(b => {
+            if (!b || !b.route_id) return;
+            const k = b.route_id + '|' + (b.vehicle || '');
+            if (!by[k]) { by[k] = { route_id: b.route_id, vehicle: b.vehicle || '', legs: [] }; order.push(k); }
+            const leg = b.leg === 'return' ? 'going back empty' : 'loaded';
+            if (!by[k].legs.includes(leg)) by[k].legs.push(leg);
+        });
+        return order.map(k => { const x = by[k]; x.legs.sort((a, b) => (a === 'loaded' ? -1 : 1) - (b === 'loaded' ? -1 : 1)); return x; });
+    }
+    // THE CARD: a map popup on the desktop, the sheet's card on a phone (openLimitCard in the last block). Every string
+    // from the server goes through escHtml.
+    function limitCardHTML(props) {
+        const p = limitPropsOf(props);
+        const e = escHtml;
+        const where = p.name && p.ref && p.name !== p.ref ? p.name + ' (' + p.ref + ')' : (p.name || p.ref || '');
+        const len = limitLengthText(p.length_m);
+        const sub = [where, len ? len + ' of road' : ''].filter(Boolean).join(' · ');
+        const row = (k, v, cls) => '<div class="lim-row"><div class="lim-k">' + k + '</div><div class="lim-v' + (cls ? ' ' + cls : '') + '">' + v + '</div></div>';
+        const lines = limitBreachLines(p.breaches);
+        const fetched = limitDate(p.fetched_at);
+        let h = '<div class="lim-card"><div class="lim-head">' + limitSignSVG(p.kind, p.icon_text, p.imperial, p.breach_count > 0, 44)
+            + '<div><div class="lim-title">' + e(p.label || limitChipText(p)) + '</div>' + (sub ? '<div class="lim-sub">' + e(sub) + '</div>' : '') + '</div></div>';
+        h += row('Applies to', e(limitAppliesText(p)));
+        h += row('Exceptions', e(p.exceptions || 'None recorded'));
+        h += row('Planned routes over it', lines.length
+            ? lines.map(x => e(x.route_id + (x.vehicle ? ' · ' + x.vehicle : '') + ' · ' + x.legs.join(' and '))).join('<br>')
+            : 'None of the planned routes', lines.length ? 'over' : '');
+        h += row('Source', e((p.source_label || p.source || '') + (fetched ? ' · fetched ' + fetched : '')));
+        h += '<div class="lim-foot">Advisory: check the signed limit on site.' + (p.attribution ? '<br>' + e(p.attribution) : '') + '</div></div>';
+        return h;
+    }
+    // the Conditions rows (buildConditions): one per limit a planned route IN USE this month is over (`routeIds` are the
+    // routes on screen, the closures row's own list). A standing limit has no dates: it applies every month.
+    function limitConditionRows(features, routeIds, month) {
+        const inUse = new Set(routeIds || []);
+        const rows = [];
+        (features || []).forEach(f => {
+            const p = limitPropsOf(f && f.properties);
+            if (!(p.breach_count > 0)) return;
+            const lines = limitBreachLines(p.breaches.filter(b => b && inUse.has(b.route_id)));
+            if (!lines.length) return;
+            const b = lines[0], where = p.name || p.ref, kw = limitKindWord(p.kind);
+            rows.push({ key: 'l|' + p.id + '|' + month, lvl: 'warn', src: 'limit', who: b.route_id, kind: 'l', id: p.id,
+                noun: 'Over ' + (p.kind === 'axle' ? 'an ' : 'a ') + kw + ' limit',
+                what: b.route_id + (b.vehicle ? ' · ' + b.vehicle : '') + ' is over the ' + limitValueText(p.kind, p.value, p.unit) + ' ' + kw + ' limit'
+                    + (where ? ' on ' + where : '') + ' (' + (p.source_label || p.source || 'source not named') + ')'
+                    + (lines.length > 1 ? ' (+' + (lines.length - 1) + ' more)' : ''),
+                sort: 1.2 });
+        });
+        return rows;
+    }
+    // the boxes, read from the checkboxes every time (a basemap switch re-adds the layers; a variable could drift)
+    function limitBoxesOn() {
+        const on = {};
+        LIMIT_BOXES.forEach(k => { const cb = document.getElementById('layer-limit-' + k); on[k] = !!(cb && cb.checked); });
+        return on;
+    }
+    // the sign's anchor points for the ticked kinds (the clustered source: a cluster counts only what is ticked)
+    function limitPointFeatures(fc, on) {
+        const out = [];
+        ((fc && fc.features) || []).forEach(f => {
+            const p = limitPropsOf(f && f.properties);
+            if (!on[LIMIT_BOX_OF[p.kind]]) return;
+            const a = Array.isArray(p.anchor) ? p.anchor : (f.geometry && f.geometry.type === 'Point' ? f.geometry.coordinates : null);
+            if (!a) return;
+            out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: a },
+                properties: { id: p.id, kind: p.kind, _img: limitImageName(p.kind, p.icon_text, p.imperial, p.breach_count > 0),
+                              _label: limitChipText(p), _sort: p.breach_count > 0 ? 0 : 1 } });
+        });
+        return { type: 'FeatureCollection', features: out };
+    }
+    // the restricted stretches of the LINE limits for the ticked kinds
+    function limitLineFeatures(fc, on) {
+        const out = [];
+        ((fc && fc.features) || []).forEach(f => {
+            const p = (f && f.properties) || {};
+            if (!on[LIMIT_BOX_OF[p.kind]] || !f.geometry || f.geometry.type !== 'LineString') return;
+            out.push({ type: 'Feature', geometry: f.geometry, properties: { id: p.id, kind: p.kind } });
+        });
+        return { type: 'FeatureCollection', features: out };
+    }
+    // the attribution of every source present in the loaded limits ("© OpenStreetMap contributors (ODbL)", "© HERE")
+    function limitAttribution(fs) {
+        const seen = [];
+        (fs || []).forEach(f => { const a = f && f.properties && f.properties.attribution; if (a && !seen.includes(a)) seen.push(a); });
+        return seen.join(' · ');
+    }
+    function limitById(id) { return (LIM.byId && LIM.byId[id]) || null; }
+    async function loadLimits() {
+        if (LIM.loading || LIM.data) return;
+        LIM.loading = true;
+        try {
+            const r = await fetch(CONFIG.API_BASE + '/public/limits');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const fc = await r.json();
+            LIM.data = (fc && Array.isArray(fc.features)) ? fc : { type: 'FeatureCollection', features: [] };
+            LIM.byId = {};
+            LIM.data.features.forEach(f => { if (f && f.properties && f.properties.id != null) LIM.byId[f.properties.id] = f; });
+            LIM.failed = false;
+        } catch (e) {
+            // a map with no limits is degraded, not broken: the group stays hidden and nothing else changes
+            LIM.failed = true;
+            console.warn('lorry limits unavailable', e);
+        }
+        LIM.loading = false;
+        renderLimitGroup();
+        if (LIM.data) ensureLimitLayers();
+        // the Conditions panel lists a planned route over a limit: rebuilt now that the limits are in
+        if (LIM.data && typeof TL !== 'undefined' && TL.on && typeof renderTimelineWarnings === 'function') renderTimelineWarnings(TL.month);
+        if (typeof schedulePresetRender === 'function') schedulePresetRender();
+    }
+    // the group: hidden when the endpoint failed; the counts per box; the "none loaded" note when there are none
+    function renderLimitGroup() {
+        const grp = document.getElementById('limits-group');
+        if (!grp) return;
+        grp.hidden = !LIM.data;
+        if (!LIM.data) return;
+        const fs = LIM.data.features || [];
+        const n = { weight: 0, height: 0, width: 0 };
+        fs.forEach(f => { const b = LIMIT_BOX_OF[(f.properties || {}).kind]; if (b) n[b]++; });
+        LIMIT_BOXES.forEach(k => {
+            const el = document.getElementById('limit-count-' + k); if (el) el.textContent = String(n[k]);
+            const row = document.getElementById('limit-row-' + k); if (row && row.classList) row.classList.toggle('dim', !n[k]);
+        });
+        const boxes = document.getElementById('limit-boxes'), empty = document.getElementById('limit-empty');
+        if (boxes) boxes.hidden = !fs.length;
+        if (empty) empty.hidden = !!fs.length;
+        const src = new Set(fs.map(f => (f.properties || {}).source));
+        const names = [(!fs.length || src.has('osm')) ? 'OpenStreetMap contributors' : '', (!fs.length || src.has('here')) ? 'HERE' : ''].filter(Boolean);
+        const note = document.getElementById('limit-source');
+        if (note) note.textContent = names.join(' and ') + ' · coverage is incomplete. Advisory: check the signed limit on site.';
+    }
+    function ensureLimitImage(p) {
+        const name = limitImageName(p.kind, p.icon_text, p.imperial, Number(p.breach_count) > 0);
+        try { if (map.hasImage(name)) return; } catch (e) { return; }
+        try {
+            const dpr = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
+            const px = Math.round(LIMIT_SIGN_PX * dpr);
+            const cv = document.createElement('canvas');
+            cv.width = px; cv.height = px;
+            const ctx = cv.getContext('2d');
+            ctx.scale(dpr, dpr);
+            drawLimitSign(ctx, p.kind, p.icon_text, p.imperial, LIMIT_SIGN_PX, Number(p.breach_count) > 0);
+            map.addImage(name, ctx.getImageData(0, 0, px, px), { pixelRatio: dpr });
+        } catch (e) { console.warn('lorry limit sign not drawn', e); }
+    }
+    // the sources and layers, from the cached collection; called on load, on every tick of a box and on style.load
+    function ensureLimitLayers() {
+        if (!LIM.data) return;
+        if (!map.isStyleLoaded()) {
+            // 13 Oct 2026, seen in Chrome on the local copy: the limits arrived after the map had gone busy and 'idle'
+            // never came again (map.loaded() stayed false with the style parsed and no source loading), so the layers
+            // were never drawn. Mapbox accepts a source and a layer once the style document is parsed, tiles or not:
+            // try now; keep one idle wait armed and retry shortly if Mapbox refuses.
+            if (!LIM.idleArmed) { LIM.idleArmed = true; map.once('idle', () => { LIM.idleArmed = false; ensureLimitLayers(); }); }
+            try { addLimitLayers(); } catch (e) { setTimeout(ensureLimitLayers, 500); }
+            return;
+        }
+        addLimitLayers();
+    }
+    function addLimitLayers() {
+        const fs = LIM.data.features || [];
+        fs.forEach(f => ensureLimitImage((f && f.properties) || {}));
+        const on = limitBoxesOn();
+        const pts = limitPointFeatures(LIM.data, on), lines = limitLineFeatures(LIM.data, on);
+        // the attribution rides on the sources: Mapbox prints it while a layer of the source is shown, so it is on the
+        // map exactly while a limit box is ticked
+        const attribution = limitAttribution(fs);
+        const withAttr = o => attribution ? Object.assign(o, { attribution: attribution }) : o;
+        if (!map.getSource('limits-points')) map.addSource('limits-points', withAttr({ type: 'geojson', data: pts, cluster: true,
+            clusterMaxZoom: LIMIT_CLUSTER_MAX_ZOOM, clusterRadius: 40 }));
+        else map.getSource('limits-points').setData(pts);
+        if (!map.getSource('limits-lines')) map.addSource('limits-lines', withAttr({ type: 'geojson', data: lines }));
+        else map.getSource('limits-lines').setData(lines);
+        const vis = LIMIT_BOXES.some(k => on[k]) ? 'visible' : 'none';
+        const single = ['!', ['has', 'point_count']];
+        if (!map.getLayer('limit-lines')) map.addLayer({ id: 'limit-lines', type: 'line', source: 'limits-lines', minzoom: LIMIT_SIGN_ZOOM,
+            layout: { visibility: vis },
+            paint: { 'line-color': LIMIT_RED, 'line-width': 3.5, 'line-dasharray': [2, 1.5], 'line-opacity': 0.95 } });
+        // a cluster: a red ring on white with the count inside
+        if (!map.getLayer('limit-clusters')) map.addLayer({ id: 'limit-clusters', type: 'circle', source: 'limits-points',
+            filter: ['has', 'point_count'], layout: { visibility: vis },
+            paint: { 'circle-radius': 13, 'circle-color': '#FFFFFF', 'circle-stroke-color': LIMIT_RED, 'circle-stroke-width': 3 } });
+        if (!map.getLayer('limit-cluster-count')) map.addLayer({ id: 'limit-cluster-count', type: 'symbol', source: 'limits-points',
+            filter: ['has', 'point_count'],
+            layout: { visibility: vis, 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 12, 'text-allow-overlap': true },
+            paint: { 'text-color': LIMIT_INK } });
+        // below zoom 13: a small plain red ring, no text (a limit not merged into a cluster, and every limit from zoom 11)
+        if (!map.getLayer('limit-dots')) map.addLayer({ id: 'limit-dots', type: 'circle', source: 'limits-points', maxzoom: LIMIT_SIGN_ZOOM,
+            filter: single, layout: { visibility: vis },
+            paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-color': LIMIT_RED, 'circle-stroke-width': 2.5 } });
+        // from zoom 13: the sign; a clash sorts first, so it wins a collision; from zoom 14 its label beside it (dropped
+        // first when there is no room: the sign stays)
+        if (!map.getLayer('limit-signs')) map.addLayer({ id: 'limit-signs', type: 'symbol', source: 'limits-points', minzoom: LIMIT_SIGN_ZOOM,
+            filter: single,
+            layout: { visibility: vis, 'icon-image': ['get', '_img'], 'icon-size': 1, 'icon-allow-overlap': false,
+                      'symbol-sort-key': ['get', '_sort'],
+                      'text-field': ['step', ['zoom'], '', LIMIT_LABEL_ZOOM, ['get', '_label']],
+                      'text-size': 12, 'text-anchor': 'left', 'text-offset': [1.7, 0], 'text-max-width': 16,
+                      'text-optional': true, 'text-allow-overlap': false },
+            // a white chip: dark text on a wide white halo, readable on the dark and satellite basemaps too
+            paint: { 'text-color': '#1F2024', 'text-halo-color': '#FFFFFF', 'text-halo-width': 3 } });
+        LIMIT_LAYERS.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis); });
+        wireLimitClicks();
+        raiseMarks();
+    }
+    // a tick on any of the three boxes (and the council view's untick / restore, which dispatches 'change')
+    function toggleLimits() {
+        if (!LIM.data) { loadLimits(); return; }
+        ensureLimitLayers();
+    }
+    // the limit layers sit over the routes and under the sites (raiseMarks calls this first); a no-op when they already do
+    function raiseLimits(ids) {
+        const present = LIMIT_LAYERS.filter(id => ids.indexOf(id) >= 0);
+        if (!present.length) return false;
+        const marks = MARK_LAYERS.filter(id => ids.indexOf(id) >= 0);
+        if (ids.slice(ids.length - present.length - marks.length).join('|') === present.concat(marks).join('|')) return false;
+        present.forEach(id => { try { map.moveLayer(id); } catch (e) {} });
+        return true;
+    }
+    // is a limit (sign, ring, stretch or cluster) under the point? The route click gives way to it.
+    function limitHitAt(point) {
+        const ls = LIMIT_CLICK_LAYERS.filter(l => map.getLayer(l));
+        if (!ls.length) return false;
+        try { return map.queryRenderedFeatures(point, { layers: ls }).length > 0; } catch (e) { return false; }
+    }
+    // the card: on the phone shell in the sheet (as a route's or a section's), on the desktop a popup at the sign
+    function openLimitCardAt(p, lngLat) {
+        if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openLimitCard === 'function') { openLimitCard(p.id); return; }
+        if (LIM.popup) { try { LIM.popup.remove(); } catch (e) {} }
+        LIM.popup = new mapboxgl.Popup({ offset: 18, maxWidth: '340px' }).setLngLat(lngLat).setHTML(limitCardHTML(p)).addTo(map);
+    }
+    // registered ONCE: a layer-scoped handler survives setStyle, and one per basemap switch would stack popups
+    function wireLimitClicks() {
+        if (LIM.wired) return;
+        LIM.wired = true;
+        LIMIT_CLICK_LAYERS.forEach(l => {
+            map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; });
+        });
+        // a cluster zooms in until it comes apart
+        map.on('click', 'limit-clusters', (e) => {
+            const f = e.features && e.features[0], src = map.getSource('limits-points');
+            if (!f || !src || typeof src.getClusterExpansionZoom !== 'function') return;
+            src.getClusterExpansionZoom(f.properties.cluster_id, (err, z) => {
+                if (err) return;
+                const cam = { center: f.geometry.coordinates, zoom: Math.min(z + 0.5, 18) };
+                if (typeof reducedMotion === 'function' && reducedMotion()) map.jumpTo(cam); else map.easeTo(Object.assign({ duration: 500 }, cam));
+            });
+        });
+        // a sign, a ring or a stretch: ONE card per click (a sign over its own stretch answers once)
+        ['limit-signs', 'limit-dots', 'limit-lines'].forEach(l => map.on('click', l, (e) => {
+            if (!e.features || !e.features.length) return;
+            if (e.originalEvent && LIM.lastClick === e.originalEvent) return;
+            LIM.lastClick = e.originalEvent || null;
+            const full = limitById(e.features[0].properties.id);
+            if (!full) return;
+            const p = limitPropsOf(full.properties);
+            openLimitCardAt(p, l === 'limit-lines' ? e.lngLat : (Array.isArray(p.anchor) ? p.anchor : e.lngLat));
+        }));
+    }
+    // "Show on map" from a Conditions row: the limit's box is ticked (so its sign is drawn), the map flies to the sign and
+    // its card opens; on a phone the card opens in the sheet once the row's own sheetTo('peek') has run
+    function showLimit(id) {
+        const f = limitById(id);
+        if (!f) return;
+        const p = limitPropsOf(f.properties);
+        const box = document.getElementById('layer-limit-' + LIMIT_BOX_OF[p.kind]);
+        if (box && !box.checked) { box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); }
+        const c = Array.isArray(p.anchor) ? p.anchor : (f.geometry && f.geometry.type === 'Point' ? f.geometry.coordinates : null);
+        if (!c) return;
+        const phone = typeof isPhoneShell === 'function' && isPhoneShell();
+        const cam = { center: c, zoom: Math.max(map.getZoom(), LIMIT_LABEL_ZOOM) };
+        if (phone) cam.offset = [0, -Math.round((window.innerHeight || 600) * 0.3)];   // the sheet covers the lower half
+        if (typeof reducedMotion === 'function' && reducedMotion()) map.jumpTo(cam); else map.flyTo(Object.assign({ duration: 700 }, cam));
+        if (phone) setTimeout(() => openLimitCardAt(p, c), 0); else openLimitCardAt(p, c);
+    }
+    // ===== end of lorry limits =====
 </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -5752,7 +6237,8 @@
     }
     // the layers with a click of their own that the route query does not cover: the cursor shows a hand over them
     const CLICKABLE_LAYERS = ['rail-alignment', 'ws-boundary-ticks', 'ws-boundary-labels', 'zone-fill', 'zone-outline', 'site-gates',
-                              'evr-rail-line', 'locations', 'restriction-points', 'restriction-lines', 'area-fill', 'area-county-fill'];
+                              'evr-rail-line', 'locations', 'restriction-points', 'restriction-lines',
+                              'limit-signs', 'limit-dots', 'limit-lines', 'limit-clusters', 'area-fill', 'area-county-fill'];
     function clickableAt(point){
         const ls = CLICKABLE_LAYERS.filter(l => map.getLayer(l));
         if (!ls.length) return false;
@@ -6235,6 +6721,7 @@
     // sits on and flies to the CLOSURE's bounds rather than the whole route.
     function showCondition(kind, id) {
         if (kind === 'h') { showRestrictionHit(id); return; }
+        if (kind === 'l') { if (typeof showLimit === 'function') showLimit(id); return; }   // 13 Oct 2026: a lorry limit
         if (kind === 'r') { if (typeof selectRoute === 'function') selectRoute(id); return; }
         const f = a1_data.features.find(x => x.geometry && x.geometry.type === 'Point'
                                              && x.properties && x.properties.type === 'Node' && x.properties.id === id);
@@ -6460,6 +6947,11 @@
                 noun: 'Over a planning flag',
                 what: capSentence(p.route_id, perDay, cap), sort: 1.5 });
         });
+        // 5. 13 Oct 2026: a lorry limit (OpenStreetMap / HERE) a planned route's approved vehicle is over -> WARNING.
+        // One row per limit, about the routes in use this month (the closures row's list); a standing limit has no
+        // dates, so it applies every month. The limits load once (loadLimits rebuilds this panel when they land).
+        if (typeof limitConditionRows === 'function' && typeof LIM !== 'undefined' && LIM.data)
+            limitConditionRows(LIM.data.features, routes.map(p => p.route_id), month).forEach(i => items.push(i));
         // 3. seasonal windows, per visible line's vehicle
         const vehByRoute = {};
         (kp && kp.lines || []).forEach(l => { (vehByRoute[l.route_id] = vehByRoute[l.route_id] || new Set()).add(l.vehicle_type); });
@@ -6703,6 +7195,7 @@
             map.on('click', lid, (e)=>{
                 if(!e.features||!e.features.length) return;
                 if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;   // 12 Oct: the section card answers
+                if(typeof limitHitAt === 'function' && limitHitAt(e.point)) return;         // 13 Oct: a lorry limit's sign answers
                 const p=e.features[0].properties, rid=p.route_id||'Route';
                 selectRoute(rid);
                 // 12 Oct 2026 (review 2.8 row 2, D14): on a phone a tap opens the route card in the sheet instead of the drawer
@@ -6823,7 +7316,9 @@
         }
         const card = document.getElementById('route-hover-card');
         if (!card) return;
-        if (!f || !e || !e.point || isPhoneShell() || !canHover()) { card.hidden = true; HOVER.key = ''; return; }
+        // 13 Oct 2026, seen in Chrome: a route's hover card sat on top of a lorry limit's card; over a limit it gives way
+        if (!f || !e || !e.point || isPhoneShell() || !canHover()
+            || (typeof limitHitAt === 'function' && limitHitAt(e.point))) { card.hidden = true; HOVER.key = ''; return; }
         // Track C review: a shared section (Road load on) gets the section's card, never one route's
         const isRun = f.source === 'road-load-source' || !!(f.layer && f.layer.id === 'road-load-line');
         const v = isRun
@@ -7014,8 +7509,16 @@
         if (p.closures) layerBoxes().forEach(cb => {
             const k = layerKey(cb.id);
             if (k === 'zones' || k.indexOf('zone-') === 0 || k.indexOf('restr-') === 0) on.add(k);
+            // 13 Oct 2026: and the three lorry-limit boxes, while the group offers them (limits loaded); Everything leaves
+            // them off, as it leaves the closures
+            if (k.indexOf('limit-') === 0 && presetLimitsAvailable()) on.add(k);
         });
         return on;
+    }
+    // the lorry-limit boxes are offered (the group shown, and limits loaded so the boxes are not swapped for the note)
+    function presetLimitsAvailable() {
+        const g = document.getElementById('limits-group'), b = document.getElementById('limit-boxes');
+        return !!g && !g.hidden && !!b && !b.hidden;
     }
     function presetMatches(p) {
         const council = presetCouncilOn();
@@ -7564,7 +8067,10 @@
         const box = document.getElementById('m-card'), main = document.getElementById('m-main');
         if (!box || !main) return;
         if (!SHEET.card) { box.hidden = true; box.innerHTML = ''; main.hidden = false; return; }
-        box.innerHTML = String(SHEET.card).indexOf('run:') === 0 ? runCardHTML(String(SHEET.card).slice(4)) : routeCardHTML(SHEET.card);
+        const sc = String(SHEET.card);
+        box.innerHTML = sc.indexOf('run:') === 0 ? runCardHTML(sc.slice(4))
+                      : sc.indexOf('limit:') === 0 ? limitSheetHTML(sc.slice(6))       // 13 Oct 2026: a lorry limit's card
+                      : routeCardHTML(SHEET.card);
         box.hidden = false; main.hidden = true;
     }
     function openRouteCard(rid) {
@@ -7594,6 +8100,19 @@
     function openRunCard(id) {
         if (id == null || id === '') return;
         SHEET.card = 'run:' + id;
+        renderRouteCard();
+        if (SHEET.state !== 'half') sheetTo('half');
+    }
+    // 13 Oct 2026: a lorry limit's card opens in the sheet too (SHEET.card 'limit:<id>'), as a section's does; the desktop
+    // keeps its map popup (openLimitCardAt in the first block)
+    function limitSheetHTML(id) {
+        const f = (typeof limitById === 'function') ? limitById(id) : null;
+        return (f && typeof limitCardHTML === 'function' ? limitCardHTML(f.properties) : '<p class="mt-note">This lorry limit is not loaded.</p>')
+             + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the card</button>';
+    }
+    function openLimitCard(id) {
+        if (id == null || id === '') return;
+        SHEET.card = 'limit:' + id;
         renderRouteCard();
         if (SHEET.state !== 'half') sheetTo('half');
     }

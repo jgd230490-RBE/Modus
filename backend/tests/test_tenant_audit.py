@@ -105,6 +105,7 @@ UNTENANTED = {
     # server's feed fetch or an admin. A tenant's own fuel settings (yard price, share,
     # the locked BAF base) are in the tenanted `config` table, key 'costing'.
     "fuel_index": "a national fuel price index, not client data; settings are tenanted in config",
+    "road_limits": "public road facts (OSM / HERE lorry limits), shared by tenants in one area and never shipped in a package",
     # 8 Oct 2026 (H9). Demo requests from the landing page are LEADS: they belong to the
     # company running the deployment, not to the tenant whose data the demo shows. The IP
     # is stored only as a salted hash; the codes the visitor was sent are never stored.
