@@ -151,6 +151,10 @@ for needed in ("overview", "standards", "readers", "problems", "not", "demo"):
     ok(f"section #{needed} exists", needed in p.ids)
 for nav in ("#overview", "#standards", "#readers", "#demo"):
     ok(f"nav links to {nav}", nav in p.hrefs)
+# REVERSED 13 Oct (landing v3): was overview < standards < readers < problems < not < demo.
+ok("sections in the pack's order: problem, how it works, readers, planning layer, standards, demo",
+   0 < src.find('id="top"') < src.find('id="problems"') < src.find('id="overview"') < src.find('id="readers"')
+   < src.find('id="not"') < src.find('id="standards"') < src.find('id="demo"'))
 
 # --- local assets exist ----------------------------------------------------------
 local = [s for s in p.srcs if s.startswith("./")]
@@ -164,73 +168,77 @@ ok("only Google Fonts is loaded from the network",
        for u in re.findall(r'href="(https://[^"]+)"', src)
        if "wayscope.co.uk" not in u and u != DEMO_URL))
 
-# --- the two placeholder videos (6 Oct) -------------------------------------------
-# Hero: the silent animated explainer, muted autoplay loop (browsers refuse autoplay with
-# sound), playsinline for iOS, controls as the pause button. Overview: the product tour,
-# which has a sound track, click to play. Neither is repeated elsewhere on the page.
-MEDIA = os.path.join(ROOT, "landing", "media")
+# --- the three films (13 Oct, landing v3; notes/session-1013-landing-v3.md) ---------------------
+# REVERSED 13 Oct: the 6 Oct page had two placeholder videos (the hero explainer and the overview
+# product tour; both showed pre-UI screens and the word "truck"). Both files are deleted. "How it works"
+# now holds three films, each a muted autoplay loop (browsers refuse autoplay with sound) with controls
+# as the sound and pause buttons, playsinline for iOS, served from landing/films/.
+FILMS = os.path.join(ROOT, "landing", "films")
 videos = re.findall(r"<video\b[^>]*>", src)
-ok("page has two videos", len(videos) == 2)
-def video_in(frame_id):
-    m = re.search(r'id="%s"[^>]*>\s*(<video\b[^>]*>)' % frame_id, src)
-    return m.group(1) if m else ""
-hv = video_in("hero-media")
-ok("hero frame holds the explainer", "./media/explainer-overview.mp4" in hv)
-for attr in ("autoplay", "muted", "loop", "playsinline", "controls"):
-    ok(f"hero video is {attr}", re.search(r"\b%s\b" % attr, hv) is not None)
-ov = video_in("overview-media")
-ok("overview frame holds the product tour", "./media/hero-overview.mp4" in ov)
-ok("overview video does not autoplay (it has sound)", "autoplay" not in ov)
-ok("overview video has controls", "controls" in ov)
-ok("overview comes before standards, readers and problems",
-   0 < src.find('id="overview"') < src.find('id="standards"') < src.find('id="readers"') < src.find('id="problems"'))
-ok("the 'what it is not' band sits between the problems and the demo request",
-   src.find('id="problems"') < src.find('id="not"') < src.find('id="demo"'))
-ok("'See how it works' goes to the overview", 'href="#overview">See how it works' in src)
-ok("each video file is used once", len(set(re.findall(r'src="\./media/([^"]+\.mp4)"', src))) == 2)
-for v in videos:
-    ok("every video has an aria-label", 'aria-label="' in v)
-    ok("every video has a poster", 'poster="./media/' in v)
-    ok("every video says fictional in its label", "fictional" in v)
-    for ref in re.findall(r'(?:src|poster)="\./([^"]+)"', v):
-        ok(f"media file present: {ref}", os.path.exists(os.path.join(ROOT, "landing", ref)))
-for name in ("hero-overview.mp4", "explainer-overview.mp4"):
-    path = os.path.join(MEDIA, name)
+ok("page has three videos, the three films", len(videos) == 3)
+ok("🔴 the old placeholder videos are gone from the page and from landing/media",
+   "explainer-overview" not in src and "hero-overview" not in src
+   and not os.path.exists(os.path.join(ROOT, "landing", "media", "explainer-overview.mp4"))
+   and not os.path.exists(os.path.join(ROOT, "landing", "media", "hero-overview.mp4")))
+for n in (1, 2, 3):
+    m = re.search(r'<div class="film" id="film-%d">(.*?)</div>\s*</div>' % n, src, re.S)
+    block = m.group(1) if m else ""
+    v = re.search(r"<video\b[^>]*>", block)
+    v = v.group(0) if v else ""
+    ok(f"film {n}: its block exists and holds one video", bool(v))
+    ok(f"film {n}: plays ./films/film{n}.mp4", f'src="./films/film{n}.mp4"' in v)
+    for attr in ("autoplay", "muted", "loop", "playsinline", "controls"):
+        ok(f"film {n}: video is {attr}", re.search(r"\b%s\b" % attr, v) is not None)
+    ok(f"film {n}: aria-label says the fictional demo scheme", re.search(r'aria-label="[^"]*fictional demo scheme', v) is not None)
+    ok(f"film {n}: has a poster that exists", any(os.path.exists(os.path.join(ROOT, "landing", r))
+       for r in re.findall(r'poster="\./([^"]+)"', v)))
+    ok(f"film {n}: the narration is on the page as a transcript", "<summary>Read the narration</summary>" in block)
+    path = os.path.join(FILMS, f"film{n}.mp4")
     head = open(path, "rb").read(65536) if os.path.exists(path) else b""
+    ok(f"⭐ film {n}: landing/films/film{n}.mp4 exists (the user supplies the films)", os.path.exists(path))
     # moov before mdat = "faststart": the browser can start playing before the whole file lands.
-    ok(f"{name} is an MP4 with faststart", head[4:8] == b"ftyp" and 0 < head.find(b"moov") < (head.find(b"mdat") if b"mdat" in head else 1 << 30))
-    ok(f"{name} is under 10 MB", os.path.exists(path) and os.path.getsize(path) < 10 * 1024 * 1024)
+    ok(f"film {n}: an MP4 with faststart", head[4:8] == b"ftyp" and 0 < head.find(b"moov") < (head.find(b"mdat") if b"mdat" in head else 1 << 30))
+    # GitHub warns above 50 MB and refuses above 100 MB; three autoplaying films load on every visit.
+    ok(f"film {n}: under 50 MB", os.path.exists(path) and os.path.getsize(path) < 50 * 1024 * 1024)
+ok("each film file is used once", len(set(re.findall(r'src="\./films/([^"]+\.mp4)"', src))) == 3)
+ok("the films come in page order, inside How it works",
+   src.find('id="overview"') < src.find('id="film-1"') < src.find('id="film-2"') < src.find('id="film-3"') < src.find('id="readers"'))
 _body = " ".join(p.text)
-ok("no media placeholder text left in the hero", "[SCREEN RECORDING" not in _body)
-# 11 Oct 2026 (the user): the map is the "public map" everywhere a person reads its name, landing page included
-ok("the landing page says 'public map', never 'corridor map' (copy and the video labels)",
-   "corridor map" not in src.lower() and "One read-only public map for the client" in src
-   and "It's the same public map, read four ways." in src)
-# 11 Oct: reversed. The five explainer placeholders were replaced by stills of the live fictional demo.
-ok("🔴 no explainer placeholder left on the page (11 Oct: stills of the live demo)",
-   "[EXPLAINER" not in _body and "[EXPLAINER" not in src)
+ok("no media placeholder text left on the page", "[SCREEN RECORDING" not in _body and "[EXPLAINER" not in src
+   and "placeholder]" not in _body.lower())
+ok("the films note says all three are the fictional demo scheme",
+   "All three films are recorded on the fictional demo scheme. Nothing in them is a real project." in _body)
+# 11 Oct 2026 (the user): the map is the "public map" everywhere a person reads its name, landing page included.
+# NARROWED 13 Oct: the two 11 Oct sentences went with the old copy; the name rule stays.
+ok("the landing page says 'public map', never 'corridor map' (copy and the labels)",
+   "corridor map" not in src.lower() and "shared public map that opens with one password you hand out" in src)
+# REVERSED 13 Oct: five stills, one per problem, became three: the hero (the public map) and the two
+# Film 2 screens (forecast submissions, the Look-ahead clash rail). The two unused stills are deleted.
 import pathlib
 _still_path = lambda n: pathlib.Path(ROOT, "landing", "media", n + ".jpg")
-_STILLS = ("still-lookahead", "still-routes", "still-carbon", "still-fleet", "still-fairprice")
-_still_tags = re.findall(r'<div class="frame still"><a href="\./media/([\w-]+)\.jpg"[^>]*><img ([^>]*)></a></div>', src)
-ok("each still links to its own full-size image", len(_still_tags) == 5
-   and all('src="./media/%s.jpg"' % href in tag for href, tag in _still_tags))
-_still_tags = [tag for _, tag in _still_tags]
-ok("five stills, one per problem, in page order",
-   len(_still_tags) == 5 and [re.search(r'src="\./media/([\w-]+)\.jpg"', t).group(1) for t in _still_tags] == list(_STILLS))
+_STILLS = ("still-routes", "still-fairprice", "still-lookahead")
+_still_tags = re.findall(r'<figure class="shot"[^>]*>\s*<a href="\./media/([\w-]+)\.jpg"[^>]*><img ([^>]*)></a>', src)
+ok("three stills, each linking to its own full-size image, in page order",
+   [h for h, _ in _still_tags] == list(_STILLS)
+   and all('src="./media/%s.jpg"' % h in t for h, t in _still_tags))
+_still_tags = [t for _, t in _still_tags]
 ok("⭐ every still's alt text says it is the fictional demo scheme",
-   all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
-# 11 Oct 2026 (late, guide v2.1 review): the map still's alt text was the last "route map" a person reads here
+   len(_still_tags) == 3 and all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
 ok("...and the map still's alt text calls it the public map, not the route map",
    'alt="The public map on the fictional demo scheme' in src and not re.search(r'alt="[^"]*route map', src, re.I))
-ok("every still has width, height (no layout jump) and lazy loading",
-   all('width="' in t and 'height="' in t and 'loading="lazy"' in t for t in _still_tags))
+ok("every still has width and height (no layout jump); the two below the fold load lazily",
+   all('width="' in t and 'height="' in t for t in _still_tags)
+   and all('loading="lazy"' in t for t in _still_tags[1:]))
 ok("each still exists as a JPEG under 200 KB",
-   all((_still_path(n)).is_file()
-       and (_still_path(n)).read_bytes()[:3] == b"\xff\xd8\xff"
-       and (_still_path(n)).stat().st_size < 200 * 1024 for n in _STILLS))
-ok("the overview has four steps, Plan / Approve / Share / Record (8 Oct)",
-   all(f"<b>{s}</b>" in src for s in ("Plan", "Approve", "Share", "Record")) and src.count('class="steps"') == 1)
+   all(_still_path(n).is_file() and _still_path(n).read_bytes()[:3] == b"\xff\xd8\xff"
+       and _still_path(n).stat().st_size < 200 * 1024 for n in _STILLS))
+ok("🔴 the two stills the page no longer shows are deleted (still-carbon, still-fleet)",
+   not _still_path("still-carbon").exists() and not _still_path("still-fleet").exists())
+# REVERSED 13 Oct: the 8 Oct overview had four steps, Plan / Approve / Share / Record.
+ok("🔴 the Plan / Approve / Share / Record steps are gone", all(f"<b>{s}</b>" not in src for s in ("Plan", "Approve", "Share", "Record")))
+ok("How it works has the four-step bar: Locate & route, Forecast & flag, Confirm week, Share",
+   src.count('class="steps"') == 1
+   and all(f">{s}</a></li>" in src for s in ("Locate &amp; route", "Forecast &amp; flag", "Confirm week", "Share")))
 
 # --- wording rules (claude/messaging-0929.md §7 + landing-copy-v2-1008.md §6) -----------
 body = " ".join(p.text)
@@ -249,6 +257,10 @@ BANNED = [
     # 8 Oct: the body was the Highways Agency until 2015 and Highways England until 2021.
     (r"\bHighways Agency\b", "Highways Agency (it is National Highways)"),
     (r"\bHighways England\b", "Highways England (it is National Highways)"),
+    # 13 Oct (the landing pack's banned list): the first client's names, as test_modus.py spells them.
+    (r"Rail\s?Baltic", "the first client's project name"),
+    (r"\bNGE\b", "the first client's contractor name"),
+    (r"\bAlliance\s?1\b", "the first client's alliance name"),
 ]
 for pat, name in BANNED:
     ok(f"no banned word: {name}", not re.search(pat, body, re.I))
@@ -256,29 +268,40 @@ ok("page says the demo is fictional", re.search(r"fictional", body, re.I) is not
 ok("page carries the sources paragraph", "DESNZ" in body and "RIS3" in body)
 ok("page uses British spelling (programme)", "programme" in body and "program " not in body)
 
-# --- standards: named, never claimed (8 Oct) ------------------------------------------
-DISCLAIMER = ("CLOCS, FORS, National Highways, CILT and CIOB are named to describe requirements and "
-              "practice that Wayscope helps you meet. Wayscope is not accredited by, endorsed by or "
-              "affiliated with any of them.")
-NH_SMALL_PRINT = "National Highways has not reviewed or endorsed Wayscope."
+# --- standards: named, never claimed (8 Oct; rewritten 13 Oct) -----------------------------
+# REVERSED 13 Oct (the landing pack; the user, 13 Oct): the disclaimer no longer says "accredited by,
+# endorsed by", and the NH card no longer says "has not reviewed or endorsed". Neither word is on the
+# page at all now. The disclaimer says the bodies are independent and none of them has reviewed Wayscope.
+DISCLAIMER = "Wayscope is independent of every organisation named here, and none of them has reviewed Wayscope."
 flat = re.sub(r"\s+", " ", body)
-ok("the standards disclaimer ships, under the cards AND in the footer", flat.count(DISCLAIMER) == 2)
-ok("the National Highways card says NH has not reviewed or endorsed Wayscope", NH_SMALL_PRINT in flat)
-ok("#standards names the five bodies", all(w in flat for w in ("CLOCS", "FORS", "National Highways", "CILT", "CIOB")))
-ok("#standards has five cards", len(re.findall(r'<article class="standard">', src)) == 5)
-ok("the readers section has four readers (was three)", len(re.findall(r'<article class="reader">', src)) == 4)
-# Strip the two negated sentences, then no claim word may remain anywhere on the page.
-_claims = flat.replace(DISCLAIMER, "").replace(NH_SMALL_PRINT, "")
+ok("the standards disclaimer ships, under the standards AND in the footer", flat.count(DISCLAIMER) == 2)
+ok("🔴 the 8 Oct disclaimer and the NH small print are gone",
+   "not accredited by, endorsed by" not in flat and "has not reviewed or endorsed" not in flat)
+ok("the standards disclaimer is in #standards", src.find('id="standards"') < src.find(DISCLAIMER.replace("'", "'")) < src.find('id="demo"'))
+ok("#standards names the documents", all(w in flat for w in ("The CLOCS Standard", "FORS Standard v7.2",
+   "National Highways Carbon Tool", "PAS 2080", "RIS3 performance specification", "CTMPs and planning conditions")))
+# REVERSED 13 Oct: five cards (CLOCS, FORS, NH, officers, CILT/CIOB) became five named documents in a list.
+ok("#standards lists five documents, no cards", src.count('<ul class="chips">') == 1
+   and len(re.findall(r"<li>", src[src.find('<ul class="chips">'):src.find("</ul>", src.find('<ul class="chips">'))])) == 5
+   and '<article class="standard">' not in src)
+ok("🔴 CILT and CIOB are no longer named (the pack dropped that block)", "CILT" not in flat and "CIOB" not in flat)
+ok("the CLOCS Standard is named with no version number", "CLOCS Standard v" not in flat and not re.search(r"CLOCS[^.]{0,20}\bv\d", flat))
+ok("the readers section has four readers: CLOCS, FORS, National Highways, Local authorities",
+   len(re.findall(r'<article class="reader">', src)) == 4
+   and all(f'<p class="eyebrow">{r}</p>' in src for r in ("CLOCS", "FORS", "National Highways", "Local authorities")))
+ok("each reader card says what stays with the reader", src.count("<b>What stays with you:</b>") == 4)
+# NARROWED 13 Oct: there is nothing to strip now; no claim word may appear anywhere on the page.
 for pat, name in [(r"\bcompliant\b", "compliant"), (r"\bapproved by\b", "approved by"),
                   (r"\baccredit", "accredited / accreditation"), (r"\bcertif", "certified / certification"),
-                  (r"\bendorsed\b", "endorsed")]:
-    # "accreditation" is allowed only in the CLOCS card's honest-scope line about what Wayscope does NOT hold.
-    hits = [m.start() for m in re.finditer(pat, _claims, re.I)]
-    if name.startswith("accredit"):
-        hits = [h for h in hits if "vehicle and driver accreditation" not in _claims[max(0, h - 30):h + 30]]
-    ok(f"no standard is claimed: '{name}' never appears except in the disclaimer", not hits)
+                  (r"\bendorse", "endorsed / endorsement")]:
+    ok(f"no standard is claimed: '{name}' never appears on the page", not re.search(pat, flat, re.I))
+# 13 Oct: the scan above reads text nodes only; an aria-label once said "approved by". Attributes too.
+_attrs = " ".join(re.findall(r'(?:alt|aria-label|placeholder|title|content)="([^"]*)"', src))
+for pat, name in BANNED + [(r"compliant", "compliant"), (r"approved by", "approved by"),
+                           (r"accredit", "accredited"), (r"certif", "certified"), (r"endorse", "endorsed")]:
+    ok(f"no banned word in alt / aria-label / placeholder / title / meta: {name}", not re.search(pat, _attrs, re.I))
 ok("no logos of the named bodies (the only images are Wayscope's own)",
-   all(s.startswith("./assets/") or s.startswith("./media/") for s in p.srcs if s.startswith("./")))
+   all(s.startswith("./assets/") or s.startswith("./media/") or s.startswith("./films/") for s in p.srcs if s.startswith("./")))
 
 # --- the event is not on the page (8 Oct: the page is for everyone) ---------------------
 # REVERSED 8 Oct: the 6 Oct page carried the Highways UK pill and an "At the stand" tile.
@@ -360,9 +383,60 @@ ok("🔴 no claim that the figures are already in the Carbon Tool's form or prep
 ok("🔴 no placeholder or caption promising a carbon export", not re.search(r"carbon[^.]{0,40}\bexport", _low))
 ok("...and the page says plainly the figures are planning estimates, not a Carbon Tool return",
    "not a Carbon Tool return" in body and "your Carbon Tool return stays your own" in body)
-ok("the Carbon planner (PR #16) is named, by its menu name, on the landing page", "The Carbon planner sets the approved plan beside" in body)
+# REVERSED 13 Oct (the landing pack, item 11): the Carbon planner, fair price, fleet sizing and gate arrivals
+# are built but sit outside the three films, so the page no longer names them.
+ok("🔴 the Carbon planner is no longer on the landing page", "Carbon planner" not in body)
+# NARROWED 13 Oct: the look-ahead line now says the commitment is recorded as held or short.
 ok("the look-ahead copy no longer promises that declared disruption is what occurs",
-   "the disruption that occurs" not in _low and "how closely the week matched what was declared" in body)
+   "the disruption that occurs" not in _low and "recorded as held or short" in body)
+
+# --- 13 Oct (the landing pack, notes/session-1013-landing-v3.md): v3 copy rules ---------------
+# Taglines (the user, 13 Oct): "Every movement in scope." in the hero eyebrow and the footer;
+# "Organisation before movement." above the closing demo request. "Every load in scope." is retired.
+ok("⭐ 'Every movement in scope.' is the hero eyebrow", '<p class="eyebrow">Every movement in scope.</p>' in src
+   and src.find("Every movement in scope.</p>") < src.find("<h1>"))
+ok("...and the footer tagline", '<p class="tagline">Every movement in scope.</p>' in src[src.find("<footer"):])
+ok("🔴 'Every load in scope' is gone, og:title included", "every load in scope" not in src.lower())
+ok("'Organisation before movement.' sits above the demo heading",
+   src.find('id="demo"') < src.find("Organisation before movement.") < src.find("See it on a fictional demo scheme."))
+ok("the h1 is the agreed headline", "<h1>Plan every lorry movement. Evidence every plan.</h1>" in src)
+# The CLOCS card (live-page fix): never "the plan you approve".
+ok("🔴 no 'the plan you approve' anywhere", "the plan you approve" not in _low)
+# RIS3: a tool only supports the seven-day horizon; the KPI is National Highways' own.
+ok("RIS3: 'supports the seven-day planning horizon', never meets or delivers it",
+   "supports the seven-day planning horizon in RIS3" in flat
+   and not re.search(r"\b(meets?|deliver(s|ed)?|achieves?)\b[^.]{0,40}seven-day", flat, re.I))
+# Ported from claude/landing-overreach (13 Oct, superseded by this page): three overclaims stay out.
+ok("🔴 no weight limits claimed (none is ever flagged)", "weight limit" not in _low)
+ok("🔴 'they don't need an account' stays gone", "don't need an account" not in _low)
+ok("🔴 no 'carbon you can report'", "carbon you can report" not in _low)
+ok("the public map always comes with its password: hero, Film 3 and the planning list",
+   flat.count("opens with one password you hand out") >= 3)
+# Built today vs not (4-rules/platform-truth.md §8): no import, no bulletin, no holding areas, no Carbon Tool export.
+ok("🔴 import is not claimed as a feature; the page says there is none today",
+   "There is no import today" in flat and "import from your booking system is set up" not in _low)
+ok("🔴 no bulletin and no holding areas on the page", "bulletin" not in _low and "holding area" not in _low)
+ok("🔴 TROs and Street Manager appear only as what stays with the reader or the reader's systems",
+   all(("What stays with you" in flat[max(0, m.start() - 160):m.start()]) or ("Permits, TROs and Street Manager" in flat[max(0, m.start() - 20):m.end() + 5])
+       for m in re.finditer(r"Street Manager", flat)))
+ok("actuals are typed, never counted or tracked", "Actuals are typed in, as held or short, not counted or tracked." in flat)
+ok("the carbon line says 'holds the inputs the Carbon Tool asks for'", "holds the inputs the Carbon Tool asks for" in flat)
+ok("closures are National Highways planned closures only, flagged, never blocked",
+   "National Highways planned closures" in flat and "flagged, never blocked" in flat)
+# The user, 13 Oct: the clash rail sits on the Look-ahead and runs before Confirm week, not before approval.
+ok("🔴 Film 2 no longer says the clash is found before approval",
+   "find the clash before approval" not in _low and "Find the clash before the week is confirmed." in flat)
+ok("...and no screen caption puts the clash rail on the forecast submissions",
+   "forecast submissions with clash rail" not in _low and "forecast submissions + clash rail" not in _low)
+# No prices (the pack's agreed decisions).
+ok("no prices on the page: no £, no 'per month', no 'pricing'",
+   "£" not in flat and "per month" not in _low and "pricing" not in _low and "fair price" not in _low)
+# The demo CTA: every "Request a demo" button goes to the form; the address is the fallback.
+ok("'Request a demo' is in the nav and the hero, and each one goes to #demo",
+   len(re.findall(r'href="#demo">Request a demo</a>', src)) >= 2 and 'href="#demo"' in src)
+ok("'Watch the films' goes to How it works", 'href="#overview">Watch the films</a>' in src)
+ok("the demo band offers the email address beside the form", 'Or write to <a href="mailto:JDavis@wayscope.co.uk">' in src)
+ok("one <main> on the page", src.count("<main") == 1)
 
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
