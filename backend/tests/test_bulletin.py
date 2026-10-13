@@ -1194,7 +1194,8 @@ ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called 
    and _EXP.count("BaseDocTemplate(buf") == 1 and "def page_frame(" in _EXP and "def frame_doc(" in _EXP
    and _EXP.count("doc = frame_doc(") == 3)
 ok("…the bulletin's frame carries the demo notice on every page and the plan-only foot",
-   "notice=((_pdf_safe(notice), \"Helvetica-Bold\", 8.5, NAVY_RGB, H - 25 * mm) if notice else None)" in _EXB
+   # NARROWED 13 Oct 2026 (D45): the notice is passed in the demo red; page_frame draws it as the demo bar
+   "notice=((_pdf_safe(notice), \"Helvetica-Bold\", 8.5, DEMO_FG_RGB, H - 25 * mm) if notice else None)" in _EXB
    and "foot=(_pdf_safe(S[\"foot\"]), \"Helvetica\", 7, GREY)" in _EXB)
 
 # the endpoints (bodies; http_smoke drives the real HTTP layer and the middleware)
@@ -1243,6 +1244,12 @@ ok("🔴 source: both endpoints check staff (_staff_request) before reading anyt
    and "export.build_bulletin_pdf(sheet)" in _fp and "bulletin_doc.html(bulletin_doc.sheet(" in _fh)
 ok("…the middleware refuses /bulletin with the bulletin's page, not the guide's", 'if gate.scope_for(path) == "bulletin":' in _MS
    and "_BULLETIN_SIGNIN_PAGE" in _MS)
+
+# 13 Oct 2026: D45 — the bulletin page's demo pill takes Option A, with the red DEMO tag
+_BD = read("backend/bulletin_doc.py")
+ok("D45: the bulletin page's notice is light grey with red text, a red edge (3 px under) and a red DEMO tag; no orange pill left",
+   ".notice{{display:inline-block;background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;border-bottom-width:3px;" in _BD
+   and ".notice::before{{content:'DEMO';content:'DEMO' / '';display:inline-block;" in _BD and "#FFF7ED" not in _BD)
 
 # =========================================================================== #
 print()

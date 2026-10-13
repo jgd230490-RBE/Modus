@@ -176,8 +176,11 @@ _GATE_CSS = """
   .foot { margin-top:18px; font-size:13px; color:#78716C; }
   a { color:#2563EB; }
   .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:999px;
-                 background:#FFF7ED; color:#9A3412; border:1px solid #FDBA74; text-align:center;
+                 background:#F1F5F9; color:#B91C1C; border:1px solid #DC2626; text-align:center;
                  font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  /* 13 Oct 2026 (D45, Option A): the app's demo bar colours, with the red DEMO tag */
+  .demo-notice::before { content:"DEMO"; content:"DEMO" / ""; display:inline-block; margin-right:8px; padding:0 6px;
+                         border-radius:3px; background:#B91C1C; color:#FFFFFF; letter-spacing:.08em; }
 """
 _GATE_HEAD = """<link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
