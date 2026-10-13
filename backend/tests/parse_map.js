@@ -4758,6 +4758,20 @@ function qrRead(mod) {
          ['limit-lines', 'limit-clusters', 'limit-cluster-count', 'limit-dots', 'limit-signs'].every(id => M.vis[id] === 'none'));
       ok("limits (sandbox): the clicks are wired once (four layers, hand cursor and click)",
          M.handlers.filter(h => h[0] === 'click' && /^limit-/.test(h[1])).length === 4 && M.handlers.filter(h => h[0] === 'mouseenter').length === 4);
+      // 13 Oct 2026, seen in Chrome: the map never went 'idle' again after the limits arrived, so they were never drawn.
+      // With the style "not loaded" and an idle that never comes, the layers must still be added straight away.
+      const savedIsLoaded = map.isStyleLoaded; let idleArmed = 0;
+      const savedOnce = map.once; map.isStyleLoaded = () => false; map.once = (ev) => { if (ev === 'idle') idleArmed++; };
+      ['limit-lines', 'limit-clusters', 'limit-cluster-count', 'limit-dots', 'limit-signs'].forEach(id => { delete M.layers[id]; });
+      delete M.sources['limits-points']; delete M.sources['limits-lines'];
+      L.ensureLimitLayers(); L.ensureLimitLayers();
+      ok("⭐ limits (sandbox): the style 'not loaded' and no idle coming — the five layers and two sources are still added at once",
+         ['limit-lines', 'limit-clusters', 'limit-cluster-count', 'limit-dots', 'limit-signs'].every(id => M.layers[id])
+         && M.sources['limits-points'] && M.sources['limits-lines']);
+      ok("...and ONE idle wait is armed, not one per call", idleArmed === 1, String(idleArmed));
+      map.isStyleLoaded = savedIsLoaded; map.once = savedOnce;
+      ok("limits (source): the deferral tries the add at once and retries on a refusal",
+         code.includes("try { addLimitLayers(); } catch (e) { setTimeout(ensureLimitLayers, 500); }"));
       // an empty collection: the note, no boxes; a failed read: no group
       L.LIM.data = { type: 'FeatureCollection', features: [] }; L.renderLimitGroup();
       ok("⭐ limits (sandbox): nothing loaded yet: the group shows 'No lorry limits loaded for this area yet' instead of the boxes",

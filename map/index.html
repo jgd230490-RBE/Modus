@@ -5039,7 +5039,18 @@
     // the sources and layers, from the cached collection; called on load, on every tick of a box and on style.load
     function ensureLimitLayers() {
         if (!LIM.data) return;
-        if (!map.isStyleLoaded()) { map.once('idle', ensureLimitLayers); return; }
+        if (!map.isStyleLoaded()) {
+            // 13 Oct 2026, seen in Chrome on the local copy: the limits arrived after the map had gone busy and 'idle'
+            // never came again (map.loaded() stayed false with the style parsed and no source loading), so the layers
+            // were never drawn. Mapbox accepts a source and a layer once the style document is parsed, tiles or not:
+            // try now; keep one idle wait armed and retry shortly if Mapbox refuses.
+            if (!LIM.idleArmed) { LIM.idleArmed = true; map.once('idle', () => { LIM.idleArmed = false; ensureLimitLayers(); }); }
+            try { addLimitLayers(); } catch (e) { setTimeout(ensureLimitLayers, 500); }
+            return;
+        }
+        addLimitLayers();
+    }
+    function addLimitLayers() {
         const fs = LIM.data.features || [];
         fs.forEach(f => ensureLimitImage((f && f.properties) || {}));
         const on = limitBoxesOn();
