@@ -234,10 +234,14 @@ ok("hero video: an MP4 with faststart, under 5 MB", _hh[4:8] == b"ftyp"
 ok("hero video: its poster exists", 'poster="./media/hero-explainer.jpg"' in _hv
    and os.path.exists(os.path.join(ROOT, "landing", "media", "hero-explainer.jpg")))
 ok("🔴 the hero no longer shows a still", '<figure class="shot" id="hero-media">' not in src)
-_bgp = os.path.join(ROOT, "landing", "media", "hero-routes.jpg")
-ok("the hero band's background is the route network image, and it exists as a JPEG under 100 KB",
-   src.count('url("./media/hero-routes.jpg")') >= 1 and 'id="top" class="hero-band' in src
-   and os.path.exists(_bgp) and open(_bgp, "rb").read(3) == b"\xff\xd8\xff" and os.path.getsize(_bgp) < 100 * 1024)
+# NARROWED 13 Oct (third pass, the user): the routes-only image became a photograph (the haul road and the planning
+# office, generated in Canva, graded locally, the scheme's routes faint on top); hero-routes.jpg is deleted.
+_bgp = os.path.join(ROOT, "landing", "media", "hero-background.jpg")
+ok("the hero band's background is hero-background.jpg, a JPEG under 250 KB",
+   src.count('url("./media/hero-background.jpg")') >= 1 and 'id="top" class="hero-band' in src
+   and os.path.exists(_bgp) and open(_bgp, "rb").read(3) == b"\xff\xd8\xff" and os.path.getsize(_bgp) < 250 * 1024)
+ok("🔴 the routes-only background is gone", "hero-routes.jpg" not in src
+   and not os.path.exists(os.path.join(ROOT, "landing", "media", "hero-routes.jpg")))
 ok("the header floats over the hero band, outside <main>",
    '<header class="site-head' in src and src.find("<header") < src.find("<main") < src.find('id="top"'))
 # 11 Oct 2026 (the user): the map is the "public map" everywhere a person reads its name, landing page included.
