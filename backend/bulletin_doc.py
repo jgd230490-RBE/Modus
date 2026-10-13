@@ -776,7 +776,8 @@ h1{{font-size:26px;line-height:1.2;margin:8px 0 4px}}
 h2{{font-size:19px;margin:28px 0 8px;padding-top:12px;border-top:2px solid var(--ink)}}
 p,li,dd,td,th{{font-size:15px}}
 .muted{{color:var(--muted)}} .amber{{color:var(--amber)}}
-.notice{{display:inline-block;background:#FFF7ED;color:#9A3412;border:1px solid #FDBA74;border-radius:999px;padding:3px 12px;font-size:14px;font-weight:700}}
+.notice{{display:inline-block;background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;border-bottom-width:3px;border-radius:6px;padding:3px 12px;font-size:14px;font-weight:700}}
+.notice::before{{content:'DEMO';content:'DEMO' / '';display:inline-block;margin-right:8px;padding:0 6px;border-radius:3px;background:#B91C1C;color:#FFFFFF;letter-spacing:.08em}}
 .sub{{color:var(--muted);font-size:15px;margin:0}}
 .count{{background:#F5F5F4;border-left:3px solid var(--plan);padding:10px 14px;margin:14px 0;font-size:15px}}
 .figs{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}}

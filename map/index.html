@@ -113,7 +113,7 @@
            already did this), the bar, the panel and the map controls move down by 26 px, and the Guide
            button sits at the right end of the strip. */
         @media (min-width:1024px){
-            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; text-align:center; padding:5px 10px; height:26px; }
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:4px 10px 3px; height:26px; }
             body.has-demo-notice #kpi-hud{ top:26px; }
             body.has-demo-notice .sidebar{ top:26px; }
             body.has-demo-notice #menu-toggle{ top:40px; }
@@ -228,7 +228,7 @@
                14-141, notice 94-281). It becomes a full-width strip along the very top; the menu button,
                the Guide button and the bar's title move down by its height (body.has-demo-notice is set
                by the overlay code only when the tenant carries a notice, so a real tenant loses nothing). */
-            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; white-space:normal; text-align:center; font-size:14px; line-height:1.35; letter-spacing:.03em; padding:5px 12px; }   /* body-scoped: outranks the generic rule below. 12 Oct 2026: 14 px (the staff bar's floor; was 9.5), wrapping to two lines if needed */
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; white-space:normal; text-align:center; font-size:14px; line-height:1.35; letter-spacing:.03em; padding:5px 12px; }   /* body-scoped: outranks the generic rule below. 12 Oct 2026: 14 px (the staff bar's floor; was 9.5), wrapping to two lines if needed */
             body.has-demo-notice #menu-toggle{ top:40px; }
             body.has-demo-notice #kpi-hud, body.has-demo-notice.sidebar-closed #kpi-hud{ padding-top:84px; }
             #guide-btn{ left:auto !important; right:12px; top:9px; }
@@ -685,7 +685,9 @@
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
   .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 Inter,system-ui,sans-serif}
   .guide-tip b{color:#fff;font-weight:600}
-            #demo-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:30;background:#1F2024;color:#FBBF24;border:1px solid #D97706;border-radius:999px;padding:4px 12px;font:700 10.5px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;}
+            #demo-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:30;background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;border-radius:999px;padding:4px 12px;font:700 10.5px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;}
+            /* 13 Oct 2026 (D45, Option A): light grey, red caps, a red rule and a red DEMO tag, as the app's demo bar */
+            #demo-notice::before{content:"DEMO";content:"DEMO" / "";display:inline-block;margin-right:8px;padding:0 6px;border-radius:3px;background:#B91C1C;color:#FFFFFF;letter-spacing:.08em;}
 </style>
 </head>
 <body>

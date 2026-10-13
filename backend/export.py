@@ -67,6 +67,12 @@ NAVY_RGB = (0x1F / 255, 0x20 / 255, 0x24 / 255)
 RED_RGB = (0xDC / 255, 0x26 / 255, 0x26 / 255)
 BLUE_RGB = (0x25 / 255, 0x63 / 255, 0xEB / 255)
 GREY = (0x64 / 255, 0x74 / 255, 0x8B / 255)
+# 13 Oct 2026 (D45, Option A): the demo notice as the app's demo bar: light grey band, red text, a red rule and a
+# red DEMO tag with white text (5.91:1 and 6.47:1). The same on every PDF and in the XLSX.
+DEMO_BG_RGB = (0xF1 / 255, 0xF5 / 255, 0xF9 / 255)
+DEMO_FG_RGB = (0xB9 / 255, 0x1C / 255, 0x1C / 255)
+DEMO_RULE_RGB = (0xDC / 255, 0x26 / 255, 0x26 / 255)
+DEMO_FG_HEX, DEMO_BG_HEX = "B91C1C", "F1F5F9"
 BAND = (0xEF / 255, 0xF6 / 255, 0xFF / 255)
 
 
@@ -358,7 +364,10 @@ def build_xlsx(page):
     ] + [("Note", f) for f in footer_lines()]
     for i, (k, v) in enumerate(about, 1):
         ws4.cell(row=i, column=1, value=k).font = Font(bold=True)
-        ws4.cell(row=i, column=2, value=v)
+        cv = ws4.cell(row=i, column=2, value=v)
+        if k == "Notice" and v:   # 13 Oct 2026 (D45): the demo bar's colours
+            cv.font = Font(bold=True, color=DEMO_FG_HEX)
+            cv.fill = PatternFill("solid", fgColor=DEMO_BG_HEX)
     ws4.column_dimensions["A"].width = 16
     ws4.column_dimensions["B"].width = 100
     buf = io.BytesIO()
@@ -510,7 +519,9 @@ def page_frame(W, H, lm, rm, title, *, rule_y, title_font, title_y, right=None, 
         right     (text, font, size, rgb) right-aligned on the title's baseline: the stamp
         sub       (text, font, size, rgb, y) the sub-line under the title
         notice    (text, font, size, rgb, y) the tenant's demo notice — on EVERY page, so no
-                  sheet that leaves the stand is unlabelled
+                  sheet that leaves the stand is unlabelled. 13 Oct 2026 (D45): drawn as the app's demo
+                  bar, a light grey band across the page with a red DEMO tag, red text and a red rule
+                  under it; rgb is ignored (the bar's colours are fixed)
         foot      (left text or None, font or None, size, rgb) at the foot; font None keeps the
                   sub-line's font for the page number (the week sheet's order)
         page N    right-aligned at the foot, always
@@ -537,8 +548,17 @@ def page_frame(W, H, lm, rm, title, *, rule_y, title_font, title_y, right=None, 
             c.drawString(lm, y, text)
         if notice:
             text, font, size, rgb, y = notice
-            c.setFont(font, size); c.setFillColorRGB(*rgb)
-            c.drawString(lm, y, text)
+            c.setFillColorRGB(*DEMO_BG_RGB)
+            c.rect(lm, y - 3, W - lm - rm, size + 4, stroke=0, fill=1)
+            c.setStrokeColorRGB(*DEMO_RULE_RGB); c.setLineWidth(1.5)
+            c.line(lm, y - 3, W - rm, y - 3)
+            tag_w = c.stringWidth("DEMO", font, size) + 6
+            c.setFillColorRGB(*DEMO_FG_RGB)
+            c.rect(lm + 4, y - 1.5, tag_w, size + 1.5, stroke=0, fill=1)
+            c.setFont(font, size); c.setFillColorRGB(1, 1, 1)
+            c.drawString(lm + 7, y, "DEMO")
+            c.setFillColorRGB(*DEMO_FG_RGB)
+            c.drawString(lm + 4 + tag_w + 6, y, text)
         if foot:
             left, font, size, rgb = foot
             if font:
@@ -613,7 +633,7 @@ def build_pdf(page):
     buf = io.BytesIO()
     W, H = landscape(A4)
     lm = rm = 10 * mm
-    top, bottom = 20 * mm, 12 * mm
+    top, bottom = (25 if _demo_notice() else 20) * mm, 12 * mm   # 13 Oct 2026 (D45): room for the demo bar
     usable = W - lm - rm
     lines = page.get("commit", {}).get("lines", [])
     confirmed_all = bool(lines) and all(((l.get("week") or {}).get("status") == "confirmed") for l in lines)
@@ -626,7 +646,9 @@ def build_pdf(page):
                          right=("CONFIRMED" if confirmed_all else "DRAFT — not confirmed", "Helvetica-Bold", 9,
                                 NAVY_RGB if confirmed_all else RED_RGB),
                          sub=("Commitment sheet · not a delivery note · planning payloads, not plated · Mon–Fri only",
-                              "Helvetica", 7.5, GREY, H - 18 * mm))
+                              "Helvetica", 7.5, GREY, H - 18 * mm),
+                         notice=((_pdf_safe(_demo_notice()), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 22.5 * mm)
+                                 if _demo_notice() else None))
     doc = frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page)
 
     st = ParagraphStyle("b", fontName="Helvetica", fontSize=7.5, leading=9)
@@ -774,7 +796,7 @@ def build_pdf(page):
             stamp = l["week"]["confirmed_at"]
     ft = [P(E(f), st_grey) for f in footer_lines()]
     if _demo_notice():                       # H2: the demo label is on the PDF too
-        ft.insert(0, P("<b>" + E(_demo_notice()) + "</b>", st_grey))
+        ft.insert(0, P(f'<font color="#{DEMO_FG_HEX}"><b>' + E(_demo_notice()) + "</b></font>", st_grey))
     ft.append(P(E(_fuel_line(page)), st_grey))
     ft.append(P((f"Confirmed {stamp}. " if stamp else "Not yet confirmed. ") + "Re-open the week in Look-ahead to change the plan.", st_grey))
     story.append(KeepTogether(ft))
@@ -814,7 +836,7 @@ def build_carbon_pdf(sc, commentary=None, generated=None):
     on_page = page_frame(W, H, lm, rm, _pdf_safe(title), rule_y=H - 9 * mm, title_font=("Helvetica-Bold", 13),
                          title_y=H - 15 * mm, right=(f"Generated {when}", "Helvetica", 8, GREY),
                          sub=(stamp, "Helvetica-Bold", 9, RED_RGB, H - 20.5 * mm),
-                         notice=((_pdf_safe(notice), "Helvetica-Bold", 8.5, NAVY_RGB, H - 25 * mm) if notice else None),
+                         notice=((_pdf_safe(notice), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 25 * mm) if notice else None),
                          foot=(stamp, "Helvetica", 7, GREY))
     doc = frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page)
     st = ParagraphStyle("b", fontName="Helvetica", fontSize=8.5, leading=10.5)
@@ -943,7 +965,7 @@ def build_carbon_pdf(sc, commentary=None, generated=None):
           P(f"Computed on request from the {E((sc.get('status') or 'Approved').lower())} forecast; nothing is stored. The "
             "commentary is printed as typed and is not saved. Each factor's source, year and status is on the Carbon page.", st_grey)]
     if notice:
-        ft.insert(0, P("<b>" + E(notice) + "</b>", st_grey))
+        ft.insert(0, P(f'<font color="#{DEMO_FG_HEX}"><b>' + E(notice) + "</b></font>", st_grey))
     story.append(KeepTogether(ft))
     doc.build(story)
     return buf.getvalue()
@@ -1314,7 +1336,7 @@ def build_bulletin_pdf(S):
                          title_y=H - 15 * mm, right=(_pdf_safe(S["as_at"]), "Helvetica-Bold", 8.5, NAVY_RGB),
                          sub=(_pdf_safe(f"{S['tenant']} · monthly bulletin · counts are two-way movements"),
                               "Helvetica", 8, GREY, H - 20.5 * mm),
-                         notice=((_pdf_safe(notice), "Helvetica-Bold", 8.5, NAVY_RGB, H - 25 * mm) if notice else None),
+                         notice=((_pdf_safe(notice), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 25 * mm) if notice else None),
                          foot=(_pdf_safe(S["foot"]), "Helvetica", 7, GREY))
     doc = frame_doc(buf, W, H, lm, rm, top, bottom, _pdf_safe(f"{S['title']} · {S['tenant']}"), on_page)
 

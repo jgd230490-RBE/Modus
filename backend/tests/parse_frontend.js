@@ -1713,12 +1713,14 @@ ok("...and it collapses with the rail like every other item (label behind railOp
       !/document\./.test(barFn) && !/document\.body|querySelector/.test(appCode));
     // NARROWED 11 Oct 2026 (review): the notice is 14 px (the floor), not 13 px (the hint allowance): a required
     // notice is not a hint
-    ok("the bar is CSS classes in <style>: 26 px, ink with amber text from tokens, centred, uppercase, letter-spaced, an ellipsis, the Guide at the right end, 14 px text",
-      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:1px solid var\(--demo-rule\);font:700 14px\/1 Inter,system-ui,sans-serif;letter-spacing:\.06em;/.test(html)
+    // NARROWED 13 Oct 2026 (D45, Option A chosen by the user): light grey with red text and a 3 px red rule, was ink
+    // with amber text and a 1 px amber rule; the token values are pinned in the 13 Oct block at the end of this file
+    ok("the bar is CSS classes in <style>: 26 px, light grey with red text from tokens, centred, uppercase, letter-spaced, an ellipsis, the Guide at the right end, 14 px text",
+      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:3px solid var\(--demo-rule\);font:700 14px\/1 Inter,system-ui,sans-serif;letter-spacing:\.06em;/.test(html)
       && !/\.demo-bar[^{]*\{[^}]*font:[^;]*\b1[0-3](?:\.\d+)?px/.test(html)
       && /\.demo-bar-text\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;\}/.test(html)
       && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;[^}]*font:600 14px\/21px /.test(html) && /\.demo-bar\.has-guide\{padding:0 84px;\}/.test(html)
-      && /--demo-bg:#1F2024; --demo-fg:#FBBF24; --demo-rule:#D97706;/.test(html));
+      && /--demo-bg:#F1F5F9; --demo-fg:#B91C1C; --demo-rule:#DC2626;/.test(html));
     // REVERSED 11 Oct 2026 (review): on a phone the text no longer truncates. With the Guide beside it, 375 px cut the
     // notice to "FICTIONAL DEMO SCHEME · NOTHING H…" on every Portal page; below 640 px it now wraps whole (the map's
     // own phone strip wrapped too), the bar grows from its 26 px, and the Guide keeps its slot, vertically centred.
@@ -2161,6 +2163,49 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     // longer promises two; the PDF is two pages or more (test_bulletin: "at least two A4 pages")
     bmc.includes("The month's lorry movements as a PDF and a web page, from the approved plan") && !bmc.includes("two-page PDF")
     && !/\btrucks?\b|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(bmc) && !/\bAI\b/.test(bmc));
+}
+
+// ---- 13 Oct 2026: D45 — the demo bar, Option A (the user's pick from the dev brief) and W1, no map over Estonia ----
+{
+
+  const _lum = (hex) => { const v = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+  const _cr = (a, b) => { const x = _lum(a), y = _lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const root = (html.match(/:root\{([\s\S]*?)\n  \}/) || ["", ""])[1];
+  const tok = (n) => ((root.match(new RegExp("--" + n + ":(#[0-9A-Fa-f]{6})")) || [])[1] || "");
+  const darkBlock = (html.match(/html\[data-theme="dark"\]\{([\s\S]*?)\n  \}/) || ["", ""])[1];
+  ok("⭐ D45: the demo bar's tokens are Option A — light grey #F1F5F9, red #B91C1C text, a #DC2626 rule, a red tag with white text",
+     tok("demo-bg") === "#F1F5F9" && tok("demo-fg") === "#B91C1C" && tok("demo-rule") === "#DC2626"
+     && tok("demo-tag-bg") === "#B91C1C" && tok("demo-tag-fg") === "#FFFFFF" && tok("demo-btn-ring") === "#94A3B8",
+     [tok("demo-bg"), tok("demo-fg"), tok("demo-rule"), tok("demo-tag-bg")].join(" "));
+  ok("🔴 D45 (REVERSED from 11 Oct): no ink-and-amber demo bar is left (no #FBBF24 / #FEF3C7 on a --demo token)",
+     !/--demo-[a-z-]+:#(?:FBBF24|FEF3C7)/i.test(html));
+  ok("🔴 D45: contrast — the red text on the grey and the white tag text pass 4.5:1, the rule 3:1, the Guide text 4.5:1",
+     _cr(tok("demo-fg"), tok("demo-bg")) >= 4.5 && _cr(tok("demo-tag-fg"), tok("demo-tag-bg")) >= 4.5
+     && _cr(tok("demo-rule"), tok("demo-bg")) >= 3 && _cr(tok("demo-btn-fg"), tok("demo-btn-bg")) >= 4.5,
+     [_cr(tok("demo-fg"), tok("demo-bg")).toFixed(2), _cr(tok("demo-tag-fg"), tok("demo-tag-bg")).toFixed(2)].join(" "));
+  ok("D45: the same bar in every look — the dark block redefines no --demo token, so the light bar stands out on the dark page",
+     darkBlock.length > 100 && !/--demo-/.test(darkBlock));
+  ok("D45: a red DEMO tag before the words, CSS only (the markup the other harnesses pin is unchanged), hidden from screen readers (alt text \"\")",
+     /\.demo-bar::before\{content:"DEMO";content:"DEMO" \/ "";flex:none;margin-right:8px;padding:0 6px;border-radius:3px;background:var\(--demo-tag-bg\);color:var\(--demo-tag-fg\);/.test(html));
+  ok("D45: the white Guide pill keeps an edge on the light bar (an inset grey ring, no layout change)",
+     /\.demo-bar-guide\{[^}]*background:var\(--demo-btn-bg\);box-shadow:inset 0 0 0 1px var\(--demo-btn-ring\);/.test(html));
+  // W1
+  const ukm = html.match(/\nconst UK_VIEW = \{ center: \[(-?[\d.]+), (-?[\d.]+)\], zoom: (\d+(?:\.\d+)?) \};\n/);
+  ok("⭐ W1: one UK_VIEW, inside Great Britain (lon -8..2, lat 50..59), declared at the top level",
+     !!ukm && +ukm[1] > -8 && +ukm[1] < 2 && +ukm[2] > 50 && +ukm[2] < 59);
+  ok("🔴 W1: no map opens on the old [24.7, 58.5] default, and the location form's placeholders are not 58.5 / 24.7",
+     !/24\.7,\s*58\.5/.test(html) && !/placeholder="(?:58\.5|24\.7)"/.test(html)
+     && /placeholder="52\.6"/.test(html) && /placeholder="-1\.5"/.test(html));
+  ok("W1: both maps the app creates open on UK_VIEW (the Look-ahead map and the Routes / Zones map)",
+     (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 2
+     && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 2);
+  const locFetch = (html.match(/fetch\(`\$\{API\}\/locations\/geojson`\)\.then\(r => r\.json\(\)\)\.then\(gj => \{([\s\S]*?)\n    \}\)\.catch/) || ["", ""])[1];
+  ok("⭐ W1: the Routes / Zones map frames the scheme's locations the FIRST time they load, once (a ref), finite points only, inside a try",
+     /const framedRef = useRef\(false\);/.test(html) && /if\(!framedRef\.current\)\{/.test(locFetch)
+     && /\.filter\(c => Array\.isArray\(c\) && isFinite\(c\[0\]\) && isFinite\(c\[1\]\)\)/.test(locFetch)
+     && /if\(pts\.length\)\{ framedRef\.current = true; try \{ m\.fitBounds\(boundsOf\(pts\), \{ padding: 60, maxZoom: 12, duration: 0 \}\); \} catch\(e\)\{\} \}/.test(locFetch)
+     && (html.match(/framedRef\.current = true/g) || []).length === 1);
 }
 
 // ---- report ------------------------------------------------------------------
