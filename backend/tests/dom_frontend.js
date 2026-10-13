@@ -325,6 +325,73 @@ async function carbonTargetDom(){
 // row's chip saying "Queue likely"; picking another month re-reads with that month and nothing else
 // (every call a GET: the panel writes nothing); an empty month shows the empty state. The fixture is
 // the one test_gate_arrivals.py writes (the planner's month 9). Not covered: a browser, the live server.
+// ---- 13 Oct 2026 (W3): the info box in a real DOM ------------------------------------------------------
+// Click opens it, a second click or Esc closes it and focus returns to the "i"; one open at a time; a
+// mousedown outside closes it; its click never reaches a clickable parent (a sortable <th>); the value line
+// carries the exact figure the old hover tooltip showed; below 640 px it is a bottom sheet. jsdom has no
+// layout, so the flip-above rule and the 44 px touch area are pinned at source level (parse_frontend) and
+// checked in a browser. react-dom/client has no createPortal here, so the panel renders in place.
+async function infoTipDom(){
+  const h = w.React.createElement;
+  const tick = () => act(async () => { await new Promise(r => setTimeout(r, 30)); });
+  const box = w.document.createElement("div"); w.document.body.appendChild(box);
+  const outside = w.document.createElement("button"); outside.textContent = "elsewhere"; w.document.body.appendChild(outside);
+  let sorted = 0;
+  const root = w.ReactDOM.createRoot(box);
+  act(() => { root.render(h("table", null, h("thead", null, h("tr", null,
+    h("th", { onClick: () => { sorted++; } }, "Tonnes", h(w.InfoTip, { id: "dash.material", value: "Exactly 796 000 t" })),
+    h("th", null, "Carbon", h(w.InfoTip, { id: "dash.carbon", value: ["Exactly 1 544.1 t CO₂e", ""] })))))); });
+  const [bA, bB] = [...box.querySelectorAll("button.ibtn")];
+  ok("INFO BOX: two closed 'i' buttons, named 'About: …', nothing open yet",
+     !!bA && !!bB && bA.getAttribute("type") === "button" && bA.getAttribute("aria-label") === "About: Material in view"
+     && bA.getAttribute("aria-expanded") === "false" && !w.document.querySelector(".info-pop"));
+  click(bA); await tick();
+  const pop = w.document.querySelector(".info-pop");
+  ok("INFO BOX: a click opens it: a non-modal dialog labelled by its title, aria-expanded true, aria-controls pointing at it",
+     !!pop && pop.getAttribute("role") === "dialog" && pop.getAttribute("aria-modal") === "false"
+     && w.document.getElementById(pop.getAttribute("aria-labelledby")).textContent === "Material in view"
+     && bA.getAttribute("aria-expanded") === "true" && bA.getAttribute("aria-controls") === pop.id);
+  ok("INFO BOX: ...it carries the plain text, the exact figure (the old tooltip's), and both guide links",
+     pop.textContent.includes("The planned quantity of every forecast month in view") && pop.querySelector(".info-val").textContent === "Exactly 796 000 t"
+     && pop.querySelector('a[href="/help/#3-1-filters-and-the-six-cards"]') && pop.querySelector('a[href="/help/technical/#t1-volume"]'));
+  ok("INFO BOX: ...focus moves into it, and the click did not sort the column under it", w.document.activeElement === pop && sorted === 0, `sorted ${sorted}`);
+  act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  ok("INFO BOX: Esc closes it and gives focus back to the 'i'",
+     !w.document.querySelector(".info-pop") && bA.getAttribute("aria-expanded") === "false" && w.document.activeElement === bA);
+  click(bA); await tick(); click(bB); await tick();
+  const pops = [...w.document.querySelectorAll(".info-pop")];
+  ok("INFO BOX: one open at a time: opening the second closes the first",
+     pops.length === 1 && pops[0].textContent.includes("Transport carbon") && bA.getAttribute("aria-expanded") === "false" && bB.getAttribute("aria-expanded") === "true"
+     && pops[0].querySelectorAll(".info-val").length === 1 && pops[0].textContent.includes("Source: DESNZ greenhouse gas conversion factors, 2026")
+     && pops[0].textContent.includes("How it is worked out"));
+  act(() => { outside.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true })); });
+  ok("INFO BOX: a mousedown anywhere else closes it", !w.document.querySelector(".info-pop") && bB.getAttribute("aria-expanded") === "false");
+  click(bB); await tick(); click(bB); await tick();
+  ok("INFO BOX: a second click on the same 'i' closes it", !w.document.querySelector(".info-pop"));
+  const mm = w.matchMedia;
+  w.matchMedia = (q) => ({ matches: q === "(max-width: 639px)", media: q, addListener(){}, removeListener(){}, addEventListener(){}, removeEventListener(){} });
+  click(bA); await tick();
+  ok("INFO BOX: below 640 px it opens as a bottom sheet (is-sheet, no coordinates of its own)",
+     !!w.document.querySelector(".info-pop.is-sheet") && !w.document.querySelector(".info-pop").style.top);
+  w.matchMedia = mm;
+  act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  act(() => { root.unmount(); }); box.remove(); outside.remove();
+
+  // the carbon target strip: the transport part that used to be a hover title is in the info box
+  const CTX = FIX("carbon_target.json");
+  const box2 = w.document.createElement("div"); w.document.body.appendChild(box2);
+  const root2 = w.ReactDOM.createRoot(box2);
+  act(() => { root2.render(h(w.CarbonTargetStrip, { ct: CTX, err: false, onOpen(){} })); });
+  const bt = box2.querySelector('button[aria-label="About: Transport in this target"]');
+  if (bt) { click(bt); await tick(); }
+  const p2 = w.document.querySelector(".info-pop");
+  ok("INFO BOX: the carbon target's transport part (once a hover title) opens in its info box with the figure",
+     !!bt && !!p2 && /Transport is \d[\d ]*\.\d tCO2e of the approved plan as forecast/.test(p2.textContent)
+     && !box2.querySelector(".ct-note[title]"), p2 ? p2.textContent.slice(0, 160) : "no panel");
+  act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  act(() => { root2.unmount(); }); box2.remove();
+}
+
 async function gateArrivalsDom(){
   const GA = FIX("gate_arrivals.json"), CTX = FIX("carbon_target.json"), CL = FIX("cost_lines.json");
   const calls = [];
@@ -699,6 +766,8 @@ async function configEstonianColumn(){
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
   try { await gateArrivalsDom(); ok("GATE DOM: the section ran to the end", true); }
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await infoTipDom(); ok("INFO BOX: the section ran to the end", true); }
+  catch (e) { ok("INFO BOX: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

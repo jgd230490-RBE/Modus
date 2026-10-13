@@ -325,8 +325,9 @@ if (loaded) {
                     factors: { ...meta.factors, material_density_t_per_m3: { "Small aggregate": 1.6 }, vehicle_payload_t: { "Rigid 8-wheeler (32t)": 20 } } };
     const dOut = render("the Dashboard renders POPULATED from the cost lines (initialData)", h(Dashboard, { meta: dMeta, initialData: cl }));
     ok("...with the three KPI groups — Volume, Cost, Carbon — and the coverage line",
-      dOut.includes(">Volume<") && dOut.includes(">Cost<") && dOut.includes(">Carbon<") && dOut.includes("line-months on a baked route")
-      && dOut.includes("exclude the " + (cl.totals.lines - cl.totals.baked_lines) + " unbaked"));
+      // 13 Oct 2026 (W3, narrowed): the coverage line in plain words
+      dOut.includes(">Volume<") && dOut.includes(">Cost<") && dOut.includes(">Carbon<") && dOut.includes("forecast months have a route")
+      && dOut.includes("leave out the " + (cl.totals.lines - cl.totals.baked_lines) + " not routed yet"));
     // the default view is Approved only, so the KPIs are sums over the Approved rows of the fixture
     const appr = cl.lines.filter(l => l.status === "Approved");
     const sumTrips = appr.reduce((a, l) => a + l.trips, 0);
@@ -337,18 +338,20 @@ if (loaded) {
       && dOut.includes("€ " + fairPerT.toFixed(2)));
     ok("...the diesel index is in the header, and IPT / discipline filters exist",
       dOut.includes("€" + (+cl.costing.index_eur_per_l).toFixed(3) + "/L") && dOut.includes("All Teams") && dOut.includes("All disciplines"));
-    ok("...the route table prints planned € with a 'target' chip, fair € and fair €/t, and 'not baked' on the unbaked route",
-      dOut.includes(">target<") && dOut.includes("Fair € (model)") && dOut.includes("not baked") && dOut.includes("Cost over time"));
+    // 13 Oct 2026 (W3, narrowed): "not baked" reads "not routed"
+    ok("...the route table prints planned € with a 'target' chip, fair € and fair €/t, and 'not routed' on the unbaked route",
+      dOut.includes(">target<") && dOut.includes("Fair € (model)") && dOut.includes(">not routed<") && !dOut.includes("not baked") && dOut.includes("Cost over time"));
     ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(dOut));
     // 11 Sep pm: the four groups, the Delivered figures from the fixture's reported line, every Fig with a title
     ok("...the Delivered-to-date group prints the server's actual tonnes and % of plan (a reported line is in the fixture)",
       dOut.includes(">Delivered to date<") && cl.totals.actual_tonnes != null
       && dOut.includes(">" + cl.totals.actual_tonnes.toLocaleString("en-US").replace(/,/g, " ") + "<")
-      && dOut.includes("tonnes moved") && dOut.includes("line-months reported"));
+      && dOut.includes("tonnes moved") && dOut.includes("forecast months reported"));     // 13 Oct 2026 (W3, narrowed): was "line-months" 
     ok("...every KPI value sits in a nowrap clamp()-sized div, none truncated",
       (dOut.match(/font-size:clamp\(1\.1rem/g) || []).length >= 16 && !/kpi-num[^"]*truncate/.test(dOut));
-    ok("...every KPI cell has a title attribute (hover)",
-      (dOut.match(/<div title="[^"]+" class="min-w-0 cursor-help">/g) || []).length >= 16);
+    // 13 Oct 2026 (W3, narrowed): the hover title became an info box button; no cursor:help is left
+    ok("...every KPI cell has an info box (was: a title attribute on hover)",
+      (dOut.match(/<div class="min-w-0"><div class="kpi-num[\s\S]*?class="ibtn" aria-label="About: [^"]+"/g) || []).length >= 16 && !dOut.includes("cursor-help"));
     ok("...the Today strip renders its loading state without the week, and the stock chart card is there (no stock table)",
       dOut.includes("Loading this week") && dOut.includes("Stockpile capacity") && !dOut.includes("Stock held") && dOut.includes("Big screen"));
     // 12 Oct 2026 (C4): the Monthly bulletin menu renders on the working view, closed, with the month and the two actions
@@ -396,7 +399,8 @@ if (loaded) {
     }
     // Approved-only default: the Pending IPT2 line is not in the default view
     ok("...the default view is Approved only (the Pending line is filtered out; the status select says so)",
-      dOut.includes("approved only") && !dOut.includes(">R4<"));
+      // 13 Oct 2026 (W3, narrowed): the scope is said once, in the kicker ("· approved"); the subtitle that repeated it is gone
+      dOut.includes(" · approved<") && !dOut.includes("approved only") && !dOut.includes(">R4<"));
     const rowsFix = cl.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
       quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: null,
       vehicle_type: l.vehicle_type, submitted_by: "tester", reject_reason: null }));
@@ -430,7 +434,8 @@ if (loaded) {
     ok("...and says 'type a quantity to see the price' with fair — and 'rate not set'", mNone.includes("type a quantity to see the price") && mNone.includes("rate not set"));
     const mUnb = render("the matrix renders an UNBAKED preview", h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner,
       initialCost: { ...pv, baked: false, fair_reason: "not baked", cells: [], totals: { ...pv.totals, fair: { eur: null, per_t: null, per_trip: null, per_km: null } } } }));
-    ok("...which says why there is no fair price and where to fix it", mUnb.includes("not baked for") && mUnb.includes("bake it on the Routes page"));
+    // 13 Oct 2026 (W3, narrowed): plain words
+    ok("...which says why there is no fair price and where to fix it", mUnb.includes("not routed for") && mUnb.includes("route it on Data → Routes"));
   }
 
   // ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast, from the fixtures
@@ -478,7 +483,8 @@ if (loaded) {
     ok("...the strip offers the Carbon planner with a target set too (it only did with none)", dSet.includes(">Open the Carbon planner</button>"));
     ok("...says once that it is all-in beside the transport-only card, with the transport part (14.1) on hover; who set it, with no date for a scrubbed one",
       dSet.includes("All-in: making the material, transport and waste disposal, on the whole approved plan. The Transport carbon card above counts transport only.")
-      && dSet.includes('title="Transport is 14.1 tCO2e of the approved plan as forecast: the Transport carbon card&#x27;s figure with no filters."')
+      // 13 Oct 2026 (W3, narrowed): the transport part is in an info box, not on hover (dom_frontend opens it and reads 14.1)
+      && dSet.includes('aria-label="About: Transport in this target"') && !dSet.includes('title="Transport is 14.1')
       && dSet.includes(">Set by Sam (planner)<"));
     ok("...the 2 agreed decisions, collapsed, in the server's words",
       dSet.includes("<summary>The 2 agreed decisions</summary>") && dSet.includes("<li>Recycled content 30% — Small aggregate</li>"));
@@ -525,7 +531,7 @@ if (loaded) {
       const red = GA.gates.filter(g => g.flag === "red"), untyped = GA.gates.filter(g => g.gate_minutes == null);
       ok("⭐ GATE ARRIVALS: three gates, one red, one untyped, one holding, each a row with its data attribute",
         GA.gates.length === 3 && red.length === 1 && untyped.length === 1 && GA.gates.every(g => gP.includes(`data-ga-gate="${g.gate_id}"`) && gP.includes(`data-ga-flag="${g.flag || "none"}"`))
-        && gOut.includes('data-gate-arrivals="set"') && gP.includes(">Gate arrivals</h3>"));
+        && gOut.includes('data-gate-arrivals="set"') && gP.includes('>Gate arrivals<button type="button" class="ibtn" aria-label="About: Gate arrivals"'));   // 13 Oct 2026 (W3, narrowed): + its info box
       ok("🔴 the red gate reads 'Queue likely' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
         (gP.match(/>Queue likely</g) || []).length === 1 && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
         && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gP.match(/background:var\(--red\)/g) || []).length === 1);
@@ -579,8 +585,9 @@ if (loaded) {
       ok("a field outside the contract is ignored: the same two note rows, nothing of it on the page",
         (gaSeg(uOut).match(/<tr class="ga-notes">/g) || []).length === 2 && !gaSeg(uOut).includes("not baked yet") && !gP.includes("unbaked"));
       ok("🔴 without initialGates the panel renders nothing (the Dashboard's other render tests keep their shape); the footnote still names the read",
-        !dSet.includes("data-gate-arrivals") && !dSet.includes(">Gate arrivals</h3>") && !dNone.includes("data-gate-arrivals") && !dNone.includes("ga-table")
-        && dSet.includes("Gate arrivals come from <code>/api/gates/arrivals</code>"));
+        // 13 Oct 2026 (W3, narrowed): the footnote no longer names the read (the technical guide does; parse_frontend pins it)
+        !dSet.includes("data-gate-arrivals") && !dSet.includes("About: Gate arrivals") && !dNone.includes("data-gate-arrivals") && !dNone.includes("ga-table")
+        && !dSet.includes("<code>/api/gates/arrivals</code>") && dSet.includes("technical guide</a>"));
     }
     // R2: a cap 2.0 tCO2e over (approved 7 361.1, with the decisions 7 002.8, cap 7 000.8) reads OVER on the Dashboard, as on the
     // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
@@ -738,8 +745,9 @@ if (loaded) {
       && acctOut.includes(">held<") && acctOut.includes("applied · ") && acctOut.includes(">waiting<"));
     ok("...the confirmed cost box is rendered next to the actual",
       acctOut.includes("The confirmed cost of this week"));
-    ok("...and the footer states the not-reported rule",
-      acctOut.includes("Empty actual is not zero"));
+    // 13 Oct 2026 (W3, narrowed): the footer's rule is in the Variance header's info box (dom_frontend opens it)
+    ok("...and the Variance header carries the not-reported rule's info box",
+      acctOut.includes('aria-label="About: Variance"') && !acctOut.includes("Empty actual is not zero"));
 
     const hzOut = render("the Horizon view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "horizon" }));
@@ -748,7 +756,7 @@ if (loaded) {
       && !hzOut.includes(">Confirm week<"));
     ok("...and NO stockpile grid under it any more (10 Sep)", !hzOut.includes("max · opening") && !hzOut.includes("Type what came out"));
     ok("...the Account view carries the account week's stockpiles with one 'out' box each",
-      acctOut.includes("Stockpiles · ") && acctOut.includes("Type what came out of each stockpile")
+      acctOut.includes("Stockpiles · ") && acctOut.includes('aria-label="About: Stockpiles"')   // 13 Oct 2026 (W3, narrowed): the how-to is in the info box
       && (acctOut.match(/placeholder="out —"/g) || []).length === fixture.account.stock.length && fixture.account.stock.length >= 1);
     ok("...and says the fixture's stockpile is OVER, with the same figure the server sent",
       acctOut.includes("OVER by " + Math.round(-fixture.account.stock[0].remaining).toLocaleString("en-US").replace(/,/g, " ")));
@@ -796,7 +804,7 @@ if (loaded) {
       const nFair = fuelFix.account.rows.filter(r => r.planned_fair_eur != null).length;
       ok("...the Account view has a 'Fair € (model)' column with a figure on every baked row and — on the unbaked one",
         fAcct.includes("Fair € <span") && nFair >= 1
-        && (fAcct.match(/title="No fair price: the route is not baked/g) || []).length === fuelFix.account.rows.length - nFair);
+        && (fAcct.match(/title="No fair price: the route is not routed yet/g) || []).length === fuelFix.account.rows.length - nFair);   // 13 Oct 2026 (W3, narrowed): plain words
       ok("...the KPI caption on Commit carries the fair total and how many lines it covers",
         fuelFix.commit.totals.fair_eur != null && fOut.includes(`(model, ${fuelFix.commit.totals.fair_lines} of ${fuelFix.commit.totals.lines})`));
       const fileDoc = { fair_price: { driver_eur_per_h: 20, vehicle_standing_eur_per_h: 16, running_eur_per_km: 0.12, margin_pct: 8,

@@ -649,14 +649,18 @@ ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons rea
 ok("APPEARANCE: the map's dark basemap and the exports are untouched — the exports keep the print palette (export.py has no theme code)",
    "data-theme" not in read("backend/export.py") and '["Dark", "mapbox://styles/mapbox/dark-v11"]' in fe)
 ok("🔴 the Dashboard status line reads the tenant's unit word and dates the index 'published' / 'typed', never 'bulletin'",
-   "· {DU()}, CO₂e and fair {CUR()} exclude the" in fe and "· km, CO₂e and fair" not in fe
+   # 13 Oct 2026 (W3, narrowed): the same line in plain words ("leave out", not "exclude … unbaked")
+   "· {DU()}, CO₂e and fair {CUR()} leave out the" in fe and "· km, CO₂e and fair" not in fe
    and '(${cost.index_source === "manual" ? "typed" : "published"} ${longDate(' in fe and "(bulletin ${" not in fe)
 ok("🔴 the Config fuel widget dates the index 'published' / 'typed' like the compact card — no 'bulletin' word on a DESNZ screen",
    "`bulletin ${fuelDate(" not in fe and fe.count('? "published" : "typed"') >= 2)
 ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the currency symbol",
    "{CUR()}/{DU()} on hover" in fe and "{CUR()}/km on hover" not in fe
-   and "{DU()}, cycle and vehicles from the baked HERE route" in fe
-   and "Fair {CUR()} = the cost model on Config" in fe and "Fair ${CUR()} = the cost model on Config" not in fe
+   # 13 Oct 2026 (W3, narrowed): the Dashboard's model note left the screen for the technical guide; its info
+   # boxes name both units ("per mile or km") and the tenant's own word stays in every figure's label
+   and "{DU()}, cycle and vehicles from the baked HERE route" not in fe and "Fair {CUR()} = the cost model on Config" not in fe
+   and "Fair ${CUR()} = the cost model on Config" not in fe and "a running cost per mile or km" in fe
+   and "lorry-km      = trips × the routed (baked) route distance" in read("frontend/help/technical/index.html")
    and "+ {DU()} × running" in fe and "+ km × running" not in fe)
 ok("🔴 the route form's rate help names no country and reads the tenant's unit",
    "usual Estonian quote" not in fe and "per-{DU()} rate is a common haulage quote" in fe)

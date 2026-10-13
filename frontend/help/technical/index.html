@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Wayscope — Technical guide</title>
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1F2024">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- 13 Oct 2026 (W4): the technical guide. Staff-only: it sits under the /help mount, so the same sign-in
+     gate as the user guide decides who reads it (gate.scope_for polices the /help prefix). It holds
+     everything the screens no longer say: endpoints, stored fields, routing internals and the formulas
+     in code terms (notes/w3-w4-inventory-1013.md lists every passage that moved here and from where).
+     The rule for words on a screen is the user guide's job; this page may use any word. -->
+<style>
+:root{--navy:#2563EB;--deep:#1F2024;--blue:#3B82F6;--green:#059669;--red:#DC2626;--ink:#1E293B;--grey:#64748B;--line:#E2E8F0;--paper:#fff;--panel:#F8FAFC}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font:15px/1.6 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
+#nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;background:var(--deep);color:rgba(255,255,255,.72);padding:18px 14px 30px;font-size:13px;border-right:2px solid #FF8C14}
+#nav .brand{color:#fff;font-weight:800;font-size:16px;line-height:1.2;margin:0 6px 14px}#nav .brand span{display:block;font-weight:500;color:rgba(255,255,255,.55);font-size:12px;margin-top:4px}
+#nav ol{list-style:none;margin:0;padding:0}#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}
+#nav li.l1 a{font-weight:700;color:#fff;margin-top:8px}#nav li.l2 a{padding-left:20px;font-size:12.5px}#nav li a:hover{background:rgba(255,255,255,.08)}
+main{margin-left:280px;padding:28px 44px 80px;max-width:1040px}
+h1{color:var(--deep);font-size:26px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--line)}h1:first-child{border-top:0;margin-top:0}
+h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:var(--blue);font-size:16px;margin:22px 0 6px}
+p{margin:0 0 10px}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EEF1F5;padding:1px 4px;border-radius:4px}
+pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font:12.5px/1.45 Consolas,ui-monospace,monospace}
+ul{margin:0 0 12px;padding-left:22px}li{margin:0 0 6px}
+.tbl{overflow-x:auto;margin:6px 0 18px}table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight:600}td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:nth-child(even) td{background:var(--panel)}td.k{font-weight:600;color:var(--navy);white-space:nowrap}
+.callout{border-left:5px solid;border-radius:8px;padding:10px 14px;margin:12px 0 18px}.callout .ct{font-weight:700;margin-bottom:4px}.callout p{margin:0 0 6px}
+.callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:var(--blue)}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:var(--red)}
+#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:20px;font-size:12px}
+@media (max-width:900px){#nav{position:static;width:auto}main{margin-left:0;padding:18px 16px 60px}}
+@media print{#nav,#top{display:none}main{margin:0;padding:0;max-width:none}}
+</style></head>
+<body>
+<nav id="nav"><div class="brand">Wayscope<span>Technical guide · staff only</span></div><ol>
+<li class="l1"><a href="#t0-about">About this guide</a></li>
+<li class="l1"><a href="#t1-figures">T1 How each figure is made</a></li>
+<li class="l2"><a href="#t1-volume">Tonnes and conversions</a></li>
+<li class="l2"><a href="#t1-trips">Trips and deliveries a day</a></li>
+<li class="l2"><a href="#t1-distance">Distance and the cycle</a></li>
+<li class="l2"><a href="#t1-vehicles">Vehicles and peak fleet</a></li>
+<li class="l2"><a href="#t1-delivered">Delivered against plan</a></li>
+<li class="l2"><a href="#t1-carbon">Carbon</a></li>
+<li class="l2"><a href="#t1-cost">Planned cost</a></li>
+<li class="l2"><a href="#t1-fair">Fair cost (the model)</a></li>
+<li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
+<li class="l2"><a href="#t1-stock">Stockpiles</a></li>
+<li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
+<li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
+<li class="l1"><a href="#t4-settings">T4 Settings and deployment</a></li>
+<li class="l1"><a href="#t5-errors">T5 Errors and what they mean</a></li>
+<li class="l1"><a href="#t6-words">T6 Old words, new words</a></li>
+<li class="l1"><a href="#t7-reference">T7 Sourced and assumed figures</a></li>
+</ol></nav>
+<main>
+
+<h1 id="t0-about">Technical guide</h1>
+<p>For the people who run Wayscope and answer &ldquo;where does that number come from?&rdquo;. The
+<a href="/help/">user guide</a> says what a screen means and how to use it; the info boxes (ⓘ) on the screens say
+what each figure means in a sentence. This page holds what the screens leave out: the formulas in code terms, the
+reads behind each screen, how routing is stored, and the settings that live on the deployment.</p>
+<div class="callout note"><div class="ct">The words on the screens</div><p>Since 13 Oct 2026 a screen does not say
+<em>API, endpoint, server, JSON, cache, geometry, bake</em> or <em>token</em> (except the admin token's own field, the
+admin panel behind Config → More, the &ldquo;Everything (JSON)&rdquo; tab and the Diagnostics panel). Those words are
+used here. <a href="#t6-words">T6</a> maps the old screen words to the new ones.</p></div>
+
+<h1 id="t1-figures">T1 How each figure is made</h1>
+<p>Every planning figure on the Dashboard comes from one read, <code>GET /api/costing/lines</code>, which uses the same
+functions as the Look-ahead (<code>backend/costlines.py</code>). The browser formats; it does not work anything out.
+A <strong>forecast month</strong> (the screens used to say <em>line-month</em>) is one month of one forecast line: a
+route, a team, a section, a material and one vehicle.</p>
+
+<h2 id="t1-volume">Tonnes and conversions</h2>
+<p>The planned quantity of every forecast month in view, in tonnes through each line's conversion (m³ and vehicle
+loads included). The Dashboard card shows a compact figure (<code>bigNum</code>, e.g. 12.3k t); its info box shows the
+exact figure.</p>
+
+<h2 id="t1-trips">Trips and deliveries a day</h2>
+<pre>trips (per forecast month)  = ceil(tonnes ÷ planning payload)        — rounded up per line-month
+deliveries a day            = Σ trips ÷ (months in view × working days per month)</pre>
+<p>Working days per month is <code>planning.working_days_per_month</code> on Config → Planning (22 by default). Each
+delivery is a two-way movement. The Look-ahead and the Today panel use the same rule per day.</p>
+
+<h2 id="t1-distance">Distance and the cycle</h2>
+<pre>lorry-km      = trips × the routed (baked) route distance, both legs, for the line's vehicle
+cycle         = drive out (laden) + drive back (empty) + turnaround
+turnaround    = the vehicle's load + unload minutes + gate induction + (gate-to-face OR a drawn haul road, never both)</pre>
+<p>The per-trip distance is on the route's basis: the round trip unless the route says loaded only. An unbaked line
+(no stored route for its vehicle) has <strong>no</strong> distance: it adds nothing to the km, CO₂e and fair totals,
+which say how many lines they exclude. It is excluded, never estimated. The load and unload minutes are the vehicle's
+own (Config → Vehicles, seeded from <code>backend/factors.json</code>); blank minutes use the planning defaults.</p>
+
+<h2 id="t1-vehicles">Vehicles and peak fleet</h2>
+<pre>trips per vehicle-day = floor(shift hours ÷ cycle)
+vehicles (per line)   = trips per day ÷ trips per vehicle-day      — the server's `vehicles`
+peak fleet            = the largest same-month sum of vehicles needed across the lines in view</pre>
+<p>That is trips ÷ (working days × what one vehicle does in a shift). An unbaked line has no cycle, so it needs an
+unknown number of vehicles and is left out of the sum. Trips are not vehicles: a fleet worked out as tonnes ÷ payload
+alone is a trip count.</p>
+
+<h2 id="t1-delivered">Delivered against plan</h2>
+<pre>delivered t        = Σ the week actuals typed on Look-ahead → Account, through each line's payload (actual_tonnes)
+delivered %        = delivered t ÷ planned t across every forecast month in view
+on reported months = delivered t ÷ planned t on the forecast months that carry an actual</pre>
+<p>A day actual rolls into its week. A week or month nobody reported counts as nothing (not yet delivered); it is
+never assumed. The Today panel's &ldquo;this week to date&rdquo; counts line-days (one day of one line).</p>
+
+<h2 id="t1-carbon">Carbon</h2>
+<pre>CO₂e (t)      = km × the vehicle's per-km factor ÷ 1000
+              — DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config)
+kg CO₂e per t = tCO₂e × 1000 ÷ the tonnes on baked lines
+tonne-km      = tonnes × the route's basis km, baked lines</pre>
+<p>The factor is set per vehicle on Config → Vehicles and <strong>stored per km whatever unit the tenant reads</strong>
+(miles are converted for display only). Tailpipe only, one average-laden factor on both legs. The Carbon planner's
+all-in figure (materials and waste as well) is a different total: see the user guide, section 6.</p>
+
+<h2 id="t1-cost">Planned cost</h2>
+<p>Planned £ = the route's typed rates (summed: per load, per tonne and per km), or the Config target rate where the
+route has none, marked &ldquo;target&rdquo;. A route with any rate of its own is priced from that alone; the two are
+never mixed. Per tonne, per trip and per km are the same total divided by the tonnes, trips and km the lines run.</p>
+
+<h2 id="t1-fair">Fair cost (the model)</h2>
+<pre>fair / trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index)
+            + cycle hours × (driver + vehicle standing)
+            + km × running
+            × (1 + margin)</pre>
+<p>The coefficients are on Config → Costing · fuel. Winter months add the
+<code>fair_price.winter_consumption_uplift_pct</code> fuel uplift (8 % by default). The diesel index is the government
+weekly price for Great Britain or the EU Weekly Oil Bulletin for an EU country, refreshed in the background, or typed.
+With no index there is no fair price. Shown on every routed line as &ldquo;fair (model)&rdquo;: a floor for
+negotiation, never a quote, never mixed with a typed rate. Three coefficients have no public source and are labelled
+as assumptions.</p>
+
+<h2 id="t1-gates">Gate arrivals</h2>
+<p>Read from <code>GET /api/gates/arrivals?month=N</code> (<code>backend/gate_arrivals.py</code>). The same trips rule,
+all teams summed at the gate a lorry arrives by: laden at the destination's entry gate, empty (coming to load) at the
+origin's. Arrivals a day = trips ÷ working days. The gap is the shift's minutes ÷ arrivals, an average with no hourly
+peak. Red only when that gap is shorter than the gate's typed check-in; a gate with no check-in typed is never
+compared. A team code gets the totals and the team names, never another team's figure.</p>
+
+<h2 id="t1-stock">Stockpiles</h2>
+<pre>balance at the week's end = opening + typed week actuals delivered there − typed consumption</pre>
+<p>A week nobody reported counts as nothing. Consumption is typed on Look-ahead → Account. The chart is red past
+capacity and amber from 90 %; a stockpile with no capacity recorded is listed, never drawn as zero.</p>
+
+<h1 id="t2-routing">T2 Routing with HERE</h1>
+<p>The screens say a route is <em>routed</em> or <em>not routed yet</em>. In the code and the data this is
+<strong>baking</strong>: a call to HERE Routing v8 with the vehicle's truck profile (gross weight, height, width,
+length, axles), stored in <code>route_geometry</code> per route, vehicle profile, leg and alternative. A stored route is
+what the screens call &ldquo;cached geometry&rdquo; in older notes.</p>
+<ul>
+<li><strong>Two legs.</strong> Every route is baked twice: laden out, empty back. The empty lorry is lighter, so it can
+use roads the loaded one legally cannot. A green vehicle chip means both legs are stored; amber means only the
+outbound is, which is enough to draw but not to work out a cycle time (the return is then assumed to mirror the
+outbound, and the screens say so). &ldquo;Laden only&rdquo; halves the HERE calls but leaves the return unbaked.</li>
+<li><strong>What clears a stored route.</strong> Moving a location or an end of a route, changing a gate, a zone set
+to avoid, or a haul road attached to the route. The app reports how many legs it clears and re-bakes them (one HERE
+call per leg; two for a spliced haul road). Moving a node re-bakes the routes it touches for the profiles ticked.</li>
+<li><strong>Gates.</strong> A route goes to a location's gate, else its access point, else the marker. A one-way gate
+is used only for the direction it serves. Changing a gate moves where HERE routes to, so the stored route has to be
+re-baked before the distances mean anything. A deactivated gate that a route selected makes that route refuse to
+bake, by name.</li>
+<li><strong>Alternatives.</strong> HERE may return more than one option per vehicle. &ldquo;Make primary&rdquo; swaps
+an alternative into first place (<code>alt_index</code> 0); re-baking restores HERE's ranking.</li>
+<li><strong>Zones.</strong> A zone ticked to avoid is sent to HERE as an avoid-area (the rectangle around what was
+drawn) and every baked leg crossing it is cleared and re-routed. Legs baked before zones existed are matched
+approximately: there is no record of what they avoided. Unticking Active retires a zone and keeps the record of why
+past bakes went the way they did.</li>
+<li><strong>Haul roads.</strong> <em>Splice</em> assumes HERE has never heard of the road: route to one end, use the
+drawn line, route on from the other end (two HERE calls per leg). <em>Via</em> lets HERE find its own way through (one
+call). Which end is the entry is worked out per leg from the geometry, so the order the road was drawn in does not
+matter. HERE will not accept a custom speed, so the haul stretch's time is substituted afterwards.</li>
+<li><strong>Restrictions.</strong> Checked against the stored route when it is baked and refreshed on demand; the
+check reports what lies within its distance of the baked line, not that it is on your carriageway. The Look-ahead says
+which providers were not checked since baking.</li>
+<li><strong>Cost.</strong> Each bake spends HERE calls; the confirm dialogs say how many before anything runs.</li>
+</ul>
+
+<h1 id="t3-sources">T3 Where each screen reads from</h1>
+<div class="tbl"><table><thead><tr><th>Screen</th><th>Read</th><th>Notes</th></tr></thead><tbody>
+<tr><td class="k">Dashboard figures, charts, route table</td><td><code>GET /api/costing/lines</code></td><td>The Look-ahead's functions; one row per forecast month with totals and the costing block.</td></tr>
+<tr><td class="k">Dashboard: Today, this week, last week</td><td><code>GET /api/lookahead</code> (the commit bucket)</td><td>The Look-ahead's own read; nothing is derived in the browser.</td></tr>
+<tr><td class="k">Dashboard: Gate arrivals</td><td><code>GET /api/gates/arrivals?month=N</code></td><td>Its own read, per month.</td></tr>
+<tr><td class="k">Dashboard and Forecasts: carbon target</td><td><code>GET /api/carbon/target</code></td><td>The all-in figure.</td></tr>
+<tr><td class="k">Config → Costing: target rate</td><td>its own endpoint, saved separately from the configuration document</td><td>The page's Save button does not save it; it has its own button.</td></tr>
+<tr><td class="k">Configuration</td><td>the configuration table (seeded from <code>backend/factors.json</code>)</td><td>See T4.</td></tr>
+</tbody></table></div>
+
+<h1 id="t4-settings">T4 Settings and deployment</h1>
+<ul>
+<li><strong>The admin token.</strong> Admin actions (saving Configuration, changing routes, zones and gates, the fuel
+index) send the token typed in the admin token field (Config → More, the Data pages' header, the fuel widget); it is
+remembered in this browser. It is checked against <code>ADMIN_TOKEN</code> on Render. While that variable is unset,
+those actions are open to anyone who can reach them. The Data → Locations note now points at the field in the page
+header (it used to name a bake panel that no longer exists).</li>
+<li><strong>Routing key.</strong> Routing needs <code>HERE_API_KEY</code> in Render → Environment for the
+<code>modus-web</code> service. Without it the Data → Routes banner says routing is not set up, and nothing bakes.</li>
+<li><strong>Configuration.</strong> The live source is the configuration table; <code>backend/factors.json</code> is the
+reset-to-default (Config → More → Reset to file). Vehicle ids are the keys forecast lines and stored routes are keyed
+on, so they cannot be renamed, and a vehicle the network is baked for cannot be removed. Routing dimensions and notes
+are edited on the &ldquo;Everything (JSON)&rdquo; tab.</li>
+<li><strong>Clearing every route</strong> (Data → Routes) deletes every route and its stored geometry; locations are
+kept. It was built to retire the first seed (the V2 seed).</li>
+<li><strong>Diagnostics</strong> (Data → Routes) shows each vehicle profile against <code>factors.json</code>: ● it
+appears in stored geometry; ⚠ the name is not a key in <code>factors.json</code> and falls back to
+<code>_default</code> (identical payload and CO₂ for every such profile, which looks like the vehicle being
+ignored).</li>
+</ul>
+
+<h1 id="t5-errors">T5 Errors and what they mean</h1>
+<div class="tbl"><table><thead><tr><th>The screen says</th><th>What happened</th></tr></thead><tbody>
+<tr><td class="k">Wayscope did not answer in time</td><td>The request to the server timed out or failed. Nothing typed is lost; try again.</td></tr>
+<tr><td class="k">Wayscope may still be starting up</td><td>The Render service was starting or redeploying, so the first read failed. Refresh the page.</td></tr>
+<tr><td class="k">admin token rejected</td><td>The server answered 403: the token typed does not match <code>ADMIN_TOKEN</code>.</td></tr>
+<tr><td class="k">Codes are checked by Wayscope</td><td>Sign-in codes are checked on the server (<code>POST /api/auth</code>), never in the browser.</td></tr>
+</tbody></table></div>
+
+<h1 id="t6-words">T6 Old words, new words</h1>
+<div class="tbl"><table><thead><tr><th>Older screens, notes and exports</th><th>The screens now</th></tr></thead><tbody>
+<tr><td class="k">baked / not baked / unbaked</td><td>routed / not routed yet</td></tr>
+<tr><td class="k">bake / re-bake / bulk bake</td><td>route / route again / route the whole network</td></tr>
+<tr><td class="k">cached geometry, geometry</td><td>stored route, route line</td></tr>
+<tr><td class="k">line-month</td><td>forecast month (one month of one forecast line)</td></tr>
+<tr><td class="k">the server</td><td>Wayscope</td></tr>
+<tr><td class="k">UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED</td></tr>
+</tbody></table></div>
+<p>The XLSX and PDF exports and the clash text made on the server still say &ldquo;baked&rdquo; (decided 13 Oct 2026:
+the words bundle covers the staff app and the user guide only). Field names in the data (<code>baked</code>,
+<code>UNBAKED</code>, <code>geometry</code>) do not change.</p>
+
+<h1 id="t7-reference">T7 Sourced and assumed figures</h1>
+<p>The user guide's Appendix D (admins) keeps the plain-words reference: how a haulage number is made (D.1), which
+figures are sourced and which are assumed (D.2), the live sources and how they fail (D.3), and what must not be
+described as finished (D.4). <a href="/help/#appendix-d-technical-reference">Open Appendix D</a>. The endpoints it
+used to name for loading an organisation are: <code>POST /api/admin/tenant/import</code> (into an empty organisation),
+<code>PUT /api/admin/overlay</code> (the map overlay) and <code>GET /api/admin/tenant/export</code> (the organisation
+as one file). After an import, bake the network: imported routes read &ldquo;not routed yet&rdquo; until then.</p>
+
+</main>
+<a id="top" href="#">↑ top</a>
+</body></html>
