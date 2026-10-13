@@ -24,6 +24,7 @@ whether 18 t is the right payload. That stays with the person editing.
 """
 import datetime
 import json
+import math
 import os
 import re
 
@@ -144,7 +145,54 @@ def tenant_settings(conversions=None, doc=None):
     t["demo_notice"] = dn.strip() if isinstance(dn, str) and dn.strip() else None
     ce = (block or {}).get("concern_email") if isinstance(block, dict) else None
     t["concern_email"] = ce.strip() if is_concern_email(ce) else None
+    t["council_breaks"] = council_breaks(doc=doc)
     return t
+
+
+# 13 Oct 2026 (W12, bundle B): the colour bands of the "By council" layer and of the bulletin's council sections, per
+# scheme. Three ascending figures per measure: two-way movements a day, and t CO2e in the month. A district below the
+# first is the lightest step, at or over the third the darkest. Typed on Config → Map and bulletin (tenant block,
+# key `council_breaks`); a tenant that has not typed them reads these defaults — the stops the map has used since
+# 12 Oct (map/index.html AREA_STOPS, held equal by parse_map.js and test_bulletin.py). Fixed per scheme, never worked
+# out from the data, so a colour means the same figure in every month.
+COUNCIL_BREAKS_DEFAULT = {"movements": (50, 100, 200), "carbon": (50, 100, 200)}
+COUNCIL_BREAK_MEASURES = ("movements", "carbon")
+
+
+def council_breaks_problem(v):
+    """None when `v` is three ascending figures above zero, else what is wrong (for validate())."""
+    if not isinstance(v, (list, tuple)) or len(v) != 3:
+        return "must be three figures"
+    # whole numbers: both legends print a band as "50 – 99 t" (the next band's figure less one)
+    if any(isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) or x < 1
+           or float(x) != int(x) for x in v):
+        return "must be whole numbers, 1 or more"
+    if not (v[0] < v[1] < v[2]):
+        return "must rise from left to right"
+    return None
+
+
+def council_breaks(doc=None, conversions=None):
+    """
+    {"movements": [a, b, c], "carbon": [a, b, c]}: the tenant's typed bands, each measure falling back to
+    COUNCIL_BREAKS_DEFAULT on its own when it is missing or not three ascending figures. The ONE reader: the
+    areas payloads (the map) and the bulletin both call it.
+    """
+    if doc is None:
+        if conversions is None:
+            import conversions as _c
+            conversions = _c
+        try:
+            doc = load(conversions)
+        except Exception:
+            doc = {}
+    block = (doc or {}).get("tenant") if isinstance(doc, dict) else None
+    typed = block.get("council_breaks") if isinstance(block, dict) else None
+    out = {}
+    for m in COUNCIL_BREAK_MEASURES:
+        v = typed.get(m) if isinstance(typed, dict) else None
+        out[m] = [int(x) for x in v] if council_breaks_problem(v) is None else list(COUNCIL_BREAKS_DEFAULT[m])
+    return out
 
 
 # one plain address: something@domain.tld, no spaces, no second address, nothing a mailto: could be bent with
@@ -442,6 +490,17 @@ def validate(doc, network=None):
             ce = tb.get("concern_email")
             if ce is not None and ce != "" and not is_concern_email(ce):
                 p.append("tenant.concern_email must be one email address, or null")
+            cb = tb.get("council_breaks")
+            if cb is not None:
+                if not isinstance(cb, dict):
+                    p.append("tenant.council_breaks must be an object with movements and carbon")
+                else:
+                    for m in COUNCIL_BREAK_MEASURES:
+                        if cb.get(m) is not None and council_breaks_problem(cb[m]):
+                            p.append(f"tenant.council_breaks.{m} {council_breaks_problem(cb[m])}")
+                    for k in cb:
+                        if k not in COUNCIL_BREAK_MEASURES:
+                            p.append(f"tenant.council_breaks.{k} is not a measure (movements or carbon)")
     for w in doc.get("seasonal_restrictions") or []:
         if not isinstance(w, dict) or not w.get("name"):
             p.append("every seasonal restriction needs a name")

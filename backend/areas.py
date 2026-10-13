@@ -604,6 +604,18 @@ def _sites_in(prepared):
     return out, placed
 
 
+# 13 Oct 2026 (W13): the double count, in ONE sentence the area payload's basis, the bulletin's movements-by-council
+# footnote and (its first clause) the map's district card all print. test_bulletin.py holds the three equal.
+DOUBLE_COUNT = ("A route counts in every area its laden leg enters, so the areas' figures add up to more than "
+                "the scheme's.")
+
+
+def _stops():
+    """The tenant's council colour bands (config.council_breaks): {"movements": [..3], "carbon": [..3]}."""
+    import config
+    return config.council_breaks()
+
+
 def shapes():
     """
     12 Oct 2026 (Track C review): the polygons, their label points and the licence lines,
@@ -624,6 +636,7 @@ def shapes():
                    "geometry": a["geometry"], "label_point": label_point(a["geometry"])}
                   for a in areas],
         "attribution": attribution,
+        "stops": _stops(),             # 13 Oct 2026 (W12): the scheme's colour bands (config.council_breaks)
     }
 
 
@@ -767,8 +780,7 @@ def area_load(month, working_days=None, drawn=None, geometry=True):
         "enter_km": ENTER_KM,
         "basis": "Two-way movements a day: one load = one two-way movement. An area counts the month's approved "
                  "loads of every route whose laden leg enters it, divided by the working days; the empty return "
-                 "adds none. A route counts in every area its laden leg enters, so the areas' figures add up to "
-                 "more than the scheme's. A laden leg enters an area when at least 200 m of it is inside (the "
+                 "adds none. " + DOUBLE_COUNT + " A laden leg enters an area when at least 200 m of it is inside (the "
                  "boundaries are generalised to 200 m); a route inside by less adds its km and carbon there, "
                  "not its movements.",
         "co2_basis": "CO2e in an area = each route's month CO2e (routed km × the vehicle's kg CO2e/km, both legs) × "
@@ -786,6 +798,8 @@ def area_load(month, working_days=None, drawn=None, geometry=True):
         },
         "routes_not_clipped": not_clipped,
         "routes_not_drawn": sorted(not_drawn),
+        # 13 Oct 2026 (W12): the scheme's colour bands, so the map paints with the figures the bulletin prints by
+        "stops": _stops(),
         "notes": notes,
         "attribution": attribution,
         "carbon": {"stamp": road_sections._carbon_stamp(),
