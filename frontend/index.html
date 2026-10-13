@@ -3869,6 +3869,8 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
   );
 }
 
+// 13 Oct 2026 (W12): the council colour bands a scheme reads until it types its own (backend config.COUNCIL_BREAKS_DEFAULT)
+const COUNCIL_BREAKS_DEFAULT = { movements: [50, 100, 200], carbon: [50, 100, 200] };
 function ConfigPage({ meta, who, access }){
   const [doc, setDoc] = useState(null);
   const [orig, setOrig] = useState(null);
@@ -3929,7 +3931,17 @@ function ConfigPage({ meta, who, access }){
   // admin token, "Reset to file") behind More with their confirm step. The Vehicles and
   // Materials sections keep a table because a grid is the right form for them.
   const inp = "ctl ctl-sm w-full tabular-nums";
-  const TABS = [["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["raw", "Everything (JSON)"]];
+  const TABS = [["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]];
+  // 13 Oct 2026 (W12): the scheme's council colour bands, three rising whole numbers per measure, in the tenant block.
+  // A measure left blank reads COUNCIL_BREAKS_DEFAULT (backend config.COUNCIL_BREAKS_DEFAULT, held equal by parse_frontend).
+  const setBreak = (d, m, i, v) => {
+    d.tenant = d.tenant || {};
+    const cb = d.tenant.council_breaks = d.tenant.council_breaks || {};
+    const arr = (cb[m] || []).slice(0, 3); while(arr.length < 3) arr.push(null);
+    arr[i] = v;
+    if(arr.every(x => x == null)) delete cb[m]; else cb[m] = arr;
+    if(!Object.keys(cb).length) delete d.tenant.council_breaks;
+  };
   const discard = () => { if(!orig) return; const d = JSON.parse(orig); setDoc(d); setRaw(JSON.stringify(d, null, 2)); setRawErr(""); setMsg(null); };
   const tabLabel = (TABS.find(([k]) => k === tab) || [])[1] || "";
 
@@ -4051,6 +4063,29 @@ function ConfigPage({ meta, who, access }){
                   <div className="hint">{help}</div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {tab === "mapbulletin" && (
+            <div className="px-6 pb-6 max-w-xl" data-cfg="council-breaks">
+              <p className="text-[14px] text-slate-600 mb-4">The colours of the public map's By council layer and of the bulletin's council sections. Three figures for each, rising: a district below the first takes the lightest colour, one at or above the third the darkest. They stay fixed, so a colour means the same figure in every month. Leave a row blank to keep the defaults.</p>
+              {[["movements", "Movements by council: two-way movements a day", "The blue colours. Defaults 50, 100, 200 a day."],
+                ["carbon", "Carbon by council: t CO₂e in the month", "The orange colours. Defaults 50, 100, 200 t. Pick figures that spread your districts across the four colours."]].map(([m, l, help]) => {
+                const cur = ((doc.tenant || {}).council_breaks || {})[m] || [];
+                return (
+                  <div key={m} className="field">
+                    <label id={"cfg-cb-" + m}>{l}</label>
+                    <div className="flex gap-2">
+                      {[0, 1, 2].map(i => (
+                        <input key={i} className="ctl w-24 tabular-nums text-right" inputMode="numeric" aria-label={`${l}, band ${i + 1} of 3`}
+                          placeholder={String(COUNCIL_BREAKS_DEFAULT[m][i])} value={cur[i] ?? ""}
+                          onChange={e => upd(d => { setBreak(d, m, i, num(e.target.value)); })} />
+                      ))}
+                    </div>
+                    <div className="hint">{help}</div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
