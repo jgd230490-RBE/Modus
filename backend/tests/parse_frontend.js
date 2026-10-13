@@ -1886,6 +1886,27 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     (code.match(/<span className="block text-sm font-medium text-slate-700 mb-1">/g) || []).length >= 40
     && !code.includes('text-[11px] uppercase tracking-wide text-slate-400') && !/text-\[(9|10|11)px\]/.test(_cfBody));
   ok("...one Discard beside Save, both in the bar; Reset keeps its confirm", _cfBody.includes(">Discard</button>") && _cfBody.includes('if(!confirm("Replace the live configuration with backend/factors.json?'));
+  // 13 Oct 2026 (W12, bundle B): Config → Map and bulletin — the scheme's council colour bands
+  ok("⭐ W12: Config has a 'Map and bulletin' section, before Everything (JSON), with three band fields per measure",
+    _cfBody.includes('["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]')
+    && _cfBody.includes('{tab === "mapbulletin" && (') && _cfBody.includes('data-cfg="council-breaks"')
+    && _cfBody.includes('{[0, 1, 2].map(i => (') && _cfBody.includes('aria-label={`${l}, band ${i + 1} of 3`}')
+    && _cfBody.includes('placeholder={String(COUNCIL_BREAKS_DEFAULT[m][i])}')
+    && _cfBody.includes('"Movements by council: two-way movements a day"') && _cfBody.includes('"Carbon by council: t CO₂e in the month"'));
+  const _sbSrc = (_cfBody.match(/const setBreak = \(d, m, i, v\) => \{[\s\S]*?\n  \};/) || [""])[0];
+  const setBreak = _sbSrc ? new Function(_sbSrc + "; return setBreak;")() : null;
+  const _d1 = { tenant: { name: "X" } };
+  if (setBreak) { setBreak(_d1, "carbon", 0, 20); setBreak(_d1, "carbon", 1, 50); setBreak(_d1, "carbon", 2, 100); }
+  const _d2 = JSON.parse(JSON.stringify(_d1));
+  if (setBreak) { setBreak(_d2, "carbon", 0, null); setBreak(_d2, "carbon", 1, null); setBreak(_d2, "carbon", 2, null); }
+  const _d3 = {};
+  if (setBreak) setBreak(_d3, "movements", 1, 80);
+  ok("⭐ W12: the fields write tenant.council_breaks (three per measure); clearing all three removes the row, so the default applies",
+    !!setBreak && JSON.stringify(_d1.tenant.council_breaks) === '{"carbon":[20,50,100]}' && _d1.tenant.name === "X"
+    && _d2.tenant.council_breaks === undefined && JSON.stringify(_d3.tenant.council_breaks) === '{"movements":[null,80,null]}',
+    JSON.stringify([_d1, _d2, _d3]));
+  ok("🔴 W12: the section's words follow the word rule (no bake, server, endpoint, token or cached on this screen)",
+    !/\b(bake|baked|server|endpoint|token|cached|geometry)\b/i.test(_cfBody.slice(_cfBody.indexOf('{tab === "mapbulletin"'), _cfBody.indexOf('{tab === "costing"'))));
   // 1. the one-screen Dashboard
   ok("Dashboard: the working view is six cards, four charts, and five collapsed sections; the big screen keeps its four WallSections",
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')

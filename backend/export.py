@@ -1065,11 +1065,13 @@ AMBER_HEX = "D97706"
 AMBER_RGB = (0xD9 / 255, 0x77 / 255, 0x06 / 255)
 
 
-def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, token=None):
+def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, token=None, sections=None):
     """
-    The month's routes over Mapbox's light style, or None: each route a plan-blue path whose
-    width follows its two-way movements a day (2-8 px), a lettered pin on each site, a numbered
-    amber pin on each local control. The URL is thinned until it fits the API's 8,192-character
+    The month's routes over Mapbox's light style, or None: REVERSED 13 Oct 2026 (W11) — each route
+    in the public map's Volume colour for its two-way movements a day (bulletin_doc.VOLUME_RAMP on
+    VOLUME_STOPS, the route's `color`), all at one width over the map's dark casing (it was one
+    plan blue with the width by volume); a lettered pin on each site, a numbered amber pin on each
+    local control. The URL is thinned until it fits the API's 8,192-character
     limit; when it cannot fit, None (the caller draws the schematic). The harnesses never reach
     Mapbox (portable.offline); the fetch itself is exercised only through that stub.
     """
@@ -1081,10 +1083,16 @@ def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, 
             + [f"pin-s-{z['n']}+{AMBER_HEX}({z['at'][0]:.5f},{z['at'][1]:.5f})"
                for z in controls if z.get("at") and z["n"] <= 99])
     url = None
+    # routes first (quietest at the bottom), then the shared sections on top, each by its routes summed (W11)
+    order = (sorted(map_routes, key=lambda r: (r.get("a_day") or 0, r.get("route_id") or ""))
+             + sorted(sections or [], key=lambda x: x.get("a_day") or 0))
     for n_pts in (100, 60, 35, 20, 10):
-        paths = [f"path-{2 + round(6 * r['weight'])}+{PLAN_BLUE_HEX}-0.85("
-                 + urllib.parse.quote(_encode_polyline(_thin(r["coords"], n_pts)), safe="") + ")"
-                 for r in sorted(map_routes, key=lambda r: r["weight"])]
+        enc = [urllib.parse.quote(_encode_polyline(_thin(r["coords"], n_pts)), safe="") for r in order]
+        paths = ([f"path-{BULLETIN_CASING_PX}+{bulletin_doc_casing()}-0.9({e})" for e in enc[:len(map_routes)]]
+                 + [f"path-{BULLETIN_LINE_PX}+{_route_color(r).lstrip('#')}-1({e})" for r, e in zip(order[:len(map_routes)], enc)]
+                 + [p for r, e in zip(order[len(map_routes):], enc[len(map_routes):])
+                    for p in (f"path-{BULLETIN_CASING_PX}+{bulletin_doc_casing()}-0.9({e})",
+                              f"path-{BULLETIN_LINE_PX}+{_route_color(r).lstrip('#')}-1({e})")])
         for with_pins in (True, False):
             u = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(paths + (pins if with_pins else []))
                  + f"/auto/{size}@2x?padding=40&access_token=" + urllib.parse.quote(token))
@@ -1104,6 +1112,20 @@ def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, 
         return None
 
 
+BULLETIN_LINE_PX, BULLETIN_CASING_PX = 4, 6       # one width for every route (W11); the casing 2 px wider
+
+
+def _route_color(r):
+    """A map route's Volume colour: the view model's `color`, else worked out from its two-way movements a day."""
+    import bulletin_doc
+    return r.get("color") or bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(r.get("a_day"))]
+
+
+def bulletin_doc_casing():
+    import bulletin_doc
+    return bulletin_doc.ROUTE_CASING.lstrip("#")
+
+
 def _draw_bulletin_schematic(c, S, x, y, w, h):
     """The fallback: the bulletin's routes, sites and controls scaled into the box (bulletin_doc.projector)."""
     import bulletin_doc
@@ -1115,15 +1137,28 @@ def _draw_bulletin_schematic(c, S, x, y, w, h):
         c.drawString(x + 3 * mm, y + h / 2, "no route with a stored road route to draw this month")
         return
     P = lambda lon, lat: tuple(a + b for a, b in zip((x, y), proj(lon, lat)))
-    c.setStrokeColorRGB(*PLAN_BLUE_RGB)
     c.setLineCap(1); c.setLineJoin(1)
-    for r in sorted(S["map_routes"], key=lambda r: r["weight"]):
-        c.setLineWidth(0.8 + 3.2 * r["weight"])
+
+    def line(r):
         path = c.beginPath()
         path.moveTo(*P(*r["coords"][0]))
         for p in r["coords"][1:]:
             path.lineTo(*P(*p))
-        c.drawPath(path, stroke=1, fill=0)
+        return path
+    # W11: the casing under every route, then each route in its Volume colour at one width, quietest first
+    c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
+    for r in S["map_routes"]:
+        c.drawPath(line(r), stroke=1, fill=0)
+    c.setLineWidth(2.2)
+    for r in S["map_routes"]:
+        c.setStrokeColorRGB(*_hex_rgb(r["color"]))
+        c.drawPath(line(r), stroke=1, fill=0)
+    # the shared sections on top, each casing then its summed colour (the map's road-load layer)
+    for sct in S.get("map_sections") or []:
+        c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
+        c.drawPath(line(sct), stroke=1, fill=0)
+        c.setStrokeColorRGB(*_hex_rgb(sct["color"])); c.setLineWidth(2.2)
+        c.drawPath(line(sct), stroke=1, fill=0)
     for p in S["places"]:
         if p.get("at") and p.get("letter"):
             px, py = P(*p["at"])
@@ -1148,7 +1183,7 @@ class _BulletinMap(Flowable):
         return self.width, self.height
 
     def draw(self):
-        png = bulletin_map_png(self.S["map_routes"], self.S["places"], self.S["controls"])
+        png = bulletin_map_png(self.S["map_routes"], self.S["places"], self.S["controls"], sections=self.S.get("map_sections"))
         if png:
             try:
                 self.canv.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=self.width, height=self.height,
@@ -1165,18 +1200,58 @@ class _BulletinMapCaption(Flowable):
     """The line under the map, written after it has drawn so it says which map it was."""
     def __init__(self, mp, n_routes):
         Flowable.__init__(self)
-        self.mp, self.n_routes, self.height = mp, n_routes, 4.5 * mm
+        self.mp, self.n_routes, self.height = mp, n_routes, 8 * mm
 
     def wrap(self, aw, ah):
         self.width = aw
         return aw, self.height
 
     def draw(self):
-        tail = (" · map © Mapbox © OpenStreetMap" if self.mp.kind == "mapbox"
-                else " · schematic from the stored road routes, not to scale (no map tiles)")
+        # 13 Oct 2026 (W11, the rendered PDF): one line ran off the page; the second line says which map it was
+        tail = ("Map © Mapbox © OpenStreetMap" if self.mp.kind == "mapbox"
+                else "A schematic from the stored road routes, not to scale (no map tiles).")
         self.canv.setFont("Helvetica", 7.5); self.canv.setFillColorRGB(*GREY)
-        self.canv.drawString(0, 1 * mm, f"Routes this month: {self.n_routes} · haul routes in the plan blue, thicker = "
-                                        "more two-way movements" + tail)
+        self.canv.drawString(0, 4.6 * mm, f"Routes this month: {self.n_routes} · each route in the public map's Volume colour "
+                                          "for its two-way movements a day, one width")
+        self.canv.drawString(0, 1 * mm, tail)
+
+
+def _volume_legend(S, width):
+    """W11: the route map's five swatches in one row, the public map's Volume legend (stepRanges wording)."""
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    items = S["volume_legend"]
+    d = Drawing(width, 11)
+    lab = _pdf_safe(S["map_legend_title"] + ":")
+    d.add(String(0, 2.5, lab, fontName="Helvetica-Bold", fontSize=7, fillColor=colors.Color(*NAVY_RGB)))
+    x0 = rl_pdfmetrics_width(lab, "Helvetica-Bold", 7) + 4 * mm
+    step = (width - x0) / len(items)
+    for i, g in enumerate(items):
+        x = x0 + i * step
+        d.add(Rect(x, 1, 14, 8, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(*_hex_rgb("#1F2024")),
+                   strokeWidth=0.6))
+        d.add(String(x + 17, 2.5, _pdf_safe(g["label"]), fontName="Helvetica", fontSize=6.8, fillColor=colors.Color(*NAVY_RGB)))
+    return d
+
+
+def _swatch(fill, hatch=False):
+    """A table cell's 8 pt colour square (the district's band); "no figure" hatched, as on the maps."""
+    from reportlab.graphics.shapes import Drawing, Line, Rect
+    import bulletin_doc
+    d = Drawing(8, 8)
+    if hatch:
+        d.add(Rect(0, 0, 8, 8, fillColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_PAPER)), strokeColor=None))
+        for k in (0, 3, 6):
+            d.add(Line(k, 0, min(8, k + 8), min(8, 8 - k), strokeColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_INK)),
+                       strokeWidth=0.8))
+    else:
+        d.add(Rect(0, 0, 8, 8, fillColor=colors.Color(*_hex_rgb(fill)), strokeColor=colors.Color(0.8, 0.8, 0.8),
+                   strokeWidth=0.3))
+    return d
+
+
+def rl_pdfmetrics_width(text, font, size):
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    return stringWidth(text, font, size)
 
 
 def _hex_rgb(h):
@@ -1257,16 +1332,26 @@ class _CouncilMap(Flowable):
         _draw_council_map(self.canv, self.C, 0, 0, self.width, self.height)
 
 
-def _council_legend(C, width):
-    """The six swatches in one row: the four orange steps, the neutral grey, the hatched "no figure"."""
+def _council_legend(C, width, title="t CO2e in the month:"):
+    """The six swatches in one row: the four steps (orange for carbon, blue for movements), the neutral grey, the
+    hatched "no figure"."""
     from reportlab.graphics.shapes import Drawing, Line, Rect, String, Group
     import bulletin_doc
     items = C["legend"]
     d = Drawing(width, 11)
-    d.add(String(0, 2.5, "t CO2e in the month:", fontName="Helvetica-Bold", fontSize=7, fillColor=colors.Color(*NAVY_RGB)))
-    x0, step = 30 * mm, (width - 30 * mm) / len(items)
+    d.add(String(0, 2.5, title, fontName="Helvetica-Bold", fontSize=7, fillColor=colors.Color(*NAVY_RGB)))
+    # 13 Oct 2026 (the rendered PDF): equal slots let "no approved laden route" run into the next swatch and the
+    # swatches cut the title; each slot is now its swatch + its label + a gap, after the measured title
+    x0 = rl_pdfmetrics_width(title, "Helvetica-Bold", 7) + 3 * mm
+    fs = 6.8
+    while fs > 5.5 and x0 + sum(10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), "Helvetica", fs) + 8 for g in items) > width:
+        fs -= 0.2
+    xs, x = [], x0
+    for g in items:
+        xs.append(x)
+        x += 10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), "Helvetica", fs) + 8
     for i, g in enumerate(items):
-        x = x0 + i * step
+        x = xs[i]
         if g["hatch"]:
             grp = Group()
             grp.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_PAPER)), strokeColor=None))
@@ -1276,7 +1361,7 @@ def _council_legend(C, width):
             d.add(Rect(x, 1, 8, 8, fillColor=None, strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
         else:
             d.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
-        d.add(String(x + 10.5, 2.5, _pdf_safe(g["label"]), fontName="Helvetica", fontSize=6.8, fillColor=colors.Color(*NAVY_RGB)))
+        d.add(String(x + 10.5, 2.5, _pdf_safe(g["label"]), fontName="Helvetica", fontSize=fs, fillColor=colors.Color(*NAVY_RGB)))
     return d
 
 
@@ -1390,6 +1475,8 @@ def build_bulletin_pdf(S):
     mp = _BulletinMap(S, usable, 76 * mm)
     story.append(mp)
     story.append(_BulletinMapCaption(mp, len(S["map_routes"])))
+    story.append(_volume_legend(S, usable))
+    story.append(P(E(S["map_note"] + ((" " + S["sections_note"]) if S.get("sections_note") else "")), st_grey))
     legend = " · ".join(f"<b>{E(p['letter'])}</b> {E(p['name'])}" for p in S["places"] if p["letter"])
     if S["controls"]:
         legend += (" · " if legend else "") + "Local controls (page 2): " + " · ".join(
@@ -1472,6 +1559,27 @@ def build_bulletin_pdf(S):
     story.append(P(E(S["change_text"])))
     story.append(P("Plan against plan: each month's approved plan as it stands today. No earlier issue of this "
                    "bulletin is stored.", st_grey))
+
+    # 13 Oct 2026 (W13): movements by council — the table, the legend of the map's blue bands, the double-count footnote
+    M = S.get("council_mv")
+    if M:
+        if M.get("error"):
+            story.append(P(E(M["title"]), st_sec))
+            story.append(P(E(M["error"]), st_grey))
+        else:
+            mvc = [["", P("District", st_h), P("Two-way movements a day", st_hr), P("Routes", st_hr),
+                    P(E(M["distance_head"]), st_hr), P(E(M["change_head"]), st_h)]]
+            for d in M["districts"]:
+                mvc.append([_swatch(d["fill"], d["cls"] == "nofig"), P(E(d["name"])), P(E(d["text"]), st_r),
+                            P(str(d["routes"]), st_r), P(E(d["distance_text"]), st_r), P(E(d["change"]))])
+            story.append(KeepTogether([P(E(M["title"]), st_sec), P(E(M["lede"])), Spacer(1, 1.5 * mm),
+                                       grid(mvc, [5 * mm, usable * 0.28, usable * 0.17, usable * 0.09, usable * 0.17,
+                                                  usable * 0.29 - 5 * mm]),
+                                       Spacer(1, 1 * mm), _council_legend(M, usable, "Two-way movements a day:")]))
+            story.append(P(E(M["scheme_line"])))
+            for line in M["county_lines"] + M["notes"]:
+                story.append(P(E(line), st_grey))
+            story.append(P(E(M["footnote"]), st_grey))
 
     # 13 Oct 2026: carbon by council — the districts alone, drawn from the boundary polygons (no Mapbox call)
     C = S.get("council")

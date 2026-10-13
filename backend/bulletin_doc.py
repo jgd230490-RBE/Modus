@@ -89,7 +89,19 @@ ZONE_WORDS = {"closure": "closure", "weight_limit": "weight limit", "works": "wo
 # AREA_NONE, AREA_STOPS.carbon and the hatch of areaHatchImage) — test_bulletin.py reads the map and holds them equal
 COUNCIL_RAMP = ("#EE9150", "#E8590C", "#B8470A", "#7C2D06")
 COUNCIL_NONE = "#E7E5E4"
+# NARROWED 13 Oct 2026 (W12): the DEFAULT bands only (config.COUNCIL_BREAKS_DEFAULT, the map's AREA_STOPS). A scheme
+# types its own on Config -> Map and bulletin; council_stops() reads them, as the map does.
 COUNCIL_STOPS = (50, 100, 200)               # t CO2e in the month, fixed, so a colour means the same tonnes every month
+# 13 Oct 2026 (W13): the council layer's MOVEMENTS colouring, the public map's own (map/index.html AREA_RAMP, the plan
+# blue in four steps); held equal by test_bulletin.py
+COUNCIL_RAMP_MOVEMENTS = ("#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95")
+# 13 Oct 2026 (W11): the page-1 route map takes the public map's Volume heat-map colours: VOLUME_STOPS (two-way
+# movements a day, fixed in every month and every scheme) and its five-step blue (map/index.html CARBON_RAMP, which
+# volumeColor() paints with), and ONE line width, so a width never carries a figure (the map's rule since PR #39).
+# The map's casing colour (CONFIG.COLORS.forecastCasing) sits under each line so the light end reads on white paper.
+VOLUME_STOPS = (10, 25, 50, 100)
+VOLUME_RAMP = ("#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888")
+ROUTE_CASING = "#1F2024"
 HATCH_INK, HATCH_PAPER = "#B8B2A8", "#F3F1EC"
 NOT_REPORTED = "Not reported"
 
@@ -156,6 +168,24 @@ def _geometries(route_ids):
     return out
 
 
+def _coords_of(geometry):
+    """A stored run's polyline as [(lon, lat), ...]: a list of pairs, or a GeoJSON LineString."""
+    g = geometry.get("coordinates") if isinstance(geometry, dict) else geometry
+    out = []
+    for c in g or []:
+        try:
+            out.append((float(c[0]), float(c[1])))
+        except (TypeError, ValueError, IndexError):
+            continue
+    return out
+
+
+def map_note(n_sections):
+    """The map's Volume legend foot, its first sentence word for word (map/index.html renderModeLegends)."""
+    return (f"Each route is painted by its own figure; {n_sections} shared section{'' if n_sections == 1 else 's'} "
+            "(a stretch of road two or more routes use) by the routes using it, summed.")
+
+
 def _controls(span_from, span_to):
     """The local controls in force in the month: active zones that are not haul roads, numbered."""
     import zones
@@ -179,17 +209,44 @@ def _controls(span_from, span_to):
     return out
 
 
-def council_class(v, unclipped=False):
-    """The map's step for a district's t CO2e: 'nofig' (hatched), 'none' (grey) or 0-3 (the orange ramp)."""
+def council_stops(measure="carbon"):
+    """The scheme's three bands for a measure ('movements' or 'carbon'), the map's: config.council_breaks()."""
+    import config
+    try:
+        return tuple(config.council_breaks()[measure])
+    except Exception:
+        return tuple(config.COUNCIL_BREAKS_DEFAULT[measure])
+
+
+def council_class(v, unclipped=False, stops=None):
+    """The map's step for a district's figure: 'nofig' (hatched), 'none' (grey) or 0-3 (the ramp). `stops` defaults
+    to COUNCIL_STOPS (the default carbon bands); the sections pass the scheme's."""
     if v is None or (unclipped and not v > 0):
         return "nofig"
     if v < 0.01:
         return "none"
-    return sum(1 for s in COUNCIL_STOPS if v >= s)
+    return sum(1 for s in (stops or COUNCIL_STOPS) if v >= s)
 
 
-def council_fill(cls):
-    return COUNCIL_NONE if cls == "none" else (HATCH_PAPER if cls == "nofig" else COUNCIL_RAMP[cls])
+def council_fill(cls, ramp=COUNCIL_RAMP):
+    return COUNCIL_NONE if cls == "none" else (HATCH_PAPER if cls == "nofig" else ramp[cls])
+
+
+def volume_class(a_day):
+    """The map's volumeColor() step for a route's two-way movements a day: 0-4 on VOLUME_STOPS (a Mapbox step:
+    at or over a stop takes the next colour)."""
+    return sum(1 for s in VOLUME_STOPS if (a_day or 0) >= s)
+
+
+def step_ranges(stops, unit=""):
+    """The map's stepRanges(s, unit), word for word: 'under 10', '10 to 25', ... '100 and over'."""
+    s = stops
+    return [f"under {s[0]}{unit}", f"{s[0]} to {s[1]}{unit}", f"{s[1]} to {s[2]}{unit}", f"{s[2]} to {s[3]}{unit}",
+            f"{s[3]}{unit} and over"]
+
+
+def volume_legend():
+    return [{"label": t, "fill": VOLUME_RAMP[i]} for i, t in enumerate(step_ranges(VOLUME_STOPS))]
 
 
 def _t(v):
@@ -205,30 +262,35 @@ def _share(v, whole):
     return "under 1%" if pc < 0.5 else f"{pc:.0f}%"
 
 
-def _council_legend():
-    s = COUNCIL_STOPS
-    return [{"label": f"under {s[0]} t", "fill": COUNCIL_RAMP[0], "hatch": False},
-            {"label": f"{s[0]} to {s[1] - 1} t", "fill": COUNCIL_RAMP[1], "hatch": False},
-            {"label": f"{s[1]} to {s[2] - 1} t", "fill": COUNCIL_RAMP[2], "hatch": False},
-            {"label": f"{s[2]} t and over", "fill": COUNCIL_RAMP[3], "hatch": False},
-            {"label": "no approved route", "fill": COUNCIL_NONE, "hatch": False},
+def _council_legend(stops=None, ramp=COUNCIL_RAMP, unit=" t", none_label="no approved route"):
+    s = stops or COUNCIL_STOPS
+    return [{"label": f"under {s[0]}{unit}", "fill": ramp[0], "hatch": False},
+            {"label": f"{s[0]} to {s[1] - 1}{unit}", "fill": ramp[1], "hatch": False},
+            {"label": f"{s[1]} to {s[2] - 1}{unit}", "fill": ramp[2], "hatch": False},
+            {"label": f"{s[2]}{unit} and over", "fill": ramp[3], "hatch": False},
+            {"label": none_label, "fill": COUNCIL_NONE, "hatch": False},
             {"label": "no figure (never a zero)", "fill": HATCH_PAPER, "hatch": True}]
 
 
-def _council_carbon(mi, wd, month_long):
+def _council_carbon(mi, wd, month_long, A=None):
     """
     The districts' t CO2e in the month (areas.area_load, the map's figures), formatted; None when the
-    tenant has no council districts (then the bulletin prints nothing about them).
+    tenant has no council districts (then the bulletin prints nothing about them). `A` is the month's
+    area_load when the caller has read it already (sheet() reads it once for both council sections), or
+    the exception that read raised.
     """
     import areas
     stored = areas.stored_areas()
     if not any(a["tier"] == "district" for a in stored):
         return None
     try:
-        A = areas.area_load(mi, working_days=wd, geometry=True)
+        A = A if A is not None else areas.area_load(mi, working_days=wd, geometry=True)
+        if isinstance(A, Exception):
+            raise A
     except Exception as e:                       # the section stays, and says why there is no figure
         return {"error": f"The council figures could not be read for {month_long} ({type(e).__name__}).",
                 "title": f"Carbon by council in {month_long}", "districts": []}
+    stops = tuple((A.get("stops") or {}).get("carbon") or council_stops("carbon"))
     unclipped = bool(A.get("routes_not_clipped"))
     tot = A.get("totals") or {}
     scheme = tot.get("co2_t")
@@ -237,7 +299,7 @@ def _council_carbon(mi, wd, month_long):
         if a["tier"] != "district":
             continue
         v = a.get("co2_t")
-        cls = council_class(v, unclipped)
+        cls = council_class(v, unclipped, stops)
         if cls == "nofig":
             text = "no figure yet" if (v is not None and unclipped) else "no figure"
         elif cls == "none":
@@ -279,7 +341,8 @@ def _council_carbon(mi, wd, month_long):
                  "carbon for the month split by the km it drives inside the district, laden and empty. Districts only: "
                  "no routes or roads are drawn."),
         "districts": districts,
-        "legend": _council_legend(),
+        "stops": list(stops),
+        "legend": _council_legend(stops),
         "tally": tally,
         "basis": ("Split by the km inside each district; across one tier it adds up to the scheme's carbon. "
                   "These are this scheme's lorries only, a planning estimate: they are not comparable with the DESNZ "
@@ -288,6 +351,104 @@ def _council_carbon(mi, wd, month_long):
         "attribution": list(A.get("attribution") or []),
         "sources": [f"Boundaries: {x}, generalised to 200 m." for x in sources],
         "stamp": (A.get("carbon") or {}).get("stamp") or "",
+    }
+
+
+def _mv(v):
+    """Two-way movements a day as a page people read prints them: whole movements; "under 1" for a sliver."""
+    if v is None:
+        return "—"
+    return "under 1" if 0 < v < 0.5 else n0(v)
+
+
+def _change_words(now, was):
+    """This month against last, in words, on the WHOLE figures the table prints (so the words match the columns)."""
+    a, b = round(now or 0), round(was or 0)
+    if not (was or 0) > 0 and (now or 0) > 0:
+        return "new this month"
+    if (was or 0) > 0 and not (now or 0) > 0:
+        return f"none this month (was {_mv(was)})"
+    if a == b:
+        return "no change" if (now or 0) > 0 else "—"
+    return f"up {a - b:,}" if a > b else f"down {b - a:,}"
+
+
+def _council_movements(mi, wd, month_long, A=None, prev=None, prev_long=None, distance_unit="km"):
+    """
+    13 Oct 2026 (W13): two-way movements a day, lorry-miles (or lorry-km) and the change since last month for each
+    local authority district, from the SAME areas.area_load the public map's By council layer reads (per area the
+    approved loads of every route whose laden leg enters it ÷ the working days; the lorry distance on the roads
+    inside, laden and empty). `A` / `prev` are this month's and last month's reads (or the exception a read raised);
+    None when the tenant has no districts. The districts add up to MORE than the scheme (a route counts in every
+    district its laden leg enters): the footnote says so in areas.DOUBLE_COUNT's words, and no total row is printed.
+    """
+    import areas
+    import config
+    stored = areas.stored_areas()
+    if not any(a["tier"] == "district" for a in stored):
+        return None
+    title = f"Movements by council in {month_long}"
+    try:
+        A = A if A is not None else areas.area_load(mi, working_days=wd, geometry=False)
+        if isinstance(A, Exception):
+            raise A
+    except Exception as e:
+        return {"error": f"The council figures could not be read for {month_long} ({type(e).__name__}).",
+                "title": title, "districts": []}
+    if isinstance(prev, Exception):
+        prev = None
+    stops = tuple((A.get("stops") or {}).get("movements") or council_stops("movements"))
+    unclipped = bool(A.get("routes_not_clipped"))
+    mi_words = "miles" if distance_unit == "mi" else "km"
+    per = config.KM_PER_MILE if distance_unit == "mi" else 1.0
+    was = {a["area_id"]: a for a in ((prev or {}).get("areas") or [])}
+    districts = []
+    for a in A.get("areas") or []:
+        if a["tier"] != "district":
+            continue
+        v = a.get("movements_per_day") or 0.0
+        cls = council_class(v, unclipped, stops)
+        if cls == "nofig":
+            text = "no figure yet"
+        elif cls == "none":
+            text = "empties only" if a.get("return_only_routes") else "no approved laden route"
+        else:
+            text = _mv(v)
+        if mi <= 1:
+            change = "no earlier month"
+        elif prev is None:
+            change = "—"
+        elif a["area_id"] not in was:
+            change = "—"
+        else:
+            change = _change_words(v, was[a["area_id"]].get("movements_per_day"))
+        dist = (a.get("lorry_km") or 0.0) / per
+        districts.append({"area_id": a["area_id"], "name": a["name"], "a_day": v, "text": text, "cls": cls,
+                          "fill": council_fill(cls, COUNCIL_RAMP_MOVEMENTS), "routes": a.get("routes_count") or 0,
+                          "distance": dist, "distance_text": (n0(dist) if dist >= 0.5 else ("under 1" if dist > 0 else "0")),
+                          "change": change})
+    districts.sort(key=lambda d: (-(d["a_day"] or 0), d["name"]))
+    tot = A.get("totals") or {}
+    county_lines = [f"{a['name']} ({a.get('tier_words') or 'county'}"
+                    + (f"; highway authority {a['highway_authority']}" if a.get("highway_authority") else "")
+                    + f"): {_mv(a.get('movements_per_day'))} two-way movements a day on roads its laden legs use."
+                    for a in A.get("areas") or [] if a["tier"] == "county"]
+    return {
+        "error": None, "title": title,
+        "lede": (f"Two-way lorry movements a day on the roads of each local authority district in {month_long}: the "
+                 f"approved loads of every route whose laden leg enters the district, divided by the {wd_text(wd)} "
+                 "working days. One load = one two-way movement, never doubled."),
+        "districts": districts, "stops": list(stops),
+        "legend": _council_legend(stops, COUNCIL_RAMP_MOVEMENTS, "", "no approved laden route"),
+        "distance_head": f"Lorry-{mi_words} in the month",
+        "change_head": f"Change since {prev_long}" if prev_long else "Change since last month",
+        "scheme_line": f"The scheme as a whole: {_mv(tot.get('movements_per_day'))} two-way movements a day in {month_long}.",
+        "footnote": (areas.DOUBLE_COUNT + " "
+                     f"Lorry-{mi_words}: laden and empty, on the roads inside the district. A route inside a district by "
+                     f"less than 200 m adds its {mi_words} there, not its movements. The colours are the public map's "
+                     "By council colours, on this scheme's bands."),
+        "county_lines": county_lines,
+        "notes": [x for x in (A.get("notes") or []) if "clipped" in x or "no stored road route" in x],
     }
 
 
@@ -393,11 +554,29 @@ def sheet(month_index, acc=None, now=None):
                 "over_flag": bool(r.get("cap") is not None and (r.get("two_way_a_day") or 0) > r["cap"])}
 
     routes_view = [route_view(r) for r in rows]
-    vmax = max([r["a_day"] or 0 for r in routes_view] or [0])
-    map_routes = [{"route_id": r["route_id"], "coords": geo[r["route_id"]][0], "a_day": r["a_day"] or 0,
-                   "weight": ((r["a_day"] or 0) / vmax if vmax else 0.0)}
-                  for r in routes_view if r["route_id"] in geo]
+    # REVERSED 13 Oct 2026 (W11): no width by volume (it was 1.5-6.5 px by the month's busiest route, so the same width
+    # meant different volumes in different months); each route takes the public map's Volume colour for its two-way
+    # movements a day, at one width. Drawn quietest first, so the busiest sit on top.
+    map_routes = sorted(({"route_id": r["route_id"], "coords": geo[r["route_id"]][0], "a_day": r["a_day"] or 0,
+                          "step": volume_class(r["a_day"]), "color": VOLUME_RAMP[volume_class(r["a_day"])]}
+                         for r in routes_view if r["route_id"] in geo), key=lambda r: (r["a_day"], r["route_id"]))
     controls = _controls(span_from, span_to)
+    # 13 Oct 2026 (W11, the map's Volume heat map held equal): the shared road sections — a stretch two or more routes
+    # use — drawn over the routes, each in the Volume colour of the routes using it, SUMMED (road_sections.road_load,
+    # the same read as /api/public/road-load), so a shared trunk road shows as the busiest stretch, as on the map.
+    map_sections, sections_note = [], None
+    try:
+        import road_sections
+        for run in (road_sections.road_load(mi, working_days=wd).get("runs") or []):
+            cs = _coords_of(run.get("geometry"))
+            if len(cs) >= 2:
+                v = float(run.get("movements_per_day") or 0.0)
+                map_sections.append({"coords": cs, "a_day": v, "step": volume_class(v),
+                                     "color": VOLUME_RAMP[volume_class(v)], "routes": len(run.get("routes") or [])})
+        map_sections.sort(key=lambda x: x["a_day"])
+    except Exception as e:
+        sections_note = (f"The shared road sections could not be read ({type(e).__name__}): each route is painted by its "
+                         "own figure only.")
 
     headline = [
         {"key": "two_way_a_day", "value": n0(H.get("two_way_a_day")),
@@ -495,7 +674,23 @@ def sheet(month_index, acc=None, now=None):
         change_text = f"Since {prev_long}: " + "; ".join(parts) + "."
 
     glance = _glance(H, R, routes_view, works, controls, rs.get("status"), never, rs.get("checked_at"), month_long)
-    council = _council_carbon(mi, wd, month_long)
+    # 13 Oct 2026 (W13): the month's areas read ONCE for both council sections (and last month's, figures only)
+    import areas
+    import config
+    A = A_prev = None
+    if any(a["tier"] == "district" for a in areas.stored_areas()):
+        try:
+            A = areas.area_load(mi, working_days=wd, geometry=True)
+        except Exception as e:
+            A = e
+        if mi > 1:
+            try:
+                A_prev = areas.area_load(mi - 1, working_days=wd, geometry=False)
+            except Exception as e:
+                A_prev = e
+    council = _council_carbon(mi, wd, month_long, A=A)
+    du = (config.tenant_settings().get("distance_unit") or "km")
+    council_mv = _council_movements(mi, wd, month_long, A=A, prev=A_prev, prev_long=prev_long, distance_unit=du)
 
     carbon = R.get("carbon") or {}
     veh = R.get("vehicles") or {}
@@ -512,8 +707,9 @@ def sheet(month_index, acc=None, now=None):
         ("Planning flag", page["terms"]["cap"] + " It is never a legal limit unless the scheme types it as agreed."),
     ]
     caveats = ["This bulletin is a planning forecast from the approved plan, not a monitoring report: no lorry was counted.",
-               "Every figure is per route. Where several routes share a road, the lorries on that road are their sum; "
-               "this bulletin does not yet print a figure per road.",
+               # NARROWED 13 Oct 2026 (W11): the route map now colours each shared road by its summed routes
+               "The tables are per route. Where several routes share a road, the lorries on that road are their sum: "
+               "the route map colours each shared stretch by that sum, but prints no figure on it.",
                "Other traffic, including local hauliers working for other customers, uses these roads too; "
                "the figures are this scheme's lorries only."]
     nd = R.get("routes_not_drawn") or {}
@@ -550,7 +746,10 @@ def sheet(month_index, acc=None, now=None):
         "moved_total": {"a_day": n0(H.get("two_way_a_day")), "vehicles": n0(veh.get("fleet")),
                         "t_day": n0((H.get("tonnes") / wd) if H.get("tonnes") is not None and wd else None)},
         "works": works, "checks": checks, "others": others,
-        "glance": glance, "council": council,
+        "glance": glance, "council": council, "council_mv": council_mv,
+        "volume_legend": volume_legend(),
+        "map_sections": map_sections, "sections_note": sections_note, "map_note": map_note(len(map_sections)),
+        "map_legend_title": f"Two-way movements a day in {month_long}",
         "change_rows": change_rows, "change_text": change_text,
         "terms": terms, "caveats": [c for c in caveats if c],
         # 12 Oct 2026 (Track C review): the tenant's typed concern_email (the map's "Report a concern"
@@ -611,10 +810,23 @@ def _svg_map(S, w=720, h=340):
         return '<p class="muted">No route with a stored road route to draw this month.</p>'
     out = [f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="Schematic of this month\'s haul routes" class="map">',
            f'<rect x="0" y="0" width="{w}" height="{h}" fill="#FAFAF9" stroke="#D6D3D1"/>']
-    for r in sorted(S["map_routes"], key=lambda r: r["weight"]):
-        pts = " ".join(f"{x:.1f},{h - y:.1f}" for x, y in (proj(*c) for c in r["coords"]))
-        out.append(f'<polyline points="{pts}" fill="none" stroke="{PLAN_BLUE}" stroke-width="{1.5 + 5 * r["weight"]:.1f}" '
-                   f'stroke-linecap="round" stroke-linejoin="round"><title>{_e(r["route_id"])}</title></polyline>')
+    # W11: the map's casing under every route first, then each route in its Volume colour, one width, quietest first
+    lines = [(r, " ".join(f"{x:.1f},{h - y:.1f}" for x, y in (proj(*c) for c in r["coords"]))) for r in S["map_routes"]]
+    for r, pts in lines:
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{ROUTE_CASING}" stroke-width="{ROUTE_CASING_W}" '
+                   'stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round"/>')
+    for r, pts in lines:
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{r["color"]}" stroke-width="{ROUTE_LINE_W}" '
+                   f'stroke-linecap="round" stroke-linejoin="round"><title>{_e(r["route_id"])}: '
+                   f'{_e(n0(r["a_day"]))} two-way movements a day</title></polyline>')
+    # the shared sections on top, each by its routes summed (the map's road-load layer), quietest first
+    for sct in S.get("map_sections") or []:
+        pts = " ".join(f"{x:.1f},{h - y:.1f}" for x, y in (proj(*c) for c in sct["coords"]))
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{ROUTE_CASING}" stroke-width="{ROUTE_CASING_W}" '
+                   'stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round" class="sec"/>'
+                   f'<polyline points="{pts}" fill="none" stroke="{sct["color"]}" stroke-width="{ROUTE_LINE_W}" '
+                   f'stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by {sct["routes"]} routes: '
+                   f'{_e(n0(sct["a_day"]))} two-way movements a day</title></polyline>')
     for p in S["places"]:
         if not p.get("at") or not p["letter"]:
             continue
@@ -629,6 +841,16 @@ def _svg_map(S, w=720, h=340):
                    f'<text x="{x:.1f}" y="{h - y + 4.5:.1f}" text-anchor="middle" class="pin">{z["n"]}</text>')
     out.append("</svg>")
     return "".join(out)
+
+
+ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5          # the map's CARBON_LINE_WIDTH / CARBON_CASING_WIDTH, in SVG units
+
+
+def _volume_legend_html(S):
+    sw = "".join(f'<span class="lg"><span class="sw" style="background:{g["fill"]}"></span>{_e(g["label"])}</span>'
+                 for g in S["volume_legend"])
+    return (f'<p class="legend cc-legend" data-bulletin="map-legend"><b>{_e(S["map_legend_title"])}:</b> {sw}</p>'
+            f'<p class="legend">{_e(S["map_note"])}' + (f' {_e(S["sections_note"])}' if S.get("sections_note") else "") + '</p>')
 
 
 def _sw_style(fill, hatch):
@@ -658,6 +880,30 @@ def _svg_council(C, w=720, h=560):
     return "".join(out)
 
 
+def _council_mv_html(M):
+    """13 Oct 2026 (W13): movements by council, the table and its footnote; empty for a tenant with no districts."""
+    if not M:
+        return ""
+    e = _e
+    if M.get("error"):
+        return f'<h2>{e(M["title"])}</h2><p class="empty">{e(M["error"])}</p>'
+    sw = "".join(f'<span class="lg"><span class="sw" style="background:{_sw_style(g["fill"], g["hatch"])}"></span>{e(g["label"])}</span>'
+                 for g in M["legend"])
+    rows = "".join(f'<tr><td><span class="dn"><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
+                   f'<span>{e(d["name"])}</span></span></td><td class="n">{e(d["text"])}</td><td class="n">{d["routes"]}</td>'
+                   f'<td class="n">{e(d["distance_text"])}</td><td>{e(d["change"])}</td></tr>' for d in M["districts"])
+    notes = "".join(f"<li>{e(x)}</li>" for x in M["county_lines"] + M["notes"])
+    return (f'<h2>{e(M["title"])}</h2>'
+            f'<p>{e(M["lede"])}</p>'
+            f'<div class="tw"><table data-bulletin="council-movements"><thead><tr><th>District</th>'
+            f'<th>Two-way movements a day</th><th>Routes</th><th>{e(M["distance_head"])}</th><th>{e(M["change_head"])}</th>'
+            f'</tr></thead><tbody>{rows}</tbody></table></div>'
+            f'<p class="legend cc-legend">Two-way movements a day: {sw}</p>'
+            f'<p>{e(M["scheme_line"])}</p>'
+            + (f'<ul>{notes}</ul>' if notes else "")
+            + f'<p class="muted" data-bulletin="double-count">{e(M["footnote"])}</p>')
+
+
 def _council_html(C):
     """The carbon-by-council section of the page; empty for a tenant with no council districts."""
     if not C:
@@ -667,8 +913,8 @@ def _council_html(C):
         return f'<h2>{e(C["title"])}</h2><p class="empty">{e(C["error"])}</p>'
     sw = "".join(f'<span class="lg"><span class="sw" style="background:{_sw_style(g["fill"], g["hatch"])}"></span>{e(g["label"])}</span>'
                  for g in C["legend"])
-    rows = "".join(f'<tr><td><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
-                   f'{e(d["name"])}</td><td>{e(d["highway_authority"])}</td><td class="n">{e(_co2(d["text"]))}</td>'
+    rows = "".join(f'<tr><td><span class="dn"><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
+                   f'<span>{e(d["name"])}</span></span></td><td>{e(d["highway_authority"])}</td><td class="n">{e(_co2(d["text"]))}</td>'
                    f'<td class="n">{e(d["share"])}</td></tr>' for d in C["districts"])
     notes = "".join(f"<li>{e(_co2(x))}</li>" for x in C["county_lines"] + C["notes"])
     lic = " ".join(e(x) for x in C["sources"] + C["attribution"])
@@ -756,7 +1002,8 @@ def html(S):
         "change_text": e(_co2(S["change_text"])),
         "rep_lorry": e(S["report"]["lorry"]), "rep_hours": e(S["report"]["hours"]), "rep_formats": e(S["report"]["formats"]),
         "foot": e(S["foot"]), "svg_map": _svg_map(S), "svg_chart": _svg_chart(S),
-        "glance": glance, "council": _council_html(S["council"]),
+        "glance": glance, "council": _council_html(S["council"]), "council_mv": _council_mv_html(S.get("council_mv")),
+        "map_legend": _volume_legend_html(S),
         "notice": notice, "nav": nav, "empty": empty, "head": head, "places": places, "busiest": busiest,
         "moved": moved, "checks": checks, "others": others, "change": change, "terms": terms, "caveats": caveats,
         "INK": INK, "MUTED": MUTED, "PLAN_BLUE": PLAN_BLUE, "PLAN_TINT": PLAN_TINT, "FLAG_RED": FLAG_RED,
@@ -803,6 +1050,7 @@ footer{{margin:28px 0 12px;font-size:14px;color:var(--muted)}}
 tr.nr td{{color:var(--muted)}} tr.nr td.n{{font-style:italic}}
 .sw{{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.08)}}
 .cc-legend .lg{{display:inline-block;margin-right:12px;white-space:nowrap}}
+.dn{{display:inline-flex;align-items:baseline}} .dn .sw{{flex:none}}   /* 13 Oct 2026: the square never wraps away from its name */
 svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}} svg .cn{{font-weight:700}}
 @media print{{
   @page{{size:A4;margin:14mm}}
@@ -826,8 +1074,9 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 
 <h2>The month's routes</h2>
 <div class="mapwrap" data-bulletin="map">{svg_map}</div>
-<p class="legend">Haul routes in the plan blue: thicker = more two-way movements. Schematic, not to scale; positions
-indicative. {places}{controls_text}</p>
+{map_legend}
+<p class="legend">Each route in the public map's Volume colour for its two-way movements a day; one width, so a width
+never carries a figure. Schematic, not to scale; positions indicative. {places}{controls_text}</p>
 
 <h2>The busiest routes</h2>
 <div class="tw"><table data-bulletin="busiest"><thead><tr><th>Route</th><th>Two-way a day</th><th>In the month</th>
@@ -861,6 +1110,8 @@ indicative. {places}{controls_text}</p>
 <tbody>{change}</tbody></table></div>
 <p>{change_text}</p>
 <p class="muted">Plan against plan: each month's approved plan as it stands today. No earlier issue of this bulletin is stored.</p>
+
+{council_mv}
 
 {council}
 

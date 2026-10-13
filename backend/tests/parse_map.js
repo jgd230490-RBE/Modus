@@ -2912,9 +2912,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
                  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }; return 1.05 / (lum(rampC[0]) + 0.05) >= 2; })()
      && !/#FF8C14|#C97A2E|#E0770C|#D97706|#F59E0B/i.test(blk), JSON.stringify(rampC));
   const AREA_NONE = "#E7E5E4";
-  const fillExpr = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE", "AREA_RAMP_CARBON",
-    (blk.match(/function areaFillExpr\(mode\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaFillExpr;")(
-    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE, rampC);
+  // NARROWED 13 Oct 2026 (W12): areaFillExpr reads the stops through areaStops() (the scheme's bands, sent with the areas,
+  // else AREA_STOPS); the sandbox carries both functions and an AREAS with no figures yet, so the default is what paints
+  const _stopsFn = (blk.match(/function areaStops\(mode\) \{[\s\S]*?\n    \}/) || [""])[0];
+  const mkArea = (name, data) => new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE", "AREA_RAMP_CARBON", "AREAS",
+    _stopsFn + (blk.match(new RegExp("function " + name + "\\(mode(?:, when)?\\) \\{[\\s\\S]*?\\n    \\}")) || [""])[0] + "; return " + name + ";")(
+    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE, rampC, { data: data });
+  const fillExpr = mkArea("areaFillExpr", null);
   const fm = fillExpr("movements"), fc = fillExpr("carbon");
   ok("⭐ council carbon: the carbon fill steps through the orange ramp, the movements fill through the blue",
      JSON.stringify(fc.slice(4).filter((x, i) => i % 2 === 0)) === JSON.stringify(rampC)
@@ -2939,9 +2943,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /mode: 'movements'/.test(blk) && /\[\['movements', 'Two-way movements a day'\], \['carbon', 't CO(?:₂|\\u2082)e this month'\]\]/.test(blk)
      && /function setAreaMode\(mode\)/.test(blk));
   // the legend, as the page builds it
-  const legend = new Function("AREA_STOPS", "AREA_RAMP", "AREA_NONE", "AREA_RAMP_CARBON",
-    (blk.match(/function areaLegendHTML\(mode, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaLegendHTML;")(
-    { movements: [50, 100, 200], carbon: [50, 100, 200] }, ramp, AREA_NONE, rampC);
+  const legend = mkArea("areaLegendHTML", null);
   const lgM = legend("movements", "Oct 2026"), lgC = legend("carbon", "Oct 2026");
   ok("⭐ §2.2b: the legend row per mode — movements titled for laden legs, five rows (four blues and the neutral)",
      lgM.includes("Two-way movements a day on roads a laden leg uses") && (lgM.match(/class="area-lg"/g) || []).length === 5
@@ -2950,6 +2952,23 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ §2.2b: ...and carbon titled with the month and the split, in t (never kg per tonne)",
      lgC.includes("t CO₂e in Oct 2026, split by the km inside each district") && lgC.includes("200 t and over")
      && lgC.includes("under 50 t") && !/\bkg\b|per tonne/.test(lgC) && rampC.every(c => lgC.includes(c)) && !ramp.some(c => lgC.includes(c)), lgC);
+  // 13 Oct 2026 (W12): the scheme's bands, sent with the areas (config.council_breaks), paint the fill and word the legend
+  const typed = { stops: { movements: [50, 100, 200], carbon: [20, 50, 100] } };
+  const fcT = mkArea("areaFillExpr", typed)("carbon"), lgT = mkArea("areaLegendHTML", typed)("carbon", "Oct 2026");
+  ok("⭐ W12: the scheme's typed carbon bands (20 / 50 / 100 t, sent with the areas) paint the fill and word the legend",
+     JSON.stringify(stops(fcT)) === "[0.01,20,50,100]" && lgT.includes("under 20 t") && lgT.includes("20 – 49 t")
+     && lgT.includes("50 – 99 t") && lgT.includes("100 t and over") && !lgT.includes("200 t"), lgT);
+  ok("W12: ...the movements keep their own bands (only carbon was typed)",
+     JSON.stringify(stops(mkArea("areaFillExpr", typed)("movements"))) === "[0.01,50,100,200]");
+  const badSets = [{ stops: { carbon: [100, 50, 20] } }, { stops: { carbon: [0, 1, 2] } }, { stops: { carbon: [1.5, 2, 3] } },
+                   { stops: { carbon: [1, 2] } }, { stops: { carbon: "20,50,100" } }, { stops: null }, {}];
+  ok("🔴 W12: bands that are not three rising whole numbers are never painted; the map falls back to AREA_STOPS",
+     badSets.every(d => JSON.stringify(stops(mkArea("areaFillExpr", d)("carbon"))) === "[0.01,50,100,200]"));
+  ok("⭐ W12: the join carries the bands from the month's figures, else from the shapes (read once a page)",
+     /out\.stops = \(figs && figs\.stops\) \|\| \(shapes && shapes\.stops\) \|\| null;/.test(blk)
+     && /const s = areaStops\(mode\);/.test(blk) && /const s = areaStops\(mode\), t = mode === 'carbon' \? ' t' : '';/.test(blk));
+  ok("🔴 W12: the old fixed read is gone from the fill and the legend (AREA_STOPS is only areaStops' fallback)",
+     (blk.match(/AREA_STOPS\[mode\]/g) || []).length === 1 && /return ok \? s : \(AREA_STOPS\[mode\] \|\| AREA_STOPS\.movements\);/.test(blk));
   // the attribution: the source carries the dataset's licence lines; the group prints them
   const seedTxt = fs.readFileSync(path.join(ROOT, "backend", "data", "areas_demo.geojson"), "utf8");
   const seed = JSON.parse(seedTxt);

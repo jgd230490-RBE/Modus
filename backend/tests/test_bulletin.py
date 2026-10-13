@@ -1175,8 +1175,17 @@ def _capture(req, timeout=0):
 export.urllib.request.urlopen = _capture
 _none = export.bulletin_map_png(S10["map_routes"], S10["places"], S10["controls"], token="pk.test")
 _u = _seen[0] if _seen else ""
-ok("⭐ the static map: plan-blue paths, width by two-way movements (R1, the busier, 8 px; R2 thinner), letter pins, the numbered amber control, within the URL limit",
-   _none is None and len(_seen) == 1 and "path-8+4A72C9-0.85(" in _u and re.search(r"path-[2-7]\+4A72C9-0\.85\(", _u)
+# REVERSED 13 Oct 2026 (W11, the user's bundle B): the routes were one plan blue with the width by volume (R1 8 px, R2
+# thinner); each now takes the public map's Volume colour for its two-way movements a day, all at ONE width over the
+# map's dark casing. R1 (~65 a day) is the 50-100 step, R2 (~23 a day) the 10-25 step.
+_r1, _r2 = (LOADS - loads_r2) / WD, loads_r2 / WD
+ok("⭐ the static map: each route in its Volume colour (R1 50-100 a day = #0B55CB, R2 10-25 = #5A96F6), ONE width (4 px) over "
+   "a 6 px dark casing per route, letter pins, the numbered amber control, within the URL limit; no plan-blue width-by-volume path",
+   _none is None and len(_seen) == 1 and 50 <= _r1 < 100 and 10 <= _r2 < 25
+   and "path-4+0B55CB-1(" in _u and "path-4+5A96F6-1(" in _u and _u.count("path-6+1F2024-0.9(") == 2
+   and not re.search(r"path-\d+\+4A72C9", _u) and not re.search(r"path-(?!4\+|6\+1F2024)\d+\+", _u)
+   and _u.index("path-6+1F2024") < _u.index("path-4+")
+   and _u.index("path-4+5A96F6") < _u.index("path-4+0B55CB")
    and "pin-s-a+1F2024(" in _u and "pin-s-b+1F2024(" in _u and "pin-s-1+D97706(" in _u and len(_u) <= 8000
    and "/styles/v1/mapbox/light-v11/static/" in _u, _u[:300])
 _many = [{"route_id": f"X{i}", "coords": [(-1.0 + j * 0.0013 + i * 0.01, 52.5 + ((j * 7919) % 97) * 0.0011) for j in range(500)],
@@ -1187,6 +1196,316 @@ ok("🔴 forty long routes: the URL is thinned (or the pins dropped) to fit 8,00
    all(len(u) <= 8000 for u in _seen), str([len(u) for u in _seen]))
 export.urllib.request.urlopen = _real_urlopen
 offline(export)
+
+
+# --------------------------------------------------------------------------- #
+#  8c. 13 Oct 2026 — BUNDLE B: W11 route colours, W12 council bands in Config,   #
+#      W13 movements by council                                                 #
+# --------------------------------------------------------------------------- #
+_CFGJS = read("map/config.js")
+# W11 — the page-1 route map takes the public map's Volume colours, one width
+_mvs = re.search(r"const VOLUME_STOPS = \[([^\]]+)\];", MAP)
+_mcr = re.search(r"const CARBON_RAMP = \[([^\]]+)\];", MAP)
+_mcs = re.search(r'forecastCasing:\s*"(#[0-9A-Fa-f]{6})"', _CFGJS)
+ok("⭐ W11 held equal: the bulletin's VOLUME_STOPS and VOLUME_RAMP are the map's VOLUME_STOPS and the CARBON_RAMP volumeColor() "
+   "paints with; the casing is the map's forecastCasing",
+   bool(_mvs and _mcr and _mcs)
+   and list(bulletin_doc.VOLUME_STOPS) == [int(x) for x in _mvs.group(1).split(",")]
+   and list(bulletin_doc.VOLUME_RAMP) == [x.strip().strip("'") for x in _mcr.group(1).split(",")]
+   and "const s = stops, c = CARBON_RAMP;" in MAP and "volumeColor('f_avg', ROUTE_VOLUME_STOPS)" in MAP
+   and bulletin_doc.ROUTE_CASING == _mcs.group(1))
+ok("⭐ W11 held equal: the legend's five labels are the map's stepRanges() wording, the function read off the map",
+   "return ['under ' + s[0] + unit, s[0] + ' to ' + s[1] + unit, s[1] + ' to ' + s[2] + unit, s[2] + ' to ' + s[3] + unit, s[3] + unit + ' and over'];" in MAP
+   and [g["label"] for g in S10["volume_legend"]] == ["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"]
+   and [g["fill"] for g in S10["volume_legend"]] == list(bulletin_doc.VOLUME_RAMP))
+_vc = bulletin_doc.volume_class
+ok("W11: the step is the map's Mapbox step (at or over a stop takes the next colour); None and 0 the lightest",
+   [_vc(x) for x in (None, 0, 9.99, 10, 24.9, 25, 49.9, 50, 99.9, 100, 4000)] == [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
+_MR = {r["route_id"]: r for r in S10["map_routes"]}
+ok("⭐ W11 (hand): R1 (~65 a day) is #0B55CB, R2 (~23 a day) #5A96F6; no width or weight is carried any more",
+   _MR["R1"]["color"] == "#0B55CB" and _MR["R2"]["color"] == "#5A96F6" and near(_MR["R1"]["a_day"], _r1, 1e-3)
+   and all("weight" not in r for r in S10["map_routes"]), str(S10["map_routes"]))
+ok("W11: drawn quietest first, so the busiest route is on top", [r["route_id"] for r in S10["map_routes"]] == ["R2", "R1"])
+_svgm = HTML10.split('data-bulletin="map">')[1].split("</svg>")[0]
+ok("⭐ W11 page: every route at ONE width (5) in its Volume colour over a 7.5 casing in the map's ink; never the plan blue",
+   _svgm.count('stroke-width="5"') == 2 and _svgm.count('stroke="#1F2024" stroke-width="7.5"') == 2
+   and 'stroke="#0B55CB" stroke-width="5"' in _svgm and 'stroke="#5A96F6" stroke-width="5"' in _svgm
+   and "#4A72C9" not in _svgm and _svgm.index('stroke-width="7.5"') < _svgm.index('stroke-width="5"'))
+ok("⭐ W11 page: the legend under the map — the title for the month and the five swatches; the old 'thicker' line is gone",
+   'data-bulletin="map-legend"><b>Two-way movements a day in October 2026:</b>' in HTML10
+   and all(f"background:{c}" in HTML10.split('data-bulletin="map-legend"')[1].split("</p>")[0] for c in bulletin_doc.VOLUME_RAMP)
+   and "thicker" not in HTML10 and "one width, so a width never carries a figure" in HTML_TEXT)
+ok("⭐ W11 PDF: page 1 carries the legend (title and the five ranges) and the caption says one width; 'thicker' nowhere",
+   "Two-way movements a day in October 2026:" in PAGES[0] and all(t in PAGES[0] for t in ("under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"))
+   and "Volume colour for its two-way movements a day, one width" in PAGES[0] and "thicker" not in T10J)
+ok("🔴 W11 source: no line width is worked out from a volume in the bulletin's drawing code or the view model any more",
+   all(x not in _EXB + read("backend/bulletin_doc.py") for x in ('r["weight"]', "r['weight']", '"weight":', "1.5 + 5 *", "0.8 + 3.2 *")))
+ok("🔴 W11 source: the schematic and the page draw the casing then the colour, at fixed widths",
+   'c.setLineWidth(3.4)' in _EXB and 'c.setLineWidth(2.2)' in _EXB and "_hex_rgb(r[\"color\"])" in _EXB
+   and "ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5" in read("backend/bulletin_doc.py")
+   and "const CARBON_LINE_WIDTH = 5, CARBON_CASING_WIDTH = 7.5;" in MAP)
+
+# W11 — the shared road sections, each by its routes summed (the map's Volume heat map: routes by their own figure,
+# shared sections summed on top). R1 and R2 run the same road in the fixture, so after the index is built it is ONE shared
+# section carrying both routes' loads (~98 a day, the 50-100 step), while each route alone is lighter.
+ok("W11: with no shared-section index the map draws the routes only, and the note says 0 shared sections in the map's words",
+   S10["map_sections"] == [] and S10["map_note"].startswith("Each route is painted by its own figure; 0 shared sections"))
+_mapfoot = re.search(r"'<div class=\"ml-foot\">Each route is painted by its own figure; ' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+\s*' \(a stretch of road two or more routes use\) by the routes using it, summed", MAP)
+ok("⭐ W11 held equal: the note is the map's Volume legend foot, word for word up to 'summed'",
+   bool(_mapfoot) and bulletin_doc.map_note(3) == "Each route is painted by its own figure; 3 shared sections (a stretch of road two or more routes use) by the routes using it, summed."
+   and bulletin_doc.map_note(1).startswith("Each route is painted by its own figure; 1 shared section ("))
+import road_sections  # noqa: E402
+_rb = road_sections.rebuild()
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    S10S = bulletin_doc.sheet(10, PLANNER)
+    PDF10S = export.build_bulletin_pdf(S10S)
+    HTML10S = bulletin_doc.html(S10S)
+finally:
+    config.tenant_settings = _real_ts4
+_RL10 = road_sections.road_load(10, working_days=WD)
+ok("⭐ W11 (hand): ONE shared section (R1 and R2's common road) at BOTH routes' loads ÷ working days = 98 a day, the 50-100 "
+   "colour, while R2 alone is the 10-25 colour; the figure is road_load's (the map's /api/public/road-load)",
+   len(S10S["map_sections"]) == 1 and near(S10S["map_sections"][0]["a_day"], LOADS / WD, 0.01)
+   and S10S["map_sections"][0]["color"] == "#0B55CB" and S10S["map_sections"][0]["routes"] == 2
+   and near(S10S["map_sections"][0]["a_day"], _RL10["runs"][0]["movements_per_day"], 1e-9)
+   and {r["route_id"]: r["color"] for r in S10S["map_routes"]}["R2"] == "#5A96F6", str((_rb, S10S["map_sections"][:1] and S10S["map_sections"][0]["a_day"])))
+_svgs = HTML10S.split('data-bulletin="map">')[1].split("</svg>")[0]
+ok("⭐ W11 page: the shared section is drawn ON TOP of the routes (after them), with its own casing, in its summed colour",
+   _svgs.count('class="sec"') == 2 and _svgs.rindex('stroke="#5A96F6"') < _svgs.index('class="sec"')
+   and 'stroke="#0B55CB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by 2 routes: 98 two-way movements a day</title>' in _svgs
+   and "Each route is painted by its own figure; 1 shared section (a stretch of road two or more routes use) by the routes using it, summed." in _hm.unescape(HTML10S))
+ok("W11 PDF: the note under the legend names the one shared section",
+   "1 shared section (a stretch of road two or more routes use) by the routes using it, summed." in " ".join(pdf_text(PDF10S).split()))
+_seen.clear(); export.urllib.request.urlopen = _capture
+export.bulletin_map_png(S10S["map_routes"], S10S["places"], S10S["controls"], token="pk.test", sections=S10S["map_sections"])
+export.urllib.request.urlopen = _real_urlopen; offline(export)
+_us = _seen[0] if _seen else ""
+ok("⭐ W11 static map: the section's casing and its summed colour come AFTER every route path (on top), within the URL limit",
+   _us.count("path-6+1F2024-0.9(") == 3 and _us.count("path-4+0B55CB-1(") == 2
+   and _us.rindex("path-4+5A96F6") < _us.rindex("path-6+1F2024") < _us.rindex("path-4+0B55CB") and len(_us) <= 8000, _us[:200])
+_real_rl = road_sections.road_load
+
+
+def _rl_boom(*a, **k):
+    raise RuntimeError("fixture: road load failed")
+
+
+road_sections.road_load = _rl_boom
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    S10F = bulletin_doc.sheet(10, PLANNER)
+finally:
+    road_sections.road_load = _real_rl
+    config.tenant_settings = _real_ts4
+ok("🔴 W11: a failed shared-section read keeps the routes on the map and SAYS the sections are missing (never a silent gap)",
+   S10F["map_sections"] == [] and len(S10F["map_routes"]) == 2
+   and S10F["sections_note"] == "The shared road sections could not be read (RuntimeError): each route is painted by its own figure only."
+   and "could not be read (RuntimeError)" in bulletin_doc._volume_legend_html(S10F))
+ok("W11: the caveat is NARROWED — the map now colours shared roads by their sum; the tables stay per route; no figure on a road",
+   "the route map colours each shared stretch by that sum, but prints no figure on it." in " ".join(S10S["caveats"])
+   and "does not yet print a figure per road" not in " ".join(S10S["caveats"]))
+
+# W12 — the council bands per scheme, in Config, read by the map and the bulletin
+ok("⭐ W12 default held equal three ways: config.COUNCIL_BREAKS_DEFAULT = the map's AREA_STOPS = the Config page's placeholder",
+   config.council_breaks({}) == {"movements": [50, 100, 200], "carbon": [50, 100, 200]}
+   and "const AREA_STOPS = { movements: [50, 100, 200], carbon: [50, 100, 200] };" in MAP
+   and "const COUNCIL_BREAKS_DEFAULT = { movements: [50, 100, 200], carbon: [50, 100, 200] };" in read("frontend/index.html")
+   and list(bulletin_doc.COUNCIL_STOPS) == list(config.COUNCIL_BREAKS_DEFAULT["carbon"]))
+_cbp = config.council_breaks_problem
+ok("🔴 W12 validation: three rising whole numbers of 1 or more, nothing else",
+   _cbp([20, 50, 100]) is None and _cbp((1, 2, 3)) is None and _cbp([20.0, 50, 100]) is None
+   and _cbp([100, 50, 200]) and _cbp([50, 50, 100]) and _cbp([0, 1, 2]) and _cbp([1.5, 2, 3]) and _cbp([1, 2])
+   and _cbp([1, 2, 3, 4]) and _cbp([True, 2, 3]) and _cbp(["1", 2, 3]) and _cbp(None) and _cbp([1, 2, float("inf")]))
+_doc0 = config.load(conversions)
+_bad = json.loads(json.dumps(_doc0)); _bad.setdefault("tenant", {})["council_breaks"] = {"carbon": [100, 50, 20], "volume": [1, 2, 3]}
+_pr = config.validate(_bad)
+ok("🔴 W12 validation on save: falling bands and an unknown measure are refused with plain words",
+   "tenant.council_breaks.carbon must rise from left to right" in _pr
+   and "tenant.council_breaks.volume is not a measure (movements or carbon)" in _pr, str(_pr))
+_bad2 = json.loads(json.dumps(_doc0)); _bad2.setdefault("tenant", {})["council_breaks"] = {"carbon": [1, None, 3]}
+ok("🔴 W12 validation: a half-typed row (a blank among the three) is refused, never half-applied",
+   "tenant.council_breaks.carbon must be whole numbers, 1 or more" in config.validate(_bad2), str(config.validate(_bad2)))
+ok("W12: an unreadable stored row falls back per measure, never a crash (movements typed, carbon broken)",
+   config.council_breaks({"tenant": {"council_breaks": {"movements": [5, 10, 20], "carbon": [3, 2, 1]}}})
+   == {"movements": [5, 10, 20], "carbon": [50, 100, 200]}
+   and config.council_breaks({"tenant": {"council_breaks": "nonsense"}}) == {"movements": [50, 100, 200], "carbon": [50, 100, 200]})
+# type the demo's bands (20 / 50 / 100 t, chosen 13 Oct from the live demo's Sep-Dec district figures) and read them back
+_doc1 = json.loads(json.dumps(_doc0)); _doc1.setdefault("tenant", {})["council_breaks"] = {"carbon": [20, 50, 100]}
+_sv = config.save(_doc1, by="harness"); config.invalidate()
+_A10 = areas.area_load(10, working_days=WD, geometry=False)
+ok("⭐ W12: typed bands are saved and read back by ONE reader; a measure not typed keeps the default",
+   _sv.get("ok") and config.council_breaks() == {"movements": [50, 100, 200], "carbon": [20, 50, 100]}
+   and config.tenant_settings(conversions)["council_breaks"] == config.council_breaks(), str(_sv))
+ok("⭐ W12 held equal, map side: both payloads the map reads carry the scheme's bands (shapes and the month's figures)",
+   _A10["stops"] == config.council_breaks() and areas.shapes()["stops"] == config.council_breaks())
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    S10B = bulletin_doc.sheet(10, PLANNER, now=datetime.datetime(2026, 10, 12, 9, 0, tzinfo=datetime.timezone.utc))
+    PDF10B = export.build_bulletin_pdf(S10B)
+    HTML10B = bulletin_doc.html(S10B)
+    S11B = bulletin_doc.sheet(11, PLANNER)
+    _real_ts5 = config.tenant_settings
+    config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE,
+                                                  distance_unit="mi")
+    S10M = bulletin_doc.sheet(10, PLANNER)
+finally:
+    config.tenant_settings = _real_ts4
+T10B = pdf_text(PDF10B)
+T10BJ = " ".join(T10B.split())
+HTML_TEXT_B = _hm.unescape(" ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", " ", HTML10B, flags=re.S)).split()))
+CB, MB = S10B["council"], S10B["council_mv"]
+ok("⭐ W12 held equal, bulletin side: the carbon section's bands are the payload's (the map's) and the legend reads them",
+   CB["stops"] == _A10["stops"]["carbon"] == [20, 50, 100]
+   and [g["label"] for g in CB["legend"][:4]] == ["under 20 t", "20 to 49 t", "50 to 99 t", "100 t and over"]
+   and all(t in HTML_TEXT_B for t in ("under 20 t", "20 to 49 t", "50 to 99 t", "100 t and over"))
+   and "under 20 t" in T10BJ and "100 t and over" in T10BJ, str(CB["stops"]))
+_DB = {d["name"]: d for d in CB["districts"]}
+ok("⭐ W12: each district's colour is its step on the SCHEME's bands (the same tonnes, a different step from the default)",
+   all(d["fill"] == bulletin_doc.COUNCIL_RAMP[sum(1 for x in (20, 50, 100) if d["co2_t"] >= x)]
+       for d in CB["districts"] if d["cls"] not in ("none", "nofig"))
+   and all(_DB[n]["co2_t"] == _D[n]["co2_t"] for n in _D), str([(d["name"], d["co2_t"], d["cls"]) for d in CB["districts"]]))
+ok("W12: the movements section reads the movements bands (default here: 50 / 100 / 200 a day, the map's blue)",
+   MB["stops"] == [50, 100, 200] and [g["fill"] for g in MB["legend"][:4]] == list(bulletin_doc.COUNCIL_RAMP_MOVEMENTS)
+   and [g["label"] for g in MB["legend"][:4]] == ["under 50", "50 to 99", "100 to 199", "200 and over"])
+_mrm = re.search(r"const AREA_RAMP = \[([^\]]+)\];", MAP)
+ok("⭐ W13 held equal: the movements colours are the map's AREA_RAMP (the plan blue in four steps)",
+   bool(_mrm) and list(bulletin_doc.COUNCIL_RAMP_MOVEMENTS) == [x.strip().strip("'") for x in _mrm.group(1).split(",")])
+ok("🔴 W12 source: neither reader works the bands out from the data (no max, no quantiles)",
+   not re.search(r"max\(|quantile|percentile", read("backend/config.py").split("def council_breaks(")[1].split("\ndef ")[0])
+   and "_stops()" in read("backend/areas.py") and "council_stops(" in read("backend/bulletin_doc.py"))
+
+# W13 — movements by council
+_DM = {d["name"]: d for d in MB["districts"]}
+_mv10 = LOADS / WD
+_mv11 = (20000 / PAY_ART + 29000 / PAY_ART) / WD
+ok("⭐ W13 (hand): Eastshire and Westvale each carry BOTH routes' loads ÷ working days (both laden legs enter them) = the "
+   "scheme's 98 a day; Farmoor none",
+   near(_DM["Eastshire"]["a_day"], _mv10, 0.01) and near(_DM["Westvale"]["a_day"], _mv10, 0.01)
+   and _DM["Eastshire"]["text"] == f"{_mv10:,.0f}" == "98" and _DM["Farmoor"]["text"] == "no approved laden route"
+   and _DM["Farmoor"]["fill"] == "#E7E5E4" and _DM["Eastshire"]["routes"] == 2, str([(d["name"], d["a_day"], d["text"]) for d in MB["districts"]]))
+ok("⭐ W13: the double count — the districts add up to MORE than the scheme, no total row, and the footnote says why in the "
+   "map's own words (areas.DOUBLE_COUNT)",
+   _DM["Eastshire"]["a_day"] + _DM["Westvale"]["a_day"] > H["two_way_a_day"]
+   and MB["footnote"].startswith(areas.DOUBLE_COUNT) and MB["scheme_line"] == "The scheme as a whole: 98 two-way movements a day in October 2026."
+   and areas.DOUBLE_COUNT in _A10["basis"])
+ok("⭐ W13 held equal: the map's district card says the same rule (the first clause of areas.DOUBLE_COUNT, word for word)",
+   "a route counts in every area its laden leg enters" in MAP
+   and areas.DOUBLE_COUNT.startswith("A route counts in every area its laden leg enters"))
+ok("W13: lorry-km are the map's (areas.area_load lorry_km, laden and empty on the roads inside); Eastshire:Westvale = 5:3",
+   all(near(_DM[a["name"]]["distance"], a["lorry_km"], 0.05) for a in _A10["areas"] if a["tier"] == "district")
+   and near(_DM["Eastshire"]["distance"] / _DM["Westvale"]["distance"], 5 / 3, 0.01) and MB["distance_head"] == "Lorry-km in the month")
+_DMM = {d["name"]: d for d in S10M["council_mv"]["districts"]}
+ok("⭐ W13: a miles tenant reads lorry-miles (the km ÷ 1.609344), headed so",
+   S10M["council_mv"]["distance_head"] == "Lorry-miles in the month"
+   and near(_DMM["Eastshire"]["distance"], _DM["Eastshire"]["distance"] / 1.609344, 0.01)
+   and "Lorry-miles: laden and empty" in S10M["council_mv"]["footnote"])
+_DM11 = {d["name"]: d for d in S11B["council_mv"]["districts"]}
+ok("⭐ W13 (hand): the change since last month on the WHOLE figures printed — October 98 → November 77 is 'down 21'; "
+   "September had none, so October reads 'new this month'",
+   f"{_mv11:,.0f}" == "77" and _DM11["Eastshire"]["text"] == "77" and _DM11["Eastshire"]["change"] == "down 21"
+   and _DM["Eastshire"]["change"] == "new this month" and _DM["Farmoor"]["change"] == "—"
+   and S11B["council_mv"]["change_head"] == "Change since October 2026", str((_DM11["Eastshire"], _DM["Eastshire"]["change"])))
+_cw_ = bulletin_doc._change_words
+ok("W13: the change words — up / down / no change / new / none this month, never a bare sign",
+   _cw_(98.4, 77.4) == "up 21" and _cw_(77.2, 98.1) == "down 21" and _cw_(10.2, 9.8) == "no change"
+   and _cw_(5, 0) == "new this month" and _cw_(0, 7.6) == "none this month (was 8)" and _cw_(0, 0) == "—"
+   and _cw_(0.3, 0) == "new this month" and bulletin_doc._mv(0.3) == "under 1")
+ok("⭐ W13 page: the table (district, movements, routes, lorry distance, change), the blue legend, the scheme line, the footnote",
+   '<table data-bulletin="council-movements">' in HTML10B and "Movements by council in October 2026" in HTML_TEXT_B
+   and "Change since September 2026" in HTML_TEXT_B and "Lorry-km in the month" in HTML_TEXT_B
+   and 'data-bulletin="double-count">' + areas.DOUBLE_COUNT.replace("'", "&#x27;") in HTML10B
+   and "The scheme as a whole: 98 two-way movements a day in October 2026." in HTML_TEXT_B
+   and HTML10B.index("Movements by council") < HTML10B.index("Carbon by council"))
+ok("⭐ W13 PDF: the section's title, each district with its figure and change, the scheme line and the double-count footnote",
+   "Movements by council in October 2026" in T10BJ and "new this month" in T10BJ and "no approved laden route" in T10BJ
+   and "The scheme as a whole: 98 two-way movements a day" in T10BJ and areas.DOUBLE_COUNT in T10BJ
+   and T10BJ.index("Movements by council") < T10BJ.index("Carbon by council"))
+ok("⭐ W13 PDF: 'fictional demo scheme' on every page, with both council sections in",
+   all("fictional demo scheme" in p.lower() for p in T10B.split("\f") if p.strip()))
+ok("🔴 W13: the banned-word scan and the UK words over both council sections, page and PDF",
+   not _BANNED.search(T10BJ + " " + HTML_TEXT_B) and not re.search(r"\bAI\b", T10BJ + " " + HTML_TEXT_B)
+   and not _trucks(T10BJ + " " + HTML_TEXT_B))
+ok("🔴 W13: no district is ever printed with a fraction of a movement (whole movements on public pages, 12 Oct)",
+   all(re.fullmatch(r"[\d,]+|under 1|no figure yet|empties only|no approved laden route", d["text"]) for d in MB["districts"] + S11B["council_mv"]["districts"]))
+_px_b = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", HTML10B)]
+ok("🔴 the 14 px floor holds with both council sections and the map legend", _px_b and min(_px_b) >= 14, str(sorted(set(_px_b))))
+ok("🔴 the literal-22 ban and the no-SQL rule still hold for the composition with bundle B",
+   "22" not in read("backend/bulletin_doc.py") and "db." not in read("backend/bulletin_doc.py"))
+# 13 Oct 2026 (found by LOOKING at the rendered PDF, not by a harness): equal legend slots let "no approved laden
+# route" run into the next swatch and cut the title; the caption ran off page 1. Both measured here.
+from reportlab.pdfbase.pdfmetrics import stringWidth as _sw  # noqa: E402
+from reportlab.lib.units import mm as _mm  # noqa: E402
+_U = 210 * _mm - 28 * _mm
+
+
+def _legend_overlaps(dr):
+    """[(end of one label, start of the next swatch)] where a label runs into the next item, or past the width."""
+    strs = [x for x in dr.contents if type(x).__name__ == "String"]
+    rects = sorted(x.x for x in dr.contents if type(x).__name__ in ("Rect", "Group") and getattr(x, "x", None) is not None)
+    bad = []
+    title = strs[0]
+    if title.x + _sw(title.text, title.fontName, title.fontSize) > rects[0]:
+        bad.append(("title", title.text))
+    labels = strs[1:]
+    for i, lb in enumerate(labels):
+        end = lb.x + _sw(lb.text, lb.fontName, lb.fontSize)
+        nxt = labels[i + 1].x - 10.5 if i + 1 < len(labels) else _U
+        if end > nxt:
+            bad.append((lb.text, round(end, 1), round(nxt, 1)))
+    return bad
+
+
+ok("🔴 the PDF legends never overlap: the title before the first swatch, each label before the next swatch, the row inside the page",
+   _legend_overlaps(export._council_legend(MB, _U, "Two-way movements a day:")) == []
+   and _legend_overlaps(export._council_legend(CB, _U)) == [],
+   str((_legend_overlaps(export._council_legend(MB, _U, "Two-way movements a day:")), _legend_overlaps(export._council_legend(CB, _U)))))
+_cap = export._BulletinMapCaption(types.SimpleNamespace(kind="schematic"), 19)
+ok("🔴 the map caption is two lines, each inside the page width (it ran off the page as one)",
+   _cap.height >= 8 * _mm
+   and _sw("Routes this month: 19 · each route in the public map's Volume colour for its two-way movements a day, one width",
+           "Helvetica", 7.5) <= _U
+   and "A schematic from the stored road routes, not to scale (no map tiles)." in T10J)
+
+# 13 Oct 2026 (seen at 375 px in the built-in browser): the colour square wrapped above "Harborough"; it is now held to its name
+ok("🔴 both council tables keep each colour square beside its district name on a phone (inline-flex, the square never shrinks)",
+   HTML10B.count('<td><span class="dn"><span class="sw"') == 2 * len(MB["districts"])
+   and ".dn{display:inline-flex;align-items:baseline} .dn .sw{flex:none}" in HTML10B)
+
+# one areas read per month: sheet() reads this month once (both sections) and last month once
+_calls_al = []
+
+
+def _al_count(*a, **k):
+    _calls_al.append((a, k.get("geometry")))
+    return _real_al(*a, **k)
+
+
+areas.area_load = _al_count
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    bulletin_doc.sheet(10, PLANNER)
+finally:
+    areas.area_load = _real_al
+    config.tenant_settings = _real_ts4
+ok("W13: one areas read for this month (with the polygons, for both sections) and one for last month (figures only)",
+   [(a[0], g) for a, g in _calls_al] == [(10, True), (9, False)], str(_calls_al))
+# a failed read: both sections stay, each says so
+areas.area_load = _al_boom
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    S10E = bulletin_doc.sheet(10, PLANNER)
+finally:
+    areas.area_load = _real_al
+    config.tenant_settings = _real_ts4
+ok("🔴 W13: a failed areas read keeps BOTH council sections and each says the figures could not be read",
+   S10E["council_mv"]["error"] == "The council figures could not be read for October 2026 (RuntimeError)."
+   and S10E["council"]["error"] == S10E["council_mv"]["error"]
+   and "could not be read" in bulletin_doc._council_mv_html(S10E["council_mv"]))
+ok("🔴 W13: no districts, no movements section (the bulletin without council areas)",
+   S10["council_mv"] is None and "Movements by council" not in T10J and 'data-bulletin="council-movements"' not in HTML10)
+# put the default back for what follows
+_doc2 = json.loads(json.dumps(_doc0)); config.save(_doc2, by="harness"); config.invalidate()
 
 # the frame, shared
 ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary and the bulletin",

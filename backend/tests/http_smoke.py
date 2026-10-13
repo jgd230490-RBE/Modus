@@ -933,6 +933,28 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("Track C review: /api/public/areas?geometry=0 gives the same figures without the polygons",
        r.status_code == 200 and len(r.json().get("areas", [])) == 9 and all("geometry" not in a and "label_point" not in a for a in r.json()["areas"])
        and [(a["area_id"], a["movements_per_day"]) for a in r.json()["areas"]] == [(a["area_id"], a["movements_per_day"]) for a in ar["areas"]], r.text[:200])
+    # 13 Oct 2026 (W12, bundle B): the council colour bands per scheme, saved through Config, served with the areas
+    ok("⭐ W12: both area payloads carry the scheme's bands — the defaults while none is typed",
+       sh.get("stops") == {"movements": [50, 100, 200], "carbon": [50, 100, 200]} and ar.get("stops") == sh.get("stops"),
+       str((sh.get("stops"), ar.get("stops"))))
+    _cfg = c.get("/api/config/factors", headers=PLAN).json()["doc"]
+    _bad = json.loads(json.dumps(_cfg)); _bad.setdefault("tenant", {})["council_breaks"] = {"carbon": [100, 50, 20]}
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _bad, "updated_by": "smoke"})
+    ok("🔴 W12: a Config save with falling bands is refused (400) with the plain-words reason, nothing stored",
+       r.status_code == 400 and "tenant.council_breaks.carbon must rise from left to right" in r.text
+       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [50, 100, 200], r.text[:200])
+    _good = json.loads(json.dumps(_cfg)); _good.setdefault("tenant", {})["council_breaks"] = {"carbon": [20, 50, 100]}
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _good, "updated_by": "smoke"})
+    import config as _cfgmod
+    _cfgmod.invalidate()
+    _s2 = c.get("/api/public/areas/shapes").json().get("stops")
+    _a2 = c.get("/api/public/areas", params={"month": 10, "geometry": 0}).json().get("stops")
+    ok("⭐ W12: saved bands (carbon 20 / 50 / 100) reach both payloads the map reads; movements keep the default",
+       r.status_code == 200 and _s2 == _a2 == {"movements": [50, 100, 200], "carbon": [20, 50, 100]}, str((r.status_code, _s2, _a2)))
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _cfg, "updated_by": "smoke"})
+    _cfgmod.invalidate()
+    ok("W12: ...and the document put back reads the defaults again", r.status_code == 200
+       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [50, 100, 200])
     # ------------------------------------------- 3d. the network behind the gate (12 Oct 2026, map review D18)
     # The twelve reads that needed no credential until today, read three ways: the staff COOKIE (this client, no
     # header), the planner CODE in the header with no cookie, and — at the end of this file — the MAP cookie and

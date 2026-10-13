@@ -3948,14 +3948,22 @@
     const AREA_RAMP_CARBON = ['#EE9150', '#E8590C', '#B8470A', '#7C2D06'];
     const AREA_NONE = '#E7E5E4';                                         // no approved laden route, or no figure
     const AREA_STOPS = { movements: [50, 100, 200], carbon: [50, 100, 200] };   // fixed, ascending: a day / t in the month
+    // 13 Oct 2026 (W12): AREA_STOPS is now the product default (config.COUNCIL_BREAKS_DEFAULT, held equal by the
+    // harnesses). A scheme types its own bands on Config → Map and bulletin; the server sends them with the areas
+    // (`stops`, config.council_breaks) and the bulletin prints by the same ones. Still fixed per scheme, never from the data.
     const AREA_INK = '#1F2024';
     // 12 Oct 2026 (night, the user: districts "segregated as it is on the mockup"): each district a near-solid block of
     // its step, parted from its neighbours by a white 2.5 px line (mockup 4); the county's dashed ink line stays on top
     const AREA_FILL_OPACITY = 0.8;
     const AREA_LAYERS = ['area-fill', 'area-nofig', 'area-outline', 'area-label'];
     const AREA_COUNTY_LAYERS = ['area-county-outline', 'area-county-fill', 'area-county-label'];
+    function areaStops(mode) {
+        const s = AREAS.data && AREAS.data.stops && AREAS.data.stops[mode];
+        const ok = Array.isArray(s) && s.length === 3 && s.every(x => Number.isInteger(x) && x >= 1) && s[0] < s[1] && s[1] < s[2];
+        return ok ? s : (AREA_STOPS[mode] || AREA_STOPS.movements);
+    }
     function areaFillExpr(mode) {
-        const s = AREA_STOPS[mode] || AREA_STOPS.movements;
+        const s = areaStops(mode);
         // a Mapbox step: below 0.01 (none, or no figure = -1) the neutral, then the four blues
         const r = mode === 'carbon' ? AREA_RAMP_CARBON : AREA_RAMP;
         return ['step', ['get', 'v'], AREA_NONE, 0.01, r[0], s[0], r[1], s[1], r[2], s[2], r[3]];
@@ -3992,7 +4000,7 @@
         return { type: 'FeatureCollection', features: feats };
     }
     function areaLegendHTML(mode, when) {
-        const s = AREA_STOPS[mode] || AREA_STOPS.movements, t = mode === 'carbon' ? ' t' : '';
+        const s = areaStops(mode), t = mode === 'carbon' ? ' t' : '';
         const r = mode === 'carbon' ? AREA_RAMP_CARBON : AREA_RAMP;
         const rows = [['under ' + s[0] + t, r[0]], [s[0] + ' – ' + (s[1] - 1) + t, r[1]],
                       [s[1] + ' – ' + (s[2] - 1) + t, r[2]], [s[2] + t + ' and over', r[3]],
@@ -4065,6 +4073,7 @@
         out.areas = ((shapes && shapes.areas) || []).map(s => Object.assign({}, byId[s.area_id] || { nofig: true }, s,
             figs && nc ? { unclipped: nc } : {}, figs ? {} : { nofig: true }));
         out.attribution = (shapes && shapes.attribution) || (figs && figs.attribution) || [];
+        out.stops = (figs && figs.stops) || (shapes && shapes.stops) || null;     // W12: the scheme's bands
         return out;
     }
     async function fetchAreas(m) {
