@@ -46,12 +46,17 @@ of the gap then says over or under), and None when there is nothing to compare. 
 that into words ("on target" / "N tCO2e over the target" / "N tCO2e under the target") and work
 out no margin of their own.
 
-WHAT A TEAM CODE SEES (11 Oct 2026)
+WHAT A TEAM CODE SEES (11 Oct 2026; REVERSED 13 Oct 2026, the user's 12 Oct decision)
 ---------------------
-The target is the scheme's. A team code's progress is on its own lines and is NOT compared with
-the target in either mode (target_t, both gaps and both on_target flags are None): nobody has
-agreed a share per team, and the scheme's % applied evenly read the agreed decisions as missing
-on every team they do not touch. A team code's GET never carries the stored decisions or the
+"Each team gets its own share of the carbon target; a team code sees its own share and verdict."
+The share (13 Oct 2026, recommended and approved): the scheme's target × the team's plan WITH the
+agreed decisions ÷ the scheme's plan with them — target_t is that share, and the gaps and the two
+on_target flags are the team's own against it. The same rule for a % target and a cap; the shares
+add up to the scheme's target exactly. It does NOT apply the scheme's % evenly (the 11 Oct
+objection: that read the decisions as missing on every team they do not touch — a team the
+decisions barely touch gets a share close to its own plan). When the decisions no longer fit the
+plan there is no "plan with them", so no share: target_t is None and `invalid` says why.
+`share_pct` is the team's share of the scheme's target; `share_rule` says the rule in words. A team code's GET never carries the stored decisions or the
 page state (they name other teams' routes); it keeps the words only of decisions that name no
 route (for_code()).
 
@@ -301,10 +306,27 @@ def status(acc, target, factors=None):
     pend = carbon.scenario(acc, status="Pending", factors=factors)
     approved = _r3(sc["baseline"]["totals"]["total_t"])
     with_dec = _r3(alt["totals"]["total_t"]) if alt is not None else None
+    share_pct = None
     if scope == "team":
-        # 11 Oct 2026: the target is the scheme's; a team code gets no share of it in either mode (nobody
-        # agreed one, and the scheme's % applied evenly read the decisions as missing on untouched teams)
+        # REVERSED 13 Oct 2026 (the user's 12 Oct decision): the team's share of the scheme's target, split by the
+        # plan WITH the agreed decisions (see WHAT A TEAM CODE SEES). The scheme's figures come from the same two
+        # scenarios on every line (the team limit lifted for this sum only; nothing of another team is returned).
         target_t = None
+        if alt is not None:
+            whole = dict(acc or {}, ipt=None)
+            try:
+                sw = carbon.scenario(whole, alternatives=[{"name": "Target", "levers": target.get("levers") or []}],
+                                     status="Approved", factors=factors)
+                s_approved = sw["baseline"]["totals"]["total_t"]
+                s_with = sw["alternatives"][0]["totals"]["total_t"]
+                s_target = (s_approved * (1.0 - float(target["pct_below"]) / 100.0) if target["mode"] == "pct"
+                            else float(target["cap_t"]))
+                if s_with and s_with > 0:
+                    target_t = _r3(s_target * alt["totals"]["total_t"] / s_with)
+                    share_pct = round(100.0 * alt["totals"]["total_t"] / s_with, 1)
+            except carbon.CarbonError as e:
+                invalid = (f"The agreed decisions no longer fit the plan ({e}), so your share of the target cannot be "
+                           f"worked out. A planner needs to set the target again on the Carbon planner.")
     elif target["mode"] == "pct":
         target_t = _r3(approved * (1.0 - float(target["pct_below"]) / 100.0))
     else:
@@ -327,7 +349,14 @@ def status(acc, target, factors=None):
                       "with_decisions_t": (_r3(alt_month.get(m["month_index"])) if alt is not None else None)}
                      for m in sc["baseline"]["by_month"]],
         "invalid": invalid,
+        # 13 Oct 2026: a team code's share of the scheme's target (None for the scheme, or with no share)
+        "share_pct": share_pct,
+        "share_rule": (SHARE_RULE if scope == "team" else None),
     }
+
+
+SHARE_RULE = ("Your share of the scheme's target: the target × your lines' plan with the agreed decisions ÷ the "
+              "scheme's plan with them. The shares of every team add up to the scheme's target.")
 
 
 def on_target(gap):

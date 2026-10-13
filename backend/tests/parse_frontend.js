@@ -2016,8 +2016,11 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("⭐ the contract's words: the two modes, as forecast and with the agreed decisions, on / over / under the target",
     ctc.includes("`Target: ${pct} below the approved plan = ${ctT(s.target_t)} tCO2e`")
     && ctc.includes("`Target: a fixed cap of ${ctT(t.cap_t)} tCO2e (${pct} below the approved plan when it was set)`")
-    && ctc.includes("`Target: a fixed cap of ${ctT(t.cap_t)} tCO2e for the whole scheme, ${ctSplit()}`")
-    && ctc.includes("`Target: ${pct} below the approved plan, for the whole scheme, ${ctSplit()}`")
+    // REVERSED 13 Oct 2026 (each team its share of the target, the user's 12 Oct decision): a team code's line said
+    // "for the whole scheme, not split by team"; it now names its own share (the server's target_t and share_pct)
+    && ctc.includes("return `Target for ${ctYour()}: ${ctT(s.target_t)} tCO2e, ${(+s.share_pct).toFixed(1)}% of ${of}`;")
+    && ctc.includes("const of = t.mode === \"cap\" ? `the scheme's fixed cap of ${ctT(t.cap_t)} tCO2e` : `the scheme's target (${pct} below the approved plan)`;")
+    && ctc.includes("have no share of it while the agreed decisions do not fit the plan`;") && !ctc.includes("ctSplit")
     && ctc.includes("`As forecast${on}: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
     && ctc.includes("`With the agreed decisions${on}: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
     && ctc.includes("s.invalid ? (dash ? `With the agreed decisions${on}: —` : s.invalid)")
@@ -2044,8 +2047,11 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && (ctc.match(/\{CT_NONE\} \{CT_WHO\}/g) || []).length === 2 && (ctc.match(/`\$\{CT_NONE\} \$\{CT_WHO\}`/g) || []).length === 2
     && !/No carbon target set yet\. A planner|No scheme carbon target|No carbon target is set yet/.test(code)
     && ctc.includes("const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;") && ctc.includes('ct.status.scope === "team"')
-    && ctc.includes("The target is for the whole scheme, so they are not compared with it.") && !ctc.includes("with the scheme's cut applied to them.")
-    && ctc.includes("const ctSplit = () => `not split by ${TEAM().toLowerCase()}`;") && !/\.ipt\b|IPT ?[1-6]|teamName\(|teamText\(/.test(ctc + mxCt));
+    // REVERSED 13 Oct 2026 (each team its share): "The target is for the whole scheme, so they are not compared with it." and
+    // ctSplit ("not split by team") are gone; the note says whose lines and how the share is split
+    && ctc.includes("against their share of the scheme's target: the target split by each ${TEAM().toLowerCase()}'s plan with the agreed decisions. The shares add up to the target.")
+    && !ctc.includes("so they are not compared with it") && !ctc.includes("with the scheme's cut applied to them.")
+    && !ctc.includes("not split by") && !/\.ipt\b|IPT ?[1-6]|teamName\(|teamText\(/.test(ctc + mxCt));
   ok("...the agreed decisions are listed for a scheme code only, collapsed (a team code's GET still carries them: this is wording, not a lock)",
     ctc.includes("{!ctTeam(ct) && words.length > 0 && (") && ctc.includes('<details className="ct-more">') && ctc.includes("const words = t.lever_words || [];"));
   ok("🔴 the target's words: tCO2e with a plain 2, none of the banned words, no small, uppercase or colour-only text",

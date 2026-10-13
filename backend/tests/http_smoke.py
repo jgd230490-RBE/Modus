@@ -645,11 +645,15 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # REVERSED 11 Oct 2026 (the review: the scheme's % applied to North's lines, which the decision does not touch, read
     # "253.2 over the target" to every show visitor while the scheme was on target). It asserted North's target_t =
     # its approved plan × (1 − %). Now a team code gets no share of the scheme's target, and so no verdict.
-    ok("⭐ the North Team code reads it: scope team, its own lines (the cut is Central's line, so none here), NOT compared with the scheme's target",
+    # REVERSED AGAIN 13 Oct 2026 (the user, 12 Oct: each team gets its own share): the share is the scheme's target split by
+    # each team's plan WITH the decisions, so North — whose lines the decision does not touch — gets its own plan as its share
+    # and reads ON target (the 11 Oct "253.2 over" came from applying the scheme's % evenly, which this rule does not do).
+    # It asserted target_t, the gap and both verdicts null.
+    ok("⭐ the North Team code reads it: scope team, its own lines; its share = its own plan (the cut is Central's), on target",
        r.status_code == 200 and sn.get("scope") == "team" and 0 < sn.get("approved_t", 0) < st.get("approved_t", 0)
        and sn.get("with_decisions_t") == sn.get("approved_t")
-       and sn.get("target_t") is None and sn.get("gap_with_decisions_t") is None and sn.get("on_target_with_decisions") is None
-       and sn.get("on_target_as_forecast") is None, str(sn)[:300])
+       and abs((sn.get("target_t") or 0) - sn["approved_t"] * st["target_t"] / st["with_decisions_t"]) <= 0.002
+       and sn.get("on_target_with_decisions") is True and 0 < (sn.get("share_pct") or 0) < 100, str(sn)[:300])
     tn = (r.json() or {}).get("target") or {} if r.status_code == 200 else {}
     ok("🔴 R3 over HTTP: North's GET carries no stored decisions and no page state, and no words for the route-scoped decision",
        r.status_code == 200 and tn.get("mode") == "pct" and "levers" not in tn and "ui_state" not in tn
@@ -660,9 +664,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 200 and cc["target"]["mode"] == "cap" and cc["target"]["cap_t"] == tg.get("cap_t")
        and cc["target"]["pct_below"] == tg.get("pct_below") and cc["status"]["target_t"] == tg.get("cap_t"), r.text[:300])
     r = c.get("/api/carbon/target", headers=NORTH)
-    ok("🔴 ...and a team code sees no share of a fixed cap (target_t null)", r.status_code == 200 and r.json()["status"]["target_t"] is None
-       and r.json()["status"]["gap_as_forecast_t"] is None and r.json()["status"]["on_target_as_forecast"] is None
-       and "levers" not in r.json()["target"], r.text[:200])
+    # REVERSED 13 Oct 2026 (each team its share): it asserted target_t null for a team under a fixed cap. The cap is split by
+    # the same rule; North's share is the cap × its plan ÷ the scheme's plan with the decisions. Still no stored decisions.
+    _cn = r.json()["status"] if r.status_code == 200 else {}
+    ok("🔴 ...and a team code under a fixed cap sees ITS share of the cap (the same rule), still without the stored decisions",
+       r.status_code == 200 and _cn.get("target_t") is not None and 0 < _cn["target_t"] < tg.get("cap_t")
+       and _cn.get("share_pct") == sn.get("share_pct") and "levers" not in r.json()["target"], r.text[:200])
     r = c.put("/api/carbon/target", headers=PLAN, json={"mode": "pct", "levers": []})
     ok("🔴 no decisions — 400 with the sentence", r.status_code == 400 and "Choose at least one decision" in r.text, r.text[:160])
     r = c.delete("/api/carbon/target", headers=NORTH)
