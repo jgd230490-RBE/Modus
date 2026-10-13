@@ -9,6 +9,11 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1F2024">
+<!-- 13 Oct 2026 (W16): the remembered look and accent go on <html> before anything is drawn, so a reload never
+     flashes the default colours while Babel compiles the app. The app applies them again (applyTheme / applyAccent). -->
+<script>(function(){var d=document.documentElement;try{var t=localStorage.getItem("modus_theme"),a=localStorage.getItem("modus_accent");
+d.setAttribute("data-theme",/^(ink|light|dark)$/.test(t||"")?t:"ink");d.setAttribute("data-accent",/^(orange|blue|blue-shades|orange-shades)$/.test(a||"")?a:"orange");}
+catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange");}})();</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -26,7 +31,7 @@
        diesel index, capacity from 90 %, edited/thaw marks — and is never the brand orange.
        The variable NAMES are kept so nothing else had to change. The brand tokens mirror
        frontend/brand/theme-tokens.css. */
-    --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6;
+    --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6; --navy-soft:rgba(37,99,235,.08);
     --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E7E5E4;
     --ink:#1E293B; --muted:#64748B; --line:#E7E5E4; --bg:#FFFFFF;
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
@@ -70,8 +75,55 @@
     --surface:#1F2024; --surface-2:#1B1D21; --surface-3:#26282D; --control-fg:#1F2024;
     --rail-bg:#1B1D21; --rail-on:#F3F4F6; --action:#FF8C14; --action-fg:#1F2024;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
+    --navy-soft:rgba(255,140,20,.14);
     color-scheme:dark;
   }
+  /* ACCENTS-START — 13 Oct 2026 (W16, bundle E; D39 and the user's picks the same evening: Orange primary the default,
+     the re-stepped shades). The accent is a SECOND axis, html[data-accent], beside html[data-theme]: the look decides
+     the surfaces, the accent decides the control colour and the chart series. "orange" is today's look and has no block
+     (it IS :root and the dark block above). The status colours (--green --gold --red) are never touched here.
+     Every pair is checked in test_h1_uk (text 4.5:1, controls and chart marks 3:1) and the series by the palette check
+     in parse_frontend (notes/bundle-e-plan-1013.md): the shade accents carry FOUR hues, the fifth series is grey;
+     Orange shades in the Dark look keeps Orange primary's series, because no warm set with two oranges passes there.
+     Slot meaning never changes: 1 = plan, 2 = delivered, 4 = the fair-price model. */
+  :root:not([data-theme="dark"])[data-accent="blue"]{
+    --navy:#2563EB; --navy-soft:rgba(37,99,235,.08); --action:#2563EB; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
+    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#E8590C; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34;
+  }
+  :root:not([data-theme="dark"])[data-accent="blue-shades"]{
+    --navy:#1D4ED8; --navy-soft:rgba(29,78,216,.08); --action:#1D4ED8; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
+    --chart-1:#1D4ED8; --chart-1-soft:rgba(29,78,216,.18); --chart-2:#0891B2; --chart-3:#7C3AED; --chart-4:#0369A1; --chart-5:#A8A29E;
+  }
+  :root:not([data-theme="dark"])[data-accent="orange-shades"]{
+    --navy:#C2410C; --navy-soft:rgba(194,65,12,.08); --action:#C2410C; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
+    --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#9A3412; --chart-3:#A07D34; --chart-4:#BE185D; --chart-5:#A8A29E;
+  }
+  /* --navy-soft is the tint behind a chip whose text is --navy: 8 % keeps that text at 4.5:1 or better in every accent
+     (the chips before 13 Oct sat on a 10 % blue tint, 4.49:1). */
+  /* Blue shades in the Ink look: a navy header (white on it 10.4:1). The Light look keeps its white header. */
+  html[data-theme="ink"][data-accent="blue-shades"]{ --hdr-bg:#1E3A8A; }
+  html[data-theme="dark"][data-accent="blue"]{
+    --navy:#5B8FF0; --navy-soft:rgba(91,143,240,.08); --blue:#8FB3F5; --action:#5B8FF0; --action-fg:#141518; --control-fg:#141518;
+    --chart-1:#5B8FF0; --chart-1-soft:rgba(91,143,240,.22); --chart-2:#E8681E; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E;
+  }
+  html[data-theme="dark"][data-accent="blue-shades"]{
+    --navy:#5B8FF0; --navy-soft:rgba(91,143,240,.08); --blue:#8FB3F5; --action:#5B8FF0; --action-fg:#141518; --control-fg:#141518;
+    --chart-1:#5B8FF0; --chart-1-soft:rgba(91,143,240,.22); --chart-2:#13A193; --chart-3:#8B5CF6; --chart-4:#2E95D6; --chart-5:#6B6965;
+  }
+  /* the few Tailwind colour utilities that mean "control blue": orange in Orange shades, blue tints in the dark blue accents */
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-\[rgba\(37\,99\,235\,\.06\)\]{background-color:rgba(194,65,12,.06)}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .border-blue-200{border-color:#FED7AA}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .border-blue-300{border-color:#FDBA74}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700{color:#9A3412}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-800{color:#7C2D12}
+  html[data-theme="dark"][data-accent^="blue"] .bg-blue-50{background-color:rgba(91,143,240,.14)}
+  html[data-theme="dark"][data-accent^="blue"] .bg-\[rgba\(37\,99\,235\,\.06\)\]{background-color:rgba(91,143,240,.10)}
+  html[data-theme="dark"][data-accent^="blue"] .border-blue-200{border-color:rgba(91,143,240,.35)}
+  html[data-theme="dark"][data-accent^="blue"] .border-blue-300{border-color:rgba(91,143,240,.45)}
+  html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}
+  html[data-theme="dark"][data-accent^="blue"] .text-blue-800{color:#A9C4F7}
+  /* ACCENTS-END */
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage */
   html[data-theme="dark"] .bg-\[rgba\(37\,99\,235\,\.06\)\]{background-color:rgba(255,140,20,.08)}
   html[data-theme="dark"] .bg-amber-50{background-color:rgba(251,191,36,.12)}
@@ -138,9 +190,10 @@
   .appearance-btn:hover,.appearance-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
   .appearance-menu{position:absolute;right:0;top:40px;min-width:200px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-size:12.5px;line-height:1.4;z-index:60;}
   .appearance-menu h6{margin:0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--popover-muted);padding:6px 10px 4px;font-weight:600;}
-  .appearance-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
-  .appearance-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on{background:rgba(255,140,20,.12);}
-  .appearance-item .tick{opacity:0;color:var(--brand-orange);} .appearance-item.is-on .tick{opacity:1;}
+  .appearance-item,.accent-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
+  .appearance-item:hover,.accent-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on,.accent-item.is-on{background:rgba(255,140,20,.12);}
+  .appearance-item .tick,.accent-item .tick{opacity:0;color:var(--brand-orange);} .appearance-item.is-on .tick,.accent-item.is-on .tick{opacity:1;}
+  .swatch.accent-sw i{flex:0 0 34%;} .swatch.accent-sw b{flex:1;} .swatch.accent-sw b::after{display:none;}
   .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
   .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
   /* H10 (8 Oct 2026): the in-app guide — a coach-mark card, demo tenant only. In-page, no library. */
@@ -232,6 +285,11 @@
   .btn-sm{padding:4px 10px;font-size:13px;}
   .chip-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;}
   .chip-st i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;}
+  /* 13 Oct 2026 (W16, D39): a status is a SHAPE and a word, never colour alone — the plan orange is 6.5 from the
+     warning amber for full colour vision and 1.8 for a colour-blind reader. Green stays a dot; amber is a triangle,
+     red an octagon. Matched on the token the dot is painted with, so every chip-st in the app follows. */
+  .chip-st i[style*="--gold"]{width:10px;height:9px;border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%);}
+  .chip-st i[style*="--red"]{width:9px;height:9px;border-radius:0;clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);}
   .empty-ic{width:40px;height:40px;border-radius:50%;background:var(--surface-3);margin:0 auto 12px;}
   .empty-ic.error{background:rgba(220,38,38,.12);}
   .skel{display:inline-block;height:14px;border-radius:4px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}
@@ -451,6 +509,11 @@ const fmtDist = (km, dp) => (km == null ? "—" : (+dist(km)).toFixed(dp == null
 const TEAMS = () => TEAM() + "s";
 
 const { useState, useEffect, useRef, useMemo } = React;
+function useAccent(){
+  const [a, setA] = useState(ACCENT.current);
+  useEffect(() => { const f = (n) => setA(n); ACCENT.subs.add(f); return () => ACCENT.subs.delete(f); }, []);
+  return [a, (n) => applyAccent(n)];
+}
 function useTheme(){
   const [t, setT] = useState(THEME.current);
   useEffect(() => { const f = (n) => setT(n); THEME.subs.add(f); return () => THEME.subs.delete(f); }, []);
@@ -513,6 +576,27 @@ function applyTheme(name, persist = true){
   THEME.subs.forEach(f => { try { f(name); } catch(e){} });
 }
 try { applyTheme(localStorage.getItem(THEME.key) || "ink", false); } catch(e){ applyTheme("ink", false); }
+// 13 Oct 2026 (W16, bundle E; D39): the ACCENT, a second axis beside the look (html[data-accent], the ACCENTS block in
+// the <style>). The look decides the surfaces; the accent decides the controls and the chart series. "orange" is the
+// default and is exactly the look before 13 Oct. Per browser (localStorage, like the look), set on <html> by the
+// small script in <head> before anything draws, and again here; charts subscribe through useAccent().
+// The swatch shows the button colour, then series 1 (the plan) and series 2 (delivered) in the Ink / Light look.
+const ACCENTS = [
+  ["orange",        "Orange",        { btn: "#C2410C", s1: "#E8590C", s2: "#2563EB" }],
+  ["blue",          "Blue",          { btn: "#2563EB", s1: "#2563EB", s2: "#E8590C" }],
+  ["blue-shades",   "Blue shades",   { btn: "#1D4ED8", s1: "#1D4ED8", s2: "#0891B2" }],
+  ["orange-shades", "Orange shades", { btn: "#C2410C", s1: "#E8590C", s2: "#9A3412" }],
+];
+const ACCENT = { key: "modus_accent", current: "orange", subs: new Set() };
+function applyAccent(name, persist = true){
+  if(!ACCENTS.some(([k]) => k === name)) name = "orange";
+  ACCENT.current = name;
+  const root = typeof document !== "undefined" && document.documentElement;
+  if(root && root.setAttribute) root.setAttribute("data-accent", name);
+  if(persist){ try { localStorage.setItem(ACCENT.key, name); } catch(e){} }
+  ACCENT.subs.forEach(f => { try { f(name); } catch(e){} });
+}
+try { applyAccent(localStorage.getItem(ACCENT.key) || "orange", false); } catch(e){ applyAccent("orange", false); }
 // a computed token, for the few colours that are built in JS (Chart.js)
 const tok = (name, fallback) => {
   try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; } catch(e){ return fallback; }
@@ -694,9 +778,50 @@ const chartLegendPos = (type, vw, asked) => {
   return asked || "bottom";
 };
 const cutLabel = (s) => { s = String(s == null ? "" : s); return s.length > CHART_LABEL_MAX ? s.slice(0, CHART_LABEL_MAX - 1) + "…" : s; };
+// 13 Oct 2026 (W16, D39): series NAMED ON THE CHART, at the right-hand end of each series, a colour mark then the name
+// in ink (the colour system's rule 4). Opt-in per chart (options.plugins.seriesLabels = { on: true }) and only from
+// 768 px; the legend stays. Why every accent, not only the shades: compared pair by pair (not only neighbours), even
+// the default palette has a weak pair (blue and violet, 0.4 for a deuteranope), and the shade accents several. A
+// stacked segment thinner than 10 px is left to the legend; labels are pushed apart so none overlap.
+const SERIES_LABEL_PAD = 108;
+const SERIES_LABELS = { id: "seriesLabels", afterDatasetsDraw(chart, _args, opts){
+  if(!opts || !opts.on) return;
+  const ctx = chart.ctx, A = chart.chartArea; if(!A) return;
+  const stacked = !!(chart.options.scales && chart.options.scales.y && chart.options.scales.y.stacked);
+  const marks = [];
+  chart.data.datasets.forEach((ds, i) => {
+    const meta = chart.getDatasetMeta(i); if(!meta || meta.hidden || !chart.isDatasetVisible(i)) return;
+    let j = (ds.data || []).length - 1; while(j >= 0 && (ds.data[j] == null || ds.data[j] === 0)) j--;
+    const el = j >= 0 ? meta.data[j] : null; if(!el) return;
+    if(stacked && Math.abs(el.base - el.y) < 10) return;
+    const y = stacked ? (el.y + el.base) / 2 : el.y;
+    const col = Array.isArray(ds.borderColor) ? ds.borderColor[j] : (meta.type === "line" || ds.type === "line" ? ds.borderColor : (Array.isArray(ds.backgroundColor) ? ds.backgroundColor[j] : (ds.borderWidth && ds.borderColor && typeof ds.borderColor === "string" && !stacked ? ds.borderColor : ds.backgroundColor)));
+    marks.push({ y, label: String(ds.label || ""), col });
+  });
+  marks.sort((a, b) => a.y - b.y);
+  for(let k = 1; k < marks.length; k++) if(marks[k].y - marks[k - 1].y < 13) marks[k].y = marks[k - 1].y + 13;
+  const over = marks.length ? marks[marks.length - 1].y - (A.bottom - 4) : 0;
+  if(over > 0) marks.forEach(m => { m.y -= over; });
+  ctx.save(); ctx.font = "600 11px Inter, system-ui, sans-serif"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  const x = A.right + 8;
+  marks.forEach(m => {
+    ctx.fillStyle = m.col || "#A8A29E"; ctx.fillRect(x, m.y - 4, 8, 8);
+    ctx.fillStyle = tok("--ink", "#1E293B");
+    const t = m.label.length > 15 ? m.label.slice(0, 14) + "…" : m.label;
+    ctx.fillText(t, x + 12, m.y);
+  });
+  ctx.restore();
+} };
 function fitChartConfig(config, vw){
   const o = { ...(config.options || {}) };
   const plugins = { ...(o.plugins || {}) };
+  if(plugins.seriesLabels && plugins.seriesLabels.on && vw >= 768){
+    const pad = (o.layout && o.layout.padding) || {};
+    o.layout = { ...(o.layout || {}), padding: { ...(typeof pad === "object" ? pad : {}), right: Math.max(SERIES_LABEL_PAD, (typeof pad === "object" && pad.right) || 0) } };
+    config = { ...config, plugins: [...(config.plugins || []), SERIES_LABELS] };
+  } else if(plugins.seriesLabels){
+    plugins.seriesLabels = { ...plugins.seriesLabels, on: false };
+  }
   if(plugins.legend && plugins.legend.display !== false){
     plugins.legend = { ...plugins.legend, position: chartLegendPos(config.type, vw, plugins.legend.position) };
   }
@@ -723,6 +848,7 @@ function ChartCanvas({ config, height, size }){
   const ref = useRef(null);
   const inst = useRef(null);
   const [theme] = useTheme();          // 5 Oct 2026: axes, grid and legend follow the look
+  const [accent] = useAccent();        // 13 Oct 2026 (W16): and the accent
   const [sized, setSized] = useState(false);
   const cfgRef = useRef(config); cfgRef.current = config;
   const vwNow = () => (typeof window !== "undefined" && window.innerWidth) || 1280;
@@ -752,7 +878,7 @@ function ChartCanvas({ config, height, size }){
     window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
     inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
-  }, [JSON.stringify(config), theme, sized]);
+  }, [JSON.stringify(config), theme, accent, sized]);
   return <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>;
 }
 
@@ -1071,6 +1197,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [tick, setTick] = useState(0);               // bumps every 5 min in big-screen mode
   const [stamp, setStamp] = useState(null);
   const [theme] = useTheme();          // 5 Oct 2026: chart colours are tokens; re-render on a change.
+  const [accent] = useAccent();        // 13 Oct 2026 (W16): the accent changes the series colours too
                                        // ⚠️ Hooks before the early returns below — on 5 Oct this hook
                                        // sat after them and React #310 blanked the whole app.
   // --- 15 Sep: how the big screen is divided ---------------------------------------
@@ -1284,18 +1411,23 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const stackedOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { font: tf } }, y: { stacked: true, ticks: { font: tf } } } };
   const legendOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } }, tooltip: eurTip }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
 
-  const demandCfg = { type: "bar", data: { labels: D.labels, datasets: D.mats.map((m, i) => ({ label: m, data: D.demand[m], backgroundColor: colorOf(i), stack: "s", borderWidth: 0 })) }, options: stackedOpts };
+  // 13 Oct 2026 (W16): a 2 px gap in the surface colour between stacked segments (every accent), and the series named
+  // on the chart (SERIES_LABELS) — see the note at fitChartConfig
+  const SURF = tok("--surface", "#FFFFFF");
+  const named = { seriesLabels: { on: true } };
+  const demandCfg = { type: "bar", data: { labels: D.labels, datasets: D.mats.map((m, i) => ({ label: m, data: D.demand[m], backgroundColor: colorOf(i), stack: "s", borderWidth: { top: 2 }, borderColor: SURF, borderSkipped: "start" })) },
+                      options: { ...stackedOpts, plugins: { ...stackedOpts.plugins, ...named } } };
   // planned tonnes as bars, what has been reported delivered as a line over them
   const tripsCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Trips", data: D.tripsM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const progressCfg = { type: "bar", data: { labels: D.labels, datasets: [
     { type: "bar", label: "Planned t", data: D.tonnesM, backgroundColor: C1S, borderColor: C1, borderWidth: 1, order: 2 },
     { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: C2, borderWidth: 0, order: 1 }] },
-    options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
+    options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } }, ...named }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
   const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: C1, backgroundColor: C1S, fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
   const costCfg   = { type: "bar", data: { labels: D.labels, datasets: [
     { label: `Planned ${CUR()} (quote / target)`, data: D.plannedM, backgroundColor: C1, borderWidth: 0 },
-    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C4, borderWidth: 0 }] }, options: legendOpts };
+    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C4, borderWidth: 0 }] }, options: { ...legendOpts, plugins: { ...legendOpts.plugins, ...named } } };
   const splitCfg  = { type: "doughnut", data: { labels: D.mats, datasets: [{ data: D.mats.map(m => D.split[m]), backgroundColor: D.mats.map((m, i) => colorOf(i)), borderWidth: 2, borderColor: tok("--surface", "#fff") }] }, options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 10, font: tf } } } } };
   const topN = [...D.routeRows].sort((a, b) => b.t - a.t).slice(0, 10);
   const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => (lineKey && r.key !== lineKey) ? C1S : C1), borderWidth: 0 }] },
@@ -1395,7 +1527,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> forecast months have a route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} leave out the {D.lines - D.baked} not routed yet ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}): route them on Data → Routes</span> : null}<InfoTip id="dash.coverage" /></span>
           <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
-          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "rgba(37,99,235,.1)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
+          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
       </PageHeader>
       {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} forecast month${D.lines === 1 ? "" : "s"} in view`} />}
@@ -1560,7 +1692,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   <td className="font-medium text-slate-800 whitespace-nowrap">{r.route_id}<div className="text-[13px] text-slate-500 font-normal leading-tight">{r.origin || "—"} → {r.dest || "—"} · {r.vehicle_short || vehLabel(r.vehicle)}</div></td>
                   <td className="text-slate-500 whitespace-nowrap">
                     {r.discipline
-                      ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: "rgba(37,99,235,.08)", color: "var(--navy)" }} title={r.section_id ? `Section ${r.section_id}` : "No section set"}>{r.discipline}</span>
+                      ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title={r.section_id ? `Section ${r.section_id}` : "No section set"}>{r.discipline}</span>
                       : <span className="text-slate-300" title="No discipline set on this forecast line">—</span>}
                   </td>
                   <td className="text-slate-500 whitespace-nowrap">{teamText(r.ipt)}</td>
@@ -1734,7 +1866,7 @@ function DashboardToday({ meta, week, err, wall }){
   const wkPct = T.wkToDateT > 0 && T.wkToDateReported > 0 ? T.wkToDateActT * 100 / T.wkToDateT : null;
   const statusChip = (s, actual) => actual != null
     ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(3,158,134,.12)", color: "var(--green)" }} title="An actual has been typed for today">reported</span>
-    : s === "confirmed" ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,.1)", color: "var(--navy)" }} title="Confirmed on the Look-ahead">confirmed</span>
+    : s === "confirmed" ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="Confirmed on the Look-ahead">confirmed</span>
     : s === "edited" ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700" title="Edited on the Look-ahead, not yet confirmed">edited</span>
     : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500" title="Derived from the week — not yet confirmed on the Look-ahead">planned</span>;
   return (
@@ -2376,6 +2508,7 @@ function DemoBar({ onGuide }){
 // or Escape. Keyboard: the button is a real button; the items are menuitemradio.
 function AppearancePicker(){
   const [theme, setTheme] = useTheme();
+  const [accent, setAccent] = useAccent();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
   useEffect(() => {
@@ -2401,6 +2534,17 @@ function AppearancePicker(){
               className={"appearance-item" + (theme === k ? " is-on" : "")}
               onClick={() => { setTheme(k); setOpen(false); }}>
               <span className="swatch" style={{ "--sw-dot": sw.dot }} aria-hidden="true"><i style={{ background: sw.bar }}></i><b style={{ background: sw.page }}></b></span>
+              <span className="flex-1">{label}</span>
+              <span className="tick" aria-hidden="true">✓</span>
+            </button>
+          ))}
+          {/* 13 Oct 2026 (W16): the accent, a second group (its own class, so the three looks stay three items) */}
+          <h6>Accent</h6>
+          {ACCENTS.map(([k, label, sw]) => (
+            <button key={k} type="button" role="menuitemradio" aria-checked={accent === k ? "true" : "false"}
+              className={"accent-item" + (accent === k ? " is-on" : "")} data-accent-choice={k}
+              onClick={() => { setAccent(k); setOpen(false); }}>
+              <span className="swatch accent-sw" aria-hidden="true"><i style={{ background: sw.btn }}></i><b style={{ background: sw.s1 }}></b><b style={{ background: sw.s2 }}></b></span>
               <span className="flex-1">{label}</span>
               <span className="tick" aria-hidden="true">✓</span>
             </button>
@@ -5032,7 +5176,7 @@ function IptPill({ ipt }){
 function WsPill({ ws }){
   if(!ws) return null;
   return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-    style={{ background: "rgba(37,99,235,.08)", color: "var(--navy)" }}>{ws}</span>;
+    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>;
 }
 function LaKpi({ value, caption, tone }){
   // a long value steps its size down before it would be cut off ("£1.43…" read as a price)
@@ -9043,7 +9187,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <label key={v} className="flex items-center gap-2 text-xs text-slate-700">
                         <input type="checkbox" checked={on}
                           onChange={() => (editingRoute ? toggleEVehicle(v) : toggleRVehicle(v))}
-                          style={{ accentColor: "#2563EB" }} />
+                          style={{ accentColor: "var(--navy)" }} />
                         {v}
                         {tag && <span className="text-[10px] font-semibold" style={{ color: tag[1] }}>· {tag[0]}</span>}
                       </label>

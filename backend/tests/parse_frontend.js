@@ -2393,7 +2393,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
      && _cc.includes('if(want && lg.position !== want){ lg.position = want; c.update("none"); } else c.resize();')
-     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, sized]);"));
+     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, accent, sized]);"));   // (W16 the same evening: + accent)
   ok("W5: the rules by width: legend under the plot below 768 px, a doughnut's on the right only from 1024 px; labels 18 characters, no rotation; DPR at most 2",
      /const CHART_LABEL_MAX = 18;/.test(src) && /if\(vw < 768\) return "bottom";/.test(src)
      && /if\(type === "doughnut" \|\| type === "pie"\) return vw >= 1024 \? \(asked \|\| "right"\) : "bottom";/.test(src)
@@ -2416,6 +2416,81 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /if\(narrow\)\{ setRailPeek\(v => !v\); return; \}/.test(src) && /\(narrow && railPeek \? " rail-peek" : ""\)/.test(src)
      && /\.rail\.rail-peek\{position:absolute;top:0;bottom:0;left:0;z-index:45;/.test(html)
      && /onClick=\{\(\) => \{ setPage\(it\.id\); if\(narrow\) setRailPeek\(false\); \}\}/.test(src));
+}
+
+// ---- 13 Oct 2026 (W16, bundle E; D39): the four accents ----------------------------------------------------------
+// The series colours of every accent × look are worked out from the <style> exactly as the browser cascades them
+// (:root, then the dark block, then the accent's block), and checked with the method the 10 and 11 Oct palettes were
+// chosen by (notes/colour-system-1010.md, notes/bundle-e-plan-1013.md): neighbouring series must stay apart for a
+// colour-blind reader (Machado 2009 protan/deutan simulation, OKLab distance × 100, at least 8) and for everyone
+// (at least 15), and every series must stand 3:1 against the chart's surface. Formulas: OKLab (Ottosson 2020), WCAG 2.
+{
+  const css = html.match(/<style>([\s\S]*?)<\/style>/)[1];
+  const blockOf = (sel) => { const i = css.indexOf(sel + "{"); if (i < 0) return null; const j = css.indexOf("}", i); return css.slice(i + sel.length + 1, j); };
+  const toks = (b) => { const o = {}; (b || "").replace(/--([a-z0-9-]+):([^;]+);/g, (_, k, v) => { o[k] = v.trim(); }); return o; };
+  const ROOT = toks(blockOf(":root")), DARK = toks(blockOf('html[data-theme="dark"]'));
+  const acc = (k) => toks(blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`));
+  const accD = (k) => toks(blockOf(`html[data-theme="dark"][data-accent="${k}"]`));
+  const eff = (k, dark) => dark ? { ...ROOT, ...DARK, ...(k === "orange" ? {} : accD(k)) } : { ...ROOT, ...(k === "orange" ? {} : acc(k)) };
+  const KEYS = ["orange", "blue", "blue-shades", "orange-shades"];
+  const series = (t) => ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map(n => t[n].toUpperCase()).filter(c => c !== t["chart-none"].toUpperCase());
+  // colour maths
+  const lin = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const lum = (h) => { const [r, g, b] = lin(h); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const M = { protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+              deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]] };
+  const sim = (h, k) => { const v = lin(h); if (!k) return v; return M[k].map(r => Math.max(0, Math.min(1, r[0] * v[0] + r[1] * v[1] + r[2] * v[2]))); };
+  const oklab = (v) => { const l = Math.cbrt(0.4122214708 * v[0] + 0.5363325363 * v[1] + 0.0514459929 * v[2]), m = Math.cbrt(0.2119034982 * v[0] + 0.6806995451 * v[1] + 0.1073969566 * v[2]),
+                            s = Math.cbrt(0.0883024619 * v[0] + 0.2817188376 * v[1] + 0.6299787005 * v[2]);
+                      return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s]; };
+  const dE = (a, b, k) => { const p = oklab(sim(a, k)), q = oklab(sim(b, k)); return 100 * Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+  const worst = (pal) => { let cvd = 1e9, nv = 1e9; for (let i = 1; i < pal.length; i++) { cvd = Math.min(cvd, dE(pal[i - 1], pal[i], "protan"), dE(pal[i - 1], pal[i], "deutan")); nv = Math.min(nv, dE(pal[i - 1], pal[i])); } return { cvd, nv }; };
+  ok("W16: the ACCENTS block exists with a light and a dark block for each of the three alternatives, and touches no status colour",
+     ["blue", "blue-shades", "orange-shades"].every(k => blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`)) && ["blue", "blue-shades"].every(k => blockOf(`html[data-theme="dark"][data-accent="${k}"]`))
+     && !blockOf('html[data-theme="dark"][data-accent="orange-shades"]') && !blockOf(':root:not([data-theme="dark"])[data-accent="orange"]')
+     && !/--(green|gold|red):/.test(css.slice(css.indexOf("ACCENTS-START"), css.indexOf("ACCENTS-END"))));
+  ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
+     series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
+     && eff("orange", false).action === "#C2410C" && eff("orange", false).navy === "#2563EB" && eff("orange", true).action === "#FF8C14");
+  ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange); the other three series stay",
+     series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #7C3AED #A07D34" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #9572EE #B48E3E");
+  ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; Orange shades in Dark draws Orange primary's series",
+     series(eff("blue-shades", false)).join(" ") === "#1D4ED8 #0891B2 #7C3AED #0369A1" && series(eff("blue-shades", true)).join(" ") === "#5B8FF0 #13A193 #8B5CF6 #2E95D6"
+     && series(eff("orange-shades", false)).join(" ") === "#E8590C #9A3412 #A07D34 #BE185D"
+     && series(eff("orange-shades", true)).join(" ") === series(eff("orange", true)).join(" "));
+  for (const k of KEYS) for (const dark of [false, true]) {
+    const t = eff(k, dark), pal = series(t), w = worst(pal), surf = dark ? "#1F2024" : "#FFFFFF";
+    ok(`W16 palette ${k} · ${dark ? "dark" : "light"}: neighbours apart for a colour-blind reader (≥ 8) and for everyone (≥ 15); every series ≥ 3:1 on the surface`,
+       w.cvd >= 8 && w.nv >= 15 && pal.every(c => cr(c, surf) >= 3), `cvd ${w.cvd.toFixed(1)} nv ${w.nv.toFixed(1)} min contrast ${Math.min(...pal.map(c => cr(c, surf))).toFixed(2)}`);
+  }
+  ok("W16: the brief's own shade ramps would FAIL the same check (kept here so a later copy of them is caught)",
+     worst(["#1E3A8A", "#2563EB", "#60A5FA", "#93C5FD", "#BFDBFE"]).nv < 15 && cr("#BFDBFE", "#FFFFFF") < 3
+     && worst(["#7C2D12", "#C2410C", "#FF8C14", "#FFB55C", "#FFE0B8"]).nv < 15 && cr("#FFE0B8", "#FFFFFF") < 3);
+  // the state, the early script, the picker, the charts
+  ok("W16: ACCENTS + applyAccent + useAccent mirror the look; stored as modus_accent (the B6 decision: keys keep the old prefix); unknown → orange",
+     /const ACCENTS = \[\n  \["orange",/.test(src) && /const ACCENT = \{ key: "modus_accent", current: "orange", subs: new Set\(\) \};/.test(src)
+     && /if\(!ACCENTS\.some\(\(\[k\]\) => k === name\)\) name = "orange";/.test(src) && /try \{ applyAccent\(localStorage\.getItem\(ACCENT\.key\) \|\| "orange", false\); \} catch\(e\)\{ applyAccent\("orange", false\); \}/.test(src)
+     && /function useAccent\(\)\{/.test(src));
+  ok("W16: 🔴 the remembered look and accent go on <html> in a plain <head> script, BEFORE the CDN scripts and Babel (no flash of the default)",
+     html.indexOf('d.setAttribute("data-accent",') > 0 && html.indexOf('d.setAttribute("data-accent",') < html.indexOf("react.production.min.js")
+     && /\/\^\(orange\|blue\|blue-shades\|orange-shades\)\$\/\.test\(a\|\|""\)\?a:"orange"/.test(html) && /\/\^\(ink\|light\|dark\)\$\/\.test\(t\|\|""\)\?t:"ink"/.test(html));
+  ok("W16: the picker has a second group, Accent, four menuitemradio items in their own class (the three looks stay three)",
+     /<h6>Accent<\/h6>\n\s*\{ACCENTS\.map\(\(\[k, label, sw\]\) => \(/.test(src) && src.includes('className={"accent-item" + (accent === k ? " is-on" : "")} data-accent-choice={k}')
+     && src.includes("onClick={() => { setAccent(k); setOpen(false); }}"));
+  ok("W16: charts rebuild on an accent change without a reload (ChartCanvas and the Dashboard subscribe)",
+     (src.match(/const \[accent\] = useAccent\(\);/g) || []).length === 2);
+  ok("W16 (D39): every multi-series Dashboard chart names its series on the chart from 768 px; stacked segments have a 2 px surface gap",
+     /const SERIES_LABELS = \{ id: "seriesLabels", afterDatasetsDraw\(chart, _args, opts\)\{/.test(src)
+     && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
+     && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
+     && /ctx\.fillStyle = tok\("--ink", "#1E293B"\);/.test(src));
+  ok("W16 (D39): an amber status is a triangle and a red one an octagon beside its word — every .chip-st dot, by the token it is painted with",
+     /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
+     && /\.chip-st i\[style\*="--red"\]\{[^}]*clip-path:polygon\(30% 0,70% 0,/.test(html));
+  ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
+     !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
+     && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)/g) || []).length);
 }
 
 // ---- report ------------------------------------------------------------------

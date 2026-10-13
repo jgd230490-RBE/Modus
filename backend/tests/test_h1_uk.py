@@ -641,7 +641,8 @@ ok("APPEARANCE: the choice is per browser (localStorage modus_theme), applied be
    'key: "modus_theme"' in fe and 'applyTheme(localStorage.getItem(THEME.key) || "ink", false)' in fe
    and 'if(!THEMES.some(([k]) => k === name)) name = "ink";' in fe and fe.index("applyTheme(localStorage.getItem") < fe.index("ReactDOM.createRoot"))
 ok("APPEARANCE: charts rebuild on a change and read token colours — no literal blue left in the Dashboard's series",
-   "}, [JSON.stringify(config), theme]);" in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
+   # 13 Oct 2026 (W16): narrowed — the chart also rebuilds on an accent change and once its box first has a size (W5)
+   "}, [JSON.stringify(config), theme, accent, sized]);" in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
    and 'backgroundColor: "#2563EB"' not in fe and 'backgroundColor: "#3B82F6"' not in fe and 'borderColor: "#2563EB"' not in fe and 'tok("--chart-1"' in fe)
 ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons read surface tokens — no literal white surface left in component CSS",
    ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
@@ -850,6 +851,79 @@ _gate = read("backend/main.py")
 ok("D45: the map password page's notice takes the same colours and the red DEMO tag",
    "background:#F1F5F9; color:#B91C1C; border:1px solid #DC2626;" in _gate and "#FFF7ED" not in _gate
    and '.demo-notice::before { content:"DEMO"; content:"DEMO" / ""; display:inline-block;' in _gate)
+
+# ---- 13 Oct 2026 (W16, bundle E; D39): every accent × look, every text / control / mark pair -------------------
+# The tokens are read from the <style> exactly as the browser cascades them (:root, then the dark block, then the
+# accent's own block). Text must be 4.5:1 (WCAG 1.4.3), a control's edge and a chart mark 3:1 (1.4.11). The status
+# colours must be byte-identical in all twelve combinations. The colour-blind separation of the series is pinned in
+# parse_frontend.js (the same method the 10 and 11 Oct palettes were chosen by).
+import re as _re
+_css = _re.search(r"<style>([\s\S]*?)</style>", fe).group(1)
+def _blk(sel):
+    i = _css.find(sel + "{")
+    return None if i < 0 else _css[i + len(sel) + 1:_css.find("}", i)]
+def _tk(b):
+    return {k: v.strip() for k, v in _re.findall(r"--([a-z0-9-]+):([^;]+);", b or "")}
+_ROOT, _DARK, _LIGHTHDR = _tk(_blk(":root")), _tk(_blk('html[data-theme="dark"]')), _tk(_blk('html[data-theme="light"]'))
+def _eff(acc, look):
+    t = dict(_ROOT)
+    if look == "light":
+        t.update(_LIGHTHDR)
+    if look == "dark":
+        t.update(_DARK)
+        if acc != "orange":
+            t.update(_tk(_blk(f'html[data-theme="dark"][data-accent="{acc}"]')))
+    else:
+        if acc != "orange":
+            t.update(_tk(_blk(f':root:not([data-theme="dark"])[data-accent="{acc}"]')))
+        if look == "ink":
+            t.update(_tk(_blk(f'html[data-theme="ink"][data-accent="{acc}"]')))
+    return t
+def _rgb(c):
+    c = c.strip()
+    if c.startswith("#"):
+        return [int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)], 1.0
+    m = _re.match(r"rgba\(([\d.]+),([\d.]+),([\d.]+),([\d.]+)\)", c.replace(" ", ""))
+    return [float(m.group(i)) / 255 for i in (1, 2, 3)], float(m.group(4))
+def _over(fg, bg):            # an rgba token laid over its surface
+    (f, a), (b, _) = _rgb(fg), _rgb(bg)
+    return "#" + "".join(f"{round((a * x + (1 - a) * y) * 255):02X}" for x, y in zip(f, b))
+def _lum(c):
+    v = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in _rgb(c)[0]]
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+def _cr(a, b):
+    x, y = sorted([_lum(a), _lum(b)], reverse=True)
+    return (x + 0.05) / (y + 0.05)
+_ACC = ["orange", "blue", "blue-shades", "orange-shades"]
+_bad = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        surf, bg = t["surface"], t["bg"]
+        chip = _over(t["navy-soft"], t["surface"])
+        pairs = [("button text on the button", t["action-fg"], t["action"], 4.5),
+                 ("a button's edge on the page", t["action"], bg, 3.0),
+                 ("the kicker (action colour) on the page", t["action"], bg, 4.5),
+                 ("a link / active control on a card", t["navy"], surf, 4.5),
+                 ("a link on the page", t["navy"], bg, 4.5),
+                 ("text on a filled control (is-on)", t["control-fg"], t["navy"], 4.5),
+                 ("a chip's text on its tint", t["navy"], chip, 4.5),
+                 ("the header's text on the header", t["hdr-fg"], t["hdr-bg"], 4.5)]
+        pairs += [(f"chart series {i} on a card", t[f"chart-{i}"], surf, 3.0) for i in range(1, 6) if t[f"chart-{i}"].upper() != t["chart-none"].upper()]
+        for name, a, b, need in pairs:
+            r = _cr(a, b)
+            if r < need:
+                _bad.append(f"{_a}/{_l}: {name} {a} on {b} = {r:.2f} < {need}")
+ok("W16: 🔴 all 12 looks × accents pass every pair — text 4.5:1, control edges and chart marks 3:1 (buttons, kicker, links, "
+   "filled controls, chips, header, series 1–5)", not _bad, "; ".join(_bad[:6]))
+ok("W16: the status colours are byte-identical in all 12 combinations (the accents never touch them)",
+   len({tuple(_eff(a, l)[k] for k in ("green", "gold", "red")) for a in _ACC for l in ("ink", "light")}) == 1
+   and len({tuple(_eff(a, "dark")[k] for k in ("green", "gold", "red")) for a in _ACC}) == 1)
+ok("W16: the brief's 'Orange primary' button #FF8C14 would fail on white (2.33:1, under 3:1) — so it is not used on the light looks",
+   round(_cr("#FF8C14", "#FFFFFF"), 2) == 2.33 and all(_eff(a, l)["action"].upper() != "#FF8C14" for a in _ACC for l in ("ink", "light")))
+ok("W16: Blue shades' navy header is the Ink look's only (white on it 10.36:1); the Light look keeps its white header",
+   _eff("blue-shades", "ink")["hdr-bg"] == "#1E3A8A" and round(_cr("#FFFFFF", "#1E3A8A"), 2) == 10.36
+   and _eff("blue-shades", "light")["hdr-bg"] == "#FFFFFF" and _eff("blue", "ink")["hdr-bg"] == "#1F2024")
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

@@ -41,7 +41,7 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
+w.eval(js + "\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
@@ -77,6 +77,25 @@ click(items[0] === undefined ? btn : [...w.document.querySelectorAll(".appearanc
 ok("APPEARANCE: back to Ink", w.document.documentElement.getAttribute("data-theme") === "ink" && w.localStorage.getItem("modus_theme") === "ink");
 act(() => { w.applyTheme("bogus"); });
 ok("APPEARANCE: an unknown value falls back to ink", w.document.documentElement.getAttribute("data-theme") === "ink");
+
+// ---- 2b. 13 Oct 2026 (W16): the Accent group in the same popover ------------------------------------------------
+ok("ACCENT: with nothing stored the accent is orange (today's look) on <html> before React mounts",
+   w.document.documentElement.getAttribute("data-accent") === "orange");
+click(btn);
+const accItems = [...w.document.querySelectorAll(".accent-item")];
+ok("ACCENT: the popover's second group lists Orange, Blue, Blue shades, Orange shades as menuitemradio, Orange checked; the looks stay three",
+   accItems.map(b => b.textContent.replace("✓", "").trim()).join("|") === "Orange|Blue|Blue shades|Orange shades"
+   && accItems.every(b => b.getAttribute("role") === "menuitemradio") && accItems.map(b => b.getAttribute("aria-checked")).join("|") === "true|false|false|false"
+   && w.document.querySelectorAll(".appearance-item").length === 3);
+let seenA = []; const subA = (n) => seenA.push(n);
+w.__ACC.subs.add(subA);
+click(accItems[2]);
+ok("ACCENT: choosing Blue shades sets html[data-accent], stores it, tells the charts, closes the popover, leaves the look alone",
+   w.document.documentElement.getAttribute("data-accent") === "blue-shades" && w.localStorage.getItem("modus_accent") === "blue-shades"
+   && seenA.join("|") === "blue-shades" && !w.document.querySelector(".appearance-menu") && w.document.documentElement.getAttribute("data-theme") === "ink");
+act(() => { w.applyAccent("bogus"); });
+ok("ACCENT: an unknown value falls back to orange", w.document.documentElement.getAttribute("data-accent") === "orange" && seenA.join("|") === "blue-shades|orange");
+w.__ACC.subs.delete(subA); w.localStorage.removeItem("modus_accent");
 
 // ---- 3. subscribers ---------------------------------------------------------------------
 let seen = [];
