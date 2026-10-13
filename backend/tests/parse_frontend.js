@@ -1263,14 +1263,19 @@ ok("0915: every one of the four is wrapped, and each wraps a DIFFERENT index",
    && [0, 1, 2, 3].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
 ok("0915: 🔴 a hidden section is HIDDEN, not unmounted — the Mapbox instance survives",
    // the wrapper renders its children unconditionally and toggles `hidden`
-   /<div ref=\{ref\} hidden=\{!show\} data-wall-section/.test(src)
+   // (13 Oct 2026, W5: narrowed — the wrapper no longer needs a ref, it fires nothing)
+   /<div hidden=\{!show\} data-wall-section/.test(src)
    && !/\{show && <DashboardToday/.test(src) && !/sectionShown\(0\) && </.test(src)
    // and [hidden] is forced in the STYLESHEET (not the script block), because a Tailwind
    // utility on the same element would otherwise win
    && /\[hidden\]\{display:none !important;\}/.test(html));
-ok("0915: ...and a section coming back into view is told to re-measure",
-   /requestAnimationFrame\(\(\) => \{ try \{ window\.dispatchEvent\(new Event\("resize"\)\)/.test(src)
-   && /cancelAnimationFrame\(id\)/.test(src));
+// 13 Oct 2026 (W5, bundle E): narrowed. The section is still re-measured when it comes back into view, but by the
+// boxes themselves: every chart box and the Today map watch their own size (ResizeObserver), so nothing fires a window
+// resize any more, and a chart that was never on screen is built then, at its real size.
+ok("0915: ...and a section coming back into view is re-measured (13 Oct: each box watches its own size)",
+   !/window\.dispatchEvent\(new Event\("resize"\)\)/.test(src)
+   && /function ChartCanvas[\s\S]{0,2600}new ResizeObserver\(/.test(src)
+   && /function CommitMap[\s\S]{0,9000}new ResizeObserver\(\(\) => \{ try \{ if\(mapDiv\.current && mapDiv\.current\.clientWidth > 0\) m\.resize\(\);/.test(src));
 ok("0915: the WORKING view always shows all four, whatever the big screen remembered",
    /const sectionShown = \(i\) => !wall \|\| wallLayout === "all" \|\| wallSection === i;/.test(src));
 ok("0915: the rotate timer runs only on the big screen, and is cleared",
@@ -1289,8 +1294,9 @@ ok("0915: the three layouts are all offered, and every localStorage read is guar
    && (src.match(/localStorage\.(get|set)Item\("modus_dash_/g) || []).length === 6
    // every one of the six sits inside a try — a private window must not blank the page
    && !/[^ ]localStorage\.getItem\("modus_dash_[^)]*\)[^;]*;\s*\n(?![\s\S]{0,40}catch)/.test(src));
-ok("...and it collapses with the rail like every other item (label behind railOpen)",
-   /\/help\/\?role=[\s\S]{0,460}?\{railOpen && <span className="truncate">User guide<\/span>\}/.test(src));
+// 13 Oct 2026 (W5): narrowed — the rail's labels follow railShown (railOpen, or below 768 px the overlay)
+ok("...and it collapses with the rail like every other item (label behind railShown)",
+   /\/help\/\?role=[\s\S]{0,460}?\{railShown && <span className="truncate">User guide<\/span>\}/.test(src));
 
 // ---- H10 (8 Oct 2026): the in-app guide ----------------------------------------
 // Demo tenant only; steps per page anchored to data-guide elements; Back/Next/Done and
@@ -1871,9 +1877,12 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
     ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
     && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
-  ok("...a collapsed section re-measures what it holds when opened (Mapbox and Chart.js measure zero while hidden)",
-    _dbBody.includes('const onMore = (e) => { if(e.target.open) requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(err){} }); };')
-    && (_dbWork.match(/onToggle=\{onMore\}/g) || []).length === 5);
+  // 13 Oct 2026 (W5): narrowed — no onToggle handler any more; a chart in a collapsed section is built when its box
+  // first has a size (ChartCanvas's ResizeObserver), so it is measured right on the first open
+  ok("...a collapsed section re-measures what it holds when opened (13 Oct: each chart box watches itself; no onMore)",
+    !_dbBody.includes("const onMore") && (_dbWork.match(/onToggle=\{onMore\}/g) || []).length === 0
+    && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5
+    && /function ChartCanvas[\s\S]{0,2600}if\(!\(el\.clientWidth > 0 && el\.clientHeight > 0\)\) return;/.test(src));
   ok("...three filters in the header, the rest behind More filters, applied chips with Clear all",
     _dbBody.includes(">More filters ▾</summary>") && _dbBody.includes('<div className="row-menu-list dash-filters">') && _dbBody.includes("{!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}"));
   // 3. the Look-ahead grid
@@ -2041,7 +2050,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     _dbW.includes("<GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && (_dbW.match(/<Card label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5
-    && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 5);
+    // 13 Oct 2026 (W5): narrowed — the five sections no longer carry onToggle={onMore} (see the W5 block)
+    && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 0);
   ok("the hooks sit before the early returns (React #310)",
     _dbc.indexOf("const [ga, setGa]") > 0 && _dbc.indexOf("const [ga, setGa]") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));") < _dbc.indexOf("if(err) return")
@@ -2367,6 +2377,45 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && src.includes("The admin token is taken from the field at the top of this page.") && !src.includes("taken from the bake panel")
      && src.includes("Saved on its own: the page's Save button does not save the target rate") && src.includes("from Config → Vehicles, plus")
      && src.includes("Codes are checked by Wayscope") && src.includes('confirm("Clear ALL routes? Locations are kept. This cannot be undone.")'));
+}
+
+// ---- 13 Oct 2026 (W5, bundle E): charts fill every screen ------------------------------------------------------
+{
+  const _cc = (src.match(/function ChartCanvas\([\s\S]*?\n\}\n/) || [""])[0];
+  const _db = (src.match(/function Dashboard\(\{[\s\S]*?\n\}\n/) || [""])[0];
+  ok("W5: every chart box is position:relative and sized by CSS clamp(), two sizes; the canvas is the box's only child",
+     /\.chart-box\{position:relative;width:100%;min-width:0;height:clamp\(200px,28vh,420px\);\}/.test(html)
+     && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
+     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
+  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile chart, whose height follows its rows)",
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 1 && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
+     && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
+  ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
+     _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
+     && _cc.includes('if(want && lg.position !== want){ lg.position = want; c.update("none"); } else c.resize();')
+     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, sized]);"));
+  ok("W5: the rules by width: legend under the plot below 768 px, a doughnut's on the right only from 1024 px; labels 18 characters, no rotation; DPR at most 2",
+     /const CHART_LABEL_MAX = 18;/.test(src) && /if\(vw < 768\) return "bottom";/.test(src)
+     && /if\(type === "doughnut" \|\| type === "pie"\) return vw >= 1024 \? \(asked \|\| "right"\) : "bottom";/.test(src)
+     && /const ticks = \{ \.\.\.\(ax\.ticks \|\| \{\}\), maxRotation: 0, autoSkip: true \};/.test(src)
+     && /o\.devicePixelRatio = Math\.min\(\(typeof window !== "undefined" && window\.devicePixelRatio\) \|\| 1, 2\);/.test(src));
+  ok("W5: the working view is up to 1680 px wide (not max-w-7xl); the big screen's Charts section fills the height when shown alone",
+     _db.includes('"max-w-[1680px]")}>') && !_db.includes('"max-w-7xl"')
+     && _db.includes('(wallLayout !== "all" && wallSection === 2 ? " dash-fill" : "")')
+     && /\.dash-wall\.dash-fill\{height:100%;display:flex;flex-direction:column;\}/.test(html)
+     && /\.dash-wall\.dash-fill \.wall-charts\{height:100%;grid-auto-rows:minmax\(0,1fr\);\}/.test(html));
+  ok("W5: the four charts: one column, 3 + 2 from 1024 px, three columns from 1600 px (top routes down the right); More charts 1 / 2 / 4",
+     /@media \(min-width:1600px\)\{\n\s*\.dash-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-areas:"demand progress top" "cost cost top";\}/.test(html)
+     && ["c-demand", "c-top", "c-progress", "c-cost"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
+     && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="pt-3 dash-more-charts">')
+     && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
+  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone)",
+     (src.match(/new ResizeObserver\(/g) || []).length === 3 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src));
+  ok("W5 (the user's \"3 yes\"): below 768 px the rail is icons only and opens OVER the page, not remembered",
+     /const NARROW_Q = "\(max-width: 767px\)";/.test(src) && /const railShown = narrow \? railPeek : railOpen;/.test(src)
+     && /if\(narrow\)\{ setRailPeek\(v => !v\); return; \}/.test(src) && /\(narrow && railPeek \? " rail-peek" : ""\)/.test(src)
+     && /\.rail\.rail-peek\{position:absolute;top:0;bottom:0;left:0;z-index:45;/.test(html)
+     && /onClick=\{\(\) => \{ setPage\(it\.id\); if\(narrow\) setRailPeek\(false\); \}\}/.test(src));
 }
 
 // ---- report ------------------------------------------------------------------

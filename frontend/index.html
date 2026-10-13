@@ -190,6 +190,8 @@
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
   .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
+  /* 13 Oct 2026 (W5): below 768 px the opened rail lies over the page instead of squeezing it */
+  .rail.rail-peek{position:absolute;top:0;bottom:0;left:0;z-index:45;box-shadow:0 12px 32px rgba(16,24,40,.22);}
   .rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);opacity:.85;}
   /* 11 Oct 2026 — the fresher shell (fresh-directions.html: A, Clean, with B's orange button and kicker) */
   .rail-item{color:var(--muted);border-radius:6px;margin:1px 8px;width:calc(100% - 16px) !important;padding-left:10px !important;}
@@ -315,6 +317,40 @@
   .dash-more[open]>summary{border-bottom:1px solid var(--line);}
   .dash-more>div{padding-bottom:16px;}
   .dash-more .card.overflow-hidden{border:0;}
+  /* 13 Oct 2026 (W5, bundle E) — charts fill every screen. Every chart sits in a .chart-box: relatively positioned and
+     used only for the chart (what Chart.js's responsive mode needs), sized by CSS, never by a fixed px prop. Two sizes:
+     the default and .is-lg (the two time series a planner reads first). The big screen sizes them larger, and in
+     "Rotate" / "One section" the Charts section fills the screen's height (.dash-fill). */
+  .chart-box{position:relative;width:100%;min-width:0;height:clamp(200px,28vh,420px);}
+  .chart-box.is-lg{height:clamp(220px,32vh,480px);}
+  .chart-box>canvas{display:block;}
+  .chart-card{display:flex;flex-direction:column;min-width:0;}
+  .chart-card>.chart-box{flex:1 1 auto;}
+  /* the working view's four charts: one column, then 5 tracks (3 + 2) from 1024 px, then 3 columns from 1600 px with
+     the top-routes list running down the right-hand column */
+  .dash-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
+  @media (min-width:1024px){
+    .dash-charts{grid-template-columns:repeat(5,minmax(0,1fr));}
+    .dash-charts>.c-demand,.dash-charts>.c-cost{grid-column:span 3;} .dash-charts>.c-top,.dash-charts>.c-progress{grid-column:span 2;}
+  }
+  @media (min-width:1600px){
+    .dash-charts{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"demand progress top" "cost cost top";}
+    .dash-charts>.c-demand{grid-area:demand;} .dash-charts>.c-progress{grid-area:progress;} .dash-charts>.c-cost{grid-area:cost;}
+    .dash-charts>.c-top{grid-area:top;} .dash-charts>.c-top>.chart-box{height:auto;min-height:clamp(200px,28vh,420px);}
+  }
+  .dash-more-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
+  @media (min-width:768px){.dash-more-charts{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  @media (min-width:1280px){.dash-more-charts{grid-template-columns:repeat(4,minmax(0,1fr));}}
+  .dash-wall .chart-box{height:clamp(240px,30vh,560px);}
+  .dash-wall .chart-box.is-lg{height:clamp(260px,34vh,620px);}
+  /* the big screen, one section at a time: the page is exactly the screen's height and the Charts grid shares it */
+  .dash-wall.dash-fill{height:100%;display:flex;flex-direction:column;}
+  .dash-wall.dash-fill>[data-wall-section="Charts"]{flex:1 1 auto;min-height:0;}
+  .dash-wall.dash-fill .wall-charts{height:100%;grid-auto-rows:minmax(0,1fr);}
+  .dash-wall.dash-fill .wall-charts>.chart-card{min-height:0;}
+  .dash-wall.dash-fill .wall-charts .chart-box{height:auto;min-height:0;}
+  .wall-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
+  @media (min-width:1024px){.wall-charts{grid-template-columns:repeat(3,minmax(0,1fr));} .wall-charts>.c-demand{grid-column:span 2;}}
   .dash-filters label{display:block;padding:6px 10px;}
   .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
   /* 12 Oct 2026 (C4): the Monthly bulletin menu on the Dashboard — the 14 px floor for its words */
@@ -646,20 +682,78 @@ function InfoTip({ id, label, value }){
   );
 }
 
-// Chart.js wrapper — recreates the chart when its serialised config changes.
-function ChartCanvas({ config, height=260 }){
+// 13 Oct 2026 (W5, bundle E): the rules every chart follows, whatever page builds it.
+//   - the legend sits under the plot below 768 px of screen; a doughnut keeps its legend on the right only from
+//     1024 px (under it otherwise), because a 260 px ring with a side legend crushes the plot on a phone;
+//   - category labels never rotate (they skip instead) and are cut at 18 characters; the tooltip names the whole;
+//   - at most two device pixels per CSS pixel, so a 4K site-office TV stays sharp without a huge canvas.
+const CHART_LABEL_MAX = 18;
+const chartLegendPos = (type, vw, asked) => {
+  if(vw < 768) return "bottom";
+  if(type === "doughnut" || type === "pie") return vw >= 1024 ? (asked || "right") : "bottom";
+  return asked || "bottom";
+};
+const cutLabel = (s) => { s = String(s == null ? "" : s); return s.length > CHART_LABEL_MAX ? s.slice(0, CHART_LABEL_MAX - 1) + "…" : s; };
+function fitChartConfig(config, vw){
+  const o = { ...(config.options || {}) };
+  const plugins = { ...(o.plugins || {}) };
+  if(plugins.legend && plugins.legend.display !== false){
+    plugins.legend = { ...plugins.legend, position: chartLegendPos(config.type, vw, plugins.legend.position) };
+  }
+  o.plugins = plugins;
+  o.devicePixelRatio = Math.min((typeof window !== "undefined" && window.devicePixelRatio) || 1, 2);
+  if(config.type !== "doughnut" && config.type !== "pie"){
+    const cat = o.indexAxis === "y" ? "y" : "x";
+    const scales = { ...(o.scales || {}) };
+    const ax = { ...(scales[cat] || {}) };
+    const ticks = { ...(ax.ticks || {}), maxRotation: 0, autoSkip: true };
+    if(!ticks.callback) ticks.callback = function(v){ return cutLabel(this.getLabelForValue(v)); };
+    ax.ticks = ticks; scales[cat] = ax; o.scales = scales;
+  }
+  return { ...config, options: o };
+}
+// Chart.js wrapper — recreates the chart when its serialised config, the look or the accent changes.
+// 13 Oct 2026 (W5): the box is `position:relative` and sized by CSS (.chart-box; `size="lg"` for the taller pair).
+// A chart is BUILT only once its box has a size, so a chart in a collapsed section (or a hidden big-screen
+// section) is built the first time it is opened, not at 0 × 0 while hidden. A ResizeObserver on the box resizes it
+// (and moves the legend when the screen crosses 768 / 1024 px); the two window `resize` dispatches that used to
+// nudge Chart.js are gone. `height` is kept for the stockpile chart, whose height follows its row count.
+function ChartCanvas({ config, height, size }){
+  const box = useRef(null);
   const ref = useRef(null);
   const inst = useRef(null);
   const [theme] = useTheme();          // 5 Oct 2026: axes, grid and legend follow the look
+  const [sized, setSized] = useState(false);
+  const cfgRef = useRef(config); cfgRef.current = config;
+  const vwNow = () => (typeof window !== "undefined" && window.innerWidth) || 1280;
   useEffect(() => {
-    if(!ref.current || !window.Chart) return;
+    const el = box.current;
+    if(!el) return;
+    if(typeof ResizeObserver === "undefined"){ setSized(true); return; }   // old browsers and the jsdom harness
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      if(!(el.clientWidth > 0 && el.clientHeight > 0)) return;           // still collapsed or hidden
+      setSized(true);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const c = inst.current; if(!c) return;
+        const lg = c.options && c.options.plugins && c.options.plugins.legend;
+        const want = lg && lg.display !== false ? chartLegendPos(c.config.type, vwNow(), ((cfgRef.current.options || {}).plugins || {}).legend ? cfgRef.current.options.plugins.legend.position : null) : null;
+        if(want && lg.position !== want){ lg.position = want; c.update("none"); } else c.resize();
+      });
+    });
+    ro.observe(el);
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
+  useEffect(() => {
+    if(!sized || !ref.current || !window.Chart) return;
     if(inst.current) inst.current.destroy();
     window.Chart.defaults.color = tok("--muted", "#64748B");
     window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
-    inst.current = new window.Chart(ref.current, config);
+    inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
-  }, [JSON.stringify(config), theme]);
-  return <div style={{height}}><canvas ref={ref}></canvas></div>;
+  }, [JSON.stringify(config), theme, sized]);
+  return <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>;
 }
 
 function Kpi({ label, value, sub, small }){
@@ -728,8 +822,8 @@ const REFRESH_MS = 5 * 60 * 1000;
 // context every few seconds on a display left running all day — browsers cap those at
 // about sixteen, and the tiles would be re-fetched each time. The standing rule ("one
 // Mapbox instance, never unmounted") applies here exactly. So a hidden section keeps its
-// DOM and its instances, and `WallSection` fires one window resize when it comes back
-// into view, because Mapbox and Chart.js both measure zero inside `display:none`.
+// DOM and its instances. Mapbox and Chart.js both measure zero inside `display:none`; since 13 Oct (W5) each
+// watches its own box and re-measures when the section comes back (it used to take a window resize).
 const DASH_SECTIONS = [
   { key: "today",  title: "Today" },
   { key: "kpis",   title: "Figures" },
@@ -738,22 +832,12 @@ const DASH_SECTIONS = [
 ];
 const DASH_ROTATE_CHOICES = [10, 15, 20, 30, 45, 60, 120];
 
+// 13 Oct 2026 (W5): a section coming back into view no longer fires a window `resize`. Each chart box and each
+// map container watches its own size (ResizeObserver in ChartCanvas and CommitMap), so it re-measures the moment
+// `hidden` comes off, and a chart that was never seen is built then, at its real size.
 function WallSection({ show, divider, title, children }){
-  const ref = useRef(null);
-  const was = useRef(show);
-  useEffect(() => {
-    if(show && !was.current && ref.current){
-      // one frame after the section is laid out again, tell everything inside it to
-      // re-measure. Mapbox (trackResize, on by default) and Chart.js (responsive) both
-      // listen to the window; a map that was display:none has width 0 until this fires.
-      const id = requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(e){} });
-      was.current = show;
-      return () => cancelAnimationFrame(id);
-    }
-    was.current = show;
-  }, [show]);
   return (
-    <div ref={ref} hidden={!show} data-wall-section={title || ""}>
+    <div hidden={!show} data-wall-section={title || ""}>
       {divider && title && <div className="dash-divider">{title}</div>}
       {children}
     </div>
@@ -1265,7 +1349,6 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       {sub && <div className="dash-card-s">{sub}</div>}
     </div>
   );
-  const onMore = (e) => { if(e.target.open) requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(err){} }); };
   const applied = [
     status !== "Approved" && { k: "status", label: `Status: ${status}` },
     ipt !== "All" && { k: "ipt", label: `${TEAM()}: ${ipt === "none" ? "none set" : teamText(ipt)}` },
@@ -1280,7 +1363,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const clearAll = () => { setStatus("Approved"); setIpt("All"); setDiscipline("All"); setUnit("t"); setMaterial("All"); setVehicle("All"); setLineKey(null); };
 
   return (
-    <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" : "max-w-7xl")}>
+    // 13 Oct 2026 (W5): the working view is up to 1680 px wide (it was 1280, max-w-7xl), so a 1920 px screen uses its
+    // width; the big screen in "Rotate" / "One section" on the Charts section fills the screen's height (.dash-fill).
+    <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" + (wallLayout !== "all" && wallSection === 2 ? " dash-fill" : "") : "max-w-[1680px]")}>
       {/* 13 Oct 2026 (W3): the date range is shown ONCE, in the kicker; the scope is shown by the filter
           chips under the header (the old subtitle repeated both) */}
       <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
@@ -1358,29 +1443,29 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
           <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
-          <div className="grid lg:grid-cols-5 gap-4">
-            <div className="card p-4 lg:col-span-3">
+          <div className="dash-charts" data-dash-charts="1">
+            <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
-          <ChartCanvas config={demandCfg} height={wall ? 320 : 260} />
+          <ChartCanvas config={demandCfg} size="lg" />
         </div>
-            <div className="card p-4 lg:col-span-2">
+            <div className="card p-4 chart-card c-top">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
-          <ChartCanvas config={topCfg} height={wall ? 280 : 240} />
+          <ChartCanvas config={topCfg} />
         </div>
-            <div className="card p-4 lg:col-span-2">
+            <div className="card p-4 chart-card c-progress">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
-          <ChartCanvas config={progressCfg} height={wall ? 320 : 260} />
+          <ChartCanvas config={progressCfg} size="lg" />
         </div>
-            <div className="card p-4 lg:col-span-3">
+            <div className="card p-4 chart-card c-cost">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
-          <ChartCanvas config={costCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={costCfg} />
         </div>
           </div>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
             <div className="pt-3"><DashboardToday meta={meta} week={week} err={weekErr} wall={wall} /></div>
           </details>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>All the figures: delivered to date, volume, cost, carbon</summary>
             <div className="pt-3">
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-dash-figures="1">
@@ -1419,32 +1504,32 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       </div>
             </div>
           </details>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>More charts: trips, vehicles needed, carbon over time, material split</summary>
-            <div className="pt-3 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="card p-4">
+            <div className="pt-3 dash-more-charts">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
-          <ChartCanvas config={tripsCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={tripsCfg} />
         </div>
-              <div className="card p-4">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
-          <ChartCanvas config={fleetCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={fleetCfg} />
         </div>
-              <div className="card p-4">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
-          <ChartCanvas config={co2Cfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={co2Cfg} />
         </div>
-              <div className="card p-4">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
-          <ChartCanvas config={splitCfg} height={wall ? 280 : 240} />
+          <ChartCanvas config={splitCfg} />
         </div>
             </div>
           </details>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>Stockpile capacity</summary>
             <div className="pt-3"><DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} /></div>
           </details>
-          <details className="dash-more" onToggle={onMore} data-dash-table="1">
+          <details className="dash-more" data-dash-table="1">
             <summary>Route planning detail</summary>
             <div className="pt-3">
       <div className="card overflow-hidden">
@@ -1546,38 +1631,38 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       </WallSection>
 
       <WallSection show={sectionShown(2)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[2].title}>
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="card p-4 lg:col-span-2">
+      <div className="wall-charts">
+        <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
-          <ChartCanvas config={demandCfg} height={wall ? 320 : 260} />
+          <ChartCanvas config={demandCfg} size="lg" />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
-          <ChartCanvas config={progressCfg} height={wall ? 320 : 260} />
+          <ChartCanvas config={progressCfg} size="lg" />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
-          <ChartCanvas config={costCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={costCfg} />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
-          <ChartCanvas config={tripsCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={tripsCfg} />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
-          <ChartCanvas config={fleetCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={fleetCfg} />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
-          <ChartCanvas config={co2Cfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={co2Cfg} />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
-          <ChartCanvas config={splitCfg} height={wall ? 280 : 240} />
+          <ChartCanvas config={splitCfg} />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
-          <ChartCanvas config={topCfg} height={wall ? 280 : 240} />
+          <ChartCanvas config={topCfg} />
         </div>
       </div>
       </WallSection>
@@ -2583,7 +2668,24 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   // and put the hash on the URL for the page we actually opened with
   useEffect(() => { try { if(pageFromHash() !== page) history.replaceState(null, "", "#" + page); } catch(e){} }, []);
   const [railOpen, setRailOpen] = useState(() => { try { return localStorage.getItem("modus_rail") !== "closed"; } catch(e){ return true; } });
-  const toggleRail = () => { const v = !railOpen; setRailOpen(v); try { localStorage.setItem("modus_rail", v ? "open" : "closed"); } catch(e){} };
+  // 13 Oct 2026 (W5, bundle E; the user's "3 yes"): below 768 px the rail is icons only, whatever was remembered —
+  // open, it squeezed the Dashboard's cards to ~65 px on a 360 px phone. The expand button there opens it OVER the
+  // page (not beside it) until a page is picked; that choice is not remembered.
+  const NARROW_Q = "(max-width: 767px)";
+  const [narrow, setNarrow] = useState(() => { try { return !!(window.matchMedia && window.matchMedia(NARROW_Q).matches); } catch(e){ return false; } });
+  const [railPeek, setRailPeek] = useState(false);
+  useEffect(() => {
+    if(!window.matchMedia) return;
+    const mq = window.matchMedia(NARROW_Q);
+    const f = (e) => { setNarrow(!!e.matches); setRailPeek(false); };
+    if(mq.addEventListener) mq.addEventListener("change", f); else if(mq.addListener) mq.addListener(f);
+    return () => { if(mq.removeEventListener) mq.removeEventListener("change", f); else if(mq.removeListener) mq.removeListener(f); };
+  }, []);
+  const railShown = narrow ? railPeek : railOpen;
+  const toggleRail = () => {
+    if(narrow){ setRailPeek(v => !v); return; }
+    const v = !railOpen; setRailOpen(v); try { localStorage.setItem("modus_rail", v ? "open" : "closed"); } catch(e){}
+  };
   // {routeId, year, toYear, discipline, sectionId} handed to the Matrix. `year` is the
   // FIRST year of the line and `toYear` the last — a line can span several since the
   // multi-year save, and reopening it on one year would hide the rest.
@@ -2602,7 +2704,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   const [navQ, setNavQ] = useState("");
   const navRef = useRef(null);
   useEffect(() => {
-    const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
+    const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); if(window.matchMedia && window.matchMedia(NARROW_Q).matches) setRailPeek(true); else setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
   const visible = NAV.filter(g => !g.admin || canApprove);
@@ -2622,10 +2724,11 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   const current = visible.flatMap(g => g.items).find(i => i.id === page) || { label: "" };
 
   return (
-    <div className="flex-1 min-h-0 flex">
-      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railOpen ? "w-56" : "w-14")}>
+    <div className="flex-1 min-h-0 flex relative">
+      {narrow && railPeek && <div className="w-14 shrink-0" aria-hidden="true"></div>}
+      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railShown ? "w-56" : "w-14") + (narrow && railPeek ? " rail-peek" : "")}>
         <div className="flex-1 overflow-y-auto py-3">
-          {railOpen && (
+          {railShown && (
             <label className="rail-search" title="Find a page (Ctrl K)">
               <input ref={navRef} value={navQ} onChange={e => setNavQ(e.target.value)} placeholder="Find a page…" aria-label="Find a page"
                 onKeyDown={e => { if(e.key === "Enter" && navFirst){ setPage(navFirst.id); setNavQ(""); } if(e.key === "Escape") setNavQ(""); }} />
@@ -2635,17 +2738,17 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
           {visible.filter(g => g.items.some(navMatch)).map(g => (
             // collapsed, the group HEADINGS go but the grouping must not: a plain
             // column of nine icons reads as one undifferentiated list.
-            <div key={g.group} className={"mb-3 " + (railOpen ? "" : "pt-3 mt-3 border-t border-slate-100 first:border-0 first:mt-0 first:pt-0")}>
-              {railOpen && <div className="rail-group px-4 pb-1">{g.group}</div>}
+            <div key={g.group} className={"mb-3 " + (railShown ? "" : "pt-3 mt-3 border-t border-slate-100 first:border-0 first:mt-0 first:pt-0")}>
+              {railShown && <div className="rail-group px-4 pb-1">{g.group}</div>}
               {g.items.filter(navMatch).map(it => {
                 const active = page === it.id;
                 const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending : null;
                 return (
-                  <button key={it.id} onClick={() => setPage(it.id)} title={railOpen ? undefined : it.label}
+                  <button key={it.id} onClick={() => { setPage(it.id); if(narrow) setRailPeek(false); }} title={railShown ? undefined : it.label}
                     className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
                     <NavIcon id={it.id} />
-                    {railOpen && <span className="truncate flex-1">{it.label}</span>}
-                    {badge != null && railOpen && (
+                    {railShown && <span className="truncate flex-1">{it.label}</span>}
+                    {badge != null && railShown && (
                       <span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>
                     )}
                   </button>
@@ -2660,15 +2763,15 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
               to type the URL. An ANCHOR, not a NAV entry: /help/ is a separate document,
               not a React view, and a new tab keeps the app's state. */}
           <a href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer"
-             title={railOpen ? "Opens in a new tab" : "User guide"}
+             title={railShown ? "Opens in a new tab" : "User guide"}
              className="w-full flex items-center gap-3 px-2 py-1.5 mb-1 text-xs rounded text-slate-500 hover:bg-slate-50 hover:text-[color:var(--navy)] transition">
             <span className="w-4 text-center text-sm leading-none opacity-80">?</span>
-            {railOpen && <span className="truncate">User guide</span>}
+            {railShown && <span className="truncate">User guide</span>}
           </a>
-          <button onClick={toggleRail} className="w-full text-xs text-slate-400 hover:text-slate-700 py-1" title={railOpen ? "Collapse" : "Expand"}>
-            {railOpen ? "‹ Collapse" : "›"}
+          <button onClick={toggleRail} className="w-full text-xs text-slate-400 hover:text-slate-700 py-1" title={railShown ? "Collapse" : "Expand"}>
+            {railShown ? "‹ Collapse" : "›"}
           </button>
-          {railOpen && role && (
+          {railShown && role && (
             <div className="px-2 pb-1 text-[11px] text-slate-500 truncate" title={who}>
               <span className="font-medium text-slate-700">{teamText(who) || "—"}</span> · {role.ipt ? teamName(role.ipt) : role.label}
             </div>
@@ -5865,6 +5968,14 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush }){
       setReady(true);
     });
     mapObj.current = m;
+    // 13 Oct 2026 (W5): the map watches its own container. On the Dashboard it sits in a collapsed section (and a
+    // hidden big-screen section), where it starts at 0 × 0; it used to wait for a window resize the page fired on
+    // open. Never removed here (the one-Mapbox rule); the observer is disconnected only if the page goes.
+    if(typeof ResizeObserver !== "undefined" && mapDiv.current){
+      const ro = new ResizeObserver(() => { try { if(mapDiv.current && mapDiv.current.clientWidth > 0) m.resize(); } catch(e){} });
+      ro.observe(mapDiv.current);
+      return () => ro.disconnect();
+    }
   }, []);
 
   useEffect(() => {
@@ -7200,10 +7311,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const t1 = setTimeout(doResize, 100);
     const t2 = setTimeout(doResize, 400);
     window.addEventListener("resize", doResize);
+    // 13 Oct 2026 (W5): and whenever its own container changes size (the rail collapsing, a panel opening)
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(doResize) : null;
+    if(ro && mapDiv.current) ro.observe(mapDiv.current);
     mapObj.current = m;
     return () => {
       clearTimeout(t1); clearTimeout(t2);
       window.removeEventListener("resize", doResize);
+      if(ro) ro.disconnect();
       if(mapObj.current){ mapObj.current.remove(); mapObj.current = null; }
     };
   }, []);

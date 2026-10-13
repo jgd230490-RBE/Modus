@@ -41,7 +41,7 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
+w.eval(js + "\nwindow.__T = THEME; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
@@ -331,6 +331,51 @@ async function carbonTargetDom(){
 // carries the exact figure the old hover tooltip showed; below 640 px it is a bottom sheet. jsdom has no
 // layout, so the flip-above rule and the 44 px touch area are pinned at source level (parse_frontend) and
 // checked in a browser. react-dom/client has no createPortal here, so the panel renders in place.
+// ---- 13 Oct 2026 (W5, bundle E): a chart is built only once its box has a size ---------------------------------
+// jsdom has no layout and no ResizeObserver, so both are stubbed here: the box reports 0 × 0 (a collapsed section)
+// and then a real size (the section opened). Chart.js is the stub above, wrapped to record each construction.
+async function chartBoxDom(){
+  const h = w.React.createElement;
+  const tick = () => act(async () => { await new Promise(r => setTimeout(r, 30)); });
+  const made = []; const RealChart = w.Chart;
+  w.Chart = function(el, cfg){ made.push(cfg); return { destroy(){}, update(){}, resize(){}, options: cfg.options, config: cfg }; }; w.Chart.defaults = {};
+  const obs = [];
+  w.ResizeObserver = function(cb){ this.cb = cb; this.observe = (el) => { this.el = el; obs.push(this); }; this.disconnect = () => {}; };
+  const vw0 = w.innerWidth; const dpr0 = w.devicePixelRatio;
+  Object.defineProperty(w, "innerWidth", { value: 600, configurable: true, writable: true });
+  Object.defineProperty(w, "devicePixelRatio", { value: 3, configurable: true, writable: true });
+  const box = w.document.createElement("div"); w.document.body.appendChild(box);
+  const root = w.ReactDOM.createRoot(box);
+  const cfg = { type: "doughnut", data: { labels: ["A very long material name indeed", "B"], datasets: [{ data: [1, 2] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } } };
+  const bar = { type: "bar", data: { labels: ["Route R-001 · Earthworks and more"], datasets: [{ data: [3] }] }, options: { plugins: { legend: { display: false } } } };
+  act(() => { root.render(h("div", null, h(w.ChartCanvas, { config: cfg }), h(w.ChartCanvas, { config: bar, size: "lg" }))); });
+  await tick();
+  const boxes = [...box.querySelectorAll("[data-chart-box]")];
+  ok("CHART BOX: each chart sits in its own .chart-box (the lg one marked), observed by a ResizeObserver",
+     boxes.length === 2 && boxes.every(b => b.classList.contains("chart-box") && b.querySelector("canvas")) && boxes[1].classList.contains("is-lg")
+     && obs.length === 2 && obs.every(o => boxes.includes(o.el)));
+  ok("CHART BOX: 🔴 while the box is 0 × 0 (a collapsed section) no chart is built", made.length === 0);
+  boxes.forEach(b => { Object.defineProperty(b, "clientWidth", { value: 400, configurable: true }); Object.defineProperty(b, "clientHeight", { value: 240, configurable: true }); });
+  act(() => { obs.forEach(o => o.cb([])); }); await tick();
+  ok("CHART BOX: once the box has a size (the section opened) each chart is built, once", made.length === 2, `built ${made.length}`);
+  const d = made.find(c => c.type === "doughnut") || { options: {} }, b = made.find(c => c.type === "bar") || { options: {} };
+  ok("CHART BOX: at most two device pixels per CSS pixel (a 3× screen gets 2)", d.options.devicePixelRatio === 2 && b.options.devicePixelRatio === 2);
+  ok("CHART BOX: below 768 px the doughnut's legend moves under the plot (it asked for the right)", d.options.plugins.legend.position === "bottom");
+  const tk = ((b.options.scales || {}).x || {}).ticks || {};
+  ok("CHART BOX: category labels never rotate, skip when crowded, and are cut at 18 characters",
+     tk.maxRotation === 0 && tk.autoSkip === true && typeof tk.callback === "function"
+     && tk.callback.call({ getLabelForValue: () => "Route R-001 · Earthworks and more" }, 0) === "Route R-001 · Ear…"
+     && tk.callback.call({ getLabelForValue: () => "Short" }, 0) === "Short");
+  ok("CHART BOX: the rule by width — a doughnut keeps its legend on the right only from 1024 px",
+     w.__CHARTFIT.chartLegendPos("doughnut", 1100, "right") === "right" && w.__CHARTFIT.chartLegendPos("doughnut", 900, "right") === "bottom"
+     && w.__CHARTFIT.chartLegendPos("bar", 700, "bottom") === "bottom" && w.__CHARTFIT.chartLegendPos("bar", 1400, "top") === "top");
+  act(() => { root.unmount(); }); box.remove();
+  w.Chart = RealChart; delete w.ResizeObserver;
+  Object.defineProperty(w, "innerWidth", { value: vw0, configurable: true, writable: true });
+  Object.defineProperty(w, "devicePixelRatio", { value: dpr0, configurable: true, writable: true });
+}
+
 async function infoTipDom(){
   const h = w.React.createElement;
   const tick = () => act(async () => { await new Promise(r => setTimeout(r, 30)); });
@@ -768,6 +813,8 @@ async function configEstonianColumn(){
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await infoTipDom(); ok("INFO BOX: the section ran to the end", true); }
   catch (e) { ok("INFO BOX: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await chartBoxDom(); ok("CHART BOX: the section ran to the end", true); }
+  catch (e) { ok("CHART BOX: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);
