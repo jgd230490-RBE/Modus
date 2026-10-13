@@ -510,15 +510,21 @@ ok("...and derives nothing: no tonnes ÷ payload, no CO₂ factor, no cycle arit
 ok("...its fleet figure is the server's `vehicles`", "r.vehicles" in _db and "capacityPerDay)" not in _db.replace("capacityPerDay: r.cycles_per_vehicle_day", ""))
 ok("the Dashboard has IPT and discipline filters, a cost group, a cost-over-time chart, and planned / fair / fair €/t columns",
    'value={ipt}' in _db and 'value={discipline}' in _db and 'title="Cost"' in _db and "Cost over time" in _db
-   and 'setSort("planned")' in _db and 'setSort("fair")' in _db and 'setSort("fairPerT")' in _db)
+   # 13 Oct 2026 (W6, narrowed): fair €/t moved into the row's details; it is still a sort, from the "Sort by" list
+   and 'setSort("planned")' in _db and 'setSort("fair")' in _db and '["fairPerT", `Fair ${CUR()}/t`]' in _fe and "DASH_SORTS().map(" in _db
+   and '<RdItem t={`Fair ${CUR()}/t`}>' in _db)
 _fc = _fe[_fe.index("function Forecasts("):_fe.index("function CostingTab(")]
 ok("the Forecasts page reads /costing/lines (its own fetch, so a failure never hides the list) and joins per line",
-   "fetch(`${API}/costing/lines?status=All`)" in _fc and "costByLine[g.key]" in _fc and "if(!c) return" in _fc)
+   # 13 Oct 2026 (W6, narrowed): the join is per row (const c), each cost cell says "—" when the line has none
+   "fetch(`${API}/costing/lines?status=All`)" in _fc and "const c = costByLine[g.key];" in _fc
+   and '!c ? <span className="text-slate-300">—</span>' in _fc)
 ok("...with a Cost column (planned + fair, €/t beside fair) and nine cost columns in the CSV",
    'data-cost-cell="1"' in _fc and '`Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/${DU()}`' in _fc   # NARROWED H1
    and '"Fair € (model)"' not in _fc)
 ok("the Look-ahead prints the unit triple (€/t · €/trip · €/km) under planned and fair on Account and in the expanded row",
-   "unitTriple(r.planned_units)" in _fe and "unitTriple(r.fair_units)" in _fe and "unitTriple(wd.fair_units)" in _fe and "unitTriple(wd.eur_units)" in _fe)
+   # 13 Oct 2026 (W6, narrowed): the expanded row's triples are details lines through unitList (unitTriple with commas)
+   "unitTriple(r.planned_units)" in _fe and "unitTriple(r.fair_units)" in _fe and "unitList(wd.fair_units)" in _fe and "unitList(wd.eur_units)" in _fe
+   and 'const unitList = (u) => unitTriple(u, { sep: ", " });' in _fe)
 ok("🔴 no cost on the public map", "costing/lines" not in open(os.path.join(ROOT, "map", "index.html"), encoding="utf-8").read())
 
 print()
