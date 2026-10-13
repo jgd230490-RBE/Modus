@@ -310,6 +310,49 @@ with TestClient(main.app, base_url="https://testserver") as c:
        str(b.get("teams")))
     ok("...and a NEW ETag, so a browser holding the empty overlay refetches", r.headers.get("etag") != etag0)
 
+    # 13 Oct 2026: the ETag covers the tenant block and the team names, not only the overlay row's updated_at.
+    # Before, a Config save or a team rename left the tag unchanged, so the map kept its 304 and the old words.
+    etag1 = r.headers.get("etag") or ""
+    _du0 = b["tenant"]["distance_unit"]
+    r = c.get("/api/public/alignment", headers={"If-None-Match": etag1})
+    ok("⭐ ETag: with nothing changed, the demo overlay's own ETag gets 304 with no body", r.status_code == 304 and not r.content
+       and r.headers.get("etag") == etag1, f"{r.status_code} {r.headers.get('etag')} vs {etag1}")
+    _fdoc = c.get("/api/config/factors", headers=PLAN).json()["doc"]
+    _fnew = json.loads(json.dumps(_fdoc))
+    _fnew.setdefault("tenant", {})["distance_unit"] = "km" if _du0 == "mi" else "mi"
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _fnew, "updated_by": "http_smoke"})
+    ok("ETag: the tenant block's distance_unit is changed on Config (PUT /api/admin/config/factors, token)",
+       r.status_code == 200 and r.json().get("ok") is True, r.text[:200])
+    r = c.get("/api/public/alignment", headers={"If-None-Match": etag1})
+    ok("🔴 ETag: after a Config save of the tenant block, the OLD If-None-Match gets 200 (not 304) with the NEW distance unit",
+       r.status_code == 200 and r.json()["tenant"]["distance_unit"] == _fnew["tenant"]["distance_unit"],
+       f"{r.status_code} {r.content[:80]!r}")
+    etag2 = r.headers.get("etag") or ""
+    ok("...and a new ETag, which itself answers 304 next time",
+       etag2 and etag2 != etag1 and c.get("/api/public/alignment", headers={"If-None-Match": etag2}).status_code == 304,
+       f"{etag1} {etag2}")
+    ok("...and the overlay itself is unchanged in that 200 (same version, bands)",
+       r.status_code == 200 and r.json().get("version") == b.get("version") and r.json().get("bands") == b.get("bands"))
+    # a team rename: there is no HTTP route for it (the names arrive with the package), so straight into the table
+    _lab0 = db.query("SELECT label FROM ipts WHERE tenant_id = ? AND id = ?", (db.current_tenant(), "IPT1"))[0]["label"]
+    db.execute("UPDATE ipts SET label = ? WHERE tenant_id = ? AND id = ?", ("Northern Team", db.current_tenant(), "IPT1"))
+    try:
+        r = c.get("/api/public/alignment", headers={"If-None-Match": etag2})
+    finally:
+        db.execute("UPDATE ipts SET label = ? WHERE tenant_id = ? AND id = ?", (_lab0, db.current_tenant(), "IPT1"))
+    ok("🔴 ETag: after a team rename, the old If-None-Match gets 200 with the new team name",
+       r.status_code == 200 and {t["id"]: t["label"] for t in r.json()["teams"]}.get("IPT1") == "Northern Team",
+       f"{r.status_code} {r.content[:80]!r}")
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _fdoc, "updated_by": "http_smoke"})
+    ok("ETag: the factors document is put back", r.status_code == 200 and r.json().get("ok") is True, r.text[:200])
+    r = c.get("/api/public/alignment", headers={"If-None-Match": etag1})
+    ok("...and with the document and the team name back, the FIRST ETag answers 304 again (the tag is the content, not a counter)",
+       r.status_code == 304, str(r.status_code))
+    ok("🔴 ETag: the 304 path does not read the overlay value — main.public_alignment asks get_overlay_stamp() before any get_overlay_row()",
+       (lambda s: "get_overlay_stamp()" in s and s.index("get_overlay_stamp()") < s.index("status_code=304")
+        < s.index("get_overlay_row()"))(
+           open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read().split("def public_alignment(", 1)[1].split("\n@app.", 1)[0]))
+
     bad = json.loads(json.dumps({k: v for k, v in b.items() if k not in ("tenant", "teams")}))
     bad["bands"][-1]["chain_to"] = 1
     r = c.put("/api/admin/overlay", params=TOKEN, json=bad)
