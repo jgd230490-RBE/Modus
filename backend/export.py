@@ -1189,18 +1189,20 @@ class _BulletinMapCaption(Flowable):
     """The line under the map, written after it has drawn so it says which map it was."""
     def __init__(self, mp, n_routes):
         Flowable.__init__(self)
-        self.mp, self.n_routes, self.height = mp, n_routes, 4.5 * mm
+        self.mp, self.n_routes, self.height = mp, n_routes, 8 * mm
 
     def wrap(self, aw, ah):
         self.width = aw
         return aw, self.height
 
     def draw(self):
-        tail = (" · map © Mapbox © OpenStreetMap" if self.mp.kind == "mapbox"
-                else " · schematic from the stored road routes, not to scale (no map tiles)")
+        # 13 Oct 2026 (W11, the rendered PDF): one line ran off the page; the second line says which map it was
+        tail = ("Map © Mapbox © OpenStreetMap" if self.mp.kind == "mapbox"
+                else "A schematic from the stored road routes, not to scale (no map tiles).")
         self.canv.setFont("Helvetica", 7.5); self.canv.setFillColorRGB(*GREY)
-        self.canv.drawString(0, 1 * mm, f"Routes this month: {self.n_routes} · each route in the public map's Volume colour "
-                                        "for its two-way movements a day, one width" + tail)
+        self.canv.drawString(0, 4.6 * mm, f"Routes this month: {self.n_routes} · each route in the public map's Volume colour "
+                                          "for its two-way movements a day, one width")
+        self.canv.drawString(0, 1 * mm, tail)
 
 
 def _volume_legend(S, width):
@@ -1327,9 +1329,18 @@ def _council_legend(C, width, title="t CO2e in the month:"):
     items = C["legend"]
     d = Drawing(width, 11)
     d.add(String(0, 2.5, title, fontName="Helvetica-Bold", fontSize=7, fillColor=colors.Color(*NAVY_RGB)))
-    x0, step = 30 * mm, (width - 30 * mm) / len(items)
+    # 13 Oct 2026 (the rendered PDF): equal slots let "no approved laden route" run into the next swatch and the
+    # swatches cut the title; each slot is now its swatch + its label + a gap, after the measured title
+    x0 = rl_pdfmetrics_width(title, "Helvetica-Bold", 7) + 3 * mm
+    fs = 6.8
+    while fs > 5.5 and x0 + sum(10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), "Helvetica", fs) + 8 for g in items) > width:
+        fs -= 0.2
+    xs, x = [], x0
+    for g in items:
+        xs.append(x)
+        x += 10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), "Helvetica", fs) + 8
     for i, g in enumerate(items):
-        x = x0 + i * step
+        x = xs[i]
         if g["hatch"]:
             grp = Group()
             grp.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_PAPER)), strokeColor=None))
@@ -1339,7 +1350,7 @@ def _council_legend(C, width, title="t CO2e in the month:"):
             d.add(Rect(x, 1, 8, 8, fillColor=None, strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
         else:
             d.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
-        d.add(String(x + 10.5, 2.5, _pdf_safe(g["label"]), fontName="Helvetica", fontSize=6.8, fillColor=colors.Color(*NAVY_RGB)))
+        d.add(String(x + 10.5, 2.5, _pdf_safe(g["label"]), fontName="Helvetica", fontSize=fs, fillColor=colors.Color(*NAVY_RGB)))
     return d
 
 

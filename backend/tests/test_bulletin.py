@@ -1371,6 +1371,41 @@ _px_b = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", H
 ok("🔴 the 14 px floor holds with both council sections and the map legend", _px_b and min(_px_b) >= 14, str(sorted(set(_px_b))))
 ok("🔴 the literal-22 ban and the no-SQL rule still hold for the composition with bundle B",
    "22" not in read("backend/bulletin_doc.py") and "db." not in read("backend/bulletin_doc.py"))
+# 13 Oct 2026 (found by LOOKING at the rendered PDF, not by a harness): equal legend slots let "no approved laden
+# route" run into the next swatch and cut the title; the caption ran off page 1. Both measured here.
+from reportlab.pdfbase.pdfmetrics import stringWidth as _sw  # noqa: E402
+from reportlab.lib.units import mm as _mm  # noqa: E402
+_U = 210 * _mm - 28 * _mm
+
+
+def _legend_overlaps(dr):
+    """[(end of one label, start of the next swatch)] where a label runs into the next item, or past the width."""
+    strs = [x for x in dr.contents if type(x).__name__ == "String"]
+    rects = sorted(x.x for x in dr.contents if type(x).__name__ in ("Rect", "Group") and getattr(x, "x", None) is not None)
+    bad = []
+    title = strs[0]
+    if title.x + _sw(title.text, title.fontName, title.fontSize) > rects[0]:
+        bad.append(("title", title.text))
+    labels = strs[1:]
+    for i, lb in enumerate(labels):
+        end = lb.x + _sw(lb.text, lb.fontName, lb.fontSize)
+        nxt = labels[i + 1].x - 10.5 if i + 1 < len(labels) else _U
+        if end > nxt:
+            bad.append((lb.text, round(end, 1), round(nxt, 1)))
+    return bad
+
+
+ok("🔴 the PDF legends never overlap: the title before the first swatch, each label before the next swatch, the row inside the page",
+   _legend_overlaps(export._council_legend(MB, _U, "Two-way movements a day:")) == []
+   and _legend_overlaps(export._council_legend(CB, _U)) == [],
+   str((_legend_overlaps(export._council_legend(MB, _U, "Two-way movements a day:")), _legend_overlaps(export._council_legend(CB, _U)))))
+_cap = export._BulletinMapCaption(types.SimpleNamespace(kind="schematic"), 19)
+ok("🔴 the map caption is two lines, each inside the page width (it ran off the page as one)",
+   _cap.height >= 8 * _mm
+   and _sw("Routes this month: 19 · each route in the public map's Volume colour for its two-way movements a day, one width",
+           "Helvetica", 7.5) <= _U
+   and "A schematic from the stored road routes, not to scale (no map tiles)." in T10J)
+
 # one areas read per month: sheet() reads this month once (both sections) and last month once
 _calls_al = []
 
