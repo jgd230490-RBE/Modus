@@ -804,7 +804,10 @@ ok("⭐ D45: export.py's demo colours are Option A (grey #F1F5F9, red #B91C1C te
    "DEMO_BG_RGB = (0xF1 / 255, 0xF5 / 255, 0xF9 / 255)" in _xsrc and "DEMO_FG_RGB = (0xB9 / 255, 0x1C / 255, 0x1C / 255)" in _xsrc
    and "DEMO_RULE_RGB = (0xDC / 255, 0x26 / 255, 0x26 / 255)" in _xsrc and 'DEMO_FG_HEX, DEMO_BG_HEX = "B91C1C", "F1F5F9"' in _xsrc)
 ok("D45: every PDF frame passes the notice in the demo red, and the week sheet now carries it in its frame too (it was in the footer only)",
-   _xsrc.count("8.5, DEMO_FG_RGB, H - 25 * mm) if notice else None)") == 2 and "8.5, NAVY_RGB, H - 25 * mm" not in _xsrc
+   # NARROWED 13 Oct 2026 (W15): the bulletin's frame passes the notice under its brand band, in Inter (two frames at
+   # H - 25 mm became one plus the bulletin's)
+   _xsrc.count("8.5, DEMO_FG_RGB, H - 25 * mm) if notice else None)") == 1 and "8.5, NAVY_RGB, H - 25 * mm" not in _xsrc
+   and 'notice=((_pdf_safe(notice), _BF("bold"), 8.5, DEMO_FG_RGB, H - band["height"] - 8.5 * mm)' in _xsrc
    and 'notice=((_pdf_safe(_demo_notice()), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 22.5 * mm)' in _xsrc
    and "top, bottom = (25 if _demo_notice() else 20) * mm, 12 * mm" in _xsrc)
 # the frame itself, drawn on a recording canvas: the band, the rule, the tag, the words

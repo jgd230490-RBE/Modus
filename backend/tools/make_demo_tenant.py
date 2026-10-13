@@ -219,8 +219,12 @@ def build(with_areas=False, out=None):
     # --- the tenant block, GBP, UK --------------------------------------------------
     doc = json.loads(json.dumps(config.load(conversions, use_cache=False)))
     # H1 (29 Sep 2026): GB, GBP, and the tenant READS MILES (HU5, per tenant; km is stored)
+    # 13 Oct 2026 (W12): the council carbon bands, 20 / 50 / 100 t in the month, chosen from the LIVE demo's district
+    # figures for Sep-Dec 2026 (1.5-191 t; on the default 50 / 100 / 200 five of eight districts shared the first colour;
+    # these give 2 / 3 / 2 / 1 in each month). The movement bands keep the default (they already spread).
     doc["tenant"] = {"name": TENANT_NAME, "team_label": "Team", "currency": "GBP", "country": "GB",
-                     "distance_unit": "mi", "demo_notice": DEMO_NOTICE}
+                     "distance_unit": "mi", "demo_notice": DEMO_NOTICE,
+                     "council_breaks": {"carbon": [20, 50, 100]}}
     doc["seasonal_restrictions"] = []
     # H1: a GB coefficient set with its sources, in GBP. The three ASSUMPTIONS are labelled
     # as such, exactly as the EE seed's are; the rest carry a public source.

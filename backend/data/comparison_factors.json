@@ -1,0 +1,46 @@
+{
+  "_what": "13 Oct 2026 (W14, D40): every figure the bulletin's \"Is it a lot?\" panel compares with that is not the scheme's own, each with its source, year and the day it was checked. Read by backend/comparisons.py and nowhere else; test_bulletin.py holds the panel to this table. Re-check each entry when its source publishes a new edition (next_edition).",
+  "factors": {
+    "car_kg_co2e_per_km": {
+      "value": 0.16591,
+      "unit": "kg CO2e per km",
+      "what": "an average car, fuel unknown, tailpipe (Scope 1): the same tank-to-wheel basis as the lorry factors",
+      "source": "UK Government GHG conversion factors 2026 (DESNZ), flat file v1.2: Passenger vehicles > Cars (by size) > Average car > Unknown, km, kg CO2e (row 4_301_3074_4_1)",
+      "year": 2026,
+      "url": "https://www.gov.uk/government/publications/greenhouse-gas-reporting-conversion-factors-2026",
+      "checked_on": "2026-10-13",
+      "next_edition": "June 2027"
+    },
+    "car_miles_a_year": {
+      "value": 7100,
+      "unit": "miles a year",
+      "what": "the average annual mileage of a car in England, all cars, all fuels",
+      "source": "DfT National Travel Survey, table NTS0901a: Annual mileage of cars by fuel type, England (updated 10 September 2026)",
+      "year": 2025,
+      "url": "https://www.gov.uk/government/statistical-data-sets/nts09-vehicle-mileage-and-occupancy",
+      "checked_on": "2026-10-13",
+      "next_edition": "Summer 2027"
+    },
+    "car_range_pct": {
+      "value": 15,
+      "unit": "% either side",
+      "what": "the car comparison is printed as a range, never one figure: the factor is a UK average for an unknown fuel and the mileage is England's",
+      "source": "Wayscope, decided by the user 13 Oct 2026 (D40)",
+      "year": 2026,
+      "url": null,
+      "checked_on": "2026-10-13",
+      "next_edition": null
+    },
+    "la_road_transport": {
+      "value": null,
+      "unit": "kt CO2e a year",
+      "what": "each local authority's road transport emissions (A roads, motorways, minor roads), territorial, from the government's local statistics; a month is taken as one twelfth of the year",
+      "source": "DESNZ, UK local authority and regional greenhouse gas emissions statistics, 2005 to 2024, Table 1.1 (published 25 June 2026)",
+      "file": "backend/data/desnz_la_road_transport_2024.json",
+      "year": 2024,
+      "url": "https://www.gov.uk/government/statistics/uk-local-authority-and-regional-greenhouse-gas-emissions-statistics-2005-to-2024",
+      "checked_on": "2026-10-13",
+      "next_edition": "June 2027 (2005 to 2025)"
+    }
+  }
+}

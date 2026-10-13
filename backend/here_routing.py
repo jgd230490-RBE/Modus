@@ -343,6 +343,74 @@ def probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,
 
 
 # --------------------------------------------------------------------------- #
+#  The road-class question (13 Oct 2026, bundle C, decision 2a)               #
+# --------------------------------------------------------------------------- #
+#
+# WHY THIS EXISTS. The bulletin's council row (D40) should compare a district's haul carbon
+# with A + minor roads, adding motorways only where the routes use them. The bake asks HERE
+# for "polyline,summary" only, so no stored route says which road class its miles were on.
+# HERE Routing v8 documents a `spans` request parameter that attaches attributes (functional
+# class, road numbers, lengths) to stretches of a section — but what it actually returns for
+# a truck route here has NOT been seen. This makes ONE call with spans asked for and reports
+# what came back, raw enough to decide from. Nothing reads its answer; nothing is built on
+# it until the user has run it on the deployment (the departure-probe rule: decide from
+# the probe, then build).
+ROAD_CLASS_SPANS = "functionalClass,routeNumbers,length"
+
+
+def road_class_probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, laden=True,
+                     spans=ROAD_CLASS_SPANS, max_spans=40):
+    """
+    One real HERE call with `spans` asked for. Reports the request (key redacted), the HTTP
+    error body if HERE refused a span name, whether the sections carry `spans`, the first
+    `max_spans` spans as returned, and — only if HERE returned them — the length per
+    functional class and every route number that starts with "M". Never raises.
+    """
+    key = api_key()
+    params = {"origin": f"{o_lat},{o_lon}", "destination": f"{d_lat},{d_lon}",
+              "return": "polyline,summary", "spans": spans, "apiKey": key}
+    params.update(_truck_params(profile, factors, laden=laden))
+    out = {"profile": profile, "laden": laden, "params_sent": {k: v for k, v in params.items() if k != "apiKey"},
+           "api_key_set": bool(key)}
+    if not key:
+        out["error"] = "HERE_API_KEY is not set on the server"
+        return out
+    url = HERE_ENDPOINT + "?" + _query(params, [])
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = json.load(resp)
+    except urllib.error.HTTPError as e:
+        out["error"] = f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:600]}"
+        return out
+    except Exception as e:
+        out["error"] = str(e)[:400]
+        return out
+    rts = data.get("routes") or []
+    secs = (rts[0].get("sections") or []) if rts else []
+    raw = [sp for sec in secs for sp in (sec.get("spans") or [])]
+    out["routes_returned"] = len(rts)
+    out["sections"] = len(secs)
+    out["section_keys"] = sorted({k for sec in secs for k in sec})
+    out["spans_returned"] = len(raw)
+    out["span_keys"] = sorted({k for sp in raw for k in sp})
+    out["spans_sample"] = raw[:max_spans]
+    by_fc, mways = {}, set()
+    for sp in raw:
+        if "functionalClass" in sp and isinstance(sp.get("length"), (int, float)):
+            by_fc[str(sp["functionalClass"])] = by_fc.get(str(sp["functionalClass"]), 0) + sp["length"]
+        for rn in sp.get("routeNumbers") or []:
+            v = rn.get("value") if isinstance(rn, dict) else rn
+            if isinstance(v, str) and v.upper().startswith("M"):
+                mways.add(v)
+    out["length_m_by_functional_class"] = by_fc or None
+    out["route_numbers_starting_M"] = sorted(mways)
+    out["reads_as"] = ("HERE returned no spans: the parameter was ignored or named wrongly; see section_keys."
+                       if not raw else
+                       "HERE returned spans: check span_keys for functionalClass / routeNumbers before building on them.")
+    return out
+
+
+# --------------------------------------------------------------------------- #
 #  The departure-time experiment                                              #
 # --------------------------------------------------------------------------- #
 #

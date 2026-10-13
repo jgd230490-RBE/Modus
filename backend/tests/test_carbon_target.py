@@ -322,7 +322,10 @@ ok("the response keys are the contract's",
    # NARROWED 11 Oct 2026 (the one on-target rule, decided on the server): + on_target_as_forecast, on_target_with_decisions
    and sorted(P["status"]) == sorted(["scope", "approved_t", "with_decisions_t", "target_t", "gap_as_forecast_t",
                                       "gap_with_decisions_t", "pending_t", "approved_transport_t", "by_month", "invalid",
-                                      "on_target_as_forecast", "on_target_with_decisions"]))
+                                      "on_target_as_forecast", "on_target_with_decisions",
+                                      # NARROWED 13 Oct 2026 (each team its share of the target, the user's 12 Oct decision)
+                                      "share_pct", "share_rule"])
+   and P["status"]["share_pct"] is None and P["status"]["share_rule"] is None)
 
 # =========================================================================== #
 #  3. Progress, % mode                                                          #
@@ -371,9 +374,14 @@ ok("⭐ team code (Central's soil line only): scope team, 120.927 as forecast, 8
 # REVERSED 11 Oct 2026 (the review: the scheme's % applied evenly to a team made a team the decisions do not touch read
 # "over the target" while the scheme was on it; nobody agreed a share per team). It asserted target 32.529, 88.398 over
 # as forecast and 23.642 under with the decisions. Now: no team target in % mode either, so nothing is compared.
-ok("⭐ ...% mode: NO team share of the scheme's target — target_t, both gaps and both on-target flags null",
-   S2["target_t"] is None and S2["gap_as_forecast_t"] is None and S2["gap_with_decisions_t"] is None
-   and S2["on_target_as_forecast"] is None and S2["on_target_with_decisions"] is None, str(S2))
+# REVERSED AGAIN 13 Oct 2026 (the user, 12 Oct: "each team gets its own share of the carbon target"; the rule recommended
+# and approved 13 Oct): the share = the scheme's target × the team's plan WITH the decisions ÷ the scheme's plan with them.
+# It asserted target_t, both gaps and both flags null. Central (8.887 with the decisions of the scheme's 43.430): its
+# share is 8.887 t (20.5 %); 112.04 over as forecast; ON target with the decisions — not the evenly applied 32.529.
+ok("⭐ ...% mode: the team's OWN share of the scheme's target — 8.887 t (20.5 %), over as forecast, on target with the decisions",
+   S2["target_t"] == 8.887 and S2["share_pct"] == 20.5 and S2["gap_as_forecast_t"] == 112.04 and S2["gap_with_decisions_t"] == 0.0
+   and S2["on_target_as_forecast"] is False and S2["on_target_with_decisions"] is True
+   and S2["share_rule"].startswith("Your share of the scheme's target: the target × your lines' plan with the agreed decisions"), str(S2))
 T2 = G2["target"]
 ok("🔴 R3: a team code's GET carries neither the stored decisions nor the page state (they name other teams' routes)",
    "levers" not in T2 and "ui_state" not in T2 and T2["mode"] == "pct" and T2["pct_below"] == 73.098745, str(sorted(T2)))
@@ -387,10 +395,16 @@ S1 = GET()["status"]
 # R1 + R2: 40.5190845 → 40.519; with 34.54337205 → 34.543; pending 5.653
 # NARROWED 11 Oct 2026 (no team share of the target): it asserted target 10.9, 29.619 over as forecast and 23.643 over
 # with the decisions — the agreed decisions read as MISSING on the lines they barely touch. The plan figures are kept.
-ok("team 1 (the aggregate lines): 40.519 → 34.543 with the decisions; no target, no gaps, no verdict; its pending 5.653",
-   S1["scope"] == "team" and S1["approved_t"] == 40.519 and S1["with_decisions_t"] == 34.543 and S1["target_t"] is None
-   and S1["gap_as_forecast_t"] is None and S1["gap_with_decisions_t"] is None and S1["on_target_with_decisions"] is None
+# REVERSED 13 Oct 2026 (each team its share, split by the plan with the decisions): it asserted no target, no gaps, no
+# verdict. Team 1's share is 34.543 t (79.5 %): 5.976 over as forecast, on target with the decisions.
+ok("team 1 (the aggregate lines): 40.519 → 34.543 with the decisions; its share 34.543 t (79.5 %); its pending 5.653",
+   S1["scope"] == "team" and S1["approved_t"] == 40.519 and S1["with_decisions_t"] == 34.543 and S1["target_t"] == 34.543
+   and S1["share_pct"] == 79.5 and S1["gap_as_forecast_t"] == 5.976 and S1["on_target_with_decisions"] is True
    and S1["pending_t"] == 5.653, str(S1))
+ok("⭐ the teams' shares ADD UP to the scheme's target (8.887 + 34.543 = 43.430; the scheme's 43.431 within rounding), "
+   "and the two shares make 100 %",
+   abs((S1["target_t"] + S2["target_t"]) - S["target_t"]) <= 0.002 and abs(S1["share_pct"] + S2["share_pct"] - 100.0) < 0.11,
+   f"{S1['target_t']} + {S2['target_t']} vs {S['target_t']}")
 access.set_current("submitter123")
 ok("the demo submitter sees every line: scope scheme, the planner's figures",
    GET()["status"] == S)
@@ -450,10 +464,11 @@ ok("⭐ cap mode, planner: target 43.431 t; 118.015 over as forecast; on target 
    and CS["on_target_as_forecast"] is False and CS["on_target_with_decisions"] is True, str(CS))
 as_team(2)
 CS2 = GET()["status"]
-ok("🔴 cap mode, team code: a fixed scheme cap has no team share — target_t and both gaps null, the plan figures still there",
-   CS2["scope"] == "team" and CS2["target_t"] is None and CS2["gap_as_forecast_t"] is None and CS2["gap_with_decisions_t"] is None
-   and CS2["on_target_as_forecast"] is None and CS2["on_target_with_decisions"] is None
-   and CS2["approved_t"] == 120.927 and CS2["with_decisions_t"] == 8.887, str(CS2))
+# REVERSED 13 Oct 2026 (each team its share): it asserted a cap had no team share (target_t and both gaps null). The cap
+# (43.431 t) is split by the same rule: Central's share 43.431 × 8.887 ÷ 43.430 = 8.887 t, on target with the decisions.
+ok("🔴 cap mode, team code: the fixed cap split by the plan with the decisions — Central 8.887 t, on target with them",
+   CS2["scope"] == "team" and CS2["target_t"] == 8.887 and CS2["share_pct"] == 20.5 and CS2["gap_with_decisions_t"] == 0.0
+   and CS2["on_target_with_decisions"] is True and CS2["approved_t"] == 120.927 and CS2["with_decisions_t"] == 8.887, str(CS2))
 access.set_current("planner123")
 B = PUT(mode="pct", updated_by="Sam (planner)")
 # NARROWED 11 Oct 2026 (% held to 6 dp): 73.1 → 73.098745 and the target 43.429 → 43.431
@@ -601,6 +616,13 @@ try:
        SI.get("approved_t") == 161.446 and SI.get("target_t") == 43.431 and SI.get("gap_as_forecast_t") == 118.015
        and SI.get("pending_t") == 5.653 and [m["with_decisions_t"] for m in SI.get("by_month") or []] == [None, None], str(SI))
     ok("...and the stored target is left as it was (a planner sets it again)", GI["target"]["levers"] == DECISIONS)
+    # 13 Oct 2026: a team code with decisions that no longer fit has no plan with them, so no share — and says why
+    as_team(1)
+    SIT = GET()["status"]
+    access.set_current("planner123")
+    ok("🔴 ...a team code then has NO share (no plan with the decisions to split by) and reads the same sentence",
+       SIT.get("target_t") is None and SIT.get("share_pct") is None and SIT.get("gap_as_forecast_t") is None
+       and (SIT.get("invalid") or "").startswith("The agreed decisions no longer fit the plan"), str(SIT))
 finally:
     db.execute("INSERT INTO routes (id, origin_id, dest_id, material_category, ipt) VALUES (?, ?, ?, ?, ?)",
                (_r4["id"], _r4["origin_id"], _r4["dest_id"], _r4["material_category"], _r4["ipt"]))
@@ -685,8 +707,9 @@ ok("carbon_target.py's docstring says what it stores, who may write, no identity
 _sql = re.findall(r'"((?:SELECT|INSERT|UPDATE|DELETE)[^"]*"(?:\s*"[^"]*")*)', _ctcode)
 ok("🔴 every statement in carbon_target.py names the tenant (SELECT / UPDATE / DELETE filter on it, the INSERT writes it)",
    len(_sql) >= 4 and all("tenant_id" in s for s in _sql) and _ctcode.count("db.current_tenant()") >= 5, str(_sql))
+# NARROWED 13 Oct 2026: a fifth carbon.scenario call — the scheme's plan with the decisions, for a team code's share
 ok("...it keeps no figure of its own: every number comes from carbon.scenario",
-   _ctcode.count("carbon.scenario(") == 4 and not re.search(r"\b0\.9\d{3}|\b7\.8\d|\b19\.5\d", _ctcode))
+   _ctcode.count("carbon.scenario(") == 5 and not re.search(r"\b0\.9\d{3}|\b7\.8\d|\b19\.5\d", _ctcode))
 ok("🔴 no team id in the new module (people see team names)", not re.search(r"\bIPT ?[1-6]\b", _ctsrc))
 ok("⭐ R2 at source: ONE tolerance, defined once (ON_TARGET_TOL_T = 0.05), read by one function; status() returns its verdicts",
    _ctcode.count("ON_TARGET_TOL_T = 0.05") == 1 and _ctcode.count("<= ON_TARGET_TOL_T + 1e-9") == 1

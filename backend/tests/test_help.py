@@ -236,8 +236,12 @@ ok("...the target is all-in and shows on the Dashboard, Forecasts and Submit for
    "It does not show on the public map or in the summary PDF." in text
    and "<h2 id=\"3-2-the-carbon-target-strip\">3.2 The carbon target strip</h2>" in src
    and "The Transport carbon card counts transport only, so the two never match." in text)
-ok("...a team code: the scheme's target, not split by team, its own figures with no verdict",
-   "not split by team" in text and "with no verdict" in text)
+# REVERSED 13 Oct 2026 (the user, 12 Oct: each team gets its own share of the target): it asserted "not split by team"
+# and "with no verdict" in the guide; the guide now says how a team's share is split and that each figure has a verdict
+ok("...a team code: its own share of the target (split by each team's plan with the agreed decisions), its figures with a verdict",
+   "not split by team" not in text and "with no verdict" not in text
+   and "the scheme's target split by each team's plan with the agreed decisions" in text
+   and "so the shares add up to the target" in text and "with a verdict on each" in text)
 ok("🔴 setting the carbon target and the money settings are gated to planner and above, like the Data pages",
    '"6-4-for-planners-setting-the-carbon-target": "planner"' in src and '"9-5-money-settings": "planner"' in src
    and 'id="6-4-for-planners-setting-the-carbon-target"' in src and 'id="9-5-money-settings"' in src)
@@ -376,7 +380,8 @@ ok("🔴 house style: no real-time, telematics or 'security phase' in the guide 
 ok("⭐ the picker covers the carbon symptoms people will hit (all-in vs transport, over as forecast, team, greyed Set, decisions gone, Carbon Tool)",
    all(s in src for s in ("The Carbon planner's carbon is much bigger than the Dashboard's",
                            "The carbon target says “over the target” as forecast",
-                           "My team's carbon figures are not compared with the target",
+                           # REVERSED 13 Oct 2026 (each team its share): was "My team's carbon figures are not compared with the target"
+                           "My team's carbon target is smaller than the scheme's",
                            "“Set as the scheme's carbon target” is greyed out",
                            "The carbon target says the agreed decisions no longer fit the plan",
                            "Our carbon does not match the National Highways Carbon Tool")))

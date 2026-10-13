@@ -1013,8 +1013,9 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
 // the same words on all four pages (the Carbon page's step 6 uses them too): no margin, no sum.
 // The figures are ALL-IN (making the material, transport and waste disposal), so where they sit
 // beside the transport-only figures the page says so once. A team code reads "your team's lines"
-// in the tenant's own word, never a team id, and its figures are not compared with the target:
-// the target is the scheme's and is not split by team (the server sends no team target_t).
+// in the tenant's own word, never a team id. REVERSED 13 Oct 2026 (the user's 12 Oct decision): a team code
+// has its OWN share of the scheme's target — the server's target_t, the target split by each team's plan with
+// the agreed decisions (share_pct) — and the server's verdicts on its own lines; nothing is worked out here.
 const CT_ALLIN = "All-in: making the material, transport and waste disposal";
 const CT_NONE = "No carbon target set yet.";
 const CT_WHO = "A planner sets it in the Carbon planner.";
@@ -1022,7 +1023,6 @@ const ctT = (n) => grp(n, 1);
 const ctOk = (ct) => !!(ct && ct.target && ct.status);
 const ctTeam = (ct) => !!(ct && ct.status && ct.status.scope === "team");
 const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;
-const ctSplit = () => `not split by ${TEAM().toLowerCase()}`;
 // the server's verdict in words: "on target", or the gap's size and its side (its sign); nothing is compared here
 function ctGap(on, gap){
   if(on == null || gap == null) return null;
@@ -1032,9 +1032,11 @@ function ctGap(on, gap){
 // the target in one sentence, the same on every page; a % and a cap read differently, so the toggle shows everywhere
 function ctTargetLine(ct){
   const t = ct.target, s = ct.status, pct = `${(+t.pct_below).toFixed(1)}%`;
-  if(ctTeam(ct)) return t.mode === "cap"
-    ? `Target: a fixed cap of ${ctT(t.cap_t)} tCO2e for the whole scheme, ${ctSplit()}`
-    : `Target: ${pct} below the approved plan, for the whole scheme, ${ctSplit()}`;
+  if(ctTeam(ct)){
+    const of = t.mode === "cap" ? `the scheme's fixed cap of ${ctT(t.cap_t)} tCO2e` : `the scheme's target (${pct} below the approved plan)`;
+    if(s.target_t == null) return `Target: ${t.mode === "cap" ? `a fixed cap of ${ctT(t.cap_t)} tCO2e` : `${pct} below the approved plan`} for the whole scheme; ${ctYour()} have no share of it while the agreed decisions do not fit the plan`;
+    return `Target for ${ctYour()}: ${ctT(s.target_t)} tCO2e, ${(+s.share_pct).toFixed(1)}% of ${of}`;
+  }
   if(t.mode === "cap") return `Target: a fixed cap of ${ctT(t.cap_t)} tCO2e (${pct} below the approved plan when it was set)`;
   return `Target: ${pct} below the approved plan = ${ctT(s.target_t)} tCO2e`;
 }
@@ -1051,7 +1053,7 @@ function ctProgress(ct, dash){
 }
 function ctScopeNote(ct){
   if(!ctTeam(ct)) return null;
-  return `These figures are for ${ctYour()} only. The target is for the whole scheme, so they are not compared with it.`;
+  return `These figures are for ${ctYour()} only, against their share of the scheme's target: the target split by each ${TEAM().toLowerCase()}'s plan with the agreed decisions. The shares add up to the target.`;
 }
 // a stamp as the reader's own clock dates it (the server stamps UTC): "12 Oct 2026", the same on every page
 function ctWhen(at){
@@ -1071,17 +1073,17 @@ function ctCellsTarget(ct){
   const [p1, p2] = ctProgress(ct, true);
   return `${ctTargetLine(ct)} · ${p1} · ${p2}`;
 }
-// the big screen's Carbon group: one more figure in the group's own pattern. A team code has no target
-// of its own: a cap shows the scheme's cap, a % shows "—", and the sub says it is the whole scheme's.
+// the big screen's Carbon group: one more figure in the group's own pattern. REVERSED 13 Oct 2026: a team code
+// shows its own share of the target with its verdicts; "—" only while it has no share (decisions that do not fit).
 function ctFig(ct, err){
   if(!ct) return { value: "—", sub: err ? "did not load" : "loading", title: err ? "The carbon target did not load." : "Loading the carbon target." };
   if(!ctOk(ct)) return { value: "—", sub: "none set yet", title: `${CT_NONE} ${CT_WHO}` };
   const t = ct.target, s = ct.status, team = ctTeam(ct);
   const how = t.mode === "cap" ? "fixed cap" : `${(+t.pct_below).toFixed(1)}% below the approved plan`;
-  const v = team ? (t.mode === "cap" ? t.cap_t : null) : s.target_t;
+  const v = s.target_t;
   const g1 = ctGap(s.on_target_as_forecast, s.gap_as_forecast_t), g2 = ctGap(s.on_target_with_decisions, s.gap_with_decisions_t);
-  const sub = team ? `whole scheme: ${how}, ${ctSplit()}`
-    : `${how} · as forecast: ${g1} · ${s.invalid ? "the agreed decisions no longer fit the plan" : "with the agreed decisions: " + g2}`;
+  const sub = team && v == null ? `whole scheme: ${how}; no share while the agreed decisions do not fit the plan`
+    : `${team ? `your share (${(+s.share_pct).toFixed(1)}%) of the scheme's ${how}` : how} · as forecast: ${g1} · ${s.invalid ? "the agreed decisions no longer fit the plan" : "with the agreed decisions: " + g2}`;
   const words = [ctTargetLine(ct), ...ctProgress(ct), ctScopeNote(ct), CT_ALLIN + ". The other carbon figures here are transport only"];
   return { value: v == null ? "—" : (Math.abs(v) >= 1e4 ? bigNum(v) : ctT(v)), sub, title: words.filter(Boolean).map(w => w.replace(/\.$/, "")).join(". ") + "." };
 }

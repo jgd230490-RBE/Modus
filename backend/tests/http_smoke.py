@@ -135,6 +135,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
        f"{r.status_code} {r.text[:120]}")
     r = c.get("/api/bulletin/month.pdf?month=10")
     ok("🔴 ...and so is its PDF — 401", r.status_code == 401, str(r.status_code))
+    # 13 Oct 2026 (D43): the one-page leaflet, page and PDF, the bulletin's staff rule
+    r = c.get("/bulletin/leaflet/?month=10")
+    ok("🔴 the leaflet page is closed without a staff sign-in — 401, the bulletin's sign-in page",
+       r.status_code == 401 and "The monthly bulletin is for signed-in staff" in r.text, f"{r.status_code} {r.text[:120]}")
+    ok("🔴 ...and so is the leaflet PDF — 401", c.get("/api/bulletin/leaflet.pdf?month=10").status_code == 401)
     r = c.get("/api/public/alignment")
     ok("🔴 the overlay API is gated like the map — 401 JSON", r.status_code == 401
        and r.headers.get("content-type", "").startswith("application/json"), str(r.status_code))
@@ -592,6 +597,21 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and r.headers.get("cache-control") == "no-store" and all(f in r.text for f in _figs)
                and 'href="/api/bulletin/month.pdf?month=10">Download the PDF</a>' in r.text
                and "Fictional demo scheme · nothing here is real" in r.text, f"{r.status_code} {r.text[:200]}")
+            r = c.get("/api/bulletin/leaflet.pdf?month=10", headers=PLAN)
+            _lp = [" ".join(x.split()) for x in pdf_text(r.content).split("\f") if x.strip()] if r.status_code == 200 else []
+            ok("⭐ D43 the leaflet PDF over HTTP: one page, named for the month, not cached, the demo bar, the four figures, the brief",
+               r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf")
+               and r.headers.get("content-disposition") == 'attachment; filename="leaflet-2026-10.pdf"'
+               and r.headers.get("cache-control") == "no-store" and len(_lp) == 1
+               and "fictional demo scheme" in _lp[0].lower() and all(f in _lp[0] for f in _figs) and "This month in brief" in _lp[0],
+               f"{r.status_code} {len(_lp)}")
+            ok("⭐ D43 the newsletter PDF over HTTP is four pages, the brand band on each",
+               len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)}")
+            r = c.get("/bulletin/leaflet/?month=10", headers=PLAN)
+            ok("⭐ the leaflet page over HTTP with a code: HTML, not cached, the band, the figures, a link to its PDF",
+               r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
+               and r.headers.get("cache-control") == "no-store" and '<header class="band">' in r.text
+               and all(f in r.text for f in _figs) and 'href="/api/bulletin/leaflet.pdf?month=10"' in r.text, f"{r.status_code}")
             ok("...a team code is staff too: the page and the PDF open for the North Team code",
                c.get("/bulletin/?month=10", headers=NORTH).status_code == 200
                and c.get("/api/bulletin/month.pdf?month=10", headers=NORTH).status_code == 200)
@@ -645,11 +665,15 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # REVERSED 11 Oct 2026 (the review: the scheme's % applied to North's lines, which the decision does not touch, read
     # "253.2 over the target" to every show visitor while the scheme was on target). It asserted North's target_t =
     # its approved plan × (1 − %). Now a team code gets no share of the scheme's target, and so no verdict.
-    ok("⭐ the North Team code reads it: scope team, its own lines (the cut is Central's line, so none here), NOT compared with the scheme's target",
+    # REVERSED AGAIN 13 Oct 2026 (the user, 12 Oct: each team gets its own share): the share is the scheme's target split by
+    # each team's plan WITH the decisions, so North — whose lines the decision does not touch — gets its own plan as its share
+    # and reads ON target (the 11 Oct "253.2 over" came from applying the scheme's % evenly, which this rule does not do).
+    # It asserted target_t, the gap and both verdicts null.
+    ok("⭐ the North Team code reads it: scope team, its own lines; its share = its own plan (the cut is Central's), on target",
        r.status_code == 200 and sn.get("scope") == "team" and 0 < sn.get("approved_t", 0) < st.get("approved_t", 0)
        and sn.get("with_decisions_t") == sn.get("approved_t")
-       and sn.get("target_t") is None and sn.get("gap_with_decisions_t") is None and sn.get("on_target_with_decisions") is None
-       and sn.get("on_target_as_forecast") is None, str(sn)[:300])
+       and abs((sn.get("target_t") or 0) - sn["approved_t"] * st["target_t"] / st["with_decisions_t"]) <= 0.002
+       and sn.get("on_target_with_decisions") is True and 0 < (sn.get("share_pct") or 0) < 100, str(sn)[:300])
     tn = (r.json() or {}).get("target") or {} if r.status_code == 200 else {}
     ok("🔴 R3 over HTTP: North's GET carries no stored decisions and no page state, and no words for the route-scoped decision",
        r.status_code == 200 and tn.get("mode") == "pct" and "levers" not in tn and "ui_state" not in tn
@@ -660,9 +684,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 200 and cc["target"]["mode"] == "cap" and cc["target"]["cap_t"] == tg.get("cap_t")
        and cc["target"]["pct_below"] == tg.get("pct_below") and cc["status"]["target_t"] == tg.get("cap_t"), r.text[:300])
     r = c.get("/api/carbon/target", headers=NORTH)
-    ok("🔴 ...and a team code sees no share of a fixed cap (target_t null)", r.status_code == 200 and r.json()["status"]["target_t"] is None
-       and r.json()["status"]["gap_as_forecast_t"] is None and r.json()["status"]["on_target_as_forecast"] is None
-       and "levers" not in r.json()["target"], r.text[:200])
+    # REVERSED 13 Oct 2026 (each team its share): it asserted target_t null for a team under a fixed cap. The cap is split by
+    # the same rule; North's share is the cap × its plan ÷ the scheme's plan with the decisions. Still no stored decisions.
+    _cn = r.json()["status"] if r.status_code == 200 else {}
+    ok("🔴 ...and a team code under a fixed cap sees ITS share of the cap (the same rule), still without the stored decisions",
+       r.status_code == 200 and _cn.get("target_t") is not None and 0 < _cn["target_t"] < tg.get("cap_t")
+       and _cn.get("share_pct") == sn.get("share_pct") and "levers" not in r.json()["target"], r.text[:200])
     r = c.put("/api/carbon/target", headers=PLAN, json={"mode": "pct", "levers": []})
     ok("🔴 no decisions — 400 with the sentence", r.status_code == 400 and "Choose at least one decision" in r.text, r.text[:160])
     r = c.delete("/api/carbon/target", headers=NORTH)
@@ -934,27 +961,28 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 200 and len(r.json().get("areas", [])) == 9 and all("geometry" not in a and "label_point" not in a for a in r.json()["areas"])
        and [(a["area_id"], a["movements_per_day"]) for a in r.json()["areas"]] == [(a["area_id"], a["movements_per_day"]) for a in ar["areas"]], r.text[:200])
     # 13 Oct 2026 (W12, bundle B): the council colour bands per scheme, saved through Config, served with the areas
-    ok("⭐ W12: both area payloads carry the scheme's bands — the defaults while none is typed",
-       sh.get("stops") == {"movements": [50, 100, 200], "carbon": [50, 100, 200]} and ar.get("stops") == sh.get("stops"),
+    # NARROWED 13 Oct 2026 (bundle C regenerated the demo package once with carbon 20 / 50 / 100): the demo's own bands
+    ok("⭐ W12: both area payloads carry the scheme's bands — the demo package's (carbon 20 / 50 / 100, movements default)",
+       sh.get("stops") == {"movements": [50, 100, 200], "carbon": [20, 50, 100]} and ar.get("stops") == sh.get("stops"),
        str((sh.get("stops"), ar.get("stops"))))
     _cfg = c.get("/api/config/factors", headers=PLAN).json()["doc"]
     _bad = json.loads(json.dumps(_cfg)); _bad.setdefault("tenant", {})["council_breaks"] = {"carbon": [100, 50, 20]}
     r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _bad, "updated_by": "smoke"})
     ok("🔴 W12: a Config save with falling bands is refused (400) with the plain-words reason, nothing stored",
        r.status_code == 400 and "tenant.council_breaks.carbon must rise from left to right" in r.text
-       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [50, 100, 200], r.text[:200])
-    _good = json.loads(json.dumps(_cfg)); _good.setdefault("tenant", {})["council_breaks"] = {"carbon": [20, 50, 100]}
+       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [20, 50, 100], r.text[:200])
+    _good = json.loads(json.dumps(_cfg)); _good.setdefault("tenant", {})["council_breaks"] = {"carbon": [25, 60, 120]}
     r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _good, "updated_by": "smoke"})
     import config as _cfgmod
     _cfgmod.invalidate()
     _s2 = c.get("/api/public/areas/shapes").json().get("stops")
     _a2 = c.get("/api/public/areas", params={"month": 10, "geometry": 0}).json().get("stops")
-    ok("⭐ W12: saved bands (carbon 20 / 50 / 100) reach both payloads the map reads; movements keep the default",
-       r.status_code == 200 and _s2 == _a2 == {"movements": [50, 100, 200], "carbon": [20, 50, 100]}, str((r.status_code, _s2, _a2)))
+    ok("⭐ W12: saved bands (carbon 25 / 60 / 120) reach both payloads the map reads; movements keep the default",
+       r.status_code == 200 and _s2 == _a2 == {"movements": [50, 100, 200], "carbon": [25, 60, 120]}, str((r.status_code, _s2, _a2)))
     r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _cfg, "updated_by": "smoke"})
     _cfgmod.invalidate()
-    ok("W12: ...and the document put back reads the defaults again", r.status_code == 200
-       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [50, 100, 200])
+    ok("W12: ...and the document put back reads the demo's bands again", r.status_code == 200
+       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [20, 50, 100])
     # ------------------------------------------- 3d. the network behind the gate (12 Oct 2026, map review D18)
     # The twelve reads that needed no credential until today, read three ways: the staff COOKIE (this client, no
     # header), the planner CODE in the header with no cookie, and — at the end of this file — the MAP cookie and

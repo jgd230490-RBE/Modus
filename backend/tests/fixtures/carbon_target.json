@@ -21,6 +21,8 @@
   "on_target_with_decisions": true,
   "pending_t": 5.653,
   "scope": "scheme",
+  "share_pct": null,
+  "share_rule": null,
   "target_t": 43.431,
   "with_decisions_t": 43.431
  },
