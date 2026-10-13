@@ -370,20 +370,12 @@ def limit(lines):
     out = []
     for l in lines:
         veh = (l.get("context") or {}).get("vehicle_type") or l.get("vehicle_type")
-        hits = [h for h in ((stored.get(l["route_id"]) or {}).get("hits") or [])
-                if isinstance(h, dict) and h.get("verdict") == "exceeds" and h.get("vehicle_profile") == veh]
+        # 13 Oct 2026 (W6): the rule and the words live in limits.py, shared with costlines
+        hits = limits.exceeding(stored.get(l["route_id"]), veh)
         if not hits:
             continue
         h = hits[0]
-        leg = "going back empty" if h.get("leg") != "loaded" else "loaded"
-        text = (f"{_label(l)}: {h.get('vehicle_label') or veh} ({h.get('vehicle_value'):g} {h.get('unit')}, {leg}) "
-                f"is over the {h.get('headline')} ({limits.SOURCES.get(h.get('source'), {}).get('short', h.get('source'))})")
-        if h.get("exceptions"):
-            text += f" — {h['exceptions'].lower()}"
-        if h.get("point"):
-            text += " — a point limit: check whether the route passes it or crosses over or under it"
-        if len(hits) > 1:
-            text += f" (+{len(hits) - 1} more)"
+        text = f"{_label(l)}: {limits.breach_text(hits, veh)}"
         out.append(_flag("LIMIT", l, text, label="ROAD LIMIT", hits=len(hits),
                          kind=h.get("kind"), limit=h.get("limit"), unit=h.get("unit"),
                          source=h.get("source"), checked_at=(stored.get(l["route_id"]) or {}).get("checked_at")))

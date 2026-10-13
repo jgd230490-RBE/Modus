@@ -304,6 +304,7 @@
   .info-pop .info-x:focus-visible{outline:2px solid var(--popover-fg);}
   .info-pop.is-sheet{left:0 !important;right:0 !important;bottom:0 !important;top:auto !important;max-width:none;width:auto;border-radius:14px 14px 0 0;max-height:70vh;overflow:auto;padding:16px 16px 20px;}
   .dash-wall .ibtn{display:none;}
+  .dash-wall .rd-chev{display:none;}   /* 13 Oct 2026 (W6): a wall display is not clicked, like its info boxes */
   .dash-card-l{font-size:14px;color:var(--muted);font-weight:500;line-height:1.3;}
   .dash-card-v{font-size:clamp(1.3rem,1.6vw,1.75rem);font-weight:600;color:var(--navy-deep);line-height:1.15;margin:6px 0 4px;white-space:nowrap;}
   .dash-card-s{font-size:13px;color:var(--muted);line-height:1.3;}
@@ -340,8 +341,9 @@
   .ga-table th{font-size:14px;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
   .ga-table td{font-size:14px;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line);}
   .ga-table tr.ga-notes td{border-bottom:1px solid var(--line);padding-top:0;}
+  .ga-gate{font-size:13px;font-weight:400;color:var(--muted);}
   .ga-sel{font-size:14px;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);margin-left:6px;}
-  @media (max-width:720px){.ga-table thead{display:none;}.ga-table td{display:block;border-bottom:0;}.ga-table td[data-label]::before{content:attr(data-label) ": ";font-weight:600;}.ga-table tr{display:block;border-bottom:1px solid var(--line);padding:6px 0;}}
+  /* 13 Oct 2026 (W6): below 768 px the gate table is cards like every row-details table (.rd-table below) */
   /* 10 Oct 2026 — the Look-ahead grid (mockup 3): sticky first column, click-to-edit cells, a totals row */
   .tbl .la-stick{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
   .tbl th.la-stick{background:var(--surface-2);z-index:3;}
@@ -350,6 +352,70 @@
   .la-cell:hover{border-bottom-color:var(--muted);}
   .tbl tr.la-total td{font-weight:600;background:var(--surface-2);border-top:1px solid var(--grey);}
   .tbl.compact tr.la-total td,.tbl.compact td.num{height:auto;padding-top:4px;padding-bottom:4px;}
+  /* 13 Oct 2026 (W6, bundle F) — RowDetails: one primary value, at most two grey chips, one status (word + icon),
+     a chevron that opens a details row (a <dl>, one fact a line). Below 768 px every .rd-table is cards in the same
+     order: primary, chips, status, the figures, details. Tokens only, so every look follows. */
+  .rd-p{display:flex;align-items:flex-start;gap:6px;}
+  .rd-main{min-width:0;}
+  .rd-sum{font-weight:600;color:var(--ink);white-space:normal;line-height:1.3;}
+  .rd-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;}
+  .rd-chip{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);white-space:nowrap;}
+  .rd-chev{position:relative;flex:none;width:22px;height:22px;margin-top:-1px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;transition:transform .15s;}
+  .rd-chev::after{content:"";position:absolute;inset:-3px;}
+  @media (pointer:coarse){.rd-chev::after{inset:-11px;}}
+  .rd-chev:hover{color:var(--ink);background:var(--surface-2);}
+  .rd-chev[aria-expanded="true"]{transform:rotate(90deg);color:var(--ink);}
+  .rd-chev:focus-visible{outline:2px solid var(--navy);outline-offset:1px;}
+  .rd-table td.rd-primary{white-space:normal;padding-top:6px;padding-bottom:6px;height:auto;min-width:200px;}
+  .rd-table tr.rd-row.is-open td{border-bottom-color:transparent;}
+  .rd-table tr.rd-details td{height:auto;white-space:normal;background:var(--surface-2);padding:0;border-bottom:1px solid var(--line);}
+  .rd-table tr.rd-details[hidden]{display:none;}
+  .rd-scroll{container-type:inline-size;}
+  .rd-dl{position:sticky;left:0;max-width:min(100cqw, 1100px);display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px 24px;margin:0;padding:10px 16px 12px 40px;}
+  .rd-i{min-width:0;}
+  .rd-i dt{font-size:12px;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0;}
+  .rd-i dd{margin:1px 0 0;font-size:13.5px;line-height:1.4;color:var(--ink);font-variant-numeric:tabular-nums;white-space:normal;}
+  .rd-i.rd-wide{grid-column:1/-1;}
+  .rd-i.rd-bad dt{color:var(--red);}
+  .rd-days{border-collapse:collapse;font-size:13px;margin-top:2px;}
+  .rd-days th,.rd-days td{position:static;height:auto;padding:2px 14px 2px 0;border:0;background:none;text-align:right;font-weight:400;color:var(--ink);white-space:nowrap;}
+  .rd-days th{font-weight:600;color:var(--muted);font-size:12px;}
+  .rd-days th:first-child,.rd-days td:first-child{text-align:left;}
+  .rd-mini td.rd-primary{min-width:0;} .rd-mini .row-st{white-space:normal;} .rd-mini .rd-chip{white-space:normal;} .rd-mini .rd-sum{font-size:12px;} .rd-mini .rd-dl{padding-left:12px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+  .row-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;}
+  .row-st i{flex:none;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:700;line-height:1;color:#fff;border-radius:50%;background:var(--chart-none);}
+  .row-st.rs-ok i{background:var(--green);}
+  .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
+  .row-st.rs-bad i{background:var(--red);}
+  .row-st .rs-more{font-weight:500;color:var(--muted);}
+  .unit-sw{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);}
+  .unit-sw-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .unit-sw-seg button{font:inherit;font-size:13px;font-weight:600;padding:4px 12px;min-height:30px;border:0;background:var(--surface);color:var(--muted);cursor:pointer;}
+  .unit-sw-seg button+button{border-left:1px solid var(--line);}
+  .unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:#fff;}
+  .unit-sw-seg button:focus-visible{outline:2px solid var(--navy);outline-offset:-2px;}
+  .rd-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;padding:10px 16px;border-bottom:1px solid var(--line);}
+  .rd-sort{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;}
+  .rd-sort select{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);}
+  @media (max-width:767px){
+    .rd-table{min-width:0 !important;width:100%;}
+    .rd-table caption{display:block;}
+    .rd-table>thead{display:none;}
+    .rd-table,.rd-table>tbody{display:block;}
+    .rd-table tr.rd-row,.rd-table tr.rd-card{display:flex;flex-direction:column;margin:10px 8px 0;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);}
+    .rd-table tr.rd-row.is-open{border-bottom-left-radius:0;border-bottom-right-radius:0;}
+    .rd-table tr.rd-row>td,.rd-table tr.rd-card>td{display:flex;justify-content:space-between;align-items:baseline;gap:12px;width:auto;height:auto;padding:3px 0;border:0;white-space:normal;text-align:right;position:static;box-shadow:none;background:none !important;order:3;}
+    .rd-table tr.rd-row>td.rd-primary{order:0;text-align:left;display:block;min-width:0 !important;padding-bottom:4px;}
+    .rd-table tr.rd-card>td{min-width:0 !important;}
+    .rd-table .row-st{white-space:normal;align-items:flex-start;text-align:left;}
+    .rd-table tr.rd-row>td.rd-status{order:1;justify-content:flex-start;padding-bottom:4px;}
+    .rd-table tr.rd-row>td.rd-actions{order:9;justify-content:flex-end;}
+    .rd-table tr.rd-row>td[data-label]::before,.rd-table tr.rd-card>td[data-label]::before{content:attr(data-label);font-size:13px;font-weight:600;color:var(--muted);text-align:left;}
+    .rd-table tr.rd-row>td:empty{display:none;}
+    .rd-table tr.rd-details{display:block;margin:0 8px;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;overflow:hidden;}
+    .rd-table tr.rd-details>td{display:block;}
+    .rd-dl{padding:8px 12px 10px;grid-template-columns:1fr 1fr;gap:6px 14px;position:static;max-width:none;}
+  }
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */
   .dash-wall .fig-label{font-size:13px;} .dash-wall .fig-sub{font-size:12px;} .dash-wall .fig-group{font-size:12px;}
@@ -555,7 +621,7 @@ const INFO = {
   "dash.col.dist": { title: "Distance per trip", text: "The route's distance for one trip: the round trip, unless the route says loaded only.", tech: "t1-distance" },
   "dash.col.delivered": { title: "Delivered", text: "Reported week actuals ÷ planned, over the months in view.", tech: "t1-delivered" },
   "dash.col.peak": { title: "Peak vehicles", text: "The most vehicles any one month needs on this line.", tech: "t1-vehicles" },
-  "la.commit": { title: "Planned quantity by day", text: "Each line's plan for each weekday of the commit week, with loads and vehicles in grey. Click a day to type its plan while the week is not confirmed. ✎ marks a day typed by hand.",
+  "la.commit": { title: "Planned quantity by day", text: "Each line's plan for each weekday of the commit week, in the unit chosen above. In Tonnes, click a day to type its plan while the week is not confirmed. ✎ marks a day typed by hand.",
     how: "A day follows the week ÷ 5 until it is typed. Monday to Friday only: Saturday and Sunday are held at 0 and not shown. Confirm locks the whole week as the haulier sheet. Figures are planning figures, not plated weights.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-trips" },
   "la.variance": { title: "Variance", text: "Planned − actual. Green: held (within the 98 % band) or over-delivered. Red: short. An empty actual is not zero: it is not reported.",
     how: "Calibrate never runs when you save an actual: only the navy button writes into the commit week, and only if that week is not already confirmed.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
@@ -569,8 +635,10 @@ const INFO = {
     how: "Opening = the balance at the end of the week before. In = the week actuals delivered here (a week nobody reported counts as nothing). Closing = opening + in − out.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
   "la.horizon": { title: "The weeks ahead", text: "Week totals for the weeks after the commit week, so hauliers are not sent a four-week daily spreadsheet. Confirm lives on the Commit view.",
     how: "The blue column is the commit week: the week that holds today, or next week by the switch above. It is the only week with daily rows.", guide: "6-5-horizon-view" },
-  "fc.cost": { title: "Planned and fair cost", text: "Planned: the route's typed rates, or the Config target rate. Fair: the cost model from the vehicle, distance, tonnage, month and diesel price. Each figure's per tonne, per trip and per mile or km is in its tooltip.",
+  "fc.cost": { title: "Planned and fair cost", text: "Planned: the route's typed rates, or the Config target rate. Fair: the cost model from the vehicle, distance, tonnage, month and diesel price. Each figure's per tonne, per trip and per mile or km is in the row's details.",
     guide: "9-5-money-settings", tech: "t1-fair" },
+  "units": { title: "Loads, tonnes or lorries", text: "The unit for the table's figures. Loads are loaded trips. Lorries are the vehicles needed: on a day, or in a line's busiest month. The other units are in each row's details, behind its arrow.",
+    tech: "t1-trips" },
 };
 const NO_ROUTES_YET = "No line in view has a route worked out yet: route them on Data → Routes.";
 // the user guide and the technical guide, as the info box links to them
@@ -646,6 +714,93 @@ function InfoTip({ id, label, value }){
   );
 }
 
+// ---- 13 Oct 2026 (W6, bundle F): row details for the four busy tables --------------------------------
+// The pattern (notes/row-details-inventory-1013.md): a row shows ONE primary value, at most two grey chips
+// (categorical facts a person filters by, never a status colour), ONE status (a word and an icon: shape and
+// word, never colour alone) and one number a cell; a chevron opens a details row, a <dl> of one fact a line,
+// which holds everything the old cells stacked and every hover title the tables used to carry (nothing is
+// lost: dom_frontend checks it field by field). The chevron is a native <button>, so Enter and Space work;
+// aria-expanded / aria-controls name the details row, which is always rendered and `hidden` when shut.
+// Which rows are open is kept per table for the session (sessionStorage); the unit switch per page for good
+// (localStorage). Both keys keep the old `modus_` prefix on purpose (todo B6: rename nothing).
+const rdKey = (table) => "modus_rows_" + table;
+function useRowOpen(table){
+  const [open, setOpen] = useState(() => {
+    try { const v = JSON.parse(window.sessionStorage.getItem(rdKey(table)) || "{}"); return (v && typeof v === "object") ? v : {}; } catch(e){ return {}; }
+  });
+  const toggle = (k) => setOpen(o => {
+    const n = { ...o };
+    if(n[k]) delete n[k]; else n[k] = 1;
+    try { window.sessionStorage.setItem(rdKey(table), JSON.stringify(n)); } catch(e){}
+    return n;
+  });
+  return [(k) => !!open[k], toggle];
+}
+// Loads | Tonnes | Lorries — the one number a cell stacks no more. Loads = loaded trips; Lorries = the
+// vehicles needed (on a day, or a line's busiest month where a figure spans months).
+const UNIT_CHOICES = [["loads", "Loads"], ["tonnes", "Tonnes"], ["lorries", "Lorries"]];
+function useUnits(page){
+  const [u, setU] = useState(() => {
+    try { const v = window.localStorage.getItem("modus_units_" + page); return UNIT_CHOICES.some(c => c[0] === v) ? v : "tonnes"; } catch(e){ return "tonnes"; }
+  });
+  const set = (v) => { setU(v); try { window.localStorage.setItem("modus_units_" + page, v); } catch(e){} };
+  return [u, set];
+}
+function UnitSwitch({ value, onChange, note }){
+  return (
+    <div className="unit-sw" data-unit-switch={value}>
+      <span>Show</span>
+      <span className="unit-sw-seg" role="group" aria-label="Show the figures as">
+        {UNIT_CHOICES.map(([k, l]) => <button key={k} type="button" aria-pressed={value === k ? "true" : "false"} onClick={() => onChange(k)}>{l}</button>)}
+      </span>
+      <InfoTip id="units" />
+      {note && <span>{note}</span>}
+    </div>
+  );
+}
+// the one status: a word, an icon whose SHAPE says the tone (✓ circle, ! square, ! circle, – circle), and
+// how many more things are flagged (the details spell each one out)
+const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–" };
+function RowStatus({ word, tone, more }){
+  const t = RS_ICON[tone] ? tone : "none";
+  return <span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}{more > 0 && <span className="rs-more">+{more}</span>}</span>;
+}
+// one fact in the details: a label and its value; nothing at all when there is no value
+function RdItem({ t, children, wide, bad }){
+  if(children == null || children === "" || children === false) return null;
+  return <div className={"rd-i" + (wide ? " rd-wide" : "") + (bad ? " rd-bad" : "")}><dt>{t}</dt><dd>{children}</dd></div>;
+}
+// a row and its details row. `cells` are the row's other <td>s in order (the caller places the status cell,
+// <td className="rd-status">); `colSpan` is the table's column count; `rowProps` go on the main <tr>.
+function RowDetails({ rowKey, isOpen, onToggle, label, summary, chips, cells, colSpan, rowProps, firstClass, firstStyle, children }){
+  const did = "rd-" + String(rowKey).replace(/[^a-z0-9]+/gi, "-");
+  const ch = (chips || []).filter(Boolean).slice(0, 2);
+  const rp = rowProps || {};
+  return (
+    <>
+      <tr {...rp} className={"rd-row" + (rp.className ? " " + rp.className : "") + (isOpen ? " is-open" : "")} data-rd={rowKey}>
+        <td className={"rd-primary" + (firstClass ? " " + firstClass : "")} style={firstStyle}>
+          <div className="rd-p">
+            <button type="button" className="rd-chev" aria-expanded={isOpen ? "true" : "false"} aria-controls={did} aria-label={label}
+                    onClick={(e) => { e.stopPropagation(); onToggle(); }}>›</button>
+            <div className="rd-main">
+              <div className="rd-sum">{summary}</div>
+              {ch.length > 0 && <div className="rd-chips">{ch.map((c, i) => <span key={i} className="rd-chip">{c}</span>)}</div>}
+            </div>
+          </div>
+        </td>
+        {cells}
+      </tr>
+      <tr className="rd-details" id={did} hidden={!isOpen} data-rd-details={rowKey}>
+        <td colSpan={colSpan}><dl className="rd-dl">{children}</dl></td>
+      </tr>
+    </>
+  );
+}
+// the money in four units for a details line: "£ 4.10/t, £ 120/trip, £ 2.31/mi" (commas: one " · " a cell at most)
+const unitList = (u) => unitTriple(u, { sep: ", " });
+const fairWords = (flags) => [(flags || []).includes("WINTER") ? "winter months add a fuel uplift" : "", (flags || []).includes("THAW") ? "thaw restrictions may apply" : ""].filter(Boolean).join(", ");
+
 // Chart.js wrapper — recreates the chart when its serialised config changes.
 function ChartCanvas({ config, height=260 }){
   const ref = useRef(null);
@@ -710,6 +865,10 @@ const unitTriple = (u, opts) => {
   return parts.length ? parts.join(o.sep || " · ") : null;
 };
 const REFRESH_MS = 5 * 60 * 1000;
+// 13 Oct 2026 (W6): every sort the Dashboard's route table offered before its columns moved into the details
+const DASH_SORTS = () => [["route_id", "Route"], ["discipline", "Discipline"], ["t", "Tonnes"], ["trips", "Loads (loaded trips)"],
+  ["peakVeh", "Lorries, busiest month"], ["deliveredPct", "Delivered"], ["dist", `${DU()} a trip`], ["cycleH", "Cycle"],
+  ["km", `Lorry-${DU()}`], ["co2", "tCO₂e"], ["planned", `Planned ${CUR()}`], ["fair", `Fair ${CUR()} (model)`], ["fairPerT", `Fair ${CUR()}/t`]];
 
 // 2026-09-15 — the big screen splits into FOUR sections (the human's ask). The cut is the
 // page's own order, so nothing moves relative to the working view:
@@ -781,6 +940,7 @@ const gaFlagWord = (g) => g.flag === "red" ? "Queue likely" : (g.gap_minutes == 
 const gaMin = (m) => m == null ? "—" : `${(+m).toFixed(1)} min`;
 const gaN1 = (n) => n == null ? "—" : (+n).toFixed(1);
 function GateArrivalsPanel({ ga, err, month, months, onMonth }){
+  const [gaOpen, gaToggle] = useRowOpen("gates");
   if(!ga) return err
     ? <div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>
     : null;
@@ -798,31 +958,46 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across the {ga.shift_hours} h shift.</div>
       {state === "none" && <EmptyState kind="none" title={`No approved lines in ${ga.label}`} body="Pick another month. Pending lines appear as a note until they are approved, then in the figures." />}
       {state === "set" && (
-        <table className="ga-table">
-          <thead><tr><th scope="col">Gate</th><th scope="col">Arrivals a day</th><th scope="col">Average gap</th><th scope="col">Check-in</th><th scope="col">Status</th></tr></thead>
+        // 13 Oct 2026 (W6): RowDetails. The row: the location (primary) with its gate under it, the teams as at most
+        // two chips, one figure a cell, the status word (red only when a queue is likely, grey otherwise: the 11 Oct
+        // rule, so no ✓ and no amber here); the laden / coming-to-load split, each team's figure, the
+        // full gap sentence, the server's reason and the two notes moved into the details row. No unit switch here:
+        // every figure on this table is already lorries.
+        <div className="overflow-auto rd-scroll"><table className="ga-table rd-table" data-rd-table="gates">
+          <thead><tr><th scope="col">Gate</th><th scope="col" className="num">Arrivals a day</th><th scope="col" className="num">Average gap</th><th scope="col" className="num">Check-in a lorry</th><th scope="col">Status</th></tr></thead>
           <tbody>
-            {gates.map(g => (
-              <React.Fragment key={g.gate_id}>
-                <tr data-ga-gate={g.gate_id} data-ga-flag={g.flag || "none"}>
-                  <td><b>{g.location_name}</b> · {g.gate_name}
-                    <div className="ct-note">{(g.teams || []).map(t => teamText(t) || "—").join(" · ")}</div></td>
-                  <td data-label="Arrivals a day">{gaN1(g.arrivals_per_day)}
-                    <div className="ct-note">{gaN1(g.laden_per_day)} laden · {gaN1(g.empty_per_day)} coming to load</div>
-                    {(g.per_team || []).map((t, i) => <div key={i} className="ct-note">{teamText(t.team) || "—"} {gaN1(t.arrivals_per_day)}</div>)}</td>
-                  <td data-label="Average gap">{g.gap_minutes == null ? "no approved arrivals" : `one every ${gaMin(g.gap_minutes)} ${GA_SPREAD}`}</td>
-                  <td data-label="Check-in">{g.gate_minutes == null ? "not typed" : `${+g.gate_minutes} min a lorry`}</td>
-                  <td data-label="Status" title={g.reason}><span className="chip-st"><i style={{ background: g.flag === "red" ? "var(--red)" : "var(--chart-none)" }} aria-hidden="true"></i><span className="font-semibold">{gaFlagWord(g)}</span></span></td>
-                </tr>
-                {(g.origin_share_note || g.pending_lines > 0) && (
-                  <tr className="ga-notes"><td colSpan={5}>
-                    {g.origin_share_note && <div className="ct-note">{g.origin_share_note}</div>}
-                    {g.pending_lines > 0 && <div className="ct-note">{g.pending_lines} pending line{g.pending_lines === 1 ? "" : "s"} would add {gaN1(g.pending_per_day)} a day here once approved.</div>}
-                  </td></tr>
-                )}
-              </React.Fragment>
-            ))}
+            {gates.map(g => {
+              const teams = (g.teams || []).map(t => teamText(t) || "—");
+              const chips = teams.length <= 2 ? teams : [teams[0], `+${teams.length - 1} more`];
+              const k = String(g.gate_id);
+              return (
+                <RowDetails key={k} rowKey={"ga-" + k} isOpen={gaOpen(k)} onToggle={() => gaToggle(k)} colSpan={5}
+                  label={`Details for ${g.location_name}, ${g.gate_name}`}
+                  rowProps={{ "data-ga-gate": g.gate_id, "data-ga-flag": g.flag || "none" }}
+                  summary={<>{g.location_name}<div className="ga-gate">{g.gate_name}</div></>}
+                  chips={chips}
+                  cells={<>
+                    <td className="num" data-label="Arrivals a day">{gaN1(g.arrivals_per_day)}</td>
+                    <td className="num" data-label="Average gap">{g.gap_minutes == null ? "none" : gaMin(g.gap_minutes)}</td>
+                    <td className="num" data-label="Check-in a lorry">{g.gate_minutes == null ? "not typed" : `${+g.gate_minutes} min`}</td>
+                    <td className="rd-status" data-label="Status"><RowStatus word={gaFlagWord(g)} tone={g.flag === "red" ? "bad" : "none"} /></td>
+                  </>}>
+                  <RdItem t="Location">{g.location_name}</RdItem>
+                  <RdItem t="Gate">{g.gate_name}</RdItem>
+                  <RdItem t={TEAMS()}>{teams.join(", ")}</RdItem>
+                  <RdItem t="Laden a day">{gaN1(g.laden_per_day)}</RdItem>
+                  <RdItem t="Coming to load a day">{gaN1(g.empty_per_day)}</RdItem>
+                  {(g.per_team || []).map((t, i) => <RdItem key={i} t={`${teamText(t.team) || "—"}, a day`}>{gaN1(t.arrivals_per_day)}</RdItem>)}
+                  <RdItem t="Average gap" wide>{g.gap_minutes == null ? "No approved arrivals." : `One every ${gaMin(g.gap_minutes)} ${GA_SPREAD}.`}</RdItem>
+                  <RdItem t="Check-in" >{g.gate_minutes == null ? "Not typed: nothing is compared." : `${+g.gate_minutes} min a lorry`}</RdItem>
+                  <RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>
+                  <RdItem t="Not all of this gate's traffic" wide>{g.origin_share_note}</RdItem>
+                  <RdItem t="Waiting for approval" wide>{g.pending_lines > 0 ? `${g.pending_lines} pending line${g.pending_lines === 1 ? "" : "s"} would add ${gaN1(g.pending_per_day)} a day here once approved.` : null}</RdItem>
+                </RowDetails>
+              );
+            })}
           </tbody>
-        </table>
+        </table></div>
       )}
       {(ga.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
     </section>
@@ -983,6 +1158,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [sortKey, setSortKey] = useState("t");
   const [sortDir, setSortDir] = useState("desc");
   const [lineKey, setLineKey] = useState(null);      // a clicked route row narrows the charts and figures
+  const [unitSel, setUnitSel] = useUnits("dashboard");    // 13 Oct 2026 (W6): the route table's Loads | Tonnes | Lorries
+  const [rowOpen, rowToggle] = useRowOpen("dashboard");
   const [wall, setWall] = useState(false);           // big-screen mode
   const [tick, setTick] = useState(0);               // bumps every 5 min in big-screen mode
   const [stamp, setStamp] = useState(null);
@@ -1129,8 +1306,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         origin: r.origin_name, dest: r.dest_name, vehicle: r.vehicle_type, vehicle_short: r.vehicle_short,
         dist: r.km_trip, cycleH: (r.cycle_min != null ? r.cycle_min / 60 : null), capacityPerDay: r.cycles_per_vehicle_day,
         baked: !!r.baked, t: 0, trips: 0, km: 0, bkm: 0, co2: 0, peakVeh: null, planned: null, fair: null, source: null, flags: new Set(),
-        actualT: null,
+        actualT: null, limit: null,
       });
+      if(r.limit && !a.limit) a.limit = r.limit;          // 13 Oct 2026 (W6): ROAD LIMIT, the same route and vehicle every month
       const bk = (r.basis_km || 0) * r.trips;
       a.t += r.tonnes; a.trips += r.trips; a.km += r.km || 0; a.bkm += bk; a.co2 += r.co2_t || 0;
       if(r.vehicles != null) a.peakVeh = Math.max(a.peakVeh || 0, r.vehicles);
@@ -1189,6 +1367,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   });
   const setSort = (k) => { if(sortKey === k) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortKey(k); setSortDir("desc"); } };
   const arrow = (k) => sortKey === k ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+  // 13 Oct 2026 (W6): the switch picks the quantity column; the Sort by list keeps every old header's sort
+  const qtyKey = unitSel === "loads" ? "trips" : unitSel === "lorries" ? "peakVeh" : "t";
+  const qtyHead = unitSel === "loads" ? "Loads" : unitSel === "lorries" ? "Lorries" : "Tonnes";
   const selected = lineKey ? D.routeRows.find(r => r.key === lineKey) : null;
   const pick = (key) => setLineKey(k => k === key ? null : key);
 
@@ -1225,8 +1406,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const cost = data.costing || {};
   const K = D.kpis;
   const ctW = ctFig(ct, ctErr);        // 11 Oct 2026: the carbon target as one more big-screen figure
-  const srcChip = (s) => s === "target" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title="No rate on the route — the target rate from Config">target</span>
-                        : s === "route" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title="The rates typed on the route">quote</span> : null;
+  const srcChip = (s) => s === "target" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>
+                        : s === "route" ? <span className="ml-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span> : null;
   // KPI cards: two figures per row below 1536 px, four on a wide screen — a figure is
   // never truncated (the 11 Sep screenshot: "1 017 …", "€ 3.31…")
   const Group = ({ title, children, tone }) => (
@@ -1447,53 +1628,75 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <details className="dash-more" onToggle={onMore} data-dash-table="1">
             <summary>Route planning detail</summary>
             <div className="pt-3">
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 text-sm font-semibold text-slate-700">Route planning detail <span className="text-slate-400 font-normal">· click a row to focus the charts on that line · click a column to sort · {CUR()} as total, and {CUR()}/t · {CUR()}/trip · {CUR()}/{DU()} on hover</span></div>
-        <div className="overflow-auto">
-          <table className="tbl">
+      {/* 13 Oct 2026 (W6, bundle F): RowDetails. The row keeps the planner's scan: the route's two ends (primary),
+          the team and the discipline (chips), the one quantity the switch picks, delivered, carbon, planned and fair
+          cost, one status. Distance a trip, cycle, lorry-distance and fair per tonne moved into the details with every
+          old hover title; the "Sort by" list keeps every sort the old headers offered (decision 4). */}
+      <div className="card overflow-hidden" data-rd-card="dashboard">
+        <div className="rd-bar">
+          <div className="text-sm font-semibold text-slate-700">Route planning detail <span className="text-slate-400 font-normal">Click a row to focus the charts on that line.</span></div>
+          <div className="flex flex-wrap items-center gap-3">
+            <UnitSwitch value={unitSel} onChange={setUnitSel} />
+            <label className="rd-sort">Sort by <select value={sortKey} onChange={e => { setSortKey(e.target.value); setSortDir(e.target.value === "route_id" || e.target.value === "discipline" ? "asc" : "desc"); }} aria-label="Sort the route table by">
+              {DASH_SORTS().map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select></label>
+          </div>
+        </div>
+        <div className="overflow-auto rd-scroll">
+          <table className="tbl rd-table" data-rd-table="dashboard">
             <thead>
               <tr>
                 <th className="cursor-pointer select-none" onClick={() => setSort("route_id")}>Route{arrow("route_id")}</th>
-                <th className="cursor-pointer select-none" onClick={() => setSort("discipline")}>Discipline{arrow("discipline")}</th>
-                <th>{TEAM()}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("dist")} >{DU()}/trip{arrow("dist")}<InfoTip id="dash.col.dist" /></th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("cycleH")}>Cycle h{arrow("cycleH")}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("t")}>Tonnes{arrow("t")}</th>
+                <th className="num cursor-pointer select-none" onClick={() => setSort(qtyKey)}>{qtyHead}{arrow(qtyKey)}{unitSel === "lorries" && <InfoTip id="dash.col.peak" />}</th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("deliveredPct")} >Delivered{arrow("deliveredPct")}<InfoTip id="dash.col.delivered" /></th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("trips")}>Trips{arrow("trips")}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("km")}>Lorry-{DU()}{arrow("km")}</th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("co2")}>tCO₂e{arrow("co2")}</th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("peakVeh")} >Peak veh{arrow("peakVeh")}<InfoTip id="dash.col.peak" /></th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("planned")} >Planned {CUR()}{arrow("planned")}<InfoTip id="dash.planned" /></th>
                 <th className="num cursor-pointer select-none" onClick={() => setSort("fair")} >Fair {CUR()} (model){arrow("fair")}<InfoTip id="dash.fair" /></th>
-                <th className="num cursor-pointer select-none" onClick={() => setSort("fairPerT")}>Fair {CUR()}/t{arrow("fairPerT")}</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {sortedRoutes.map(r => (
-                <tr key={r.key} onClick={() => pick(r.key)} className={"cursor-pointer " + (r.key === lineKey ? "is-picked" : "")} title={r.key === lineKey ? "Click to show every line again" : "Click to focus the charts and figures on this line"}>
-                  <td className="font-medium text-slate-800 whitespace-nowrap">{r.route_id}<div className="text-[13px] text-slate-500 font-normal leading-tight">{r.origin || "—"} → {r.dest || "—"} · {r.vehicle_short || vehLabel(r.vehicle)}</div></td>
-                  <td className="text-slate-500 whitespace-nowrap">
-                    {r.discipline
-                      ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: "rgba(37,99,235,.08)", color: "var(--navy)" }} title={r.section_id ? `Section ${r.section_id}` : "No section set"}>{r.discipline}</span>
-                      : <span className="text-slate-300" title="No discipline set on this forecast line">—</span>}
-                  </td>
-                  <td className="text-slate-500 whitespace-nowrap">{teamText(r.ipt)}</td>
-                  {/* an unbaked route has NO distance, which is not the same as zero */}
-                  <td className={numTd}>{r.dist == null ? <span className="text-slate-300" title="Not routed yet for this lorry: route it on Data → Routes">—</span> : (+dist(r.dist)).toFixed(1)}</td>
-                  <td className={numTd}>{r.cycleH == null ? <span className="text-slate-300" title="The cycle time needs this line's route worked out for its vehicle">not routed</span> : r.cycleH.toFixed(2)}</td>
-                  <td className={numTd}>{grp(r.t)}</td>
-                  <td className={numTd} title={r.actualT == null ? "No week actual reported on this line in the months in view" : `${grp(r.actualT)} t reported of ${grp(r.t)} t planned`}>{r.deliveredPct == null ? <span className="text-slate-300">—</span> : <span style={{ color: "var(--green)" }}>{r.deliveredPct.toFixed(0)} %</span>}</td>
-                  <td className={numTd}>{grp(r.trips)}</td>
-                  <td className={numTd}>{r.baked ? grp(dist(r.km)) : <span className="text-slate-300">—</span>}</td>
-                  <td className={numTd}>{r.baked ? r.co2.toFixed(1) : <span className="text-slate-300">—</span>}</td>
-                  <td className={numTd} title={r.capacityPerDay ? `${r.capacityPerDay} trips/day per vehicle` : undefined}>{r.peakVeh == null ? <span className="text-slate-300">—</span> : r.peakVeh}</td>
-                  <td className={numTd} title={r.plannedU ? unitTriple(r.plannedU) : "no rate typed on the route, no target set"}>{r.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(r.planned)}{srcChip(r.source)}</>}</td>
-                  <td className={numTd} style={{ color: "var(--navy)" }} title={r.fairU ? unitTriple(r.fairU) + (r.flags.length ? " · " + r.flags.join(", ") : "") : (r.baked ? "no diesel index" : "not routed yet, so no distance")}>{r.fair == null ? <span className="text-slate-300">—</span> : <>{CUR()} {grp(r.fair)}{r.flags.includes("WINTER") && <span className="ml-1 text-[9px] text-slate-400">winter</span>}{r.flags.includes("THAW") && <span className="ml-1 text-[9px] text-amber-700">thaw</span>}</>}</td>
-                  <td className={numTd}>{r.fairPerT == null ? <span className="text-slate-300">—</span> : (+r.fairPerT).toFixed(2)}</td>
-                </tr>
-              ))}
-              {sortedRoutes.length === 0 && <tr><td colSpan="14" className="px-3 py-6 text-center text-slate-400">No routes in range.</td></tr>}
+              {sortedRoutes.map(r => {
+                const st = r.limit ? { word: "ROAD LIMIT", tone: "bad" } : (!r.baked ? { word: "Not routed", tone: "warn" } : { word: "Clear", tone: "ok" });
+                const veh = r.vehicle_short || vehLabel(r.vehicle);
+                return (
+                <RowDetails key={r.key} rowKey={"dash-" + r.key} isOpen={rowOpen(r.key)} onToggle={() => rowToggle(r.key)} colSpan={7}
+                  label={`Details for ${r.route_id}`}
+                  rowProps={{ onClick: () => pick(r.key), className: "cursor-pointer" + (r.key === lineKey ? " is-picked" : ""), "data-route-row": r.route_id }}
+                  summary={<>{r.origin || "—"} → {r.dest || "—"}</>}
+                  chips={[(r.ipt && r.ipt !== "—" && teamText(r.ipt)) || `No ${TEAM().toLowerCase()}`, r.discipline || null]}
+                  cells={<>
+                    <td className={numTd} data-label={qtyHead}>{unitSel === "loads" ? grp(r.trips) : unitSel === "lorries" ? (r.peakVeh == null ? "—" : r.peakVeh) : grp(r.t)}</td>
+                    <td className={numTd} data-label="Delivered">{r.deliveredPct == null ? <span className="text-slate-300">—</span> : <span style={{ color: "var(--green)" }}>{r.deliveredPct.toFixed(0)} %</span>}</td>
+                    <td className={numTd} data-label="tCO₂e">{r.baked ? r.co2.toFixed(1) : <span className="text-slate-300">—</span>}</td>
+                    <td className={numTd} data-label={`Planned ${CUR()}`}>{r.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(r.planned)}{srcChip(r.source)}</>}</td>
+                    <td className={numTd} data-label={`Fair ${CUR()}`} style={{ color: "var(--navy)" }}>{r.fair == null ? <span className="text-slate-300">—</span> : <>{CUR()} {grp(r.fair)}</>}</td>
+                    <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} /></td>
+                  </>}>
+                  <RdItem t="Route">{r.route_id}</RdItem>
+                  <RdItem t="Discipline">{r.discipline || "None set"}</RdItem>
+                  <RdItem t="Section">{r.section_id || "None set"}</RdItem>
+                  <RdItem t="Vehicle">{veh}</RdItem>
+                  <RdItem t="Vehicle, full name">{r.vehicle && r.vehicle !== veh ? r.vehicle : null}</RdItem>
+                  <RdItem t="Tonnes">{grp(r.t)}</RdItem>
+                  <RdItem t="Loads (loaded trips)">{grp(r.trips)}</RdItem>
+                  <RdItem t={<>Lorries, busiest month<InfoTip id="dash.col.peak" /></>}>{r.peakVeh == null ? "Needs the route worked out" : String(r.peakVeh)}</RdItem>
+                  <RdItem t="Trips a day per lorry">{r.capacityPerDay ? `${r.capacityPerDay}` : null}</RdItem>
+                  <RdItem t="Delivered">{r.actualT == null ? "No week actual reported on this line in the months in view" : `${grp(r.actualT)} t reported of ${grp(r.t)} t planned`}</RdItem>
+                  <RdItem t={<>{DU()} a trip<InfoTip id="dash.col.dist" /></>}>{r.dist == null ? "Not routed yet for this lorry: route it on Data → Routes" : (+dist(r.dist)).toFixed(1)}</RdItem>
+                  <RdItem t="Cycle">{r.cycleH == null ? "Needs this line's route worked out for its vehicle" : `${r.cycleH.toFixed(2)} h`}</RdItem>
+                  <RdItem t={`Lorry-${DU()}`}>{r.baked ? grp(dist(r.km)) : "Not routed yet"}</RdItem>
+                  <RdItem t="tCO₂e">{r.baked ? r.co2.toFixed(1) : "Not routed yet"}</RdItem>
+                  <RdItem t={`Planned ${CUR()}`}>{r.planned == null ? "No rate typed on the route, no target set" : `${CUR()} ${grp(r.planned)}, ${r.source === "target" ? "the target rate from Config (no rate on the route)" : "the rates typed on the route"}`}</RdItem>
+                  <RdItem t="Planned, per unit">{r.plannedU ? unitList(r.plannedU) : null}</RdItem>
+                  <RdItem t={`Fair ${CUR()} (model)`}>{r.fair == null ? (r.baked ? "No diesel index" : "Not routed yet, so no distance") : `${CUR()} ${grp(r.fair)}${fairWords(r.flags) ? ", " + fairWords(r.flags) : ""}`}</RdItem>
+                  <RdItem t="Fair, per unit">{r.fairU ? unitList(r.fairU) : null}</RdItem>
+                  <RdItem t={`Fair ${CUR()}/t`}>{r.fairPerT == null ? null : (+r.fairPerT).toFixed(2)}</RdItem>
+                  <RdItem t="ROAD LIMIT" wide bad>{r.limit ? `${r.limit.text}${r.limit.checked_at ? `. Checked ${ctWhen(r.limit.checked_at)}.` : ""}` : null}</RdItem>
+                </RowDetails>
+                );
+              })}
+              {sortedRoutes.length === 0 && <tr><td colSpan="7" className="px-3 py-6 text-center text-slate-400">No routes in range.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -1602,6 +1805,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // trips and vehicles; the account carries its own totals. Cost stays off the map (the
 // map's hover shows quantity and trips only, as on the Look-ahead).
 function DashboardToday({ meta, week, err, wall }){
+  const [todayOpen, todayToggle] = useRowOpen("today");    // 13 Oct 2026 (W6): the rows' hover title moved into details
   const lines = (week && week.commit && week.commit.lines) || [];
   const today = (week && week.today) || new Date().toISOString().slice(0, 10);
   const acct = (week && week.account) || null;
@@ -1620,7 +1824,7 @@ function DashboardToday({ meta, week, err, wall }){
         }
         if(d.day_date !== today || !((d.planned_qty || 0) > 0 || d.actual_qty != null)) return;
         out.rows.push({ key: `${l.route_id}|${l.discipline || ""}|${l.section_id || ""}`, route_id: l.route_id, discipline: l.discipline, ipt: ctx.ipt || l.ipt,
-                        origin: ctx.origin_name, dest: ctx.dest_name, material: l.material_type, vehicle: ctx.vehicle_short || l.vehicle_type,
+                        origin: ctx.origin_name, dest: ctx.dest_name, material: l.material_type, vehicle: ctx.vehicle_short || l.vehicle_type, vehicle_full: ctx.vehicle_type || l.vehicle_type,
                         qty: d.planned_qty, unit: l.unit, tonnes: dv.tonnes, trips: dv.trips, vehicles: dv.vehicles, km: dv.km_day,
                         status: d.status, actual: d.actual_qty, baked: !!ctx.baked, flags: ctx.flags || [] });
         out.t += dv.tonnes || 0; out.trips += dv.trips || 0; out.veh += dv.vehicles || 0; out.km += dv.km_day || 0; out.lines += 1;
@@ -1647,11 +1851,11 @@ function DashboardToday({ meta, week, err, wall }){
   const acctReportedPlanT = acct ? (acct.rows || []).filter(r => r.actual_qty != null).reduce((s, r) => s + (r.planned_t || 0), 0) : 0;
   const acctPct = acct && acct.reported > 0 && acctReportedPlanT > 0 ? acct.actual_t * 100 / acctReportedPlanT : null;
   const wkPct = T.wkToDateT > 0 && T.wkToDateReported > 0 ? T.wkToDateActT * 100 / T.wkToDateT : null;
-  const statusChip = (s, actual) => actual != null
-    ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(3,158,134,.12)", color: "var(--green)" }} title="An actual has been typed for today">reported</span>
-    : s === "confirmed" ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,.1)", color: "var(--navy)" }} title="Confirmed on the Look-ahead">confirmed</span>
-    : s === "edited" ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700" title="Edited on the Look-ahead, not yet confirmed">edited</span>
-    : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500" title="Derived from the week — not yet confirmed on the Look-ahead">planned</span>;
+  // 13 Oct 2026 (W6): one status a row, a word and an icon; what each word means is in the row's details
+  const todayStatus = (s, actual) => actual != null ? { word: "reported", tone: "ok", say: "An actual has been typed for today" }
+    : s === "confirmed" ? { word: "confirmed", tone: "ok", say: "Confirmed on the Look-ahead" }
+    : s === "edited" ? { word: "edited", tone: "warn", say: "Edited on the Look-ahead, not yet confirmed" }
+    : { word: "planned", tone: "none", say: "Derived from the week, not yet confirmed on the Look-ahead" };
   return (
     <div className="grid lg:grid-cols-5 gap-3">
       <div className="card p-4 lg:col-span-2 flex flex-col">
@@ -1681,21 +1885,36 @@ function DashboardToday({ meta, week, err, wall }){
               <div className="text-[11px] text-slate-400 mt-1">{acct && acct.week ? `${acct.reported} of ${acct.lines} lines reported · ${acct.delivered} held to plan${acct.shortfall ? ` · ${grp(acct.shortfall)} short` : ""}` : "—"}</div>
             </div>
           </div>
-          <div className="mt-3 flex-1 overflow-auto" style={{ maxHeight: wall ? 260 : 190 }}>
+          <div className="mt-3 flex-1 overflow-auto rd-scroll" style={{ maxHeight: wall ? 260 : 190 }}>
             {T.rows.length === 0 ? <div className="text-xs text-slate-400 py-2">{lines.length ? "No deliveries planned for today." : "No confirmed lines in this week's Look-ahead."}</div> : (
-            <table className="w-full text-xs">
-              <thead className="text-slate-400"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-left font-semibold py-1">Material</th><th className="text-right font-semibold py-1">t</th><th className="text-right font-semibold py-1">trips</th><th className="text-right font-semibold py-1">veh</th><th className="text-right font-semibold py-1"></th></tr></thead>
+            <table className="w-full text-xs rd-table rd-mini" data-rd-table="today">
+              <thead className="text-slate-400"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-right font-semibold py-1">t</th><th className="text-right font-semibold py-1">trips</th><th className="text-right font-semibold py-1">veh</th><th className="text-left font-semibold py-1 pl-2">Status</th></tr></thead>
               <tbody>
-                {T.rows.map(r => (
-                  <tr key={r.key} className="border-t border-slate-100" title={`${grp(r.qty)} ${unitLbl(r.unit)} planned today${r.actual != null ? ` · ${grp(r.actual)} ${unitLbl(r.unit)} reported` : ""}${r.baked ? "" : " · route not worked out yet, so no distance or vehicles"}`}>
-                    <td className="py-1 pr-2 whitespace-nowrap"><span className="font-semibold text-slate-800">{r.route_id}</span>{r.discipline && <span className="ml-1 text-[10px] text-slate-400">{r.discipline}</span>}<div className="text-[10px] text-slate-400">{r.origin || "—"} → {r.dest || "—"} · {r.vehicle}</div></td>
-                    <td className="py-1 pr-2 text-slate-600">{r.material}</td>
-                    <td className="py-1 text-right tabular-nums font-semibold">{grp(r.tonnes)}</td>
-                    <td className="py-1 text-right tabular-nums">{r.trips == null ? "—" : grp(r.trips)}</td>
-                    <td className="py-1 text-right tabular-nums">{r.vehicles == null ? <span className="text-slate-300" title="not routed yet">—</span> : r.vehicles}</td>
-                    <td className="py-1 text-right">{statusChip(r.status, r.actual)}</td>
-                  </tr>
-                ))}
+                {T.rows.map(r => {
+                  const st = todayStatus(r.status, r.actual);
+                  return (
+                  <RowDetails key={r.key} rowKey={"today-" + r.key} isOpen={todayOpen(r.key)} onToggle={() => todayToggle(r.key)} colSpan={5}
+                    label={`Details for ${r.route_id}`} rowProps={{ className: "border-t border-slate-100" }} firstClass="py-1 pr-2"
+                    summary={<>{r.origin || "—"} → {r.dest || "—"}</>}
+                    chips={[r.material, r.discipline || null]}
+                    cells={<>
+                      <td className="py-1 text-right tabular-nums font-semibold" data-label="t">{grp(r.tonnes)}</td>
+                      <td className="py-1 text-right tabular-nums" data-label="trips">{r.trips == null ? "—" : grp(r.trips)}</td>
+                      <td className="py-1 text-right tabular-nums" data-label="veh">{r.vehicles == null ? <span className="text-slate-300">—</span> : r.vehicles}</td>
+                      <td className="py-1 pl-2 rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} /></td>
+                    </>}>
+                    <RdItem t="Route">{r.route_id}</RdItem>
+                    <RdItem t="Discipline">{r.discipline || null}</RdItem>
+                    <RdItem t="Vehicle">{r.vehicle}</RdItem>
+                    <RdItem t="Vehicle, full name">{r.vehicle_full && r.vehicle_full !== r.vehicle ? r.vehicle_full : null}</RdItem>
+                    <RdItem t="Planned today">{`${grp(r.qty)} ${unitLbl(r.unit)}`}</RdItem>
+                    <RdItem t="Reported today">{r.actual != null ? `${grp(r.actual)} ${unitLbl(r.unit)}` : "Not reported yet"}</RdItem>
+                    <RdItem t={`Lorry-${DU()} today`}>{r.baked && r.km != null ? grp(dist(r.km)) : null}</RdItem>
+                    <RdItem t="Status">{st.say}</RdItem>
+                    <RdItem t="Route not worked out" wide>{r.baked ? null : "The route is not worked out yet, so no distance or vehicles."}</RdItem>
+                  </RowDetails>
+                  );
+                })}
               </tbody>
             </table>)}
           </div>
@@ -3434,6 +3653,8 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   const [busy, setBusy] = useState("");
   const [f, setF] = useState({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
   const [sort, setSort] = useState({ key: "quantity", dir: "desc" });   // 10 Oct: the one visible sort
+  const [unitSel, setUnitSel] = useUnits("forecasts");     // 13 Oct 2026 (W6): the Total column's Loads | Tonnes | Lorries
+  const [rowOpen, rowToggle] = useRowOpen("forecasts");
 
   useEffect(() => {
     let live = true;
@@ -3465,8 +3686,11 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
     const m = {};
     ((cost && cost.lines) || []).forEach(r => {
       const key = [r.route_id, r.discipline || "", r.section_id || ""].join("|");
-      const e = m[key] || (m[key] = { t: 0, trips: 0, bkm: 0, planned: null, fair: null, source: null, baked: 0, n: 0, flags: new Set() });
+      const e = m[key] || (m[key] = { t: 0, trips: 0, bkm: 0, planned: null, fair: null, source: null, baked: 0, n: 0, flags: new Set(), peakVeh: null, limit: null });
       e.n += 1; e.t += r.tonnes || 0; e.trips += r.trips || 0; e.bkm += (r.basis_km || 0) * (r.trips || 0); if(r.baked) e.baked += 1;
+      // 13 Oct 2026 (W6): the busiest month's lorries (the Lorries unit) and the ROAD LIMIT flag for the status column
+      if(r.vehicles != null) e.peakVeh = Math.max(e.peakVeh || 0, r.vehicles);
+      if(r.limit && !e.limit) e.limit = r.limit;
       if(r.planned && r.planned.eur != null){ e.planned = (e.planned || 0) + r.planned.eur; e.source = r.planned.source; }
       if(r.fair && r.fair.eur != null){ e.fair = (e.fair || 0) + r.fair.eur; (r.fair.flags || []).forEach(x => e.flags.add(x)); }
     });
@@ -3569,13 +3793,21 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   // the shared empty-state family. The cost column stays (one compact cell per line, the 13 px
   // allowance) until the Routes page carries the figures. Approve is the one visible action;
   // Reject, Edit and Withdraw sit behind the row menu.
-  const units = new Set(shown.map(g => g.unit));
   const unitLabel = (u) => u === "m3" ? "m³" : (u || "");
+  // 13 Oct 2026 (W6): the Total column shows ONE unit for every line (the switch). Tonnes: a line typed in tonnes
+  // shows what was typed; any other line the tonnes its own conversion gives (the Dashboard's figure). Loads and
+  // Lorries are the Dashboard's figures too. What was typed, in its own unit, is in the details.
+  const qtyOf = (g) => {
+    const c = costByLine[g.key];
+    if(unitSel === "loads") return c ? c.trips : null;
+    if(unitSel === "lorries") return c ? c.peakVeh : null;
+    return g.unit === "t" ? g.quantity : (c ? c.t : null);
+  };
   const sorted = [...shown].sort((a, b) => {
     const pend = (a.status === "Pending" ? -1 : 1) - (b.status === "Pending" ? -1 : 1);
     if(pend) return pend;
     const dir = sort.dir === "asc" ? 1 : -1;
-    const av = a[sort.key], bv = b[sort.key];
+    const av = sort.key === "quantity" ? qtyOf(a) : a[sort.key], bv = sort.key === "quantity" ? qtyOf(b) : b[sort.key];
     if(av == null && bv == null) return 0; if(av == null) return 1; if(bv == null) return -1;
     return (av > bv ? 1 : av < bv ? -1 : 0) * dir || a.routeId.localeCompare(b.routeId);
   });
@@ -3595,6 +3827,17 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   const clearAll = () => setF({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
   const chip = (t, title) => <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title={title}>{t}</span>;
   const sortCaption = `sorted by ${sort.key === "quantity" ? "total" : sort.key === "months" ? "months" : "route"}, ${sort.dir === "desc" ? "largest first" : "smallest first"}`;
+  const qtyHead = unitSel === "loads" ? "Loads" : unitSel === "lorries" ? "Lorries" : "Tonnes";
+  // the one status: what needs a person first (Rejected, a ROAD LIMIT, Pending, Mixed), else Approved; +1 when both
+  // a rejection and a limit apply. The approval word itself is always in the details.
+  const fcStatus = (g, c) => {
+    const lim = !!(c && c.limit);
+    if(g.status === "Rejected") return { word: "Rejected", tone: "bad", more: lim ? 1 : 0 };
+    if(lim) return { word: "ROAD LIMIT", tone: "bad", more: 0 };
+    if(g.status === "Pending") return { word: "Pending", tone: "warn", more: 0 };
+    if(g.status === "Mixed") return { word: "Mixed", tone: "warn", more: 0 };
+    return { word: g.status, tone: g.status === "Approved" ? "ok" : "none", more: 0 };
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -3611,7 +3854,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
 
       {err ? <EmptyState kind="error" title="Forecasts did not load" body="Wayscope did not answer in time. Nothing you typed is lost."
                action={<button onClick={() => setTick(t => t + 1)} className="btn-sec">Try again</button>} />
-       : !rows ? <SkeletonTable cols={["Route", "From → to", TEAM(), "Material", "Vehicle", "Months", "Total", "Status"]} rows={6} caption="Forecast lines · loading" />
+       : !rows ? <SkeletonTable cols={["Route", "Tonnes", "Planned", "Fair", "Status"]} rows={6} caption="Forecast lines · loading" />
        : groups.length === 0 ? (
         <EmptyState title="No forecast lines yet"
           body={canApprove ? "Nothing has been submitted that you can see. Lines appear here the moment a submitter saves one." : "Head to Submit forecast to add your first line."}
@@ -3642,20 +3885,26 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
           <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}
             count={`${shown.length} of ${groups.length} line${groups.length === 1 ? "" : "s"}`} />
 
-          <div className="card overflow-hidden">
-            <div className="max-h-[72vh] overflow-auto">
-              <table className="tbl">
-                <caption><b>Forecast lines</b> · {sortCaption}{counts.Pending ? ` · ${counts.Pending} pending approval` : ""}</caption>
+          {/* 13 Oct 2026 (W6, bundle F): RowDetails. The row: the route's two ends (primary, no longer cut off), the team
+              and the material (chips), the total in the unit the switch picks, planned and fair cost as two columns, one
+              status. Route id, discipline, section, vehicle, months, what was typed, the per-unit prices, the reject
+              reason and who submitted the line are in the details. Approve and the row menu stay. */}
+          <div className="card overflow-hidden" data-rd-card="forecasts">
+            <div className="rd-bar">
+              <UnitSwitch value={unitSel} onChange={setUnitSel} />
+              <label className="rd-sort">Sort by <select value={sort.key} onChange={e => setSort({ key: e.target.value, dir: e.target.value === "routeId" ? "asc" : "desc" })} aria-label="Sort the forecast lines by">
+                <option value="quantity">Total</option><option value="months">Months</option><option value="routeId">Route</option>
+              </select></label>
+            </div>
+            <div className="max-h-[72vh] overflow-auto rd-scroll">
+              <table className="tbl rd-table" data-rd-table="forecasts">
+                <caption><b>Forecast lines</b> · {sortCaption}{counts.Pending ? `, ${counts.Pending} pending approval` : ""}</caption>
                 <thead>
                   <tr>
                     {th("Route", "routeId")}
-                    <th scope="col">From → to</th>
-                    <th scope="col">{TEAM()}</th>
-                    <th scope="col">Material</th>
-                    <th scope="col">Vehicle</th>
-                    {th("Months", "months", true)}
-                    {th(units.size === 1 ? `Total (${unitLabel([...units][0])})` : "Total", "quantity", true)}
-                    <th scope="col" className="num">Cost ({CUR()})<InfoTip id="fc.cost" /></th>
+                    {th(qtyHead, "quantity", true)}
+                    <th scope="col" className="num">Planned ({CUR()})<InfoTip id="fc.cost" /></th>
+                    <th scope="col" className="num">Fair ({CUR()})</th>
                     <th scope="col">Status</th>
                     <th scope="col" className="num"><span className="sr-only">Actions</span></th>
                   </tr>
@@ -3664,51 +3913,68 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                   {sorted.map(g => {
                     const r = routeById[g.routeId] || {};
                     const own = g.submittedBy === who;
-                    const line = [g.discipline || null, g.sectionId || null].filter(Boolean).join(" · ");
+                    const c = costByLine[g.key];
+                    const st = fcStatus(g, c);
+                    const q = qtyOf(g);
+                    const noTeam = `No ${TEAM().toLowerCase()} on this line: only planners can see it until one is set. Edit and re-save it from Submit forecast.`;
                     return (
-                      <tr key={g.key} title={`Submitted by ${teamText(g.submittedBy) || "—"}${own ? " (you)" : ""} · ${g.yearLabel}`}>
-                        <td>
-                          <div className="font-medium text-slate-800 leading-tight">{g.routeId}{!g.ipt && <span className="ml-1.5">{chip("no " + TEAM().toLowerCase(), `No ${TEAM().toLowerCase()} on this line — only planners can see it until one is set. Edit and re-save it from Submit forecast.`)}</span>}</div>
-                          {line && <div className="text-[13px] text-slate-500 leading-tight">{line}</div>}
-                        </td>
-                        <td className="max-w-[240px] truncate" title={`${r.origin || "—"} → ${r.dest || "—"}`}>{r.origin || "—"} → {r.dest || "—"}</td>
-                        <td>{g.ipt ? teamText(g.ipt) : <span className="text-slate-400">—</span>}</td>
-                        <td className="max-w-[160px] truncate text-slate-700" title={`${g.material || ""}${g.material_description ? " · " + g.material_description : ""}`}>{g.material || "—"}</td>
-                        <td className="max-w-[140px] truncate text-slate-700" title={g.vehicle}>{vehLabel(g.vehicle)}</td>
-                        <td className="num" title={g.yearLabel}>{g.months}</td>
-                        <td className="num">{fmt(g.quantity, g.unit)}{units.size > 1 && <span className="text-slate-400 text-[13px]"> {unitLabel(g.unit)}</span>}</td>
-                        <td className="num text-[13px] leading-tight" data-cost-cell="1">
-                          {(() => { const c = costByLine[g.key]; if(!cost) return <span className="text-slate-300">…</span>; if(!c) return <span className="text-slate-300">—</span>; return (<>
-                            <div title={c.plannedU ? unitTriple(c.plannedU) : "no rate on the route, no target on Config"}>{c.planned == null ? <span className="text-slate-300">rate not set</span> : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[13px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</div>
-                            <div style={{ color: "var(--chart-4)" }} title={c.fairU ? "fair (model): " + unitTriple(c.fairU) + (c.flags.length ? " · " + c.flags.join(", ") : "") : (c.baked < c.n ? "not routed yet for this vehicle, so no distance and no fair price" : "no diesel index")}>{c.fair == null ? <span className="text-slate-300">fair —</span> : <>fair {CUR()} {grp(c.fair)}{c.fairU && c.fairU.per_t != null && <span className="text-slate-400"> · {(+c.fairU.per_t).toFixed(2)}/t</span>}</>}</div>
-                          </>); })()}
-                        </td>
-                        <td>
-                          <StatusWord status={g.status} />
-                          {g.rejectReason && <div className="text-[13px] leading-tight max-w-[200px] truncate" style={{ color: "var(--red)" }} title={g.rejectReason}>{g.rejectReason}</div>}
-                        </td>
-                        <td className="num whitespace-nowrap">
-                          {canApprove && g.status !== "Approved" && (
-                            <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")} className="btn-pri btn-sm mr-1">Approve</button>
-                          )}
-                          <details className="row-menu">
-                            <summary aria-label={`More actions for ${g.routeId}`} title="More actions">⋯</summary>
-                            <div className="row-menu-list">
-                              {canApprove && g.status !== "Rejected" && (
-                                <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
-                              )}
-                              <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
-                              {(own || canApprove) && (
-                                <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
-                              )}
-                              <div className="row-menu-note">Submitted by {teamText(g.submittedBy) || "—"}{own ? " (you)" : ""} · {g.yearLabel}</div>
-                            </div>
-                          </details>
-                        </td>
-                      </tr>
+                      <RowDetails key={g.key} rowKey={"fc-" + g.key} isOpen={rowOpen(g.key)} onToggle={() => rowToggle(g.key)} colSpan={6}
+                        label={`Details for ${g.routeId}${g.discipline ? ", " + g.discipline : ""}`}
+                        rowProps={{ "data-fc-line": g.key }}
+                        summary={<>{r.origin || "—"} → {r.dest || "—"}</>}
+                        chips={[g.ipt ? teamText(g.ipt) : `No ${TEAM().toLowerCase()}`, g.material || null]}
+                        cells={<>
+                          <td className="num" data-label={qtyHead}>{q == null ? (cost ? <span className="text-slate-300">—</span> : <span className="text-slate-300">…</span>)
+                            : grp(q)}</td>
+                          <td className="num" data-label={`Planned ${CUR()}`} data-cost-cell="1">{!cost ? <span className="text-slate-300">…</span> : !c ? <span className="text-slate-300">—</span>
+                            : c.planned == null ? <span className="text-slate-300">rate not set</span>
+                            : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[12px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</td>
+                          <td className="num" data-label={`Fair ${CUR()}`} style={{ color: "var(--chart-4)" }}>{!cost ? <span className="text-slate-300">…</span> : (!c || c.fair == null) ? <span className="text-slate-300">—</span> : <>{CUR()} {grp(c.fair)}</>}</td>
+                          <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
+                          <td className="num whitespace-nowrap rd-actions">
+                            {canApprove && g.status !== "Approved" && (
+                              <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")} className="btn-pri btn-sm mr-1">Approve</button>
+                            )}
+                            <details className="row-menu">
+                              <summary aria-label={`More actions for ${g.routeId}`} title="More actions">⋯</summary>
+                              <div className="row-menu-list">
+                                {canApprove && g.status !== "Rejected" && (
+                                  <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
+                                )}
+                                <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
+                                {(own || canApprove) && (
+                                  <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
+                                )}
+                                <div className="row-menu-note">Submitted by {teamText(g.submittedBy) || "—"}{own ? " (you)" : ""}, {g.yearLabel}</div>
+                              </div>
+                            </details>
+                          </td>
+                        </>}>
+                        <RdItem t="Route">{g.routeId}</RdItem>
+                        <RdItem t="Discipline">{g.discipline || null}</RdItem>
+                        <RdItem t="Section">{g.sectionId || null}</RdItem>
+                        <RdItem t={TEAM()} wide={!g.ipt}>{g.ipt ? teamText(g.ipt) : noTeam}</RdItem>
+                        <RdItem t="Material">{g.material || "—"}</RdItem>
+                        <RdItem t="Description">{g.material_description || null}</RdItem>
+                        <RdItem t="Vehicle">{vehLabel(g.vehicle)}</RdItem>
+                        <RdItem t="Vehicle, full name">{g.vehicle && g.vehicle !== vehLabel(g.vehicle) ? g.vehicle : null}</RdItem>
+                        <RdItem t="Months">{`${g.months}, ${g.yearLabel}`}</RdItem>
+                        <RdItem t="Typed">{`${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>
+                        <RdItem t="Tonnes">{c ? grp(c.t) : null}</RdItem>
+                        <RdItem t="Loads (loaded trips)">{c ? grp(c.trips) : null}</RdItem>
+                        <RdItem t="Lorries, busiest month">{c ? (c.peakVeh == null ? "Needs the route worked out" : String(c.peakVeh)) : null}</RdItem>
+                        <RdItem t={`Planned ${CUR()}`}>{!c ? null : c.planned == null ? "No rate on the route, no target on Config" : `${CUR()} ${grp(c.planned)}, ${c.source === "target" ? "the target rate from Config" : "the rates typed on the route"}`}</RdItem>
+                        <RdItem t="Planned, per unit">{c && c.plannedU ? unitList(c.plannedU) : null}</RdItem>
+                        <RdItem t={`Fair ${CUR()} (model)`}>{!c ? null : c.fair == null ? (c.baked < c.n ? "Not routed yet for this vehicle, so no distance and no fair price" : "No diesel index") : `${CUR()} ${grp(c.fair)}${fairWords(c.flags) ? ", " + fairWords(c.flags) : ""}`}</RdItem>
+                        <RdItem t="Fair, per unit">{c && c.fairU ? unitList(c.fairU) : null}</RdItem>
+                        <RdItem t="Approval">{g.status}</RdItem>
+                        <RdItem t="Reason for rejecting" wide bad>{g.rejectReason || null}</RdItem>
+                        <RdItem t="Submitted by">{`${teamText(g.submittedBy) || "—"}${own ? " (you)" : ""}`}</RdItem>
+                        <RdItem t="ROAD LIMIT" wide bad>{c && c.limit ? `${c.limit.text}${c.limit.checked_at ? `. Checked ${ctWhen(c.limit.checked_at)}.` : ""}` : null}</RdItem>
+                      </RowDetails>
                     );
                   })}
-                  {sorted.length === 0 && <tr><td colSpan="10" className="!p-0 !h-auto"><EmptyState kind="nomatch" title="No lines match these filters" body={applied.map(a => a.label).join(" · ")} action={<button onClick={clearAll} className="btn-sec">Clear filters</button>} /></td></tr>}
+                  {sorted.length === 0 && <tr><td colSpan="6" className="!p-0 !h-auto"><EmptyState kind="nomatch" title="No lines match these filters" body={applied.map(a => a.label).join(", ")} action={<button onClick={clearAll} className="btn-sec">Clear filters</button>} /></td></tr>}
                 </tbody>
               </table>
             </div>
@@ -4903,22 +5169,6 @@ const spanLabel = (a, b) => {
     : `${da.getDate()} ${MONTHS[da.getMonth()]} – ${db.getDate()} ${MONTHS[db.getMonth()]} ${db.getFullYear()}`;
 };
 
-function StatusChip({ s, parentChanged }){
-  // 10 Oct 2026: a word with a dot (StatusWord), the same colours as everywhere else
-  return (
-    <span className="inline-flex flex-wrap gap-2">
-      <StatusWord status={s} label={s === "derived" ? "Derived" : s === "edited" ? "Edited" : s === "confirmed" ? "Confirmed" : s} />
-      {/* The parent month's quantity moved after this week was set. Only ever shown on
-          an edited or confirmed week — a derived one is refreshed instead of flagged. */}
-      {parentChanged && (
-        <span className="chip-st" style={{ color: "var(--red)" }}
-          title="The parent month's quantity changed after this week was set. This week was deliberately not refreshed.">
-          <i style={{ background: "var(--red)" }} aria-hidden="true"></i>parent month changed
-        </span>
-      )}
-    </span>
-  );
-}
 
 function IptPill({ ipt }){
   const k = iptKey(ipt);
@@ -4950,21 +5200,44 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
-function LineFlags({ flags }){
-  const codes = Array.from(new Set((flags || []).map(f => f.code)));
-  const label = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
+// the grid's short words for each flag (the rail spells some out longer: RAIL_LABEL)
+const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
-  const wordFor = (code) => { const f = (flags || []).find(x => x.code === code); return f ? flagWord(f, label) : (label[code] || code); };
-  return (
-    <span className="inline-flex flex-col gap-0.5 items-start">
-      {codes.map(c => (
-        <span key={c} className="chip-st whitespace-nowrap" style={{ color: c === "UNBAKED" ? "var(--brand-orange-text)" : "var(--red)" }}>
-          <i style={{ background: c === "UNBAKED" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>{wordFor(c)}
-        </span>
-      ))}
-    </span>
-  );
+// 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
+// before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
+// other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
+// StatusChip column: one status a row.)
+const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8 };
+const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
+const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
+// the rail's colours: NOT ROUTED and a road restriction in amber, every other flag red
+const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION") ? "warn" : "bad";
+// the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
+// the team's words (teamText, as the rail does)
+function laFlagGroups(flags){
+  const out = [];
+  laSorted(flags).forEach(f => {
+    let g = out.find(x => x.code === f.code);
+    if(!g){ g = { code: f.code, word: flagWord(f, LINE_FLAG_LABEL), tone: laTone(f.code), texts: [] }; out.push(g); }
+    const t = teamText(f.text || "") || "—";
+    if(!g.texts.includes(t)) g.texts.push(t);
+  });
+  return out;
 }
+function laStatus(flags, w){
+  const codes = Array.from(new Set(laSorted(flags).map(f => f.code)));
+  if(codes.length){
+    const f = (flags || []).find(x => x.code === codes[0]);
+    return { word: flagWord(f, LINE_FLAG_LABEL), tone: laTone(codes[0]), more: codes.length - 1 };
+  }
+  if(w && w.parent_changed) return { word: "MONTH CHANGED", tone: "bad", more: 0 };
+  const s = w && w.status;
+  return s === "confirmed" ? { word: "Confirmed", tone: "ok", more: 0 } : s === "edited" ? { word: "Edited", tone: "warn", more: 0 }
+    : { word: s === "derived" ? "Derived" : (s || "—"), tone: "none", more: 0 };
+}
+// the week's state in words, for the details (the old status column's titles)
+const laWeekWords = (s) => s === "confirmed" ? "Confirmed: reopen it to change the plan"
+  : s === "edited" ? "Edited, not confirmed yet" : s === "derived" ? "Derived from the month, not confirmed yet" : (s || "—");
 
 // ---- 10 Sep evening: the fuel-price widget — ONE component, THREE mounts --------------
 // Account (top of the strip), Commit (the KPI strip, right of t·km) and Config (under the
@@ -5136,7 +5409,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const [busy, setBusy] = useState("");
   const [editing, setEditing] = useState(null);   // 10 Oct: the one day cell that is an input (mockup 3)
   const [draft, setDraft] = useState({});                // key -> unsaved input
-  const [open, setOpen] = useState({});                  // line key -> expanded
+  const [laOpen, laToggle] = useRowOpen("lookahead");    // 13 Oct 2026 (W6): line key -> details open, for the session
+  const [unitSel, setUnitSel] = useUnits("lookahead");     // the grid's Loads | Tonnes | Lorries
   const [railOpen, setRailOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);   // the whole-week flag dialog
   const [flags, setFlags] = useState({ weather: "", wetness: "", traffic: "", other: "" });
@@ -5398,24 +5672,31 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             <EmptyState title={`No approved forecast line in the commit week (${spanLabel(cw.from, cw.to)}).`}
               body="Days exist only for Approved month lines. Approve a line for this month, or switch to next week." />
           ) : (
-            <div className="card overflow-hidden">
-              <div className="overflow-auto">
-                <table className="tbl compact" style={{ minWidth: `${520 + dates.length * 112}px` }}>
-                  <caption><b>Planned quantity by day</b><InfoTip id="la.commit" /></caption>
+            // 13 Oct 2026 (W6, bundle F): RowDetails. The row: the route's two ends (primary), the team and the material
+            // (chips), ONE status (the most serious flag, ROAD LIMIT first, else the week's state: decision 1), one figure a
+            // day in the unit the switch picks, the week. Typing a day's plan is in Tonnes only (decision 2). The old second
+            // line, the ▶ row's long string, every flag's sentence, the other units a day and every cell's hover title are
+            // in the details row.
+            <div className="card overflow-hidden" data-rd-card="lookahead">
+              <div className="rd-bar">
+                <UnitSwitch value={unitSel} onChange={setUnitSel} note={unitSel !== "tonnes" ? "Switch to Tonnes to type a day's plan." : null} />
+              </div>
+              <div className="overflow-auto rd-scroll">
+                <table className="tbl compact rd-table" data-rd-table="lookahead" style={{ minWidth: `${440 + dates.length * 96}px` }}>
+                  <caption><b>{unitSel === "loads" ? "Loads by day" : unitSel === "lorries" ? "Lorries needed by day" : "Planned quantity by day"}</b><InfoTip id="la.commit" /></caption>
                   <thead>
                     <tr>
-                      <th className="la-stick" style={{ minWidth: 330 }}>Route · {TEAM().toLowerCase()} · section</th>
-                      <th>Flags</th>
+                      <th className="la-stick" style={{ minWidth: 280 }}>Route</th>
+                      <th>Status</th>
                       {dates.map(iso => {
-                        const t = iso === today, we = isWeekend(iso);
+                        const t = iso === today;
                         return (
                           <th key={iso} className="num" style={t ? { background: "#eff6ff" } : {}}>
-                            <span className={we ? "text-slate-400" : (t ? "" : "")} style={t ? { color: "var(--navy)" } : {}}>{dayName(iso)} {dayNum(iso)}{t ? " · today" : ""}</span>
+                            <span style={t ? { color: "var(--navy)" } : {}}>{dayName(iso)} {dayNum(iso)}{t ? ", today" : ""}</span>
                           </th>
                         );
                       })}
                       <th className="num">Week</th>
-                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5426,89 +5707,107 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       const w = line.week || {};
                       const locked = w.status === "confirmed";
                       const wd = line.week_derived || {};
-                      const isOpen = !!open[lk];
+                      const st = laStatus(lf, w);
+                      const teamWord = iptKey(c.ipt) ? teamName(iptKey(c.ipt)) : `No ${TEAM().toLowerCase()}`;
+                      const veh = c.vehicle_short || vehLabel(c.vehicle_type) || "—";
+                      const own = line.unit && line.unit !== "t" ? ` ${unitLbl(line.unit)}` : "";
                       return (
-                        <React.Fragment key={lk}>
-                          <tr>
-                            <td className="la-stick" style={{ minWidth: 330 }}>
-                              <div className="flex items-center gap-1.5">
-                                <button onClick={() => setOpen(o => ({ ...o, [lk]: !o[lk] }))}
-                                  className="text-slate-400 hover:text-slate-700 text-xs w-4 shrink-0"
-                                  title={isOpen ? `Hide ${DU()}, ${TKM()}, cycle and ${CUR()}` : `Show ${DU()}, ${TKM()}, cycle and ${CUR()}`}>{isOpen ? "▼" : "▶"}</button>
-                                <div className="min-w-0 leading-tight">
-                                  <div className="font-medium text-[color:var(--navy-deep)] whitespace-nowrap">
-                                    {c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}
-                                  </div>
-                                  <div className="text-[13px] text-slate-500 whitespace-nowrap">{line.route_id} · {iptKey(c.ipt) ? teamName(iptKey(c.ipt)) : `no ${TEAM().toLowerCase()}`}{c.section_id ? ` · ${c.section_id}` : ""} · {c.material_type || "—"} · <span title={c.vehicle_type}>{c.vehicle_short || vehLabel(c.vehicle_type) || "—"}</span>{line.days_ne_week ? <span style={{ color: "var(--red)" }}> · days sum {grp(line.days_sum, 1)} ≠ week</span> : null}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td><LineFlags flags={lf} /></td>
+                        <RowDetails key={lk} rowKey={"la-" + lk} isOpen={laOpen(lk)} onToggle={() => laToggle(lk)} colSpan={3 + dates.length}
+                          label={`Details for ${line.route_id}${line.discipline ? ", " + line.discipline : ""}`}
+                          firstClass="la-stick" firstStyle={{ minWidth: 280 }}
+                          rowProps={{ "data-la-line": lk }}
+                          summary={<>{c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}</>}
+                          chips={[teamWord, c.material_type || null]}
+                          cells={<>
+                            <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
                             {weekdaysOf(line).map(d => {
                               const k = `${lk}|${d.day_date}|p`;
-                              const t = d.day_date === today, we = isWeekend(d.day_date);
+                              const t = d.day_date === today;
                               const f = d.derived || {};
+                              const typed = d.status === "edited" && <span className="ml-1 text-amber-700" role="img" aria-label="typed by hand">✎</span>;
                               return (
-                                <td key={d.day_date} className="num" style={t ? { background: "#eff6ff" } : {}}>
+                                <td key={d.day_date} className="num" data-label={`${dayName(d.day_date)} ${dayNum(d.day_date)}`} style={t ? { background: "#eff6ff" } : {}}>
                                   {/* ⭐ Editable while the week is not confirmed — this week or next,
                                       whichever bucket is open. A confirmed week's plan is read-only
                                       (L6); re-open it to change it. 10 Oct: the cell reads as a figure
                                       and becomes an input when clicked (mockup 3), so the grid reads
-                                      as a table until someone types. */}
-                                  {!locked && editing === k ? (
+                                      as a table until someone types. 13 Oct (W6): in Tonnes only. */}
+                                  {unitSel === "loads" ? <span className="tabular-nums">{grp(f.trips)}</span>
+                                   : unitSel === "lorries" ? (c.baked ? <span className="tabular-nums">{grp(f.vehicles)}</span> : <span className="text-amber-700">—</span>)
+                                   : !locked && editing === k ? (
                                     <input autoFocus className={fld + " font-semibold"} inputMode="decimal"
+                                      aria-label={`${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}
                                       value={draft[k] ?? (d.planned_qty ?? "")}
                                       onChange={e => setDraft(x => ({ ...x, [k]: e.target.value }))}
                                       onKeyDown={e => { if(e.key === "Enter" || e.key === "Escape") e.currentTarget.blur(); }}
                                       onBlur={() => { saveDay(line, d); setEditing(null); }} />
                                   ) : !locked ? (
-                                    <button type="button" className={"la-cell" + (we && !(draft[k] ?? d.planned_qty) ? " text-slate-300" : "")} onClick={() => setEditing(k)}
-                                      title={`Click to type ${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}>{grp(draft[k] ?? d.planned_qty, 1)}</button>
+                                    <button type="button" className="la-cell" onClick={() => setEditing(k)}
+                                      aria-label={`${dayName(d.day_date)}'s plan, ${grp(draft[k] ?? d.planned_qty, 1)} ${unitLbl(line.unit)}: click to type`}>{grp(draft[k] ?? d.planned_qty, 1)}{own}</button>
                                   ) : (
-                                    <span className={"tabular-nums " + (we ? "text-slate-300" : "font-semibold text-slate-700")}
-                                      title="Confirmed — reopen it to change the plan">{grp(d.planned_qty, 1)}</span>
+                                    <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty, 1)}{own}</span>
                                   )}
-                                  <div className="text-[13px] text-slate-500 tabular-nums whitespace-nowrap leading-tight">
-                                    {we && !(+d.planned_qty) ? "" : c.baked
-                                      ? `${grp(f.trips)} tr · ${grp(f.vehicles)} veh`
-                                      : <span title="Vehicles need this line's route worked out for its vehicle">{grp(f.trips)} tr · <span className="text-amber-700">veh —</span></span>}
-                                    {d.status === "edited" && <span className="ml-1 text-amber-700" title="typed — this day no longer follows the week ÷ 5">✎</span>}
-                                  </div>
+                                  {typed}
                                 </td>
                               );
                             })}
-                            <td className="num font-semibold" title={`${grp(w.planned_qty, 1)} ${unitLbl(line.unit)} planned this week on this line`}>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></td>
-                            <td><StatusChip s={w.status} parentChanged={w.parent_changed} /></td>
-                          </tr>
-                          {isOpen && (
-                            <tr className="bg-slate-50">
-                              <td colSpan={4 + dates.length} className="px-3 py-1.5 text-[13px] text-slate-600 tabular-nums" style={{ height: "auto", whiteSpace: "normal" }}>
-                                {c.baked ? (
-                                  <>
-                                    {grp(dist(c.km_trip))} {DU()}/trip{c.return_baked ? "" : " (outbound only — return not routed yet)"} · {grp(dist(wd.km))} {DU()}/week
-                                    · {grp(wd.vehicles_peak)} veh peak · {grp(dist(wd.tonne_km))} {TKM()} ({c.km_basis === "loaded" ? "loaded leg" : "round trip"})
-                                    · cycle {grp(c.cycle_min)} min {c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"}
-                                    · {c.cycles_per_vehicle_day} cycles/veh/day · {wd.eur == null ? "rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? ` (per-${DU()} term missing)` : ""} this week${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}`}{wd.fair_eur != null && c.fair && <span title={`fair (model): ${grp(c.fair.litres_trip, 1)} L / trip at ${CUR()}${c.fair.index_eur_per_l} · fuel ${grp(c.fair.fuel_share_pct)} % of cost${c.fair.flags.length ? " · " + c.fair.flags.join(", ") : ""}`}> · <span className="text-[color:var(--navy)] font-semibold">fair {CUR()} {grp(wd.fair_eur)}</span> (model{c.fair.flags.includes("WINTER") ? ", winter" : ""}{c.fair.flags.includes("THAW") ? ", thaw restrictions may apply" : ""}){wd.fair_units && wd.fair_units.per_t != null ? ` = ${unitTriple(wd.fair_units)}` : ""}</span>}{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null && <span className="text-slate-500"> · {c.rate_source === "target" ? "target" : "quote"} = {unitTriple(wd.eur_units)}</span>}
-                                  </>
-                                ) : (
-                                  <span className="text-amber-700">{DU()} — until the route is worked out · trips still from {grp(c.payload_t, 1)} t planning payload{c.payload_fallback ? ` (${c.payload_fallback} fallback)` : ""}{wd.eur != null ? ` · ${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? " (target rate)" : ""}${wd.eur_partial ? ` without the per-${DU()} term` : ""}${wd.eur_adj != null ? ` · + BAF ${CUR()} ${grp(wd.eur_adj)}` : ""}` : ""}</span>
-                                )}
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
+                            <td className="num font-semibold" data-label="Week">
+                              {unitSel === "loads" ? grp(wd.trips)
+                               : unitSel === "lorries" ? (c.baked && wd.vehicles_peak != null ? grp(wd.vehicles_peak) : "—")
+                               : <>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></>}
+                            </td>
+                          </>}>
+                          <RdItem t="Route">{line.route_id}</RdItem>
+                          <RdItem t={TEAM()}>{teamWord}</RdItem>
+                          <RdItem t="Discipline">{line.discipline || null}</RdItem>
+                          <RdItem t="Section">{c.section_id || "None set"}</RdItem>
+                          <RdItem t="Material">{c.material_type || "—"}</RdItem>
+                          <RdItem t="Vehicle">{veh}</RdItem>
+                          <RdItem t="Vehicle, full name">{c.vehicle_type && c.vehicle_type !== veh ? c.vehicle_type : null}</RdItem>
+                          <RdItem t="This week">{laWeekWords(w.status)}</RdItem>
+                          <RdItem t="Parent month changed" wide bad>{w.parent_changed ? "The parent month's quantity changed after this week was set. This week was deliberately not refreshed." : null}</RdItem>
+                          <RdItem t="Days and week disagree" wide bad>{line.days_ne_week ? `The days add up to ${grp(line.days_sum, 1)} ${unitLbl(line.unit)}, not the week's ${grp(w.planned_qty, 1)}.` : null}</RdItem>
+                          {laFlagGroups(lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === "bad"}>{g.texts.map((x, i) => <div key={i}>{x}</div>)}</RdItem>)}
+                          <RdItem t="By day" wide>
+                            <table className="rd-days">
+                              <thead><tr><th scope="col">Day</th><th scope="col">Plan ({unitLbl(line.unit)})</th><th scope="col">Tonnes</th><th scope="col">Loads</th><th scope="col">Lorries</th><th scope="col"><span className="sr-only">Typed</span></th></tr></thead>
+                              <tbody>{weekdaysOf(line).map(d => { const f = d.derived || {}; return (
+                                <tr key={d.day_date}><td>{dayName(d.day_date)} {dayNum(d.day_date)}</td><td>{grp(d.planned_qty, 1)}</td>
+                                  <td>{f.tonnes != null ? grp(f.tonnes, 1) : "—"}</td><td>{grp(f.trips)}</td><td>{c.baked ? grp(f.vehicles) : "—"}</td>
+                                  <td>{d.status === "edited" ? "typed by hand" : ""}</td></tr>); })}</tbody>
+                            </table>
+                          </RdItem>
+                          <RdItem t="Week">{`${grp(w.planned_qty, 1)} ${unitLbl(line.unit)}`}</RdItem>
+                          <RdItem t="Week, tonnes">{wd.tonnes != null ? grp(wd.tonnes, 1) : null}</RdItem>
+                          <RdItem t="Week, loads">{wd.trips != null ? grp(wd.trips) : null}</RdItem>
+                          <RdItem t="Week, peak lorries">{c.baked ? grp(wd.vehicles_peak) : "Needs this line's route worked out for its vehicle"}</RdItem>
+                          {c.baked ? <>
+                            <RdItem t={`${DU()} a trip`}>{`${grp(dist(c.km_trip))}${c.return_baked ? "" : ", outbound only: the return is not routed yet"}`}</RdItem>
+                            <RdItem t={`${DU()} this week`}>{grp(dist(wd.km))}</RdItem>
+                            <RdItem t={TKM()}>{`${grp(dist(wd.tonne_km))}, ${c.km_basis === "loaded" ? "loaded leg" : "round trip"}`}</RdItem>
+                            <RdItem t="Cycle">{`${grp(c.cycle_min)} min, ${c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"}`}</RdItem>
+                            <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) : null}</RdItem>
+                          </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${c.payload_fallback} fallback)` : ""}.`}</RdItem>}
+                          <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
+                          <RdItem t={c.rate_source === "target" ? "Target, per unit" : "Quote, per unit"}>{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null ? unitList(wd.eur_units) : null}</RdItem>
+                          <RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()} ${grp(wd.eur_adj)}` : null}</RdItem>
+                          <RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()} ${grp(wd.fair_eur)}${fairWords(c.fair.flags) ? ", " + fairWords(c.fair.flags) : ""}` : null}</RdItem>
+                          <RdItem t="Fair, per unit">{wd.fair_eur != null && wd.fair_units && wd.fair_units.per_t != null ? unitList(wd.fair_units) : null}</RdItem>
+                          <RdItem t="Fuel" wide>{wd.fair_eur != null && c.fair ? `${grp(c.fair.litres_trip, 1)} L a trip at ${CUR()}${c.fair.index_eur_per_l} a litre, fuel ${grp(c.fair.fuel_share_pct)} % of the cost` : null}</RdItem>
+                        </RowDetails>
                       );
                     })}
-                    <tr className="la-total">
-                      <td className="la-stick">{lines.length} line{lines.length === 1 ? "" : "s"}</td>
+                    <tr className="la-total rd-card">
+                      <td className="la-stick" data-label="Total">{lines.length} line{lines.length === 1 ? "" : "s"}</td>
                       <td></td>
                       {dates.map(iso => {
-                        let tt = 0, tr = 0;
-                        lines.forEach(l => (l.days || []).forEach(d => { if(d.day_date === iso){ tt += (d.derived || {}).tonnes || 0; tr += (d.derived || {}).trips || 0; } }));
-                        return <td key={iso} className="num" style={iso === today ? { background: "#eff6ff" } : {}}>{grp(tt)} t<div className="text-[13px] text-slate-500 font-normal leading-tight">{grp(tr)} tr</div></td>;
+                        let tt = 0, tr = 0, vv = 0;
+                        lines.forEach(l => (l.days || []).forEach(d => { if(d.day_date === iso){ const f = d.derived || {}; tt += f.tonnes || 0; tr += f.trips || 0; vv += f.vehicles || 0; } }));
+                        return <td key={iso} className="num" data-label={`${dayName(iso)} ${dayNum(iso)}`} style={iso === today ? { background: "#eff6ff" } : {}}>{unitSel === "loads" ? grp(tr) : unitSel === "lorries" ? grp(vv) : `${grp(tt)} t`}</td>;
                       })}
-                      <td className="num">{grp(totals.planned_t)} t</td>
-                      <td></td>
+                      <td className="num" data-label="Week">{unitSel === "loads" ? grp(lines.reduce((x, l) => x + ((l.week_derived || {}).trips || 0), 0))
+                        : unitSel === "lorries" ? grp(Math.max(0, ...dates.map(iso => lines.reduce((x, l) => x + (((l.days || []).find(d => d.day_date === iso) || {}).derived || {}).vehicles || 0, 0))))
+                        : `${grp(totals.planned_t)} t`}</td>
                     </tr>
                   </tbody>
                 </table>

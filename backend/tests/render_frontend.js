@@ -93,7 +93,8 @@ try {
 const isoDow = (iso) => new Date(iso + "T00:00:00Z").getUTCDay();
 const weekdayInWeek = (fx) => !!(fx && fx.today && fx.commit_week && fx.commit_week.from <= fx.today
   && fx.today <= fx.commit_week.to && isoDow(fx.today) >= 1 && isoDow(fx.today) <= 5);
-const TODAY_HEADER = /(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+ · today/;
+// 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
+const TODAY_HEADER = /(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+, today/;
 
 // ---- the fixture ---------------------------------------------------------------
 // Deliberately minimal and deliberately EMPTY of routes: a first-boot database is the
@@ -340,7 +341,8 @@ if (loaded) {
       dOut.includes("€" + (+cl.costing.index_eur_per_l).toFixed(3) + "/L") && dOut.includes("All Teams") && dOut.includes("All disciplines"));
     // 13 Oct 2026 (W3, narrowed): "not baked" reads "not routed"
     ok("...the route table prints planned € with a 'target' chip, fair € and fair €/t, and 'not routed' on the unbaked route",
-      dOut.includes(">target<") && dOut.includes("Fair € (model)") && dOut.includes(">not routed<") && !dOut.includes("not baked") && dOut.includes("Cost over time"));
+      // 13 Oct 2026 (W6, narrowed): "not routed" is the unrouted line's status word, "Not routed"
+      dOut.includes(">target<") && dOut.includes("Fair € (model)") && dOut.includes(">Not routed<") && !dOut.includes("not baked") && dOut.includes("Cost over time"));
     ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(dOut));
     // 11 Sep pm: the four groups, the Delivered figures from the fixture's reported line, every Fig with a title
     ok("...the Delivered-to-date group prints the server's actual tonnes and % of plan (a reported line is in the fixture)",
@@ -378,7 +380,8 @@ if (loaded) {
       ok(`...today (${wk.today}) lists ${todayRows.length} lines with the SERVER's day tonnes and trips summed (${tT} t, ${tTrips} trips)`,
         todayRows.length > 0 && wOut.includes(">tonnes<") && wOut.includes("day actuals typed today") && wOut.includes(">" + tT.toLocaleString("en-US").replace(/,/g, " ") + "<")
         && wOut.includes(">" + tTrips.toLocaleString("en-US").replace(/,/g, " ") + "<")
-        && todayRows.every(x => wOut.includes(">" + x.l.route_id + "</span>")));
+        // 13 Oct 2026 (W6, narrowed): the route id is a details line under each Today row
+        && todayRows.every(x => wOut.includes("<dt>Route</dt><dd>" + x.l.route_id + "</dd>")));
       ok("...this week to date and last week's account are printed with their bars",
         wOut.includes("This week to date") && wOut.includes("Last week") && (wOut.match(/h-2 rounded-full bg-slate-100/g) || []).length === 2
         && wOut.includes(`${wk.account.reported} of ${wk.account.lines} lines reported`));
@@ -407,10 +410,13 @@ if (loaded) {
     const fOut = render("the Forecasts page renders POPULATED with the cost column (initialRows + initialCost)",
       h(Forecasts, { meta: dMeta, who: "t", access: planner, onEdit(){}, onChanged(){}, initialRows: rowsFix, initialCost: cl }));
     const nLines = new Set(cl.lines.map(l => `${l.route_id}|${l.discipline}|${l.section_id}`)).size;
+    // 13 Oct 2026 (W6, narrowed): the cost cell is two columns, Planned and Fair; the fair figure's reason for "—" and its
+    // per-unit split are in the row's details
     ok("...one Cost cell per line, each with a planned figure (or 'rate not set') and a fair figure (or 'fair —')",
-      (fOut.match(/data-cost-cell="1"/g) || []).length === nLines && (fOut.match(/fair € /g) || []).length >= 1 && fOut.includes("fair —")
+      (fOut.match(/data-cost-cell="1"/g) || []).length === nLines && (fOut.match(/<dt>Fair € \(model\)<\/dt><dd>€ /g) || []).length >= 1
+      && /<dt>Fair € \(model\)<\/dt><dd>(Not routed yet for this vehicle, so no distance and no fair price|No diesel index)<\/dd>/.test(fOut)
       && (fOut.match(/>target<\/span>/g) || []).length >= 1);
-    ok("...and the fair figure carries €/t beside it", /fair € [\d ]+<span class="text-slate-400"> · [\d.]+\/t<\/span>/.test(fOut));
+    ok("...and the fair figure carries €/t beside it", /<dt>Fair, per unit<\/dt><dd>€ [\d.]+\/t, /.test(fOut));
     ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(fOut));
   }
 
@@ -533,21 +539,30 @@ if (loaded) {
         GA.gates.length === 3 && red.length === 1 && untyped.length === 1 && GA.gates.every(g => gP.includes(`data-ga-gate="${g.gate_id}"`) && gP.includes(`data-ga-flag="${g.flag || "none"}"`))
         && gOut.includes('data-gate-arrivals="set"') && gP.includes('>Gate arrivals<button type="button" class="ibtn" aria-label="About: Gate arrivals"'));   // 13 Oct 2026 (W3, narrowed): + its info box
       ok("🔴 the red gate reads 'Queue likely' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
+        // 13 Oct 2026 (W6, narrowed): the chip is RowStatus; red is its "bad" tone, once
         (gP.match(/>Queue likely</g) || []).length === 1 && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
-        && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gP.match(/background:var\(--red\)/g) || []).length === 1);
+        && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gP.match(/data-row-status="bad"/g) || []).length === 1
+        && (gP.match(/data-row-status="none"/g) || []).length === 2 && !gP.includes('data-row-status="ok"'));
       ok("⭐ every figure is the server's, formatted to 1 dp, with the gap in the contract's words; the check-in is a word, never a bare 0",
-        GA.gates.every(g => gP.includes(`>${g.arrivals_per_day.toFixed(1)}<`) && (g.gap_minutes == null || gP.includes(`one every ${g.gap_minutes.toFixed(1)} min if arrivals are spread evenly`)))
+        // 13 Oct 2026 (W6, narrowed): the gap cell is "2.6 min", the sentence and the laden / coming-to-load split are details lines
+        GA.gates.every(g => gP.includes(`>${g.arrivals_per_day.toFixed(1)}<`) && (g.gap_minutes == null || (gP.includes(`One every ${g.gap_minutes.toFixed(1)} min if arrivals are spread evenly.`) && gP.includes(`>${g.gap_minutes.toFixed(1)} min<`))))
         && gP.includes(">not typed<") && gP.includes(">2 min a lorry<") && gP.includes(">3 min a lorry<") && !gP.includes(">0 min a lorry<")
-        && gP.includes("0.0 laden · 252.3 coming to load") && gP.includes("227.3 laden · 4.5 coming to load") && !/undefined|NaN/.test(gP));
+        && gP.includes("<dt>Laden a day</dt><dd>0.0</dd></div><div class=\"rd-i\"><dt>Coming to load a day</dt><dd>252.3</dd>")
+        && gP.includes("<dt>Laden a day</dt><dd>227.3</dd></div><div class=\"rd-i\"><dt>Coming to load a day</dt><dd>4.5</dd>") && !/undefined|NaN/.test(gP));
       ok("the origin gate carries the share note and the pending gates their pending line; the compound carries neither",
         gP.includes("West pit serves other customers too; Wayscope sees only this scheme&#x27;s share of this gate&#x27;s traffic.")
         && (gP.match(/serves other customers too/g) || []).length === 1
         && (gP.match(/>1 pending line would add 5\.0 a day here once approved\.</g) || []).length === 2
-        && (gP.match(/<tr class="ga-notes">/g) || []).length === 2);
+        // 13 Oct 2026 (W6, narrowed): the two note rows became details lines (three notes on two gates, as before)
+        && (gP.match(/<dt>Waiting for approval<\/dt>/g) || []).length === 2 && (gP.match(/<dt>Not all of this gate&#x27;s traffic<\/dt>/g) || []).length === 1);
       ok("⭐ team NAMES, every team at the gate, the planner's per-team split (Team 1 161.4 / Team 2 90.9)",
-        gP.includes(">Team 1 · Team 2<") && gP.includes(">Team 1<") && gP.includes(">Team 1 161.4<") && gP.includes(">Team 2 90.9<") && gP.includes(">Team 1 140.9<")
+        // 13 Oct 2026 (W6, narrowed): the teams are chips and a details line; each team's figure its own details line
+        gP.includes(">Team 1, Team 2<") && gP.includes('<span class="rd-chip">Team 1</span>') && gP.includes("<dt>Team 1, a day</dt><dd>161.4</dd>")
+        && gP.includes("<dt>Team 2, a day</dt><dd>90.9</dd>") && gP.includes("<dt>Team 1, a day</dt><dd>140.9</dd>")
         // the gate id is the row's data attribute for these harnesses and nothing else: stripped, no id, location id, route id or scope is left on the page
-        && !/IPT ?[1-6]/.test(gP) && !/G00[1-9]|\bL[1-9]\b|\bR[1-9]\b|scheme</.test(gP.replace(/data-ga-gate="G00\d"/g, "")));
+        // 13 Oct 2026 (W6, narrowed): RowDetails keys its details row by the gate id too (id / aria-controls / data-rd*,
+        // attributes nobody reads on screen); those are stripped with the data attribute
+        && !/IPT ?[1-6]/.test(gP) && !/G00[1-9]|\bL[1-9]\b|\bR[1-9]\b|scheme</.test(gP.replace(/data-ga-gate="G00\d"|(?:id|aria-controls|data-rd|data-rd-details)="(?:rd-)?ga-G00\d"/g, "")));
       ok("the month's words under the header, and the two notes under the table, in the server's words",
         // NARROWED 11 Oct 2026 (review): "every teams" was ungrammatical — "all teams together"
         gP.includes("Sep 2026: lorries a day at each gate, all teams together, if arrivals are spread evenly across the 10 h shift.") && !gP.includes("every teams")
@@ -556,8 +571,9 @@ if (loaded) {
       const tOut = render("the Dashboard renders a team code's gate arrivals (per_team already stripped by the server)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAT, onOpen(){} }));
       const tP = gaSeg(tOut);
       ok("🔴 a team code's page shows the totals and both names but never the other team's figure",
-        tP.includes(">252.3<") && tP.includes(">231.8<") && tP.includes(">Team 1 · Team 2<") && !tP.includes("161.4") && !tP.includes("140.9")
-        && (tP.match(/>Team 2 90\.9</g) || []).length === 2 && !/>Team 1 \d/.test(tP) && !/undefined|NaN/.test(tP));
+        // 13 Oct 2026 (W6, narrowed): the same, in the details lines
+        tP.includes(">252.3<") && tP.includes(">231.8<") && tP.includes(">Team 1, Team 2<") && !tP.includes("161.4") && !tP.includes("140.9")
+        && (tP.match(/<dt>Team 2, a day<\/dt><dd>90\.9</g) || []).length === 2 && !tP.includes("<dt>Team 1, a day") && !/undefined|NaN/.test(tP));
       const eOut = render("the Dashboard renders an EMPTY month of gate arrivals", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: { ...GA, month: 11, label: "Nov 2026", gates: [], notes: ["No approved lines in Nov 2026.", GA.notes[GA.notes.length - 1]] }, onOpen(){} }));
       const eP = gaSeg(eOut);
       ok("the empty state names the month and keeps the averages note; no table",
@@ -570,7 +586,8 @@ if (loaded) {
       const pOut = render("the Dashboard renders a pending-only gate", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: { ...GA, gates: [pOnly] }, onOpen(){} }));
       const pP = gaSeg(pOut);
       ok("🔴 a pending-only gate reads 'No approved arrivals' as the chip's word and 'no approved arrivals' as its gap; never 'Spacing holds' or 'one every —'",
-        (pP.match(/>No approved arrivals</g) || []).length === 1 && pP.includes(">no approved arrivals<") && !pP.includes("Spacing holds") && !pP.includes("one every")
+        // 13 Oct 2026 (W6, narrowed): the gap cell reads "none", the details "No approved arrivals."
+        (pP.match(/>No approved arrivals</g) || []).length === 1 && pP.includes(">none<") && pP.includes(">No approved arrivals.<") && !pP.includes("Spacing holds") && !/one every/i.test(pP)
         && !pP.includes("—") && pP.includes('data-ga-flag="none"') && pP.includes(">1 pending line would add 5.0 a day here once approved.<") && !/undefined|NaN/.test(pP));
       const selP = seg(gP, '<select class="ga-sel"', "</select>");
       ok("the month select shows the fixture's month in the Dashboard's words (Sep 26), 24 months of the horizon",
@@ -583,7 +600,8 @@ if (loaded) {
       const uOut = render("the Dashboard renders a gate carrying a field outside the contract", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT,
         initialGates: { ...GA, gates: GA.gates.map((g, i) => i === 1 ? { ...g, unbaked_note: "One route here is not baked yet." } : g) }, onOpen(){} }));
       ok("a field outside the contract is ignored: the same two note rows, nothing of it on the page",
-        (gaSeg(uOut).match(/<tr class="ga-notes">/g) || []).length === 2 && !gaSeg(uOut).includes("not baked yet") && !gP.includes("unbaked"));
+        // 13 Oct 2026 (W6, narrowed): the note rows are details lines
+        (gaSeg(uOut).match(/<dt>Waiting for approval<\/dt>/g) || []).length === 2 && !gaSeg(uOut).includes("not baked yet") && !gP.includes("unbaked"));
       ok("🔴 without initialGates the panel renders nothing (the Dashboard's other render tests keep their shape); the footnote still names the read",
         // 13 Oct 2026 (W3, narrowed): the footnote no longer names the read (the technical guide does; parse_frontend pins it)
         !dSet.includes("data-gate-arrivals") && !dSet.includes("About: Gate arrivals") && !dNone.includes("data-gate-arrivals") && !dNone.includes("ga-table")
@@ -714,12 +732,13 @@ if (loaded) {
     const commitOut = render("the Commit view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "commit" }));
     ok("...with the KPI strip, the clash rail and one row per line",
+      // 13 Oct 2026 (W6, narrowed): one RowDetails chevron a line, not a ▶
       commitOut.includes("planned this week") && commitOut.includes("+" + (fixture.clashes.count - 3) + " more")
-      && (commitOut.match(/▶/g) || []).length === fixture.commit.lines.length);
+      && (commitOut.match(/class="rd-chev"/g) || []).length === fixture.commit.lines.length);
     // 10 Oct 2026 NARROWED: the 9 px "qty · tr · veh" sub-label went with the one-off styles; the five
     // day columns are counted by their headers (a day name and number), and the caption says the rest
     ok("...the day headers name today, and there are exactly five day columns — Mon–Fri only (10 Sep)",
-      commitOut.includes("· today") && !commitOut.includes("0 default")
+      commitOut.includes(", today") && !commitOut.includes("0 default")   // 13 Oct 2026 (W6, narrowed): ", today"
       && (commitOut.match(/<th class="num"[^>]*><span[^>]*>(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+/g) || []).length === 5
       && commitOut.includes("Planned quantity by day"));
     // 2026-10-11: the weekend, rendered on purpose: the same page with the server's today on the week's
@@ -729,9 +748,12 @@ if (loaded) {
     ok("...on a weekend no day header says today, and there are still exactly five day columns (Mon–Fri) and one row per line",
       isoDow((fixture.commit_week || {}).to) === 0 && TODAY_HEADER.test(commitOut) && !TODAY_HEADER.test(sunOut)
       && (sunOut.match(/<th class="num"[^>]*><span[^>]*>(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+/g) || []).length === 5
-      && (sunOut.match(/▶/g) || []).length === fixture.commit.lines.length && !/undefined|NaN/.test(sunOut));
+      && (sunOut.match(/class="rd-chev"/g) || []).length === fixture.commit.lines.length && !/undefined|NaN/.test(sunOut));   // 13 Oct 2026 (W6, narrowed)
+    // 13 Oct 2026 (W6, narrowed): a cell shows ONE unit (the switch); every weekday's trips and vehicles are in the
+    // line's by-day table in the details: five rows a line, each with a loads and a lorries figure
     ok("...every weekday cell carries trips and vehicles (baked fixture)",
-      (commitOut.match(/ tr · /g) || []).length >= fixture.commit.lines.length * 5);
+      (commitOut.match(/<table class="rd-days">/g) || []).length === fixture.commit.lines.length
+      && (commitOut.match(/<tr><td>(Mon|Tue|Wed|Thu|Fri) \d+<\/td><td>[\d .]+<\/td><td>[\d .]+<\/td><td>\d[\d ]*<\/td><td>\d[\d ]*<\/td>/g) || []).length >= fixture.commit.lines.length * 5);
     ok("...no stock card on Commit any more (10 Sep) — and no map either under the render harness (initialPage)",
       !commitOut.includes("Stock held") && !commitOut.includes("This week's movements"));
     ok("...Export XLSX and the green Confirm week are in the bar",
