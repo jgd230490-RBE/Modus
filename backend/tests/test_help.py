@@ -279,7 +279,8 @@ ok("the Dashboard: the six cards by name, More filters, the four charts, the fol
    all(s in src for s in ("Material in view", "Deliveries a day", "Vehicles needed", "Planned this week",
                            "Delivered against plan", "Transport carbon", "More filters ▾", "Cost over time",
                            "This week and today, with the Look-ahead's map", "Route planning detail",
-                           "<strong>Big screen</strong>", "#dashboard/1", "tCO2e target, all-in", "All four", "Rotate", "One section")))
+                           # 14 Oct 2026 (narrowed): "All four" became "All sections" (a fifth section, More charts)
+                           "<strong>Big screen</strong>", "#dashboard/1", "tCO2e target, all-in", "All sections", "Rotate", "One section")))
 ok("🔴 ...the retired tiles are gone (Total trips, Intensity, Peak month as tiles)",
    "The six tiles read" not in text and "<strong>Intensity</strong>" not in src and "<strong>Total trips</strong>" not in src)
 

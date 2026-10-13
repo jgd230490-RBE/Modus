@@ -1276,10 +1276,12 @@ ok("...a hashchange (a second link from the guide into the same tab) moves the p
 ok("0915: four sections, named, in the page's own order",
    /const DASH_SECTIONS = \[/.test(src)
    && ["today", "kpis", "charts", "stock"].every(k => new RegExp(`key: "${k}"`).test(src))
-   && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
-ok("0915: every one of the four is wrapped, and each wraps a DIFFERENT index",
-   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4
-   && [0, 1, 2, 3].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
+   && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4
+   // 14 Oct 2026 (narrowed): a FIFTH, More charts, added LAST so #dashboard/1 … /4 keep their screens
+   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n\];/.test(src));
+ok("0915: every one of the five (14 Oct: was four) is wrapped, and each wraps a DIFFERENT index",
+   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
+   && [0, 1, 2, 3, 4].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
 ok("0915: 🔴 a hidden section is HIDDEN, not unmounted — the Mapbox instance survives",
    // the wrapper renders its children unconditionally and toggles `hidden`
    // (13 Oct 2026, W5: narrowed — the wrapper no longer needs a ref, it fires nothing)
@@ -1920,7 +1922,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("Dashboard: the working view is six cards, four charts, and five collapsed sections; the big screen keeps its four WallSections",
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
-    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8);
+    // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
+    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
+    && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
   ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
     ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
     && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
@@ -2171,7 +2175,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && _tg.includes("all teams summed at the gate a lorry arrives by") && src.includes("the gap is the shift's minutes ÷ arrivals, an average with no peak hour")
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
-    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4
+    // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
+    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
 }
 
@@ -2624,6 +2629,53 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
      !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
      && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)/g) || []).length);
+}
+
+// ---- 14 Oct 2026: the big screen fills the screen in EVERY section (the user: "the screen still don't fill up on
+// rotate"; measured on the branch at 1920 × 1080: Today 67 %, Figures 38 %, Stockpiles 37 %, Charts 98 %). TV-dashboard
+// practice (Datadog TV mode, Grafana kiosk, Geckoboard, Microsoft's TV guidance): fit without scrolling, hide the
+// chrome, split a crowded screen, nothing that needs a hover, a clock. Browser-measured afterwards: 96–99 % at
+// 1366 × 768, 1920 × 1080 and 3840 × 2160, nothing cut off (notes/session-1014-big-screen.md).
+{
+  const _db = (src.match(/function Dashboard\(\{[\s\S]*?\n\}\n/) || [""])[0];
+  const _td = (src.match(/function DashboardToday\([\s\S]*?\n\}\n/) || [""])[0];
+  const _sc = (src.match(/function DashboardStockChart\([\s\S]*?\n\}\n/) || [""])[0];
+  const _pf = (src.match(/function Portal\([\s\S]*?\n\}\n/) || [""])[0];
+  ok("BIG SCREEN: Rotate and One section fill (dash-fill) whatever the section; the shown section takes the height left",
+     _db.includes('const fill = wall && wallLayout !== "all";') && _db.includes('(fill ? " dash-fill" : "")')
+     && /\.dash-wall\.dash-fill>\[data-wall-section\]:not\(\[hidden\]\)\{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;\}/.test(html)
+     && /\.dash-wall\.dash-fill>\[data-wall-section\]>\*\{flex:1 1 auto;min-height:0;\}/.test(html));
+  ok("BIG SCREEN: the TV type scale is from the screen height (figures ~6 % and width-capped, labels ~1.8 %, never under 13 px); chart text = height ÷ 74",
+     /\.dash-wall\.dash-fill \.fig-val\{font-size:clamp\(2rem,min\(6\.4vh,3\.3vw\),8rem\);/.test(html)
+     && /\.dash-wall\.dash-fill \.fig-label\{font-size:clamp\(13px,1\.8vh,30px\);/.test(html)
+     && _db.includes("const tf = { size: wall ? Math.max(13, Math.min(30, Math.round(winH / 74))) : 11 };")
+     && _db.includes("const named = { seriesLabels: { on: true, size: tf.size } };"));
+  ok("BIG SCREEN: Figures is a 2 × 2 grid of tiles; a tile with five figures takes three columns so none is cut off",
+     _db.includes('<div className={fill ? "wall-figs" : "grid md:grid-cols-2 xl:grid-cols-4 gap-3"} data-wall-figures="1">')
+     && /\.dash-wall\.dash-fill \.wall-figs\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);grid-auto-rows:minmax\(0,1fr\);/.test(html)
+     && /\.wall-figs>\.card>\.grid:has\(>:nth-child\(5\)\)\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);\}/.test(html));
+  ok("BIG SCREEN: Today's figures go 2 × 2, its lines take the rest of the card (never a scrollbar on a TV), the map the whole right column",
+     _td.includes('(fill ? " today-figs" : " xl:grid-cols-4")') && _td.includes("today-lines") && _td.includes('lg:col-span-3 today-map')
+     && _td.includes("flush fill={fill} />") && /\.dash-wall\.dash-fill \.today-lines\{max-height:none !important;overflow:hidden;\}/.test(html)
+     && src.includes('<div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />'));
+  ok("BIG SCREEN: the stockpile chart takes its card, and each bar names its fill in words (no hover on a TV)",
+     _sc.includes('(fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} height={Math.max(wall ? 220 : 160, 36 * bars.length + 40)} />)')
+     && _sc.includes('(b.over ? " · over capacity" : b.pct >= 90 ? " · nearly full" : "")') && _sc.includes("plugins: [capLine, barLabels] };")
+     && /\.chart-box\.is-fill\{height:100%;min-height:0;\}/.test(html));
+  ok("BIG SCREEN: eight charts no longer share one screen — Charts has the four a planner reads first, More charts (5th, added last) the other four, each 2 × 2",
+     (_db.match(/<div className="wall-charts">/g) || []).length === 2 && /\{ key: "more",   title: "More charts" \}/.test(src)
+     && /@media \(min-width:1024px\)\{\.wall-charts\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);\}\}/.test(html)
+     && _db.includes('[["all", "All sections"], ["rotate", "Rotate"], ["single", "One section"]]') && !_db.includes('"All four"'));
+  ok("BIG SCREEN: the rotation shows a line that fills over the section's time and names the next one; no motion when reduced motion is asked for",
+     _db.includes('<i key={wallSection + "-" + rotateSecs} style={{ animationDuration: rotateSecs + "s" }}></i>')
+     && _db.includes("next: {DASH_SECTIONS[(wallSection + 1) % DASH_SECTIONS.length].title}")
+     && /@media \(prefers-reduced-motion:reduce\)\{\.dash-rot>i\{animation:none;/.test(html));
+  ok("BIG SCREEN: the page header folds into the bar (range, updated, a clock, Exit); no tour and no menu over the TV",
+     _db.includes("{!fill && <PageHeader") && _db.includes('<span className="dash-clock" data-wall-clock="1">{hhmm(clock)}</span>')
+     && _db.includes('{fill && <button type="button" className="dash-wallbar-btn" onClick={toggleWall} title="Back to the working view (Esc)">Exit</button>}')
+     && _pf.includes('(wallOn && page === "dashboard" ? " hidden" : "")') && _pf.includes('!(page === "dashboard" && wallOn) && <Guide'));
+  ok("BIG SCREEN: on a TV nothing asks for a click — Top routes drops 'click a bar to focus' there",
+     _db.includes('{!wall && <span className="text-slate-400 font-normal">· click a bar to focus</span>}'));
 }
 
 // ---- report ------------------------------------------------------------------

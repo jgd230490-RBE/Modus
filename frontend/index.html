@@ -406,7 +406,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 14 Oct 2026 (the user: "the screen still don't fill up on rotate"): EVERY section fills the screen in "Rotate" and
      "One section", not only Charts. The page is the screen's height; the one section on show takes what the header and
      the big-screen bar leave; its content is sized from that height (vh), so a 1080p TV and a 4K one read the same from
-     across a site office. "All four" stays an overview that scrolls. */
+     across a site office. "All sections" stays an overview that scrolls. */
   .dash-wall.dash-fill{height:100%;display:flex;flex-direction:column;}
   .dash-wall.dash-fill>[data-wall-section]:not([hidden]){flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
   .dash-wall.dash-fill>[data-wall-section]>*{flex:1 1 auto;min-height:0;}
@@ -414,7 +414,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wall.dash-fill .wall-charts>.chart-card{min-height:0;}
   .dash-wall.dash-fill .wall-charts .chart-box{height:auto;min-height:0;}
   /* the TV type scale (dash-fill): hero figures ~6 % of the screen height, labels ~1.8 %, never under 13 px */
-  .dash-wall.dash-fill .fig-val{font-size:clamp(2rem,6vh,8rem);line-height:1.05;}
+  .dash-wall.dash-fill .fig-val{font-size:clamp(2rem,min(6.4vh,3.3vw),8rem);line-height:1.05;}
   .dash-wall.dash-fill .fig-label{font-size:clamp(13px,1.8vh,30px);margin-top:.35em;}
   .dash-wall.dash-fill .fig-sub{font-size:clamp(12px,1.45vh,24px);}
   .dash-wall.dash-fill .fig-group{font-size:clamp(13px,1.9vh,32px);margin-bottom:.6em;}
@@ -424,10 +424,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wall.dash-fill .wall-figs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:clamp(12px,1.6vh,32px);}
   .dash-wall.dash-fill .wall-figs>.card{display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:clamp(14px,2.2vh,40px) clamp(16px,1.6vw,48px);}
   .dash-wall.dash-fill .wall-figs>.card>.grid{flex:1 1 auto;min-height:0;align-content:space-evenly;column-gap:clamp(16px,2vw,64px);}
+  /* a group with five figures (Carbon, with the target) takes three columns, so none is cut off */
+  .dash-wall.dash-fill .wall-figs>.card>.grid:has(>:nth-child(5)){grid-template-columns:repeat(3,minmax(0,1fr));}
   /* 1. Today: the figures and the day's lines on the left, the map down the whole right-hand column */
   .dash-wall.dash-fill .today-grid{grid-template-rows:minmax(0,1fr);}
   .dash-wall.dash-fill .today-grid>.card{min-height:0;overflow:hidden;}
   .dash-wall.dash-fill .today-lines{max-height:none !important;overflow:hidden;}
+  .dash-wall.dash-fill .today-figs{column-gap:clamp(16px,2vw,64px);row-gap:clamp(10px,2vh,40px);}
+  .dash-wall.dash-fill .today-figs .fig-val{font-size:clamp(2rem,min(7vh,3vw),8.5rem);}
   .dash-wall.dash-fill .today-map{display:flex;flex-direction:column;}
   /* 4. Stockpiles: the chart takes the card */
   .dash-wall.dash-fill .stock-card{display:flex;flex-direction:column;min-height:0;}
@@ -440,7 +444,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @keyframes dash-rot{from{width:0}to{width:100%}}
   @media (prefers-reduced-motion:reduce){.dash-rot>i{animation:none;width:100%;opacity:.35;}}
   .wall-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
-  @media (min-width:1024px){.wall-charts{grid-template-columns:repeat(3,minmax(0,1fr));} .wall-charts>.c-demand{grid-column:span 2;}}
+  @media (min-width:1024px){.wall-charts{grid-template-columns:repeat(2,minmax(0,1fr));}}   /* 14 Oct: four charts a section, 2 × 2 */
   .dash-filters label{display:block;padding:6px 10px;}
   .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
   /* 12 Oct 2026 (C4): the Monthly bulletin menu on the Dashboard — the 14 px floor for its words */
@@ -558,6 +562,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wallbar-btn.is-on{background:var(--navy);color:var(--control-fg);}
   .dash-wallbar-sel{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 7px;cursor:pointer;}
   .dash-wallbar-sep{width:1px;height:20px;background:var(--line);margin:0 3px;}
+  .dash-clock{margin-left:auto;font:700 clamp(15px,2.2vh,40px)/1 Inter,system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums;}
   .dash-wallbar-note{font-size:12px;color:var(--muted);}
   .dash-wallbar-note code{background:var(--surface-3);border-radius:4px;padding:1px 5px;font-size:11.5px;}
   .dash-divider{font:700 12px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:#9aa1ac;
@@ -1144,11 +1149,16 @@ const DASH_SORTS = () => [["route_id", "Route"], ["discipline", "Discipline"], [
 // Mapbox instance, never unmounted") applies here exactly. So a hidden section keeps its
 // DOM and its instances. Mapbox and Chart.js both measure zero inside `display:none`; since 13 Oct (W5) each
 // watches its own box and re-measures when the section comes back (it used to take a window resize).
+// 14 Oct 2026 (the user: every screen professional, useful and filled; TV-dashboard practice: split a crowded screen
+// rather than cram it): eight charts on one TV screen were 188 px each at 1080p, so Charts keeps the four a planner
+// reads first and a FIFTH section, More charts, takes the other four. It is added LAST, so #dashboard/1 … /4 still
+// open the same screens on a display that was pinned before.
 const DASH_SECTIONS = [
   { key: "today",  title: "Today" },
   { key: "kpis",   title: "Figures" },
   { key: "charts", title: "Charts" },
   { key: "stock",  title: "Stockpiles" },
+  { key: "more",   title: "More charts" },
 ];
 const DASH_ROTATE_CHOICES = [10, 15, 20, 30, 45, 60, 120];
 
@@ -1409,6 +1419,12 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [rowOpen, rowToggle] = useRowOpen("dashboard");
   const [wall, setWall] = useState(false);           // big-screen mode
   const [winH, setWinH] = useState(() => (typeof window !== "undefined" && window.innerHeight) || 900);   // 14 Oct: the TV type scale
+  const [clock, setClock] = useState(() => new Date());                                                  // 14 Oct: the wall clock
+  useEffect(() => {
+    if(!wall) return;
+    const id = setInterval(() => setClock(new Date()), 15000);
+    return () => clearInterval(id);
+  }, [wall]);
   useEffect(() => {
     if(!wall) return;
     const f = () => setWinH(window.innerHeight || 900);
@@ -1729,7 +1745,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" + (fill ? " dash-fill" : "") : "max-w-[1680px]")}>
       {/* 13 Oct 2026 (W3): the date range is shown ONCE, in the kicker; the scope is shown by the filter
           chips under the header (the old subtitle repeated both) */}
-      <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
+      {/* 14 Oct 2026: on a filled big screen the page header folds into the big-screen bar (range, updated, clock,
+          Exit), so a 1366 × 768 TV keeps its height for the figures */}
+      {!fill && <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
             <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
@@ -1758,17 +1776,17 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
           {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
-      </PageHeader>
+      </PageHeader>}
       {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} forecast month${D.lines === 1 ? "" : "s"} in view`} />}
 
       {wall && <div className="dash-wallbar">
         <span className="dash-wallbar-lbl">Big screen</span>
-        {[["all", "All four"], ["rotate", "Rotate"], ["single", "One section"]].map(([v, t]) =>
+        {[["all", "All sections"], ["rotate", "Rotate"], ["single", "One section"]].map(([v, t]) =>
           <button key={v} type="button" onClick={() => pickLayout(v)}
                   className={"dash-wallbar-btn" + (wallLayout === v ? " is-on" : "")}
                   title={v === "all" ? "Every section on this screen, divided and labelled"
                        : v === "rotate" ? "One section at a time, advancing on a timer"
-                       : "One section, chosen here — or pin a display to it with #dashboard/1 … /4 in the address bar"}>{t}</button>)}
+                       : `One section, chosen here — or pin a display to it with #dashboard/1 … /${DASH_SECTIONS.length} in the address bar`}>{t}</button>)}
         {wallLayout !== "all" && <span className="dash-wallbar-sep" />}
         {wallLayout !== "all" && DASH_SECTIONS.map((s, i) =>
           <button key={s.key} type="button" onClick={() => { pickSection(i); }}
@@ -1785,7 +1803,11 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             {DASH_ROTATE_CHOICES.map(n => <option key={n} value={n}>{n < 60 ? `${n} s` : `${n / 60} min`}</option>)}
           </select>
         </React.Fragment>}
-        {wallLayout === "single" && <span className="dash-wallbar-note">this screen is showing section {wallSection + 1} of {DASH_SECTIONS.length} · open <code>#dashboard/{wallSection + 1}</code> on another display to pin it there</span>}
+        {wallLayout === "single" && !fill && <span className="dash-wallbar-note">this screen is showing section {wallSection + 1} of {DASH_SECTIONS.length} · open <code>#dashboard/{wallSection + 1}</code> on another display to pin it there</span>}
+        {fill && <span className="dash-wallbar-note" title={`Pin a display to this section with #dashboard/${wallSection + 1}`}>{rangeLabel} · {status === "All" ? "all forecasts" : status.toLowerCase()}{stamp ? ` · updated ${hhmm(stamp)}` : ""}</span>}
+        {/* 14 Oct 2026: a clock, as wall dashboards carry, at the bar's right end (the data's own time is "updated" above) */}
+        <span className="dash-clock" data-wall-clock="1">{hhmm(clock)}</span>
+        {fill && <button type="button" className="dash-wallbar-btn" onClick={toggleWall} title="Back to the working view (Esc)">Exit</button>}
       </div>}
 
       {!wall ? (
@@ -2031,6 +2053,19 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <ChartCanvas config={costCfg} />
         </div>
         <div className="card p-4 chart-card">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage {!wall && <span className="text-slate-400 font-normal">· click a bar to focus</span>}<InfoTip id="dash.chart.top" /></div>
+          <ChartCanvas config={topCfg} />
+        </div>
+      </div>
+      </WallSection>
+
+      <WallSection show={sectionShown(3)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[3].title}>
+        <DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} fill={fill} tick={tick} />
+      </WallSection>
+
+      <WallSection show={sectionShown(4)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[4].title}>
+      <div className="wall-charts">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
           <ChartCanvas config={tripsCfg} />
         </div>
@@ -2046,15 +2081,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
           <ChartCanvas config={splitCfg} />
         </div>
-        <div className="card p-4 chart-card">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
-          <ChartCanvas config={topCfg} />
-        </div>
       </div>
-      </WallSection>
-
-      <WallSection show={sectionShown(3)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[3].title}>
-        <DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} fill={fill} tick={tick} />
       </WallSection>
         </>
       )}
@@ -2134,7 +2161,7 @@ function DashboardToday({ meta, week, err, wall, fill }){
         {err && <div className="text-xs mt-2" style={{ color: "var(--red)" }}>{err}</div>}
         {!week && !err && <div className="text-sm text-slate-400 mt-3">Loading this week…</div>}
         {week && <>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3 mt-3">
+          <div className={"grid grid-cols-2 gap-x-4 gap-y-3 mt-3" + (fill ? " today-figs" : " xl:grid-cols-4")}>
             <Big value={T.lines ? bigNum(T.t) : "—"} label="tonnes" sub={T.lines ? `today · ${T.lines} line${T.lines === 1 ? "" : "s"} · ${T.confirmed} confirmed` : (lines.length ? "nothing planned today" : "no lines this week")}
                  info={{ id: "dash.today_t", value: T.lines ? `${grp(T.t)} t planned for today across ${T.lines} line${T.lines === 1 ? "" : "s"}` : "No line has a planned quantity on today's date in the commit week." }} />
             <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(dist(T.km))} ${DU()}` : "—"} info={{ id: "dash.today_trips", value: T.lines ? `${grp(T.trips)} loaded trips, ${grp(dist(T.km))} lorry-${DU()}` : "" }} />
@@ -2242,11 +2269,22 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
     ctx.fillStyle = "#DC2626"; ctx.font = `600 ${wall ? sf : 10}px Inter, system-ui, sans-serif`; ctx.textAlign = "center";
     ctx.fillText("capacity", px, chart.chartArea.top - 4); ctx.restore();
   } };
+  // 14 Oct 2026: on the big screen each bar says how full it is, in words for the two warnings (nobody hovers a TV)
+  const barLabels = { id: "barLabels", afterDatasetsDraw: (chart) => {
+    if(!wall) return;
+    const meta = chart.getDatasetMeta(0), ctx = chart.ctx;
+    ctx.save(); ctx.font = `600 ${sf + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    ctx.fillStyle = tok("--ink", "#1E293B");
+    meta.data.forEach((el, i) => { const b = bars[i]; if(!b) return;
+      const t = `${b.pct.toFixed(0)} %` + (b.over ? " · over capacity" : b.pct >= 90 ? " · nearly full" : "");
+      ctx.fillText(t, el.x + 8, el.y); });
+    ctx.restore();
+  } };
   const cfg = { type: "bar",
     data: { labels: bars.map(b => b.sp.name), datasets: [{ label: "% of capacity", data: bars.map(b => Math.round(b.pct * 10) / 10),
               backgroundColor: bars.map(b => b.over ? "#DC2626" : b.pct >= 90 ? "#D97706" : "#059669"), borderWidth: 0, borderRadius: 4, barPercentage: 0.7,
               maxBarThickness: fill ? 96 : 40 }] },
-    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14 } },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14, right: wall ? sf * 13 : 0 } },
       plugins: { legend: { display: false }, tooltip: { callbacks: {
         title: (items) => items.length ? bars[items[0].dataIndex].sp.name : "",
         label: (item) => { const b = bars[item.dataIndex]; const u = unitOf(b.sp); return [
@@ -2255,7 +2293,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
           b.over ? `OVER capacity by ${fmt(-(b.c.remaining || 0), b.sp.capacity_unit)} ${u}` : `room for ${fmt(b.c.remaining == null ? 0 : b.c.remaining, b.sp.capacity_unit)} ${u} more` ]; } } } },
       scales: { x: { min: 0, max: Math.ceil(maxPct / 10) * 10, grid: { display: false }, ticks: { font: { size: wall ? sf : 10 }, callback: (v) => v + " %" } },
                 y: { ticks: { font: { size: wall ? sf + 1 : 11 } } } } },
-    plugins: [capLine] };
+    plugins: [capLine, barLabels] };
   const c = cols.find(x => x.k === selKey);
   return (
     <div className="card p-4 stock-card">
@@ -3146,7 +3184,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   return (
     <div className="flex-1 min-h-0 flex relative">
       {narrow && railPeek && <div className="w-14 shrink-0" aria-hidden="true"></div>}
-      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railShown ? "w-56" : "w-14") + (narrow && railPeek ? " rail-peek" : "")}>
+      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railShown ? "w-56" : "w-14") + (narrow && railPeek ? " rail-peek" : "") + (wallOn && page === "dashboard" ? " hidden" : "")}>
         <div className="flex-1 overflow-y-auto py-3">
           {railShown && (
             <label className="rail-search" title="Find a page (Ctrl K)">
