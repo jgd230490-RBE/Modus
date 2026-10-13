@@ -2847,6 +2847,20 @@ def diagnostics_departure(route_id: str, profile: str = network.DEFAULT_PROFILE,
     return network.departure_diagnostics(route_id, profile=profile, leg=leg, times=want)
 
 
+@app.get("/api/admin/diagnostics/road-class/{route_id}")
+def diagnostics_road_class(route_id: str, profile: str = network.DEFAULT_PROFILE, leg: str = "loaded",
+                           token: Optional[str] = None):
+    """
+    13 Oct 2026 (bundle C, decision 2a). Does HERE tell us which road class a route's miles are on?
+    One HERE request for this leg with `spans=functionalClass,routeNumbers,length`; the answer is
+    reported as it came back (or HERE's error if it refuses a span name). Nothing is stored or read
+    from it: the bulletin compares with all of a district's roads until this has been run on the
+    deployment and its answer looked at. ⚠️ Costs one HERE request.
+    """
+    _check_admin(token)
+    return network.road_class_diagnostics(route_id, profile=profile, leg=leg)
+
+
 @app.get("/api/admin/diagnostics/compare/{route_id}")
 def diagnostics_compare(route_id: str, probe: bool = False, token: Optional[str] = None):
     """

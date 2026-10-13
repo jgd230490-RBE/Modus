@@ -1086,9 +1086,12 @@ ok("council: a sliver of the scheme's carbon reads 'under 1%', never 0%",
 ok("council: the county's figure is a line of text (its roads, its highway authority), not a second fill",
    CA["county_lines"] == [f"Testshire (county or unitary authority; highway authority Test County Council): {_tt(0.8 * _CT)} CO2e "
                           "in October 2026 on its roads."], str(CA["county_lines"]))
-ok("⭐ council: the basis sentence, the not-comparable-with-DESNZ line, the Carbon page's stamp, the boundary source and the ONS / OS licence lines",
+# REVERSED 13 Oct 2026 (D40, the user: the council share "for scale"): it asserted "not comparable with the DESNZ local
+# authority greenhouse gas statistics"; the basis now sets each district beside a month of its DESNZ road transport, for scale
+ok("⭐ council: the basis sentence, the for-scale DESNZ wording, the Carbon page's stamp, the boundary source and the ONS / OS licence lines",
    "Split by the km inside each district; across one tier it adds up to the scheme's carbon." in CA["basis"]
-   and "not comparable with the DESNZ local authority greenhouse gas statistics" in CA["basis"]
+   and "not comparable" not in CA["basis"] and "for scale only, so read it as \"about\"" in CA["basis"]
+   and "a month (one twelfth of the year) of its road transport emissions in the government's local statistics (DESNZ, 2024" in CA["basis"]
    and CA["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
    and CA["sources"] == ["Boundaries: Test districts (May 2026), generalised to 200 m."] and CA["attribution"] == _ATTR)
 ok("⭐ council PDF: the section's title, each district and its figure, the tally, the stamp and both licence lines are in the PDF text",
@@ -1506,6 +1509,216 @@ ok("🔴 W13: no districts, no movements section (the bulletin without council a
    S10["council_mv"] is None and "Movements by council" not in T10J and 'data-bulletin="council-movements"' not in HTML10)
 # put the default back for what follows
 _doc2 = json.loads(json.dumps(_doc0)); config.save(_doc2, by="harness"); config.invalidate()
+
+# --------------------------------------------------------------------------- #
+#  8d. 13 Oct 2026 — BUNDLE C1: "Is it a lot?" (W14, D40, D44)                  #
+# --------------------------------------------------------------------------- #
+import comparisons  # noqa: E402
+import carbon_target  # noqa: E402
+_F = comparisons.factors()
+ok("⭐ one table of comparison factors: every entry has a source, a year, the day it was checked and a next edition; the "
+   "values are the sources' (DESNZ 2026 average car 0.16591 kg/km, row 4_301_3074_4_1; NTS0901a 7,100 miles, 2025; ±15 %)",
+   set(_F) == {"car_kg_co2e_per_km", "car_miles_a_year", "car_range_pct", "la_road_transport"}
+   and all(all(k in v for k in ("value", "unit", "what", "source", "year", "url", "checked_on", "next_edition")) for v in _F.values())
+   and _F["car_kg_co2e_per_km"]["value"] == 0.16591 and "4_301_3074_4_1" in _F["car_kg_co2e_per_km"]["source"]
+   and _F["car_kg_co2e_per_km"]["year"] == 2026 and _F["car_miles_a_year"]["value"] == 7100 and _F["car_miles_a_year"]["year"] == 2025
+   and "NTS0901a" in _F["car_miles_a_year"]["source"] and _F["car_range_pct"]["value"] == 15 and _F["la_road_transport"]["year"] == 2024
+   and all(v["checked_on"] == "2026-10-13" for v in _F.values()))
+_LT = comparisons.la_table()
+ok("⭐ the DESNZ 2024 road transport file: 362 councils, Table 1.1, published 25 June 2026, OGL v3 attribution; Harborough "
+   "(E07000131) 69.620 / 130.173 / 85.682 kt (A / motorways / minor) as read 13 Oct; Melton has no motorway",
+   len(_LT["rows"]) == 362 and _LT["year"] == 2024 and _LT["published"] == "2026-06-25"
+   and _LT["table"].startswith("Table 1.1: Local authority territorial greenhouse gas emissions estimates 2005-2024 (kt CO2e)")
+   and _LT["attribution"] == "Contains public sector information licensed under the Open Government Licence v3.0."
+   and _LT["rows"]["E07000131"] == ["Harborough", 69.62, 130.173, 85.682] and _LT["rows"]["E07000133"][2] == 0
+   and _LT["columns"] == ["name", "a_roads_kt", "motorways_kt", "minor_roads_kt"])
+ok("🔴 no factor is typed outside the table: comparisons.py carries none of the outside figures",
+   not re.search(r"0\.16591|7,?100\b|\b15\b", read("backend/comparisons.py").split('"""', 2)[2]))
+# cars, by hand
+_carm = 7100 * 1.609344 * 0.16591 / 12
+_eq = comparisons.car_equivalents(384.2)
+ok("⭐ cars (hand): one car-month = 7,100 mi × 1.609344 × 0.16591 ÷ 12 = 158 kg; 384.2 t = 2,431 cars → 'about 2,100–2,800' "
+   "(±15 %, two significant figures); never one exact figure",
+   abs(comparisons.car_month_kg() - _carm) < 1e-9 and abs(_carm - 157.98) < 0.01 and _eq["low"] == 2100 and _eq["high"] == 2800
+   and _eq["words"] == "about 2,100–2,800 average cars driven for a month", str(_eq))
+ok("cars: small figures and none — 'less than one', a single figure when both ends round alike, None for no carbon",
+   comparisons.car_equivalents(0.05)["words"] == "less than one average car driven for a month"
+   and comparisons.car_equivalents(None) is None and comparisons.car_equivalents(0) is None
+   and comparisons.sig2(2431) == 2400 and comparisons.sig2(96.4) == 96 and comparisons.sig2(7.3) == 7)
+# the council share, by hand on the real table
+_sh = comparisons.la_share("E07000131", 150.0)
+ok("⭐ council share (hand): Harborough 150 t ÷ ((69.620 + 130.173 + 85.682) kt × 1000 ÷ 12) = 0.63 % — all roads, motorways "
+   "included, and it says the motorway question is open; Melton (no motorway) says A and minor roads",
+   abs(_sh["pct"] - 100 * 150 / (285.475 * 1000 / 12)) < 1e-9 and _sh["pct_words"] == "0.6%" and _sh["has_motorway"]
+   and _sh["roads"] == "all roads, motorways included; whether these lorries used one is not yet known"
+   and comparisons.la_share("E07000133", 10)["roads"] == "A and minor roads: the government figures give no motorway in the district"
+   and comparisons.la_share("E1", 10) is None and comparisons.la_share("E07000131", None) is None)
+ok("council share words: under 0.1 % never reads 'about under'; one decimal under 10 %; whole from 10 %",
+   comparisons.about("under 0.1%") == "under 0.1%" and comparisons.about("0.6%") == "about 0.6%"
+   and comparisons.pct_words(0.04) == "under 0.1%" and comparisons.pct_words(12.4) == "12%" and comparisons.pct_words(3.25) == "3.2%")
+# the panel on the fixture (no target set here; the fixture's districts carry test codes, so the council row falls back)
+LOT10 = S10A["lot"]
+_c10 = S10A["rollup"]["carbon"]["co2_t_in_month"]
+_L = {r["label"]: r for r in LOT10["rows"]}
+ok("⭐ the panel: six rows in the brief's order, titled 'Is <n> t CO2e a lot?' with the month's haul carbon",
+   [r["label"] for r in LOT10["rows"]] == ["Against the plan", "Against last month", "Against the target",
+                                           "The council's figures", "In everyday terms", "Per tonne, per movement"]
+   and LOT10["title"] == f"Is {_tt(_c10)} CO2e a lot?" and _c10 > 0, str([r["label"] for r in LOT10["rows"]]))
+ok("⭐ row 1: NOT REPORTED — the bulletin is the plan; no measured carbon is invented to set against it",
+   _L["Against the plan"]["text"].startswith("Not reported. This bulletin is the approved plan") and _L["Against the plan"]["status"] is None)
+ok("⭐ row 2 (hand): September had no approved haul, so October says so (never a % of nothing)",
+   _L["Against last month"]["text"] == "There was no approved haul in September 2026.")
+_c11 = S11B["rollup"]["carbon"]["co2_t_in_month"]
+_r2_11 = next(r for r in S11B["lot"]["rows"] if r["label"] == "Against last month")["text"]
+ok("⭐ row 2 (hand): November against October = (c11 − c10) ÷ c10, in words, with both tonnages",
+   _r2_11 == f"{abs(100 * (_c11 - _c10) / _c10):.0f}% {'more' if _c11 > _c10 else 'less'} than October 2026 ({_tt(_c11)} against {_tt(_c10)}).", _r2_11)
+ok("⭐ row 3: no target in the fixture — 'No carbon target set yet.', never 0 %",
+   _L["Against the target"]["text"] == "No carbon target set yet." and "%" not in _L["Against the target"]["text"])
+ok("row 4: the fixture's districts are not in the government table, so the row says so by name and code (never a guess)",
+   _L["The council's figures"]["text"] == "No government figure for Eastshire (code E1).")
+ok("⭐ row 5 (hand): the month's tonnes as cars driven for a month, the range from the table",
+   _L["In everyday terms"]["text"] == f"{_tt(_c10)} is {comparisons.car_equivalents(_c10)['words']}, tailpipe only, the same basis as the lorries."
+   and "0.16591 kg CO2e per km" in _L["In everyday terms"]["source"] and "7,100 miles a car in 2025" in _L["In everyday terms"]["source"]
+   and "15% either side" in _L["In everyday terms"]["source"])
+ok("⭐ row 6 (hand): kg CO2e per tonne (÷ 60,400 t) and per two-way movement (÷ the month's loads)",
+   _L["Per tonne, per movement"]["text"] == f"{1000 * _c10 / 60400:,.1f} kg CO2e per tonne moved and {1000 * _c10 / LOADS:,.0f} kg per two-way movement.")
+ok("⭐ every row but the plan carries its source; the outside rows name their publisher and year; no file path is printed",
+   all(r["source"] and r["source"] != "—" for r in LOT10["rows"][1:]) and "2024" in _L["The council's figures"]["source"]
+   and "DESNZ" in _L["The council's figures"]["source"] and "2026" in _L["In everyday terms"]["source"]
+   and not any("backend/" in r["source"] or ".json" in r["source"] for r in LOT10["rows"]))
+ok("the demo tenant says the plan, target and tonnes are invented and the government figures real",
+   LOT10["demo_note"] == "Fictional demo scheme: the plan, the target and the tonnes are invented; the government figures they are set beside are real.")
+# the council row and the table column on a table that knows the fixture's codes
+_saved_la = comparisons._CACHE.get(comparisons.LA_PATH)
+comparisons._CACHE[comparisons.LA_PATH] = dict(_LT, rows={"E1": ["Eastshire", 12.0, 0, 12.0], "W1": ["Westvale", 6.0, 6.0, 6.0]})
+try:
+    _CK = bulletin_doc._council_carbon(10, WD, "October 2026")
+    _LK = bulletin_doc._lot(10, "October 2026", "September 2026", S10A["rollup"], None, H, _CK, PLANNER, False)
+finally:
+    comparisons._CACHE[comparisons.LA_PATH] = _saved_la
+_DK = {d["name"]: d for d in _CK["districts"]}
+_eK = 100 * _DK["Eastshire"]["co2_t"] / (24.0 * 1000 / 12)
+ok("⭐ row 4 (hand, a table that knows the codes): the district with the most haul carbon against a month of ITS figures, "
+   "'about', with the road basis; no motorway → A and minor roads",
+   next(r for r in _LK["rows"] if r["label"] == "The council's figures")["text"]
+   == f"In Eastshire, {_tt(_DK['Eastshire']['co2_t'])} is {comparisons.about(comparisons.pct_words(_eK))} of a month of the district's road "
+      "transport emissions (A and minor roads: the government figures give no motorway in the district). Each district is in the Carbon by council table.")
+ok("⭐ the council table's for-scale column: each district against a month of its own road transport; '(A and minor)' where no "
+   "motorway; '—' with no haul; 'no government figure' when the code is not in the table",
+   _DK["Eastshire"]["la_share"] == comparisons.about(comparisons.pct_words(_eK)) + " (A and minor)"
+   and _DK["Westvale"]["la_share"] == comparisons.about(comparisons.pct_words(100 * _DK["Westvale"]["co2_t"] / (18.0 * 1000 / 12)))
+   and _DK["Farmoor"]["la_share"] == "—" and _D["Eastshire"]["la_share"] == "no government figure")
+# D44 — the monthly allowance, by hand, on a stubbed target (the real one is held by test_carbon_target)
+_real_get, _real_status = carbon_target.get, carbon_target.status
+_seen_acc = []
+
+
+def _status_stub(acc, t, factors=None):
+    _seen_acc.append(acc)
+    return {"approved_t": 400.0, "target_t": 100.0, "invalid": None,
+            "by_month": [{"month_index": 10, "approved_t": 120.0, "with_decisions_t": 25.0},
+                         {"month_index": 11, "approved_t": 280.0, "with_decisions_t": 80.0}]}
+
+
+carbon_target.get = lambda: {"mode": "cap", "cap_t": 100.0}
+carbon_target.status = _status_stub
+try:
+    _T10 = bulletin_doc._target_row(10, "October 2026", {"role": "submitter", "ipt": "IPT2"})
+    _T11 = bulletin_doc._target_row(11, "November 2026", None)
+finally:
+    carbon_target.get, carbon_target.status = _real_get, _real_status
+ok("⭐ D44 (hand): October's allowance = target 100 × 120 ÷ 400 = 30 t; 25 t all-in with the decisions is WITHIN it (word + colour)",
+   abs(_T10["allowance_t"] - 30.0) < 1e-9 and _T10["month_t"] == 25.0 and _T10["status"] == "Within the allowance" and _T10["status_ok"]
+   and _T10["text"].startswith("25 t CO2e all-in in October 2026 with the agreed decisions, against an allowance of 30 t."))
+ok("⭐ D44 (hand): November's allowance = 100 × 280 ÷ 400 = 70 t; 80 t is OVER by 10 t, said in words",
+   abs(_T11["allowance_t"] - 70.0) < 1e-9 and _T11["status"] == "Over the allowance" and not _T11["status_ok"]
+   and "against an allowance of 70 t: 10 t over." in _T11["text"])
+ok("🔴 the target row is ALL-IN and says so beside the haul figures; it reads the scheme's target even for a team code (D37)",
+   "All-in means making the material, transport and waste disposal" in _T10["text"]
+   and _seen_acc[0].get("ipt") is None and _seen_acc[0].get("role") == "submitter")
+_P10K = export.build_bulletin_pdf(dict(S10A, lot=dict(LOT10, rows=LOT10["rows"][:2] + [_T11] + LOT10["rows"][3:])))
+_T10KJ = " ".join(pdf_text(_P10K).split())
+ok("⭐ the panel in the PDF: the title, each row's label, the status word, every source and the demo note",
+   LOT10["title"] in _T10KJ and all(r["label"].upper() in _T10KJ for r in LOT10["rows"]) and "Over the allowance" in _T10KJ
+   and "Source: DfT National Travel Survey" not in _T10KJ.replace("; DfT National Travel Survey", "")
+   and "NTS0901a" in _T10KJ and "Table 1.1" in _T10KJ and "Fictional demo scheme: the plan, the target and the tonnes are invented" in _T10KJ
+   and "Factors checked 13 October 2026." in _T10KJ)
+_H10A = bulletin_doc.html(dict(S10A, lot=dict(LOT10, rows=LOT10["rows"][:2] + [_T10] + LOT10["rows"][3:])))
+ok("⭐ the panel on the page: its own section after the council sections, the status word with its colour AND its word and mark",
+   'data-bulletin="lot"' in _H10A and _H10A.index("Carbon by council") < _H10A.index('data-bulletin="lot"')
+   and '<b class="lot-st" style="color:#047857">✓ Within the allowance</b>' in _H10A and "Is " in _H10A and "a lot?" in _H10A)
+ok("🔴 the panel's status colours are 4.5:1 or better on white (the dark green and the dark amber), never colour alone",
+   bulletin_doc.STATUS_OK == "#047857" and bulletin_doc.STATUS_OVER == "#B45309")
+_TXT_LOT = " ".join(r["text"] + " " + r["source"] for r in LOT10["rows"]) + _T10KJ
+ok("🔴 the banned-word scan and the UK words over the panel; no trees, flights or households",
+   not _BANNED.search(_TXT_LOT) and not _trucks(_TXT_LOT) and not re.search(r"\b(trees?|flights?|households?)\b", _TXT_LOT, re.I))
+ok("🔴 no haul carbon figure → no panel (nothing to compare), and no section on page or PDF",
+   bulletin_doc._lot(10, "October 2026", None, {"carbon": {"co2_t_in_month": None}}, None, H, None, PLANNER, False) is None
+   and bulletin_doc._lot_html(None) == "")
+
+# decision 2a: the road-class probe — plumbing only, against STUBS (what HERE really returns is the unknown it exists for)
+import here_routing  # noqa: E402
+import io as _io  # noqa: E402
+import urllib.error as _ue  # noqa: E402
+_saved_key = os.environ.pop("HERE_API_KEY", None)
+_rc0 = here_routing.road_class_probe(52.5, -1.0, 52.6, -1.1, ART)
+ok("🔴 road-class probe: no key → says so and calls nothing", _rc0.get("error") == "HERE_API_KEY is not set on the server"
+   and _rc0["params_sent"]["spans"] == "functionalClass,routeNumbers,length" and "apiKey" not in _rc0["params_sent"])
+os.environ["HERE_API_KEY"] = "harness-key"
+_rc_urls = []
+
+
+def _here_refuses(url, timeout=0):
+    _rc_urls.append(url)
+    raise _ue.HTTPError(url, 400, "Bad Request", {}, _io.BytesIO(b'{"title":"Malformed request","cause":"spans: unknown value"}'))
+
+
+class _Resp:
+    def __init__(self, body):
+        self._b = body
+
+    def read(self, *a):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _here_spans(url, timeout=0):
+    _rc_urls.append(url)
+    return _Resp(json.dumps({"routes": [{"sections": [{"polyline": "x", "summary": {"length": 3000}, "spans": [
+        {"offset": 0, "functionalClass": 1, "routeNumbers": [{"value": "M1"}], "length": 2000},
+        {"offset": 5, "functionalClass": 3, "routeNumbers": [{"value": "A6"}], "length": 1000}]}]}]}).encode())
+
+
+_real_uo = here_routing.urllib.request.urlopen
+try:
+    here_routing.urllib.request.urlopen = _here_refuses
+    _rc1 = here_routing.road_class_probe(52.5, -1.0, 52.6, -1.1, ART)
+    here_routing.urllib.request.urlopen = _here_spans
+    _rc2 = here_routing.road_class_probe(52.5, -1.0, 52.6, -1.1, ART)
+finally:
+    here_routing.urllib.request.urlopen = _real_uo
+    os.environ.pop("HERE_API_KEY", None)
+    if _saved_key is not None:
+        os.environ["HERE_API_KEY"] = _saved_key
+ok("⭐ road-class probe (stub): the request asks for spans=functionalClass,routeNumbers,length with the truck parameters; "
+   "a refusal reports HERE's own error body, never raises",
+   "spans=functionalClass%2CrouteNumbers%2Clength" in _rc_urls[0] and "vehicle" in _rc_urls[0]
+   and _rc1["error"].startswith("HTTP 400:") and "spans: unknown value" in _rc1["error"])
+ok("road-class probe (stub): spans that come back are reported raw, with the length per class and the M-numbers",
+   _rc2["spans_returned"] == 2 and _rc2["length_m_by_functional_class"] == {"1": 2000, "3": 1000}
+   and _rc2["route_numbers_starting_M"] == ["M1"] and "functionalClass" in _rc2["span_keys"]
+   and _rc2["reads_as"].startswith("HERE returned spans"))
+_MAINSRC = read("backend/main.py")
+ok("🔴 the endpoint is admin-only, costs one HERE call and stores nothing; nothing in the bulletin reads its answer",
+   '@app.get("/api/admin/diagnostics/road-class/{route_id}")' in _MAINSRC
+   and _MAINSRC.split('def diagnostics_road_class(')[1].split('return network.road_class_diagnostics(')[0].count("_check_admin(token)") == 1
+   and "road_class" not in read("backend/bulletin_doc.py") and "road_class" not in read("backend/comparisons.py").split('"""', 2)[2]
+   and "db.execute" not in read("backend/network.py").split("def road_class_diagnostics(")[1].split("\ndef ")[0])
 
 # the frame, shared
 ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary and the bulletin",

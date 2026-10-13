@@ -307,9 +307,14 @@ def _council_carbon(mi, wd, month_long, A=None):
                     else "under 0.1 t")
         else:
             text = _t(v)
+        import comparisons
+        las = comparisons.la_share(a["area_id"], v) if (v or 0) > 0 else None
         districts.append({"area_id": a["area_id"], "name": a["name"], "co2_t": v, "cls": cls, "text": text,
                           "fill": council_fill(cls), "highway_authority": a.get("highway_authority") or "",
                           "share": _share(v, scheme),
+                          # 13 Oct 2026 (D40): about this share of a month of the district's road transport (DESNZ 2024)
+                          "la_share": ((comparisons.about(las["pct_words"]) + ("" if las["has_motorway"] else " (A and minor)"))
+                                       if las else ("—" if not (v or 0) > 0 else "no government figure")),
                           "rings": areas.rings_of(a.get("geometry")), "label_at": a.get("label_point")})
     districts.sort(key=lambda d: (-(d["co2_t"] or 0), d["name"]))
     d_sum = (tot.get("co2_t_by_tier") or {}).get("district")
@@ -344,9 +349,17 @@ def _council_carbon(mi, wd, month_long, A=None):
         "stops": list(stops),
         "legend": _council_legend(stops),
         "tally": tally,
+        # REVERSED 13 Oct 2026 (D40, the user: the council share "for scale"): it said the figures are "not comparable with
+        # the DESNZ local authority greenhouse gas statistics"; the share column now sets them beside those figures, for scale
         "basis": ("Split by the km inside each district; across one tier it adds up to the scheme's carbon. "
-                  "These are this scheme's lorries only, a planning estimate: they are not comparable with the DESNZ "
-                  "local authority greenhouse gas statistics, which count every vehicle and every source."),
+                  "These are this scheme's planned lorries only, a planning estimate on 2026 factors. The last column sets "
+                  "each district's figure beside a month (one twelfth of the year) of its road transport emissions in the "
+                  "government's local statistics (DESNZ, 2024: every vehicle, estimated by a national model), for scale "
+                  "only, so read it as \"about\". It takes all roads, motorways included, where the district has a "
+                  "motorway: whether these lorries used it is not yet known."),
+        "la_source": "Road transport: DESNZ, UK local authority and regional greenhouse gas emissions statistics, 2005 to "
+                     "2024, Table 1.1 (published 25 June 2026). Contains public sector information licensed under the "
+                     "Open Government Licence v3.0.",
         "county_lines": county_lines, "notes": notes,
         "attribution": list(A.get("attribution") or []),
         "sources": [f"Boundaries: {x}, generalised to 200 m." for x in sources],
@@ -449,6 +462,128 @@ def _council_movements(mi, wd, month_long, A=None, prev=None, prev_long=None, di
                      "By council colours, on this scheme's bands."),
         "county_lines": county_lines,
         "notes": [x for x in (A.get("notes") or []) if "clipped" in x or "no stored road route" in x],
+    }
+
+
+# 13 Oct 2026 (W14, D40, D44): the "Is it a lot?" panel. Status words carry their colour AND their word (never colour
+# alone): within an allowance in the dark green, over it in the dark amber, both 4.5:1 or better on white.
+STATUS_OK, STATUS_OVER = "#047857", "#B45309"
+LOT_SOURCE_OWN = "This bulletin's own figures: the approved plan and the DESNZ 2026 lorry factors."
+
+
+def _scheme_acc(acc):
+    """The access the panel's target figures are read with: the whole scheme (D37), whoever opened the bulletin."""
+    return dict(acc or {}, ipt=None)
+
+
+def _target_row(mi, month_long, acc):
+    """Row 3: the month's ALL-IN carbon against its share of the scheme's target (D44: target × plan_month ÷ plan_total)."""
+    import carbon_target
+    label = "Against the target"
+    src = ("The scheme's carbon target on the Carbon planner. A month's allowance is the target × the month's share of "
+           "the approved plan, so the allowance follows the shape of the plan.")
+    try:
+        t = carbon_target.get()
+    except Exception as e:
+        return {"label": label, "text": f"The carbon target could not be read ({type(e).__name__}).", "status": None, "source": src}
+    if not t:
+        return {"label": label, "text": "No carbon target set yet.", "status": None, "source": src}
+    try:
+        st = carbon_target.status(_scheme_acc(acc), t)
+    except Exception as e:
+        return {"label": label, "text": f"The carbon target could not be worked out ({type(e).__name__}).", "status": None,
+                "source": src}
+    month = next((m for m in st.get("by_month") or [] if m["month_index"] == mi), None)
+    total, target_t = st.get("approved_t"), st.get("target_t")
+    if month is None or not total or target_t is None:
+        return {"label": label, "text": f"No all-in figure for {month_long} in the approved plan.", "status": None, "source": src}
+    allowance = target_t * month["approved_t"] / total
+    use_dec = month.get("with_decisions_t") is not None and not st.get("invalid")
+    fig = month["with_decisions_t"] if use_dec else month["approved_t"]
+    gap = fig - allowance
+    within = gap <= carbon_target.ON_TARGET_TOL_T + 1e-9
+    status = "Within the allowance" if within else "Over the allowance"
+    how = "with the agreed decisions" if use_dec else "as forecast (the agreed decisions no longer fit the plan)"
+    text = (f"{_t(fig)} CO2e all-in in {month_long} {how}, against an allowance of {_t(allowance)}"
+            + ("." if within else f": {_t(gap)} over.")
+            + " All-in means making the material, transport and waste disposal, so it is larger than the haul figures "
+              "on the rest of this page.")
+    return {"label": label, "text": text, "status": status, "status_ok": within, "source": src,
+            "allowance_t": allowance, "month_t": fig}
+
+
+def _lot(mi, month_long, prev_long, R, prev, H, council, acc, demo):
+    """
+    The six rows of "Is <n> t CO2e a lot?" (D40: all six, each with its source and year; the outside ones say "about").
+    None when the month has no haul carbon figure (the panel would compare nothing).
+    """
+    import comparisons
+    c = (R.get("carbon") or {}).get("co2_t_in_month")
+    if c is None:
+        return None
+    F = comparisons.factors()
+    rows = [{"label": "Against the plan", "text": NOT_REPORTED + ". This bulletin is the approved plan: no delivered loads "
+             "were counted, so there is no measured carbon to set against it.", "status": None, "source": "—"}]
+    # 2. last month, recomputed (never read off an old PDF)
+    if mi <= 1:
+        t2 = "No earlier month in the programme."
+    else:
+        last = ((prev or {}).get("carbon") or {}).get("co2_t_in_month")
+        if (prev or {}).get("empty"):
+            t2 = f"There was no approved haul in {prev_long}."
+        elif last is None:
+            t2 = f"No haul carbon figure for {prev_long}."
+        elif not last > 0:
+            t2 = f"There was no approved haul in {prev_long}."
+        else:
+            ch = 100.0 * (c - last) / last
+            t2 = (f"About the same as {prev_long} ({_t(c)} against {_t(last)})." if abs(ch) < 0.5 else
+                  f"{abs(ch):.0f}% {'more' if ch > 0 else 'less'} than {prev_long} ({_t(c)} against {_t(last)}).")
+    rows.append({"label": "Against last month", "text": t2, "status": None, "source": LOT_SOURCE_OWN})
+    rows.append(_target_row(mi, month_long, acc))
+    # 4. the council's own figures: the district that carries the most haul carbon, in its own government figures
+    la_src = (f"{F['la_road_transport']['source']}; {comparisons.la_table()['attribution']} A month is one twelfth of the "
+              "year. For scale only: those figures count every vehicle, estimated by a national model; these are this "
+              "scheme's planned lorries on 2026 factors.")
+    ds = [d for d in ((council or {}).get("districts") or []) if (d.get("co2_t") or 0) > 0]
+    if not council:
+        t4 = "No council areas are loaded for this scheme."
+    elif council.get("error"):
+        t4 = council["error"]
+    elif not ds:
+        t4 = f"No district carries haul carbon in {month_long}."
+    else:
+        top = ds[0]
+        sh = comparisons.la_share(top["area_id"], top["co2_t"])
+        t4 = (f"No government figure for {top['name']} (code {top['area_id']})." if sh is None else
+              f"In {top['name']}, {_t(top['co2_t'])} is {comparisons.about(sh['pct_words'])} of a month of the district's road "
+              f"transport emissions ({sh['roads']}). Each district is in the Carbon by council table.")
+    rows.append({"label": "The council's figures", "text": t4, "status": None, "source": la_src})
+    # 5. cars
+    eq = comparisons.car_equivalents(c)
+    rows.append({"label": "In everyday terms", "text": f"{_t(c)} is {eq['words']}, tailpipe only, the same basis as the "
+                 "lorries.", "status": None,
+                 "source": (f"{F['car_kg_co2e_per_km']['source']}: {F['car_kg_co2e_per_km']['value']} kg CO2e per km; "
+                            f"{F['car_miles_a_year']['source']}: {F['car_miles_a_year']['value']:,} miles a car in "
+                            f"{F['car_miles_a_year']['year']}. A range of {F['car_range_pct']['value']}% either side: the "
+                            "factor is a UK average for an unknown fuel and the mileage is England's.")})
+    # 6. per tonne, per movement
+    tn, mv = H.get("tonnes"), H.get("movements_in_month")
+    per = []
+    if tn:
+        per.append(f"{1000.0 * c / tn:,.1f} kg CO2e per tonne moved")
+    if mv:
+        per.append(f"{1000.0 * c / mv:,.0f} kg per two-way movement")
+    rows.append({"label": "Per tonne, per movement", "text": (" and ".join(per) + ".") if per else
+                 "No tonnes or movements to divide by this month.", "status": None, "source": LOT_SOURCE_OWN})
+    return {
+        "title": f"Is {_t(c)} CO2e a lot?",
+        "co2_t": c,
+        "lede": f"The haul carbon of {month_long} beside six yardsticks: the scheme's own first, then two from outside.",
+        "rows": rows,
+        "demo_note": ("Fictional demo scheme: the plan, the target and the tonnes are invented; the government figures they "
+                      "are set beside are real." if demo else None),
+        "checked": "Factors checked 13 October 2026.",
     }
 
 
@@ -689,6 +824,7 @@ def sheet(month_index, acc=None, now=None):
             except Exception as e:
                 A_prev = e
     council = _council_carbon(mi, wd, month_long, A=A)
+    lot = _lot(mi, month_long, prev_long, R, prev, H, council, acc, bool(page.get("demo_notice")))
     du = (config.tenant_settings().get("distance_unit") or "km")
     council_mv = _council_movements(mi, wd, month_long, A=A, prev=A_prev, prev_long=prev_long, distance_unit=du)
 
@@ -746,7 +882,7 @@ def sheet(month_index, acc=None, now=None):
         "moved_total": {"a_day": n0(H.get("two_way_a_day")), "vehicles": n0(veh.get("fleet")),
                         "t_day": n0((H.get("tonnes") / wd) if H.get("tonnes") is not None and wd else None)},
         "works": works, "checks": checks, "others": others,
-        "glance": glance, "council": council, "council_mv": council_mv,
+        "glance": glance, "council": council, "council_mv": council_mv, "lot": lot,
         "volume_legend": volume_legend(),
         "map_sections": map_sections, "sections_note": sections_note, "map_note": map_note(len(map_sections)),
         "map_legend_title": f"Two-way movements a day in {month_long}",
@@ -904,6 +1040,26 @@ def _council_mv_html(M):
             + f'<p class="muted" data-bulletin="double-count">{e(M["footnote"])}</p>')
 
 
+def _lot_html(L):
+    """13 Oct 2026 (W14): the "Is it a lot?" panel — each row a label, a sentence, its status word, its source."""
+    if not L:
+        return ""
+    e = _e
+    rows = []
+    for r in L["rows"]:
+        st = ""
+        if r.get("status"):
+            st = (f' <b class="lot-st" style="color:{STATUS_OK if r.get("status_ok") else STATUS_OVER}">'
+                  f'{"✓" if r.get("status_ok") else "▲"} {e(r["status"])}</b>')
+        rows.append(f'<div class="lot-row"><div class="lot-l">{e(r["label"])}</div>'
+                    f'<p>{e(_co2(r["text"]))}{st}</p>'
+                    + (f'<p class="lot-src">Source: {e(_co2(r["source"]))}</p>' if r.get("source") and r["source"] != "—" else "")
+                    + '</div>')
+    return (f'<h2>{e(_co2(L["title"]))}</h2><div class="lot" data-bulletin="lot"><p>{e(L["lede"])}</p>{"".join(rows)}'
+            + (f'<p class="lot-demo">{e(L["demo_note"])}</p>' if L.get("demo_note") else "")
+            + f'<p class="lot-src">{e(L["checked"])}</p></div>')
+
+
 def _council_html(C):
     """The carbon-by-council section of the page; empty for a tenant with no council districts."""
     if not C:
@@ -915,7 +1071,7 @@ def _council_html(C):
                  for g in C["legend"])
     rows = "".join(f'<tr><td><span class="dn"><span class="sw" style="background:{_sw_style(d["fill"], d["cls"] == "nofig")}"></span>'
                    f'<span>{e(d["name"])}</span></span></td><td>{e(d["highway_authority"])}</td><td class="n">{e(_co2(d["text"]))}</td>'
-                   f'<td class="n">{e(d["share"])}</td></tr>' for d in C["districts"])
+                   f'<td class="n">{e(d["share"])}</td><td class="n">{e(d.get("la_share") or "—")}</td></tr>' for d in C["districts"])
     notes = "".join(f"<li>{e(_co2(x))}</li>" for x in C["county_lines"] + C["notes"])
     lic = " ".join(e(x) for x in C["sources"] + C["attribution"])
     return (f'<h2>{e(C["title"])}</h2>'
@@ -923,10 +1079,11 @@ def _council_html(C):
             f'<div class="mapwrap" data-bulletin="council-map">{_svg_council(C)}</div>'
             f'<p class="legend cc-legend">t CO₂e in the month: {sw}</p>'
             f'<div class="tw"><table data-bulletin="council"><thead><tr><th>District</th><th>Highway authority</th>'
-            f'<th>t CO₂e in the month</th><th>Share of the scheme&#39;s</th></tr></thead><tbody>{rows}</tbody></table></div>'
+            f'<th>t CO₂e in the month</th><th>Share of the scheme&#39;s</th><th>Of the district&#39;s road transport, a month (2024)</th></tr></thead><tbody>{rows}</tbody></table></div>'
             f'<p>{e(_co2(C["tally"]))}</p>'
             + (f'<ul>{notes}</ul>' if notes else "")
             + f'<p class="muted">{e(_co2(C["basis"]))} {e(_co2(C["stamp"]))}.</p>'
+            + f'<p class="muted">{e(C.get("la_source") or "")}</p>'
             f'<p class="muted">{lic}</p>')
 
 
@@ -1003,6 +1160,7 @@ def html(S):
         "rep_lorry": e(S["report"]["lorry"]), "rep_hours": e(S["report"]["hours"]), "rep_formats": e(S["report"]["formats"]),
         "foot": e(S["foot"]), "svg_map": _svg_map(S), "svg_chart": _svg_chart(S),
         "glance": glance, "council": _council_html(S["council"]), "council_mv": _council_mv_html(S.get("council_mv")),
+        "lot": _lot_html(S.get("lot")),
         "map_legend": _volume_legend_html(S),
         "notice": notice, "nav": nav, "empty": empty, "head": head, "places": places, "busiest": busiest,
         "moved": moved, "checks": checks, "others": others, "change": change, "terms": terms, "caveats": caveats,
@@ -1051,6 +1209,9 @@ tr.nr td{{color:var(--muted)}} tr.nr td.n{{font-style:italic}}
 .sw{{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.08)}}
 .cc-legend .lg{{display:inline-block;margin-right:12px;white-space:nowrap}}
 .dn{{display:inline-flex;align-items:baseline}} .dn .sw{{flex:none}}   /* 13 Oct 2026: the square never wraps away from its name */
+.lot{{border:1px solid var(--line);border-radius:8px;padding:4px 14px 10px}} .lot-row{{border-bottom:1px solid var(--line);padding:8px 0}}
+.lot-l{{font-size:14px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}} .lot-row p{{margin:4px 0}}
+.lot-src{{font-size:14px;color:var(--muted)}} .lot-demo{{font-size:14px;color:#B91C1C;font-weight:600}} .lot-st{{white-space:nowrap}}
 svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}} svg .cn{{font-weight:700}}
 @media print{{
   @page{{size:A4;margin:14mm}}
@@ -1114,6 +1275,8 @@ never carries a figure. Schematic, not to scale; positions indicative. {places}{
 {council_mv}
 
 {council}
+
+{lot}
 
 <h2>Terms explained</h2>
 <dl>{terms}</dl>

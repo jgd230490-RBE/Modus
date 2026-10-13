@@ -1949,6 +1949,38 @@ def route_diagnostics(route_id, profile=DEFAULT_PROFILE, probe=False):
     return out
 
 
+def road_class_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded"):
+    """
+    13 Oct 2026 (bundle C, decision 2a): what does HERE return when asked for road attributes
+    (functional class, road numbers) on this leg? The endpoints resolve exactly as the bake's
+    (departure_diagnostics' rule). One HERE request; writes nothing; nothing reads the answer.
+    """
+    if leg not in LEGS:
+        return {"error": f"leg must be one of {LEGS}", "leg": leg}
+    r = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route_id))
+    if not r:
+        return {"error": "route not found", "route_id": route_id}
+    r = r[0]
+    locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
+    o, d = locs.get(r["origin_id"]), locs.get(r["dest_id"])
+    if not o or not d:
+        return {"error": "missing origin/destination", "route_id": route_id}
+    if leg == "loaded":
+        a = _waypoint_full(o, "exit", r.get("origin_gate_id"))
+        b = _waypoint_full(d, "entry", r.get("dest_gate_id"))
+    else:
+        a = _waypoint_full(d, "exit", r.get("dest_gate_id"))
+        b = _waypoint_full(o, "entry", r.get("origin_gate_id"))
+    out = {"route_id": route_id, "profile": profile, "leg": leg, "from": [a["lat"], a["lon"]], "to": [b["lat"], b["lon"]],
+           "here_configured": here_routing.configured()}
+    if not out["here_configured"]:
+        out["error"] = "HERE_API_KEY is not set on the server"
+        return out
+    out["probe"] = here_routing.road_class_probe(a["lat"], a["lon"], b["lat"], b["lon"], profile,
+                                                 conversions.load_factors(), laden=(leg == "loaded"))
+    return out
+
+
 def departure_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded", times=None):
     """
     Is a baked route reproducible, or is it a snapshot of the minute it was baked?

@@ -1115,6 +1115,12 @@ def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, 
 BULLETIN_LINE_PX, BULLETIN_CASING_PX = 4, 6       # one width for every route (W11); the casing 2 px wider
 
 
+def bulletin_doc_status(ok):
+    """The status word's colour (bulletin_doc.STATUS_OK / STATUS_OVER), as reportlab's <font color> takes it."""
+    import bulletin_doc
+    return bulletin_doc.STATUS_OK if ok else bulletin_doc.STATUS_OVER
+
+
 def _route_color(r):
     """A map route's Volume colour: the view model's `color`, else worked out from its two-way movements a day."""
     import bulletin_doc
@@ -1589,18 +1595,47 @@ def build_bulletin_pdf(S):
             story.append(P(E(C["error"]), st_grey))
         else:
             cc = [[P("District", st_h), P("Highway authority", st_h), P("t CO2e in the month", st_hr),
-                   P("Share of the scheme's", st_hr)]]
+                   P("Share of the scheme's", st_hr), P("Of the district's road transport, a month (2024)", st_hr)]]
             for d in C["districts"]:
-                cc.append([P(E(d["name"])), P(E(d["highway_authority"])), P(E(d["text"]), st_r), P(E(d["share"]), st_r)])
+                cc.append([P(E(d["name"])), P(E(d["highway_authority"])), P(E(d["text"]), st_r), P(E(d["share"]), st_r),
+                           P(E(d.get("la_share") or "—"), st_r)])
             story.append(KeepTogether([P(E(C["title"]), st_sec), P(E(C["lede"])), Spacer(1, 1.5 * mm),
                                        _CouncilMap(C, usable, 100 * mm), Spacer(1, 1 * mm), _council_legend(C, usable)]))
             story.append(Spacer(1, 1.5 * mm))
-            story.append(grid(cc, [usable * 0.30, usable * 0.34, usable * 0.18, usable * 0.18]))
+            story.append(grid(cc, [usable * 0.24, usable * 0.28, usable * 0.15, usable * 0.13, usable * 0.20]))
             story.append(P(E(C["tally"])))
             for line in C["county_lines"] + C["notes"]:
                 story.append(P(E(line), st_grey))
             story.append(P(E(C["basis"] + " " + C["stamp"] + "."), st_grey))
+            if C.get("la_source"):
+                story.append(P(E(C["la_source"]), st_grey))
             story.append(P(E(" ".join(C["sources"] + C["attribution"])), st_grey))
+
+    # 13 Oct 2026 (W14, D40): "Is <n> t CO2e a lot?" — each row its label, sentence, status word and source
+    L = S.get("lot")
+    if L:
+        st_lab2 = ParagraphStyle("lotl", parent=st, fontName="Helvetica-Bold", fontSize=7.5, leading=9.5,
+                                 textColor=colors.Color(*GREY))
+        lot_rows = []
+        for r in L["rows"]:
+            stw = ""
+            if r.get("status"):
+                hexc = (bulletin_doc_status(r.get("status_ok")))
+                stw = f" <font color='{hexc}'><b>{E(r['status'])}</b></font>"
+            cell = [P(E(r["text"]) + stw)]
+            if r.get("source") and r["source"] != "—":
+                cell.append(P("Source: " + E(r["source"]), st_grey))
+            lot_rows.append([P(E(r["label"].upper()), st_lab2), cell])
+        lt = LongTable(lot_rows, colWidths=[usable * 0.25, usable * 0.75])
+        lt.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.Color(0.85, 0.87, 0.9)),
+                                ("BOX", (0, 0), (-1, -1), 0.6, colors.Color(0.75, 0.78, 0.83)),
+                                ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                                ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5)]))
+        story.append(KeepTogether([P(E(L["title"]), st_sec), P(E(L["lede"])), Spacer(1, 1.5 * mm), lt]))
+        if L.get("demo_note"):
+            story.append(P(f"<b>{E(L['demo_note'])}</b>", ParagraphStyle("ld", parent=st_grey, textColor=colors.Color(*DEMO_FG_RGB))))
+        story.append(P(E(L["checked"]), st_grey))
 
     story.append(P("Terms explained", st_sec))
     for k, v in S["terms"]:
