@@ -805,6 +805,11 @@ T10 = pdf_text(PDF10)
 PAGES = [" ".join(p.split()) for p in T10.split("\f") if p.strip()]
 T10J = " ".join(T10.split())
 T11J = " ".join(pdf_text(PDF11).split())
+PAGES11 = [" ".join(p.split()) for p in pdf_text(PDF11).split("") if p.strip()]
+# 14 Oct 2026 (the publishing check): the Sources are set in two columns; pdftotext -layout reads across the columns line by
+# line, so what is asserted IN the Sources is read in drawing order (-raw), each column whole
+T10R = " ".join(pdf_text(PDF10, raw=True).split())
+PAGESR = [" ".join(p.split()) for p in pdf_text(PDF10, raw=True).split("\f") if p.strip()]
 HTML_TEXT = " ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", " ", HTML10, flags=re.S)).split())
 import html as _hm  # noqa: E402
 HTML_TEXT = _hm.unescape(HTML_TEXT)
@@ -824,27 +829,36 @@ ok("…each figure is the roll-up's (the sheet reads the same headline the JSON 
    S10["rollup"]["headline"] == H and S10["headline"][0]["value"] == f"{H['two_way_a_day']:,.0f}"
    # REVERSED 12 Oct 2026 (the user, evening): whole movements on the page, rounded once from the fractional sum
    and S10["headline"][1]["value"] == f"{H['movements_in_month']:,.0f}" and "." not in S10["headline"][1]["value"])
+# NARROWED 14 Oct 2026 (the publishing check): the label is short; "Working days are the scheme's settings" is in Sources
 ok("…the movements in the month name the working days from the scheme's settings (the roll-up's day count)",
-   S10["headline"][1]["label"] == f"movements in the month ({WD:g} working days, from the scheme's settings)"
-   and f"movements in the month ({WD:g}" in PAGES[0] and "working days, from the scheme's" in PAGES[0])
+   S10["headline"][1]["label"] == f"movements in the month ({WD:g} working days)"
+   and f"movements in the month ({WD:g}" in PAGES[0] and "Working days are the scheme's settings." in T10R)
 ok("⭐ the HTML page carries the SAME four figures as the PDF (one view model): page and PDF cannot disagree",
    all(f'<div class="v">{v.replace("&", "&amp;")}</div>' in HTML10 for v in _fig.values())
    and all(v in HTML_TEXT for v in _fig.values()))
 _KPI = f"Two-way movements = loads (deliveries) per working day ({WD:g}/month); each is a lorry out laden and back empty."
-ok("⭐ page 1: the counting line and the one-sentence definition — the map's kpi-note sentence, verbatim",
-   "Counts are two-way movements: one lorry out laden and back empty is one delivery, counted once, never doubled." in PAGES[0]
-   and _KPI in PAGES[0] and _KPI in HTML_TEXT
+# NARROWED 14 Oct 2026 (the publishing check): page 1 prints the ONE short definition under the figures; the counting line and the map's
+# kpi-note sentence, verbatim, are printed once, in Sources (they were on page 1 and again in the terms)
+ok("⭐ page 1: the one-line definition; the counting line and the map's kpi-note sentence, verbatim, in Sources (PDF and page)",
+   bulletin_doc.DEFINITION in PAGES[0] and bulletin_doc.DEFINITION in HTML_TEXT
+   and "Counts are two-way movements: one lorry out laden and back empty is one delivery, counted once, never doubled." in PAGESR[-1]
+   and _KPI in PAGESR[-1] and _KPI in HTML_TEXT and _KPI not in PAGESR[0]
    and "Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty." in MAP)
+# NARROWED 14 Oct 2026 (the publishing check): in Sources (page 4), with "Other schemes count differently" in the Two-way movement term
 ok("…and the other-schemes line (HS2 counts HGVs visiting the site; EKFB printed each way)",
-   "HS2 prints HGVs visiting the site" in PAGES[0] and "EKFB 2020 printed maximum HGV each way" in PAGES[0])
+   "HS2 prints HGVs visiting the site" in PAGESR[-1] and "EKFB 2020 printed maximum HGV each way" in PAGESR[-1]
+   and "Other schemes count differently." in T10J)
 # NARROWED 13 Oct 2026 (W15, D43: the 4-page newsletter): the busiest routes table opens page 2 ("02 Routes and roads");
 # page 1 names the busiest route in "This month in brief"
-ok("⭐ the busiest routes (page 2 of the newsletter): origin to destination, the planning flag typed on R1 and the plan above it; "
-   "page 1's brief names the busiest route",
-   "Kelsey Quarry to Mill Compound" in PAGES[1] and "Ridge Pit to Mill Compound" in PAGES[1]
-   and "60 a day · plan is above it" in PAGES[1] and "no planning cap typed" in PAGES[1]
-   and "The busiest route is Kelsey Quarry to Mill Compound" in PAGES[0]
-   and S10["busiest"][0]["flag_text"] == "60 a day · plan is above it" and S10["busiest"][0]["over_flag"] is True)
+# NARROWED 14 Oct 2026 (the publishing check): ONE table of every route opens page 2 ("Every route this month", it replaced the busiest
+# table and the chart); its flag cell is short ("60 · above", "—"); the brief says "Busiest route: ..."
+ok("⭐ every route (page 2 of the newsletter): origin to destination, the planning flag typed on R1 and the plan above it; "
+   "page 1's key points name the busiest route",
+   "Every route this month" in PAGES[1] and "Kelsey Quarry to Mill Compound" in PAGES[1] and "Ridge Pit to Mill Compound" in PAGES[1]
+   and "60 · above" in PAGES[1] and "no planning cap typed" not in PAGES[1]
+   and "Busiest route: Kelsey Quarry to Mill Compound" in PAGES[0]
+   and S10["busiest"][0]["flag_text"] == "60 a day · plan is above it" and S10["busiest"][0]["over_flag"] is True
+   and S10["busiest"][0]["flag_short"] == "60 · above" and [r for r in S10["routes"] if r["cap"] is None][0]["flag_short"] == "—")
 ok("…the letter pins: the busiest route's sites are A and B, in the legend under the map",
    [p["letter"] + " " + p["name"] for p in S10["places"]] == ["A Kelsey Quarry", "B Mill Compound", "C Ridge Pit"]
    and S10["busiest"][0]["letters"] == "A → B" and S10["busiest"][1]["letters"] == "C → B")
@@ -852,16 +866,23 @@ ok("…the busiest list is the roll-up's, in its order", [r["route_id"] for r in
 ok("⭐ last month, plan against plan: October's sheet says September had none planned; November's prints October's rate for R1",
    S10["busiest"][0]["last_month_text"] == "none planned"
    and [r for r in S11["routes"] if r["route_id"] == "R1"][0]["last_month_text"] == f"{(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f} a day"
-   and f"{(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f} a day" in T11J)
+   # NARROWED 14 Oct 2026 (the publishing check): the route table's last-month column is headed "Oct" and prints the figure
+   and " Oct " in PAGES11[1].split("Every route this month")[1][:120]
+   and f'<td class="n">{(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f}</td>' in bulletin_doc.html(S11))
 ok("⭐ the roll-up's by_route list ranks EVERY drawn route the same way as the busiest five (the chart and the list agree)",
    R["by_route"][:len(R["busiest_routes"])] == R["busiest_routes"] and {r["route_id"] for r in R["by_route"]} == set(R["routes_in_use"])
    and [r["route_id"] for r in R7["by_route"]] == ["S7", "S6", "S5", "S4", "S3", "S2", "S1"] and R_EMPTY["by_route"] == [])
-ok("⭐ page 2: the chart of movements a day by route, what is being moved, the works, what changed, terms, caveats",
-   all(h in T10J for h in ("Two-way movements a day by route", "What is being moved", "Works affecting the roads in October 2026",
-                           "What changed since last month", "Terms explained", "Caveats"))
-   and "Two-way movements a day by route" not in PAGES[0])
-ok("…the chart's caption names the print treatment and the dashed planning flag", "Dashed red mark: the planning flag typed on the route" in T10J
-   and "flag 60" in T10J)
+# REVERSED 14 Oct 2026 (the publishing check): the chart repeated the route table, so it is gone; each route's bar sits in the table, in its
+# map colour, the planning flag a dashed red mark. Page 2: every route, what is moved, road works and limits, what changed;
+# the last page: terms, caveats, Sources
+ok("⭐ page 2: every route with its bar, what is being moved, the road works and limits, what changed; the last page terms, caveats, Sources",
+   all(h in PAGES[1] for h in ("Every route this month", "What is being moved", "Road works and limits, October 2026",
+                               "What changed since last month"))
+   and all(h in PAGES[-1] for h in ("Terms", "Caveats", "Sources"))
+   and "Two-way movements a day by route" not in T10J and "Terms explained" not in T10J)
+ok("…the table's note names the bar colours and the dashed planning flag; the chart's caption and its 'flag 60' label are gone",
+   "Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark (1 of 2 routes have one)." in T10J
+   and "Dashed red mark: the planning flag typed on the route" not in T10J and "flag 60" not in T10J)
 ok("…what is being moved is the bar's discipline panel, with an All routes row equal to the headline",
    [m["name"] for m in S10["moved"]] == [d["name"] for d in BD["discipline"]] and S10["moved_total"]["a_day"] == _fig["two_way"]
    and S10["moved_total"]["vehicles"] == f"{FLEET:,}")
@@ -871,31 +892,35 @@ ok("⭐ works affecting the roads: the stored A6 closure in October with its dat
 ok("⭐ …the local controls are the zones in force in the month, numbered: the weight limit in; the September closure and the haul road out",
    [(z["n"], z["name"], z["kind"]) for z in S10["controls"]] == [(1, "Mill Lane 7.5 t limit except for access", "weight limit")]
    and "Mill Lane 7.5 t limit except for access" in T10J and "Old bridge closure" not in T10J and "Quarry haul road" not in T10J)
-ok("…the routes never checked are named as never checked — never a clear road",
-   "never checked for 2 of this month's routes (R2, R3); not a clear road." in T10J)
-ok("…the typed cap exceeded reads as a planning flag, never a block",
-   f"Route R1: {(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f} two-way movements a day planned against a planning flag of 60 a day. "
-   "A planning flag is never a block." in T10J)
+# NARROWED 14 Oct 2026 (the publishing check): plain words, no route ids; "never a block" is in the Planning flag term
+ok("…the routes never checked are named as not checked — never a clear road",
+   "2 of this month's routes not checked against published road works: other works may affect them." in T10J
+   and "(R2, R3)" not in T10J)
+ok("…the typed cap exceeded reads as a planning flag, never a block, by the route's places",
+   f"Kelsey Quarry to Mill Compound: {(loads_r1_a + loads_r1_b + loads_r1_c) / WD:,.0f} a day planned, above its planning flag of 60 a day."
+   in T10J and "It flags, never blocks, and is not a legal limit." in T10J and "Route R1" not in T10J)
 ok("⭐ what changed since last month is plan against plan, and says so; October against an empty September; November against October",
-   "Plan against plan: each month's approved plan as it stands today. No earlier issue of this bulletin is stored." in T10J
+   "Each month's approved plan as it stands today." in T10J     # NARROWED 14 Oct 2026: one short line
    and S10["change_text"].startswith("Since September 2026: Two-way movements a day — → 98")
    and f"Since October 2026: Two-way movements a day 98 to {(V11) / WD:,.0f}" in T11J
    and [c["label"] for c in S10["change_rows"]] == ["September 2026", "October 2026", "November 2026 (next)"], S10["change_text"])
+# NARROWED 14 Oct 2026 (the publishing check): the rule is in Sources (the "Counting:" note), once
 ok("⭐ the D28 rule is named: the month's loads summed as typed (fractional), not rounded per line",
-   "The month's loads are summed as typed (fractional), not rounded per line" in T10J)
+   "The month's loads are summed as typed (fractional), not rounded per line" in T10R)
 ok("⭐ whole movements (12 Oct, evening): the terms say the total is shown to the nearest whole movement, and no movement "
    "count on the page carries a decimal (the fractional sum stays in the JSON)",
-   "the total is then shown to the nearest whole movement." in T10J
+   "the total is then shown to the nearest whole movement." in T10R       # NARROWED 14 Oct 2026: in Sources
    and all("." not in r["in_month_text"] for r in S10["routes"])
    and any(abs(r["a_day"] or 0) > 0 for r in S10["routes"]))
 ok("⭐ carbon carries the stamp: planning estimate, DESNZ 2026 basis, not Carbon Tool figures; CO2e spelled so Helvetica prints it",
    "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in T10J and "CO2e = routed km" in T10J
    and "₂" not in "".join(v for _, v in S10["terms"]) and "CO₂e = routed km" in HTML_TEXT
    and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in HTML_TEXT)
+# NARROWED 14 Oct 2026 (the publishing check): the placeholder reads "[contact not set yet]" ("[... a typed field this scheme has not set yet]"
+# read as an error)
 ok("⭐ the report-a-lorry block with the typed fields as placeholders (no invented contact)",
-   "Report a lorry off route: the date, time, place, direction of travel and registration, to [contact line and email: "
-   "a typed field this scheme has not set yet]." in T10J and "Working hours: [a typed field this scheme has not set yet]." in T10J
-   and "@" not in S10["report"]["lorry"])
+   "Report a lorry off route: the date, time, place, direction and registration, to [contact not set yet]." in T10J
+   and "Working hours: [not set yet]." in T10J and "@" not in S10["report"]["lorry"])
 # 12 Oct 2026 (Track C review): the typed tenant.concern_email (the map's "Report a concern" address) is the
 # bulletin's report-a-lorry address too; the placeholder prints only while it is not typed
 _real_ts3 = config.tenant_settings
@@ -908,20 +933,26 @@ try:
 finally:
     config.tenant_settings = _real_ts3
 ok("⭐ report a lorry: a typed concern_email is printed (page and PDF), the placeholder is not",
-   S10C["report"]["lorry"] == "Report a lorry off route: the date, time, place, direction of travel and registration, to "
+   S10C["report"]["lorry"] == "Report a lorry off route: the date, time, place, direction and registration, to "
    "haulage.concerns@example.org." and "haulage.concerns@example.org" in HTML10C and "haulage.concerns@example.org" in T10CJ
-   and "[contact line and email:" not in S10C["report"]["lorry"], S10C["report"]["lorry"])
+   and "[contact" not in S10C["report"]["lorry"], S10C["report"]["lorry"])
 ok("…and with none typed the same block keeps the placeholder (no invented contact)",
-   S10["report"]["lorry"].endswith("[contact line and email: a typed field this scheme has not set yet].")
+   S10["report"]["lorry"].endswith("[contact not set yet].")
    and "concern_email" not in S10["report"]["lorry"])
 # NARROWED 13 Oct 2026 (W15): the band carries the brand title "Lorry movements bulletin · <month>" (the document's own
 # title stays "Lorry movements in <month>"), the as-at stamp and the issue date; the foot adds wayscope.co.uk
 ok("…the frame: the band's title, the as-at stamp and issue date, the plan-only foot on every page",
    "Lorry movements bulletin · October 2026" in PAGES[0] and S10["title"] == "Lorry movements in October 2026"
    and "Approved plan as at 12 October 2026 · Issued 12 October 2026" in PAGES[0]
-   and all("A planning forecast, not a monitoring report · prepared with Wayscope · wayscope.co.uk" in pg for pg in PAGES))
-ok("…the map is the schematic offline, and the caption says so", "schematic from the stored road routes, not to scale" in PAGES[0]
-   and "Routes this month: 2" in PAGES[0])
+   # NARROWED 14 Oct 2026 (the publishing check): the foot is "Planned figures, not counts"; pages 2 on carry a slim
+   # running head (the band's title again, small) and every foot says "n of N"
+   and all("Planned figures, not counts · prepared with Wayscope · wayscope.co.uk" in pg for pg in PAGES)
+   and all(f"{i} of {len(PAGES)}" in pg for i, pg in enumerate(PAGES, 1))
+   and all("Lorry movements bulletin · October 2026" in pg for pg in PAGES[1:]))
+# NARROWED 14 Oct 2026 (the publishing check): the caption is one line ("Routes this month: 2 · ..." went: the table has the count); the map has
+# its own title
+ok("…the map is the schematic offline, and the caption says so", "Schematic from the stored road routes, not to scale." in PAGES[0]
+   and "Routes this month: 2" not in PAGES[0] and "Planned lorry routes, October 2026" in PAGES[0])
 ok("🔴 no team id in the PDF or the page, and no team name either (the per-team rows are not printed, D33)",
    not ID_FORM.search(T10J) and not ID_FORM.search(HTML10) and "North Team" not in T10J + HTML10 and "Central Team" not in T10J + HTML10)
 _BANNED = re.compile(r"\b(secure|real[- ]time|telematics|optimi[sz]e|predict|live tracking)\b", re.I)
@@ -950,26 +981,30 @@ ok("…the page moves a month either way", 'href="/bulletin/?month=9">‹ Septem
    and 'href="/bulletin/?month=11">November 2026 ›</a>' in HTML10)
 _px = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", HTML10)]
 ok("🔴 the 14 px floor: no type on the page is set below 14 px (SVG labels included)", _px and min(_px) >= 14, str(sorted(set(_px))))
-ok("…the routes are blue, the bars in the print treatment (light fill, solid edge), the flag dashed in red with its word",
-   'stroke="#4A72C9"' in HTML10 and 'fill="#D7E0F3" stroke="#4A72C9" stroke-width="2"' in HTML10
-   and 'stroke="#DC2626" stroke-width="2" stroke-dasharray="4 3"><title>planning flag 60 a day</title>' in HTML10
-   and "Dashed red mark: the planning flag typed on the route." in HTML10)
+# REVERSED 14 Oct 2026 (the publishing check): the chart (plan-blue bars, its own flag line) is gone; each route's bar is in the route table,
+# in the route's map colour, the planning flag a dashed red mark with its words in the title
+_rt = HTML10.split('<table data-bulletin="routes">')[1].split("</table>")[0] if '<table data-bulletin="routes">' in HTML10 else ""
+ok("…every route in one table, each bar in its map colour, the flag a dashed red mark with its words; no chart, no plan blue",
+   _rt.count("<tr>") == 1 + len(S10["routes"]) and all(f'background:{r["color"]}' in _rt for r in S10["routes"])
+   and '<span class="bc" style="left:' in _rt and 'title="planning flag 60 a day"' in _rt and '60 · above' in _rt
+   and "border-left:2px dashed var(--flag)" in HTML10 and 'class="chart"' not in HTML10 and 'stroke="#4A72C9"' not in HTML10
+   and "Bars in each route's map colour" in HTML_TEXT)
 # NARROWED 12 Oct 2026 (wording review): 640 px let the 14 px labels of the 720-unit chart render at 12.4 px on a phone
-ok("…the chart scrolls on a phone rather than shrinking its labels; the map is an inline schematic, not a second Mapbox",
-   ".chartwrap svg{min-width:720px}" in HTML10 and "mapbox" not in HTML10.lower())
-_cw = re.search(r'<svg viewBox="0 0 (\d+) \d+" role="img" aria-label="Two-way movements a day by route" class="chart">', HTML10)
-_mw = re.search(r"\.chartwrap svg\{min-width:(\d+)px\}", HTML10)
-ok("🔴 the 14 px floor on a phone: the chart never draws narrower than its viewBox, so its 14 px labels never render below 14 px",
-   bool(_cw and _mw) and int(_mw.group(1)) >= int(_cw.group(1)), str((_cw and _cw.group(1), _mw and _mw.group(1))))
+# REVERSED 14 Oct 2026: there is no chart to scroll; offline the map is the inline schematic, with no basemap image
+ok("…no chart wrapper; offline the map is the inline schematic: no basemap image and no Mapbox credit",
+   "chartwrap" not in HTML10 and "mapbox" not in HTML10.lower() and "<image " not in HTML10
+   and "Schematic, not to scale." in HTML_TEXT)
+ok("🔴 the 14 px floor on a phone: the bar column never squeezes (a min width; the table scrolls in its wrapper)",
+   "td.bar{min-width:200px;white-space:nowrap}" in HTML10 and '<div class="tw"><table data-bulletin="routes">' in HTML10)
 # 12 Oct 2026 (Track C review): the schematic map is 720 units wide with 14 px pin letters; at width:100% on a 375 px
 # phone they drew at about 6.7 px. It now sits in a scrolling wrapper and never draws narrower than its viewBox.
 _mv = re.search(r'<div class="mapwrap" data-bulletin="map"><svg viewBox="0 0 (\d+) \d+" role="img"', HTML10)
 _mm = re.search(r"\.mapwrap svg\{min-width:(\d+)px\}", HTML10)
 ok("🔴 the 14 px floor on a phone: the schematic map never draws narrower than its viewBox (it scrolls instead)",
-   bool(_mv and _mm) and int(_mm.group(1)) >= int(_mv.group(1)) and ".mapwrap{overflow-x:auto}" in HTML10,
+   bool(_mv and _mm) and int(_mm.group(1)) >= int(_mv.group(1)) and ".mapwrap{overflow-x:auto" in HTML10,
    str((_mv and _mv.group(1), _mm and _mm.group(1))))
 ok("…and on paper both figures take the page width (the phone's minimum is reset for print)",
-   ".chartwrap svg,.mapwrap svg{min-width:0}" in HTML10.split("@media print")[1])
+   ".mapwrap svg{min-width:0}" in HTML10.split("@media print")[1])      # NARROWED 14 Oct 2026: no chart
 ok("…every place a person reads text is escaped (a zone typed with markup prints as text)",
    "<script" not in bulletin_doc.html(dict(S10, title="<script>x</script>")).split("<style>")[1].split("</style>")[1]
    .replace("&lt;script&gt;", ""))
@@ -988,10 +1023,12 @@ ok("⭐ glance: the plan's figures equal the headline (two-way a day, movements 
 ok("⭐ glance: the planning flag line counts the routes planned above their typed flag (R1 of the one route with a flag)",
    _G["Routes planned above their planning flag"]["figure"] == "1 of 1")
 ok("⭐ glance: the month's haul carbon is the roll-up's t CO2e in the month, with the DESNZ basis named",
-   _G["Haul carbon in the month"]["figure"] == f"{R['carbon']['co2_t_in_month']:,.1f} t CO2e"
+   # NARROWED 14 Oct 2026 (the publishing check): whole tonnes from 10 t (the panel's own rounding, _t), not one decimal
+   _G["Haul carbon in the month"]["figure"] == bulletin_doc._t(R['carbon']['co2_t_in_month']) + " CO2e" == f"{R['carbon']['co2_t_in_month']:,.0f} t CO2e"
    and "DESNZ 2026" in _G["Haul carbon in the month"]["data"])
-ok("glance: road works say two of the month's routes were never checked (the stored check's own state), never a clear road",
-   "never checked" in _G["Road works, closures and local controls in October 2026"]["data"])
+# NARROWED 14 Oct 2026 (the publishing check): the item is "Road works, closures and local limits"; "2 routes not checked"
+ok("glance: road works say two of the month's routes were not checked (the stored check's own state), never a clear road",
+   _G["Road works, closures and local limits"]["data"] == "2 routes not checked")
 _NR = [g["item"] for g in S10["glance"] if g["not_reported"]]
 ok("⭐ glance: the five things a monitoring report fills from observed records are listed and marked Not reported, never a figure",
    _NR == ["Lorries counted on the roads or at the site gates", "Lorries kept to the approved routes and working hours",
@@ -1001,9 +1038,10 @@ ok("⭐ glance: the five things a monitoring report fills from observed records 
 # NARROWED in build 13 Oct (the rendered PDF): page 1 overflowed and split the table; it now opens page 2
 # NARROWED 13 Oct 2026 (W15, D43): the tracker is part of page 1's summary now, after "This month in brief" (it opened
 # page 2 of the 4-page bulletin of 13 Oct)
-ok("⭐ glance: on page 1 of the newsletter, after the brief, and on the page, with its explanation",
-   "This month at a glance" in PAGES[0] and "This month at a glance" not in PAGES[1]
-   and PAGES[0].index("This month in brief") < PAGES[0].index("This month at a glance") and "Not reported" in T10J and "FORS, CLOCS, Euro VI" in T10J and "Direct Vision" in T10J
+# NARROWED 14 Oct 2026 (the publishing check): the glance moved to the last page (carbon and the small print); page 1 is the front page
+ok("⭐ glance: on the last page of the newsletter, after the carbon panel, and on the page, with its explanation",
+   "This month at a glance" in PAGES[-1] and "This month at a glance" not in PAGES[0] and "This month in brief" not in T10J
+   and "Key points" in PAGES[0] and "Not reported" in T10J and "FORS, CLOCS, Euro VI" in T10J and "Direct Vision" in T10J
    and '<table data-bulletin="glance">' in HTML10 and "never estimated" in HTML_TEXT and "never estimated" in T10J
    and HTML10.count('<tr class="nr">') == 5)
 ok("🔴 no council districts: no carbon-by-council section anywhere, and nothing printed about it",
@@ -1057,10 +1095,13 @@ def _count_open(req, timeout=0):
     raise OSError("harness: counted, not fetched")
 
 
+import basemap  # noqa: E402
 try:
     export.urllib.request.urlopen = _count_open
+    basemap._DOWN_UNTIL[0] = 0.0; basemap._CACHE.clear()
     _n0 = len(_calls); export.build_bulletin_pdf(S10); _no_council_calls = len(_calls) - _n0
     S10A = bulletin_doc.sheet(10, PLANNER, now=datetime.datetime(2026, 10, 12, 9, 0, tzinfo=datetime.timezone.utc))
+    basemap._DOWN_UNTIL[0] = 0.0; basemap._CACHE.clear()
     _n0 = len(_calls); PDF10A = export.build_bulletin_pdf(S10A); _council_calls = len(_calls) - _n0
     HTML10A = bulletin_doc.html(S10A)
 finally:
@@ -1069,6 +1110,7 @@ finally:
 offline(export)
 T10A = pdf_text(PDF10A)
 T10AJ = " ".join(T10A.split())
+T10AR = " ".join(pdf_text(PDF10A, raw=True).split())         # the Sources in drawing order (two columns)
 HTML_TEXT_A = _hm.unescape(" ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", " ", HTML10A, flags=re.S)).split()))
 CA = S10A["council"]
 _D = {d["name"]: d for d in (CA or {}).get("districts") or []}
@@ -1086,35 +1128,45 @@ ok("⭐ council: a district with no approved route is the neutral grey with its 
 ok("council: each orange district's fill is the ramp step its tonnes fall in",
    all(d["fill"] == bulletin_doc.COUNCIL_RAMP[bulletin_doc.council_class(d["co2_t"])] for d in CA["districts"] if d["cls"] not in ("none", "nofig")))
 ok("⭐ council: the tally names the carbon driven OUTSIDE the districts loaded (0.2 of the routes), never silently dropped",
-   CA["tally"] == f"The 3 districts shown carry {_tt(0.8 * _CT)} of the scheme's {_tt(_CT)} CO2e in October 2026; "
-                  f"the other {_tt(0.2 * _CT)} is driven on roads outside them, in council areas not loaded.", CA["tally"])
+   # NARROWED 14 Oct 2026 (the publishing check): one short sentence
+   CA["tally"] == f"The 3 districts carry {_tt(0.8 * _CT)} of the scheme's {_tt(_CT)} CO2e; {_tt(0.2 * _CT)} is driven "
+                  "outside them.", CA["tally"])
 ok("council: shares of the scheme's carbon (50% and 30%) and the highway authority per district",
    _D["Eastshire"]["share"] == "50%" and _D["Westvale"]["share"] == "30%" and _D["Westvale"]["highway_authority"] == "Westvale City Council")
 ok("council: a sliver of the scheme's carbon reads 'under 1%', never 0%",
    bulletin_doc._share(0.4, 100) == "under 1%" and bulletin_doc._share(0.6, 100) == "1%" and bulletin_doc._share(None, 100) == "—"
    and bulletin_doc._share(0, 100) == "—" and bulletin_doc._share(5, None) == "—")
 ok("council: the county's figure is a line of text (its roads, its highway authority), not a second fill",
-   CA["county_lines"] == [f"Testshire (county or unitary authority; highway authority Test County Council): {_tt(0.8 * _CT)} CO2e "
-                          "in October 2026 on its roads."], str(CA["county_lines"]))
+   # NARROWED 14 Oct 2026 (the publishing check): "<highway authority> roads: <t> CO2e."
+   CA["county_lines"] == [f"Test County Council roads: {_tt(0.8 * _CT)} CO2e."], str(CA["county_lines"]))
 # REVERSED 13 Oct 2026 (D40, the user: the council share "for scale"): it asserted "not comparable with the DESNZ local
 # authority greenhouse gas statistics"; the basis now sets each district beside a month of its DESNZ road transport, for scale
 ok("⭐ council: the basis sentence, the for-scale DESNZ wording, the Carbon page's stamp, the boundary source and the ONS / OS licence lines",
-   "Split by the km inside each district; across one tier it adds up to the scheme's carbon." in CA["basis"]
-   and "not comparable" not in CA["basis"] and "for scale only, so read it as \"about\"" in CA["basis"]
-   and "a month (one twelfth of the year) of its road transport emissions in the government's local statistics (DESNZ, 2024" in CA["basis"]
+   # NARROWED 14 Oct 2026 (the publishing check): the basis in two sentences; the sources and licences once, in Sources
+   "Each route's carbon is split by the km driven in each district, so the districts add up to the scheme's figure." in CA["basis"]
+   and "not comparable" not in CA["basis"] and "for scale only" in CA["basis"]
+   and "a month (one twelfth of the year) of its road transport CO2e in the government's local statistics (DESNZ, 2024" in CA["basis"]
    and CA["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
    and CA["sources"] == ["Boundaries: Test districts (May 2026), generalised to 200 m."] and CA["attribution"] == _ATTR)
 ok("⭐ council PDF: the section's title, each district and its figure, the tally, the stamp and both licence lines are in the PDF text",
    "Carbon by council in October 2026" in T10AJ and all(n in T10AJ for n in ("Eastshire", "Westvale", "Farmoor"))
-   and _tt(0.5 * _CT) in T10AJ and "is driven on roads outside them" in T10AJ
-   and "Contains OS data © Crown copyright and database right 2026" in T10AJ
-   and "Source: Office for National Statistics licensed under the Open Government Licence v.3.0" in T10AJ
-   and "not Carbon Tool figures" in T10AJ, T10AJ[-1500:])
-ok("🔴 council PDF: drawing the districts makes NO network call (the same urlopen count as the bulletin without them)",
-   _council_calls == _no_council_calls, f"{_council_calls} vs {_no_council_calls} {_calls}")
+   and _tt(0.5 * _CT) in T10AJ and "is driven outside them" in T10AJ
+   # NARROWED 14 Oct 2026 (the publishing check): the licence lines and the stamp are in Sources, read in drawing order
+   and "Contains OS data © Crown copyright and database right 2026" in T10AR
+   and "Source: Office for National Statistics licensed under the Open Government Licence v.3.0" in T10AR
+   and "not Carbon Tool figures" in T10AR, T10AR[-1500:])
+# REVERSED 14 Oct 2026 (the user: "no map behind the route"): the districts are drawn over a basemap now, so a PDF asks
+# Mapbox for a basemap — the basemap ALONE (no polygon, no route in the URL). The page fit is found on sizing passes with
+# no fetch, and after one refusal nothing more is asked for DOWN_S seconds: ONE refused request per document, with or
+# without districts, never one per map height or per map.
+ok("🔴 council PDF: the only requests are basemaps (no route or polygon in any URL); one refused request per document, never one "
+   "per map height or per map (sizing passes fetch nothing; the back-off)",
+   _no_council_calls == 1 and _council_calls == 1 and all("/styles/v1/mapbox/light-v11/static/" in u and "path-" not in u
+                                                          and "geojson" not in u for u in _calls),
+   f"{_council_calls} vs {_no_council_calls} {[u.split('?')[0] for u in _calls]}")
 ok("⭐ council PDF: 'fictional demo scheme' still on every page, which now number at least three",
    len([p for p in T10A.split("\f") if p.strip()]) >= 3 and all("fictional demo scheme" in p.lower() for p in T10A.split("\f") if p.strip()))
-ok("⭐ council page: an inline SVG of the districts (even-odd fill, white 2.5 px borders), each label with name and figure; no Mapbox",
+ok("⭐ council page: an inline SVG of the districts (even-odd fill, white 2.5 px borders), each label with name and figure; offline no basemap",
    '<div class="mapwrap" data-bulletin="council-map"><svg viewBox="0 0 720 560"' in HTML10A
    and HTML10A.count('fill-rule="evenodd" stroke="#FFFFFF" stroke-width="2.5"') == 3
    and f'<tspan class="cn">Eastshire</tspan>' in HTML10A and f'dy="17">{_tt(0.5 * _CT)}</tspan>' in HTML10A
@@ -1123,9 +1175,12 @@ ok("council page: the district fills are the ramp's and the grey; the legend lis
    f'fill="{_D["Eastshire"]["fill"]}" fill-rule="evenodd"' in HTML10A and 'fill="#E7E5E4" fill-rule="evenodd"' in HTML10A
    and all(t in HTML_TEXT_A for t in ("under 50 t", "50 to 99 t", "100 to 199 t", "200 t and over", "no approved route", "no figure (never a zero)")))
 ok("council page: the table (district, highway authority, t CO₂e, share), the tally, the licence lines, the stamp",
-   '<table data-bulletin="council">' in HTML10A and "Westvale City Council" in HTML_TEXT_A and "is driven on roads outside them" in HTML_TEXT_A
-   and "Contains OS data © Crown copyright and database right 2026" in HTML_TEXT_A and "not Carbon Tool figures" in HTML_TEXT_A
-   and "t CO₂e in the month" in HTML_TEXT_A)
+   # NARROWED 14 Oct 2026 (the publishing check): the licences and the stamp are in Sources at the foot (once); the column
+   # head is "t CO₂e"
+   '<table data-bulletin="council">' in HTML10A and "Westvale City Council" in HTML_TEXT_A and "is driven outside them" in HTML_TEXT_A
+   and "Contains OS data © Crown copyright and database right 2026" in HTML_TEXT_A.split("Sources")[-1]
+   and "not Carbon Tool figures" in HTML_TEXT_A.split("Sources")[-1]
+   and "<th class=\"n\">t CO₂e</th>" in HTML10A)
 _pxA = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", HTML10A)]
 ok("🔴 the 14 px floor holds with the council section (its labels 14 px; the 720-unit map scrolls on a phone, never shrinks)",
    _pxA and min(_pxA) >= 14 and ".mapwrap svg{min-width:720px}" in HTML10A, str(sorted(set(_pxA))))
@@ -1172,9 +1227,12 @@ finally:
 ok("🔴 council: a failed areas read keeps the section and says the figures could not be read (never a blank map of zeros)",
    CE["error"] == "The council figures could not be read for October 2026 (RuntimeError)." and CE["districts"] == []
    and "could not be read" in bulletin_doc._council_html(CE) and "could not be read" in " ".join(pdf_text(export.build_bulletin_pdf(dict(S10A, council=CE))).split()))
-ok("council: the shared projection — one projector for the page and the PDF (bulletin_doc.projector over council_points)",
+# NARROWED 14 Oct 2026: with no basemap the schematic projector; with one, Mapbox's own projection — both over council_points
+ok("council: the shared projection — one projector for the page and the PDF (bulletin_doc.projector over council_points), "
+   "or the basemap's view of the same points",
    "bulletin_doc.projector(bulletin_doc.council_points(C), w, h, 3 * mm)" in read("backend/export.py")
-   and "proj = projector(council_points(C), w, h, 16)" in read("backend/bulletin_doc.py"))
+   and "P, img, v = _map_view(council_points(C), w, h, 16)" in read("backend/bulletin_doc.py")
+   and "_basemap_box(bulletin_doc.council_points(self.C), self.width, self.height, 20)" in read("backend/export.py"))
 
 # the static map's URL (a capturing stub, never the network)
 _seen = []
@@ -1185,30 +1243,64 @@ def _capture(req, timeout=0):
     raise OSError("harness: captured, not fetched")
 
 
-export.urllib.request.urlopen = _capture
-_none = export.bulletin_map_png(S10["map_routes"], S10["places"], S10["controls"], token="pk.test")
-_u = _seen[0] if _seen else ""
-# REVERSED 13 Oct 2026 (W11, the user's bundle B): the routes were one plan blue with the width by volume (R1 8 px, R2
-# thinner); each now takes the public map's Volume colour for its two-way movements a day, all at ONE width over the
-# map's dark casing. R1 (~65 a day) is the 50-100 step, R2 (~23 a day) the 10-25 step.
+# REVERSED 14 Oct 2026 (the user: "no map behind the route"): the routes in the static-image URL (one plan blue, then
+# bundle B's Volume colours with a casing per route and the shared sections on top) never fitted Mapbox's 8,192-character
+# limit for a real month, so every PDF fell back to the blank schematic. basemap.py asks for the BASEMAP ALONE (a short
+# URL whatever the month) and the routes, sections, pins and district fills are drawn over it in vector, in Mapbox's own
+# projection. The URL is read off a capturing stub; the projection is checked by hand.
+import basemap  # noqa: E402
 _r1, _r2 = (LOADS - loads_r2) / WD, loads_r2 / WD
-ok("⭐ the static map: each route in its Volume colour (R1 50-100 a day = #0B55CB, R2 10-25 = #5A96F6), ONE width (4 px) over "
-   "a 6 px dark casing per route, letter pins, the numbered amber control, within the URL limit; no plan-blue width-by-volume path",
-   _none is None and len(_seen) == 1 and 50 <= _r1 < 100 and 10 <= _r2 < 25
-   and "path-4+0B55CB-1(" in _u and "path-4+5A96F6-1(" in _u and _u.count("path-6+1F2024-0.9(") == 2
-   and not re.search(r"path-\d+\+4A72C9", _u) and not re.search(r"path-(?!4\+|6\+1F2024)\d+\+", _u)
-   and _u.index("path-6+1F2024") < _u.index("path-4+")
-   and _u.index("path-4+5A96F6") < _u.index("path-4+0B55CB")
-   and "pin-s-a+1F2024(" in _u and "pin-s-b+1F2024(" in _u and "pin-s-1+D97706(" in _u and len(_u) <= 8000
-   and "/styles/v1/mapbox/light-v11/static/" in _u, _u[:300])
+basemap._CACHE.clear(); basemap._DOWN_UNTIL[0] = 0.0          # the earlier refusals set the back-off
+_v = basemap.view(bulletin_doc.map_points(S10), 1280, 600, 40)
+basemap.urllib.request.urlopen = _capture
+_none = basemap.fetch(_v, token="pk.test")
+_down_after_refusal = basemap._DOWN_UNTIL[0] > 0
+_seen_n = len(_seen)
+basemap.fetch(basemap.view([(0.0, 51.0), (0.1, 51.1)], 400, 300), token="pk.test")
+ok("🔴 basemap back-off: after a refused fetch the next one asks nothing (a document never waits on Mapbox twice)",
+   _down_after_refusal and len(_seen) == _seen_n)
+_seen[_seen_n:] = []
+basemap._DOWN_UNTIL[0] = 0.0
+_u = _seen[0] if _seen else ""
+ok("⭐ the basemap URL: the light style, the view's centre and zoom, @2x, the token — and NO overlay (no path, no pin), so it "
+   "always fits; a refused fetch is None (the caller draws the schematic)",
+   _none is None and len(_seen) == 1
+   and _u.startswith(f"https://api.mapbox.com/styles/v1/mapbox/light-v11/static/{_v['lon']:.5f},{_v['lat']:.5f},{_v['zoom']:.2f},0/1280x600@2x?access_token=pk.test")
+   and "path-" not in _u and "pin-" not in _u and "geojson" not in _u and len(_u) < 200, _u)
 _many = [{"route_id": f"X{i}", "coords": [(-1.0 + j * 0.0013 + i * 0.01, 52.5 + ((j * 7919) % 97) * 0.0011) for j in range(500)],
-          "a_day": i, "weight": i / 40} for i in range(1, 41)]
-_seen.clear()
-export.bulletin_map_png(_many, S10["places"], S10["controls"], token="pk.test")
-ok("🔴 forty long routes: the URL is thinned (or the pins dropped) to fit 8,000 characters — never sent over the limit",
-   all(len(u) <= 8000 for u in _seen), str([len(u) for u in _seen]))
-export.urllib.request.urlopen = _real_urlopen
+          "a_day": i} for i in range(1, 41)]
+_seen.clear(); basemap._DOWN_UNTIL[0] = 0.0
+basemap.fetch(basemap.view([c for r in _many for c in r["coords"]], 1280, 600, 40), token="pk.test")
+ok("🔴 forty long routes: the URL is the same short basemap request (routes are never in it), far under 8,000 characters",
+   len(_seen) == 1 and len(_seen[0]) < 200 and "path-" not in _seen[0], str([len(u) for u in _seen]))
+_seen.clear(); basemap._DOWN_UNTIL[0] = 0.0
+basemap.fetch(_v, token="pk.test", retina=False)
+ok("…the HTML page asks for @1x (the PNG is inlined in the page), the PDF for @2x",
+   len(_seen) == 1 and "/1280x600?access_token" in _seen[0] and "@2x" not in _seen[0])
+basemap.urllib.request.urlopen = _real_urlopen
 offline(export)
+# the projection, by hand: the view's centre is the image's centre; every framed point lands inside the padding
+_pc = basemap.project(_v, _v["lon"], _v["lat"])
+_pp = [basemap.project(_v, *pt) for pt in bulletin_doc.map_points(S10)]
+ok("⭐ basemap projection (hand): the centre at the image centre; every route point, pin and control inside the 40 px padding; "
+   "the zoom kept to two decimals so the URL and the drawing use the same one",
+   abs(_pc[0] - 640) < 1e-6 and abs(_pc[1] - 300) < 1e-6
+   and all(39 <= x <= 1241 and 39 <= y <= 561 for x, y in _pp) and _v["zoom"] == round(_v["zoom"], 2)
+   and (max(x for x, _ in _pp) - min(x for x, _ in _pp) > 1100 or max(y for _, y in _pp) - min(y for _, y in _pp) > 500))
+# Web Mercator by hand: at zoom z one degree of longitude is 512 × 2^z / 360 px
+_v0 = dict(_v, lon=0.0, lat=0.0, cx=0.5, cy=0.5, zoom=1.0)
+ok("basemap projection (hand): one degree of longitude at zoom 1 is 1024/360 px; north is up (smaller y)",
+   abs(basemap.project(_v0, 1.0, 0.0)[0] - 640 - 1024 / 360) < 1e-9 and basemap.project(_v0, 0.0, 10.0)[1] < 300)
+# the scale bar: a round length near the asked width, from the ground resolution at the centre latitude
+_km, _px = basemap.scale(dict(_v0, lat=52.5, zoom=10.0), 110)
+_mpp = 40075016.686 * math.cos(math.radians(52.5)) / (512 * 2 ** 10)
+ok("basemap scale (hand): at 52.5° N, zoom 10, a bar near 110 px is a round km length, drawn at exactly km ÷ metres a pixel",
+   _km in (0.5, 1, 2, 5, 10) and abs(_px - _km * 1000 / _mpp) < 1e-9 and 110 / 1.6 <= _px <= 110 * 1.6, str((_km, _px)))
+ok("🔴 the old route-in-URL map is gone (no bulletin_map_png, no static path or pin overlay built anywhere)",
+   not hasattr(export, "bulletin_map_png") and "path-" not in read("backend/basemap.py") and "path-{" not in _EXB
+   and "pin-s-" not in _EXB)
+ok("🔴 basemap: the cache key is the URL WITHOUT the token; nothing is written to disk",
+   'key = u.split("?", 1)[0]' in read("backend/basemap.py") and not re.search(r"(?<!url)open\(", read("backend/basemap.py")))
 
 
 # --------------------------------------------------------------------------- #
@@ -1244,13 +1336,16 @@ ok("⭐ W11 page: every route at ONE width (5) in its Volume colour over a 7.5 c
    _svgm.count('stroke-width="5"') == 2 and _svgm.count('stroke="#1F2024" stroke-width="7.5"') == 2
    and 'stroke="#0B55CB" stroke-width="5"' in _svgm and 'stroke="#5A96F6" stroke-width="5"' in _svgm
    and "#4A72C9" not in _svgm and _svgm.index('stroke-width="7.5"') < _svgm.index('stroke-width="5"'))
-ok("⭐ W11 page: the legend under the map — the title for the month and the five swatches; the old 'thicker' line is gone",
-   'data-bulletin="map-legend"><b>Two-way movements a day in October 2026:</b>' in HTML10
+# NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the legend title is "Two-way movements a day" (the map's own title names the month); the
+# long "one width" sentences went (one width is a drawing rule, held at source below, not a thing a reader needs told)
+ok("⭐ W11 page: the legend under the map — its title and the five swatches; the old 'thicker' line and the long one-width line are gone",
+   'data-bulletin="map-legend"><b>Two-way movements a day:</b>' in HTML10
    and all(f"background:{c}" in HTML10.split('data-bulletin="map-legend"')[1].split("</p>")[0] for c in bulletin_doc.VOLUME_RAMP)
-   and "thicker" not in HTML10 and "one width, so a width never carries a figure" in HTML_TEXT)
-ok("⭐ W11 PDF: page 1 carries the legend (title and the five ranges) and the caption says one width; 'thicker' nowhere",
-   "Two-way movements a day in October 2026:" in PAGES[0] and all(t in PAGES[0] for t in ("under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"))
-   and "Volume colour for its two-way movements a day, one width" in PAGES[0] and "thicker" not in T10J)
+   and "thicker" not in HTML10 and "one width, so a width never carries a figure" not in HTML_TEXT
+   and "Planned lorry routes, October 2026" in HTML_TEXT)
+ok("⭐ W11 PDF: page 1 carries the legend (title and the five ranges); 'thicker' and the long caption nowhere",
+   "Two-way movements a day:" in PAGES[0] and all(t in PAGES[0] for t in ("under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"))
+   and "Volume colour for its two-way movements a day, one width" not in PAGES[0] and "thicker" not in T10J)
 ok("🔴 W11 source: no line width is worked out from a volume in the bulletin's drawing code or the view model any more",
    all(x not in _EXB + read("backend/bulletin_doc.py") for x in ('r["weight"]', "r['weight']", '"weight":', "1.5 + 5 *", "0.8 + 3.2 *")))
 ok("🔴 W11 source: the schematic and the page draw the casing then the colour, at fixed widths",
@@ -1261,12 +1356,15 @@ ok("🔴 W11 source: the schematic and the page draw the casing then the colour,
 # W11 — the shared road sections, each by its routes summed (the map's Volume heat map: routes by their own figure,
 # shared sections summed on top). R1 and R2 run the same road in the fixture, so after the index is built it is ONE shared
 # section carrying both routes' loads (~98 a day, the 50-100 step), while each route alone is lighter.
-ok("W11: with no shared-section index the map draws the routes only, and the note says 0 shared sections in the map's words",
-   S10["map_sections"] == [] and S10["map_note"].startswith("Each route is painted by its own figure; 0 shared sections"))
+# NARROWED 14 Oct 2026 (the publishing check: legends too wordy): one short sentence each way
+ok("W11: with no shared-section index the map draws the routes only, and the note says each route has its own colour",
+   S10["map_sections"] == [] and S10["map_note"] == "Each route is coloured by its own two-way movements a day.")
 _mapfoot = re.search(r"'<div class=\"ml-foot\">Each route is painted by its own figure; ' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+\s*' \(a stretch of road two or more routes use\) by the routes using it, summed", MAP)
-ok("⭐ W11 held equal: the note is the map's Volume legend foot, word for word up to 'summed'",
-   bool(_mapfoot) and bulletin_doc.map_note(3) == "Each route is painted by its own figure; 3 shared sections (a stretch of road two or more routes use) by the routes using it, summed."
-   and bulletin_doc.map_note(1).startswith("Each route is painted by its own figure; 1 shared section ("))
+# NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the bulletin's note is no longer the map's legend foot word for
+# word (that foot is still the map's, unchanged); it says the same rule in one sentence
+ok("⭐ W11: the note says the map's rule in one sentence (shared roads show the routes' total); the map's own foot is unchanged",
+   bool(_mapfoot) and bulletin_doc.map_note(3) == "Where routes share a road, its colour shows their total."
+   and bulletin_doc.map_note(1) == bulletin_doc.map_note(3) and "Each route is painted" not in bulletin_doc.map_note(3))
 import road_sections  # noqa: E402
 _rb = road_sections.rebuild()
 config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
@@ -1287,16 +1385,16 @@ _svgs = HTML10S.split('data-bulletin="map">')[1].split("</svg>")[0]
 ok("⭐ W11 page: the shared section is drawn ON TOP of the routes (after them), with its own casing, in its summed colour",
    _svgs.count('class="sec"') == 2 and _svgs.rindex('stroke="#5A96F6"') < _svgs.index('class="sec"')
    and 'stroke="#0B55CB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by 2 routes: 98 two-way movements a day</title>' in _svgs
-   and "Each route is painted by its own figure; 1 shared section (a stretch of road two or more routes use) by the routes using it, summed." in _hm.unescape(HTML10S))
-ok("W11 PDF: the note under the legend names the one shared section",
-   "1 shared section (a stretch of road two or more routes use) by the routes using it, summed." in " ".join(pdf_text(PDF10S).split()))
-_seen.clear(); export.urllib.request.urlopen = _capture
-export.bulletin_map_png(S10S["map_routes"], S10S["places"], S10S["controls"], token="pk.test", sections=S10S["map_sections"])
-export.urllib.request.urlopen = _real_urlopen; offline(export)
-_us = _seen[0] if _seen else ""
-ok("⭐ W11 static map: the section's casing and its summed colour come AFTER every route path (on top), within the URL limit",
-   _us.count("path-6+1F2024-0.9(") == 3 and _us.count("path-4+0B55CB-1(") == 2
-   and _us.rindex("path-4+5A96F6") < _us.rindex("path-6+1F2024") < _us.rindex("path-4+0B55CB") and len(_us) <= 8000, _us[:200])
+   and "Where routes share a road, its colour shows their total." in _hm.unescape(HTML10S))
+# NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the one-sentence note
+ok("W11 PDF: the note under the legend says shared roads show the routes' total",
+   "Where routes share a road, its colour shows their total." in " ".join(pdf_text(PDF10S).split()))
+# REVERSED 14 Oct 2026: the sections were paths in the static-image URL; they are drawn over the basemap in vector now,
+# casing then summed colour, after every route (the drawing code, read at source)
+_dbs = _EXP[_EXP.index("def _draw_bulletin_schematic("):_EXP.index("class _BulletinMap(")]
+ok("⭐ W11 map: the section's casing and its summed colour are drawn AFTER every route (on top), over the basemap or the schematic",
+   _dbs.index('for r in S["map_routes"]:') < _dbs.index('for sct in S.get("map_sections") or []:')
+   and "_hex_rgb(sct[\"color\"])" in _dbs)
 _real_rl = road_sections.road_load
 
 
@@ -1315,8 +1413,10 @@ ok("🔴 W11: a failed shared-section read keeps the routes on the map and SAYS 
    S10F["map_sections"] == [] and len(S10F["map_routes"]) == 2
    and S10F["sections_note"] == "The shared road sections could not be read (RuntimeError): each route is painted by its own figure only."
    and "could not be read (RuntimeError)" in bulletin_doc._volume_legend_html(S10F))
+# NARROWED 14 Oct 2026 (the publishing check): the same caveat in one short sentence
 ok("W11: the caveat is NARROWED — the map now colours shared roads by their sum; the tables stay per route; no figure on a road",
-   "the route map colours each shared stretch by that sum, but prints no figure on it." in " ".join(S10S["caveats"])
+   "The tables are per route; on a road several routes share, the lorries are their sum (the map colours it, with no figure "
+   "printed)." in " ".join(S10S["caveats"])
    and "does not yet print a figure per road" not in " ".join(S10S["caveats"]))
 
 # W12 — the council bands per scheme, in Config, read by the map and the bulletin
@@ -1400,7 +1500,7 @@ ok("⭐ W13 (hand): Eastshire and Westvale each carry BOTH routes' loads ÷ work
 ok("⭐ W13: the double count — the districts add up to MORE than the scheme, no total row, and the footnote says why in the "
    "map's own words (areas.DOUBLE_COUNT)",
    _DM["Eastshire"]["a_day"] + _DM["Westvale"]["a_day"] > H["two_way_a_day"]
-   and MB["footnote"].startswith(areas.DOUBLE_COUNT) and MB["scheme_line"] == "The scheme as a whole: 98 two-way movements a day in October 2026."
+   and MB["footnote"].startswith(areas.DOUBLE_COUNT) and MB["scheme_line"] == "Whole scheme: 98 two-way movements a day."     # NARROWED 14 Oct 2026
    and areas.DOUBLE_COUNT in _A10["basis"])
 ok("⭐ W13 held equal: the map's district card says the same rule (the first clause of areas.DOUBLE_COUNT, word for word)",
    "a route counts in every area its laden leg enters" in MAP
@@ -1412,7 +1512,7 @@ _DMM = {d["name"]: d for d in S10M["council_mv"]["districts"]}
 ok("⭐ W13: a miles tenant reads lorry-miles (the km ÷ 1.609344), headed so",
    S10M["council_mv"]["distance_head"] == "Lorry-miles in the month"
    and near(_DMM["Eastshire"]["distance"], _DM["Eastshire"]["distance"] / 1.609344, 0.01)
-   and "Lorry-miles: laden and empty" in S10M["council_mv"]["footnote"])
+   and "Lorry-miles: loaded and empty" in S10M["council_mv"]["footnote"])      # NARROWED 14 Oct 2026: plain "loaded"
 _DM11 = {d["name"]: d for d in S11B["council_mv"]["districts"]}
 ok("⭐ W13 (hand): the change since last month on the WHOLE figures printed — October 98 → November 77 is 'down 21'; "
    "September had none, so October reads 'new this month'",
@@ -1428,11 +1528,11 @@ ok("⭐ W13 page: the table (district, movements, routes, lorry distance, change
    '<table data-bulletin="council-movements">' in HTML10B and "Movements by council in October 2026" in HTML_TEXT_B
    and "Change since September 2026" in HTML_TEXT_B and "Lorry-km in the month" in HTML_TEXT_B
    and 'data-bulletin="double-count">' + areas.DOUBLE_COUNT.replace("'", "&#x27;") in HTML10B
-   and "The scheme as a whole: 98 two-way movements a day in October 2026." in HTML_TEXT_B
+   and "Whole scheme: 98 two-way movements a day." in HTML_TEXT_B       # NARROWED 14 Oct 2026
    and HTML10B.index("Movements by council") < HTML10B.index("Carbon by council"))
 ok("⭐ W13 PDF: the section's title, each district with its figure and change, the scheme line and the double-count footnote",
    "Movements by council in October 2026" in T10BJ and "new this month" in T10BJ and "no approved laden route" in T10BJ
-   and "The scheme as a whole: 98 two-way movements a day" in T10BJ and areas.DOUBLE_COUNT in T10BJ
+   and "Whole scheme: 98 two-way movements a day." in T10BJ and areas.DOUBLE_COUNT in T10BJ       # NARROWED 14 Oct 2026
    and T10BJ.index("Movements by council") < T10BJ.index("Carbon by council"))
 ok("⭐ W13 PDF: 'fictional demo scheme' on every page, with both council sections in",
    all("fictional demo scheme" in p.lower() for p in T10B.split("\f") if p.strip()))
@@ -1463,22 +1563,29 @@ def _legend_overlaps(dr):
     labels = strs[1:]
     for i, lb in enumerate(labels):
         end = lb.x + _sw(lb.text, lb.fontName, lb.fontSize)
-        nxt = labels[i + 1].x - 10.5 if i + 1 < len(labels) else _U
+        # 14 Oct 2026: a legend may run on to a second row; the next swatch is only "next" on the same row
+        nxt = labels[i + 1].x - 10.5 if i + 1 < len(labels) and labels[i + 1].y == lb.y else _U
         if end > nxt:
             bad.append((lb.text, round(end, 1), round(nxt, 1)))
     return bad
 
 
+# NARROWED 14 Oct 2026 (the publishing check): margins 15 mm (the page is 180 mm wide inside), legends at 7.5 pt (they
+# shrank to 5.5), and the route map's legend measured too
+_U = 210 * _mm - 30 * _mm
 ok("🔴 the PDF legends never overlap: the title before the first swatch, each label before the next swatch, the row inside the page",
    _legend_overlaps(export._council_legend(MB, _U, "Two-way movements a day:")) == []
-   and _legend_overlaps(export._council_legend(CB, _U)) == [],
+   and _legend_overlaps(export._council_legend(CB, _U)) == []
+   and _legend_overlaps(export._volume_legend(S10, _U)) == []
+   and min(x.fontSize for x in export._council_legend(CB, _U).contents if type(x).__name__ == "String") >= 7.0
+   and min(x.fontSize for x in export._volume_legend(S10, _U).contents if type(x).__name__ == "String") >= 7.5,
    str((_legend_overlaps(export._council_legend(MB, _U, "Two-way movements a day:")), _legend_overlaps(export._council_legend(CB, _U)))))
+# NARROWED 14 Oct 2026 (the publishing check): the caption is ONE short line (the credit, or "not to scale"), right
+# under the map; the map has its own title above it
 _cap = export._BulletinMapCaption(types.SimpleNamespace(kind="schematic"), 19)
-ok("🔴 the map caption is two lines, each inside the page width (it ran off the page as one)",
-   _cap.height >= 8 * _mm
-   and _sw("Routes this month: 19 · each route in the public map's Volume colour for its two-way movements a day, one width",
-           "Helvetica", 7.5) <= _U
-   and "A schematic from the stored road routes, not to scale (no map tiles)." in T10J)
+ok("🔴 the map caption is one short line inside the page width; the schematic says it is not to scale",
+   _cap.height < 8 * _mm and _sw("Schematic from the stored road routes, not to scale.", "Helvetica", 7.5) <= _U
+   and "Schematic from the stored road routes, not to scale." in T10J and "(no map tiles)" not in T10J)
 
 # 13 Oct 2026 (seen at 375 px in the built-in browser): the colour square wrapped above "Harborough"; it is now held to its name
 ok("🔴 both council tables keep each colour square beside its district name on a phone (inline-flex, the square never shrinks)",
@@ -1573,9 +1680,11 @@ _L = {r["label"]: r for r in LOT10["rows"]}
 ok("⭐ the panel: six rows in the brief's order, titled 'Is <n> t CO2e a lot?' with the month's haul carbon",
    [r["label"] for r in LOT10["rows"]] == ["Against the plan", "Against last month", "Against the target",
                                            "The council's figures", "In everyday terms", "Per tonne, per movement"]
-   and LOT10["title"] == f"Is {_tt(_c10)} CO2e a lot?" and _c10 > 0, str([r["label"] for r in LOT10["rows"]]))
+   and LOT10["title"] == f"Is {_tt(_c10)} of CO2e a lot?" and _c10 > 0, str([r["label"] for r in LOT10["rows"]]))
 ok("⭐ row 1: NOT REPORTED — the bulletin is the plan; no measured carbon is invented to set against it",
-   _L["Against the plan"]["text"].startswith("Not reported. This bulletin is the approved plan") and _L["Against the plan"]["status"] is None)
+   # NARROWED 14 Oct 2026 (the publishing check): one plain sentence
+   _L["Against the plan"]["text"] == "Not reported: nothing was counted, so there is no measured carbon to compare with the plan."
+   and _L["Against the plan"]["status"] is None)
 ok("⭐ row 2 (hand): September had no approved haul, so October says so (never a % of nothing)",
    _L["Against last month"]["text"] == "There was no approved haul in September 2026.")
 _c11 = S11B["rollup"]["carbon"]["co2_t_in_month"]
@@ -1587,7 +1696,9 @@ ok("⭐ row 3: no target in the fixture — 'No carbon target set yet.', never 0
 ok("row 4: the fixture's districts are not in the government table, so the row says so by name and code (never a guess)",
    _L["The council's figures"]["text"] == "No government figure for Eastshire (code E1).")
 ok("⭐ row 5 (hand): the month's tonnes as cars driven for a month, the range from the table",
-   _L["In everyday terms"]["text"] == f"{_tt(_c10)} is {comparisons.car_equivalents(_c10)['words']}, tailpipe only, the same basis as the lorries."
+   # NARROWED 14 Oct 2026 (the publishing check): the figure is in the title; "exhaust only" is the plain word for tailpipe
+   _L["In everyday terms"]["text"] == (comparisons.car_equivalents(_c10)['words'][0].upper() + comparisons.car_equivalents(_c10)['words'][1:]
+                                       + " (exhaust only, as for the lorries).")
    and "0.16591 kg CO2e per km" in _L["In everyday terms"]["source"] and "7,100 miles a car in 2025" in _L["In everyday terms"]["source"]
    and "15% either side" in _L["In everyday terms"]["source"])
 ok("⭐ row 6 (hand): kg CO2e per tonne (÷ 60,400 t) and per two-way movement (÷ the month's loads)",
@@ -1616,8 +1727,9 @@ _eK = 100 * _DK["Eastshire"]["co2_t"] / (24.0 * 1000 / 12)
 ok("⭐ row 4 (hand, a table that knows the codes): the district with the most haul carbon against a month of ITS figures, "
    "'about', with the road basis; no motorway → A and minor roads",
    next(r for r in _LK["rows"] if r["label"] == "The council's figures")["text"]
-   == f"In Eastshire, {_tt(_DK['Eastshire']['co2_t'])} is {comparisons.about(comparisons.pct_words(_eK))} of a month of the district's road "
-      "transport emissions (A and minor roads: the government figures give no motorway in the district). Each district is in the Carbon by council table.")
+   # NARROWED 14 Oct 2026 (the publishing check): the road basis in three words; the table is on the page before
+   == f"In Eastshire, {_tt(_DK['Eastshire']['co2_t'])} is {comparisons.about(comparisons.pct_words(_eK))} of a month of all road "
+      "transport CO2e in the district (2024; A and minor roads).")
 # NARROWED 13 Oct 2026 (the rendered newsletter: "(A and minor)" wrapped the narrow column): a † and one footnote
 ok("⭐ the council table's for-scale column: each district against a month of its own road transport; † where no "
    "motorway (one footnote says so); '—' with no haul; 'no government figure' when the code is not in the table",
@@ -1645,17 +1757,22 @@ finally:
     carbon_target.get, carbon_target.status = _real_get, _real_status
 ok("⭐ D44 (hand): October's allowance = target 100 × 120 ÷ 400 = 30 t; 25 t all-in with the decisions is WITHIN it (word + colour)",
    abs(_T10["allowance_t"] - 30.0) < 1e-9 and _T10["month_t"] == 25.0 and _T10["status"] == "Within the allowance" and _T10["status_ok"]
-   and _T10["text"].startswith("25 t CO2e all-in in October 2026 with the agreed decisions, against an allowance of 30 t."))
+   # NARROWED 14 Oct 2026 (the publishing check): the panel's title names the month
+   and _T10["text"].startswith("25 t CO2e all-in with the agreed decisions, against an allowance of 30 t."), _T10["text"])
 ok("⭐ D44 (hand): November's allowance = 100 × 280 ÷ 400 = 70 t; 80 t is OVER by 10 t, said in words",
    abs(_T11["allowance_t"] - 70.0) < 1e-9 and _T11["status"] == "Over the allowance" and not _T11["status_ok"]
    and "against an allowance of 70 t: 10 t over." in _T11["text"])
 ok("🔴 the target row is ALL-IN and says so beside the haul figures; it reads the scheme's target even for a team code (D37)",
-   "All-in means making the material, transport and waste disposal" in _T10["text"]
+   "All-in includes making the material, so it is larger than the haul figures." in _T10["text"]     # NARROWED 14 Oct 2026
    and _seen_acc[0].get("ipt") is None and _seen_acc[0].get("role") == "submitter")
 _P10K = export.build_bulletin_pdf(dict(S10A, lot=dict(LOT10, rows=LOT10["rows"][:2] + [_T11] + LOT10["rows"][3:])))
 _T10KJ = " ".join(pdf_text(_P10K).split())
-ok("⭐ the panel in the PDF: the title, each row's label, the status word, every source and the demo note",
+# NARROWED 14 Oct 2026 (the publishing check): each row's source is a reference number into one Sources list (no
+# "Source:" line under every row); the sources are all still printed, once
+ok("⭐ the panel in the PDF: the title, each row's label, the status word, every source (once, numbered) and the demo note",
    LOT10["title"] in _T10KJ and all(r["label"].upper() in _T10KJ for r in LOT10["rows"]) and "Over the allowance" in _T10KJ
+   and "Source:" not in _T10KJ.split("Is ")[1].split("This month at a glance")[0]
+   and all(isinstance(r.get("ref"), int) for r in LOT10["rows"] if r["source"] != "—")
    and "Source: DfT National Travel Survey" not in _T10KJ.replace("; DfT National Travel Survey", "")
    and "NTS0901a" in _T10KJ and "Table 1.1" in _T10KJ and "Fictional demo scheme: the plan, the target and the tonnes are invented" in _T10KJ
    and "Factors checked 13 October 2026." in _T10KJ)
@@ -1747,18 +1864,30 @@ ok("⭐ D43 the newsletter is FOUR pages — with council areas (S10B) and witho
    len(PAGES) == 4 and len(_PB) == 4
    and all(k in _PB[i] for i, k in enumerate(("01 THE MONTH IN BRIEF", "02 ROUTES AND ROADS", "03 COUNCILS", "04 CARBON AND THE SMALL PRINT")))
    and "03 CARBON" in PAGES[2] and "Is " in PAGES[2] and "a lot?" in PAGES[2], str([len(PAGES), len(_PB)]))
-ok("⭐ page 1 reads on its own: the lede, the four figures, the map and its legend, This month in brief, the glance, how to report a lorry",
-   all(t in _PB[0] for t in ("What Wolds Link (fictional) plans to move by lorry in October 2026", "This month in brief",
-                             "This month at a glance", "Two-way movements a day in October 2026:", "Report a lorry off route"))
-   and all(f["value"] in _PB[0] for f in S10B["headline"]))
-ok("⭐ page 3 holds both council sections; page 4 the panel, how council carbon is worked out, what changed, terms, caveats",
+# NARROWED 14 Oct 2026 (the publishing check): page 1 is the front page — the lede, the four figures, the definition, the
+# map with its title, legend and key, the key points, how to report a lorry; the glance moved to page 4
+ok("⭐ page 1 reads on its own: the lede, the four figures, the definition, the map and its legend and key, Key points, how to report a lorry",
+   all(t in _PB[0] for t in ("The lorries Wolds Link (fictional) plans for October 2026: how many, where they go, and their carbon.",
+                             bulletin_doc.DEFINITION, "Planned lorry routes, October 2026", "Two-way movements a day:",
+                             "SITES", "ROAD WORKS AND LIMITS", "Key points", "Report a lorry off route"))
+   and "This month at a glance" not in _PB[0] and all(f["value"] in _PB[0] for f in S10B["headline"]))
+# NARROWED 14 Oct 2026 (the publishing check): what changed closes page 2; page 4 is the panel, the glance, the four
+# terms, caveats, the numbered Sources (the council method notes are in them) and the report box
+ok("⭐ page 3 holds both council sections; page 4 the panel, the glance, terms, caveats, Sources, the report box",
    "Movements by council in October 2026" in _PB[2] and "Carbon by council in October 2026" in _PB[2]
-   and all(t in _PB[3] for t in ("a lot?", "Carbon by council: how it is worked out", "What changed since last month",
-                                 "Terms explained", "Caveats", "Large print and other formats")))
-ok("⭐ W15 the brand band on EVERY page: the title 'Lorry movements bulletin · <month>', the scheme, 'monthly newsletter', the "
-   "as-at stamp and issue date; the demo bar under it on every page; the foot with wayscope.co.uk",
-   all("Lorry movements bulletin · October 2026" in pg and "monthly newsletter" in pg and "Issued" in pg
-       and "Fictional demo scheme · nothing here is real" in pg and "wayscope.co.uk" in pg for pg in _PB + PAGES))
+   and "What changed since last month" in _PB[1]
+   and all(t in _PB[3] for t in ("a lot?", "This month at a glance", "Terms", "Caveats", "Sources"))
+   and "Large print and other formats" in _PB[0] and "Large print and other formats" not in _PB[3]
+   and "Carbon by council: how it is worked out" not in T10BJ and "Terms explained" not in T10BJ)
+# NARROWED 14 Oct 2026 (the publishing check): the full band on page 1 only; pages 2 on carry a slim running head (the
+# title and "<scheme> · monthly newsletter"); the demo bar and the foot on every page, which says "n of 4"
+ok("⭐ W15 the brand band on page 1 (title, scheme, 'monthly newsletter', as-at stamp, issue date); a running head with the title "
+   "on every later page; the demo bar on every page; the foot with wayscope.co.uk and 'n of 4'",
+   all("Issued" in pg[0] and "Approved plan as at" in pg[0] for pg in (_PB, PAGES))
+   and all("Issued" not in pg for pg in _PB[1:] + PAGES[1:])
+   and all("Lorry movements bulletin · October 2026" in pg and "monthly newsletter" in pg
+           and "Fictional demo scheme · nothing here is real" in pg and "wayscope.co.uk" in pg for pg in _PB + PAGES)
+   and all(f"{i} of 4" in pg for i, pg in enumerate(_PB, 1)))
 def _shown_fonts(pdf):
     """The fonts text is actually SHOWN in: per BT…ET block that shows text (Tj / TJ), the font set last before it.
     (reportlab writes empty font switches in its preambles — the page's initial Helvetica, a drawing's Times-Roman — that
@@ -1808,32 +1937,44 @@ finally:
 _LP, _LPB = _pages(LF10), _pages(LF10B)
 ok("⭐ D43 the leaflet is ONE page, with or without council areas",
    len(_LP) == 1 and len(_LPB) == 1, str([len(_LP), len(_LPB)]))
-ok("⭐ the leaflet: the band (leaflet), the demo bar, the lede, the four figures, the map and legend, the brief, how to report a "
-   "lorry with the hours and other formats, and where to read the newsletter (a placeholder until typed)",
+# NARROWED 14 Oct 2026 (the publishing check): the leaflet leads with a heading a resident reads first ("Lorries on your
+# roads in <month>", which says what the lede said), the definition once, the map with its key, Key points; the placeholder
+# reads "[link not set yet]"
+ok("⭐ the leaflet: the band (leaflet), the demo bar, the heading, the four figures, the definition, the map and legend, Key points, "
+   "how to report a lorry with the hours and other formats, and where to read the newsletter (a placeholder until typed)",
    all(t in _LPB[0] for t in ("Lorry movements bulletin · October 2026", "· leaflet ·", "Fictional demo scheme · nothing here is real",
-                              "What Wolds Link (fictional) plans to move by lorry", "Two-way movements a day in October 2026:",
-                              "This month in brief", "Report a lorry off route", "Working hours:", "Large print and other formats:",
-                              "The full monthly newsletter", "[where to read the full newsletter: a typed field this scheme has not set yet]"))
+                              "Lorries on your roads in October 2026", bulletin_doc.DEFINITION, "Two-way movements a day:",
+                              "Key points", "Report a lorry off route", "Working hours:", "Large print and other formats:",
+                              "Every route, the councils and the carbon are in the monthly newsletter: [link not set yet]"))
+   and "(page 2)" not in _LPB[0] and "page 1" in _LPB[0]
    and all(f["value"] in _LPB[0] for f in S10B["headline"]) and b"Inter-Bold" in LF10B and all(b"+" in f for f in _shown_fonts(LF10B)))
 ok("🔴 the leaflet: word ban, UK words, no team id or name", not _BANNED.search(_LPB[0]) and not _trucks(_LPB[0])
    and not ID_FORM.search(_LPB[0]) and "North Team" not in _LPB[0])
-ok("🔴 the leaflet never spills: the map gives way first (88 → 74 → 60 → 46 mm), checked on the built page count",
-   "for map_h in (88 * mm, 74 * mm, 60 * mm, 46 * mm):" in _EXP and "if doc.page <= 1:" in _EXP)
-ok("🔴 the newsletter's page 1 never spills: its map gives way first (64 → 54 → 44 → 34 mm) until the newsletter is four pages",
-   "NEWSLETTER_MAP_HEIGHTS = (64 * mm, 54 * mm, 44 * mm, 34 * mm)" in _EXP and "if pages <= 4:" in _EXP
-   and "return buf.getvalue(), doc.page" in _EXP)
+# NARROWED 14 Oct 2026 (the publishing check): bigger maps; the fit is found on sizing passes with no basemap, and
+# the final build fetches it once. The newsletter's map is the biggest that keeps page 1 on its own page (it used to
+# shrink until the WHOLE newsletter fitted four pages, so a long route table shrank the front-page map)
+ok("🔴 the leaflet never spills: the map gives way first (100 → 90 → … → 50 mm), checked on the built page count, on sizing passes",
+   "LEAFLET_MAP_HEIGHTS = (100 * mm, 90 * mm, 80 * mm, 70 * mm, 60 * mm, 50 * mm)" in _EXP
+   and "if _leaflet(S, map_h)[1] <= 1:" in _EXP and "with _sizing():" in _EXP)
+ok("🔴 the newsletter's page 1 never spills: its map gives way first (100 → … → 36 mm) until section 02 starts page 2",
+   "NEWSLETTER_MAP_HEIGHTS = (100 * mm, 92 * mm, 84 * mm, 76 * mm, 68 * mm, 60 * mm, 52 * mm, 44 * mm, 36 * mm)" in _EXP
+   and "if page2 == 2:" in _EXP and "return buf.getvalue(), doc.page, mark.page" in _EXP)
+ok("🔴 a sizing pass fetches no basemap (the box is the same size either way); only the final build asks Mapbox",
+   'if getattr(_SIZING, "on", False):\n        return None, None, None' in _EXP
+   and _EXP.index("with _sizing():") < _EXP.index("return _newsletter(S, map_h, pages)[0]"))
 # the brief, by hand
 _BR = S10B["brief"]
-ok("⭐ This month in brief (hand): the busiest route with its flag, September empty, the works count, the busiest district, "
-   "the carbon as cars",
-   _BR == [f"The busiest route is {S10B['routes'][0]['label']}: {_r1:,.0f} two-way lorry movements a day, above its planning flag of 60 a day.",
-           f"No approved lorries in September 2026; {_mv10:,.0f} two-way movements a day in October 2026.",
-           "3 road works, closures or local controls listed for October 2026.",
-           "Eastshire sees the most: 98 two-way movements a day on roads its laden legs use.",
-           f"Haul carbon: {_tt(_c10)} CO2e in October 2026, {comparisons.car_equivalents(_c10)['words']}."], str(_BR))
+# NARROWED 14 Oct 2026 (the publishing check): "Key points", shorter: no "laden legs", the district named as a district,
+# the change said as up / down from last month
+ok("⭐ Key points (hand): the busiest route with its flag, September empty, the works count, the busiest district, the carbon as cars",
+   _BR == [f"Busiest route: {S10B['routes'][0]['label']}, {_r1:,.0f} two-way movements a day, above its planning flag of 60.",
+           f"{_mv10:,.0f} two-way movements a day; no approved lorries in September 2026.",
+           "3 road works, closures or local limits on or near the routes.",
+           "Eastshire district sees the most: 98 two-way movements a day.",
+           f"Haul carbon: {_tt(_c10)} CO2e, {comparisons.car_equivalents(_c10)['words']}."], str(_BR))
 _BR11 = S11B["brief"]
-ok("This month in brief (hand): November says October's and November's two-way movements a day",
-   f"Two-way movements a day: {_mv10:,.0f} in October 2026, {_mv11:,.0f} in November 2026." in _BR11, str(_BR11))
+ok("Key points (hand): November says its two-way movements a day, down from October's",
+   f"{_mv11:,.0f} two-way movements a day, down from {_mv10:,.0f} in October 2026." in _BR11, str(_BR11))
 # D41: the tag on the maps
 ok("⭐ D41 'Fictional demo scheme' ON both maps of a demo tenant: the route map and the council map, PDF and page; none without "
    "a demo notice",
@@ -1843,7 +1984,7 @@ ok("⭐ D41 'Fictional demo scheme' ON both maps of a demo tenant: the route map
    and bulletin_doc._svg_tag(None) == "" and "map_demo_tag" in read("backend/bulletin_doc.py"))
 # the HTML: the band, the brief, the leaflet links
 ok("⭐ W15 the page: the ink band with the logo inlined as SVG (vector, gradient kept), the orange rule, Inter loaded, the mark "
-   "at the foot; This month in brief after the map; links to the leaflet page and its PDF",
+   "at the foot; Key points after the map; links to the leaflet page and its PDF",
    '<header class="band">' in HTML10B and 'class="brand-logo"' in HTML10B and "ws-orange" in HTML10B and "<img" not in HTML10B
    and '<div class="band-rule"></div>' in HTML10B and "fonts.googleapis.com/css2?family=Inter" in HTML10B
    and '<ul class="brief" data-bulletin="brief">' in HTML10B and HTML10B.index('data-bulletin="map"') < HTML10B.index('data-bulletin="brief"')
@@ -1926,6 +2067,122 @@ _BD = read("backend/bulletin_doc.py")
 ok("D45: the bulletin page's notice is light grey with red text, a red edge (3 px under) and a red DEMO tag; no orange pill left",
    ".notice{{display:inline-block;background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;border-bottom-width:3px;" in _BD
    and ".notice::before{{content:'DEMO';content:'DEMO' / '';display:inline-block;" in _BD and "#FFF7ED" not in _BD)
+
+
+# --------------------------------------------------------------------------- #
+#  8f. 14 Oct 2026 — THE PUBLISHING CHECK (the user: "no map behind route,      #
+#      layout needs improvement, legends too wordy")                            #
+# --------------------------------------------------------------------------- #
+# what a person reads: type no smaller than 7 pt (superscript reference numbers apart), the definition ONCE, every source
+# ONCE and numbered, controls off the site pins, district labels apart, and a real basemap when Mapbox answers
+def _sizes(pdf):
+    out = {}
+    for blk in re.findall(rb"BT(.*?)ET", pdf, re.S):
+        cur = None
+        for m in re.finditer(rb"/(\S+) ([\d.]+) Tf|(\)\s*Tj|\]\s*TJ)", blk):
+            if m.group(1):
+                cur = float(m.group(2))
+            elif cur is not None:
+                out[cur] = out.get(cur, 0) + 1
+    return out
+
+
+_SZ, _SZL = _sizes(PDF10B), _sizes(LF10B)
+_nref = sum(1 for r in S10B["lot"]["rows"] if r.get("ref"))
+ok("🔴 type floor: nothing the newsletter or the leaflet shows is under 7 pt, except the panel's superscript reference numbers "
+   "(one per referenced row); body text 7.5 pt and up (the glance, sources and legends were 5.5–6.8 pt)",
+   all(k >= 7.0 for k in _SZL) and all(k >= 7.0 or (k >= 6.5 and _SZ[k] <= _nref) for k in _SZ)
+   and sum(v for k, v in _SZ.items() if k < 7.5) < 0.15 * sum(_SZ.values()), str((sorted(_SZ.items()), _nref)))
+_DEFN = bulletin_doc.DEFINITION
+ok("⭐ the definition is printed ONCE in the newsletter (under the four figures) and once on the page — it was seven times",
+   T10BJ.count(_DEFN) == 1 and _PB[0].count(_DEFN) == 1 and HTML_TEXT_B.count(_DEFN) == 1)
+_SRC = S10B["sources"]
+ok("⭐ Sources: each source once, numbered in order; the panel's rows carry the number of THEIR source; the council row and "
+   "the council table share ONE DESNZ entry (they were two)",
+   len(_SRC) == len(set(_SRC)) and all(1 <= r["ref"] <= len(_SRC) for r in S10B["lot"]["rows"] if r.get("ref"))
+   and all(_SRC[r["ref"] - 1] == r["source"] for r in S10B["lot"]["rows"] if r.get("ref") and r["label"] != "The council's figures")
+   and sum("local authority and regional greenhouse gas" in x for x in _SRC) <= 1
+   and any(x.startswith("Counting: ") for x in _SRC) and not any("Mapbox" in x for x in _SRC), str(_SRC))
+ok("…on the page the references link to the numbered list at the foot",
+   all(f'<li id="src-{i}">' in HTML10B for i in range(1, len(_SRC) + 1)) and '<ol class="src" data-bulletin="sources">' in HTML10B
+   and all(f'<sup><a href="#src-{r["ref"]}">{r["ref"]}</a></sup>' in HTML10B for r in S10B["lot"]["rows"] if r.get("ref")))
+# controls never sit on a site's pin
+ok("⭐ control_spot: a control on a site's pin steps off by one step (up first) to a clear spot; a clear control stays put; "
+   "a y-down caller (the page's SVG) passes a negative step and goes UP the screen",
+   bulletin_doc.control_spot(10, 10, [(10, 10)]) == (10, 23.0) and bulletin_doc.control_spot(50, 50, [(10, 10)]) == (50, 50)
+   and bulletin_doc.control_spot(10, 10, [(10, 10), (10, 23)])[0] > 10
+   and bulletin_doc.control_spot(10, 100, [(10, 100)], clear=24, step=-26) == (10, 74.0))
+_cs = [bulletin_doc.control_spot(0, 0, [(0, 0)] + [(13 * math.cos(math.pi / 2 - k * math.pi / 4), 13 * math.sin(math.pi / 2 - k * math.pi / 4)) for k in range(8)])]
+ok("control_spot: boxed in on every side it goes one step up (never on the pin itself)", _cs == [(0, 13)])
+_dbs2 = _EXP[_EXP.index("def _draw_bulletin_schematic("):_EXP.index("def _scale_bar(")]
+ok("🔴 the PDF and the page both step controls off the pins and draw a leader back (one rule, bulletin_doc.control_spot)",
+   "bulletin_doc.control_spot(ax, ay, pins)" in _dbs2 and "c.line(ax, ay, px, py)" in _dbs2
+   and "control_spot(ax, ay, pins, clear=24, step=-26)" in read("backend/bulletin_doc.py"))
+# labels apart
+_ent = [(100, 100, 60), (104, 102, 60), (98, 96, 80), (300, 300, 40)]
+_pl = bulletin_doc.place_labels(_ent, -9.5, 9, (0, 0, 400, 400))
+_bx = [(x - w / 2, y - 9.5, x + w / 2, y + 9) for (x, y), (_, _, w) in zip(_pl, _ent)]
+ok("⭐ place_labels (hand): three labels on one spot come out apart (no two boxes overlap), the first stays on its point, a "
+   "lone label never moves, every box inside the bounds",
+   _pl[0] == (100, 100) and _pl[3] == (300, 300)
+   and not any(a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3] for i, a in enumerate(_bx) for b in _bx[i + 1:])
+   and all(b[0] >= 0 and b[2] <= 400 and b[1] >= 0 and b[3] <= 400 for b in _bx), str(_pl))
+ok("🔴 the PDF's council labels and the page's are placed by the SAME rule (place_labels), biggest district first",
+   "bulletin_doc.place_labels(ent, -9.5, 9, bounds)" in _EXP and "place_labels(ent, -14, 20, (4, 36, w - 4, h - 26), k=1.4)" in read("backend/bulletin_doc.py")
+   and _EXP.count("key=lambda d: -(d.get(\"co2_t\") or d.get(\"a_day\") or 0))") == 1)
+# the basemap path end to end, on a stubbed PNG (no Mapbox call): the PDF draws the image under the routes, says whose map
+# it is and draws a scale bar; the page inlines the image and does the same
+import struct as _st  # noqa: E402
+
+
+def _tiny_png(w=4, h=3):
+    raw = b"".join(b"\x00" + b"\xee\xee\xee" * w for _ in range(h))
+    chunk = lambda t, d: _st.pack(">I", len(d)) + t + d + _st.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", _st.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
+import zlib  # noqa: E402
+_real_fetch = basemap.fetch
+_fetched = []
+# a different PNG per request (reportlab draws identical image bytes once and reuses them)
+basemap.fetch = lambda v, token=None, timeout=12, retina=True: (_fetched.append((v["w"], v["h"], retina)), _tiny_png(4 + len(_fetched)))[1]
+try:
+    _PDFM = export.build_bulletin_pdf(S10B)
+    _LFM = export.build_bulletin_leaflet_pdf(S10B)
+    _HTM = bulletin_doc.html(S10B)
+finally:
+    basemap.fetch = _real_fetch
+_TM = " ".join(pdf_text(_PDFM).split())
+ok("⭐ with a basemap: the newsletter draws it under the route map and the council map (two images), credits Mapbox and "
+   "OpenStreetMap under the map and draws a scale bar; still four pages",
+   _PDFM.count(b"/Subtype /Image") == 2 and "© Mapbox © OpenStreetMap" in _TM and re.search(r"\b\d+(\.5)? km\b", _TM)
+   and len([p for p in pdf_text(_PDFM).split("\f") if p.strip()]) == 4 and "not to scale" not in _TM.split("Key points")[0])
+ok("⭐ …and ONE request per map: the page fit is found on sizing passes, so the newsletter asked for two basemaps (route map, "
+   "council map) and the leaflet one, all @2x for print; the page two @1x",
+   [r for _, _, r in _fetched].count(True) == 3 and [r for _, _, r in _fetched].count(False) == 2, str(_fetched))
+ok("⭐ …the page inlines the basemap under its routes and districts (no Mapbox URL or token in the page), with the credit and a scale bar",
+   _HTM.count('<image href="data:image/png;base64,') == 2 and "api.mapbox.com" not in _HTM and "access_token" not in _HTM
+   and "© Mapbox © OpenStreetMap" in _HTM and _HTM.count('<g class="scale">') == 2 and 'fill-opacity="0.8"' in _HTM
+   and ("aria-label=\"Map of this month's planned lorry routes\"" in _HTM
+        or 'aria-label="Map of this month&#x27;s planned lorry routes"' in _HTM))
+ok("⭐ the leaflet with a basemap: one image, still ONE page", _LFM.count(b"/Subtype /Image") == 1
+   and len([p for p in pdf_text(_LFM).split("\f") if p.strip()]) == 1)
+# the frame and the look, at source
+ok("🔴 tables: a pale head band (#F1F5F9) in ink with a rule under it, hairlines between rows, no box (the ink heads made every page heavy)",
+   'HEAD_TINT = colors.HexColor("#F1F5F9")' in _EXP and '("LINEBELOW", (0, 0), (-1, 0), 0.9, colors.Color(*NAVY_RGB))' in _EXP
+   and 'self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=7.5, leading=9.5, textColor=colors.Color(*NAVY_RGB))' in _EXP
+   and "th{{font-size:14px;font-weight:700;background:var(--head);border-bottom:2px solid var(--ink)}}" in read("backend/bulletin_doc.py"))
+ok("🔴 ONE page frame still: one on_page, the running head and the page total are page_frame's options, the three callers unchanged",
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 3 and _EXP.count("doc = frame_doc(") == 3
+   and 'later = doc.page > 1 and band.get("running")' in _EXP and "autoNextPageTemplate=\"later\"" in _EXP)
+ok("🔴 the report-a-lorry strip is on page 1 (all three lines) and not repeated at the end; the page keeps one at the foot too",
+   "Working hours:" in _PB[0] and "Working hours:" not in _PB[3] and HTML10B.count('<div class="report">') == 2)
+ok("🔴 the publishing check's words: no '[a typed field this scheme has not set yet]', no 'laden legs', no route id in the "
+   "works or flags, no 'Terms explained', no chart",
+   "a typed field this scheme has not set yet" not in T10BJ + HTML_TEXT_B and "laden legs" not in T10BJ + HTML_TEXT_B
+   and not re.search(r"\bR\d+\b", " ".join(o["text"] for o in S10B["others"]) + " ".join(w["routes_text"] for w in S10B["works"]))
+   and "Terms explained" not in T10BJ + HTML_TEXT_B and "by route" not in T10BJ)
 
 # =========================================================================== #
 print()
