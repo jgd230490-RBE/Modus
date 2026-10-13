@@ -2564,7 +2564,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes("map.on('mousemove', (e) => {\n                    let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });"));
   // 5. the demo strip on a phone
   ok("mobile: the demo strip is 14 px below 1024 (was 9.5), wrapping, and the offsets under it follow its MEASURED height (--notice-h, 26 px floor)",
-     /body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 1px; white-space:normal; text-align:center; font-size:14px;/.test(phone)
+     // NARROWED 13 Oct 2026 (D45, Option A): the strip's rule is 3 px (was 1 px)
+     /body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; white-space:normal; text-align:center; font-size:14px;/.test(phone)
      && !/#demo-notice\{[^}]*font-size:9\.5px/.test(html)
      && /body\.has-demo-notice #menu-toggle\{ top:calc\(var\(--notice-h, 26px\) \+ 14px\); \}/.test(phone)
      && /body\.has-demo-notice #kpi-hud, body\.has-demo-notice\.sidebar-closed #kpi-hud\{ padding-top:calc\(var\(--notice-h, 26px\) \+ 58px\); \}/.test(phone)
@@ -4649,6 +4650,19 @@ function qrRead(mod) {
     ok("⭐ presets (sandbox): on the phone shell a pick lowers the Layers sheet (the panel closes, the map shows)", sheetOpen === false && calls.sheet === 1);
   }
   Object.keys(fakeGlobals).forEach(k => { if (savedGlobals[k] === undefined) delete globalThis[k]; else globalThis[k] = savedGlobals[k]; });
+}
+
+// ---- 13 Oct 2026: D45 — the map's own demo strip (on /map/ opened by itself) takes Option A, as the app's bar ----
+{
+  const dn = (html.match(/\n\s*#demo-notice\{([^}]*)\}/) || ["", ""])[1];
+  ok("⭐ D45: the map's demo strip is light grey #F1F5F9 with red #B91C1C text and a #DC2626 edge (was ink, amber, amber)",
+     /background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;/.test(dn) && !/FBBF24|#1F2024/.test(dn), dn.slice(0, 160));
+  ok("D45: the strip has the red DEMO tag (CSS only, so dn.textContent still sets the words; hidden from screen readers)",
+     /#demo-notice::before\{content:"DEMO";content:"DEMO" \/ "";display:inline-block;[^}]*background:#B91C1C;color:#FFFFFF;/.test(html)
+     && /dn\.textContent = TENANT\.demo_notice;/.test(code));
+  ok("D45: from 1024 px up the strip keeps 26 px with a 3 px red rule inside it (border-box, so nothing under it moves)",
+     /body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:4px 10px 3px; height:26px; \}/.test(html)
+     && /\*\{ box-sizing:border-box; \}/.test(html) && !/#demo-notice\{[^}]*border-width:0 0 1px/.test(html));
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

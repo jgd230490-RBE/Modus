@@ -363,7 +363,9 @@ ok("concern_email: tenant_settings serves a valid address trimmed, and drops an 
 # NARROWED 11 Oct 2026 (the demo bar): the app carries the notice in the bar under its header on every view
 # (DemoBar), not in a header badge, which is gone
 ok("H2: the notice is on both exports (XLSX About row, PDF footer) and the app's demo bar under the header, and the map hides an empty rail layer",
-   '("Notice", _demo_notice() or "")' in read("backend/export.py") and 'ft.insert(0, P("<b>" + E(_demo_notice()) + "</b>", st_grey))' in read("backend/export.py")
+   # NARROWED 13 Oct 2026 (D45): the footer line is red (the demo bar's #B91C1C), was grey bold
+   '("Notice", _demo_notice() or "")' in read("backend/export.py")
+   and """ft.insert(0, P(f'<font color=\"#{DEMO_FG_HEX}\"><b>' + E(_demo_notice()) + \"</b></font>\", st_grey))""" in read("backend/export.py")
    and '<span className="demo-bar-text" title={TENANT.demo_notice}>{TENANT.demo_notice}</span>' in read("frontend/index.html")
    and 'className="demo-badge' not in read("frontend/index.html") and "demo_notice: (tn.demo_notice || null)" in read("frontend/index.html")
    and "railItem.hidden = !hasRail" in read("map/index.html") and "dn.textContent = TENANT.demo_notice" in read("map/index.html"))
@@ -612,7 +614,8 @@ ok("the staff app hides the tenant's hidden vehicles in its pickers and the EU l
 import re as _re2
 _fits = [m.start() for m in _re2.finditer(r"\.fitBounds\(", fe)]
 ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the Look-ahead map white-screened the whole app)",
-   len(_fits) == 3 and all("try {" in fe[max(0, i - 60):i] for i in _fits), str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
+   # NARROWED 13 Oct 2026 (W1): four, the Routes / Zones map now frames the scheme's locations on first load
+   len(_fits) == 4 and all("try {" in fe[max(0, i - 60):i] for i in _fits), str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
 _SKIP = re.compile(r'^(?:\w+:)?(?:text-white|bg-white/\d+|border-white/\d+|text-white/\d+|bg-black/\d+|\w+-transparent|\w+-current|(?:bg|text|border|ring)-\[color:var|ring-\[)')
@@ -787,6 +790,62 @@ ok("the restrictions probe on a GB tenant shows the NH field map, the raw proper
 ok("the probes are behind the admin check and shipped in main.py",
    '@app.get("/api/admin/diagnostics/fuel-index")' in _srcs["backend/main.py"]
    and "def diagnostics_fuel_index(" in _srcs["backend/main.py"] and "_nh_diagnostics(probe)" in _srcs["backend/restrictions.py"])
+
+# --- 13 Oct 2026: D45 — the demo notice on the exports and the map password page takes Option A ------------------
+_xsrc = read("backend/export.py")
+ok("⭐ D45: export.py's demo colours are Option A (grey #F1F5F9, red #B91C1C text, #DC2626 rule), one place",
+   "DEMO_BG_RGB = (0xF1 / 255, 0xF5 / 255, 0xF9 / 255)" in _xsrc and "DEMO_FG_RGB = (0xB9 / 255, 0x1C / 255, 0x1C / 255)" in _xsrc
+   and "DEMO_RULE_RGB = (0xDC / 255, 0x26 / 255, 0x26 / 255)" in _xsrc and 'DEMO_FG_HEX, DEMO_BG_HEX = "B91C1C", "F1F5F9"' in _xsrc)
+ok("D45: every PDF frame passes the notice in the demo red, and the week sheet now carries it in its frame too (it was in the footer only)",
+   _xsrc.count("8.5, DEMO_FG_RGB, H - 25 * mm) if notice else None)") == 2 and "8.5, NAVY_RGB, H - 25 * mm" not in _xsrc
+   and 'notice=((_pdf_safe(_demo_notice()), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 22.5 * mm)' in _xsrc
+   and "top, bottom = (25 if _demo_notice() else 20) * mm, 12 * mm" in _xsrc)
+# the frame itself, drawn on a recording canvas: the band, the rule, the tag, the words
+class _RecCanvas:
+    def __init__(self): self.calls, self.fill = [], None
+    def __getattr__(self, name):
+        def rec(*a, **k):
+            if name == "setFillColorRGB": self.fill = tuple(round(x, 3) for x in a)
+            self.calls.append((name, a, k, self.fill))
+        return rec
+    def stringWidth(self, t, f, s): return 6.0 * len(t)
+class _Doc: page = 1
+_rc = _RecCanvas()
+export.page_frame(595.0, 842.0, 40.0, 40.0, "T", rule_y=800, title_font=("Helvetica-Bold", 13), title_y=790,
+                  notice=("Fictional demo scheme", "Helvetica-Bold", 8.5, export.NAVY_RGB, 770))(_rc, _Doc())
+_grey, _red = tuple(round(x, 3) for x in export.DEMO_BG_RGB), tuple(round(x, 3) for x in export.DEMO_FG_RGB)
+_rects = [(c[1], c[3]) for c in _rc.calls if c[0] == "rect"]
+_strs = [(c[1][2], c[3]) for c in _rc.calls if c[0] == "drawString"]
+ok("⭐ D45: page_frame draws the notice as a grey band the width of the page, a red DEMO tag in white, the words in red",
+   any(a[:4] == (40.0, 767, 515.0, 12.5) and f == _grey for a, f in _rects)
+   and any(f == _red for a, f in _rects[1:]) and ("DEMO", (1, 1, 1)) in _strs and ("Fictional demo scheme", _red) in _strs,
+   str(_strs)[:200])
+ok("...with the red rule under the band, and no notice means no band (a real tenant's PDF is unchanged)",
+   ("setStrokeColorRGB", tuple(export.DEMO_RULE_RGB)) in [(c[0], c[1]) for c in _rc.calls]
+   and ("line", (40.0, 767, 555.0, 767)) in [(c[0], c[1]) for c in _rc.calls])
+_rc0 = _RecCanvas()
+export.page_frame(595.0, 842.0, 40.0, 40.0, "T", rule_y=800, title_font=("Helvetica-Bold", 13), title_y=790)(_rc0, _Doc())
+ok("...(no notice: no rect drawn at all)", not [c for c in _rc0.calls if c[0] == "rect"])
+try:
+    import openpyxl
+    _rn = export._demo_notice
+    export._demo_notice = lambda: "Fictional demo scheme · nothing here is real"
+    try:
+        _wb = openpyxl.load_workbook(io.BytesIO(export.build_xlsx(_la)))
+    finally:
+        export._demo_notice = _rn
+    _ab = _wb["About"]
+    _nc = [r[1] for r in _ab.iter_rows() if r[0].value == "Notice"][0]
+    ok("D45: the XLSX About sheet's notice is red bold on the grey (the demo bar's colours)",
+       _nc.value == "Fictional demo scheme · nothing here is real" and _nc.font.bold
+       and str(_nc.font.color.rgb).endswith("B91C1C") and str(_nc.fill.fgColor.rgb).endswith("F1F5F9"),
+       f"{_nc.font.color.rgb if _nc.font.color else None} {_nc.fill.fgColor.rgb}")
+except ImportError:
+    ok("(XLSX notice read-back skipped — openpyxl not installed here)", True)
+_gate = read("backend/main.py")
+ok("D45: the map password page's notice takes the same colours and the red DEMO tag",
+   "background:#F1F5F9; color:#B91C1C; border:1px solid #DC2626;" in _gate and "#FFF7ED" not in _gate
+   and '.demo-notice::before { content:"DEMO"; content:"DEMO" / ""; display:inline-block;' in _gate)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
