@@ -17,6 +17,10 @@ be reached — Tark Tee. Nothing here is stored, nothing here refuses a confirm.
                     planned closure (GB) whose dates overlap THIS week (HU4, 29 Sep).
                     Shown with the provider's word: "TARK TEE" / "ROADWORKS". Until H1
                     the code was TARK_TEE.
+    LIMIT           13 Oct 2026: the line's vehicle is over a weight / height / width limit
+                    its baked route runs along (limits.py: OpenStreetMap and HERE). Only an
+                    "exceeds" verdict for THIS line's vehicle and leg raises it; "except for
+                    access" is said in the text. Standing limits: no week test.
     UNBAKED         quantity on a route not baked for the line's vehicle (slice 2)
     PARENT_CHANGED  the month moved under a set week (Task C's flag, surfaced)
 
@@ -41,12 +45,13 @@ import datetime
 
 import db
 import derived
+import limits
 import restrictions
 import stockpiles
 import weeks
 
 CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "IPT_SHARE", "RESTRICTION",
-         "UNBAKED", "PARENT_CHANGED")
+         "LIMIT", "UNBAKED", "PARENT_CHANGED")
 
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
 HOLD_BAND = 0.98
@@ -351,6 +356,40 @@ def restriction(lines, month_index=None, week_index=None):
                  "week": ([wf.isoformat(), wt.isoformat()] if wf and wt else None)}
 
 
+def limit(lines):
+    """
+    LIMIT (13 Oct 2026) from the STORED per-route limits check (limits.store_checks): the
+    line's own vehicle is over a limit on a leg of its baked route. One flag per line,
+    naming the first breach and how many more. Returns (flags, source) like restriction().
+    """
+    routes = sorted({l["route_id"] for l in lines if (l.get("context") or {}).get("baked")})
+    if not routes:
+        return [], {"status": "skipped", "checked_at": None}
+    stored = limits.stored_checks(routes)
+    checked = [stored[r]["checked_at"] for r in routes if (stored.get(r) or {}).get("checked_at")]
+    out = []
+    for l in lines:
+        veh = (l.get("context") or {}).get("vehicle_type") or l.get("vehicle_type")
+        hits = [h for h in ((stored.get(l["route_id"]) or {}).get("hits") or [])
+                if isinstance(h, dict) and h.get("verdict") == "exceeds" and h.get("vehicle_profile") == veh]
+        if not hits:
+            continue
+        h = hits[0]
+        leg = "going back empty" if h.get("leg") != "loaded" else "loaded"
+        text = (f"{_label(l)}: {h.get('vehicle_label') or veh} ({h.get('vehicle_value'):g} {h.get('unit')}, {leg}) "
+                f"is over the {h.get('headline')} ({limits.SOURCES.get(h.get('source'), {}).get('short', h.get('source'))})")
+        if h.get("exceptions"):
+            text += f" — {h['exceptions'].lower()}"
+        if h.get("point"):
+            text += " — a point limit: check whether the route passes it or crosses over or under it"
+        if len(hits) > 1:
+            text += f" (+{len(hits) - 1} more)"
+        out.append(_flag("LIMIT", l, text, label="ROAD LIMIT", hits=len(hits),
+                         kind=h.get("kind"), limit=h.get("limit"), unit=h.get("unit"),
+                         source=h.get("source"), checked_at=(stored.get(l["route_id"]) or {}).get("checked_at")))
+    return out, {"status": "ok" if checked else "unchecked", "checked_at": (min(checked) if checked else None)}
+
+
 # --------------------------------------------------------------------------- #
 #  The rail                                                                    #
 # --------------------------------------------------------------------------- #
@@ -375,6 +414,12 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     if with_restrictions:
         tt, tt_source = restriction(all_lines, month_index, week_index)
         flags += tt
+    lim_source = {"status": "off", "checked_at": None}
+    try:
+        lim, lim_source = limit(all_lines)
+        flags += lim
+    except Exception as e:                       # a missing column on an old database
+        lim_source = {"status": "error: " + str(e)[:80], "checked_at": None}
     vis = [f for f in flags
            if (f["route_id"], int(f["month_index"]), f["discipline"], f["section_id"]) in visible_keys]
     order = {c: i for i, c in enumerate(CODES)}
@@ -390,5 +435,6 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
                         "restrictions_provider": tt_source.get("provider"),
                         "restrictions_label": tt_source.get("flag_label"),
                         "restrictions_ui_label": prov.get("ui_label"),
-                        "restrictions_week": tt_source.get("week")},
+                        "restrictions_week": tt_source.get("week"),
+                        "limits": lim_source.get("status"), "limits_checked_at": lim_source.get("checked_at")},
             "stock": stock}

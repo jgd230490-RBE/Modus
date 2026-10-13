@@ -746,8 +746,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("the Look-ahead page reads over HTTP", r.status_code == 200 and "commit" in la, r.text[:200])
     flags = (la.get("clashes") or {}).get("flags") or []
     ok("...its flag codes are the documented ones (the app names them for people)",
+       # 13 Oct 2026: LIMIT (lorry limits, limits.py) joins the documented codes
        all(f.get("code") in ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "IPT_SHARE", "TARK_TEE",
-                             "UNBAKED", "PARENT_CHANGED") for f in flags), str({f.get("code") for f in flags}))
+                             "LIMIT", "UNBAKED", "PARENT_CHANGED") for f in flags), str({f.get("code") for f in flags}))
+    ok("...the rail reports the stored lorry-limits check as a source (13 Oct 2026)",
+       "limits" in ((la.get("clashes") or {}).get("sources") or {}), str(((la.get("clashes") or {}).get("sources") or {}).keys()))
     ok("...and the unbaked demo network is flagged, not estimated",
        any(f.get("code") == "UNBAKED" for f in flags) or (la.get("clashes") or {}).get("by_code", {}).get("UNBAKED"),
        str((la.get("clashes") or {}).get("by_code")))
@@ -818,6 +821,19 @@ with TestClient(main.app, base_url="https://testserver") as c:
 
     r = c.get("/api/public/map-data")
     ok("the public map data reads (staff cookie)", r.status_code == 200, str(r.status_code))
+
+    # ------------------------------------------------- 3a. 13 Oct 2026: lorry limits (limits.py)
+    # No import has run on the demo: the endpoint answers an empty collection that still says
+    # it is advisory and names both sources; the admin import is refused without the token.
+    r = c.get("/api/public/limits")
+    lm = r.json() if r.status_code == 200 else {}
+    ok("⭐ /api/public/limits answers 200 with an empty, advisory collection before any import",
+       r.status_code == 200 and lm.get("features") == [] and str(lm.get("note", "")).startswith("Advisory")
+       and set((lm.get("sources") or {}).keys()) == {"osm", "here"}, f"{r.status_code} {r.text[:160]}")
+    ok("...a bad bbox is a 400", c.get("/api/public/limits", params={"bbox": "x"}).status_code == 400)
+    ok("🔴 the limits import is refused without the admin token",
+       c.post("/api/admin/limits/import", params={"source": "osm"}).status_code == 403)
+    ok("🔴 ...and so is the limits diagnostic", c.get("/api/admin/diagnostics/limits").status_code == 403)
 
     # ------------------------------------------------- 3b. 12 Oct 2026 (§2.2d): shared road sections
     # The demo package ships 0 geometry rows, so the index is empty here: the endpoint must
@@ -1099,6 +1115,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
            c.get("/api/public/areas", params={"month": 10}).status_code == 401)
         ok("🔴 ...and so is /api/public/areas/shapes (Track C review, 12 Oct 2026)",
            c.get("/api/public/areas/shapes").status_code == 401)
+        ok("🔴 ...and so is /api/public/limits (13 Oct 2026)", c.get("/api/public/limits").status_code == 401)
         r = c.get("/api/admin/diagnostics/smtp")
         ok("the SMTP probe is refused without the admin token", r.status_code == 403, str(r.status_code))
         r = c.get("/api/admin/diagnostics/smtp", params=TOKEN)
