@@ -871,7 +871,9 @@ def _eff(acc, look):
         t.update(_LIGHTHDR)
     if look == "dark":
         t.update(_DARK)
-        if acc != "orange":
+        if acc in ("blue", "blue-shades"):   # one shared dark block (Blue shades in Dark draws Blue's series)
+            t.update(_tk(_blk('html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]')))
+        elif acc != "orange":
             t.update(_tk(_blk(f'html[data-theme="dark"][data-accent="{acc}"]')))
     else:
         if acc != "orange":

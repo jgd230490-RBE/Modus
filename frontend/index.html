@@ -85,14 +85,17 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      Every pair is checked in test_h1_uk (text 4.5:1, controls and chart marks 3:1) and the series by the palette check
      in parse_frontend (notes/bundle-e-plan-1013.md): the shade accents carry FOUR hues, the fifth series is grey;
      Orange shades in the Dark look keeps Orange primary's series, because no warm set with two oranges passes there.
-     Slot meaning never changes: 1 = plan, 2 = delivered, 4 = the fair-price model. */
+     Slot meaning never changes: 1 = plan, 2 = delivered, 4 = the fair-price model. Because the cost chart draws 1
+     beside 4, the pair 1–4 is checked as well as the neighbours: so Blue's model is gold (blue beside violet is 0.4 for a
+     deuteranope) and Blue shades' is teal, and Blue shades in the Dark look draws Blue's series (no dark blue family
+     keeps the plan and the model apart), as Orange shades in Dark draws Orange's. */
   :root:not([data-theme="dark"])[data-accent="blue"]{
     --navy:#2563EB; --navy-soft:rgba(37,99,235,.08); --action:#2563EB; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
-    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#E8590C; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34;
+    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#E8590C; --chart-3:#0D9488; --chart-4:#A07D34; --chart-5:#7C3AED;
   }
   :root:not([data-theme="dark"])[data-accent="blue-shades"]{
     --navy:#1D4ED8; --navy-soft:rgba(29,78,216,.08); --action:#1D4ED8; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
-    --chart-1:#1D4ED8; --chart-1-soft:rgba(29,78,216,.18); --chart-2:#0891B2; --chart-3:#7C3AED; --chart-4:#0369A1; --chart-5:#A8A29E;
+    --chart-1:#1D4ED8; --chart-1-soft:rgba(29,78,216,.18); --chart-2:#0891B2; --chart-3:#4F46E5; --chart-4:#0D9488; --chart-5:#A8A29E;
   }
   :root:not([data-theme="dark"])[data-accent="orange-shades"]{
     --navy:#C2410C; --navy-soft:rgba(194,65,12,.08); --action:#C2410C; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
@@ -102,13 +105,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      (the chips before 13 Oct sat on a 10 % blue tint, 4.49:1). */
   /* Blue shades in the Ink look: a navy header (white on it 10.4:1). The Light look keeps its white header. */
   html[data-theme="ink"][data-accent="blue-shades"]{ --hdr-bg:#1E3A8A; }
-  html[data-theme="dark"][data-accent="blue"]{
+  html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]{
     --navy:#5B8FF0; --navy-soft:rgba(91,143,240,.08); --blue:#8FB3F5; --action:#5B8FF0; --action-fg:#141518; --control-fg:#141518;
-    --chart-1:#5B8FF0; --chart-1-soft:rgba(91,143,240,.22); --chart-2:#E8681E; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E;
-  }
-  html[data-theme="dark"][data-accent="blue-shades"]{
-    --navy:#5B8FF0; --navy-soft:rgba(91,143,240,.08); --blue:#8FB3F5; --action:#5B8FF0; --action-fg:#141518; --control-fg:#141518;
-    --chart-1:#5B8FF0; --chart-1-soft:rgba(91,143,240,.22); --chart-2:#13A193; --chart-3:#8B5CF6; --chart-4:#2E95D6; --chart-5:#6B6965;
+    --chart-1:#5B8FF0; --chart-1-soft:rgba(91,143,240,.22); --chart-2:#E8681E; --chart-3:#13A193; --chart-4:#B48E3E; --chart-5:#9572EE;
   }
   /* the few Tailwind colour utilities that mean "control blue": orange in Orange shades, blue tints in the dark blue accents */
   :root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}
@@ -287,9 +286,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .chip-st i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;}
   /* 13 Oct 2026 (W16, D39): a status is a SHAPE and a word, never colour alone — the plan orange is 6.5 from the
      warning amber for full colour vision and 1.8 for a colour-blind reader. Green stays a dot; amber is a triangle,
-     red an octagon. Matched on the token the dot is painted with, so every chip-st in the app follows. */
+     red a diamond (an octagon was tried: at 9 px it reads as a dot). Matched on the token the dot is painted with, so every chip-st in the app follows. */
   .chip-st i[style*="--gold"]{width:10px;height:9px;border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%);}
-  .chip-st i[style*="--red"]{width:9px;height:9px;border-radius:0;clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);}
+  .chip-st i[style*="--red"]{width:10px;height:10px;border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}
   .empty-ic{width:40px;height:40px;border-radius:50%;background:var(--surface-3);margin:0 auto 12px;}
   .empty-ic.error{background:rgba(220,38,38,.12);}
   .skel{display:inline-block;height:14px;border-radius:4px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}

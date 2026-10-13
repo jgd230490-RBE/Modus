@@ -2430,7 +2430,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const toks = (b) => { const o = {}; (b || "").replace(/--([a-z0-9-]+):([^;]+);/g, (_, k, v) => { o[k] = v.trim(); }); return o; };
   const ROOT = toks(blockOf(":root")), DARK = toks(blockOf('html[data-theme="dark"]'));
   const acc = (k) => toks(blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`));
-  const accD = (k) => toks(blockOf(`html[data-theme="dark"][data-accent="${k}"]`));
+  // (Blue and Blue shades share one dark block: `html[data-theme="dark"][data-accent="blue"],html[…="blue-shades"]`)
+  const DARK_BLUE = 'html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]';
+  const accD = (k) => (k === "blue" || k === "blue-shades") ? toks(blockOf(DARK_BLUE)) : toks(blockOf(`html[data-theme="dark"][data-accent="${k}"]`));
   const eff = (k, dark) => dark ? { ...ROOT, ...DARK, ...(k === "orange" ? {} : accD(k)) } : { ...ROOT, ...(k === "orange" ? {} : acc(k)) };
   const KEYS = ["orange", "blue", "blue-shades", "orange-shades"];
   const series = (t) => ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map(n => t[n].toUpperCase()).filter(c => c !== t["chart-none"].toUpperCase());
@@ -2445,23 +2447,25 @@ ok("...and it collapses with the rail like every other item (label behind railSh
                             s = Math.cbrt(0.0883024619 * v[0] + 0.2817188376 * v[1] + 0.6299787005 * v[2]);
                       return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s]; };
   const dE = (a, b, k) => { const p = oklab(sim(a, k)), q = oklab(sim(b, k)); return 100 * Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
-  const worst = (pal) => { let cvd = 1e9, nv = 1e9; for (let i = 1; i < pal.length; i++) { cvd = Math.min(cvd, dE(pal[i - 1], pal[i], "protan"), dE(pal[i - 1], pal[i], "deutan")); nv = Math.min(nv, dE(pal[i - 1], pal[i])); } return { cvd, nv }; };
+  // the pairs a reader compares: neighbours in a stack, and 1 against 4 (the cost chart: planned beside the model)
+  const worst = (pal) => { let cvd = 1e9, nv = 1e9; const P = []; for (let i = 1; i < pal.length; i++) P.push([i - 1, i]); if (pal.length >= 4) P.push([0, 3]);
+    for (const [i, j] of P) { cvd = Math.min(cvd, dE(pal[i], pal[j], "protan"), dE(pal[i], pal[j], "deutan")); nv = Math.min(nv, dE(pal[i], pal[j])); } return { cvd, nv }; };
   ok("W16: the ACCENTS block exists with a light and a dark block for each of the three alternatives, and touches no status colour",
-     ["blue", "blue-shades", "orange-shades"].every(k => blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`)) && ["blue", "blue-shades"].every(k => blockOf(`html[data-theme="dark"][data-accent="${k}"]`))
+     ["blue", "blue-shades", "orange-shades"].every(k => blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`)) && !!blockOf(DARK_BLUE)
      && !blockOf('html[data-theme="dark"][data-accent="orange-shades"]') && !blockOf(':root:not([data-theme="dark"])[data-accent="orange"]')
      && !/--(green|gold|red):/.test(css.slice(css.indexOf("ACCENTS-START"), css.indexOf("ACCENTS-END"))));
   ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
      series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
      && eff("orange", false).action === "#C2410C" && eff("orange", false).navy === "#2563EB" && eff("orange", true).action === "#FF8C14");
-  ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange); the other three series stay",
-     series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #7C3AED #A07D34" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #9572EE #B48E3E");
-  ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; Orange shades in Dark draws Orange primary's series",
-     series(eff("blue-shades", false)).join(" ") === "#1D4ED8 #0891B2 #7C3AED #0369A1" && series(eff("blue-shades", true)).join(" ") === "#5B8FF0 #13A193 #8B5CF6 #2E95D6"
+  ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange) and 4 and 5 (the model gold: blue beside violet fails 1–4)",
+     series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #A07D34 #7C3AED" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #B48E3E #9572EE");
+  ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; in Dark each draws its primary's series",
+     series(eff("blue-shades", false)).join(" ") === "#1D4ED8 #0891B2 #4F46E5 #0D9488" && series(eff("blue-shades", true)).join(" ") === series(eff("blue", true)).join(" ")
      && series(eff("orange-shades", false)).join(" ") === "#E8590C #9A3412 #A07D34 #BE185D"
      && series(eff("orange-shades", true)).join(" ") === series(eff("orange", true)).join(" "));
   for (const k of KEYS) for (const dark of [false, true]) {
     const t = eff(k, dark), pal = series(t), w = worst(pal), surf = dark ? "#1F2024" : "#FFFFFF";
-    ok(`W16 palette ${k} · ${dark ? "dark" : "light"}: neighbours apart for a colour-blind reader (≥ 8) and for everyone (≥ 15); every series ≥ 3:1 on the surface`,
+    ok(`W16 palette ${k} · ${dark ? "dark" : "light"}: neighbours and the plan–model pair apart for a colour-blind reader (≥ 8) and for everyone (≥ 15); every series ≥ 3:1 on the surface`,
        w.cvd >= 8 && w.nv >= 15 && pal.every(c => cr(c, surf) >= 3), `cvd ${w.cvd.toFixed(1)} nv ${w.nv.toFixed(1)} min contrast ${Math.min(...pal.map(c => cr(c, surf))).toFixed(2)}`);
   }
   ok("W16: the brief's own shade ramps would FAIL the same check (kept here so a later copy of them is caught)",
@@ -2485,9 +2489,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
      && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
      && /ctx\.fillStyle = tok\("--ink", "#1E293B"\);/.test(src));
-  ok("W16 (D39): an amber status is a triangle and a red one an octagon beside its word — every .chip-st dot, by the token it is painted with",
+  ok("W16 (D39): an amber status is a triangle and a red one a diamond beside its word — every .chip-st dot, by the token it is painted with",
      /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
-     && /\.chip-st i\[style\*="--red"\]\{[^}]*clip-path:polygon\(30% 0,70% 0,/.test(html));
+     && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
   ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
      !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
      && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)/g) || []).length);
