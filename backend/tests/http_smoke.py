@@ -135,6 +135,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
        f"{r.status_code} {r.text[:120]}")
     r = c.get("/api/bulletin/month.pdf?month=10")
     ok("🔴 ...and so is its PDF — 401", r.status_code == 401, str(r.status_code))
+    # 13 Oct 2026 (D43): the one-page leaflet, page and PDF, the bulletin's staff rule
+    r = c.get("/bulletin/leaflet/?month=10")
+    ok("🔴 the leaflet page is closed without a staff sign-in — 401, the bulletin's sign-in page",
+       r.status_code == 401 and "The monthly bulletin is for signed-in staff" in r.text, f"{r.status_code} {r.text[:120]}")
+    ok("🔴 ...and so is the leaflet PDF — 401", c.get("/api/bulletin/leaflet.pdf?month=10").status_code == 401)
     r = c.get("/api/public/alignment")
     ok("🔴 the overlay API is gated like the map — 401 JSON", r.status_code == 401
        and r.headers.get("content-type", "").startswith("application/json"), str(r.status_code))
@@ -592,6 +597,21 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and r.headers.get("cache-control") == "no-store" and all(f in r.text for f in _figs)
                and 'href="/api/bulletin/month.pdf?month=10">Download the PDF</a>' in r.text
                and "Fictional demo scheme · nothing here is real" in r.text, f"{r.status_code} {r.text[:200]}")
+            r = c.get("/api/bulletin/leaflet.pdf?month=10", headers=PLAN)
+            _lp = [" ".join(x.split()) for x in pdf_text(r.content).split("\f") if x.strip()] if r.status_code == 200 else []
+            ok("⭐ D43 the leaflet PDF over HTTP: one page, named for the month, not cached, the demo bar, the four figures, the brief",
+               r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf")
+               and r.headers.get("content-disposition") == 'attachment; filename="leaflet-2026-10.pdf"'
+               and r.headers.get("cache-control") == "no-store" and len(_lp) == 1
+               and "fictional demo scheme" in _lp[0].lower() and all(f in _lp[0] for f in _figs) and "This month in brief" in _lp[0],
+               f"{r.status_code} {len(_lp)}")
+            ok("⭐ D43 the newsletter PDF over HTTP is four pages, the brand band on each",
+               len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)}")
+            r = c.get("/bulletin/leaflet/?month=10", headers=PLAN)
+            ok("⭐ the leaflet page over HTTP with a code: HTML, not cached, the band, the figures, a link to its PDF",
+               r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
+               and r.headers.get("cache-control") == "no-store" and '<header class="band">' in r.text
+               and all(f in r.text for f in _figs) and 'href="/api/bulletin/leaflet.pdf?month=10"' in r.text, f"{r.status_code}")
             ok("...a team code is staff too: the page and the PDF open for the North Team code",
                c.get("/bulletin/?month=10", headers=NORTH).status_code == 200
                and c.get("/api/bulletin/month.pdf?month=10", headers=NORTH).status_code == 200)

@@ -837,9 +837,13 @@ ok("⭐ page 1: the counting line and the one-sentence definition — the map's 
    and "Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty." in MAP)
 ok("…and the other-schemes line (HS2 counts HGVs visiting the site; EKFB printed each way)",
    "HS2 prints HGVs visiting the site" in PAGES[0] and "EKFB 2020 printed maximum HGV each way" in PAGES[0])
-ok("⭐ the busiest routes on page 1: origin to destination (Helvetica has no arrow), the planning flag typed on R1 and the plan above it",
-   "Kelsey Quarry to Mill Compound" in PAGES[0] and "Ridge Pit to Mill Compound" in PAGES[0]
-   and "60 a day · plan is above it" in PAGES[0] and "no planning cap typed" in PAGES[0]
+# NARROWED 13 Oct 2026 (W15, D43: the 4-page newsletter): the busiest routes table opens page 2 ("02 Routes and roads");
+# page 1 names the busiest route in "This month in brief"
+ok("⭐ the busiest routes (page 2 of the newsletter): origin to destination, the planning flag typed on R1 and the plan above it; "
+   "page 1's brief names the busiest route",
+   "Kelsey Quarry to Mill Compound" in PAGES[1] and "Ridge Pit to Mill Compound" in PAGES[1]
+   and "60 a day · plan is above it" in PAGES[1] and "no planning cap typed" in PAGES[1]
+   and "The busiest route is Kelsey Quarry to Mill Compound" in PAGES[0]
    and S10["busiest"][0]["flag_text"] == "60 a day · plan is above it" and S10["busiest"][0]["over_flag"] is True)
 ok("…the letter pins: the busiest route's sites are A and B, in the legend under the map",
    [p["letter"] + " " + p["name"] for p in S10["places"]] == ["A Kelsey Quarry", "B Mill Compound", "C Ridge Pit"]
@@ -910,8 +914,12 @@ ok("⭐ report a lorry: a typed concern_email is printed (page and PDF), the pla
 ok("…and with none typed the same block keeps the placeholder (no invented contact)",
    S10["report"]["lorry"].endswith("[contact line and email: a typed field this scheme has not set yet].")
    and "concern_email" not in S10["report"]["lorry"])
-ok("…the frame: the title, the as-at stamp, the plan-only foot", "Lorry movements in October 2026" in PAGES[0]
-   and "Approved plan as at 12 October 2026" in PAGES[0] and "A planning forecast, not a monitoring report" in PAGES[1])
+# NARROWED 13 Oct 2026 (W15): the band carries the brand title "Lorry movements bulletin · <month>" (the document's own
+# title stays "Lorry movements in <month>"), the as-at stamp and the issue date; the foot adds wayscope.co.uk
+ok("…the frame: the band's title, the as-at stamp and issue date, the plan-only foot on every page",
+   "Lorry movements bulletin · October 2026" in PAGES[0] and S10["title"] == "Lorry movements in October 2026"
+   and "Approved plan as at 12 October 2026 · Issued 12 October 2026" in PAGES[0]
+   and all("A planning forecast, not a monitoring report · prepared with Wayscope · wayscope.co.uk" in pg for pg in PAGES))
 ok("…the map is the schematic offline, and the caption says so", "schematic from the stored road routes, not to scale" in PAGES[0]
    and "Routes this month: 2" in PAGES[0])
 ok("🔴 no team id in the PDF or the page, and no team name either (the per-team rows are not printed, D33)",
@@ -991,9 +999,11 @@ ok("⭐ glance: the five things a monitoring report fills from observed records 
            "Enquiries and complaints"]
    and all(g["figure"] == "Not reported" for g in S10["glance"] if g["not_reported"]), str(_NR))
 # NARROWED in build 13 Oct (the rendered PDF): page 1 overflowed and split the table; it now opens page 2
-ok("⭐ glance: at the top of page 2 of the PDF (page 1 keeps its shape) and on the page, with its explanation",
-   "This month at a glance" in PAGES[1] and "This month at a glance" not in PAGES[0]
-   and PAGES[1].index("This month at a glance") < PAGES[1].index("Two-way movements a day by route") and "Not reported" in T10J and "FORS, CLOCS, Euro VI" in T10J and "Direct Vision" in T10J
+# NARROWED 13 Oct 2026 (W15, D43): the tracker is part of page 1's summary now, after "This month in brief" (it opened
+# page 2 of the 4-page bulletin of 13 Oct)
+ok("⭐ glance: on page 1 of the newsletter, after the brief, and on the page, with its explanation",
+   "This month at a glance" in PAGES[0] and "This month at a glance" not in PAGES[1]
+   and PAGES[0].index("This month in brief") < PAGES[0].index("This month at a glance") and "Not reported" in T10J and "FORS, CLOCS, Euro VI" in T10J and "Direct Vision" in T10J
    and '<table data-bulletin="glance">' in HTML10 and "never estimated" in HTML_TEXT and "never estimated" in T10J
    and HTML10.count('<tr class="nr">') == 5)
 ok("🔴 no council districts: no carbon-by-council section anywhere, and nothing printed about it",
@@ -1582,9 +1592,11 @@ ok("⭐ row 5 (hand): the month's tonnes as cars driven for a month, the range f
    and "15% either side" in _L["In everyday terms"]["source"])
 ok("⭐ row 6 (hand): kg CO2e per tonne (÷ 60,400 t) and per two-way movement (÷ the month's loads)",
    _L["Per tonne, per movement"]["text"] == f"{1000 * _c10 / 60400:,.1f} kg CO2e per tonne moved and {1000 * _c10 / LOADS:,.0f} kg per two-way movement.")
-ok("⭐ every row but the plan carries its source; the outside rows name their publisher and year; no file path is printed",
-   all(r["source"] and r["source"] != "—" for r in LOT10["rows"][1:]) and "2024" in _L["The council's figures"]["source"]
-   and "DESNZ" in _L["The council's figures"]["source"] and "2026" in _L["In everyday terms"]["source"]
+# NARROWED 13 Oct 2026 (the rendered smoke month): a council row with NO figure carries no source line; with one, it does
+ok("⭐ every row with a figure carries its source; the outside rows name their publisher and year; no file path is printed; a "
+   "council row with no figure has no source line",
+   all(r["source"] and r["source"] != "—" for r in LOT10["rows"][1:] if r["label"] != "The council's figures")
+   and _L["The council's figures"]["source"] == "—" and "2026" in _L["In everyday terms"]["source"]
    and not any("backend/" in r["source"] or ".json" in r["source"] for r in LOT10["rows"]))
 ok("the demo tenant says the plan, target and tonnes are invented and the government figures real",
    LOT10["demo_note"] == "Fictional demo scheme: the plan, the target and the tonnes are invented; the government figures they are set beside are real.")
@@ -1597,15 +1609,19 @@ try:
 finally:
     comparisons._CACHE[comparisons.LA_PATH] = _saved_la
 _DK = {d["name"]: d for d in _CK["districts"]}
+_LKs = next(r for r in _LK["rows"] if r["label"] == "The council's figures")["source"]
+ok("...and a council row WITH a figure names DESNZ 2024, Table 1.1 and the OGL", "2024" in _LKs and "DESNZ" in _LKs
+   and "Table 1.1" in _LKs and "Open Government Licence v3.0" in _LKs)
 _eK = 100 * _DK["Eastshire"]["co2_t"] / (24.0 * 1000 / 12)
 ok("⭐ row 4 (hand, a table that knows the codes): the district with the most haul carbon against a month of ITS figures, "
    "'about', with the road basis; no motorway → A and minor roads",
    next(r for r in _LK["rows"] if r["label"] == "The council's figures")["text"]
    == f"In Eastshire, {_tt(_DK['Eastshire']['co2_t'])} is {comparisons.about(comparisons.pct_words(_eK))} of a month of the district's road "
       "transport emissions (A and minor roads: the government figures give no motorway in the district). Each district is in the Carbon by council table.")
-ok("⭐ the council table's for-scale column: each district against a month of its own road transport; '(A and minor)' where no "
-   "motorway; '—' with no haul; 'no government figure' when the code is not in the table",
-   _DK["Eastshire"]["la_share"] == comparisons.about(comparisons.pct_words(_eK)) + " (A and minor)"
+# NARROWED 13 Oct 2026 (the rendered newsletter: "(A and minor)" wrapped the narrow column): a † and one footnote
+ok("⭐ the council table's for-scale column: each district against a month of its own road transport; † where no "
+   "motorway (one footnote says so); '—' with no haul; 'no government figure' when the code is not in the table",
+   _DK["Eastshire"]["la_share"] == comparisons.about(comparisons.pct_words(_eK)) + " †"
    and _DK["Westvale"]["la_share"] == comparisons.about(comparisons.pct_words(100 * _DK["Westvale"]["co2_t"] / (18.0 * 1000 / 12)))
    and _DK["Farmoor"]["la_share"] == "—" and _D["Eastshire"]["la_share"] == "no government figure")
 # D44 — the monthly allowance, by hand, on a stubbed target (the real one is held by test_carbon_target)
@@ -1720,6 +1736,132 @@ ok("🔴 the endpoint is admin-only, costs one HERE call and stores nothing; not
    and "road_class" not in read("backend/bulletin_doc.py") and "road_class" not in read("backend/comparisons.py").split('"""', 2)[2]
    and "db.execute" not in read("backend/network.py").split("def road_class_diagnostics(")[1].split("\ndef ")[0])
 
+# --------------------------------------------------------------------------- #
+#  8e. 13 Oct 2026 — BUNDLE C2: the newsletter (4 pages), the leaflet (1 page),  #
+#      the brand (W15), the D41 tag                                              #
+# --------------------------------------------------------------------------- #
+import brand_pdf  # noqa: E402
+_pages = lambda pdf: [" ".join(x.split()) for x in pdf_text(pdf).split("\f") if x.strip()]
+_PB = _pages(PDF10B)
+ok("⭐ D43 the newsletter is FOUR pages — with council areas (S10B) and without (S10) — each page one numbered section, in order",
+   len(PAGES) == 4 and len(_PB) == 4
+   and all(k in _PB[i] for i, k in enumerate(("01 THE MONTH IN BRIEF", "02 ROUTES AND ROADS", "03 COUNCILS", "04 CARBON AND THE SMALL PRINT")))
+   and "03 CARBON" in PAGES[2] and "Is " in PAGES[2] and "a lot?" in PAGES[2], str([len(PAGES), len(_PB)]))
+ok("⭐ page 1 reads on its own: the lede, the four figures, the map and its legend, This month in brief, the glance, how to report a lorry",
+   all(t in _PB[0] for t in ("What Wolds Link (fictional) plans to move by lorry in October 2026", "This month in brief",
+                             "This month at a glance", "Two-way movements a day in October 2026:", "Report a lorry off route"))
+   and all(f["value"] in _PB[0] for f in S10B["headline"]))
+ok("⭐ page 3 holds both council sections; page 4 the panel, how council carbon is worked out, what changed, terms, caveats",
+   "Movements by council in October 2026" in _PB[2] and "Carbon by council in October 2026" in _PB[2]
+   and all(t in _PB[3] for t in ("a lot?", "Carbon by council: how it is worked out", "What changed since last month",
+                                 "Terms explained", "Caveats", "Large print and other formats")))
+ok("⭐ W15 the brand band on EVERY page: the title 'Lorry movements bulletin · <month>', the scheme, 'monthly newsletter', the "
+   "as-at stamp and issue date; the demo bar under it on every page; the foot with wayscope.co.uk",
+   all("Lorry movements bulletin · October 2026" in pg and "monthly newsletter" in pg and "Issued" in pg
+       and "Fictional demo scheme · nothing here is real" in pg and "wayscope.co.uk" in pg for pg in _PB + PAGES))
+def _shown_fonts(pdf):
+    """The fonts text is actually SHOWN in: per BT…ET block that shows text (Tj / TJ), the font set last before it.
+    (reportlab writes empty font switches in its preambles — the page's initial Helvetica, a drawing's Times-Roman — that
+    show nothing; they are not text in those fonts.)"""
+    out = set()
+    for blk in re.findall(rb"BT(.*?)ET", pdf, re.S):
+        cur = None
+        for m in re.finditer(rb"/(\S+) [\d.]+ Tf|(\)\s*Tj|\]\s*TJ)", blk):
+            if m.group(1):
+                cur = m.group(1)
+            elif cur is not None:
+                out.add(cur)
+    return out
+
+
+_SF = _shown_fonts(PDF10B)
+ok("⭐ W15 Inter in the PDFs (embedded TrueType subsets): every piece of text the newsletter shows is in an embedded Inter "
+   "subset — none in Helvetica or Times",
+   b"Inter-Bold" in PDF10B and b"/FontFile2" in PDF10B and _SF and all(b"+" in f for f in _SF), str(_SF))
+ok("⭐ W15 the logo is VECTOR: drawn from the brand SVG master, no image in an offline newsletter (the map is a schematic too)",
+   b"/Subtype /Image" not in PDF10B and len(brand_pdf.logo_shapes()[1]) == 9
+   and brand_pdf.logo_shapes()[0] == [15.0, 84.0, 1380.39, 263.0])
+_ofl = read("backend/fonts/Inter-OFL.txt")
+ok("🔴 the OFL ships beside the fonts (the licence's condition), three static TrueType files, no Reserved Font Name claimed",
+   "SIL Open Font License, Version 1.1" in _ofl and "Copyright (c) 2016 The Inter Project Authors" in _ofl
+   and sorted(f for f in os.listdir(os.path.join(BACKEND, "fonts")) if f.endswith(".ttf")) == ["Inter-Bold.ttf", "Inter-Italic.ttf", "Inter-Regular.ttf"]
+   and all(open(os.path.join(BACKEND, "fonts", f), "rb").read(4) == b"\x00\x01\x00\x00" for f in ("Inter-Bold.ttf", "Inter-Italic.ttf", "Inter-Regular.ttf")))
+# the SVG reader: an arc, a relative path, implicit repeats, a quadratic
+_seg = brand_pdf.path_segments("M0,0 L10,0 A5,5 0 0 1 20,0 h5 v5 q1,1 2,2 Z m1,1 2,2")
+ok("W15 the SVG path reader: absolute and relative moves, implicit linetos after a moveto, H/V, an arc into Béziers, Q into C, Z",
+   _seg[0] == ("M", 0.0, 0.0) and _seg[1] == ("L", 10.0, 0.0) and _seg[2][0] == "C" and abs(_seg[-6 + 0][5] - 20) < 1e-6 if False else
+   (_seg[0] == ("M", 0.0, 0.0) and _seg[1] == ("L", 10.0, 0.0) and any(x[0] == "C" for x in _seg)
+    and ("L", 25.0, 0.0) in _seg and ("L", 25.0, 5.0) in _seg and ("Z",) in _seg and _seg[-1] == ("L", 3.0, 3.0)), str(_seg))
+_arc = brand_pdf._arc_to_beziers(10, 0, 5, 5, 0, 0, 1, 20, 0)
+ok("W15 an SVG arc (a half circle) becomes two Bézier quarters that end on the arc's end point",
+   len(_arc) == 2 and abs(_arc[-1][4] - 20) < 1e-9 and abs(_arc[-1][5]) < 1e-9 and abs(_arc[0][5] - (-5)) < 1e-6 or abs(_arc[0][5] - 5) < 1e-6, str(_arc))
+ok("🔴 the logo is filled with SVG's non-zero rule (even-odd punched holes where a letter's outlines overlap)",
+   "fillMode=FILL_NON_ZERO" in read("backend/brand_pdf.py") and "FILL_NON_ZERO = 1" in read("backend/brand_pdf.py"))
+# the leaflet
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+try:
+    LF10 = export.build_bulletin_leaflet_pdf(S10)
+    LF10B = export.build_bulletin_leaflet_pdf(S10B)
+    LH10B = bulletin_doc.leaflet_html(S10B)
+finally:
+    config.tenant_settings = _real_ts4
+_LP, _LPB = _pages(LF10), _pages(LF10B)
+ok("⭐ D43 the leaflet is ONE page, with or without council areas",
+   len(_LP) == 1 and len(_LPB) == 1, str([len(_LP), len(_LPB)]))
+ok("⭐ the leaflet: the band (leaflet), the demo bar, the lede, the four figures, the map and legend, the brief, how to report a "
+   "lorry with the hours and other formats, and where to read the newsletter (a placeholder until typed)",
+   all(t in _LPB[0] for t in ("Lorry movements bulletin · October 2026", "· leaflet ·", "Fictional demo scheme · nothing here is real",
+                              "What Wolds Link (fictional) plans to move by lorry", "Two-way movements a day in October 2026:",
+                              "This month in brief", "Report a lorry off route", "Working hours:", "Large print and other formats:",
+                              "The full monthly newsletter", "[where to read the full newsletter: a typed field this scheme has not set yet]"))
+   and all(f["value"] in _LPB[0] for f in S10B["headline"]) and b"Inter-Bold" in LF10B and all(b"+" in f for f in _shown_fonts(LF10B)))
+ok("🔴 the leaflet: word ban, UK words, no team id or name", not _BANNED.search(_LPB[0]) and not _trucks(_LPB[0])
+   and not ID_FORM.search(_LPB[0]) and "North Team" not in _LPB[0])
+ok("🔴 the leaflet never spills: the map gives way first (88 → 74 → 60 → 46 mm), checked on the built page count",
+   "for map_h in (88 * mm, 74 * mm, 60 * mm, 46 * mm):" in _EXP and "if doc.page <= 1:" in _EXP)
+ok("🔴 the newsletter's page 1 never spills: its map gives way first (64 → 54 → 44 → 34 mm) until the newsletter is four pages",
+   "NEWSLETTER_MAP_HEIGHTS = (64 * mm, 54 * mm, 44 * mm, 34 * mm)" in _EXP and "if pages <= 4:" in _EXP
+   and "return buf.getvalue(), doc.page" in _EXP)
+# the brief, by hand
+_BR = S10B["brief"]
+ok("⭐ This month in brief (hand): the busiest route with its flag, September empty, the works count, the busiest district, "
+   "the carbon as cars",
+   _BR == [f"The busiest route is {S10B['routes'][0]['label']}: {_r1:,.0f} two-way lorry movements a day, above its planning flag of 60 a day.",
+           f"No approved lorries in September 2026; {_mv10:,.0f} two-way movements a day in October 2026.",
+           "3 road works, closures or local controls listed for October 2026.",
+           "Eastshire sees the most: 98 two-way movements a day on roads its laden legs use.",
+           f"Haul carbon: {_tt(_c10)} CO2e in October 2026, {comparisons.car_equivalents(_c10)['words']}."], str(_BR))
+_BR11 = S11B["brief"]
+ok("This month in brief (hand): November says October's and November's two-way movements a day",
+   f"Two-way movements a day: {_mv10:,.0f} in October 2026, {_mv11:,.0f} in November 2026." in _BR11, str(_BR11))
+# D41: the tag on the maps
+ok("⭐ D41 'Fictional demo scheme' ON both maps of a demo tenant: the route map and the council map, PDF and page; none without "
+   "a demo notice",
+   S10B["map_demo_tag"] == "Fictional demo scheme" and S10B["council"]["demo_tag"] == "Fictional demo scheme"
+   and _PB[0].count("Fictional demo scheme") >= 2 and _PB[2].count("Fictional demo scheme") >= 2
+   and HTML10B.count('<g class="map-tag">') == 2 and LH10B.count('<g class="map-tag">') == 1
+   and bulletin_doc._svg_tag(None) == "" and "map_demo_tag" in read("backend/bulletin_doc.py"))
+# the HTML: the band, the brief, the leaflet links
+ok("⭐ W15 the page: the ink band with the logo inlined as SVG (vector, gradient kept), the orange rule, Inter loaded, the mark "
+   "at the foot; This month in brief after the map; links to the leaflet page and its PDF",
+   '<header class="band">' in HTML10B and 'class="brand-logo"' in HTML10B and "ws-orange" in HTML10B and "<img" not in HTML10B
+   and '<div class="band-rule"></div>' in HTML10B and "fonts.googleapis.com/css2?family=Inter" in HTML10B
+   and '<ul class="brief" data-bulletin="brief">' in HTML10B and HTML10B.index('data-bulletin="map"') < HTML10B.index('data-bulletin="brief"')
+   and 'href="/bulletin/leaflet/?month=10">The one-page leaflet</a>' in HTML10B and 'href="/api/bulletin/leaflet.pdf?month=10"' in HTML10B)
+_pxL = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", LH10B)]
+ok("🔴 the leaflet page: the 14 px floor, a viewport, the demo notice, the map scrolls rather than shrinks on a phone",
+   _pxL and min(_pxL) >= 14 and '<meta name="viewport" content="width=device-width,initial-scale=1">' in LH10B
+   and f'<div class="notice">{NOTICE}</div>' in LH10B and ".mapwrap svg{min-width:720px}" in LH10B, str(sorted(set(_pxL))))
+ok("🔴 the leaflet page: word ban and UK words", not _BANNED.search(re.sub(r"<[^>]+>", " ", LH10B)) and not _trucks(re.sub(r"<[^>]+>", " ", LH10B)))
+_MS = read("backend/main.py")
+# the leaflet endpoints, staff only like the bulletin (D10)
+ok("🔴 the gate calls /bulletin/leaflet/ 'bulletin' (staff only); both endpoints check staff before reading anything",
+   gate.scope_for("/bulletin/leaflet/?month=10") == "bulletin"
+   and _MS.index('@app.get("/api/bulletin/leaflet.pdf")') > 0 and _MS.index('@app.get("/bulletin/leaflet/")') > 0
+   and _MS.split("def bulletin_leaflet_pdf(")[1].split("def bulletin_leaflet_page(")[0].index("_staff_request(request)")
+   < _MS.split("def bulletin_leaflet_pdf(")[1].split("def bulletin_leaflet_page(")[0].index("bulletin_doc.sheet(")
+   and "export.build_bulletin_leaflet_pdf(sheet)" in _MS and "bulletin_doc.leaflet_html(bulletin_doc.sheet(" in _MS)
+
 # the frame, shared
 ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary and the bulletin",
    _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 3 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
@@ -1727,8 +1869,10 @@ ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called 
    and _EXP.count("doc = frame_doc(") == 3)
 ok("…the bulletin's frame carries the demo notice on every page and the plan-only foot",
    # NARROWED 13 Oct 2026 (D45): the notice is passed in the demo red; page_frame draws it as the demo bar
-   "notice=((_pdf_safe(notice), \"Helvetica-Bold\", 8.5, DEMO_FG_RGB, H - 25 * mm) if notice else None)" in _EXB
-   and "foot=(_pdf_safe(S[\"foot\"]), \"Helvetica\", 7, GREY)" in _EXB)
+   # NARROWED 13 Oct 2026 (W15): in Inter, under the brand band, with wayscope.co.uk in the foot; one call for both PDFs
+   "notice=((_pdf_safe(notice), _BF(\"bold\"), 8.5, DEMO_FG_RGB, H - band[\"height\"] - 8.5 * mm)" in _EXB
+   and "foot=(_pdf_safe(S[\"foot\"] + \" · wayscope.co.uk\"), _BF(\"regular\"), 7, GREY), band=band)" in _EXB
+   and _EXB.count("on_page = page_frame(") == 1)
 
 # the endpoints (bodies; http_smoke drives the real HTTP layer and the middleware)
 _tok = access._ACCESS.set(None)

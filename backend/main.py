@@ -1699,6 +1699,37 @@ def bulletin_month_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: R
                              "Cache-Control": "no-store"})
 
 
+@app.get("/api/bulletin/leaflet.pdf")
+def bulletin_leaflet_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: Request = None):
+    """
+    13 Oct 2026 (D43) — the one-page LEAFLET (residents, the working group) as an A4 PDF, from the SAME view model as
+    the newsletter and the page (bulletin_doc.sheet). Staff only, the bulletin's rule (D10). Stores nothing.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — a valid access code is required")
+    sheet = bulletin_doc.sheet(month, access.current())
+    try:
+        data = export.build_bulletin_leaflet_pdf(sheet)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    y, m = weeks._month_of(month)
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="leaflet-{y}-{m:02d}.pdf"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/bulletin/leaflet/")
+def bulletin_leaflet_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), request: Request = None):
+    """13 Oct 2026 (D43) — the leaflet as an HTML page; staff-gated like /bulletin/ (gate.scope_for: "bulletin")."""
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        return Response(content=_BULLETIN_SIGNIN_PAGE, status_code=401, media_type="text/html; charset=utf-8")
+    mi = month if month is not None else _bulletin_month_default()
+    return Response(content=bulletin_doc.leaflet_html(bulletin_doc.sheet(mi, access.current())),
+                    media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/bulletin/")
 def bulletin_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), request: Request = None):
     """
