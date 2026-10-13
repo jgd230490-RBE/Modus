@@ -102,7 +102,7 @@
         #limit-boxes .control-item.dim label{ opacity:.45; }
         .lim-n{ margin-left:auto; padding-left:8px; color:var(--muted); font-weight:400; font-variant-numeric:tabular-nums; }
         .lim-sw{ flex:none; width:13px; height:13px; margin-left:8px; border-radius:50%; background:#fff; border:2.5px solid #C8102E; box-sizing:border-box; }
-        .lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; }
+        .lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; max-height:min(52vh, 380px); overflow-y:auto; }   /* 13 Oct, seen in Chrome: a card with three routes ran off the map */
         .lim-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
         .lim-head svg{ flex:none; }
         .lim-title{ font-weight:600; font-size:16px; }
@@ -7314,7 +7314,9 @@
         }
         const card = document.getElementById('route-hover-card');
         if (!card) return;
-        if (!f || !e || !e.point || isPhoneShell() || !canHover()) { card.hidden = true; HOVER.key = ''; return; }
+        // 13 Oct 2026, seen in Chrome: a route's hover card sat on top of a lorry limit's card; over a limit it gives way
+        if (!f || !e || !e.point || isPhoneShell() || !canHover()
+            || (typeof limitHitAt === 'function' && limitHitAt(e.point))) { card.hidden = true; HOVER.key = ''; return; }
         // Track C review: a shared section (Road load on) gets the section's card, never one route's
         const isRun = f.source === 'road-load-source' || !!(f.layer && f.layer.id === 'road-load-line');
         const v = isRun

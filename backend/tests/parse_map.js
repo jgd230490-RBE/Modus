@@ -3741,7 +3741,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes("map.setFeatureState({ source: 'routes-source', id: id }, { hover: true });"));
   ok("C3 hover: the card is a tooltip outside the canvas, never on a phone or a touch-only screen, and goes when the pointer leaves the map",
      html.includes('<div id="route-hover-card" role="tooltip" hidden></div>') && /#route-hover-card\{ display:none !important; \}/.test(shell)
-     && code.includes("if (!f || !e || !e.point || isPhoneShell() || !canHover()) { card.hidden = true; HOVER.key = ''; return; }")
+     // NARROWED 13 Oct 2026: the same hide condition, which now also gives way over a lorry limit (pinned in the limits block)
+     && code.includes("if (!f || !e || !e.point || isPhoneShell() || !canHover()\n            || (typeof limitHitAt === 'function' && limitHitAt(e.point))) { card.hidden = true; HOVER.key = ''; return; }")
      && code.includes("if (mapEl) mapEl.addEventListener('mouseleave', () => setRouteHover(null, null));"));
   // ---- (5) the deep link, the share card and the hooks ---------------------------------------------------------------
   ok("C3 link: written on change — applyFilters ends with the write; a layer box or Show forecast schedules it; a stop of playback writes it",
@@ -4770,6 +4771,10 @@ function qrRead(mod) {
          && M.sources['limits-points'] && M.sources['limits-lines']);
       ok("...and ONE idle wait is armed, not one per call", idleArmed === 1, String(idleArmed));
       map.isStyleLoaded = savedIsLoaded; map.once = savedOnce;
+      ok("limits (source): a route's hover card gives way over a lorry limit (seen in Chrome 13 Oct)",
+         code.includes("|| (typeof limitHitAt === 'function' && limitHitAt(e.point))) { card.hidden = true; HOVER.key = ''; return; }"));
+      ok("limits (source): the card scrolls inside the popup instead of running off the map",
+         html.includes(".lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; max-height:min(52vh, 380px); overflow-y:auto; }"));
       ok("limits (source): the deferral tries the add at once and retries on a refusal",
          code.includes("try { addLimitLayers(); } catch (e) { setTimeout(ensureLimitLayers, 500); }"));
       // an empty collection: the note, no boxes; a failed read: no group
