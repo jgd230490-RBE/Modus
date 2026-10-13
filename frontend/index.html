@@ -471,6 +471,20 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ct-more ul{margin:4px 0 0 18px;list-style:disc;}
   /* 11 Oct 2026 — the Gate arrivals panel on the Dashboard (tokens only; 14 px table text; the .ct-* family's strip) */
   .ga-strip{margin-top:12px;}
+  /* 14 Oct 2026: the gate chart (arrivals against capacity) and its key; the table folds under it */
+  .ga-chart{margin-top:10px;}
+  .ga-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:4px;}
+  .ga-head-v{font-size:18px;font-weight:700;color:var(--ink);}
+  .ga-key{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;color:var(--muted);}
+  .ga-key i{display:inline-block;vertical-align:middle;margin-left:8px;}
+  .ga-key i:first-child{margin-left:0;}
+  .ga-key-bar{width:16px;height:10px;border-radius:2px;background:var(--chart-1);}
+  .ga-key-cap{width:3px;height:14px;background:var(--ink);margin-left:0 !important;}
+  .ga-key-track{width:18px;height:12px;border-radius:2px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
+  .ga-key-red{width:16px;height:10px;border-radius:2px;background:var(--red);}
+  .ga-key-none{width:16px;height:10px;border-radius:2px;background:var(--chart-none);}
+  .ga-more{margin-top:8px;}
+  .ga-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:6px 0;}
   .ga-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
   .ga-table th{font-size:14px;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
   .ga-table td{font-size:14px;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line);}
@@ -1213,6 +1227,11 @@ const GA_SPREAD = "if arrivals are spread evenly";
 // lines only: gap null); no check-in typed (nothing compared); otherwise the average holds
 const gaFlagWord = (g) => g.flag === "red" ? "Queue likely" : (g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds"));
 const gaMin = (m) => m == null ? "—" : `${(+m).toFixed(1)} min`;
+// 14 Oct 2026 (the user: "gate arrivals should be a chart, measuring arrivals against capacity"): a gate's CAPACITY is
+// the most lorries it can check in a day if they arrive evenly = the shift's minutes ÷ the check-in minutes a lorry.
+// The SERVER sends it (capacity_per_day, capacity_pct): it is its own red rule turned round, so the chart and the
+// status word cannot disagree (test_gate_arrivals checks it). The bar is red only when the server's flag is.
+// No check-in typed = no capacity: the bar is grey and says so, never compared.
 const gaN1 = (n) => n == null ? "—" : (+n).toFixed(1);
 function GateArrivalsPanel({ ga, err, month, months, onMonth }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
@@ -1222,6 +1241,50 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
   const gates = ga.gates || [];
   const state = gates.length === 0 ? "none" : "set";
   const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
+  // the chart: one row a gate, the fullest first (by share of capacity; gates with none after, busiest first)
+  const rowsC = gates.filter(g => g.arrivals_per_day != null && g.arrivals_per_day > 0)
+    .map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === "red" }))
+    .sort((a, b) => ((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day));
+  const nOverG = rowsC.filter(r => r.over).length;
+  const gaFs = 11;
+  const C1g = tok("--chart-1", "#E8590C"), REDg = tok("--red", "#DC2626"), NONEg = tok("--chart-none", "#A8A29E"), INKg = tok("--ink", "#1E293B");
+  const xTop = Math.max(1, ...rowsC.map(r => Math.max(r.g.arrivals_per_day, r.cap || 0)));
+  const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {
+    const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx, A = chart.chartArea; if(!x || !A) return;   // 1 = the arrivals
+    ctx.save();
+    meta.data.forEach((el, i) => { const r = rowsC[i]; if(!r) return;
+      const half = (el.height || 16) / 2 + 5;
+      let right = el.x;
+      if(r.cap){
+        const px = x.getPixelForValue(r.cap); right = Math.max(right, px);
+        ctx.strokeStyle = INKg; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(px, el.y - half); ctx.lineTo(px, el.y + half); ctx.stroke();
+        ctx.fillStyle = INKg; ctx.beginPath(); ctx.moveTo(px - 5, el.y - half - 7); ctx.lineTo(px + 5, el.y - half - 7); ctx.lineTo(px, el.y - half); ctx.closePath(); ctx.fill();
+      }
+      const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : "");
+      ctx.font = `600 ${gaFs + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.fillStyle = r.over ? REDg : INKg;
+      ctx.fillText(`${gaN1(r.g.arrivals_per_day)} a day${words}`, right + 10, el.y);
+    });
+    ctx.restore();
+  } };
+  const gaCfg = { type: "bar",
+    // a bullet chart: a pale track from 0 to the gate's capacity, the planned arrivals as the bar inside it, a marker at
+    // capacity; a gate with no check-in has no track
+    data: { labels: rowsC.map(r => r.g.location_name), datasets: [
+      { label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap), backgroundColor: tok("--surface-3", "#F3F2EF"),
+        borderColor: tok("--grey", "#E7E5E4"), borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
+      { label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day),
+        backgroundColor: rowsC.map(r => r.over ? REDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 12, right: 250 } },
+      plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1, callbacks: {
+        title: (items) => items.length ? `${rowsC[items[0].dataIndex].g.location_name}, ${rowsC[items[0].dataIndex].g.gate_name}` : "",
+        label: (item) => { const r = rowsC[item.dataIndex]; return [`${gaN1(r.g.arrivals_per_day)} lorries a day ${GA_SPREAD}`,
+          r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`,
+          gaFlagWord(r.g)]; } } } },
+      scales: { x: { min: 0, suggestedMax: xTop, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: gaFs } },
+                     title: { display: true, text: "lorries a day", font: { size: gaFs } } },
+                y: { grid: { display: false }, ticks: { font: { size: gaFs + 1 }, callback: function(v){ const r = rowsC[v]; return r ? [cutLabel(r.g.location_name), cutLabel(r.g.gate_name)] : ""; } } } } },
+    plugins: [capMarks] };
   return (
     <section className="ct-strip ga-strip" data-gate-arrivals={state} data-guide="dash-gates" aria-label="Gate arrivals">
       <div className="ct-row">
@@ -1232,12 +1295,24 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
       </div>
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across the {ga.shift_hours} h shift.</div>
       {state === "none" && <EmptyState kind="none" title={`No approved lines in ${ga.label}`} body="Pick another month. Pending lines appear as a note until they are approved, then in the figures." />}
+      {state === "set" && rowsC.length > 0 && (
+        <div className="ga-chart" data-ga-chart="1">
+          <div className="ga-head">
+            <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : "Every gate within its capacity"}</span>
+            <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the shift ÷ the check-in time a lorry <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
+          </div>
+          <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />
+        </div>
+      )}
       {state === "set" && (
-        // 13 Oct 2026 (W6): RowDetails. The row: the location (primary) with its gate under it, the teams as at most
-        // two chips, one figure a cell, the status word (red only when a queue is likely, grey otherwise: the 11 Oct
-        // rule, so no ✓ and no amber here); the laden / coming-to-load split, each team's figure, the
-        // full gap sentence, the server's reason and the two notes moved into the details row. No unit switch here:
-        // every figure on this table is already lorries.
+        // 14 Oct 2026: the table is the detail behind the chart now ("Gate by gate"), every fact kept
+        <details className="ga-more" data-ga-table="1"><summary>Gate by gate: the gap, the check-in time, the lorries of each {TEAM().toLowerCase()}</summary>
+        {/* 13 Oct 2026 (W6): RowDetails. The row: the location (primary) with its gate under it, the teams as at most
+            two chips, one figure a cell, the status word (red only when a queue is likely, grey otherwise: the 11 Oct
+            rule, so no tick and no amber here); the laden / coming-to-load split, each team figure, the
+            full gap sentence, the reason and the two notes moved into the details row. No unit switch here:
+            every figure on this table is already lorries.
+        */}
         <div className="overflow-auto rd-scroll"><table className="ga-table rd-table" data-rd-table="gates">
           <thead><tr><th scope="col">Gate</th><th scope="col" className="num">Arrivals a day</th><th scope="col" className="num">Average gap</th><th scope="col" className="num">Check-in a lorry</th><th scope="col">Status</th></tr></thead>
           <tbody>
@@ -1273,6 +1348,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
             })}
           </tbody>
         </table></div>
+        </details>
       )}
       {(ga.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
     </section>

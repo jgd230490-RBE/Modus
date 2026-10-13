@@ -2520,8 +2520,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
      // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
      && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
-  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile chart, whose height follows its rows)",
-     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 1 && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
+  // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
+  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile and gate charts, whose height follows their rows)",
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 2 && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
@@ -2705,6 +2706,31 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /\.chart-head \.ch-lbl\{[^}]*margin-left:\.45em;\}/.test(html));
   ok("DESIGN: series names at a chart's end keep 20 characters (were cut at 15: 'Large aggregat…'), with room for them",
      src.includes('const t = m.label.length > 20 ? m.label.slice(0, 19) + "…" : m.label;') && /const SERIES_LABEL_PAD = 136;/.test(src));
+}
+
+// ---- 14 Oct 2026 (the user: "gate arrivals should be a chart, measuring arrivals against capacity"): a bullet chart,
+// one row a gate, the fullest first. Capacity = the shift's minutes ÷ the check-in minutes a lorry, SENT BY THE SERVER
+// (capacity_per_day, capacity_pct; test_gate_arrivals pins the arithmetic and that it agrees with the red flag).
+{
+  const _ga = (src.match(/function GateArrivalsPanel\([\s\S]*?\n\}\n/) || [""])[0];
+  ok("GATE CHART: the panel opens with a chart, one row a gate (fullest first), above the table, which folds under 'Gate by gate'",
+     _ga.includes('<div className="ga-chart" data-ga-chart="1">') && _ga.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />")
+     && _ga.indexOf('data-ga-chart="1"') < _ga.indexOf('data-rd-table="gates"') && _ga.includes('<details className="ga-more" data-ga-table="1"><summary>Gate by gate:')
+     && _ga.includes("((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day)"));
+  ok("GATE CHART: a bullet chart — a pale track to the gate's capacity, the planned arrivals inside it, a marker with an arrow at capacity",
+     _ga.includes('{ label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap)') && _ga.includes('{ label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day)')
+     && _ga.includes('const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {') && _ga.includes("plugins: [capMarks] };")
+     && (_ga.match(/grouped: false/g) || []).length === 2);
+  ok("GATE CHART: 🔴 the browser draws the server's capacity and flag — it divides nothing; red only where the server's flag is red",
+     _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\" }))")
+     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60/.test(_ga) && _ga.includes("r.over ? REDg : (r.cap == null ? NONEg : C1g)"));
+  ok("GATE CHART: every row says its figure in words (no hover on a TV or a print): 'N a day · P % of C', 'over capacity', 'no check-in time typed'",
+     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : "");')
+     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : "Every gate within its capacity"}'));
+  ok("GATE CHART: a key names the bar, the track, the marker, red and grey; the tooltip names the gate and how capacity is worked out",
+     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the shift ÷ the check-in time a lorry")
+     && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
+     && _ga.includes("`capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`"));
 }
 
 // ---- report ------------------------------------------------------------------

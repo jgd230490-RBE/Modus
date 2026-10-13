@@ -635,5 +635,10 @@ ok("E (W16): the guide names the four accents beside the three looks, the plan-f
 ok("E (W5): the guide says the left menu shows icons only below 768 px and opens over the page",
    "Below 768 px the left menu shows its icons only" in src and "opens it over the page until you pick one" in src)
 
+# 14 Oct 2026: the gate chart is described where the Dashboard is
+ok("the guide explains the gate chart: the track, the bar, the marker, capacity worked out, red and grey, Gate by gate",
+   "<strong>Gate arrivals</strong> shows" in src and "the shift's hours ÷ the check-in time a lorry" in src and "over capacity" in src
+   and "A grey bar has no check-in time typed" in src and "<strong>Gate by gate</strong> under the chart opens the table" in src)
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
