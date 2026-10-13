@@ -250,14 +250,22 @@ ok("2. parse: 7 limits read, 2 dropped (300 t out of range, 'default' not a valu
 ok("2. Back Lane: 5 t, except for access (hgv=destination), a line with its length",
    by[("w101", "weight")]["value"] == 5.0 and by[("w101", "weight")]["exceptions"] == "Except for access"
    and by[("w101", "weight")]["geom_type"] == "LineString" and by[("w101", "weight")]["length_m"] > 200)
-ok("2. ⭐ Rockingham Road 14'6\": 4.42 m, the signed text kept for the sign",
-   by[("w103", "height")]["value"] == 4.42 and by[("w103", "height")]["signed"] == "14'6\"")
+# REVERSED 13 Oct 2026 (East Langton, signed 4.0 m / 13'0"): an imperial-only value is read as the SIGNED metric
+ok("2. ⭐ Rockingham Road 14'6\": 4.4 m (the metric a UK dual sign shows), the signed text kept for the sign",
+   by[("w103", "height")]["value"] == 4.4 and by[("w103", "height")]["signed"] == "14'6\"")
 ok("2. a metric height keeps no 'signed' text (the map shows the converted imperial)", by[("w102", "height")]["signed"] is None)
 ok("2. a node limit is a Point with its own coordinates", by[("n201", "height")]["geom_type"] == "Point"
    and by[("n201", "height")]["geometry"] == [-0.87, 52.50003])
 ok("2. a line's anchor (where the sign goes) is half-way along it",
    abs(by[("w101", "weight")]["anchor"][0] - (-0.938)) < 1e-6)
 ok("2. axle weight read from maxaxleload", by[("w107", "axle")]["value"] == 10.0)
+# 13 Oct 2026, Street View: Melton Road, East Langton is signed 4.0 m AND 13'0"; OSM holds only 13'0"
+ok("2. ⭐ signed_metric: 13'0\" -> 4.0 (the sign at East Langton), 14'6\" -> 4.4, 6'6\" -> 2.0; a metric value -> None",
+   limits.signed_metric("13'0\"") == 4.0 and limits.signed_metric("14'6\"") == 4.4 and limits.signed_metric("6'6\"") == 2.0
+   and limits.signed_metric("4.4") is None and limits.signed_metric("default") is None)
+ok("2. heights and widths print with one decimal like the sign: '4.0 m', legend '4.0m'; weights unchanged",
+   limits.fmt_value("height", 4.0) == "4.0 m" and limits.icon_text("height", 4.0) == "4.0m"
+   and limits.fmt_value("weight", 7.5) == "7.5 t" and limits.icon_text("weight", 18.0) == "18T")
 
 # =========================================================================== #
 #  3. The table: global, never in a package                                    #
@@ -308,8 +316,9 @@ ok("4. ⭐ 44 t laden is over 5 t: exceeds; going back empty at 15 t (44 - 29 pa
    H[("w101", "weight", "loaded")]["verdict"] == "exceeds" and H[("w101", "weight", "loaded")]["vehicle_value"] == 44.0
    and H[("w101", "weight", "return")]["vehicle_value"] == 15.0 and H[("w101", "weight", "return")]["verdict"] == "exceeds")
 ok("4. 'except for access' is in the note, the verdict kept", "Except for access" in (H[("w101", "weight", "loaded")]["note"] or ""))
-ok("4. Rockingham Road 4.42 m against a 4.00 m artic: within, margin 0.42",
-   H[("w103", "height", "loaded")]["verdict"] == "within" and H[("w103", "height", "loaded")]["margin"] == 0.42)
+# REVERSED 13 Oct 2026 (East Langton, signed 4.0 m / 13'0"): an imperial-only value is read as the SIGNED metric
+ok("4. Rockingham Road 4.4 m against a 4.00 m artic: within, margin 0.4",
+   H[("w103", "height", "loaded")]["verdict"] == "within" and H[("w103", "height", "loaded")]["margin"] == 0.4)
 ok("4. a 2.0 m width against a 2.55 m artic: exceeds", H[("w104", "width", "loaded")]["verdict"] == "exceeds")
 ok("4. the node 3 m off the route is a POINT hit, with the check-it note",
    H[("n201", "height", "loaded")]["point"] is True and "check whether the route passes it" in H[("n201", "height", "loaded")]["note"])
@@ -320,7 +329,7 @@ ok("4. hits are ordered exceeds first, and a limit run ALONG before a point limi
    st["hits"][0]["verdict"] == "exceeds" and st["hits"][0]["point"] is False)
 ok("4. a hit names the vehicle by its label and carries the sign's headline",
    H[("w103", "height", "loaded")]["vehicle_label"] == "Artic Tipper (44t)"
-   and H[("w103", "height", "loaded")]["headline"] == "Height limit 4.42 m (14'6\") · Rockingham Road")
+   and H[("w103", "height", "loaded")]["headline"] == "Height limit 4.4 m (14'6\") · Rockingham Road")   # REVERSED 13 Oct: signed metric
 # an 18 t limit: the laden artic is over it, the empty one is not
 limits.replace_rows("osm", EXT, ROWS + [dict(ROWS[0], ext_id="w150", value=18.0, exceptions=None,
                                              geometry=[[-0.93, 52.50], [-0.928, 52.50]], anchor=[-0.929, 52.50])])
@@ -338,6 +347,28 @@ ok("4. an unbaked route has nothing to check", limits.check_route(r2)["baked"] i
 ok("4. along_m of a perpendicular crossing is ~0; of a parallel stretch is its length",
    limits.along_m([[-0.92, 52.499], [-0.92, 52.501]], LINE) == 0.0
    and abs(limits.along_m([[-0.94, 52.50], [-0.936, 52.50]], LINE) - hav_m([-0.94, 52.5], [-0.936, 52.5])) < 0.5)
+
+# ---- 13 Oct 2026: East Langton, signed 4.0 m / 13'0", OSM maxheight=13'0" ----
+EL = way(170, [[-0.875, 52.50], [-0.872, 52.50]], maxheight="13'0\"", highway="tertiary", name="Melton Road")
+EL_ROWS, _d = limits.parse_osm([EL], fetched_at="2026-10-13T10:00:00+00:00")
+ok("4. ⭐ East Langton parses as 4.0 m (the signed metric), not 3.96", EL_ROWS[0]["value"] == 4.0, str(EL_ROWS[0]["value"]))
+limits.replace_rows("osm", EXT, ROWS + EL_ROWS)
+hEL = [h for h in limits.check_route(r1)["hits"] if h["ext_id"] == "w170"]
+ok("4. ⭐ a 4.0 m artic at a 4.0 m limit is AT the limit — not 'exceeds' (no false breach), not a silent 'within'",
+   hEL and all(h["verdict"] == "at_limit" and h["margin"] == 0.0 and "exactly at the signed limit" in h["note"] for h in hEL),
+   str([(h["verdict"], h["margin"]) for h in hEL]))
+ok("4. ...and its headline reads 'Height limit 4.0 m (13'0\")'", hEL[0]["headline"] == "Height limit 4.0 m (13'0\") · Melton Road")
+# a row imported BEFORE the fix holds 3.96: stored() reads it as the signed metric, so a re-check fixes it
+OLD = dict(EL_ROWS[0], value=3.96)
+limits.replace_rows("osm", EXT, ROWS + [OLD])
+ok("4. ⭐ a row stored before the fix (3.96, signed 13'0\") is READ as 4.0 — a re-check fixes live, no re-import",
+   [x["value"] for x in limits.stored() if x["ext_id"] == "w170"] == [4.0]
+   and db.query("SELECT value FROM road_limits WHERE ext_id = 'w170'")[0]["value"] == 3.96)
+limits.store_checks()
+ok("4. ...after the re-check the artic's hits there are at_limit, none exceeds",
+   {h["verdict"] for h in limits.stored_checks([r1])[r1]["hits"] if h["ext_id"] == "w170"} == {"at_limit"})
+limits.replace_rows("osm", EXT, ROWS)
+limits.store_checks()
 
 # =========================================================================== #
 #  5. The clash rail: LIMIT                                                    #
@@ -367,6 +398,10 @@ limits.store_checks()
 ok("5. a line whose vehicle was never checked on that route gets no flag (the verdict is per vehicle)",
    clashes.limit([line(r1, RIGID)])[0] == [])
 ok("5. an unbaked line gets no flag", clashes.limit([line(r2, PROFILE, baked=False)])[0] == [])
+_only_at = [dict(h, verdict="at_limit") for h in limits.stored_checks([r1])[r1]["hits"]]
+db.execute("UPDATE routes SET limits_hits = ? WHERE tenant_id = ? AND id = ?", (json.dumps(_only_at), db.current_tenant(), r1))
+ok("5. ⭐ 'at the limit' raises NO LIMIT flag (13 Oct: the East Langton false breach)", clashes.limit([line(r1, PROFILE)])[0] == [])
+limits.store_checks()
 ok("5. the source block says the check is stored", src["status"] == "ok" and src["checked_at"])
 csrc = read("backend/clashes.py")
 ok("5. compute() adds the LIMIT flags and reports the limits source",
@@ -403,8 +438,9 @@ ok("6. the crossing (Kettering Road) is on the map but breached by nobody", P["o
 ok("6. a feature carries what the sign and the card need",
    all(k in P["osm:w103:height"] for k in ("kind", "value", "unit", "label", "headline", "icon_text", "imperial", "name",
                                            "exceptions", "source", "source_label", "attribution", "fetched_at", "anchor", "breaches")))
-ok("6. Rockingham Road: legend 4.42m, imperial 14'6\" (the signed text)",
-   P["osm:w103:height"]["icon_text"] == "4.42m" and P["osm:w103:height"]["imperial"] == "14'6\"")
+# REVERSED 13 Oct 2026 (East Langton, signed 4.0 m / 13'0"): an imperial-only value is read as the SIGNED metric
+ok("6. Rockingham Road: legend 4.4m, imperial 14'6\" (the signed text)",
+   P["osm:w103:height"]["icon_text"] == "4.4m" and P["osm:w103:height"]["imperial"] == "14'6\"")
 ok("6. a metric-only height gets its imperial line computed (3.8 m -> 12'6\")", P["osm:w102:height"]["imperial"] == "12'6\"")
 ok("6. weight has no imperial line", P["osm:w101:weight"]["imperial"] is None)
 ok("6. lines stay lines, nodes stay points", FC["features"][0]["geometry"]["type"] in ("LineString", "Point")
