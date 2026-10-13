@@ -41,7 +41,9 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
+w.eval(js + "\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;"
+  // 13 Oct 2026 (W6): the app's own formatters, so the nothing-lost check formats each fact exactly as the old cell did
+  + "\nwindow.__F = { grp, dist, distRate, DU, CUR, TKM, teamText, teamName, iptKey, vehLabel, unitLbl, gaN1, gaMin, gaFlagWord, fmt, flagWord, LINE_FLAG_LABEL, dayName, dayNum, isWeekend };");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
@@ -816,6 +818,324 @@ async function configEstonianColumn(){
   w.__VEH.langs = ["en"]; w.__TENANT.country = null; w.__VEH.lang = "en"; w.fetch = () => new Promise(() => {});
 }
 
+// ---- 13 Oct 2026 (W6, bundle F): row details in a real DOM ---------------------------------------------
+// The four busy tables (Look-ahead Commit, Gate arrivals, the Dashboard's route table, Forecasts) and the Dashboard's
+// Today rows, mounted from the backend harnesses' own fixtures. Checked here:
+//   1. "≤ one ' · ' per rendered cell": every row cell, every details line (<dd>), every cell of the by-day table and
+//      of the totals row, in each of the three units (Loads | Tonnes | Lorries) where the table has the switch;
+//   2. NOTHING LOST, field by field: every fact the old cells showed (each one formatted as the old cell did, with the
+//      app's own helpers) is in the row or in its details row, for every row of every fixture;
+//   3. the chevron: a native button with aria-expanded / aria-controls, the details row hidden until it is clicked,
+//      the open rows kept for the session (sessionStorage) across an unmount; on the Dashboard it never picks the line;
+//   4. the switch: remembered per page (localStorage), one figure a cell, typing a day's plan in Tonnes only;
+//   5. the status column: ROAD LIMIT first (Look-ahead, Dashboard, Forecasts), a count of the other flags.
+// NOT covered here (jsdom has no layout): the cards below 768 px, the details grid, a real key press reaching a
+// native button (jsdom does not turn Enter into a click; the browser matrix and a real keyboard did).
+async function rowDetailsDom(){
+  const F = w.__F;
+  const CL = FIX("cost_lines.json"), GA = FIX("gate_arrivals.json"), LA = FIX("lookahead_page.json"), WK = FIX("lookahead_page_fuel.json"), CTX = FIX("carbon_target.json");
+  w.fetch = (url) => (url === "/api/carbon/target" ? reply(200, CTX) : new Promise(() => {}));
+  ["dashboard", "forecasts", "lookahead"].forEach(k => w.localStorage.removeItem("modus_units_" + k));
+  w.sessionStorage.clear();
+  const routes = [];
+  CL.lines.forEach(l => { if (!routes.some(r => r.route_id === l.route_id)) routes.push({ route_id: l.route_id, origin: l.origin_name, dest: l.dest_name }); });
+  const dMeta = { ...metaMin, routes, vehicles: ["Rigid 8-wheeler (32t)"], factors: { ...metaMin.factors, vehicle_payload_t: { "Rigid 8-wheeler (32t)": 20 } } };
+  const laMeta = { ...metaMin, months: { start_year: 2026, count: 60 } };
+  const rowsFix = CL.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
+    quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: "Type 1 sub-base",
+    vehicle_type: l.vehicle_type, submitted_by: "tester", reject_reason: l.route_id === "R3" ? "Wrong month: move it to November" : null }));
+  rowsFix.filter(r => r.route_id === "R3").forEach(r => { r.status = "Rejected"; });
+  const mount = (C, props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    act(() => { r.render(w.React.createElement(C, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+  const norm = (t) => String(t || "").replace(/\s+/g, " ").trim();
+  const dots = (t) => (t.match(/ · /g) || []).length;
+  const tableOf = (el, name) => el.querySelector(`table[data-rd-table="${name}"]`);
+  // every "cell" a person reads in a row-details table: the row cells, each details line, the by-day and totals cells
+  const cellsOf = (table) => {
+    const out = [];
+    [...table.tBodies[0].rows].forEach(tr => {
+      if (tr.classList.contains("rd-details")) {
+        tr.querySelectorAll("dd").forEach(dd => { if (!dd.querySelector("table")) out.push(dd); });
+        tr.querySelectorAll("table.rd-days td").forEach(td => out.push(td));
+      } else [...tr.cells].forEach(td => out.push(td));
+    });
+    return out;
+  };
+  const dotCheck = (label, table) => {
+    const cells = table ? cellsOf(table) : [];
+    const bad = cells.filter(c => dots(norm(c.textContent)) > 1).map(c => norm(c.textContent).slice(0, 90));
+    ok(`ROW DETAILS · ≤ one ' · ' per rendered cell: ${label} (${cells.length} cells)`, !!table && cells.length > 0 && bad.length === 0, bad.slice(0, 3).join(" | "));
+  };
+  const pressUnit = (el, which) => {
+    const b = [...el.querySelectorAll("[data-unit-switch] button")].find(x => x.textContent === which);
+    if (b) act(() => { b.click(); });
+    return !!b;
+  };
+  // a row and its details row, as one text (the details row is always rendered, hidden while shut)
+  // text nodes joined with a space, as a person reads them (textContent runs adjacent cells together: "Mon 28160.0")
+  const words = (el) => { const out = []; const it = w.document.createTreeWalker(el, 4); let x; while ((x = it.nextNode())) out.push(x.textContent); return out.join(" "); };
+  const rowText = (tr) => tr ? norm(words(tr) + " " + ((tr.nextElementSibling && tr.nextElementSibling.classList.contains("rd-details")) ? words(tr.nextElementSibling) : "")) : "";
+  // field by field: one assertion per fact, across every row of the fixture
+  const lost = (table, rows) => {          // rows: [{ name, text, facts: [[field, expected], ...] }]
+    const byField = {};
+    rows.forEach(r => r.facts.forEach(([field, want]) => {
+      if (want == null || want === "") return;
+      (byField[field] || (byField[field] = { n: 0, miss: [] })).n += 1;
+      if (!r.text.includes(norm(want))) byField[field].miss.push(`${r.name}: "${norm(want)}"`);
+    }));
+    Object.entries(byField).forEach(([field, v]) =>
+      ok(`ROW DETAILS · NOTHING LOST · ${table} · ${field} (${v.n} row${v.n === 1 ? "" : "s"})`, v.miss.length === 0, v.miss.slice(0, 2).join(" | ")));
+    return Object.keys(byField).length;
+  };
+  const cur = F.CUR();
+  const triple = (u) => !u || u.eur == null ? [] : [u.per_t != null ? `${cur} ${(+u.per_t).toFixed(2)}/t` : null,
+    u.per_trip != null ? `${cur} ${F.grp(u.per_trip, 0)}/trip` : null, u.per_km != null ? `${cur} ${(+F.distRate(u.per_km)).toFixed(2)}/${F.DU()}` : null].filter(Boolean);
+
+  // ============================== 1. Look-ahead → Commit ==============================
+  const la = mount(w.LookAhead, { meta: laMeta, who: "t", initialPage: LA, initialView: "commit" });
+  const laT = tableOf(la.el, "lookahead");
+  ok("ROW DETAILS · Look-ahead: the grid is a row-details table with one chevron a line and the switch above it, Tonnes by default",
+     !!laT && laT.querySelectorAll("button.rd-chev").length === LA.commit.lines.length
+     && la.el.querySelector('[data-unit-switch="tonnes"]') && la.el.querySelector('[data-unit-switch] button[aria-pressed="true"]').textContent === "Tonnes");
+  ["Tonnes", "Loads", "Lorries"].forEach(u => { pressUnit(la.el, u); dotCheck(`Look-ahead Commit in ${u}`, tableOf(la.el, "lookahead")); });
+  pressUnit(la.el, "Loads");
+  const laL = tableOf(la.el, "lookahead");
+  ok("ROW DETAILS · Look-ahead in Loads: no day cell can be typed, the bar says to switch, the caption and a cell follow the unit",
+     laL.querySelectorAll("button.la-cell").length === 0 && la.el.textContent.includes("Switch to Tonnes to type a day's plan.")
+     && laL.querySelector("caption").textContent.startsWith("Loads by day")
+     && norm(laL.querySelector(`tr[data-la-line] td[data-label]:not(.rd-status)`).textContent) === F.grp((LA.commit.lines[0].days.find(d => !F.isWeekend(d.day_date)).derived || {}).trips));
+  pressUnit(la.el, "Tonnes");
+  const unlocked = LA.commit.lines.filter(l => (l.week || {}).status !== "confirmed").length;
+  ok("ROW DETAILS · Look-ahead in Tonnes: every unconfirmed line's five days are click-to-type again (decision 2), and the choice is stored for this page",
+     tableOf(la.el, "lookahead").querySelectorAll("button.la-cell").length === unlocked * 5 && w.localStorage.getItem("modus_units_lookahead") === "tonnes");
+  // nothing lost
+  const laRows = LA.commit.lines.map(l => {
+    const c = l.context || {}, wd = l.week_derived || {}, wk = l.week || {};
+    const lk = `${l.route_id}|${l.discipline || ""}|${l.section_id || ""}|${l.month_index}`;
+    const tr = laT.querySelector(`tr[data-la-line="${lk}"]`);
+    const fl = (LA.clashes.flags || []).filter(f => `${f.route_id}|${f.discipline || ""}|${f.section_id || ""}|${f.month_index}` === lk);
+    const days = (l.days || []).filter(d => !F.isWeekend(d.day_date));
+    const facts = [
+      ["origin", c.origin_name], ["destination", c.dest_name], ["route id", l.route_id],
+      ["team", c.ipt ? F.teamName(F.iptKey(c.ipt)) : null], ["section", c.section_id], ["material", c.material_type],
+      ["vehicle (short)", c.vehicle_short || F.vehLabel(c.vehicle_type)], ["vehicle (full name)", c.vehicle_type],
+      ["week state", { derived: "Derived", edited: "Edited", confirmed: "Confirmed" }[wk.status]],
+      ["parent month changed", wk.parent_changed ? "The parent month's quantity changed after this week was set" : null],
+      ["days ≠ week", l.days_ne_week ? F.grp(l.days_sum, 1) : null],
+      ["week quantity", `${F.grp(wk.planned_qty, 1)} ${F.unitLbl(l.unit)}`],
+    ];
+    fl.forEach(f => { facts.push(["flag word", F.flagWord(f, F.LINE_FLAG_LABEL)]); facts.push(["flag sentence (team names, not ids)", F.teamText(f.text)]); });
+    days.forEach(d => { const f = d.derived || {};
+      facts.push(["day plan", `${F.dayName(d.day_date)} ${F.dayNum(d.day_date)} ${F.grp(d.planned_qty, 1)}`]);
+      facts.push(["day trips", F.grp(f.trips)]);
+      if (c.baked) facts.push(["day vehicles", F.grp(f.vehicles)]);
+      if (d.status === "edited") facts.push(["day typed by hand", "typed by hand"]); });
+    if (c.baked) {
+      facts.push(["distance a trip", F.grp(F.dist(c.km_trip))], ["outbound only", c.return_baked ? null : "outbound only"],
+        ["distance this week", F.grp(F.dist(wd.km))], ["peak vehicles", F.grp(wd.vehicles_peak)], ["tonne-distance", F.grp(F.dist(wd.tonne_km))],
+        ["tonne-distance basis", c.km_basis === "loaded" ? "loaded leg" : "round trip"], ["cycle", `${F.grp(c.cycle_min)} min`],
+        ["cycle source", c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"], ["cycles a vehicle a day", String(c.cycles_per_vehicle_day)]);
+    } else facts.push(["unrouted: payload", `${F.grp(c.payload_t, 1)} t planning payload`]);
+    facts.push(["planned cost", wd.eur == null ? "Rate not set" : `${cur} ${F.grp(wd.eur)}`], ["target rate", c.rate_source === "target" && wd.eur != null ? "target rate" : null],
+      ["+ BAF", wd.eur_adj != null ? `${cur} ${F.grp(wd.eur_adj)}` : null]);
+    if (wd.eur != null && wd.eur_units && wd.eur_units.per_t != null) triple(wd.eur_units).forEach(x => facts.push(["quote per unit", x]));
+    if (wd.fair_eur != null && c.fair) {
+      facts.push(["fair cost", `${cur} ${F.grp(wd.fair_eur)}`], ["litres a trip", `${F.grp(c.fair.litres_trip, 1)} L`],
+        ["diesel price", `${cur}${c.fair.index_eur_per_l}`], ["fuel share", `${F.grp(c.fair.fuel_share_pct)} %`],
+        ["winter", (c.fair.flags || []).includes("WINTER") ? "winter" : null], ["thaw", (c.fair.flags || []).includes("THAW") ? "thaw restrictions may apply" : null]);
+      if (wd.fair_units && wd.fair_units.per_t != null) triple(wd.fair_units).forEach(x => facts.push(["fair per unit", x]));
+    }
+    return { name: lk, text: rowText(tr), facts };
+  });
+  ok("ROW DETAILS · NOTHING LOST · Look-ahead: every fixture line has its row", laRows.every(r => r.text.length > 0));
+  const nLa = lost("Look-ahead", laRows);
+  // the chevron and the session
+  const lk0 = `${LA.commit.lines[0].route_id}|${LA.commit.lines[0].discipline || ""}|${LA.commit.lines[0].section_id || ""}|${LA.commit.lines[0].month_index}`;
+  const chev = () => la.el.querySelector(`tr[data-la-line="${lk0}"] button.rd-chev`);
+  const det = () => la.el.querySelector(`[data-rd-details="la-${lk0}"]`);
+  ok("ROW DETAILS · the chevron is a native button (Enter and Space click it), named, shut, pointing at a hidden details row",
+     chev().tagName === "BUTTON" && chev().getAttribute("type") === "button" && chev().getAttribute("aria-expanded") === "false"
+     && /^Details for R\d/.test(chev().getAttribute("aria-label")) && chev().getAttribute("aria-controls") === det().id && det().hidden === true);
+  act(() => { chev().click(); });
+  ok("ROW DETAILS · ...a click opens it: aria-expanded true, the details row shown, the row remembered for the session",
+     chev().getAttribute("aria-expanded") === "true" && det().hidden === false && JSON.parse(w.sessionStorage.getItem("modus_rows_lookahead") || "{}")[lk0] === 1);
+  la.done();
+  const la2 = mount(w.LookAhead, { meta: laMeta, who: "t", initialPage: LA, initialView: "commit" });
+  const chev2 = la2.el.querySelector(`tr[data-la-line="${lk0}"] button.rd-chev`);
+  ok("ROW DETAILS · ...and it is still open when the page is mounted again (leaving the page and coming back)",
+     chev2.getAttribute("aria-expanded") === "true" && la2.el.querySelector(`[data-rd-details="la-${lk0}"]`).hidden === false);
+  act(() => { chev2.click(); });
+  ok("ROW DETAILS · ...a second click shuts it and forgets it", chev2.getAttribute("aria-expanded") === "false" && !JSON.parse(w.sessionStorage.getItem("modus_rows_lookahead") || "{}")[lk0]);
+  la2.done();
+  // ROAD LIMIT wins the status, with a count of the other kinds of flag
+  const limText = "Artic Tipper (44t) (44 t, loaded) is over the Weight limit 5 t · Back Lane (OpenStreetMap) (+1 more)";
+  const l0 = LA.commit.lines[0];
+  const LA2 = JSON.parse(JSON.stringify(LA));
+  LA2.clashes.flags.push({ code: "LIMIT", label: "ROAD LIMIT", route_id: l0.route_id, month_index: l0.month_index, discipline: l0.discipline || "", section_id: l0.section_id || "",
+    ipt: l0.ipt, text: "Pit → Site: " + limText });
+  const la3 = mount(w.LookAhead, { meta: laMeta, who: "t", initialPage: LA2, initialView: "commit" });
+  const r0 = la3.el.querySelector(`tr[data-la-line="${lk0}"]`);
+  const kinds0 = new Set(LA.clashes.flags.filter(f => `${f.route_id}|${f.discipline || ""}|${f.section_id || ""}|${f.month_index}` === lk0).map(f => f.code)).size;
+  const st0 = r0.querySelector("td.rd-status .row-st");
+  ok("⭐ ROW DETAILS · Look-ahead: a lorry over a road limit is the row's ONE status, ahead of the line's other flags, with their count (decision 1)",
+     norm(st0.textContent) === `!ROAD LIMIT+${kinds0}` && st0.getAttribute("data-row-status") === "bad" && r0.querySelectorAll(".row-st").length === 1, norm(st0.textContent));
+  const d0 = la3.el.querySelector(`[data-rd-details="la-${lk0}"]`);
+  ok("ROW DETAILS · ...and the details spell it out first, the limit sentence in full, then each other flag",
+     d0.querySelector(".rd-i.rd-wide dt").textContent === "ROAD LIMIT" && d0.textContent.includes(limText) && d0.querySelectorAll(".rd-i.rd-wide.rd-bad").length >= kinds0 + 1);
+  la3.done();
+
+  // ============================== 2. the Dashboard: gates, Today, the route table ==============================
+  const GA2 = JSON.parse(JSON.stringify(GA));
+  const d = mount(w.Dashboard, { meta: dMeta, initialData: CL, initialGates: GA2, initialWeek: WK, initialTarget: CTX });
+  await settle(30);
+  dotCheck("Gate arrivals", tableOf(d.el, "gates"));
+  dotCheck("Dashboard Today", tableOf(d.el, "today"));
+  ["Tonnes", "Loads", "Lorries"].forEach(u => { pressUnit(d.el.querySelector('[data-rd-card="dashboard"]'), u); dotCheck(`Dashboard route table in ${u}`, tableOf(d.el, "dashboard")); });
+  // gates, nothing lost
+  const gT = tableOf(d.el, "gates");
+  const gRows = GA2.gates.map(g => ({ name: g.gate_id, text: rowText(gT.querySelector(`tr[data-ga-gate="${g.gate_id}"]`)), facts: [
+    ["location", g.location_name], ["gate", g.gate_name], ...(g.teams || []).map(t => ["team at the gate", F.teamText(t)]),
+    ["arrivals a day", F.gaN1(g.arrivals_per_day)], ["laden a day", `Laden a day ${F.gaN1(g.laden_per_day)}`], ["coming to load a day", `Coming to load a day ${F.gaN1(g.empty_per_day)}`],
+    ...(g.per_team || []).map(t => ["each team's figure", `${F.teamText(t.team)}, a day ${F.gaN1(t.arrivals_per_day)}`]),
+    ["average gap", g.gap_minutes == null ? "No approved arrivals" : `One every ${F.gaMin(g.gap_minutes)} if arrivals are spread evenly`],
+    ["check-in", g.gate_minutes == null ? "not typed" : `${+g.gate_minutes} min a lorry`], ["status word", F.gaFlagWord(g)], ["the server's reason", g.reason],
+    ["origin share note", g.origin_share_note], ["pending lines", g.pending_lines > 0 ? `${g.pending_lines} pending line${g.pending_lines === 1 ? "" : "s"} would add ${F.gaN1(g.pending_per_day)} a day here once approved.` : null],
+  ] }));
+  const nGa = lost("Gate arrivals", gRows);
+  ok("ROW DETAILS · Gate arrivals: three gates or more get a '+N more' chip, never a third chip",
+     [...gT.querySelectorAll("tr.rd-row")].every(tr => tr.querySelectorAll(".rd-chip").length <= 2));
+  // Today, nothing lost
+  const tT = tableOf(d.el, "today");
+  const todayRows = [];
+  WK.commit.lines.forEach(l => (l.days || []).forEach(dd => { if (dd.day_date === WK.today && ((dd.planned_qty || 0) > 0 || dd.actual_qty != null)) todayRows.push({ l, dd }); }));
+  const tdRows = todayRows.map(({ l, dd }) => { const ctx = l.context || {}, dv = dd.derived || {};
+    const key = `${l.route_id}|${l.discipline || ""}|${l.section_id || ""}`;
+    return { name: key, text: rowText(tT.querySelector(`tr[data-rd="today-${key}"]`)), facts: [
+      ["route id", l.route_id], ["origin", ctx.origin_name], ["destination", ctx.dest_name], ["material", l.material_type], ["discipline", l.discipline],
+      ["vehicle", ctx.vehicle_short || l.vehicle_type], ["tonnes", F.grp(dv.tonnes)], ["trips", dv.trips == null ? null : F.grp(dv.trips)],
+      ["vehicles", dv.vehicles == null ? null : String(dv.vehicles)], ["planned today (old title)", `${F.grp(dd.planned_qty)} ${F.unitLbl(l.unit)}`],
+      ["reported (old title)", dd.actual_qty != null ? `${F.grp(dd.actual_qty)} ${F.unitLbl(l.unit)}` : "Not reported yet"],
+      ["not routed (old title)", ctx.baked ? null : "not worked out yet, so no distance or vehicles"],
+      ["status word", dd.actual_qty != null ? "reported" : dd.status === "confirmed" ? "confirmed" : dd.status === "edited" ? "edited" : "planned"],
+    ] }; });
+  const nTd = lost("Dashboard Today", tdRows);
+  // the route table, nothing lost: the Dashboard's own sums over the fixture's Approved lines (its default filter)
+  const rT = tableOf(d.el, "dashboard");
+  const agg = {};
+  CL.lines.filter(l => l.status === "Approved").forEach(l => {
+    const k = `${l.route_id}|${l.discipline || ""}|${l.section_id || ""}`;
+    const a = agg[k] || (agg[k] = { l, t: 0, trips: 0, km: 0, co2: 0, peak: null, planned: null, fair: null, source: null, flags: new Set(), actualT: null, bkm: 0 });
+    a.t += l.tonnes; a.trips += l.trips; a.km += l.km || 0; a.co2 += l.co2_t || 0; a.bkm += (l.basis_km || 0) * l.trips;
+    if (l.vehicles != null) a.peak = Math.max(a.peak || 0, l.vehicles);
+    if (l.planned && l.planned.eur != null) { a.planned = (a.planned || 0) + l.planned.eur; a.source = l.planned.source; }
+    if (l.fair && l.fair.eur != null) { a.fair = (a.fair || 0) + l.fair.eur; (l.fair.flags || []).forEach(x => a.flags.add(x)); }
+    if (l.actual_tonnes != null) a.actualT = (a.actualT || 0) + l.actual_tonnes;
+  });
+  const per = (eur, a) => eur == null ? null : { eur, per_t: a.t > 0 ? eur / a.t : null, per_trip: a.trips > 0 ? eur / a.trips : null, per_km: a.bkm > 0 ? eur / a.bkm : null };
+  const dRows = Object.entries(agg).map(([k, a]) => { const l = a.l;
+    const facts = [["route id", l.route_id], ["origin", l.origin_name], ["destination", l.dest_name], ["vehicle (short)", l.vehicle_short || F.vehLabel(l.vehicle_type)],
+      ["vehicle (full name)", l.vehicle_type], ["discipline", l.discipline], ["section (old title)", l.section_id], ["team", l.ipt ? F.teamText(l.ipt) : null],
+      ["distance a trip", l.km_trip == null ? "Not routed yet for this lorry" : (+F.dist(l.km_trip)).toFixed(1)],
+      ["cycle", l.cycle_min == null ? "Needs this line's route worked out" : (l.cycle_min / 60).toFixed(2)], ["tonnes", F.grp(a.t)], ["trips", F.grp(a.trips)],
+      ["delivered %", a.actualT != null && a.t > 0 ? `${(a.actualT * 100 / a.t).toFixed(0)} %` : null],
+      ["delivered (old title)", a.actualT == null ? "No week actual reported on this line in the months in view" : `${F.grp(a.actualT)} t reported of ${F.grp(a.t)} t planned`],
+      ["lorry-distance", l.baked ? F.grp(F.dist(a.km)) : null], ["tCO₂e", l.baked ? a.co2.toFixed(1) : null], ["peak vehicles", a.peak == null ? null : String(a.peak)],
+      ["trips a day per vehicle (old title)", l.cycles_per_vehicle_day ? String(l.cycles_per_vehicle_day) : null],
+      ["planned", a.planned == null ? "rate not set" : `${cur} ${F.grp(a.planned)}`], ["quote / target tag", a.source === "target" ? "target" : a.source === "route" ? "quote" : null],
+      ["fair", a.fair == null ? (l.baked ? "No diesel index" : "Not routed yet, so no distance") : `${cur} ${F.grp(a.fair)}`],
+      ["fair per tonne", a.fair != null && a.t > 0 ? (a.fair / a.t).toFixed(2) : null], ["winter", a.flags.has("WINTER") ? "winter" : null], ["thaw", a.flags.has("THAW") ? "thaw" : null]];
+    triple(per(a.planned, a)).forEach(x => facts.push(["planned per unit (old title)", x]));
+    triple(per(a.fair, a)).forEach(x => facts.push(["fair per unit (old title)", x]));
+    return { name: k, text: rowText(rT.querySelector(`tr[data-rd="dash-${k}"]`)), facts }; });
+  const nDash = lost("Dashboard route table", dRows);
+  // the switch on the Dashboard
+  const rCard = () => d.el.querySelector('[data-rd-card="dashboard"]');
+  pressUnit(rCard(), "Loads");
+  const firstKey = Object.keys(agg)[0];
+  const qCell = () => d.el.querySelector(`tr[data-rd="dash-${firstKey}"] td.num`);
+  ok("ROW DETAILS · Dashboard: Loads makes the quantity column loads (its header says so) and is stored for this page only",
+     norm(qCell().textContent) === F.grp(agg[firstKey].trips) && w.localStorage.getItem("modus_units_dashboard") === "loads"
+     && [...tableOf(d.el, "dashboard").querySelectorAll("thead th")][1].textContent.startsWith("Loads") && w.localStorage.getItem("modus_units_forecasts") === null);
+  // the chevron never picks the line; the row still does
+  const rowEl = () => d.el.querySelector(`tr[data-rd="dash-${firstKey}"]`);
+  act(() => { rowEl().querySelector("button.rd-chev").click(); });
+  ok("ROW DETAILS · Dashboard: the chevron opens the details and does NOT focus the charts on the line",
+     !rowEl().classList.contains("is-picked") && rowEl().querySelector("button.rd-chev").getAttribute("aria-expanded") === "true");
+  act(() => { rowEl().querySelector("td.num").click(); });
+  ok("ROW DETAILS · ...a click on the row itself still does", rowEl().classList.contains("is-picked"));
+  const sortSel = d.el.querySelector('select[aria-label="Sort the route table by"]');
+  ok("ROW DETAILS · Dashboard: the 'Sort by' list keeps all 13 of the old headers' sorts (decision 4)",
+     !!sortSel && [...sortSel.options].map(o => o.value).join(",") === "route_id,discipline,t,trips,peakVeh,deliveredPct,dist,cycleH,km,co2,planned,fair,fairPerT");
+  d.done();
+  const d2 = mount(w.Dashboard, { meta: dMeta, initialData: CL, initialGates: GA2, initialWeek: WK, initialTarget: CTX });
+  await settle(30);
+  ok("ROW DETAILS · ...the Dashboard comes back in Loads, with that row's details still open",
+     d2.el.querySelector('[data-rd-card="dashboard"] button[aria-pressed="true"]').textContent === "Loads"
+     && d2.el.querySelector(`tr[data-rd="dash-${firstKey}"] button.rd-chev`).getAttribute("aria-expanded") === "true");
+  d2.done();
+  // ROAD LIMIT on the Dashboard's route table
+  const CLL = JSON.parse(JSON.stringify(CL));
+  const limLine = CLL.lines.find(l => l.baked && l.status === "Approved");
+  CLL.lines.filter(l => l.route_id === limLine.route_id && l.vehicle_type === limLine.vehicle_type).forEach(l => { l.limit = { count: 2, text: limText, kind: "weight", checked_at: "2026-10-13T09:00:00Z" }; });
+  const d3 = mount(w.Dashboard, { meta: dMeta, initialData: CLL, initialTarget: CTX });
+  await settle(30);
+  const limKey = `${limLine.route_id}|${limLine.discipline || ""}|${limLine.section_id || ""}`;
+  const limRow = d3.el.querySelector(`tr[data-rd="dash-${limKey}"]`);
+  ok("⭐ ROW DETAILS · Dashboard: a line whose lorry is over a road limit reads ROAD LIMIT in its status, the sentence in its details (decision 3)",
+     limRow.querySelector(".row-st").getAttribute("data-row-status") === "bad" && norm(limRow.querySelector(".row-st").textContent) === "!ROAD LIMIT"
+     && rowText(limRow).includes(limText) && rowText(limRow).includes("Checked 13 Oct 2026"));
+  const others = [...d3.el.querySelectorAll('table[data-rd-table="dashboard"] tr.rd-row')].filter(tr => tr !== limRow).map(tr => norm(tr.querySelector(".row-st").textContent));
+  ok("ROW DETAILS · ...the other lines read Clear or Not routed, nothing else", others.length > 0 && others.every(x => x === "✓Clear" || x === "!Not routed"), others.join("|"));
+  d3.done();
+
+  // ============================== 3. Forecasts ==============================
+  const f = mount(w.Forecasts, { meta: dMeta, who: "tester", access: plannerAcc, onEdit(){}, onChanged(){}, initialRows: rowsFix, initialCost: CL, initialTarget: CTX });
+  ["Tonnes", "Loads", "Lorries"].forEach(u => { pressUnit(f.el, u); dotCheck(`Forecasts in ${u}`, tableOf(f.el, "forecasts")); });
+  pressUnit(f.el, "Tonnes");
+  const fT = tableOf(f.el, "forecasts");
+  const fg = {};
+  rowsFix.forEach(r => { const k = [r.route_id, r.discipline || "", r.section_id || ""].join("|");
+    const g = fg[k] || (fg[k] = { r, n: 0, q: 0, min: r.month_index, max: r.month_index, st: new Set() });
+    g.n += 1; g.q += +r.quantity || 0; g.min = Math.min(g.min, r.month_index); g.max = Math.max(g.max, r.month_index); g.st.add(r.status); });
+  const fc = {};
+  CL.lines.forEach(l => { const k = [l.route_id, l.discipline || "", l.section_id || ""].join("|");
+    const e = fc[k] || (fc[k] = { t: 0, trips: 0, bkm: 0, planned: null, fair: null, source: null, baked: 0, n: 0, flags: new Set() });
+    e.n += 1; e.t += l.tonnes || 0; e.trips += l.trips || 0; e.bkm += (l.basis_km || 0) * (l.trips || 0); if (l.baked) e.baked += 1;
+    if (l.planned && l.planned.eur != null) { e.planned = (e.planned || 0) + l.planned.eur; e.source = l.planned.source; }
+    if (l.fair && l.fair.eur != null) { e.fair = (e.fair || 0) + l.fair.eur; (l.fair.flags || []).forEach(x => e.flags.add(x)); } });
+  const fRows = Object.entries(fg).map(([k, g]) => { const r = g.r, c = fc[k] || {}, rt = routes.find(x => x.route_id === r.route_id) || {};
+    const yr = (mi) => 2026 + Math.floor((mi - 1) / 12), years = yr(g.min) === yr(g.max) ? String(yr(g.min)) : `${yr(g.min)}–${yr(g.max)}`;
+    const status = g.st.size === 1 ? [...g.st][0] : "Mixed";
+    const pu = c.planned != null ? { eur: c.planned, per_t: c.t > 0 ? c.planned / c.t : null, per_trip: c.trips > 0 ? c.planned / c.trips : null, per_km: c.bkm > 0 ? c.planned / c.bkm : null } : null;
+    const fu = c.fair != null ? { eur: c.fair, per_t: c.t > 0 ? c.fair / c.t : null, per_trip: c.trips > 0 ? c.fair / c.trips : null, per_km: c.bkm > 0 ? c.fair / c.bkm : null } : null;
+    const facts = [["route id", r.route_id], ["discipline", r.discipline], ["section", r.section_id], ["origin", rt.origin], ["destination", rt.dest],
+      ["team", r.ipt ? F.teamText(r.ipt) : "No team"], ["material", r.material_type], ["description (old title)", r.material_description],
+      ["vehicle", F.vehLabel(r.vehicle_type)], ["vehicle (full name, old title)", r.vehicle_type], ["months", `${g.n}, ${years}`],
+      ["total as typed", `${F.fmt(g.q, r.unit)} ${r.unit === "m3" ? "m³" : r.unit}`],
+      ["planned", c.planned == null ? "rate not set" : `${cur} ${F.grp(c.planned)}`], ["target tag", c.source === "target" ? "target" : null],
+      ["fair", c.fair == null ? (c.baked < c.n ? "Not routed yet for this vehicle, so no distance and no fair price" : "No diesel index") : `${cur} ${F.grp(c.fair)}`],
+      ["status", status], ["reject reason (old title, full)", r.reject_reason], ["submitted by (old row title)", "tester (you)"]];
+    triple(pu).forEach(x => facts.push(["planned per unit (old title)", x]));
+    triple(fu).forEach(x => facts.push(["fair per unit (old title)", x]));
+    return { name: k, text: rowText(fT.querySelector(`tr[data-fc-line="${k}"]`)), facts }; });
+  const nFc = lost("Forecasts", fRows);
+  const stOf = (k) => norm(fT.querySelector(`tr[data-fc-line="${k}"] .row-st`).textContent);
+  const rej = Object.keys(fg).find(k => k.startsWith("R3|"));
+  ok("ROW DETAILS · Forecasts: a rejected line's status reads Rejected (red), its reason in full in the details",
+     stOf(rej) === "!Rejected" && rowText(fT.querySelector(`tr[data-fc-line="${rej}"]`)).includes("Wrong month: move it to November"));
+  f.done();
+  const f2 = mount(w.Forecasts, { meta: dMeta, who: "tester", access: plannerAcc, onEdit(){}, onChanged(){}, initialRows: rowsFix, initialCost: CLL, initialTarget: CTX });
+  const fT2 = tableOf(f2.el, "forecasts");
+  const limFk = [limLine.route_id, limLine.discipline || "", limLine.section_id || ""].join("|");
+  const limFr = fT2.querySelector(`tr[data-fc-line="${limFk}"]`);
+  ok("⭐ ROW DETAILS · Forecasts: the same line reads ROAD LIMIT before Pending or Approved, so an approver sees it first; the sentence in the details",
+     norm(limFr.querySelector(".row-st").textContent) === "!ROAD LIMIT" && rowText(limFr).includes(limText) && rowText(limFr).includes("Approval"));
+  f2.done();
+  ok("ROW DETAILS · the nothing-lost checks covered every table: Look-ahead, gates, Today, the route table and Forecasts each with ten fields or more",
+     [nLa, nGa, nTd, nDash, nFc].every(n => n >= 10), [nLa, nGa, nTd, nDash, nFc].join(" / "));
+  w.fetch = () => new Promise(() => {});
+}
+
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
 (async () => {
@@ -834,6 +1154,8 @@ async function configEstonianColumn(){
   catch (e) { ok("INFO BOX: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await chartBoxDom(); ok("CHART BOX: the section ran to the end", true); }
   catch (e) { ok("CHART BOX: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await rowDetailsDom(); ok("ROW DETAILS: the section ran to the end", true); }
+  catch (e) { ok("ROW DETAILS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

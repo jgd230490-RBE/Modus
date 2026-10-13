@@ -656,7 +656,10 @@ ok("🔴 the Dashboard status line reads the tenant's unit word and dates the in
 ok("🔴 the Config fuel widget dates the index 'published' / 'typed' like the compact card — no 'bulletin' word on a DESNZ screen",
    "`bulletin ${fuelDate(" not in fe and fe.count('? "published" : "typed"') >= 2)
 ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the currency symbol",
-   "{CUR()}/{DU()} on hover" in fe and "{CUR()}/km on hover" not in fe
+   # 13 Oct 2026 (W6, narrowed): the route table's "on hover" hint left with the hover titles; the per-unit prices it
+   # named are details lines, and their distance word is still DU()
+   "{CUR()}/{DU()} on hover" not in fe and "{CUR()}/km on hover" not in fe
+   and "parts.push(`${CUR()} ${(+distRate(u.per_km)).toFixed(2)}/${DU()}`)" in fe and "unitList(r.fairU)" in fe
    # 13 Oct 2026 (W3, narrowed): the Dashboard's model note left the screen for the technical guide; its info
    # boxes name both units ("per mile or km") and the tenant's own word stays in every figure's label
    and "{DU()}, cycle and vehicles from the baked HERE route" not in fe and "Fair {CUR()} = the cost model on Config" not in fe

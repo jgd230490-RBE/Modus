@@ -297,10 +297,22 @@ ok("the Look-ahead: this week by default, the next week switch, the remembered v
    "<strong>Commit · this week</strong>" in src and "<strong>Commit · next week</strong>" in src
    and "The page opens on the view you used last" in text and "<strong>check now</strong> (or <strong>re-check</strong>)" in src
    and "Switch the pill to" not in text)
+# 13 Oct 2026 (W6, narrowed): the Flags column became the one Status column, ▶ the row's arrow (›) and its details,
+# and the grid's unit is the Show switch; the same facts, told as the screen now shows them
 ok("...the grid's Flags, Week and Status columns, ▶ to expand, ✎ for a typed day; the exports' Fuel sheet and the DRAFT stamp",
-   "The <strong>Flags</strong> column" in src and "<strong>Week</strong> is the line's total" in src
-   and "Press <strong>▶</strong> at the left of a row" in src and "The day shows ✎" in src
+   "<strong>Status</strong> shows the one thing to look at first: a flag in short form (§12.1), ROAD LIMIT before any other" in src
+   and "<strong>Week</strong> is the line's total in the same unit" in src
+   and "Press the arrow (<strong>›</strong>) at the left of a row, or move to it with Tab and press Enter or Space, to open its details" in src
+   and "The day shows ✎" in src and "<strong>Show</strong> above the grid switches every day cell between <strong>Tonnes</strong>" in src
+   and "The <strong>Flags</strong> column" not in src and "Press <strong>▶</strong> at the left of a row" not in src and "17 tr · 3 veh" not in src
    and "<strong>Fuel</strong> sheet" in src and "DRAFT — not confirmed" in src and "Click a row</strong> to see" not in src)
+# 13 Oct 2026 (W6): the other three tables and the marks, as the screens now show them
+ok("W6: the guide tells the route table, Forecasts and the marks as they are: the switch, the arrow and its details, one status, no hover",
+   "<strong>Sort by</strong>, to sort" in src and "Click Route or the total to sort, or pick Total, Months or Route from <strong>Sort by</strong>" in src
+   and "The status column shows what needs a person first: <strong>Rejected</strong>, then <strong>ROAD LIMIT</strong>" in src
+   and "<tr><td>ROAD LIMIT</td>" in src and "<strong>Status as a word with an icon</strong>" in src and "<strong>Grey chips</strong>" in src
+   and "Point at a figure for the price per tonne" not in src and "shown in red under the status" not in src
+   and "Click a column to sort.</li>" not in src and "The grid's Flags column" not in src)
 ok("...Account's columns and the diesel strip: Planned £, Fair £ (model), Actual £, £ var, Yard £/L, Fuel share %",
    all(s in src for s in ("<strong>Planned £</strong>", "<strong>Fair £ (model)</strong>", "<strong>Actual £</strong>",
                            "<strong>£ var</strong>", "<strong>Yard £/L</strong>", "<strong>Fuel share %</strong>")))
