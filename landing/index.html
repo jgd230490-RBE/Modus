@@ -161,16 +161,18 @@
   .disclaimer{font-size:14px;color:var(--ink-2);line-height:1.6;margin-top:28px;max-width:960px;background:var(--stone);border:1px solid var(--line);border-radius:10px;padding:16px 20px}
 
   /* demo request: the orange band, the form on a dark card (8 Oct H9 form, kept) */
-  .demo{background:var(--orange);color:var(--ink)}
+  /* 13 Oct (the user): the solid orange band was too loud. Now charcoal with the site-office picture in a subtle
+     orange hue; a left-to-right shade keeps the copy readable; orange stays on the eyebrow and the button. */
+  .demo{color:#fff;background-color:var(--dark);background-image:linear-gradient(90deg,rgba(31,32,36,.9) 0%,rgba(31,32,36,.62) 45%,rgba(31,32,36,.35) 100%),url("./media/demo-background.jpg");background-size:cover;background-position:center;background-repeat:no-repeat;border-top:1px solid var(--dark-line)}
   .demo .wrap{display:flex;flex-wrap:wrap;gap:40px 56px;align-items:flex-start;padding:80px 32px}
   @media (max-width:600px){.demo .wrap{padding:64px 20px}}
   .demo .copy{flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:16px}
-  .demo .eyebrow{color:var(--ink)}
+  .demo .eyebrow{color:var(--orange)}
   .demo .copy h2{font-size:clamp(28px,3.6vw,40px)}
-  .demo .copy p{font-size:17px;line-height:1.6}
-  .demo .copy a{font-weight:600}
-  .demo .copy a:hover{color:#000}
-  .demo form{flex:1 1 440px;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;background:var(--dark);color:#fff;border-radius:14px;padding:28px}
+  .demo .copy p{font-size:17px;line-height:1.6;color:var(--on-dark-2)}
+  .demo .copy a{font-weight:600;color:#fff}
+  .demo .copy a:hover{color:var(--orange)}
+  .demo form{flex:1 1 440px;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;background:rgba(24,25,29,.86);border:1px solid var(--dark-line);box-shadow:0 24px 60px rgba(0,0,0,.35);color:#fff;border-radius:14px;padding:28px}
   @media (max-width:560px){.demo form{grid-template-columns:1fr;padding:22px}}
   .demo .field{display:flex;flex-direction:column;gap:6px;min-width:0}
   .demo .field.wide{grid-column:1 / -1}

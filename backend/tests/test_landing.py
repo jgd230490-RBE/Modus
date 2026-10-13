@@ -477,6 +477,17 @@ ok("'See how it works' goes to How it works; no 'Watch the films'",
    'href="#overview">See how it works</a>' in src and "Watch the films" not in src)
 ok("the demo band offers the email address beside the form", 'Or write to <a href="mailto:JDavis@wayscope.co.uk">' in src)
 ok("one <main> on the page", src.count("<main") == 1)
+# 13 Oct (the user): the demo band was a solid orange block; now charcoal with a picture in a subtle orange hue.
+_demo_css = re.search(r"\.demo\{[^}]*\}", src)
+_demo_css = _demo_css.group(0) if _demo_css else ""
+ok("🔴 the demo band is no longer solid orange", "background:var(--orange)" not in _demo_css)
+_dbg = os.path.join(ROOT, "landing", "media", "demo-background.jpg")
+ok("...it is charcoal with demo-background.jpg (a JPEG under 200 KB) behind a shade",
+   "background-color:var(--dark)" in _demo_css and 'url("./media/demo-background.jpg")' in _demo_css
+   and "linear-gradient" in _demo_css and os.path.exists(_dbg) and open(_dbg, "rb").read(3) == b"\xff\xd8\xff"
+   and os.path.getsize(_dbg) < 200 * 1024)
+ok("...and orange stays on the band's eyebrow and its button", ".demo .eyebrow{color:var(--orange)}" in src
+   and '<button class="btn btn-orange" type="submit">' in src)
 
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
