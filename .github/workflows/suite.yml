@@ -1,0 +1,80 @@
+# The whole test suite on every pull request and every push to main (HU7, restored 14 Oct 2026).
+#
+# One job, one script: backend/tests/run_suite.py runs every harness and prints a per-harness count
+# table (also on the run's Summary page). The job fails if any harness fails, prints no count, counts
+# 0, or reports SKIPPED.
+#
+# Two Pythons, as on the laptop:
+#   - the setup-python 3.12 interpreter gets backend/requirements.txt MINUS fastapi and uvicorn
+#     (the stubbed test_*.py harnesses stub FastAPI themselves and must get the stub), plus tzdata;
+#   - /tmp/venv-smoke gets all of backend/requirements.txt plus httpx and tzdata, for http_smoke.py.
+#
+# Offline: no secret is passed to this workflow, and the harnesses run inside a network namespace
+# with only loopback. No step needs a HERE or Mapbox key; a harness that tried the network would fail
+# here rather than pass on the answer. (Installing packages happens before, with the network.)
+#
+# Fixtures: test_costlines.py / test_lookahead.py and others rewrite backend/tests/fixtures/*.json.
+# The checkout is thrown away after the run; nothing is committed. run_suite.py lists what changed.
+name: suite
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: pdftotext (poppler) for the PDF text checks
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+
+      - name: Python for the stubbed harnesses (no FastAPI)
+        run: |
+          grep -viE '^(fastapi|uvicorn)\b' backend/requirements.txt > /tmp/req-tests.txt
+          cat /tmp/req-tests.txt
+          python -m pip install -r /tmp/req-tests.txt tzdata
+          if python -c "import fastapi" 2>/dev/null; then echo "fastapi must not be here"; exit 1; fi
+
+      - name: Python for http_smoke.py (the real app)
+        run: |
+          python -m venv /tmp/venv-smoke
+          /tmp/venv-smoke/bin/python -m pip install -r backend/requirements.txt httpx tzdata
+
+      - name: Node packages the JS harnesses resolve through NODE_PATH
+        run: npm install -g typescript@5 react@18 react-dom@18 jsdom@24
+
+      - name: Run every harness (offline)
+        run: |
+          export NODE_PATH="$(npm root -g)"
+          export RUN_UID="$(id -u)" RUN_GID="$(id -g)" RUN_PATH="$PATH"
+          export PY="$(command -v python)" NODE_BIN="$(command -v node)"
+          # A fresh network namespace has only loopback: bring it up, drop back to the runner user, run.
+          sudo -E unshare --net -- sh -c '
+            ip link set lo up
+            exec setpriv --reuid="$RUN_UID" --regid="$RUN_GID" --init-groups env PATH="$RUN_PATH" \
+              "$PY" backend/tests/run_suite.py --py "$PY" --smoke-py /tmp/venv-smoke/bin/python \
+              --node "$NODE_BIN" --require-offline'
