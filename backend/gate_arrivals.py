@@ -226,6 +226,12 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         gm = grow.get("safety_minutes")
         gm = float(gm) if gm is not None else None
         red = gm is not None and gap is not None and gap < gm
+        # 14 Oct 2026 (the Dashboard's gate chart): the gate's CAPACITY, the most lorries it can check in a day if they
+        # arrive evenly = the shift's minutes ÷ its check-in minutes a lorry — the red rule turned round (gap < check-in
+        # ⇔ arrivals > capacity), sent from here so the browser only draws it. No check-in typed: no capacity.
+        cap_raw = (open_m / gm) if (gm is not None and gm > 0) else None
+        cap = r1(cap_raw) if cap_raw is not None else None
+        cap_pct = (round(arr_raw * 100.0 / cap_raw) if (cap_raw and total > 0) else None)
         roles = g["roles"] or g["pending_roles"]
         role = "both" if len(roles) == 2 else (next(iter(roles)) if roles else "destination")
         teams = sorted(((team_name(k), k) for k in g["team_trips"]),
@@ -252,6 +258,8 @@ def arrivals(month_index, acc, factors=None, working_days=None):
             "arrivals_per_day": arr,
             "gap_minutes": gap,
             "gate_minutes": gm,
+            "capacity_per_day": cap,
+            "capacity_pct": cap_pct,
             "flag": "red" if red else None,
             "reason": _reason(arr if total > 0 else None, gap, gm),
             "pending_lines": g["pending_lines"],

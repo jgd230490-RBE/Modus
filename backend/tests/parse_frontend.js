@@ -1202,7 +1202,8 @@ const _tdBody = src.slice(src.indexOf("function DashboardToday("), src.indexOf("
 ok("🔴 every KPI figure carries an info box (was: a hover title) — none is bare",
   _dbBody.split("<Fig ").slice(1).length >= 16 && _dbBody.split("<Fig ").slice(1).every(chunk => chunk.slice(0, chunk.indexOf("/>")).includes("info={{ id: \"")));
 ok("🔴 no KPI figure is truncated: no `truncate` on a Fig, the value is nowrap with a clamp() size, two per row",
-  !/kpi-num[^"]*truncate/.test(_dbBody) && _dbBody.includes('kpi-num font-bold whitespace-nowrap') && _dbBody.includes('fontSize: "clamp(')
+  // 14 Oct 2026 (narrowed): the clamp() size moved from the inline style to CSS (.fig-val), so the big screen can scale it
+  !/kpi-num[^"]*truncate/.test(_dbBody) && _dbBody.includes('kpi-num font-bold whitespace-nowrap fig-val') && /\.fig-val\{font-size:clamp\(1\.1rem,1\.45vw,1\.7rem\);\}/.test(html)
   && _dbBody.includes('<div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>'));
 // 13 Oct 2026 (W3, narrowed): the exact figure rides in the info box's value line
 ok("millions print compact (bigNum) with the exact figure in the info box",
@@ -1220,7 +1221,8 @@ ok("...today's rows are the day rows whose date is the server's `today` — the 
 ok("...with this week to date and last week's account (the server's actual_t, reported, delivered, hold band)",
   _tdBody.includes("This week to date") && _tdBody.includes("acct.actual_t") && _tdBody.includes("acct.hold_band"));
 ok("...and the small map is the Look-ahead's CommitMap, title and height as props, defaults unchanged for the Look-ahead",
-  _tdBody.includes('<CommitMap meta={meta} bucket="commit"') && src.includes("function CommitMap({ meta, bucket, tick, lines, title, height, flush })")
+  // 14 Oct 2026 (narrowed): + `fill`, the big screen's map takes its whole card (the default is unchanged)
+  _tdBody.includes('<CommitMap meta={meta} bucket="commit"') && src.includes("function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill })")
   && src.includes('{title || "This week\'s movements"}') && src.includes("height: height || 380"));
 ok("🔴 cost never reaches the map: no €, eur, fair or rate anywhere in CommitMap (its hover carries quantity and trips only)",
   !/€|\beur\b|_eur|fair|rate_|\brates?\b|planned_units|eur_units/i.test(_cmBody) && _cmBody.includes("trips`).join"));
@@ -1274,20 +1276,27 @@ ok("...a hashchange (a second link from the guide into the same tab) moves the p
 ok("0915: four sections, named, in the page's own order",
    /const DASH_SECTIONS = \[/.test(src)
    && ["today", "kpis", "charts", "stock"].every(k => new RegExp(`key: "${k}"`).test(src))
-   && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
-ok("0915: every one of the four is wrapped, and each wraps a DIFFERENT index",
-   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4
-   && [0, 1, 2, 3].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
+   && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4
+   // 14 Oct 2026 (narrowed): a FIFTH, More charts, added LAST so #dashboard/1 … /4 keep their screens
+   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n\];/.test(src));
+ok("0915: every one of the five (14 Oct: was four) is wrapped, and each wraps a DIFFERENT index",
+   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
+   && [0, 1, 2, 3, 4].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
 ok("0915: 🔴 a hidden section is HIDDEN, not unmounted — the Mapbox instance survives",
    // the wrapper renders its children unconditionally and toggles `hidden`
-   /<div ref=\{ref\} hidden=\{!show\} data-wall-section/.test(src)
+   // (13 Oct 2026, W5: narrowed — the wrapper no longer needs a ref, it fires nothing)
+   /<div hidden=\{!show\} data-wall-section/.test(src)
    && !/\{show && <DashboardToday/.test(src) && !/sectionShown\(0\) && </.test(src)
    // and [hidden] is forced in the STYLESHEET (not the script block), because a Tailwind
    // utility on the same element would otherwise win
    && /\[hidden\]\{display:none !important;\}/.test(html));
-ok("0915: ...and a section coming back into view is told to re-measure",
-   /requestAnimationFrame\(\(\) => \{ try \{ window\.dispatchEvent\(new Event\("resize"\)\)/.test(src)
-   && /cancelAnimationFrame\(id\)/.test(src));
+// 13 Oct 2026 (W5, bundle E): narrowed. The section is still re-measured when it comes back into view, but by the
+// boxes themselves: every chart box and the Today map watch their own size (ResizeObserver), so nothing fires a window
+// resize any more, and a chart that was never on screen is built then, at its real size.
+ok("0915: ...and a section coming back into view is re-measured (13 Oct: each box watches its own size)",
+   !/window\.dispatchEvent\(new Event\("resize"\)\)/.test(src)
+   && /function ChartCanvas[\s\S]{0,2600}new ResizeObserver\(/.test(src)
+   && /function CommitMap[\s\S]{0,9000}new ResizeObserver\(\(\) => \{ try \{ if\(mapDiv\.current && mapDiv\.current\.clientWidth > 0\) m\.resize\(\);/.test(src));
 ok("0915: the WORKING view always shows all four, whatever the big screen remembered",
    /const sectionShown = \(i\) => !wall \|\| wallLayout === "all" \|\| wallSection === i;/.test(src));
 ok("0915: the rotate timer runs only on the big screen, and is cleared",
@@ -1306,8 +1315,9 @@ ok("0915: the three layouts are all offered, and every localStorage read is guar
    && (src.match(/localStorage\.(get|set)Item\("modus_dash_/g) || []).length === 6
    // every one of the six sits inside a try — a private window must not blank the page
    && !/[^ ]localStorage\.getItem\("modus_dash_[^)]*\)[^;]*;\s*\n(?![\s\S]{0,40}catch)/.test(src));
-ok("...and it collapses with the rail like every other item (label behind railOpen)",
-   /\/help\/\?role=[\s\S]{0,460}?\{railOpen && <span className="truncate">User guide<\/span>\}/.test(src));
+// 13 Oct 2026 (W5): narrowed — the rail's labels follow railShown (railOpen, or below 768 px the overlay)
+ok("...and it collapses with the rail like every other item (label behind railShown)",
+   /\/help\/\?role=[\s\S]{0,460}?\{railShown && <span className="truncate">User guide<\/span>\}/.test(src));
 
 // ---- H10 (8 Oct 2026): the in-app guide ----------------------------------------
 // Demo tenant only; steps per page anchored to data-guide elements; Back/Next/Done and
@@ -1821,7 +1831,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
         && /\n    function guideStart\(\)\{/.test(mapHtml) && mapHtml.includes("new URLSearchParams(location.search).get('embed') === '1'"));
     }
     ok("the app's own guide is not mounted on the Route map (the embedded map runs its own): one 'New here?' strip there, and the app never touches wayscope_guide_map",
-      portalFn.includes('{page !== "map" && <Guide page={page} groups={visible} />}') && (src.match(/<Guide /g) || []).length === 1
+      // 14 Oct 2026 (narrowed): nor over the Dashboard's big screen
+      portalFn.includes('{page !== "map" && !(page === "dashboard" && wallOn) && <Guide page={page} groups={visible} />}') && (src.match(/<Guide /g) || []).length === 1
       && !/\n  map: \[/.test((src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1]));
     ok("a page with no steps of its own (Config) replays the welcome, so the bar's Guide never does nothing",
       /const startTour = \(\) => \{ setTip\(null\); setSteps\(build\(guideRead\("welcome"\) !== "done" \|\| !\(GUIDE_STEPS\[key\] \|\| \[\]\)\.length\)\); setI\(0\); \};/.test(src));
@@ -1911,13 +1922,18 @@ ok("...and it collapses with the rail like every other item (label behind railOp
   ok("Dashboard: the working view is six cards, four charts, and five collapsed sections; the big screen keeps its four WallSections",
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
-    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8);
+    // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
+    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
+    && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
   ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
     ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
     && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
-  ok("...a collapsed section re-measures what it holds when opened (Mapbox and Chart.js measure zero while hidden)",
-    _dbBody.includes('const onMore = (e) => { if(e.target.open) requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(err){} }); };')
-    && (_dbWork.match(/onToggle=\{onMore\}/g) || []).length === 5);
+  // 13 Oct 2026 (W5): narrowed — no onToggle handler any more; a chart in a collapsed section is built when its box
+  // first has a size (ChartCanvas's ResizeObserver), so it is measured right on the first open
+  ok("...a collapsed section re-measures what it holds when opened (13 Oct: each chart box watches itself; no onMore)",
+    !_dbBody.includes("const onMore") && (_dbWork.match(/onToggle=\{onMore\}/g) || []).length === 0
+    && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5
+    && /function ChartCanvas[\s\S]{0,2600}if\(!\(el\.clientWidth > 0 && el\.clientHeight > 0\)\) return;/.test(src));
   ok("...three filters in the header, the rest behind More filters, applied chips with Clear all",
     _dbBody.includes(">More filters ▾</summary>") && _dbBody.includes('<div className="row-menu-list dash-filters">') && _dbBody.includes("{!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}"));
   // 3. the Look-ahead grid
@@ -1980,7 +1996,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />") && (_dbW.match(/<Card label=/g) || []).length === 6
     && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
-    && code.includes("<Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} onOpen={setPage} />")
+    // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
+    && code.includes("<Dashboard meta={meta} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature)
     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
@@ -2097,7 +2114,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     _dbW.includes("<GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && (_dbW.match(/<Card label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5
-    && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 5);
+    // 13 Oct 2026 (W5): narrowed — the five sections no longer carry onToggle={onMore} (see the W5 block)
+    && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 0);
   ok("the hooks sit before the early returns (React #310)",
     _dbc.indexOf("const [ga, setGa]") > 0 && _dbc.indexOf("const [ga, setGa]") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));") < _dbc.indexOf("if(err) return")
@@ -2157,7 +2175,8 @@ ok("...and it collapses with the rail like every other item (label behind railOp
     && _tg.includes("all teams summed at the gate a lorry arrives by") && src.includes("the gap is the shift's minutes ÷ arrivals, an average with no peak hour")
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
-    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 4
+    // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
+    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
 }
 
@@ -2490,6 +2509,228 @@ ok("...and it collapses with the rail like every other item (label behind railOp
      && src.includes("The admin token is taken from the field at the top of this page.") && !src.includes("taken from the bake panel")
      && src.includes("Saved on its own: the page's Save button does not save the target rate") && src.includes("from Config → Vehicles, plus")
      && src.includes("Codes are checked by Wayscope") && src.includes('confirm("Clear ALL routes? Locations are kept. This cannot be undone.")'));
+}
+
+// ---- 13 Oct 2026 (W5, bundle E): charts fill every screen ------------------------------------------------------
+{
+  const _cc = (src.match(/function ChartCanvas\([\s\S]*?\n\}\n/) || [""])[0];
+  const _db = (src.match(/function Dashboard\(\{[\s\S]*?\n\}\n/) || [""])[0];
+  ok("W5: every chart box is position:relative and sized by CSS clamp(), two sizes; the canvas is the box's only child",
+     /\.chart-box\{position:relative;width:100%;min-width:0;height:clamp\(200px,28vh,420px\);\}/.test(html)
+     && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
+     // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
+     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
+  // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
+  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile and gate charts, whose height follows their rows)",
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 2 && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
+     && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
+  ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
+     _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
+     && _cc.includes('if(want && lg.position !== want){ lg.position = want; c.update("none"); } else c.resize();')
+     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, accent, sized]);"));   // (W16 the same evening: + accent)
+  ok("W5: the rules by width: legend under the plot below 768 px, a doughnut's on the right only from 1024 px; labels 18 characters, no rotation; DPR at most 2",
+     /const CHART_LABEL_MAX = 18;/.test(src) && /if\(vw < 768\) return "bottom";/.test(src)
+     && /if\(type === "doughnut" \|\| type === "pie"\) return vw >= 1024 \? \(asked \|\| "right"\) : "bottom";/.test(src)
+     && /const ticks = \{ \.\.\.\(ax\.ticks \|\| \{\}\), maxRotation: 0, autoSkip: true \};/.test(src)
+     && /o\.devicePixelRatio = Math\.min\(\(typeof window !== "undefined" && window\.devicePixelRatio\) \|\| 1, 2\);/.test(src));
+  ok("W5: the working view is up to 1680 px wide (not max-w-7xl); the big screen's Charts section fills the height when shown alone",
+     _db.includes('"max-w-[1680px]")}>') && !_db.includes('"max-w-7xl"')
+     // 14 Oct 2026 (narrowed): EVERY section fills in Rotate / One section, not only Charts
+     && _db.includes('const fill = wall && wallLayout !== "all";') && _db.includes('(fill ? " dash-fill" : "")')
+     && /\.dash-wall\.dash-fill\{height:100%;display:flex;flex-direction:column;\}/.test(html)
+     && /\.dash-wall\.dash-fill \.wall-charts\{height:100%;grid-auto-rows:minmax\(0,1fr\);\}/.test(html));
+  ok("W5: the four charts: one column, 3 + 2 from 1024 px, three columns from 1600 px (top routes down the right); More charts 1 / 2 / 4",
+     /@media \(min-width:1600px\)\{\n\s*\.dash-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-areas:"demand progress top" "cost cost top";\}/.test(html)
+     && ["c-demand", "c-top", "c-progress", "c-cost"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
+     && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="pt-3 dash-more-charts">')
+     && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
+  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone)",
+     (src.match(/new ResizeObserver\(/g) || []).length === 3 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src));
+  ok("W5 (the user's \"3 yes\"): below 768 px the rail is icons only and opens OVER the page, not remembered",
+     /const NARROW_Q = "\(max-width: 767px\)";/.test(src) && /const railShown = narrow \? railPeek : railOpen;/.test(src)
+     && /if\(narrow\)\{ setRailPeek\(v => !v\); return; \}/.test(src) && /\(narrow && railPeek \? " rail-peek" : ""\)/.test(src)
+     && /\.rail\.rail-peek\{position:absolute;top:0;bottom:0;left:0;z-index:45;/.test(html)
+     && /onClick=\{\(\) => \{ setPage\(it\.id\); if\(narrow\) setRailPeek\(false\); \}\}/.test(src));
+}
+
+// ---- 13 Oct 2026 (W16, bundle E; D39): the four accents ----------------------------------------------------------
+// The series colours of every accent × look are worked out from the <style> exactly as the browser cascades them
+// (:root, then the dark block, then the accent's block), and checked with the method the 10 and 11 Oct palettes were
+// chosen by (notes/colour-system-1010.md, notes/bundle-e-plan-1013.md): neighbouring series must stay apart for a
+// colour-blind reader (Machado 2009 protan/deutan simulation, OKLab distance × 100, at least 8) and for everyone
+// (at least 15), and every series must stand 3:1 against the chart's surface. Formulas: OKLab (Ottosson 2020), WCAG 2.
+{
+  const css = html.match(/<style>([\s\S]*?)<\/style>/)[1];
+  const blockOf = (sel) => { const i = css.indexOf(sel + "{"); if (i < 0) return null; const j = css.indexOf("}", i); return css.slice(i + sel.length + 1, j); };
+  const toks = (b) => { const o = {}; (b || "").replace(/--([a-z0-9-]+):([^;]+);/g, (_, k, v) => { o[k] = v.trim(); }); return o; };
+  const ROOT = toks(blockOf(":root")), DARK = toks(blockOf('html[data-theme="dark"]'));
+  const acc = (k) => toks(blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`));
+  // (Blue and Blue shades share one dark block: `html[data-theme="dark"][data-accent="blue"],html[…="blue-shades"]`)
+  const DARK_BLUE = 'html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]';
+  const accD = (k) => (k === "blue" || k === "blue-shades") ? toks(blockOf(DARK_BLUE)) : toks(blockOf(`html[data-theme="dark"][data-accent="${k}"]`));
+  const eff = (k, dark) => dark ? { ...ROOT, ...DARK, ...(k === "orange" ? {} : accD(k)) } : { ...ROOT, ...(k === "orange" ? {} : acc(k)) };
+  const KEYS = ["orange", "blue", "blue-shades", "orange-shades"];
+  const series = (t) => ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map(n => t[n].toUpperCase()).filter(c => c !== t["chart-none"].toUpperCase());
+  // colour maths
+  const lin = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const lum = (h) => { const [r, g, b] = lin(h); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const M = { protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+              deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]] };
+  const sim = (h, k) => { const v = lin(h); if (!k) return v; return M[k].map(r => Math.max(0, Math.min(1, r[0] * v[0] + r[1] * v[1] + r[2] * v[2]))); };
+  const oklab = (v) => { const l = Math.cbrt(0.4122214708 * v[0] + 0.5363325363 * v[1] + 0.0514459929 * v[2]), m = Math.cbrt(0.2119034982 * v[0] + 0.6806995451 * v[1] + 0.1073969566 * v[2]),
+                            s = Math.cbrt(0.0883024619 * v[0] + 0.2817188376 * v[1] + 0.6299787005 * v[2]);
+                      return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s]; };
+  const dE = (a, b, k) => { const p = oklab(sim(a, k)), q = oklab(sim(b, k)); return 100 * Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+  // the pairs a reader compares: neighbours in a stack, and 1 against 4 (the cost chart: planned beside the model)
+  const worst = (pal) => { let cvd = 1e9, nv = 1e9; const P = []; for (let i = 1; i < pal.length; i++) P.push([i - 1, i]); if (pal.length >= 4) P.push([0, 3]);
+    for (const [i, j] of P) { cvd = Math.min(cvd, dE(pal[i], pal[j], "protan"), dE(pal[i], pal[j], "deutan")); nv = Math.min(nv, dE(pal[i], pal[j])); } return { cvd, nv }; };
+  ok("W16: the ACCENTS block exists with a light and a dark block for each of the three alternatives, and touches no status colour",
+     ["blue", "blue-shades", "orange-shades"].every(k => blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`)) && !!blockOf(DARK_BLUE)
+     && !blockOf('html[data-theme="dark"][data-accent="orange-shades"]') && !blockOf(':root:not([data-theme="dark"])[data-accent="orange"]')
+     && !/--(green|gold|red):/.test(css.slice(css.indexOf("ACCENTS-START"), css.indexOf("ACCENTS-END"))));
+  ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
+     series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
+     && eff("orange", false).action === "#C2410C" && eff("orange", false).navy === "#2563EB" && eff("orange", true).action === "#FF8C14");
+  ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange) and 4 and 5 (the model gold: blue beside violet fails 1–4)",
+     series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #A07D34 #7C3AED" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #B48E3E #9572EE");
+  ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; in Dark each draws its primary's series",
+     series(eff("blue-shades", false)).join(" ") === "#1D4ED8 #0891B2 #4F46E5 #0D9488" && series(eff("blue-shades", true)).join(" ") === series(eff("blue", true)).join(" ")
+     && series(eff("orange-shades", false)).join(" ") === "#E8590C #9A3412 #A07D34 #BE185D"
+     && series(eff("orange-shades", true)).join(" ") === series(eff("orange", true)).join(" "));
+  for (const k of KEYS) for (const dark of [false, true]) {
+    const t = eff(k, dark), pal = series(t), w = worst(pal), surf = dark ? "#1F2024" : "#FFFFFF";
+    ok(`W16 palette ${k} · ${dark ? "dark" : "light"}: neighbours and the plan–model pair apart for a colour-blind reader (≥ 8) and for everyone (≥ 15); every series ≥ 3:1 on the surface`,
+       w.cvd >= 8 && w.nv >= 15 && pal.every(c => cr(c, surf) >= 3), `cvd ${w.cvd.toFixed(1)} nv ${w.nv.toFixed(1)} min contrast ${Math.min(...pal.map(c => cr(c, surf))).toFixed(2)}`);
+  }
+  ok("W16: the brief's own shade ramps would FAIL the same check (kept here so a later copy of them is caught)",
+     worst(["#1E3A8A", "#2563EB", "#60A5FA", "#93C5FD", "#BFDBFE"]).nv < 15 && cr("#BFDBFE", "#FFFFFF") < 3
+     && worst(["#7C2D12", "#C2410C", "#FF8C14", "#FFB55C", "#FFE0B8"]).nv < 15 && cr("#FFE0B8", "#FFFFFF") < 3);
+  // the state, the early script, the picker, the charts
+  ok("W16: ACCENTS + applyAccent + useAccent mirror the look; stored as modus_accent (the B6 decision: keys keep the old prefix); unknown → orange",
+     /const ACCENTS = \[\n  \["orange",/.test(src) && /const ACCENT = \{ key: "modus_accent", current: "orange", subs: new Set\(\) \};/.test(src)
+     && /if\(!ACCENTS\.some\(\(\[k\]\) => k === name\)\) name = "orange";/.test(src) && /try \{ applyAccent\(localStorage\.getItem\(ACCENT\.key\) \|\| "orange", false\); \} catch\(e\)\{ applyAccent\("orange", false\); \}/.test(src)
+     && /function useAccent\(\)\{/.test(src));
+  ok("W16: 🔴 the remembered look and accent go on <html> in a plain <head> script, BEFORE the CDN scripts and Babel (no flash of the default)",
+     html.indexOf('d.setAttribute("data-accent",') > 0 && html.indexOf('d.setAttribute("data-accent",') < html.indexOf("react.production.min.js")
+     && /\/\^\(orange\|blue\|blue-shades\|orange-shades\)\$\/\.test\(a\|\|""\)\?a:"orange"/.test(html) && /\/\^\(ink\|light\|dark\)\$\/\.test\(t\|\|""\)\?t:"ink"/.test(html));
+  ok("W16: the picker has a second group, Accent, four menuitemradio items in their own class (the three looks stay three)",
+     /<h6>Accent<\/h6>\n\s*\{ACCENTS\.map\(\(\[k, label, sw\]\) => \(/.test(src) && src.includes('className={"accent-item" + (accent === k ? " is-on" : "")} data-accent-choice={k}')
+     && src.includes("onClick={() => { setAccent(k); setOpen(false); }}"));
+  ok("W16: charts rebuild on an accent change without a reload (ChartCanvas and the Dashboard subscribe)",
+     (src.match(/const \[accent\] = useAccent\(\);/g) || []).length === 2);
+  ok("W16 (D39): every multi-series Dashboard chart names its series on the chart from 768 px; stacked segments have a 2 px surface gap",
+     /const SERIES_LABELS = \{ id: "seriesLabels", afterDatasetsDraw\(chart, _args, opts\)\{/.test(src)
+     && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
+     && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
+     && /ctx\.fillStyle = tok\("--ink", "#1E293B"\);/.test(src));
+  ok("W16 (D39): an amber status is a triangle and a red one a diamond beside its word — every .chip-st dot, by the token it is painted with",
+     /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
+     && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
+  ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
+     !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
+     && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)/g) || []).length);
+}
+
+// ---- 14 Oct 2026: the big screen fills the screen in EVERY section (the user: "the screen still don't fill up on
+// rotate"; measured on the branch at 1920 × 1080: Today 67 %, Figures 38 %, Stockpiles 37 %, Charts 98 %). TV-dashboard
+// practice (Datadog TV mode, Grafana kiosk, Geckoboard, Microsoft's TV guidance): fit without scrolling, hide the
+// chrome, split a crowded screen, nothing that needs a hover, a clock. Browser-measured afterwards: 96–99 % at
+// 1366 × 768, 1920 × 1080 and 3840 × 2160, nothing cut off (notes/session-1014-big-screen.md).
+{
+  const _db = (src.match(/function Dashboard\(\{[\s\S]*?\n\}\n/) || [""])[0];
+  const _td = (src.match(/function DashboardToday\([\s\S]*?\n\}\n/) || [""])[0];
+  const _sc = (src.match(/function DashboardStockChart\([\s\S]*?\n\}\n/) || [""])[0];
+  const _pf = (src.match(/function Portal\([\s\S]*?\n\}\n/) || [""])[0];
+  ok("BIG SCREEN: Rotate and One section fill (dash-fill) whatever the section; the shown section takes the height left",
+     _db.includes('const fill = wall && wallLayout !== "all";') && _db.includes('(fill ? " dash-fill" : "")')
+     && /\.dash-wall\.dash-fill>\[data-wall-section\]:not\(\[hidden\]\)\{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;\}/.test(html)
+     && /\.dash-wall\.dash-fill>\[data-wall-section\]>\*\{flex:1 1 auto;min-height:0;\}/.test(html));
+  ok("BIG SCREEN: the TV type scale is from the screen height (figures ~6 % and width-capped, labels ~1.8 %, never under 13 px); chart text = height ÷ 74",
+     /\.dash-wall\.dash-fill \.fig-val\{font-size:clamp\(2rem,min\(6\.4vh,3\.3vw\),8rem\);/.test(html)
+     && /\.dash-wall\.dash-fill \.fig-label\{font-size:clamp\(13px,1\.8vh,30px\);/.test(html)
+     && _db.includes("const tf = { size: wall ? Math.max(13, Math.min(30, Math.round(winH / 74))) : 11 };")
+     && _db.includes("const named = { seriesLabels: { on: true, size: tf.size } };"));
+  ok("BIG SCREEN: Figures is a 2 × 2 grid of tiles; a tile with five figures takes three columns so none is cut off",
+     _db.includes('<div className={fill ? "wall-figs" : "grid md:grid-cols-2 xl:grid-cols-4 gap-3"} data-wall-figures="1">')
+     && /\.dash-wall\.dash-fill \.wall-figs\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);grid-auto-rows:minmax\(0,1fr\);/.test(html)
+     && /\.wall-figs>\.card>\.grid:has\(>:nth-child\(5\)\)\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);\}/.test(html));
+  ok("BIG SCREEN: Today's figures go 2 × 2, its lines take the rest of the card (never a scrollbar on a TV), the map the whole right column",
+     _td.includes('(fill ? " today-figs" : " xl:grid-cols-4")') && _td.includes("today-lines") && _td.includes('lg:col-span-3 today-map')
+     && _td.includes("flush fill={fill} />") && /\.dash-wall\.dash-fill \.today-lines\{max-height:none !important;overflow:hidden;\}/.test(html)
+     && src.includes('<div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />'));
+  ok("BIG SCREEN: the stockpile chart takes its card, and each bar names its fill in words (no hover on a TV)",
+     _sc.includes('(fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} height={Math.max(wall ? 220 : 160, 36 * bars.length + 40)} />)')
+     && _sc.includes('(b.over ? " · over capacity" : b.pct >= 90 ? " · nearly full" : "")') && _sc.includes("plugins: [capLine, barLabels] };")
+     && /\.chart-box\.is-fill\{height:100%;min-height:0;\}/.test(html));
+  ok("BIG SCREEN: eight charts no longer share one screen — Charts has the four a planner reads first, More charts (5th, added last) the other four, each 2 × 2",
+     (_db.match(/<div className="wall-charts">/g) || []).length === 2 && /\{ key: "more",   title: "More charts" \}/.test(src)
+     && /@media \(min-width:1024px\)\{\.wall-charts\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);\}\}/.test(html)
+     && _db.includes('[["all", "All sections"], ["rotate", "Rotate"], ["single", "One section"]]') && !_db.includes('"All four"'));
+  ok("BIG SCREEN: the rotation shows a line that fills over the section's time and names the next one; no motion when reduced motion is asked for",
+     _db.includes('<i key={wallSection + "-" + rotateSecs} style={{ animationDuration: rotateSecs + "s" }}></i>')
+     && _db.includes("next: {DASH_SECTIONS[(wallSection + 1) % DASH_SECTIONS.length].title}")
+     && /@media \(prefers-reduced-motion:reduce\)\{\.dash-rot>i\{animation:none;/.test(html));
+  ok("BIG SCREEN: the page header folds into the bar (range, updated, a clock, Exit); no tour and no menu over the TV",
+     _db.includes("{!fill && <PageHeader") && _db.includes('<span className="dash-clock" data-wall-clock="1">{hhmm(clock)}</span>')
+     && _db.includes('{fill && <button type="button" className="dash-wallbar-btn" onClick={toggleWall} title="Back to the working view (Esc)">Exit</button>}')
+     && _pf.includes('(wallOn && page === "dashboard" ? " hidden" : "")') && _pf.includes('!(page === "dashboard" && wallOn) && <Guide'));
+  ok("BIG SCREEN: on a TV nothing asks for a click — Top routes drops 'click a bar to focus' there",
+     _db.includes('{!wall && <span className="text-slate-400 font-normal">· click a bar to focus</span>}'));
+}
+
+// ---- 14 Oct 2026 (the user: "rather than having huge charts, size charts and KPIs appropriately; do a design UI and UX
+// quality check"). Found: charts stretched to fill with no message; four months as 180 px slabs; the carbon line's axis at
+// 370 (a 10 % dip looked like a cliff); "1,000,000" ticks. Now: a headline over each big-screen chart, bars capped,
+// axes from zero, compact ticks. Measured: fattest bar 68 px at 1080p (was ~180), every value axis min 0.
+{
+  const _db = (src.match(/function Dashboard\(\{[\s\S]*?\n\}\n/) || [""])[0];
+  const _sc = (src.match(/function DashboardStockChart\([\s\S]*?\n\}\n/) || [""])[0];
+  const _wall = _db.slice(_db.indexOf('<div className="wall-charts">'));
+  ok("DESIGN: every big-screen chart opens with its message (a ChartHead), only on a filled screen — eight charts, eight headlines",
+     (_wall.match(/\{fill && <ChartHead /g) || []).length === 8 && /const ChartHead = \(\{ value, label, note, tone \}\) => \(/.test(_db)
+     && ["demandCfg", "progressCfg", "costCfg", "topCfg", "tripsCfg", "fleetCfg", "co2Cfg", "splitCfg"].every(k => new RegExp("<ChartHead [^\\n]*\\n\\s*<ChartCanvas config=\\{" + k + "\\}").test(_wall))
+     && !_db.slice(0, _db.indexOf('<div className="wall-charts">')).includes("<ChartHead "));
+  ok("DESIGN: the headlines say what the number is measured against (delivered of plan, planned vs the model, share of tonnes, per tonne)",
+     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualT)} t reported of ${bigNum(K.totT)} t planned`')
+     && _wall.includes('"the fair-price model"') && _wall.includes("% of the tonnes in view`") && _wall.includes("kg for each tonne moved`"));
+  ok("DESIGN: the stockpile screen opens with how many are over capacity (red), nearly full, with room, and with no capacity recorded",
+     _sc.includes('{nOver ? `${nOver} over capacity` : "None over capacity"}') && _sc.includes("`${noCap.length} with no capacity recorded`")
+     && _sc.includes("maxBarThickness: fill ? Math.round(sf * 4.5) : 40"));
+  ok("DESIGN: every chart's value axis starts at zero, with compact ticks, and a bar is capped at 4.5 × its text (fitChartConfig)",
+     /if\(vax\.beginAtZero == null && vax\.min == null\) vax\.beginAtZero = true;/.test(src) && /if\(!vt\.callback\) vt\.callback = compactTick;/.test(src)
+     && /o\.datasets = \{ \.\.\.\(o\.datasets \|\| \{\}\), bar: \{ maxBarThickness: Math\.round\(fsz \* 4\.5\)/.test(src)
+     && /const compactTick = \(v\) => \{/.test(src));
+  ok("DESIGN: the headline type is from the screen height (number ~5 %, label 2 %, note 1.6 %), the label spaced from the number",
+     /\.chart-head \.ch-val\{font-weight:700;color:var\(--navy-deep\);font-size:clamp\(1\.6rem,min\(5\.2vh,2\.7vw\),6\.5rem\);/.test(html)
+     && /\.chart-head \.ch-lbl\{[^}]*margin-left:\.45em;\}/.test(html));
+  ok("DESIGN: series names at a chart's end keep 20 characters (were cut at 15: 'Large aggregat…'), with room for them",
+     src.includes('const t = m.label.length > 20 ? m.label.slice(0, 19) + "…" : m.label;') && /const SERIES_LABEL_PAD = 136;/.test(src));
+}
+
+// ---- 14 Oct 2026 (the user: "gate arrivals should be a chart, measuring arrivals against capacity"): a bullet chart,
+// one row a gate, the fullest first. Capacity = the shift's minutes ÷ the check-in minutes a lorry, SENT BY THE SERVER
+// (capacity_per_day, capacity_pct; test_gate_arrivals pins the arithmetic and that it agrees with the red flag).
+{
+  const _ga = (src.match(/function GateArrivalsPanel\([\s\S]*?\n\}\n/) || [""])[0];
+  ok("GATE CHART: the panel opens with a chart, one row a gate (fullest first), above the table, which folds under 'Gate by gate'",
+     _ga.includes('<div className="ga-chart" data-ga-chart="1">') && _ga.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />")
+     && _ga.indexOf('data-ga-chart="1"') < _ga.indexOf('data-rd-table="gates"') && _ga.includes('<details className="ga-more" data-ga-table="1"><summary>Gate by gate:')
+     && _ga.includes("((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day)"));
+  ok("GATE CHART: a bullet chart — a pale track to the gate's capacity, the planned arrivals inside it, a marker with an arrow at capacity",
+     _ga.includes('{ label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap)') && _ga.includes('{ label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day)')
+     && _ga.includes('const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {') && _ga.includes("plugins: [capMarks] };")
+     && (_ga.match(/grouped: false/g) || []).length === 2);
+  ok("GATE CHART: 🔴 the browser draws the server's capacity and flag — it divides nothing; red only where the server's flag is red",
+     _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\" }))")
+     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60/.test(_ga) && _ga.includes("r.over ? REDg : (r.cap == null ? NONEg : C1g)"));
+  ok("GATE CHART: every row says its figure in words (no hover on a TV or a print): 'N a day · P % of C', 'over capacity', 'no check-in time typed'",
+     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : "");')
+     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : "Every gate within its capacity"}'));
+  ok("GATE CHART: a key names the bar, the track, the marker, red and grey; the tooltip names the gate and how capacity is worked out",
+     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the shift ÷ the check-in time a lorry")
+     && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
+     && _ga.includes("`capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`"));
 }
 
 // ---- report ------------------------------------------------------------------

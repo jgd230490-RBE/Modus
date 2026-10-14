@@ -279,7 +279,8 @@ ok("the Dashboard: the six cards by name, More filters, the four charts, the fol
    all(s in src for s in ("Material in view", "Deliveries a day", "Vehicles needed", "Planned this week",
                            "Delivered against plan", "Transport carbon", "More filters ▾", "Cost over time",
                            "This week and today, with the Look-ahead's map", "Route planning detail",
-                           "<strong>Big screen</strong>", "#dashboard/1", "tCO2e target, all-in", "All four", "Rotate", "One section")))
+                           # 14 Oct 2026 (narrowed): "All four" became "All sections" (a fifth section, More charts)
+                           "<strong>Big screen</strong>", "#dashboard/1", "tCO2e target, all-in", "All sections", "Rotate", "One section")))
 ok("🔴 ...the retired tiles are gone (Total trips, Intensity, Peak month as tiles)",
    "The six tiles read" not in text and "<strong>Intensity</strong>" not in src and "<strong>Total trips</strong>" not in src)
 
@@ -626,6 +627,18 @@ ok3("⭐ W3 word rule on the user guide: no banned word in its text outside <cod
    len(_vis) > 500 and not _hits, " | ".join(_hits[:6]))
 ok("...the guide names the buttons the screens now show (Route all, not routed)",
    "<strong>Route all</strong>" in src and "Bake all" not in src and "not routed" in src)
+
+# 13 Oct 2026 (bundle E): the guide describes what the Appearance button now offers, and the narrow left menu
+ok("E (W16): the guide names the four accents beside the three looks, the plan-first rule and the status shapes",
+   all(f"<strong>{w}</strong>" in src for w in ("Ink", "Light", "Dark", "Orange", "Blue", "Blue shades", "Orange shades"))
+   and "the first series is the plan and the second what was delivered" in src and "a warning is a triangle and a problem a diamond" in src)
+ok("E (W5): the guide says the left menu shows icons only below 768 px and opens over the page",
+   "Below 768 px the left menu shows its icons only" in src and "opens it over the page until you pick one" in src)
+
+# 14 Oct 2026: the gate chart is described where the Dashboard is
+ok("the guide explains the gate chart: the track, the bar, the marker, capacity worked out, red and grey, Gate by gate",
+   "<strong>Gate arrivals</strong> shows" in src and "the shift's hours ÷ the check-in time a lorry" in src and "over capacity" in src
+   and "A grey bar has no check-in time typed" in src and "<strong>Gate by gate</strong> under the chart opens the table" in src)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

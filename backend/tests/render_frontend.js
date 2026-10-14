@@ -353,7 +353,8 @@ if (loaded) {
       && dOut.includes(">" + cl.totals.actual_tonnes.toLocaleString("en-US").replace(/,/g, " ") + "<")
       && dOut.includes("tonnes moved") && dOut.includes("forecast months reported"));     // 13 Oct 2026 (W3, narrowed): was "line-months" 
     ok("...every KPI value sits in a nowrap clamp()-sized div, none truncated",
-      (dOut.match(/font-size:clamp\(1\.1rem/g) || []).length >= 16 && !/kpi-num[^"]*truncate/.test(dOut));
+      // 14 Oct 2026 (narrowed): the clamp() size is CSS now (.fig-val, pinned in parse_frontend), not an inline style
+      (dOut.match(/kpi-num font-bold whitespace-nowrap fig-val/g) || []).length >= 16 && !/kpi-num[^"]*truncate/.test(dOut));
     // 13 Oct 2026 (W3, narrowed): the hover title became an info box button; no cursor:help is left
     ok("...every KPI cell has an info box (was: a title attribute on hover)",
       (dOut.match(/<div class="min-w-0"><div class="kpi-num[\s\S]*?class="ibtn" aria-label="About: [^"]+"/g) || []).length >= 16 && !dOut.includes("cursor-help"));

@@ -9,6 +9,11 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1F2024">
+<!-- 13 Oct 2026 (W16): the remembered look and accent go on <html> before anything is drawn, so a reload never
+     flashes the default colours while Babel compiles the app. The app applies them again (applyTheme / applyAccent). -->
+<script>(function(){var d=document.documentElement;try{var t=localStorage.getItem("modus_theme"),a=localStorage.getItem("modus_accent");
+d.setAttribute("data-theme",/^(ink|light|dark)$/.test(t||"")?t:"ink");d.setAttribute("data-accent",/^(orange|blue|blue-shades|orange-shades)$/.test(a||"")?a:"orange");}
+catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange");}})();</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -26,7 +31,7 @@
        diesel index, capacity from 90 %, edited/thaw marks — and is never the brand orange.
        The variable NAMES are kept so nothing else had to change. The brand tokens mirror
        frontend/brand/theme-tokens.css. */
-    --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6;
+    --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6; --navy-soft:rgba(37,99,235,.08);
     --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E7E5E4;
     --ink:#1E293B; --muted:#64748B; --line:#E7E5E4; --bg:#FFFFFF;
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
@@ -70,8 +75,54 @@
     --surface:#1F2024; --surface-2:#1B1D21; --surface-3:#26282D; --control-fg:#1F2024;
     --rail-bg:#1B1D21; --rail-on:#F3F4F6; --action:#FF8C14; --action-fg:#1F2024;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
+    --navy-soft:rgba(255,140,20,.14);
     color-scheme:dark;
   }
+  /* ACCENTS-START — 13 Oct 2026 (W16, bundle E; D39 and the user's picks the same evening: Orange primary the default,
+     the re-stepped shades). The accent is a SECOND axis, html[data-accent], beside html[data-theme]: the look decides
+     the surfaces, the accent decides the control colour and the chart series. "orange" is today's look and has no block
+     (it IS :root and the dark block above). The status colours (--green --gold --red) are never touched here.
+     Every pair is checked in test_h1_uk (text 4.5:1, controls and chart marks 3:1) and the series by the palette check
+     in parse_frontend (notes/bundle-e-plan-1013.md): the shade accents carry FOUR hues, the fifth series is grey;
+     Orange shades in the Dark look keeps Orange primary's series, because no warm set with two oranges passes there.
+     Slot meaning never changes: 1 = plan, 2 = delivered, 4 = the fair-price model. Because the cost chart draws 1
+     beside 4, the pair 1–4 is checked as well as the neighbours: so Blue's model is gold (blue beside violet is 0.4 for a
+     deuteranope) and Blue shades' is teal, and Blue shades in the Dark look draws Blue's series (no dark blue family
+     keeps the plan and the model apart), as Orange shades in Dark draws Orange's. */
+  :root:not([data-theme="dark"])[data-accent="blue"]{
+    --navy:#2563EB; --navy-soft:rgba(37,99,235,.08); --action:#2563EB; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
+    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#E8590C; --chart-3:#0D9488; --chart-4:#A07D34; --chart-5:#7C3AED;
+  }
+  :root:not([data-theme="dark"])[data-accent="blue-shades"]{
+    --navy:#1D4ED8; --navy-soft:rgba(29,78,216,.08); --action:#1D4ED8; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
+    --chart-1:#1D4ED8; --chart-1-soft:rgba(29,78,216,.18); --chart-2:#0891B2; --chart-3:#4F46E5; --chart-4:#0D9488; --chart-5:#A8A29E;
+  }
+  :root:not([data-theme="dark"])[data-accent="orange-shades"]{
+    --navy:#C2410C; --navy-soft:rgba(194,65,12,.08); --action:#C2410C; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
+    --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#9A3412; --chart-3:#A07D34; --chart-4:#BE185D; --chart-5:#A8A29E;
+  }
+  /* --navy-soft is the tint behind a chip whose text is --navy: 8 % keeps that text at 4.5:1 or better in every accent
+     (the chips before 13 Oct sat on a 10 % blue tint, 4.49:1). */
+  /* Blue shades in the Ink look: a navy header (white on it 10.4:1). The Light look keeps its white header. */
+  html[data-theme="ink"][data-accent="blue-shades"]{ --hdr-bg:#1E3A8A; }
+  html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]{
+    --navy:#5B8FF0; --navy-soft:rgba(91,143,240,.08); --blue:#8FB3F5; --action:#5B8FF0; --action-fg:#141518; --control-fg:#141518;
+    --chart-1:#5B8FF0; --chart-1-soft:rgba(91,143,240,.22); --chart-2:#E8681E; --chart-3:#13A193; --chart-4:#B48E3E; --chart-5:#9572EE;
+  }
+  /* the few Tailwind colour utilities that mean "control blue": orange in Orange shades, blue tints in the dark blue accents */
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-\[rgba\(37\,99\,235\,\.06\)\]{background-color:rgba(194,65,12,.06)}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .border-blue-200{border-color:#FED7AA}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .border-blue-300{border-color:#FDBA74}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700{color:#9A3412}
+  :root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-800{color:#7C2D12}
+  html[data-theme="dark"][data-accent^="blue"] .bg-blue-50{background-color:rgba(91,143,240,.14)}
+  html[data-theme="dark"][data-accent^="blue"] .bg-\[rgba\(37\,99\,235\,\.06\)\]{background-color:rgba(91,143,240,.10)}
+  html[data-theme="dark"][data-accent^="blue"] .border-blue-200{border-color:rgba(91,143,240,.35)}
+  html[data-theme="dark"][data-accent^="blue"] .border-blue-300{border-color:rgba(91,143,240,.45)}
+  html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}
+  html[data-theme="dark"][data-accent^="blue"] .text-blue-800{color:#A9C4F7}
+  /* ACCENTS-END */
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage */
   html[data-theme="dark"] .bg-\[rgba\(37\,99\,235\,\.06\)\]{background-color:rgba(255,140,20,.08)}
   html[data-theme="dark"] .bg-amber-50{background-color:rgba(251,191,36,.12)}
@@ -138,9 +189,10 @@
   .appearance-btn:hover,.appearance-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
   .appearance-menu{position:absolute;right:0;top:40px;min-width:200px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-size:12.5px;line-height:1.4;z-index:60;}
   .appearance-menu h6{margin:0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--popover-muted);padding:6px 10px 4px;font-weight:600;}
-  .appearance-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
-  .appearance-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on{background:rgba(255,140,20,.12);}
-  .appearance-item .tick{opacity:0;color:var(--brand-orange);} .appearance-item.is-on .tick{opacity:1;}
+  .appearance-item,.accent-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
+  .appearance-item:hover,.accent-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on,.accent-item.is-on{background:rgba(255,140,20,.12);}
+  .appearance-item .tick,.accent-item .tick{opacity:0;color:var(--brand-orange);} .appearance-item.is-on .tick,.accent-item.is-on .tick{opacity:1;}
+  .swatch.accent-sw i{flex:0 0 34%;} .swatch.accent-sw b{flex:1;} .swatch.accent-sw b::after{display:none;}
   .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
   .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
   /* H10 (8 Oct 2026): the in-app guide — a coach-mark card, demo tenant only. In-page, no library. */
@@ -190,6 +242,8 @@
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
   .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
+  /* 13 Oct 2026 (W5): below 768 px the opened rail lies over the page instead of squeezing it */
+  .rail.rail-peek{position:absolute;top:0;bottom:0;left:0;z-index:45;box-shadow:0 12px 32px rgba(16,24,40,.22);}
   .rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);opacity:.85;}
   /* 11 Oct 2026 — the fresher shell (fresh-directions.html: A, Clean, with B's orange button and kicker) */
   .rail-item{color:var(--muted);border-radius:6px;margin:1px 8px;width:calc(100% - 16px) !important;padding-left:10px !important;}
@@ -230,6 +284,11 @@
   .btn-sm{padding:4px 10px;font-size:13px;}
   .chip-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;}
   .chip-st i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;}
+  /* 13 Oct 2026 (W16, D39): a status is a SHAPE and a word, never colour alone — the plan orange is 6.5 from the
+     warning amber for full colour vision and 1.8 for a colour-blind reader. Green stays a dot; amber is a triangle,
+     red a diamond (an octagon was tried: at 9 px it reads as a dot). Matched on the token the dot is painted with, so every chip-st in the app follows. */
+  .chip-st i[style*="--gold"]{width:10px;height:9px;border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%);}
+  .chip-st i[style*="--red"]{width:10px;height:10px;border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}
   .empty-ic{width:40px;height:40px;border-radius:50%;background:var(--surface-3);margin:0 auto 12px;}
   .empty-ic.error{background:rgba(220,38,38,.12);}
   .skel{display:inline-block;height:14px;border-radius:4px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}
@@ -316,6 +375,81 @@
   .dash-more[open]>summary{border-bottom:1px solid var(--line);}
   .dash-more>div{padding-bottom:16px;}
   .dash-more .card.overflow-hidden{border:0;}
+  /* 13 Oct 2026 (W5, bundle E) — charts fill every screen. Every chart sits in a .chart-box: relatively positioned and
+     used only for the chart (what Chart.js's responsive mode needs), sized by CSS, never by a fixed px prop. Two sizes:
+     the default and .is-lg (the two time series a planner reads first). The big screen sizes them larger, and in
+     "Rotate" / "One section" the Charts section fills the screen's height (.dash-fill). */
+  .chart-box{position:relative;width:100%;min-width:0;height:clamp(200px,28vh,420px);}
+  .chart-box.is-lg{height:clamp(220px,32vh,480px);}
+  .chart-box>canvas{display:block;}
+  .fig-val{font-size:clamp(1.1rem,1.45vw,1.7rem);}   /* a KPI figure: nowrap, never truncated, sized by clamp() */
+  .chart-card{display:flex;flex-direction:column;min-width:0;}
+  .chart-card>.chart-box{flex:1 1 auto;}
+  /* the working view's four charts: one column, then 5 tracks (3 + 2) from 1024 px, then 3 columns from 1600 px with
+     the top-routes list running down the right-hand column */
+  .dash-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
+  @media (min-width:1024px){
+    .dash-charts{grid-template-columns:repeat(5,minmax(0,1fr));}
+    .dash-charts>.c-demand,.dash-charts>.c-cost{grid-column:span 3;} .dash-charts>.c-top,.dash-charts>.c-progress{grid-column:span 2;}
+  }
+  @media (min-width:1600px){
+    .dash-charts{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"demand progress top" "cost cost top";}
+    .dash-charts>.c-demand{grid-area:demand;} .dash-charts>.c-progress{grid-area:progress;} .dash-charts>.c-cost{grid-area:cost;}
+    .dash-charts>.c-top{grid-area:top;} .dash-charts>.c-top>.chart-box{height:auto;min-height:clamp(200px,28vh,420px);}
+  }
+  .dash-more-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
+  @media (min-width:768px){.dash-more-charts{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  @media (min-width:1280px){.dash-more-charts{grid-template-columns:repeat(4,minmax(0,1fr));}}
+  .dash-wall .chart-box{height:clamp(240px,30vh,560px);}
+  .dash-wall .chart-box.is-lg{height:clamp(260px,34vh,620px);}
+  /* the big screen, one section at a time: the page is exactly the screen's height and the Charts grid shares it */
+  /* 14 Oct 2026 (the user: "the screen still don't fill up on rotate"): EVERY section fills the screen in "Rotate" and
+     "One section", not only Charts. The page is the screen's height; the one section on show takes what the header and
+     the big-screen bar leave; its content is sized from that height (vh), so a 1080p TV and a 4K one read the same from
+     across a site office. "All sections" stays an overview that scrolls. */
+  .dash-wall.dash-fill{height:100%;display:flex;flex-direction:column;}
+  .dash-wall.dash-fill>[data-wall-section]:not([hidden]){flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .dash-wall.dash-fill>[data-wall-section]>*{flex:1 1 auto;min-height:0;}
+  .dash-wall.dash-fill .wall-charts{height:100%;grid-auto-rows:minmax(0,1fr);}
+  .dash-wall.dash-fill .wall-charts>.chart-card{min-height:0;}
+  .dash-wall.dash-fill .wall-charts .chart-box{height:auto;min-height:0;}
+  /* the TV type scale (dash-fill): hero figures ~6 % of the screen height, labels ~1.8 %, never under 13 px */
+  .dash-wall.dash-fill .fig-val{font-size:clamp(2rem,min(6.4vh,3.3vw),8rem);line-height:1.05;}
+  .dash-wall.dash-fill .fig-label{font-size:clamp(13px,1.8vh,30px);margin-top:.35em;}
+  .dash-wall.dash-fill .fig-sub{font-size:clamp(12px,1.45vh,24px);}
+  .dash-wall.dash-fill .fig-group{font-size:clamp(13px,1.9vh,32px);margin-bottom:.6em;}
+  .dash-wall.dash-fill .chart-title{font-size:clamp(15px,1.9vh,32px);}
+  .dash-wall.dash-fill .text-xs,.dash-wall.dash-fill table.text-xs{font-size:clamp(13px,1.5vh,26px);}
+  /* 2. Figures: the four groups as a 2 × 2 grid of tiles that share the screen; each tile's figures spread over it */
+  .dash-wall.dash-fill .wall-figs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:clamp(12px,1.6vh,32px);}
+  .dash-wall.dash-fill .wall-figs>.card{display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:clamp(14px,2.2vh,40px) clamp(16px,1.6vw,48px);}
+  .dash-wall.dash-fill .wall-figs>.card>.grid{flex:1 1 auto;min-height:0;align-content:space-evenly;column-gap:clamp(16px,2vw,64px);}
+  /* a group with five figures (Carbon, with the target) takes three columns, so none is cut off */
+  .dash-wall.dash-fill .wall-figs>.card>.grid:has(>:nth-child(5)){grid-template-columns:repeat(3,minmax(0,1fr));}
+  /* 1. Today: the figures and the day's lines on the left, the map down the whole right-hand column */
+  .dash-wall.dash-fill .today-grid{grid-template-rows:minmax(0,1fr);}
+  .dash-wall.dash-fill .today-grid>.card{min-height:0;overflow:hidden;}
+  .dash-wall.dash-fill .today-lines{max-height:none !important;overflow:hidden;}
+  .dash-wall.dash-fill .today-figs{column-gap:clamp(16px,2vw,64px);row-gap:clamp(10px,2vh,40px);}
+  .dash-wall.dash-fill .today-figs .fig-val{font-size:clamp(2rem,min(7vh,3vw),8.5rem);}
+  .dash-wall.dash-fill .today-map{display:flex;flex-direction:column;}
+  /* 4. Stockpiles: the chart takes the card */
+  .dash-wall.dash-fill .stock-card{display:flex;flex-direction:column;min-height:0;}
+  .dash-wall.dash-fill .stock-body{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr);}
+  .dash-wall.dash-fill .stock-nocap{font-size:clamp(13px,1.6vh,26px);}
+  .chart-box.is-fill{height:100%;min-height:0;}
+  /* the chart's headline on a filled big screen: the number, what it is, and what it is measured against */
+  .chart-head{margin:.1em 0 .5em;line-height:1.15;}
+  .chart-head .ch-val{font-weight:700;color:var(--navy-deep);font-size:clamp(1.6rem,min(5.2vh,2.7vw),6.5rem);letter-spacing:-.01em;}
+  .chart-head .ch-lbl{font-weight:600;color:var(--muted);font-size:clamp(14px,2vh,34px);margin-left:.45em;}
+  .chart-head .ch-note{color:var(--muted);font-size:clamp(13px,1.6vh,28px);margin-top:.2em;}
+  /* the rotation: a thin line that fills while a section is on show, and what comes next (no motion if reduced) */
+  .dash-rot{position:relative;display:inline-block;width:120px;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden;vertical-align:middle;}
+  .dash-rot>i{position:absolute;inset:0 auto 0 0;width:0;background:var(--action);animation:dash-rot linear forwards;}
+  @keyframes dash-rot{from{width:0}to{width:100%}}
+  @media (prefers-reduced-motion:reduce){.dash-rot>i{animation:none;width:100%;opacity:.35;}}
+  .wall-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
+  @media (min-width:1024px){.wall-charts{grid-template-columns:repeat(2,minmax(0,1fr));}}   /* 14 Oct: four charts a section, 2 × 2 */
   .dash-filters label{display:block;padding:6px 10px;}
   .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
   /* 12 Oct 2026 (C4): the Monthly bulletin menu on the Dashboard — the 14 px floor for its words */
@@ -337,6 +471,20 @@
   .ct-more ul{margin:4px 0 0 18px;list-style:disc;}
   /* 11 Oct 2026 — the Gate arrivals panel on the Dashboard (tokens only; 14 px table text; the .ct-* family's strip) */
   .ga-strip{margin-top:12px;}
+  /* 14 Oct 2026: the gate chart (arrivals against capacity) and its key; the table folds under it */
+  .ga-chart{margin-top:10px;}
+  .ga-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:4px;}
+  .ga-head-v{font-size:18px;font-weight:700;color:var(--ink);}
+  .ga-key{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;color:var(--muted);}
+  .ga-key i{display:inline-block;vertical-align:middle;margin-left:8px;}
+  .ga-key i:first-child{margin-left:0;}
+  .ga-key-bar{width:16px;height:10px;border-radius:2px;background:var(--chart-1);}
+  .ga-key-cap{width:3px;height:14px;background:var(--ink);margin-left:0 !important;}
+  .ga-key-track{width:18px;height:12px;border-radius:2px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
+  .ga-key-red{width:16px;height:10px;border-radius:2px;background:var(--red);}
+  .ga-key-none{width:16px;height:10px;border-radius:2px;background:var(--chart-none);}
+  .ga-more{margin-top:8px;}
+  .ga-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:6px 0;}
   .ga-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
   .ga-table th{font-size:14px;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
   .ga-table td{font-size:14px;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line);}
@@ -433,6 +581,7 @@
   .dash-wallbar-btn.is-on{background:var(--navy);color:var(--control-fg);}
   .dash-wallbar-sel{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 7px;cursor:pointer;}
   .dash-wallbar-sep{width:1px;height:20px;background:var(--line);margin:0 3px;}
+  .dash-clock{margin-left:auto;font:700 clamp(15px,2.2vh,40px)/1 Inter,system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums;}
   .dash-wallbar-note{font-size:12px;color:var(--muted);}
   .dash-wallbar-note code{background:var(--surface-3);border-radius:4px;padding:1px 5px;font-size:11.5px;}
   .dash-divider{font:700 12px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:#9aa1ac;
@@ -481,6 +630,11 @@ const fmtDist = (km, dp) => (km == null ? "—" : (+dist(km)).toFixed(dp == null
 const TEAMS = () => TEAM() + "s";
 
 const { useState, useEffect, useRef, useMemo } = React;
+function useAccent(){
+  const [a, setA] = useState(ACCENT.current);
+  useEffect(() => { const f = (n) => setA(n); ACCENT.subs.add(f); return () => ACCENT.subs.delete(f); }, []);
+  return [a, (n) => applyAccent(n)];
+}
 function useTheme(){
   const [t, setT] = useState(THEME.current);
   useEffect(() => { const f = (n) => setT(n); THEME.subs.add(f); return () => THEME.subs.delete(f); }, []);
@@ -543,6 +697,27 @@ function applyTheme(name, persist = true){
   THEME.subs.forEach(f => { try { f(name); } catch(e){} });
 }
 try { applyTheme(localStorage.getItem(THEME.key) || "ink", false); } catch(e){ applyTheme("ink", false); }
+// 13 Oct 2026 (W16, bundle E; D39): the ACCENT, a second axis beside the look (html[data-accent], the ACCENTS block in
+// the <style>). The look decides the surfaces; the accent decides the controls and the chart series. "orange" is the
+// default and is exactly the look before 13 Oct. Per browser (localStorage, like the look), set on <html> by the
+// small script in <head> before anything draws, and again here; charts subscribe through useAccent().
+// The swatch shows the button colour, then series 1 (the plan) and series 2 (delivered) in the Ink / Light look.
+const ACCENTS = [
+  ["orange",        "Orange",        { btn: "#C2410C", s1: "#E8590C", s2: "#2563EB" }],
+  ["blue",          "Blue",          { btn: "#2563EB", s1: "#2563EB", s2: "#E8590C" }],
+  ["blue-shades",   "Blue shades",   { btn: "#1D4ED8", s1: "#1D4ED8", s2: "#0891B2" }],
+  ["orange-shades", "Orange shades", { btn: "#C2410C", s1: "#E8590C", s2: "#9A3412" }],
+];
+const ACCENT = { key: "modus_accent", current: "orange", subs: new Set() };
+function applyAccent(name, persist = true){
+  if(!ACCENTS.some(([k]) => k === name)) name = "orange";
+  ACCENT.current = name;
+  const root = typeof document !== "undefined" && document.documentElement;
+  if(root && root.setAttribute) root.setAttribute("data-accent", name);
+  if(persist){ try { localStorage.setItem(ACCENT.key, name); } catch(e){} }
+  ACCENT.subs.forEach(f => { try { f(name); } catch(e){} });
+}
+try { applyAccent(localStorage.getItem(ACCENT.key) || "orange", false); } catch(e){ applyAccent("orange", false); }
 // a computed token, for the few colours that are built in JS (Chart.js)
 const tok = (name, fallback) => {
   try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; } catch(e){ return fallback; }
@@ -801,20 +976,139 @@ function RowDetails({ rowKey, isOpen, onToggle, label, summary, chips, cells, co
 const unitList = (u) => unitTriple(u, { sep: ", " });
 const fairWords = (flags) => [(flags || []).includes("WINTER") ? "winter months add a fuel uplift" : "", (flags || []).includes("THAW") ? "thaw restrictions may apply" : ""].filter(Boolean).join(", ");
 
-// Chart.js wrapper — recreates the chart when its serialised config changes.
-function ChartCanvas({ config, height=260 }){
+
+// 13 Oct 2026 (W5, bundle E): the rules every chart follows, whatever page builds it.
+//   - the legend sits under the plot below 768 px of screen; a doughnut keeps its legend on the right only from
+//     1024 px (under it otherwise), because a 260 px ring with a side legend crushes the plot on a phone;
+//   - category labels never rotate (they skip instead) and are cut at 18 characters; the tooltip names the whole;
+//   - at most two device pixels per CSS pixel, so a 4K site-office TV stays sharp without a huge canvas.
+const CHART_LABEL_MAX = 18;
+const chartLegendPos = (type, vw, asked) => {
+  if(vw < 768) return "bottom";
+  if(type === "doughnut" || type === "pie") return vw >= 1024 ? (asked || "right") : "bottom";
+  return asked || "bottom";
+};
+const cutLabel = (s) => { s = String(s == null ? "" : s); return s.length > CHART_LABEL_MAX ? s.slice(0, CHART_LABEL_MAX - 1) + "…" : s; };
+// 14 Oct 2026 (the design check): "1,000,000" on an axis is noise; 1.0 M / 200 k reads at a glance (the tooltip keeps the
+// exact figure). A value axis always starts at zero — the carbon line started at 370 and made a 10 % dip look like a cliff.
+const compactTick = (v) => { const a = Math.abs(+v); if(!isFinite(a)) return v;
+  return a >= 1e6 ? (+v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + " M" : a >= 1e3 ? Math.round(+v / 1e3) + " k" : String(Math.round(+v * 100) / 100); };
+// 13 Oct 2026 (W16, D39): series NAMED ON THE CHART, at the right-hand end of each series, a colour mark then the name
+// in ink (the colour system's rule 4). Opt-in per chart (options.plugins.seriesLabels = { on: true }) and only from
+// 768 px; the legend stays. Why every accent, not only the shades: compared pair by pair (not only neighbours), even
+// the default palette has a weak pair (blue and violet, 0.4 for a deuteranope), and the shade accents several. A
+// stacked segment thinner than 10 px is left to the legend; labels are pushed apart so none overlap.
+const SERIES_LABEL_PAD = 136;   // 14 Oct 2026: room for 20 characters (was 108 for 15)
+const SERIES_LABELS = { id: "seriesLabels", afterDatasetsDraw(chart, _args, opts){
+  if(!opts || !opts.on) return;
+  const ctx = chart.ctx, A = chart.chartArea; if(!A) return;
+  const stacked = !!(chart.options.scales && chart.options.scales.y && chart.options.scales.y.stacked);
+  const marks = [];
+  chart.data.datasets.forEach((ds, i) => {
+    const meta = chart.getDatasetMeta(i); if(!meta || meta.hidden || !chart.isDatasetVisible(i)) return;
+    let j = (ds.data || []).length - 1; while(j >= 0 && (ds.data[j] == null || ds.data[j] === 0)) j--;
+    const el = j >= 0 ? meta.data[j] : null; if(!el) return;
+    if(stacked && Math.abs(el.base - el.y) < 10) return;
+    const y = stacked ? (el.y + el.base) / 2 : el.y;
+    const col = Array.isArray(ds.borderColor) ? ds.borderColor[j] : (meta.type === "line" || ds.type === "line" ? ds.borderColor : (Array.isArray(ds.backgroundColor) ? ds.backgroundColor[j] : (ds.borderWidth && ds.borderColor && typeof ds.borderColor === "string" && !stacked ? ds.borderColor : ds.backgroundColor)));
+    marks.push({ y, label: String(ds.label || ""), col });
+  });
+  marks.sort((a, b) => a.y - b.y);
+  const gap = (((opts && opts.size) || 11) * 1.2);
+  for(let k = 1; k < marks.length; k++) if(marks[k].y - marks[k - 1].y < gap) marks[k].y = marks[k - 1].y + gap;
+  const over = marks.length ? marks[marks.length - 1].y - (A.bottom - 4) : 0;
+  if(over > 0) marks.forEach(m => { m.y -= over; });
+  const fs = (opts && opts.size) || 11;      // 14 Oct 2026: the big screen passes its larger text size
+  ctx.save(); ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  const x = A.right + 8;
+  marks.forEach(m => {
+    ctx.fillStyle = m.col || "#A8A29E"; ctx.fillRect(x, m.y - fs * 0.36, fs * 0.72, fs * 0.72);
+    ctx.fillStyle = tok("--ink", "#1E293B");
+    const t = m.label.length > 20 ? m.label.slice(0, 19) + "…" : m.label;   // 14 Oct: 20 (was 15; "Large aggregat…")
+    ctx.fillText(t, x + fs * 1.1, m.y);
+  });
+  ctx.restore();
+} };
+function fitChartConfig(config, vw){
+  const o = { ...(config.options || {}) };
+  const plugins = { ...(o.plugins || {}) };
+  if(plugins.seriesLabels && plugins.seriesLabels.on && vw >= 768){
+    const pad = (o.layout && o.layout.padding) || {};
+    const padR = Math.round(SERIES_LABEL_PAD * ((plugins.seriesLabels.size || 11) / 11));
+    o.layout = { ...(o.layout || {}), padding: { ...(typeof pad === "object" ? pad : {}), right: Math.max(padR, (typeof pad === "object" && pad.right) || 0) } };
+    config = { ...config, plugins: [...(config.plugins || []), SERIES_LABELS] };
+  } else if(plugins.seriesLabels){
+    plugins.seriesLabels = { ...plugins.seriesLabels, on: false };
+  }
+  if(plugins.legend && plugins.legend.display !== false){
+    plugins.legend = { ...plugins.legend, position: chartLegendPos(config.type, vw, plugins.legend.position) };
+  }
+  o.plugins = plugins;
+  o.devicePixelRatio = Math.min((typeof window !== "undefined" && window.devicePixelRatio) || 1, 2);
+  if(config.type !== "doughnut" && config.type !== "pie"){
+    const cat = o.indexAxis === "y" ? "y" : "x";
+    const scales = { ...(o.scales || {}) };
+    const ax = { ...(scales[cat] || {}) };
+    const ticks = { ...(ax.ticks || {}), maxRotation: 0, autoSkip: true };
+    if(!ticks.callback) ticks.callback = function(v){ return cutLabel(this.getLabelForValue(v)); };
+    ax.ticks = ticks; scales[cat] = ax;
+    // the value axis: from zero, compact labels (unless the chart set its own, e.g. "%")
+    const val = cat === "x" ? "y" : "x";
+    const vax = { ...(scales[val] || {}) };
+    if(vax.beginAtZero == null && vax.min == null) vax.beginAtZero = true;
+    const vt = { ...(vax.ticks || {}) };
+    if(!vt.callback) vt.callback = compactTick;
+    vax.ticks = vt; scales[val] = vax;
+    o.scales = scales;
+    // a bar is never fatter than ~4.5 × the chart's text: four months on a 1920 px TV were 180 px slabs
+    const fsz = (((ax.ticks || {}).font || {}).size) || 11;
+    o.datasets = { ...(o.datasets || {}), bar: { maxBarThickness: Math.round(fsz * 4.5), ...((o.datasets || {}).bar || {}) } };
+  }
+  return { ...config, options: o };
+}
+// Chart.js wrapper — recreates the chart when its serialised config, the look or the accent changes.
+// 13 Oct 2026 (W5): the box is `position:relative` and sized by CSS (.chart-box; `size="lg"` for the taller pair).
+// A chart is BUILT only once its box has a size, so a chart in a collapsed section (or a hidden big-screen
+// section) is built the first time it is opened, not at 0 × 0 while hidden. A ResizeObserver on the box resizes it
+// (and moves the legend when the screen crosses 768 / 1024 px); the two window `resize` dispatches that used to
+// nudge Chart.js are gone. `height` is kept for the stockpile chart, whose height follows its row count.
+function ChartCanvas({ config, height, size }){
+  const box = useRef(null);
   const ref = useRef(null);
   const inst = useRef(null);
   const [theme] = useTheme();          // 5 Oct 2026: axes, grid and legend follow the look
+  const [accent] = useAccent();        // 13 Oct 2026 (W16): and the accent
+  const [sized, setSized] = useState(false);
+  const cfgRef = useRef(config); cfgRef.current = config;
+  const vwNow = () => (typeof window !== "undefined" && window.innerWidth) || 1280;
   useEffect(() => {
-    if(!ref.current || !window.Chart) return;
+    const el = box.current;
+    if(!el) return;
+    if(typeof ResizeObserver === "undefined"){ setSized(true); return; }   // old browsers and the jsdom harness
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      if(!(el.clientWidth > 0 && el.clientHeight > 0)) return;           // still collapsed or hidden
+      setSized(true);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const c = inst.current; if(!c) return;
+        const lg = c.options && c.options.plugins && c.options.plugins.legend;
+        const want = lg && lg.display !== false ? chartLegendPos(c.config.type, vwNow(), ((cfgRef.current.options || {}).plugins || {}).legend ? cfgRef.current.options.plugins.legend.position : null) : null;
+        if(want && lg.position !== want){ lg.position = want; c.update("none"); } else c.resize();
+      });
+    });
+    ro.observe(el);
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
+  useEffect(() => {
+    if(!sized || !ref.current || !window.Chart) return;
     if(inst.current) inst.current.destroy();
     window.Chart.defaults.color = tok("--muted", "#64748B");
     window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
-    inst.current = new window.Chart(ref.current, config);
+    inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
-  }, [JSON.stringify(config), theme]);
-  return <div style={{height}}><canvas ref={ref}></canvas></div>;
+  }, [JSON.stringify(config), theme, accent, sized]);
+  return <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>;
 }
 
 function Kpi({ label, value, sub, small }){
@@ -887,32 +1181,27 @@ const DASH_SORTS = () => [["route_id", "Route"], ["discipline", "Discipline"], [
 // context every few seconds on a display left running all day — browsers cap those at
 // about sixteen, and the tiles would be re-fetched each time. The standing rule ("one
 // Mapbox instance, never unmounted") applies here exactly. So a hidden section keeps its
-// DOM and its instances, and `WallSection` fires one window resize when it comes back
-// into view, because Mapbox and Chart.js both measure zero inside `display:none`.
+// DOM and its instances. Mapbox and Chart.js both measure zero inside `display:none`; since 13 Oct (W5) each
+// watches its own box and re-measures when the section comes back (it used to take a window resize).
+// 14 Oct 2026 (the user: every screen professional, useful and filled; TV-dashboard practice: split a crowded screen
+// rather than cram it): eight charts on one TV screen were 188 px each at 1080p, so Charts keeps the four a planner
+// reads first and a FIFTH section, More charts, takes the other four. It is added LAST, so #dashboard/1 … /4 still
+// open the same screens on a display that was pinned before.
 const DASH_SECTIONS = [
   { key: "today",  title: "Today" },
   { key: "kpis",   title: "Figures" },
   { key: "charts", title: "Charts" },
   { key: "stock",  title: "Stockpiles" },
+  { key: "more",   title: "More charts" },
 ];
 const DASH_ROTATE_CHOICES = [10, 15, 20, 30, 45, 60, 120];
 
+// 13 Oct 2026 (W5): a section coming back into view no longer fires a window `resize`. Each chart box and each
+// map container watches its own size (ResizeObserver in ChartCanvas and CommitMap), so it re-measures the moment
+// `hidden` comes off, and a chart that was never seen is built then, at its real size.
 function WallSection({ show, divider, title, children }){
-  const ref = useRef(null);
-  const was = useRef(show);
-  useEffect(() => {
-    if(show && !was.current && ref.current){
-      // one frame after the section is laid out again, tell everything inside it to
-      // re-measure. Mapbox (trackResize, on by default) and Chart.js (responsive) both
-      // listen to the window; a map that was display:none has width 0 until this fires.
-      const id = requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(e){} });
-      was.current = show;
-      return () => cancelAnimationFrame(id);
-    }
-    was.current = show;
-  }, [show]);
   return (
-    <div ref={ref} hidden={!show} data-wall-section={title || ""}>
+    <div hidden={!show} data-wall-section={title || ""}>
       {divider && title && <div className="dash-divider">{title}</div>}
       {children}
     </div>
@@ -938,6 +1227,11 @@ const GA_SPREAD = "if arrivals are spread evenly";
 // lines only: gap null); no check-in typed (nothing compared); otherwise the average holds
 const gaFlagWord = (g) => g.flag === "red" ? "Queue likely" : (g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds"));
 const gaMin = (m) => m == null ? "—" : `${(+m).toFixed(1)} min`;
+// 14 Oct 2026 (the user: "gate arrivals should be a chart, measuring arrivals against capacity"): a gate's CAPACITY is
+// the most lorries it can check in a day if they arrive evenly = the shift's minutes ÷ the check-in minutes a lorry.
+// The SERVER sends it (capacity_per_day, capacity_pct): it is its own red rule turned round, so the chart and the
+// status word cannot disagree (test_gate_arrivals checks it). The bar is red only when the server's flag is.
+// No check-in typed = no capacity: the bar is grey and says so, never compared.
 const gaN1 = (n) => n == null ? "—" : (+n).toFixed(1);
 function GateArrivalsPanel({ ga, err, month, months, onMonth }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
@@ -947,6 +1241,50 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
   const gates = ga.gates || [];
   const state = gates.length === 0 ? "none" : "set";
   const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
+  // the chart: one row a gate, the fullest first (by share of capacity; gates with none after, busiest first)
+  const rowsC = gates.filter(g => g.arrivals_per_day != null && g.arrivals_per_day > 0)
+    .map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === "red" }))
+    .sort((a, b) => ((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day));
+  const nOverG = rowsC.filter(r => r.over).length;
+  const gaFs = 11;
+  const C1g = tok("--chart-1", "#E8590C"), REDg = tok("--red", "#DC2626"), NONEg = tok("--chart-none", "#A8A29E"), INKg = tok("--ink", "#1E293B");
+  const xTop = Math.max(1, ...rowsC.map(r => Math.max(r.g.arrivals_per_day, r.cap || 0)));
+  const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {
+    const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx, A = chart.chartArea; if(!x || !A) return;   // 1 = the arrivals
+    ctx.save();
+    meta.data.forEach((el, i) => { const r = rowsC[i]; if(!r) return;
+      const half = (el.height || 16) / 2 + 5;
+      let right = el.x;
+      if(r.cap){
+        const px = x.getPixelForValue(r.cap); right = Math.max(right, px);
+        ctx.strokeStyle = INKg; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(px, el.y - half); ctx.lineTo(px, el.y + half); ctx.stroke();
+        ctx.fillStyle = INKg; ctx.beginPath(); ctx.moveTo(px - 5, el.y - half - 7); ctx.lineTo(px + 5, el.y - half - 7); ctx.lineTo(px, el.y - half); ctx.closePath(); ctx.fill();
+      }
+      const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : "");
+      ctx.font = `600 ${gaFs + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.fillStyle = r.over ? REDg : INKg;
+      ctx.fillText(`${gaN1(r.g.arrivals_per_day)} a day${words}`, right + 10, el.y);
+    });
+    ctx.restore();
+  } };
+  const gaCfg = { type: "bar",
+    // a bullet chart: a pale track from 0 to the gate's capacity, the planned arrivals as the bar inside it, a marker at
+    // capacity; a gate with no check-in has no track
+    data: { labels: rowsC.map(r => r.g.location_name), datasets: [
+      { label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap), backgroundColor: tok("--surface-3", "#F3F2EF"),
+        borderColor: tok("--grey", "#E7E5E4"), borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
+      { label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day),
+        backgroundColor: rowsC.map(r => r.over ? REDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 12, right: 250 } },
+      plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1, callbacks: {
+        title: (items) => items.length ? `${rowsC[items[0].dataIndex].g.location_name}, ${rowsC[items[0].dataIndex].g.gate_name}` : "",
+        label: (item) => { const r = rowsC[item.dataIndex]; return [`${gaN1(r.g.arrivals_per_day)} lorries a day ${GA_SPREAD}`,
+          r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`,
+          gaFlagWord(r.g)]; } } } },
+      scales: { x: { min: 0, suggestedMax: xTop, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: gaFs } },
+                     title: { display: true, text: "lorries a day", font: { size: gaFs } } },
+                y: { grid: { display: false }, ticks: { font: { size: gaFs + 1 }, callback: function(v){ const r = rowsC[v]; return r ? [cutLabel(r.g.location_name), cutLabel(r.g.gate_name)] : ""; } } } } },
+    plugins: [capMarks] };
   return (
     <section className="ct-strip ga-strip" data-gate-arrivals={state} data-guide="dash-gates" aria-label="Gate arrivals">
       <div className="ct-row">
@@ -957,12 +1295,24 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
       </div>
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across the {ga.shift_hours} h shift.</div>
       {state === "none" && <EmptyState kind="none" title={`No approved lines in ${ga.label}`} body="Pick another month. Pending lines appear as a note until they are approved, then in the figures." />}
+      {state === "set" && rowsC.length > 0 && (
+        <div className="ga-chart" data-ga-chart="1">
+          <div className="ga-head">
+            <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : "Every gate within its capacity"}</span>
+            <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the shift ÷ the check-in time a lorry <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
+          </div>
+          <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />
+        </div>
+      )}
       {state === "set" && (
-        // 13 Oct 2026 (W6): RowDetails. The row: the location (primary) with its gate under it, the teams as at most
-        // two chips, one figure a cell, the status word (red only when a queue is likely, grey otherwise: the 11 Oct
-        // rule, so no ✓ and no amber here); the laden / coming-to-load split, each team's figure, the
-        // full gap sentence, the server's reason and the two notes moved into the details row. No unit switch here:
-        // every figure on this table is already lorries.
+        // 14 Oct 2026: the table is the detail behind the chart now ("Gate by gate"), every fact kept
+        <details className="ga-more" data-ga-table="1"><summary>Gate by gate: the gap, the check-in time, the lorries of each {TEAM().toLowerCase()}</summary>
+        {/* 13 Oct 2026 (W6): RowDetails. The row: the location (primary) with its gate under it, the teams as at most
+            two chips, one figure a cell, the status word (red only when a queue is likely, grey otherwise: the 11 Oct
+            rule, so no tick and no amber here); the laden / coming-to-load split, each team figure, the
+            full gap sentence, the reason and the two notes moved into the details row. No unit switch here:
+            every figure on this table is already lorries.
+        */}
         <div className="overflow-auto rd-scroll"><table className="ga-table rd-table" data-rd-table="gates">
           <thead><tr><th scope="col">Gate</th><th scope="col" className="num">Arrivals a day</th><th scope="col" className="num">Average gap</th><th scope="col" className="num">Check-in a lorry</th><th scope="col">Status</th></tr></thead>
           <tbody>
@@ -998,6 +1348,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
             })}
           </tbody>
         </table></div>
+        </details>
       )}
       {(ga.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
     </section>
@@ -1163,9 +1514,23 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [unitSel, setUnitSel] = useUnits("dashboard");    // 13 Oct 2026 (W6): the route table's Loads | Tonnes | Lorries
   const [rowOpen, rowToggle] = useRowOpen("dashboard");
   const [wall, setWall] = useState(false);           // big-screen mode
+  const [winH, setWinH] = useState(() => (typeof window !== "undefined" && window.innerHeight) || 900);   // 14 Oct: the TV type scale
+  const [clock, setClock] = useState(() => new Date());                                                  // 14 Oct: the wall clock
+  useEffect(() => {
+    if(!wall) return;
+    const id = setInterval(() => setClock(new Date()), 15000);
+    return () => clearInterval(id);
+  }, [wall]);
+  useEffect(() => {
+    if(!wall) return;
+    const f = () => setWinH(window.innerHeight || 900);
+    f(); window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, [wall]);
   const [tick, setTick] = useState(0);               // bumps every 5 min in big-screen mode
   const [stamp, setStamp] = useState(null);
   const [theme] = useTheme();          // 5 Oct 2026: chart colours are tokens; re-render on a change.
+  const [accent] = useAccent();        // 13 Oct 2026 (W16): the accent changes the series colours too
                                        // ⚠️ Hooks before the early returns below — on 5 Oct this hook
                                        // sat after them and React #310 blanked the whole app.
   // --- 15 Sep: how the big screen is divided ---------------------------------------
@@ -1375,7 +1740,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const selected = lineKey ? D.routeRows.find(r => r.key === lineKey) : null;
   const pick = (key) => setLineKey(k => k === key ? null : key);
 
-  const tf = { size: wall ? 13 : 11 };
+  // 14 Oct 2026: on the big screen the chart text follows the screen's height (13 px at 1080p … 29 px on a 4K TV at
+  // 1:1), so it reads from across a site office; `fill` = one section at a time, filling the screen
+  const fill = wall && wallLayout !== "all";
+  const tf = { size: wall ? Math.max(13, Math.min(30, Math.round(winH / 74))) : 11 };
   const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)"), C2 = tok("--chart-2", "#2563EB"), C4 = tok("--chart-4", "#7C3AED");
   const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()} ${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
@@ -1383,23 +1751,30 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const stackedOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { font: tf } }, y: { stacked: true, ticks: { font: tf } } } };
   const legendOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } }, tooltip: eurTip }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
 
-  const demandCfg = { type: "bar", data: { labels: D.labels, datasets: D.mats.map((m, i) => ({ label: m, data: D.demand[m], backgroundColor: colorOf(i), stack: "s", borderWidth: 0 })) }, options: stackedOpts };
+  // 13 Oct 2026 (W16): a 2 px gap in the surface colour between stacked segments (every accent), and the series named
+  // on the chart (SERIES_LABELS) — see the note at fitChartConfig
+  const SURF = tok("--surface", "#FFFFFF");
+  const named = { seriesLabels: { on: true, size: tf.size } };
+  const demandCfg = { type: "bar", data: { labels: D.labels, datasets: D.mats.map((m, i) => ({ label: m, data: D.demand[m], backgroundColor: colorOf(i), stack: "s", borderWidth: { top: 2 }, borderColor: SURF, borderSkipped: "start" })) },
+                      options: { ...stackedOpts, plugins: { ...stackedOpts.plugins, ...named } } };
   // planned tonnes as bars, what has been reported delivered as a line over them
   const tripsCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Trips", data: D.tripsM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const progressCfg = { type: "bar", data: { labels: D.labels, datasets: [
     { type: "bar", label: "Planned t", data: D.tonnesM, backgroundColor: C1S, borderColor: C1, borderWidth: 1, order: 2 },
     { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: C2, borderWidth: 0, order: 1 }] },
-    options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
+    options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } }, ...named }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
   const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: C1, backgroundColor: C1S, fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
   const costCfg   = { type: "bar", data: { labels: D.labels, datasets: [
     { label: `Planned ${CUR()} (quote / target)`, data: D.plannedM, backgroundColor: C1, borderWidth: 0 },
-    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C4, borderWidth: 0 }] }, options: legendOpts };
+    { label: `Fair ${CUR()} (model)`, data: D.fairM, backgroundColor: C4, borderWidth: 0 }] }, options: { ...legendOpts, plugins: { ...legendOpts.plugins, ...named } } };
   const splitCfg  = { type: "doughnut", data: { labels: D.mats, datasets: [{ data: D.mats.map(m => D.split[m]), backgroundColor: D.mats.map((m, i) => colorOf(i)), borderWidth: 2, borderColor: tok("--surface", "#fff") }] }, options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 10, font: tf } } } } };
   const topN = [...D.routeRows].sort((a, b) => b.t - a.t).slice(0, 10);
+  const splitSum = D.mats.reduce((a, m) => a + (D.split[m] || 0), 0);
+  const splitTop = splitSum > 0 ? D.mats.map(m => ({ m, pct: (D.split[m] || 0) * 100 / splitSum })).sort((a, b) => b.pct - a.pct)[0] : null;
   const topCfg = { type: "bar", data: { labels: topN.map(r => r.route_id + (r.discipline ? ` · ${r.discipline}` : "")), datasets: [{ label: "tonnes", data: topN.map(r => r.t), backgroundColor: topN.map(r => (lineKey && r.key !== lineKey) ? C1S : C1), borderWidth: 0 }] },
     options: { indexAxis: "y", ...commonOpts, onClick: (evt, els) => { if(els && els.length) pick(topN[els[0].index].key); },
-               scales: { x: { grid: { display: false }, ticks: { font: { size: wall ? 12 : 10 } } }, y: { ticks: { font: { size: wall ? 12 : 9 } } } } } };
+               scales: { x: { grid: { display: false }, ticks: { font: { size: wall ? tf.size : 10 } } }, y: { ticks: { font: { size: wall ? tf.size : 9 } } } } } };
 
   // width-capped: a vehicle name is 50 characters, and an uncapped <select> pushed the
   // whole filter row off the right of a 1440 px screen (the 11 Sep screenshot)
@@ -1420,9 +1795,18 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   );
   // 13 Oct 2026 (W3): no hover tooltip and no help cursor — the "i" opens the figure's info box,
   // with the exact figure the tooltip used to carry (`info.value`)
+  // 14 Oct 2026 (the design check): on a filled big screen each chart opens with its message — the number and what it is
+  // measured against — so nobody has to read the axes from across a room; the chart takes what is left.
+  const ChartHead = ({ value, label, note, tone }) => (
+    <div className="chart-head" data-chart-head="1">
+      <span className="ch-val kpi-num" style={tone ? { color: tone } : undefined}>{value}</span> <span className="ch-lbl">{label}</span>
+      {note && <div className="ch-note">{note}</div>}
+    </div>
+  );
+  // 14 Oct 2026: the figure's size is CSS (.fig-val), so the big screen can scale it by the screen's height
   const Fig = ({ value, label, sub, info, tone }) => (
     <div className="min-w-0">
-      <div className="kpi-num font-bold whitespace-nowrap" style={{ color: tone || "var(--navy-deep)", fontSize: "clamp(1.1rem, 1.45vw, 1.7rem)", lineHeight: 1.15 }}>{value}</div>
+      <div className="kpi-num font-bold whitespace-nowrap fig-val" style={{ color: tone || "var(--navy-deep)", lineHeight: 1.15 }}>{value}</div>
       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mt-0.5 fig-label">{label}{info && <InfoTip id={info.id} label={info.label} value={info.value} />}</div>
       {sub && <div className="text-[11px] text-slate-400 fig-sub">{sub}</div>}
     </div>
@@ -1448,7 +1832,6 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       {sub && <div className="dash-card-s">{sub}</div>}
     </div>
   );
-  const onMore = (e) => { if(e.target.open) requestAnimationFrame(() => { try { window.dispatchEvent(new Event("resize")); } catch(err){} }); };
   const applied = [
     status !== "Approved" && { k: "status", label: `Status: ${status}` },
     ipt !== "All" && { k: "ipt", label: `${TEAM()}: ${ipt === "none" ? "none set" : teamText(ipt)}` },
@@ -1463,10 +1846,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const clearAll = () => { setStatus("Approved"); setIpt("All"); setDiscipline("All"); setUnit("t"); setMaterial("All"); setVehicle("All"); setLineKey(null); };
 
   return (
-    <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" : "max-w-7xl")}>
+    // 13 Oct 2026 (W5): the working view is up to 1680 px wide (it was 1280, max-w-7xl), so a 1920 px screen uses its
+    // width; the big screen in "Rotate" / "One section" on the Charts section fills the screen's height (.dash-fill).
+    <div className={"mx-auto p-5 space-y-5 " + (wall ? "dash-wall max-w-none" + (fill ? " dash-fill" : "") : "max-w-[1680px]")}>
       {/* 13 Oct 2026 (W3): the date range is shown ONCE, in the kicker; the scope is shown by the filter
           chips under the header (the old subtitle repeated both) */}
-      <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
+      {/* 14 Oct 2026: on a filled big screen the page header folds into the big-screen bar (range, updated, clock,
+          Exit), so a 1366 × 768 TV keeps its height for the figures */}
+      {!fill && <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
             <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
@@ -1493,24 +1880,27 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> forecast months have a route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} leave out the {D.lines - D.baked} not routed yet ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}): route them on Data → Routes</span> : null}<InfoTip id="dash.coverage" /></span>
           <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
-          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "rgba(37,99,235,.1)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
+          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
-      </PageHeader>
+      </PageHeader>}
       {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} forecast month${D.lines === 1 ? "" : "s"} in view`} />}
 
       {wall && <div className="dash-wallbar">
         <span className="dash-wallbar-lbl">Big screen</span>
-        {[["all", "All four"], ["rotate", "Rotate"], ["single", "One section"]].map(([v, t]) =>
+        {[["all", "All sections"], ["rotate", "Rotate"], ["single", "One section"]].map(([v, t]) =>
           <button key={v} type="button" onClick={() => pickLayout(v)}
                   className={"dash-wallbar-btn" + (wallLayout === v ? " is-on" : "")}
                   title={v === "all" ? "Every section on this screen, divided and labelled"
                        : v === "rotate" ? "One section at a time, advancing on a timer"
-                       : "One section, chosen here — or pin a display to it with #dashboard/1 … /4 in the address bar"}>{t}</button>)}
+                       : `One section, chosen here — or pin a display to it with #dashboard/1 … /${DASH_SECTIONS.length} in the address bar`}>{t}</button>)}
         {wallLayout !== "all" && <span className="dash-wallbar-sep" />}
         {wallLayout !== "all" && DASH_SECTIONS.map((s, i) =>
           <button key={s.key} type="button" onClick={() => { pickSection(i); }}
                   className={"dash-wallbar-btn" + (wallSection === i ? " is-on" : "")}
                   title={`Section ${i + 1} · ${s.title} · pin a screen to it with #dashboard/${i + 1}`}>{i + 1}. {s.title}</button>)}
+        {wallLayout === "rotate" && <span className="dash-wallbar-note" data-rotate-next="1">
+          <span className="dash-rot" aria-hidden="true"><i key={wallSection + "-" + rotateSecs} style={{ animationDuration: rotateSecs + "s" }}></i></span>
+          {" "}next: {DASH_SECTIONS[(wallSection + 1) % DASH_SECTIONS.length].title}</span>}
         {wallLayout === "rotate" && <React.Fragment>
           <span className="dash-wallbar-sep" />
           <span className="dash-wallbar-lbl">every</span>
@@ -1519,7 +1909,11 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             {DASH_ROTATE_CHOICES.map(n => <option key={n} value={n}>{n < 60 ? `${n} s` : `${n / 60} min`}</option>)}
           </select>
         </React.Fragment>}
-        {wallLayout === "single" && <span className="dash-wallbar-note">this screen is showing section {wallSection + 1} of {DASH_SECTIONS.length} · open <code>#dashboard/{wallSection + 1}</code> on another display to pin it there</span>}
+        {wallLayout === "single" && !fill && <span className="dash-wallbar-note">this screen is showing section {wallSection + 1} of {DASH_SECTIONS.length} · open <code>#dashboard/{wallSection + 1}</code> on another display to pin it there</span>}
+        {fill && <span className="dash-wallbar-note" title={`Pin a display to this section with #dashboard/${wallSection + 1}`}>{rangeLabel} · {status === "All" ? "all forecasts" : status.toLowerCase()}{stamp ? ` · updated ${hhmm(stamp)}` : ""}</span>}
+        {/* 14 Oct 2026: a clock, as wall dashboards carry, at the bar's right end (the data's own time is "updated" above) */}
+        <span className="dash-clock" data-wall-clock="1">{hhmm(clock)}</span>
+        {fill && <button type="button" className="dash-wallbar-btn" onClick={toggleWall} title="Back to the working view (Esc)">Exit</button>}
       </div>}
 
       {!wall ? (
@@ -1541,29 +1935,29 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
           <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
-          <div className="grid lg:grid-cols-5 gap-4">
-            <div className="card p-4 lg:col-span-3">
+          <div className="dash-charts" data-dash-charts="1">
+            <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
-          <ChartCanvas config={demandCfg} height={wall ? 320 : 260} />
+          <ChartCanvas config={demandCfg} size="lg" />
         </div>
-            <div className="card p-4 lg:col-span-2">
+            <div className="card p-4 chart-card c-top">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
-          <ChartCanvas config={topCfg} height={wall ? 280 : 240} />
+          <ChartCanvas config={topCfg} />
         </div>
-            <div className="card p-4 lg:col-span-2">
+            <div className="card p-4 chart-card c-progress">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
-          <ChartCanvas config={progressCfg} height={wall ? 320 : 260} />
+          <ChartCanvas config={progressCfg} size="lg" />
         </div>
-            <div className="card p-4 lg:col-span-3">
+            <div className="card p-4 chart-card c-cost">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
-          <ChartCanvas config={costCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={costCfg} />
         </div>
           </div>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
             <div className="pt-3"><DashboardToday meta={meta} week={week} err={weekErr} wall={wall} /></div>
           </details>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>All the figures: delivered to date, volume, cost, carbon</summary>
             <div className="pt-3">
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-dash-figures="1">
@@ -1602,32 +1996,32 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       </div>
             </div>
           </details>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>More charts: trips, vehicles needed, carbon over time, material split</summary>
-            <div className="pt-3 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="card p-4">
+            <div className="pt-3 dash-more-charts">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
-          <ChartCanvas config={tripsCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={tripsCfg} />
         </div>
-              <div className="card p-4">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
-          <ChartCanvas config={fleetCfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={fleetCfg} />
         </div>
-              <div className="card p-4">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
-          <ChartCanvas config={co2Cfg} height={wall ? 280 : 220} />
+          <ChartCanvas config={co2Cfg} />
         </div>
-              <div className="card p-4">
+              <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
-          <ChartCanvas config={splitCfg} height={wall ? 280 : 240} />
+          <ChartCanvas config={splitCfg} />
         </div>
             </div>
           </details>
-          <details className="dash-more" onToggle={onMore}>
+          <details className="dash-more">
             <summary>Stockpile capacity</summary>
             <div className="pt-3"><DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} /></div>
           </details>
-          <details className="dash-more" onToggle={onMore} data-dash-table="1">
+          <details className="dash-more" data-dash-table="1">
             <summary>Route planning detail</summary>
             <div className="pt-3">
       {/* 13 Oct 2026 (W6, bundle F): RowDetails. The row keeps the planner's scan: the route's two ends (primary),
@@ -1709,11 +2103,11 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       ) : (
         <>
       <WallSection show={sectionShown(0)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[0].title}>
-        <DashboardToday meta={meta} week={week} err={weekErr} wall={wall} />
+        <DashboardToday meta={meta} week={week} err={weekErr} wall={wall} fill={fill} />
       </WallSection>
 
       <WallSection show={sectionShown(1)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[1].title}>
-      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3" data-wall-figures="1">
+      <div className={fill ? "wall-figs" : "grid md:grid-cols-2 xl:grid-cols-4 gap-3"} data-wall-figures="1">
         <Group title="Delivered to date" tone="var(--green)">
           <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `${K.reportedN} of ${D.lines} forecast months reported`} tone="var(--green)"
                info={{ id: "dash.moved", value: K.actualT == null ? "No week actual typed yet against any line in view." : `${grp(K.actualT)} t reported on ${K.reportedN} forecast month${K.reportedN === 1 ? "" : "s"}` }} />
@@ -1751,44 +2145,57 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       </WallSection>
 
       <WallSection show={sectionShown(2)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[2].title}>
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="card p-4 lg:col-span-2">
+      <div className="wall-charts">
+        <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
-          <ChartCanvas config={demandCfg} height={wall ? 320 : 260} />
+          {fill && <ChartHead value={`${bigNum(K.totT)} t`} label="planned in view" note={K.peakMonthT ? `the busiest month is ${K.peakMonth}, ${bigNum(K.peakMonthT)} t` : null} />}
+          <ChartCanvas config={demandCfg} size="lg" />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
-          <ChartCanvas config={progressCfg} height={wall ? 320 : 260} />
+          {fill && <ChartHead value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} label="of the plan delivered" tone="var(--chart-2)" note={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t reported of ${bigNum(K.totT)} t planned`} />}
+          <ChartCanvas config={progressCfg} size="lg" />
         </div>
-        <div className="card p-4">
+        <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
-          <ChartCanvas config={costCfg} height={wall ? 280 : 220} />
+          {fill && <ChartHead value={plannedVsFair == null ? (K.planned ? `${CUR()} ${eurK(K.planned.eur)}` : "—") : `${Math.abs(plannedVsFair).toFixed(0)} % ${plannedVsFair < 0 ? "below" : "above"}`} label={plannedVsFair == null ? "planned" : "the fair-price model"} note={K.planned && K.fair ? `planned ${CUR()} ${eurK(K.planned.eur)} · the model ${CUR()} ${eurK(K.fair.eur)}` : "no planned or fair price to compare yet"} />}
+          <ChartCanvas config={costCfg} />
         </div>
-        <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
-          <ChartCanvas config={tripsCfg} height={wall ? 280 : 220} />
-        </div>
-        <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
-          <ChartCanvas config={fleetCfg} height={wall ? 280 : 220} />
-        </div>
-        <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
-          <ChartCanvas config={co2Cfg} height={wall ? 280 : 220} />
-        </div>
-        <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
-          <ChartCanvas config={splitCfg} height={wall ? 280 : 240} />
-        </div>
-        <div className="card p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
-          <ChartCanvas config={topCfg} height={wall ? 280 : 240} />
+        <div className="card p-4 chart-card">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage {!wall && <span className="text-slate-400 font-normal">· click a bar to focus</span>}<InfoTip id="dash.chart.top" /></div>
+          {fill && <ChartHead value={topN[0] ? topN[0].route_id : "—"} label="carries the most" note={topN[0] && K.totT ? `${bigNum(topN[0].t)} t, ${(topN[0].t * 100 / K.totT).toFixed(0)} % of the tonnes in view` : null} />}
+          <ChartCanvas config={topCfg} />
         </div>
       </div>
       </WallSection>
 
       <WallSection show={sectionShown(3)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[3].title}>
-        <DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} />
+        <DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} fill={fill} tick={tick} />
+      </WallSection>
+
+      <WallSection show={sectionShown(4)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[4].title}>
+      <div className="wall-charts">
+        <div className="card p-4 chart-card">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
+          {fill && <ChartHead value={bigNum(K.totTrips)} label="loaded trips" note={`about ${grp(Math.round(K.totTrips / nMonths))} a month`} />}
+          <ChartCanvas config={tripsCfg} />
+        </div>
+        <div className="card p-4 chart-card">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
+          {fill && <ChartHead value={K.peakFleet ? grp(K.peakFleet) : "—"} label="vehicles at the peak" note={K.peakFleet ? `in ${K.peakFleetMonth}` : "needs the routes worked out"} />}
+          <ChartCanvas config={fleetCfg} />
+        </div>
+        <div className="card p-4 chart-card">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
+          {fill && <ChartHead value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(0)} t`} label="CO₂e" note={K.intensity == null ? null : `${K.intensity.toFixed(1)} kg for each tonne moved`} />}
+          <ChartCanvas config={co2Cfg} />
+        </div>
+        <div className="card p-4 chart-card">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
+          {fill && <ChartHead value={splitTop ? `${splitTop.pct.toFixed(0)} %` : "—"} label={splitTop ? splitTop.m : ""} note="of the tonnes in view" />}
+          <ChartCanvas config={splitCfg} />
+        </div>
+      </div>
       </WallSection>
         </>
       )}
@@ -1806,7 +2213,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // today; Tark Tee off). Nothing is derived here: the days carry the server's tonnes,
 // trips and vehicles; the account carries its own totals. Cost stays off the map (the
 // map's hover shows quantity and trips only, as on the Look-ahead).
-function DashboardToday({ meta, week, err, wall }){
+function DashboardToday({ meta, week, err, wall, fill }){
   const [todayOpen, todayToggle] = useRowOpen("today");    // 13 Oct 2026 (W6): the rows' hover title moved into details
   const lines = (week && week.commit && week.commit.lines) || [];
   const today = (week && week.today) || new Date().toISOString().slice(0, 10);
@@ -1842,7 +2249,7 @@ function DashboardToday({ meta, week, err, wall }){
   // 13 Oct 2026 (W3): an info box, not a hover tooltip (see Fig)
   const Big = ({ value, label, sub, info, tone }) => (
     <div className="min-w-0">
-      <div className="kpi-num font-bold whitespace-nowrap" style={{ color: tone || "var(--navy-deep)", fontSize: wall ? "clamp(1.6rem, 2.4vw, 3rem)" : "clamp(1.3rem, 1.8vw, 2rem)", lineHeight: 1.1 }}>{value}</div>
+      <div className={"kpi-num font-bold whitespace-nowrap" + (fill ? " fig-val" : "")} style={{ color: tone || "var(--navy-deep)", fontSize: fill ? undefined : wall ? "clamp(1.6rem, 2.4vw, 3rem)" : "clamp(1.3rem, 1.8vw, 2rem)", lineHeight: 1.1 }}>{value}</div>
       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mt-0.5 fig-label">{label}{info && <InfoTip id={info.id} value={info.value} />}</div>
       {sub && <div className="text-[11px] text-slate-400 fig-sub">{sub}</div>}
     </div>
@@ -1859,7 +2266,7 @@ function DashboardToday({ meta, week, err, wall }){
     : s === "edited" ? { word: "edited", tone: "warn", say: "Edited on the Look-ahead, not yet confirmed" }
     : { word: "planned", tone: "none", say: "Derived from the week, not yet confirmed on the Look-ahead" };
   return (
-    <div className="grid lg:grid-cols-5 gap-3">
+    <div className="grid lg:grid-cols-5 gap-3 today-grid">
       <div className="card p-4 lg:col-span-2 flex flex-col">
         <div className="flex items-baseline justify-between gap-2 flex-wrap">
           <div className="text-[10px] font-semibold uppercase tracking-wide fig-group" style={{ color: "var(--navy)" }}>Today · {dayName(today)} {longDate(today)}<InfoTip id="dash.today" /></div>
@@ -1868,7 +2275,7 @@ function DashboardToday({ meta, week, err, wall }){
         {err && <div className="text-xs mt-2" style={{ color: "var(--red)" }}>{err}</div>}
         {!week && !err && <div className="text-sm text-slate-400 mt-3">Loading this week…</div>}
         {week && <>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3 mt-3">
+          <div className={"grid grid-cols-2 gap-x-4 gap-y-3 mt-3" + (fill ? " today-figs" : " xl:grid-cols-4")}>
             <Big value={T.lines ? bigNum(T.t) : "—"} label="tonnes" sub={T.lines ? `today · ${T.lines} line${T.lines === 1 ? "" : "s"} · ${T.confirmed} confirmed` : (lines.length ? "nothing planned today" : "no lines this week")}
                  info={{ id: "dash.today_t", value: T.lines ? `${grp(T.t)} t planned for today across ${T.lines} line${T.lines === 1 ? "" : "s"}` : "No line has a planned quantity on today's date in the commit week." }} />
             <Big value={T.lines ? grp(T.trips) : "—"} label="trips" sub={T.lines ? `today · ${grp(dist(T.km))} ${DU()}` : "—"} info={{ id: "dash.today_trips", value: T.lines ? `${grp(T.trips)} loaded trips, ${grp(dist(T.km))} lorry-${DU()}` : "" }} />
@@ -1887,7 +2294,9 @@ function DashboardToday({ meta, week, err, wall }){
               <div className="text-[11px] text-slate-400 mt-1">{acct && acct.week ? `${acct.reported} of ${acct.lines} lines reported · ${acct.delivered} held to plan${acct.shortfall ? ` · ${grp(acct.shortfall)} short` : ""}` : "—"}</div>
             </div>
           </div>
-          <div className="mt-3 flex-1 overflow-auto rd-scroll" style={{ maxHeight: wall ? 260 : 190 }}>
+          {/* 14 Oct 2026: on a filled big screen the list takes the rest of the card (busiest first; what does not fit
+              is left off, never scrolled on a TV) */}
+          <div className="mt-3 flex-1 overflow-auto rd-scroll today-lines" style={{ maxHeight: wall ? 260 : 190 }}>
             {T.rows.length === 0 ? <div className="text-xs text-slate-400 py-2">{lines.length ? "No deliveries planned for today." : "No confirmed lines in this week's Look-ahead."}</div> : (
             <table className="w-full text-xs rd-table rd-mini" data-rd-table="today">
               <thead className="text-slate-400"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-right font-semibold py-1">t</th><th className="text-right font-semibold py-1">trips</th><th className="text-right font-semibold py-1">veh</th><th className="text-left font-semibold py-1 pl-2">Status</th></tr></thead>
@@ -1922,8 +2331,8 @@ function DashboardToday({ meta, week, err, wall }){
           </div>
         </>}
       </div>
-      <div className="card p-0 overflow-hidden lg:col-span-3">
-        {week ? <CommitMap meta={meta} bucket="commit" tick={0} lines={lines} title="This week's lines on the map" height={wall ? 460 : 380} flush />
+      <div className="card p-0 overflow-hidden lg:col-span-3 today-map">
+        {week ? <CommitMap meta={meta} bucket="commit" tick={0} lines={lines} title="This week's lines on the map" height={wall ? 460 : 380} flush fill={fill} />
               : <div className="p-6 text-sm text-slate-400">Loading the map…</div>}
       </div>
     </div>
@@ -1936,7 +2345,7 @@ function DashboardToday({ meta, week, err, wall }){
 // (balance = opening + typed inbound − typed consumption; a week nobody reported counts as
 // nothing). A stockpile with NO capacity recorded cannot be a %, so it is listed beside
 // the chart with its balance — never drawn as 0 % or as full. Pick the week with the chips.
-function DashboardStockChart({ meta, weekNow, wall, tick }){
+function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
   const { months } = meta;
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
@@ -1964,30 +2373,50 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
   const bars = withCap.map(sp => { const c = cellOf(sp) || {}; const bal = c.balance_end || 0; return { sp, c, bal, pct: bal * 100 / sp.capacity_qty, over: !!c.over }; });
   const maxPct = Math.max(120, ...bars.map(b => b.pct));
   const unitOf = (sp) => sp.capacity_unit === "m3" ? "m³" : (sp.capacity_unit || "");
+  // 14 Oct 2026: on the big screen the text follows the screen's height, as on the other charts
+  const sf = Math.max(12, Math.min(30, Math.round(((typeof window !== "undefined" && window.innerHeight) || 900) / 76)));
   const capLine = { id: "capLine", afterDatasetsDraw: (chart) => {
     const x = chart.scales.x, ctx = chart.ctx; if(!x) return;
     const px = x.getPixelForValue(100);
     ctx.save(); ctx.strokeStyle = "#DC2626"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(px, chart.chartArea.top); ctx.lineTo(px, chart.chartArea.bottom); ctx.stroke();
-    ctx.fillStyle = "#DC2626"; ctx.font = "600 10px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#DC2626"; ctx.font = `600 ${wall ? sf : 10}px Inter, system-ui, sans-serif`; ctx.textAlign = "center";
     ctx.fillText("capacity", px, chart.chartArea.top - 4); ctx.restore();
+  } };
+  // 14 Oct 2026: on the big screen each bar says how full it is, in words for the two warnings (nobody hovers a TV)
+  const barLabels = { id: "barLabels", afterDatasetsDraw: (chart) => {
+    if(!wall) return;
+    const meta = chart.getDatasetMeta(0), ctx = chart.ctx;
+    ctx.save(); ctx.font = `600 ${sf + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    ctx.fillStyle = tok("--ink", "#1E293B");
+    meta.data.forEach((el, i) => { const b = bars[i]; if(!b) return;
+      const t = `${b.pct.toFixed(0)} %` + (b.over ? " · over capacity" : b.pct >= 90 ? " · nearly full" : "");
+      ctx.fillText(t, el.x + 8, el.y); });
+    ctx.restore();
   } };
   const cfg = { type: "bar",
     data: { labels: bars.map(b => b.sp.name), datasets: [{ label: "% of capacity", data: bars.map(b => Math.round(b.pct * 10) / 10),
-              backgroundColor: bars.map(b => b.over ? "#DC2626" : b.pct >= 90 ? "#D97706" : "#059669"), borderWidth: 0, borderRadius: 4, barPercentage: 0.7 }] },
-    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14 } },
+              backgroundColor: bars.map(b => b.over ? "#DC2626" : b.pct >= 90 ? "#D97706" : "#059669"), borderWidth: 0, borderRadius: 4, barPercentage: 0.7,
+              maxBarThickness: fill ? Math.round(sf * 4.5) : 40 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14, right: wall ? sf * 13 : 0 } },
       plugins: { legend: { display: false }, tooltip: { callbacks: {
         title: (items) => items.length ? bars[items[0].dataIndex].sp.name : "",
         label: (item) => { const b = bars[item.dataIndex]; const u = unitOf(b.sp); return [
           `${b.pct.toFixed(0)} % full · ${fmt(b.bal, b.sp.capacity_unit)} of ${fmt(b.sp.capacity_qty, b.sp.capacity_unit)} ${u}`,
           `in ${fmt(b.c.inbound || 0, b.sp.capacity_unit)} · out ${fmt(b.c.consumed || 0, b.sp.capacity_unit)} this week`,
           b.over ? `OVER capacity by ${fmt(-(b.c.remaining || 0), b.sp.capacity_unit)} ${u}` : `room for ${fmt(b.c.remaining == null ? 0 : b.c.remaining, b.sp.capacity_unit)} ${u} more` ]; } } } },
-      scales: { x: { min: 0, max: Math.ceil(maxPct / 10) * 10, grid: { display: false }, ticks: { font: { size: wall ? 12 : 10 }, callback: (v) => v + " %" } },
-                y: { ticks: { font: { size: wall ? 13 : 11 } } } } },
-    plugins: [capLine] };
+      scales: { x: { min: 0, max: Math.ceil(maxPct / 10) * 10, grid: { display: false }, ticks: { font: { size: wall ? sf : 10 }, callback: (v) => v + " %" } },
+                y: { ticks: { font: { size: wall ? sf + 1 : 11 } } } } },
+    plugins: [capLine, barLabels] };
   const c = cols.find(x => x.k === selKey);
+  // 14 Oct 2026 (the design check): on a filled big screen the chart opens with its message
+  const nOver = bars.filter(b => b.over).length, nNear = bars.filter(b => !b.over && b.pct >= 90).length, nRoom = bars.length - nOver - nNear;
   return (
-    <div className="card p-4">
+    <div className="card p-4 stock-card">
+      {fill && bars.length > 0 && <div className="chart-head" data-chart-head="1">
+        <span className="ch-val kpi-num" style={nOver ? { color: "var(--red)" } : undefined}>{nOver ? `${nOver} over capacity` : "None over capacity"}</span>
+        <div className="ch-note">{[nNear ? `${nNear} nearly full` : "", nRoom ? `${nRoom} with room` : "", noCap.length ? `${noCap.length} with no capacity recorded` : ""].filter(Boolean).join(" · ")}</div>
+      </div>}
       <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
         <div className="text-sm font-semibold text-slate-700 chart-title">Stockpile capacity <span className="text-slate-400 font-normal">· how full each stockpile is at the end of {c ? `${MONTHS[(c.m - 1) % 12]} week ${c.w}` : "the week"}</span><InfoTip id="dash.stock" /></div>
         <div className="flex flex-wrap gap-1">
@@ -2001,12 +2430,12 @@ function DashboardStockChart({ meta, weekNow, wall, tick }){
           No locations that hold stock yet. Set a type of Stockpile, Site, Compound or Railhead on the Locations page, and give it a capacity there.
         </div>
       ) : (
-        <div className="grid lg:grid-cols-4 gap-4">
-          <div className={noCap.length ? "lg:col-span-3" : "lg:col-span-4"}>
-            {bars.length ? <ChartCanvas config={cfg} height={Math.max(wall ? 220 : 160, 36 * bars.length + 40)} />
+        <div className="grid lg:grid-cols-4 gap-4 stock-body">
+          <div className={(noCap.length ? "lg:col-span-3" : "lg:col-span-4") + (fill ? " min-h-0" : "")}>
+            {bars.length ? (fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} height={Math.max(wall ? 220 : 160, 36 * bars.length + 40)} />)
                          : <div className="text-sm text-slate-400 p-4">No stockpile has a capacity recorded — set one on the Locations page to see how full it is.</div>}
           </div>
-          {noCap.length > 0 && <div className="text-xs text-slate-600">
+          {noCap.length > 0 && <div className="text-xs text-slate-600 stock-nocap">
             {/* '—', never 0. No capacity recorded is not zero capacity. */}
             <div className="font-semibold text-slate-700 mb-1">No capacity recorded</div>
             {noCap.map(sp => { const cell = cellOf(sp) || {}; return (
@@ -2512,6 +2941,7 @@ function DemoBar({ onGuide }){
 // or Escape. Keyboard: the button is a real button; the items are menuitemradio.
 function AppearancePicker(){
   const [theme, setTheme] = useTheme();
+  const [accent, setAccent] = useAccent();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
   useEffect(() => {
@@ -2537,6 +2967,17 @@ function AppearancePicker(){
               className={"appearance-item" + (theme === k ? " is-on" : "")}
               onClick={() => { setTheme(k); setOpen(false); }}>
               <span className="swatch" style={{ "--sw-dot": sw.dot }} aria-hidden="true"><i style={{ background: sw.bar }}></i><b style={{ background: sw.page }}></b></span>
+              <span className="flex-1">{label}</span>
+              <span className="tick" aria-hidden="true">✓</span>
+            </button>
+          ))}
+          {/* 13 Oct 2026 (W16): the accent, a second group (its own class, so the three looks stay three items) */}
+          <h6>Accent</h6>
+          {ACCENTS.map(([k, label, sw]) => (
+            <button key={k} type="button" role="menuitemradio" aria-checked={accent === k ? "true" : "false"}
+              className={"accent-item" + (accent === k ? " is-on" : "")} data-accent-choice={k}
+              onClick={() => { setAccent(k); setOpen(false); }}>
+              <span className="swatch accent-sw" aria-hidden="true"><i style={{ background: sw.btn }}></i><b style={{ background: sw.s1 }}></b><b style={{ background: sw.s2 }}></b></span>
               <span className="flex-1">{label}</span>
               <span className="tick" aria-hidden="true">✓</span>
             </button>
@@ -2804,7 +3245,25 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   // and put the hash on the URL for the page we actually opened with
   useEffect(() => { try { if(pageFromHash() !== page) history.replaceState(null, "", "#" + page); } catch(e){} }, []);
   const [railOpen, setRailOpen] = useState(() => { try { return localStorage.getItem("modus_rail") !== "closed"; } catch(e){ return true; } });
-  const toggleRail = () => { const v = !railOpen; setRailOpen(v); try { localStorage.setItem("modus_rail", v ? "open" : "closed"); } catch(e){} };
+  // 13 Oct 2026 (W5, bundle E; the user's "3 yes"): below 768 px the rail is icons only, whatever was remembered —
+  // open, it squeezed the Dashboard's cards to ~65 px on a 360 px phone. The expand button there opens it OVER the
+  // page (not beside it) until a page is picked; that choice is not remembered.
+  const NARROW_Q = "(max-width: 767px)";
+  const [narrow, setNarrow] = useState(() => { try { return !!(window.matchMedia && window.matchMedia(NARROW_Q).matches); } catch(e){ return false; } });
+  const [railPeek, setRailPeek] = useState(false);
+  const [wallOn, setWallOn] = useState(false);      // 14 Oct 2026: the Dashboard's big screen is on
+  useEffect(() => {
+    if(!window.matchMedia) return;
+    const mq = window.matchMedia(NARROW_Q);
+    const f = (e) => { setNarrow(!!e.matches); setRailPeek(false); };
+    if(mq.addEventListener) mq.addEventListener("change", f); else if(mq.addListener) mq.addListener(f);
+    return () => { if(mq.removeEventListener) mq.removeEventListener("change", f); else if(mq.removeListener) mq.removeListener(f); };
+  }, []);
+  const railShown = narrow ? railPeek : railOpen;
+  const toggleRail = () => {
+    if(narrow){ setRailPeek(v => !v); return; }
+    const v = !railOpen; setRailOpen(v); try { localStorage.setItem("modus_rail", v ? "open" : "closed"); } catch(e){}
+  };
   // {routeId, year, toYear, discipline, sectionId} handed to the Matrix. `year` is the
   // FIRST year of the line and `toYear` the last — a line can span several since the
   // multi-year save, and reopening it on one year would hide the rest.
@@ -2823,7 +3282,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   const [navQ, setNavQ] = useState("");
   const navRef = useRef(null);
   useEffect(() => {
-    const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
+    const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); if(window.matchMedia && window.matchMedia(NARROW_Q).matches) setRailPeek(true); else setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
   const visible = NAV.filter(g => !g.admin || canApprove);
@@ -2843,10 +3302,11 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   const current = visible.flatMap(g => g.items).find(i => i.id === page) || { label: "" };
 
   return (
-    <div className="flex-1 min-h-0 flex">
-      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railOpen ? "w-56" : "w-14")}>
+    <div className="flex-1 min-h-0 flex relative">
+      {narrow && railPeek && <div className="w-14 shrink-0" aria-hidden="true"></div>}
+      <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railShown ? "w-56" : "w-14") + (narrow && railPeek ? " rail-peek" : "") + (wallOn && page === "dashboard" ? " hidden" : "")}>
         <div className="flex-1 overflow-y-auto py-3">
-          {railOpen && (
+          {railShown && (
             <label className="rail-search" title="Find a page (Ctrl K)">
               <input ref={navRef} value={navQ} onChange={e => setNavQ(e.target.value)} placeholder="Find a page…" aria-label="Find a page"
                 onKeyDown={e => { if(e.key === "Enter" && navFirst){ setPage(navFirst.id); setNavQ(""); } if(e.key === "Escape") setNavQ(""); }} />
@@ -2856,17 +3316,17 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
           {visible.filter(g => g.items.some(navMatch)).map(g => (
             // collapsed, the group HEADINGS go but the grouping must not: a plain
             // column of nine icons reads as one undifferentiated list.
-            <div key={g.group} className={"mb-3 " + (railOpen ? "" : "pt-3 mt-3 border-t border-slate-100 first:border-0 first:mt-0 first:pt-0")}>
-              {railOpen && <div className="rail-group px-4 pb-1">{g.group}</div>}
+            <div key={g.group} className={"mb-3 " + (railShown ? "" : "pt-3 mt-3 border-t border-slate-100 first:border-0 first:mt-0 first:pt-0")}>
+              {railShown && <div className="rail-group px-4 pb-1">{g.group}</div>}
               {g.items.filter(navMatch).map(it => {
                 const active = page === it.id;
                 const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending : null;
                 return (
-                  <button key={it.id} onClick={() => setPage(it.id)} title={railOpen ? undefined : it.label}
+                  <button key={it.id} onClick={() => { setPage(it.id); if(narrow) setRailPeek(false); }} title={railShown ? undefined : it.label}
                     className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
                     <NavIcon id={it.id} />
-                    {railOpen && <span className="truncate flex-1">{it.label}</span>}
-                    {badge != null && railOpen && (
+                    {railShown && <span className="truncate flex-1">{it.label}</span>}
+                    {badge != null && railShown && (
                       <span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>
                     )}
                   </button>
@@ -2881,15 +3341,15 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
               to type the URL. An ANCHOR, not a NAV entry: /help/ is a separate document,
               not a React view, and a new tab keeps the app's state. */}
           <a href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer"
-             title={railOpen ? "Opens in a new tab" : "User guide"}
+             title={railShown ? "Opens in a new tab" : "User guide"}
              className="w-full flex items-center gap-3 px-2 py-1.5 mb-1 text-xs rounded text-slate-500 hover:bg-slate-50 hover:text-[color:var(--navy)] transition">
             <span className="w-4 text-center text-sm leading-none opacity-80">?</span>
-            {railOpen && <span className="truncate">User guide</span>}
+            {railShown && <span className="truncate">User guide</span>}
           </a>
-          <button onClick={toggleRail} className="w-full text-xs text-slate-400 hover:text-slate-700 py-1" title={railOpen ? "Collapse" : "Expand"}>
-            {railOpen ? "‹ Collapse" : "›"}
+          <button onClick={toggleRail} className="w-full text-xs text-slate-400 hover:text-slate-700 py-1" title={railShown ? "Collapse" : "Expand"}>
+            {railShown ? "‹ Collapse" : "›"}
           </button>
-          {railOpen && role && (
+          {railShown && role && (
             <div className="px-2 pb-1 text-[11px] text-slate-500 truncate" title={who}>
               <span className="font-medium text-slate-700">{teamText(who) || "—"}</span> · {role.ipt ? teamName(role.ipt) : role.label}
             </div>
@@ -2898,7 +3358,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       </aside>
 
       <main className="flex-1 min-h-0 overflow-auto">
-        {page === "dashboard" && <Dashboard meta={meta} onWall={(on) => setRailOpen(!on)} onOpen={setPage} />}
+        {page === "dashboard" && <Dashboard meta={meta} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />}
         {page === "submit" && <Matrix meta={meta} who={who} editTarget={editTarget} vehLang={vehLang} access={role} />}
         {page === "forecasts" && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
         {page === "carbon" && <CarbonPage meta={meta} access={role} who={who} />}
@@ -2916,7 +3376,8 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
           11 Oct 2026 (the demo bar): not on the Route map, whose embedded map runs its own guide (its strip under
           its bar, its dots, its tour). That was two "New here?" strips on one screen, and the app's guide there
           shared the map's localStorage key (wayscope_guide_map). */}
-      {page !== "map" && <Guide page={page} groups={visible} />}
+      {/* 14 Oct 2026: not over the big screen either — a TV on a wall has nobody to take a tour */}
+      {page !== "map" && !(page === "dashboard" && wallOn) && <Guide page={page} groups={visible} />}
     </div>
   );
 }
@@ -5216,7 +5677,7 @@ function IptPill({ ipt }){
 function WsPill({ ws }){
   if(!ws) return null;
   return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-    style={{ background: "rgba(37,99,235,.08)", color: "var(--navy)" }}>{ws}</span>;
+    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>;
 }
 function LaKpi({ value, caption, tone }){
   // a long value steps its size down before it would be cut off ("£1.43…" read as a price)
@@ -6143,7 +6604,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 // the Look-ahead — moving to Account and back does not rebuild it. Lines take the IPT's
 // palette-C colour; ends are dots (navy origin, red destination); hover names the line
 // with its week figures. An unbaked route is listed under the map, not drawn.
-function CommitMap({ meta, bucket, tick, lines, title, height, flush }){
+function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
   const mapDiv = useRef(null);
   const mapObj = useRef(null);
   const [geo, setGeo] = useState(null);
@@ -6201,6 +6662,14 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush }){
       setReady(true);
     });
     mapObj.current = m;
+    // 13 Oct 2026 (W5): the map watches its own container. On the Dashboard it sits in a collapsed section (and a
+    // hidden big-screen section), where it starts at 0 × 0; it used to wait for a window resize the page fired on
+    // open. Never removed here (the one-Mapbox rule); the observer is disconnected only if the page goes.
+    if(typeof ResizeObserver !== "undefined" && mapDiv.current){
+      const ro = new ResizeObserver(() => { try { if(mapDiv.current && mapDiv.current.clientWidth > 0) m.resize(); } catch(e){} });
+      ro.observe(mapDiv.current);
+      return () => ro.disconnect();
+    }
   }, []);
 
   useEffect(() => {
@@ -6237,10 +6706,11 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush }){
   // 11 Sep: the Dashboard mounts this too (`flush` inside its own card, its own title
   // and height); the Look-ahead's rendering is unchanged by the defaults.
   return (
-    <div className={flush ? "" : "mt-4"}>
+    <div className={(flush ? "" : "mt-4") + (fill ? " h-full flex flex-col min-h-0" : "")}>
       <div className={"text-sm font-semibold text-slate-700 mb-2" + (flush ? " px-4 pt-3 chart-title" : "")}>{title || "This week's movements"}</div>
-      <div className={flush ? "" : "bg-white rounded-xl border border-slate-200 overflow-hidden"}>
-        <div ref={mapDiv} style={{ height: height || 380 }} />
+      <div className={(flush ? "" : "bg-white rounded-xl border border-slate-200 overflow-hidden") + (fill ? " flex-1 flex flex-col min-h-0" : "")}>
+        {/* 14 Oct 2026: on a filled big screen the map takes the whole card; its ResizeObserver follows */}
+        <div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />
         <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 flex flex-wrap gap-x-3">
           <span>Routed loaded leg per line, coloured by {TEAM().toLowerCase()} · dark dot = origin · red dot = destination · hover a line for its week.</span>
           {unbaked.length > 0 && <span className="text-amber-700">Not drawn (no route worked out): {unbaked.join(", ")}</span>}
@@ -7536,10 +8006,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const t1 = setTimeout(doResize, 100);
     const t2 = setTimeout(doResize, 400);
     window.addEventListener("resize", doResize);
+    // 13 Oct 2026 (W5): and whenever its own container changes size (the rail collapsing, a panel opening)
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(doResize) : null;
+    if(ro && mapDiv.current) ro.observe(mapDiv.current);
     mapObj.current = m;
     return () => {
       clearTimeout(t1); clearTimeout(t2);
       window.removeEventListener("resize", doResize);
+      if(ro) ro.disconnect();
       if(mapObj.current){ mapObj.current.remove(); mapObj.current = null; }
     };
   }, []);
@@ -9264,7 +9738,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <label key={v} className="flex items-center gap-2 text-xs text-slate-700">
                         <input type="checkbox" checked={on}
                           onChange={() => (editingRoute ? toggleEVehicle(v) : toggleRVehicle(v))}
-                          style={{ accentColor: "#2563EB" }} />
+                          style={{ accentColor: "var(--navy)" }} />
                         {v}
                         {tag && <span className="text-[10px] font-semibold" style={{ color: tag[1] }}>· {tag[0]}</span>}
                       </label>

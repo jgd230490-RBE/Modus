@@ -336,6 +336,19 @@ ok("gap_minutes = round(600 ÷ unrounded arrivals, 1) on every gate",
    all(g["gap_minutes"] == round(OPEN / (max(T_LADEN.get(g["gate_id"], 0) + T_EMPTY.get(g["gate_id"], 0), 1) / WD), 1) for g in gl),
    str([(g["gate_id"], g["gap_minutes"]) for g in gl]))
 
+# 14 Oct 2026: the gate's capacity (for the Dashboard's chart) — shift minutes ÷ check-in minutes, and the share of it
+ok("⭐ capacity_per_day = round(600 ÷ the check-in minutes, 1) where a check-in is typed, None where it is not",
+   all((g["capacity_per_day"] == round(OPEN / g["gate_minutes"], 1)) if g.get("gate_minutes") else (g["capacity_per_day"] is None) for g in gl)
+   and g3.get("capacity_per_day") == 200.0, str([(g["gate_id"], g.get("gate_minutes"), g.get("capacity_per_day")) for g in gl]))
+ok("⭐ capacity_pct = round(unrounded arrivals × 100 ÷ capacity) (None with no check-in)",
+   all((g["capacity_pct"] == round(((T_LADEN.get(g["gate_id"], 0) + T_EMPTY.get(g["gate_id"], 0)) / WD) * 100 / (OPEN / g["gate_minutes"])))
+       if g.get("gate_minutes") else (g["capacity_pct"] is None) for g in gl),
+   str([(g["gate_id"], g.get("capacity_pct")) for g in gl]))
+ok("🔴 the chart cannot disagree with the flag: every red gate is over 100 % of its capacity, every compared gate that is not red is at or under it (to the rounding of the gap)",
+   all(((g["capacity_pct"] or 0) > 100) for g in gl if g.get("flag") == "red")
+   and all(((g["capacity_pct"] or 0) <= 102) for g in gl if g.get("flag") != "red" and g.get("capacity_pct") is not None),
+   str([(g["gate_id"], g.get("flag"), g.get("capacity_pct")) for g in gl]))
+
 # the flag rule
 ok('🔴 the red rule: East compound\'s 2.6 min gap is shorter than its 3 min check-in -> flag "red" and the reason reads "a queue even with perfect spacing"',
    g3.get("gap_minutes") == 2.6 and g3.get("gate_minutes") == 3.0 and g3.get("flag") == "red"
@@ -397,9 +410,10 @@ ok("⭐ planner: per_team carries every team with its figure (G001: Team 1 161.4
    and round(3550 / WD, 1) == 161.4 and round(2000 / WD, 1) == 90.9
    and g3.get("per_team") == [{"team": "Team 1", "arrivals_per_day": round(3100 / WD, 1)}, {"team": "Team 2", "arrivals_per_day": round(2000 / WD, 1)}]
    and g4.get("per_team") == [{"team": "Team 1", "arrivals_per_day": round(650 / WD, 1)}], str(g1.get("per_team")))
+# 14 Oct 2026 (narrowed): + capacity_per_day and capacity_pct, for the Dashboard's gate chart
 ok("the response carries every key of the contract on every gate",
    all(set(g) == {"gate_id", "gate_name", "location_id", "location_name", "loc_type", "role", "laden_per_day", "empty_per_day",
-                  "arrivals_per_day", "gap_minutes", "gate_minutes", "flag", "reason", "pending_lines", "pending_per_day",
+                  "arrivals_per_day", "gap_minutes", "gate_minutes", "capacity_per_day", "capacity_pct", "flag", "reason", "pending_lines", "pending_per_day",
                   "teams", "per_team", "origin_share_note", "fallthrough_routes"} for g in gl)
    and set(res) == {"month", "label", "working_days", "shift_hours", "open_minutes", "scope", "gates", "notes"})
 
