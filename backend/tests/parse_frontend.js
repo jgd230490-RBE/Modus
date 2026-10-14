@@ -2783,7 +2783,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      clpc.includes('if(per === "tonne" && c.target_kg_per_tonne != null) ds.push({ label: "The target, shared out", data: m.map(() => c.target_kg_per_tonne), borderColor: INK, borderDash: [6, 4]')
      && !clpc.includes("target_kg_per_load"));
   ok("CLP: every bullet row says its figure in words (no hover on a print or a TV): 'N word · P % of C' and 'over the cap'",
-     clpc.includes('ctx.fillText(`${clpN1(r[valKey])} ${word} · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : "")'));
+     // NARROWED 14 Oct 2026 (seen at 1366 px: one long line ran off the card): two short lines in a column right of the plot
+     clpc.includes('ctx.fillText(`${clpN1(r[valKey])} ${word}`, A.right + 12, el.y - 7);')
+     && clpc.includes('ctx.fillText(`${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : ""), A.right + 12, el.y + 8);'));
   // W17: the Look-ahead's gates this week, and the rail's two codes
   ok("⭐ W17: GatesWeek draws the page's gates_week (no read of its own), after the grid and before the map",
      src.includes("function GatesWeek({ gw }){") && src.includes("{lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}")

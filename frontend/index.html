@@ -2545,14 +2545,19 @@ function clpBulletCfg(rows, valKey, nameKey, word){
   const C1 = tok("--chart-1", "#E8590C"), RED = tok("--red", "#DC2626"), INK = tok("--ink", "#1E293B");
   const fs = 11;
   const marks = { id: "clpCapMarks", afterDatasetsDraw: (chart) => {
-    const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx; if(!x) return;
+    const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx, A = chart.chartArea; if(!x || !A) return;
     ctx.save();
     meta.data.forEach((el, i) => { const r = rows[i]; if(!r) return;
       const half = (el.height || 16) / 2 + 5, px = x.getPixelForValue(r.cap);
       ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(px, el.y - half); ctx.lineTo(px, el.y + half); ctx.stroke();
       ctx.font = `600 ${fs + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.fillStyle = r.over ? RED : INK;
-      ctx.fillText(`${clpN1(r[valKey])} ${word} · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : ""), Math.max(el.x, px) + 10, el.y);
+      // 14 Oct 2026 (seen at 1366 px): the words sit in a column right of the plot, never after the bar, so a bar past its
+      // cap cannot push them off the card
+      // two short lines, so the column fits at 1366 px
+      ctx.fillText(`${clpN1(r[valKey])} ${word}`, A.right + 12, el.y - 7);
+      ctx.font = `500 ${fs}px Inter, system-ui, sans-serif`;
+      ctx.fillText(`${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : ""), A.right + 12, el.y + 8);
     });
     ctx.restore();
   } };
@@ -2562,11 +2567,12 @@ function clpBulletCfg(rows, valKey, nameKey, word){
         borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
       { label: `Planned ${word}`, data: rows.map(r => r[valKey]), backgroundColor: rows.map(r => r.over ? RED : C1), borderWidth: 0,
         borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
-    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 8, right: 230 } },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 8, right: 200 } },
       plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1 } },
       scales: { x: { min: 0, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: fs } },
                      title: { display: true, text: word, font: { size: fs } } },
-                y: { grid: { display: false }, ticks: { font: { size: fs + 1 } } } } },
+                y: { grid: { display: false }, ticks: { font: { size: fs + 1 }, callback: function(v){ const n = String(rows[v] ? rows[v][nameKey] : "");
+                  const i = n.indexOf(" → "); return i > 0 ? [cutLabel(n.slice(0, i)), cutLabel("→ " + n.slice(i + 3))] : cutLabel(n); } } } } },
     plugins: [marks] };
 }
 // a 100 % stacked bar a month: each group's share of the month's loads, the share and the loads in the tooltip
@@ -2587,17 +2593,19 @@ function clpCouncilCfg(c){
   const C1 = tok("--chart-1", "#E8590C"), C3 = tok("--chart-3", "#0D9488"), INK = tok("--ink", "#1E293B");
   const rows = c.rows || [];
   const words = { id: "clpCouncilWords", afterDatasetsDraw: (chart) => {
-    const meta = chart.getDatasetMeta(1), ctx = chart.ctx; ctx.save();
-    ctx.font = "600 12px Inter, system-ui, sans-serif"; ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillStyle = INK;
+    const meta = chart.getDatasetMeta(1), ctx = chart.ctx, A = chart.chartArea; if(!A) return; ctx.save();
+    ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillStyle = INK;
+    // 14 Oct 2026 (seen at 1366 px): a column right of the plot, two short lines, so the busiest council's words fit
     meta.data.forEach((el, i) => { const r = rows[i]; if(!r) return;
-      ctx.fillText(`${clpN1(r.movements_per_day)} movements a day · ${grp(r.distance)} ${c.distance_word}`, el.x + 8, el.y); });
+      ctx.font = "600 12px Inter, system-ui, sans-serif"; ctx.fillText(`${clpN1(r.movements_per_day)} movements a day`, A.right + 12, el.y - 7);
+      ctx.font = "500 11px Inter, system-ui, sans-serif"; ctx.fillText(`${grp(r.distance)} ${c.distance_word}`, A.right + 12, el.y + 7); });
     ctx.restore();
   } };
   return { type: "bar",
     data: { labels: rows.map(r => r.council), datasets: [
       { label: `Laden ${c.distance_word}`, data: rows.map(r => r.laden_distance), backgroundColor: C1, stack: "d", borderWidth: 0 },
       { label: `Empty ${c.distance_word}`, data: rows.map(r => r.empty_distance), backgroundColor: C3, stack: "d", borderWidth: 0 }] },
-    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { right: 250 } },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { right: 190 } },
       plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } },
       scales: { x: { stacked: true, grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") } }, y: { stacked: true, grid: { display: false } } } },
     plugins: [words] };
@@ -2626,7 +2634,12 @@ function clpTripsCfg(c){
 function ClpUncapped({ rows, nameKey, valKey, word, what }){
   const left = (rows || []).filter(r => r.cap == null);
   if(!left.length) return null;
-  return <div className="clp-note" data-clp-uncapped={what}>{left.length} {left.length === 1 ? what : what + "s"} with no cap typed, not compared: {left.map(r => `${r[nameKey]} (${clpN1(r[valKey])} ${word})`).join(", ")}.</div>;
+  return (
+    <details className="clp-how" data-clp-uncapped={what}>
+      <summary>{left.length} {left.length === 1 ? what : what + "s"} with no cap typed, not compared</summary>
+      <p>{left.map(r => `${r[nameKey]} (${clpN1(r[valKey])} ${word})`).join(", ")}.</p>
+    </details>
+  );
 }
 function ClpMonitoring({ months, initial }){
   const [open, setOpen] = useState(!!initial);

@@ -642,7 +642,8 @@ if (loaded) {
         && cP.includes(escH(CLPF.scope_line)) && cP.includes(escH(CLPF.limit)) && cP.includes('data-clp-peak="1">' + escH(CLPF.peak_words) + "<")
         && cP.includes('aria-label="About: CLP monitoring"'));
       ok("CLP: the routes and sites with no cap are one line each, never a bar; the councils' double-count sentence and licence lines print",
-        cP.includes('data-clp-uncapped="route">2 routes with no cap typed, not compared: ') && cP.includes('data-clp-uncapped="site">')
+        // NARROWED 14 Oct 2026 (seen in the browser at 1366 px: 17 uncapped routes were a wall of text): folded behind one line
+        cP.includes('data-clp-uncapped="route"><summary>2 routes with no cap typed, not compared</summary><p>') && cP.includes('data-clp-uncapped="site">')
         && cP.includes(escH(CLPF.charts.councils.double_count)) && CLPF.charts.councils.attribution.every(a => cP.includes(escH(a))));
       ok("CLP: the carbon card draws per tonne and per load, says why per load has no target line, and names the decision on the trips card",
         cP.includes('<div class="clp-sub">Per tonne</div>') && cP.includes('<div class="clp-sub">Per load</div>') && cP.includes(escH(CLPF.charts.carbon_rate.per_load_note))
