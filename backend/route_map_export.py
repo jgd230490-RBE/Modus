@@ -61,8 +61,34 @@ def _date_words(iso):
         return "not checked"
 
 
-def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, now=None):
-    """Everything the route map export prints for one month, the chosen routes and one team (or all). Reads only."""
+def team_id(team):
+    """The team filter as the map sends it — the slot id (its select's value) or the team's NAME (a deep link) — as a
+    slot id, or None for every team."""
+    if not team or str(team).upper() == "ALL":
+        return None
+    import access
+    t = access.canonical_ipt(team)
+    if t:
+        return t
+    try:
+        import taxonomy
+        for k, v in (taxonomy.team_labels() or {}).items():
+            if str(v).strip().lower() == str(team).strip().lower():
+                return access.canonical_ipt(k) or k
+    except Exception:
+        pass
+    return str(team)
+
+
+def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, now=None,
+          origin=None, dest=None, discipline=None, map_only=False):
+    """
+    Everything the route map export prints for one month and the routes the filters let through. The filters are the
+    public map's Route filtering, applied as the map applies them (map/index.html applyFilters and calculateKPIs):
+    origin, destination and team from the ROUTE, discipline from the LINE; `route_ids` narrows further (the Routes page
+    sends the routes it lists). Reads only.
+    """
+    import access
     import bulletin
     import bulletin_doc
     import restrictions
@@ -70,14 +96,24 @@ def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, n
     wd = bulletin.working_days()
     # a team code sees its own team only, whatever it asks for
     own = (acc or {}).get("ipt") if isinstance(acc, dict) else None
-    team = own or team
+    team = own or team_id(team)
+    norm = lambda v: None if (v is None or str(v).upper() == "ALL" or v == "") else v
+    origin, dest, discipline = norm(origin), norm(dest), norm(discipline)
     want = set(route_ids) if route_ids else None
-    payload = dict(bulletin.month_payload(mi))
-    lines = [l for l in (payload.get("lines") or [])
-             if (want is None or l.get("route_id") in want) and (not team or l.get("ipt") == team)]
-    payload["lines"] = lines
     routes = bulletin.drawn_routes()
     bulletin._stamp_caps(routes)
+
+    def route_ok(rid):
+        rp = routes.get(rid)
+        if rp is None:                       # not drawn: let it through, the roll-up names it as not drawn
+            return want is None or rid in want
+        return ((want is None or rid in want) and (not origin or rp.get("origin") == origin)
+                and (not dest or rp.get("dest") == dest)
+                and (not team or (access.canonical_ipt(rp.get("ipt")) or rp.get("ipt")) == team))
+    payload = dict(bulletin.month_payload(mi))
+    lines = [l for l in (payload.get("lines") or [])
+             if route_ok(l.get("route_id")) and (not discipline or l.get("discipline") == discipline)]
+    payload["lines"] = lines
     R = bulletin.rollup_payloads([payload], routes, wd, acc=acc)
     rows = list(R.get("by_route") or [])
     ids = [r["route_id"] for r in rows]
@@ -133,13 +169,16 @@ def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, n
     import export      # the tenant's name and demo notice exactly as every other PDF reads them
     notice = export._demo_notice() or None
     team_words = _team_text(team) if team else "All teams"
+    narrowed = [w for w in ((f"from {origin}" if origin else None), (f"to {dest}" if dest else None),
+                            (discipline if discipline else None)) if w]
     S = {
         "title": f"Route map · {month_long}",
         "tenant": export._tenant_name() or "Wayscope",
         "demo_notice": notice, "map_demo_tag": bulletin_doc.DEMO_MAP_TAG if notice else None,
         "month_long": month_long, "team_words": team_words,
-        "filter_words": (f"{len(out_rows)} route{'s' if len(out_rows) != 1 else ''} · {team_words} · {month_long} · "
-                         f"approved lines only"),
+        "filter_words": " · ".join([f"{len(out_rows)} route{'s' if len(out_rows) != 1 else ''}", team_words, *narrowed,
+                                    month_long, "approved lines only"]),
+        "map_only": bool(map_only),
         "as_at": f"Approved plan as at {(now or datetime.date.today()):%d %b %Y}".replace(" 0", " "),
         "working_days": wd,
         "rows": out_rows, "map_routes": map_routes, "map_sections": [], "places": places, "controls": [],
@@ -150,11 +189,11 @@ def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, n
         "empty": not out_rows,
     }
     if carbon_tool:
-        S["carbon_tool"] = carbon_tool_rows(mi, set(ids), team, acc)
+        S["carbon_tool"] = carbon_tool_rows(mi, set(ids), discipline, acc)
     return S
 
 
-def carbon_tool_rows(month_index, route_ids, team, acc):
+def carbon_tool_rows(month_index, route_ids, discipline, acc):
     """H3: the NH Carbon Tool's transport inputs for the month — per Carbon Tool sheet, material and origin → destination:
     tonnes and the ONE-WAY LOADED km (carbon.scenario's baseline, Approved lines, the chosen routes and team)."""
     import carbon
@@ -164,9 +203,11 @@ def carbon_tool_rows(month_index, route_ids, team, acc):
         return {"rows": [], "error": f"{type(e).__name__}: {e}"}
     agg = {}
     for l in (sc.get("lines") or []):
-        if l.get("route_id") not in route_ids or (team and l.get("ipt") != team):
+        # the same lines as the map rows: the routes the filters let through, the discipline from the line
+        if l.get("route_id") not in route_ids or (discipline and l.get("discipline") != discipline):
             continue
-        k = (l.get("sheet") or "—", l.get("carbon_material") or l.get("material_type") or "—", l.get("route_id"))
+        # the scheme's own material name (a person reads "Precast / concrete", never the factor key "concrete")
+        k = (l.get("sheet") or "—", l.get("material_type") or "—", l.get("route_id"))
         a = agg.setdefault(k, {"tonnes": 0.0, "km": l.get("one_way_km"), "vehicle": l.get("vehicle")})
         a["tonnes"] += float(l.get("tonnes") or 0.0)
     rows = [{"sheet": k[0], "material": k[1], "route_id": k[2], "tonnes": round(v["tonnes"], 1),

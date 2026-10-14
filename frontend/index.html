@@ -467,6 +467,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
   /* 12 Oct 2026 (C4): the Monthly bulletin menu on the Dashboard — the 14 px floor for its words */
   .bulletin-menu label span{font-size:14px;}
+  .bulletin-menu .rme-tick{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:14px;color:var(--popover-fg);white-space:normal;cursor:pointer;}
+  .bulletin-menu .rme-tick input{width:16px;height:16px;flex:none;}
   .bulletin-menu .row-menu-list a{display:block;padding:7px 10px;font-size:14px;color:var(--popover-fg);border-radius:6px;text-decoration:underline;}
   .bulletin-menu .row-menu-list a:hover{background:rgba(255,255,255,.06);}
   .bulletin-menu .bm-err{white-space:normal;max-width:260px;font-size:14px;color:#FCA5A5;padding:4px 10px;}
@@ -3030,6 +3032,67 @@ function App(){
         )}
       </main>
     </div>
+  );
+}
+
+// 14 Oct 2026 (backlog item 2, replaces the per-route sheet): the route map export from the Routes page — every route,
+// or the one picked in the list; a month; a team or all; and the two options (map only with the legend on the map; the
+// National Highways Carbon Tool rows). The same request the public map's "Export route map (PDF)" sends; staff only
+// (this page is a planner's). The PDF is drawn on the server; nothing here computes a figure.
+function RouteMapExportMenu({ months, ipts, picked }){
+  const now = new Date();
+  const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));
+  const [m, setM] = useState(cur);
+  const [scope, setScope] = useState("all");
+  const [team, setTeam] = useState("ALL");
+  const [mapOnly, setMapOnly] = useState(false);
+  const [carbonTool, setCarbonTool] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  useEffect(() => { if(!picked && scope === "picked") setScope("all"); }, [picked]);
+  const download = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const q = new URLSearchParams({ month: String(m) });
+      if(scope === "picked" && picked) q.set("routes", picked);
+      if(team !== "ALL") q.set("team", team);
+      if(mapOnly) q.set("map_only", "1"); else if(carbonTool) q.set("carbon_tool", "1");
+      const r = await fetch(`${API}/routes/map-export.pdf?${q.toString()}`);
+      if(!r.ok){
+        const txt = await r.text();
+        let d = "";
+        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+        throw new Error(d || `error ${r.status}`);
+      }
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `route-map-${months.start_year + Math.floor((m - 1) / 12)}-${String((m - 1) % 12 + 1).padStart(2, "0")}${mapOnly ? "-map" : ""}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setErr("The route map could not be made: " + (e.message || e)); }
+    setBusy(false);
+  };
+  return (
+    <details className="row-menu bulletin-menu" data-route-map-export="1">
+      <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }}
+               title="The routes on a map with their figures, as a PDF, from the approved plan">Route map (PDF) ▾</summary>
+      <div className="row-menu-list dash-filters">
+        <label><span>Month</span><select value={m} onChange={e => setM(+e.target.value)} aria-label="Route map month">
+          {Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select></label>
+        <label><span>Routes</span><select value={scope} onChange={e => setScope(e.target.value)} aria-label="Which routes">
+          <option value="all">Every route</option>
+          {picked && <option value="picked">Only the route picked in the list</option>}</select></label>
+        <label><span>{TEAM()}</span><select value={team} onChange={e => setTeam(e.target.value)} aria-label={TEAM()}>
+          <option value="ALL">All {TEAMS()}</option>
+          {(ipts || []).map(i => <option key={i.id} value={i.id}>{teamText(i.id)}</option>)}</select></label>
+        <label className="rme-tick"><input type="checkbox" checked={mapOnly} onChange={e => setMapOnly(e.target.checked)} /> Map only, with the legend on the map</label>
+        {!mapOnly && <label className="rme-tick"><input type="checkbox" checked={carbonTool} onChange={e => setCarbonTool(e.target.checked)} /> Add the National Highways Carbon Tool rows</label>}
+        <button type="button" onClick={download} disabled={busy}>{busy ? "Drawing the map…" : "Download the PDF"}</button>
+        <div className="row-menu-note">Approved lines only. A planning document, not an approved CLP.</div>
+        {err && <div className="bm-err" role="alert">{err}</div>}
+      </div>
+    </details>
   );
 }
 
@@ -10797,6 +10860,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-slate-700">Routes <span className="text-slate-400 font-normal">· click a row to locate it on the map</span></span>
           <span className="flex items-center gap-2">
+            {/* 14 Oct 2026 (backlog item 2): the route map export (replaces the per-route sheet) */}
+            <RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />
             {/* Bulk bake. Vehicles come from the tick-boxes on the Create route panel so
                 there is one vehicle list on the tab rather than two that can disagree. */}
             <select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)} className={sel}

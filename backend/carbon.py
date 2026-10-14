@@ -897,6 +897,7 @@ def _eval(line, s, ctx):
         "transport_t": tr_t, "transport_nh_t": nh_t, "transport_tkm_t": tkm_t,
         "wtt_kg_per_km": (wf or {}).get("kg_per_km"), "transport_wtt_t": wtt_t,
         "total_t": total, "flags": flags, "ipt": line.get("ipt"),
+        "discipline": line.get("discipline"),        # 14 Oct 2026: the route map export filters by it, as the map does
     }
 
 
@@ -1208,7 +1209,7 @@ def _line_out(e):
     keep = ("route_id", "month_index", "material_type", "carbon_material", "sheet", "vehicle", "fuel", "tonnes",
             "trips", "baked", "one_way_km", "km_trip", "kg_per_km", "factor_status", "material_kg_per_t",
             "material_method", "material_status", "material_t", "transport_t", "transport_nh_t",
-            "transport_wtt_t", "disposal_route", "disposal_kg_per_t", "disposal_t", "total_t", "flags", "ipt")
+            "transport_wtt_t", "disposal_route", "disposal_kg_per_t", "disposal_t", "total_t", "flags", "ipt", "discipline")
     return {k: _r(e[k]) for k in keep}
 
 
