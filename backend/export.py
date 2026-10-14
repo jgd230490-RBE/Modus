@@ -1323,6 +1323,16 @@ def _BF(kind):
     return brand_pdf.fonts()[kind]
 
 
+def _co2_pdf(s):
+    """
+    14 Oct 2026 (the user took the recommendation): the bulletin PDFs print CO₂e with the subscript, as the page does.
+    Inter has U+2082 (all three files); Helvetica's WinAnsi set does not, so the fallback keeps CO2e rather than a box.
+    """
+    import brand_pdf
+    s = str(s if s is not None else "")
+    return s.replace("CO₂e", "CO2e") if brand_pdf.fonts()["fallback"] else s.replace("CO2e", "CO₂e")
+
+
 PLAN_BLUE_HEX = "4A72C9"
 PLAN_BLUE_RGB = (0x4A / 255, 0x72 / 255, 0xC9 / 255)
 PLAN_TINT_RGB = (0xD7 / 255, 0xE0 / 255, 0xF3 / 255)
@@ -1690,6 +1700,7 @@ def _council_legend(C, width, title="t CO2e in the month:"):
     from reportlab.graphics.shapes import Drawing, Line, Rect, String, Group
     import bulletin_doc
     items = C["legend"]
+    title = _co2_pdf(title)   # 14 Oct 2026: before it is measured
     d = Drawing(width, 12)
     d.add(String(0, 2.5, title, fontName=_BF("bold"), fontSize=7.5, fillColor=colors.Color(*NAVY_RGB)))
     # 13 Oct 2026 (the rendered PDF): equal slots let "no approved laden route" run into the next swatch and the
@@ -1787,7 +1798,7 @@ class _Kit:
         return _pdf_safe(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     def P(self, txt, style=None):
-        return Paragraph(str(txt), style or self.st)
+        return Paragraph(_co2_pdf(txt), style or self.st)   # 14 Oct 2026: CO₂e where the font has it
 
     def grid(self, data, widths, total_row=False):
         t = LongTable(data, colWidths=widths, repeatRows=1)
@@ -1869,7 +1880,7 @@ class _Kit:
 
     def brief(self, S, title="Key points"):
         E, P = self.E, self.P
-        return [P(E(title), self.st_sec)] + [P(E(b), self.st_bul, ) if False else Paragraph(E(b), self.st_bul, bulletText="•")
+        return [P(E(title), self.st_sec)] + [P(E(b), self.st_bul, ) if False else Paragraph(_co2_pdf(E(b)), self.st_bul, bulletText="•")
                                               for b in S["brief"]]
 
     def report_box(self, S, lines=("lorry", "hours", "formats")):
@@ -1889,7 +1900,7 @@ class _Kit:
         E, P = self.E, self.P
         sm = ParagraphStyle("src", parent=self.st_grey, leftIndent=11, bulletIndent=0, bulletFontName=_BF("regular"),
                             bulletFontSize=7.5, spaceAfter=1.5)
-        items = [(i, E(t).replace("CO₂e", "CO2e")) for i, t in enumerate(S.get("sources") or [], 1)]
+        items = [(i, _co2_pdf(E(t))) for i, t in enumerate(S.get("sources") or [], 1)]   # 14 Oct 2026: was CO2e always
         if not items:
             return []
         # two columns, split where the running length is half the total, read down the left then the right
@@ -2108,7 +2119,7 @@ def _newsletter(S, map_h, pages=None):
     story.append(tt)
     story.append(P("Caveats", st_sec))
     for cv in S["caveats"]:
-        story.append(Paragraph(E(cv), ParagraphStyle("cv", parent=st_grey, leftIndent=9, bulletIndent=0,
+        story.append(Paragraph(_co2_pdf(E(cv)), ParagraphStyle("cv", parent=st_grey, leftIndent=9, bulletIndent=0,
                                                      bulletFontName=_BF("regular")), bulletText="•"))
     story += K.sources(S)
     doc.build(story)

@@ -6119,9 +6119,10 @@
                     rlBox.innerHTML = '<b>Volume · two-way movements a day in ' + rlEsc(monthLabel(m)) + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
                         stepRanges(VOLUME_STOPS, '').map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
-                        '<div class="ml-foot">Each route is painted by its own figure; ' + n + ' shared section' + (n === 1 ? '' : 's') +
-                        ' (a stretch of road two or more routes use) by the routes using it, summed, and labelled. ' +
-                        'One load = one two-way movement; the loaded leg is counted once. Stops are fixed, so a colour means the same volume in every month. ' +
+                        // 14 Oct 2026 (the user took the recommendation): shortened to match the bulletin's map note — its first
+                        // sentence is bulletin_doc.map_note() word for word; the rest keeps only the facts a reader needs
+                        '<div class="ml-foot">Where routes share a road, its colour shows their total (' + n + ' shared section' + (n === 1 ? '' : 's') + '). ' +
+                        'One load = one two-way movement; the loaded leg is counted once. Fixed stops: a colour means the same volume every month. ' +
                         'Hover or click a route for its own figure.' +
                         (other ? ' Routes are painted in ' + rlEsc(CONFIG.FORECAST_UNIT) + ' a day on stops twenty times these.' : '') +
                         ((data.notes || []).length ? ' ' + data.notes.map(rlEsc).join(' ') : '') + '</div>';

@@ -71,7 +71,8 @@ KEY = "factors"
 TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", "country": None,
                    "distance_unit": "km",     # H1: km stored always; "mi" = read in miles
                    # H2 (5 Oct 2026): a short notice every screen and export carries when set —
-                   # the demo tenant says "Fictional demo scheme · nothing here is real". A real
+                   # the demo tenant says "Fictional demo scheme · the scheme and its plan are invented" (14 Oct 2026;
+                   # was "· nothing here is real", which the bulletin's real government figures contradicted). A real
                    # tenant leaves it null and nothing is shown. Validated as text or null.
                    "demo_notice": None,
                    # 12 Oct 2026 (map review 2.1 / 2.3): the address the public map's "Report a concern" link

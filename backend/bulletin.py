@@ -585,6 +585,17 @@ def conditions_of_month(month_index, payload=None, factors=None):
             "count": len(hits) + len(piles) + len(seasonal) + len(exceeded)}
 
 
+def public_conditions(c):
+    """
+    14 Oct 2026 (the user took the recommendation): the bulletin is read by councils and residents, and a stockpile
+    over its capacity is a site matter, so the public page leaves the stockpile list out and the count with it.
+    conditions_of_month still computes it (the Dashboard and the map's own rules are unchanged).
+    """
+    out = {k: v for k, v in (c or {}).items() if k != "stockpiles_over"}
+    out["count"] = int((c or {}).get("count") or 0) - len((c or {}).get("stockpiles_over") or [])
+    return out
+
+
 # --------------------------------------------------------------------------- #
 #  The page                                                                     #
 # --------------------------------------------------------------------------- #
@@ -613,7 +624,7 @@ def month_page(month_index, acc):
                   "from": span_from.isoformat(), "to": span_to.isoformat()},
         "working_days": wd,
         "rollup": rollup,
-        "conditions": conditions_of_month(mi, payload=payload, factors=factors),
+        "conditions": public_conditions(conditions_of_month(mi, payload=payload, factors=factors)),
         # 12 Oct 2026: the note says plainly what a team code sees — everything, every team's row
         # included (D37, the user's decision: the public map's own figures, which
         # /api/public/month-kpis gives anyone with the map password).
