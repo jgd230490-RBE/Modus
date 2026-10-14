@@ -218,8 +218,11 @@ ok("D31: /api/meta is loaded through one function, on mount and again after a si
   && (code.match(/fetch\(`\$\{API\}\/meta`\)/g) || []).length === 1);
 // 12 Oct 2026 (the review and fix pass): Sign out asks the server to swap the 12-hour staff cookie for a map-only one
 // (gate.downgrade_kwargs) — clearing the tab's code alone left the staff surface open to the next person at the machine
-ok("Sign out POSTs /api/gate-signout?keep=map and forgets the staff shape, so the next sign-in fetches /api/meta again",
-  /const signOut = \(\) => \{[\s\S]{0,500}fetch\(`\$\{API\}\/gate-signout\?keep=map`, \{ method: "POST" \}\)\.catch\(\(\) => \{\}\);\s*\n\s*metaHadCode\.current = false;/.test(code));
+// NARROWED 14 Oct 2026 (G3): Sign out posts /api/auth/signout, which does what gate-signout?keep=map did (the staff
+// cookie becomes a map cookie) AND ends a login's session on the server; gate-signout still answers (test_gate)
+ok("Sign out POSTs /api/auth/signout and forgets the staff shape, so the next sign-in fetches /api/meta again",
+  /const signOut = \(\) => \{[\s\S]{0,900}fetch\(`\$\{API\}\/auth\/signout`, \{ method: "POST" \}\)\.catch\(\(\) => \{\}\);\s*\n\s*metaHadCode\.current = false;/.test(code)
+  && /const signOut = \(\) => \{[\s\S]{0,300}authHint\(false\);/.test(code));
 // ⭐ THE INVARIANT. The <option value> is the canonical id; only the text changes.
 ok("⭐ the picker's option VALUE is the canonical id, the text is the label",
   /<option key=\{v\} value=\{v\} disabled=[\s\S]{0,160}\{vehLabel\(v\)\}/.test(code));
@@ -1789,12 +1792,15 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     ok("the bar's Guide: none on sign-in; the embedded map's tour on a map view once the map says it is ready; the app's guide on other Portal pages",
       appFn.includes('const onMap = view === "public" || (view === "portal" && page === "map");')
       // 11 Oct: "resume" (signing back in after a reload) has no guide either, like the sign-in view
-      && appFn.includes('const barGuide = (view === "login" || view === "resume") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
+      // NARROWED 14 Oct 2026 (G3): the set-password and dead-link views have no tour either
+      && appFn.includes('const barGuide = (view === "login" || view === "resume" || view === "setpw" || view === "linkerr") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
     ok("🔴 a reload with a stored code starts on resume and re-checks it with /api/auth, never trusting it unchecked",
-      appFn.includes('const [view, setView] = useState(() => ACCESS.code ? "resume" : "public");')
+      // NARROWED 14 Oct 2026 (G3): a set-password link opens "setpw"; a lead's link, a stored code or a browser that
+      // signed in with a login before (the hint) starts on "resume"; anything else the public map, as before
+      appFn.includes('const [view, setView] = useState(() => (START_LINK && START_LINK.purpose !== "demo") ? "setpw"\n    : (START_LINK || ACCESS.code || hasAuthHint()) ? "resume" : "public");')
       && appFn.includes('body: JSON.stringify({ code: ACCESS.code }) })')
       && appFn.includes('.then(info => { ACCESS.info = info; setRole(info); setView("portal"); })')
-      && (appFn.match(/setView\("portal"\)/g) || []).length === 2);   // signIn() and the checked resume, nowhere else
+      && (appFn.match(/setView\("portal"\)/g) || []).length === 3);   // signIn(), the checked code resume and (G3) the checked session resume
     ok("...a 401 / 403 forgets the stored code; the public map is the fallback either way",
       appFn.includes('if(e === 401 || e === 403){ ACCESS.code = ""; try { sessionStorage.removeItem("modus_access_code"); } catch(x){} }')
       && /\.catch\(e => \{[\s\S]{0,400}setView\("public"\);\s*\}\);/.test(appFn));
@@ -1847,7 +1853,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
       && code.includes('onClick={() => setView("login")}'));
   }
   {
-    const lg = (src.match(/function Login\(\{ onSignIn, onBack, savedName \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    // NARROWED 14 Oct 2026 (G3): Login also takes the "you have been signed out" notice
+    const lg = (src.match(/function Login\(\{ onSignIn, onBack, savedName, notice \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
     ok("11 Oct: the staff sign-in uses the finalised theme — tokens, labels above, orange focus and button; no blue focus ring, no navy button",
       lg.includes('<div className="auth-card">') && lg.includes('className="btn-pri auth-go"') && lg.includes('<label htmlFor="auth-code">Access code</label>')
       && !/focus:ring-\[color:var\(--blue\)\]/.test(lg) && !/background:"var\(--navy\)"/.test(lg)
@@ -2735,6 +2742,58 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the shift ÷ the check-in time a lorry")
      && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
      && _ga.includes("`capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`"));
+}
+
+// ---- 14 Oct 2026 (G3): per-person logins, at source ---------------------------------------------------------
+{
+  const fnBody = (name) => { const i = code.indexOf(`function ${name}(`); if (i < 0) return ""; const j = code.indexOf("\nfunction ", i + 10); return code.slice(i, j < 0 ? undefined : j); };
+  const wrap = code.slice(code.indexOf("window.fetch = (url, opts) =>"), code.indexOf("const SESSION_ENDED"));
+  ok("⭐ G3: the ONE fetch wrapper adds X-Wayscope to every API call (the server refuses a cookie write without it)",
+     wrap.includes('o.headers = { ...(o.headers || {}), "X-Wayscope": "1", ...(ACCESS.code ? { "X-Access-Code": ACCESS.code } : {}) };')
+     && (code.match(/"X-Wayscope"/g) || []).length === 1);
+  ok("G3: a 401 to a login (not on a sign-in call) ends the session in the app, once, by one event",
+     wrap.includes('if(r.status === 401 && ACCESS.info && ACCESS.info.via === "login" && !u.startsWith(API + "/auth/"))')
+     && code.includes('const SESSION_ENDED = "wayscope-session-ended";'));
+  ok("⭐ G3: an emailed link is read from the FRAGMENT once, only its own characters, and taken off the address at once",
+     /const START_LINK = \(function\(\)\{[\s\S]{0,400}\/\^#\(invite\|reset\|demo\)=\(\[A-Za-z0-9_-\]\{20,200\}\)\$\/[\s\S]{0,200}history\.replaceState\(null, "", window\.location\.pathname \+ window\.location\.search\);/.test(code));
+  ok("🔴 G3: the session never touches page storage — only a '1' hint is kept, and no password or email is stored",
+     code.includes('localStorage.setItem(AUTH_HINT, "1")') && !/(local|session)Storage\.setItem\([^)]*(pass|email|session)/i.test(code)
+     && !/document\.cookie/.test(code));
+  const lg = fnBody("Login");
+  ok("G3: the sign-in screen opens on email and password; the code form only while the server says codes are on",
+     lg.includes('const [mode, setMode] = useState("email");') && lg.includes('postJSON("/auth/signin", { email: email.trim(), password: pass, remember })')
+     && lg.includes('{codesOn && !forgot && <button type="button" onClick={() => go("code")}>Sign in with a team code instead</button>}')
+     && lg.includes("setCodesOn(!!(j && j.codes))") && lg.includes('autoComplete="username"') && lg.includes('autoComplete="current-password"'));
+  ok("G3: 'Forgot your password?' posts the email only, and shows the server's one answer",
+     lg.includes('postJSON("/auth/forgot", { email: email.trim() })') && lg.includes("setMsg(j.message"));
+  const sp = fnBody("SetPassword");
+  ok("G3: the set-password screen checks the link first (no use), refuses short and unmatched passwords on the page, then posts",
+     sp.includes('postJSON("/auth/check", { token: link.token })') && sp.includes("if(pw.length < 10)") && sp.includes("if(pw !== pw2)")
+     && sp.includes('postJSON("/auth/reset", { token: link.token, password: pw, remember })') && sp.includes('autoComplete="new-password"'));
+  const up = fnBody("UsersPage");
+  ok("⭐ G3 USERS: never renders a team id — teams come from the server's NAMES; the slot is only an option value",
+     up.length > 3000 && !/\{u\.team\}|\{l\.team\}|\{t\.id\}<|>\{.*\.team\}/.test(up) && up.includes('teams.map(t => ["team:" + t.id, t.label])')
+     && up.includes("{choices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}"));
+  ok("G3 USERS: the admin token is asked for only when NOT signed in as an admin login (D47 bootstrap), never sent by a login",
+     up.includes("{!viaLogin && (") && up.includes('if(!viaLogin && token) q.set("token", token);'));
+  ok("G3 USERS: the person cannot disable themself; a link that could not be emailed is shown to pass on",
+     up.includes("{u.id !== data.me && <button") && up.includes("Pass this link on yourself") && up.includes("navigator.clipboard.writeText(note.link)"));
+  ok("G3: Users is an admin-only item, shown to an admin and (for the first-admin step) a planner on a shared CODE, never a planner login",
+     code.includes('const isAdmin = !!(role && (role.role === "admin" || (role.can_approve && role.via !== "login")));'));
+  ok("G3: Users is an admin-only item, rendered only for an admin",
+     code.includes('{ id: "users", label: "Users", glyph: "☺", adminOnly: true }') && code.includes('{page === "users" && isAdmin && <UsersPage access={role} />}')
+     && code.includes(".map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) }))"));
+  ok("G3 (D51): only a DEMO login reports page opens", /if\(!role \|\| role\.kind !== "demo"\) return;\s*\n\s*fetch\(`\$\{API\}\/activity`/.test(code));
+  const am = fnBody("AccountMenu");
+  ok("G3: the account menu shows the team by NAME and offers a password change to staff logins only",
+     am.includes("const team = role.ipt ? teamName(role.ipt) : role.label;") && am.includes("{!demo && (")
+     && am.includes('postJSON("/auth/password", { current: cur, new: nw })'));
+  ok("G3: the header shows the account menu for a login and the old team/role line for a code",
+     code.includes('{role.via === "login" ? <AccountMenu role={role} onSignOut={signOut} />'));
+  ok("G3 (phone): below 640 px a login's name becomes its initials, its Sign out moves into the menu, and the menu is pinned on screen",
+     html.includes(".hdr-signout-login{display:none;} .acct-signout{display:block;} }") && html.includes(".acct-btn .acct-name{display:none;} .acct-btn .acct-ini{display:inline;}")
+     && html.includes(".acct-menu{position:fixed;left:8px;right:8px;top:60px;min-width:0;}")
+     && code.includes('(role.via === "login" ? " hdr-signout-login" : "")') && code.includes('aria-label={`Your account: ${role.name}`}'));
 }
 
 // ---- report ------------------------------------------------------------------

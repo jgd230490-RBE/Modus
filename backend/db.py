@@ -911,6 +911,100 @@ def init_demo_requests_db():
         conn.close()
 
 
+def init_users_db():
+    """
+    G3 (14 Oct 2026) — per-person logins. FIVE tables, each carrying tenant_id (every read
+    and write filters on current_tenant()) but deliberately NOT in TENANTED_TABLES: a login
+    is account data, not tenant PACKAGE data. A package import deletes and rewrites every
+    TENANTED_TABLES row, and re-importing the demo must never delete the people who sign in
+    to it. Listed as untenanted (with this reason) in test_tenant_audit.py, like
+    demo_requests. Tokens are stored only as SHA-256 hashes; passwords only as scrypt
+    hashes; IPs only as the salted hash demo_request.ip_hash() makes. See backend/users.py.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id               TEXT PRIMARY KEY,
+                tenant_id        TEXT NOT NULL,
+                email            TEXT NOT NULL,
+                name             TEXT NOT NULL,
+                role             TEXT NOT NULL,
+                team             TEXT,
+                password_hash    TEXT,
+                disabled         INTEGER DEFAULT 0,
+                kind             TEXT DEFAULT 'staff',
+                expires_at       TEXT,
+                demo_request_id  TEXT,
+                created_at       TEXT,
+                created_by       TEXT,
+                last_sign_in_at  TEXT,
+                password_set_at  TEXT
+            )
+        """)
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_users_tenant_email ON users (tenant_id, email)")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                token_hash    TEXT PRIMARY KEY,
+                tenant_id     TEXT NOT NULL,
+                user_id       TEXT NOT NULL,
+                created_at    TEXT,
+                expires_at    TEXT NOT NULL,
+                last_seen_at  TEXT,
+                remember      INTEGER DEFAULT 0,
+                ip_hash       TEXT,
+                ua            TEXT
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS ix_user_sessions_user ON user_sessions (user_id)")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS auth_tokens (
+                token_hash  TEXT PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                user_id     TEXT NOT NULL,
+                purpose     TEXT NOT NULL,
+                created_at  TEXT,
+                expires_at  TEXT NOT NULL,
+                used_at     TEXT,
+                uses        INTEGER DEFAULT 0
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id           TEXT PRIMARY KEY,
+                tenant_id    TEXT NOT NULL,
+                at           TEXT NOT NULL,
+                kind         TEXT NOT NULL,
+                actor_kind   TEXT,
+                actor_id     TEXT,
+                actor_label  TEXT,
+                method       TEXT,
+                path         TEXT,
+                target       TEXT,
+                status       INTEGER,
+                detail       TEXT,
+                ip_hash      TEXT
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS ix_audit_log_at ON audit_log (tenant_id, at)")
+        cur.execute("CREATE INDEX IF NOT EXISTS ix_audit_log_actor ON audit_log (tenant_id, actor_id)")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS auth_attempts (
+                id         TEXT PRIMARY KEY,
+                tenant_id  TEXT NOT NULL,
+                kind       TEXT NOT NULL,
+                key_hash   TEXT NOT NULL,
+                at         TEXT NOT NULL,
+                ok         INTEGER DEFAULT 0
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS ix_auth_attempts_key ON auth_attempts (kind, key_hash, at)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def count_forecast_weeks():
     return query("SELECT COUNT(*) AS n FROM forecast_weeks WHERE tenant_id = ?",
                  (current_tenant(),))[0]["n"]

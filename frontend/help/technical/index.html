@@ -190,10 +190,37 @@ which providers were not checked since baking.</li>
 
 <h1 id="t4-settings">T4 Settings and deployment</h1>
 <ul>
+<li><strong>Sign-in (G3, 14 Oct 2026).</strong> A login is a row in <code>users</code> (email, name, role
+<code>team</code> with one of the six internal team slots, <code>planner</code> or <code>admin</code>, a scrypt hash, a
+disabled flag; kind <code>staff</code> or <code>demo</code>). <code>POST /api/auth/signin</code> makes a server-side
+session: a random token in the <code>wayscope_session</code> cookie (HttpOnly, Secure, SameSite=Lax; 12 h, or 30 days
+with "keep me signed in"), stored only as its SHA-256 in <code>user_sessions</code>. Sign out and Disable delete the
+rows, so the cookie dies everywhere at once. A session resolves to the same access dict a code does
+(<code>access.resolve_request</code>: a valid <code>X-Access-Code</code> first, else the cookie), so every line filter
+is unchanged. Invite (72 h) and reset (60 min) links are single-use, sent as <code>APP_URL/#invite=…</code> or
+<code>#reset=…</code> (a fragment: never in a server log or a Referer) and stored hashed in <code>auth_tokens</code>.
+Limits: 5 failed sign-ins per email per 15 min, 30 per IP; 3 reset requests per email per hour, 10 per IP; kept in
+<code>auth_attempts</code>. The tables carry <code>tenant_id</code> but are not package data: a package import leaves
+them alone.</li>
+<li><strong>The shared codes</strong> (<code>IPT1_CODE…IPT6_CODE</code>, <code>PLANNER_CODE</code>,
+<code>ADMIN_CODE</code>) work only while set; deleting them on Render ends them (decided for 31 Oct 2026). The sign-in
+screen offers the code form only while <code>/api/auth/me</code> says <code>codes: true</code>.</li>
+<li><strong>Writes from the app.</strong> The app's one fetch wrapper adds <code>X-Wayscope: 1</code>. A write that the
+session cookie authenticates without that header is refused (403), and so is any <code>/api/auth/*</code> POST: another
+site cannot add a header. CORS answers no other origin.</li>
+<li><strong>The audit trail.</strong> The middleware writes one <code>audit_log</code> row for every
+non-GET <code>/api/</code> request that answers 2xx: who (the login; "&lt;role&gt; code (shared)"; or "admin token"),
+when, the path, the query and the JSON body with every key ending in password / token / code / secret removed,
+capped at 4 KB. POSTs that change nothing (the costing preview, the carbon scenario and its PDF) are not logged; the
+sign-in calls log their own events. Demo logins also log page opens (<code>POST /api/activity</code>). Read it on
+Users → Activity or <code>GET /api/admin/audit.csv</code>.</li>
+<li><strong>Demo leads (HU14).</strong> A demo request makes (or renews) a <code>demo</code> login on the team slot
+<code>DEMO_TEAM_CODE_VAR</code> names, for 14 days, and emails its personal link (<code>#demo=…</code>), reusable until
+the login ends. The leads CSV gains login, expiry, sign-ins, first and last seen, pages.</li>
 <li><strong>The admin token.</strong> Admin actions (saving Configuration, changing routes, zones and gates, the fuel
-index) send the token typed in the admin token field (Config → More, the Data pages' header, the fuel widget); it is
-remembered in this browser. It is checked against <code>ADMIN_TOKEN</code> on Render. While that variable is unset,
-those actions are open to anyone who can reach them. The Data → Locations note now points at the field in the page
+index, Users) pass on an admin LOGIN, or with the token typed in the admin token field (Config → More, the Data pages'
+header, the fuel widget, Users); it is remembered in this browser. It is checked against <code>ADMIN_TOKEN</code> on Render.
+Since 12 Oct 2026 an unset <code>ADMIN_TOKEN</code> refuses those actions (it used to open them). The Data → Locations note now points at the field in the page
 header (it used to name a bake panel that no longer exists).</li>
 <li><strong>Routing key.</strong> Routing needs <code>HERE_API_KEY</code> in Render → Environment for the
 <code>modus-web</code> service. Without it the Data → Routes banner says routing is not set up, and nothing bakes.</li>

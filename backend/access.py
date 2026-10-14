@@ -48,9 +48,16 @@ The moment any real code is set, the demo codes stop working whatever `ALLOW_DEM
 says. A known string that grants planner rights is not a demo any more once real codes
 exist beside it.
 
-⚠️ WHAT THIS IS NOT
--------------------
-It is an access filter, not authentication in the Phase 6 sense. The codes are shared
+G3 (14 Oct 2026): PER-PERSON LOGINS SIT BESIDE THE CODES
+--------------------------------------------------------
+A signed-in person's session cookie resolves (users.py) to the SAME dict a code does —
+role, ipt, label — plus who they are and `via: "login"`, so every filter below works on
+both unchanged. The codes keep working only while one is set in the environment; the user
+deletes them on Render on 31 Oct 2026 (D49), after which only logins resolve.
+
+⚠️ WHAT THE CODES ARE NOT
+-------------------------
+A code is an access filter, not authentication in the Phase 6 sense. The codes are shared
 secrets typed into a browser, `LOGINS` in the frontend is gone but the code itself sits
 in sessionStorage for the tab, and there is no rate limit. Do not describe the
 deployment as secure on the strength of this.
@@ -168,9 +175,35 @@ def resolve(code):
 # --------------------------------------------------------------------------- #
 #  Per-request context                                                         #
 # --------------------------------------------------------------------------- #
-def set_current(code):
-    """Resolve a code into the request context. Returns the token to reset with."""
-    return _ACCESS.set(resolve(code))
+def resolve_request(code, session_token=None):
+    """
+    G3 (14 Oct 2026): what one request is allowed, from its X-Access-Code header and its
+    `wayscope_session` cookie.
+
+      1. a code that resolves (only while a code is set in the environment, D49) — the app
+         sends the header only when the person signed in with a code, so a code beats a
+         stale session cookie left in the same browser;
+      2. else a live session of a usable login (users.resolve_session);
+      3. else None.
+    """
+    acc = resolve(code)
+    if acc:
+        acc["via"] = "code"
+        return acc
+    if session_token:
+        try:
+            import users
+            got, _user = users.resolve_session(session_token)
+            return got
+        except Exception as e:  # noqa: BLE001 — a broken session store must not open anything
+            print(f"access: session lookup failed {e.__class__.__name__}: {str(e)[:200]}")
+            return None
+    return None
+
+
+def set_current(code, session_token=None):
+    """Resolve a request into the context. Returns the token to reset with."""
+    return _ACCESS.set(resolve_request(code, session_token))
 
 
 def reset_current(token):
@@ -262,11 +295,21 @@ def describe(acc=None):
     acc = acc if acc is not None else current()
     if not acc:
         return None
-    return {
+    out = {
         "role": acc["role"], "label": acc["label"], "ipt": acc.get("ipt"),
         "can_approve": can_approve(acc),
         "ipt_locked": bool(acc.get("ipt")),
         "ipt_required": acc["role"] in ("planner", "admin"),
         "demo": demo_mode(),
         "ipts": tenant_team_ids(),
+        # G3 (14 Oct 2026): how this person signed in, and who they are when it was a login.
+        # `codes` says whether the shared codes are still on (D49), so the sign-in screen
+        # offers the code form only while they work.
+        "via": acc.get("via") or "code",
+        "codes": bool(configured_codes()),
     }
+    if acc.get("via") == "login":
+        out.update({"name": acc.get("name"), "email": acc.get("email"), "kind": acc.get("kind"),
+                    "expires_at": acc.get("expires_at"), "user_id": acc.get("user_id"),
+                    "session_expires_at": acc.get("session_expires_at")})
+    return out

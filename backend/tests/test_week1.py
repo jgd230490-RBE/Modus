@@ -469,7 +469,8 @@ ok("A3 (11 Oct 2026 review): ...and the refused reset leaves the live document a
 ok("A3 (11 Oct 2026 review): ...the refusal names ONLY the vehicle the file lacks — the baked default profile, which the file keeps, is not a problem",
    "Artic Tipper (44t)" not in str(getattr(_rr, "detail", "")))
 ok("A3 (11 Oct 2026 review): the reset endpoint and reset_to_file both pass the network through (source level)",
-   "reset_to_file(conversions, by=updated_by, network=network)" in inspect.getsource(main.reset_factors_config)
+   # 14 Oct 2026 (G3): the name now goes through main._by() (a login's own name wins over the typed one)
+   "reset_to_file(conversions, by=_by(updated_by), network=network)" in inspect.getsource(main.reset_factors_config)
    and "save(doc, by=f\"reset:factors.json ({by or 'unknown'})\", network=network)" in inspect.getsource(config.reset_to_file))
 db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?",
            (db.current_tenant(), "RA3", V07))

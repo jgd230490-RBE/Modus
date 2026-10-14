@@ -110,6 +110,14 @@ UNTENANTED = {
     # company running the deployment, not to the tenant whose data the demo shows. The IP
     # is stored only as a salted hash; the codes the visitor was sent are never stored.
     "demo_requests": "leads for the company running the deployment, not a tenant's data",
+    # 14 Oct 2026 (G3). Logins and everything that hangs off them. Each carries tenant_id and every
+    # statement filters on it, but none is PACKAGE data: a package import deletes and rewrites every
+    # TENANTED_TABLES row, and re-importing the demo must never delete the people who sign in to it.
+    "users": "per-person logins (G3): account data scoped by tenant_id, never shipped in or wiped by a package",
+    "user_sessions": "signed-in browsers of a login (G3): account data, scoped by tenant_id, not package data",
+    "auth_tokens": "invite, reset and demo links of a login (G3), stored as hashes: account data, not package data",
+    "audit_log": "who changed what (G3, D55): a record about the tenant's data, kept when a package is re-imported",
+    "auth_attempts": "the sign-in and reset rate limit's memory (G3): one day of hashed keys, not package data",
 }
 
 # Statements that may touch a tenanted table with no tenant predicate, each with
