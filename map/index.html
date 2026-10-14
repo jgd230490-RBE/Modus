@@ -590,6 +590,20 @@
                       max-height:calc(100vh - 24px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:12px;
                       box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
         #share-panel[hidden]{ display:none; }
+        /* 14 Oct 2026 (backlog item 2): the route map export card, the share card's twin */
+        #rme-panel{ position:fixed; z-index:40; left:50%; top:50%; transform:translate(-50%, -50%); width:min(360px, calc(100vw - 24px));
+                    max-height:calc(100vh - 24px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:12px;
+                    box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
+        #rme-panel[hidden]{ display:none; }
+        #rme-panel .share-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+        #rme-panel .share-head b{ flex:1; font-size:16px; color:var(--navy-deep); }
+        #rme-panel .rme-what{ margin:0 0 10px; color:var(--muted); }
+        #rme-panel .rme-field{ display:block; font-weight:600; margin-bottom:4px; }
+        #rme-panel select{ width:100%; min-height:44px; font:14px Inter,system-ui,sans-serif; margin-bottom:10px; }
+        #rme-panel .rme-check{ display:flex; align-items:center; gap:10px; min-height:44px; cursor:pointer; }
+        #rme-panel .rme-check input{ width:20px; height:20px; flex:none; }
+        #rme-panel .rme-check[hidden]{ display:none; }
+        #rme-status{ min-height:20px; font-size:14px; margin-top:6px; }
         #share-panel .share-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
         #share-panel .share-head b{ flex:1; font-size:16px; color:var(--navy-deep); }
         #share-qr{ display:flex; justify-content:center; margin:6px 0 10px; }
@@ -735,6 +749,9 @@
         <select id="filter-discipline" onchange="applyFilters()"><option value="ALL">All disciplines</option></select>
         <select id="filter-ipt" onchange="applyFilters()"><option value="ALL">All teams</option></select>
         <button class="btn btn-ghost" onclick="resetFilters()">Reset filters</button>
+        <!-- 14 Oct 2026 (backlog item 2): the route map export, STAFF ONLY (the user, 14 Oct). Hidden until
+             /api/public/whoami says staff; the endpoint refuses anyone else (401) whatever the page shows. -->
+        <button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport()">Export route map (PDF)</button>
     </div>
 
     <!-- 11 Oct 2026 — the map leads (ui-review-1009, mockup 7): the layer controls fold away. Closed by
@@ -1065,6 +1082,20 @@
   <div class="share-row"><button type="button" class="btn" onclick="copyViewLink()">Copy link</button></div>
   <div id="share-status" role="status" aria-live="polite"></div>
   <p class="mt-note" id="share-note">The link opens the map on this month with these layers and filters. It still asks for the map password.</p>
+</div>
+
+<!-- 14 Oct 2026 (backlog item 2): the route map export — the routes the filters show, one month, two options. Staff only. -->
+<div id="rme-panel" role="dialog" aria-labelledby="rme-title" hidden>
+  <div class="share-head"><b id="rme-title">Export the route map</b>
+    <button type="button" class="share-close" onclick="closeRouteExport()" aria-label="Close the export card" title="Close">&times;</button></div>
+  <p class="rme-what" id="rme-what"></p>
+  <label class="rme-field" for="rme-month">Month</label>
+  <select id="rme-month"></select>
+  <label class="rme-check"><input type="checkbox" id="rme-maponly" onchange="syncRouteExport()"> Map only, with the legend on the map</label>
+  <label class="rme-check" id="rme-carbon-row"><input type="checkbox" id="rme-carbon"> Add the National Highways Carbon Tool rows</label>
+  <div class="share-row"><button type="button" class="btn" id="rme-go" onclick="downloadRouteExport()">Download PDF</button></div>
+  <div id="rme-status" role="status" aria-live="polite"></div>
+  <p class="mt-note">Approved lines only, for the routes the filters show. A planning document, not an approved CLP.</p>
 </div>
 
 <!-- 12 Oct 2026 (review 2.3): the hover card on a route (desktop; a phone taps for the route card instead) -->
@@ -7642,6 +7673,87 @@
         if (SHARE.opener && SHARE.opener.focus) { try { SHARE.opener.focus(); } catch (e) {} }
     }
 
+    // ---------------------------------------------------------------- the route map export (14 Oct 2026, backlog item 2)
+    // STAFF ONLY (the user, 14 Oct). The button is shown once /api/public/whoami answers "staff" (a code, or the staff
+    // cookie the app's iframe carries); the map password's visitor never sees it, and the endpoint refuses them anyway.
+    // The request carries the Route filtering as the map applies it (origin, destination, team: the select's values;
+    // discipline) and ONE month: the month on screen, else the first month with volume. The PDF is drawn on the server.
+    const RME = { staff: false, opener: null };
+    function checkRouteExportStaff() {
+        try {
+            fetch('/api/public/whoami', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null)
+                .then(j => { RME.staff = !!(j && j.level === 'staff'); const b = document.getElementById('rme-open'); if (b) b.hidden = !RME.staff; })
+                .catch(() => {});
+        } catch (e) {}
+    }
+    function routeExportFilters() {
+        const val = id => { const el = document.getElementById(id); return el && el.value !== 'ALL' ? el.value : null; };
+        return { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'), team: val('filter-ipt') };
+    }
+    function routeExportWords() {
+        const f = routeExportFilters();
+        const parts = [f.team ? selectedText('filter-ipt') : 'All teams'];
+        if (f.origin) parts.push('from ' + f.origin);
+        if (f.dest) parts.push('to ' + f.dest);
+        if (f.discipline) parts.push(f.discipline);
+        return 'The routes the filters show: ' + parts.join(' · ') + '.';
+    }
+    function syncRouteExport() {
+        const mo = document.getElementById('rme-maponly'), row = document.getElementById('rme-carbon-row');
+        if (row && mo) row.hidden = mo.checked;            // a map-only page has no tables, so no Carbon Tool rows
+    }
+    function openRouteExport() {
+        if (!RME.staff) return;
+        const p = document.getElementById('rme-panel');
+        if (!p) return;
+        RME.opener = document.activeElement;
+        const months = chipMonths();
+        const sel = document.getElementById('rme-month');
+        const want = (TL.on && TL.month) ? TL.month : (months[0] || null);
+        if (sel) {
+            sel.innerHTML = months.map(m => '<option value="' + m + '"' + (m === want ? ' selected' : '') + '>' + escHtml(monthLabel(m)) + '</option>').join('');
+        }
+        const w = document.getElementById('rme-what'); if (w) w.textContent = months.length ? routeExportWords() : 'No month carries approved volume yet.';
+        const go = document.getElementById('rme-go'); if (go) go.hidden = !months.length;
+        const st = document.getElementById('rme-status'); if (st) st.textContent = '';
+        syncRouteExport();
+        p.hidden = false;
+        const c = p.querySelector('.share-close'); if (c) c.focus();
+    }
+    function closeRouteExport() {
+        const p = document.getElementById('rme-panel');
+        if (p) p.hidden = true;
+        if (RME.opener && RME.opener.focus) { try { RME.opener.focus(); } catch (e) {} }
+    }
+    function routeExportUrl() {
+        const f = routeExportFilters();
+        const q = new URLSearchParams();
+        q.set('month', document.getElementById('rme-month').value);
+        Object.keys(f).forEach(k => { if (f[k]) q.set(k, f[k]); });
+        const mapOnly = document.getElementById('rme-maponly').checked;
+        if (mapOnly) q.set('map_only', '1');
+        else if (document.getElementById('rme-carbon').checked) q.set('carbon_tool', '1');
+        return '/api/routes/map-export.pdf?' + q.toString();
+    }
+    async function downloadRouteExport() {
+        const st = document.getElementById('rme-status');
+        if (st) st.textContent = 'Drawing the map…';
+        try {
+            const r = await fetch(routeExportUrl(), { credentials: 'same-origin' });
+            if (!r.ok) throw new Error(r.status === 401 ? 'only staff can export the route map: sign in to the app' : 'the export failed (' + r.status + ')');
+            const blob = await r.blob();
+            const cd = r.headers.get('content-disposition') || '';
+            const m = cd.match(/filename="([^"]+)"/);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); a.download = m ? m[1] : 'route-map.pdf';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            if (st) st.textContent = 'Downloaded.';
+        } catch (e) { if (st) st.textContent = 'Not downloaded: ' + (e && e.message || e); }
+    }
+    checkRouteExportStaff();
+
     // ---------------------------------------------------------------- the QR code, drawn here (ISO/IEC 18004; no library)
     // Byte mode, error correction level M, versions 1-10 (up to 213 bytes of link). The harness decodes what this draws
     // and checks every block's Reed-Solomon syndromes, the format and version bits and the text that comes back.
@@ -8191,6 +8303,8 @@
     // Escape closes the top-most of: the share card, the text view, the layers sheet, a raised sheet
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        const rp = document.getElementById('rme-panel');
+        if (rp && !rp.hidden) { closeRouteExport(); return; }
         const sp = document.getElementById('share-panel');
         if (sp && !sp.hidden) { closeSharePanel(); return; }
         const mt = document.getElementById('month-text');

@@ -2991,6 +2991,27 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && code.includes('(role.via === "login" ? " hdr-signout-login" : "")') && code.includes('aria-label={`Your account: ${role.name}`}'));
 }
 
+// ---- 14 Oct 2026 (backlog item 2): the route map export from the Routes page --------------------------------------------
+{
+  const _rm = (src.match(/function RouteMapExportMenu\([\s\S]*?\n\}\n/) || [""])[0];
+  ok("⭐ ROUTE MAP EXPORT (Routes page): one menu on the Routes list's bar, the month, every route or the one picked, a team, two options",
+     _rm.length > 1500 && (code.match(/<RouteMapExportMenu /g) || []).length === 1
+     && code.includes("<RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />")
+     && _rm.includes('aria-label="Route map month"') && _rm.includes('<option value="all">Every route</option>')
+     && _rm.includes('{picked && <option value="picked">Only the route picked in the list</option>}')
+     && _rm.includes("Map only, with the legend on the map") && _rm.includes("Add the National Highways Carbon Tool rows"));
+  ok("...it asks the one staff-only endpoint with the same parameters as the public map (routes, team, map_only, carbon_tool)",
+     _rm.includes("fetch(`${API}/routes/map-export.pdf?${q.toString()}`)") && _rm.includes('if(scope === "picked" && picked) q.set("routes", picked);')
+     && _rm.includes('if(mapOnly) q.set("map_only", "1"); else if(carbonTool) q.set("carbon_tool", "1");'));
+  ok("...team NAMES in its list (teamText), never an id; the Carbon Tool box is not drawn under map only",
+     _rm.includes("{(ipts || []).map(i => <option key={i.id} value={i.id}>{teamText(i.id)}</option>)}")
+     && _rm.includes("{!mapOnly && <label className=\"rme-tick\">"));
+  ok("...it says what it is (approved lines, not an approved CLP), and a refusal in words",
+     _rm.includes("Approved lines only. A planning document, not an approved CLP.") && _rm.includes('setErr("The route map could not be made: " + (e.message || e));'));
+  ok("...placed after App, outside the Dashboard's read-only stock slice (that pin scans DashboardStockChart → App)",
+     code.indexOf("function RouteMapExportMenu(") > code.indexOf("function App(") && code.indexOf("function RouteMapExportMenu(") < code.indexOf("function Header("));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

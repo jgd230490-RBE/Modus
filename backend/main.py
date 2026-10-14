@@ -55,6 +55,7 @@ import road_sections  # 12 Oct 2026 — shared road sections (public map review 
 import areas         # 12 Oct 2026 — movements and carbon per council (public map review §2.2b, D27)
 import limits        # 13 Oct 2026 — lorry limits (weight / height / width) from OpenStreetMap and HERE
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
+import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
@@ -2604,6 +2605,36 @@ def routes_status():
 @app.get("/api/routes/summary")
 def routes_summary():
     return network.summary()
+
+
+@app.get("/api/routes/map-export.pdf")
+def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
+                         dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
+                         routes: Optional[str] = None, carbon_tool: int = 0, map_only: int = 0, request: Request = None):
+    """
+    14 Oct 2026 (backlog item 2, replaces the per-route sheet) — the map as it is filtered, as an A4 landscape PDF
+    drawn here (basemap.py + the bulletin's route drawing), never a screenshot. STAFF ONLY (the user, 14 Oct): a valid
+    code or the staff cookie (the map's iframe in the app sends the cookie); the map password's cookie gets 401.
+    The filters are the public map's Route filtering (origin, dest, discipline, team: the slot id or the team's name)
+    and `routes` (comma-separated ids, the Routes page's list). Options: `carbon_tool=1` adds the NH Carbon Tool
+    transport rows (H3), `map_only=1` is one page with the legend inside the map (and no tables). A team code gets its
+    own team's routes whatever it asks for. Approved lines only (D11). Stores nothing.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the route map export is for staff")
+    ids = [x.strip() for x in (routes or "").split(",") if x.strip()] or None
+    S = route_map_export.sheet(month, route_ids=ids, team=team, acc=access.current(), origin=origin, dest=dest,
+                               discipline=discipline, carbon_tool=bool(carbon_tool) and not map_only,
+                               map_only=bool(map_only))
+    try:
+        data = export.build_route_map_pdf(S)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    y, m = weeks._month_of(month)
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="route-map-{y}-{m:02d}{"-map" if map_only else ""}.pdf"',
+                             "Cache-Control": "no-store"})
 
 
 @app.get("/api/public/route-alternatives")

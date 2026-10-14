@@ -51,8 +51,10 @@ def _unmerc(x, y):
     return lon, lat
 
 
-def view(points, w_px, h_px, pad_px=24, max_zoom=15.0):
-    """The centre (lon, lat) and fractional zoom that frame every (lon, lat) point in w_px × h_px with pad_px round it."""
+def view(points, w_px, h_px, pad_px=24, max_zoom=15.0, reserve_right_px=0):
+    """The centre (lon, lat) and fractional zoom that frame every (lon, lat) point in w_px × h_px with pad_px round it.
+    14 Oct 2026 (the route map export's map-only page): `reserve_right_px` keeps a strip at the right free for a legend
+    drawn inside the map — the points are framed in the rest, and the centre moves right by half the strip."""
     pts = [p for p in points if p]
     if not pts:
         return None
@@ -61,9 +63,10 @@ def view(points, w_px, h_px, pad_px=24, max_zoom=15.0):
     x0, x1 = min(m[0] for m in ms), max(m[0] for m in ms)
     y0, y1 = min(m[1] for m in ms), max(m[1] for m in ms)
     dx, dy = max(x1 - x0, 1e-9), max(y1 - y0, 1e-9)
-    z = min(math.log2((w_px - 2 * pad_px) / (dx * TILE)), math.log2((h_px - 2 * pad_px) / (dy * TILE)), max_zoom)
+    r = max(0, min(int(reserve_right_px), w_px // 2))
+    z = min(math.log2((w_px - r - 2 * pad_px) / (dx * TILE)), math.log2((h_px - 2 * pad_px) / (dy * TILE)), max_zoom)
     z = math.floor(max(0.0, z) * 100) / 100.0           # two decimals: the URL and the drawing use the SAME zoom
-    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    cx, cy = (x0 + x1) / 2 + (r / 2) / (TILE * 2 ** z), (y0 + y1) / 2
     lon, lat = _unmerc(cx, cy)
     lon, lat = round(lon, 5), round(lat, 5)              # what the URL says, so project() uses exactly that centre
     cx, cy = _merc(lon, lat)
