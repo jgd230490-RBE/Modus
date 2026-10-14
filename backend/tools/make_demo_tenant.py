@@ -99,7 +99,7 @@ random.seed(20260916)
 OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
 AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
 TENANT_NAME = "Wolds Link dualling — demo scheme"
-DEMO_NOTICE = "Fictional demo scheme · nothing here is real"
+DEMO_NOTICE = "Fictional demo scheme · the scheme and its plan are invented"   # 14 Oct 2026: was "· nothing here is real"
 START_YEAR = 2026
 MONTHS = [9, 10, 11, 12]          # Sep–Dec 2026, month_index == month for 2026
 
