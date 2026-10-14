@@ -2117,9 +2117,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && _dbc.includes("const [ga, setGa] = useState(initialGates || null);") && _dbc.includes("if(initialGates) return;")
     && _dbc.includes("{ if(live) setGaErr(true); }") && !/fetch\(/.test(gac) && !/gates\/arrivals[^`]*`,/.test(_dbc)
     && (_dbc.match(/fetch\(`\$\{API\}\/gates\/arrivals/g) || []).length === 1);
-  ok("⭐ the panel sits under the carbon strip and before the first collapsed section; the six cards, five sections, eight charts are untouched",
+  // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
+  // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
+  ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
     _dbW.includes("<GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
+    && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
+    && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
     && (_dbW.match(/<Card label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5
     // 13 Oct 2026 (W5): narrowed — the five sections no longer carry onToggle={onMore} (see the W5 block)
     && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 0);

@@ -279,8 +279,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ demo tenant, no cookie: the app's iframe (/map/?embed=1) gets the password page, 401, WITHOUT the notice pill (the bar has it)",
        r_emb.status_code == 401 and 'id="p" name="p" type="password"' in r_emb.text and 'class="demo-notice"' not in r_emb.text
        and r_emb_nohdr.status_code == 401 and 'class="demo-notice"' not in r_emb_nohdr.text, f"{r_emb.status_code} {r_emb_nohdr.status_code}")
+    # NARROWED 14 Oct 2026 (the user took the recommendation): the demo package's notice is "the scheme and its plan are
+    # invented" (was "nothing here is real", which the bulletin's real government figures contradicted); same three places
     ok("⭐ .../map/ on its own gets the password page WITH the notice pill (no bar above it)",
-       r_alone.status_code == 401 and '<div class="demo-notice">Fictional demo scheme · nothing here is real</div>' in r_alone.text,
+       r_alone.status_code == 401 and '<div class="demo-notice">Fictional demo scheme · the scheme and its plan are invented</div>' in r_alone.text,
        str(r_alone.status_code))
     ok("🔴 ...and /map/?embed=1 typed into the tab (a top-level page) keeps the pill too",
        r_typed.status_code == 401 and 'class="demo-notice"' in r_typed.text, str(r_typed.status_code))
@@ -559,7 +561,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
            r.status_code == 200 and pg["month"] == {"index": 10, "label": "Oct 2026", "label_long": "October 2026",
                                                      "from": "2026-10-01", "to": "2026-10-31"}
            and all(hl.get(k) is not None for k in ("two_way_a_day", "movements_in_month", "routes_in_use", "tonnes"))
-           and _wd and hl["working_days"] == _wd and pg["demo_notice"] == "Fictional demo scheme · nothing here is real"
+           and _wd and hl["working_days"] == _wd and pg["demo_notice"] == "Fictional demo scheme · the scheme and its plan are invented" and "nothing here is real" not in r.text
            and pg["plan_only"] is True, f"{r.status_code} {str(pg)[:300]}")
         _kp = c.get("/api/public/month-kpis?month=10", headers=PLAN).json()
         _r001 = [l for l in _kp["lines"] if l["route_id"] == "R001"]
@@ -585,14 +587,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("⭐ …conditions of the month from what is STORED: no stored check, so \"never checked\" on all 19 routes (National Highways provider)",
            _cn["restrictions"]["status"] == "never checked" and len(_cn["restrictions"]["never_checked_routes"]) == 19
            and _cn["restrictions"]["hits"] == [] and _cn["restrictions"]["provider"] == "nh_closures", str(_cn["restrictions"])[:200])
-        ok("⭐ …Stockpile Tilton over at the end of October by 510 t (40,510 against 40,000 — the figure the live map showed on 11 Oct)",
-           [(p["name"], p["capacity_qty"], p["balance_end"], p["over_by"]) for p in _cn["stockpiles_over"]]
-           == [("Stockpile Tilton", 40000.0, 40510.0, 510.0)], str(_cn["stockpiles_over"]))
-        ok("⭐ …and its sentence says the balance is RECORDED (typed week actuals carried forward), never \"the plan puts\" (D23)",
-           # NARROWED 12 Oct 2026 (the review and fix pass): "has a capacity of", not "holds"
-           _cn["stockpiles_over"][0]["wording"] == ("Stockpile Tilton has a capacity of 40,000 t; 40,510 t recorded in it at the end "
-                                                    "of Oct 2026, from the week actuals typed so far, carried forward.")
-           and "plan puts" not in r.text, str(_cn["stockpiles_over"][0].get("wording")))
+        # REVERSED 14 Oct 2026 (the user took the recommendation): the public bulletin no longer carries the stockpile over
+        # capacity (a site matter). Stockpile Tilton is still over by 510 t in the demo; the sentence and the figures stay
+        # pinned on bulletin.conditions_of_month in test_bulletin.py, which still computes them.
+        ok("⭐ …the public page carries NO stockpile: no stockpiles_over key, Stockpile Tilton nowhere in the body, and the count leaves it out",
+           "stockpiles_over" not in _cn and "Stockpile Tilton" not in r.text and "40,510" not in r.text
+           and _cn["count"] == len(_cn["restrictions"]["hits"]) + len(_cn["seasonal"]) + len(_cn["route_caps"]["exceeded"]),
+           str(sorted(_cn)))
+        ok("…and the bulletin never says \"the plan puts\" (D23)", "plan puts" not in r.text)
         _cap = _cn["route_caps"]
         ok("⭐ …the typed cap on R016 (20 a day) is exceeded by October's loaded trips a day and reads \"planning flag\", never a block",
            _cap["wording"] == "planning flag" and _cap["routes_with_cap"] == 2 and [e["route_id"] for e in _cap["exceeded"]] == ["R016"]
@@ -628,11 +630,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and all("fictional demo scheme" in x.lower() for x in _bp), f"{r.status_code} {len(_bp)} pages")
             ok("⭐ ...page 1 carries the four headline figures equal to /api/bulletin/month's roll-up",
                bool(_bp) and all(f in _bp[0] for f in _figs), f"{_figs} | {_bp[0][:400] if _bp else ''}")
-            ok("...the busiest route by its places, the stockpile over capacity, the never-checked routes, the carbon stamp, the planning flag",
+            # REVERSED 14 Oct 2026 (the user took the recommendation): the stockpile over capacity is a site matter and is
+            # no longer in the public bulletin — its absence is asserted where its presence was
+            ok("...the busiest route by its places, NO stockpile, the never-checked routes, the carbon stamp, the planning flag",
                # NARROWED 14 Oct 2026 (the publishing check): plain words, the flagged route by its places (no "Route R016"),
                # the stockpile as its balance against its capacity; the stamp is in Sources (two columns: read in drawing order)
-               "Kilby Ridge Quarry to Harborough Compound" in _bj and "above its 40,000 t capacity (weekly records so far)" in _bj
-               and "Stockpile Tilton:" in _bj and "Not checked against published road works" in _bj
+               "Kilby Ridge Quarry to Harborough Compound" in _bj and "40,000 t capacity" not in _bj
+               and "Stockpile Tilton" not in _bj and "Over capacity" not in _bj and "Not checked against published road works" in _bj
                and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in " ".join(pdf_text(r_pdf_bytes, raw=True).split())
                and "Route R016" not in _bj and "above its planning flag of 20 a day." in _bj, _bj[:600])
             ok("🔴 ...no team id, none of the banned words",
@@ -643,7 +647,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
                and r.headers.get("cache-control") == "no-store" and all(f in r.text for f in _figs)
                and 'href="/api/bulletin/month.pdf?month=10">Download the PDF</a>' in r.text
-               and "Fictional demo scheme · nothing here is real" in r.text, f"{r.status_code} {r.text[:200]}")
+               and "Fictional demo scheme · the scheme and its plan are invented" in r.text, f"{r.status_code} {r.text[:200]}")
             r = c.get("/api/bulletin/leaflet.pdf?month=10", headers=PLAN)
             _lp = [" ".join(x.split()) for x in pdf_text(r.content).split("\f") if x.strip()] if r.status_code == 200 else []
             ok("⭐ D43 the leaflet PDF over HTTP: one page, named for the month, not cached, the demo bar, the four figures, the brief",
