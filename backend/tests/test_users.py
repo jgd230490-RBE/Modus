@@ -613,12 +613,13 @@ ch = main.admin_user_change(bob_id, main.UserPatch(role="planner"))
 ok("change role to Planner drops the team", ch["user"]["role"] == "planner" and ch["user"]["team"] is None)
 ok("🔴 the admin cannot disable themself through the endpoint", raises(lambda: main.admin_user_change(ada["id"], main.UserPatch(disabled=True))) == 400)
 ok("an unknown login is a 404", raises(lambda: main.admin_user_change("nope", main.UserPatch(name="x"))) == 404)
-os.environ.update({"SMTP_USER": "s@wayscope.co.uk", "SMTP_PASSWORD": "pw", "DEMO_FROM": "s@wayscope.co.uk",
+os.environ.update({"SMTP_USER": "s@wayscope.co.uk", "SMTP_PASSWORD": "pw", "DEMO_FROM": "Wayscope <s@wayscope.co.uk>",
                    "DEMO_NOTIFY": "n@wayscope.co.uk"})
 SENT.clear()
 rs = main.admin_user_reset(bob_id)
 ok("⭐ Send reset (with a sender): the invite is emailed and the link is NOT returned",
    rs["email"] == "sent" and "link" not in rs and len(SENT) == 1 and SENT[0]["To"] == "bob@example.org"
+   and SENT[0]["From"] == "Wayscope <s@wayscope.co.uk>"   # DEMO_FROM as Render has it, not wrapped a second time
    and "#invite=" in SENT[0].get_content() and SENT[0]["Subject"] == "Your Wayscope sign-in")
 inv_link = re.search(r"https://\S+#invite=\S+", SENT[0].get_content()).group(0)
 access._ACCESS.reset(tok)

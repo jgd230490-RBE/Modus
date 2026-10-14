@@ -864,7 +864,7 @@ def account_message(purpose, user, url, settings):
                 "your password has not changed.")
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = f"Wayscope <{settings['DEMO_FROM']}>"
+    msg["From"] = settings["DEMO_FROM"]          # as the lead email: DEMO_FROM is already "Wayscope <address>"
     msg["To"] = user["email"]
     msg["Reply-To"] = settings["reply_to"]
     msg.set_content(f"{lead}\n\n{url}\n\n{last}\n\nWayscope\n")
