@@ -57,6 +57,10 @@
         .btn-ghost:hover{ background:var(--surface-2); }
 
         .control-group { display:flex; flex-direction:column; }
+        /* 14 Oct 2026 (night): display:flex beats the hidden attribute, so a hidden group still showed — the staff-only
+           Community considerations on the password view, and By council on an organisation with no council areas */
+        .control-group[hidden] { display:none; }
+        #community-group h3, #community-group .control-item{ font-size:14px; }
         .control-item { display:flex; align-items:center; justify-content:space-between; font-size:13.5px; padding:7px 2px; }
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
@@ -7912,8 +7916,17 @@
                 filter: ['all', ['==', ['geometry-type'], 'Point'], filt],
                 layout: { visibility: vis, 'icon-image': ['concat', 'comm-', ['get', 'kind']], 'icon-allow-overlap': true,
                           'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1] } });
+            // ONE click handler, so a symbol wins over the residential area under it (a handler per layer let the fill's
+            // popup replace the school's — browser check, 14 Oct 2026): symbols first, then cycle lines, then outlines
+            map.on('click', e => {
+                if (!COMM.on) return;
+                for (const l of ['community-points', 'community-line', 'community-fill']) {
+                    let hit = [];
+                    try { hit = map.getLayer(l) ? map.queryRenderedFeatures(e.point, { layers: [l] }) : []; } catch (err) {}
+                    if (hit.length) { communityPopup({ features: hit, lngLat: e.lngLat }); return; }
+                }
+            });
             ['community-points', 'community-fill', 'community-line'].forEach(l => {
-                map.on('click', l, e => communityPopup(e));
                 map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; });
                 map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; });
             });
@@ -7926,10 +7939,12 @@
         const f = e.features && e.features[0];
         if (!f || !COMM.on) return;
         const p = f.properties || {}, k = commKind(p.kind) || { label: p.kind };
+        // metres, as the strip itself is stated (250 m / 500 m), whatever unit the tenant reads distances in
         const d = (p.dist_m === null || p.dist_m === undefined || p.dist_m === 'null') ? '' :
-            (Number(p.dist_m) === 0 ? 'On a route or a site' : `${fmtDist(Number(p.dist_m) / 1000, 2)} ${DU()} from the nearest route or site`);
-        const html = `<div style="font:13px system-ui;max-width:260px"><b>${escHtml(p.name || k.label)}</b>` +
-            `<div>${escHtml(k.label)}${p.detail ? ' · ' + escHtml(p.detail) : ''}</div>` +
+            (Number(p.dist_m) < 1 ? 'On or across a route or a site' : `${Math.round(Number(p.dist_m))} m from the nearest route or site`);
+        const sub = p.name ? k.label + (p.detail ? ' · ' + p.detail : '') : (p.detail || '');
+        const html = `<div style="font:14px system-ui;max-width:260px"><b>${escHtml(p.name || k.label)}</b>` +
+            (sub ? `<div>${escHtml(sub)}</div>` : '') +
             (d ? `<div style="color:#64748B">${escHtml(d)}</div>` : '') +
             `<div style="color:#64748B">Source: ${escHtml(p.source || '')}</div></div>`;
         if (COMM.popup) COMM.popup.remove();

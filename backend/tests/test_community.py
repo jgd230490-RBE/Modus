@@ -656,6 +656,11 @@ ok("7: plan() adds the layer unless asked not to", "def plan(S, kind=\"regional\
 MAP, APP = read("map/index.html"), read("frontend/index.html")
 _grp = MAP.split('<div class="control-group" id="community-group" hidden>')
 ok("8: map — the group is hidden in the markup", len(_grp) == 2)
+# found in the browser check (14 Oct 2026): .control-group is display:flex, which beat the hidden attribute — the group
+# showed on the password view (and By council on an organisation without council areas)
+ok("8: map — a hidden control group is not displayed (display:flex no longer beats the hidden attribute)",
+   ".control-group[hidden] { display:none; }" in MAP
+   and MAP.index(".control-group[hidden] { display:none; }") > MAP.index(".control-group { display:flex; flex-direction:column; }"))
 ok("8: map — ...and shown only when whoami answers level 'staff'",
    "RME.staff = !!(j && j.level === 'staff');" in MAP and "communityStaff(RME.staff);" in MAP
    and "if (g) g.hidden = !COMM.staff;" in MAP)
