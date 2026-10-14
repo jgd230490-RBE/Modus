@@ -63,17 +63,40 @@ DISCIPLINES = [
 
 # The authoritative seed for discipline_materials, not an illustration. A destination's
 # derived `receives` is exactly this list for the disciplines it serves.
+# 14 Oct 2026 (civils materials): the four categories added to factors.json are APPENDED to each
+# discipline's list (nothing removed or renamed): ready-mixed concrete wherever concrete is placed,
+# precast units and steel / rebar where structures and drainage are built, asphalt on the pavement.
 DISCIPLINE_MATERIALS = {
     "earthworks": ["Earthworks / soil", "Small aggregate"],
     "substructure": ["Small aggregate", "Large aggregate / ballast",
-                     "Precast / concrete", "General / imported"],
-    "utilities": ["General / imported", "Precast / concrete"],
-    "structures": ["Precast / concrete", "Steel / rail", "General / imported"],
-    "superstructure": ["Large aggregate / ballast", "Steel / rail", "Precast / concrete"],
-    "stations": ["Precast / concrete", "Steel / rail", "General / imported"],
-    "temporary_works": ["Small aggregate", "Large aggregate / ballast", "General / imported"],
+                     "Precast / concrete", "General / imported",
+                     "Ready-mixed concrete", "Precast units", "Structural steel / rebar"],
+    "utilities": ["General / imported", "Precast / concrete",
+                  "Ready-mixed concrete", "Precast units"],
+    "structures": ["Precast / concrete", "Steel / rail", "General / imported",
+                   "Ready-mixed concrete", "Precast units", "Structural steel / rebar"],
+    "superstructure": ["Large aggregate / ballast", "Steel / rail", "Precast / concrete",
+                       "Asphalt", "Ready-mixed concrete"],
+    "stations": ["Precast / concrete", "Steel / rail", "General / imported",
+                 "Ready-mixed concrete", "Precast units", "Structural steel / rebar"],
+    "temporary_works": ["Small aggregate", "Large aggregate / ballast", "General / imported",
+                        "Ready-mixed concrete"],
     # mep / ene / ccs carry no material rows until they come into scope.
 }
+
+
+def _tenant_categories():
+    """The material categories THIS tenant's live factors document carries (None = unknown: seed
+    everything). 14 Oct 2026: seed_taxonomy() runs on every boot, and a tenant whose stored config
+    predates a category (the live demo's row, saved before the civils categories) must not be given
+    discipline links to a category its own Config does not have — the Submit form would offer a
+    material that converts on `_default`. It gets them with the category: a re-import of its
+    package, or a Config reset to file followed by a restart."""
+    try:
+        import conversions
+        return set(conversions.material_names(conversions.load_factors()))
+    except Exception:
+        return None
 
 # --------------------------------------------------------------------------- #
 #  Teams, design sections, work sections — TENANT DATA, not shipped            #
@@ -165,10 +188,13 @@ def seed_taxonomy(bundle=None):
     have_dm = {(r["discipline_id"], r["material_category"])
                for r in db.query("SELECT discipline_id, material_category FROM "
                                  "discipline_materials WHERE tenant_id = ?", (tenant,))}
+    known_cats = _tenant_categories() if b is DEFAULT_BUNDLE else None
     for did, cats in DISCIPLINE_MATERIALS_.items():
         for cat in cats:
             if (did, cat) in have_dm:
                 continue
+            if known_cats is not None and cat not in known_cats:
+                continue        # a category this tenant's Config does not carry (see _tenant_categories)
             db.execute(
                 "INSERT INTO discipline_materials (tenant_id, discipline_id, "
                 "material_category) VALUES (?, ?, ?)",

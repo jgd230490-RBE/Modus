@@ -736,7 +736,7 @@ def _apply(state, line, levers, ctx, notes):
                 if ev:
                     s["vehicle"] = ev
                 elif (vs.get(s["vehicle"]) or {}).get("fuel") != "electric":
-                    notes.add(f"no electric variant of {s['vehicle']} on Config: those lines stay diesel")
+                    notes.add(f"no electric variant of {conversions.vehicle_label(ctx['doc'], s['vehicle'])} on Config: those lines stay diesel")
             else:
                 tw = (vs.get(s["vehicle"]) or {}).get("geometry_twin")
                 if (vs.get(s["vehicle"]) or {}).get("fuel") == "electric" and tw:
@@ -1349,11 +1349,11 @@ def provenance(evals, ctx, alt_evals=(), lever_sets=()):
         out.append(_prov_material(cp, name))
     for vname in sorted({e["vehicle"] for e in every}
                         | {electric_variant(vs, e["vehicle"]) for e in evals if electric_variant(vs, e["vehicle"])}):
-        out.append(dict(vehicle_factor(doc, cp, vname), key=f"vehicle:{vname}", label=vname, unit="kg CO2e per vehicle-km"))
+        out.append(dict(vehicle_factor(doc, cp, vname), key=f"vehicle:{vname}", label=conversions.vehicle_label(doc, vname), unit="kg CO2e per vehicle-km"))
     for vname in sorted({e["vehicle"] for e in every}):
         w = wtt_factor(doc, cp, vname)
         if w is not None:
-            out.append({"key": f"wtt:{vname}", "label": f"{vname}, well-to-tank", "unit": "kg CO2e per vehicle-km",
+            out.append({"key": f"wtt:{vname}", "label": f"{conversions.vehicle_label(doc, vname)}, well-to-tank", "unit": "kg CO2e per vehicle-km",
                         "value": round(w["kg_per_km"], 5), "status": w["status"], "year": w.get("year"),
                         "source": w["source"], "ids": [w.get("id")]})
     seen = set()

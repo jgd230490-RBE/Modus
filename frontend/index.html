@@ -2265,7 +2265,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   <RdItem t="Discipline">{r.discipline || "None set"}</RdItem>
                   <RdItem t="Section">{r.section_id || "None set"}</RdItem>
                   <RdItem t="Vehicle">{veh}</RdItem>
-                  <RdItem t="Vehicle, full name">{r.vehicle && r.vehicle !== veh ? r.vehicle : null}</RdItem>
+                  <RdItem t="Vehicle, full name">{r.vehicle && vehLabel(r.vehicle) !== veh ? vehLabel(r.vehicle) : null}</RdItem>
                   <RdItem t="Tonnes">{grp(r.t)}</RdItem>
                   <RdItem t="Loads (loaded trips)">{grp(r.trips)}</RdItem>
                   <RdItem t={<>Lorries, busiest month<InfoTip id="dash.col.peak" /></>}>{r.peakVeh == null ? "Needs the route worked out" : String(r.peakVeh)}</RdItem>
@@ -2425,7 +2425,7 @@ function DashboardToday({ meta, week, err, wall, fill }){
         }
         if(d.day_date !== today || !((d.planned_qty || 0) > 0 || d.actual_qty != null)) return;
         out.rows.push({ key: `${l.route_id}|${l.discipline || ""}|${l.section_id || ""}`, route_id: l.route_id, discipline: l.discipline, ipt: ctx.ipt || l.ipt,
-                        origin: ctx.origin_name, dest: ctx.dest_name, material: l.material_type, vehicle: ctx.vehicle_short || l.vehicle_type, vehicle_full: ctx.vehicle_type || l.vehicle_type,
+                        origin: ctx.origin_name, dest: ctx.dest_name, material: l.material_type, vehicle: ctx.vehicle_short || vehShort(l.vehicle_type), vehicle_full: vehLabel(ctx.vehicle_type || l.vehicle_type),
                         qty: d.planned_qty, unit: l.unit, tonnes: dv.tonnes, trips: dv.trips, vehicles: dv.vehicles, km: dv.km_day,
                         status: d.status, actual: d.actual_qty, baked: !!ctx.baked, flags: ctx.flags || [] });
         out.t += dv.tonnes || 0; out.trips += dv.trips || 0; out.veh += dv.vehicles || 0; out.km += dv.km_day || 0; out.lines += 1;
@@ -5359,7 +5359,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
       const c = costByLine[g.key] || {};
       const r2 = (v) => (v == null ? "" : Math.round(v * 100) / 100);
       lines.push([g.routeId, r.origin || "", r.dest || "", g.yearLabel, teamText(g.ipt), g.discipline, g.sectionId,
-        g.material || "", g.material_description || "", g.vehicle || "", g.unit || "",
+        g.material || "", g.material_description || "", vehLabel(g.vehicle), g.unit || "",
         Math.round(g.quantity * 10) / 10, g.months, g.status, teamText(g.submittedBy), g.rejectReason || "",
         r2(c.t), c.trips ?? "", r2(c.planned), c.source || "", r2(c.plannedU && c.plannedU.per_t),
         r2(c.fair), r2(c.fairU && c.fairU.per_t), r2(c.fairU && c.fairU.per_trip), r2(c.fairU && distRate(c.fairU.per_km))].map(esc).join(","));
@@ -5541,7 +5541,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                         <RdItem t="Material">{g.material || "—"}</RdItem>
                         <RdItem t="Description">{g.material_description || null}</RdItem>
                         <RdItem t="Vehicle">{vehLabel(g.vehicle)}</RdItem>
-                        <RdItem t="Vehicle, full name">{g.vehicle && g.vehicle !== vehLabel(g.vehicle) ? g.vehicle : null}</RdItem>
+                        <RdItem t="Vehicle, full name">{g.vehicle && vehShort(g.vehicle) !== vehLabel(g.vehicle) ? vehLabel(g.vehicle) : null}</RdItem>
                         <RdItem t="Months">{`${g.months}, ${g.yearLabel}`}</RdItem>
                         <RdItem t="Typed">{`${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>
                         <RdItem t="Tonnes">{c ? grp(c.t) : null}</RdItem>
@@ -5836,35 +5836,39 @@ function ConfigPage({ meta, who, access }){
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {vehicles.map(k => { const v = doc.vehicles[k]; const lab = v.labels || {}; return (
+                  {vehicles.map(k => { const v = doc.vehicles[k]; const lab = v.labels || {};
+                    // 14 Oct 2026 (civils materials): the row is named by the NAME being edited, never by the
+                    // stored id ("Truck mixer 8 m³ (32t)" is an id; the word rule makes it "Concrete mixer …")
+                    const nm = ((lab.en || "").trim() && lab.en.trim() !== k) ? lab.en.trim() : vehWord(k);
+                    return (
                     <tr key={k}>
-                      <td><div className="font-medium text-slate-800 leading-tight">{k}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
-                      <td className="min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={k} aria-label={`${k} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
-                      {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={k} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
-                      <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${k} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
-                      <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${k} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
-                      <td className="num w-28"><input className={inp + " text-right"} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km ?? ""} aria-label={`${k} kg CO2e per km`} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
-                      <td className="num w-20"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${k} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
-                      <td className="num w-20"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${k} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
+                      <td><div className="font-medium text-slate-800 leading-tight" data-cfg-vehname>{nm}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
+                      <td className="min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
+                      {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={vehWord(k)} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
+                      <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${nm} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
+                      <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${nm} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
+                      <td className="num w-28"><input className={inp + " text-right"} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km ?? ""} aria-label={`${nm} kg CO2e per km`} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
+                      <td className="num w-20"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${nm} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
+                      <td className="num w-20"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${nm} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
                       {/* 14 Oct 2026 (bundle G, W8): the Euro class the plan assumes for this vehicle type — optional, read only by
                           the CLP section's chart 5; "not typed" deletes the key (never a guess) */}
-                      <td className="w-36"><select className={inp} value={v.euro_class || ""} aria-label={`${k} Euro class`} data-cfg-euro={k}
+                      <td className="w-36"><select className={inp} value={v.euro_class || ""} aria-label={`${nm} Euro class`} data-cfg-euro={k}
                         onChange={e => upd(d => { if(e.target.value) d.vehicles[k].euro_class = e.target.value; else delete d.vehicles[k].euro_class; })}>
                         <option value="">not typed</option>{EURO_CLASSES.map(x => <option key={x} value={x}>{x}</option>)}
                       </select></td>
                       {/* 11 Oct 2026: a tick keeps the planning list's ORDER (the first is the payload fallback) and adds a
                           newly ticked vehicle at the end; until then every tick rebuilt the list in file order */}
-                      <td className="text-center"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${k} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle && !kept.includes(x))]; })} /></td>
+                      <td className="text-center"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${nm} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle && !kept.includes(x))]; })} /></td>
                     </tr>
                   ); })}
                 </tbody>
               </table>
               <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">
-                The id is what forecast lines and routes are stored under, so it cannot be renamed here. A vehicle the network is routed for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions are on the Everything tab. The Euro class is what the plan assumes the hauliers will send for each vehicle type, for the CLP monitoring charts; it is not a check of anyone's fleet and changes no carbon figure.
+                Each vehicle is stored under a fixed id that forecast lines and routes keep, so it cannot be renamed here; the English name is what every screen and export shows. A vehicle the network is routed for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions are on the Everything tab. The Euro class is what the plan assumes the hauliers will send for each vehicle type, for the CLP monitoring charts; it is not a check of anyone's fleet and changes no carbon figure.
               </p>
             </div>
           )}
@@ -7467,7 +7471,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           <RdItem t="Section">{c.section_id || "None set"}</RdItem>
                           <RdItem t="Material">{c.material_type || "—"}</RdItem>
                           <RdItem t="Vehicle">{veh}</RdItem>
-                          <RdItem t="Vehicle, full name">{c.vehicle_type && c.vehicle_type !== veh ? c.vehicle_type : null}</RdItem>
+                          <RdItem t="Vehicle, full name">{c.vehicle_type && vehLabel(c.vehicle_type) !== veh ? vehLabel(c.vehicle_type) : null}</RdItem>
                           <RdItem t="This week">{laWeekWords(w.status)}</RdItem>
                           <RdItem t="Parent month changed" wide bad>{w.parent_changed ? "The parent month's quantity changed after this week was set. This week was deliberately not refreshed." : null}</RdItem>
                           <RdItem t="Days and week disagree" wide bad>{line.days_ne_week ? `The days add up to ${grp(line.days_sum, 1)} ${unitLbl(line.unit)}, not the week's ${grp(w.planned_qty, 1)}.` : null}</RdItem>
@@ -7491,7 +7495,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <RdItem t={TKM()}>{`${grp(dist(wd.tonne_km))}, ${c.km_basis === "loaded" ? "loaded leg" : "round trip"}`}</RdItem>
                             <RdItem t="Cycle">{`${grp(c.cycle_min)} min, ${c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"}`}</RdItem>
                             <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) : null}</RdItem>
-                          </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${c.payload_fallback} fallback)` : ""}.`}</RdItem>}
+                          </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${vehLabel(c.payload_fallback)} fallback)` : ""}.`}</RdItem>}
                           <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
                           <RdItem t={c.rate_source === "target" ? "Target, per unit" : "Quote, per unit"}>{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null ? unitList(wd.eur_units) : null}</RdItem>
                           <RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()} ${grp(wd.eur_adj)}` : null}</RdItem>
@@ -7571,7 +7575,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{r.route_id}</div>
                             <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1">
                               <IptPill ipt={r.ipt} /><WsPill ws={r.section_id} />
-                              <span>{r.material_type || "—"} · <span title={r.vehicle_type}>{vehShort(r.vehicle_type) || "—"}</span> · {r.status}</span>
+                              <span>{r.material_type || "—"} · <span title={vehLabel(r.vehicle_type)}>{vehShort(r.vehicle_type) || "—"}</span> · {r.status}</span>
                             </div>
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums font-semibold">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>
@@ -8056,7 +8060,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
       const ls = byRoute[r.route_id] || [];
       const color = IPT_PALETTE_C[iptKey(r.ipt || (ls[0] || {}).ipt)] || "#1F2024";
       const wk = ls.map(l => `${grp((l.week || {}).planned_qty, 0)} ${unitLbl(l.unit)} · ${grp((l.week_derived || {}).trips)} trips`).join("<br>");
-      const label = `<div style="font:12px system-ui"><b>${r.route_id}</b> · ${r.origin.name} → ${r.dest.name}<br>${wk}${r.vehicle_as_planned === false ? `<br><i>drawn for ${r.vehicle_profile}, not the planned vehicle</i>` : ""}</div>`;
+      const label = `<div style="font:12px system-ui"><b>${r.route_id}</b> · ${r.origin.name} → ${r.dest.name}<br>${wk}${r.vehicle_as_planned === false ? `<br><i>drawn for ${vehLabel(r.vehicle_profile)}, not the planned vehicle</i>` : ""}</div>`;
       if(r.geometry && r.geometry.length > 1){
         feats.push({ type: "Feature", properties: { route_id: r.route_id, color, label }, geometry: { type: "LineString", coordinates: r.geometry } });
         r.geometry.forEach(c => b.extend(c));
@@ -8309,7 +8313,11 @@ const vehLangShown = (k) => k === "en" || ((VEH.langs || []).includes(k) && (
 // organisation types its FIRST Estonian name, and gating it on what is offered left no way in but the
 // raw JSON. The column only edits labels.ee; nothing a forecast stores changes.
 const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");
-const vehLabel = (v, lang) => ((VEH.labels[v] || {})[lang || VEH.lang]) || v || "";
+// 14 Oct 2026 (civils materials): a key used as a name passes the word rule (UK copy says lorry, never
+// truck): "Truck mixer 8 m³ (32t)" — a stored key, never renamed — reads "Concrete mixer 8 m³ (32t)".
+// The server applies the same rule (conversions.vehicle_word_rule); /api/meta's labels already carry it.
+const vehWord = (v) => String(v == null ? "" : v).replace(/^\s*truck\s+mixer\b/i, "Concrete mixer");
+const vehLabel = (v, lang) => { const l = (VEH.labels[v] || {})[lang || VEH.lang]; return (l && l !== v) ? l : vehWord(v || ""); };
 const vehIsFallback = (v, lang) => ((VEH.fallbacks[v] || []).includes(lang || VEH.lang));
 // short form for tables: the label, minus the leading 'Artic'/'Rigid' of the trade names
 const vehShort = (v) => vehLabel(v).replace(/^(Artic|Rigid)\s+/, "");
@@ -8331,9 +8339,9 @@ function VehChips({ profiles }){
                        : p.error ? ["rgba(191,46,85,.12)", "var(--red)"]
                                  : ["#f1f5f9", "#94a3b8"];
         const alts = p.alt_count > 1 ? ` · ${p.alt_count} options` : "";
-        const tip = p.error ? `${k} — ${p.error}`
-                  : !p.baked ? `${k} · not routed`
-                  : `${k} · ${fmtDist(p.distance_km, 1)} ${DU()} out` +
+        const tip = p.error ? `${vehLabel(k)} — ${p.error}`
+                  : !p.baked ? `${vehLabel(k)} · not routed`
+                  : `${vehLabel(k)} · ${fmtDist(p.distance_km, 1)} ${DU()} out` +
                     (p.return_baked ? ", return routed" : ", return NOT routed") + alts;
         return (
           <span key={k} title={tip}
@@ -9945,7 +9953,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(rVehicles.length){
         for(let i = 0; i < rVehicles.length; i++){
           const prof = rVehicles[i];
-          setRouteMsg(`Created ${newId} — routing ${prof} (${i + 1}/${rVehicles.length})…`);
+          setRouteMsg(`Created ${newId} — routing ${vehLabel(prof)} (${i + 1}/${rVehicles.length})…`);
           const bqs = new URLSearchParams({ route_id: newId, profile: prof });
           if(tokenRef.current) bqs.set("token", tokenRef.current);
           try {
@@ -10470,7 +10478,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </select>
           <span className="text-xs text-slate-400 ml-1">Show</span>
           <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel}>
-            {vehicles.filter(v => vehShown(v, showProfile)).map(v => <option key={v}>{v}</option>)}
+            {vehicles.filter(v => vehShown(v, showProfile)).map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}
           </select>
           {/* the map can only draw one of the baked geometries at a time */}
           <select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw">
@@ -10492,7 +10500,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <span>{locs.length} locations</span><span className="text-slate-300">·</span>
           <span>{(status || []).length} routes</span><span className="text-slate-300">·</span>
           <span>{zoneList.length} zones</span><span className="text-slate-300">·</span>
-          <span>{bakedCount}/{totalRoutes || 0} routed for {showProfile}</span>
+          <span>{bakedCount}/{totalRoutes || 0} routed for {vehLabel(showProfile)}</span>
         </div>
       </PageHeader>
 
@@ -11175,7 +11183,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         <input type="checkbox" checked={on}
                           onChange={() => (editingRoute ? toggleEVehicle(v) : toggleRVehicle(v))}
                           style={{ accentColor: "var(--navy)" }} />
-                        {v}
+                        {vehLabel(v)}
                         {tag && <span className="text-[10px] font-semibold" style={{ color: tag[1] }}>· {tag[0]}</span>}
                       </label>
                     );

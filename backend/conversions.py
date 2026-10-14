@@ -11,6 +11,7 @@ live in factors.json so an engineer can adjust them without touching code.
 """
 import json
 import os
+import re
 import sys
 
 UNITS = ["m3", "t", "vehicles"]
@@ -278,6 +279,39 @@ def offered_vehicle_langs(factors, country=None):
     return ["en"] + [l for l in VEHICLE_LANGS if l != "en" and l in used]
 
 
+#: 14 Oct 2026 (civils materials): the product's word rule (UK copy says lorry, never truck) applied
+#: to a vehicle's NAME when the tenant has typed no name of its own. The seed keys the two UK
+#: mixers "Truck mixer …" and keys are never renamed (a forecast line, a route and its baked
+#: geometry store them), so the name shown is "Concrete mixer …": the seed's labels.en says so,
+#: and a document whose label is blank or still equals the key (the live demo's config row,
+#: saved before today) reads it through this rule. A label the tenant typed wins untouched.
+_NAME_RULES = ((re.compile(r"^\s*truck\s+mixer\b", re.I), "Concrete mixer"),)
+
+
+def vehicle_word_rule(name):
+    """A vehicle name with the word rule applied ("Truck mixer 8 m³" → "Concrete mixer 8 m³")."""
+    s = name if isinstance(name, str) else ("" if name is None else str(name))
+    for rx, repl in _NAME_RULES:
+        s = rx.sub(repl, s, count=1)
+    return s
+
+
+def vehicle_label(factors, key, lang="en"):
+    """THE name a person reads for a vehicle key, everywhere the server prints one (PDFs, XLSX,
+    the public feeds, messages): the entry's labels[lang] when typed and different from the key,
+    else the key through vehicle_word_rule(). A key the document does not carry gets the rule
+    too. Never None for a key; "" for no key."""
+    if not key:
+        return ""
+    v = ((factors or {}).get("vehicles") or {}).get(key) if isinstance(factors, dict) else None
+    lab = ((v or {}).get("labels") or {}) if isinstance(v, dict) else {}
+    val = lab.get(lang) if isinstance(lab.get(lang), str) else ""
+    val = (val or "").strip()
+    if val and val != key:
+        return val
+    return vehicle_word_rule(key)
+
+
 def vehicle_labels(factors, country=None):
     """
     {"labels": {vehicle_key: {lang: text}}, "fallbacks": {vehicle_key: [lang]}, "langs": [...]}.
@@ -289,6 +323,9 @@ def vehicle_labels(factors, country=None):
     rather than invent, show the id). The key is the canonical id a forecast line stores;
     a label only changes what a picker shows. `fallbacks` says which slots were filled
     that way, so a UI can mark them rather than pass a fallback off as a translation.
+    14 Oct 2026: a key used as a name passes the word rule (vehicle_word_rule), and a label
+    equal to its key does too — so "Truck mixer …" reaches no picker even from a config row
+    saved before the seed's labels said "Concrete mixer …".
     """
     langs = offered_vehicle_langs(factors, country)
     out, fallbacks = {}, {}
@@ -300,9 +337,9 @@ def vehicle_labels(factors, country=None):
         for lang in langs:
             val = (lab.get(lang) or "").strip() if isinstance(lab.get(lang), str) else ""
             if val:
-                out[k][lang] = val
+                out[k][lang] = val if val != k else vehicle_word_rule(k)
             else:
-                out[k][lang] = k
+                out[k][lang] = vehicle_word_rule(k)
                 fallbacks.setdefault(k, []).append(lang)
     return {"labels": out, "fallbacks": fallbacks, "langs": langs}
 

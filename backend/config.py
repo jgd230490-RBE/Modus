@@ -27,6 +27,7 @@ import json
 import math
 import os
 import re
+import sys
 
 import db
 
@@ -249,6 +250,13 @@ def load(conversions, use_cache=True):
 
 def invalidate():
     _CACHE["doc"], _CACHE["at"] = None, 0.0
+    # 14 Oct 2026 (civils materials): network keeps its own set of category names; a Save
+    # that adds or removes a category must reach it too (it used to live until a restart).
+    # Through sys.modules, not an import: network imports this module, and a process that
+    # never loaded network has no cache to clear.
+    net = sys.modules.get("network")
+    if net is not None and hasattr(net, "invalidate_categories"):
+        net.invalidate_categories()
 
 
 def seed_from_file(conversions):
@@ -524,7 +532,24 @@ def validate(doc, network=None):
         for v in w.get("restricted_vehicles") or []:
             if isinstance(vs, dict) and v not in vs:
                 p.append(f"seasonal '{w['name']}' names vehicle '{v}', which does not exist")
-    return p
+    return _vehicle_names_in(p, doc)
+
+
+def _vehicle_names_in(problems, doc):
+    """14 Oct 2026 (civils materials): a problem sentence names a vehicle by its NAME, the one a
+    person reads on the Config page (conversions.vehicle_label), not by the stored key; a name the
+    document does not carry gets the word rule ("Truck mixer …" → "Concrete mixer …")."""
+    import conversions
+    vs = (doc or {}).get("vehicles") if isinstance(doc, dict) else None
+    names = {k: conversions.vehicle_label(doc, k) for k in (vs or {}) if isinstance(k, str) and not k.startswith("_")}
+    out = []
+    for s in problems:
+        for k, n in names.items():
+            if n != k:
+                s = s.replace(f"'{k}'", f"'{n}'")
+        s = re.sub(r"'(\s*truck\s+mixer\b)", lambda m: "'" + conversions.vehicle_word_rule(m.group(1)), s, flags=re.I)
+        out.append(s)
+    return out
 
 
 def save(doc, by=None, network=None):

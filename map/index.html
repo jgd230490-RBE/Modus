@@ -1116,6 +1116,11 @@
 <div id="map"></div>
 
 <script>
+    // 14 Oct 2026 (civils materials): a vehicle is shown by its NAME, never its stored key. The feeds send
+    // vehicle_name (conversions.vehicle_label on the server); vehWord is the same word rule for a bare key
+    // (UK copy says lorry, never truck: the key "Truck mixer 8 m³ (32t)" reads "Concrete mixer 8 m³ (32t)").
+    function vehWord(v){ return String(v == null ? '' : v).replace(/^\s*truck\s+mixer\b/i, 'Concrete mixer'); }
+    function vehName(key, name){ return name || vehWord(key); }
     // Route and node data now come from the routing network over the API, not from the
     // 4 MB static map/data/a1_data.js that used to sit beside this file. That file was
     // keyed to the 69 LEGACY route ids; measured overlap with the routing network was
@@ -2539,7 +2544,7 @@
         const render = payloads => {
             const routes = routePropsById();
             const wd = payloads[0].working_days || 22;
-            const fbName = payloads[0].payload_fallback_vehicle;
+            const fbName = vehName(payloads[0].payload_fallback_vehicle, payloads[0].payload_fallback_name);
             // per month, sum the lines that pass the filters; then average over the
             // months that had any
             // ⭐ 2026-09-03 — MOVEMENTS and VEHICLES are different numbers.
@@ -4969,7 +4974,7 @@
         h += row('Applies to', e(limitAppliesText(p)));
         h += row('Exceptions', e(p.exceptions || 'None recorded'));
         h += row('Planned routes over it', lines.length
-            ? lines.map(x => e(x.route_id + (x.vehicle ? ' · ' + x.vehicle : '') + ' · ' + x.legs.join(' and '))).join('<br>')
+            ? lines.map(x => e(x.route_id + (x.vehicle ? ' · ' + vehWord(x.vehicle) : '') + ' · ' + x.legs.join(' and '))).join('<br>')
             : 'None of the planned routes', lines.length ? 'over' : '');
         h += row('Source', e((p.source_label || p.source || '') + (fetched ? ' · fetched ' + fetched : '')));
         h += '<div class="lim-foot">Advisory: check the signed limit on site.' + (p.attribution ? '<br>' + e(p.attribution) : '') + '</div></div>';
@@ -4988,7 +4993,7 @@
             const b = lines[0], where = p.name || p.ref, kw = limitKindWord(p.kind);
             rows.push({ key: 'l|' + p.id + '|' + month, lvl: 'warn', src: 'limit', who: b.route_id, kind: 'l', id: p.id,
                 noun: 'Over ' + (p.kind === 'axle' ? 'an ' : 'a ') + kw + ' limit',
-                what: b.route_id + (b.vehicle ? ' · ' + b.vehicle : '') + ' is over the ' + limitValueText(p.kind, p.value, p.unit) + ' ' + kw + ' limit'
+                what: b.route_id + (b.vehicle ? ' · ' + vehWord(b.vehicle) : '') + ' is over the ' + limitValueText(p.kind, p.value, p.unit) + ' ' + kw + ' limit'
                     + (where ? ' on ' + where : '') + ' (' + (p.source_label || p.source || 'source not named') + ')'
                     + (lines.length > 1 ? ' (+' + (lines.length - 1) + ' more)' : ''),
                 sort: 1.2 });
@@ -5656,7 +5661,7 @@
             const row=rows.length?rows[0]:null;
             let extra;
             if(row){
-                const veh=row.vehicle_type, mat=row.material_type;
+                const veh=row.vehicle_type, vehN=vehName(row.vehicle_type,row.vehicle_name), mat=row.material_type;
                 const payload=pick(F.vehicle_payload_t,veh)||20;
                 // 12 Oct 2026 (B2): carbon is the SERVER's figure. forecast-matrix carries co2_t per month,
                 // keyed like monthly, from the same costlines read as the KPI bar and the Dashboard (km × the
@@ -5698,8 +5703,8 @@
                 const trucksPeak=(tripsPerDay>0)?Math.ceil(peakLoads/(tripsPerDay*P.working_days_per_month)):0;
                 // Track A's caption: a route with several approved lines names each material · vehicle pair
                 const what=rows.length>1
-                    ? rows.length+' approved lines: '+[...new Set(rows.map(r=>(r.material_type||'—')+' · '+(r.vehicle_type||'—')))].join('; ')
-                    : mat+' · '+veh+' · payload '+payload+' t';
+                    ? rows.length+' approved lines: '+[...new Set(rows.map(r=>(r.material_type||'—')+' · '+(vehName(r.vehicle_type,r.vehicle_name)||'—')))].join('; ')
+                    : mat+' · '+vehN+' · payload '+payload+' t';
                 extra =
                     '<div class="an-title" style="margin-top:16px;">Forecast · '+monthLabel(mtx.from)+' – '+monthLabel(mtx.to)+'</div>'+
                     '<div class="an-route">'+what+'</div>'+

@@ -831,12 +831,14 @@ def leg_dimensions(profile, leg):
 
 
 def vehicle_label(profile):
+    """The vehicle's NAME (conversions.vehicle_label). 14 Oct 2026: read wherever a hit is SHOWN,
+    from its vehicle_profile, not from the vehicle_label a check stored — a stored name goes stale
+    when Config renames the vehicle (the mixers became "Concrete mixer …" on 14 Oct 2026)."""
+    import conversions
     try:
-        import conversions
-        v = (conversions.load_factors().get("vehicles", {}) or {}).get(profile, {}) or {}
-        return ((v.get("labels") or {}).get("en")) or profile
+        return conversions.vehicle_label(conversions.load_factors(), profile)
     except Exception:
-        return profile
+        return conversions.vehicle_word_rule(profile)
 
 
 def assess(limit, profile, leg="loaded"):
@@ -985,7 +987,7 @@ def breach_text(hits, vehicle_type=None):
     the <headline> (<source>) ...". The clash rail puts the line's name in front of it."""
     h = hits[0]
     leg = "going back empty" if h.get("leg") != "loaded" else "loaded"
-    text = (f"{h.get('vehicle_label') or vehicle_type} ({h.get('vehicle_value'):g} {h.get('unit')}, {leg}) "
+    text = (f"{vehicle_label(h.get('vehicle_profile') or vehicle_type)} ({h.get('vehicle_value'):g} {h.get('unit')}, {leg}) "
             f"is over the {h.get('headline')} ({SOURCES.get(h.get('source'), {}).get('short', h.get('source'))})")
     if h.get("exceptions"):
         text += f" — {h['exceptions'].lower()}"
@@ -1015,7 +1017,7 @@ def feature_collection(box=None):
                 continue
             k = (h["source"], h["ext_id"], h["kind"])
             lst = over.setdefault(k, [])
-            item = {"route_id": rid, "vehicle": h.get("vehicle_label") or h["vehicle_profile"],
+            item = {"route_id": rid, "vehicle": vehicle_label(h["vehicle_profile"]),
                     "vehicle_value": h.get("vehicle_value"), "leg": h["leg"]}
             if item not in lst:
                 lst.append(item)
