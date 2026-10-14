@@ -48,6 +48,7 @@ import costing       # 10 Sep evening — target rates + fuel settings (config k
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
+import users         # G3, 14 Oct 2026 — per-person logins, sessions, reset links, the audit trail
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
 import road_sections  # 12 Oct 2026 — shared road sections (public map review §2.2d): the index and the month read
@@ -91,6 +92,7 @@ async def lifespan(app: FastAPI):
         db.init_config_db()         # 2.5b. No ALTERs, so its position only needs to precede the seed.
         db.init_costing_db()        # 10 Sep evening. The GLOBAL fuel_index table (untenanted, by design).
         db.init_demo_requests_db()  # H9, 8 Oct. The GLOBAL demo_requests table (untenanted, by design).
+        db.init_users_db()          # G3, 14 Oct. Logins, sessions, links, audit, attempts: account data, not package data.
         limits.init_db()            # 13 Oct. The GLOBAL road_limits table (untenanted, by design: public road facts).
         # Phase 4.5. Must sit exactly here: init_tenant() migrates a pre-4.5 database by
         # rebuilding each table, copying the columns the table actually has — several of
@@ -136,9 +138,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Wayscope", lifespan=lifespan)
+# G3 (14 Oct 2026): no other origin may call the API. Until today every origin was allowed
+# with credentials, and Starlette answers such a request with the caller's own origin echoed
+# back — harmless while the only credential was a header code no other site holds, NOT
+# harmless once a session cookie signs people in. Every caller is same-origin: the app and
+# the map fetch "/api", and the landing page's form is a plain form POST, which CORS does not
+# touch. The middleware stays registered with nothing allowed, so a cross-origin request gets
+# no CORS headers and the browser keeps the answer from the calling page.
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware, allow_origins=[], allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=[],
 )
 
 
@@ -337,7 +346,11 @@ if _Request is not None and hasattr(app, "middleware"):
 
     @app.middleware("http")
     async def _access_middleware(request, call_next):
-        token = access.set_current(request.headers.get(access.HEADER))
+        # G3 (14 Oct 2026): the session cookie resolves too (access.resolve_request), so a
+        # signed-in person passes the gate, the line filters and /api/meta's staff shape
+        # exactly as a code did.
+        token = access.set_current(request.headers.get(access.HEADER),
+                                   request.cookies.get(users.SESSION_COOKIE))
         try:
             path = request.url.path
             decision = gate.decide(
@@ -348,7 +361,33 @@ if _Request is not None and hasattr(app, "middleware"):
             if decision != gate.ALLOW:
                 return _gate_refusal(decision, path, embedded=_embedded_request(request))
 
+            method = request.method.upper()
+            write = method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/")
+            # G3 (plan §4.6): a write that a session COOKIE authenticates must carry the app's own
+            # header. A form on another site cannot add a header, and a script on another site
+            # cannot send one without a CORS preflight, which now fails. A code (a header) and the
+            # admin token (a query value) are not sent by the browser on its own, so they need
+            # nothing more. The new /api/auth/* calls always need it (no signing a person in or
+            # out from another page).
+            acc_now = access.current()
+            if write and request.headers.get(GUARD_HEADER) != "1" and (
+                    (acc_now and acc_now.get("via") == "login") or path.startswith("/api/auth/")):
+                return _JSON({"detail": "refused: this request did not come from the Wayscope app"},
+                             status_code=403)
+
+            body = None
+            if write and _audited(path):
+                try:
+                    body = await request.body()
+                except Exception:
+                    body = None
+
             response = await call_next(request)
+
+            # G3 (D55): every write that worked, with who did it and what was sent (secrets removed).
+            # One place, so a new endpoint cannot forget it.
+            if write and _audited(path) and 200 <= getattr(response, "status_code", 0) < 300:
+                _audit_write(request, path, method, response.status_code, body)
 
             # The cookie is set HERE rather than in the endpoint so that auth() and
             # map_auth() stay plain functions the harness can call directly. A staff
@@ -364,8 +403,71 @@ if _Request is not None and hasattr(app, "middleware"):
             access.reset_current(token)
 
 
+#: G3 (plan §4.6): the header the app's fetch wrapper adds to every API call. A session-cookie
+#: write without it is refused by the middleware.
+GUARD_HEADER = "X-Wayscope"
+
+#: POSTs that change nothing (they compute an answer or a file from the body), and the paths that
+#: write their own audit rows (sign-in, the lead form, page opens). Everything else that writes is
+#: logged by the middleware.
+AUDIT_SKIP = ("/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summary.pdf",
+              "/api/public/demo-request", "/api/map-auth", "/api/gate-signout", "/api/auth",
+              "/api/activity")
+AUDIT_SKIP_PREFIXES = ("/api/auth/",)
+
+
+def _audited(path):
+    return path not in AUDIT_SKIP and not path.startswith(AUDIT_SKIP_PREFIXES)
+
+
+def _client_ip(request):
+    try:
+        return demo_request.client_ip(request.headers.get("x-forwarded-for"),
+                                      request.client.host if request.client else "")
+    except Exception:
+        return ""
+
+
+def _audit_write(request, path, method, status, body):
+    """One audit row for a write that worked. The query string and the JSON body go in the
+    detail with every secret removed (users.scrub); a body that is not JSON is recorded by its
+    size only. Never raises."""
+    try:
+        detail = {}
+        q = dict(request.query_params)
+        if q:
+            detail["query"] = q
+        if body:
+            ctype = (request.headers.get("content-type") or "").lower()
+            if "json" in ctype and len(body) <= 1_000_000:
+                try:
+                    detail["body"] = json.loads(body.decode("utf-8"))
+                except Exception:
+                    detail["body_bytes"] = len(body)
+            else:
+                detail["body_bytes"] = len(body)
+        acc = access.current()
+        token_used = (not acc) and bool(q.get("token"))
+        users.audit("write", acc=acc, method=method, path=path, status=status,
+                    detail=detail or None, ip=_client_ip(request), token_used=token_used)
+    except Exception as e:  # noqa: BLE001
+        print(f"audit: {method} {path} not recorded: {e.__class__.__name__}: {str(e)[:200]}")
+
+
+def _by(supplied=None):
+    """
+    G3 (14 Oct 2026): the name every "by" column records. A signed-in person is recorded by the
+    name on their login, whatever the browser sent; on a shared code the typed name is all there
+    is, as before (and the audit row says it came from a code).
+    """
+    acc = access.current()
+    if acc and acc.get("via") == "login":
+        return acc.get("name")
+    return supplied
+
+
 def _require_access():
-    """Any valid code. 401 otherwise."""
+    """Any valid code or a signed-in login. 401 otherwise."""
     acc = access.current()
     if not acc:
         raise HTTPException(401, "sign in — a valid access code is required")
@@ -444,6 +546,387 @@ def gate_signout(request: Request = None, keep: Optional[str] = None):
         return r
     r.delete_cookie(gate.COOKIE, path="/")
     return r
+
+
+# ------------------------------------------------------------------ G3: per-person logins (14 Oct 2026)
+# The plan and the decisions D46–D57: notes\g3-plan.md. The logic is in users.py, where the
+# stubbed harness (test_users.py) drives every branch; these are the HTTP shells, which
+# http_smoke.py drives through the real app. Every /api/auth/* POST needs the app's header
+# (the middleware refuses one without it).
+class SignInIn(BaseModel):
+    email: str
+    password: str
+    remember: bool = False
+
+
+class EmailIn(BaseModel):
+    email: str
+
+
+class TokenIn(BaseModel):
+    token: str
+
+
+class ResetIn(BaseModel):
+    token: str
+    password: str
+    remember: bool = False
+
+
+class PasswordIn(BaseModel):
+    current: str
+    new: str
+
+
+class ActivityIn(BaseModel):
+    page: str
+
+
+#: what every refusal of a link says — never which of used, expired or unknown it was
+LINK_REFUSED = "This link has expired or has already been used. Ask for a new one."
+
+
+def _ua(request):
+    return ((getattr(request, "headers", None) or {}).get("user-agent") or "")[:120]
+
+
+def _session_answer(user, request, remember=False, payload_extra=None):
+    """A JSONResponse carrying the new session cookie and what the person can do (access.describe)."""
+    from fastapi.responses import JSONResponse as _J
+    raw, ttl = users.create_session(user["id"], remember=remember, ip=_client_ip(request), ua=_ua(request))
+    acc, _u = users.resolve_session(raw)
+    payload = access.describe(acc)
+    if payload_extra:
+        payload.update(payload_extra)
+    r = _J(payload)
+    r.set_cookie(**users.cookie_kwargs(raw, ttl))
+    return r
+
+
+@app.post("/api/auth/signin")
+def auth_signin(body: SignInIn, request: Request = None):
+    """Email and password → a session cookie. One refusal message for every reason (users.sign_in);
+    429 after five failures for an address in 15 minutes, or 30 tries from one address."""
+    user, err, status = users.sign_in(body.email, body.password, ip=_client_ip(request))
+    if not user:
+        raise HTTPException(status, err)
+    return _session_answer(user, request, remember=bool(body.remember))
+
+
+@app.get("/api/auth/me")
+def auth_me():
+    """Who this browser is signed in as, and whether the shared codes are still on (D49) — the
+    sign-in screen offers the code form only while they work."""
+    acc = access.current()
+    return {"signed_in": bool(acc), "access": access.describe(acc) if acc else None,
+            "codes": users.codes_enabled()}
+
+
+@app.post("/api/auth/signout")
+def auth_signout(request: Request = None):
+    """
+    End this browser's session (the row is deleted, so the cookie is dead everywhere it was
+    copied) and drop the cookie. The public map stays open on this machine until the session
+    would have ended, never longer than the map password's month — the rule gate_signout(keep=map)
+    applies to a code's staff cookie, which is downgraded here too.
+    """
+    from fastapi.responses import JSONResponse as _J
+    cookies = getattr(request, "cookies", None) or {}
+    raw = cookies.get(users.SESSION_COOKIE)
+    r = _J({"ok": True})
+    map_kw = gate.downgrade_kwargs(cookies.get(gate.COOKIE))
+    if raw:
+        acc = access.current()
+        exp = users.session_expiry(raw)
+        users.end_session(raw)
+        if acc and acc.get("via") == "login":
+            users.audit_event("signout", user=users.get_user(acc["user_id"]), ip=_client_ip(request))
+        if exp and not map_kw:
+            ttl = min(max(1, int((exp - users._now()).total_seconds())), gate.MAP_TTL_S)
+            value = gate.sign(gate.LEVEL_MAP, ttl_s=ttl)
+            if value:
+                map_kw = {"key": gate.COOKIE, "value": value, "max_age": ttl, "path": "/", "httponly": True,
+                          "samesite": "lax", "secure": True}
+    r.delete_cookie(users.SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="lax")
+    if map_kw:
+        r.set_cookie(**map_kw)
+    return r
+
+
+def _send_reset(email, ip):
+    """The background half of /api/auth/forgot: only an enabled, unexpired STAFF login with an
+    address gets a link. A demo login gets a fresh personal link instead (they have no password)."""
+    user = users.find_by_email(email)
+    if not users.usable(user):
+        return "nobody"
+    if user.get("kind") == "demo":
+        raw = users.issue_token(user["id"], "demo", expires_at=user["expires_at"])
+        c = {"status": "renewed", "link": users.link("demo", raw), "expires_on": users.nice_date(user["expires_at"]),
+             "sign_in": users.app_url() + "/"}
+        s = demo_request.smtp_settings()
+        if s is None:
+            return "unsent"
+        try:
+            demo_request.send(demo_request.build_message(user["email"], user["name"], c, s), s)
+        except Exception as e:  # noqa: BLE001
+            print(f"forgot: demo link email FAILED {e.__class__.__name__}")
+            return "failed"
+        users.audit_event("reset-asked", user=user, ip=ip, detail={"sent": "demo link"})
+        return "sent"
+    purpose = "reset" if user.get("password_hash") else "invite"
+    raw = users.issue_token(user["id"], purpose)
+    sent = users.send_account_email(purpose, user, users.link(purpose, raw))
+    users.audit_event("reset-asked", user=user, ip=ip, detail={"email": sent})
+    return sent
+
+
+@app.post("/api/auth/forgot")
+def auth_forgot(body: EmailIn, request: Request = None):
+    """
+    Always the same answer, whether or not the address has a login, and the email is sent in the
+    background so the answer takes the same time either way. 429 after three requests for one
+    address in an hour, or ten from one IP.
+    """
+    from fastapi.responses import JSONResponse as _J
+    from starlette.background import BackgroundTask as _BT
+    ip = _client_ip(request)
+    email = users.norm_email(body.email)
+    if users.reset_blocked(email, ip):
+        raise HTTPException(429, "Too many requests. Try again in an hour.")
+    users.note_reset_request(email, ip)
+    answer = {"ok": True, "message": "If that address has a Wayscope login, we have sent it a link. "
+                                     "It works once and for 60 minutes."}
+    if not users.email_ok(email):
+        return answer
+    return _J(answer, background=_BT(_send_reset, email, ip))
+
+
+@app.post("/api/auth/check")
+def auth_check(body: TokenIn):
+    """What a set-password or reset link is for, without using it up: the screen greets the person
+    by name. Refused links all read the same."""
+    t, user = users.peek_token(body.token, ("invite", "reset"))
+    if not t:
+        raise HTTPException(410, LINK_REFUSED)
+    return {"purpose": t["purpose"], "name": user["name"], "email": user["email"]}
+
+
+@app.post("/api/auth/reset")
+def auth_reset(body: ResetIn, request: Request = None):
+    """Set a password from an invite or reset link and sign in. The password is checked BEFORE the
+    link is used, so a too-short password does not burn the link. Every other session of the person
+    ends (users.set_password)."""
+    t, user = users.peek_token(body.token, ("invite", "reset"))
+    if not t:
+        raise HTTPException(410, LINK_REFUSED)
+    problem = users.password_problem(body.password, user["email"])
+    if problem:
+        raise HTTPException(400, problem)
+    t, user = users.use_token(body.token, ("invite", "reset"))
+    if not t:
+        raise HTTPException(410, LINK_REFUSED)
+    ok_, err = users.set_password(user["id"], body.password)
+    if not ok_:
+        raise HTTPException(400, err)
+    users.audit_event("password-set", user=user, ip=_client_ip(request), detail={"via": t["purpose"]})
+    return _session_answer(users.get_user(user["id"]), request, remember=bool(body.remember))
+
+
+@app.post("/api/auth/link")
+def auth_link(body: TokenIn, request: Request = None):
+    """HU14 / D50: a lead's personal link signs them in. It stays live until their login expires
+    (each use is counted); the session never outlives the login."""
+    t, user = users.use_token(body.token, ("demo",))
+    if not t:
+        raise HTTPException(410, "This demo link has expired. Ask for the demo again at wayscope.co.uk "
+                                 "and we will send you a new one.")
+    users.audit_event("demo-link", user=user, ip=_client_ip(request))
+    return _session_answer(user, request, remember=True)
+
+
+@app.post("/api/auth/password")
+def auth_password(body: PasswordIn, request: Request = None):
+    """Change your own password. A wrong current password counts towards the sign-in limit. Every
+    other browser is signed out; this one gets a fresh session."""
+    acc = access.current()
+    if not acc or acc.get("via") != "login":
+        raise HTTPException(401, "Sign in with your email first.")
+    user = users.get_user(acc["user_id"])
+    ip = _client_ip(request)
+    if users.signin_blocked(user["email"], ip):
+        raise HTTPException(429, users.SIGNIN_LOCKED)
+    if not users.verify_password(body.current, user.get("password_hash")):
+        users.record_attempt("signin-email", users._attempt_key("signin-email", user["email"]), False)
+        raise HTTPException(400, "Your current password isn't right.")
+    ok_, err = users.set_password(user["id"], body.new)
+    if not ok_:
+        raise HTTPException(400, err)
+    users.audit_event("password-changed", user=user, ip=ip)
+    return _session_answer(users.get_user(user["id"]), request)
+
+
+@app.post("/api/activity")
+def activity(body: ActivityIn):
+    """D51: a demo login's page open (HU14, the leads CSV's `pages`). Anyone else: nothing recorded."""
+    return {"ok": True, "recorded": users.record_page(access.current(), body.page)}
+
+
+# ---- Config → Users (admins: an admin login, or the admin token for the first admin, D47/D57)
+class UserIn(BaseModel):
+    email: str
+    name: str
+    role: str
+    team: Optional[str] = None
+
+
+class UserPatch(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    team: Optional[str] = None
+    disabled: Optional[bool] = None
+    extend_days: Optional[int] = None
+
+
+def _admin_actor():
+    acc = access.current()
+    if acc and acc.get("via") == "login":
+        return users.actor_of(acc)
+    return users.actor_of(None, token_used=True)
+
+
+def _me_id():
+    acc = access.current()
+    return acc.get("user_id") if acc and acc.get("via") == "login" else None
+
+
+def _invite_or_reset(user):
+    """Send a staff login its link: an invite (no password yet) or a reset. When there is no sender,
+    or the send fails, the link comes back so the admin can pass it on — nobody is locked out by a
+    mail problem (plan §6)."""
+    purpose = "reset" if user.get("password_hash") else "invite"
+    raw = users.issue_token(user["id"], purpose)
+    url = users.link(purpose, raw)
+    sent = users.send_account_email(purpose, user, url)
+    out = {"email": sent, "purpose": purpose}
+    if sent != "sent":
+        out["link"] = url
+    return out
+
+
+def _send_demo_link(user):
+    """A demo login's personal link, emailed (or returned when it cannot be)."""
+    raw = users.issue_token(user["id"], "demo", expires_at=user["expires_at"])
+    url = users.link("demo", raw)
+    c = {"status": "renewed", "link": url, "expires_on": users.nice_date(user["expires_at"]),
+         "sign_in": users.app_url() + "/"}
+    s = demo_request.smtp_settings()
+    sent = "unsent"
+    if s is not None:
+        try:
+            demo_request.send(demo_request.build_message(user["email"], user["name"], c, s), s)
+            sent = "sent"
+        except Exception as e:  # noqa: BLE001
+            sent = "failed: " + e.__class__.__name__
+    out = {"email": sent, "purpose": "demo"}
+    if sent != "sent":
+        out["link"] = url
+    return out
+
+
+def _teams():
+    return [{"id": i, "label": users.team_label(i)} for i in access.tenant_team_ids()]
+
+
+@app.get("/api/admin/users")
+def admin_users(token: Optional[str] = None):
+    """Every login of this tenant (no password hashes), the teams by NAME, whether the shared codes
+    are still on and whether email can be sent."""
+    _check_admin(token)
+    return {"users": [users.public(u) for u in users.list_users()], "teams": _teams(),
+            "codes": users.codes_enabled(), "mail": users.mail_settings() is not None, "me": _me_id()}
+
+
+@app.post("/api/admin/users")
+def admin_user_add(body: UserIn, token: Optional[str] = None):
+    """Add a staff login and send its invite (a set-your-password link, 72 hours, single use)."""
+    _check_admin(token)
+    label = _admin_actor()[2]
+    user, err = users.create_user(body.email, body.name, body.role, body.team, created_by=label)
+    if err:
+        raise HTTPException(400, err)
+    return {"user": users.public(user), **_invite_or_reset(user)}
+
+
+@app.patch("/api/admin/users/{user_id}")
+def admin_user_change(user_id: str, body: UserPatch, token: Optional[str] = None):
+    """Change a login's name, team or role, disable or enable it, or give a demo login more days."""
+    _check_admin(token)
+    fields = {k: getattr(body, k) for k in ("name", "role", "team", "disabled") if getattr(body, k) is not None}
+    if body.role is not None and body.role != "team":
+        fields["team"] = None
+    if body.extend_days is not None:
+        u = users.get_user(user_id)
+        if not u or u.get("kind") != "demo":
+            raise HTTPException(400, "Only a demo login has an end date.")
+        days_ = max(1, min(int(body.extend_days), 90))
+        base = max(users._now(), users._parse(u.get("expires_at")) or users._now())
+        fields["expires_at"] = users._later(days_ * 86400, base)
+    user, err = users.update_user(user_id, fields, by_user_id=_me_id())
+    if err:
+        raise HTTPException(404 if err == "No such login." else 400, err)
+    return {"user": users.public(user)}
+
+
+@app.post("/api/admin/users/{user_id}/reset")
+def admin_user_reset(user_id: str, token: Optional[str] = None):
+    """Send a staff login a reset (or its invite again), or a demo login a fresh personal link."""
+    _check_admin(token)
+    user = users.get_user(user_id)
+    if not user:
+        raise HTTPException(404, "No such login.")
+    if not users.usable(user):
+        raise HTTPException(400, "This login is disabled or has expired. Enable or extend it first.")
+    return _send_demo_link(user) if user.get("kind") == "demo" else _invite_or_reset(user)
+
+
+@app.get("/api/admin/leads")
+def admin_leads(token: Optional[str] = None):
+    """The demo requests with each lead's login (HU14), for the Users page."""
+    _check_admin(token)
+    return {"leads": demo_request.leads()}
+
+
+@app.post("/api/admin/leads/{request_id}/login")
+def admin_lead_login(request_id: str, token: Optional[str] = None):
+    """D56: give a lead who asked before 14 Oct (and so got the shared code) a personal login, and
+    email its link. Pressed by an admin, one lead at a time — never a bulk send."""
+    _check_admin(token)
+    row = demo_request.get(request_id)
+    if not row:
+        raise HTTPException(404, "No such demo request.")
+    got = users.demo_login(row["email"], row["name"], request_id)
+    if got["status"] in ("staff", "disabled", "error"):
+        raise HTTPException(400, {"staff": "That address already has a staff login.",
+                                  "disabled": "This lead's login is disabled. Enable it on the Users list first.",
+                                  "error": got.get("error") or "Could not make the login."}[got["status"]])
+    return {"status": got["status"], **_send_demo_link(got["user"]), "user": users.public(got["user"])}
+
+
+@app.get("/api/admin/audit")
+def admin_audit(token: Optional[str] = None, user: Optional[str] = None, kind: Optional[str] = None,
+                since: Optional[str] = None, limit: int = 500):
+    """The audit trail, newest first: every write, every sign-in event, demo page opens."""
+    _check_admin(token)
+    return {"rows": users.audit_rows(actor_id=user, kind=kind, since=since, limit=limit)}
+
+
+@app.get("/api/admin/audit.csv")
+def admin_audit_csv(token: Optional[str] = None, user: Optional[str] = None, kind: Optional[str] = None,
+                    since: Optional[str] = None):
+    _check_admin(token)
+    return Response(content=users.audit_csv(actor_id=user, kind=kind, since=since), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="wayscope-activity.csv"',
+                             "Cache-Control": "no-store"})
 
 
 # ------------------------------------------------------------------ schemas
@@ -797,7 +1280,7 @@ def save_matrix_row(row: MatrixRow):
                 (db.current_tenant(),
                  rid, row.route_id, c.month_index, disc, sect, float(c.quantity), row.unit,
                  row.material_type, row.material_description, row.vehicle_type,
-                 row.submitted_by, row.status, None, ipt),
+                 _by(row.submitted_by), row.status, None, ipt),
             )
             touched += 1
         else:
@@ -997,7 +1480,7 @@ def edit_forecast_week(body: WeekEdit):
     res = weeks.set_week(body.route_id, body.month_index, body.discipline,
                          body.section_id, body.week_index,
                          planned_qty=body.planned_qty, flags=_flags_of(body),
-                         by=body.edited_by)
+                         by=_by(body.edited_by))
     if res.get("error"):
         raise HTTPException(400, res["error"])
     return res
@@ -1012,7 +1495,7 @@ def confirm_forecast_week(body: WeekConfirm):
     # outside the commit bucket has no days and confirms exactly as before.
     res = days.confirm_week(body.route_id, body.month_index, body.discipline,
                             body.section_id, body.week_index,
-                            by=body.confirmed_by, flags=_flags_of(body))
+                            by=_by(body.confirmed_by), flags=_flags_of(body))
     if res.get("error"):
         raise HTTPException(400, res["error"])
     return res
@@ -1030,7 +1513,7 @@ def set_forecast_week_actual(body: WeekActual):
     res = weeks.set_actual(body.route_id, body.month_index, body.discipline,
                            body.section_id, body.week_index,
                            actual_qty=body.actual_qty, actual_note=body.actual_note,
-                           by=body.actual_by, actual_cost_eur=body.actual_cost_eur,
+                           by=_by(body.actual_by), actual_cost_eur=body.actual_cost_eur,
                            cost_given=("actual_cost_eur" in set(_fields_set(body))))
     if res.get("error"):
         raise HTTPException(400, res["error"])
@@ -1046,7 +1529,7 @@ def reopen_forecast_week(body: WeekReopen):
     """
     _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
     res = days.reopen_week(body.route_id, body.month_index, body.discipline,
-                           body.section_id, body.week_index, by=body.reopened_by)
+                           body.section_id, body.week_index, by=_by(body.reopened_by))
     if res.get("error"):
         raise HTTPException(400, res["error"])
     return res
@@ -1063,7 +1546,7 @@ def calibrate_forecast_week(body: WeekCalibrate):
     _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
     res = days.calibrate(body.route_id, body.month_index, body.discipline,
                          body.section_id, body.week_index,
-                         override_qty=body.override_qty, by=body.by,
+                         override_qty=body.override_qty, by=_by(body.by),
                          spread=bool(body.spread), spread_from=body.spread_from)
     if res.get("error"):
         raise HTTPException(400, res["error"])
@@ -1241,7 +1724,7 @@ def edit_forecast_day(body: DayEdit):
     """Type one day's planned quantity. The day and (if it was derived) its week go `edited`."""
     _require_line(body.route_id, body.month_index, body.discipline, body.section_id)
     res = days.set_day(body.route_id, body.month_index, body.discipline,
-                       body.section_id, body.day_date, body.planned_qty, by=body.edited_by)
+                       body.section_id, body.day_date, body.planned_qty, by=_by(body.edited_by))
     if res.get("error"):
         raise HTTPException(400, res["error"])
     return res
@@ -1259,7 +1742,7 @@ def set_forecast_day_actual(body: DayActual):
     res = days.set_day_actual(body.route_id, body.month_index, body.discipline,
                               body.section_id, body.day_date,
                               actual_qty=body.actual_qty, actual_note=body.actual_note,
-                              by=body.actual_by)
+                              by=_by(body.actual_by))
     if res.get("error"):
         raise HTTPException(400, res["error"])
     return res
@@ -1323,7 +1806,7 @@ def consume_stockpile(body: ConsumeIn):
     _require_access()
     res = stockpiles.consume(body.location_id, body.month_index, body.week_index,
                              consumed_qty=body.consumed_qty, unit=body.unit,
-                             note=body.note, by=body.updated_by)
+                             note=body.note, by=_by(body.updated_by))
     if res.get("error"):
         raise HTTPException(404, res["error"])
     return res
@@ -1351,7 +1834,7 @@ def put_factors_config(body: FactorsIn, token: Optional[str] = None):
     config.validate() — a bad document here changes every number in the system.
     """
     _check_admin(token)
-    res = config.save(body.doc, by=body.updated_by, network=network)
+    res = config.save(body.doc, by=_by(body.updated_by), network=network)
     if not res["ok"]:
         raise HTTPException(400, "; ".join(res["problems"]))
     return {"ok": True, "status": config.status(conversions)}
@@ -1363,7 +1846,7 @@ def reset_factors_config(updated_by: Optional[str] = None, token: Optional[str] 
     when the file would remove a vehicle the network is baked for (11 Oct 2026: the same
     check a Save makes)."""
     _check_admin(token)
-    res = config.reset_to_file(conversions, by=updated_by, network=network)
+    res = config.reset_to_file(conversions, by=_by(updated_by), network=network)
     if not res["ok"]:
         raise HTTPException(400, "; ".join(res["problems"]))
     return {"ok": True, "status": config.status(conversions)}
@@ -1416,7 +1899,7 @@ def put_costing_target(body: TargetRatesIn, token: Optional[str] = None):
     """
     _check_admin(token)
     fields = {k: getattr(body, k) for k in costing.TARGET_FIELDS if k in _fields_set(body)}
-    res = costing.set_target(fields, by=body.updated_by)
+    res = costing.set_target(fields, by=_by(body.updated_by))
     if not res["ok"]:
         raise HTTPException(400, "; ".join(res["problems"]))
     return _costing_payload()
@@ -1456,7 +1939,7 @@ def put_fuel_settings(body: FuelSettingsIn):
     """
     _require_approver()
     fields = {k: getattr(body, k) for k in costing.FUEL_FIELDS if k in _fields_set(body)}
-    res = costing.set_fuel(fields, by=body.updated_by)
+    res = costing.set_fuel(fields, by=_by(body.updated_by))
     if not res["ok"]:
         raise HTTPException(400, "; ".join(res["problems"]))
     return _costing_payload()
@@ -1467,7 +1950,7 @@ def put_fuel_manual(body: ManualIndexIn, token: Optional[str] = None):
     """Type the index when the feed is down (admin). Writes the same row, source 'manual'."""
     _check_admin(token)
     s = costing.settings()
-    res = fuel.set_manual(body.eur_per_l, body.bulletin_date, by=body.updated_by,
+    res = fuel.set_manual(body.eur_per_l, body.bulletin_date, by=_by(body.updated_by),
                           country=fuel.norm_country(s["fuel"].get("country")))
     if not res["ok"]:
         raise HTTPException(400, "; ".join(res["problems"]))
@@ -1478,7 +1961,7 @@ def put_fuel_manual(body: ManualIndexIn, token: Optional[str] = None):
 def reset_fuel_base(updated_by: Optional[str] = None, token: Optional[str] = None):
     """Clear the locked BAF base (admin). The next Confirm week locks a fresh one."""
     _check_admin(token)
-    costing.reset_baf_base(by=updated_by)
+    costing.reset_baf_base(by=_by(updated_by))
     return _costing_payload()
 
 
@@ -1635,9 +2118,9 @@ def put_carbon_target(body: CarbonTargetIn):
     acc = _require_approver()
     try:
         if body.levers is not None:
-            carbon_target.set_from_levers(acc, body.mode, body.levers, body.ui_state, by=body.updated_by)
+            carbon_target.set_from_levers(acc, body.mode, body.levers, body.ui_state, by=_by(body.updated_by))
         else:
-            carbon_target.set_mode(body.mode, by=body.updated_by)
+            carbon_target.set_mode(body.mode, by=_by(body.updated_by))
     except carbon_target.TargetError as e:
         raise HTTPException(400, str(e))
     return carbon_target.payload(acc)
@@ -2559,6 +3042,11 @@ def _check_admin(token):
     A deployment whose ADMIN_TOKEN has gone missing now loses its admin surface, never its
     data — the same choice access.resolve() makes for the access codes.
     """
+    # G3 (14 Oct 2026, D53): a signed-in ADMIN LOGIN passes without the token, so a Config save is
+    # attributed to a person. Never the shared ADMIN_CODE (via "code"): that boundary is unchanged.
+    acc = access.current()
+    if acc and acc.get("via") == "login" and acc.get("role") == "admin":
+        return
     admin_token = os.getenv("ADMIN_TOKEN", "").strip()
     if not admin_token:
         raise HTTPException(403, "admin access is not configured — set ADMIN_TOKEN")
@@ -3524,7 +4012,7 @@ async def demo_request_submit(request: Request):
     result = demo_request.handle(form, ip)
     lu = demo_request.landing_url()
     if result["outcome"] == "screen":
-        return _DRHtml(demo_request.access_page(result["name"], result["codes"]),
+        return _DRHtml(demo_request.access_page(result["name"], result["access"]),
                        headers={"Cache-Control": "no-store"})
     if result["outcome"] == "error":
         return _DRRedirect(lu + "/error.html", status_code=303)
