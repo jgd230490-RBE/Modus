@@ -628,7 +628,9 @@ const respond = (data) => Promise.resolve({ ok: true, status: 200, json: () => P
 const tick = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 async function demoBar(){
   let meta = META;
-  w.fetch = (url) => /\/api\/meta$/.test(String(url)) ? respond(meta) : /\/api\/auth$/.test(String(url)) ? respond(PLANNER) : new Promise(() => {});
+  // 14 Oct 2026 (G3): /api/auth/me says the shared codes are still on, so the sign-in screen offers the code form
+  w.fetch = (url) => /\/api\/meta$/.test(String(url)) ? respond(meta) : /\/api\/auth$/.test(String(url)) ? respond(PLANNER)
+    : /\/api\/auth\/me$/.test(String(url)) ? respond({ signed_in: false, access: null, codes: true }) : new Promise(() => {});
   w.localStorage.setItem("modus_page", "dashboard");
   const mount = async () => {
     const box = w.document.createElement("div"); w.document.body.appendChild(box);
@@ -668,6 +670,14 @@ async function demoBar(){
   ok("🔴 DEMO BAR: with no guideStart in the frame (the map password page) the Guide throws nothing and starts nothing", !threw && mapTours === 1 && appGuides === 0);
   // sign-in: the bar stays, with no Guide (there is no tour)
   click([...box.querySelectorAll("header button")].find(b => /Staff sign in/.test(b.textContent)));
+  await tick();
+  // NARROWED 14 Oct 2026 (G3): the sign-in view opens on email and password; the code form is one click away while
+  // the server still has codes (it said so above)
+  ok("G3: the sign-in view opens on email and password, with Forgot your password? and, while codes are on, the code link",
+     !!box.querySelector('input#auth-email') && !!box.querySelector('input#auth-pass') && !box.querySelector('input[placeholder="Access code"]')
+     && [...box.querySelectorAll("button")].some(b => b.textContent === "Forgot your password?")
+     && [...box.querySelectorAll("button")].some(b => b.textContent === "Sign in with a team code instead"));
+  click([...box.querySelectorAll("button")].find(b => b.textContent === "Sign in with a team code instead"));
   ok("DEMO BAR: on the sign-in view the bar stays, under the header, with no Guide", order() === "header>div.demo-bar>main" && !guideBtn() && !!box.querySelector('input[placeholder="Access code"]'));
   const setVal = (el, v) => act(() => { Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); });
   await setVal(box.querySelector('input[placeholder="Your name"]'), "Tester");
@@ -1268,6 +1278,366 @@ function keptAppLoader(){
   ok("SPEED: a damaged kept entry is ignored and replaced", p7.calls.transform === 1 && p7.win.RAN === 1 && JSON.parse(p7.store.modus_app_js).k);
 }
 
+// ---- 14 Oct 2026 (D9, the mobile shell): the Portal on a phone, in a real DOM ---------------------------------------
+// The Portal mounted with matchMedia answering "(max-width: 767px)", once as a team code (the stand's "demo" visitor:
+// role ipt, cannot approve) and once as the planner, then turned to a desktop width through the same media query's
+// change event. The Look-ahead reads the backend harness's own fixture (lookahead_page.json); every other read never
+// settles. Checked: no rail on a phone, the four tabs in the tenant's words, the desk pages as the "open on a desktop"
+// card (the page itself never mounted), the phone Look-ahead's day strip, figures, order, team names and details, the
+// Day sheet's request, and that NOTHING on a phone can write: no input, select or textarea, no write button, no fetch
+// with a method. NOT covered (jsdom has no layout): the 48 px boxes, no sideways scroll, the looks and accents — the
+// browser matrix measured those (notes/session-1014-mobile-shell.md).
+async function phoneShellDom(){
+  const LA = FIX("lookahead_page.json"), CL = FIX("cost_lines.json");
+  const calls = [];
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (/\/api\/lookahead\?bucket=commit$/.test(String(url))) return reply(200, LA);
+    if (/\/api\/costing\/lines\?status=All$/.test(String(url))) return reply(200, CL);
+    if (/\/api\/forecast-weeks\/day-sheet\?/.test(String(url))) return reply(200, "pdf");
+    return new Promise(() => {});
+  };
+  w.URL.createObjectURL = () => "blob:day-sheet"; w.URL.revokeObjectURL = () => {};
+  let mqHandler = null, narrowNow = true;
+  const mm = w.matchMedia;
+  w.matchMedia = (q) => ({ get matches(){ return q === "(max-width: 767px)" && narrowNow; }, media: q,
+    addListener(f){ if(q === "(max-width: 767px)") mqHandler = f; }, removeListener(){},
+    addEventListener(t, f){ if(q === "(max-width: 767px)") mqHandler = f; }, removeEventListener(){} });
+  const TEAM_ACC = { role: "ipt", label: "North Team", ipt: "IPT1", can_approve: false, ipt_locked: true, ipt_required: false, demo: false, ipts: ["IPT1", "IPT2"] };
+  const meta = { ...metaMin, months: { start_year: 2026, count: 60 } };
+  const mountPortal = async (role, pageId) => {
+    w.localStorage.setItem("modus_page", pageId || "dashboard");
+    try { w.history.replaceState(null, "", "#" + (pageId || "dashboard")); } catch(e){}
+    const el = w.document.createElement("div"); w.document.body.appendChild(el);
+    const r = w.ReactDOM.createRoot(el);
+    await act(async () => { r.render(w.React.createElement(w.Portal, { role, who: "Tester", meta, metaErr: false, vehLang: "en", onPage(){} })); });
+    await settle(5);
+    return { el, done: async () => { await act(async () => { r.unmount(); }); el.remove(); } };
+  };
+  const tabs = (el) => [...el.querySelectorAll("nav.phone-tabs > button")];
+  const tabText = (b) => b.querySelector("span").textContent.trim();
+  const WRITE_WORDS = /^(Confirm|Re-open|Export|Save|Submit|Approve|Reject|Delete|Add|check now|re-check|Spread)/i;
+
+  // -- a team code on a phone
+  const t = await mountPortal(TEAM_ACC, "dashboard");
+  ok("⭐ PHONE: below 768 px the rail is not drawn; a bottom tab bar of four is (Dashboard, Look-ahead, Route map, More), the NAV's own words",
+     !t.el.querySelector("aside.rail") && tabs(t.el).map(tabText).join("|") === "Dashboard|Look-ahead|Route map|More"
+     && t.el.querySelector("nav.phone-tabs").getAttribute("aria-label") === "Pages");
+  ok("PHONE: the open page's tab is marked (aria-current=page and is-on); More says whether its sheet is open",
+     tabs(t.el)[0].getAttribute("aria-current") === "page" && tabs(t.el)[0].classList.contains("is-on")
+     && tabs(t.el)[3].getAttribute("aria-expanded") === "false" && tabs(t.el)[3].getAttribute("aria-controls") === "phone-more");
+  ok("PHONE: the Dashboard has no big-screen switch on a phone (the Dashboard itself is drawn: its six cards)", !!t.el.querySelector('[data-guide="dash-figures"]') && !t.el.querySelector('[data-guide="dash-wall"]')
+     && ![...t.el.querySelectorAll("button")].some(b => /Big screen/.test(b.textContent)));
+  await act(async () => { tabs(t.el)[1].dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await settle(5);
+  const ph = () => t.el.querySelector('[data-phone-page="lookahead"]');
+  ok("⭐ PHONE: the Look-ahead tab opens the phone Look-ahead (one read of /lookahead), not the desk grid",
+     !!ph() && !t.el.querySelector('[data-rd-table="lookahead"]') && !t.el.querySelector('[data-guide="lookahead-tabs"]')
+     && calls.some(c => c.url === "/api/lookahead?bucket=commit" && c.method === "GET"));
+  const dayBtns = () => [...ph().querySelectorAll(".ph-days > button")];
+  const shown = () => (dayBtns().find(b => b.getAttribute("aria-pressed") === "true") || {}).textContent;
+  const weekdays = LA.commit.lines[0].days.map(d => d.day_date).filter(iso => !w.__F.isWeekend(iso));
+  ok("PHONE: the date strip is the week's five weekdays, today pressed first (the fixture's today)",
+     dayBtns().length === 5 && dayBtns().map(b => b.textContent).join("|") === weekdays.map(iso => w.__F.dayName(iso) + w.__F.dayNum(iso)).join("|")
+     && shown() === w.__F.dayName(LA.today) + w.__F.dayNum(LA.today) && ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === LA.today);
+  // the day's figures are the server's own, summed over the lines with something planned that day
+  const dayRows = (iso) => LA.commit.lines.map(l => ({ l, d: l.days.find(x => x.day_date === iso) }))
+    .filter(x => x.d && ((+x.d.planned_qty || 0) > 0 || ((x.d.derived || {}).trips || 0) > 0));
+  const figs = () => [...ph().querySelectorAll(".ph-figs > span")].map(s => s.textContent.replace(/\s+/g, " ").trim());
+  const sumOf = (rows, k) => rows.reduce((a, x) => a + ((x.d.derived || {})[k] || 0), 0);
+  const rT = dayRows(LA.today);
+  ok("⭐ PHONE: the day card's figures are the server's for that day: tonnes, loads, lorries (routed lines), lines",
+     figs().join("|") === [`${w.__F.grp(sumOf(rT, "tonnes"))}t`, `${w.__F.grp(sumOf(rT, "trips"))}loads`,
+                           `${rT.some(x => x.l.context.baked) ? w.__F.grp(rT.filter(x => x.l.context.baked).reduce((a, x) => a + (x.d.derived.vehicles || 0), 0)) : "—"}${rT.some(x => !x.l.context.baked) && rT.some(x => x.l.context.baked) ? "lorries, routed lines" : "lorries"}`,
+                           `${rT.length}line${rT.length === 1 ? "" : "s"}`].join("|"), figs().join("|"));
+  const lineEls = () => [...ph().querySelectorAll(".ph-line")];
+  const tonnesOf = (el) => { const k = el.getAttribute("data-ph-line"); const x = rT.find(y => `${y.l.route_id}|${y.l.discipline || ""}|${y.l.section_id || ""}|${y.l.month_index}` === k); return x ? (x.d.derived.tonnes || 0) : -1; };
+  ok("PHONE: one row per line planned that day, heaviest first",
+     lineEls().length === Math.min(rT.length, 6) && lineEls().every((e, i, a) => i === 0 || tonnesOf(a[i - 1]) >= tonnesOf(e)));
+  ok("🔴 PHONE: team NAMES on the phone Look-ahead, never an id", !/\bIPT ?\d\b/i.test(ph().textContent) && /Team \d|North Team|No team/i.test(ph().textContent));
+  const first = lineEls()[0], fb = first.querySelector("button"), fdl = first.querySelector("dl");
+  ok("PHONE: a line's facts are shut until it is tapped (a native button, aria-expanded / aria-controls)",
+     fb.getAttribute("aria-expanded") === "false" && fdl.hidden === true && fb.getAttribute("aria-controls") === fdl.id);
+  click(fb);
+  ok("PHONE: ...and a tap shows them (route, vehicle, plan, lorries, the week's state)",
+     fb.getAttribute("aria-expanded") === "true" && fdl.hidden === false && /Route/.test(fdl.textContent) && /Plan/.test(fdl.textContent) && /This week/.test(fdl.textContent));
+  const other = weekdays.find(iso => iso !== LA.today);
+  click(dayBtns().find(b => b.textContent === w.__F.dayName(other) + w.__F.dayNum(other)));
+  ok("PHONE: another day in the strip shows that day's card (and shuts the open facts)",
+     ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === other && shown() === w.__F.dayName(other) + w.__F.dayNum(other)
+     && [...ph().querySelectorAll(".ph-line > button")].every(b => b.getAttribute("aria-expanded") === "false"));
+  // nothing on a phone writes: no input, no select, no textarea, no write button, no request with a method
+  const writeBtns = (el) => [...el.querySelectorAll("button")].filter(b => WRITE_WORDS.test(b.textContent.trim()));
+  ok("⭐ PHONE WATCHER: the phone Look-ahead has no input, select or textarea and no write button (Confirm, Re-open, Save…)",
+     !ph().querySelector("input, select, textarea") && writeBtns(ph()).length === 0, writeBtns(ph()).map(b => b.textContent).join(","));
+  await act(async () => { [...ph().querySelectorAll("button")].find(b => /Day sheet/.test(b.textContent)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await settle(5);
+  ok("⭐ PHONE: the Day sheet asks for the shown day of the open week (a GET; the file is named after the day)",
+     calls.some(c => c.url === `/api/forecast-weeks/day-sheet?bucket=commit&day=${other}` && c.method === "GET"));
+  ok("🔴 PHONE WATCHER: not one request from the phone pages carries a method other than GET", calls.every(c => c.method === "GET"),
+     calls.filter(c => c.method !== "GET").map(c => c.method + " " + c.url).join(", "));
+  // More: the desk pages, each the card on a phone
+  click(tabs(t.el)[3]);
+  const sheet = () => t.el.querySelector("#phone-more");
+  ok("PHONE: More opens a sheet (a dialog) with the pages made for a desk this role can see, and the user guide",
+     !!sheet() && sheet().getAttribute("role") === "dialog" && tabs(t.el)[3].getAttribute("aria-expanded") === "true"
+     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner"
+     && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
+  ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
+  await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  ok("PHONE: Escape shuts the sheet", !sheet() && tabs(t.el)[3].getAttribute("aria-expanded") === "false");
+  click(tabs(t.el)[3]);
+  click([...sheet().querySelectorAll("button.phone-more-item")].find(b => /Forecasts/.test(b.textContent)));
+  const desk = () => t.el.querySelector("[data-desk-only]");
+  ok("⭐ PHONE: a desk page on a phone is the card \"Open on a desktop to edit this.\" with its own name, never the page",
+     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && /Open on a desktop to edit this\./.test(desk().textContent)
+     && !t.el.querySelector('[data-rd-table="forecasts"], table') && !sheet() && w.location.hash === "#forecasts" && tabs(t.el)[3].classList.contains("is-on"));
+  ok("🔴 PHONE WATCHER: the desk card has no input and no write button (hidden, not disabled)",
+     !t.el.querySelector("main input, main select, main textarea") && writeBtns(t.el.querySelector("main")).length === 0
+     && ![...t.el.querySelectorAll("main button")].some(b => b.disabled));
+  click([...desk().querySelectorAll("button")].find(b => /Go to the Dashboard/.test(b.textContent)));
+  ok("PHONE: its button goes back to the Dashboard", !desk() && tabs(t.el)[0].classList.contains("is-on") && w.location.hash === "#dashboard");
+  // a desk page opened by its address (#submit) on a phone is the card too
+  await t.done();
+  const s2 = await mountPortal(TEAM_ACC, "submit");
+  ok("PHONE: a desk page opened by its address (#submit) is the card as well, the matrix never mounted",
+     !!s2.el.querySelector("[data-desk-only]") && s2.el.querySelector("[data-desk-only] h2").textContent === "Submit forecast" && !s2.el.querySelector("main input, main select"));
+  await s2.done();
+
+  // -- the planner on a phone: the Data pages and Config are desk pages too
+  const p = await mountPortal(plannerAcc, "dashboard");
+  click(tabs(p.el)[3]);
+  // NARROWED 14 Oct 2026 (merged with G3): a planner on a shared CODE also sees Users (G3's first-admin step), a desk page too
+  ok("PHONE: the planner's sheet adds the Data pages, Config and Users (each a desk page)",
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Locations|Routes|Zones|Config|Users");
+  click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Users/.test(b.textContent)));
+  ok("PHONE (with G3): Users on a phone is the card, the Users page never mounted",
+     !!p.el.querySelector("[data-desk-only]") && p.el.querySelector("[data-desk-only] h2").textContent === "Users" && !p.el.querySelector("main table, main input"));
+  click(tabs(p.el)[3]);
+  click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Config/.test(b.textContent)));
+  ok("PHONE: Config on a phone is the card (the Config page, its Save and its JSON never mount)",
+     !!p.el.querySelector("[data-desk-only]") && !/Everything \(JSON\)/.test(p.el.textContent) && !p.el.querySelector("main textarea"));
+  // turned sideways past 768 px (the media query changes): the desk shell, the rail and the page itself
+  narrowNow = false;
+  await act(async () => { if (mqHandler) mqHandler({ matches: false }); });
+  await settle(5);
+  ok("⭐ PHONE → DESK: past 768 px the rail is back, the tab bar gone, and the desk page itself mounts (no card)",
+     !!p.el.querySelector("aside.rail") && !p.el.querySelector("nav.phone-tabs") && !p.el.querySelector("[data-desk-only]") && !p.el.querySelector("#phone-more"));
+  await p.done();
+  w.matchMedia = mm;
+}
+
+// ---- 14 Oct 2026 (G3): per-person logins, mounted -------------------------------------------------------------
+// The whole App with a stubbed fetch that records every call: email sign-in, the account menu, the Users page (teams by
+// NAME, never an id), the hint that resumes a session on reload, a session ending while the app is open, a demo login
+// sending its page opens, and the set-password screen (mounted on its own: the link is read once as the page loads).
+// NOT covered: the real cookie (http_smoke.py), how it looks (the browser check).
+async function g3LoginsDom(){
+  const answer = (status, data) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(data) });
+  const ADMIN = { role: "admin", label: "Admin", ipt: null, can_approve: true, ipt_locked: false, ipt_required: true, demo: false,
+                  ipts: [], via: "login", codes: false, name: "Ada Lovelace", email: "ada@example.org", kind: "staff", user_id: "u1" };
+  const TEAMLOGIN = { ...ADMIN, role: "ipt", label: "North Team", ipt: "IPT1", can_approve: false, ipt_locked: true, ipt_required: false,
+                      name: "Bob North", email: "bob@example.org", user_id: "u2" };
+  const USERS = { users: [
+      { id: "u1", email: "ada@example.org", name: "Ada Lovelace", role: "admin", team: null, team_label: null, role_label: "Admin",
+        status: "active", kind: "staff", disabled: false, has_password: true, last_sign_in_at: "2026-10-14T09:00:00Z" },
+      { id: "u2", email: "bob@example.org", name: "Bob North", role: "team", team: "IPT1", team_label: "North Team", role_label: "North Team",
+        status: "invited", kind: "staff", disabled: false, has_password: false, last_sign_in_at: null },
+      { id: "u3", email: "lea@example.org", name: "Lea Lead", role: "team", team: "IPT1", team_label: "North Team", role_label: "North Team",
+        status: "active", kind: "demo", disabled: false, has_password: false, expires_at: "2026-10-28T09:00:00Z", last_sign_in_at: null }],
+    teams: [{ id: "IPT1", label: "North Team" }, { id: "IPT2", label: "Central Team" }], codes: true, mail: false, me: "u1" };
+  const calls = [];
+  let signinAnswer = () => answer(200, ADMIN), meAnswer = () => answer(200, { signed_in: false, access: null, codes: false });
+  w.fetch = (url, o) => {
+    const u = String(url); calls.push({ u, o });
+    if (/\/api\/meta$/.test(u)) return respond(META);
+    if (/\/api\/auth\/me$/.test(u)) return meAnswer();
+    if (/\/api\/auth\/signin$/.test(u)) return signinAnswer();
+    if (/\/api\/auth\/signout$/.test(u)) return answer(200, { ok: true });
+    if (/\/api\/admin\/users(\?|$)/.test(u) && !(o && o.method === "POST")) return answer(200, USERS);
+    if (/\/api\/admin\/users(\?|$)/.test(u)) return answer(200, { user: { ...USERS.users[1], id: "u9", name: "Cy New" }, email: "unsent", purpose: "invite",
+                                                                    link: "https://app.wayscope.co.uk/#invite=abcdefghijklmnopqrstuvwxyz" });
+    if (/\/api\/admin\/audit/.test(u)) return answer(200, { rows: [
+      { id: "a1", at: "2026-10-14T10:00:00Z", kind: "write", actor_label: "Ada Lovelace <ada@example.org>", method: "POST", path: "/api/forecasts/bulk", detail: "{\"rows\":1}" },
+      { id: "a2", at: "2026-10-14T09:00:00Z", kind: "page", actor_label: "Lea Lead <lea@example.org>", target: "dashboard" }] });
+    if (/\/api\/admin\/leads/.test(u)) return answer(200, { leads: [
+      { id: "r1", created_at: "2026-10-09T12:00:00Z", name: "Old Lead", email: "old@example.org", organisation: "O", role: "Other", login: "none",
+        login_expires_at: "", sign_ins: "", first_seen: "", last_seen: "", pages: "" }] });
+    if (/\/api\/activity$/.test(u)) return answer(200, { ok: true, recorded: true });
+    return new Promise(() => {});
+  };
+  const mountApp = async () => {
+    const box = w.document.createElement("div"); w.document.body.appendChild(box);
+    const root = w.ReactDOM.createRoot(box);
+    await act(async () => { root.render(w.React.createElement(w.App)); });
+    await tick(); await tick();
+    return { box, root };
+  };
+  const btnT = (box, t) => [...box.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+  const setVal = (el, v) => act(() => { Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  w.__ACCESS.code = ""; w.__ACCESS.info = null; w.sessionStorage.removeItem("modus_access_code"); w.localStorage.removeItem("wayscope_signed_in");
+  w.localStorage.setItem("modus_page", "dashboard");
+
+  // (a) email sign-in as an admin
+  const a = await mountApp();
+  click(btnT(a.box, "Staff sign in")); await tick();
+  ok("G3 SIGN-IN: with the codes OFF on the server, the code link is not offered",
+     !!a.box.querySelector("input#auth-email") && !btnT(a.box, "Sign in with a team code instead") && !!btnT(a.box, "Forgot your password?"));
+  await setVal(a.box.querySelector("input#auth-email"), "  ada@example.org ");
+  await setVal(a.box.querySelector("input#auth-pass"), "correct horse battery");
+  click(a.box.querySelector(".auth-check input"));
+  await act(async () => { btnT(a.box, "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  const sc = calls.find(c => /\/api\/auth\/signin$/.test(c.u));
+  ok("⭐ G3 SIGN-IN: posts the trimmed email, the password and the keep-me-signed-in tick to /api/auth/signin",
+     sc && sc.o.method === "POST" && JSON.parse(sc.o.body).email === "ada@example.org" && JSON.parse(sc.o.body).password === "correct horse battery"
+     && JSON.parse(sc.o.body).remember === true);
+  ok("⭐ G3 SIGN-IN: the staff app opens; the header shows the person's NAME (the account menu), and no code is kept in the tab",
+     !!btnT(a.box, "Sign out") && !!a.box.querySelector(".acct-btn") && /Ada Lovelace/.test(a.box.querySelector(".acct-btn").textContent)
+     && w.sessionStorage.getItem("modus_access_code") === null && w.__ACCESS.code === "" && w.__ACCESS.info === ADMIN);
+  ok("...and the browser keeps only the harmless note that someone signed in here", w.localStorage.getItem("wayscope_signed_in") === "1");
+  ok("G3: an ADMIN sees Users in the rail", [...a.box.querySelectorAll(".rail-item")].some(b => /Users/.test(b.textContent)));
+  click(a.box.querySelector(".acct-btn"));
+  const menu = a.box.querySelector(".acct-menu");
+  ok("G3 ACCOUNT: the menu names the person, their email, and offers a password change",
+     !!menu && /ada@example\.org/.test(menu.textContent) && /Change your password/.test(menu.textContent)
+     && !!menu.querySelector('input[aria-label="Current password"]'));
+  click(a.box.querySelector(".acct-btn"));
+  // the Users page
+  await act(async () => { [...a.box.querySelectorAll(".rail-item")].find(b => /Users/.test(b.textContent)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  const usersText = a.box.querySelector("main main") ? a.box.querySelector("main main").textContent : a.box.textContent;
+  ok("⭐ G3 USERS: the list shows each person, a team by its NAME, and NEVER a team id",
+     /Bob North/.test(usersText) && /North Team/.test(usersText) && !/IPT1|IPT2/.test(usersText));
+  ok("G3 USERS: the shared codes are still on, and the page says so", /The shared codes still work on this site/.test(usersText));
+  ok("G3 USERS: an admin LOGIN is not asked for the admin token", !a.box.querySelector('input[aria-label="Admin token"]'));
+  ok("G3 USERS: the add form offers each team by NAME, Planner and Admin",
+     [...a.box.querySelectorAll('select[aria-label="Team or role"] option')].map(x => x.textContent).join("|") === "Choose…|North Team|Central Team|Planner|Admin");
+  ok("G3 USERS: the person signed in cannot disable themself (no Disable on their own row); others can be",
+     [...a.box.querySelectorAll("tbody tr")].filter(r => /Ada Lovelace/.test(r.textContent)).every(r => !/Disable/.test(r.textContent))
+     && [...a.box.querySelectorAll("tbody tr")].some(r => /Bob North/.test(r.textContent) && /Disable/.test(r.textContent)));
+  ok("G3 USERS: a demo login sits in its own table with its end date and '7 more days'",
+     /Demo logins/.test(usersText) && [...a.box.querySelectorAll("tbody tr")].some(r => /Lea Lead/.test(r.textContent) && /7 more days/.test(r.textContent)));
+  await setVal(a.box.querySelector('input[aria-label="Name"]'), "Cy New");
+  await setVal(a.box.querySelector('input[aria-label="Email"]'), "cy@example.org");
+  const sel = a.box.querySelector('select[aria-label="Team or role"]');
+  await act(async () => { sel.value = "team:IPT2"; sel.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  await act(async () => { btnT(a.box, "Add and send the link").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  const add = calls.find(c => /\/api\/admin\/users(\?|$)/.test(c.u) && c.o && c.o.method === "POST");
+  ok("⭐ G3 USERS: Add posts the name, the email and the team SLOT behind the name, with no token in the address",
+     add && JSON.stringify(JSON.parse(add.o.body)) === JSON.stringify({ name: "Cy New", email: "cy@example.org", role: "team", team: "IPT2" })
+     && !/token=/.test(add.u));
+  ok("G3 USERS: with no email set up, the page shows the invite link to pass on, with Copy",
+     /pass this link/.test(a.box.textContent) && /#invite=abcdefghijklmnopqrstuvwxyz/.test(a.box.textContent) && !!btnT(a.box, "Copy"));
+  click(btnT(a.box, "Demo leads")); await tick(); await tick();
+  ok("G3 USERS → Demo leads: a lead who had the shared code gets 'Send a personal login'",
+     /Old Lead/.test(a.box.textContent) && /had the shared code/.test(a.box.textContent) && !!btnT(a.box, "Send a personal login"));
+  click(btnT(a.box, "Activity")); await tick(); await tick();
+  ok("G3 USERS → Activity: rows read in words — who, and what they did — not paths",
+     /Ada Lovelace/.test(a.box.textContent) && /Saved forecast lines/.test(a.box.textContent) && /Opened dashboard/.test(a.box.textContent)
+     && !/\/api\/forecasts/.test([...a.box.querySelectorAll("tbody td")].map(t => t.textContent).join(" ").replace(/Details[\s\S]*$/, "")));
+  // sign out
+  await act(async () => { btnT(a.box, "Sign out").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick();
+  ok("⭐ G3 SIGN OUT: posts /api/auth/signout, drops the note, lands on the public map",
+     calls.some(c => /\/api\/auth\/signout$/.test(c.u) && c.o && c.o.method === "POST") && w.localStorage.getItem("wayscope_signed_in") === null
+     && !!btnT(a.box, "Staff sign in"));
+  await act(async () => { a.root.unmount(); }); a.box.remove();
+
+  // (b) a refused sign-in shows the server's one sentence
+  signinAnswer = () => answer(401, { detail: "That email and password don't match." });
+  const b = await mountApp();
+  click(btnT(b.box, "Staff sign in")); await tick();
+  await setVal(b.box.querySelector("input#auth-email"), "x@example.org");
+  await setVal(b.box.querySelector("input#auth-pass"), "wrong wrong wrong");
+  await act(async () => { btnT(b.box, "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  ok("G3 SIGN-IN: a refusal shows the server's one sentence and stays on the sign-in screen",
+     /That email and password don't match\./.test(b.box.textContent) && !!b.box.querySelector("input#auth-email"));
+  click(btnT(b.box, "Forgot your password?")); await tick();
+  ok("G3 FORGOT: the same card asks for the email and offers 'Send me a link' and 'Back to sign in'",
+     /Forgotten your password\?/.test(b.box.textContent) && !!btnT(b.box, "Send me a link") && !!btnT(b.box, "Back to sign in") && !b.box.querySelector("input#auth-pass"));
+  await act(async () => { b.root.unmount(); }); b.box.remove();
+  const staffActivity = calls.filter(x => /\/api\/activity$/.test(x.u)).length;   // (a) opened Dashboard and Users as an admin login
+
+  // (c) a reload with the note: the server is asked who this is
+  w.localStorage.setItem("wayscope_signed_in", "1");
+  meAnswer = () => answer(200, { signed_in: true, access: TEAMLOGIN, codes: false });
+  calls.length = 0;
+  const c = await mountApp(); await tick();
+  ok("⭐ G3 RELOAD: with the note, the app asks /api/auth/me and returns to the staff app as that login",
+     calls.some(x => /\/api\/auth\/me$/.test(x.u)) && !!btnT(c.box, "Sign out") && /Bob North/.test(c.box.querySelector(".acct-btn").textContent));
+  ok("G3: a TEAM login sees no Users page", ![...c.box.querySelectorAll(".rail-item")].some(x => /Users/.test(x.textContent)));
+  await act(async () => { w.dispatchEvent(new w.Event("wayscope-session-ended")); }); await tick();
+  ok("⭐ G3 SESSION ENDED: a session that ends while the app is open lands on sign-in with a sentence saying so, and the note goes",
+     !!c.box.querySelector("input#auth-email") && /You have been signed out/.test(c.box.textContent) && w.localStorage.getItem("wayscope_signed_in") === null);
+  await act(async () => { c.root.unmount(); }); c.box.remove();
+  // the note, but the session is gone
+  w.localStorage.setItem("wayscope_signed_in", "1");
+  meAnswer = () => answer(200, { signed_in: false, access: null, codes: false });
+  const d = await mountApp(); await tick();
+  ok("🔴 G3 RELOAD: the note with no live session → the public map, and the note is dropped",
+     !!btnT(d.box, "Staff sign in") && w.localStorage.getItem("wayscope_signed_in") === null);
+  await act(async () => { d.root.unmount(); }); d.box.remove();
+  // no note: /api/auth/me is not asked on load
+  calls.length = 0;
+  const e = await mountApp(); await tick();
+  ok("G3 RELOAD: without the note a visitor gets the public map at once and /api/auth/me is not asked before sign-in",
+     !!btnT(e.box, "Staff sign in") && !calls.some(x => /\/api\/auth\/me$/.test(x.u)));
+  await act(async () => { e.root.unmount(); }); e.box.remove();
+
+  // (d) a demo login sends its page opens (D51); a staff login does not
+  w.localStorage.setItem("wayscope_signed_in", "1");
+  meAnswer = () => answer(200, { signed_in: true, access: { ...TEAMLOGIN, kind: "demo", name: "Lea Lead", expires_at: "2026-10-28T09:00:00Z" }, codes: false });
+  calls.length = 0;
+  const f = await mountApp(); await tick(); await tick();
+  await act(async () => { [...f.box.querySelectorAll(".rail-item")].find(x => /Look-ahead/.test(x.textContent)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick();
+  const acts = calls.filter(x => /\/api\/activity$/.test(x.u)).map(x => JSON.parse(x.o.body).page);
+  ok("⭐ G3 DEMO: a demo login reports each page it opens (Dashboard, then Look-ahead)", acts.join("|") === "dashboard|lookahead");
+  click(f.box.querySelector(".acct-btn"));
+  ok("G3 DEMO: its account menu says when the demo access ends and offers no password change",
+     /Your demo access ends/.test(f.box.querySelector(".acct-menu").textContent) && !/Change your password/.test(f.box.querySelector(".acct-menu").textContent));
+  await act(async () => { f.root.unmount(); }); f.box.remove();
+  ok("🔴 G3: the STAFF login in (a) opened two pages and sent no page open", staffActivity === 0);
+  w.localStorage.removeItem("wayscope_signed_in");
+
+  // (e) the set-password screen
+  let resetBody = null, checkAnswer = () => answer(200, { purpose: "invite", name: "Cy New", email: "cy@example.org" });
+  w.fetch = (url, o) => { const u = String(url);
+    if (/\/api\/auth\/check$/.test(u)) return checkAnswer();
+    if (/\/api\/auth\/reset$/.test(u)) { resetBody = JSON.parse(o.body); return answer(200, { ...TEAMLOGIN, name: "Cy New" }); }
+    return new Promise(() => {}); };
+  let signedIn = null;
+  const g = w.document.createElement("div"); w.document.body.appendChild(g);
+  const gr = w.ReactDOM.createRoot(g);
+  await act(async () => { gr.render(w.React.createElement(w.SetPassword, { link: { purpose: "invite", token: "t".repeat(40) }, onSignIn: (i) => { signedIn = i; }, onBack: () => {} })); });
+  await tick(); await tick();
+  ok("⭐ G3 SET PASSWORD: an invite greets the person by first name and names the login's email", /Welcome, Cy/.test(g.textContent) && /cy@example\.org/.test(g.textContent));
+  await setVal(g.querySelector("#set-pw"), "short");
+  await act(async () => { btnT(g, "Save and sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  ok("G3 SET PASSWORD: under 10 characters is refused on the page, nothing posted", /at least 10 characters/.test(g.textContent) && resetBody === null);
+  await setVal(g.querySelector("#set-pw"), "purple tractor river");
+  await setVal(g.querySelector("#set-pw2"), "purple tractor rivers");
+  await act(async () => { btnT(g, "Save and sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  ok("G3 SET PASSWORD: two different passwords are refused on the page", /not the same/.test(g.textContent) && resetBody === null);
+  await setVal(g.querySelector("#set-pw2"), "purple tractor river");
+  await act(async () => { btnT(g, "Save and sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick();
+  ok("⭐ G3 SET PASSWORD: posts the link and the password to /api/auth/reset and signs in with the answer",
+     resetBody && resetBody.token === "t".repeat(40) && resetBody.password === "purple tractor river" && signedIn && signedIn.name === "Cy New");
+  await act(async () => { gr.unmount(); }); g.remove();
+  checkAnswer = () => answer(410, { detail: "This link has expired or has already been used. Ask for a new one." });
+  const h = w.document.createElement("div"); w.document.body.appendChild(h);
+  const hr = w.ReactDOM.createRoot(h);
+  await act(async () => { hr.render(w.React.createElement(w.SetPassword, { link: { purpose: "reset", token: "u".repeat(40) }, onSignIn: () => {}, onBack: () => {} })); });
+  await tick(); await tick();
+  ok("🔴 G3 SET PASSWORD: a used or expired link says so, says how to get a new one, and shows no password field",
+     /This link no longer works/.test(h.textContent) && /Forgot your password/.test(h.textContent) && !h.querySelector("#set-pw"));
+  await act(async () => { hr.unmount(); }); h.remove();
+}
+
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
 (async () => {
@@ -1277,6 +1647,8 @@ function keptAppLoader(){
   catch (e) { ok("MAP UNDER THE BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await reloadResume(); ok("RELOAD: the section ran to the end", true); }
   catch (e) { ok("RELOAD: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await g3LoginsDom(); ok("G3 LOGINS: the section ran to the end", true); }
+  catch (e) { ok("G3 LOGINS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await configEstonianColumn(); ok("CONFIG (11 Oct 2026 review): the section ran to the end", true); }
   catch (e) { ok("CONFIG (11 Oct 2026 review): the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
@@ -1292,6 +1664,8 @@ function keptAppLoader(){
   catch (e) { ok("SPEED: the loader section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await rowDetailsDom(); ok("ROW DETAILS: the section ran to the end", true); }
   catch (e) { ok("ROW DETAILS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  try { await phoneShellDom(); ok("PHONE: the section ran to the end", true); }
+  catch (e) { ok("PHONE: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

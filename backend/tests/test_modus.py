@@ -232,7 +232,8 @@ for dirpath, dirs, files in os.walk(ROOT):
 ID_FORM_ALLOWED = {"backend/access.py", "backend/taxonomy.py", "backend/db.py", "backend/network.py",
                    "backend/main.py", "frontend/index.html", "map/index.html",
                    "backend/tools/make_demo_tenant.py", "demo/uk-corridor.package.json",
-                   "README.md", "README.txt", "env.example"}   # these name the IPTn_CODE variables
+                   "README.md", "README.txt", "env.example",   # these name the IPTn_CODE variables
+                   "backend/users.py"}   # 14 Oct 2026 (G3): a login's team SLOT, the id behind the tenant's team name
 HUMAN_FORM_ALLOWED = {"backend/access.py"}
 for rel in list(hits):
     keep = []
@@ -668,8 +669,10 @@ ok("export: the Clashes sheet and the PDF name the codes and the teams",
    and export._flag_label({"code": "RESTRICTION", "label": "ROADWORKS"}) == "ROADWORKS"
    and export._flag_label({"code": "RESTRICTION", "label": "TARK TEE"}) == "TARK TEE"
    and export._flag_label({"code": "IPT_SHARE"}) == "SHARE" and "TARK_TEE" not in export.FLAG_LABEL)
+# NARROWED 14 Oct 2026 (D9): + the Day sheet's rows (export.day_sheet_rows builds its namer once, before its loop)
 ok("export: the team namer is built once per sheet, not per row",
-   read("backend/export.py").count("= _team_namer()") == 4)   # day rows, Clashes sheet, PDF rows, PDF flags
+   read("backend/export.py").count("= _team_namer()") == 5   # day rows, Clashes sheet, PDF rows, PDF flags, Day sheet rows
+   and "    name = _team_namer()\n    by_line = {}" in read("backend/export.py"))
 _page = {"commit": {"lines": [{"route_id": "R9", "context": {"ipt": "IPT3", "origin_name": "A", "dest_name": "B"},
                                "days": [{"day_date": "2026-09-14", "derived": {}}]}]}}
 _rows = export._line_rows(_page)
@@ -688,8 +691,9 @@ ok("frontend: the team pill shows the name, with the id only as a tooltip",
    "title={k}>{teamName(k)}</span>" in fe_src)
 ok("frontend: the submit picker has no hard-coded six-team fallback",
    '["IPT1","IPT2","IPT3","IPT4","IPT5","IPT6"]' not in fe_src and "Object.keys(TEAM_LABELS)" in fe_src)
+# NARROWED 14 Oct 2026 (D9): + the phone's More sheet (the header, the rail's foot, and More)
 ok("frontend: signed-in role text shows the team's name",
-   fe_src.count("{role.ipt ? teamName(role.ipt) : role.label}") == 2 and "` · ${role.ipt}`" not in fe_src)
+   fe_src.count("{role.ipt ? teamName(role.ipt) : role.label}") == 3 and "` · ${role.ipt}`" not in fe_src)
 # NARROWED (H1, 29 Sep): the word comes from flagWord(f) — RAIL_LABEL, or the provider's own
 # word off a RESTRICTION flag ("TARK TEE" / "ROADWORKS")
 # NARROWED (10 Oct, the UI pass): the rail is a card of words with dots; the word and the team text are

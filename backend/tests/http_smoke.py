@@ -279,8 +279,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ demo tenant, no cookie: the app's iframe (/map/?embed=1) gets the password page, 401, WITHOUT the notice pill (the bar has it)",
        r_emb.status_code == 401 and 'id="p" name="p" type="password"' in r_emb.text and 'class="demo-notice"' not in r_emb.text
        and r_emb_nohdr.status_code == 401 and 'class="demo-notice"' not in r_emb_nohdr.text, f"{r_emb.status_code} {r_emb_nohdr.status_code}")
+    # NARROWED 14 Oct 2026 (the user took the recommendation): the demo package's notice is "the scheme and its plan are
+    # invented" (was "nothing here is real", which the bulletin's real government figures contradicted); same three places
     ok("⭐ .../map/ on its own gets the password page WITH the notice pill (no bar above it)",
-       r_alone.status_code == 401 and '<div class="demo-notice">Fictional demo scheme · nothing here is real</div>' in r_alone.text,
+       r_alone.status_code == 401 and '<div class="demo-notice">Fictional demo scheme · the scheme and its plan are invented</div>' in r_alone.text,
        str(r_alone.status_code))
     ok("🔴 ...and /map/?embed=1 typed into the tab (a top-level page) keeps the pill too",
        r_typed.status_code == 401 and 'class="demo-notice"' in r_typed.text, str(r_typed.status_code))
@@ -559,7 +561,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
            r.status_code == 200 and pg["month"] == {"index": 10, "label": "Oct 2026", "label_long": "October 2026",
                                                      "from": "2026-10-01", "to": "2026-10-31"}
            and all(hl.get(k) is not None for k in ("two_way_a_day", "movements_in_month", "routes_in_use", "tonnes"))
-           and _wd and hl["working_days"] == _wd and pg["demo_notice"] == "Fictional demo scheme · nothing here is real"
+           and _wd and hl["working_days"] == _wd and pg["demo_notice"] == "Fictional demo scheme · the scheme and its plan are invented" and "nothing here is real" not in r.text
            and pg["plan_only"] is True, f"{r.status_code} {str(pg)[:300]}")
         _kp = c.get("/api/public/month-kpis?month=10", headers=PLAN).json()
         _r001 = [l for l in _kp["lines"] if l["route_id"] == "R001"]
@@ -585,14 +587,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("⭐ …conditions of the month from what is STORED: no stored check, so \"never checked\" on all 19 routes (National Highways provider)",
            _cn["restrictions"]["status"] == "never checked" and len(_cn["restrictions"]["never_checked_routes"]) == 19
            and _cn["restrictions"]["hits"] == [] and _cn["restrictions"]["provider"] == "nh_closures", str(_cn["restrictions"])[:200])
-        ok("⭐ …Stockpile Tilton over at the end of October by 510 t (40,510 against 40,000 — the figure the live map showed on 11 Oct)",
-           [(p["name"], p["capacity_qty"], p["balance_end"], p["over_by"]) for p in _cn["stockpiles_over"]]
-           == [("Stockpile Tilton", 40000.0, 40510.0, 510.0)], str(_cn["stockpiles_over"]))
-        ok("⭐ …and its sentence says the balance is RECORDED (typed week actuals carried forward), never \"the plan puts\" (D23)",
-           # NARROWED 12 Oct 2026 (the review and fix pass): "has a capacity of", not "holds"
-           _cn["stockpiles_over"][0]["wording"] == ("Stockpile Tilton has a capacity of 40,000 t; 40,510 t recorded in it at the end "
-                                                    "of Oct 2026, from the week actuals typed so far, carried forward.")
-           and "plan puts" not in r.text, str(_cn["stockpiles_over"][0].get("wording")))
+        # REVERSED 14 Oct 2026 (the user took the recommendation): the public bulletin no longer carries the stockpile over
+        # capacity (a site matter). Stockpile Tilton is still over by 510 t in the demo; the sentence and the figures stay
+        # pinned on bulletin.conditions_of_month in test_bulletin.py, which still computes them.
+        ok("⭐ …the public page carries NO stockpile: no stockpiles_over key, Stockpile Tilton nowhere in the body, and the count leaves it out",
+           "stockpiles_over" not in _cn and "Stockpile Tilton" not in r.text and "40,510" not in r.text
+           and _cn["count"] == len(_cn["restrictions"]["hits"]) + len(_cn["seasonal"]) + len(_cn["route_caps"]["exceeded"]),
+           str(sorted(_cn)))
+        ok("…and the bulletin never says \"the plan puts\" (D23)", "plan puts" not in r.text)
         _cap = _cn["route_caps"]
         ok("⭐ …the typed cap on R016 (20 a day) is exceeded by October's loaded trips a day and reads \"planning flag\", never a block",
            _cap["wording"] == "planning flag" and _cap["routes_with_cap"] == 2 and [e["route_id"] for e in _cap["exceeded"]] == ["R016"]
@@ -628,11 +630,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and all("fictional demo scheme" in x.lower() for x in _bp), f"{r.status_code} {len(_bp)} pages")
             ok("⭐ ...page 1 carries the four headline figures equal to /api/bulletin/month's roll-up",
                bool(_bp) and all(f in _bp[0] for f in _figs), f"{_figs} | {_bp[0][:400] if _bp else ''}")
-            ok("...the busiest route by its places, the stockpile over capacity, the never-checked routes, the carbon stamp, the planning flag",
+            # REVERSED 14 Oct 2026 (the user took the recommendation): the stockpile over capacity is a site matter and is
+            # no longer in the public bulletin — its absence is asserted where its presence was
+            ok("...the busiest route by its places, NO stockpile, the never-checked routes, the carbon stamp, the planning flag",
                # NARROWED 14 Oct 2026 (the publishing check): plain words, the flagged route by its places (no "Route R016"),
                # the stockpile as its balance against its capacity; the stamp is in Sources (two columns: read in drawing order)
-               "Kilby Ridge Quarry to Harborough Compound" in _bj and "above its 40,000 t capacity (weekly records so far)" in _bj
-               and "Stockpile Tilton:" in _bj and "Not checked against published road works" in _bj
+               "Kilby Ridge Quarry to Harborough Compound" in _bj and "40,000 t capacity" not in _bj
+               and "Stockpile Tilton" not in _bj and "Over capacity" not in _bj and "Not checked against published road works" in _bj
                and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in " ".join(pdf_text(r_pdf_bytes, raw=True).split())
                and "Route R016" not in _bj and "above its planning flag of 20 a day." in _bj, _bj[:600])
             ok("🔴 ...no team id, none of the banned words",
@@ -643,7 +647,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
                and r.headers.get("cache-control") == "no-store" and all(f in r.text for f in _figs)
                and 'href="/api/bulletin/month.pdf?month=10">Download the PDF</a>' in r.text
-               and "Fictional demo scheme · nothing here is real" in r.text, f"{r.status_code} {r.text[:200]}")
+               and "Fictional demo scheme · the scheme and its plan are invented" in r.text, f"{r.status_code} {r.text[:200]}")
             r = c.get("/api/bulletin/leaflet.pdf?month=10", headers=PLAN)
             _lp = [" ".join(x.split()) for x in pdf_text(r.content).split("\f") if x.strip()] if r.status_code == 200 else []
             ok("⭐ D43 the leaflet PDF over HTTP: one page, named for the month, not cached, the demo bar, the four figures, the brief",
@@ -879,6 +883,38 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and r.headers.get("content-type") == "application/pdf" and r.content[:5] == b"%PDF-",
        f"{r.status_code} {r.headers.get('content-type')} {r.content[:60]!r}")
     pdf_bytes = r.content
+
+    # ---- 14 Oct 2026 (D9, the mobile shell): the Day sheet, one weekday of the open week as a one-page PDF -------------
+    from portable import pdf_text as _pt
+    _cw = la.get("commit_week") or {}
+    _wds = [d["day_date"] for d in ((la.get("commit") or {}).get("lines") or [{}])[0].get("days", [])
+            if __import__("datetime").date.fromisoformat(d["day_date"]).weekday() <= 4]
+    _day = _wds[0] if _wds else _cw.get("from")
+    r = c.get("/api/forecast-weeks/day-sheet", params={"day": _day})
+    ok("🔴 DAY SHEET: without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/forecast-weeks/day-sheet", params={"day": _day}, headers=PLAN)
+    _dst = " ".join(_pt(r.content).split()) if r.status_code == 200 else ""
+    ok("⭐ DAY SHEET: the planner downloads one A4 portrait page (real reportlab), named after the day",
+       r.status_code == 200 and r.headers.get("content-type") == "application/pdf" and r.content[:5] == b"%PDF-"
+       and r.content.count(b"/Type /Page\n") == 1 and f'filename="day-sheet-{_day}.pdf"' in r.headers.get("content-disposition", "")
+       and b"/MediaBox [ 0 0 595." in r.content and "day sheet" in _dst and "not a delivery note" in _dst,
+       f"{r.status_code} pages={r.content.count(b'/Type /Page\n')} mb={r.content[r.content.find(b'/MediaBox'):r.content.find(b'/MediaBox')+40]!r} {_dst[-400:]}")
+    ok("...with the demo notice, team NAMES and no team id; NOT ROUTED counted, never the server's 'baked' working note",
+       "DEMO" in _dst and "Fictional demo scheme" in _dst and not re.search(r"\bIPT ?[1-6]\b", _dst)
+       and "NOT ROUTED on" in _dst and not re.search(r"\b(un)?baked?\b", _dst, re.I)
+       and any(t in _dst for t in ("North Team", "Central Team", "South Team")), _dst[:300])
+    r = c.get("/api/forecast-weeks/day-sheet", params={"day": _day}, headers=NORTH)
+    _dsn = " ".join(_pt(r.content).split()) if r.status_code == 200 else ""
+    ok("⭐ DAY SHEET: a team code gets ITS lines only (the page's own scope)",
+       r.status_code == 200 and ("North Team" in _dsn or "Nothing is planned on this day" in _dsn)
+       and "Central Team" not in _dsn and "South Team" not in _dsn, _dsn[:300])
+    _sat = (__import__("datetime").date.fromisoformat(_cw["from"]) + __import__("datetime").timedelta(days=5)).isoformat() if _cw.get("from") else "2000-01-01"
+    r1 = c.get("/api/forecast-weeks/day-sheet", params={"day": _sat}, headers=PLAN)
+    r2 = c.get("/api/forecast-weeks/day-sheet", params={"day": "2000-01-03"}, headers=PLAN)
+    r3 = c.get("/api/forecast-weeks/day-sheet", params={"day": "not-a-day"}, headers=PLAN)
+    ok("🔴 DAY SHEET: a weekend, a day outside the week and a non-date are each a 400 with the reason",
+       r1.status_code == 400 and r2.status_code == 400 and r3.status_code == 400 and "not a weekday of the week" in r1.text
+       and "YYYY-MM-DD" in r3.text, f"{r1.status_code} {r2.status_code} {r3.status_code} {r1.text[:120]}")
 
     try:
         import io
@@ -1227,8 +1263,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
         form = {"name": "Ada Example", "email": "ada@example.org", "organisation": "Example Civils",
                 "role": "Principal contractor", "wants": "the look-ahead", "updates": "yes", "website": ""}
         r = c.post("/api/public/demo-request", follow_redirects=False, data=form)
-        ok("⭐ no sender configured: the form POST (signed out) answers 200 with the access page", r.status_code == 200
-           and "map-pass-xyz" in r.text and "north-code-xyz" in r.text and "fictional" in r.text, str(r.status_code))
+        # REVERSED 14 Oct 2026 (G3 / HU14): the access page carried both shared codes; it now carries the lead's OWN link
+        ok("⭐ no sender configured: the form POST (signed out) answers 200 with the access page — the lead's own link, no code",
+           r.status_code == 200 and "https://app.wayscope.co.uk/#demo=" in r.text and "fictional" in r.text
+           and "map-pass-xyz" not in r.text and "north-code-xyz" not in r.text, str(r.status_code))
+        _screen_link = re.search(r"https://app\.wayscope\.co\.uk/#demo=([A-Za-z0-9_-]+)", r.text).group(1)
         ok("...no-store, and it never carries the planner or admin code", r.headers.get("cache-control") == "no-store"
            and "plan-code-xyz" not in r.text and "admin-code-xyz" not in r.text)
         r = c.post("/api/public/demo-request", follow_redirects=False, data=dict(form, website="bot"))
@@ -1241,8 +1280,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("⭐ sender configured: the POST is a 303 to thanks.html and the background task sent two emails",
            r.status_code == 303 and r.headers["location"] == "https://wayscope.co.uk/thanks.html" and len(_sent) == 2
            and _sent[0]["To"] == "bea@example.org" and _sent[1]["To"] == "notify@wayscope.co.uk", f"{r.status_code} {len(_sent)}")
-        ok("...the email carries both codes", "map-pass-xyz" in _sent[0].get_body(preferencelist=("plain",)).get_content()
-           and "north-code-xyz" in _sent[0].get_body(preferencelist=("plain",)).get_content())
+        # REVERSED 14 Oct 2026 (G3 / HU14): the email carried both shared codes; it now carries the lead's own link
+        _bea = _sent[0].get_body(preferencelist=("plain",)).get_content()
+        ok("...the email carries the lead's own link and NEITHER code", "#demo=" in _bea
+           and "map-pass-xyz" not in _bea and "north-code-xyz" not in _bea)
+        _bea_link = re.search(r"#demo=([A-Za-z0-9_-]+)", _bea).group(1)
         ok("🔴 /api/public/route-forecasts is still closed to the same signed-out visitor",
            c.get("/api/public/route-forecasts").status_code == 401)
         ok("🔴 ...and so is /api/public/road-load (12 Oct 2026, §2.2d)",
@@ -1323,6 +1365,136 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/admin/road-sections/status", params={"token": "é-not-the-token"})
     ok("🔴 a non-ASCII admin token is a 403, not a 500 (hmac.compare_digest on str raised TypeError)", r.status_code == 403,
        f"{r.status_code} {r.text[:80]}")
+
+    # ------------------------------------------------------------ 6. G3: per-person logins (14 Oct 2026)
+    # The real app: the cookie the browser gets, the middleware's guard header and audit row, CORS, the package
+    # re-import leaving the logins alone, HU14's link. users.py's every branch is in test_users.py.
+    import users as _users
+    c.cookies.clear()
+    W = {"X-Wayscope": "1"}
+    r = c.post("/api/auth/signin", json={"email": "nobody@example.org", "password": "whatever pass"})
+    ok("🔴 G3: an /api/auth/ call without the app's header is refused (403) before anything is checked",
+       r.status_code == 403 and "Wayscope app" in r.text, f"{r.status_code} {r.text[:80]}")
+    r = c.post("/api/auth/signin", json={"email": "nobody@example.org", "password": "whatever pass"}, headers=W)
+    ok("G3: an unknown address is the one refusal, 401", r.status_code == 401 and "don't match" in r.text, r.text[:120])
+    r = c.get("/api/auth/me")
+    ok("G3: /api/auth/me signed out says so, and that the shared codes are still on (they are set here)",
+       r.status_code == 200 and r.json() == {"signed_in": False, "access": None, "codes": True}, r.text[:200])
+    # the first admin, D47: the admin token on the Users endpoints
+    r = c.post("/api/admin/users", params=TOKEN, json={"email": "Ada@Example.org", "name": "Ada Lovelace", "role": "admin"})
+    ok("⭐ G3 D47: the admin token adds the first admin; with no sender the invite link comes back",
+       r.status_code == 200 and r.json()["email"] == "unsent" and "#invite=" in r.json().get("link", ""), r.text[:200])
+    ok("G3: Ada had asked for a demo above (a demo login): adding her as staff CONVERTS that login — no end date, Admin",
+       r.json().get("converted") is True and r.json()["user"]["kind"] == "staff" and r.json()["user"]["expires_at"] is None
+       and r.json()["user"]["role"] == "admin")
+    ok("🔴 ...and her old personal demo link no longer signs anyone in",
+       c.post("/api/auth/link", json={"token": _screen_link}, headers={"X-Wayscope": "1"}).status_code == 410)
+    _inv = r.json()["link"].split("#invite=", 1)[1]
+    r = c.post("/api/admin/users", json={"email": "x@example.org", "name": "X", "role": "planner"}, headers=W)
+    ok("🔴 G3: without the token or an admin login, adding a login is refused (403)", r.status_code == 403)
+    r = c.post("/api/auth/check", json={"token": _inv}, headers=W)
+    ok("G3: the invite greets Ada", r.status_code == 200 and r.json()["name"] == "Ada Lovelace", r.text[:120])
+    r = c.post("/api/auth/reset", json={"token": _inv, "password": "correct horse battery"}, headers=W)
+    _sc = r.headers.get("set-cookie", "")
+    ok("⭐ G3: setting the password signs Ada in; the session cookie is HttpOnly, Secure, SameSite=Lax, path /, 12 hours",
+       r.status_code == 200 and r.json()["via"] == "login" and r.json()["role"] == "admin"
+       and "wayscope_session=" in _sc and "HttpOnly" in _sc and "Secure" in _sc and "samesite=lax" in _sc.lower()
+       and "Path=/" in _sc and "Max-Age=43200" in _sc, _sc[:300])
+    ok("🔴 ...and the raw session value is in no table", _sc.split("wayscope_session=", 1)[1].split(";", 1)[0]
+       not in json.dumps(db.query("SELECT * FROM user_sessions")))
+    r = c.get("/api/auth/me")
+    ok("G3: the cookie alone (no header) is who you are", r.json()["signed_in"] and r.json()["access"]["email"] == "ada@example.org")
+    ok("⭐ G3: the session opens what the staff cookie opened: /help/, /bulletin/, /map/, the staff /api/meta",
+       c.get("/help/").status_code == 200 and c.get("/bulletin/?month=10").status_code == 200
+       and c.get("/map/").status_code == 200 and c.get("/api/meta").json()["scope"] == "staff")
+    ok("G3: whoami says staff for a login", c.get("/api/public/whoami").json()["level"] == "staff")
+    # D53: an admin LOGIN saves Config with no token; the audit row names Ada
+    _doc = c.get("/api/config/factors").json()["doc"]
+    r = c.put("/api/admin/config/factors", json={"doc": _doc, "updated_by": "Mallory"})
+    ok("🔴 G3: a cookie write WITHOUT the app's header is refused (403), nothing saved",
+       r.status_code == 403 and "Wayscope app" in r.text, f"{r.status_code} {r.text[:80]}")
+    r = c.put("/api/admin/config/factors", json={"doc": _doc, "updated_by": "Mallory"}, headers=W)
+    ok("⭐ G3 D53: an admin LOGIN saves Config with no admin token", r.status_code == 200, f"{r.status_code} {r.text[:120]}")
+    ok("⭐ G3: ...recorded as Ada, whatever the browser typed (main._by)",
+       c.get("/api/config/factors").json()["status"].get("updated_by") == "Ada Lovelace")
+    _a = c.get("/api/admin/audit", params={"kind": "write"}).json()["rows"]
+    ok("⭐ G3 D55: the middleware wrote ONE audit row for that write: Ada, the path, the body; the refused one is not there",
+       len([x for x in _a if x["path"] == "/api/admin/config/factors" and x["actor_kind"] == "user"]) == 1
+       and _a[0]["actor_label"] == "Ada Lovelace <ada@example.org>" and _a[0]["method"] == "PUT" and _a[0]["status"] == 200
+       and _a[0]["detail"].startswith('{"body":{"doc":{') and len(_a[0]["detail"]) <= 4000, json.dumps(_a[:2])[:400])
+    # a team login: the line filter works on a session
+    r = c.post("/api/admin/users", json={"email": "bob@example.org", "name": "Bob North", "role": "team", "team": "IPT1"}, headers=W)
+    _bob_inv = r.json()["link"].split("#invite=", 1)[1]
+    r = c.post("/api/admin/users", json={"email": "pat@example.org", "name": "Pat Planner", "role": "planner"}, headers=W)
+    ok("G3: Ada (a login) adds a team login and a planner, no token", r.status_code == 200)
+    _ul = c.get("/api/admin/users").json()
+    ok("G3: the Users list carries the team's NAME beside the slot, and no hash",
+       [u for u in _ul["users"] if u["email"] == "bob@example.org"][0]["team_label"] not in (None, "", "IPT1")
+       and "password_hash" not in json.dumps(_ul) and "scrypt$" not in json.dumps(_ul))
+    _ada_jar = dict(c.cookies)
+    c.cookies.clear()
+    r = c.post("/api/auth/reset", json={"token": _bob_inv, "password": "bob's long password"}, headers=W)
+    ok("G3: Bob sets his password and is signed in as his team", r.status_code == 200 and r.json()["ipt"] == "IPT1"
+       and r.json()["ipt_locked"] is True)
+    _bob_lines = c.get("/api/forecasts").json()
+    ok("⭐ G3: a team LOGIN sees only its own team's lines, exactly as the team code does",
+       len(_bob_lines) > 0 and all(x.get("ipt") == "IPT1" for x in _bob_lines)
+       and len(_bob_lines) == len(c.get("/api/forecasts", headers={"X-Access-Code": "north-code-xyz"}).json()))
+    r = c.put("/api/routes/R001/status", json={"status": "Approved"}, headers=W)
+    ok("🔴 G3: a team login cannot approve (403)", r.status_code == 403, f"{r.status_code} {r.text[:80]}")
+    ok("🔴 G3: ...nor reach Users", c.get("/api/admin/users").status_code == 403)
+    r = c.post("/api/auth/signout", headers=W)
+    ok("⭐ G3 sign out: the session row is gone, the cookie dropped, and the map still opens on this machine (map cookie)",
+       r.status_code == 200 and c.get("/api/auth/me").json()["signed_in"] is False
+       and c.get("/api/public/whoami").json()["level"] == "map" and c.get("/help/").status_code == 401)
+    # rate limit: five failures lock the address
+    c.cookies.clear()
+    for _i in range(5):
+        c.post("/api/auth/signin", json={"email": "bob@example.org", "password": "not his password"}, headers=W)
+    r = c.post("/api/auth/signin", json={"email": "bob@example.org", "password": "bob's long password"}, headers=W)
+    ok("⭐ G3: after five failures the right password is refused for 15 minutes — 429", r.status_code == 429, r.text[:120])
+    # the shared codes keep working beside logins (D49)
+    ok("G3 D49: the planner code still signs in while it is set",
+       c.post("/api/auth", json={"code": "plan-code-xyz"}).status_code == 200)
+    _sg = c.get("/api/admin/audit", params=dict(TOKEN, kind="signin-code")).json()["rows"]
+    ok("G3 D49: ...and that sign-in is recorded, as the code", _sg and _sg[0]["actor_label"] == "Planner code (shared)", json.dumps(_sg[:1]))
+    r = c.put("/api/routes/R001/status", json={"status": "Approved"}, headers=PLAN)
+    _cr = c.get("/api/admin/audit", params=dict(TOKEN, kind="write")).json()["rows"][0]
+    ok("G3: a write on a shared code needs no extra header, and is recorded as the code",
+       r.status_code == 200 and _cr["actor_label"] == "Planner code (shared)" and _cr["path"] == "/api/routes/R001/status",
+       json.dumps(_cr)[:200])
+    _tok_rows = [x for x in c.get("/api/admin/audit", params=dict(TOKEN, kind="write")).json()["rows"] if x["path"] == "/api/admin/users"]
+    ok("G3: the first-admin add (by token) is recorded as the admin token, without the token's value",
+       any(x["actor_label"] == "admin token" for x in _tok_rows) and "adm-token-xyz" not in json.dumps(_tok_rows))
+    # CORS
+    r = c.get("/api/meta", headers={"Origin": "https://evil.example", "Cookie": "x=1"})
+    ok("🔴 G3: CORS no longer answers another origin (no Access-Control-Allow-Origin, no credentials)",
+       "access-control-allow-origin" not in {k.lower() for k in r.headers.keys()}
+       and "access-control-allow-credentials" not in {k.lower() for k in r.headers.keys()}, str(dict(r.headers))[:300])
+    r = c.options("/api/forecasts/bulk", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST",
+                                                    "Access-Control-Request-Headers": "x-wayscope,content-type"})
+    ok("🔴 G3: ...and a preflight from another origin is not granted", r.headers.get("access-control-allow-origin") is None,
+       f"{r.status_code} {dict(r.headers)}")
+    # the package re-import leaves the logins
+    _n_users = len(db.query("SELECT * FROM users"))
+    _pkg = c.get("/api/admin/tenant/export", params=TOKEN).json()
+    r = c.post("/api/admin/tenant/import", params=dict(TOKEN, replace=1), json=_pkg)
+    ok("⭐ G3: re-importing the tenant (replace) leaves every login and the audit trail in place",
+       r.status_code == 200 and len(db.query("SELECT * FROM users")) == _n_users >= 3
+       and len(db.query("SELECT * FROM audit_log")) > 0, f"{r.status_code} {_n_users}")
+    # HU14: the lead's link from the form above signs them in, and their page opens are recorded
+    c.cookies.clear()
+    r = c.post("/api/auth/link", json={"token": _bea_link}, headers=W)
+    ok("⭐ G3 HU14: the emailed link signs the lead in as a demo login on the team slot, for its 14 days",
+       r.status_code == 200 and r.json()["kind"] == "demo" and r.json()["ipt"] == "IPT1"
+       and "Max-Age=1209" in r.headers.get("set-cookie", ""), f"{r.status_code} {r.headers.get('set-cookie', '')[:200]}")
+    ok("G3 HU14: the lead's page open is recorded", c.post("/api/activity", json={"page": "lookahead"}, headers=W).json()["recorded"] is True)
+    c.cookies.clear()
+    r = c.get("/api/admin/demo-requests.csv", params=TOKEN)
+    _bea_line = [l for l in r.text.split("\n") if "bea@example.org" in l][0]
+    ok("⭐ G3 HU14: the leads CSV says who looked at what — login, expiry, sign-ins, pages",
+       r.text.split("\n")[0].endswith(",login,login_expires_at,sign_ins,first_seen,last_seen,pages")
+       and ",active," in _bea_line and _bea_line.endswith(",lookahead 1"), _bea_line)
 
 print()
 for f in FAIL:

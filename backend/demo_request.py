@@ -12,15 +12,18 @@ The form on wayscope.co.uk POSTs (plain HTML, form-encoded, no script) to
 Two delivery modes, chosen by the environment at request time:
 
   * SMTP configured (SMTP_USER, SMTP_PASSWORD, DEMO_FROM, DEMO_NOTIFY all set): the row is
-    stored, the visitor is sent to {LANDING_URL}/thanks.html, and a background task emails
-    the demo link + the two shared codes through Google Workspace SMTP (STARTTLS, 587).
+    stored, the visitor is sent to {LANDING_URL}/thanks.html, and a background task makes
+    the visitor's own login and emails its link through Google Workspace SMTP (STARTTLS, 587).
   * SMTP not configured: the row is stored and the app answers with a page that SHOWS the
-    link and the codes — the same words the email would carry. No visitor ever sees an
-    error because a variable is missing. The CSV marks these rows "shown on screen".
+    link — the same words the email would carry. No visitor ever sees an error because a
+    variable is missing. The CSV marks these rows "shown on screen".
 
-The codes are MAP_PASSWORD and the team code named by DEMO_TEAM_CODE_VAR (default
-IPT1_CODE), read from the environment at send time. They never enter the repository, the
-landing page or the database. The planner and admin codes are never sent.
+G3 / HU14 (14 Oct 2026): each lead gets their OWN expiring login (users.demo_login: a
+`demo` login on the team slot DEMO_TEAM_CODE_VAR names, 14 days, D48) and a personal link
+that signs them in until it expires (D50). Until 14 Oct the email carried two SHARED
+secrets, MAP_PASSWORD and the team code; it now carries neither — the login opens the map
+too (D46). The raw link exists only in the email (or on the screen); the database holds its
+SHA-256. The planner and admin codes were never sent and still are not.
 
 Abuse limits — a limit, not security (G3 is after 15 Oct): a honeypot field ("website") a
 person never sees; at most PER_IP_PER_HOUR requests per hashed IP per hour; one email per
@@ -47,6 +50,8 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 PER_IP_PER_HOUR = 5
 PER_EMAIL_MINUTES = 10
+#: HU14 (D48): how long a lead's own login lasts, as the email says it (users.DEMO_DAYS is the number)
+DEMO_DAYS_TEXT = "14 days"
 MAX_LEN = {"name": 120, "email": 200, "organisation": 160, "role": 80, "wants": 300}
 ROLES = ("Client or highway authority", "Principal contractor", "Logistics or site management",
          "Haulier or fleet operator", "Local authority officer", "Consultant", "Other")
@@ -76,7 +81,9 @@ def smtp_settings():
 
 
 def codes():
-    """The two shared codes a visitor gets. Read at call time; never cached, never stored."""
+    """The two shared codes a visitor USED to get (until 14 Oct 2026, G3/HU14). Nothing that reaches a
+    visitor calls this any more: the email and the access page carry a personal link instead. Kept so
+    the harness can pin that the codes are still read from the environment only, never stored."""
     var = (os.getenv("DEMO_TEAM_CODE_VAR") or "IPT1_CODE").strip()
     return {"map": (os.getenv("MAP_PASSWORD") or "").strip(),
             "team": (os.getenv(var) or "").strip(),
@@ -178,8 +185,9 @@ def handle(form, ip, now=None):
       {"outcome": "thanks"}                         → 303 to thanks.html, nothing more
       {"outcome": "error", "reason": ...}           → 303 to error.html
       {"outcome": "queued", "request_id": ...}      → 303 to thanks.html + deliver() in the background
-      {"outcome": "screen", "request_id": ..., "name": ..., "codes": {...}}
+      {"outcome": "screen", "request_id": ..., "name": ..., "access": {...}}
                                                     → 200 with access_page()
+    `access` is personal_access(): the lead's own link and its expiry (HU14).
     """
     now = now or _now()
     clean, err = validate(form)
@@ -192,7 +200,8 @@ def handle(form, ip, now=None):
         return {"outcome": "error", "reason": "too many requests from this address"}
     if smtp_settings() is None:
         rid = store(clean, iph, STATUS_SCREEN, now)
-        return {"outcome": "screen", "request_id": rid, "name": clean["name"], "codes": codes()}
+        return {"outcome": "screen", "request_id": rid, "name": clean["name"],
+                "access": personal_access(clean["email"], clean["name"], rid, now)}
     if email_recent(clean["email"], now):
         # Not stored: the lead exists already, and a stored repeat would itself count as
         # "recent" and push the window along for ever.
@@ -207,17 +216,38 @@ def _first_name(name):
     return (name or "").strip().split(" ")[0] or "there"
 
 
+def personal_access(email, name, request_id=None, now=None):
+    """
+    HU14: make or renew the lead's own login and return what the email or the page says:
+      {"status": "new" | "renewed", "link": ..., "expires_on": "Wed 28 Oct 2026"}
+      {"status": "staff"}      the address already has a staff login: sign in as usual
+      {"status": "disabled"}   an admin turned this lead's login off: nothing to give
+    """
+    import users
+    got = users.demo_login(email, name, request_id, now=now)
+    out = {"status": got["status"], "link": got.get("link"), "expires_on": users.nice_date(got.get("expires_at")),
+           "sign_in": users.app_url() + "/"}
+    return out
+
+
+def _access_lines(c):
+    """The access part of the email in plain text."""
+    if c.get("status") == "staff":
+        return (f"You already have a Wayscope login for this address. Sign in at {c['sign_in']} with your email "
+                f"and password. If you've forgotten it, use \"Forgot your password?\" on the sign-in screen.")
+    return (f"Open the demo: {c['link']}\n\n"
+            f"The link is your own: it signs you straight in, and it works until {c['expires_on']}. To come back, "
+            f"use the same link. Asking again at wayscope.co.uk renews it for another {DEMO_DAYS_TEXT}.")
+
+
 def email_text(name, c):
     return f"""Hello {_first_name(name)},
 
 Thanks for asking to see Wayscope. Here's everything you need for the demo.
 
-Open the demo: {DEMO_URL}
+{_access_lines(c)}
 
-Public map password: {c['map']}
-Team access code: {c['team']}
-
-The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.
+The demo is a fictional highways scheme, and nothing in it is a real project, so please don't enter real data.
 
 Three things to try:
 1. Dashboard: the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.
@@ -240,9 +270,8 @@ def email_html(name, c):
     return f"""<!doctype html><html lang="en-GB"><body style="font-family:'IBM Plex Sans',Segoe UI,system-ui,sans-serif;color:#1F2024;line-height:1.55;max-width:600px;margin:0 auto;padding:24px">
 <p>Hello {e(_first_name(name))},</p>
 <p>Thanks for asking to see Wayscope. Here's everything you need for the demo.</p>
-<p><b>Open the demo:</b> <a href="{DEMO_URL}">{DEMO_URL}</a></p>
-<p><b>Public map password:</b> {e(c['map'])}<br><b>Team access code:</b> {e(c['team'])}</p>
-<p>The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.</p>
+{_access_html(c)}
+<p>The demo is a fictional highways scheme, and nothing in it is a real project, so please don't enter real data.</p>
 <p>Three things to try:</p>
 <ol>
 <li><b>Dashboard:</b> the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.</li>
@@ -256,6 +285,19 @@ def email_html(name, c):
 </body></html>"""
 
 
+def _access_html(c):
+    e = html.escape
+    if c.get("status") == "staff":
+        return (f'<p>You already have a Wayscope login for this address. Sign in at <a href="{e(c["sign_in"])}">'
+                f'{e(c["sign_in"])}</a> with your email and password. If you\'ve forgotten it, use '
+                f'"Forgot your password?" on the sign-in screen.</p>')
+    return (f'<p><a href="{e(c["link"])}" style="display:inline-block;background:#FF8C14;color:#1F2024;'
+            f'text-decoration:none;border-radius:999px;padding:12px 22px;font-weight:500">Open the demo</a></p>'
+            f'<p>The link is your own: it signs you straight in, and it works until <b>{e(c["expires_on"])}</b>. '
+            f'To come back, use the same link. Asking again at wayscope.co.uk renews it for another '
+            f'{DEMO_DAYS_TEXT}.</p>')
+
+
 def build_message(to, name, c, settings):
     msg = EmailMessage()
     msg["Subject"] = "Your Wayscope demo access"
@@ -267,14 +309,16 @@ def build_message(to, name, c, settings):
     return msg
 
 
-def notify_message(row, settings):
+def notify_message(row, settings, c=None):
     msg = EmailMessage()
     msg["Subject"] = f"Demo request: {row['name']}, {row['organisation']}"
     msg["From"] = settings["DEMO_FROM"]
     msg["To"] = settings["DEMO_NOTIFY"]
     msg.set_content(
         f"Demo request: {row['name']}, {row['organisation']}, {row['role']}, {row['email']}. "
-        f"Wants to see: {row.get('wants') or '-'}. Updates: {'yes' if row.get('updates_opt_in') else 'no'}.\n")
+        f"Wants to see: {row.get('wants') or '-'}. Updates: {'yes' if row.get('updates_opt_in') else 'no'}.\n"
+        + (f"Personal login: {c['status']}" + (f", works until {c['expires_on']}" if c.get('expires_on') else "") + ".\n"
+           if c else ""))
     return msg
 
 
@@ -301,7 +345,20 @@ def deliver(request_id):
         set_status(request_id, "unsent: SMTP not configured")
         return "unsent"
     try:
-        send(build_message(row["email"], row["name"], codes(), settings), settings)
+        c = personal_access(row["email"], row["name"], request_id)
+    except Exception as e:  # noqa: BLE001
+        set_status(request_id, STATUS_FAILED + "login " + e.__class__.__name__, str(e))
+        print(f"demo_request: {request_id} personal login FAILED {e.__class__.__name__}: {str(e)[:200]}")
+        return "failed"
+    if c["status"] == "disabled":
+        set_status(request_id, "not sent: this lead's login is disabled")
+        try:
+            send(notify_message(row, settings, c), settings)
+        except Exception:  # noqa: BLE001
+            pass
+        return "disabled"
+    try:
+        send(build_message(row["email"], row["name"], c, settings), settings)
     except Exception as e:  # noqa: BLE001 — recorded, never raised into the request
         set_status(request_id, STATUS_FAILED + e.__class__.__name__, str(e))
         print(f"demo_request: {request_id} visitor email FAILED {e.__class__.__name__}: {str(e)[:200]}")
@@ -309,7 +366,7 @@ def deliver(request_id):
     set_status(request_id, STATUS_SENT)
     print(f"demo_request: {request_id} visitor email sent")
     try:
-        send(notify_message(row, settings), settings)
+        send(notify_message(row, settings, c), settings)
         print(f"demo_request: {request_id} notification sent")
     except Exception as e:  # noqa: BLE001 — the visitor has theirs; note the miss
         set_status(request_id, STATUS_SENT + "; notification failed: " + e.__class__.__name__, str(e))
@@ -381,8 +438,22 @@ def smtp_probe():
 
 # --------------------------------------------------------------------------- the on-screen page
 
+def _access_block(c):
+    e = html.escape
+    if c.get("status") == "staff":
+        return (f'<div class="codes"><div><span class="k">You already have a login</span><span class="v" style="font-size:17px;'
+                f'letter-spacing:0">Sign in with your email and password.</span></div></div>'
+                f'<a class="btn" href="{e(c["sign_in"])}">Sign in</a>')
+    if c.get("status") == "disabled":
+        return ('<div class="codes"><div><span class="k">Demo access</span><span class="v" style="font-size:17px;letter-spacing:0">'
+                'We have your request and will be in touch.</span></div></div>')
+    return (f'<div class="codes"><div><span class="k">Your sign-in link works until</span><span class="v">{e(c["expires_on"])}'
+            f'</span></div></div><a class="btn" href="{e(c["link"])}">Open the demo</a>')
+
+
 def access_page(name, c):
-    """The fallback for a deployment with no sender: the same words as the email, on screen."""
+    """The fallback for a deployment with no sender: the same words as the email, on screen. `c` is
+    personal_access()."""
     e = html.escape
     lu = landing_url()
     return f"""<!doctype html>
@@ -415,13 +486,9 @@ def access_page(name, c):
 <header class="wrap"><a href="{lu}/" style="text-decoration:none">Wayscope</a></header>
 <main class="wrap">
   <h1>Hello {e(_first_name(name))}, here's your demo access.</h1>
-  <p>Thanks for asking to see Wayscope. Everything you need is below. Keep this page open, or write the two codes down.</p>
-  <div class="codes">
-    <div><span class="k">Public map password</span><span class="v">{e(c['map'])}</span></div>
-    <div><span class="k">Team access code</span><span class="v">{e(c['team'])}</span></div>
-  </div>
-  <a class="btn" href="{DEMO_URL}">Open the demo</a>
-  <p>The demo is a fictional highways scheme, and nothing in it is a real project. The access details are shared with everyone viewing the demo, so please don't enter real data.</p>
+  <p>Thanks for asking to see Wayscope. Everything you need is below. Keep this page, or bookmark the link: it is your own.</p>
+  {_access_block(c)}
+  <p>The demo is a fictional highways scheme, and nothing in it is a real project, so please don't enter real data.</p>
   <p>Three things to try:</p>
   <ol>
     <li><b>Dashboard:</b> the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.</li>
@@ -440,13 +507,45 @@ def access_page(name, c):
 
 CSV_COLUMNS = ("created_at", "name", "email", "organisation", "role", "wants", "updates_opt_in",
                "email_status", "email_error", "id")
+#: HU14 (14 Oct 2026): who looked at what. Appended, so a sheet built on the first ten columns still lines up.
+LOGIN_COLUMNS = ("login", "login_expires_at", "sign_ins", "first_seen", "last_seen", "pages")
+
+
+def login_summary(email):
+    """The lead's own login, if they have one: status, expiry and what they opened (users.demo_activity)."""
+    import users
+    u = users.find_by_email(email)
+    if not u:
+        return {"login": "none", "login_expires_at": "", "sign_ins": "", "first_seen": "", "last_seen": "", "pages": ""}
+    if u.get("kind") != "demo":
+        return {"login": "staff login", "login_expires_at": "", "sign_ins": "", "first_seen": "", "last_seen": "",
+                "pages": ""}
+    a = users.demo_activity(u["id"])
+    return {"login": users.status_of(u), "login_expires_at": u.get("expires_at") or "", "sign_ins": a["sign_ins"],
+            "first_seen": a["first_seen"], "last_seen": a["last_seen"], "pages": a["pages"], "user_id": u["id"]}
+
+
+def leads():
+    """The leads for the Users page: each request with its login summary."""
+    out = []
+    for r in db.query("SELECT * FROM demo_requests ORDER BY created_at DESC"):
+        row = {k: r.get(k) for k in CSV_COLUMNS}
+        row["updates_opt_in"] = bool(r.get("updates_opt_in"))
+        row.update(login_summary(r["email"]))
+        out.append(row)
+    return out
 
 
 def csv_export():
     rows = db.query("SELECT * FROM demo_requests ORDER BY created_at DESC")
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
-    w.writerow(CSV_COLUMNS)
+    w.writerow(CSV_COLUMNS + LOGIN_COLUMNS)
+    summaries = {}
     for r in rows:
-        w.writerow([("yes" if r.get(k) else "no") if k == "updates_opt_in" else (r.get(k) or "") for k in CSV_COLUMNS])
+        if r["email"] not in summaries:
+            summaries[r["email"]] = login_summary(r["email"])
+        s = summaries[r["email"]]
+        w.writerow([("yes" if r.get(k) else "no") if k == "updates_opt_in" else (r.get(k) or "") for k in CSV_COLUMNS]
+                   + [s.get(k, "") for k in LOGIN_COLUMNS])
     return buf.getvalue()

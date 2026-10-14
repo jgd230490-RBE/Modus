@@ -29,7 +29,10 @@ services:
       # explains each one.
       - key: ADMIN_TOKEN            # required — admin calls are OPEN while it is unset
         sync: false
-      - key: PLANNER_CODE           # required — nobody signs in until a code is set
+      # G3 (14 Oct 2026): people sign in with their own email and password (Config → Users).
+      # The eight shared codes below keep working only while they are set; delete them on
+      # Render to end them (decided: Sat 31 Oct 2026). Nothing else changes when they go.
+      - key: PLANNER_CODE           # shared code — retire by deleting (G3)
         sync: false
       - key: ADMIN_CODE
         sync: false
@@ -70,7 +73,9 @@ services:
         sync: false
       - key: LANDING_URL            # optional — defaults to https://wayscope.co.uk
         sync: false
-      - key: DEMO_TEAM_CODE_VAR     # optional — which team code the email carries; default IPT1_CODE
+      - key: DEMO_TEAM_CODE_VAR     # optional — which team a lead's own login belongs to (IPT1_CODE → team 1); its value is never sent
+        sync: false
+      - key: APP_URL                # optional (G3) — the address in invite, reset and demo links; default https://app.wayscope.co.uk
         sync: false
       - key: TENANT_ID              # optional — defaults to "default"
         sync: false

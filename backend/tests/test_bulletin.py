@@ -729,6 +729,17 @@ ok("…the roll-up on the page is the hand-computed one, with the typed cap on t
    and PAGE["rollup"]["busiest_routes"][0]["cap_wording"] == "planning flag" and PAGE["rollup"]["months"] == [10])
 ok("…the conditions on the page are the month's: the two hits, the planning flag",
    len(PAGE["conditions"]["restrictions"]["hits"]) == 2 and PAGE["conditions"]["route_caps"]["exceeded"][0]["route_id"] == "R1")
+# 14 Oct 2026 (the user took the recommendation): a stockpile over capacity is a site matter, so the PUBLIC page leaves it
+# out; conditions_of_month still computes it (pinned in section 6 above)
+_full9 = bulletin.conditions_of_month(9, payload=bulletin.month_payload(9), factors=FACTORS)
+_pub9 = bulletin.public_conditions(_full9)
+ok("⭐ the public page's conditions carry no stockpile: September's Mill Compound (over in the full list) is left out, the count with it",
+   len(_full9["stockpiles_over"]) == 1 and "stockpiles_over" not in _pub9 and _pub9["count"] == _full9["count"] - 1
+   and {k: v for k, v in _full9.items() if k not in ("stockpiles_over", "count")} == {k: v for k, v in _pub9.items() if k != "count"}
+   and "stockpiles_over" not in PAGE["conditions"], str(sorted(_pub9)))
+ok("…the page is built through public_conditions, and the bulletin document never prints a stockpile line",
+   "public_conditions(conditions_of_month(" in read("backend/bulletin.py")
+   and "stockpiles_over" not in read("backend/bulletin_doc.py") and '"Over capacity"' not in read("backend/bulletin_doc.py"))
 ok("…the terms name the rule, the working days, the cap wording and that other schemes count differently",
    "lorry out laden and back empty" in PAGE["terms"]["two_way_movements"] and f"{WD:g}" in PAGE["terms"]["working_days"]
    and "planning flag" in PAGE["terms"]["cap"] and "no planning cap typed" in PAGE["terms"]["cap"]
@@ -912,10 +923,26 @@ ok("⭐ whole movements (12 Oct, evening): the terms say the total is shown to t
    "the total is then shown to the nearest whole movement." in T10R       # NARROWED 14 Oct 2026: in Sources
    and all("." not in r["in_month_text"] for r in S10["routes"])
    and any(abs(r["a_day"] or 0) > 0 for r in S10["routes"]))
-ok("⭐ carbon carries the stamp: planning estimate, DESNZ 2026 basis, not Carbon Tool figures; CO2e spelled so Helvetica prints it",
-   "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in T10J and "CO2e = routed km" in T10J
+# REVERSED 14 Oct 2026 (the user took the recommendation): the PDF prints CO₂e with the subscript (Inter has U+2082); the
+# view model still says CO2e, and only the Helvetica fallback keeps CO2e (pinned below)
+ok("⭐ carbon carries the stamp: planning estimate, DESNZ 2026 basis, not Carbon Tool figures; CO₂e with its subscript in the PDF",
+   "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in T10J and "CO₂e = routed km" in T10J
+   and "CO2e = routed km" not in T10J
    and "₂" not in "".join(v for _, v in S10["terms"]) and "CO₂e = routed km" in HTML_TEXT
    and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in HTML_TEXT)
+import brand_pdf as _bpdf
+_st = dict(_bpdf.fonts())
+ok("⭐ CO₂e in the PDFs: no plain CO2e left anywhere in the newsletter text; Inter carries U+2082 in all three files",
+   "CO2e" not in T10J and "CO₂e" in T10J and not _st["fallback"]
+   and all(0x2082 in __import__("reportlab.pdfbase.ttfonts", fromlist=["TTFont"]).TTFont("chk" + f, os.path.join(BACKEND, "fonts", f"Inter-{f}.ttf")).face.charToGlyph
+           for f in ("Regular", "Bold", "Italic")), str([T10J[max(0, m.start() - 70):m.end() + 30] for m in re.finditer("CO2e", T10J)][:6]))
+_bpdf._STATE["fonts"] = dict(_st, fallback=True)
+try:
+    ok("🔴 …the breaking case: on Helvetica's fallback (no ₂ in WinAnsi) the helper keeps CO2e, and turns a CO₂e back",
+       export._co2_pdf("t CO2e") == "t CO2e" and export._co2_pdf("t CO₂e") == "t CO2e")
+finally:
+    _bpdf._STATE["fonts"] = _st
+ok("…and with Inter it prints the subscript", export._co2_pdf("t CO2e a day") == "t CO₂e a day" and export._co2_pdf(None) == "")
 # NARROWED 14 Oct 2026 (the publishing check): the placeholder reads "[contact not set yet]" ("[... a typed field this scheme has not set yet]"
 # read as an error)
 ok("⭐ the report-a-lorry block with the typed fields as placeholders (no invented contact)",
@@ -1359,11 +1386,14 @@ ok("🔴 W11 source: the schematic and the page draw the casing then the colour,
 # NARROWED 14 Oct 2026 (the publishing check: legends too wordy): one short sentence each way
 ok("W11: with no shared-section index the map draws the routes only, and the note says each route has its own colour",
    S10["map_sections"] == [] and S10["map_note"] == "Each route is coloured by its own two-way movements a day.")
-_mapfoot = re.search(r"'<div class=\"ml-foot\">Each route is painted by its own figure; ' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+\s*' \(a stretch of road two or more routes use\) by the routes using it, summed", MAP)
-# NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the bulletin's note is no longer the map's legend foot word for
-# word (that foot is still the map's, unchanged); it says the same rule in one sentence
-ok("⭐ W11: the note says the map's rule in one sentence (shared roads show the routes' total); the map's own foot is unchanged",
+# REVERSED 14 Oct 2026 (the user took the recommendation): the map's Volume legend foot is shortened to match — it OPENS with the
+# bulletin's note word for word, and the long "Each route is painted by its own figure; … summed, and labelled" is gone
+_mapfoot = re.search(r"'<div class=\"ml-foot\">Where routes share a road, its colour shows their total \(' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+ '\)\. ' \+", MAP)
+# NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the bulletin's note says the rule in one sentence
+ok("⭐ W11: the note says the map's rule in one sentence (shared roads show the routes' total), and the map's foot opens with it",
    bool(_mapfoot) and bulletin_doc.map_note(3) == "Where routes share a road, its colour shows their total."
+   and "Each route is painted by its own figure; " not in MAP and "by the routes using it, summed, and labelled" not in MAP
+   and MAP.count(bulletin_doc.map_note(3)[:-1]) >= 1
    and bulletin_doc.map_note(1) == bulletin_doc.map_note(3) and "Each route is painted" not in bulletin_doc.map_note(3))
 import road_sections  # noqa: E402
 _rb = road_sections.rebuild()
@@ -1769,8 +1799,10 @@ _P10K = export.build_bulletin_pdf(dict(S10A, lot=dict(LOT10, rows=LOT10["rows"][
 _T10KJ = " ".join(pdf_text(_P10K).split())
 # NARROWED 14 Oct 2026 (the publishing check): each row's source is a reference number into one Sources list (no
 # "Source:" line under every row); the sources are all still printed, once
+# NARROWED 14 Oct 2026: the title and labels as printed, CO₂e with its subscript
+_SUB = lambda t: t.replace("CO2e", "CO₂e")
 ok("⭐ the panel in the PDF: the title, each row's label, the status word, every source (once, numbered) and the demo note",
-   LOT10["title"] in _T10KJ and all(r["label"].upper() in _T10KJ for r in LOT10["rows"]) and "Over the allowance" in _T10KJ
+   _SUB(LOT10["title"]) in _T10KJ and all(_SUB(r["label"]).upper() in _T10KJ for r in LOT10["rows"]) and "Over the allowance" in _T10KJ
    and "Source:" not in _T10KJ.split("Is ")[1].split("This month at a glance")[0]
    and all(isinstance(r.get("ref"), int) for r in LOT10["rows"] if r["source"] != "—")
    and "Source: DfT National Travel Survey" not in _T10KJ.replace("; DfT National Travel Survey", "")
@@ -2004,10 +2036,11 @@ ok("🔴 the gate calls /bulletin/leaflet/ 'bulletin' (staff only); both endpoin
    and "export.build_bulletin_leaflet_pdf(sheet)" in _MS and "bulletin_doc.leaflet_html(bulletin_doc.sheet(" in _MS)
 
 # the frame, shared
-ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary and the bulletin",
-   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 3 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
+# NARROWED 14 Oct 2026 (D9): the Day sheet is a FOURTH caller of the same frame (it reuses it; it draws no frame of its own)
+ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary, the bulletin and the Day sheet",
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 4 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
    and _EXP.count("BaseDocTemplate(buf") == 1 and "def page_frame(" in _EXP and "def frame_doc(" in _EXP
-   and _EXP.count("doc = frame_doc(") == 3)
+   and _EXP.count("doc = frame_doc(") == 4 and _EXP[_EXP.index("def build_day_sheet_pdf("):].count("on_page = page_frame(") >= 1)
 ok("…the bulletin's frame carries the demo notice on every page and the plan-only foot",
    # NARROWED 13 Oct 2026 (D45): the notice is passed in the demo red; page_frame draws it as the demo bar
    # NARROWED 13 Oct 2026 (W15): in Inter, under the brand band, with wayscope.co.uk in the foot; one call for both PDFs
@@ -2173,8 +2206,9 @@ ok("🔴 tables: a pale head band (#F1F5F9) in ink with a rule under it, hairlin
    'HEAD_TINT = colors.HexColor("#F1F5F9")' in _EXP and '("LINEBELOW", (0, 0), (-1, 0), 0.9, colors.Color(*NAVY_RGB))' in _EXP
    and 'self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=7.5, leading=9.5, textColor=colors.Color(*NAVY_RGB))' in _EXP
    and "th{{font-size:14px;font-weight:700;background:var(--head);border-bottom:2px solid var(--ink)}}" in read("backend/bulletin_doc.py"))
-ok("🔴 ONE page frame still: one on_page, the running head and the page total are page_frame's options, the three callers unchanged",
-   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 3 and _EXP.count("doc = frame_doc(") == 3
+# NARROWED 14 Oct 2026 (D9): four callers (+ the Day sheet)
+ok("🔴 ONE page frame still: one on_page, the running head and the page total are page_frame's options, the four callers unchanged",
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 4 and _EXP.count("doc = frame_doc(") == 4
    and 'later = doc.page > 1 and band.get("running")' in _EXP and "autoNextPageTemplate=\"later\"" in _EXP)
 ok("🔴 the report-a-lorry strip is on page 1 (all three lines) and not repeated at the end; the page keeps one at the foot too",
    "Working hours:" in _PB[0] and "Working hours:" not in _PB[3] and HTML10B.count('<div class="report">') == 2)

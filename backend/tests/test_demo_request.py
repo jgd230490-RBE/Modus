@@ -16,6 +16,11 @@ the six variables; the gate opens exactly one path.
 
 What it does not prove: a real SMTP session with Google (the user's live send), inbox
 placement, or the HTTP layer (http_smoke.py drives the real app).
+
+14 Oct 2026 (G3 / HU14): the email and the on-screen page carry the lead's OWN link and its
+expiry, and NO shared code and NO map password. The assertions that pinned both codes in them
+are REVERSED below (each says so), not deleted. New: the personal login (made, renewed, refused
+for a staff or a disabled address), the notification's login line, the CSV's login columns.
 """
 import datetime
 import os
@@ -48,6 +53,7 @@ import db  # noqa: E402
 db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
 import demo_request as dr  # noqa: E402
 import gate  # noqa: E402
+import users  # noqa: E402
 
 PASS = 0
 FAIL = []
@@ -64,9 +70,12 @@ def ok(label, cond, extra=""):
 def reset_db():
     remove_scratch_db(db, TMP)
     db.init_demo_requests_db()
+    db.init_users_db()          # G3: a lead's own login lives in users / auth_tokens
 
 
 T0 = datetime.datetime(2026, 10, 8, 12, 0, tzinfo=datetime.timezone.utc)
+users.NOW = T0                  # G3: deliver() makes the login on its own clock; pin it
+T0_EXPIRES = "Thu 22 Oct 2026"  # T0 + 14 days (D48)
 GOOD = {"name": "Ada Example", "email": "Ada@Example.org", "organisation": "Example Civils",
         "role": "Principal contractor", "wants": "the look-ahead", "updates": "yes", "website": ""}
 
@@ -138,26 +147,50 @@ ok("invalid form → 'error', nothing stored", r["outcome"] == "error" and db.qu
 # --- no sender configured: the on-screen mode
 ok("with no SMTP variables smtp_settings() is None", dr.smtp_settings() is None)
 r = dr.handle(GOOD, "203.0.113.7", T0)
-ok("⭐ no sender → 'screen' with the name and BOTH codes", r["outcome"] == "screen" and r["name"] == "Ada Example"
-   and r["codes"] == {"map": "map-pass-abc", "team": "north-team-code", "team_var": "IPT1_CODE"})
+# REVERSED 14 Oct 2026 (G3 / HU14): the screen outcome used to carry BOTH shared codes; it now carries the lead's own link
+ok("⭐ no sender → 'screen' with the name and the lead's OWN link and its expiry, and no codes",
+   r["outcome"] == "screen" and r["name"] == "Ada Example" and "codes" not in r
+   and r["access"]["status"] == "new" and r["access"]["link"].startswith("https://app.wayscope.co.uk/#demo=")
+   and r["access"]["expires_on"] == T0_EXPIRES)
+_lead = users.find_by_email("ada@example.org")
+ok("...a demo login was made for the lead: their team slot, 14 days, linked to the request, no password",
+   _lead and _lead["kind"] == "demo" and _lead["role"] == "team" and _lead["team"] == "IPT1"
+   and _lead["expires_at"] == "2026-10-22T12:00:00Z" and _lead["demo_request_id"] == r["request_id"]
+   and not _lead["password_hash"])
+_raw = r["access"]["link"].split("#demo=", 1)[1]
+ok("🔴 the raw link is in no table — only its hash",
+   not any(_raw in str(db.query(f"SELECT * FROM {t}")) for t in ("demo_requests", "users", "auth_tokens")))
 row = dr.get(r["request_id"])
 ok("...the row is stored and marked shown on screen", row and row["email_status"] == dr.STATUS_SCREEN
    and row["email"] == "ada@example.org" and row["updates_opt_in"] in (1, True) and row["ip_hash"] == h1)
 ok("...and the row holds NO code and NO raw IP",
    not any(v in str(row) for v in ("map-pass-abc", "north-team-code", "203.0.113.7")))
-page = dr.access_page(r["name"], r["codes"])
-ok("⭐ the on-screen page carries the demo link, both codes, the fictional sentence and the three things to try",
-   dr.DEMO_URL in page and "map-pass-abc" in page and "north-team-code" in page and "fictional" in page
+page = dr.access_page(r["name"], r["access"])
+# REVERSED 14 Oct 2026 (G3 / HU14): the page carried both codes; it now carries the personal link and NEITHER code
+ok("⭐ the on-screen page carries the personal link, its expiry, the fictional sentence and the three things to try",
+   r["access"]["link"] in page and T0_EXPIRES in page and "fictional" in page
    and "Dashboard" in page and "Look-ahead" in page and "Public map" in page and "Corridor map" not in page and "Hello Ada" in page)   # 11 Oct 2026 NARROWED: renamed
+ok("🔴 ...and NO shared code, NO map password and no 'shared with everyone' (HU14)",
+   "map-pass-abc" not in page and "north-team-code" not in page and "Team access code" not in page
+   and "Public map password" not in page and "shared with everyone" not in page)
 ok("...and never the planner / admin code or the admin token",
    not any(s in page for s in ("planner-secret-xyz", "admin-secret-xyz", "adm-token-for-tests")))
 ok("...it is noindex, links the privacy notice and loads no script",
    'name="robots" content="noindex"' in page and "/privacy.html" in page and "<script" not in page)
-ok("...and HTML in a name is escaped", "<b>x</b>" not in dr.access_page("<b>x</b>", r["codes"]) and "&lt;b&gt;x" in dr.access_page("<b>x</b>", r["codes"]))
+ok("...and HTML in a name is escaped", "<b>x</b>" not in dr.access_page("<b>x</b>", r["access"]) and "&lt;b&gt;x" in dr.access_page("<b>x</b>", r["access"]))
 os.environ["DEMO_TEAM_CODE_VAR"] = "IPT2_CODE"
 ok("DEMO_TEAM_CODE_VAR picks which team code travels", dr.codes()["team"] == "central-team-code")
 os.environ.pop("DEMO_TEAM_CODE_VAR")
 ok("...default IPT1_CODE", dr.codes()["team"] == "north-team-code")
+# 14 Oct 2026 (G3 / HU14): the variable now names only the SLOT a lead's login belongs to; its value is never sent
+os.environ["DEMO_TEAM_CODE_VAR"] = "IPT2_CODE"
+ok("G3: DEMO_TEAM_CODE_VAR=IPT2_CODE → a lead's login is on the IPT2 slot", users.demo_slot() == "IPT2")
+os.environ["DEMO_TEAM_CODE_VAR"] = "nonsense"
+ok("...anything that is not a slot falls back to IPT1", users.demo_slot() == "IPT1")
+os.environ.pop("DEMO_TEAM_CODE_VAR")
+ok("...default IPT1", users.demo_slot() == "IPT1")
+ok("🔴 the access page and the email no longer call codes()",
+   "codes()" not in open(os.path.join(BACKEND, "demo_request.py"), encoding="utf-8").read().split("def codes():", 1)[1].split("\n\n\n", 1)[1])
 
 # --- the per-IP limit in screen mode
 reset_db()
@@ -230,12 +263,20 @@ try:
     text = msg.get_body(preferencelist=("plain",)).get_content()
     htmlp = msg.get_body(preferencelist=("html",)).get_content()
     ok("...plain text AND HTML parts", bool(text) and bool(htmlp) and msg.is_multipart())
+    _lead_link = None
     for part, label in ((text, "plain"), (htmlp, "HTML")):
-        ok(f"⭐ the {label} part carries the demo link, BOTH codes, the fictional sentence, the three things to try and the privacy link",
-           dr.DEMO_URL in part and "map-pass-abc" in part and "north-team-code" in part
-           and "fictional highways scheme" in part and "shared with everyone viewing the demo" in part
+        # REVERSED 14 Oct 2026 (G3 / HU14): the email carried BOTH shared codes and said the access was shared; it now
+        # carries the lead's own link and its expiry, and neither code
+        _m = re.search(r"https://app\.wayscope\.co\.uk/#demo=[A-Za-z0-9_-]+", part)
+        _lead_link = _lead_link or (_m.group(0) if _m else None)
+        ok(f"⭐ the {label} part carries the lead's own link, its expiry, the fictional sentence, the three things to try and the privacy link",
+           _m is not None and T0_EXPIRES in part
+           and "fictional highways scheme" in part
            and "Dashboard" in part and "Look-ahead" in part and "Public map" in part and "Corridor map" not in part
            and "https://wayscope.co.uk/privacy.html" in part and "Hello Ada" in part)
+        ok(f"🔴 the {label} part carries NO shared code, NO map password and no 'shared with everyone' (HU14, D46)",
+           "map-pass-abc" not in part and "north-team-code" not in part and "Team access code" not in part
+           and "Public map password" not in part and "shared with everyone" not in part)
         ok(f"🔴 the {label} part never carries the planner code, the admin code or the admin token",
            not any(x in part for x in ("planner-secret-xyz", "admin-secret-xyz", "adm-token-for-tests", "PLANNER_CODE", "ADMIN")))
         ok(f"the {label} part is signed John Davis and says why they got it",
@@ -250,6 +291,45 @@ try:
        and "Ada Example, Example Civils, Principal contractor, ada@example.org" in note.get_content()
        and "Wants to see: the look-ahead" in note.get_content() and "Updates: yes" in note.get_content())
     ok("🔴 the notification carries no code", "map-pass-abc" not in note.get_content() and "north-team-code" not in note.get_content())
+    ok("G3: the notification says the lead got a personal login and until when, and carries no link",
+       f"Personal login: new, works until {T0_EXPIRES}." in note.get_content() and "#demo=" not in note.get_content())
+    _t, _u = users.peek_token(_lead_link.split("#demo=", 1)[1], ("demo",))
+    ok("⭐ the emailed link is live: it belongs to the lead's demo login", _t is not None and _u["email"] == "ada@example.org")
+
+    # HU14: a repeat request after the 10-minute window renews the same login and sends a NEW link
+    SENT.clear()
+    r5 = dr.handle(GOOD, "203.0.113.7", T0 + datetime.timedelta(minutes=30))
+    users.NOW = T0 + datetime.timedelta(days=3)
+    dr.deliver(r5["request_id"])
+    _again = SENT[0].calls[-1][1].get_body(preferencelist=("plain",)).get_content()
+    ok("HU14: a repeat request renews the SAME login for 14 days from now (one login per address)",
+       db.query("SELECT COUNT(*) AS n FROM users WHERE email = 'ada@example.org'")[0]["n"] == 1
+       and users.find_by_email("ada@example.org")["expires_at"] == "2026-10-25T12:00:00Z"
+       and "Sun 25 Oct 2026" in _again)
+    ok("...and the earlier link is retired (only the newest one works)", users.peek_token(_lead_link.split("#demo=", 1)[1], ("demo",))[0] is None)
+    users.NOW = T0
+
+    # HU14: an address that already has a STAFF login gets no demo link — they sign in as usual
+    users.create_user("staff@example.org", "Sam Staff", "planner")
+    SENT.clear()
+    r6 = dr.handle(dict(GOOD, email="staff@example.org", name="Sam Staff"), "203.0.113.10", T0)
+    dr.deliver(r6["request_id"])
+    _st = SENT[0].calls[-1][1].get_body(preferencelist=("plain",)).get_content()
+    ok("🔴 HU14: a staff address gets 'you already have a login', no link, and its login is untouched",
+       "You already have a Wayscope login" in _st and "#demo=" not in _st
+       and users.find_by_email("staff@example.org")["kind"] == "staff"
+       and users.find_by_email("staff@example.org")["expires_at"] is None)
+
+    # HU14: a lead an admin disabled stays disabled, and is not emailed
+    users.update_user(users.find_by_email("ada@example.org")["id"], {"disabled": True})
+    SENT.clear()
+    r7 = dr.handle(GOOD, "203.0.113.11", T0 + datetime.timedelta(minutes=60))
+    res7 = dr.deliver(r7["request_id"])
+    ok("🔴 HU14: a disabled lead asking again is not re-enabled and gets no email (the team is notified)",
+       res7 == "disabled" and users.find_by_email("ada@example.org")["disabled"] == 1
+       and len(SENT) == 1 and SENT[0].calls[-1][1]["To"] == "notify@wayscope.co.uk"
+       and dr.get(r7["request_id"])["email_status"] == "not sent: this lead's login is disabled")
+    users.update_user(users.find_by_email("ada@example.org")["id"], {"disabled": False})
 
     # a failing send
     class _Boom(_SMTP):
@@ -313,8 +393,23 @@ ok("deliver() writes the outcome to the service log by request id, never an addr
 # =========================================================================== #
 csv_text = dr.csv_export()
 lines = csv_text.strip().split("\n")
+# NARROWED 14 Oct 2026 (G3 / HU14): the header is the ten columns it always had, then the six login columns
 ok("the CSV has a header and one line per request, newest first",
-   lines[0] == ",".join(dr.CSV_COLUMNS) and len(lines) == 1 + db.query("SELECT COUNT(*) AS n FROM demo_requests")[0]["n"])
+   lines[0] == ",".join(dr.CSV_COLUMNS + dr.LOGIN_COLUMNS) and lines[0].startswith(",".join(dr.CSV_COLUMNS) + ",")
+   and len(lines) == 1 + db.query("SELECT COUNT(*) AS n FROM demo_requests")[0]["n"])
+_ada = users.find_by_email("ada@example.org")
+users.audit_event("demo-link", user=_ada)
+users.record_page(users.access_for(_ada), "dashboard")
+users.record_page(users.access_for(_ada), "dashboard")
+users.record_page(users.access_for(_ada), "map")
+_csv2 = dr.csv_export()
+_ada_line = [l for l in _csv2.strip().split("\n") if "ada@example.org" in l][0]
+ok("HU14: each lead's line says who looked at what: login status, expiry, sign-ins, pages with counts",
+   ",active,2026-10-25T12:00:00Z,1," in _ada_line and _ada_line.endswith(",dashboard 2 · map 1"))
+ok("...a staff address reads 'staff login' and shows nothing of what that person did",
+   [l for l in _csv2.strip().split("\n") if "staff@example.org" in l][0].endswith(",staff login,,,,,"))
+ok("...the Users page's lead list carries the same summary and the login id",
+   [x for x in dr.leads() if x["email"] == "ada@example.org"][0]["user_id"] == _ada["id"])
 ok("...opt-in reads yes/no and the status column is there", ",yes," in csv_text and "failed: SMTPAuthenticationError" in csv_text)
 ok("🔴 the CSV never carries a code or a raw IP",
    not any(x in csv_text for x in ("map-pass-abc", "north-team-code", "203.0.113", "planner-secret-xyz")))
@@ -331,7 +426,9 @@ ok("...reads the visitor's IP through client_ip(X-Forwarded-For, peer)", 'demo_r
 ok("...answers 303 to thanks.html / error.html on the landing site", main_src.count("status_code=303") == 3
    and '"/thanks.html"' in main_src and '"/error.html"' in main_src)
 ok("...and the send is a BackgroundTask AFTER the redirect", "_DRTask(demo_request.deliver, result[\"request_id\"])" in main_src)
-ok("...the screen outcome is an HTML response with no-store", "demo_request.access_page(result[\"name\"], result[\"codes\"])" in main_src)
+# NARROWED 14 Oct 2026 (G3 / HU14): the page is built from the personal access, not the codes
+ok("...the screen outcome is an HTML response with no-store", "demo_request.access_page(result[\"name\"], result[\"access\"])" in main_src
+   and "result[\"codes\"]" not in main_src)
 ok("main.py serves /api/admin/demo-requests.csv behind _check_admin",
    '@app.get("/api/admin/demo-requests.csv")' in main_src
    and re.search(r'demo-requests\.csv"\)\ndef demo_requests_csv\(token: Optional\[str\] = None\):\n(?:    .*\n)*?    _check_admin\(token\)', main_src))
@@ -352,7 +449,9 @@ ok("the module reads the codes at call time (os.getenv inside codes()), never at
 
 # 11 Oct 2026 — the guide update: the email and the access page say how the tour works now (nothing pops up; the
 # New here? box, the dots, Guide on the demo bar). Narrowed nothing.
-_c = {"map": "map-pass-abc", "team": "north-team-code", "team_var": "X"}
+# 14 Oct 2026 (G3): the email and the page take the personal access now, not the codes
+_c = {"status": "new", "link": "https://app.wayscope.co.uk/#demo=abc", "expires_on": T0_EXPIRES,
+      "sign_in": "https://app.wayscope.co.uk/"}
 _new_guide = 'Each page offers a short tour in a small "New here?" box'
 for _part, _label in ((dr.email_text("Ada Example", _c), "plain"), (dr.email_html("Ada Example", _c), "HTML"),
                       (dr.access_page("Ada Example", _c), "access page")):
