@@ -448,6 +448,140 @@ ok("no route type field was invented: no 'route_type' / 'road_surface' NAME in t
    all(not any(x in n for n in _code_tokens(open(os.path.join(BACKEND, f), encoding="utf-8").read())[0] for x in ("route_type", "road_surface", "surface_factor"))
        for f in ("fairprice.py", "derived.py", "lookahead.py")))
 
+# =========================================================================== #
+#  4. HU7 (14 Oct 2026): a GB set in the SEED, beside the Estonian one          #
+# =========================================================================== #
+# Until today only the demo package carried a GB set; a GB tenant set up without it priced in £ on
+# Estonian figures (driver from Statistics Estonia, a thaw season Great Britain does not have).
+BYC = FACT_FILE.get("fair_price_by_country") or {}
+GB = BYC.get("GB") or {}
+ok("⭐ factors.json carries fair_price_by_country with a GB set and a README; fair_price (the EE set) is unchanged",
+   isinstance(BYC, dict) and isinstance(GB, dict) and len(GB.get("_README", "")) > 100
+   and "Great Britain" in GB["_README"] and "_fair_price_by_country_note" in FACT_FILE
+   and FP["driver_eur_per_h"] == 20.0 and FP["consumption"]["rigid"]["l_per_100km_empty"] == 27.0)
+ok("...every GB coefficient has a source line beside it",
+   "_source" in (GB.get("consumption") or {}) and "_driver_source" in GB and "_vehicle_standing_source" in GB
+   and "_running_source" in GB and "_margin_source" in GB and "_source" in (GB.get("season") or {}) and "_sanity_source" in GB)
+ok("🔴 C25: the three unsourced GB numbers are LABELLED as assumptions; the driver rate is not one",
+   all(GB.get(k, "").startswith("ASSUMPTION") for k in ("_vehicle_standing_source", "_running_source", "_margin_source"))
+   and "ASSUMPTION" in GB["_README"] and "ASSUMED multiplier" in GB["_driver_source"]
+   and not GB["_driver_source"].startswith("ASSUMPTION"))
+ok("...and the sourced GB ones name where they came from (ONS ASHE via DfT, RHA, ICCT, DfT payload, DESNZ, US DOE)",
+   "ONS Annual Survey of Hours and Earnings" in GB["_driver_source"] and "DfT Road Freight Statistics" in GB["_driver_source"]
+   and "RHA Pay Report 2026" in GB["_driver_source"] and "ICCT" in GB["consumption"]["_source"]
+   and "DESNZ 2026" in GB["consumption"]["_source"] and "fueleconomy.gov" in GB["season"]["_source"])
+ok("the GB values are pinned (a silent change is caught here): £24/h driver, £13/h standing from £150k, £0.12/km, 8 %, rigid 31, artic 23.6, no thaw",
+   GB["driver_eur_per_h"] == 24.0 and GB["vehicle_standing_eur_per_h"] == 13.0 and GB["vehicle_new_price_eur"] == 150000
+   and GB["running_eur_per_km"] == 0.12 and GB["margin_pct"] == 8.0 and GB["consumption"]["l_per_100km_per_tonne"] == 0.4
+   and GB["consumption"]["rigid"]["l_per_100km_empty"] == 31.0 and GB["consumption"]["artic"]["l_per_100km_empty"] == 23.6
+   and GB["season"]["winter_months"] == [11, 12, 1, 2, 3] and GB["season"]["winter_consumption_uplift_pct"] == 8.0
+   and GB["season"]["thaw_months"] == [])
+# Sources checked 14 Oct 2026 (a research pass; VED, levy and RHA re-read here): the 29 Sep text's "VED + levy ≈ £1,300"
+# was wrong — HGV VED is £1 for a lorry taxed 1 Jul 2026 – 30 Jun 2027 (gov.uk) and the 44 t Euro VI levy is £619.
+ok("...the GB standing derivation is arithmetically consistent (150k, 7 yr, 20 % residual, 3 %, tax + levy £620 now / ~£1,200 full, 1,800 h → 12.4 / 12.7, rounded 13)",
+   abs((150000 * 0.8 / 7 + 150000 * 0.03 + 620) / 1800 - 12.4) < 0.05 and abs((150000 * 0.8 / 7 + 150000 * 0.03 + 1199) / 1800 - 12.7) < 0.05
+   and "£12.4/h now, £12.7/h at the full rate, rounded to £13" in GB["_vehicle_standing_source"])
+ok("🔴 ...and states the vehicle tax as gov.uk has it now: levy £619 + VED £1 (1 Jul 2026 – 30 Jun 2027), never the old ≈ £1,300",
+   "levy £619" in GB["_vehicle_standing_source"] and "£1 for a lorry taxed between 1 Jul 2026 and 30 Jun 2027" in GB["_vehicle_standing_source"]
+   and "VED + HGV road user levy ≈ £1,300/yr" not in GB["_vehicle_standing_source"])
+ok("...the GB driver derivation is too (£16.25 × 1.28 / 0.85 = £24.5, rounded 24), and says the £16.25 is gross (with overtime) and the RHA rates basic",
+   abs(16.25 * 1.28 / 0.85 - 24.5) < 0.05 and "£24.5/h" in GB["_driver_source"]
+   and "£16.25 GROSS, which includes overtime (£16.01 excluding overtime)" in GB["_driver_source"]
+   and "BASIC hourly rate medians C+E £15.05, C £14.50" in GB["_driver_source"]
+   and abs(0.15 * (16.25 * 2000 - 5000) / (16.25 * 2000) - 0.127) < 0.001)
+ok("...the running ASSUMPTION is set against the RHA's own tyre and repair figures (17.74 p/mile tractor + 9.92 trailer ≈ £0.17/km), not the 78.21 that includes fuel",
+   abs((3.13 + 14.61) - 17.74) < 1e-9 and abs((17.74 + 9.92) / 160.934 - 0.172) < 0.001
+   and "17.74 p/mile for the tractor" in GB["_running_source"] and "about £0.17/km for the whole outfit" in GB["_running_source"]
+   and "is not used" in GB["_running_source"])
+ok("...and the IRU band is called what it is: a page with no method, source or scope — a loose check, not a benchmark",
+   "no method, source or scope given" in GB["_sanity_source"] and "not a benchmark and not an input" in GB["_sanity_source"])
+ok("...the rigid 31 is the 2026 derivation the EE block's note names (0.99773 / 2.58354 × 100 − 0.4 × 20 = 30.6)",
+   abs(0.99773 / 2.58354 * 100 - 0.4 * 20 - 30.6) < 0.05 and "would be 31" not in GB["consumption"]["_source"])
+ok("🔴 the GB set carries no diesel price (DESNZ is the live index) and no Estonian source or term",
+   not any(("diesel" in k.lower() or "eur_per_l" in k.lower()) for k in GB if not k.startswith("_"))
+   and not any(w in json.dumps(GB, ensure_ascii=False) for w in ("Estonia", "stat.ee", "emta", "palgad", "Transpordiamet",
+                                                               "Virumaa", "vignette", "Tark Tee", "€")))
+ok("...the per-country sets are keyed by two-letter capitals, and GB is the only one today", sorted(k for k in BYC if not k.startswith("_")) == ["GB"])
+
+# the model's fallback picks the tenant country's set
+_gbp = fairprice.params({"tenant": {"country": "GB"}})
+_eep = fairprice.params({"tenant": {"country": "EE"}})
+ok("⭐ params(): a GB tenant WITHOUT a block prices on the GB set (24 / 13 / rigid 31 / no thaw); an EE one on the EE set",
+   _gbp["driver_eur_per_h"] == 24.0 and _gbp["vehicle_standing_eur_per_h"] == 13.0
+   and _gbp["consumption"]["rigid"]["l_per_100km_empty"] == 31.0 and _gbp["season"]["thaw_months"] == []
+   and _eep["driver_eur_per_h"] == 20.0 and _eep["consumption"]["rigid"]["l_per_100km_empty"] == 27.0
+   and _eep["season"]["thaw_months"] == [3, 4])
+ok("...no country, a country the file has no set for, or a blank one ⇒ the fair_price set (EE), as before",
+   fairprice.params({})["driver_eur_per_h"] == 20.0 and fairprice.params({"tenant": {"country": "FR"}})["driver_eur_per_h"] == 20.0
+   and fairprice.params({"tenant": {"country": ""}})["driver_eur_per_h"] == 20.0
+   and fairprice.params({"tenant": {"country": None}})["driver_eur_per_h"] == 20.0)
+ok("...the country is read case-blind ('gb' = GB), and a GB tenant's own keys still win key by key over the GB set",
+   fairprice.params({"tenant": {"country": "gb"}})["driver_eur_per_h"] == 24.0
+   and fairprice.params({"tenant": {"country": "GB"}, "fair_price": {"driver_eur_per_h": 30}})["driver_eur_per_h"] == 30
+   and fairprice.params({"tenant": {"country": "GB"}, "fair_price": {"driver_eur_per_h": 30}})["vehicle_standing_eur_per_h"] == 13.0
+   and fairprice.params({"tenant": {"country": "GB"}, "fair_price": {"consumption": {"artic": {"l_per_100km_empty": 22}}}})["consumption"]["rigid"]["l_per_100km_empty"] == 31.0)
+ok("...file_defaults(country) returns the set itself; file_defaults() the EE set",
+   fairprice.file_defaults("GB") is fairprice.file_defaults("gb") and fairprice.file_defaults("GB")["driver_eur_per_h"] == 24.0
+   and fairprice.file_defaults()["driver_eur_per_h"] == 20.0 and fairprice.file_defaults("FR") is fairprice.file_defaults())
+_tg = fairprice.trip_cost(CTX, 9, 1.955, _gbp)
+_tg3 = fairprice.trip_cost(CTX, 3, 1.955, _gbp)
+# REVERSED before it was ever committed (14 Oct 2026): the 29 Sep note said this trip "lands inside that band". It does
+# not — £2.02/km, above the 2.00 top of an EUR band. The note now gives the figure; this pins it, so the note cannot drift.
+ok("the fixture trip on the GB set at £1.955/L costs £121.38 = £2.02/km, just ABOVE the IRU band, and the sanity note says so; March is WINTER, never THAW",
+   _tg is not None and _tg["eur_trip"] == 121.38 and _tg["eur_per_km"] == 2.023 and _tg["eur_per_km"] > 2.0
+   and "£121.38 a trip = £2.02/km" in GB["_sanity_source"] and "lands inside that band" not in GB["_sanity_source"]
+   and _tg3["flags"] == ["WINTER"]
+   and abs(_tg["eur_trip"] - round((_tg["fuel_eur"] + _tg["time_eur"] + _tg["running_eur"]) * 1.08, 2)) < 0.02,
+   str(_tg))
+
+# validation: each set held to fair_price's rules
+_bad = lambda s: config.validate({**FACT_FILE, "fair_price_by_country": s})
+ok("config.validate: a GB set with a negative driver rate, a month 13 or a zero empty consumption is refused, by name",
+   any("fair_price_by_country.GB.driver_eur_per_h" in x for x in _bad({"GB": {**GB, "driver_eur_per_h": -1}}))
+   and any("fair_price_by_country.GB.season.thaw_months" in x for x in _bad({"GB": {**GB, "season": {**GB["season"], "thaw_months": [13]}}}))
+   and any("fair_price_by_country.GB.consumption.rigid" in x for x in _bad({"GB": {**GB, "consumption": {**GB["consumption"], "rigid": {"l_per_100km_empty": 0}}}})))
+ok("...a lower-case or three-letter key, a set that is not an object, and a block that is not an object are refused",
+   any("two-letter country code" in x for x in _bad({"gb": GB})) and any("two-letter country code" in x for x in _bad({"GBR": GB}))
+   and any("fair_price_by_country.GB must be an object" in x for x in _bad({"GB": 5}))
+   and any("fair_price_by_country must be an object" in x for x in _bad([GB])))
+ok("...the seed passes, the block absent passes, and an _note key inside it is ignored",
+   not config.validate(FACT_FILE) and not config.validate({k: v for k, v in FACT_FILE.items() if k != "fair_price_by_country"})
+   and not _bad({"_note": "x", "GB": GB}))
+
+# one copy: the demo package's GB block IS the seed's, and the tool takes it from the seed
+_pkg = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
+_dfp = json.loads([r for r in _pkg["tables"]["config"] if r["key"] == "factors"][0]["value"])["fair_price"]
+_strip = lambda d: {k: v for k, v in d.items() if k not in ("_README", "_demo_note")}
+ok("⭐ the demo package's fair_price is the seed's GB set word for word (bar its README and demo note)",
+   _strip(_dfp) == _strip(GB) and "_demo_note" in _dfp)
+_tool = open(os.path.join(BACKEND, "tools", "make_demo_tenant.py"), encoding="utf-8").read()
+ok("...and make_demo_tenant.py takes it from the seed instead of carrying its own copy of the figures",
+   'doc["fair_price_by_country"]["GB"]' in _tool and "£16.25" not in _tool and 'fp["driver_eur_per_h"] = 24.0' not in _tool)
+
+# the live path: a GB tenant whose document has no block prices on the GB set
+_gbdoc = {k: v for k, v in FACT_FILE.items() if k != "fair_price"}
+_gbdoc["tenant"] = dict(FACT_FILE.get("tenant") or {}, country="GB", currency="GBP")
+_r = config.save(_gbdoc, by="t")
+config.invalidate()
+costing.invalidate()
+fuel.set_manual(1.955, "2026-09-21", by="admin", country="GB")
+_lg = {l["section_id"]: l for l in main.list_forecast_days()["lines"]}["WS1"]["context"]
+_fg = _lg.get("fair") or {}
+ok("⭐ live: a GB tenant with no block on its document prices WS1 on the GB set (time term = cycle × (24 + 13))",
+   _r["ok"] and _fg.get("time_eur") is not None
+   and abs(_fg["time_eur"] - round(_lg["cycle_min"] / 60.0 * (24.0 + 13.0), 2)) < 0.011, str(_fg))
+config.reset_to_file(conversions, by="t")
+config.invalidate()
+costing.invalidate()
+
+# the page: the country's set is shown, copied and offered
+ok("the page: FairPriceSection reads the file's set for the tenant's country, falling back to fair_price",
+   "(fileDoc.fair_price_by_country || {})[cc]" in _fe and "const fileFp = countryFp || (fileDoc && fileDoc.fair_price) || {};" in _fe)
+ok("...and offers it as one click when the live block differs (numbers only), saved with the page's Save",
+   "data-fair-country-offer={cc}" in _fe and "Use the {countryName} set" in _fe
+   and "d.fair_price = JSON.parse(JSON.stringify(countryFp))" in _fe and "Nothing changes until you Save." in _fe
+   and "fairCanon(doc.fair_price) !== fairCanon(countryFp)" in _fe)
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

@@ -132,7 +132,10 @@ never mixed. Per tonne, per trip and per km are the same total divided by the to
 weekly price for Great Britain or the EU Weekly Oil Bulletin for an EU country, refreshed in the background, or typed.
 With no index there is no fair price. Shown on every routed line as &ldquo;fair (model)&rdquo;: a floor for
 negotiation, never a quote, never mixed with a typed rate. Three coefficients have no public source and are labelled
-as assumptions.</p>
+as assumptions. The starting coefficients come from <code>factors.json</code>: <code>fair_price_by_country</code> holds a
+set per country (Great Britain, in £), and <code>fair_price</code> is the set for every other organisation (an Estonian
+set, in EUR). A coefficient missing from the organisation's own block is read from its country's set, and the page offers
+the country's set in one click when the figures differ.</p>
 
 <h2 id="t1-gates">Gate arrivals</h2>
 <p>Read from <code>GET /api/gates/arrivals?month=N</code> (<code>backend/gate_arrivals.py</code>). The same trips rule,
