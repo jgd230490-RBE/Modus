@@ -2607,34 +2607,82 @@ def routes_summary():
     return network.summary()
 
 
-@app.get("/api/routes/map-export.pdf")
-def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
-                         dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
-                         routes: Optional[str] = None, carbon_tool: int = 0, map_only: int = 0, request: Request = None):
+def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at):
     """
-    14 Oct 2026 (backlog item 2, replaces the per-route sheet) — the map as it is filtered, as an A4 landscape PDF
-    drawn here (basemap.py + the bulletin's route drawing), never a screenshot. STAFF ONLY (the user, 14 Oct): a valid
-    code or the staff cookie (the map's iframe in the app sends the cookie); the map password's cookie gets 401.
+    14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
+    template") — the route map export's one read: the map as it is filtered, as one of the CLOCS outline CLP template's
+    three plans (route_map_export.PLANS: regional, local, site) at a stated scale. STAFF ONLY (the user, 14 Oct): a
+    valid code or the staff cookie (the map's iframe in the app sends the cookie); the map password's cookie gets 401.
     The filters are the public map's Route filtering (origin, dest, discipline, team: the slot id or the team's name)
-    and `routes` (comma-separated ids, the Routes page's list). Options: `carbon_tool=1` adds the NH Carbon Tool
-    transport rows (H3), `map_only=1` is one page with the legend inside the map (and no tables). A team code gets its
-    own team's routes whatever it asks for. Approved lines only (D11). Stores nothing.
+    and `routes` (comma-separated ids, the Routes page's list). `plan` = regional | local | site; `scale` = the N of 1:N
+    (one the plan offers; regional is fitted to the routes without one); `at` = the place a local or site plan is
+    centred on (by name; the busiest route's site end without one). A team code gets its own team's routes whatever it
+    asks for. Approved lines only (D11). Stores nothing.
     """
-    from fastapi.responses import Response       # not in every test stub; imported here
     if not _staff_request(request):
         raise HTTPException(401, "sign in — the route map export is for staff")
     ids = [x.strip() for x in (routes or "").split(",") if x.strip()] or None
     S = route_map_export.sheet(month, route_ids=ids, team=team, acc=access.current(), origin=origin, dest=dest,
-                               discipline=discipline, carbon_tool=bool(carbon_tool) and not map_only,
-                               map_only=bool(map_only))
+                               discipline=discipline)
+    try:
+        route_map_export.plan(S, plan, scale, at)
+    except route_map_export.PlanError as e:
+        raise HTTPException(422, str(e))
+    return S
+
+
+def _route_map_file(S, month, ext):
+    y, m = weeks._month_of(month)
+    PL = S["plan"]
+    tail = f"-1-{PL['denom']}" if PL.get("denom") else ""
+    return f"route-map-{y}-{m:02d}-{PL['kind']}{tail}.{ext}"
+
+
+@app.get("/api/routes/map-export.pdf")
+def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
+                         dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
+                         routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
+                         at: Optional[str] = None, request: Request = None):
+    """The plan as one A4 landscape page, exactly at its stated scale when printed at 100 % (_route_map_plan)."""
+    from fastapi.responses import Response       # not in every test stub; imported here
+    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at)
     try:
         data = export.build_route_map_pdf(S)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
-    y, m = weeks._month_of(month)
     return Response(content=data, media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="route-map-{y}-{m:02d}{"-map" if map_only else ""}.pdf"',
+                    headers={"Content-Disposition": f'attachment; filename="{_route_map_file(S, month, "pdf")}"',
                              "Cache-Control": "no-store"})
+
+
+@app.get("/api/routes/map-export.png")
+def route_map_export_png(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
+                         dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
+                         routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
+                         at: Optional[str] = None, request: Request = None):
+    """The same plan as a PNG for a Word document: the PDF page rasterised, so the two never differ."""
+    from fastapi.responses import Response
+    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at)
+    try:
+        data = export.route_map_png(export.build_route_map_pdf(S))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="image/png",
+                    headers={"Content-Disposition": f'attachment; filename="{_route_map_file(S, month, "png")}"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/api/routes/map-export/places")
+def route_map_export_places(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
+                            dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
+                            routes: Optional[str] = None, request: Request = None):
+    """What the export card offers for these filters: the three plans with their scales, and the places a local or site
+    plan can be centred on (names, the sites first). Staff only, like the export."""
+    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, "regional", None, None)
+    return {"places": S["plan"]["centre_choices"],
+            "plans": [{"kind": k, "name": v["name"], "what": v["what"], "centred": v["centred"],
+                       "scales": list(v["scales"]), "default": v["default"]} for k, v in route_map_export.PLANS.items()],
+            "regional_fitted": S["plan"]["denom"]}
 
 
 @app.get("/api/public/route-alternatives")

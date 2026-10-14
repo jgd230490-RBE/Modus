@@ -467,8 +467,6 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
   /* 12 Oct 2026 (C4): the Monthly bulletin menu on the Dashboard — the 14 px floor for its words */
   .bulletin-menu label span{font-size:14px;}
-  .bulletin-menu .rme-tick{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:14px;color:var(--popover-fg);white-space:normal;cursor:pointer;}
-  .bulletin-menu .rme-tick input{width:16px;height:16px;flex:none;}
   .bulletin-menu .row-menu-list a{display:block;padding:7px 10px;font-size:14px;color:var(--popover-fg);border-radius:6px;text-decoration:underline;}
   .bulletin-menu .row-menu-list a:hover{background:rgba(255,255,255,.06);}
   .bulletin-menu .bm-err{white-space:normal;max-width:260px;font-size:14px;color:#FCA5A5;padding:4px 10px;}
@@ -3327,28 +3325,48 @@ function App(){
 }
 
 // 14 Oct 2026 (backlog item 2, replaces the per-route sheet): the route map export from the Routes page — every route,
-// or the one picked in the list; a month; a team or all; and the two options (map only with the legend on the map; the
-// National Highways Carbon Tool rows). The same request the public map's "Export route map (PDF)" sends; staff only
-// (this page is a planner's). The PDF is drawn on the server; nothing here computes a figure.
+// or the one picked in the list; a month; a team or all. 14 Oct, evening (the user: "just the map … certain scales as in
+// the CLP template"): ONLY THE MAP, as one of the CLOCS outline CLP template's three plans (regional, local, site) at a
+// stated scale, as a PDF (prints at that scale on A4) or a PNG for a Word document. The same request the public map's
+// "Export route map (plan)" sends; staff only (this page is a planner's). The server says which scales each plan has
+// and which places a local or site plan can be centred on; the map is drawn on the server, nothing here computes it.
 function RouteMapExportMenu({ months, ipts, picked }){
   const now = new Date();
   const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));
   const [m, setM] = useState(cur);
   const [scope, setScope] = useState("all");
   const [team, setTeam] = useState("ALL");
-  const [mapOnly, setMapOnly] = useState(false);
-  const [carbonTool, setCarbonTool] = useState(false);
+  const [plan, setPlan] = useState("regional");
+  const [scale, setScale] = useState("");
+  const [at, setAt] = useState("");
+  const [opts, setOpts] = useState({ plans: [], places: [], regional_fitted: null });
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   useEffect(() => { if(!picked && scope === "picked") setScope("all"); }, [picked]);
-  const download = async () => {
+  const query = () => {
+    const q = new URLSearchParams({ month: String(m) });
+    if(scope === "picked" && picked) q.set("routes", picked);
+    if(team !== "ALL") q.set("team", team);
+    return q;
+  };
+  const load = async () => {
+    try {
+      const r = await fetch(`${API}/routes/map-export/places?${query().toString()}`);
+      if(r.ok){ const j = await r.json(); setOpts(j); setAt(a => (j.places || []).includes(a) ? a : ((j.places || [])[0] || "")); }
+    } catch(e){ /* the download says what went wrong */ }
+  };
+  useEffect(() => { if(open) load(); }, [open, m, scope, team, picked]);
+  const spec = (opts.plans || []).find(p => p.kind === plan) || null;
+  useEffect(() => { setScale(spec && spec.default ? String(spec.default) : ""); }, [plan, opts]);
+  const download = async (kind) => {
     setBusy(true); setErr(null);
     try {
-      const q = new URLSearchParams({ month: String(m) });
-      if(scope === "picked" && picked) q.set("routes", picked);
-      if(team !== "ALL") q.set("team", team);
-      if(mapOnly) q.set("map_only", "1"); else if(carbonTool) q.set("carbon_tool", "1");
-      const r = await fetch(`${API}/routes/map-export.pdf?${q.toString()}`);
+      const q = query();
+      q.set("plan", plan);
+      if(scale) q.set("scale", scale);
+      if(spec && spec.centred && at) q.set("at", at);
+      const r = await fetch(`${API}/routes/map-export.${kind}?${q.toString()}`);
       if(!r.ok){
         const txt = await r.text();
         let d = "";
@@ -3356,18 +3374,21 @@ function RouteMapExportMenu({ months, ipts, picked }){
         throw new Error(d || `error ${r.status}`);
       }
       const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const fm = cd.match(/filename="([^"]+)"/);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `route-map-${months.start_year + Math.floor((m - 1) / 12)}-${String((m - 1) % 12 + 1).padStart(2, "0")}${mapOnly ? "-map" : ""}.pdf`;
+      a.download = fm ? fm[1] : `route-map.${kind}`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     } catch(e){ setErr("The route map could not be made: " + (e.message || e)); }
     setBusy(false);
   };
+  const noPlace = !!(spec && spec.centred && !(opts.places || []).length);
   return (
-    <details className="row-menu bulletin-menu" data-route-map-export="1">
+    <details className="row-menu bulletin-menu" data-route-map-export="1" onToggle={e => setOpen(e.currentTarget.open)}>
       <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }}
-               title="The routes on a map with their figures, as a PDF, from the approved plan">Route map (PDF) ▾</summary>
+               title="The routes on a map at a CLP plan's scale, as a PDF or a PNG, from the approved plan">Route map (plan) ▾</summary>
       <div className="row-menu-list dash-filters">
         <label><span>Month</span><select value={m} onChange={e => setM(+e.target.value)} aria-label="Route map month">
           {Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select></label>
@@ -3377,10 +3398,18 @@ function RouteMapExportMenu({ months, ipts, picked }){
         <label><span>{TEAM()}</span><select value={team} onChange={e => setTeam(e.target.value)} aria-label={TEAM()}>
           <option value="ALL">All {TEAMS()}</option>
           {(ipts || []).map(i => <option key={i.id} value={i.id}>{teamText(i.id)}</option>)}</select></label>
-        <label className="rme-tick"><input type="checkbox" checked={mapOnly} onChange={e => setMapOnly(e.target.checked)} /> Map only, with the legend on the map</label>
-        {!mapOnly && <label className="rme-tick"><input type="checkbox" checked={carbonTool} onChange={e => setCarbonTool(e.target.checked)} /> Add the National Highways Carbon Tool rows</label>}
-        <button type="button" onClick={download} disabled={busy}>{busy ? "Drawing the map…" : "Download the PDF"}</button>
-        <div className="row-menu-note">Approved lines only. A planning document, not an approved CLP.</div>
+        <label><span>Plan</span><select value={plan} onChange={e => setPlan(e.target.value)} aria-label="Which plan">
+          <option value="regional">Regional plan: the whole routes</option>
+          <option value="local">Local plan: around a site, 1:2,000 to 1:3,000</option>
+          <option value="site">Site plan: around a site, 1:500 to 1:1,000</option></select></label>
+        <label><span>Scale</span><select value={scale} onChange={e => setScale(e.target.value)} aria-label="Scale">
+          {plan === "regional" && <option value="">Fitted to the routes{opts.regional_fitted ? ` (1:${Number(opts.regional_fitted).toLocaleString("en-GB")})` : ""}</option>}
+          {(spec ? spec.scales : []).map(n => <option key={n} value={String(n)}>1:{Number(n).toLocaleString("en-GB")}</option>)}</select></label>
+        {spec && spec.centred && <label><span>Centred on</span><select value={at} onChange={e => setAt(e.target.value)} aria-label="Centred on">
+          {(opts.places || []).map(n => <option key={n} value={n}>{n}</option>)}</select></label>}
+        <button type="button" onClick={() => download("pdf")} disabled={busy || noPlace}>{busy ? "Drawing the map…" : "Download PDF"}</button>
+        <button type="button" onClick={() => download("png")} disabled={busy || noPlace}>Download PNG</button>
+        <div className="row-menu-note">Just the map, with its legend, scale and north arrow on it. Approved lines only. A planning document, not an approved CLP. The PDF prints at the stated scale on A4 at 100 %; in a Word document, use the scale bar.</div>
         {err && <div className="bm-err" role="alert">{err}</div>}
       </div>
     </details>

@@ -22,6 +22,7 @@ rendered pages (notes/session-1014-route-map-export.md). HERE is never called: g
 Run:  python3 backend/tests/test_route_map_export.py
 """
 import datetime
+import io
 import json
 import math
 import os
@@ -264,7 +265,7 @@ n0 = bulletin_doc.n0
 
 # ---- 1. the figures are the roll-up's, per route ------------------------------------------------
 S = rme.sheet(10, acc=PLANNER)
-ok("⭐ every drawn route of the month, busiest first, with the bulletin roll-up's own figures (two-way a day, loads, tonnes, lorries)",
+ok("⭐ every drawn route of the month, busiest first, with the bulletin roll-up's own figures (two-way a day, loads, tonnes)",
    [r["route_id"] for r in S["rows"]] == [r["route_id"] for r in R10["by_route"]] == ["R1", "R2"]
    and all(r["a_day_text"] == n0(BYR[r["route_id"]]["two_way_a_day"]) and r["loads_text"] == n0(BYR[r["route_id"]]["movements_in_month"])
            and r["tonnes_text"] == n0(BYR[r["route_id"]]["tonnes"]) + " t" for r in S["rows"]),
@@ -276,25 +277,30 @@ ok("🔴 approved lines only: R2's pending 99,999 t is not in it (D11: an approv
    S["rows"][1]["tonnes_text"] == "14,500 t")
 ok("...a route the map does not draw (R3, no stored road route) is named, not counted",
    S["not_drawn"] == ["R3"] and "R3" not in [r["route_id"] for r in S["rows"]])
-ok("places, never an id; letters from the bulletin's rule (the busiest route's ends first)",
+ok("places, never an id; letters from the bulletin's rule (the busiest route's ends first); each place knows which end it is",
    S["rows"][0]["places"] == "Kelsey Quarry → Mill Compound" and S["rows"][0]["letters"] == "A → B"
    and S["rows"][1]["places"] == "Ridge Pit → Mill Compound" and S["rows"][1]["letters"] == "C → B"
-   and [p["name"] for p in S["places"]] == ["Kelsey Quarry", "Mill Compound", "Ridge Pit"])
-ok("vehicles as people read them, each once per route",
-   S["rows"][0]["vehicles_text"] == f"{rme._vehicle_word(ART)}, {rme._vehicle_word(R8)}" and S["rows"][1]["vehicles_text"] == rme._vehicle_word(ART))
-ok("the planning flag: the typed figure, 'above it' exactly when the route's two-way a day is over it; 'none set' with none",
-   S["rows"][0]["flag_text"] == ("60 a day: above it" if BYR["R1"]["two_way_a_day"] > 60 else "60 a day")
-   and S["rows"][0]["flag_over"] == (BYR["R1"]["two_way_a_day"] > 60) and S["rows"][1]["flag_text"] == "none set")
-ok("closures: 'not checked' while no check is stored", all(r["checked_text"] == "not checked" for r in S["rows"]))
+   and [(p["name"], p["end"]) for p in S["places"]] == [("Kelsey Quarry", "origin"), ("Mill Compound", "dest"), ("Ridge Pit", "origin")])
+# REVERSED 14 Oct 2026, evening (the user: "the only map export to be just the map"): the per-route table is gone, so the
+# rows no longer carry the vehicles, the lorries needed, the planning flag or the closures date (nothing prints them)
+ok("🔴 the rows carry no table fields any more: no vehicles, lorries needed, planning flag or closures date",
+   not any(k in r for r in S["rows"] for k in ("vehicles_text", "lorries_text", "flag_text", "flag_over", "checked_text"))
+   and "restrictions" not in read("backend/route_map_export.py") and not hasattr(rme, "_vehicle_word"))
 db.execute("UPDATE routes SET restrictions_checked_at = ? WHERE id = ?", ("2026-10-12T08:30:00Z", "R1"))
-ok("...and the stored check's date once there is one", rme.sheet(10, acc=PLANNER)["rows"][0]["checked_text"] == "12 Oct 2026")
+ok("🔴 ...a stored closures check changes nothing on the map's rows",
+   rme.sheet(10, acc=PLANNER)["rows"] == S["rows"])
 db.execute("UPDATE routes SET restrictions_checked_at = NULL WHERE id = ?", ("R1",))
 ok("the map draws each route in the public map's Volume colour for its two-way movements a day, quietest first",
    [m["route_id"] for m in S["map_routes"]] == ["R2", "R1"]
    and all(m["color"] == bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(BYR[m["route_id"]]["two_way_a_day"])] for m in S["map_routes"]))
-ok("the line under the title says what was filtered: routes, team, month, approved lines only",
+ok("the line in the panel says what was filtered: routes, team, month, approved lines only",
    S["filter_words"] == "2 routes · All teams · October 2026 · approved lines only", S["filter_words"])
-ok("no Carbon Tool rows unless asked, and the full layout unless map only is asked", "carbon_tool" not in S and S["map_only"] is False)
+# REVERSED 14 Oct 2026, evening: no Carbon Tool rows and no map-only switch — the export is only ever the map
+import inspect  # noqa: E402
+ok("🔴 sheet() takes no Carbon Tool or map-only option and the module has no Carbon Tool rows or scheme block left",
+   "carbon_tool" not in inspect.signature(rme.sheet).parameters and "map_only" not in inspect.signature(rme.sheet).parameters
+   and not hasattr(rme, "carbon_tool_rows") and not hasattr(rme, "SCHEME_FIELDS") and not hasattr(rme, "FLAG_WORDS")
+   and "carbon_tool" not in S and "map_only" not in S and "scheme_fields" not in S)
 
 # ---- 2. the filters, as the public map applies them ----------------------------------------------
 ids = lambda s: [r["route_id"] for r in s["rows"]]
@@ -315,93 +321,172 @@ ok("origin and destination from the route, by name (the map's select values)",
    ids(rme.sheet(10, origin="Kelsey Quarry", acc=PLANNER)) == ["R1"] and ids(rme.sheet(10, dest="Mill Compound", acc=PLANNER)) == ["R1", "R2"]
    and ids(rme.sheet(10, origin="Nowhere", acc=PLANNER)) == [])
 SD = rme.sheet(10, discipline="structures", acc=PLANNER)
+# NARROWED 14 Oct 2026, evening: the vehicles are no longer in the rows (no table), so the check is the tonnes and loads
 ok("⭐ discipline from the LINE: 'structures' keeps R1's rigid line only — 4,400 t, 4,400 ÷ 20 loads",
    ids(SD) == ["R1"] and SD["rows"][0]["tonnes_text"] == "4,400 t" and SD["rows"][0]["loads_text"] == n0(4400 / PAY_R8)
-   and SD["rows"][0]["vehicles_text"] == rme._vehicle_word(R8) and "structures" in SD["filter_words"])
+   and "structures" in SD["filter_words"])
 ok("the Routes page's list: routes=R2 alone", ids(rme.sheet(10, route_ids=["R2"], acc=PLANNER)) == ["R2"])
 ok("🔴 a team code gets its OWN team's routes, whatever it asks for", ids(rme.sheet(10, team="IPT2", acc=TEAM1)) == ["R1"]
    and ids(rme.sheet(10, acc=TEAM1)) == ["R1"])
 ok("an empty month says so (no rows, empty)", rme.sheet(12, acc=PLANNER)["empty"] is True and rme.sheet(12, acc=PLANNER)["rows"] == [])
 
-# ---- 3. the National Highways Carbon Tool rows (H3), only when asked ---------------------------------
-SC = rme.sheet(10, acc=PLANNER, carbon_tool=True)
-CT = SC["carbon_tool"]["rows"]
-r1a = [r for r in CT if r["route_id"] == "R1" and r["vehicle"] == rme._vehicle_word(ART)]
-r1r = [r for r in CT if r["route_id"] == "R1" and r["vehicle"] == rme._vehicle_word(R8)]
-ok("⭐ one row per Carbon Tool sheet, material, route and VEHICLE: R1's artic lines 41,500 t at the artic's 30 km loaded, one way",
-   len(r1a) == 1 and r1a[0]["tonnes"] == 41500.0 and r1a[0]["one_way_km"] == 30.0 and r1a[0]["material"] == "Small aggregate",
-   str(CT))
-ok("...R1's rigid line on its own row, with no km (its route is not worked out for the rigid), never the artic's",
-   len(r1r) == 1 and r1r[0]["tonnes"] == 4400.0 and r1r[0]["one_way_km"] is None)
-ok("...R2 14,500 t at 10 km; R3 (not drawn) has no row; every row names its Carbon Tool sheet",
-   [(r["tonnes"], r["one_way_km"]) for r in CT if r["route_id"] == "R2"] == [(14500.0, 10.0)]
-   and not [r for r in CT if r["route_id"] == "R3"] and all(r["sheet"] and r["sheet"] != "—" for r in CT), str(CT))
-ok("...the discipline filter reaches the Carbon Tool rows too",
-   [(r["route_id"], r["tonnes"]) for r in rme.sheet(10, discipline="structures", acc=PLANNER, carbon_tool=True)["carbon_tool"]["rows"]] == [("R1", 4400.0)])
+# ---- 3. the CLP plans: three plans, each at a STATED scale (14 Oct 2026, evening) ---------------------
+# the CLOCS outline CLP template §2.2 / §4: regional smaller than 1:15,000; local 1:2,000-1:3,000; site 1:500-1:1,000
+ok("⭐ the three plans and their scales are the CLP template's: regional 1:20,000 and smaller, local 1:2,000 to 1:3,000, site 1:500 to 1:1,000",
+   list(rme.PLANS) == ["regional", "local", "site"] and min(rme.PLANS["regional"]["scales"]) > 15000
+   and all(2000 <= n <= 3000 for n in rme.PLANS["local"]["scales"]) and all(500 <= n <= 1000 for n in rme.PLANS["site"]["scales"])
+   and rme.PLANS["local"]["default"] == 2500 and rme.PLANS["site"]["default"] == 1000 and rme.PLANS["regional"]["default"] is None
+   and list(rme.PLANS["regional"]["scales"]) == sorted(rme.PLANS["regional"]["scales"]))
+ok("...the frame is A4 landscape less a 6 mm margin (285 × 198 mm) and the basemap image keeps its proportions",
+   (rme.FRAME_W_MM, rme.FRAME_H_MM) == (285.0, 198.0) and rme.W_PX == basemap.MAX_PX
+   and abs(rme.H_PX / rme.W_PX - rme.FRAME_H_MM / rme.FRAME_W_MM) < 1 / rme.W_PX)
+# the zoom for a scale, worked out by hand: 1:2,500 printed 285 mm wide from 1,280 px = 0.5566 m a pixel at 52.5° N
+_mpp = 2500 / 1000 * 285 / 1280
+_z = math.log2(40075016.686 * math.cos(math.radians(52.5)) / (512 * _mpp))
+ok("⭐ basemap.zoom_for_scale: by hand, 1:2,500 at 52.5° N on a 1,280 px image printed 285 mm wide is zoom "
+   f"{_z:.2f}", basemap.zoom_for_scale(2500, 52.5, 285, 1280) == round(_z, 2), str(basemap.zoom_for_scale(2500, 52.5, 285, 1280)))
+_errs = []
+for _n_ in (500, 1000, 2000, 2500, 3000, 20000, 125000, 1000000):
+    for _lat in (50.0, 52.5, 55.8):
+        _vv = basemap.view_centred(-1.0, _lat, basemap.zoom_for_scale(_n_, _lat, 285, 1280), 1280, 889)
+        _errs.append(abs(basemap.scale_denominator(_vv, 285) / _n_ - 1))
+ok("⭐ ...the scale the view REALLY is at its centre is within 0.5 % of the stated one, at every plan scale and from Cornwall to Scotland "
+   "(the zoom is rounded to two decimals: at most ±0.35 %)", max(_errs) < 0.005, f"{max(_errs):.4%}")
 
-# ---- 4. the PDF: the full export -----------------------------------------------------------------
-PDF = export.build_route_map_pdf(S)
+SR = rme.plan(rme.sheet(10, acc=PLANNER))["plan"]
+_pts = bulletin_doc.map_points(S)
+_res = int(round((rme.PANEL_W_MM + 4) / rme.FRAME_W_MM * rme.W_PX))
+_xy = [basemap.project(SR["view"], *p) for p in _pts]
+ok("⭐ REGIONAL, fitted: the largest scale of the series at which every route point fits left of the panel (with the padding) …",
+   SR["kind"] == "regional" and SR["fitted"] is True and SR["denom"] in rme.PLANS["regional"]["scales"]
+   and all(rme.PAD_PX - 1 <= x <= rme.W_PX - _res - rme.PAD_PX + 1 and rme.PAD_PX - 1 <= y <= rme.H_PX - rme.PAD_PX + 1 for x, y in _xy),
+   f"{SR['denom']} {_xy}")
+_prev = [n for n in rme.PLANS["regional"]["scales"] if n < SR["denom"]]
+_vp = basemap.view_centred(SR["view"]["lon"], SR["view"]["lat"], basemap.zoom_for_scale(_prev[-1], SR["view"]["lat"], 285, 1280), 1280, rme.H_PX, _res) if _prev else None
+_xyp = [basemap.project(_vp, *p) for p in _pts] if _vp else []
+ok("🔴 ...and the next larger scale would NOT fit (so the fitted scale is the largest that does)",
+   not _prev or not all(rme.PAD_PX <= x <= rme.W_PX - _res - rme.PAD_PX and rme.PAD_PX <= y <= rme.H_PX - rme.PAD_PX for x, y in _xyp),
+   f"{_prev[-1:]} {_xyp}")
+ok("...its stated scale reads 1:N and every place is in the frame", SR["scale_words"] == f"1:{SR['denom']:,}"
+   and [p["name"] for p in SR["places"]] == ["Kelsey Quarry", "Mill Compound", "Ridge Pit"])
+SR25 = rme.plan(rme.sheet(10, acc=PLANNER), "regional", 25000)["plan"]
+ok("...a regional scale can be asked for (1:25,000 here, not fitted): the routes centred, whatever does not fit is cut off",
+   SR25["denom"] == 25000 and SR25["fitted"] is False and abs(basemap.scale_denominator(SR25["view"], 285) / 25000 - 1) < 0.005)
+
+SL = rme.plan(rme.sheet(10, acc=PLANNER), "local")["plan"]
+_cx, _cy = basemap.project(SL["view"], -1.1, 52.6)
+ok("⭐ LOCAL, as asked for nothing else: 1:2,500, centred on the busiest route's SITE end (Mill Compound) in the part of the map "
+   "the panel leaves free", SL["denom"] == 2500 and SL["centre"] == "Mill Compound" and SL["scale_words"] == "1:2,500"
+   and abs(_cx - (rme.W_PX - _res) / 2) < 2 and abs(_cy - rme.H_PX / 2) < 2, f"{SL['centre']} {_cx} {_cy}")
+ok("...only the places inside the frame are listed (Kelsey Quarry and Ridge Pit are 13 km away at 1:2,500)",
+   [p["name"] for p in SL["places"]] == ["Mill Compound"])
+ok("...the places to centre on are the routes' ends, the sites first, names only",
+   SL["centre_choices"] == ["Mill Compound", "Kelsey Quarry", "Ridge Pit"])
+SK = rme.plan(rme.sheet(10, acc=PLANNER), "local", "1:2,000", at="kelsey quarry")["plan"]
+ok("...a place by its name (any case) and a scale written 1:2,000 are taken", SK["centre"] == "Kelsey Quarry" and SK["denom"] == 2000
+   and [p["name"] for p in SK["places"]] == ["Kelsey Quarry", "Ridge Pit"])
+SS = rme.plan(rme.sheet(10, acc=PLANNER), "site", 500)["plan"]
+ok("SITE: 1:500 and 1:1,000, centred the same way", SS["denom"] == 500 and SS["centre"] == "Mill Compound"
+   and rme.plan(rme.sheet(10, acc=PLANNER), "site")["plan"]["denom"] == 1000)
+
+
+def _err(*a, **k):
+    try:
+        rme.plan(rme.sheet(10, acc=PLANNER), *a, **k)
+        return None
+    except rme.PlanError as e:
+        return str(e)
+
+
+ok("🔴 a scale the plan does not offer, an unknown plan, a place not on these routes: refused in words",
+   _err("site", 2500) == "the site plan is drawn at 1:500, 1:1,000" and _err("county") == "no such plan: choose regional, local, site"
+   and _err("local", at="Nowhere") == "Nowhere is not at the end of a route on this map" and _err("local", "two") is not None)
+SE = rme.plan(rme.sheet(12, acc=PLANNER), "local")["plan"]
+ok("an empty month: no view, no scale, nothing to centre on (the PDF says so)", SE["view"] is None and SE["denom"] is None
+   and SE["centre_choices"] == [] and rme.plan(rme.sheet(12, acc=PLANNER))["plan"]["view"] is None)
+ok("the scale bar: 1, 2 or 5 × 10^k metres under 50 mm — 100 m at 1:2,500, 20 m at 1:500 — in words",
+   basemap.bar_metres(SL["view"], 50 * 1280 / 285)[0] == 100 and basemap.bar_metres(SS["view"], 50 * 1280 / 285)[0] == 20
+   and basemap.length_words(500) == "500 m" and basemap.length_words(2000) == "2 km" and basemap.length_words(2500) == "2.5 km")
+
+# ---- 4. the PDF: just the map, one page ---------------------------------------------------------------
+SP = rme.plan(rme.sheet(10, acc=PLANNER))
+PDF = export.build_route_map_pdf(SP)
 T = " ".join(pdf_text(PDF).split())
-ok("⭐ A4 LANDSCAPE, the map then the table: title, filter line, the eight columns, both routes by their places",
-   PDF[:5] == b"%PDF-" and b"/MediaBox [ 0 0 841.8898 595.2756 ]" in PDF and "Route map · October 2026" in T
-   and "2 routes · All teams · October 2026 · approved lines only" in T
-   # the two-line headings come out of the text one line at a time ("TWO-WAY … A DAY")
-   and all(h in T for h in ("ROUTE", "TWO-WAY", "A DAY", "LOADS IN", "THE MONTH", "TONNES", "VEHICLES", "LORRIES", "NEEDED", "PLANNING FLAG", "CLOSURES", "CHECKED"))
-   and "Kelsey Quarry to Mill Compound" in T and "Ridge Pit to Mill Compound" in T, T[:400])
-ok("...the figures printed are the view model's", S["rows"][0]["loads_text"] in T and "45,900 t" in T and "14,500 t" in T)
-ok("⭐ 'a planning document, not an approved CLP' and the flag is a flag, never a block",
-   "a planning document, not an approved CLP" in T and "A planning flag, never a block" in T)
-ok("⭐ the fixed block the scheme fills in: working hours, wheel wash, holding area, contacts — Wayscope does not hold them",
-   "To be completed by the scheme" in T and all(k in T for k in ("Working hours", "Wheel wash", "Holding area", "Contacts"))
-   and "Wayscope does not hold these" in T)
-ok("the legend (the map's Volume steps) and the site key under the map",
-   "Two-way movements a day:" in T and all(g["label"] in T for g in bulletin_doc.volume_legend()) and "A Kelsey Quarry" in T)
-ok("offline the map is the schematic and says so (the browser check saw the basemap and its credit)",
-   "Schematic from the stored road routes, not to scale." in T)
-ok("🔴 no Carbon Tool block unless asked", "Carbon Tool" not in T)
-ok("🔴 no team id, no 'truck', no 'baked', no route id where a person reads the route",
+ok("⭐ ONE A4 LANDSCAPE page; the panel on the map: the plan, the scheme, its stated scale 'at A4', the filters",
+   PDF[:5] == b"%PDF-" and PDF.count(b"/Type /Page\n") == 1 and b"/MediaBox [ 0 0 841.8898 595.2756 ]" in PDF
+   and "Regional plan" in T and f"Scale {SR['scale_words']} at A4 (fitted to the routes)" in T
+   and "2 routes · All teams · October 2026 · approved lines only" in T, T[:500])
+ok("...the legend (the map's Volume steps) and every site in the frame by its letter",
+   "Two-way movements a day" in T and all(g["label"] in T for g in bulletin_doc.volume_legend()) and "Sites" in T
+   and all(p["name"] in T for p in SR["places"]))
+ok("⭐ 'a planning document, not an approved CLP', approved lines only, the as-at date",
+   "A planning document, not an approved CLP." in T and "Approved lines only." in T and "Approved plan as at" in T)
+ok("offline (no basemap) the routes are still drawn to scale and it says so; no Mapbox credit is claimed for a map it did not draw",
+   "No basemap could be had: the routes alone, still to scale." in T and "Mapbox" not in T and SP["plan"]["drawn"] == "routes only")
+# REVERSED 14 Oct 2026, evening (the user: "just the map"; "Yes, remove them"): the table, the scheme's block and the
+# Carbon Tool rows are gone from every export
+ok("🔴 no route table, no scheme's block, no Carbon Tool rows: just the map",
+   not any(h in T for h in ("PLANNING FLAG", "LOADS IN", "LORRIES", "CLOSURES", "To be completed by the scheme", "Working hours",
+                            "Wheel wash", "Carbon Tool", "ONE-WAY LOADED")), T)
+ok("🔴 no team id, no 'truck', no 'baked', no route id where a person reads it",
    not re.search(r"\bIPT ?\d\b", T) and not re.search(r"\btrucks?\b", T, re.I) and not re.search(r"\b(un)?baked?\b", T, re.I)
    and not re.search(r"\bR[123]\b", T))
-PDFC = export.build_route_map_pdf(SC)
-TC = " ".join(pdf_text(PDFC).split())
-ok("⭐ with the option: the National Highways Carbon Tool rows — sheet, material, from / to, tonnes, one-way loaded km, vehicle",
-   "National Highways Carbon Tool: transport inputs for the month" in TC and "ONE-WAY LOADED" in TC and "FROM / TO" in TC
-   and "41,500" in TC and "30.0" in TC and "Wayscope's own carbon figures are not Carbon Tool figures" in TC)
+TL_ = " ".join(pdf_text(export.build_route_map_pdf(rme.plan(rme.sheet(10, acc=PLANNER), "local"))).split())
+ok("⭐ the local plan: its name, 'Scale 1:2,500 at A4', centred on the site, only that site in the key, a 100 m scale bar",
+   "Local plan" in TL_ and "Scale 1:2,500 at A4" in TL_ and "(fitted" not in TL_ and "Centred on Mill Compound" in TL_
+   and "B Mill Compound" in TL_ and "Kelsey Quarry" not in TL_ and "100 m" in TL_, TL_)
+TS_ = " ".join(pdf_text(export.build_route_map_pdf(rme.plan(rme.sheet(10, acc=PLANNER), "site", 500))).split())
+ok("...the site plan at 1:500: a 20 m scale bar", "Site plan" in TS_ and "Scale 1:500 at A4" in TS_ and "20 m" in TS_)
+ok("...the north arrow and the scale bar are drawn on every plan with a view; the routes are clipped to the frame",
+   "_north_arrow(c, x0 + pw - pad - 6, y0 + ph - pad - 26)" in read("backend/export.py")
+   and "_plan_scale_bar(c, v, fw)" in read("backend/export.py") and "c.clipPath(clip, stroke=0, fill=0)" in read("backend/export.py"))
 _rn = export._demo_notice
 export._demo_notice = lambda: "Fictional demo scheme · the scheme and its plan are invented"
 try:
-    SDm = rme.sheet(10, acc=PLANNER)
+    SDm = rme.plan(rme.sheet(10, acc=PLANNER), "local")
     TD = " ".join(pdf_text(export.build_route_map_pdf(SDm)).split())
-    TDm = " ".join(pdf_text(export.build_route_map_pdf(rme.sheet(10, acc=PLANNER, map_only=True))).split())
 finally:
     export._demo_notice = _rn
-ok("⭐ on a demo tenant: the demo bar on the page AND the 'Fictional demo scheme' tag on the map, in both layouts",
-   SDm["map_demo_tag"] == bulletin_doc.DEMO_MAP_TAG and "DEMO" in TD and "the scheme and its plan are invented" in TD
-   and TD.count("Fictional demo scheme") >= 2 and "DEMO" in TDm and TDm.count("Fictional demo scheme") >= 2)
-_big = _copy.deepcopy(S)
-_big["rows"] = [dict(S["rows"][i % 2], places=f"Site {i} → Yard {i}") for i in range(40)]
-PB = export.build_route_map_pdf(_big)
-TB = pdf_text(PB)
-_np = PB.count(b"/Type /Page\n")
-ok("forty routes run on to more pages with the header row repeated (the table is not one block that cannot split)",
-   _np >= 2 and _np - 1 <= TB.count("PLANNING FLAG") <= _np, f"{_np} pages, {TB.count('PLANNING FLAG')} headers")
+# NARROWED 14 Oct 2026, evening: no page bar any more (the page is the map); the tag ON the map says it
+ok("⭐ on a demo tenant: the 'Fictional demo scheme' tag on the map itself", SDm["map_demo_tag"] == bulletin_doc.DEMO_MAP_TAG
+   and "Fictional demo scheme" in TD)
+_many = rme.plan(rme.sheet(10, acc=PLANNER))
+_many["plan"] = dict(_many["plan"], places=[{"letter": bulletin_doc._letters(i), "name": f"Site {i}", "at": None} for i in range(20)])
+ok("...the panel lists at most 16 sites, then '+N more sites'",
+   export.ROUTE_MAP_PANEL_MAX_PLACES == 16 and "+4 more sites" in " ".join(pdf_text(export.build_route_map_pdf(_many)).split()))
+TE = " ".join(pdf_text(export.build_route_map_pdf(rme.plan(rme.sheet(12, acc=PLANNER), "local"))).split())
+ok("an empty month: one page that says so, no scale claimed", "No approved line on the chosen routes in this month." in TE
+   and "Scale 1:" not in TE)
 
-# ---- 5. the PDF: map only, the legend inside the map ---------------------------------------------
-SM = rme.sheet(10, acc=PLANNER, map_only=True, carbon_tool=True)
-PM = export.build_route_map_pdf(SM)
-TM = " ".join(pdf_text(PM).split())
-ok("⭐ MAP ONLY: one A4 landscape page, the legend drawn on the map (the Volume steps and every site by its letter)",
-   PM.count(b"/Type /Page\n") == 1 and b"/MediaBox [ 0 0 841.8898 595.2756 ]" in PM and "Two-way movements a day" in TM
-   and all(g["label"] in TM for g in bulletin_doc.volume_legend()) and "Sites" in TM
-   and all(p["name"] in TM for p in SM["places"]), TM[:500])
-ok("...no table, no scheme block, no Carbon Tool rows (map only wins over the option)",
-   "PLANNING FLAG" not in TM and "To be completed by the scheme" not in TM and "Carbon Tool" not in TM
-   and "figures by route are in the full export" in TM)
-ok("...the inset key lists at most 16 sites, then '+N more sites'",
-   export.ROUTE_MAP_INSET_MAX_PLACES == 16 and "+4 more sites" in " ".join(pdf_text(export.build_route_map_pdf(
-       dict(SM, places=[{"letter": bulletin_doc._letters(i), "name": f"Site {i}", "at": None} for i in range(20)]))).split()))
+# ---- 5. the PNG: the same page, for a Word document -------------------------------------------------------
+from PIL import Image  # noqa: E402
+PNG = export.route_map_png(PDF)
+IM = Image.open(io.BytesIO(PNG))
+ok("⭐ PNG: the PDF page rasterised at 228 dpi, the margin cut: ≈ 2,560 px wide (the basemap's own pixels), the frame's shape",
+   PNG[:8] == b"\x89PNG\r\n\x1a\n" and 2550 <= IM.size[0] <= 2570 and abs(IM.size[1] / IM.size[0] - 198 / 285) < 0.003
+   and abs(IM.info.get("dpi", (0, 0))[0] - 228) < 0.5, f"{IM.size} {IM.info.get('dpi')}")
+_px = IM.convert("RGB")
+ok("...the frame's keyline is kept at the edge (the cut is inside the margin, not through the map)",
+   sum(_px.getpixel((IM.size[0] // 2, 0))) < 600 and sum(_px.getpixel((0, IM.size[1] // 2))) < 600,
+   f"{_px.getpixel((IM.size[0] // 2, 0))} {_px.getpixel((0, IM.size[1] // 2))}")
+_real = sys.modules.get("pypdfium2")
+sys.modules["pypdfium2"] = None
+try:
+    try:
+        export.route_map_png(PDF)
+        _msg = None
+    except RuntimeError as e:
+        _msg = str(e)
+finally:
+    if _real is not None:
+        sys.modules["pypdfium2"] = _real
+    else:
+        sys.modules.pop("pypdfium2", None)
+ok("🔴 without pypdfium2 the PNG is refused in words (the endpoint answers 503), never a crash at start-up",
+   _msg == "the PNG needs pypdfium2, which is not installed here (backend/requirements.txt)"
+   and "pypdfium2==" in read("backend/requirements.txt") and "\nimport pypdfium2" not in read("backend/export.py"))
 
-# ---- 6. the basemap leaves the legend's strip free ---------------------------------------------
+# ---- 6. the basemap leaves the panel's strip free ---------------------------------------------
 _pts = [(-1.20, 52.40), (-0.60, 52.80), (-0.90, 52.55)]
 _v0 = basemap.view(_pts, 1200, 800, 40)
 _v1 = basemap.view(_pts, 1200, 800, 40, reserve_right_px=300)
@@ -410,19 +495,25 @@ _xs1 = [basemap.project(_v1, *p)[0] for p in _pts]
 ok("⭐ basemap.view(reserve_right_px): every point is framed left of the reserved strip (with the padding), and without it the frame is centred as before",
    max(_xs1) <= 1200 - 300 - 40 + 1 and min(_xs1) >= 40 - 1 and abs((min(_xs0) + max(_xs0)) / 2 - 600) < 1
    and _v1["zoom"] <= _v0["zoom"], f"{_xs0} {_xs1} {_v0['zoom']} {_v1['zoom']}")
-ok("...the export's map reserves the legend's width (+12 pt) only on the map-only page",
-   "self.reserve_right = (ROUTE_MAP_INSET_W + 12) if inset else 0" in read("backend/export.py")
-   and 'reserve_right_pt=getattr(self, "reserve_right", 0))' in read("backend/export.py"))
+# NARROWED 14 Oct 2026, evening: the map-only flowable is gone; every plan keeps the panel's width (+4 mm) free
+ok("...every plan reserves the panel's width (+4 mm): the regional fit and the local / site centring both",
+   "reserve = int(round((PANEL_W_MM + 4) / FRAME_W_MM * W_PX))" in read("backend/route_map_export.py")
+   and read("backend/route_map_export.py").count(", reserve)") == 3 and "class _RouteMap" not in read("backend/export.py"))
 
-# ---- 7. the endpoint ----------------------------------------------------------------------------
+# ---- 7. the endpoints ----------------------------------------------------------------------------
 _mn = read("backend/main.py")
-_ep = _mn[_mn.index('@app.get("/api/routes/map-export.pdf")'):_mn.index('@app.get("/api/public/route-alternatives")')]
-ok("⭐ STAFF ONLY: a valid code or the staff cookie (_staff_request), else 401 — the map password's cookie is not staff",
-   "if not _staff_request(request):" in _ep and 'raise HTTPException(401, "sign in — the route map export is for staff")' in _ep)
-ok("the endpoint passes the map's filters, the Routes page's list and the two options; map only drops the Carbon Tool rows",
+_ep = _mn[_mn.index("def _route_map_plan("):_mn.index('@app.get("/api/public/route-alternatives")')]
+ok("⭐ STAFF ONLY: a valid code or the staff cookie (_staff_request), else 401 — the map password's cookie is not staff — in the one "
+   "read the PDF, the PNG and the card's places all go through",
+   "if not _staff_request(request):" in _ep and 'raise HTTPException(401, "sign in — the route map export is for staff")' in _ep
+   and _ep.count("S = _route_map_plan(request, month, origin, dest, discipline, team, routes,") == 3)
+ok("the read passes the map's filters and the Routes page's list; a plan it cannot draw is a 422 with the sentence",
    "route_ids=ids, team=team, acc=access.current(), origin=origin, dest=dest," in _ep
-   and "carbon_tool=bool(carbon_tool) and not map_only" in _ep and "map_only=bool(map_only)" in _ep
-   and 'filename="route-map-{y}-{m:02d}{"-map" if map_only else ""}.pdf"' in _ep and '"Cache-Control": "no-store"' in _ep)
+   and "except route_map_export.PlanError as e:\n        raise HTTPException(422, str(e))" in _ep
+   and "carbon_tool" not in _ep and "map_only" not in _ep)
+ok("both files are named by month, plan and scale (route-map-2026-10-local-1-2500.pdf), never cached",
+   'return f"route-map-{y}-{m:02d}-{PL[\'kind\']}{tail}.{ext}"' in _ep and _ep.count('"Cache-Control": "no-store"') == 2
+   and 'media_type="image/png"' in _ep and "export.route_map_png(export.build_route_map_pdf(S))" in _ep)
 ok("one read, nothing stored: the module writes nothing", "db.execute" not in read("backend/route_map_export.py")
    and "INSERT" not in read("backend/route_map_export.py") and "UPDATE" not in read("backend/route_map_export.py"))
 

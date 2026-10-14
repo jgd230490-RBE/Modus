@@ -3,34 +3,62 @@ route_map_export.py — the route map export (backlog item 2, 14 Oct 2026; repla
 
 WHAT IT IS
 ----------
-A PDF of the map as the person has filtered it — the routes chosen in the map's Route filtering, one month, one team or
-all — drawn on the SERVER (basemap.py behind, the bulletin's route drawing on top), never a screenshot of the browser map.
-Under the map, one row per chosen route: its places (never an id), two-way movements a day, loads and tonnes in the month,
-the vehicles, the planning flag (a flag, never a block) and the date its road closures were last checked ("not checked"
-when never). Then a fixed block the scheme fills in: what Wayscope does not hold (hours, wheel wash, holding area,
-contacts). Staff only (the user, 14 Oct: "STAFF ONLY").
+The map as the person has filtered it — the routes chosen in the map's Route filtering, one month, one team or all —
+drawn on the SERVER (basemap.py behind, the bulletin's route drawing on top), never a screenshot of the browser map.
+Staff only (the user, 14 Oct: "STAFF ONLY").
 
-D11: an approved route = the route plus its Approved lines. Every figure comes from the month roll-up the public map's bar
-and the bulletin use (bulletin.rollup_payloads over /api/public/month-kpis lines, which are Approved only), filtered to the
-chosen routes and team BEFORE the roll-up, so the figures are those routes' own.
+14 Oct 2026, evening (the user: "the only map export to be just the map so it can be added into documents … add certain
+scales as in the CLP template"): ONLY THE MAP, as one of the three plans the CLOCS outline CLP template asks for (§2.2
+"Three plans at different scales", §4 "Vehicle routing and site access"):
 
-    S = sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False)    the view model (formatted)
-    export.build_route_map_pdf(S)                                                       the PDF
+    Regional plan   the routes in their wider setting        1:20,000 or smaller (the template: smaller than 1:15,000),
+                                                              fitted to the routes unless a scale is asked for
+    Local plan      around one site or gate                  1:2,000, 1:2,500 or 1:3,000
+    Site plan       around one site or gate                  1:500 or 1:1,000
 
-`carbon_tool=True` adds the National Highways Carbon Tool rows (H3: tonnes and one-way LOADED km per origin → destination
-for the month, by Carbon Tool sheet), from carbon.scenario's baseline — offered as an option, not decided.
+A PDF (A4 landscape, the map filling the page: exactly at its stated scale when printed at 100 %) or a PNG of the same map
+for a Word document (the scale bar stays right when the picture is resized; the stated ratio does not). The legend, the
+title, the scale and a north arrow are drawn INSIDE the map. The per-route table, the scheme's block and the National
+Highways Carbon Tool rows of the first build are gone (the user, 14 Oct: "Yes, remove them"); the figures stay on screen
+(the Routes page, the Carbon planner).
+
+D11: an approved route = the route plus its Approved lines. Each route's colour comes from the month roll-up the public
+map's bar and the bulletin use (bulletin.rollup_payloads over /api/public/month-kpis lines, which are Approved only),
+filtered to the chosen routes and team BEFORE the roll-up, so the figures are those routes' own.
+
+    S = sheet(month_index, route_ids=None, team=None, acc=None, origin=None, dest=None, discipline=None)
+    plan(S, kind="regional", scale=None, at=None)      adds S["plan"]: the view at the stated scale, the places in frame
+    export.build_route_map_pdf(S) / export.route_map_png(pdf)
 """
 import datetime
 
-#: the scheme's own fields a CLP / CTMP appendix needs and Wayscope does not hold (backlog §2, the CLOCS / CTMP sources)
-SCHEME_FIELDS = (
-    ("Working hours", "Site delivery hours, and any times lorries must not arrive."),
-    ("Wheel wash", "Where it is and when it must be used before a lorry leaves site."),
-    ("Holding area", "Where a lorry waits if it arrives early or the gate is full; never on the public road."),
-    ("Contacts", "The site's traffic marshal or logistics manager, and an out-of-hours number."),
-)
+#: the PDF page (A4 landscape, mm), the map's frame on it and the basemap image that fills the frame
+PAGE_W_MM, PAGE_H_MM = 297.0, 210.0
+MARGIN_MM = 6.0
+FRAME_W_MM, FRAME_H_MM = PAGE_W_MM - 2 * MARGIN_MM, PAGE_H_MM - 2 * MARGIN_MM       # 285 × 198 mm
+W_PX = 1280                                                                         # basemap.MAX_PX (× 2 for @2x)
+H_PX = int(round(W_PX * FRAME_H_MM / FRAME_W_MM))
+PANEL_W_MM = 66.0          # the panel inside the map, top right: title, scale, legend, sites (kept clear of the routes)
+PAD_PX = 28
 
-FLAG_WORDS = "A planning flag, never a block: the scheme's own daily figure for a route, not a legal limit."
+#: the CLOCS outline CLP template's three plans (§2.2, §4). Scales are the N of 1:N, largest scale first.
+PLANS = {
+    "regional": {"name": "Regional plan", "centred": False, "default": None,
+                 "scales": (20000, 25000, 50000, 75000, 100000, 125000, 150000, 200000, 250000, 500000, 1000000),
+                 "what": "The routes in their wider setting: the strategic roads they use."},
+    "local": {"name": "Local plan", "centred": True, "default": 2500, "scales": (2000, 2500, 3000),
+              "what": "The last part of each route to the site: the local roads it uses."},
+    "site": {"name": "Site plan", "centred": True, "default": 1000, "scales": (500, 1000),
+             "what": "The site's own access: a base to draw gates, swept paths and marshal points on."},
+}
+
+
+class PlanError(ValueError):
+    """A plan that cannot be drawn as asked (unknown plan, a scale it does not offer, a place not on these routes)."""
+
+
+def scale_words(n):
+    return f"1:{int(n):,}"
 
 
 def _team_text(v):
@@ -39,26 +67,6 @@ def _team_text(v):
         return taxonomy.team_text(v)
     except Exception:
         return v
-
-
-def _vehicle_word(key):
-    """The vehicle as people read it: the English label the factors carry for it, else its key."""
-    try:
-        import conversions
-        v = (conversions.load_factors().get("vehicles") or {}).get(key) or {}
-        return ((v.get("labels") or {}).get("en")) or key
-    except Exception:
-        return key
-
-
-def _date_words(iso):
-    if not iso:
-        return "not checked"
-    try:
-        d = datetime.date.fromisoformat(str(iso)[:10])
-        return f"{d.day} {d:%b %Y}"
-    except ValueError:
-        return "not checked"
 
 
 def team_id(team):
@@ -80,18 +88,16 @@ def team_id(team):
     return str(team)
 
 
-def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, now=None,
-          origin=None, dest=None, discipline=None, map_only=False):
+def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=None, dest=None, discipline=None):
     """
-    Everything the route map export prints for one month and the routes the filters let through. The filters are the
-    public map's Route filtering, applied as the map applies them (map/index.html applyFilters and calculateKPIs):
-    origin, destination and team from the ROUTE, discipline from the LINE; `route_ids` narrows further (the Routes page
-    sends the routes it lists). Reads only.
+    The routes the filters let through for one month, each with its colour, letters and places, and the places at their
+    ends. The filters are the public map's Route filtering, applied as the map applies them (map/index.html applyFilters
+    and calculateKPIs): origin, destination and team from the ROUTE, discipline from the LINE; `route_ids` narrows
+    further (the Routes page sends the routes it lists). Reads only.
     """
     import access
     import bulletin
     import bulletin_doc
-    import restrictions
     mi = int(month_index)
     wd = bulletin.working_days()
     # a team code sees its own team only, whatever it asks for
@@ -117,25 +123,18 @@ def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, n
     R = bulletin.rollup_payloads([payload], routes, wd, acc=acc)
     rows = list(R.get("by_route") or [])
     ids = [r["route_id"] for r in rows]
-    veh = {}
-    for l in lines:
-        veh.setdefault(l["route_id"], [])
-        w = _vehicle_word(l.get("vehicle_type"))
-        if w and w not in veh[l["route_id"]]:
-            veh[l["route_id"]].append(w)
-    checks = restrictions.stored_checks(ids) if ids else {}
     geo = bulletin_doc._geometries(ids)
 
-    # letter pins, the busiest route's ends first (the bulletin's rule)
+    # letter pins, the busiest route's ends first (the bulletin's rule); `end` says which end of a route it is
     places, letter_of = [], {}
     for r in rows:
         g = geo.get(r["route_id"])
-        for name, loc_id, at in ((r.get("origin"), g[1] if g else None, g[0][0] if g else None),
-                                 (r.get("dest"), g[2] if g else None, g[0][-1] if g else None)):
+        for name, loc_id, at, end in ((r.get("origin"), g[1] if g else None, g[0][0] if g else None, "origin"),
+                                      (r.get("dest"), g[2] if g else None, g[0][-1] if g else None, "dest")):
             key = loc_id or name
             if key and key not in letter_of:
                 letter_of[key] = bulletin_doc._letters(len(places))
-                places.append({"letter": letter_of[key], "name": name or "", "at": at})
+                places.append({"letter": letter_of[key], "name": name or "", "at": at, "end": end})
 
     def letters(r):
         g = geo.get(r["route_id"])
@@ -146,20 +145,13 @@ def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, n
     n0 = bulletin_doc.n0
     out_rows = []
     for r in rows:
-        cap, a_day = r.get("cap"), r.get("two_way_a_day") or 0
-        ck = checks.get(r["route_id"]) or {}
+        a_day = r.get("two_way_a_day") or 0
         out_rows.append({
             "route_id": r["route_id"], "letters": letters(r),
             "places": f"{r.get('origin') or ''} → {r.get('dest') or ''}".strip(" →"),
             "a_day": a_day, "a_day_text": n0(a_day),
             "loads_text": n0(r.get("movements_in_month")),
             "tonnes_text": (n0(r.get("tonnes")) + " t") if r.get("tonnes") is not None else "—",
-            "vehicles_text": ", ".join(veh.get(r["route_id"]) or []) or "—",
-            "lorries_text": n0(r.get("vehicles")) if r.get("vehicles") else "—",
-            "flag_text": ("none set" if cap is None else
-                          f"{cap:,} a day: above it" if a_day > cap else f"{cap:,} a day"),
-            "flag_over": bool(cap is not None and a_day > cap),
-            "checked_text": _date_words(ck.get("checked_at")),
             "color": bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(a_day)],
         })
     map_routes = sorted(({"route_id": r["route_id"], "coords": geo[r["route_id"]][0], "a_day": r["a_day"],
@@ -171,49 +163,86 @@ def sheet(month_index, route_ids=None, team=None, acc=None, carbon_tool=False, n
     team_words = _team_text(team) if team else "All teams"
     narrowed = [w for w in ((f"from {origin}" if origin else None), (f"to {dest}" if dest else None),
                             (discipline if discipline else None)) if w]
-    S = {
+    return {
         "title": f"Route map · {month_long}",
         "tenant": export._tenant_name() or "Wayscope",
         "demo_notice": notice, "map_demo_tag": bulletin_doc.DEMO_MAP_TAG if notice else None,
         "month_long": month_long, "team_words": team_words,
         "filter_words": " · ".join([f"{len(out_rows)} route{'s' if len(out_rows) != 1 else ''}", team_words, *narrowed,
                                     month_long, "approved lines only"]),
-        "map_only": bool(map_only),
         "as_at": f"Approved plan as at {(now or datetime.date.today()):%d %b %Y}".replace(" 0", " "),
         "working_days": wd,
         "rows": out_rows, "map_routes": map_routes, "map_sections": [], "places": places, "controls": [],
         "volume_legend": bulletin_doc.volume_legend(), "map_legend_title": "Two-way movements a day",
-        "scheme_fields": SCHEME_FIELDS, "flag_words": FLAG_WORDS,
-        "two_way_sentence": bulletin_doc.two_way_sentence(wd),
         "not_drawn": [r for r in (R.get("routes_not_drawn") or {}).get("routes") or []],
         "empty": not out_rows,
     }
-    if carbon_tool:
-        S["carbon_tool"] = carbon_tool_rows(mi, set(ids), discipline, acc)
+
+
+def centre_choices(S):
+    """The places a local or site plan can be centred on: the ends of the chosen routes that have a stored road route,
+    the sites (route destinations) first, then by letter. Names only (never an id)."""
+    ps = [p for p in S["places"] if p.get("at")]
+    return [p["name"] for p in sorted(ps, key=lambda p: (p.get("end") != "dest", p["letter"]))]
+
+
+def plan(S, kind="regional", scale=None, at=None):
+    """
+    Adds S["plan"]: which plan, its stated scale, the basemap view drawn exactly at that scale (FRAME_W_MM wide), the
+    place it is centred on, and the places inside the frame (the panel lists those). Raises PlanError on a plan, scale or
+    place it does not offer.
+    """
+    import basemap
+    import bulletin_doc
+    kind = (kind or "regional").strip().lower()
+    if kind not in PLANS:
+        raise PlanError(f"no such plan: choose {', '.join(PLANS)}")
+    spec = PLANS[kind]
+    if scale is not None:
+        try:
+            scale = int(str(scale).replace(",", "").split(":")[-1])
+        except ValueError:
+            raise PlanError("the scale is a number, such as 2500 for 1:2,500")
+        if scale not in spec["scales"]:
+            raise PlanError(f"the {spec['name'].lower()} is drawn at " + ", ".join(scale_words(n) for n in spec["scales"]))
+    reserve = int(round((PANEL_W_MM + 4) / FRAME_W_MM * W_PX))
+    P = {"kind": kind, "name": spec["name"], "what": spec["what"], "frame_w_mm": FRAME_W_MM, "frame_h_mm": FRAME_H_MM,
+         "view": None, "denom": None, "scale_words": None, "centre": None, "places": [], "fitted": False}
+    choices = centre_choices(S)
+    if spec["centred"]:
+        if at:
+            hit = [p for p in S["places"] if p.get("at") and p["name"].strip().lower() == str(at).strip().lower()]
+            if not hit:
+                raise PlanError(f"{at} is not at the end of a route on this map")
+            centre = hit[0]
+        else:
+            # none asked for: the busiest route's site end (destination), else the first place drawn
+            centre = next((p for p in S["places"] if p.get("at") and p["name"] == (choices[0] if choices else None)), None)
+        if centre:
+            n = scale or spec["default"]
+            lon, lat = centre["at"]
+            v = basemap.view_centred(lon, lat, basemap.zoom_for_scale(n, lat, FRAME_W_MM, W_PX), W_PX, H_PX, reserve)
+            P.update(view=v, denom=n, centre=centre["name"])
+    else:
+        pts = bulletin_doc.map_points(S)
+        if pts:
+            if scale:
+                n, v = basemap.view_to_scale(pts, (scale,), FRAME_W_MM, W_PX, H_PX, PAD_PX, reserve)
+            else:
+                n, v = basemap.view_to_scale(pts, spec["scales"], FRAME_W_MM, W_PX, H_PX, PAD_PX, reserve)
+                P["fitted"] = True
+            P.update(view=v, denom=n)
+    if P["view"]:
+        v = P["view"]
+        P["scale_words"] = scale_words(P["denom"])
+        P["true_denom"] = basemap.scale_denominator(v, FRAME_W_MM)
+        inside = []
+        for p in S["places"]:
+            if p.get("at"):
+                x, y = basemap.project(v, *p["at"])
+                if 0 <= x <= v["w"] and 0 <= y <= v["h"]:
+                    inside.append(p)
+        P["places"] = inside
+    P["centre_choices"] = choices
+    S["plan"] = P
     return S
-
-
-def carbon_tool_rows(month_index, route_ids, discipline, acc):
-    """H3: the NH Carbon Tool's transport inputs for the month — per Carbon Tool sheet, material and origin → destination:
-    tonnes and the ONE-WAY LOADED km (carbon.scenario's baseline, Approved lines, the chosen routes and team)."""
-    import carbon
-    try:
-        sc = carbon.scenario(acc=acc, from_month=month_index, to_month=month_index)
-    except Exception as e:
-        return {"rows": [], "error": f"{type(e).__name__}: {e}"}
-    agg = {}
-    for l in (sc.get("lines") or []):
-        # the same lines as the map rows: the routes the filters let through, the discipline from the line
-        if l.get("route_id") not in route_ids or (discipline and l.get("discipline") != discipline):
-            continue
-        # the scheme's own material name (a person reads "Precast / concrete", never the factor key "concrete")
-        # one row per vehicle as well: the loaded km is the route worked out for THAT vehicle (none when it is not)
-        k = (l.get("sheet") or "—", l.get("material_type") or "—", l.get("route_id"), l.get("vehicle") or "")
-        a = agg.setdefault(k, {"tonnes": 0.0, "km": l.get("one_way_km")})
-        a["tonnes"] += float(l.get("tonnes") or 0.0)
-        if a["km"] is None and l.get("one_way_km") is not None:
-            a["km"] = l.get("one_way_km")
-    rows = [{"sheet": k[0], "material": k[1], "route_id": k[2], "tonnes": round(v["tonnes"], 1),
-             "one_way_km": (round(v["km"], 1) if v["km"] is not None else None), "vehicle": _vehicle_word(k[3])}
-            for k, v in sorted(agg.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2], kv[0][3]))]
-    return {"rows": rows, "error": None}

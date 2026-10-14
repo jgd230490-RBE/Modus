@@ -5018,33 +5018,63 @@ function qrRead(mod) {
 // applyFilters applies it (the selects' values: origin, destination, team; discipline) and ONE month, plus the two options.
 {
   const fnSrc = (name) => { let i = src.indexOf("    function " + name + "("); if (i < 0) i = src.indexOf("    async function " + name + "("); if (i < 0) return ""; const j = src.indexOf("\n    }\n", i); return src.slice(i, j + 6); };
+  // NARROWED 14 Oct 2026, evening (the CLP plans): the button says "plan" — it exports just the map, as a PDF or a PNG
   ok("⭐ ROUTE MAP EXPORT: the button is under Route filtering and HIDDEN in the markup (shown for staff only)",
-     /<button class="btn btn-ghost" onclick="resetFilters\(\)">Reset filters<\/button>\n[\s\S]{0,400}<button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport\(\)">Export route map \(PDF\)<\/button>/.test(html));
+     /<button class="btn btn-ghost" onclick="resetFilters\(\)">Reset filters<\/button>\n[\s\S]{0,400}<button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport\(\)">Export route map \(plan\)<\/button>/.test(html)
+     && !html.includes("Export route map (PDF)"));
   const chk = fnSrc("checkRouteExportStaff");
   ok("⭐ ...it is shown only when /api/public/whoami says level 'staff' (the map password's 'map' keeps it hidden)",
      chk.includes("fetch('/api/public/whoami', { credentials: 'same-origin' })") && chk.includes("RME.staff = !!(j && j.level === 'staff');")
      && chk.includes("if (b) b.hidden = !RME.staff;") && /\n    checkRouteExportStaff\(\);\n/.test(src)
      && fnSrc("openRouteExport").includes("if (!RME.staff) return;"));
-  const url = fnSrc("routeExportUrl"), filt = fnSrc("routeExportFilters");
+  const url = fnSrc("routeExportUrl"), filt = fnSrc("routeExportFilters"), rq = fnSrc("routeExportQuery");
+  // NARROWED 14 Oct 2026, evening: the filters and the month are built once (routeExportQuery) for the export and the
+  // card's list of places; the URL is the PDF's or the PNG's
   ok("⭐ ...the request carries the map's Route filtering (the select values applyFilters reads) and ONE month",
      filt.includes("origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'), team: val('filter-ipt')")
-     && url.includes("q.set('month', document.getElementById('rme-month').value);") && url.includes("return '/api/routes/map-export.pdf?' + q.toString();"));
-  ok("...map only wins over the Carbon Tool rows (the request never asks for both), and the Carbon Tool box hides under map only",
-     url.includes("if (mapOnly) q.set('map_only', '1');") && url.includes("else if (document.getElementById('rme-carbon').checked) q.set('carbon_tool', '1');")
-     && fnSrc("syncRouteExport").includes("if (row && mo) row.hidden = mo.checked;"));
+     && rq.includes("q.set('month', document.getElementById('rme-month').value);") && url.includes("const q = routeExportQuery();")
+     && url.includes("return '/api/routes/map-export.' + (kind === 'png' ? 'png' : 'pdf') + '?' + q.toString();"));
+  // REVERSED 14 Oct 2026, evening (the user: "the only map export to be just the map"; the tables, the scheme's block
+  // and the Carbon Tool rows were removed with their consent): no option asks for them any more
+  ok("🔴 ...no map-only switch and no Carbon Tool rows: the export is only ever the map",
+     !/rme-maponly|rme-carbon|map_only|carbon_tool/.test(html) && !html.includes("Add the National Highways Carbon Tool rows"));
+  ok("⭐ CLP PLANS: the plan (regional / local / site), its scale and — for a local or site plan only — the place it is centred on",
+     url.includes("q.set('plan', plan);") && url.includes("if (sc) q.set('scale', sc);")
+     && url.includes("if (at && !at.hidden && at.value) q.set('at', at.value);")
+     && fnSrc("syncRouteExport").includes("const centred = !!(spec && spec.centred);")
+     && fnSrc("syncRouteExport").includes("if (at) at.hidden = !centred;")
+     && html.includes('<option value="regional">Regional plan: the whole routes</option>')
+     && html.includes('<option value="local">Local plan: around a site, 1:2,000 to 1:3,000</option>')
+     && html.includes('<option value="site">Site plan: around a site, 1:500 to 1:1,000</option>'));
+  ok("...the scales and the places come from the server for these filters (staff only), never typed into the page",
+     fnSrc("loadRouteExportPlaces").includes("fetch('/api/routes/map-export/places?' + routeExportQuery().toString(), { credentials: 'same-origin' })")
+     && fnSrc("syncRouteExport").includes("const opts = spec ? spec.scales : [];")
+     && !/1:2,500<\/option>|value="2500"/.test(html)
+     && html.includes('<select id="rme-month" onchange="loadRouteExportPlaces()"></select>'));
+  ok("...a regional plan offers 'Fitted to the routes' first; a local or site plan with nowhere to centre cannot be downloaded",
+     fnSrc("syncRouteExport").includes("'<option value=\"\">Fitted to the routes'")
+     && fnSrc("syncRouteExport").includes("const noPlace = centred && !(RME.places || []).length;"));
+  ok("...two downloads, the PDF and the PNG, and the note says what each is for (the scale bar once a picture is resized)",
+     html.includes(`onclick="downloadRouteExport('pdf')">Download PDF</button>`) && html.includes(`onclick="downloadRouteExport('png')">Download PNG</button>`)
+     && html.includes("The PDF prints at the stated scale on A4 at 100 %. The PNG is for a Word document: once it is resized, use the scale bar."));
   const open = fnSrc("openRouteExport");
   ok("...the month list is the months with volume (the chips); the month on screen is picked, else the first",
      open.includes("const months = chipMonths();") && open.includes("const want = (TL.on && TL.month) ? TL.month : (months[0] || null);"));
-  ok("...the card: a dialog with a month, the two tick-boxes in words, Download, and what it is (approved lines, not an approved CLP)",
+  // NARROWED 14 Oct 2026, evening: the two tick-boxes gave way to the plan, scale and centre selects
+  ok("...the card: a dialog with a month, the plan, Download, and what it is (approved lines, not an approved CLP)",
      /<div id="rme-panel" role="dialog" aria-labelledby="rme-title" hidden>/.test(html)
-     && html.includes("Map only, with the legend on the map") && html.includes("Add the National Highways Carbon Tool rows")
+     && html.includes('<label class="rme-field" for="rme-plan">Plan (the CLP template\'s three scales)</label>')
+     && !html.includes("Map only, with the legend on the map")
      && html.includes("Approved lines only, for the routes the filters show. A planning document, not an approved CLP."));
   ok("...Escape shuts the export card first; every control there is 44 px or more and 14 px type",
      /if \(rp && !rp\.hidden\) \{ closeRouteExport\(\); return; \}\n        const sp = document\.getElementById\('share-panel'\);/.test(src)
-     && /#rme-panel select\{ width:100%; min-height:44px; font:14px /.test(html) && /#rme-panel \.rme-check\{ display:flex; align-items:center; gap:10px; min-height:44px;/.test(html));
-  ok("...a refusal says so in words (401: only staff), never a raw code alone",
-     fnSrc("downloadRouteExport").includes("r.status === 401 ? 'only staff can export the route map: sign in to the app'"));
-  ok("🔴 no PNG export and no screenshot of the browser map: the PDF is the server's (D29 stands)",
+     // NARROWED 14 Oct 2026, evening: no tick-boxes left; the selects are 44 px, the notes 14 px
+     && /#rme-panel select\{ width:100%; min-height:44px; font:14px /.test(html) && !html.includes("#rme-panel .rme-check")
+     && /#rme-panel \.rme-note\{[^}]*font-size:14px; \}/.test(html) && /#rme-panel \.rme-plan-what\{[^}]*font-size:14px; \}/.test(html));
+  ok("...a refusal says so in words (401: only staff; a plan it cannot draw: the server's sentence), never a raw code alone",
+     fnSrc("downloadRouteExport").includes("r.status === 401 ? 'only staff can export the route map: sign in to the app' : (d || 'the export failed (' + r.status + ')')"));
+  // NARROWED 14 Oct 2026, evening: there IS a PNG now, but the server's (the PDF page rasterised), never the browser map's
+  ok("🔴 no screenshot of the browser map: the PDF and the PNG are both the server's (D29 stands)",
      // (the one toDataURL in the page is buildLocLegend's 34 px swatch, not the map)
      !/preserveDrawingBuffer:\s*true|getCanvas\(\)\.(toBlob|toDataURL)/.test(src));
 }

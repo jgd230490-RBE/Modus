@@ -138,6 +138,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # 14 Oct 2026 (backlog item 2): the route map export is staff only too
     r = c.get("/api/routes/map-export.pdf?month=10")
     ok("🔴 ROUTE MAP EXPORT: without a staff sign-in — 401", r.status_code == 401, str(r.status_code))
+    ok("🔴 ...and so are its PNG and the card's list of places (14 Oct, evening) — 401",
+       c.get("/api/routes/map-export.png?month=10").status_code == 401
+       and c.get("/api/routes/map-export/places?month=10").status_code == 401)
     # 13 Oct 2026 (D43): the one-page leaflet, page and PDF, the bulletin's staff rule
     r = c.get("/bulletin/leaflet/?month=10")
     ok("🔴 the leaflet page is closed without a staff sign-in — 401, the bulletin's sign-in page",
@@ -620,25 +623,47 @@ with TestClient(main.app, base_url="https://testserver") as c:
         _real_open = offline(export)
         try:
             # ---- 14 Oct 2026 (backlog item 2): the route map export over HTTP (real reportlab, the demo package) ----
+            # 14 Oct 2026, evening (the CLP plans): just the map, as a regional / local / site plan, PDF or PNG
             r = c.get("/api/routes/map-export.pdf", params={"month": 10}, headers=PLAN)
             _rt = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
-            ok("⭐ ROUTE MAP EXPORT: the planner downloads the map as filtered — A4 landscape, the demo bar, the routes by place, the scheme's block",
+            # NARROWED 14 Oct 2026, evening: one page, just the map (no demo bar, no table, no scheme's block); the tag on the map
+            ok("⭐ ROUTE MAP EXPORT: the planner downloads the map as filtered — ONE A4 landscape page, a regional plan, the demo tag on the map",
                r.status_code == 200 and r.headers.get("content-type") == "application/pdf" and b"/MediaBox [ 0 0 841.8898 595.2756 ]" in r.content
-               and 'filename="route-map-2026-10.pdf"' in r.headers.get("content-disposition", "") and r.headers.get("cache-control") == "no-store"
-               and "DEMO" in _rt and "Fictional demo scheme" in _rt and "To be completed by the scheme" in _rt and "PLANNING FLAG" in _rt
-               and "not an approved CLP" in _rt and "Carbon Tool" not in _rt, f"{r.status_code} {_rt[:300]}")
-            ok("🔴 ...no team id, no 'truck', no 'baked' in it", not re.search(r"\bIPT ?[1-6]\b", _rt) and not re.search(r"\btrucks?\b", _rt, re.I)
-               and not re.search(r"\b(un)?baked?\b", _rt, re.I), _rt[:300])
-            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "carbon_tool": 1}, headers=PLAN)
+               and r.content.count(b"/Type /Page\n") == 1
+               and re.search(r'filename="route-map-2026-10-regional(-1-\d+)?\.pdf"', r.headers.get("content-disposition", "")) is not None
+               and r.headers.get("cache-control") == "no-store"
+               and "Regional plan" in _rt and "Fictional demo scheme" in _rt and "Two-way movements a day" in _rt
+               and "not an approved CLP" in _rt, f"{r.status_code} {r.headers.get('content-disposition')} {_rt[:300]}")
+            ok("🔴 ...no team id, no 'truck', no 'baked' in it; no table, no scheme's block, no Carbon Tool rows (just the map)",
+               not re.search(r"\bIPT ?[1-6]\b", _rt) and not re.search(r"\btrucks?\b", _rt, re.I)
+               and not re.search(r"\b(un)?baked?\b", _rt, re.I) and "PLANNING FLAG" not in _rt
+               and "To be completed by the scheme" not in _rt and "Carbon Tool" not in _rt, _rt[:300])
+            # REVERSED 14 Oct 2026, evening: the old options are ignored — the export is only ever the map
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "carbon_tool": 1, "map_only": 1}, headers=PLAN)
             _rc = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
-            ok("⭐ ...with carbon_tool=1, the National Highways Carbon Tool rows", r.status_code == 200
-               and "National Highways Carbon Tool: transport inputs for the month" in _rc, _rc[-300:])
-            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "map_only": 1, "carbon_tool": 1}, headers=PLAN)
-            _rm = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
-            ok("⭐ ...map_only=1: ONE page, the legend on the map, no tables, no Carbon Tool rows, its own file name",
-               r.status_code == 200 and r.content.count(b"/Type /Page\n") == 1 and "Two-way movements a day" in _rm and "Sites" in _rm
-               and "PLANNING FLAG" not in _rm and "Carbon Tool" not in _rm and 'filename="route-map-2026-10-map.pdf"' in r.headers.get("content-disposition", ""),
-               f"{r.status_code} {_rm[:200]}")
+            ok("🔴 ...carbon_tool=1 and map_only=1 change nothing: no Carbon Tool rows, the same one page",
+               r.status_code == 200 and "Carbon Tool" not in _rc and r.content.count(b"/Type /Page\n") == 1, _rc[-300:])
+            r = c.get("/api/routes/map-export/places", params={"month": 10}, headers=PLAN)
+            _pl = r.json() if r.status_code == 200 else {}
+            ok("⭐ ...the card's list: the three plans with the CLP template's scales, and the places to centre on (names, never ids)",
+               r.status_code == 200 and [p["kind"] for p in _pl.get("plans", [])] == ["regional", "local", "site"]
+               and _pl["plans"][1]["scales"] == [2000, 2500, 3000] and _pl["plans"][2]["scales"] == [500, 1000]
+               and isinstance(_pl.get("places"), list) and not any(re.match(r"^L\d+$", str(n)) for n in _pl.get("places", [])), str(_pl)[:300])
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "plan": "site", "scale": 2500}, headers=PLAN)
+            ok("🔴 ...a scale the plan does not offer: 422 with the sentence", r.status_code == 422
+               and r.json().get("detail") == "the site plan is drawn at 1:500, 1:1,000", r.text[:200])
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "plan": "local", "at": "Nowhere"}, headers=PLAN)
+            ok("🔴 ...a place not at the end of a route: 422", r.status_code == 422 and "Nowhere is not at the end of a route" in r.text, r.text[:200])
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "plan": "local"}, headers=PLAN)
+            _rl = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+            ok("...a local plan over HTTP: its name, and a scale only when there is a place to centre on (the demo package carries no road routes)",
+               r.status_code == 200 and "Local plan" in _rl and (("Scale 1:2,500 at A4" in _rl) == bool(_pl.get("places"))),
+               f"{r.status_code} {_rl[:200]}")
+            r = c.get("/api/routes/map-export.png", params={"month": 10}, headers=PLAN)
+            ok("⭐ ...the PNG for a Word document: an image, named for the month and plan, not cached",
+               r.status_code == 200 and r.headers.get("content-type") == "image/png" and r.content[:8] == b"\x89PNG\r\n\x1a\n"
+               and re.search(r'filename="route-map-2026-10-regional(-1-\d+)?\.png"', r.headers.get("content-disposition", "")) is not None
+               and r.headers.get("cache-control") == "no-store", f"{r.status_code} {r.headers.get('content-type')} {r.text[:120] if r.status_code != 200 else ''}")
             r = c.get("/api/routes/map-export.pdf", params={"month": 10, "team": "IPT2"}, headers=NORTH)
             _rn = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
             ok("🔴 ...a team code asking for another team gets its OWN team's routes",
@@ -1354,7 +1379,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("…and 🔴 not the monthly bulletin (staff only, D10)", c.get("/bulletin/?month=10").status_code == 401
        and c.get("/api/bulletin/month.pdf?month=10").status_code == 401)
     ok("…and 🔴 not the route map export (staff only, the user 14 Oct): the map password's cookie gets 401, and whoami says 'map'",
-       c.get("/api/routes/map-export.pdf?month=10").status_code == 401 and c.get("/api/public/whoami").json().get("level") == "map")
+       c.get("/api/routes/map-export.pdf?month=10").status_code == 401 and c.get("/api/public/whoami").json().get("level") == "map"
+       and c.get("/api/routes/map-export.png?month=10").status_code == 401
+       and c.get("/api/routes/map-export/places?month=10").status_code == 401)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",

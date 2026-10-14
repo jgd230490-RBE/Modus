@@ -6,3 +6,4 @@ flexpolyline==0.1.0
 openpyxl==3.1.5
 reportlab==4.4.10
 pillow==12.2.0
+pypdfium2==5.14.0
