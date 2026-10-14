@@ -5011,6 +5011,44 @@ function qrRead(mod) {
      && /\*\{ box-sizing:border-box; \}/.test(html) && !/#demo-notice\{[^}]*border-width:0 0 1px/.test(html));
 }
 
+
+// ---- 14 Oct 2026 (backlog item 2): the route map export from the public map — STAFF ONLY ------------------------------
+// The button sits under Route filtering, HIDDEN until /api/public/whoami answers "staff" (the map password's visitor
+// never sees it; the endpoint refuses them with 401 anyway: http_smoke). The request carries the Route filtering the way
+// applyFilters applies it (the selects' values: origin, destination, team; discipline) and ONE month, plus the two options.
+{
+  const fnSrc = (name) => { let i = src.indexOf("    function " + name + "("); if (i < 0) i = src.indexOf("    async function " + name + "("); if (i < 0) return ""; const j = src.indexOf("\n    }\n", i); return src.slice(i, j + 6); };
+  ok("⭐ ROUTE MAP EXPORT: the button is under Route filtering and HIDDEN in the markup (shown for staff only)",
+     /<button class="btn btn-ghost" onclick="resetFilters\(\)">Reset filters<\/button>\n[\s\S]{0,400}<button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport\(\)">Export route map \(PDF\)<\/button>/.test(html));
+  const chk = fnSrc("checkRouteExportStaff");
+  ok("⭐ ...it is shown only when /api/public/whoami says level 'staff' (the map password's 'map' keeps it hidden)",
+     chk.includes("fetch('/api/public/whoami', { credentials: 'same-origin' })") && chk.includes("RME.staff = !!(j && j.level === 'staff');")
+     && chk.includes("if (b) b.hidden = !RME.staff;") && /\n    checkRouteExportStaff\(\);\n/.test(src)
+     && fnSrc("openRouteExport").includes("if (!RME.staff) return;"));
+  const url = fnSrc("routeExportUrl"), filt = fnSrc("routeExportFilters");
+  ok("⭐ ...the request carries the map's Route filtering (the select values applyFilters reads) and ONE month",
+     filt.includes("origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'), team: val('filter-ipt')")
+     && url.includes("q.set('month', document.getElementById('rme-month').value);") && url.includes("return '/api/routes/map-export.pdf?' + q.toString();"));
+  ok("...map only wins over the Carbon Tool rows (the request never asks for both), and the Carbon Tool box hides under map only",
+     url.includes("if (mapOnly) q.set('map_only', '1');") && url.includes("else if (document.getElementById('rme-carbon').checked) q.set('carbon_tool', '1');")
+     && fnSrc("syncRouteExport").includes("if (row && mo) row.hidden = mo.checked;"));
+  const open = fnSrc("openRouteExport");
+  ok("...the month list is the months with volume (the chips); the month on screen is picked, else the first",
+     open.includes("const months = chipMonths();") && open.includes("const want = (TL.on && TL.month) ? TL.month : (months[0] || null);"));
+  ok("...the card: a dialog with a month, the two tick-boxes in words, Download, and what it is (approved lines, not an approved CLP)",
+     /<div id="rme-panel" role="dialog" aria-labelledby="rme-title" hidden>/.test(html)
+     && html.includes("Map only, with the legend on the map") && html.includes("Add the National Highways Carbon Tool rows")
+     && html.includes("Approved lines only, for the routes the filters show. A planning document, not an approved CLP."));
+  ok("...Escape shuts the export card first; every control there is 44 px or more and 14 px type",
+     /if \(rp && !rp\.hidden\) \{ closeRouteExport\(\); return; \}\n        const sp = document\.getElementById\('share-panel'\);/.test(src)
+     && /#rme-panel select\{ width:100%; min-height:44px; font:14px /.test(html) && /#rme-panel \.rme-check\{ display:flex; align-items:center; gap:10px; min-height:44px;/.test(html));
+  ok("...a refusal says so in words (401: only staff), never a raw code alone",
+     fnSrc("downloadRouteExport").includes("r.status === 401 ? 'only staff can export the route map: sign in to the app'"));
+  ok("🔴 no PNG export and no screenshot of the browser map: the PDF is the server's (D29 stands)",
+     // (the one toDataURL in the page is buildLocLegend's 34 px swatch, not the map)
+     !/preserveDrawingBuffer:\s*true|getCanvas\(\)\.(toBlob|toDataURL)/.test(src));
+}
+
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();

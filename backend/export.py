@@ -2387,7 +2387,7 @@ def build_route_map_pdf(S):
         places = {r["route_id"]: r["places"] for r in S["rows"]}
         story.append(P("National Highways Carbon Tool: transport inputs for the month (optional block)", st_sec))
         if ct.get("rows"):
-            data = [[P("CARBON TOOL SHEET", st_h), P("MATERIAL", st_h), P("FROM → TO", st_h), P("TONNES", st_hr),
+            data = [[P("CARBON TOOL SHEET", st_h), P("MATERIAL", st_h), P("FROM / TO", st_h), P("TONNES", st_hr),
                      P("ONE-WAY LOADED KM", st_hr), P("VEHICLE", st_h)]]
             for r in ct["rows"]:
                 data.append([P(E(r["sheet"])), P(E(r["material"])), P(E(places.get(r["route_id"], r["route_id"]))),
@@ -2401,6 +2401,7 @@ def build_route_map_pdf(S):
             story.append(P("Typed into the Carbon Tool's transport rows by the scheme: tonnes and one-way loaded km per origin and "
                            "destination. Wayscope's own carbon figures are not Carbon Tool figures.", st_g))
         else:
-            story.append(P("No rows: " + E(ct.get("error") or "no approved line with a worked-out route on these routes."), st_g))
+            story.append(P("No rows: " + ("the carbon figures could not be read for this month." if ct.get("error")
+                                          else "no approved line on these routes in this month."), st_g))
     doc.build(story)
     return buf.getvalue()

@@ -991,7 +991,10 @@ ok("🔴 the banned-word scan over the PDF text and the HTML (\"Truck mixer\" is
 ok("…and over the two modules' own words", not _BANNED.search(read("backend/bulletin_doc.py"))
    and not re.search(r"\bAI\b", read("backend/bulletin_doc.py")) and not _trucks(read("backend/bulletin_doc.py")))
 _EXP = read("backend/export.py")
-_EXB = _EXP[_EXP.index("# ------------------------------------------------------------------ the monthly bulletin (C4"):]
+# NARROWED 14 Oct 2026 (backlog item 2): the bulletin's PDF code ends where the route map export's begins (it was "to the
+# end of the file", and the route map export now follows it in export.py)
+_EXB = _EXP[_EXP.index("# ------------------------------------------------------------------ the monthly bulletin (C4"):
+            _EXP.index("# ------------------------------------------------------------------ the route map export (14 Oct 2026")]
 ok("🔴 the literal-22 ban on the composition: bulletin_doc.py and the bulletin's PDF code carry no '22' and never read the day count",
    "22" not in read("backend/bulletin_doc.py") and "22" not in _EXB
    and "working_days_per_month" not in read("backend/bulletin_doc.py") + _EXB and "[\"planning\"]" not in _EXB and "get(\"planning\")" not in _EXB)
@@ -2038,9 +2041,11 @@ ok("🔴 the gate calls /bulletin/leaflet/ 'bulletin' (staff only); both endpoin
 # the frame, shared
 # NARROWED 14 Oct 2026 (D9): the Day sheet is a FOURTH caller of the same frame (it reuses it; it draws no frame of its own)
 ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary, the bulletin and the Day sheet",
-   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 4 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
+   # NARROWED 14 Oct 2026 (backlog item 2): + the route map export, a FIFTH caller of the same frame
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 5 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
    and _EXP.count("BaseDocTemplate(buf") == 1 and "def page_frame(" in _EXP and "def frame_doc(" in _EXP
-   and _EXP.count("doc = frame_doc(") == 4 and _EXP[_EXP.index("def build_day_sheet_pdf("):].count("on_page = page_frame(") >= 1)
+   and _EXP.count("doc = frame_doc(") == 5 and _EXP[_EXP.index("def build_day_sheet_pdf("):].count("on_page = page_frame(") >= 1
+   and _EXP[_EXP.index("def build_route_map_pdf("):].count("on_page = page_frame(") == 1)
 ok("…the bulletin's frame carries the demo notice on every page and the plan-only foot",
    # NARROWED 13 Oct 2026 (D45): the notice is passed in the demo red; page_frame draws it as the demo bar
    # NARROWED 13 Oct 2026 (W15): in Inter, under the brand band, with wayscope.co.uk in the foot; one call for both PDFs
@@ -2208,7 +2213,7 @@ ok("🔴 tables: a pale head band (#F1F5F9) in ink with a rule under it, hairlin
    and "th{{font-size:14px;font-weight:700;background:var(--head);border-bottom:2px solid var(--ink)}}" in read("backend/bulletin_doc.py"))
 # NARROWED 14 Oct 2026 (D9): four callers (+ the Day sheet)
 ok("🔴 ONE page frame still: one on_page, the running head and the page total are page_frame's options, the four callers unchanged",
-   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 4 and _EXP.count("doc = frame_doc(") == 4
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 5 and _EXP.count("doc = frame_doc(") == 5   # NARROWED 14 Oct 2026: + the route map export
    and 'later = doc.page > 1 and band.get("running")' in _EXP and "autoNextPageTemplate=\"later\"" in _EXP)
 ok("🔴 the report-a-lorry strip is on page 1 (all three lines) and not repeated at the end; the page keeps one at the foot too",
    "Working hours:" in _PB[0] and "Working hours:" not in _PB[3] and HTML10B.count('<div class="report">') == 2)

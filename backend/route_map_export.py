@@ -207,10 +207,13 @@ def carbon_tool_rows(month_index, route_ids, discipline, acc):
         if l.get("route_id") not in route_ids or (discipline and l.get("discipline") != discipline):
             continue
         # the scheme's own material name (a person reads "Precast / concrete", never the factor key "concrete")
-        k = (l.get("sheet") or "—", l.get("material_type") or "—", l.get("route_id"))
-        a = agg.setdefault(k, {"tonnes": 0.0, "km": l.get("one_way_km"), "vehicle": l.get("vehicle")})
+        # one row per vehicle as well: the loaded km is the route worked out for THAT vehicle (none when it is not)
+        k = (l.get("sheet") or "—", l.get("material_type") or "—", l.get("route_id"), l.get("vehicle") or "")
+        a = agg.setdefault(k, {"tonnes": 0.0, "km": l.get("one_way_km")})
         a["tonnes"] += float(l.get("tonnes") or 0.0)
+        if a["km"] is None and l.get("one_way_km") is not None:
+            a["km"] = l.get("one_way_km")
     rows = [{"sheet": k[0], "material": k[1], "route_id": k[2], "tonnes": round(v["tonnes"], 1),
-             "one_way_km": (round(v["km"], 1) if v["km"] is not None else None), "vehicle": _vehicle_word(v["vehicle"])}
-            for k, v in sorted(agg.items())]
+             "one_way_km": (round(v["km"], 1) if v["km"] is not None else None), "vehicle": _vehicle_word(k[3])}
+            for k, v in sorted(agg.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2], kv[0][3]))]
     return {"rows": rows, "error": None}

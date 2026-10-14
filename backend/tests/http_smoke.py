@@ -135,6 +135,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        f"{r.status_code} {r.text[:120]}")
     r = c.get("/api/bulletin/month.pdf?month=10")
     ok("🔴 ...and so is its PDF — 401", r.status_code == 401, str(r.status_code))
+    # 14 Oct 2026 (backlog item 2): the route map export is staff only too
+    r = c.get("/api/routes/map-export.pdf?month=10")
+    ok("🔴 ROUTE MAP EXPORT: without a staff sign-in — 401", r.status_code == 401, str(r.status_code))
     # 13 Oct 2026 (D43): the one-page leaflet, page and PDF, the bulletin's staff rule
     r = c.get("/bulletin/leaflet/?month=10")
     ok("🔴 the leaflet page is closed without a staff sign-in — 401, the bulletin's sign-in page",
@@ -616,6 +619,36 @@ with TestClient(main.app, base_url="https://testserver") as c:
         from portable import offline
         _real_open = offline(export)
         try:
+            # ---- 14 Oct 2026 (backlog item 2): the route map export over HTTP (real reportlab, the demo package) ----
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10}, headers=PLAN)
+            _rt = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+            ok("⭐ ROUTE MAP EXPORT: the planner downloads the map as filtered — A4 landscape, the demo bar, the routes by place, the scheme's block",
+               r.status_code == 200 and r.headers.get("content-type") == "application/pdf" and b"/MediaBox [ 0 0 841.8898 595.2756 ]" in r.content
+               and 'filename="route-map-2026-10.pdf"' in r.headers.get("content-disposition", "") and r.headers.get("cache-control") == "no-store"
+               and "DEMO" in _rt and "Fictional demo scheme" in _rt and "To be completed by the scheme" in _rt and "PLANNING FLAG" in _rt
+               and "not an approved CLP" in _rt and "Carbon Tool" not in _rt, f"{r.status_code} {_rt[:300]}")
+            ok("🔴 ...no team id, no 'truck', no 'baked' in it", not re.search(r"\bIPT ?[1-6]\b", _rt) and not re.search(r"\btrucks?\b", _rt, re.I)
+               and not re.search(r"\b(un)?baked?\b", _rt, re.I), _rt[:300])
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "carbon_tool": 1}, headers=PLAN)
+            _rc = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+            ok("⭐ ...with carbon_tool=1, the National Highways Carbon Tool rows", r.status_code == 200
+               and "National Highways Carbon Tool: transport inputs for the month" in _rc, _rc[-300:])
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "map_only": 1, "carbon_tool": 1}, headers=PLAN)
+            _rm = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+            ok("⭐ ...map_only=1: ONE page, the legend on the map, no tables, no Carbon Tool rows, its own file name",
+               r.status_code == 200 and r.content.count(b"/Type /Page\n") == 1 and "Two-way movements a day" in _rm and "Sites" in _rm
+               and "PLANNING FLAG" not in _rm and "Carbon Tool" not in _rm and 'filename="route-map-2026-10-map.pdf"' in r.headers.get("content-disposition", ""),
+               f"{r.status_code} {_rm[:200]}")
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "team": "IPT2"}, headers=NORTH)
+            _rn = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+            ok("🔴 ...a team code asking for another team gets its OWN team's routes",
+               r.status_code == 200 and " · North Team · " in _rn and "Central Team" not in _rn, _rn[:240])
+            r = c.get("/api/routes/map-export.pdf", params={"month": 10, "team": "Central Team"}, headers=PLAN)
+            _rp = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+            ok("...the planner can filter by the team's NAME (the map's deep link) as well as its slot",
+               r.status_code == 200 and " · Central Team · " in _rp, _rp[:240])
+            ok("🔴 ...a month outside the horizon is refused — 422",
+               c.get("/api/routes/map-export.pdf", params={"month": 61}, headers=PLAN).status_code == 422)
             r = c.get("/api/bulletin/month.pdf?month=10", headers=PLAN)
             _bt = pdf_text(r.content) if r.status_code == 200 else ""
             _bp = [" ".join(x.split()) for x in _bt.split("\f") if x.strip()]
@@ -1281,6 +1314,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("…but 🔴 not the guide", c.get("/help/").status_code == 401)
     ok("…and 🔴 not the monthly bulletin (staff only, D10)", c.get("/bulletin/?month=10").status_code == 401
        and c.get("/api/bulletin/month.pdf?month=10").status_code == 401)
+    ok("…and 🔴 not the route map export (staff only, the user 14 Oct): the map password's cookie gets 401, and whoami says 'map'",
+       c.get("/api/routes/map-export.pdf?month=10").status_code == 401 and c.get("/api/public/whoami").json().get("level") == "map")
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",
