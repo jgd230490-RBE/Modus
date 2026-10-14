@@ -247,14 +247,39 @@ ok("🔴 setting the carbon target and the money settings are gated to planner a
    and 'id="6-4-for-planners-setting-the-carbon-target"' in src and 'id="9-5-money-settings"' in src)
 
 # getting started: sign-in, the menu, the header, the demo bar and the tour
+# NARROWED 14 Oct 2026 (G3): the code form is now the "until 31 Oct" paragraph; its words are kept there
 ok("⭐ sign-in as it is: Staff sign in, Your name, Access code, the eye, Back to the map; spaces are ignored",
    all(s in src for s in ("<strong>Staff sign in</strong>", "<strong>Your name</strong>", "<strong>Access code</strong>",
                            "The eye at the end of the code box", "<strong>Back to the map</strong>",
                            "Spaces before or after it are ignored")))
 ok("🔴 ...and no longer blames a trailing space or says planners rotate the codes in the app",
    "trailing space" not in text and "rotated by the planners" not in text and "codes are rotated" not in text)
-ok("...the staff sign-in keeps the map and the guide open for 12 hours, past Sign out (gate.STAFF_TTL_S)",
-   "for 12 hours" in text and "does not close them" in text)
+# NARROWED 14 Oct 2026 (G3): since 12 Oct Sign out turns the staff cookie into a map cookie (gate.downgrade_kwargs), so
+# "Sign out does not close them" was out of date: the guide closes and the map stays open
+ok("...a code sign-in opens the map and the guide for 12 hours; Sign out closes the guide and leaves the map (gate.STAFF_TTL_S)",
+   "for 12 hours" in text and "closes the guide and leaves the map open" in text and "does not close them" not in text)
+ok("⭐ G3: the guide's sign-in is email and password, with the 72-hour invite, the 60-minute reset, the 30-day tick and the limit",
+   all(s in src for s in ("<strong>Email</strong>", "<strong>Password</strong>", "<strong>Forgot your password?</strong>",
+                           "<strong>Keep me signed in on this device for 30 days</strong>", "<strong>Sign in with a team code instead</strong>"))
+   and "once, for 72 hours" in text and "once, for 60 minutes" in text and "five wrong passwords" in text
+   and "Until Saturday 31 October 2026, the shared team codes still work." in text)
+ok("⭐ G3: Users (9.6) is in the guide for admins only, in the nav too, and names its three parts and the first-admin steps",
+   '<h2 id="9-6-users" data-role="admin">9.6 Users and activity (admins)</h2>' in src
+   and '<li class="l2" data-navrole="admin"><a href="#9-6-users">' in src
+   and all(f"<strong>{w}</strong>" in src for w in ("People.", "Demo leads", "Activity", "Send a personal login", "Add and send the link"))
+   and "That is how the first admin is added" in text)
+ok("🔴 G3: the guide no longer says per-person logins are planned, nor that an unset admin token opens admin actions",
+   "Per-person logins are planned" not in text and "Per-person logins\nare planned" not in text and "are planned next" not in text
+   and "open to anyone who can reach them" not in text)
+ok("G3: section 10 signs each role in with a login, and says the admin code opens what the planner code opens until 31 Oct",
+   "<td>a login for your team</td>" in src and "<td>a planner login</td>" in src and "<td>an admin login</td>" in src
+   and "only an admin <em>login</em> saves without the admin token" in src)
+_tg = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
+ok("⭐ G3: the technical guide explains the session, the links, the limits, the guard header, the audit trail and HU14",
+   all(s in _tg for s in ("<code>wayscope_session</code>", "<code>user_sessions</code>", "<code>auth_tokens</code>",
+                          "<code>X-Wayscope: 1</code>", "<code>audit_log</code>", "<code>auth_attempts</code>",
+                          "5 failed sign-ins per email per 15 min", "Demo leads (HU14).", "<code>APP_URL/#invite=…</code>"))
+   and "those actions are open to anyone who can reach them" not in _tg)
 ok("the menu as it is: four groups with the Carbon planner under PLAN, Find a page, Ctrl K, User guide, Collapse",
    "<strong>PLAN</strong> (Dashboard, Submit forecast, Forecasts, Carbon planner)" in src
    and "Find a page…" in src and "Ctrl K" in src and "<strong>User guide</strong>" in src and "‹ Collapse" in src)

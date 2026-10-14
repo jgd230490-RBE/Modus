@@ -232,7 +232,8 @@ for dirpath, dirs, files in os.walk(ROOT):
 ID_FORM_ALLOWED = {"backend/access.py", "backend/taxonomy.py", "backend/db.py", "backend/network.py",
                    "backend/main.py", "frontend/index.html", "map/index.html",
                    "backend/tools/make_demo_tenant.py", "demo/uk-corridor.package.json",
-                   "README.md", "README.txt", "env.example"}   # these name the IPTn_CODE variables
+                   "README.md", "README.txt", "env.example",   # these name the IPTn_CODE variables
+                   "backend/users.py"}   # 14 Oct 2026 (G3): a login's team SLOT, the id behind the tenant's team name
 HUMAN_FORM_ALLOWED = {"backend/access.py"}
 for rel in list(hits):
     keep = []

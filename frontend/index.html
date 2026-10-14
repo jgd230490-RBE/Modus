@@ -327,6 +327,20 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .auth-back{display:block;width:100%;margin-top:8px;padding:8px;font:inherit;font-size:14px;color:var(--muted);background:none;border:0;cursor:pointer;}
   .auth-back:hover{color:var(--ink);}
   .auth-note{margin-top:20px;font-size:12px;line-height:1.55;color:var(--muted);}
+  /* G3 (14 Oct 2026): per-person sign-in — the keep-me-signed-in tick, the small links under the button, a message */
+  .auth-check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin:2px 0 10px;cursor:pointer;}
+  .auth-links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;margin-top:10px;font-size:13px;}
+  .auth-links button{background:none;border:0;padding:0;font:inherit;color:var(--muted);text-decoration:underline;cursor:pointer;white-space:nowrap;}
+  .auth-links button:hover{color:var(--ink);}
+  .auth-msg{font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--action) 8%,transparent);border:1px solid color-mix(in srgb,var(--action) 30%,transparent);border-radius:6px;padding:9px 11px;margin-bottom:12px;color:var(--ink);}
+  .acct-btn{max-width:220px;display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);font:inherit;font-size:13px;cursor:pointer;}
+  .acct-btn:hover,.acct-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
+  .acct-menu{min-width:280px;padding:10px 12px;}
+  .acct-btn .acct-ini{display:none;} .acct-signout{display:none;}
+  @media (max-width:640px){ .acct-menu{position:fixed;left:8px;right:8px;top:60px;min-width:0;} .acct-btn .acct-name{display:none;} .acct-btn .acct-ini{display:inline;}
+    .hdr-signout-login{display:none;} .acct-signout{display:block;} }
+  .acct-menu input{width:100%;font:inherit;font-size:13px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);margin-top:6px;}
+  .users-link{word-break:break-all;font-size:13px;}
   .field label{display:block;font-size:14px;font-weight:500;color:var(--ink);margin-bottom:6px;}
   .field .hint{font-size:13px;color:var(--muted);margin-top:4px;}
   .ctl-sm{padding:4px 8px;}
@@ -729,19 +743,56 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 //
 // ⚠️ Still not authentication in the Phase 6 sense: a shared code per role, no rate
 // limit, no per-person identity beyond the name you type. Do not call this secure.
+//
+// G3 (14 Oct 2026): people sign in with their own email and password. The session is an HttpOnly cookie the page
+// cannot read; it travels with every same-origin call by itself. The code above keeps working only while the
+// server still has codes set (the shared codes end on 31 Oct 2026, D49).
 const ACCESS = { code: "", info: null };
 try { ACCESS.code = sessionStorage.getItem("modus_access_code") || ""; } catch(e){}
-// one place adds the header, so no fetch() call site can forget it
+// one place adds the headers, so no fetch() call site can forget them. X-Wayscope says the call comes from this app:
+// the server refuses a write signed in by the cookie without it (another site cannot add a header).
 const _rawFetch = window.fetch.bind(window);
 window.fetch = (url, opts) => {
   const u = typeof url === "string" ? url : (url && url.url) || "";
-  if(u.startsWith(API) && ACCESS.code){
+  if(u.startsWith(API)){
     const o = { ...(opts || {}) };
-    o.headers = { ...(o.headers || {}), "X-Access-Code": ACCESS.code };
-    return _rawFetch(url, o);
+    o.headers = { ...(o.headers || {}), "X-Wayscope": "1", ...(ACCESS.code ? { "X-Access-Code": ACCESS.code } : {}) };
+    // a login whose session has ended (signed out elsewhere, disabled, expired): back to the sign-in screen once
+    return _rawFetch(url, o).then(r => {
+      if(r.status === 401 && ACCESS.info && ACCESS.info.via === "login" && !u.startsWith(API + "/auth/")){
+        try { window.dispatchEvent(new Event(SESSION_ENDED)); } catch(e){}
+      }
+      return r;
+    });
   }
   return _rawFetch(url, opts);
 };
+const SESSION_ENDED = "wayscope-session-ended";
+// G3: the page cannot see the HttpOnly session cookie, so it keeps a harmless note that someone signed in on this
+// browser, and asks the server on load only then (a visitor gets the public map at once, no "Signing you back in").
+const AUTH_HINT = "wayscope_signed_in";
+function authHint(on){ try { if(on) localStorage.setItem(AUTH_HINT, "1"); else localStorage.removeItem(AUTH_HINT); } catch(e){} }
+function hasAuthHint(){ try { return localStorage.getItem(AUTH_HINT) === "1"; } catch(e){ return false; } }
+// A link from an email: #invite=…, #reset=… (set a password) or #demo=… (a lead's own link, HU14). Read ONCE, as the
+// page loads, and taken off the address at once, so it is not bookmarked, shared in a screenshot or left in history.
+// The link is a fragment, never sent to the server by the browser; the page posts it.
+const START_LINK = (function(){
+  try {
+    const m = /^#(invite|reset|demo)=([A-Za-z0-9_-]{20,200})$/.exec(window.location.hash || "");
+    if(!m) return null;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    return { purpose: m[1], token: m[2] };
+  } catch(e){ return null; }
+})();
+// POST a JSON body; resolve with the answer, or reject with {status, detail} (the server's own sentence when it sent one)
+function postJSON(path, body){
+  return fetch(`${API}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
+    .then(async r => {
+      const j = await r.json().catch(() => ({}));
+      if(!r.ok) throw { status: r.status, detail: (j && typeof j.detail === "string") ? j.detail : "" };
+      return j;
+    }, () => { throw { status: 0, detail: "" }; });
+}
 
 // ---- Appearance (5 Oct 2026) ----------------------------------------------------
 // Three looks — "ink" (the 29 Sep rebrand, default), "light" (white header bar), "dark"
@@ -2820,7 +2871,12 @@ function App(){
   // only) for the fetch header, but the view always started on the public map, so F5 at the stand dropped the
   // demo to the public page. Now, with a stored code, the app starts on "resume", asks /api/auth what the code
   // grants (the same call the sign-in form makes), and returns to the staff app. A refused code is forgotten.
-  const [view, setView] = useState(() => ACCESS.code ? "resume" : "public");   // public | login | portal | resume
+  // G3 (14 Oct 2026): "setpw" (an invite or reset link), "linkerr" (a demo link that no longer works). A session is
+  // resumed the same way a code is — only when this browser signed in before (the hint) or a lead's link is opening.
+  const [view, setView] = useState(() => (START_LINK && START_LINK.purpose !== "demo") ? "setpw"
+    : (START_LINK || ACCESS.code || hasAuthHint()) ? "resume" : "public");   // public | login | portal | resume | setpw | linkerr
+  const [authNotice, setAuthNotice] = useState("");
+  const [linkErr, setLinkErr] = useState("");
   const [role, setRole] = useState(null);
   const [who, setWho] = useState(() => { try { return localStorage.getItem("modus_who") || ""; } catch(e){ return ""; } });
   const [meta, setMeta] = useState(null);
@@ -2890,14 +2946,42 @@ function App(){
   // `role` is now the /api/auth payload: {role, label, ipt, can_approve, ipt_locked,
   // ipt_required, demo, ipts}. Every permission the UI shows comes from it, not from a
   // client-side table.
+  // G3: a login's answer carries the person's own name (via "login"); a code still carries only what was typed
   const signIn = (info, name, code) => {
-    const n = (name || "").trim();
-    ACCESS.code = code; ACCESS.info = info;
-    try { sessionStorage.setItem("modus_access_code", code); } catch(e){}
-    setRole(info); setWho(n);
+    const n = ((info && info.via === "login" ? info.name : name) || "").trim();
+    ACCESS.code = code || ""; ACCESS.info = info;
+    if(code){ try { sessionStorage.setItem("modus_access_code", code); } catch(e){} }
+    else { try { sessionStorage.removeItem("modus_access_code"); } catch(e){} authHint(true); }
+    setRole(info); setWho(n); setAuthNotice("");
     try { localStorage.setItem("modus_who", n); } catch(e){}
     setView("portal");
   };
+  // G3: a lead's link (HU14) signs them straight in; a browser that signed in before asks who it is
+  useEffect(() => {
+    if(ACCESS.code) return;   // the code path below
+    if(START_LINK && START_LINK.purpose === "demo"){
+      postJSON("/auth/link", { token: START_LINK.token })
+        .then(info => signIn(info))
+        .catch(e => { setLinkErr(e.detail || "This demo link could not be opened."); setView("linkerr"); });
+      return;
+    }
+    if(START_LINK || !hasAuthHint()) return;
+    fetch(`${API}/auth/me`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(j => {
+        if(j && j.signed_in && j.access && j.access.via === "login"){ ACCESS.info = j.access; setRole(j.access); setWho(j.access.name || ""); setView("portal"); }
+        else { authHint(false); setView("public"); }
+      })
+      .catch(() => setView("public"));
+  }, []);
+  // a session that ends while the app is open (signed out on another device, disabled, or past its time)
+  useEffect(() => {
+    const ended = () => {
+      ACCESS.info = null; authHint(false); setRole(null); metaHadCode.current = false;
+      setAuthNotice("You have been signed out. Sign in again to carry on."); setView("login");
+    };
+    window.addEventListener(SESSION_ENDED, ended);
+    return () => window.removeEventListener(SESSION_ENDED, ended);
+  }, []);
   useEffect(() => {
     if(!ACCESS.code) return;
     fetch(`${API}/auth`, { method: "POST", headers: { "Content-Type": "application/json" },
@@ -2914,16 +2998,19 @@ function App(){
   const signOut = () => {
     ACCESS.code = ""; ACCESS.info = null;
     try { sessionStorage.removeItem("modus_access_code"); } catch(e){}
+    authHint(false);
     // 12 Oct 2026 (the review and fix pass): the server swaps the 12-hour STAFF cookie for a map-only one, so the next
-    // person at a shared machine gets the public map and not the staff data; the next sign-in fetches /api/meta again
-    fetch(`${API}/gate-signout?keep=map`, { method: "POST" }).catch(() => {});
+    // person at a shared machine gets the public map and not the staff data; the next sign-in fetches /api/meta again.
+    // G3 (14 Oct 2026): /auth/signout does that AND ends a login's session on the server (the row is deleted, so the
+    // cookie is dead wherever it was copied); it replaced the call to gate-signout?keep=map, which still answers.
+    fetch(`${API}/auth/signout`, { method: "POST" }).catch(() => {});
     metaHadCode.current = false;
     setRole(null); setView("public");
   };
   // the bar's Guide: none on the sign-in view (it has no tour); the embedded map's tour on a map view, once the map
   // has said it is ready (never over the map password page); this app's guide on every other Portal page
   const onMap = view === "public" || (view === "portal" && page === "map");
-  const barGuide = (view === "login" || view === "resume") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;
+  const barGuide = (view === "login" || view === "resume" || view === "setpw" || view === "linkerr") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;
 
   return (
     <div className="h-full flex flex-col">
@@ -2932,7 +3019,11 @@ function App(){
       <DemoBar onGuide={barGuide} />
       <main className="flex-1 min-h-0 flex flex-col">
         {view === "public" && <PublicMap onLogin={() => setView("login")} />}
-        {view === "login" && <Login onSignIn={signIn} onBack={() => setView("public")} savedName={who} />}
+        {view === "login" && <Login onSignIn={signIn} onBack={() => setView("public")} savedName={who} notice={authNotice} />}
+        {view === "setpw" && START_LINK && <SetPassword link={START_LINK} onSignIn={signIn} onBack={() => setView("login")} />}
+        {view === "linkerr" && (
+          <AuthNote title="This link no longer works" body={linkErr} action="Back to the map" onAction={() => setView("public")} />
+        )}
         {view === "resume" && <div className="flex-1 flex items-center justify-center text-sm text-slate-500" role="status">Signing you back in…</div>}
         {view === "portal" && (
           <Portal role={role} who={who} meta={meta} metaErr={metaErr} vehLang={vehLang} onPage={setPage} />
@@ -2985,12 +3076,15 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
                   </button>
                 ))}
               </span>)}
-              <span className="hidden sm:inline hdr-muted mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>
+              {role.via === "login" ? <AccountMenu role={role} onSignOut={signOut} />
+                : <span className="hidden sm:inline hdr-muted mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>}
               {/* 11 Oct 2026: the Guide button moved to the right end of the demo bar (DemoBar). It was shown
                   only to a demo tenant, and the bar shows exactly then, so a real tenant loses nothing. */}
               <AppearancePicker />
+              {/* G3: below 640 px a LOGIN's Sign out lives in the account menu (the header has no room for the name, the
+                  appearance button and Sign out on a 360 px phone); a code sign-in keeps this button at every width */}
               <button onClick={signOut}
-                className="px-4 py-2 rounded-md hdr-btn font-medium transition">
+                className={"px-4 py-2 rounded-md hdr-btn font-medium transition" + (role.via === "login" ? " hdr-signout-login" : "")}>
                 Sign out
               </button>
             </>
@@ -3075,6 +3169,72 @@ function AppearancePicker(){
   );
 }
 
+// ================================================================= Account menu (G3, 14 Oct 2026)
+// A signed-in person's name at the right of the header; the menu says who and which team (by NAME), and lets them
+// change their password. A lead's demo login has no password (they sign in by their link) and says when it ends.
+function AccountMenu({ role, onSignOut }){
+  const [open, setOpen] = useState(false);
+  const [cur, setCur] = useState(""); const [nw, setNw] = useState(""); const [nw2, setNw2] = useState("");
+  const [msg, setMsg] = useState(null); const [busy, setBusy] = useState(false);
+  const box = useRef(null);
+  useEffect(() => {
+    if(!open) return;
+    const away = (e) => { if(box.current && !box.current.contains(e.target)) setOpen(false); };
+    const key = (e) => { if(e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", key); };
+  }, [open]);
+  const team = role.ipt ? teamName(role.ipt) : role.label;
+  const demo = role.kind === "demo";
+  const change = () => {
+    if(nw.length < 10){ setMsg({ ok: false, t: "Use at least 10 characters. Three random words work well." }); return; }
+    if(nw !== nw2){ setMsg({ ok: false, t: "The two new passwords are not the same." }); return; }
+    setBusy(true); setMsg(null);
+    postJSON("/auth/password", { current: cur, new: nw })
+      .then(() => { setCur(""); setNw(""); setNw2(""); setMsg({ ok: true, t: "Password changed. Your other devices are signed out." }); })
+      .catch(e => setMsg({ ok: false, t: e.detail || `Not changed (${e.status || "no answer"}).` }))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <span className="appearance" ref={box}>
+      <button type="button" className="acct-btn" aria-haspopup="menu" aria-expanded={open ? "true" : "false"}
+        onClick={() => setOpen(o => !o)} title={`${role.name} · ${team}`} aria-label={`Your account: ${role.name}`}>
+        <span className="truncate acct-name">{role.name}</span>
+        <span className="acct-ini" aria-hidden="true">{String(role.name || "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("")}</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div className="appearance-menu acct-menu" role="menu" aria-label="Your account">
+          <div style={{ fontWeight: 600 }}>{role.name}</div>
+          <div style={{ color: "var(--popover-muted)" }}>{role.email}</div>
+          <div style={{ marginTop: 4 }}>{team}{role.can_approve ? " · can approve" : ""}</div>
+          {demo && role.expires_at && <div style={{ marginTop: 4, color: "var(--popover-muted)" }}>Your demo access ends {fmtWhen(role.expires_at)}.</div>}
+          {!demo && (
+            <>
+              <h6 style={{ padding: "12px 0 0" }}>Change your password</h6>
+              <input type="password" autoComplete="current-password" placeholder="Current password" aria-label="Current password" value={cur} onChange={e => setCur(e.target.value)} />
+              <input type="password" autoComplete="new-password" placeholder="New password (10 characters or more)" aria-label="New password" value={nw} onChange={e => setNw(e.target.value)} />
+              <input type="password" autoComplete="new-password" placeholder="New password again" aria-label="New password again" value={nw2} onChange={e => setNw2(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && change()} />
+              {msg && <div style={{ marginTop: 6, color: msg.ok ? "var(--popover-fg)" : "#FCA5A5" }} role="status">{msg.t}</div>}
+              <button type="button" className="btn-pri" style={{ marginTop: 8, width: "100%" }} disabled={busy || !cur || !nw} onClick={change}>
+                {busy ? "Saving…" : "Change password"}
+              </button>
+            </>
+          )}
+          <button type="button" className="btn-sec acct-signout" style={{ marginTop: 10, width: "100%" }} onClick={() => { setOpen(false); onSignOut && onSignOut(); }}>Sign out</button>
+        </div>
+      )}
+    </span>
+  );
+}
+// "Wed 28 Oct 2026, 09:00" from the server's ISO time, in the browser's own time zone
+function fmtWhen(iso){
+  try { const d = new Date(iso); if(isNaN(d)) return iso || "";
+    return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) + ", "
+      + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); } catch(e){ return iso || ""; }
+}
+
 // ================================================================= Public map
 function PublicMap({ onLogin }){
   // 11 Oct 2026 (the user): the strip above the map ("Public Route Map · Approved haul-route forecasts.
@@ -3088,12 +3248,88 @@ function PublicMap({ onLogin }){
 }
 
 // ================================================================= Login
-function Login({ onSignIn, onBack, savedName }){
+// G3 (14 Oct 2026): the sign-in screen is email and password. "Forgot your password?" asks for a link. While the
+// server still has shared codes set (until 31 Oct, D49) a small link opens the code form below, unchanged; when the
+// codes are deleted on the server the link is not offered.
+function Login({ onSignIn, onBack, savedName, notice }){
+  const [mode, setMode] = useState("email");   // email | forgot | code
+  const [codesOn, setCodesOn] = useState(false);
+  useEffect(() => { fetch(`${API}/auth/me`).then(r => r.ok ? r.json() : null).then(j => setCodesOn(!!(j && j.codes))).catch(() => {}); }, []);
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [msg, setMsg] = useState(notice || "");
   const [pw, setPw] = useState("");
   const [name, setName] = useState(savedName || "");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [show, setShow] = useState(false);   // 11 Oct 2026: the show / hide eye on the access code
+  const go = (m) => { setMode(m); setErr(""); if(m !== "email") setMsg(""); };
+  const signInEmail = () => {
+    if(!email.trim() || !pass){ setErr("Enter your email and password."); return; }
+    setBusy(true); setErr(""); setMsg("");
+    postJSON("/auth/signin", { email: email.trim(), password: pass, remember })
+      .then(info => onSignIn(info))
+      .catch(e => setErr((e.status === 401 || e.status === 429) && e.detail ? e.detail : `Couldn't sign in (${e.status || "no answer"}).`))
+      .finally(() => setBusy(false));
+  };
+  const askLink = () => {
+    if(!email.trim()){ setErr("Enter the email address you sign in with."); return; }
+    setBusy(true); setErr(""); setMsg("");
+    postJSON("/auth/forgot", { email: email.trim() })
+      .then(j => setMsg(j.message || "If that address has a Wayscope login, we have sent it a link."))
+      .catch(e => setErr(e.status === 429 && e.detail ? e.detail : "Couldn't send the link. Try again in a minute."))
+      .finally(() => setBusy(false));
+  };
+  if(mode === "email" || mode === "forgot"){
+    const forgot = mode === "forgot";
+    return (
+      <div className="flex-1 grid place-items-center px-5">
+        <div className="auth-card">
+          <h1>{forgot ? "Forgotten your password?" : "Staff sign in"}</h1>
+          <p className="auth-sub">{forgot ? "Enter your email. We'll send you a link to choose a new password." : "Sign in with your email and password."}</p>
+          {msg && <div className="auth-msg" role="status">{msg}</div>}
+          <div className="field">
+            <label htmlFor="auth-email">Email</label>
+            <input id="auth-email" className="auth-input" type="email" value={email} autoFocus autoComplete="username"
+              onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && (forgot ? askLink() : signInEmail())}
+              placeholder="you@example.com" />
+          </div>
+          {!forgot && (
+            <>
+              <div className="field">
+                <label htmlFor="auth-pass">Password</label>
+                <div className="pw-wrap">
+                  <input id="auth-pass" className="auth-input" type={show ? "text" : "password"} value={pass} autoComplete="current-password"
+                    onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && signInEmail()} placeholder="Password" />
+                  <button type="button" className="pw-eye" onClick={() => setShow(s => !s)}
+                    aria-label={show ? "Hide password" : "Show password"} aria-pressed={show} title={show ? "Hide password" : "Show password"}>
+                    <PwEye show={show} />
+                  </button>
+                </div>
+              </div>
+              <label className="auth-check"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />Keep me signed in on this device for 30 days</label>
+            </>
+          )}
+          {err && <p className="text-sm mb-2" style={{color:"var(--red)"}} role="alert">{err}</p>}
+          <button onClick={forgot ? askLink : signInEmail} disabled={busy} className="btn-pri auth-go">
+            {busy ? (forgot ? "Sending…" : "Checking…") : (forgot ? "Send me a link" : "Sign in")}
+          </button>
+          <div className="auth-links">
+            <button type="button" onClick={() => go(forgot ? "email" : "forgot")}>{forgot ? "Back to sign in" : "Forgot your password?"}</button>
+            {codesOn && !forgot && <button type="button" onClick={() => go("code")}>Sign in with a team code instead</button>}
+          </div>
+          <button onClick={onBack} className="auth-back">
+            Back to the map
+          </button>
+          <p className="auth-note">
+            Your login belongs to your {TEAM().toLowerCase()}: you see your {TEAM().toLowerCase()}'s forecast lines. A planner sees every {TEAM().toLowerCase()} and
+            approves. Ask your administrator if you do not have a login.
+          </p>
+        </div>
+      </div>
+    );
+  }
   const submit = () => {
     if(!name.trim()){ setErr("Please enter your name."); return; }
     const code = pw.trim();
@@ -3138,6 +3374,9 @@ function Login({ onSignIn, onBack, savedName }){
         <button onClick={submit} disabled={busy} className="btn-pri auth-go">
           {busy ? "Checking…" : "Sign in"}
         </button>
+        <button onClick={() => go("email")} className="auth-back">
+          Sign in with your email instead
+        </button>
         <button onClick={onBack} className="auth-back">
           Back to the map
         </button>
@@ -3149,6 +3388,320 @@ function Login({ onSignIn, onBack, savedName }){
           approve. Codes are checked by Wayscope — ask your planner if you do not have one.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ================================================================= Set a password (G3, 14 Oct 2026)
+// Reached from an invite (72 hours) or a reset link (60 minutes); both work once. The link is checked first, so the
+// person is greeted by name; the password is checked before the link is used, so a too-short one does not waste it.
+function SetPassword({ link, onSignIn, onBack }){
+  const [info, setInfo] = useState(null);
+  const [bad, setBad] = useState("");
+  const [pw, setPw] = useState(""); const [pw2, setPw2] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [show, setShow] = useState(false);
+  useEffect(() => {
+    postJSON("/auth/check", { token: link.token }).then(setInfo)
+      .catch(e => setBad(e.detail || "This link has expired or has already been used. Ask for a new one."));
+  }, []);
+  const submit = () => {
+    if(pw.length < 10){ setErr("Use at least 10 characters. Three random words work well."); return; }
+    if(pw !== pw2){ setErr("The two passwords are not the same."); return; }
+    setBusy(true); setErr("");
+    postJSON("/auth/reset", { token: link.token, password: pw, remember })
+      .then(info => onSignIn(info))
+      .catch(e => { if(e.status === 410) setBad(e.detail); else setErr(e.detail || `Couldn't save the password (${e.status || "no answer"}).`); })
+      .finally(() => setBusy(false));
+  };
+  if(bad) return <AuthNote title="This link no longer works" body={bad + " On the sign-in screen, \u201cForgot your password?\u201d sends a new one."}
+    action="Go to sign in" onAction={onBack} />;
+  if(!info) return <div className="flex-1 flex items-center justify-center text-sm text-slate-500" role="status">Checking your link…</div>;
+  return (
+    <div className="flex-1 grid place-items-center px-5">
+      <div className="auth-card">
+        <h1>{info.purpose === "invite" ? `Welcome, ${(info.name || "").split(" ")[0]}` : "Choose a new password"}</h1>
+        <p className="auth-sub">{info.purpose === "invite" ? "Set a password for your Wayscope login" : "For your Wayscope login"}, {info.email}.</p>
+        <div className="field">
+          <label htmlFor="set-pw">New password</label>
+          <div className="pw-wrap">
+            <input id="set-pw" className="auth-input" type={show ? "text" : "password"} value={pw} autoFocus autoComplete="new-password"
+              onChange={e => setPw(e.target.value)} placeholder="10 characters or more" />
+            <button type="button" className="pw-eye" onClick={() => setShow(s => !s)}
+              aria-label={show ? "Hide password" : "Show password"} aria-pressed={show} title={show ? "Hide password" : "Show password"}>
+              <PwEye show={show} />
+            </button>
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="set-pw2">The same again</label>
+          <input id="set-pw2" className="auth-input" type={show ? "text" : "password"} value={pw2} autoComplete="new-password"
+            onChange={e => setPw2(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+        </div>
+        <label className="auth-check"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />Keep me signed in on this device for 30 days</label>
+        {err && <p className="text-sm mb-2" style={{color:"var(--red)"}} role="alert">{err}</p>}
+        <button onClick={submit} disabled={busy} className="btn-pri auth-go">{busy ? "Saving…" : "Save and sign in"}</button>
+        <p className="auth-note">At least 10 characters. Three random words are easy to remember and hard to guess. Saving signs you out on every other device.</p>
+      </div>
+    </div>
+  );
+}
+// The show / hide eye of a password field: the same two drawings as the access code's eye (11 Oct 2026)
+function PwEye({ show }){
+  return show
+    ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2"/><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+    : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>;
+}
+// One card for a sign-in message that has a single way on
+function AuthNote({ title, body, action, onAction }){
+  return (
+    <div className="flex-1 grid place-items-center px-5">
+      <div className="auth-card">
+        <h1>{title}</h1>
+        <p className="auth-sub">{body}</p>
+        {action && <button onClick={onAction} className="btn-pri auth-go">{action}</button>}
+      </div>
+    </div>
+  );
+}
+
+// ================================================================= Users (G3, 14 Oct 2026)
+// Admins only (D57). Three parts: People (every login: add, change team or role, disable, send a link, extend a demo
+// login), Leads (the demo requests with each lead's own login and what they opened, HU14; "Send a personal login"
+// for a lead who asked before 14 Oct, D56) and Activity (every change, sign-in and demo page open, D55). An admin
+// LOGIN needs nothing more (D53); signed in with the shared admin code, the admin token typed here opens it — that
+// is how the first admin is added (D47). A team is always shown by its NAME.
+const USER_STATUS = { active: ["Approved", "Active"], invited: ["Pending", "Invited"], disabled: ["Rejected", "Disabled"],
+                      expired: ["none", "Ended"] };
+function roleChoice(u){ return u.role === "team" ? "team:" + u.team : u.role; }
+function describeActivity(r){
+  const words = { signin: "Signed in", "signin-code": "Signed in with a shared code", "signin-refused": "Sign-in refused", "signin-locked": "Sign-in locked (too many tries)",
+                  signout: "Signed out", "reset-asked": "Asked for a password link", "password-set": "Set a password",
+                  "password-changed": "Changed their password", "demo-link": "Opened their demo link" };
+  if(words[r.kind]) return words[r.kind];
+  if(r.kind === "page") return "Opened " + (r.target || "a page");
+  const p = (r.path || "").replace(/^\/api\//, "");
+  const known = [[/^forecasts\/bulk$/, "Saved forecast lines"], [/^forecasts\//, "Withdrew a forecast"],
+    [/^routes\/[^/]+\/status$/, "Approved, rejected or reopened a forecast"], [/^forecast-weeks\/confirm$/, "Confirmed a week"],
+    [/^forecast-weeks\/actual$/, "Typed a week's actual"], [/^forecast-weeks\/reopen$/, "Reopened a week"],
+    [/^forecast-weeks\/calibrate$/, "Calibrated a week"], [/^forecast-weeks$/, "Edited a week"], [/^forecast-days\/actual$/, "Typed a day's actual"],
+    [/^forecast-days$/, "Edited a day"], [/^stockpiles\/consume$/, "Recorded stockpile use"], [/^carbon\/target$/, "Changed the carbon target"],
+    [/^admin\/config\/factors\/reset$/, "Reset the configuration to the file"], [/^admin\/config\/factors$/, "Saved the configuration"],
+    [/^admin\/users\/[^/]+\/reset$/, "Sent a login its link"], [/^admin\/users\/[^/]+$/, "Changed a login"], [/^admin\/users$/, "Added a login"],
+    [/^admin\/leads\/[^/]+\/login$/, "Gave a lead a personal login"], [/^admin\/tenant\/import$/, "Imported the organisation's data"]];
+  for(const [rx, w] of known){ if(rx.test(p)) return w; }
+  const verb = { POST: "Added", PUT: "Changed", PATCH: "Changed", DELETE: "Removed" }[r.method] || "Changed";
+  return verb + " · " + p.replace(/^admin\//, "");
+}
+function UsersPage({ access }){
+  const viaLogin = !!(access && access.via === "login");
+  const [token, setToken] = useState(() => { try { return localStorage.getItem("modus_admin_token") || ""; } catch(e){ return ""; } });
+  const saveToken = (v) => { setToken(v); try { localStorage.setItem("modus_admin_token", v); } catch(e){} };
+  const qs = (extra) => { const q = new URLSearchParams(extra || {}); if(!viaLogin && token) q.set("token", token); const t = q.toString(); return t ? "?" + t : ""; };
+  const [tab, setTab] = useState("people");
+  const [data, setData] = useState(null);
+  const [leads, setLeads] = useState(null);
+  const [rows, setRows] = useState(null);
+  const [who, setWhoF] = useState("");
+  const [err, setErr] = useState("");
+  const [note, setNote] = useState(null);   // {ok, text, link}
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", choice: "" });
+  const call = async (path, method, body) => {
+    const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
+                                             body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(typeof j.detail === "string" && r.status !== 403 ? j.detail
+      : r.status === 403 ? "Only an admin can open this. Sign in with an admin login, or type the admin token above." : `Not done (${r.status}).`);
+    return j;
+  };
+  const load = () => call(`/admin/users${qs()}`).then(j => { setData(j); setErr(""); }).catch(e => { setData(null); setErr(e.message); });
+  const loadLeads = () => call(`/admin/leads${qs()}`).then(j => setLeads(j.leads || [])).catch(e => setErr(e.message));
+  const loadRows = () => call(`/admin/audit${qs(who ? { user: who } : {})}`).then(j => setRows(j.rows || [])).catch(e => setErr(e.message));
+  useEffect(() => { load(); }, [token]);
+  useEffect(() => { if(tab === "leads") loadLeads(); if(tab === "activity") loadRows(); }, [tab, who, token]);
+  const teams = (data && data.teams) || [];
+  const teamLabel = (id) => (teams.find(t => t.id === id) || {}).label || teamName(id);
+  const choices = [...teams.map(t => ["team:" + t.id, t.label]), ["planner", "Planner"], ["admin", "Admin"]];
+  const fromChoice = (c) => c.startsWith("team:") ? { role: "team", team: c.slice(5) } : { role: c, team: null };
+  const sent = (j, who) => {
+    if(j.email === "sent") return { ok: true, text: `Emailed ${who} their link.` };
+    return { ok: true, text: j.email === "unsent" ? `Email is not set up here, so pass this link to ${who} yourself:`
+                                                 : `The email to ${who} did not go (${j.email}). Pass this link on yourself:`, link: j.link };
+  };
+  const act = async (fn) => { setBusy(true); setNote(null); try { await fn(); } catch(e){ setNote({ ok: false, text: e.message }); } setBusy(false); };
+  const add = () => act(async () => {
+    if(!form.name.trim() || !form.email.trim() || !form.choice) throw new Error("Fill in the name, the email and the team or role.");
+    const j = await call(`/admin/users${qs()}`, "POST", { name: form.name.trim(), email: form.email.trim(), ...fromChoice(form.choice) });
+    setForm({ name: "", email: "", choice: "" });
+    setNote({ ...sent(j, j.user.name), text: `Added ${j.user.name}. ` + sent(j, j.user.name).text });
+    await load();
+  });
+  const change = (u, body, done) => act(async () => { await call(`/admin/users/${u.id}${qs()}`, "PATCH", body); setNote({ ok: true, text: done }); await load(); });
+  const sendLink = (u) => act(async () => { const j = await call(`/admin/users/${u.id}/reset${qs()}`, "POST"); setNote(sent(j, u.name)); });
+  const leadLogin = (l) => act(async () => { const j = await call(`/admin/leads/${l.id}/login${qs()}`, "POST"); setNote(sent(j, l.name)); await loadLeads(); await load(); });
+  const people = (data && data.users) || [];
+  const staff = people.filter(u => u.kind !== "demo"), demos = people.filter(u => u.kind === "demo");
+  const tabs = [["people", "People"], ["leads", "Demo leads"], ["activity", "Activity"]];
+  const csvHref = (path, extra) => `${API}${path}${qs(extra)}`;
+  const statusOf = (u) => { const [st, label] = USER_STATUS[u.status] || ["none", u.status]; return <StatusWord status={st} label={label} />; };
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2">
+      <PageHeader title="Users" kicker="Data"
+        subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role. A ${TEAM().toLowerCase()} login sees its own ${TEAM().toLowerCase()}'s lines; a planner sees every ${TEAM().toLowerCase()} and approves; an admin also manages logins and the configuration.`} />
+      {!viaLogin && (
+        <div className="card p-4 mb-4 text-sm">
+          <label className="flex flex-wrap items-center gap-2"><span>Admin token · needed here while you are signed in with a shared code</span>
+            <input className="ctl ctl-sm" style={{ minWidth: 260 }} value={token} onChange={e => saveToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" /></label>
+          <p className="text-slate-500 mt-2">To set up per-person sign-in: add yourself below as an Admin, open the link that arrives, choose a password, then sign out and sign in with your email.</p>
+        </div>
+      )}
+      {data && data.codes && (
+        <div className="card p-4 mb-4 text-sm" role="note" style={{ borderColor: "var(--gold)" }}>
+          <b>The shared codes still work on this site.</b> Anyone with a {TEAM().toLowerCase()}, planner or admin code can sign in without a login of their own.
+          Once everyone has a login, delete the eight code settings on the hosting service to end them (planned: Sat 31 Oct 2026).
+        </div>
+      )}
+      {err && <EmptyState kind="error" title="Couldn't open the list of logins" body={err} />}
+      {note && (
+        <div className="card p-4 mb-4 text-sm" role="status" style={{ borderColor: note.ok ? "var(--green)" : "var(--red)" }}>
+          {note.text}{note.link && <div className="users-link mt-2"><code>{note.link}</code>{" "}
+            <button type="button" className="link-btn" onClick={() => { try { navigator.clipboard.writeText(note.link); } catch(e){} }}>Copy</button></div>}
+        </div>
+      )}
+      {data && (
+        <>
+          <nav className="flex gap-2 mb-4" aria-label="Users sections">
+            {tabs.map(([k, l]) => <button key={k} type="button" onClick={() => setTab(k)} className={tab === k ? "btn-pri" : "btn-sec"} aria-current={tab === k ? "page" : undefined}>{l}</button>)}
+          </nav>
+          {tab === "people" && (
+            <>
+              <div className="card p-4 mb-4">
+                <h3 className="text-[15px] font-semibold text-slate-800 mb-2">Add a login</h3>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <label className="text-sm">Name<br /><input className="ctl ctl-sm" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} aria-label="Name" /></label>
+                  <label className="text-sm">Email<br /><input className="ctl ctl-sm" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} aria-label="Email" /></label>
+                  <label className="text-sm">{TEAM()} or role<br />
+                    <select className="ctl ctl-sm" value={form.choice} onChange={e => setForm({ ...form, choice: e.target.value })} aria-label={`${TEAM()} or role`}>
+                      <option value="">Choose…</option>
+                      {choices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select></label>
+                  <button type="button" className="btn-pri" disabled={busy} onClick={add}>Add and send the link</button>
+                </div>
+                <p className="text-[13px] text-slate-500 mt-2">They get an email with a link to choose their password. It works once, for 72 hours.{data.mail ? "" : " Email is not set up here, so the link is shown to you instead."}</p>
+              </div>
+              <div className="card overflow-auto">
+                <table className="tbl">
+                  <caption><b>Logins</b> · {staff.length}</caption>
+                  <thead><tr>{["Name", `${TEAM()} or role`, "Status", "Last signed in", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {staff.map(u => (
+                      <tr key={u.id}>
+                        <td><div className="font-medium text-slate-800">{u.name}{u.id === data.me ? " (you)" : ""}</div><div className="text-[13px] text-slate-500">{u.email}</div></td>
+                        <td>
+                          <select className="ctl ctl-sm" value={roleChoice(u)} disabled={busy} aria-label={`${u.name}: ${TEAM().toLowerCase()} or role`}
+                            onChange={e => change(u, fromChoice(e.target.value), `${u.name} is now ${(choices.find(c => c[0] === e.target.value) || [])[1]}. They sign in again to pick it up.`)}>
+                            {choices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                          </select>
+                        </td>
+                        <td>{statusOf(u)}</td>
+                        <td className="text-sm text-slate-600">{u.last_sign_in_at ? fmtWhen(u.last_sign_in_at) : "Never"}</td>
+                        <td className="text-right whitespace-nowrap">
+                          {!u.disabled && <button type="button" className="btn-sec" disabled={busy} onClick={() => sendLink(u)}
+                            title={u.has_password ? "Email a link to choose a new password (60 minutes)" : "Email the set-your-password link again (72 hours)"}>{u.has_password ? "Send reset link" : "Send invite again"}</button>}{" "}
+                          {u.id !== data.me && <button type="button" className="btn-sec" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
+                            onClick={() => change(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can sign in again.` : `${u.name} is signed out everywhere and cannot sign in.`)}>
+                            {u.disabled ? "Enable" : "Disable"}</button>}
+                        </td>
+                      </tr>
+                    ))}
+                    {!staff.length && <tr><td colSpan={5} className="text-sm text-slate-500">No logins yet. Add yourself first, as an Admin.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              {demos.length > 0 && (
+                <div className="card overflow-auto mt-4">
+                  <table className="tbl">
+                    <caption><b>Demo logins</b> · {demos.length} · one per person who asked for a demo; each ends after 14 days</caption>
+                    <thead><tr>{["Name", "Status", "Ends", "Last signed in", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                    <tbody>
+                      {demos.map(u => (
+                        <tr key={u.id}>
+                          <td><div className="font-medium text-slate-800">{u.name}</div><div className="text-[13px] text-slate-500">{u.email}</div></td>
+                          <td>{statusOf(u)}</td>
+                          <td className="text-sm text-slate-600">{u.expires_at ? fmtWhen(u.expires_at) : "—"}</td>
+                          <td className="text-sm text-slate-600">{u.last_sign_in_at ? fmtWhen(u.last_sign_in_at) : "Never"}</td>
+                          <td className="text-right whitespace-nowrap">
+                            <button type="button" className="btn-sec" disabled={busy} onClick={() => change(u, { extend_days: 7 }, `${u.name}'s demo access now runs 7 days longer.`)}>7 more days</button>{" "}
+                            {u.status === "active" && <button type="button" className="btn-sec" disabled={busy} onClick={() => sendLink(u)}>Send their link again</button>}{" "}
+                            <button type="button" className="btn-sec" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
+                              onClick={() => change(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can use the demo again.` : `${u.name}'s demo access is off.`)}>{u.disabled ? "Enable" : "Disable"}</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+          {tab === "leads" && (
+            <div className="card overflow-auto">
+              <table className="tbl">
+                <caption><b>Demo requests</b> · {leads ? leads.length : "…"} · <a className="link-btn" href={csvHref("/admin/demo-requests.csv")}>Download the list</a></caption>
+                <thead><tr>{["Asked", "Name", "Their login", "Sign-ins", "Pages opened", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                <tbody>
+                  {(leads || []).map(l => (
+                    <tr key={l.id} className="align-top">
+                      <td className="text-sm text-slate-600 whitespace-nowrap">{fmtWhen(l.created_at)}</td>
+                      <td><div className="font-medium text-slate-800">{l.name}</div><div className="text-[13px] text-slate-500">{l.email} · {l.organisation} · {l.role}</div></td>
+                      <td className="text-sm">{l.login === "none" ? "None (had the shared code)" : l.login === "staff login" ? "A staff login" : <>{l.login}{l.login_expires_at ? ", ends " + fmtWhen(l.login_expires_at) : ""}</>}</td>
+                      <td className="num">{l.sign_ins === "" ? "—" : l.sign_ins}</td>
+                      <td className="text-sm text-slate-600">{l.pages || "—"}</td>
+                      <td className="text-right whitespace-nowrap">
+                        {l.login === "none" && <button type="button" className="btn-sec" disabled={busy} onClick={() => leadLogin(l)}
+                          title="Make this person their own 14-day demo login and email them its link">Send a personal login</button>}
+                      </td>
+                    </tr>
+                  ))}
+                  {leads && !leads.length && <tr><td colSpan={6} className="text-sm text-slate-500">No demo requests yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {tab === "activity" && (
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+                <label>Person{" "}
+                  <select className="ctl ctl-sm" value={who} onChange={e => setWhoF(e.target.value)} aria-label="Person">
+                    <option value="">Everyone</option>
+                    {people.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select></label>
+                <a className="link-btn" href={csvHref("/admin/audit.csv", who ? { user: who } : {})}>Download as a spreadsheet</a>
+                <span className="text-slate-500">Every change anyone made, every sign-in, and the pages demo visitors opened. Newest first.</span>
+              </div>
+              <div className="card overflow-auto">
+                <table className="tbl">
+                  <thead><tr>{["When", "Who", "What", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {(rows || []).map(r => (
+                      <tr key={r.id} className="align-top">
+                        <td className="text-sm text-slate-600 whitespace-nowrap">{fmtWhen(r.at)}</td>
+                        <td className="text-sm">{r.actor_label}</td>
+                        <td className="text-sm">{describeActivity(r)}</td>
+                        <td className="text-[12px] text-slate-500" style={{ maxWidth: 420 }}>
+                          {r.detail && <details><summary>Details</summary><pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{r.detail.slice(0, 1500)}</pre></details>}
+                        </td>
+                      </tr>
+                    ))}
+                    {rows && !rows.length && <tr><td colSpan={4} className="text-sm text-slate-500">Nothing recorded yet.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -3185,6 +3738,8 @@ const NAV = [
     { id: "routes", label: "Routes", glyph: "⇄" },
     { id: "zones", label: "Zones", glyph: "◇" },
     { id: "config", label: "Config", glyph: "⚙" },
+    // G3 (14 Oct 2026, D57): admins only — the logins, the leads, the activity log
+    { id: "users", label: "Users", glyph: "☺", adminOnly: true },
   ]},
   { group: "Map", items: [
     { id: "map", label: "Route map", glyph: "🗺" },
@@ -3194,6 +3749,7 @@ const DATA_PAGES = ["locations", "routes", "zones"];
 // 11 Oct 2026 — line icons for the rail (fresh-directions, A). Inline SVG paths, no library.
 const NAV_ICON = {
   dashboard: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
+  users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M21 21v-1a6 6 0 0 0-4-5.7",
   submit: "M5 19h4L19 9l-4-4L5 15zM13 7l4 4",
   forecasts: "M5 6h14M5 12h14M5 18h9",
   carbon: "M5 19c0-8.3 5.7-14 14-14 0 8.3-5.7 14-14 14zM5 19l7-7",
@@ -3442,11 +3998,22 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
     const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); if(window.matchMedia && window.matchMedia(NARROW_Q).matches){ setMoreOpen(true); return; } setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const visible = NAV.filter(g => !g.admin || canApprove);
+  // G3: an item marked adminOnly (Users) shows to an admin — an admin login, or the shared admin code while codes last —
+  // and, so the first admin can be added on a site with no admin code set, to a planner signed in with a shared CODE.
+  // The page itself still needs an admin login or the admin token (the server checks), so this opens nothing new.
+  const isAdmin = !!(role && (role.role === "admin" || (role.can_approve && role.via !== "login")));
+  const visible = NAV.filter(g => !g.admin || canApprove)
+    .map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) })).filter(g => g.items.length);
   const navMatch = (it) => !navQ || it.label.toLowerCase().includes(navQ.toLowerCase());
   const navFirst = visible.flatMap(g => g.items).find(navMatch);
   const allowed = new Set(visible.flatMap(g => g.items.map(i => i.id)));
-  useEffect(() => { if(!allowed.has(page)) setPage("dashboard"); }, [canApprove]);
+  useEffect(() => { if(!allowed.has(page)) setPage("dashboard"); }, [canApprove, isAdmin]);
+  // G3 (D51, HU14): a lead's demo login says which page it opened, so the leads list shows who looked at what. Staff
+  // page opens are never sent (the server would ignore them anyway).
+  useEffect(() => {
+    if(!role || role.kind !== "demo") return;
+    fetch(`${API}/activity`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ page }) }).catch(() => {});
+  }, [page]);
 
   if(metaErr){
     return <div className="p-8 text-center text-slate-600">
@@ -3533,6 +4100,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
           <DataManagement meta={meta} who={who} subTab={page} onSubTab={(t) => setPage(t)} />
         )}
         {page === "config" && canApprove && !narrow && <ConfigPage meta={meta} who={who} access={role} />}
+        {page === "users" && isAdmin && !narrow && <UsersPage access={role} />}
         {page === "map" && (
           <iframe src={MAP_URL} title="Public Route Map" className="w-full h-full border-0" />
         )}
@@ -4852,7 +5420,7 @@ function ConfigPage({ meta, who, access }){
           <details className="row-menu" data-cfg-more="1">
             <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }} title="The admin token and the reset">More ▾</summary>
             <div className="row-menu-list" style={{ minWidth: 300 }}>
-              <label className="row-menu-field"><span>Admin token · needed to save, remembered in this browser</span>
+              <label className="row-menu-field"><span>Admin token · needed to save unless you signed in as an admin; remembered in this browser</span>
                 <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" /></label>
               <button onClick={reset} disabled={busy} style={{ color: "var(--red)" }} title="Overwrite the live configuration with backend/factors.json">Reset to file…</button>
               <div className="row-menu-note">Reset replaces every value on this page, including the tenant block, with the file in the repository. It asks first.</div>
