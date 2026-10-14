@@ -25,7 +25,7 @@ definition of a two-way movement (the map's kpi-note sentence); the demo notice.
 Page 2: movements a day by route with each typed cap dashed (print treatment: light fill, solid
 edge, label in ink — colour-system-1010.md); what is being moved (by discipline, the bar's own
 panel); works affecting the roads this month (stored restriction hits overlapping the month,
-the local controls, stockpiles over capacity, seasonal windows, planning flags exceeded, and
+the local controls, seasonal windows, planning flags exceeded (no stockpiles since 14 Oct: a site matter), and
 which routes were never checked); what changed since last month (plan against plan: the
 approved plan for each month as it stands today — no earlier issue is stored); terms explained;
 caveats; the report-a-lorry block, with the scheme's typed fields as placeholders.
@@ -847,10 +847,8 @@ def sheet(month_index, acc=None, now=None):
     if rs.get("past_month_note"):
         checks.append(rs["past_month_note"])
     others = []
-    for p in C.get("stockpiles_over") or []:
-        _u = p.get("unit") or "t"
-        others.append({"kind": "Over capacity", "text": f"{p['name']}: {float(p['balance_end']):,.0f} {_u} at the end of "
-                       f"{month_long}, above its {float(p['capacity_qty']):,.0f} {_u} capacity (weekly records so far)."})
+    # 14 Oct 2026 (the user took the recommendation): no stockpile line — a stockpile over capacity is a site matter,
+    # not for a public bulletin (bulletin.public_conditions leaves it out of the page's conditions)
     for s in C.get("seasonal") or []:
         others.append({"kind": "Seasonal window", "text": f"{s.get('name')}: {s.get('message') or ''} "
                        f"Applies to {len(s.get('routes') or [])} route(s) this month.".strip()})

@@ -1933,7 +1933,6 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   info={{ id: "dash.carbon", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
           </div>
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
-          <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
           <div className="dash-charts" data-dash-charts="1">
             <div className="card p-4 chart-card c-demand">
@@ -1953,6 +1952,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <ChartCanvas config={costCfg} />
         </div>
           </div>
+          {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
+              below them, so the four key charts are on the first screen at 1920 x 1080 */}
+          <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
             <div className="pt-3"><DashboardToday meta={meta} week={week} err={weekErr} wall={wall} /></div>
@@ -2554,7 +2556,7 @@ const GUIDE_STEPS = {
     { anchor: "page-header", title: "The plan at a glance.", body: "Pick the months, team and status here; the cards and charts follow, except this week's plan and the carbon target. Today's figures are under This week and today, further down." },
     { anchor: "dash-figures", title: "Six cards.", body: "Material in view, deliveries a day, vehicles needed, delivered against plan and transport carbon for the lines in view, and this week's plan from the Look-ahead. Point at a card to see how it is worked out." },
     { anchor: "dash-figures", title: "Carbon.", body: "Transport carbon counts transport only. The strip under the cards shows the scheme's all-in carbon target, once a planner has set one. Cost is in the Cost over time chart." },
-    // 11 Oct 2026 (gate arrivals): the panel under the carbon strip has its own step
+    // 11 Oct 2026 (gate arrivals): the panel has its own step (under the four charts since 14 Oct)
     { anchor: "dash-gates", title: "Gate arrivals.", body: "Lorries a day at each gate, every team together, and the average gap if arrivals are spread evenly." },
     { anchor: "dash-wall", title: "Big screen.", body: "Opens a version made for a site-office TV." },
   ],
