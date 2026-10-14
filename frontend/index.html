@@ -5842,7 +5842,7 @@ function ConfigPage({ meta, who, access }){
                 <tbody>
                   {vehicles.map(k => { const v = doc.vehicles[k]; const lab = v.labels || {};
                     // 14 Oct 2026 (civils materials): the row is named by the NAME being edited, never by the
-                    // stored id ("Truck mixer 8 m³ (32t)" is an id; the word rule makes it "Concrete mixer …")
+                    // stored id (a mixer's id keeps its trade name; the word rule makes it "Concrete mixer …")
                     const nm = ((lab.en || "").trim() && lab.en.trim() !== k) ? lab.en.trim() : vehWord(k);
                     return (
                     <tr key={k}>
@@ -8314,7 +8314,7 @@ const vehLangShown = (k) => k === "en" || ((VEH.langs || []).includes(k) && (
 // raw JSON. The column only edits labels.ee; nothing a forecast stores changes.
 const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");
 // 14 Oct 2026 (civils materials): a key used as a name passes the word rule (UK copy says lorry, never
-// truck): "Truck mixer 8 m³ (32t)" — a stored key, never renamed — reads "Concrete mixer 8 m³ (32t)".
+// truck): a mixer's stored key (its trade name, never renamed) reads "Concrete mixer 8 m³ (32t)".
 // The server applies the same rule (conversions.vehicle_word_rule); /api/meta's labels already carry it.
 const vehWord = (v) => String(v == null ? "" : v).replace(/^\s*truck\s+mixer\b/i, "Concrete mixer");
 const vehLabel = (v, lang) => { const l = (VEH.labels[v] || {})[lang || VEH.lang]; return (l && l !== v) ? l : vehWord(v || ""); };

@@ -30,7 +30,9 @@ boundaries — and, from v2: a gate or two on every site (entry and exit on diff
 roads where that is how the site works), two temporary haul roads ATTACHED to the routes
 that use them, three geofences (a works-zone closure that re-routes three routes, an
 advisory 7.5 t village limit, an advisory works area), daily vehicle caps on the village
-routes, and the tenant's demo notice on every screen and export.
+routes, and the tenant's demo notice on every screen and export. Since 14 Oct 2026 (civils
+materials, D13): a fictional ready-mix batching plant and a concrete pour — two mixer routes
+to Tilton and Melton Compounds, three lines in m³ on the two concrete mixers.
 
 NOTHING IN IT IS ANYONE'S DATA. Every name is invented; the quantities are made up to
 look plausible; the coordinates are chosen so HERE's truck routing finds sensible roads.
@@ -581,6 +583,64 @@ def build(with_areas=False, out=None):
             weeks.set_actual(spoil[0], m, "earthworks", section_of["C2"], wk, actual_qty=actual, actual_note=None, by="site clerk")
     weeks.confirm_week(spoil[0], 9, "earthworks", section_of["C2"], 3, by="Central Team planner")
 
+    # --- civils materials (14 Oct 2026, D13): a concrete pour --------------------------------------
+    # A (fictional) ready-mix batching plant on the Melton side feeds the two big structures — Tilton
+    # viaduct (Tilton Compound) and the Melton junction bridge (Melton Compound) — in m³, on the two
+    # concrete mixers. Its OWN seeded generator, so every draw above, and so every row above, is what
+    # it was before this block existed (the carbon block's rule). The compounds' `receives` gain the
+    # category through update_location, so their creation rows above are untouched too.
+    READY = "Ready-mixed concrete"
+    MIX8, MIX6 = "Truck mixer 8 m³ (32t)", "Truck mixer 6 m³ (26t)"   # the stored KEYS; every screen shows "Concrete mixer …"
+    rrng = random.Random(20261014)
+    # open ground on an unclassified road off the A606 south-east of Melton (OSM, 14 Oct 2026: New Road, no premises)
+    add("BP", "Wolds Link Batching Plant (fictional)", "origin", "Batching plant", -0.8620, 52.7440, supplies=[READY],
+        vendor="Wolds Ready-Mix Ltd (fictional)",
+        detail="Ready-mixed concrete for the structures; loading under the plant, a mixer an 8–10 minute turnaround. Fictional: no such plant.")
+    for key in ("C3", "C4"):
+        row = db.query("SELECT receives FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), loc[key]))[0]
+        have = json.loads(row["receives"]) if row.get("receives") else []
+        res = network.update_location(loc[key], receives=have + [READY])
+        assert "error" not in (res or {}), res
+    G["BP"] = gate("BP", "Plant gate", 140, -90, "both", default=True, safety=3, internal=3,
+                   note="One-way loop under the batching plant; wash-out bay before the exit (fictional).")
+    pour = {}
+    for dest in ("C3", "C4"):
+        r = network.create_route(loc["BP"], loc[dest], material_category=READY, ipt=team_of[dest])
+        assert "error" not in r, r
+        pour[dest] = r["id"] if isinstance(r, dict) and "id" in r else r.get("route", {}).get("id")
+        res = gates.set_route_gates(pour[dest], origin_gate_id=G["BP"], dest_gate_id=dest_gate[dest], origin_given=True, dest_given=True)
+        assert "error" not in res, res
+    # (dest, discipline, section, m³ a month range, mixer, description, months)
+    POUR_LINES = [
+        ("C3", "structures", "WS4", (900, 1500), MIX8, "C32/40 concrete — Tilton viaduct piers and deck", MONTHS),
+        ("C4", "structures", "WS8", (500, 900), MIX8, "C32/40 concrete — Melton junction bridge", [10, 11, 12]),
+        ("C4", "substructure", "WS6", (200, 400), MIX6, "C20/25 concrete — kerb bedding and drainage surrounds", [10, 11, 12]),
+    ]
+    n_pour = db.query("SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
+    for dest, disc, sec, (lo, hi), veh, desc, months in POUR_LINES:
+        base = rrng.uniform(lo, hi)
+        for m in months:
+            n_pour += 1
+            db.execute(
+                "INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, "
+                "quantity, unit, material_type, material_description, vehicle_type, submitted_by, "
+                "status, reject_reason, ipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (db.current_tenant(), f"F{n_pour:04d}", pour[dest], mi_of[m], disc, sec,
+                 float(round(base * rrng.uniform(0.85, 1.15) / 10.0) * 10), "m3", READY, desc,
+                 veh, f"{team_of[dest]} planner", "Approved", None, team_of[dest]))
+            weeks.materialise_line(pour[dest], disc, sec, month_index=mi_of[m])
+        # actuals typed for weeks 1–2 of each month up to October, as on every other line
+        for m in (9, 10):
+            if m not in months:
+                continue
+            for wk in (1, 2):
+                w = weeks.get_week(pour[dest], m, disc, sec, wk)
+                if not w:
+                    continue
+                actual = round(float(w.get("planned_qty") or 0) * rrng.uniform(0.86, 1.04))
+                weeks.set_actual(pour[dest], m, disc, sec, wk, actual_qty=actual, actual_note=None, by="site clerk")
+    weeks.confirm_week(pour["C3"], 9, "structures", "WS4", 3, by="North Team planner")
+
     # --- the overlay ------------------------------------------------------------------
     # Chainage markers at EXACT 100 m chainages, positioned along the line — the shape a
     # survey's chainage file has. (Markers at the alignment's own vertices would sit at
@@ -642,7 +702,8 @@ def build(with_areas=False, out=None):
     pkg["_readme"] = ("Synthetic demo tenant v2 — the Wolds Link, a fictional ~32 km A-road dualling scheme in the East "
                       "Midlands. Nothing in it is anyone's data. Import into an EMPTY tenant "
                       "(POST /api/admin/tenant/import; replace=1 over the v1 demo), then bake the network (HERE) for EVERY "
-                      "planning vehicle the lines use (Artic Tipper, Artic Flatbed, Rigid 8-wheeler) — routes read "
+                      "planning vehicle the lines use (Artic Tipper, Artic Flatbed, Rigid 8-wheeler, and since 14 Oct 2026 "
+                      "the two concrete mixers on the batching plant's routes) — routes read "
                       "UNBAKED until then, and the works-zone geofence only re-routes what is baked. Diesel index: fetched "
                       "automatically from DESNZ weekly road fuel prices (H1); fuel_index below is a typed placeholder applied "
                       "on import if the GB row is empty. Distances read in miles (tenant.distance_unit); km is what is stored. "

@@ -10,6 +10,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 4010.0,
@@ -52,7 +53,8 @@
    "actual_tonnes": 1900.0,
    "actual_eur": 3300.0,
    "weeks_reported": 2,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R1",
@@ -64,6 +66,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 4010.0,
@@ -106,7 +109,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R1",
@@ -118,6 +122,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 4010.0,
@@ -162,7 +167,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R2",
@@ -174,6 +180,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Artic Tipper (44t)",
    "vehicle_short": "Tipper (44t)",
+   "vehicle_name": "Artic Tipper (44t)",
    "vehicle_class": "artic",
    "unit": "t",
    "quantity": 2600.0,
@@ -216,7 +223,8 @@
    "actual_tonnes": 0.0,
    "actual_eur": null,
    "weeks_reported": 1,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R2",
@@ -228,6 +236,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Artic Tipper (44t)",
    "vehicle_short": "Tipper (44t)",
+   "vehicle_name": "Artic Tipper (44t)",
    "vehicle_class": "artic",
    "unit": "t",
    "quantity": 2600.0,
@@ -270,7 +279,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R2",
@@ -282,6 +292,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Artic Tipper (44t)",
    "vehicle_short": "Tipper (44t)",
+   "vehicle_name": "Artic Tipper (44t)",
    "vehicle_class": "artic",
    "unit": "t",
    "quantity": 2600.0,
@@ -326,7 +337,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R3",
@@ -338,6 +350,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 900.0,
@@ -382,7 +395,8 @@
    "weeks_reported": 0,
    "flags": [
     "UNBAKED"
-   ]
+   ],
+   "limit": null
   },
   {
    "route_id": "R3",
@@ -394,6 +408,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 900.0,
@@ -438,7 +453,8 @@
    "weeks_reported": 0,
    "flags": [
     "UNBAKED"
-   ]
+   ],
+   "limit": null
   },
   {
    "route_id": "R3",
@@ -450,6 +466,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 900.0,
@@ -494,7 +511,8 @@
    "weeks_reported": 0,
    "flags": [
     "UNBAKED"
-   ]
+   ],
+   "limit": null
   },
   {
    "route_id": "R4",
@@ -506,6 +524,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 1000.0,
@@ -548,7 +567,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R4",
@@ -560,6 +580,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 1000.0,
@@ -602,7 +623,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R4",
@@ -614,6 +636,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 1000.0,
@@ -658,7 +681,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   }
  ],
  "totals": {
@@ -714,22 +738,20 @@
   "baf_reason": "no base",
   "fair_params": {
    "driver_eur_per_h": 20.0,
-   "running_eur_per_km": 0.12,
-   "margin_pct": 8.0,
+   "vehicle_new_price_eur": 190000,
    "consumption": {
-    "rigid": {
-     "l_per_100km_empty": 27.0
-    },
     "artic": {
      "l_per_100km_empty": 23.6
     },
+    "rigid": {
+     "l_per_100km_empty": 27.0
+    },
     "l_per_100km_per_tonne": 0.4
    },
+   "margin_pct": 8.0,
+   "vehicle_standing_eur_per_h": 16.0,
    "season": {
-    "thaw_months": [
-     3,
-     4
-    ],
+    "winter_consumption_uplift_pct": 8.0,
     "winter_months": [
      11,
      12,
@@ -737,10 +759,12 @@
      2,
      3
     ],
-    "winter_consumption_uplift_pct": 8.0
+    "thaw_months": [
+     3,
+     4
+    ]
    },
-   "vehicle_standing_eur_per_h": 16.0,
-   "vehicle_new_price_eur": 190000
+   "running_eur_per_km": 0.12
   },
   "fair": {
    "index_eur_per_l": 1.922,

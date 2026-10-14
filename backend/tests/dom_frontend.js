@@ -898,7 +898,8 @@ async function configEstonianColumn(){
   };
   const ee = await mount("EE");
   ok("CONFIG (11 Oct 2026 review): ⭐ an Estonian tenant offered English alone still sees the Estonian column, to type its first Estonian name",
-     ee.th.includes("Vehicle (id)") && ee.th.includes("Estonian") && ee.inputs === 2, JSON.stringify(ee));
+     // NARROWED 14 Oct 2026: the first column is "Vehicle" (the name), no longer "Vehicle (id)"
+     ee.th.includes("Vehicle") && !ee.th.includes("Vehicle (id)") && ee.th.includes("Estonian") && ee.inputs === 2, JSON.stringify(ee));
   const gb = await mount("GB");
   ok("CONFIG (11 Oct 2026 review): ...a GB tenant does not (the country rule stands), English column only",
      gb.th.includes("English") && !gb.th.includes("Estonian") && gb.inputs === 1, JSON.stringify(gb));

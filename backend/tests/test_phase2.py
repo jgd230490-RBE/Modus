@@ -374,8 +374,12 @@ ok("re-seeding inserts nothing and rewrites nothing",
 ok("disciplines carry their material categories for the picker",
    all("materials" in d for d in in_scope))
 sub = [d for d in in_scope if d["id"] == "substructure"][0]
+# NARROWED 14 Oct 2026 (civils materials): this harness seeds its OWN bundle (FIX_TAX), which until today equalled the
+# product constant; the constant now also links the four civils categories, so the picker matches the bundle it was
+# seeded from, and every pair of that bundle is still in the constant (nothing was removed)
 ok("a discipline's materials match its seed",
-   sorted(sub["materials"]) == sorted(taxonomy.DISCIPLINE_MATERIALS["substructure"]),
+   sorted(sub["materials"]) == sorted(taxonomy.load_bundle(FIX_TAX)["discipline_materials"]["substructure"])
+   and set(sub["materials"]) <= set(taxonomy.DISCIPLINE_MATERIALS["substructure"]),
    str(sub["materials"]))
 ok("ipts.manager left NULL", all(i["manager"] is None for i in taxonomy.list_ipts()))
 ok("IPTs seeded pre-merge, no merge modelling",

@@ -1118,7 +1118,7 @@
 <script>
     // 14 Oct 2026 (civils materials): a vehicle is shown by its NAME, never its stored key. The feeds send
     // vehicle_name (conversions.vehicle_label on the server); vehWord is the same word rule for a bare key
-    // (UK copy says lorry, never truck: the key "Truck mixer 8 m³ (32t)" reads "Concrete mixer 8 m³ (32t)").
+    // (UK copy says lorry, never truck: a mixer's stored key, its trade name, reads "Concrete mixer 8 m³ (32t)").
     function vehWord(v){ return String(v == null ? '' : v).replace(/^\s*truck\s+mixer\b/i, 'Concrete mixer'); }
     function vehName(key, name){ return name || vehWord(key); }
     // Route and node data now come from the routing network over the API, not from the
@@ -4974,7 +4974,7 @@
         h += row('Applies to', e(limitAppliesText(p)));
         h += row('Exceptions', e(p.exceptions || 'None recorded'));
         h += row('Planned routes over it', lines.length
-            ? lines.map(x => e(x.route_id + (x.vehicle ? ' · ' + vehWord(x.vehicle) : '') + ' · ' + x.legs.join(' and '))).join('<br>')
+            ? lines.map(x => e(x.route_id + (x.vehicle ? ' · ' + x.vehicle : '') + ' · ' + x.legs.join(' and '))).join('<br>')
             : 'None of the planned routes', lines.length ? 'over' : '');
         h += row('Source', e((p.source_label || p.source || '') + (fetched ? ' · fetched ' + fetched : '')));
         h += '<div class="lim-foot">Advisory: check the signed limit on site.' + (p.attribution ? '<br>' + e(p.attribution) : '') + '</div></div>';
@@ -4993,7 +4993,7 @@
             const b = lines[0], where = p.name || p.ref, kw = limitKindWord(p.kind);
             rows.push({ key: 'l|' + p.id + '|' + month, lvl: 'warn', src: 'limit', who: b.route_id, kind: 'l', id: p.id,
                 noun: 'Over ' + (p.kind === 'axle' ? 'an ' : 'a ') + kw + ' limit',
-                what: b.route_id + (b.vehicle ? ' · ' + vehWord(b.vehicle) : '') + ' is over the ' + limitValueText(p.kind, p.value, p.unit) + ' ' + kw + ' limit'
+                what: b.route_id + (b.vehicle ? ' · ' + b.vehicle : '') + ' is over the ' + limitValueText(p.kind, p.value, p.unit) + ' ' + kw + ' limit'
                     + (where ? ' on ' + where : '') + ' (' + (p.source_label || p.source || 'source not named') + ')'
                     + (lines.length > 1 ? ' (+' + (lines.length - 1) + ' more)' : ''),
                 sort: 1.2 });

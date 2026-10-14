@@ -1925,7 +1925,10 @@ class _Kit:
             if run >= tot / 2:
                 cut_at = k + 1
                 break
-        col = lambda part: [Paragraph(t, sm, bulletText=f"{i}") for i, t in part] or [""]
+        # 14 Oct 2026 (found by the civils harness): an EMPTY column was [""] — a list holding a bare string, which
+        # reportlab cannot lay out, so every bulletin whose sources all fell in the left column (a tenant with no council
+        # areas: the shipped demo package) failed to build. An empty column is now a zero-height spacer.
+        col = lambda part: [Paragraph(t, sm, bulletText=f"{i}") for i, t in part] or [Spacer(1, 0)]
         g = self.usable * 0.07              # a wide gutter, so text readers keep the two columns apart
         tb = LongTable([[col(items[:cut_at]), "", col(items[cut_at:])]],
                        colWidths=[(self.usable - g) / 2, g, (self.usable - g) / 2])
