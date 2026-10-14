@@ -42,10 +42,12 @@ import datetime
 import hashlib
 import hmac
 import io
+import itertools
 import json
 import os
 import re
 import secrets
+import time
 import uuid
 
 import db
@@ -372,6 +374,29 @@ def update_user(user_id, fields, by_user_id=None):
     return get_user(user_id), None
 
 
+def promote_demo(user_id, name, role, team=None):
+    """
+    (user, error). A lead who becomes a customer: their DEMO login becomes a staff login — the end date
+    is cleared, the name, role and team are the admin's, every session ends and the personal demo link
+    stops working (they will set a password from the invite). Called when an admin adds a staff login
+    for an address that already holds a demo login; refused for anything but a demo login.
+    """
+    user = get_user(user_id)
+    if not user or user.get("kind") != "demo":
+        return None, "Only a demo login can become a staff login."
+    name = (name or "").strip()
+    if not name or len(name) > 120:
+        return None, "Enter the person's name (at most 120 characters)."
+    role, slot, err = _check_role(role, team)
+    if err:
+        return None, err
+    sql = "UPDATE users SET kind = 'staff', expires_at = NULL, name = ?, role = ?, team = ?, disabled = 0 WHERE tenant_id = ? AND id = ?"
+    db.execute(sql, (name, role, slot, _tenant(), user_id))
+    db.execute("DELETE FROM auth_tokens WHERE tenant_id = ? AND user_id = ? AND purpose = 'demo'", (_tenant(), user_id))
+    end_all_sessions(user_id)
+    return get_user(user_id), None
+
+
 def set_password(user_id, pw):
     """(ok, error). Ends every session of the person: a new password signs every other browser out."""
     user = get_user(user_id)
@@ -666,10 +691,21 @@ def actor_of(acc, token_used=False):
     if acc and acc.get("via") == "login":
         return "user", acc.get("user_id"), f"{acc.get('name')} <{acc.get('email')}>"
     if acc:
-        return "code", None, f"{acc.get('label') or acc.get('role')} code (shared)"
+        label = f"{acc.get('label') or acc.get('role')} code (shared)"
+        return "code", None, label + (", with the admin token" if token_used else "")
     if token_used:
         return "token", None, "admin token"
     return "anonymous", None, "not signed in"
+
+
+_AUDIT_SEQ = itertools.count()
+
+
+def _audit_id():
+    """Time-ordered (nanoseconds, then a per-process counter, then random), so rows written in the same
+    second still list newest first: audit_rows() orders by `at`, then this id. The counter is there
+    because Windows' clock can return the same nanoseconds for two writes in a row."""
+    return "%020d%08d%s" % (time.time_ns(), next(_AUDIT_SEQ) % 100000000, uuid.uuid4().hex[:8])
 
 
 def audit(kind, acc=None, method=None, path=None, target=None, status=None, detail=None, ip=None,
@@ -681,7 +717,7 @@ def audit(kind, acc=None, method=None, path=None, target=None, status=None, deta
         db.execute(
             "INSERT INTO audit_log (tenant_id, id, at, kind, actor_kind, actor_id, actor_label, method, path, target, "
             "status, detail, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (_tenant(), uuid.uuid4().hex, _iso(now or _now()), kind, ak, aid, (al or "")[:300], method,
+            (_tenant(), _audit_id(), _iso(now or _now()), kind, ak, aid, (al or "")[:300], method,
              (path or "")[:300] or None, (target or "")[:300] or None, status, _detail(detail),
              ip_hash(ip) if ip else None))
     except Exception as e:  # noqa: BLE001

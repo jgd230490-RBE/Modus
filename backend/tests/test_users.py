@@ -445,6 +445,15 @@ at()
 ok("a staff address gets no demo login", users.demo_login("cy@example.org", "Cy", "req3")["status"] == "staff"
    and users.get_user(cy["id"])["kind"] == "staff")
 ok("nice_date reads 'Wed 28 Oct 2026'", users.nice_date("2026-10-28T09:00:00Z") == "Wed 28 Oct 2026")
+pd = users.demo_login("convert@example.org", "Con Vert")
+pdraw = pd["link"].split("#demo=", 1)[1]
+s_pd, _ = users.create_session(pd["user"]["id"])
+pu, perr = users.promote_demo(pd["user"]["id"], "Con Vert", "planner")
+ok("⭐ a lead who becomes a customer: promote_demo makes the demo login a staff planner with no end date",
+   perr is None and pu["kind"] == "staff" and pu["expires_at"] is None and pu["role"] == "planner")
+ok("🔴 ...their personal link and their sessions end", users.peek_token(pdraw, ("demo",)) == (None, None)
+   and users.resolve_session(s_pd) == (None, None))
+ok("promote_demo refuses a staff login", users.promote_demo(cy["id"], "Cy", "planner")[1] is not None)
 
 # =========================================================================== #
 #  6. changing logins: the last admin, yourself                                #
@@ -527,6 +536,9 @@ big = {"rows": [{"q": i} for i in range(2000)]}
 users.audit("write", acc=None, method="POST", path="/api/forecasts/bulk", status=200, detail=big)
 r_ = users.audit_rows()[0]
 ok("a big body is capped at 4 KB", len(r_["detail"]) <= users.AUDIT_DETAIL_MAX and r_["detail"].endswith("…"))
+users.audit("write", acc=None, path="/api/first"); users.audit("write", acc=None, path="/api/second")
+ok("rows written in the same second list newest first (time-ordered ids)",
+   [r["path"] for r in users.audit_rows(kind="write")][:2] == ["/api/second", "/api/first"])
 ada, _ = users.create_user("ada@example.org", "Ada Lovelace", "admin")
 users.audit("write", acc=users.access_for(ada), method="PUT", path="/api/admin/config/factors", status=200,
             detail={"body": {"doc": {"x": 1}, "updated_by": "Ada"}, "query": {"token": "adm-token-for-tests"}})
@@ -539,6 +551,8 @@ users.audit("write", acc=None, token_used=True, method="POST", path="/api/admin/
 labels = [r["actor_label"] for r in users.audit_rows(kind="write")]
 ok("a shared code is named as a code, the admin token as the token",
    "Planner code (shared)" in labels and "admin token" in labels)
+ok("...and a code holder who typed the admin token is named as both",
+   users.actor_of(access.resolve("planner-secret-xyz"), token_used=True)[2] == "Planner code (shared), with the admin token")
 lead = users.demo_login("lead@example.org", "Lea Lead")["user"]
 ok("⭐ D51: a page open is recorded for a DEMO login", users.record_page(users.access_for(lead), "Look-ahead!") is True
    and users.audit_rows(kind="page")[0]["target"] == "look-ahead")

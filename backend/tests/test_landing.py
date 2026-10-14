@@ -380,8 +380,17 @@ ok("a honeypot field exists for the server to reject bots on (H9)",
    "website" in names and 'class="hp"' in src and "tabindex" in names["website"][1])
 ok("the submit button says what happens", any(t == "button" and a.get("type") == "submit" for t, a in p.fields)
    and "Email me the demo access" in body)
-ok("the form links the privacy notice and warns that the access details are shared",
-   "./privacy.html" in p.hrefs and "shared between everyone viewing the demo" in flat)
+# REVERSED 14 Oct 2026 (G3 / HU14, D54): the access is no longer shared — each visitor gets their own 14-day link
+ok("the form links the privacy notice, says the link is the visitor's own for 14 days, and no longer says the access is shared",
+   "./privacy.html" in p.hrefs and "Your demo link is your own and works for 14 days." in flat
+   and "shared between everyone" not in flat and "own sign-in link" in flat)
+for _fn in ("privacy.html", "thanks.html", "index.html"):
+    ok(f"🔴 G3: {_fn} no longer says the demo access is shared between everyone",
+       "shared between everyone" not in open(os.path.join(ROOT, "landing", _fn), encoding="utf-8").read())
+_priv = re.sub(r"\s+", " ", open(os.path.join(ROOT, "landing", "privacy.html"), encoding="utf-8").read())
+ok("D54: the privacy notice says what the demo login records (sign-ins, pages opened), that it lasts 14 days, and the one cookie",
+   "their own sign-in link, which stops working after 14 days" in _priv and "which pages you opened" in _priv
+   and "the app sets one cookie that keeps you signed in" in _priv)
 
 # --- the three support pages (8 Oct) ----------------------------------------------------
 for fn, must in (("privacy.html", ("ico.org.uk", "24 months", "JDavis@wayscope.co.uk", "no tracking cookies")),

@@ -404,12 +404,12 @@
       <div class="copy">
         <p class="eyebrow">Organisation before movement.</p>
         <h2>See it on a fictional demo scheme.</h2>
-        <p>Demos are by request. Tell us who you are and we'll email you the link and access details for the fictional demo scheme straight away. Tell us the type of scheme and the plans you have to write, and we'll take you through the three walkthroughs on it.</p>
+        <p>Demos are by request. Tell us who you are and we'll email you your own sign-in link for the fictional demo scheme straight away. Tell us the type of scheme and the plans you have to write, and we'll take you through the three walkthroughs on it.</p>
         <p>Or write to <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a>.</p>
       </div>
       <!-- 8 Oct (H5c): a plain HTML POST to the app on app.wayscope.co.uk (H9 builds the endpoint;
            it stores the request, emails the access details and answers 303 to thanks.html or
-           error.html). The codes are never on this page; they travel only in the email. -->
+           error.html). Since G3 (14 Oct 2026) the email carries the visitor's OWN 14-day link, no shared code. -->
       <form method="post" action="https://app.wayscope.co.uk/api/public/demo-request" accept-charset="UTF-8">
         <div class="field">
           <label for="dr-name">Your name <span class="req" aria-hidden="true">*</span></label>
@@ -447,7 +447,7 @@
         <label class="check"><input type="checkbox" name="updates" value="yes"><span>Send me occasional product updates</span></label>
         <div class="submit">
           <button class="btn btn-orange" type="submit">Email me the demo access</button>
-          <p class="fine">We use your details to send the demo and to follow up on your request. Read the <a href="./privacy.html">privacy notice</a>. The access details are shared between everyone viewing the demo, so please don't enter real project data.</p>
+          <p class="fine">We use your details to send the demo and to follow up on your request. Read the <a href="./privacy.html">privacy notice</a>. Your demo link is your own and works for 14 days. The demo is a fictional scheme, so please don't enter real project data.</p>
         </div>
       </form>
     </div>

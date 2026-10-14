@@ -447,7 +447,8 @@ def _audit_write(request, path, method, status, body):
             else:
                 detail["body_bytes"] = len(body)
         acc = access.current()
-        token_used = (not acc) and bool(q.get("token"))
+        # the token counts only where a LOGIN did not already pass _check_admin
+        token_used = bool(q.get("token")) and not (acc and acc.get("via") == "login")
         users.audit("write", acc=acc, method=method, path=path, status=status,
                     detail=detail or None, ip=_client_ip(request), token_used=token_used)
     except Exception as e:  # noqa: BLE001
@@ -504,6 +505,9 @@ def auth(body: AuthIn):
     acc = access.resolve(body.code)
     if not acc:
         raise HTTPException(401, "unknown access code")
+    acc["via"] = "code"
+    # G3 (D49): a sign-in with a shared code is recorded, as the code — there is nobody else to name
+    users.audit("signin-code", actor=users.actor_of(acc))
     return access.describe(acc)
 
 
@@ -848,13 +852,21 @@ def admin_users(token: Optional[str] = None):
 
 @app.post("/api/admin/users")
 def admin_user_add(body: UserIn, token: Optional[str] = None):
-    """Add a staff login and send its invite (a set-your-password link, 72 hours, single use)."""
+    """Add a staff login and send its invite (a set-your-password link, 72 hours, single use). An address
+    that holds a lead's DEMO login is turned into a staff login (users.promote_demo): a lead who becomes
+    a customer keeps their history in the activity log."""
     _check_admin(token)
     label = _admin_actor()[2]
-    user, err = users.create_user(body.email, body.name, body.role, body.team, created_by=label)
+    existing = users.find_by_email(body.email)
+    if existing and existing.get("kind") == "demo":
+        user, err = users.promote_demo(existing["id"], body.name, body.role, body.team)
+        converted = True
+    else:
+        user, err = users.create_user(body.email, body.name, body.role, body.team, created_by=label)
+        converted = False
     if err:
         raise HTTPException(400, err)
-    return {"user": users.public(user), **_invite_or_reset(user)}
+    return {"user": users.public(user), "converted": converted, **_invite_or_reset(user)}
 
 
 @app.patch("/api/admin/users/{user_id}")
