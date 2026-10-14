@@ -82,7 +82,9 @@ def _ensure_location_columns():
                      # stockpiles.set_capacity(); listed here so a live database whose
                      # `locations` predates that migration cannot 500 an admin write.
                      ("capacity_qty", "REAL"), ("capacity_unit", "TEXT"),
-                     ("opening_qty", "REAL")):
+                     ("opening_qty", "REAL"),
+                     # 14 Oct 2026 (bundle G, W8): the site's CLP cap — set_clp_cap()
+                     ("clp_cap_per_day", "REAL")):
         try:
             if db.IS_PG:
                 db.execute(f"ALTER TABLE locations ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1023,10 +1025,46 @@ def locations_geojson():
                            # balance reports remaining as unknown.
                            "capacity_qty": l.get("capacity_qty"),
                            "capacity_unit": l.get("capacity_unit"),
-                           "opening_qty": l.get("opening_qty")},
+                           "opening_qty": l.get("opening_qty"),
+                           # 14 Oct 2026 (bundle G, W8): lorry visits a day agreed in the CLP; null = none
+                           "clp_cap_per_day": l.get("clp_cap_per_day")},
             "geometry": {"type": "Point", "coordinates": [l["lon"], l["lat"]]},
         })
     return {"type": "FeatureCollection", "features": feats}
+
+
+CLP_CAP_WORDS = "lorry visits a day agreed in the CLP (one visit = one lorry in and out)"
+
+
+def clp_cap_problem(v):
+    """14 Oct 2026 (W8): None for a blank (no cap) or a number above 0; else the problem in words."""
+    if v is None or v == "":
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return "the CLP cap must be a number of lorry visits a day"
+    if f != f or f <= 0:
+        return "the CLP cap must be above 0 (clear it to mean no cap)"
+    return None
+
+
+def set_clp_cap(location_id, value):
+    """
+    14 Oct 2026 (bundle G, W8). The site's CLP cap: lorry visits a day agreed in the
+    Construction Logistics Plan, compared with the planned visits by the CLP section (chart 1b).
+    A flag, never a block. Blank clears it (None, never 0). Routes are untouched: no re-bake.
+    """
+    _ensure_location_columns()
+    p = clp_cap_problem(value)
+    if p:
+        return {"error": p}
+    if not db.query("SELECT id FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), location_id)):
+        return {"error": "not found"}
+    v = None if value in (None, "") else float(value)
+    db.execute("UPDATE locations SET clp_cap_per_day = ? WHERE tenant_id = ? AND id = ?",
+               (v, db.current_tenant(), location_id))
+    return {"id": location_id, "clp_cap_per_day": v}
 
 
 def routes_touching(location_id):

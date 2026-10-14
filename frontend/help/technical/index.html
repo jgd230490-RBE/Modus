@@ -47,6 +47,7 @@ th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight
 <li class="l2"><a href="#t1-fair">Fair cost (the model)</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li>
+<li class="l2"><a href="#t1-clp">CLP monitoring</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
 <li class="l1"><a href="#t4-settings">T4 Settings and deployment</a></li>
@@ -139,11 +140,36 @@ all teams summed at the gate a lorry arrives by: laden at the destination's entr
 origin's. Arrivals a day = trips ÷ working days. The gap is the shift's minutes ÷ arrivals, an average with no hourly
 peak. Red only when that gap is shorter than the gate's typed check-in; a gate with no check-in typed is never
 compared. A team code gets the totals and the team names, never another team's figure.</p>
+<p>Since 14 Oct 2026 (<code>backend/gate_hours.py</code>, the one rule for every screen and export): a gate's <strong>open
+minutes</strong> are its typed open hours (a window that ends before it starts runs past midnight) less the scheme's
+no-delivery peak bands (<code>planning.peak_bands</code>, Config → Planning) inside them; a gate with no hours typed uses
+the shift's minutes, and the peak bands cannot be taken off it (the shift has no clock times). Capacity a day = open
+minutes ÷ check-in minutes a lorry; the gap uses the same open minutes. Two steps: <strong>Queue likely</strong> (amber)
+at 85 % of capacity or more (<code>NEAR_PCT</code>), <strong>Over gate capacity</strong> (red) past it — the red rule
+above, renamed on screen. Open days (seven flags, Monday first) are tested on the Look-ahead's dated days only: a month
+figure is a working-day average. The reply carries <code>near_per_day</code> (85 % of capacity) for the chart's guide tick.</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
 <pre>balance at the week's end = opening + typed week actuals delivered there − typed consumption</pre>
 <p>A week nobody reported counts as nothing. Consumption is typed on Look-ahead → Account. The chart is red past
 capacity and amber from 90 %; a stockpile with no capacity recorded is listed, never drawn as zero.</p>
+
+<h2 id="t1-clp">CLP monitoring</h2>
+<p>Read from <code>GET /api/clp/monitoring?month=N</code> (<code>backend/clp.py</code>), the first time the Dashboard
+section is opened; the CLP pack prints the same reply. Each chart comes back with <code>state</code> "set", or "empty"
+and <code>missing</code> in words. Every figure is the module's that owns it, never worked out again:</p>
+<pre>routes vs cap      bulletin.route_cap_rows: the month's approved loads ÷ working days vs max_vehicles_per_day
+sites vs CLP cap   gate_arrivals.location_visits: laden + coming-to-load trips ÷ working days vs clp_cap_per_day
+vehicle / Euro     carbon.scenario's baseline lines: trips by vehicle (equal to costlines' trips), Euro class from Config
+councils           areas.area_load: districts, movements a day, laden and total lorry-km (÷ 1.609344 for miles)
+carbon a tonne     all-in total_t × 1000 ÷ tonnes, as planned and with the target's levers; target_t (carbon_target.status) ÷ plan tonnes
+trips avoided      the same scenario: baseline trips − trips with the target's levers; delta_vkm_km</pre>
+<p>The CLP pack is the same reply printed: <code>GET /api/clp/pack.pdf?month=N</code> and <code>/api/clp/pack.xlsx?month=N</code>
+(<code>backend/clp_pack.py</code>), exactly the charts in state "set", each with its table, basis and source; the rest listed
+under "Not drawn this month". It draws and never computes. The demo notice is on every page (the shared page frame) and
+heads every sheet.</p>
+<p>Scope: the vehicle, carbon and trip charts are the caller's visible lines (a team code: its own, and its share of the
+target); the caps and councils are the scheme's. No figure is observed: no gate log is held (decision D42).</p>
 
 <h1 id="t2-routing">T2 Routing with HERE</h1>
 <p>The screens say a route is <em>routed</em> or <em>not routed yet</em>. In the code and the data this is

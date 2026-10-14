@@ -250,7 +250,16 @@ FLAG_LABEL = {"SHORTAGE": "SHORTAGE", "DAYS_NE_WEEK": "DAYS ≠ WEEK", "STOCKPIL
               # H1: the restriction flag reads the provider's word (TARK TEE / ROADWORKS);
               # see _flag_label(), which reads it off the flag itself
               "RESTRICTION": "RESTRICTION",
-              "UNBAKED": "UNBAKED", "PARENT_CHANGED": "PARENT CHANGED"}
+              "UNBAKED": "UNBAKED", "PARENT_CHANGED": "PARENT CHANGED",
+              # 14 Oct 2026 (bundle G, W17): a gate's planned arrivals on a day against what it can check in
+              "GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"}
+
+#: 14 Oct 2026 (W17): printed wherever a gate flag is — the figures are planned, not observed
+GATE_LIMIT = "Gate capacity: planned arrivals spread evenly over the gate's open hours; no hourly peak is known."
+
+
+def _has_gate_flag(page):
+    return any((f or {}).get("code") in ("GATE_OVER", "GATE_NEAR") for f in ((page.get("clashes") or {}).get("flags") or []))
 
 
 def _flag_label(f):
@@ -352,6 +361,8 @@ def build_xlsx(page):
                 ("WS", "section_id"), ("Day", "day_date"), ("Detail", "text")],
           [dict(f, code=_flag_label(f), ipt=_nm(f.get("ipt")), text=_nm(f.get("text")))
            for f in ((page.get("clashes") or {}).get("flags") or [])])
+    if _has_gate_flag(page):           # 14 Oct 2026 (W17): the honest limit beside the gate flags
+        ws3.cell(row=ws3.max_row + 2, column=1, value=GATE_LIMIT)
     ws4 = wb.create_sheet("About")
     about = [
         ("Sheet", f"{_tenant_name()} · {_week_title(page)} · commit week"),
@@ -363,7 +374,7 @@ def build_xlsx(page):
         (_src_word(page), ((page.get("clashes") or {}).get("sources") or {}).get("restrictions")),
         (_src_word(page) + " checked", ((page.get("clashes") or {}).get("sources") or {}).get("restrictions_checked_at")),
         ("Days", "Mon–Fri only; Sat/Sun are 0 and not listed"),
-    ] + [("Note", f) for f in footer_lines()]
+    ] + ([("Gate capacity", GATE_LIMIT)] if _has_gate_flag(page) else []) + [("Note", f) for f in footer_lines()]
     for i, (k, v) in enumerate(about, 1):
         ws4.cell(row=i, column=1, value=k).font = Font(bold=True)
         cv = ws4.cell(row=i, column=2, value=v)
@@ -838,6 +849,8 @@ def build_pdf(page):
             fl.append(P(E(f"{_flag_label(f)}: {_nm(f['text'])}"[:160]), st_red))
         if len(flags) > 12:
             fl.append(P(f"+{len(flags) - 12} more on the XLSX", st_red))
+        if _has_gate_flag(page):
+            fl.append(P(E(GATE_LIMIT), st_grey))
     else:
         tt = ((page.get("clashes") or {}).get("sources") or {}).get("restrictions")
         fl.append(P("none" + (f" · {_src_word(page)} unavailable, restrictions not checked" if tt == "unavailable" else ""), st_grey))

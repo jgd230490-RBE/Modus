@@ -803,6 +803,45 @@ with TestClient(main.app, base_url="https://testserver") as c:
               f"(laden {g['laden_per_day']}, empty {g['empty_per_day']}), gap {g['gap_minutes']} min, "
               f"check-in {g['gate_minutes']}, flag {g['flag']}, role {g['role']}, teams {g['teams']}")
 
+    # 14 Oct 2026 (bundle G, W7): the CLP monitoring read, over the real app and the demo package (which carries no route
+    # geometry, so the councils chart has no clipped legs and the carbon is material + disposal only — honest gaps, asserted)
+    r = c.get("/api/clp/monitoring?month=10")
+    ok("🔴 CLP monitoring without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/clp/monitoring?month=10", headers=PLAN)
+    cm = r.json() if r.status_code == 200 else {}
+    ch = cm.get("charts") or {}
+    ok("⭐ the planner reads CLP monitoring for Oct 2026 of the demo: seven charts in order, each set or empty with a sentence",
+       r.status_code == 200 and cm.get("label") == "Oct 2026" and cm.get("order") == ["route_caps", "site_caps", "vehicle_types", "euro_class",
+                                                                                   "councils", "carbon_rate", "trips_avoided"]
+       and all((c_.get("state") == "set") or (c_.get("state") == "empty" and c_.get("missing")) for c_ in ch.values()), r.text[:300])
+    ok("the demo's vehicle chart is drawn (approved loads exist), its shares from the server",
+       (ch.get("vehicle_types") or {}).get("state") == "set" and (ch.get("vehicle_types") or {}).get("series"), str(ch.get("vehicle_types"))[:200])
+    ok("🔴 no team id and no team slot in the reply; the demo notice rides on it",
+       "IPT" not in r.text and cm.get("demo_notice"), str(cm.get("demo_notice")))
+    r = c.get("/api/clp/monitoring?month=10", headers=NORTH)
+    cn = r.json() if r.status_code == 200 else {}
+    ok("🔴 the North Team code: scope team; its vehicle chart holds only its own loads (no more than the planner's)",
+       r.status_code == 200 and cn.get("scope") == "team"
+       and sum(((cn.get("charts") or {}).get("vehicle_types") or {}).get("totals") or [0])
+       <= sum((ch.get("vehicle_types") or {}).get("totals") or [0]), r.text[:200])
+    r = c.get("/api/clp/monitoring?month=0", headers=PLAN)
+    ok("CLP month 0 is refused — 400", r.status_code == 400, str(r.status_code))
+    # 14 Oct 2026 (bundle G, W10): the CLP pack over HTTP
+    r = c.get("/api/clp/pack.pdf?month=10", headers=PLAN)
+    ok("⭐ the CLP pack PDF for Oct 2026: 200, a PDF, the month's file name",
+       r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:4] == b"%PDF"
+       and 'filename="wayscope-clp-pack-2026-10.pdf"' in r.headers.get("content-disposition", ""), str(r.status_code))
+    r = c.get("/api/clp/pack.xlsx?month=10", headers=PLAN)
+    ok("⭐ the CLP pack XLSX for Oct 2026: 200, a workbook, the month's file name",
+       r.status_code == 200 and r.content[:2] == b"PK"
+       and 'filename="wayscope-clp-pack-2026-10.xlsx"' in r.headers.get("content-disposition", ""), str(r.status_code))
+    r = c.get("/api/clp/pack.pdf?month=10")
+    ok("🔴 the CLP pack without a code — 401", r.status_code == 401, str(r.status_code))
+    print("  CLP monitoring, Oct 2026 (demo package):")
+    for k in cm.get("order") or []:
+        c_ = ch.get(k) or {}
+        print(f"    {k}: {c_.get('state')} · {c_.get('headline') or c_.get('missing')}")
+
     # the Submit forecast preview's all-in carbon, over HTTP: 1,000 t of cut to the landfill = 1000 × 19.55376
     r = c.post("/api/costing/preview", headers=PLAN, json={"route_id": "R019", "vehicle_type": "Artic Tipper (44t)",
                                                           "material_type": "Earthworks / soil", "unit": "t",

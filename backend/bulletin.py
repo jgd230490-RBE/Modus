@@ -457,6 +457,37 @@ def _stamp_caps(routes):
 # --------------------------------------------------------------------------- #
 #  Conditions of the month                                                      #
 # --------------------------------------------------------------------------- #
+def loads_by_route_of(payload):
+    """{route_id: the month's approved loads} from a month payload (fractional, the bar's rule)."""
+    out = {}
+    for l in (payload or {}).get("lines", []) or []:
+        out[l["route_id"]] = out.get(l["route_id"], 0.0) + float(l.get("vehicle_loads") or 0.0)
+    return out
+
+
+def route_cap_rows(loads_by_route, wd):
+    """
+    14 Oct 2026 (bundle G): the Conditions panel's cap rule as ONE function, read by conditions_of_month and
+    by the CLP section's chart 1 — every route with a typed cap AND approved volume in the month: two-way
+    movements a day (one load = one movement; the month's loads ÷ working days) against the cap. A flag,
+    never a block. The Look-ahead's ROUTE_CAP counts the lorries needed on a day instead (the user, 14 Oct:
+    "keep both as now").
+    """
+    caps = db.query("SELECT id, max_vehicles_per_day FROM routes WHERE tenant_id = ? "
+                    "AND max_vehicles_per_day IS NOT NULL", (db.current_tenant(),))
+    out = []
+    for r in caps:
+        if r["id"] not in loads_by_route:
+            continue
+        a_day = loads_by_route[r["id"]] / wd
+        cap = int(r["max_vehicles_per_day"])
+        over = a_day > cap
+        out.append({"route_id": r["id"], "cap": cap, "two_way_a_day": _r(a_day), "over": over,
+                     "over_by": (_r(a_day - cap) if over else None), "pct": (round(a_day * 100.0 / cap) if cap > 0 else None)})
+    out.sort(key=lambda x: x["route_id"])
+    return out
+
+
 def conditions_of_month(month_index, payload=None, factors=None):
     """
     What the map's Conditions panel shows for a month, from what is STORED:
@@ -562,19 +593,11 @@ def conditions_of_month(month_index, payload=None, factors=None):
             seasonal.append({"name": w.get("name"), "message": w.get("message"),
                              "months": w.get("months"), "restricted_vehicles": rv, "routes": applies})
 
-    # 4. typed caps against the month's two-way movements a day
-    caps = db.query("SELECT id, max_vehicles_per_day FROM routes WHERE tenant_id = ? "
-                    "AND max_vehicles_per_day IS NOT NULL", (db.current_tenant(),))
-    exceeded, checked_caps = [], 0
-    for r in caps:
-        if r["id"] not in loads_by_route:
-            continue
-        checked_caps += 1
-        a_day = loads_by_route[r["id"]] / wd
-        cap = int(r["max_vehicles_per_day"])
-        if a_day > cap:
-            exceeded.append({"route_id": r["id"], "cap": cap, "two_way_a_day": _r(a_day),
-                             "over_by": _r(a_day - cap), "wording": CAP_WORDING})
+    # 4. typed caps against the month's two-way movements a day (14 Oct 2026: route_cap_rows, shared with the CLP section)
+    rows_cap = route_cap_rows(loads_by_route, wd)
+    checked_caps = len(rows_cap)
+    exceeded = [{"route_id": r["route_id"], "cap": r["cap"], "two_way_a_day": r["two_way_a_day"],
+                 "over_by": r["over_by"], "wording": CAP_WORDING} for r in rows_cap if r["over"]]
     route_caps = {"wording": CAP_WORDING, "exceeded": exceeded, "routes_with_cap": checked_caps,
                   "note": ("Two-way movements a day (one load = one movement; the month's loads ÷ working "
                            "days) against the daily cap typed on the route — a planning flag, never a block.")}

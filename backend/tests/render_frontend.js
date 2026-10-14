@@ -547,9 +547,11 @@ if (loaded) {
       ok("⭐ GATE ARRIVALS: three gates, one red, one untyped, one holding, each a row with its data attribute",
         GA.gates.length === 3 && red.length === 1 && untyped.length === 1 && GA.gates.every(g => gP.includes(`data-ga-gate="${g.gate_id}"`) && gP.includes(`data-ga-flag="${g.flag || "none"}"`))
         && gOut.includes('data-gate-arrivals="set"') && gP.includes('>Gate arrivals<button type="button" class="ibtn" aria-label="About: Gate arrivals"'));   // 13 Oct 2026 (W3, narrowed): + its info box
-      ok("🔴 the red gate reads 'Queue likely' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
+      // NARROWED 14 Oct 2026 (bundle G, W17): the red word is now "Over gate capacity" ("Queue likely" is the amber 85 % step,
+      // which this fixture month does not reach — no chip says it)
+      ok("🔴 the red gate reads 'Over gate capacity' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
         // 13 Oct 2026 (W6, narrowed): the chip is RowStatus; red is its "bad" tone, once
-        (gP.match(/>Queue likely</g) || []).length === 1 && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
+        (gP.match(/>Over gate capacity</g) || []).length === 1 && !/>Queue likely</.test(gP) && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
         && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gP.match(/data-row-status="bad"/g) || []).length === 1
         && (gP.match(/data-row-status="none"/g) || []).length === 2 && !gP.includes('data-row-status="ok"'));
       ok("⭐ every figure is the server's, formatted to 1 dp, with the gap in the contract's words; the check-in is a word, never a bare 0",
@@ -615,6 +617,52 @@ if (loaded) {
         // 13 Oct 2026 (W3, narrowed): the footnote no longer names the read (the technical guide does; parse_frontend pins it)
         !dSet.includes("data-gate-arrivals") && !dSet.includes("About: Gate arrivals") && !dNone.includes("data-gate-arrivals") && !dNone.includes("ga-table")
         && !dSet.includes("<code>/api/gates/arrivals</code>") && dSet.includes("technical guide</a>"));
+    }
+    // ---- 14 Oct 2026 (bundle G, W7): CLP monitoring, from fixtures/clp_monitoring.json (test_clp.py writes it: Oct 2026, every
+    // chart set). The section is folded and read on first open; with the fixture handed in (initialClp) it renders open.
+    const clpPath = path.join(__dirname, "fixtures", "clp_monitoring.json");
+    ok("the CLP fixture exists (test_clp.py writes it from a clean run)", fs.existsSync(clpPath));
+    if (fs.existsSync(clpPath)) {
+      const CLPF = JSON.parse(fs.readFileSync(clpPath, "utf8"));
+      const escH = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
+      const cOut = render("the Dashboard renders with the CLP section open (initialClp)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: CLPF, onOpen(){} }));
+      const cP = seg(cOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
+      ok("⭐ CLP: the section is a folded <details> after More charts, open when its figures are handed in, with its summary",
+        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>")
+        && cOut.indexOf('data-clp="1"') > cOut.indexOf("<summary>More charts") && cOut.indexOf('data-clp="1"') < cOut.indexOf("<summary>Stockpile capacity"));
+      ok("⭐ CLP: seven cards in the server's order, each in state set, each headline the server's words",
+        CLPF.order.every(k => cP.includes(`data-clp-chart="${k}" data-clp-state="set"`))
+        && CLPF.order.every((k, i) => i === 0 || cP.indexOf(`data-clp-chart="${CLPF.order[i - 1]}"`) < cP.indexOf(`data-clp-chart="${k}"`))
+        && CLPF.order.every(k => cP.includes(`data-clp-head="${k}">${escH(CLPF.charts[k].headline)}<`)),
+        CLPF.order.filter(k => !cP.includes(`data-clp-chart="${k}" data-clp-state="set"`)).join(", "));
+      ok("CLP: each card names its title, its source, an info box and how it is worked out; the scope, the limit and the peak bands are said once",
+        ["Routes against their planning cap", "Sites against their CLP cap", "Movements by vehicle type", "Movements by Euro class",
+         "Movements and lorry distance by council", "Carbon per delivery and per tonne", "Lorry trips avoided"].every(t => cP.includes(`aria-label="About: ${t}"`))
+        && (cP.match(/<summary>How it is worked out<\/summary>/g) || []).length === 7 && (cP.match(/class="clp-src">Source: Wayscope/g) || []).length === 7
+        && cP.includes(escH(CLPF.scope_line)) && cP.includes(escH(CLPF.limit)) && cP.includes('data-clp-peak="1">' + escH(CLPF.peak_words) + "<")
+        && cP.includes('aria-label="About: CLP monitoring"'));
+      ok("CLP: the routes and sites with no cap are one line each, never a bar; the councils' double-count sentence and licence lines print",
+        // NARROWED 14 Oct 2026 (seen in the browser at 1366 px: 17 uncapped routes were a wall of text): folded behind one line
+        cP.includes('data-clp-uncapped="route"><summary>2 routes with no cap typed, not compared</summary><p>') && cP.includes('data-clp-uncapped="site">')
+        && cP.includes(escH(CLPF.charts.councils.double_count)) && CLPF.charts.councils.attribution.every(a => cP.includes(escH(a))));
+      ok("CLP: the carbon card draws per tonne and per load, says why per load has no target line, and names the decision on the trips card",
+        cP.includes('<div class="clp-sub">Per tonne</div>') && cP.includes('<div class="clp-sub">Per load</div>') && cP.includes(escH(CLPF.charts.carbon_rate.per_load_note))
+        && cP.includes(escH("The agreed decisions: " + CLPF.charts.trips_avoided.decisions.join("; ") + ".")));
+      ok("🔴 CLP: no undefined / NaN, no team id, none of the banned words in the rendered section",
+        !/undefined|NaN|\bIPT ?[1-6]\b/.test(cP) && !/\b(bake[ds]?|line-month|cached|geometry|server|endpoint|token|real-time|telematics|optimi[sz]\w*|predict\w*|trucks?)\b/i.test(cP.replace(/<[^>]+>/g, " ")));
+      const E = JSON.parse(JSON.stringify(CLPF));
+      E.charts.euro_class = { ...E.charts.euro_class, state: "empty", missing: "No Euro class typed for the vehicles the plan uses (Config → Vehicles → Euro class)." };
+      const eC = seg(render("the Dashboard renders a CLP chart with no data", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: E, onOpen(){} })),
+                     '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
+      const eCard = seg(eC, 'data-clp-chart="euro_class"', 'data-clp-chart="councils"');
+      ok("⭐ CLP: an empty chart is an empty state naming the field to fill in — no headline, no canvas, no figure",
+        eCard.includes('data-clp-state="empty"') && eCard.includes('data-empty="none"') && eCard.includes(">Not enough to draw this yet<")
+        && eCard.includes(">No Euro class typed for the vehicles the plan uses (Config → Vehicles → Euro class).<")
+        && !eCard.includes("data-clp-head") && !eCard.includes("<canvas") && !/\b0 %|>0</.test(eCard));
+      const zOut = render("the Dashboard renders the CLP section folded (no figures yet)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, onOpen(){} }));
+      const zP = seg(zOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
+      ok("CLP: with nothing handed in, the section is folded (no open attribute) and holds no chart",
+        zP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp">') && !zP.includes("data-clp-chart") && zP.includes("Loading the CLP figures"));
     }
     // R2: a cap 2.0 tCO2e over (approved 7 361.1, with the decisions 7 002.8, cap 7 000.8) reads OVER on the Dashboard, as on the
     // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
@@ -746,6 +794,31 @@ if (loaded) {
       weekdayInWeek(fixture), `week ${(fixture.commit_week || {}).from}..${(fixture.commit_week || {}).to}`);
     const commitOut = render("the Commit view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "commit" }));
+    // ---- 14 Oct 2026 (bundle G, W17): the committed week at each gate, from fixtures/lookahead_gates_week.json
+    // (test_gate_arrivals.py writes it: Sep 2026, East compound and West pit over, North stockpile with no check-in)
+    const gwPath = path.join(__dirname, "fixtures", "lookahead_gates_week.json");
+    ok("the gates-week fixture exists (test_gate_arrivals.py writes it from a clean run)", fs.existsSync(gwPath));
+    if (fs.existsSync(gwPath)) {
+      const GW = JSON.parse(fs.readFileSync(gwPath, "utf8"));
+      const gOut = render("the Commit view renders with the gates of the week", h(LookAhead, { meta: laMeta, who: "t", initialPage: { ...fixture, gates_week: GW }, initialView: "commit" }));
+      const gS = (() => { const i = gOut.indexOf('data-gates-week="1"'); return i < 0 ? "" : gOut.slice(i, gOut.indexOf("</section>", i)); })();
+      ok("⭐ W17: the Commit view shows 'Gates this week' with one block a gate in the server's order (the busiest first)",
+        gS.length > 0 && GW.gates.slice(0, 6).every((g, i) => i === 0 || gS.indexOf(`data-gw-gate="${GW.gates[i - 1].gate_id}"`) < gS.indexOf(`data-gw-gate="${g.gate_id}"`))
+        && gS.includes('aria-label="About: Gates this week"'));
+      const nRed = GW.gates.filter(g => g.flag === "red").length;
+      ok("W17: the headline counts the gates over capacity; every flagged day is a word with its icon and its %, never colour alone",
+        gS.includes(`data-gw-head="1">${nRed} gate${nRed === 1 ? "" : "s"} over capacity on a day this week<`)
+        && GW.gates.slice(0, 6).every(g => g.days.filter(d => d.flag).every(d => gS.includes(`data-gw-day="${d.date}"`)))
+        && (gS.match(/data-row-status="bad"/g) || []).length === GW.gates.slice(0, 6).reduce((n, g) => n + g.days.filter(d => d.flag === "red").length, 0)
+        && gS.includes(`${GW.gates[0].days[0].day}: Over gate capacity (${GW.gates[0].days[0].pct} %)`));
+      ok("W17: a gate with no check-in says nothing is compared; each gate says what it can check in and how",
+        gS.includes("No check-in time typed: nothing is compared.") && gS.includes("Can check in 200 a day (the shift ÷ 3 min a lorry).")
+        && gS.includes("Can check in 300 a day (the shift ÷ 2 min a lorry)."));
+      ok("🔴 W17: the honest limit and the week-split sentence are printed under the gates",
+        gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours; no hourly peak is known.")
+        && gS.includes("so a day can be busier than the Dashboard&#x27;s month average"));
+      ok("W17: without the week's gates (an older page) the card is not drawn", !commitOut.includes('data-gates-week="1"'));
+    }
     ok("...with the KPI strip, the clash rail and one row per line",
       // 13 Oct 2026 (W6, narrowed): one RowDetails chevron a line, not a ▶
       commitOut.includes("planned this week") && commitOut.includes("+" + (fixture.clashes.count - 3) + " more")

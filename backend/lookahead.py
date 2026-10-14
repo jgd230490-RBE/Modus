@@ -339,5 +339,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     cl = clashes.compute(all_lines, vis_keys, acct_all["rows"], mi, wi,
                          with_restrictions=with_restrictions)
     out["stock"] = cl.pop("stock")
+    # 14 Oct 2026 (bundle G, W17): the committed week at each gate (the rail's GATE_OVER / GATE_NEAR come from it)
+    out["gates_week"] = cl.pop("gates_week", None)
     out["clashes"] = cl
     return out
