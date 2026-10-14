@@ -793,6 +793,31 @@ if (loaded) {
       weekdayInWeek(fixture), `week ${(fixture.commit_week || {}).from}..${(fixture.commit_week || {}).to}`);
     const commitOut = render("the Commit view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "commit" }));
+    // ---- 14 Oct 2026 (bundle G, W17): the committed week at each gate, from fixtures/lookahead_gates_week.json
+    // (test_gate_arrivals.py writes it: Sep 2026, East compound and West pit over, North stockpile with no check-in)
+    const gwPath = path.join(__dirname, "fixtures", "lookahead_gates_week.json");
+    ok("the gates-week fixture exists (test_gate_arrivals.py writes it from a clean run)", fs.existsSync(gwPath));
+    if (fs.existsSync(gwPath)) {
+      const GW = JSON.parse(fs.readFileSync(gwPath, "utf8"));
+      const gOut = render("the Commit view renders with the gates of the week", h(LookAhead, { meta: laMeta, who: "t", initialPage: { ...fixture, gates_week: GW }, initialView: "commit" }));
+      const gS = (() => { const i = gOut.indexOf('data-gates-week="1"'); return i < 0 ? "" : gOut.slice(i, gOut.indexOf("</section>", i)); })();
+      ok("⭐ W17: the Commit view shows 'Gates this week' with one block a gate in the server's order (the busiest first)",
+        gS.length > 0 && GW.gates.slice(0, 6).every((g, i) => i === 0 || gS.indexOf(`data-gw-gate="${GW.gates[i - 1].gate_id}"`) < gS.indexOf(`data-gw-gate="${g.gate_id}"`))
+        && gS.includes('aria-label="About: Gates this week"'));
+      const nRed = GW.gates.filter(g => g.flag === "red").length;
+      ok("W17: the headline counts the gates over capacity; every flagged day is a word with its icon and its %, never colour alone",
+        gS.includes(`data-gw-head="1">${nRed} gate${nRed === 1 ? "" : "s"} over capacity on a day this week<`)
+        && GW.gates.slice(0, 6).every(g => g.days.filter(d => d.flag).every(d => gS.includes(`data-gw-day="${d.date}"`)))
+        && (gS.match(/data-row-status="bad"/g) || []).length === GW.gates.slice(0, 6).reduce((n, g) => n + g.days.filter(d => d.flag === "red").length, 0)
+        && gS.includes(`${GW.gates[0].days[0].day}: Over gate capacity (${GW.gates[0].days[0].pct} %)`));
+      ok("W17: a gate with no check-in says nothing is compared; each gate says what it can check in and how",
+        gS.includes("No check-in time typed: nothing is compared.") && gS.includes("Can check in 200 a day (the shift ÷ 3 min a lorry).")
+        && gS.includes("Can check in 300 a day (the shift ÷ 2 min a lorry)."));
+      ok("🔴 W17: the honest limit and the week-split sentence are printed under the gates",
+        gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours; no hourly peak is known.")
+        && gS.includes("so a day can be busier than the Dashboard&#x27;s month average"));
+      ok("W17: without the week's gates (an older page) the card is not drawn", !commitOut.includes('data-gates-week="1"'));
+    }
     ok("...with the KPI strip, the clash rail and one row per line",
       // 13 Oct 2026 (W6, narrowed): one RowDetails chevron a line, not a ▶
       commitOut.includes("planned this week") && commitOut.includes("+" + (fixture.clashes.count - 3) + " more")

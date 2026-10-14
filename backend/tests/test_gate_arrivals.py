@@ -255,9 +255,10 @@ ok("⭐ it imports neither network nor main, and names no team slot id",
    not re.search(r"^\s*(import|from)\s+(network|main)\b", src, re.M)
    and re.search(r"\bIPT ?[1-6]\b", src) is None)
 _stmts = re.findall(r'db\.query\(\s*((?:"[^"]*"\s*)+)', code_only)
-# NARROWED 14 Oct 2026 (bundle G): five statements — location_visits() (the CLP section's chart 1b) adds two, each tenanted
+# NARROWED 14 Oct 2026 (bundle G): seven statements — location_visits() (the CLP section's chart 1b) adds two and
+# week_by_day() (W17, the Look-ahead's gates) two more, each tenanted
 ok("🔴 tenant isolation: the SQL literals in gate_arrivals.py constrain tenant_id",
-   len(_stmts) == 5 and all("tenant_id = ?" in s for s in _stmts)
+   len(_stmts) == 7 and all("tenant_id = ?" in s for s in _stmts)
    and all(re.search(r"FROM (\w+)", s) for s in _stmts)
    and code_only.count("db.current_tenant()") >= 3, str(_stmts))
 
@@ -639,6 +640,111 @@ ok("a gate created with hours past midnight stores them; one created half-typed 
    _cg.get("open_from") == "22:00" and _cg.get("open_days") == "1111111"
    and gates.create_gate("L3", "Bad", 58.7, 24.2, open_to="06:00").get("error", "").startswith("type both open hours"), str(_cg))
 gates.update_gate(_cg["id"], active=False)
+
+# =========================================================================== #
+#  8c. 14 Oct 2026 (bundle G, W17): the committed week at each gate, and the clash flags    #
+# =========================================================================== #
+import datetime as _dtm  # noqa: E402
+import clashes as _clashes  # noqa: E402
+_TODAY = _dtm.date(2026, 9, 16)                        # a Wednesday in Sep 2026, the fixture's month
+_pg = lookahead.page("commit", today=_TODAY)
+_gw = _pg.get("gates_week") or {}
+_gwg = {g["gate_id"]: g for g in _gw.get("gates") or []}
+# the expectation, independently: East compound (G003) takes R1 + R3 laden and R4's lorries coming to load, per day
+_exp3 = {}
+for _l in _pg["commit"]["lines"]:
+    if _l["route_id"] in ("R1", "R3", "R4"):
+        for _d in _l["days"]:
+            _exp3[_d["day_date"]] = _exp3.get(_d["day_date"], 0) + int((_d.get("derived") or {}).get("trips") or 0)
+ok("⭐ W17: the Look-ahead page carries the committed week at each gate: weekdays only (no weekend arrivals), the busiest first",
+   _gw.get("dates") and all(_dtm.date.fromisoformat(x).weekday() < 5 for x in _gw["dates"]) and len(_gw["dates"]) == 5
+   and _gw.get("near_pct") == 85 and _gw.get("limit") == gate_hours.LIMIT_WORDS and "G003" in _gwg, str(_gw)[:300])
+ok("⭐ W17: East compound's arrivals each day are the grid's own trips of R1 + R3 (laden) + R4 (coming to load), summed",
+   [d["arrivals"] for d in _gwg["G003"]["days"]] == [_exp3.get(x, 0) for x in _gw["dates"]] and sum(_exp3.values()) > 0,
+   f"{[d['arrivals'] for d in _gwg['G003']['days']]} vs {[_exp3.get(x, 0) for x in _gw['dates']]}")
+_c3 = _gwg["G003"]["capacity_per_day"]
+ok("W17: capacity a day = 600 open minutes ÷ the 3 min check-in = 200.0; the 85 % step 170.0; every weekday's % = round(arrivals × 100 ÷ 200)",
+   _c3 == 200.0 and _gwg["G003"]["near_per_day"] == 170.0
+   and all(d["pct"] == (round(d["arrivals"] * 100 / 200) if d["arrivals"] else None) for d in _gwg["G003"]["days"]))
+ok("⭐ W17: the status of each day is gate_hours.status: over 100 % red 'Over gate capacity', 85 % or more amber 'Queue likely'",
+   all(d["flag"] == gate_hours.status(d["arrivals"], 200.0) and d["status_word"] == gate_hours.STATUS_WORDS.get(d["flag"]) for d in _gwg["G003"]["days"])
+   and any(d["flag"] == "red" for d in _gwg["G003"]["days"]), str([(d["arrivals"], d["flag"]) for d in _gwg["G003"]["days"]]))
+ok("W17: a gate with no check-in typed (North stockpile) is listed with its arrivals, no capacity and no flag — never compared",
+   "G004" in _gwg and _gwg["G004"]["capacity_per_day"] is None and all(d["flag"] is None and d["pct"] is None for d in _gwg["G004"]["days"]))
+ok("🔴 W17: the page's week carries no line keys (they would name other teams' lines): _lines stripped",
+   "_lines" not in json.dumps(_gw))
+_fl = [f for f in _pg["clashes"]["flags"] if f["code"] in ("GATE_OVER", "GATE_NEAR")]
+_red_days = [d["date"] for d in _gwg["G003"]["days"] if d["flag"] == "red"]
+ok("⭐ W17: the clash rail raises GATE_OVER on every line arriving at East compound on each red day (R1, R3 laden; R4 coming to load)",
+   _red_days and all({f["route_id"] for f in _fl if f["code"] == "GATE_OVER" and f["gate_id"] == "G003" and f["day_date"] == x}
+                     == {l["route_id"] for l in _pg["commit"]["lines"] if l["route_id"] in ("R1", "R3", "R4")
+                         and any(dd["day_date"] == x and int((dd.get("derived") or {}).get("trips") or 0) > 0 for dd in l["days"])}
+                     for x in _red_days), str([(f["route_id"], f["day_date"]) for f in _fl])[:300])
+_f0 = next((f for f in _fl if f["gate_id"] == "G003" and f["code"] == "GATE_OVER"), {})
+_d0 = next((d for d in _gwg["G003"]["days"] if d["date"] == _f0.get("day_date")), {})
+ok("W17: the flag's words name the gate, the day and the gate's total against capacity (never a team's share)",
+   _f0.get("text") == f"East compound, Compound gate on {_d0.get('day')}: {_d0.get('arrivals')} lorries against the 200 it can check in ({_d0.get('pct')} %)"
+   and _f0.get("arrivals") == _d0.get("arrivals") and _f0.get("capacity") == 200.0, str(_f0))
+ok("W17: the codes sit in the rail's order — GATE_OVER after ROUTE_CAP, GATE_NEAR (a warning) after UNBAKED; flags, never blocks",
+   _clashes.CODES.index("GATE_OVER") == _clashes.CODES.index("ROUTE_CAP") + 1 and _clashes.CODES.index("GATE_NEAR") == _clashes.CODES.index("UNBAKED") + 1)
+# the exports: the XLSX Clashes sheet and the commit-week PDF name the gate flags and print the honest limit
+import io as _io  # noqa: E402
+import export as _export  # noqa: E402
+import openpyxl as _openpyxl  # noqa: E402
+from portable import offline as _offline, pdf_text as _pdf_text  # noqa: E402
+_offline(_export)
+_wb = _openpyxl.load_workbook(_io.BytesIO(_export.build_xlsx(_pg)))
+_cl_rows = [[c.value for c in r] for r in _wb["Clashes"].iter_rows()]
+_gate_rows = [r for r in _cl_rows if r and r[0] == "GATE OVER CAPACITY"]
+ok("⭐ W17 XLSX: the Clashes sheet lists each GATE OVER CAPACITY flag with its route, day and words, and prints the limit under them",
+   _gate_rows and all(r[4] in _red_days for r in _gate_rows) and any(r[5] == _f0.get("text") for r in _gate_rows)
+   and any(r and r[0] == _export.GATE_LIMIT for r in _cl_rows)
+   and any(r and r[0] == "Gate capacity" and r[1] == _export.GATE_LIMIT for r in ([[c.value for c in x] for x in _wb["About"].iter_rows()])),
+   str(_cl_rows[:4]))
+_ptxt = _pdf_text(_export.build_pdf(_pg))
+_flat = re.sub(r"\s+", " ", _ptxt or "")
+ok("⭐ W17 PDF: the flags list names GATE OVER CAPACITY and the gate, and prints the limit",
+   "GATE OVER CAPACITY" in _flat and "East compound, Compound gate" in _flat
+   and "Gate capacity: planned arrivals spread evenly over the gate's open hours; no hourly peak is known." in _flat, _flat[:300])
+
+# a closed day, and the near step: East compound closed on Wednesdays; West pit's hours cut to make it near
+gates.update_gate("G003", open_from="07:00", open_to="17:00", open_days="1101111")
+gates.update_gate("G001", open_from="07:00", open_to="16:00")          # 540 min ÷ 2 = 270 a day
+_pg2 = lookahead.page("commit", today=_TODAY)
+_g2 = {g["gate_id"]: g for g in _pg2["gates_week"]["gates"]}
+_wed = next(d for d in _g2["G003"]["days"] if _dtm.date.fromisoformat(d["date"]).weekday() == 2)
+ok("⭐ W17: a gate closed on Wednesdays has capacity 0 that day, and its arrivals are 'Over gate capacity' with the reason in words",
+   _wed["open"] is False and _wed["capacity"] == 0.0 and _wed["pct"] is None and (_wed["arrivals"] == 0 or _wed["flag"] == "red")
+   and _g2["G003"]["closed_days"] == "closed on Wednesdays", str(_wed))
+_fw = [f for f in _pg2["clashes"]["flags"] if f["code"] == "GATE_OVER" and f["gate_id"] == "G003" and f["day_date"] == _wed["date"]]
+ok("W17: ...and the clash text says the gate is closed that day, not a percentage",
+   (_wed["arrivals"] == 0) or (_fw and _fw[0]["text"] == f"East compound, Compound gate on {_wed['day']}: {_wed['arrivals']} lorries planned, but the gate is closed on Wednesdays"),
+   str(_fw[:1]))
+_near = [d for d in _g2["G001"]["days"] if d["flag"] == "amber"]
+_fn = [f for f in _pg2["clashes"]["flags"] if f["code"] == "GATE_NEAR" and f["gate_id"] == "G001"]
+ok("⭐ W17: West pit at 270 a day: the days at 85 % or more are amber, each with a GATE_NEAR flag saying 'near capacity'",
+   all((85 <= d["pct"] <= 100) for d in _near) and {f["day_date"] for f in _fn} == {d["date"] for d in _near}
+   and all(f["text"].endswith(", near capacity") for f in _fn), str([(d["arrivals"], d["pct"], d["flag"]) for d in _g2["G001"]["days"]]))
+gates.update_gate("G003", open_from="", open_to="", open_days="")
+gates.update_gate("G001", open_from="", open_to="", open_days="")
+os.environ["IPT2_CODE"] = "ipt2-secret"
+try:
+    access.set_current("ipt2-secret")
+    _pgt = lookahead.page("commit", today=_TODAY)
+finally:
+    os.environ.pop("IPT2_CODE", None)
+    access.set_current("planner123")
+ok("🔴 W17: a team code sees the gate's total (same arrivals as the planner) but flags on its own lines only (R3 for Team 2)",
+   [d["arrivals"] for d in {g["gate_id"]: g for g in _pgt["gates_week"]["gates"]}["G003"]["days"]] == [d["arrivals"] for d in _gwg["G003"]["days"]]
+   and {f["route_id"] for f in _pgt["clashes"]["flags"] if f["code"] in ("GATE_OVER", "GATE_NEAR")} <= {"R3"}
+   and any(f["code"] == "GATE_OVER" for f in _pgt["clashes"]["flags"]), str({f["route_id"] for f in _pgt["clashes"]["flags"]}))
+# the frontend fixture: the planner's committed week with its gates (the Look-ahead's W17 card reads it)
+_fx_w = os.path.join(HERE, "fixtures", "lookahead_gates_week.json")
+if not FAIL:
+    with open(_fx_w, "w", encoding="utf-8", newline="\n") as _fh:
+        _fh.write(json.dumps(_pg["gates_week"], indent=1, ensure_ascii=False))
+ok("the fixture backend/tests/fixtures/lookahead_gates_week.json is written from a clean run, LF on disk",
+   os.path.exists(_fx_w) and b"\r\n" not in open(_fx_w, "rb").read())
 
 # =========================================================================== #
 #  9. The fixture for the frontend harnesses (planner view, month 9)          #

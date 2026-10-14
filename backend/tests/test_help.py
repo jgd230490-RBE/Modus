@@ -653,5 +653,17 @@ ok("⭐ the guide's §3.5 CLP monitoring: in the contents, says planned not obse
                               "<strong>Carbon per delivery and per tonne against the target</strong>", "<strong>Lorry trips avoided</strong>"))
    and "it never shows a zero in place of a missing figure" in src and "Per load has no target line" in src)
 
+# 14 Oct 2026 (bundle G, W8 + W17): the new fields and the gates week, in the guide where a person looks for them
+ok("⭐ the guide names the W8 fields where they are typed: the CLP cap (Locations), open hours (the gates), the peak bands (Planning), the Euro class (Vehicles)",
+   "<strong>CLP cap (optional)</strong> — the most lorry visits a day the Construction Logistics Plan allows at the site" in src
+   and "<strong>Open hours (optional)</strong> — from and to, and the days the gate is open; blank uses the scheme's shift, every day." in src
+   and "<strong>No-delivery peak bands (from the CLP)</strong>" in src and "Wayscope holds no arrival times, so it cannot check that lorries keep out of them." in src
+   and "<strong>Euro class</strong> (optional: what the plan assumes the hauliers will send for that vehicle type" in src)
+ok("⭐ the guide's Commit view explains Gates this week, the 85 % step and the honest limit; §12.1 lists GATE OVER / NEAR CAPACITY",
+   "<p><strong>Gates this week</strong>, under the grid," in src and "the dashed gold line 85 % of that" in src
+   and "These are planned arrivals spread evenly over the gate's open hours; no hourly peak is known." in src
+   and "<tr><td>GATE OVER CAPACITY</td>" in src and "<tr><td>GATE NEAR CAPACITY</td>" in src
+   and src.index("<tr><td>ROUTE CAP</td>") < src.index("<tr><td>GATE OVER CAPACITY</td>") < src.index("<tr><td>SHARE</td>"))
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

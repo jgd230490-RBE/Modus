@@ -52,6 +52,8 @@ READ-ONLY. Three SELECTs (forecasts of the month, routes, locations) plus the on
 read, every literal carrying the tenant predicate. Nothing here changes any existing
 figure: the Dashboard cards, the Look-ahead, the exports and the map are untouched.
 """
+import datetime
+
 import access
 import conversions
 import db
@@ -379,3 +381,112 @@ def location_visits(month_index, factors=None, working_days=None):
                   "visits_per_day": r1((e["laden"] + e["empty"]) / wd),
                   "visits_raw": (e["laden"] + e["empty"]) / wd}
             for lid, e in acc_by.items()}
+
+
+DAY_SHORT = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def day_words(iso):
+    """'2026-10-14' -> 'Wed 14 Oct'."""
+    d = datetime.date.fromisoformat(str(iso)[:10])
+    return f"{DAY_SHORT[d.weekday()]} {d.day} {MONTHS[d.month - 1]}"
+
+
+def week_by_day(lines, factors=None, dates=None):
+    """
+    14 Oct 2026 (bundle G, W17): the committed week by day at each gate, against what the gate can check in.
+    `lines` are the Look-ahead's DECORATED lines for the bucket — every team's (clashes.py's rule: a sum
+    across teams needs the unfiltered lines; the caller filters the flags, and no team's own figure is in
+    the reply). Each day's trips (derived.day_figures, the grid's own) arrive at the destination's entry gate
+    laden and at the origin's entry gate coming to load — the month panel's ends, by gates.resolve; a route
+    naming a gate that is inactive or gone counts at the location's default entry gate (arrivals()'s rule).
+    Capacity a day = the gate's open minutes ÷ its check-in minutes (gate_hours); a day the gate is closed
+    (its open days) has capacity 0 and any arrival is over it. Status by gate_hours.status: amber "Queue
+    likely" at 85 %, red "Over gate capacity". `_lines` on each day lists the line keys arriving there (for
+    the clash rail; the caller strips it). Weekends are listed only when some gate has arrivals on them.
+    """
+    factors = factors or conversions.load_factors()
+    routes = {r["id"]: r for r in db.query(
+        "SELECT id, origin_id, dest_id, origin_gate_id, dest_gate_id FROM routes WHERE tenant_id = ?",
+        (db.current_tenant(),))}
+    locations = {l["id"]: l for l in db.query(
+        "SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
+    gbl = gates.gates_by_location()
+    gate_rows = {g["id"]: g for gs in gbl.values() for g in gs}
+    per, keys, all_dates = {}, {}, set(dates or [])
+    for l in lines or []:
+        route = routes.get(l.get("route_id"))
+        if not route:
+            continue
+        lk = (l["route_id"], int(l["month_index"]), l.get("discipline") or "", l.get("section_id") or "")
+        for d in l.get("days") or []:
+            all_dates.add(d["day_date"])
+        for loc_key, gate_key in (("dest_id", "dest_gate_id"), ("origin_id", "origin_gate_id")):
+            loc = locations.get(route.get(loc_key))
+            if not loc:
+                continue
+            loc_gates = gbl.get(loc["id"]) or []
+            r = gates.resolve(loc, "entry", route.get(gate_key), gates=loc_gates)
+            if r.get("blocked"):
+                r = gates.resolve(loc, "entry", None, gates=loc_gates)
+            gid = r.get("gate_id")
+            if gid is None:
+                continue
+            for d in l.get("days") or []:
+                t = int(((d.get("derived") or {}).get("trips")) or 0)
+                if t <= 0:
+                    continue
+                g = per.setdefault(gid, {})
+                g[d["day_date"]] = g.get(d["day_date"], 0) + t
+                kl = keys.setdefault((gid, d["day_date"]), [])
+                if lk not in kl:
+                    kl.append(lk)
+    busy_weekend = {iso for g in per.values() for iso, n in g.items()
+                    if n > 0 and datetime.date.fromisoformat(iso).weekday() >= 5}
+    shown = sorted(iso for iso in all_dates if datetime.date.fromisoformat(iso).weekday() < 5 or iso in busy_weekend)
+    out = []
+    for gid, byday in per.items():
+        grow = gate_rows.get(gid) or {}
+        loc = locations.get(grow.get("location_id")) or {}
+        om = gate_hours.open_minutes(grow, factors)
+        gm = grow.get("safety_minutes")
+        gm = float(gm) if gm is not None else None
+        cap_raw = gate_hours.capacity(om["minutes"], gm)
+        days_out, worst, peak_pct = [], None, None
+        for iso in shown:
+            arr = int(byday.get(iso, 0))
+            open_today = gate_hours.is_open_on(grow, datetime.date.fromisoformat(iso))
+            flag = gate_hours.status(arr, cap_raw, open_today)
+            cap_day = (r1(cap_raw) if cap_raw is not None else None) if open_today else 0.0
+            pct = round(arr * 100.0 / cap_raw) if (cap_raw and arr and open_today) else None
+            if pct is not None:
+                peak_pct = pct if peak_pct is None else max(peak_pct, pct)
+            if flag == "red" or (flag == "amber" and worst is None):
+                worst = flag
+            days_out.append({"date": iso, "day": day_words(iso), "arrivals": arr, "capacity": cap_day, "pct": pct,
+                             "open": open_today, "flag": flag, "status_word": gate_hours.STATUS_WORDS.get(flag),
+                             "_lines": keys.get((gid, iso), [])})
+        out.append({"gate_id": gid, "gate_name": grow.get("name"), "location_id": grow.get("location_id"),
+                    "location_name": loc.get("name") or grow.get("location_id") or "",
+                    "check_in_minutes": gm, "open_minutes": om["minutes"], "open_basis": om["basis"],
+                    "open_hours": om["hours"], "peak_minutes": om["peak_minutes"],
+                    "closed_days": gate_hours.closed_days_words(grow),
+                    "capacity_per_day": (r1(cap_raw) if cap_raw is not None else None),
+                    "near_per_day": (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None),
+                    "peak_pct": peak_pct, "flag": worst, "status_word": gate_hours.STATUS_WORDS.get(worst),
+                    "days": days_out})
+    order = {"red": 0, "amber": 1, None: 2}
+    out.sort(key=lambda x: (order.get(x["flag"], 2), -(x["peak_pct"] or -1), -max([d["arrivals"] for d in x["days"]] or [0]),
+                            x["gate_id"]))
+    return {"dates": shown, "days": [day_words(i) for i in shown], "gates": out, "near_pct": gate_hours.NEAR_PCT,
+            "limit": gate_hours.LIMIT_WORDS,
+            "peak_bands": gate_hours.peak_bands(factors)}
+
+
+def strip_lines(gw):
+    """The week's reply without the line keys clashes.py needs (they name other teams' lines)."""
+    if not gw:
+        return gw
+    out = dict(gw)
+    out["gates"] = [dict(g, days=[{k: v for k, v in d.items() if k != "_lines"} for d in g["days"]]) for g in gw.get("gates") or []]
+    return out

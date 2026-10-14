@@ -494,6 +494,12 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .clp-src{font-size:13px;color:var(--muted);margin-top:4px;}
   .clp-how{margin-top:6px;font-size:13px;color:var(--muted);}
   .clp-how summary{cursor:pointer;color:var(--action);}
+  /* 14 Oct 2026 (bundle G, W17): the Look-ahead's gates this week */
+  .gw-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:8px;}
+  @media (min-width:1024px){.gw-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  @media (min-width:1600px){.gw-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+  .gw-gate{border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;}
+  .gw-days{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;}
   .ga-key-none{width:16px;height:10px;border-radius:2px;background:var(--chart-none);}
   .ga-more{margin-top:8px;}
   .ga-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:6px 0;}
@@ -805,6 +811,9 @@ const INFO = {
     how: "Per load has no target line: moving material to a bigger lorry makes fewer, heavier loads, so the carbon a load can rise while the total falls.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.trips_avoided": { title: "Lorry trips avoided", text: "Loads each month as planned and with the decisions agreed with the carbon target, and the difference.",
     how: "Only a decision that changes the lorry, the supplier or the route changes trips; one that changes only the material does not.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  // 14 Oct 2026 (bundle G, W17)
+  "la.gates": { title: "Gates this week", text: "Each gate's planned lorries a day this week, every team together, against what it can check in. Gold, Queue likely, from 85 %; red, Over gate capacity, past it or on a closed day.",
+    how: "What a gate can check in = its open minutes (its hours less the no-delivery peak bands, else the shift) ÷ its check-in minutes a lorry. Planned arrivals spread evenly; no hourly peak is known.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-gates" },
   "dash.today": { title: "Today", text: "What the Look-ahead plans for today. Each line says reported (an actual is typed), confirmed, edited (not yet confirmed) or planned (follows the week, not yet confirmed).", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_t": { title: "Tonnes today", text: "Each line's planned quantity for today, in tonnes, from the Look-ahead's commit week.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_trips": { title: "Trips today", text: "Loaded trips today: tonnes ÷ payload, rounded up for each line, and the lorry distance on lines with a route.", tech: "t1-trips" },
@@ -5957,26 +5966,83 @@ function LaKpi({ value, caption, tone }){
     </div>
   );
 }
+// ---- 14 Oct 2026 (bundle G, W17): the committed week at each gate --------------------------------------
+// The page's own read carries it (lookahead.page → gates_week, from gate_arrivals.week_by_day): each gate's planned
+// arrivals a day — every team's lorries, from the grid's own day trips — against what it can check in (its open minutes
+// ÷ the check-in minutes a lorry; 0 on a day it is closed). The SERVER decides each day's status (gate_hours.py): gold
+// "Queue likely" at 85 % or more, red "Over gate capacity" past it — always a word and an icon too, never colour alone.
+// The browser draws; it divides nothing. The same days raise GATE_OVER / GATE_NEAR on the clash rail. Flags, never blocks.
+const GW_SHOW = 6;
+function gwCfg(g, labels){
+  const C1 = tok("--chart-1", "#E8590C"), RED = tok("--red", "#DC2626"), GOLD = tok("--gold", "#D97706"), NONE = tok("--chart-none", "#A8A29E"), INK = tok("--ink", "#1E293B");
+  const ds = [{ type: "bar", label: "Planned arrivals", data: g.days.map(d => d.arrivals), order: 2, borderWidth: 0, borderRadius: 3,
+    backgroundColor: g.days.map(d => d.flag === "red" ? RED : d.flag === "amber" ? GOLD : (g.capacity_per_day == null ? NONE : C1)) }];
+  if(g.capacity_per_day != null){
+    ds.push({ type: "line", label: "What it can check in", data: g.days.map(d => d.capacity), borderColor: INK, borderWidth: 2, pointRadius: 0, stepped: "middle", order: 1 });
+    ds.push({ type: "line", label: `${GA_NEAR} %: queue likely`, data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0, stepped: "middle", order: 1 });
+  }
+  return { type: "bar", data: { labels, datasets: ds },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+      tooltip: { callbacks: { label: (it) => it.datasetIndex === 0 ? `${grp(g.days[it.dataIndex].arrivals)} lorries planned${g.days[it.dataIndex].pct != null ? ` · ${g.days[it.dataIndex].pct} %` : ""}` : `${it.dataset.label}: ${grp(it.parsed.y)}` } } },
+      scales: { x: { grid: { display: false } }, y: { title: { display: true, text: "lorries a day" } } } } };
+}
+function GatesWeek({ gw }){
+  if(!gw || !(gw.gates || []).length) return null;
+  const gs = gw.gates;
+  const nRed = gs.filter(g => g.flag === "red").length, nAmber = gs.filter(g => g.flag === "amber").length;
+  const shown = gs.slice(0, GW_SHOW), rest = gs.slice(GW_SHOW);
+  return (
+    <section className="card p-4 mb-3" data-gates-week="1" data-guide="lookahead-gates" aria-label="Gates this week">
+      <div className="ct-row">
+        <h3 className="ct-h">Gates this week<InfoTip id="la.gates" /></h3>
+        <span className="clp-head" style={nRed ? { color: "var(--red)" } : undefined} data-gw-head="1">
+          {nRed ? `${nRed} gate${nRed === 1 ? "" : "s"} over capacity on a day this week` : nAmber ? `${nAmber} gate${nAmber === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity this week"}
+        </span>
+      </div>
+      <div className="gw-grid">
+        {shown.map(g => (
+          <div key={g.gate_id} className="gw-gate" data-gw-gate={g.gate_id} data-gw-flag={g.flag || "none"}>
+            <div className="text-sm font-semibold text-slate-700">{g.location_name}<span className="text-slate-400 font-normal"> · {g.gate_name}</span></div>
+            <div className="clp-note">{g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
+              : `Can check in ${grp(g.capacity_per_day)} a day (${g.open_basis === "gate" ? `open ${g.open_hours}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}` : "the shift"} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
+            <ChartCanvas config={gwCfg(g, gw.days)} />
+            <div className="gw-days">
+              {g.days.filter(d => d.flag).map(d => (
+                <span key={d.date} className="gw-day" data-gw-day={d.date}><RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} /></span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {rest.length > 0 && <div className="clp-note" data-gw-rest="1">{rest.length} more gate{rest.length === 1 ? "" : "s"}: {rest.map(g => `${g.location_name}, ${g.gate_name}${g.status_word ? ` (${g.status_word})` : ""}`).join("; ")}.</div>}
+      <div className="ct-note">{gw.limit} The days are this page's own: the month spread over its calendar weeks, rounded up a day, so a day can be busier than the Dashboard's month average.</div>
+    </section>
+  );
+}
 // the status pill column between the line and the days — sparse by design
 // the clash rail's names for each code — the same words as the user guide's §10.1
 const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKPILE_OVER: "STOCKPILE OVER",
                      ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
-                     LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED" };
+                     LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED",
+                     // 14 Oct 2026 (bundle G, W17)
+                     GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
 // the grid's short words for each flag (the rail spells some out longer: RAIL_LABEL)
 const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
-                  STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED" };
+                  STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED",
+                  GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR" };
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
 // StatusChip column: one status a row.)
-const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8 };
+const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8,
+                       GATE_OVER: 3.5, GATE_NEAR: 7.5 };   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
-// the rail's colours: NOT ROUTED and a road restriction in amber, every other flag red
-const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION") ? "warn" : "bad";
+// the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
+const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -6401,7 +6467,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               <span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>
               <span className="min-w-0 flex-1 leading-6 flex flex-wrap gap-x-4 gap-y-1">
                 {(railOpen ? rail.flags : rail.flags.slice(0, 3)).map((f, i) => (
-                  <span key={i} className="chip-st"><i style={{ background: f.code === "UNBAKED" || f.code === "RESTRICTION" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i><span className="font-semibold">{flagWord(f)}</span>&nbsp;{teamText(f.text)}</span>
+                  <span key={i} className="chip-st"><i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i><span className="font-semibold">{flagWord(f)}</span>&nbsp;{teamText(f.text)}</span>
                 ))}
               </span>
               {rail.count > 3 && (
@@ -6585,6 +6651,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             </div>
           )}
 
+          {/* 14 Oct 2026 (bundle G, W17): the committed week at each gate, against what it can check in */}
+          {lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}
           {/* 10 Sep: this week's movements on a map, in place of the stock card (now on
               the Dashboard). Drawn from the baked geometry of the lines on this page;
               its own small fetch, off the page read, so it cannot slow the grid. */}

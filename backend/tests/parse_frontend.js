@@ -2778,6 +2778,20 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && !clpc.includes("target_kg_per_load"));
   ok("CLP: every bullet row says its figure in words (no hover on a print or a TV): 'N word · P % of C' and 'over the cap'",
      clpc.includes('ctx.fillText(`${clpN1(r[valKey])} ${word} · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : "")'));
+  // W17: the Look-ahead's gates this week, and the rail's two codes
+  ok("⭐ W17: GatesWeek draws the page's gates_week (no read of its own), after the grid and before the map",
+     src.includes("function GatesWeek({ gw }){") && src.includes("{lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}")
+     && src.indexOf("<GatesWeek gw=") < src.indexOf("<CommitMap meta={meta} bucket={bucket} tick={tick} lines={lines} />")
+     && !src.slice(src.indexOf("function GatesWeek({ gw }){"), src.indexOf("// the status pill column between the line and the days")).includes("fetch("));
+  ok("W17: each day is the server's: red past capacity, gold from 85 %, a capacity step line and a dashed 85 % line; words via RowStatus",
+     src.includes('backgroundColor: g.days.map(d => d.flag === "red" ? RED : d.flag === "amber" ? GOLD : (g.capacity_per_day == null ? NONE : C1)) }];')
+     && src.includes('stepped: "middle", order: 1 });') && src.includes("data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3]")
+     && src.includes('<RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} />'));
+  ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
+     src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY" };') && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR" };')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR") ? "warn" : "bad";')
+     && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
+     && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
   ok("⭐ W8: the location form carries the CLP cap (lorry visits a day), sends null for blank, never 0",
      src.includes('data-clp-cap-field="1"') && src.includes('aria-label="CLP cap: lorry visits a day"')
