@@ -2323,11 +2323,14 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
         gap(4)
         text("Community considerations", B, 7.8, 10)
         for kd in CM["kinds"]:
-            def ck(x, y, kd=kd):
-                _comm_legend_swatch(c, kd, x, y)
-                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.4)
-                c.drawString(x + 17, y - 7.2, _pdf_safe(kd["label"])[:52])
-            items.append((9.6, ck))
+            lines = _wrap(_pdf_safe(kd["label"]), R, 7.4, tw - 17) or [""]
+            for i, ln in enumerate(lines):          # a long label (the cycle routes) wraps inside the panel
+                def ck(x, y, kd=kd, ln=ln, first=(i == 0)):
+                    if first:
+                        _comm_legend_swatch(c, kd, x, y)
+                    c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.4)
+                    c.drawString(x + 17, y - 7.2, ln)
+                items.append((9.6 if i == len(lines) - 1 else 8.8, ck))
     gap(4)
     if PL.get("view") and not basemap_ok:
         text("No basemap could be had: the routes alone, still to scale.", B, 7, 8.8, DEMO_FG_RGB)

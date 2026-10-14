@@ -151,12 +151,36 @@ class Strip:
                 for x, y in self.probe:
                     if bb[0] <= x <= bb[2] and bb[1] <= y <= bb[3] and in_polygons(x, y, polys):
                         return 0.0
+                # a route that CROSSES the outline between its vertices (a long straight stretch through a housing
+                # estate): any route segment meeting an edge, or ending inside, is in at 0 m
+                if self._crosses(polys, bb):
+                    return 0.0
         best = None
         for c in coords:
             ok, d = self.margin(c[0], c[1])
             if ok and (best is None or d < best):
                 best = d
         return round(best, 1) if best is not None else None
+
+    @staticmethod
+    def _seg_cross(p1, p2, q1, q2):
+        def o(a, b, c):
+            v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+            return 0 if abs(v) < 1e-18 else (1 if v > 0 else -1)
+        return o(p1, p2, q1) != o(p1, p2, q2) and o(q1, q2, p1) != o(q1, q2, p2)
+
+    def _crosses(self, polys, bb):
+        from community_sources import in_polygons
+        edges = [(r[i - 1], r[i]) for poly in polys for r in poly for i in range(1, len(r))]
+        for line in self.lines:
+            for a, b in zip(line, line[1:]):
+                if max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2] or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]:
+                    continue
+                if in_polygons(a[0], a[1], polys) or in_polygons(b[0], b[1], polys):
+                    return True
+                if any(self._seg_cross(a, b, e1, e2) for e1, e2 in edges):
+                    return True
+        return False
 
     def keep(self, kind, geometry):
         return self.distance(geometry)
