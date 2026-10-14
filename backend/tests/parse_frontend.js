@@ -2019,7 +2019,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     // 14 Oct 2026 (narrowed, D9): the Portal tells the Dashboard it is on a phone (no big screen there)
     && code.includes("<Dashboard meta={meta} phone={narrow} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature); 14 Oct 2026: + phone
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen, phone })")
+    // NARROWED 14 Oct 2026 (bundle G, W7: the render harness's prop initialClp joins the signature too; merged with D9's phone)
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen, phone })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2156,12 +2157,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && gac.includes("lorries a day at each gate") && gac.includes("The gate arrivals did not load.")
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?|booking|peak hour)\b/i.test(gac)
     && !/\bAI\b/.test(gac) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(gac) && !/style=\{\{ ?color/.test(gac));
-  ok("🔴 red only, and always with a word: the chip's dot is var(--red) for flag 'red' and var(--chart-none) otherwise; no amber or gold token in the block",
-    // 13 Oct 2026 (W6, narrowed): RowStatus — red ("bad") for flag red, grey ("none") otherwise; the server's reason
-    // (the old title) is the details' Status line
-    gac.includes('<RowStatus word={gaFlagWord(g)} tone={g.flag === "red" ? "bad" : "none"} />') && !/--gold|--amber|amber|"warn"|"ok"/.test(gac)
+  // REVERSED 14 Oct 2026 (bundle G, W17, the user's D42 follow-up): two steps, each always with a word — red "Over gate
+  // capacity" (the 11 Oct red rule, renamed) and amber "Queue likely" at 85 % (the gold token, RowStatus "warn"); no green tick
+  ok("🔴 always with a word: red 'Over gate capacity' ('bad'), amber 'Queue likely' ('warn', the gold token) and grey otherwise; no tick",
+    gac.includes('<RowStatus word={gaFlagWord(g)} tone={gaTone(g)} />') && !/"ok"/.test(gac)
+    && code.includes('const gaTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : "none";')
     && gac.includes('<RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>') && !gac.includes("title={g.reason}")
-    && gac.includes('g.flag === "red" ? "Queue likely"') && gac.includes('"data-ga-flag": g.flag || "none"'));
+    && code.includes('g.flag === "red" ? "Over gate capacity" : g.flag === "amber" ? "Queue likely"') && gac.includes('"data-ga-flag": g.flag || "none"'));
   ok("the browser derives nothing: no division, ceil or payload arithmetic in the block; it formats the server's fields",
     !/Math\.ceil|\/ *60|payload|\* *60|working_days *[*\/]|[*\/] *working_days/.test(gac)
     // NARROWED 11 Oct 2026 (review): `unbaked_note` was a field the server never sends; the block renders only the contract's
@@ -2196,7 +2198,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   // the rule in plain words to the panel's info box
   ok("the gate arrivals read and how the figure is made: the technical guide and the panel's info box",
     _tg.includes("<code>GET /api/gates/arrivals?month=N</code>") && _tg.includes("The gap is the shift's minutes ÷ arrivals, an average with no hourly")
-    && _tg.includes("all teams summed at the gate a lorry arrives by") && src.includes("the gap is the shift's minutes ÷ arrivals, an average with no peak hour")
+    // NARROWED 14 Oct 2026 (bundle G, W17): the info box's how-to now names the gate's open minutes and the peak bands
+    && _tg.includes("all teams summed at the gate a lorry arrives by")
+    && src.includes("Capacity = the gate's open minutes (its hours less any no-delivery peak bands, else the shift) ÷ its check-in minutes a lorry. Averages, no peak hour.")
+    && _tg.includes("<code>backend/gate_hours.py</code>") && _tg.includes("<strong>Queue likely</strong> (amber)")
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
@@ -2546,8 +2551,11 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
      && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
   // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
-  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile and gate charts, whose height follows their rows)",
-     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 2 && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
+  // NARROWED 14 Oct 2026 (bundle G, W7): + the CLP section's three row charts (routes, sites, councils), one row each too
+  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile, gate and CLP row charts, whose height follows their rows)",
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 5
+     && src.includes('height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />') && src.includes('height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />')
+     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
@@ -2749,15 +2757,96 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _ga.includes('const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {') && _ga.includes("plugins: [capMarks] };")
      && (_ga.match(/grouped: false/g) || []).length === 2);
   ok("GATE CHART: 🔴 the browser draws the server's capacity and flag — it divides nothing; red only where the server's flag is red",
-     _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\" }))")
-     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60/.test(_ga) && _ga.includes("r.over ? REDg : (r.cap == null ? NONEg : C1g)"));
+     // NARROWED 14 Oct 2026 (W17): + near (the server's amber flag) in gold; the 85 % tick is the server's near_per_day
+     _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\", near: g.flag === \"amber\" }))")
+     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60|GA_NEAR *\/|\/ *100/.test(_ga) && _ga.includes("r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)")
+     && _ga.includes("x.getPixelForValue(r.g.near_per_day)"));
   ok("GATE CHART: every row says its figure in words (no hover on a TV or a print): 'N a day · P % of C', 'over capacity', 'no check-in time typed'",
-     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : "");')
-     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : "Every gate within its capacity"}'));
+     // NARROWED 14 Oct 2026 (W17): + "queue likely" on an amber row, and a headline for gates near capacity
+     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : r.near ? " · queue likely" : "");')
+     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}'));
   ok("GATE CHART: a key names the bar, the track, the marker, red and grey; the tooltip names the gate and how capacity is worked out",
-     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the shift ÷ the check-in time a lorry")
+     // NARROWED 14 Oct 2026 (W17): capacity is the gate's open hours (the shift where none are typed), and the key names the 85 % step
+     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the open hours ÷ the check-in time a lorry")
+     && _ga.includes('<i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely')
      && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
-     && _ga.includes("`capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`"));
+     && _ga.includes("`the ${ga.shift_hours} h shift`} ÷ ${+r.g.gate_minutes} min a lorry)`") && _ga.includes("`open ${r.g.open_hours}"));
+}
+
+// ---- 14 Oct 2026 (bundle G, W7 + W8): CLP monitoring and the CLP data fields, source level ---------------
+{
+  const _cs = src.indexOf("// ---- 14 Oct 2026 (bundle G, W7): CLP monitoring ----"), _ce = src.indexOf("function BulletinMenu({ months }){");
+  const clpc = _cs > 0 && _ce > _cs ? src.slice(_cs, _ce) : "";
+  ok("CLP: one block before BulletinMenu holds the section, its cards and its five chart builders",
+     clpc.length > 4000 && ["function ClpCard(", "function clpBulletCfg(", "function clpShareCfg(", "function clpCouncilCfg(", "function clpCarbonCfg(",
+       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));
+  ok("⭐ CLP: read on FIRST OPEN only: the effect waits for open, GETs /api/clp/monitoring?month=N, keyed on open and the month",
+     clpc.includes("if(!open) return;") && clpc.includes("fetch(`${API}/clp/monitoring?month=${month}`)") && clpc.includes("}, [open, month]);")
+     // NARROWED 14 Oct 2026 (W10, the same session): a second fetch, the CLP pack, on a button press only
+     && clpc.includes('onToggle={e => setOpen(e.currentTarget.open)}') && (clpc.match(/fetch\(/g) || []).length === 2
+     && clpc.includes("const r = await fetch(`${API}/clp/pack.${ext}?month=${month}`);"));
+  ok("⭐ W10: the section offers the CLP pack for its month, PDF and XLSX; the file name is the reply's own; a failure is said in words",
+     clpc.includes('onClick={() => pack("pdf")}') && clpc.includes('onClick={() => pack("xlsx")}')
+     && clpc.includes('const m = cd.match(/filename="([^"]+)"/);') && clpc.includes('setPackErr("The CLP pack could not be made: " + (e.message || e));')
+     && clpc.includes('{packErr && <div className="ct-line" role="alert" data-clp-pack-error="1">{packErr}</div>}'));
+  ok("⭐ CLP: the Dashboard mounts it once, folded, after More charts and before Stockpile capacity",
+     (src.match(/<ClpMonitoring months=\{months\} initial=\{initialClp\} \/>/g) || []).length === 1
+     && src.indexOf("<ClpMonitoring") > src.indexOf("<summary>More charts: trips") && src.indexOf("<ClpMonitoring") < src.indexOf("<summary>Stockpile capacity</summary>"));
+  ok("🔴 CLP: the browser divides nothing — no division, ceil or rounding of a figure; it draws the server's fields",
+     // (the one division left is drawing, not a figure: half a bar's height in pixels for the cap marker)
+     clpc.includes("const half = (el.height || 16) / 2 + 5")
+     && !/[\w)\]]\s*\/\s*[\w(]/.test(clpc.replace("(el.height || 16) / 2", "").replace(/<\/?[A-Za-z][^>]*>/g, "").replace(/\/\/[^\n]*/g, "").replace(/"[^"\n]*"|`[^`\n]*`/g, '""'))
+     && !/Math\.(ceil|round|floor)/.test(clpc));
+  ok("CLP: an empty chart is an EmptyState carrying the server's missing sentence; a set one its headline, how it is worked out and its source",
+     clpc.includes('{c.state !== "set" ? <EmptyState kind="none" title="Not enough to draw this yet" body={c.missing} /> : <>')
+     && clpc.includes('<details className="clp-how"><summary>How it is worked out</summary><p>{c.basis}</p></details>') && clpc.includes("Source: {c.source}"));
+  ok("CLP: each card carries its own literal info box (seven) and the section one",
+     ["clp.route_caps", "clp.site_caps", "clp.vehicle_types", "clp.euro_class", "clp.councils", "clp.carbon_rate", "clp.trips_avoided", "dash.clp"]
+       .every(id => clpc.includes(`<InfoTip id="${id}" />`)));
+  ok("🔴 CLP colours are tokens only: the chart slots, the status red, the none grey, ink for a cap or target; Not typed is grey",
+     !/#[0-9A-Fa-f]{6}\b(?!")/.test(clpc.replace(/tok\("[^"]+", "#[0-9A-Fa-f]{6}"\)/g, "")) && clpc.includes('s.group === CLP_NOT_TYPED ? tok("--chart-none", "#A8A29E") : colorOf(slot++)')
+     && clpc.includes('const CLP_NOT_TYPED = "Not typed";'));
+  ok("CLP: per load is drawn without a target line; the target shared out per tonne is a dashed ink line",
+     clpc.includes('if(per === "tonne" && c.target_kg_per_tonne != null) ds.push({ label: "The target, shared out", data: m.map(() => c.target_kg_per_tonne), borderColor: INK, borderDash: [6, 4]')
+     && !clpc.includes("target_kg_per_load"));
+  ok("CLP: every bullet row says its figure in words (no hover on a print or a TV): 'N word · P % of C' and 'over the cap'",
+     // NARROWED 14 Oct 2026 (seen at 1366 px: one long line ran off the card): two short lines in a column right of the plot
+     clpc.includes('ctx.fillText(`${clpN1(r[valKey])} ${word}`, A.right + 12, el.y - 7);')
+     && clpc.includes('ctx.fillText(`${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : ""), A.right + 12, el.y + 8);'));
+  // W17: the Look-ahead's gates this week, and the rail's two codes
+  ok("⭐ W17: GatesWeek draws the page's gates_week (no read of its own), after the grid and before the map",
+     src.includes("function GatesWeek({ gw }){") && src.includes("{lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}")
+     && src.indexOf("<GatesWeek gw=") < src.indexOf("<CommitMap meta={meta} bucket={bucket} tick={tick} lines={lines} />")
+     && !src.slice(src.indexOf("function GatesWeek({ gw }){"), src.indexOf("// the status pill column between the line and the days")).includes("fetch("));
+  ok("W17: each day is the server's: red past capacity, gold from 85 %, a capacity step line and a dashed 85 % line; words via RowStatus",
+     src.includes('backgroundColor: g.days.map(d => d.flag === "red" ? RED : d.flag === "amber" ? GOLD : (g.capacity_per_day == null ? NONE : C1)) }];')
+     && src.includes('stepped: "middle", order: 1 });') && src.includes("data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3]")
+     && src.includes('<RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} />'));
+  ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
+     src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY" };') && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR" };')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR") ? "warn" : "bad";')
+     && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
+     && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
+  // W8: the data fields
+  ok("⭐ W8: the location form carries the CLP cap (lorry visits a day), sends null for blank, never 0",
+     src.includes('data-clp-cap-field="1"') && src.includes('aria-label="CLP cap: lorry visits a day"')
+     && src.includes('clp_cap_per_day: (f.clp_cap_per_day === "" || f.clp_cap_per_day == null) ? null : +f.clp_cap_per_day,')
+     && src.includes('clp_cap_per_day: p.clp_cap_per_day == null ? "" : p.clp_cap_per_day'));
+  ok("⭐ W17: the gate form carries open hours (two time boxes) and seven day boxes; every day ticked is sent as blank (the shift, every day)",
+     src.includes('data-gate-hours-form="1"') && src.includes('aria-label="Open from"') && src.includes('aria-label="Open to"')
+     && src.includes('return { ...g, open_days: v === "1111111" ? "" : v };') && src.includes('open_from: gateForm.open_from || "", open_to: gateForm.open_to || "", open_days: gateForm.open_days || "",')
+     && src.includes('const GATE_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];'));
+  const _cfgPy = fs.readFileSync(path.join(ROOT, "backend", "config.py"), "utf8"), _ghPy = fs.readFileSync(path.join(ROOT, "backend", "gate_hours.py"), "utf8");
+  ok("🔴 W8: the Euro classes, the peak-band cap and placeholder and the 85 % step are held equal to the backend",
+     /EURO_CLASSES = \("Euro IV", "Euro V", "Euro VI", "Zero emission"\)/.test(_cfgPy) && src.includes('const EURO_CLASSES = ["Euro IV", "Euro V", "Euro VI", "Zero emission"];')
+     && /MAX_PEAK_BANDS = 4\b/.test(_ghPy) && src.includes("const PEAK_BANDS_MAX = 4;")
+     && /PEAK_PLACEHOLDER = \[\{"from": "07:00", "to": "10:00"\}, \{"from": "16:00", "to": "19:00"\}\]/.test(_ghPy)
+     && src.includes('const PEAK_BANDS_PLACEHOLDER = [{ from: "07:00", to: "10:00" }, { from: "16:00", to: "19:00" }];')
+     && /NEAR_PCT = 85\b/.test(_ghPy) && src.includes("const GA_NEAR = 85;"));
+  ok("W8: Config → Vehicles has a Euro class column ('not typed' deletes the key); Config → Planning the no-delivery peak bands, at most four",
+     src.includes('"Unload min", "Euro class", "Planning"]') && src.includes('data-cfg-euro={k}') && src.includes("else delete d.vehicles[k].euro_class;")
+     && src.includes('data-cfg="peak-bands"') && src.includes("No-delivery peak bands (from the CLP)") && src.includes("((doc.planning || {}).peak_bands || []).length < PEAK_BANDS_MAX")
+     && src.includes("Wayscope holds no arrival times, so it cannot check that lorries keep out of them."));
 }
 
 // ---- 14 Oct 2026 (D9 + D14, the mobile shell; notes/session-1014-mobile-shell.md) ----------------------------------------

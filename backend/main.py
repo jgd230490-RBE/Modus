@@ -58,6 +58,8 @@ import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the m
 import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
+import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
+import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -3093,6 +3095,8 @@ class LocationIn(BaseModel):
     # was the only copy anywhere, and editable in the Locations panel since.
     vendor: Optional[str] = None
     detail: Optional[str] = None
+    # 14 Oct 2026 (bundle G, W8): the site's CLP cap, lorry visits a day; written only when sent
+    clp_cap_per_day: Optional[float] = None
 
 
 def _fields_set(model):
@@ -3129,10 +3133,16 @@ def _check_admin(token):
 @app.post("/api/admin/locations")
 def create_location(body: LocationIn, token: Optional[str] = None):
     _check_admin(token)
-    return network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
-                                   body.loc_type, supplies=body.supplies, receives=body.receives,
-                                   gate_lat=body.gate_lat, gate_lon=body.gate_lon,
-                                   vendor=body.vendor, detail=body.detail)
+    cp = network.clp_cap_problem(body.clp_cap_per_day)
+    if cp:
+        raise HTTPException(400, cp)
+    out = network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
+                                  body.loc_type, supplies=body.supplies, receives=body.receives,
+                                  gate_lat=body.gate_lat, gate_lon=body.gate_lon,
+                                  vendor=body.vendor, detail=body.detail)
+    if body.clp_cap_per_day is not None and out.get("id"):
+        network.set_clp_cap(out["id"], body.clp_cap_per_day)
+    return out
 
 
 @app.put("/api/admin/locations/{location_id}")
@@ -3142,13 +3152,22 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
     # know about gates (or an older client) would silently wipe one that was set
     gate_given = bool({"gate_lat", "gate_lon"} & set(_fields_set(body)))
     meta_given = bool({"vendor", "detail"} & set(_fields_set(body)))
-    return network.update_location(location_id, body.name, body.role, body.materials,
-                                   body.lat, body.lon, body.loc_type,
-                                   supplies=body.supplies, receives=body.receives,
-                                   gate_lat=body.gate_lat, gate_lon=body.gate_lon,
-                                   gate_given=gate_given,
-                                   vendor=body.vendor, detail=body.detail,
-                                   meta_given=meta_given)
+    # 14 Oct 2026 (W8): the CLP cap only when the client sent it, so an older client cannot blank it
+    clp_given = "clp_cap_per_day" in set(_fields_set(body))
+    if clp_given:
+        cp = network.clp_cap_problem(body.clp_cap_per_day)
+        if cp:
+            raise HTTPException(400, cp)
+    out = network.update_location(location_id, body.name, body.role, body.materials,
+                                  body.lat, body.lon, body.loc_type,
+                                  supplies=body.supplies, receives=body.receives,
+                                  gate_lat=body.gate_lat, gate_lon=body.gate_lon,
+                                  gate_given=gate_given,
+                                  vendor=body.vendor, detail=body.detail,
+                                  meta_given=meta_given)
+    if clp_given and not (isinstance(out, dict) and out.get("error")):
+        network.set_clp_cap(location_id, body.clp_cap_per_day)
+    return out
 
 
 @app.delete("/api/admin/locations/{location_id}")
@@ -3181,6 +3200,10 @@ class GateIn(BaseModel):
     active: bool = True
     note: Optional[str] = None
     gate_id: Optional[str] = None
+    # 14 Oct 2026 (bundle G, W17): when the gate is open (HH:MM, and seven on/off flags Monday first)
+    open_from: Optional[str] = None
+    open_to: Optional[str] = None
+    open_days: Optional[str] = None
 
 
 class GatePatch(BaseModel):
@@ -3193,6 +3216,9 @@ class GatePatch(BaseModel):
     is_default: Optional[bool] = None
     active: Optional[bool] = None
     note: Optional[str] = None
+    open_from: Optional[str] = None
+    open_to: Optional[str] = None
+    open_days: Optional[str] = None
 
 
 class RouteGatesIn(BaseModel):
@@ -3227,6 +3253,59 @@ def gate_arrivals_month(month: Optional[int] = None):
     return gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=_working_days(factors))
 
 
+@app.get("/api/clp/monitoring")
+def clp_monitoring(month: Optional[int] = None):
+    """
+    14 Oct 2026 (bundle G, W7) — the CLP monitoring charts for one month and the months around it
+    (clp.monitoring): routes and sites against their caps, movements by vehicle type and Euro class,
+    movements and lorry distance by council, all-in carbon per load and per tonne against the
+    target, and the trips the agreed decisions avoid. Any signed-in code; a team code gets its own
+    lines for the vehicle, carbon and trip charts and the scheme's for the caps and councils (the
+    public map's figures). Each chart says what is missing when it has no data. Reads only.
+    """
+    acc = _require_access()
+    if month is None:
+        import datetime as _dt
+        month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
+    if not (1 <= int(month) <= MONTH_COUNT):
+        raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    factors = conversions.load_factors()
+    return clp.monitoring(int(month), acc, factors=factors, working_days=_working_days(factors))
+
+
+def _clp_pack_reply(month):
+    acc = _require_access()
+    if month is None or not (1 <= int(month) <= MONTH_COUNT):
+        raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    factors = conversions.load_factors()
+    return clp.monitoring(int(month), acc, factors=factors, working_days=_working_days(factors))
+
+
+@app.get("/api/clp/pack.pdf")
+def clp_pack_pdf(month: Optional[int] = None):
+    """14 Oct 2026 (bundle G, W10) — the CLP pack for a month as a PDF: exactly the CLP monitoring charts that have
+    data (the same reply as /api/clp/monitoring), the rest named with what they need; the demo notice on every page."""
+    m = _clp_pack_reply(month)
+    try:
+        data = clp_pack.build_pdf(m)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{clp_pack.file_name(m, "pdf")}"'})
+
+
+@app.get("/api/clp/pack.xlsx")
+def clp_pack_xlsx(month: Optional[int] = None):
+    """14 Oct 2026 (bundle G, W10) — the CLP pack for a month as an XLSX: About, then one sheet a chart with data."""
+    m = _clp_pack_reply(month)
+    try:
+        data = clp_pack.build_xlsx(m)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{clp_pack.file_name(m, "xlsx")}"'})
+
+
 @app.post("/api/admin/gates")
 def create_gate(body: GateIn, token: Optional[str] = None):
     _check_admin(token)
@@ -3235,7 +3314,8 @@ def create_gate(body: GateIn, token: Optional[str] = None):
                              safety_minutes=body.safety_minutes,
                              internal_travel_minutes=body.internal_travel_minutes,
                              is_default=body.is_default, active=body.active,
-                             note=body.note, gate_id=body.gate_id)
+                             note=body.note, gate_id=body.gate_id,
+                             open_from=body.open_from, open_to=body.open_to, open_days=body.open_days)
 
 
 @app.patch("/api/admin/gates/{gate_id}")

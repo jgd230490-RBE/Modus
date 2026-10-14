@@ -17,6 +17,10 @@ be reached — Tark Tee. Nothing here is stored, nothing here refuses a confirm.
                     planned closure (GB) whose dates overlap THIS week (HU4, 29 Sep).
                     Shown with the provider's word: "TARK TEE" / "ROADWORKS". Until H1
                     the code was TARK_TEE.
+    GATE_OVER       14 Oct 2026 (bundle G, W17): planned arrivals at a gate on a day of the committed week are
+                    more than it can check in (open minutes ÷ check-in minutes, gate_hours.py), or the gate is
+                    closed that day — every team's lorries summed, on every line arriving there that day
+    GATE_NEAR       the same at 85 % of capacity or more: "near capacity", a warning ("Queue likely")
     LIMIT           13 Oct 2026: the line's vehicle is over a weight / height / width limit
                     its baked route runs along (limits.py: OpenStreetMap and HERE). Only an
                     "exceeds" verdict for THIS line's vehicle and leg raises it; "except for
@@ -45,13 +49,14 @@ import datetime
 
 import db
 import derived
+import gate_arrivals
 import limits
 import restrictions
 import stockpiles
 import weeks
 
-CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "IPT_SHARE", "RESTRICTION",
-         "LIMIT", "UNBAKED", "PARENT_CHANGED")
+CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "GATE_OVER", "IPT_SHARE", "RESTRICTION",
+         "LIMIT", "UNBAKED", "GATE_NEAR", "PARENT_CHANGED")
 
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
 HOLD_BAND = 0.98
@@ -155,6 +160,35 @@ def route_cap(lines):
                 out.append(_flag("ROUTE_CAP", l,
                                  f"{rid} {day}: {veh} veh against a cap of {cap}",
                                  day_date=day, vehicles=veh, cap=cap))
+    return out
+
+
+def gate_capacity(lines, gw):
+    """
+    14 Oct 2026 (bundle G, W17): GATE_OVER / GATE_NEAR from gate_arrivals.week_by_day (every team's lines),
+    one flag per line arriving at the gate that day. The text names the gate, the day and the figures —
+    the gate's total, never another team's share. Flags, never blocks.
+    """
+    by_key = {line_key(l): l for l in lines or []}
+    out = []
+    for g in (gw or {}).get("gates") or []:
+        where = f"{g['location_name']}, {g['gate_name']}"
+        for d in g["days"]:
+            if d["flag"] not in ("red", "amber"):
+                continue
+            code = "GATE_OVER" if d["flag"] == "red" else "GATE_NEAR"
+            if not d["open"]:
+                text = (f"{where} on {d['day']}: {d['arrivals']} lorries planned, but the gate is "
+                        f"{g['closed_days'] or 'closed that day'}")
+            else:
+                text = (f"{where} on {d['day']}: {d['arrivals']} lorries against the {g['capacity_per_day']:g} it can "
+                        f"check in ({d['pct']} %)" + ("" if code == "GATE_OVER" else ", near capacity"))
+            for lk in d.get("_lines") or []:
+                l = by_key.get(lk)
+                if l is None:
+                    continue
+                out.append(_flag(code, l, text, day_date=d["date"], gate_id=g["gate_id"], arrivals=d["arrivals"],
+                                 capacity=d["capacity"], pct=d["pct"]))
     return out
 
 
@@ -396,6 +430,12 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     flags = []
     flags += per_line(all_lines, account_rows)
     flags += route_cap(all_lines)
+    # 14 Oct 2026 (bundle G, W17): the committed week at each gate, against what it can check in
+    try:
+        gw = gate_arrivals.week_by_day(all_lines)
+    except Exception as e:                       # a missing column on an old database must not take the rail down
+        gw = {"dates": [], "days": [], "gates": [], "error": str(e)[:120]}
+    flags += gate_capacity(all_lines, gw)
     flags += ipt_share(all_lines)
     flags += stockpile_over(all_lines, stock)
     # the STORED check — a DB read, so it is always on. `with_restrictions=False` is for a
@@ -421,6 +461,7 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
         by_code[f["code"]] = by_code.get(f["code"], 0) + 1
     return {"flags": vis, "count": len(vis), "by_code": by_code,
             "codes": list(CODES), "hold_band": HOLD_BAND,
+            "gates_week": gate_arrivals.strip_lines(gw),
             "sources": {"restrictions": tt_source["status"], "restrictions_checked_at": tt_source["checked_at"],
                         "restrictions_unchecked": tt_source["unchecked"],
                         "restrictions_refresh": restrictions.refresh_state(),

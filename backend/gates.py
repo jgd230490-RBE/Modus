@@ -51,6 +51,7 @@ import re
 from datetime import datetime, timezone
 
 import db
+import gate_hours
 
 #: A gate's direction of travel. 'access' is entry only, 'egress' exit only.
 DIRECTIONS = ("access", "egress", "both")
@@ -128,6 +129,10 @@ def _row(g):
         "is_default": _truthy(g.get("is_default")),
         "active": _truthy(g.get("active")),
         "note": g.get("note"),
+        # 14 Oct 2026 (bundle G, W17): when the gate is open; None = the scheme's shift, every day
+        "open_from": g.get("open_from"),
+        "open_to": g.get("open_to"),
+        "open_days": gate_hours.clean_days(g.get("open_days")),
         "created_at": g.get("created_at"),
         "updated_at": g.get("updated_at"),
     }
@@ -277,9 +282,31 @@ def bake_blockers(route, origin, dest, gates_by_loc=None):
 # --------------------------------------------------------------------------- #
 #  Writes                                                                      #
 # --------------------------------------------------------------------------- #
+def _hours_problem(open_from, open_to, open_days):
+    """14 Oct 2026 (W17): both times or neither, each a 24-hour HH:MM, not the same; the days seven flags."""
+    f = None if open_from in (None, "") else open_from
+    t = None if open_to in (None, "") else open_to
+    if (f is None) != (t is None):
+        return "type both open hours (from and to), or clear both to use the scheme's shift"
+    if f is not None:
+        for k, v in (("open from", f), ("open to", t)):
+            if gate_hours.hhmm_problem(v):
+                return f"{k} {gate_hours.hhmm_problem(v)}"
+        if gate_hours.minutes_of(f) == gate_hours.minutes_of(t):
+            return "open from and open to are the same time"
+    return gate_hours.days_problem(open_days)
+
+
+def _clean_hhmm(v):
+    return None if v in (None, "") else str(v).strip()
+
+
 def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=None,
                 internal_travel_minutes=None, is_default=False, active=True,
-                note=None, gate_id=None):
+                note=None, gate_id=None, open_from=None, open_to=None, open_days=None):
+    hp = _hours_problem(open_from, open_to, open_days)
+    if hp:
+        return {"error": hp}
     if not (location_id or "").strip():
         return {"error": "location_id is required"}
     if not (name or "").strip():
@@ -298,11 +325,13 @@ def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=No
     db.execute(
         "INSERT INTO location_gates (tenant_id, id, location_id, name, direction, "
         "lat, lon, safety_minutes, internal_travel_minutes, is_default, active, note, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "created_at, updated_at, open_from, open_to, open_days) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (db.current_tenant(), gid, location_id, name.strip(),
          _clean_direction(direction), la, lo, _clean_minutes(safety_minutes),
          _clean_minutes(internal_travel_minutes), bool(is_default), bool(active),
-         (note or None), now, now),
+         (note or None), now, now, _clean_hhmm(open_from), _clean_hhmm(open_to),
+         gate_hours.clean_days(open_days)),
     )
     if is_default:
         _clear_other_defaults(location_id, gid)
@@ -346,6 +375,19 @@ def update_gate(gate_id, **fields):
             sets.append(f"{key} = ?"); params.append(_clean_minutes(fields[key]))
     if "note" in fields:
         sets.append("note = ?"); params.append(fields["note"] or None)
+    # 14 Oct 2026 (W17): the open hours, checked as a pair against what is stored
+    if {"open_from", "open_to", "open_days"} & set(fields):
+        nf = fields.get("open_from", cur.get("open_from"))
+        nt = fields.get("open_to", cur.get("open_to"))
+        nd = fields.get("open_days", cur.get("open_days"))
+        hp = _hours_problem(nf, nt, nd)
+        if hp:
+            return {"error": hp}
+        for key in ("open_from", "open_to"):
+            if key in fields:
+                sets.append(f"{key} = ?"); params.append(_clean_hhmm(fields[key]))
+        if "open_days" in fields:
+            sets.append("open_days = ?"); params.append(gate_hours.clean_days(fields["open_days"]))
     if "active" in fields:
         sets.append("active = ?"); params.append(bool(fields["active"]))
     if "is_default" in fields:

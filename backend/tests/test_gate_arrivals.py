@@ -255,8 +255,10 @@ ok("⭐ it imports neither network nor main, and names no team slot id",
    not re.search(r"^\s*(import|from)\s+(network|main)\b", src, re.M)
    and re.search(r"\bIPT ?[1-6]\b", src) is None)
 _stmts = re.findall(r'db\.query\(\s*((?:"[^"]*"\s*)+)', code_only)
+# NARROWED 14 Oct 2026 (bundle G): seven statements — location_visits() (the CLP section's chart 1b) adds two and
+# week_by_day() (W17, the Look-ahead's gates) two more, each tenanted
 ok("🔴 tenant isolation: the SQL literals in gate_arrivals.py constrain tenant_id",
-   len(_stmts) == 3 and all("tenant_id = ?" in s for s in _stmts)
+   len(_stmts) == 7 and all("tenant_id = ?" in s for s in _stmts)
    and all(re.search(r"FROM (\w+)", s) for s in _stmts)
    and code_only.count("db.current_tenant()") >= 3, str(_stmts))
 
@@ -358,11 +360,14 @@ ok('🔴 the red rule: East compound\'s 2.6 min gap is shorter than its 3 min ch
 # screen never reads "3.0 min" flagged red against a 3 min check-in. East compound's 5 100 trips at chosen day counts:
 _edge = lambda wd: {g["gate_id"]: g for g in gate_arrivals.arrivals(9, acc_planner, factors=factors, working_days=wd)["gates"]}["G003"]
 _e_eq, _e_rd, _e_lt = _edge(25.5), _edge(25.245), _edge(24.5)
-ok("🔴 the edge: 5100 ÷ 25.5 = 200.0 a day, gap exactly 3.0 against 3 min -> NOT red (shorter than, not equal)",
-   _e_eq["arrivals_per_day"] == 200.0 and _e_eq["gap_minutes"] == 3.0 and _e_eq["flag"] is None
+# NARROWED 14 Oct 2026 (bundle G, W17): the edge is still NOT red, but at 100 % of capacity it is now the amber step
+# ("Queue likely", 85 % or more) — flag "amber" where it was None. The red rule itself is unchanged.
+ok("🔴 the edge: 5100 ÷ 25.5 = 200.0 a day, gap exactly 3.0 against 3 min -> NOT red (shorter than, not equal); amber since 14 Oct (100 % ≥ 85 %)",
+   _e_eq["arrivals_per_day"] == 200.0 and _e_eq["gap_minutes"] == 3.0 and _e_eq["flag"] == "amber"
+   and _e_eq["status_word"] == "Queue likely"
    and _e_eq["reason"].startswith("One every 3.0 min if arrivals are spread evenly, against a 3 min check-in"), str(_e_eq)[:200])
-ok("🔴 the edge: a raw gap of 2.97 min (5100 ÷ 25.245) is shown as 3.0 and does NOT flag — the displayed figure is what is compared",
-   round(600 / (5100 / 25.245), 3) == 2.97 and _e_rd["gap_minutes"] == 3.0 and _e_rd["flag"] is None, str(_e_rd)[:200])
+ok("🔴 the edge: a raw gap of 2.97 min (5100 ÷ 25.245) is shown as 3.0 and does NOT flag red — the displayed figure is what is compared (amber since 14 Oct)",
+   round(600 / (5100 / 25.245), 3) == 2.97 and _e_rd["gap_minutes"] == 3.0 and _e_rd["flag"] == "amber", str(_e_rd)[:200])
 ok("the edge: a raw gap of 2.88 min (5100 ÷ 24.5) is shown as 2.9 and flags red",
    _e_lt["gap_minutes"] == 2.9 and _e_lt["flag"] == "red" and "one every 2.9 min" in _e_lt["reason"], str(_e_lt)[:200])
 _txt = json.dumps(res, ensure_ascii=False)
@@ -411,11 +416,15 @@ ok("⭐ planner: per_team carries every team with its figure (G001: Team 1 161.4
    and g3.get("per_team") == [{"team": "Team 1", "arrivals_per_day": round(3100 / WD, 1)}, {"team": "Team 2", "arrivals_per_day": round(2000 / WD, 1)}]
    and g4.get("per_team") == [{"team": "Team 1", "arrivals_per_day": round(650 / WD, 1)}], str(g1.get("per_team")))
 # 14 Oct 2026 (narrowed): + capacity_per_day and capacity_pct, for the Dashboard's gate chart
+# 14 Oct 2026, later (narrowed again, bundle G W17): + status_word, the gate's own open minutes, basis, hours, peak
+# minutes and closed days; the response + near_pct, peak_bands, limit
 ok("the response carries every key of the contract on every gate",
    all(set(g) == {"gate_id", "gate_name", "location_id", "location_name", "loc_type", "role", "laden_per_day", "empty_per_day",
                   "arrivals_per_day", "gap_minutes", "gate_minutes", "capacity_per_day", "capacity_pct", "flag", "reason", "pending_lines", "pending_per_day",
-                  "teams", "per_team", "origin_share_note", "fallthrough_routes"} for g in gl)
-   and set(res) == {"month", "label", "working_days", "shift_hours", "open_minutes", "scope", "gates", "notes"})
+                  "teams", "per_team", "origin_share_note", "fallthrough_routes",
+                  "status_word", "open_minutes", "open_basis", "open_hours", "peak_minutes", "closed_days", "near_per_day"} for g in gl)
+   and set(res) == {"month", "label", "working_days", "shift_hours", "open_minutes", "scope", "gates", "notes",
+                    "near_pct", "peak_bands", "limit"})
 
 # =========================================================================== #
 #  5. A team code: totals and names, never the other team's figure              #
@@ -554,6 +563,188 @@ ok("an inactive gate with no other entry gate: not listed, ONE note naming the i
    and all(("if arrivals are spread evenly" in s) or (s in _allowed_other) or s.endswith("they are not in the figures.")
            or s.endswith("so arrivals there are not shown.") or " so arrivals there are counted at " in s for s in [g["reason"] for g in res6["gates"]] + res6["notes"]),
    str(res6["notes"]))
+
+# =========================================================================== #
+#  8b. 14 Oct 2026 (bundle G, W17): each gate's open hours, the peak bands, the 85 % step  #
+# =========================================================================== #
+import copy as _copy  # noqa: E402
+import gate_hours  # noqa: E402
+ok("gate_hours: 07:30 is 450 min; 24:00, 7:00 and '' are not times; a window past midnight (22:00-06:00) is 480 min",
+   gate_hours.minutes_of("07:30") == 450 and gate_hours.minutes_of("24:00") is None and gate_hours.minutes_of("7:00") is None
+   and gate_hours.minutes_of("") is None
+   and gate_hours.open_minutes({"open_from": "22:00", "open_to": "06:00"}, factors)["minutes"] == 480.0)
+ok("gate_hours: open days are seven flags Monday first; none open is refused; a list of booleans is accepted",
+   gate_hours.clean_days([1, 1, 1, 1, 1, 0, 0]) == "1111100" and bool(gate_hours.days_problem("0000000"))
+   and bool(gate_hours.days_problem("11111")) and gate_hours.days_problem("1111100") is None and gate_hours.clean_days("") is None)
+ok("gate_hours: peak bands — at most four, times, no overlap, not the same time",
+   gate_hours.peak_bands_problem([{"from": "07:00", "to": "10:00"}, {"from": "09:00", "to": "11:00"}]) == "peak band 2 overlaps another band"
+   and gate_hours.peak_bands_problem([{"from": "07:00", "to": "07:00"}]).endswith("the same time")
+   and gate_hours.peak_bands_problem([{"from": "7", "to": "10:00"}]).startswith("peak band 1: from and to must be")
+   and gate_hours.peak_bands_problem([{"from": "0%d:00" % i, "to": "0%d:30" % i} for i in range(5)]) == "at most 4 peak bands"
+   and gate_hours.peak_bands_problem(gate_hours.PEAK_PLACEHOLDER) is None and gate_hours.peak_bands_problem(None) is None)
+ok("gate_hours.status: 84 % none, 85 % amber, 100 % amber, 100.4 % red, anything on a closed day red, no capacity none",
+   gate_hours.status(84, 100) is None and gate_hours.status(85, 100) == "amber" and gate_hours.status(100, 100) == "amber"
+   and gate_hours.status(100.4, 100) == "red" and gate_hours.status(1, 100, open_today=False) == "red"
+   and gate_hours.status(50, None) is None and gate_hours.status(0, 100) is None
+   and gate_hours.STATUS_WORDS == {"red": "Over gate capacity", "amber": "Queue likely"})
+# the hours, written through the gate write path
+_bad = [gates.update_gate("G003", open_from="07:00"), gates.update_gate("G003", open_from="7am", open_to="15:00"),
+        gates.update_gate("G003", open_from="07:00", open_to="07:00"), gates.update_gate("G003", open_days="0000000")]
+ok("🔴 the gate write refuses half-typed hours, a non-time, the same time twice and a gate open on no day — each in words",
+   [b.get("error") for b in _bad] == ["type both open hours (from and to), or clear both to use the scheme's shift",
+                                      "open from must be a 24-hour time such as 07:00",
+                                      "open from and open to are the same time",
+                                      "a gate must be open on at least one day (clear the days to mean every day)"], str(_bad))
+_g3 = gates.update_gate("G003", open_from="07:00", open_to="15:00", open_days="1111100")
+ok("the hours are stored and read back on the gate (open_days as seven flags)",
+   _g3.get("open_from") == "07:00" and _g3.get("open_to") == "15:00" and _g3.get("open_days") == "1111100", str(_g3))
+_r8 = {g["gate_id"]: g for g in gate_arrivals.arrivals(9, acc_planner, factors=factors, working_days=WD)["gates"]}
+ok("⭐ East compound open 07:00-15:00 (480 min): capacity 480 ÷ 3 = 160.0 a day, gap round(480 ÷ (5100 ÷ 22), 1), basis 'gate', closed on Saturdays and Sundays",
+   _r8["G003"]["open_minutes"] == 480.0 and _r8["G003"]["capacity_per_day"] == 160.0 and _r8["G003"]["open_basis"] == "gate"
+   and _r8["G003"]["gap_minutes"] == round(480 / (5100 / WD), 1) and _r8["G003"]["open_hours"] == "07:00–15:00"
+   and _r8["G003"]["closed_days"] == "closed on Saturdays and Sundays" and _r8["G003"]["flag"] == "red"
+   and _r8["G003"]["status_word"] == "Over gate capacity", str(_r8.get("G003"))[:300])
+ok("near_per_day is 85 % of the capacity, rounded once from the unrounded figure (160 -> 136.0); None with no check-in",
+   _r8["G003"]["near_per_day"] == round(480 / 3 * 0.85, 1) == 136.0 and {g["gate_id"]: g for g in gl}["G004"]["near_per_day"] is None)
+ok("a gate with no hours typed keeps the scheme's shift (600 min, basis 'shift', no closed days)",
+   _r8["G001"]["open_minutes"] == 600.0 and _r8["G001"]["open_basis"] == "shift" and _r8["G001"]["closed_days"] is None)
+_fpk = _copy.deepcopy(factors)
+_fpk["planning"]["peak_bands"] = [{"from": "07:00", "to": "08:00"}, {"from": "16:00", "to": "19:00"}]
+_rp = gate_arrivals.arrivals(9, acc_planner, factors=_fpk, working_days=WD)
+_rpg = {g["gate_id"]: g for g in _rp["gates"]}
+ok("⭐ the peak bands are taken off the gate's open hours: 07:00-15:00 less 07:00-08:00 = 420 min (16:00-19:00 is outside), capacity 140.0",
+   _rpg["G003"]["open_minutes"] == 420.0 and _rpg["G003"]["peak_minutes"] == 60.0 and _rpg["G003"]["capacity_per_day"] == 140.0,
+   str(_rpg.get("G003"))[:300])
+ok("...and a gate on the scheme's shift keeps 600 min, with ONE note that the bands could not be taken off it; the bands ride on the response",
+   _rpg["G001"]["open_minutes"] == 600.0 and _rp["peak_bands"] == _fpk["planning"]["peak_bands"]
+   and sum(1 for n in _rp["notes"] if n.startswith("The peak bands (07:00–08:00 and 16:00–19:00, no deliveries) are taken off only")) == 1
+   and _rp["limit"] == gate_hours.LIMIT_WORDS, str(_rp["notes"]))
+# amber: West pit carries 6 210 trips by now (section 8 added the Shut tip lines), 282.3 a day at a 2 min check-in;
+# 07:00-16:30 = 570 min -> capacity 285, 99 %: under the red rule (gap 2.0 = check-in), over the 85 % step
+gates.update_gate("G001", open_from="07:00", open_to="16:30")
+_ra = {g["gate_id"]: g for g in gate_arrivals.arrivals(9, acc_planner, factors=factors, working_days=WD)["gates"]}
+ok("⭐ the 85 % step: West pit at 570 open minutes is round(6210 ÷ 22 × 100 ÷ 285) = 99 % -> amber 'Queue likely' (gap 2.0 is not shorter than 2 min), and the reason says so",
+   _ra["G001"]["capacity_per_day"] == 285.0 and _ra["G001"]["capacity_pct"] == round(6210 / WD * 100 / 285) == 99
+   and _ra["G001"]["gap_minutes"] == 2.0
+   and _ra["G001"]["flag"] == "amber" and _ra["G001"]["status_word"] == "Queue likely"
+   and "99 % of what the gate can check in, so a queue is likely when lorries bunch" in _ra["G001"]["reason"]
+   and "if arrivals are spread evenly" in _ra["G001"]["reason"], str(_ra.get("G001"))[:300])
+_rr = gates.update_gate("G001", open_from="", open_to="", open_days="")
+_r3 = gates.update_gate("G003", open_from=None, open_to=None, open_days=None)
+ok("clearing the hours puts both gates back on the scheme's shift (blank and None both clear)",
+   _rr.get("open_from") is None and _rr.get("open_to") is None and _rr.get("open_days") is None
+   and _r3.get("open_from") is None and _r3.get("open_days") is None
+   and {g["gate_id"]: g["open_basis"] for g in gate_arrivals.arrivals(9, acc_planner, factors=factors, working_days=WD)["gates"]}.get("G003") == "shift")
+_cg = gates.create_gate("L3", "Night gate", 58.702, 24.202, direction="access", safety_minutes=2, open_from="22:00", open_to="06:00", open_days="1111111")
+ok("a gate created with hours past midnight stores them; one created half-typed is refused",
+   _cg.get("open_from") == "22:00" and _cg.get("open_days") == "1111111"
+   and gates.create_gate("L3", "Bad", 58.7, 24.2, open_to="06:00").get("error", "").startswith("type both open hours"), str(_cg))
+gates.update_gate(_cg["id"], active=False)
+
+# =========================================================================== #
+#  8c. 14 Oct 2026 (bundle G, W17): the committed week at each gate, and the clash flags    #
+# =========================================================================== #
+import datetime as _dtm  # noqa: E402
+import clashes as _clashes  # noqa: E402
+_TODAY = _dtm.date(2026, 9, 16)                        # a Wednesday in Sep 2026, the fixture's month
+_pg = lookahead.page("commit", today=_TODAY)
+_gw = _pg.get("gates_week") or {}
+_gwg = {g["gate_id"]: g for g in _gw.get("gates") or []}
+# the expectation, independently: East compound (G003) takes R1 + R3 laden and R4's lorries coming to load, per day
+_exp3 = {}
+for _l in _pg["commit"]["lines"]:
+    if _l["route_id"] in ("R1", "R3", "R4"):
+        for _d in _l["days"]:
+            _exp3[_d["day_date"]] = _exp3.get(_d["day_date"], 0) + int((_d.get("derived") or {}).get("trips") or 0)
+ok("⭐ W17: the Look-ahead page carries the committed week at each gate: weekdays only (no weekend arrivals), the busiest first",
+   _gw.get("dates") and all(_dtm.date.fromisoformat(x).weekday() < 5 for x in _gw["dates"]) and len(_gw["dates"]) == 5
+   and _gw.get("near_pct") == 85 and _gw.get("limit") == gate_hours.LIMIT_WORDS and "G003" in _gwg, str(_gw)[:300])
+ok("⭐ W17: East compound's arrivals each day are the grid's own trips of R1 + R3 (laden) + R4 (coming to load), summed",
+   [d["arrivals"] for d in _gwg["G003"]["days"]] == [_exp3.get(x, 0) for x in _gw["dates"]] and sum(_exp3.values()) > 0,
+   f"{[d['arrivals'] for d in _gwg['G003']['days']]} vs {[_exp3.get(x, 0) for x in _gw['dates']]}")
+_c3 = _gwg["G003"]["capacity_per_day"]
+ok("W17: capacity a day = 600 open minutes ÷ the 3 min check-in = 200.0; the 85 % step 170.0; every weekday's % = round(arrivals × 100 ÷ 200)",
+   _c3 == 200.0 and _gwg["G003"]["near_per_day"] == 170.0
+   and all(d["pct"] == (round(d["arrivals"] * 100 / 200) if d["arrivals"] else None) for d in _gwg["G003"]["days"]))
+ok("⭐ W17: the status of each day is gate_hours.status: over 100 % red 'Over gate capacity', 85 % or more amber 'Queue likely'",
+   all(d["flag"] == gate_hours.status(d["arrivals"], 200.0) and d["status_word"] == gate_hours.STATUS_WORDS.get(d["flag"]) for d in _gwg["G003"]["days"])
+   and any(d["flag"] == "red" for d in _gwg["G003"]["days"]), str([(d["arrivals"], d["flag"]) for d in _gwg["G003"]["days"]]))
+ok("W17: a gate with no check-in typed (North stockpile) is listed with its arrivals, no capacity and no flag — never compared",
+   "G004" in _gwg and _gwg["G004"]["capacity_per_day"] is None and all(d["flag"] is None and d["pct"] is None for d in _gwg["G004"]["days"]))
+ok("🔴 W17: the page's week carries no line keys (they would name other teams' lines): _lines stripped",
+   "_lines" not in json.dumps(_gw))
+_fl = [f for f in _pg["clashes"]["flags"] if f["code"] in ("GATE_OVER", "GATE_NEAR")]
+_red_days = [d["date"] for d in _gwg["G003"]["days"] if d["flag"] == "red"]
+ok("⭐ W17: the clash rail raises GATE_OVER on every line arriving at East compound on each red day (R1, R3 laden; R4 coming to load)",
+   _red_days and all({f["route_id"] for f in _fl if f["code"] == "GATE_OVER" and f["gate_id"] == "G003" and f["day_date"] == x}
+                     == {l["route_id"] for l in _pg["commit"]["lines"] if l["route_id"] in ("R1", "R3", "R4")
+                         and any(dd["day_date"] == x and int((dd.get("derived") or {}).get("trips") or 0) > 0 for dd in l["days"])}
+                     for x in _red_days), str([(f["route_id"], f["day_date"]) for f in _fl])[:300])
+_f0 = next((f for f in _fl if f["gate_id"] == "G003" and f["code"] == "GATE_OVER"), {})
+_d0 = next((d for d in _gwg["G003"]["days"] if d["date"] == _f0.get("day_date")), {})
+ok("W17: the flag's words name the gate, the day and the gate's total against capacity (never a team's share)",
+   _f0.get("text") == f"East compound, Compound gate on {_d0.get('day')}: {_d0.get('arrivals')} lorries against the 200 it can check in ({_d0.get('pct')} %)"
+   and _f0.get("arrivals") == _d0.get("arrivals") and _f0.get("capacity") == 200.0, str(_f0))
+ok("W17: the codes sit in the rail's order — GATE_OVER after ROUTE_CAP, GATE_NEAR (a warning) after UNBAKED; flags, never blocks",
+   _clashes.CODES.index("GATE_OVER") == _clashes.CODES.index("ROUTE_CAP") + 1 and _clashes.CODES.index("GATE_NEAR") == _clashes.CODES.index("UNBAKED") + 1)
+# the exports: the XLSX Clashes sheet and the commit-week PDF name the gate flags and print the honest limit
+import io as _io  # noqa: E402
+import export as _export  # noqa: E402
+import openpyxl as _openpyxl  # noqa: E402
+from portable import offline as _offline, pdf_text as _pdf_text  # noqa: E402
+_offline(_export)
+_wb = _openpyxl.load_workbook(_io.BytesIO(_export.build_xlsx(_pg)))
+_cl_rows = [[c.value for c in r] for r in _wb["Clashes"].iter_rows()]
+_gate_rows = [r for r in _cl_rows if r and r[0] == "GATE OVER CAPACITY"]
+ok("⭐ W17 XLSX: the Clashes sheet lists each GATE OVER CAPACITY flag with its route, day and words, and prints the limit under them",
+   _gate_rows and all(r[4] in _red_days for r in _gate_rows) and any(r[5] == _f0.get("text") for r in _gate_rows)
+   and any(r and r[0] == _export.GATE_LIMIT for r in _cl_rows)
+   and any(r and r[0] == "Gate capacity" and r[1] == _export.GATE_LIMIT for r in ([[c.value for c in x] for x in _wb["About"].iter_rows()])),
+   str(_cl_rows[:4]))
+_ptxt = _pdf_text(_export.build_pdf(_pg))
+_flat = re.sub(r"\s+", " ", _ptxt or "")
+ok("⭐ W17 PDF: the flags list names GATE OVER CAPACITY and the gate, and prints the limit",
+   "GATE OVER CAPACITY" in _flat and "East compound, Compound gate" in _flat
+   and "Gate capacity: planned arrivals spread evenly over the gate's open hours; no hourly peak is known." in _flat, _flat[:300])
+
+# a closed day, and the near step: East compound closed on Wednesdays; West pit's hours cut to make it near
+gates.update_gate("G003", open_from="07:00", open_to="17:00", open_days="1101111")
+gates.update_gate("G001", open_from="07:00", open_to="16:00")          # 540 min ÷ 2 = 270 a day
+_pg2 = lookahead.page("commit", today=_TODAY)
+_g2 = {g["gate_id"]: g for g in _pg2["gates_week"]["gates"]}
+_wed = next(d for d in _g2["G003"]["days"] if _dtm.date.fromisoformat(d["date"]).weekday() == 2)
+ok("⭐ W17: a gate closed on Wednesdays has capacity 0 that day, and its arrivals are 'Over gate capacity' with the reason in words",
+   _wed["open"] is False and _wed["capacity"] == 0.0 and _wed["pct"] is None and (_wed["arrivals"] == 0 or _wed["flag"] == "red")
+   and _g2["G003"]["closed_days"] == "closed on Wednesdays", str(_wed))
+_fw = [f for f in _pg2["clashes"]["flags"] if f["code"] == "GATE_OVER" and f["gate_id"] == "G003" and f["day_date"] == _wed["date"]]
+ok("W17: ...and the clash text says the gate is closed that day, not a percentage",
+   (_wed["arrivals"] == 0) or (_fw and _fw[0]["text"] == f"East compound, Compound gate on {_wed['day']}: {_wed['arrivals']} lorries planned, but the gate is closed on Wednesdays"),
+   str(_fw[:1]))
+_near = [d for d in _g2["G001"]["days"] if d["flag"] == "amber"]
+_fn = [f for f in _pg2["clashes"]["flags"] if f["code"] == "GATE_NEAR" and f["gate_id"] == "G001"]
+ok("⭐ W17: West pit at 270 a day: the days at 85 % or more are amber, each with a GATE_NEAR flag saying 'near capacity'",
+   all((85 <= d["pct"] <= 100) for d in _near) and {f["day_date"] for f in _fn} == {d["date"] for d in _near}
+   and all(f["text"].endswith(", near capacity") for f in _fn), str([(d["arrivals"], d["pct"], d["flag"]) for d in _g2["G001"]["days"]]))
+gates.update_gate("G003", open_from="", open_to="", open_days="")
+gates.update_gate("G001", open_from="", open_to="", open_days="")
+os.environ["IPT2_CODE"] = "ipt2-secret"
+try:
+    access.set_current("ipt2-secret")
+    _pgt = lookahead.page("commit", today=_TODAY)
+finally:
+    os.environ.pop("IPT2_CODE", None)
+    access.set_current("planner123")
+ok("🔴 W17: a team code sees the gate's total (same arrivals as the planner) but flags on its own lines only (R3 for Team 2)",
+   [d["arrivals"] for d in {g["gate_id"]: g for g in _pgt["gates_week"]["gates"]}["G003"]["days"]] == [d["arrivals"] for d in _gwg["G003"]["days"]]
+   and {f["route_id"] for f in _pgt["clashes"]["flags"] if f["code"] in ("GATE_OVER", "GATE_NEAR")} <= {"R3"}
+   and any(f["code"] == "GATE_OVER" for f in _pgt["clashes"]["flags"]), str({f["route_id"] for f in _pgt["clashes"]["flags"]}))
+# the frontend fixture: the planner's committed week with its gates (the Look-ahead's W17 card reads it)
+_fx_w = os.path.join(HERE, "fixtures", "lookahead_gates_week.json")
+if not FAIL:
+    with open(_fx_w, "w", encoding="utf-8", newline="\n") as _fh:
+        _fh.write(json.dumps(_pg["gates_week"], indent=1, ensure_ascii=False))
+ok("the fixture backend/tests/fixtures/lookahead_gates_week.json is written from a clean run, LF on disk",
+   os.path.exists(_fx_w) and b"\r\n" not in open(_fx_w, "rb").read())
 
 # =========================================================================== #
 #  9. The fixture for the frontend harnesses (planner view, month 9)          #

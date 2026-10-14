@@ -1,0 +1,297 @@
+{
+ "dates": [
+  "2026-09-14",
+  "2026-09-15",
+  "2026-09-16",
+  "2026-09-17",
+  "2026-09-18"
+ ],
+ "days": [
+  "Mon 14 Sep",
+  "Tue 15 Sep",
+  "Wed 16 Sep",
+  "Thu 17 Sep",
+  "Fri 18 Sep"
+ ],
+ "gates": [
+  {
+   "gate_id": "G003",
+   "gate_name": "Compound gate",
+   "location_id": "L2",
+   "location_name": "East compound",
+   "check_in_minutes": 3.0,
+   "open_minutes": 600.0,
+   "open_basis": "shift",
+   "open_hours": null,
+   "peak_minutes": 0.0,
+   "closed_days": null,
+   "capacity_per_day": 200.0,
+   "near_per_day": 170.0,
+   "peak_pct": 128,
+   "flag": "red",
+   "status_word": "Over gate capacity",
+   "days": [
+    {
+     "date": "2026-09-14",
+     "day": "Mon 14 Sep",
+     "arrivals": 255,
+     "capacity": 200.0,
+     "pct": 128,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-15",
+     "day": "Tue 15 Sep",
+     "arrivals": 255,
+     "capacity": 200.0,
+     "pct": 128,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-16",
+     "day": "Wed 16 Sep",
+     "arrivals": 255,
+     "capacity": 200.0,
+     "pct": 128,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-17",
+     "day": "Thu 17 Sep",
+     "arrivals": 255,
+     "capacity": 200.0,
+     "pct": 128,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-18",
+     "day": "Fri 18 Sep",
+     "arrivals": 255,
+     "capacity": 200.0,
+     "pct": 128,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    }
+   ]
+  },
+  {
+   "gate_id": "G001",
+   "gate_name": "Weighbridge (in)",
+   "location_id": "L1",
+   "location_name": "West pit",
+   "check_in_minutes": 2.0,
+   "open_minutes": 600.0,
+   "open_basis": "shift",
+   "open_hours": null,
+   "peak_minutes": 0.0,
+   "closed_days": null,
+   "capacity_per_day": 300.0,
+   "near_per_day": 255.0,
+   "peak_pct": 104,
+   "flag": "red",
+   "status_word": "Over gate capacity",
+   "days": [
+    {
+     "date": "2026-09-14",
+     "day": "Mon 14 Sep",
+     "arrivals": 313,
+     "capacity": 300.0,
+     "pct": 104,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-15",
+     "day": "Tue 15 Sep",
+     "arrivals": 313,
+     "capacity": 300.0,
+     "pct": 104,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-16",
+     "day": "Wed 16 Sep",
+     "arrivals": 313,
+     "capacity": 300.0,
+     "pct": 104,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-17",
+     "day": "Thu 17 Sep",
+     "arrivals": 313,
+     "capacity": 300.0,
+     "pct": 104,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    },
+    {
+     "date": "2026-09-18",
+     "day": "Fri 18 Sep",
+     "arrivals": 313,
+     "capacity": 300.0,
+     "pct": 104,
+     "open": true,
+     "flag": "red",
+     "status_word": "Over gate capacity"
+    }
+   ]
+  },
+  {
+   "gate_id": "G006",
+   "gate_name": "Main gate",
+   "location_id": "L5",
+   "location_name": "Shut tip",
+   "check_in_minutes": 4.0,
+   "open_minutes": 600.0,
+   "open_basis": "shift",
+   "open_hours": null,
+   "peak_minutes": 0.0,
+   "closed_days": null,
+   "capacity_per_day": 150.0,
+   "near_per_day": 127.5,
+   "peak_pct": 11,
+   "flag": null,
+   "status_word": null,
+   "days": [
+    {
+     "date": "2026-09-14",
+     "day": "Mon 14 Sep",
+     "arrivals": 17,
+     "capacity": 150.0,
+     "pct": 11,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-15",
+     "day": "Tue 15 Sep",
+     "arrivals": 17,
+     "capacity": 150.0,
+     "pct": 11,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-16",
+     "day": "Wed 16 Sep",
+     "arrivals": 17,
+     "capacity": 150.0,
+     "pct": 11,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-17",
+     "day": "Thu 17 Sep",
+     "arrivals": 17,
+     "capacity": 150.0,
+     "pct": 11,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-18",
+     "day": "Fri 18 Sep",
+     "arrivals": 17,
+     "capacity": 150.0,
+     "pct": 11,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    }
+   ]
+  },
+  {
+   "gate_id": "G004",
+   "gate_name": "Stockpile gate",
+   "location_id": "L3",
+   "location_name": "North stockpile",
+   "check_in_minutes": null,
+   "open_minutes": 600.0,
+   "open_basis": "shift",
+   "open_hours": null,
+   "peak_minutes": 0.0,
+   "closed_days": null,
+   "capacity_per_day": null,
+   "near_per_day": null,
+   "peak_pct": null,
+   "flag": null,
+   "status_word": null,
+   "days": [
+    {
+     "date": "2026-09-14",
+     "day": "Mon 14 Sep",
+     "arrivals": 33,
+     "capacity": null,
+     "pct": null,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-15",
+     "day": "Tue 15 Sep",
+     "arrivals": 33,
+     "capacity": null,
+     "pct": null,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-16",
+     "day": "Wed 16 Sep",
+     "arrivals": 33,
+     "capacity": null,
+     "pct": null,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-17",
+     "day": "Thu 17 Sep",
+     "arrivals": 33,
+     "capacity": null,
+     "pct": null,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    },
+    {
+     "date": "2026-09-18",
+     "day": "Fri 18 Sep",
+     "arrivals": 33,
+     "capacity": null,
+     "pct": null,
+     "open": true,
+     "flag": null,
+     "status_word": null
+    }
+   ]
+  }
+ ],
+ "near_pct": 85,
+ "limit": "Planned arrivals spread evenly over the gate's open hours; no hourly peak is known.",
+ "peak_bands": []
+}

@@ -106,6 +106,8 @@ except Exception:                                   # pragma: no cover
 DISTANCE_UNITS = ("km", "mi")
 # 10 Oct 2026, carbon planner: what a vehicle runs on. Absent = diesel (every entry before 10 Oct).
 FUELS = ("diesel", "electric")
+# 14 Oct 2026 (bundle G, W8): the Euro classes a vehicle type may carry (optional; chart 5 of the CLP section)
+EURO_CLASSES = ("Euro IV", "Euro V", "Euro VI", "Zero emission")
 KM_PER_MILE = 1.609344
 
 
@@ -328,6 +330,11 @@ def validate(doc, network=None):
             for f in ("kwh_per_km", "battery_kwh_usable", "charge_kw"):
                 if v.get(f) is not None and (not num(v[f]) or v[f] < 0):
                     p.append(f"vehicle '{k}': {f} must be a number >= 0")
+            # 14 Oct 2026 (bundle G, W8): the Euro class the plan assumes for this vehicle type (optional;
+            # an assumption about the hauliers' fleets, read only by the CLP section's chart 5)
+            ec = v.get("euro_class")
+            if ec is not None and ec not in EURO_CLASSES:
+                p.append(f"vehicle '{k}': euro_class must be one of {', '.join(EURO_CLASSES)}")
             tw = v.get("geometry_twin")
             if tw is not None and (not isinstance(tw, str) or tw not in vs or tw == k):
                 p.append(f"vehicle '{k}': geometry_twin must name another vehicle")
@@ -370,6 +377,11 @@ def validate(doc, network=None):
             x = plan.get(f)
             if not num(x) or x <= 0:
                 p.append(f"planning.{f} must be a positive number")
+        # 14 Oct 2026 (bundle G, W8 + the user's Q1): the CLP's no-delivery windows, taken off each gate's open hours
+        import gate_hours
+        pb = gate_hours.peak_bands_problem(plan.get("peak_bands"))
+        if pb:
+            p.append(f"planning.{pb}" if pb.startswith("peak_bands") else f"planning.peak_bands: {pb}")
     # 10 Oct 2026: the carbon block, when present. Every shape the carbon planner reads is
     # checked, so a Config save can never leave a document that makes every scenario fail:
     # the sub-blocks are objects, every factor a number >= 0 (null switches a figure off), a

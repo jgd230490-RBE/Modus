@@ -661,9 +661,39 @@ ok("E (W5): the guide says the left menu shows icons only below 768 px and opens
    "Below 768 px the left menu shows its icons only" in src and "opens it over the page until you pick one" in src)
 
 # 14 Oct 2026: the gate chart is described where the Dashboard is
-ok("the guide explains the gate chart: the track, the bar, the marker, capacity worked out, red and grey, Gate by gate",
-   "<strong>Gate arrivals</strong> shows" in src and "the shift's hours ÷ the check-in time a lorry" in src and "over capacity" in src
+# NARROWED 14 Oct 2026 (bundle G, W17): capacity is the gate's open minutes (its hours less the peak bands, else the shift),
+# and the two steps are named: gold "Queue likely" from 85 %, red "Over gate capacity" past it
+ok("the guide explains the gate chart: the track, the bar, the marker, capacity worked out, the 85 % step, red and grey, Gate by gate",
+   "<strong>Gate arrivals</strong> shows" in src and "its open minutes ÷ the check-in time a lorry" in src
+   and "less any no-delivery peak bands set on Configuration → Planning" in src
+   and "<strong>Queue likely</strong>" in src and "<strong>Over gate capacity</strong>" in src
    and "A grey bar has no check-in time typed" in src and "<strong>Gate by gate</strong> under the chart opens the table" in src)
+# 14 Oct 2026 (bundle G, W7): the CLP monitoring section, in the guide and its contents, with the honest limit
+ok("⭐ the guide's §3.5 CLP monitoring: in the contents, says planned not observed, names every chart, the empty-state rule and the per-load caveat",
+   '<a href="#3-5-clp-monitoring">3.5 CLP monitoring</a>' in src and '<h2 id="3-5-clp-monitoring">3.5 CLP monitoring</h2>' in src
+   and "the figures are planned, not observed, because Wayscope holds no gate log, booking slots or arrival times" in src
+   and all(t in src for t in ("<strong>Routes against their planning cap</strong>", "<strong>Sites against their CLP cap</strong>",
+                              "<strong>Movements by vehicle type</strong>", "<strong>by Euro class</strong>",
+                              "<strong>Movements and lorry distance by council</strong>",
+                              "<strong>Carbon per delivery and per tonne against the target</strong>", "<strong>Lorry trips avoided</strong>"))
+   and "it never shows a zero in place of a missing figure" in src and "Per load has no target line" in src)
+
+# 14 Oct 2026 (bundle G, W8 + W17): the new fields and the gates week, in the guide where a person looks for them
+ok("⭐ the guide names the W8 fields where they are typed: the CLP cap (Locations), open hours (the gates), the peak bands (Planning), the Euro class (Vehicles)",
+   "<strong>CLP cap (optional)</strong> — the most lorry visits a day the Construction Logistics Plan allows at the site" in src
+   and "<strong>Open hours (optional)</strong> — from and to, and the days the gate is open; blank uses the scheme's shift, every day." in src
+   and "<strong>No-delivery peak bands (from the CLP)</strong>" in src and "Wayscope holds no arrival times, so it cannot check that lorries keep out of them." in src
+   and "<strong>Euro class</strong> (optional: what the plan assumes the hauliers will send for that vehicle type" in src)
+ok("⭐ the guide's Commit view explains Gates this week, the 85 % step and the honest limit; §12.1 lists GATE OVER / NEAR CAPACITY",
+   "<p><strong>Gates this week</strong>, under the grid," in src and "the dashed gold line 85 % of that" in src
+   and "These are planned arrivals spread evenly over the gate's open hours; no hourly peak is known." in src
+   and "<tr><td>GATE OVER CAPACITY</td>" in src and "<tr><td>GATE NEAR CAPACITY</td>" in src
+   and src.index("<tr><td>ROUTE CAP</td>") < src.index("<tr><td>GATE OVER CAPACITY</td>") < src.index("<tr><td>SHARE</td>"))
+
+ok("⭐ W10: the guide offers the CLP pack beside the month and says what it holds; the technical guide names its two reads",
+   "<strong>CLP pack (PDF)</strong> and <strong>CLP pack (XLSX)</strong>, beside the month" in src
+   and "the charts that cannot be drawn yet are listed with what they need" in src
+   and "<code>GET /api/clp/pack.pdf?month=N</code>" in open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read())
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
