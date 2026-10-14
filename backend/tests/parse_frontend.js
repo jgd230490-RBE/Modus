@@ -437,8 +437,9 @@ ok("there is a Look-ahead nav entry",
   /\{ id: "lookahead", label: "Look-ahead"/.test(code));
 ok("...in the Track group, on its own",
   /group: "Track", items: \[\s*\{ id: "lookahead"/.test(code));
+// NARROWED 14 Oct 2026 (D9, the mobile shell): on a desktop; below 768 px the page is PhoneLookAhead
 ok("...and it renders the LookAhead component",
-  /page === "lookahead" && <LookAhead/.test(code));
+  /page === "lookahead" && !narrow && <LookAhead/.test(code) && /page === "lookahead" && narrow && <PhoneLookAhead meta=\{meta\} \/>/.test(code));
 // ⚠️ Visible to submitters too. /api/forecast-weeks is filtered per IPT on the server
 // since Task F, so the boundary is there, not in the nav. Asserted so nobody "fixes"
 // this into a second, inconsistent permission.
@@ -1248,10 +1249,13 @@ ok("nothing on the Dashboard writes", !/fetch\(`\$\{API\}[^`]*`,\s*\{\s*method/.
 // ---- 2026-09-14: the user guide is reachable from the app --------------------
 // It has been served at /help/ since 10 Sep and NOTHING linked to it: the only way in
 // was to type the URL. That is why the human could not find it.
-ok("\u2b50 the rail links to the user guide at /help/, exactly once",
-   (src.match(/href=\{"\/help\/\?role="/g) || []).length === 1);
+// NARROWED 14 Oct 2026 (D9): the rail and, on a phone, the More sheet (the rail is not drawn there) — once each
+ok("\u2b50 the rail links to the user guide at /help/, exactly once (and the phone's More sheet once)",
+   (src.match(/href=\{"\/help\/\?role="/g) || []).length === 2
+   && (src.slice(src.indexOf("function PhoneMore("), src.indexOf("function DeskOnly(")).match(/href=\{"\/help\/\?role="/g) || []).length === 1);
 ok("...carrying the signed-in role, so the guide opens on the right view",
-   /href=\{"\/help\/\?role=" \+ encodeURIComponent\(\(role && role\.role\) \|\| ""\)\}/.test(src));
+   /href=\{"\/help\/\?role=" \+ encodeURIComponent\(\(role && role\.role\) \|\| ""\)\}/.test(src)
+   && (src.match(/href=\{"\/help\/\?role=" \+ encodeURIComponent\(\(role && role\.role\) \|\| ""\)\}/g) || []).length === 2);
 ok("...as an ANCHOR, not a NAV entry \u2014 /help/ is a separate document, not a React view, "
    + "so a 'help' id would fail the allowed-page check and bounce to the dashboard",
    !/\{\s*id:\s*"help"/.test(src) && /<a href=\{"\/help\//.test(src));
@@ -1342,7 +1346,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("the page header is the universal anchor (every page renders one)", /<div className="flex flex-wrap items-start justify-between gap-3 mb-5" data-guide="page-header">/.test(src));
   ok("a missing or hidden anchor falls back to the page header, never to nothing",
      /if\(!el \|\| !\(el\.offsetWidth \|\| el\.offsetHeight\)\) el = document\.querySelector\('\[data-guide="page-header"\]'\);/.test(src));
-  const guideFn = (src.match(/function Guide\(\{ page, groups \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+  // NARROWED 14 Oct 2026 (D9): the signature gained `phone` (the phone's own steps and the tab bar as the "rail")
+  const guideFn = (src.match(/function Guide\(\{ page, groups, phone \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
   ok("Guide is a component", guideFn.length > 500);
   ok("🔴 the guide shows ONLY on a demo tenant (TENANT.demo_notice), so a real client never sees it",
      /useEffect\(\(\) => \{\n    if\(!TENANT\.demo_notice\) return;/.test(guideFn));
@@ -1351,7 +1356,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && guideFn.includes("const hintsEl = (hints && !step) ? ("));
   ok("the welcome's menu line is built from the groups the ROLE can see (not from NAV)",
      guideFn.includes("(groups || []).map(g => `${g.group} (${g.items.map(it => it.label.toLowerCase()).join(\", \")})`)")
-     && /<Guide page=\{page\} groups=\{visible\} \/>/.test(src));
+     // NARROWED 14 Oct 2026 (D9): + phone={narrow}; on a phone the welcome's second step names the tab bar instead
+     && /<Guide page=\{page\} groups=\{visible\} phone=\{narrow\} \/>/.test(src)
+     && guideFn.includes(': phone ? { ...s, title: "The tabs", body: "The tabs at the foot of the screen open the Dashboard, the Look-ahead and the Route map. More lists the pages made for a desktop." }'));
   ok("...and the welcome names the tenant, never a project", guideFn.includes("This is ${TENANT.name || \"the demo scheme\"}. Everything you see is invented") && !/Wolds Link/.test(src));
   ok("remembered per visitor under wayscope_guide_<page>", /const GUIDE_KEY = "wayscope_guide_";/.test(src));
   ok("every storage read and write is in try/catch (no storage → shows once per load)",
@@ -1415,7 +1422,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      /\{ id: "forecasts", label: "Forecasts", glyph: "☰" \},\n    \{ id: "carbon", label: "Carbon planner", glyph: "◐" \},\n  \]\},/.test(code)
      && !/group: "Plan", admin/.test(code));
   // NARROWED 11 Oct 2026 (the process layout: the page switch also hands the Carbon page the typed sign-in name, the "set by" of a target)
-  ok("...and the page switch renders CarbonPage", /page === "carbon" && <CarbonPage meta=\{meta\} access=\{role\} who=\{who\} \/>/.test(code));
+  // NARROWED 14 Oct 2026 (D9): on a desktop only (on a phone the Carbon planner is the desk-only card)
+  ok("...and the page switch renders CarbonPage", /page === "carbon" && !narrow && <CarbonPage meta=\{meta\} access=\{role\} who=\{who\} \/>/.test(code));
   // NARROWED 11 Oct 2026 (after the show, item 11): + the one summary download, which the server draws from the same read
   // NARROWED 11 Oct 2026 (the process layout, step 6): + ONE call to /api/carbon/target, whose three verbs (GET, PUT, DELETE)
   // go through one helper; the scenario is still the page's only read of carbon figures
@@ -1720,7 +1728,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     /\.guide-card\{position:fixed;z-index:9001;width:min\(300px,calc\(100vw - 24px\)\);background:rgba\(32,33,36,\.88\);[^}]*backdrop-filter:blur\(8px\)/.test(html)
     && /\.guide-card\[data-place="above"\]::before/.test(html) && code.includes("data-place={place}"));
   {
-    const gf = (src.match(/function Guide\(\{ page, groups \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
+    // NARROWED 14 Oct 2026 (D9): the signature gained `phone`
+    const gf = (src.match(/function Guide\(\{ page, groups, phone \}\)\{([\s\S]*?)\n\}\n/) || ["", ""])[1];
     ok("11 Oct: nothing pops up uninvited — the first visit shows the strip and the dots, not the tour",
       gf.includes('setHints(true); setStrip(guideRead(key) !== "done");') && !/if\(s\.length\)\{ setSteps\(s\); setI\(0\); \}/.test(gf));
     ok("11 Oct: the strip offers the tour and × switches every tip off; dots one per distinct anchor, re-placed every second, none during the tour",
@@ -1838,10 +1847,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     }
     ok("the app's own guide is not mounted on the Route map (the embedded map runs its own): one 'New here?' strip there, and the app never touches wayscope_guide_map",
       // 14 Oct 2026 (narrowed): nor over the Dashboard's big screen
-      portalFn.includes('{page !== "map" && !(page === "dashboard" && wallOn) && <Guide page={page} groups={visible} />}') && (src.match(/<Guide /g) || []).length === 1
+      // 14 Oct 2026 (narrowed, D9): nor over a desk page's card on a phone; the guide is told it is on a phone
+      portalFn.includes('{page !== "map" && !phoneDesk && !(page === "dashboard" && wallOn) && <Guide page={page} groups={visible} phone={narrow} />}') && (src.match(/<Guide /g) || []).length === 1
       && !/\n  map: \[/.test((src.match(/const GUIDE_STEPS = \{([\s\S]*?)\n\};/) || ["", ""])[1]));
     ok("a page with no steps of its own (Config) replays the welcome, so the bar's Guide never does nothing",
-      /const startTour = \(\) => \{ setTip\(null\); setSteps\(build\(guideRead\("welcome"\) !== "done" \|\| !\(GUIDE_STEPS\[key\] \|\| \[\]\)\.length\)\); setI\(0\); \};/.test(src));
+      // NARROWED 14 Oct 2026 (D9): the page's steps come from stepsOf() (on a phone, its own set or the desk steps left out)
+      /const startTour = \(\) => \{ setTip\(null\); setSteps\(build\(guideRead\("welcome"\) !== "done" \|\| !stepsOf\(\)\.length\)\); setI\(0\); \};/.test(src)
+      && src.includes('const stepsOf = () => (phone && GUIDE_STEPS[key + "_phone"]) ? GUIDE_STEPS[key + "_phone"] : (GUIDE_STEPS[key] || []).filter(s => !(phone && s.desk));'));
   }
   {
     // NOTE 11 Oct 2026 (the demo bar): the bar above the map lives in App, not in PublicMap; this pin is about
@@ -2004,9 +2016,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
     // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
-    && code.includes("<Dashboard meta={meta} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
-    // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature)
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen })")
+    // 14 Oct 2026 (narrowed, D9): the Portal tells the Dashboard it is on a phone (no big screen there)
+    && code.includes("<Dashboard meta={meta} phone={narrow} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
+    // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature); 14 Oct 2026: + phone
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen, phone })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2257,7 +2270,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const bmc = bm.slice(0, bm.indexOf("\n}\n") + 3);
   ok("⭐ BULLETIN: one BulletinMenu component, outside the Dashboard's own body (the carbon-target pins slice it), used ONCE, in the working view's actions",
     bmc.length > 500 && (code.match(/<BulletinMenu months=\{months\} \/>/g) || []).length === 1
-    && _dbBody.includes("            <BulletinMenu months={months} />\n          </>}\n          <button type=\"button\" data-guide=\"dash-wall\"")
+    // NARROWED 14 Oct 2026 (D9): the big-screen button after it is not drawn on a phone
+    && _dbBody.includes("            <BulletinMenu months={months} />\n          </>}\n          {/* 14 Oct 2026 (D9): no big screen from a phone (a site-office TV is not a phone) */}\n          {!phone && <button type=\"button\" data-guide=\"dash-wall\"")
     && !_dbBody.includes("function BulletinMenu(") && code.indexOf("function BulletinMenu(") > code.indexOf("function DashboardStockChart("));
   ok("⭐ BULLETIN: the PDF is fetched from /api/bulletin/month.pdf for the chosen month and saved as bulletin-YYYY-MM.pdf",
     bmc.includes("const r = await fetch(`${API}/bulletin/month.pdf?month=${m}`);") && bmc.includes("const blob = await r.blob();")
@@ -2557,11 +2571,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
   ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone)",
      (src.match(/new ResizeObserver\(/g) || []).length === 3 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src));
-  ok("W5 (the user's \"3 yes\"): below 768 px the rail is icons only and opens OVER the page, not remembered",
-     /const NARROW_Q = "\(max-width: 767px\)";/.test(src) && /const railShown = narrow \? railPeek : railOpen;/.test(src)
-     && /if\(narrow\)\{ setRailPeek\(v => !v\); return; \}/.test(src) && /\(narrow && railPeek \? " rail-peek" : ""\)/.test(src)
-     && /\.rail\.rail-peek\{position:absolute;top:0;bottom:0;left:0;z-index:45;/.test(html)
-     && /onClick=\{\(\) => \{ setPage\(it\.id\); if\(narrow\) setRailPeek\(false\); \}\}/.test(src));
+  // REVERSED 14 Oct 2026 (D9, the mobile shell): below 768 px there is NO rail (not even icons); the bottom tab bar
+  // (PhoneTabs) takes its place. The same one breakpoint; the over-the-page "peek" and its CSS are gone.
+  ok("W5 → D9 (14 Oct): below 768 px the rail is not drawn at all; the peek state, its class and its CSS are gone",
+     /const NARROW_Q = "\(max-width: 767px\)";/.test(src) && /const railShown = railOpen;/.test(src)
+     && /\{!narrow && <aside data-guide="rail" className=\{"rail shrink-0/.test(src)
+     && !/railPeek|setRailPeek|rail-peek/.test(src) && !/\.rail\.rail-peek\{/.test(html)
+     && /onClick=\{\(\) => setPage\(it\.id\)\}/.test(src));
 }
 
 // ---- 13 Oct 2026 (W16, bundle E; D39): the four accents ----------------------------------------------------------
@@ -2744,6 +2760,95 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _ga.includes("`capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`"));
 }
 
+// ---- 14 Oct 2026 (D9 + D14, the mobile shell; notes/session-1014-mobile-shell.md) ----------------------------------------
+// Below 768 px (one breakpoint, D9) the rail gives way to a bottom tab bar of four in the tenant's words; on a phone the
+// Dashboard, the Look-ahead and the Route map show (D9), everything else is the "Open on a desktop to edit this" card;
+// nothing on a phone writes (D9: read-only first) — the write controls are NOT RENDERED there, never disabled. The phone
+// Look-ahead is a date strip and one day card with a Day sheet (mockup 10, D9 "Day sheet yes"). dom_frontend clicks it.
+{
+  const _pt = (src.match(/function PhoneTabs\([\s\S]*?\n\}\n/) || [""])[0];
+  const _pm = (src.match(/function PhoneMore\([\s\S]*?\n\}\n/) || [""])[0];
+  const _do = (src.match(/function DeskOnly\([\s\S]*?\n\}\n/) || [""])[0];
+  const _pl = (src.match(/function PhoneLookAhead\([\s\S]*?\n\}\n/) || [""])[0];
+  const _po = (src.match(/function Portal\([\s\S]*?\n\}\n/) || [""])[0];
+  const _css = (html.match(/\/\* PHONE-SHELL-START[\s\S]*?PHONE-SHELL-END \*\//) || [""])[0];
+  ok("⭐ D9: one breakpoint, 768 px, the same as the cards; the phone pages are the Dashboard, the Look-ahead and the Route map",
+     /const NARROW_Q = "\(max-width: 767px\)";/.test(src) && src.includes('const PHONE_PAGES = ["dashboard", "lookahead", "map"];')
+     && /@media \(max-width:767px\)\{\n    \.rd-table\{min-width:0 !important;width:100%;\}/.test(html));
+  ok("PHONE TABS: the three phone pages from NAV (their labels: the tenant's words, never an id) and More; one nav named 'Pages'",
+     _pt.includes("(groups || []).flatMap(g => g.items).filter(it => PHONE_PAGES.includes(it.id))") && _pt.includes("<NavIcon id={it.id} /><span>{it.label}</span>")
+     && _pt.includes('<span>More</span>') && _pt.includes('aria-label="Pages"') && !/\{it\.id\}<\/span>/.test(_pt)
+     && _pt.includes('aria-current={page === it.id ? "page" : undefined}') && _pt.includes('aria-expanded={moreOpen ? "true" : "false"} aria-controls="phone-more"'));
+  ok("PHONE TABS: the tab bar is the guide's 'rail' anchor and the foot the guide's strip stays above",
+     _pt.includes('data-guide="rail" data-sticky-foot="1"'));
+  ok("⭐ PHONE: the Portal draws the rail only at 768 px and up, and the tab bar and More only below",
+     _po.includes('{!narrow && <aside data-guide="rail"') && _po.includes("{narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}")
+     && _po.includes("{narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage}"));
+  ok("⭐ PHONE WATCHER (hide, do not disable): every desk page is not RENDERED on a phone — Submit, Forecasts, Carbon, the desk Look-ahead, Data, Config",
+     _po.includes('{page === "submit" && !narrow && <Matrix ') && _po.includes('{page === "forecasts" && !narrow && <Forecasts ')
+     && _po.includes('{page === "carbon" && !narrow && <CarbonPage ') && _po.includes('{page === "lookahead" && !narrow && <LookAhead ')
+     && _po.includes("{DATA_PAGES.includes(page) && canApprove && !narrow && (") && _po.includes('{page === "config" && canApprove && !narrow && <ConfigPage ')
+     && _po.includes("const phoneDesk = narrow && !PHONE_PAGES.includes(page);") && _po.includes("{phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
+     && !/disabled=\{[^}]*\b(narrow|phone)\b/.test(src));
+  // the same rule for ANY page added later (G3's Users page, say): every page the Portal mounts, other than the Dashboard
+  // and the Route map, carries `!narrow`, or is a Phone… page mounted only when narrow
+  {
+    const _main = _po.slice(_po.indexOf('<main className="flex-1 min-h-0 overflow-auto">'), _po.indexOf("</main>"));
+    const mounts = [..._main.matchAll(/\{(?:page === "(\w+)"|DATA_PAGES\.includes\(page\))([^\n]*)/g)].map(m => ({ id: m[1] || "data", rest: m[2] }));
+    const loose = mounts.filter(m => !["dashboard", "map"].includes(m.id) && !/ && !narrow && /.test(m.rest) && !/ && narrow && <Phone[A-Z]/.test(m.rest));
+    ok("⭐ PHONE WATCHER, for every page: each page the Portal mounts (but the Dashboard and the Route map) is desk-only on a phone or a Phone… page",
+       mounts.length >= 9 && loose.length === 0, loose.map(m => m.id).join(", ") || String(mounts.length));
+  }
+  ok("PHONE: the desk-only card says 'Open on a desktop to edit this.' under the page's own name, and offers the Dashboard",
+     _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">Open on a desktop to edit this.</p>')
+     && _do.includes("On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read.") && _do.includes("Go to the Dashboard"));
+  ok("PHONE: More lists the role's desk pages (from the visible groups, so a team code never sees Data or Config) and the user guide in a new tab",
+     _pm.includes("const desk = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")
+     && _pm.includes('role="dialog" aria-modal="true" aria-label="More pages"') && _pm.includes('target="_blank" rel="noopener noreferrer"')
+     && _pm.includes("{teamText(who) || \"—\"} · {role.ipt ? teamName(role.ipt) : role.label}"));
+  ok("PHONE: Escape and the shade shut More; Ctrl K opens it on a phone (the rail's search is not drawn there)",
+     _po.includes('const k = (e) => { if(e.key === "Escape") setMoreOpen(false); };') && _pm.includes('className="phone-more-back" aria-label="Close More" tabIndex={-1} onClick={onClose}')
+     && _po.includes("if(window.matchMedia && window.matchMedia(NARROW_Q).matches){ setMoreOpen(true); return; }"));
+  ok("⭐ PHONE WATCHER: the Dashboard's big-screen switch is not drawn on a phone", src.includes('{!phone && <button type="button" data-guide="dash-wall" onClick={toggleWall}'));
+  ok("⭐ PHONE WATCHER: the phone Look-ahead only READS — one GET of /lookahead and the Day sheet's GET; no method, no send(), no input, no Confirm",
+     _pl.length > 3000 && (_pl.match(/fetch\(/g) || []).length === 2 && _pl.includes("fetch(`${API}/lookahead?bucket=${bucket}`)")
+     && _pl.includes("fetch(`${API}/forecast-weeks/day-sheet?bucket=${bucket}&day=${shown}`)")
+     && !/method|send\(|<input|<select|<textarea|Confirm week|Re-open|saveDay|saveActual|doConfirm|doSpread|refreshTarkTee/.test(_pl));
+  ok("PHONE LOOK-AHEAD: a date strip of the week's weekdays (today first, today marked), one card for the chosen day",
+     _pl.includes("const shown = (day && dates.includes(day)) ? day : (dates.includes(today) ? today : dates[0]);")
+     && _pl.includes('aria-pressed={iso === shown ? "true" : "false"}') && _pl.includes('className={"ph-day" + (iso === today ? " is-today" : "")}')
+     && _pl.includes('data-guide="ph-days"') && _pl.includes('data-guide="ph-sheet"'));
+  ok("PHONE LOOK-AHEAD: the card's figures are the server's for that day (derived tonnes, trips, vehicles of routed lines), lines heaviest first",
+     _pl.includes("const tonnes = rows.reduce((x, r) => x + (r.f.tonnes || 0), 0);") && _pl.includes("const loads = rows.reduce((x, r) => x + (r.f.trips || 0), 0);")
+     && _pl.includes("const lorries = routed.reduce((x, r) => x + (r.f.vehicles || 0), 0);")
+     && _pl.includes(".sort((a, b) => ((b.f.tonnes || 0) - (a.f.tonnes || 0)) || String(a.line.route_id).localeCompare(String(b.line.route_id)));"));
+  ok("PHONE LOOK-AHEAD: each line shows its places, the team's NAME and the material as chips, one status (the desk grid's laStatus), facts behind a native button",
+     _pl.includes("const teamWord = iptKey(r.c.ipt) ? teamName(iptKey(r.c.ipt)) : `No ${TEAM().toLowerCase()}`;")
+     && _pl.includes("<RowStatus word={r.st.word} tone={r.st.tone} more={r.st.more} />") && _pl.includes("st: laStatus(lf, line.week || {})")
+     && _pl.includes('aria-expanded={isOpen ? "true" : "false"} aria-controls={did}') && _pl.includes('<dl className="rd-dl" id={did} hidden={!isOpen}>')
+     && _pl.includes("laFlagGroups(r.lf).map(g =>"));
+  ok("PHONE LOOK-AHEAD: the Day sheet downloads as day-sheet-<day>.pdf, and the page says where typing happens",
+     _pl.includes("a.download = `day-sheet-${shown}.pdf`;") && _pl.includes("To type a day's plan, confirm the week or record what moved, open the Look-ahead on a desktop."));
+  ok("PHONE GUIDE: the Look-ahead has its own phone steps, the Dashboard's big-screen step is marked desk-only, and the welcome names the tabs",
+     /\n  lookahead_phone: \[\n    \{ anchor: "ph-days", title: "One day at a time\."/.test(src) && src.includes('{ anchor: "dash-wall", title: "Big screen.", body: "Opens a version made for a site-office TV.", desk: true },')
+     && src.includes("setRailRight(rr.height > rr.width ? Math.round(rr.right) : 0);"));
+  ok("PHONE CSS: every phone control is a 48 px box or more (tabs 56, sheet rows 48, week switch 48, days 56, lines 48, Show more 48, the card's buttons 48)",
+     /\.phone-tab\{[^}]*min-height:56px;/.test(_css) && /\.phone-more-item\{[^}]*min-height:48px;/.test(_css) && /\.ph-seg button\{min-height:48px;/.test(_css)
+     && /\.ph-day\{[^}]*min-height:56px;/.test(_css) && /\.ph-line>button\{[^}]*min-height:48px;/.test(_css) && /\.ph-more\{[^}]*min-height:48px;/.test(_css)
+     && /\.ph-actions>\*\{flex:1;min-height:48px;/.test(_css) && /\.tap48\{min-height:48px;\}/.test(_css));
+  ok("PHONE CSS: tokens only (every look and accent follows), the active tab in the accent's control colour, the 14 px floor kept (13 px only for the tab words and notes)",
+     _css.length > 3000 && !/#[0-9A-Fa-f]{3,6}\b/.test(_css) && /\.phone-tab\.is-on\{color:var\(--action\);/.test(_css)
+     && /\.phone-tab\.is-on::before\{[^}]*background:var\(--action\);\}/.test(_css) && !/font(-size)?:[^;]*\b(9|10|11|12)px/.test(_css));
+  ok("PHONE CSS: the page header's actions wrap under the title (a phone, and 768–1023 px beside the open rail), the Look-ahead's flags wrap in their chips",
+     /\n  \.ph-actions-box\{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;\}/.test(_css)
+     && /\[data-guide="lookahead-flags"\] \.chip-st\{white-space:normal;/.test(_css)
+     && /\.chart-box>canvas\{max-width:100%;\}/.test(_css)
+     && src.includes('{actions && <div className="flex items-center gap-2 shrink-0 ph-actions-box">{actions}</div>}'));
+  ok("PHONE: the sheet stops at the tab bar, so More still shuts it; the bar keeps clear of a phone's home indicator",
+     /\.phone-more\{position:absolute;left:0;right:0;bottom:calc\(57px \+ env\(safe-area-inset-bottom,0px\)\);/.test(_css)
+     && /\.phone-tabs\{[^}]*padding-bottom:env\(safe-area-inset-bottom,0px\);/.test(_css));
+}
+
 // ---- 14 Oct 2026 (G3): per-person logins, at source ---------------------------------------------------------
 {
   const fnBody = (name) => { const i = code.indexOf(`function ${name}(`); if (i < 0) return ""; const j = code.indexOf("\nfunction ", i + 10); return code.slice(i, j < 0 ? undefined : j); };
@@ -2780,8 +2885,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      up.includes("{u.id !== data.me && <button") && up.includes("Pass this link on yourself") && up.includes("navigator.clipboard.writeText(note.link)"));
   ok("G3: Users is an admin-only item, shown to an admin and (for the first-admin step) a planner on a shared CODE, never a planner login",
      code.includes('const isAdmin = !!(role && (role.role === "admin" || (role.can_approve && role.via !== "login")));'));
+  // NARROWED 14 Oct 2026 (merged with the mobile shell, D9): and only at 768 px and up; on a phone it is the desk card
   ok("G3: Users is an admin-only item, rendered only for an admin",
-     code.includes('{ id: "users", label: "Users", glyph: "☺", adminOnly: true }') && code.includes('{page === "users" && isAdmin && <UsersPage access={role} />}')
+     code.includes('{ id: "users", label: "Users", glyph: "☺", adminOnly: true }') && code.includes('{page === "users" && isAdmin && !narrow && <UsersPage access={role} />}')
      && code.includes(".map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) }))"));
   ok("G3 (D51): only a DEMO login reports page opens", /if\(!role \|\| role\.kind !== "demo"\) return;\s*\n\s*fetch\(`\$\{API\}\/activity`/.test(code));
   const am = fnBody("AccountMenu");

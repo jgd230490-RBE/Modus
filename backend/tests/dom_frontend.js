@@ -1204,6 +1204,155 @@ function keptAppLoader(){
   ok("SPEED: a damaged kept entry is ignored and replaced", p7.calls.transform === 1 && p7.win.RAN === 1 && JSON.parse(p7.store.modus_app_js).k);
 }
 
+// ---- 14 Oct 2026 (D9, the mobile shell): the Portal on a phone, in a real DOM ---------------------------------------
+// The Portal mounted with matchMedia answering "(max-width: 767px)", once as a team code (the stand's "demo" visitor:
+// role ipt, cannot approve) and once as the planner, then turned to a desktop width through the same media query's
+// change event. The Look-ahead reads the backend harness's own fixture (lookahead_page.json); every other read never
+// settles. Checked: no rail on a phone, the four tabs in the tenant's words, the desk pages as the "open on a desktop"
+// card (the page itself never mounted), the phone Look-ahead's day strip, figures, order, team names and details, the
+// Day sheet's request, and that NOTHING on a phone can write: no input, select or textarea, no write button, no fetch
+// with a method. NOT covered (jsdom has no layout): the 48 px boxes, no sideways scroll, the looks and accents — the
+// browser matrix measured those (notes/session-1014-mobile-shell.md).
+async function phoneShellDom(){
+  const LA = FIX("lookahead_page.json"), CL = FIX("cost_lines.json");
+  const calls = [];
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (/\/api\/lookahead\?bucket=commit$/.test(String(url))) return reply(200, LA);
+    if (/\/api\/costing\/lines\?status=All$/.test(String(url))) return reply(200, CL);
+    if (/\/api\/forecast-weeks\/day-sheet\?/.test(String(url))) return reply(200, "pdf");
+    return new Promise(() => {});
+  };
+  w.URL.createObjectURL = () => "blob:day-sheet"; w.URL.revokeObjectURL = () => {};
+  let mqHandler = null, narrowNow = true;
+  const mm = w.matchMedia;
+  w.matchMedia = (q) => ({ get matches(){ return q === "(max-width: 767px)" && narrowNow; }, media: q,
+    addListener(f){ if(q === "(max-width: 767px)") mqHandler = f; }, removeListener(){},
+    addEventListener(t, f){ if(q === "(max-width: 767px)") mqHandler = f; }, removeEventListener(){} });
+  const TEAM_ACC = { role: "ipt", label: "North Team", ipt: "IPT1", can_approve: false, ipt_locked: true, ipt_required: false, demo: false, ipts: ["IPT1", "IPT2"] };
+  const meta = { ...metaMin, months: { start_year: 2026, count: 60 } };
+  const mountPortal = async (role, pageId) => {
+    w.localStorage.setItem("modus_page", pageId || "dashboard");
+    try { w.history.replaceState(null, "", "#" + (pageId || "dashboard")); } catch(e){}
+    const el = w.document.createElement("div"); w.document.body.appendChild(el);
+    const r = w.ReactDOM.createRoot(el);
+    await act(async () => { r.render(w.React.createElement(w.Portal, { role, who: "Tester", meta, metaErr: false, vehLang: "en", onPage(){} })); });
+    await settle(5);
+    return { el, done: async () => { await act(async () => { r.unmount(); }); el.remove(); } };
+  };
+  const tabs = (el) => [...el.querySelectorAll("nav.phone-tabs > button")];
+  const tabText = (b) => b.querySelector("span").textContent.trim();
+  const WRITE_WORDS = /^(Confirm|Re-open|Export|Save|Submit|Approve|Reject|Delete|Add|check now|re-check|Spread)/i;
+
+  // -- a team code on a phone
+  const t = await mountPortal(TEAM_ACC, "dashboard");
+  ok("⭐ PHONE: below 768 px the rail is not drawn; a bottom tab bar of four is (Dashboard, Look-ahead, Route map, More), the NAV's own words",
+     !t.el.querySelector("aside.rail") && tabs(t.el).map(tabText).join("|") === "Dashboard|Look-ahead|Route map|More"
+     && t.el.querySelector("nav.phone-tabs").getAttribute("aria-label") === "Pages");
+  ok("PHONE: the open page's tab is marked (aria-current=page and is-on); More says whether its sheet is open",
+     tabs(t.el)[0].getAttribute("aria-current") === "page" && tabs(t.el)[0].classList.contains("is-on")
+     && tabs(t.el)[3].getAttribute("aria-expanded") === "false" && tabs(t.el)[3].getAttribute("aria-controls") === "phone-more");
+  ok("PHONE: the Dashboard has no big-screen switch on a phone (the Dashboard itself is drawn: its six cards)", !!t.el.querySelector('[data-guide="dash-figures"]') && !t.el.querySelector('[data-guide="dash-wall"]')
+     && ![...t.el.querySelectorAll("button")].some(b => /Big screen/.test(b.textContent)));
+  await act(async () => { tabs(t.el)[1].dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await settle(5);
+  const ph = () => t.el.querySelector('[data-phone-page="lookahead"]');
+  ok("⭐ PHONE: the Look-ahead tab opens the phone Look-ahead (one read of /lookahead), not the desk grid",
+     !!ph() && !t.el.querySelector('[data-rd-table="lookahead"]') && !t.el.querySelector('[data-guide="lookahead-tabs"]')
+     && calls.some(c => c.url === "/api/lookahead?bucket=commit" && c.method === "GET"));
+  const dayBtns = () => [...ph().querySelectorAll(".ph-days > button")];
+  const shown = () => (dayBtns().find(b => b.getAttribute("aria-pressed") === "true") || {}).textContent;
+  const weekdays = LA.commit.lines[0].days.map(d => d.day_date).filter(iso => !w.__F.isWeekend(iso));
+  ok("PHONE: the date strip is the week's five weekdays, today pressed first (the fixture's today)",
+     dayBtns().length === 5 && dayBtns().map(b => b.textContent).join("|") === weekdays.map(iso => w.__F.dayName(iso) + w.__F.dayNum(iso)).join("|")
+     && shown() === w.__F.dayName(LA.today) + w.__F.dayNum(LA.today) && ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === LA.today);
+  // the day's figures are the server's own, summed over the lines with something planned that day
+  const dayRows = (iso) => LA.commit.lines.map(l => ({ l, d: l.days.find(x => x.day_date === iso) }))
+    .filter(x => x.d && ((+x.d.planned_qty || 0) > 0 || ((x.d.derived || {}).trips || 0) > 0));
+  const figs = () => [...ph().querySelectorAll(".ph-figs > span")].map(s => s.textContent.replace(/\s+/g, " ").trim());
+  const sumOf = (rows, k) => rows.reduce((a, x) => a + ((x.d.derived || {})[k] || 0), 0);
+  const rT = dayRows(LA.today);
+  ok("⭐ PHONE: the day card's figures are the server's for that day: tonnes, loads, lorries (routed lines), lines",
+     figs().join("|") === [`${w.__F.grp(sumOf(rT, "tonnes"))}t`, `${w.__F.grp(sumOf(rT, "trips"))}loads`,
+                           `${rT.some(x => x.l.context.baked) ? w.__F.grp(rT.filter(x => x.l.context.baked).reduce((a, x) => a + (x.d.derived.vehicles || 0), 0)) : "—"}${rT.some(x => !x.l.context.baked) && rT.some(x => x.l.context.baked) ? "lorries, routed lines" : "lorries"}`,
+                           `${rT.length}line${rT.length === 1 ? "" : "s"}`].join("|"), figs().join("|"));
+  const lineEls = () => [...ph().querySelectorAll(".ph-line")];
+  const tonnesOf = (el) => { const k = el.getAttribute("data-ph-line"); const x = rT.find(y => `${y.l.route_id}|${y.l.discipline || ""}|${y.l.section_id || ""}|${y.l.month_index}` === k); return x ? (x.d.derived.tonnes || 0) : -1; };
+  ok("PHONE: one row per line planned that day, heaviest first",
+     lineEls().length === Math.min(rT.length, 6) && lineEls().every((e, i, a) => i === 0 || tonnesOf(a[i - 1]) >= tonnesOf(e)));
+  ok("🔴 PHONE: team NAMES on the phone Look-ahead, never an id", !/\bIPT ?\d\b/i.test(ph().textContent) && /Team \d|North Team|No team/i.test(ph().textContent));
+  const first = lineEls()[0], fb = first.querySelector("button"), fdl = first.querySelector("dl");
+  ok("PHONE: a line's facts are shut until it is tapped (a native button, aria-expanded / aria-controls)",
+     fb.getAttribute("aria-expanded") === "false" && fdl.hidden === true && fb.getAttribute("aria-controls") === fdl.id);
+  click(fb);
+  ok("PHONE: ...and a tap shows them (route, vehicle, plan, lorries, the week's state)",
+     fb.getAttribute("aria-expanded") === "true" && fdl.hidden === false && /Route/.test(fdl.textContent) && /Plan/.test(fdl.textContent) && /This week/.test(fdl.textContent));
+  const other = weekdays.find(iso => iso !== LA.today);
+  click(dayBtns().find(b => b.textContent === w.__F.dayName(other) + w.__F.dayNum(other)));
+  ok("PHONE: another day in the strip shows that day's card (and shuts the open facts)",
+     ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === other && shown() === w.__F.dayName(other) + w.__F.dayNum(other)
+     && [...ph().querySelectorAll(".ph-line > button")].every(b => b.getAttribute("aria-expanded") === "false"));
+  // nothing on a phone writes: no input, no select, no textarea, no write button, no request with a method
+  const writeBtns = (el) => [...el.querySelectorAll("button")].filter(b => WRITE_WORDS.test(b.textContent.trim()));
+  ok("⭐ PHONE WATCHER: the phone Look-ahead has no input, select or textarea and no write button (Confirm, Re-open, Save…)",
+     !ph().querySelector("input, select, textarea") && writeBtns(ph()).length === 0, writeBtns(ph()).map(b => b.textContent).join(","));
+  await act(async () => { [...ph().querySelectorAll("button")].find(b => /Day sheet/.test(b.textContent)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await settle(5);
+  ok("⭐ PHONE: the Day sheet asks for the shown day of the open week (a GET; the file is named after the day)",
+     calls.some(c => c.url === `/api/forecast-weeks/day-sheet?bucket=commit&day=${other}` && c.method === "GET"));
+  ok("🔴 PHONE WATCHER: not one request from the phone pages carries a method other than GET", calls.every(c => c.method === "GET"),
+     calls.filter(c => c.method !== "GET").map(c => c.method + " " + c.url).join(", "));
+  // More: the desk pages, each the card on a phone
+  click(tabs(t.el)[3]);
+  const sheet = () => t.el.querySelector("#phone-more");
+  ok("PHONE: More opens a sheet (a dialog) with the pages made for a desk this role can see, and the user guide",
+     !!sheet() && sheet().getAttribute("role") === "dialog" && tabs(t.el)[3].getAttribute("aria-expanded") === "true"
+     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner"
+     && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
+  ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
+  await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  ok("PHONE: Escape shuts the sheet", !sheet() && tabs(t.el)[3].getAttribute("aria-expanded") === "false");
+  click(tabs(t.el)[3]);
+  click([...sheet().querySelectorAll("button.phone-more-item")].find(b => /Forecasts/.test(b.textContent)));
+  const desk = () => t.el.querySelector("[data-desk-only]");
+  ok("⭐ PHONE: a desk page on a phone is the card \"Open on a desktop to edit this.\" with its own name, never the page",
+     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && /Open on a desktop to edit this\./.test(desk().textContent)
+     && !t.el.querySelector('[data-rd-table="forecasts"], table') && !sheet() && w.location.hash === "#forecasts" && tabs(t.el)[3].classList.contains("is-on"));
+  ok("🔴 PHONE WATCHER: the desk card has no input and no write button (hidden, not disabled)",
+     !t.el.querySelector("main input, main select, main textarea") && writeBtns(t.el.querySelector("main")).length === 0
+     && ![...t.el.querySelectorAll("main button")].some(b => b.disabled));
+  click([...desk().querySelectorAll("button")].find(b => /Go to the Dashboard/.test(b.textContent)));
+  ok("PHONE: its button goes back to the Dashboard", !desk() && tabs(t.el)[0].classList.contains("is-on") && w.location.hash === "#dashboard");
+  // a desk page opened by its address (#submit) on a phone is the card too
+  await t.done();
+  const s2 = await mountPortal(TEAM_ACC, "submit");
+  ok("PHONE: a desk page opened by its address (#submit) is the card as well, the matrix never mounted",
+     !!s2.el.querySelector("[data-desk-only]") && s2.el.querySelector("[data-desk-only] h2").textContent === "Submit forecast" && !s2.el.querySelector("main input, main select"));
+  await s2.done();
+
+  // -- the planner on a phone: the Data pages and Config are desk pages too
+  const p = await mountPortal(plannerAcc, "dashboard");
+  click(tabs(p.el)[3]);
+  // NARROWED 14 Oct 2026 (merged with G3): a planner on a shared CODE also sees Users (G3's first-admin step), a desk page too
+  ok("PHONE: the planner's sheet adds the Data pages, Config and Users (each a desk page)",
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Locations|Routes|Zones|Config|Users");
+  click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Users/.test(b.textContent)));
+  ok("PHONE (with G3): Users on a phone is the card, the Users page never mounted",
+     !!p.el.querySelector("[data-desk-only]") && p.el.querySelector("[data-desk-only] h2").textContent === "Users" && !p.el.querySelector("main table, main input"));
+  click(tabs(p.el)[3]);
+  click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Config/.test(b.textContent)));
+  ok("PHONE: Config on a phone is the card (the Config page, its Save and its JSON never mount)",
+     !!p.el.querySelector("[data-desk-only]") && !/Everything \(JSON\)/.test(p.el.textContent) && !p.el.querySelector("main textarea"));
+  // turned sideways past 768 px (the media query changes): the desk shell, the rail and the page itself
+  narrowNow = false;
+  await act(async () => { if (mqHandler) mqHandler({ matches: false }); });
+  await settle(5);
+  ok("⭐ PHONE → DESK: past 768 px the rail is back, the tab bar gone, and the desk page itself mounts (no card)",
+     !!p.el.querySelector("aside.rail") && !p.el.querySelector("nav.phone-tabs") && !p.el.querySelector("[data-desk-only]") && !p.el.querySelector("#phone-more"));
+  await p.done();
+  w.matchMedia = mm;
+}
+
 // ---- 14 Oct 2026 (G3): per-person logins, mounted -------------------------------------------------------------
 // The whole App with a stubbed fetch that records every call: email sign-in, the account menu, the Users page (teams by
 // NAME, never an id), the hint that resumes a session on reload, a session ending while the app is open, a demo login
@@ -1439,6 +1588,8 @@ async function g3LoginsDom(){
   catch (e) { ok("SPEED: the loader section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await rowDetailsDom(); ok("ROW DETAILS: the section ran to the end", true); }
   catch (e) { ok("ROW DETAILS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  try { await phoneShellDom(); ok("PHONE: the section ran to the end", true); }
+  catch (e) { ok("PHONE: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

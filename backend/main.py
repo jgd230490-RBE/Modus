@@ -1731,6 +1731,33 @@ def forecast_week_export(format: str = "xlsx", bucket: str = "commit",
                     headers={"Content-Disposition": f'attachment; filename="{stem}.{ext}"'})
 
 
+@app.get("/api/forecast-weeks/day-sheet")
+def forecast_week_day_sheet(day: str, bucket: str = "commit", route_id: Optional[str] = None):
+    """
+    14 Oct 2026 (D9, the mobile shell): the Day sheet, one weekday of the open week as a one-page A4 PDF (the phone's
+    Look-ahead button; mockup 10). Any staff code, scoped like the page (a team code sees its own lines only), built
+    from the same read the page shows, with the stored restriction check. `day` must be a weekday of that week.
+    """
+    from fastapi.responses import Response       # not in the test stub; imported here
+    acc = _require_access()
+    try:
+        import datetime as _dt
+        d = _dt.date.fromisoformat(day)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "day must be a date, YYYY-MM-DD")
+    pg = lookahead.page(bucket=("next" if bucket == "next" else "commit"), route_id=route_id, acc=acc,
+                        with_restrictions=True)
+    cw = pg.get("commit_week") or {}
+    if not (cw.get("from") and cw.get("to") and cw["from"] <= day <= cw["to"]) or d.weekday() > 4:
+        raise HTTPException(400, f"{day} is not a weekday of the week {cw.get('from')} to {cw.get('to')}")
+    try:
+        data = export.build_day_sheet_pdf(pg, day)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="day-sheet-{day}.pdf"'})
+
+
 @app.put("/api/forecast-days")
 def edit_forecast_day(body: DayEdit):
     """Type one day's planned quantity. The day and (if it was derived) its week go `edited`."""

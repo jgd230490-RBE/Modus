@@ -859,6 +859,210 @@ def build_pdf(page):
     return buf.getvalue()
 
 
+# ------------------------------------------------------------------ the Day sheet (14 Oct 2026, D9; mockup 10)
+#: the Look-ahead's order of seriousness (frontend LA_FLAG_RANK): a lorry over a road limit first
+DAY_FLAG_RANK = ("LIMIT", "RESTRICTION", "SHORTAGE", "ROUTE_CAP", "STOCKPILE_OVER", "IPT_SHARE", "DAYS_NE_WEEK",
+                 "PARENT_CHANGED", "UNBAKED")
+#: the words a person reads on the sheet (the grid's LINE_FLAG_LABEL, with the restriction's own word from the flag)
+DAY_FLAG_WORD = {"LIMIT": "ROAD LIMIT", "RESTRICTION": "RESTRICTION", "SHORTAGE": "SHORT", "ROUTE_CAP": "CAP",
+                 "STOCKPILE_OVER": "STOCKPILE OVER", "IPT_SHARE": "SHARE", "DAYS_NE_WEEK": "DAYS NOT = WEEK",
+                 "PARENT_CHANGED": "MONTH CHANGED", "UNBAKED": "NOT ROUTED"}
+
+
+#: flag sentences printed in full under the counts; the rest are counted (every one is in the Look-ahead)
+DAY_FLAGS_SHOWN = 5
+
+
+def _line_key(r):
+    """The Look-ahead's line key (frontend lineKeyOf): route | discipline | section | month."""
+    return f"{r.get('route_id')}|{r.get('discipline') or ''}|{r.get('section_id') or ''}|{r.get('month_index')}"
+
+
+def _day_flag_word(f):
+    if f.get("code") == "RESTRICTION" and f.get("label"):
+        return str(f["label"])
+    return DAY_FLAG_WORD.get(f.get("code"), str(f.get("code") or ""))
+
+
+def day_sheet_rows(page, day):
+    """
+    The Day sheet's rows for ONE weekday of the open week: every line with something planned that day (a planned
+    quantity or a load), heaviest first. Each row carries the server's own figures for that day (derived tonnes,
+    trips, vehicles), the line's flags most serious first, and the places, team NAME, material and vehicle a person
+    reads. The phone's day card (PhoneLookAhead) lists the same lines in the same order.
+    """
+    name = _team_namer()
+    by_line = {}
+    for f in ((page.get("clashes") or {}).get("flags") or []):
+        by_line.setdefault(_line_key(f), []).append(f)
+    out = []
+    for l in (page.get("commit") or {}).get("lines", []):
+        d = next((x for x in (l.get("days") or []) if x.get("day_date") == day), None)
+        if not d:
+            continue
+        f = d.get("derived") or {}
+        if not ((d.get("planned_qty") or 0) > 0 or (f.get("trips") or 0) > 0):
+            continue
+        c = l.get("context") or {}
+        flags = sorted(by_line.get(_line_key(l), []),
+                       key=lambda x: DAY_FLAG_RANK.index(x.get("code")) if x.get("code") in DAY_FLAG_RANK else 99)
+        out.append({
+            "key": _line_key(l), "route_id": l.get("route_id"),
+            "origin": c.get("origin_name") or c.get("origin_id") or "—",
+            "dest": c.get("dest_name") or c.get("dest_id") or "—",
+            "team": name(c.get("ipt")) or "No team", "section": c.get("section_id") or "",
+            "material": c.get("material_type") or "—",
+            "vehicle": c.get("vehicle_short") or c.get("vehicle_type") or "—",
+            "qty": d.get("planned_qty"), "unit": l.get("unit") or c.get("unit") or "",
+            "typed": d.get("status") == "edited",
+            "tonnes": f.get("tonnes"), "loads": f.get("trips") or 0,
+            "lorries": f.get("vehicles") if c.get("baked") else None, "routed": bool(c.get("baked")),
+            "week_status": (l.get("week") or {}).get("status"),
+            "flag": _day_flag_word(flags[0]) if flags else None, "more": len({x.get("code") for x in flags}) - 1 if flags else 0,
+            # the flag's own sentence already names the route's places, so it is printed as it is (team ids in words)
+            "flag_texts": [f"{_day_flag_word(x)}: {name(x.get('text') or '')}" for x in flags],
+        })
+    out.sort(key=lambda r: (-(r["tonnes"] or 0), str(r["route_id"])))
+    return out
+
+
+def day_sheet_totals(rows):
+    routed = [r for r in rows if r["routed"]]
+    return {"lines": len(rows), "tonnes": sum(r["tonnes"] or 0 for r in rows), "loads": sum(r["loads"] for r in rows),
+            "lorries": sum(r["lorries"] or 0 for r in routed) if routed else None, "routed": len(routed),
+            "flagged": sum(1 for r in rows if r["flag"]),
+            "confirmed": bool(rows) and all(r["week_status"] == "confirmed" for r in rows)}
+
+
+def build_day_sheet_pdf(page, day):
+    """
+    One weekday of the open Look-ahead week on one A4 portrait page (D9: "Day sheet yes"; mockup 10): the day's lines
+    with places, team, material, vehicle, the plan, tonnes, loads and lorries, each line's most serious flag (a flag,
+    never a stop), the totals, and the flags spelt out. Built from the same read the page shows (lookahead.page), on
+    the shared page_frame: the tenant's demo notice is on the page whenever the tenant carries one. Long days run on
+    to a second page rather than shrink the type below 7 pt.
+    """
+    if rl_canvas is None:
+        raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
+    buf = io.BytesIO()
+    W, H = A4
+    lm = rm = 12 * mm
+    top, bottom = (27 if _demo_notice() else 22) * mm, 14 * mm
+    usable = W - lm - rm
+    rows = day_sheet_rows(page, day)
+    tot = day_sheet_totals(rows)
+    d = datetime.date.fromisoformat(day)
+    day_words = f"{d:%A} {d.day} {d:%B %Y}"
+    title = f"{_tenant_name()} · day sheet · {d:%a} {d.day} {d:%b %Y}"
+    on_page = page_frame(W, H, lm, rm, _pdf_safe(title), rule_y=H - 9 * mm, title_font=("Helvetica-Bold", 13),
+                         title_y=H - 15 * mm,
+                         right=("CONFIRMED" if tot["confirmed"] else "DRAFT - not confirmed", "Helvetica-Bold", 9,
+                                NAVY_RGB if tot["confirmed"] else RED_RGB),
+                         sub=("Day sheet · not a delivery note · planning payloads, not plated", "Helvetica", 8, GREY,
+                              H - 19.5 * mm),
+                         notice=((_pdf_safe(_demo_notice()), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 24.5 * mm)
+                                 if _demo_notice() else None),
+                         foot=("Wayscope · " + _pdf_safe(_tenant_name()), "Helvetica", 7, GREY))
+    doc = frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page)
+
+    st = ParagraphStyle("b", fontName="Helvetica", fontSize=8, leading=9.6)
+    st_h = ParagraphStyle("h", parent=st, fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.Color(*NAVY_RGB))
+    st_hr = ParagraphStyle("hr", parent=st_h, alignment=2)
+    st_r = ParagraphStyle("r", parent=st, alignment=2)
+    st_grey = ParagraphStyle("g", parent=st, fontSize=7.5, leading=9.5, textColor=colors.Color(*GREY))
+    st_day = ParagraphStyle("d", parent=st, fontName="Helvetica-Bold", fontSize=15, leading=18, textColor=colors.Color(*NAVY_RGB))
+    st_figs = ParagraphStyle("f", parent=st, fontSize=10, leading=13)
+    st_navy = ParagraphStyle("n", parent=st, fontName="Helvetica-Bold", fontSize=10, leading=12, textColor=colors.Color(*NAVY_RGB))
+    st_red = ParagraphStyle("rd", parent=st, fontSize=8, leading=10, textColor=colors.Color(*RED_RGB))
+
+    def P(txt, style=st):
+        return Paragraph(str(txt), style)
+
+    def E(v):
+        return _pdf_safe(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    story = [P(E(day_words) + (" · today" if day == page.get("today") else ""), st_day), Spacer(1, 1.5 * mm)]
+    lor = ("—" if tot["lorries"] is None else _n(tot["lorries"]))
+    lor_note = (f" (the {tot['routed']} routed lines)" if tot["lorries"] is not None and tot["routed"] < tot["lines"] else "")
+    story.append(P(f"<b>{tot['lines']}</b> line{'' if tot['lines'] == 1 else 's'} · <b>{_n(tot['tonnes'])} t</b> · "
+                   f"<b>{_n(tot['loads'])}</b> loads, each a two-way movement · <b>{lor}</b> lorries{lor_note}"
+                   + (f" · {tot['flagged']} flagged" if tot["flagged"] else ""), st_figs))
+    story.append(Spacer(1, 3 * mm))
+
+    team_word = E((_tenant().get("team_label") or "Team"))
+    # the PLAN column only when a line is planned in another unit than tonnes (in tonnes it repeats TONNES)
+    plan_col = any(r["unit"] not in ("t", "") or r["typed"] for r in rows)
+    if rows:
+        head = [P("FROM / TO", st_h), P(team_word.upper(), st_h), P("MATERIAL / VEHICLE", st_h)]
+        head += [P("PLAN", st_hr)] if plan_col else []
+        head += [P("TONNES", st_hr), P("LOADS", st_hr), P("LORRIES", st_hr), P("FLAG", st_h)]
+        data = [head]
+        for r in rows:
+            plan = f"{_n(r['qty'], 1 if r['unit'] != 't' else 0)} {E(r['unit'])}".strip()
+            sub = " · ".join(x for x in (r["route_id"], r["section"]) if x)
+            row = [P(f"<b>{E(r['origin'])}</b> to <b>{E(r['dest'])}</b>"),
+                   P(E(r["team"]) + (f"<br/><font size=6.5 color='#64748B'>{E(sub)}</font>" if sub else "")),
+                   P(E(r["material"]) + f"<br/><font size=6.5 color='#64748B'>{E(r['vehicle'])}</font>")]
+            row += [P(plan + (" †" if r["typed"] else ""), st_r)] if plan_col else []
+            row += [P("—" if r["tonnes"] is None else _n(r["tonnes"]), st_r),
+                    P(_n(r["loads"]), st_r),
+                    P("—" if r["lorries"] is None else _n(r["lorries"]), st_r),
+                    P(("<font color='#DC2626'><b>" + E(r["flag"]) + "</b></font>" + (f" +{r['more']}" if r["more"] > 0 else ""))
+                      if r["flag"] else "—")]
+            data.append(row)
+        data.append([P(f"<b>Total</b> · {tot['lines']} line{'' if tot['lines'] == 1 else 's'}"), "", ""]
+                    + ([""] if plan_col else [])
+                    + [P(f"<b>{_n(tot['tonnes'])}</b>", st_r), P(f"<b>{_n(tot['loads'])}</b>", st_r), P(f"<b>{lor}</b>", st_r), ""])
+        # FLAG keeps at least ~27 mm ("ROAD LIMIT +1" on one line): the places and the material give way to PLAN
+        widths = ([48 * mm, 22 * mm, 34 * mm, 15 * mm] if plan_col else [55 * mm, 22 * mm, 37 * mm]) + [14 * mm, 12 * mm, 14 * mm]
+        widths.append(usable - sum(widths))
+        t = LongTable(data, colWidths=widths, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.Color(*NAVY_RGB)),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LINEBELOW", (0, 1), (-1, -2), 0.4, colors.Color(0.85, 0.87, 0.9)),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.Color(*BAND)),
+            ("LINEABOVE", (0, -1), (-1, -1), 0.8, colors.Color(*NAVY_RGB)),
+        ]))
+        story.append(t)
+    else:
+        story.append(P("Nothing is planned on this day: no approved line has a quantity or a load on it.", st_grey))
+    story.append(Spacer(1, 4 * mm))
+
+    # NOT ROUTED is counted, not spelt out: its sentence is the server's working note, and the LORRIES column already
+    # shows "—" for those lines
+    texts = []
+    for r in rows:
+        for x in r["flag_texts"]:
+            if x not in texts and not x.startswith(DAY_FLAG_WORD["UNBAKED"] + ":"):
+                texts.append(x)
+    # one count per kind of flag (lines carrying it), then the first sentences: a busy day keeps to one page
+    kinds = {}
+    for r in rows:
+        for w in {x.split(":", 1)[0] for x in r["flag_texts"]}:
+            kinds[w] = kinds.get(w, 0) + 1
+    fl = [P("Flags (a flag, never a stop)", st_navy)]
+    if kinds:
+        fl.append(P(" · ".join(f"<b>{E(w)}</b> on {n} line{'' if n == 1 else 's'}"
+                               for w, n in sorted(kinds.items(), key=lambda kv: (-kv[1], kv[0]))), st))
+    fl += [P(E(x), st_red) for x in texts[:DAY_FLAGS_SHOWN]] or [P("none on these lines", st_grey)]
+    if len(texts) > DAY_FLAGS_SHOWN:
+        fl.append(P(f"+{len(texts) - DAY_FLAGS_SHOWN} more: every flag is in the Look-ahead and its week sheet", st_grey))
+    story.append(KeepTogether(fl))
+    story.append(Spacer(1, 2 * mm))
+
+    story.append(P("Loads are loaded trips: each is one delivery and one two-way movement. Lorries are the vehicles the day "
+                   "needs from each route's worked-out cycle (none where the route is not worked out yet). † = typed by hand. "
+                   "Planning figures, not plated weights. Road restrictions are the stored check, not re-read for this sheet. "
+                   + ("This week is confirmed. " if tot["confirmed"] else "This week is not confirmed yet: the plan can still change. ")
+                   + "Made from the Look-ahead on " + datetime.date.today().isoformat() + ".", st_grey))
+    doc.build(story)
+    return buf.getvalue()
+
+
 # ------------------------------------------------------------------ carbon summary (11 Oct 2026)
 def _pdf_safe(s):
     """Helvetica's WinAnsi set has no arrow: route words read "A to B" on paper."""
