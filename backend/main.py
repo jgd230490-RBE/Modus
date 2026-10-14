@@ -56,6 +56,7 @@ import areas         # 12 Oct 2026 — movements and carbon per council (public 
 import limits        # 13 Oct 2026 — lorry limits (weight / height / width) from OpenStreetMap and HERE
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
+import community     # 14 Oct 2026 — the community considerations layer (staff map and the CLP plans)
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
@@ -2683,6 +2684,41 @@ def route_map_export_places(month: int = Query(..., ge=1, le=MONTH_COUNT), origi
             "plans": [{"kind": k, "name": v["name"], "what": v["what"], "centred": v["centred"],
                        "scales": list(v["scales"]), "default": v["default"]} for k, v in route_map_export.PLANS.items()],
             "regional_fitted": S["plan"]["denom"]}
+
+
+@app.get("/api/community")
+def community_layer(kinds: Optional[str] = None, request: Request = None):
+    """
+    14 Oct 2026 — the COMMUNITY CONSIDERATIONS layer (community.py): the schools, hospitals, health centres, community
+    centres, sports facilities, stations, cycle routes, bus stops and residential areas stored along the tenant's routes,
+    as one GeoJSON FeatureCollection, with when and from what each source was fetched and the credit line. STAFF ONLY
+    (the user, 14 Oct): a valid code, a login or the staff cookie; the map password's cookie and no credential get 401.
+    Reads what is stored: nothing is fetched on a page view. `kinds` = comma-separated keys (community.KIND_KEYS).
+    """
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the community considerations layer is for staff")
+    ks = [k.strip() for k in (kinds or "").split(",") if k.strip()] or None
+    return community.payload(ks)
+
+
+@app.get("/api/community/status")
+def community_status(request: Request = None):
+    """When the layer was fetched, from what, the counts and the state of a refresh. Staff only, like the layer."""
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the community considerations layer is for staff")
+    return community.status()
+
+
+@app.post("/api/community/refresh")
+def community_refresh(request: Request = None):
+    """Fetch the layer again along the routes as they are stored now (Geofabrik, GIAS, NaPTAN; a few minutes, on a
+    thread). A planner or an admin (a code or a login); a team code may look but not fetch."""
+    acc = access.current()
+    if not acc:
+        raise HTTPException(401, "sign in — a valid access code is required")
+    if acc.get("role") not in ("planner", "admin"):
+        raise HTTPException(403, "only a planner or an admin can fetch the community considerations again")
+    return community.start_refresh(by=acc.get("name") or acc.get("label") or acc.get("role"))
 
 
 @app.get("/api/public/route-alternatives")
