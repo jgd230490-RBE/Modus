@@ -452,34 +452,48 @@ def validate(doc, network=None):
             elif cm is not None and known and cm not in known:
                 p.append(f"material '{k}': carbon_material '{cm}' is not a carbon material ({', '.join(sorted(known))})")
     # 10 Sep night: the fair-price block, when present — numbers >= 0, months 1-12
-    fp = doc.get("fair_price")
-    if fp is not None:
+    # 14 Oct 2026 (HU7): each set in fair_price_by_country (a set per ISO country) to the same rules.
+    fp_sets = [("fair_price", doc.get("fair_price"))]
+    byc = doc.get("fair_price_by_country")
+    if byc is not None:
+        if not isinstance(byc, dict):
+            p.append("fair_price_by_country must be an object of country code -> coefficient set")
+        else:
+            for c, s in byc.items():
+                if str(c).startswith("_"):
+                    continue
+                if not (isinstance(c, str) and len(c) == 2 and c.isalpha() and c.isupper()):
+                    p.append(f"fair_price_by_country: '{c}' must be a two-letter country code in capitals")
+                fp_sets.append((f"fair_price_by_country.{c}", s))
+    for name, fp in fp_sets:
+        if fp is None:
+            continue
         if not isinstance(fp, dict):
-            p.append("fair_price must be an object")
+            p.append(f"{name} must be an object")
         else:
             for f in ("driver_eur_per_h", "vehicle_standing_eur_per_h", "running_eur_per_km",
                       "margin_pct", "vehicle_new_price_eur"):
                 x = fp.get(f)
                 if x is not None and (not num(x) or x < 0):
-                    p.append(f"fair_price.{f} must be a number >= 0")
+                    p.append(f"{name}.{f} must be a number >= 0")
             cons = fp.get("consumption") or {}
             if isinstance(cons, dict):
                 x = cons.get("l_per_100km_per_tonne")
                 if x is not None and (not num(x) or x < 0):
-                    p.append("fair_price.consumption.l_per_100km_per_tonne must be a number >= 0")
+                    p.append(f"{name}.consumption.l_per_100km_per_tonne must be a number >= 0")
                 for cls in ("rigid", "artic"):
                     y = (cons.get(cls) or {}).get("l_per_100km_empty") if isinstance(cons.get(cls), dict) else None
                     if y is not None and (not num(y) or y <= 0):
-                        p.append(f"fair_price.consumption.{cls}.l_per_100km_empty must be a positive number")
+                        p.append(f"{name}.consumption.{cls}.l_per_100km_empty must be a positive number")
             se = fp.get("season") or {}
             if isinstance(se, dict):
                 for f in ("winter_months", "thaw_months"):
                     ms = se.get(f) or []
                     if not all(isinstance(m, int) and 1 <= m <= 12 for m in ms):
-                        p.append(f"fair_price.season.{f} must be integers 1-12")
+                        p.append(f"{name}.season.{f} must be integers 1-12")
                 u = se.get("winter_consumption_uplift_pct")
                 if u is not None and (not num(u) or u < 0):
-                    p.append("fair_price.season.winter_consumption_uplift_pct must be a number >= 0")
+                    p.append(f"{name}.season.winter_consumption_uplift_pct must be a number >= 0")
     # G2: the tenant block, when present
     tb = doc.get("tenant")
     if tb is not None:

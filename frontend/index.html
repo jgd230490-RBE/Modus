@@ -5652,9 +5652,19 @@ const FAIR_FIELDS_FOR = () => [["driver_eur_per_h", `Driver ${CUR()} / h`, "publ
                      ["vehicle_standing_eur_per_h", `Vehicle standing ${CUR()} / h`, `ASSUMPTION — from the vehicle price in the file, 7 years, insurance, road charge`],
                      ["running_eur_per_km", `Running ${CUR()} / ${DU()}`, "ASSUMPTION — tyres, maintenance, repairs"],
                      ["margin_pct", "Margin %", "ASSUMPTION"]];
+// 14 Oct 2026 (HU7): factors.json carries a set per country (fair_price_by_country, GB today). The file's
+// set for the tenant's country is the one shown, copied and offered; every other tenant gets fair_price.
+const FAIR_COUNTRY_NAMES = { GB: "Great Britain", EE: "Estonia" };
+const fairCanon = (o) => JSON.stringify(o, (k, v) => (k.startsWith("_") ? undefined
+  : (v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v).sort().reduce((a, kk) => (a[kk] = v[kk], a), {}) : v)));
 function FairPriceSection({ doc, upd, fileDoc, summary }){
-  const fileFp = (fileDoc && fileDoc.fair_price) || {};
+  const cc = (((doc && doc.tenant) || {}).country || "").toUpperCase() || null;
+  const countryFp = (cc && fileDoc && (fileDoc.fair_price_by_country || {})[cc]) || null;
+  const fileFp = countryFp || (fileDoc && fileDoc.fair_price) || {};
   const fp = (doc && doc.fair_price) || fileFp;
+  // the live block differs from the country's set in the file (numbers only, sources ignored): offer the set
+  const offerCountry = !!(countryFp && doc && doc.fair_price && fairCanon(doc.fair_price) !== fairCanon(countryFp));
+  const countryName = FAIR_COUNTRY_NAMES[cc] || cc;
   const cons = fp.consumption || {};
   const season = fp.season || {};
   const inp = "ctl ctl-sm w-full tabular-nums";
@@ -5680,6 +5690,13 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
     <div data-fair-price-section="1">
       <div className="text-[15px] font-semibold text-slate-800">Fair price — the model</div>
       <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">{CUR()}/trip = fuel (litres from the vehicle class, tonnes carried and the live diesel index) + cycle hours × (driver + vehicle standing) + {DU()} × running, × (1 + margin). Shown on every routed line as "fair (model)" — a floor for negotiation, never a quote, never mixed with a typed rate. Seeded from public benchmarks; the file names each source. Three are assumptions to replace with your own figures. {!(doc && doc.fair_price) && <span className="text-amber-700">Showing the file's values — the live document has no fair_price block yet; Save once to store it.</span>} Saved with the page's Save button (admin token).</p>
+      {offerCountry && (
+        <div data-fair-country-offer={cc} className="mb-3 max-w-3xl rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-slate-700 flex flex-wrap items-center gap-2">
+          <span>The file holds a set of public benchmarks for {countryName}, in {CUR()}, each with its source. The figures on this page are a different set.</span>
+          <button type="button" className="btn-sec" onClick={() => upd && upd(d => { d.fair_price = JSON.parse(JSON.stringify(countryFp)); })}>Use the {countryName} set</button>
+          <span className="text-slate-500">Nothing changes until you Save.</span>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl">
         {FAIR_FIELDS_FOR().map(([k, l, help]) => (
           <label key={k} className="block">
