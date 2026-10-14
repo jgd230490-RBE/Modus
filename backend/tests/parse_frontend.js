@@ -2755,7 +2755,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
        "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));
   ok("⭐ CLP: read on FIRST OPEN only: the effect waits for open, GETs /api/clp/monitoring?month=N, keyed on open and the month",
      clpc.includes("if(!open) return;") && clpc.includes("fetch(`${API}/clp/monitoring?month=${month}`)") && clpc.includes("}, [open, month]);")
-     && clpc.includes('onToggle={e => setOpen(e.currentTarget.open)}') && (clpc.match(/fetch\(/g) || []).length === 1);
+     // NARROWED 14 Oct 2026 (W10, the same session): a second fetch, the CLP pack, on a button press only
+     && clpc.includes('onToggle={e => setOpen(e.currentTarget.open)}') && (clpc.match(/fetch\(/g) || []).length === 2
+     && clpc.includes("const r = await fetch(`${API}/clp/pack.${ext}?month=${month}`);"));
+  ok("⭐ W10: the section offers the CLP pack for its month, PDF and XLSX; the file name is the reply's own; a failure is said in words",
+     clpc.includes('onClick={() => pack("pdf")}') && clpc.includes('onClick={() => pack("xlsx")}')
+     && clpc.includes('const m = cd.match(/filename="([^"]+)"/);') && clpc.includes('setPackErr("The CLP pack could not be made: " + (e.message || e));')
+     && clpc.includes('{packErr && <div className="ct-line" role="alert" data-clp-pack-error="1">{packErr}</div>}'));
   ok("⭐ CLP: the Dashboard mounts it once, folded, after More charts and before Stockpile capacity",
      (src.match(/<ClpMonitoring months=\{months\} initial=\{initialClp\} \/>/g) || []).length === 1
      && src.indexOf("<ClpMonitoring") > src.indexOf("<summary>More charts: trips") && src.indexOf("<ClpMonitoring") < src.indexOf("<summary>Stockpile capacity</summary>"));

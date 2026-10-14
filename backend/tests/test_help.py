@@ -665,5 +665,10 @@ ok("⭐ the guide's Commit view explains Gates this week, the 85 % step and the 
    and "<tr><td>GATE OVER CAPACITY</td>" in src and "<tr><td>GATE NEAR CAPACITY</td>" in src
    and src.index("<tr><td>ROUTE CAP</td>") < src.index("<tr><td>GATE OVER CAPACITY</td>") < src.index("<tr><td>SHARE</td>"))
 
+ok("⭐ W10: the guide offers the CLP pack beside the month and says what it holds; the technical guide names its two reads",
+   "<strong>CLP pack (PDF)</strong> and <strong>CLP pack (XLSX)</strong>, beside the month" in src
+   and "the charts that cannot be drawn yet are listed with what they need" in src
+   and "<code>GET /api/clp/pack.pdf?month=N</code>" in open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read())
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

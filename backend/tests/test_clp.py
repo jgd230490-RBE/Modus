@@ -527,6 +527,81 @@ ok("an empty month (Jan 2026): every chart empty, each with a sentence, no figur
        if c["key"] in ("route_caps", "site_caps", "councils")))
 
 # =========================================================================== #
+#  6b. W10: the CLP pack — exactly the charts with data, the demo notice on every page and sheet  #
+# =========================================================================== #
+import io as _io  # noqa: E402
+import export as _export  # noqa: E402
+import clp_pack  # noqa: E402
+import openpyxl as _openpyxl  # noqa: E402
+from portable import pdf_text as _pdf_text  # noqa: E402
+offline(_export)
+_doc = copy.deepcopy(config.load(conversions, use_cache=False))
+_doc.setdefault("tenant", {})["demo_notice"] = "Fictional demo scheme · nothing here is real"
+config.save(_doc, by="tester"); config.invalidate()
+MP = clp.monitoring(10, acc_planner, factors=conversions.load_factors(), working_days=WD)
+ok("the pack's month carries the demo notice from the tenant block", MP["demo_notice"] == "Fictional demo scheme · nothing here is real")
+_pdf = clp_pack.build_pdf(MP, generated="14 Oct 2026")
+_pt = re.sub(r"\s+", " ", _pdf_text(_pdf) or "")
+_pages = len(re.findall(r"page \d+", _pt))
+ok("⭐ W10 PDF: titled for the month, the demo notice on EVERY page, the stamp 'planned, not observed'",
+   "Wayscope · CLP monitoring pack · Oct 2026" in _pt and _pages >= 2
+   and _pt.count("Fictional demo scheme · nothing here is real") >= _pages
+   and "Planned figures from the approved plan, not observed: Wayscope holds no gate log or arrival times." in _pt, f"{_pages} pages")
+ok("⭐ W10 PDF: every chart with data, in the section's order, each with its headline, how it is worked out and its source",
+   all(MP["charts"][k]["title"] in _pt and MP["charts"][k]["headline"] in _pt for k in MP["with_data"])
+   and [_pt.index(MP["charts"][k]["title"]) for k in MP["with_data"]] == sorted(_pt.index(MP["charts"][k]["title"]) for k in MP["with_data"])
+   and _pt.count("How it is worked out: ") == len(MP["with_data"]) and _pt.count("Source: Wayscope") == len(MP["with_data"]), _pt[:300])
+ok("W10 PDF: the figures are printed as a table too (Pit West → Yard East 4.5 against 4, 114 %; 31 trips avoided)",
+   "Pit West → Yard East 4.5 4 114 % Over the cap" in _pt and "Oct 2026 220 189 31" in _pt, _pt[:200])
+ok("🔴 W10 PDF: no team id, none of the banned words",
+   re.search(r"\bIPT ?[1-6]\b", _pt) is None
+   and not re.search(r"\b(bake[ds]?|line-month|cached|geometry|server|endpoint|token|trucks?|real-time|predict\w*|optimi[sz]\w*)\b", _pt, re.I))
+# a month with charts missing: they are named with what they need, never drawn as empty
+_ME = copy.deepcopy(MP)
+for _k in ("euro_class", "trips_avoided"):
+    _ME["charts"][_k] = {**{x: _ME["charts"][_k][x] for x in ("key", "number", "title", "serves")}, "state": "empty",
+                         "missing": clp.monitoring(10, acc_planner, factors=factors, working_days=WD)["charts"][_k].get("missing") or "no data"}
+_ME["with_data"] = [k for k in _ME["order"] if _ME["charts"][k]["state"] == "set"]
+_pe = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_ME, generated="14 Oct 2026")) or "")
+ok("⭐ W10 PDF: a chart with no data is not drawn — it is listed under 'Not drawn this month' with what it needs",
+   "Not drawn this month" in _pe and f"{_ME['charts']['euro_class']['title']}: " in _pe
+   and _pe.count(_ME["charts"]["euro_class"]["title"]) == 1 and _pe.count("How it is worked out: ") == len(_ME["with_data"]))
+_wb = _openpyxl.load_workbook(_io.BytesIO(clp_pack.build_xlsx(MP, generated="2026-10-14T12:00:00Z")))
+ok("⭐ W10 XLSX: About first, then one sheet a chart with data, named for it",
+   _wb.sheetnames == ["About"] + [clp_pack.SHEET[k] for k in MP["with_data"]], str(_wb.sheetnames))
+_ab = [[c.value for c in r] for r in _wb["About"].iter_rows()]
+ok("W10 XLSX: the demo notice heads every sheet in the demo bar's colours; About names the month, the scope and the basis",
+   all(_wb[n]["A1"].value == "Fictional demo scheme · nothing here is real" and (_wb[n]["A1"].font.color.rgb or "").endswith(_export.DEMO_FG_HEX)
+       for n in _wb.sheetnames)
+   and ["Month", "Oct 2026"] == [x for x in _ab if x[0] == "Month"][0][:2] and any(x[0] == "Scope" and x[1] == MP["scope_line"] for x in _ab))
+_rc = [[c.value for c in r] for r in _wb[clp_pack.SHEET["route_caps"]].iter_rows()]
+ok("W10 XLSX: a chart's sheet holds its table and says how it is worked out and its source",
+   ["Pit West → Yard East", "4.5", "4", "114 %", "Over the cap"] in [r[:5] for r in _rc]
+   and any(r[0] == "How it is worked out" and r[1] == MP["charts"]["route_caps"]["basis"] for r in _rc)
+   and any(r[0] == "Source" for r in _rc))
+_wbe = _openpyxl.load_workbook(_io.BytesIO(clp_pack.build_xlsx(_ME)))
+ok("W10 XLSX: a chart with no data has no sheet; About lists it as not drawn with what it needs",
+   clp_pack.SHEET["euro_class"] not in _wbe.sheetnames
+   and any(x[0] == "Not drawn" and str(x[1]).startswith(_ME["charts"]["euro_class"]["title"] + ": ") for x in [[c.value for c in r] for r in _wbe["About"].iter_rows()]))
+ok("W10: the file name is the month's: wayscope-clp-pack-2026-10.pdf / .xlsx",
+   clp_pack.file_name(MP, "pdf") == "wayscope-clp-pack-2026-10.pdf" and clp_pack.file_name({"month": 13}, "xlsx") == "wayscope-clp-pack-2027-01.xlsx")
+_rp = main.clp_pack_pdf(10)
+_rx = main.clp_pack_xlsx(10)
+ok("⭐ W10 endpoints: the PDF and the XLSX for a month, as attachments under the month's file name",
+   _rp.media_type == "application/pdf" and _rp.headers["Content-Disposition"] == 'attachment; filename="wayscope-clp-pack-2026-10.pdf"'
+   and (_rp.body or b"")[:4] == b"%PDF"
+   and _rx.media_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+   and _rx.headers["Content-Disposition"] == 'attachment; filename="wayscope-clp-pack-2026-10.xlsx"' and (_rx.body or b"")[:2] == b"PK")
+_e = [_raises(lambda: main.clp_pack_pdf(0)), _raises(lambda: main.clp_pack_xlsx(None))]
+ok("W10 endpoints: no month or month 0 is a 400", all(getattr(x, "status_code", None) == 400 for x in _e))
+access.set_current("")
+_e401 = _raises(lambda: main.clp_pack_pdf(10))
+access.set_current("planner123")
+ok("🔴 W10 endpoints: no code -> 401", getattr(_e401, "status_code", None) == 401)
+_doc["tenant"]["demo_notice"] = None
+config.save(_doc, by="tester"); config.invalidate()
+
+# =========================================================================== #
 #  7. The fixture for the frontend harnesses (planner, Oct 2026, every chart set)  #
 # =========================================================================== #
 _fix = os.path.join(HERE, "fixtures", "clp_monitoring.json")

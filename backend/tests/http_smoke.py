@@ -822,6 +822,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
        <= sum((ch.get("vehicle_types") or {}).get("totals") or [0]), r.text[:200])
     r = c.get("/api/clp/monitoring?month=0", headers=PLAN)
     ok("CLP month 0 is refused — 400", r.status_code == 400, str(r.status_code))
+    # 14 Oct 2026 (bundle G, W10): the CLP pack over HTTP
+    r = c.get("/api/clp/pack.pdf?month=10", headers=PLAN)
+    ok("⭐ the CLP pack PDF for Oct 2026: 200, a PDF, the month's file name",
+       r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:4] == b"%PDF"
+       and 'filename="wayscope-clp-pack-2026-10.pdf"' in r.headers.get("content-disposition", ""), str(r.status_code))
+    r = c.get("/api/clp/pack.xlsx?month=10", headers=PLAN)
+    ok("⭐ the CLP pack XLSX for Oct 2026: 200, a workbook, the month's file name",
+       r.status_code == 200 and r.content[:2] == b"PK"
+       and 'filename="wayscope-clp-pack-2026-10.xlsx"' in r.headers.get("content-disposition", ""), str(r.status_code))
+    r = c.get("/api/clp/pack.pdf?month=10")
+    ok("🔴 the CLP pack without a code — 401", r.status_code == 401, str(r.status_code))
     print("  CLP monitoring, Oct 2026 (demo package):")
     for k in cm.get("order") or []:
         c_ = ch.get(k) or {}

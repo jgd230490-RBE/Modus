@@ -494,6 +494,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .clp-src{font-size:13px;color:var(--muted);margin-top:4px;}
   .clp-how{margin-top:6px;font-size:13px;color:var(--muted);}
   .clp-how summary{cursor:pointer;color:var(--action);}
+  .clp-pack{display:inline-flex;gap:8px;flex-wrap:wrap;}
   /* 14 Oct 2026 (bundle G, W17): the Look-ahead's gates this week */
   .gw-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:8px;}
   @media (min-width:1024px){.gw-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
@@ -2642,6 +2643,30 @@ function ClpMonitoring({ months, initial }){
     }).catch(() => { if(live) setErr(true); });
     return () => { live = false; };
   }, [open, month]);
+  // 14 Oct 2026 (bundle G, W10): the CLP pack for the month — the same reply, printed (only the charts with data)
+  const [packBusy, setPackBusy] = useState("");
+  const [packErr, setPackErr] = useState(null);
+  const pack = async (ext) => {
+    setPackBusy(ext); setPackErr(null);
+    try {
+      const r = await fetch(`${API}/clp/pack.${ext}?month=${month}`);
+      if(!r.ok){
+        const txt = await r.text();
+        let d = "";
+        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+        throw new Error(d || `error ${r.status}`);
+      }
+      const blob = await r.blob();
+      const cd = (r.headers && r.headers.get && r.headers.get("Content-Disposition")) || "";
+      const m = cd.match(/filename="([^"]+)"/);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = m ? m[1] : `wayscope-clp-pack.${ext}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setPackErr("The CLP pack could not be made: " + (e.message || e)); }
+    setPackBusy("");
+  };
   const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
   const C = (data && data.charts) || {};
   const capped = (rows) => (rows || []).filter(r => r.cap != null);
@@ -2654,7 +2679,12 @@ function ClpMonitoring({ months, initial }){
           <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => setMonth(+e.target.value)} aria-label="CLP month">
             {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}
           </select></label>
+          <span className="clp-pack" data-clp-pack="1">
+            <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => pack("pdf")} disabled={!!packBusy}>{packBusy === "pdf" ? "Making the CLP pack…" : "CLP pack (PDF)"}</button>
+            <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => pack("xlsx")} disabled={!!packBusy}>{packBusy === "xlsx" ? "Making the CLP pack…" : "CLP pack (XLSX)"}</button>
+          </span>
         </div>
+        {packErr && <div className="ct-line" role="alert" data-clp-pack-error="1">{packErr}</div>}
         {err && <div className="ct-line" data-clp-error="1">The CLP figures did not load.</div>}
         {!data && !err && <div className="ct-line">Loading the CLP figures…</div>}
         {data && <>

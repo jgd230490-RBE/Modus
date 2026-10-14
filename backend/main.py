@@ -57,6 +57,7 @@ import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the m
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
+import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -2712,6 +2713,39 @@ def clp_monitoring(month: Optional[int] = None):
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
     factors = conversions.load_factors()
     return clp.monitoring(int(month), acc, factors=factors, working_days=_working_days(factors))
+
+
+def _clp_pack_reply(month):
+    acc = _require_access()
+    if month is None or not (1 <= int(month) <= MONTH_COUNT):
+        raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    factors = conversions.load_factors()
+    return clp.monitoring(int(month), acc, factors=factors, working_days=_working_days(factors))
+
+
+@app.get("/api/clp/pack.pdf")
+def clp_pack_pdf(month: Optional[int] = None):
+    """14 Oct 2026 (bundle G, W10) — the CLP pack for a month as a PDF: exactly the CLP monitoring charts that have
+    data (the same reply as /api/clp/monitoring), the rest named with what they need; the demo notice on every page."""
+    m = _clp_pack_reply(month)
+    try:
+        data = clp_pack.build_pdf(m)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{clp_pack.file_name(m, "pdf")}"'})
+
+
+@app.get("/api/clp/pack.xlsx")
+def clp_pack_xlsx(month: Optional[int] = None):
+    """14 Oct 2026 (bundle G, W10) — the CLP pack for a month as an XLSX: About, then one sheet a chart with data."""
+    m = _clp_pack_reply(month)
+    try:
+        data = clp_pack.build_xlsx(m)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{clp_pack.file_name(m, "xlsx")}"'})
 
 
 @app.post("/api/admin/gates")

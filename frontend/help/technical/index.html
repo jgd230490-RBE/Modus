@@ -164,6 +164,10 @@ vehicle / Euro     carbon.scenario's baseline lines: trips by vehicle (equal to 
 councils           areas.area_load: districts, movements a day, laden and total lorry-km (÷ 1.609344 for miles)
 carbon a tonne     all-in total_t × 1000 ÷ tonnes, as planned and with the target's levers; target_t (carbon_target.status) ÷ plan tonnes
 trips avoided      the same scenario: baseline trips − trips with the target's levers; delta_vkm_km</pre>
+<p>The CLP pack is the same reply printed: <code>GET /api/clp/pack.pdf?month=N</code> and <code>/api/clp/pack.xlsx?month=N</code>
+(<code>backend/clp_pack.py</code>), exactly the charts in state "set", each with its table, basis and source; the rest listed
+under "Not drawn this month". It draws and never computes. The demo notice is on every page (the shared page frame) and
+heads every sheet.</p>
 <p>Scope: the vehicle, carbon and trip charts are the caller's visible lines (a team code: its own, and its share of the
 target); the caps and councils are the scheme's. No figure is observed: no gate log is held (decision D42).</p>
 

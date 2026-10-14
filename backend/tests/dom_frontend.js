@@ -511,6 +511,29 @@ async function clpDom(){
   ok("⭐ CLP DOM: an empty chart names what is missing and where, with no figure",
      !!tc && tc.getAttribute("data-clp-state") === "empty" && tc.textContent.includes("No decisions agreed yet: a planner sets them with the carbon target in the Carbon planner.")
      && !tc.querySelector("canvas") && !tc.querySelector("[data-clp-head]"));
+  // W10: the pack buttons ask for this month's pack and name the file from the reply
+  const made = [];
+  const realCreate = w.URL.createObjectURL;
+  w.URL.createObjectURL = () => "blob:x"; w.URL.revokeObjectURL = () => {};
+  const realClick = w.HTMLAnchorElement.prototype.click;
+  w.HTMLAnchorElement.prototype.click = function(){ made.push(this.download); };
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (String(url).startsWith("/api/clp/pack.pdf")) return Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(new w.Blob(["%PDF"])),
+      headers: { get: (h) => h === "Content-Disposition" ? 'attachment; filename="wayscope-clp-pack-2026-10.pdf"' : null } });
+    if (String(url).startsWith("/api/clp/pack.xlsx")) return reply(503, { detail: "openpyxl is not installed" });
+    return new Promise(() => {});
+  };
+  const pdfBtn = [...el.querySelectorAll("[data-clp-pack] button")].find(b => b.textContent === "CLP pack (PDF)");
+  calls.length = 0;
+  await act(async () => { pdfBtn.click(); await sleep(30); });
+  ok("⭐ CLP DOM (W10): the PDF button GETs this month's pack and saves it under the reply's file name",
+     calls.length === 1 && calls[0].url === `/api/clp/pack.pdf?month=${thisMonth}` && made[0] === "wayscope-clp-pack-2026-10.pdf", JSON.stringify(calls) + " " + JSON.stringify(made));
+  const xBtn = [...el.querySelectorAll("[data-clp-pack] button")].find(b => b.textContent === "CLP pack (XLSX)");
+  await act(async () => { xBtn.click(); await sleep(30); });
+  ok("CLP DOM (W10): a refused pack says why, in words",
+     !!el.querySelector('[data-clp-pack-error="1"]') && el.querySelector('[data-clp-pack-error="1"]').textContent === "The CLP pack could not be made: openpyxl is not installed");
+  w.HTMLAnchorElement.prototype.click = realClick; w.URL.createObjectURL = realCreate;
   act(() => { r.unmount(); }); el.remove();
 }
 
