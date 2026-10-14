@@ -2779,6 +2779,15 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _po.includes("{DATA_PAGES.includes(page) && canApprove && !narrow && (") && _po.includes('{page === "config" && canApprove && !narrow && <ConfigPage ')
      && _po.includes("const phoneDesk = narrow && !PHONE_PAGES.includes(page);") && _po.includes("{phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
      && !/disabled=\{[^}]*\b(narrow|phone)\b/.test(src));
+  // the same rule for ANY page added later (G3's Users page, say): every page the Portal mounts, other than the Dashboard
+  // and the Route map, carries `!narrow`, or is a Phone… page mounted only when narrow
+  {
+    const _main = _po.slice(_po.indexOf('<main className="flex-1 min-h-0 overflow-auto">'), _po.indexOf("</main>"));
+    const mounts = [..._main.matchAll(/\{(?:page === "(\w+)"|DATA_PAGES\.includes\(page\))([^\n]*)/g)].map(m => ({ id: m[1] || "data", rest: m[2] }));
+    const loose = mounts.filter(m => !["dashboard", "map"].includes(m.id) && !/ && !narrow && /.test(m.rest) && !/ && narrow && <Phone[A-Z]/.test(m.rest));
+    ok("⭐ PHONE WATCHER, for every page: each page the Portal mounts (but the Dashboard and the Route map) is desk-only on a phone or a Phone… page",
+       mounts.length >= 9 && loose.length === 0, loose.map(m => m.id).join(", ") || String(mounts.length));
+  }
   ok("PHONE: the desk-only card says 'Open on a desktop to edit this.' under the page's own name, and offers the Dashboard",
      _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">Open on a desktop to edit this.</p>')
      && _do.includes("On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read.") && _do.includes("Go to the Dashboard"));
