@@ -31,6 +31,7 @@ are missing.
 """
 import datetime
 import io
+import threading
 import json
 import os
 import urllib.parse
@@ -532,6 +533,9 @@ def page_frame(W, H, lm, rm, title, *, rule_y, title_font, title_y, right=None, 
                   right-hand stamp in the band's grey, a 3 pt orange gradient rule under it
                   (#FF8312 → #FFA10A, the brand's), and the brand mark beside the foot. With a band
                   the plain rule and title are not drawn; the notice and the page number are.
+                  14 Oct 2026 (the publishing check): with "running" (a height) pages after the first
+                  draw a slim running head instead (logo, title, "right_later"), and the notice sits
+                  under whichever head the page has; with "pages" the foot says "1 of 4".
 
     The two sheets that had their own frame draw exactly what they drew before (the pinned PDF
     texts in test_lookahead, test_carbon, test_h1_uk, test_costing, test_fairprice and
@@ -541,24 +545,37 @@ def page_frame(W, H, lm, rm, title, *, rule_y, title_font, title_y, right=None, 
 
     def on_page(c, doc):
         c.saveState()
+        notice_y = None
         if band:
             import brand_pdf
-            bh, bf = band["height"], band["fonts"]
+            bf = band["fonts"]
+            # 14 Oct 2026 (the publishing check): the full band on page 1 only; later pages a slim running head
+            later = doc.page > 1 and band.get("running")
+            bh = band["running"] if later else band["height"]
             c.setFillColorRGB(*NAVY_RGB)
             c.rect(0, H - bh, W, bh, stroke=0, fill=1)
-            lw = brand_pdf.draw_logo(c, lm, H - bh + bh * 0.52, bh * 0.30)
-            c.setFillColorRGB(1, 1, 1); c.setFont(bf["bold"], 13)
-            c.drawString(lm, H - bh + bh * 0.30, band["title"])
-            c.setFillColorRGB(*BAND_GREY_RGB); c.setFont(bf["regular"], 8)
-            c.drawString(lm, H - bh + bh * 0.13, band["sub"])
-            if band.get("right"):
-                c.drawRightString(W - rm, H - bh + bh * 0.30, band["right"])
+            if later:
+                lw = brand_pdf.draw_logo(c, lm, H - bh + bh * 0.28, bh * 0.44)
+                c.setFillColorRGB(1, 1, 1); c.setFont(bf["bold"], 9)
+                c.drawString(lm + lw + 5 * mm, H - bh + bh * 0.36, band["title"])
+                c.setFillColorRGB(*BAND_GREY_RGB); c.setFont(bf["regular"], 8)
+                if band.get("right_later"):
+                    c.drawRightString(W - rm, H - bh + bh * 0.36, band["right_later"])
+            else:
+                brand_pdf.draw_logo(c, lm, H - bh + bh * 0.52, bh * 0.30)
+                c.setFillColorRGB(1, 1, 1); c.setFont(bf["bold"], 14)
+                c.drawString(lm, H - bh + bh * 0.28, band["title"])
+                c.setFillColorRGB(*BAND_GREY_RGB); c.setFont(bf["regular"], 8.5)
+                c.drawString(lm, H - bh + bh * 0.11, band["sub"])
+                if band.get("right"):
+                    c.drawRightString(W - rm, H - bh + bh * 0.58, band["right"])
             # the brand's orange gradient as the rule under the band
             c.saveState()
             rp = c.beginPath(); rp.rect(0, H - bh - 3, W, 3)
             c.clipPath(rp, stroke=0, fill=0)
             c.linearGradient(0, 0, W, 0, (colors.HexColor("#FF8312"), colors.HexColor("#FFA10A")), extend=True)
             c.restoreState()
+            notice_y = H - bh - 8.5 * mm
         else:
             c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(2)
             c.line(lm, rule_y, W - rm, rule_y)
@@ -574,6 +591,7 @@ def page_frame(W, H, lm, rm, title, *, rule_y, title_font, title_y, right=None, 
                 c.drawString(lm, y, text)
         if notice:
             text, font, size, rgb, y = notice
+            y = notice_y if notice_y is not None else y      # under whichever head this page has
             c.setFillColorRGB(*DEMO_BG_RGB)
             c.rect(lm, y - 3, W - lm - rm, size + 4, stroke=0, fill=1)
             c.setStrokeColorRGB(*DEMO_RULE_RGB); c.setLineWidth(1.5)
@@ -596,18 +614,24 @@ def page_frame(W, H, lm, rm, title, *, rule_y, title_font, title_y, right=None, 
                 c.setFont(font or band["fonts"]["regular"], size); c.setFillColorRGB(*rgb)
             if left:
                 c.drawString(fx, page_y, left)
-        c.drawRightString(W - rm, page_y, f"page {doc.page}")
+        # 14 Oct 2026: "1 of 4" where the builder knows the total (the bulletin), "page N" elsewhere
+        c.drawRightString(W - rm, page_y, f"{doc.page} of {band['pages']}" if band and band.get("pages") else f"page {doc.page}")
         c.restoreState()
     return on_page
 
 
-def frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page):
-    """One page template, one full-width frame inside the margins, the frame drawn on every page."""
+def frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page, top_later=None):
+    """One page template, one full-width frame inside the margins, the frame drawn on every page. With `top_later`
+    (14 Oct 2026, the bulletin's slim running head) page 1 keeps `top` and every later page uses `top_later`."""
     doc = BaseDocTemplate(buf, pagesize=(W, H), leftMargin=lm, rightMargin=rm, topMargin=top,
                           bottomMargin=bottom, title=title, pageCompression=0)
-    doc.addPageTemplates([PageTemplate(id="p", frames=[Frame(lm, bottom, W - lm - rm, H - top - bottom, id="f",
-                                                                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)],
-                                       onPage=on_page)])
+    fr = lambda t, i: Frame(lm, bottom, W - lm - rm, H - t - bottom, id=i, leftPadding=0, rightPadding=0, topPadding=0,
+                            bottomPadding=0)
+    if top_later is None:
+        doc.addPageTemplates([PageTemplate(id="p", frames=[fr(top, "f")], onPage=on_page)])
+    else:
+        doc.addPageTemplates([PageTemplate(id="first", frames=[fr(top, "f1")], onPage=on_page, autoNextPageTemplate="later"),
+                              PageTemplate(id="later", frames=[fr(top_later, "f2")], onPage=on_page)])
     return doc
 
 
@@ -1102,51 +1126,37 @@ AMBER_HEX = "D97706"
 AMBER_RGB = (0xD9 / 255, 0x77 / 255, 0x06 / 255)
 
 
-def bulletin_map_png(map_routes, places, controls, size="1100x480", timeout=12, token=None, sections=None):
-    """
-    The month's routes over Mapbox's light style, or None: REVERSED 13 Oct 2026 (W11) — each route
-    in the public map's Volume colour for its two-way movements a day (bulletin_doc.VOLUME_RAMP on
-    VOLUME_STOPS, the route's `color`), all at one width over the map's dark casing (it was one
-    plan blue with the width by volume); a lettered pin on each site, a numbered amber pin on each
-    local control. The URL is thinned until it fits the API's 8,192-character
-    limit; when it cannot fit, None (the caller draws the schematic). The harnesses never reach
-    Mapbox (portable.offline); the fetch itself is exercised only through that stub.
-    """
-    token = config.mapbox_token() if token is None else token
-    if not token or not map_routes:
-        return None
-    pins = ([f"pin-s-{p['letter'].lower()}+1F2024({p['at'][0]:.5f},{p['at'][1]:.5f})"
-             for p in places if p.get("letter") and p.get("at")]
-            + [f"pin-s-{z['n']}+{AMBER_HEX}({z['at'][0]:.5f},{z['at'][1]:.5f})"
-               for z in controls if z.get("at") and z["n"] <= 99])
-    url = None
-    # routes first (quietest at the bottom), then the shared sections on top, each by its routes summed (W11)
-    order = (sorted(map_routes, key=lambda r: (r.get("a_day") or 0, r.get("route_id") or ""))
-             + sorted(sections or [], key=lambda x: x.get("a_day") or 0))
-    for n_pts in (100, 60, 35, 20, 10):
-        enc = [urllib.parse.quote(_encode_polyline(_thin(r["coords"], n_pts)), safe="") for r in order]
-        paths = ([f"path-{BULLETIN_CASING_PX}+{bulletin_doc_casing()}-0.9({e})" for e in enc[:len(map_routes)]]
-                 + [f"path-{BULLETIN_LINE_PX}+{_route_color(r).lstrip('#')}-1({e})" for r, e in zip(order[:len(map_routes)], enc)]
-                 + [p for r, e in zip(order[len(map_routes):], enc[len(map_routes):])
-                    for p in (f"path-{BULLETIN_CASING_PX}+{bulletin_doc_casing()}-0.9({e})",
-                              f"path-{BULLETIN_LINE_PX}+{_route_color(r).lstrip('#')}-1({e})")])
-        for with_pins in (True, False):
-            u = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(paths + (pins if with_pins else []))
-                 + f"/auto/{size}@2x?padding=40&access_token=" + urllib.parse.quote(token))
-            if len(u) <= 8000:
-                url = u
-                break
-        if url:
-            break
-    if not url:
-        return None
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Wayscope/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = resp.read()
-        return data if data[:8] == b"\x89PNG\r\n\x1a\n" else None
-    except Exception:
-        return None
+_SIZING = threading.local()             # a sizing pass: page fit only, no basemap fetched
+
+
+class _sizing:
+    """`with _sizing():` builds without fetching a basemap. The map's box is the same size either way, so the page fit is
+    found on schematic passes and the basemap is fetched ONCE, for the final build."""
+    def __enter__(self):
+        _SIZING.on = True
+
+    def __exit__(self, *a):
+        _SIZING.on = False
+
+
+def _basemap_box(points, w_pt, h_pt, pad_px=40):
+    """14 Oct 2026: the view and basemap PNG for a box of w_pt × h_pt (basemap.py), and the box projection (y up, points).
+    (None, None, None) when there is no basemap — the caller draws its schematic — and on a sizing pass."""
+    if getattr(_SIZING, "on", False):
+        return None, None, None
+    import basemap
+    w_px = basemap.MAX_PX
+    h_px = max(200, int(round(w_px * h_pt / w_pt)))
+    v = basemap.view(points, w_px, h_px, pad_px)
+    png = basemap.fetch(v)
+    if not png:
+        return None, None, None
+    k = w_pt / v["w"]
+
+    def P(lon, lat):
+        x, y = basemap.project(v, lon, lat)
+        return x * k, h_pt - y * k
+    return v, png, P
 
 
 BULLETIN_LINE_PX, BULLETIN_CASING_PX = 4, 6       # one width for every route (W11); the casing 2 px wider
@@ -1169,17 +1179,19 @@ def bulletin_doc_casing():
     return bulletin_doc.ROUTE_CASING.lstrip("#")
 
 
-def _draw_bulletin_schematic(c, S, x, y, w, h):
-    """The fallback: the bulletin's routes, sites and controls scaled into the box (bulletin_doc.projector)."""
+def _draw_bulletin_schematic(c, S, x, y, w, h, P=None):
+    """The routes, shared sections, sites and controls in the box: over the basemap with its projection `P`, or — with
+    no basemap — scaled into a framed box (bulletin_doc.projector), the schematic."""
     import bulletin_doc
-    c.setStrokeColorRGB(0.85, 0.85, 0.85); c.setLineWidth(0.5)
-    c.rect(x, y, w, h, stroke=1, fill=0)
-    proj = bulletin_doc.projector(bulletin_doc.map_points(S), w, h, 6 * mm)
-    if proj is None:
-        c.setFont(_BF("regular"), 8); c.setFillColorRGB(*GREY)
-        c.drawString(x + 3 * mm, y + h / 2, "no route with a stored road route to draw this month")
-        return
-    P = lambda lon, lat: tuple(a + b for a, b in zip((x, y), proj(lon, lat)))
+    if P is None:
+        c.setStrokeColorRGB(0.85, 0.85, 0.85); c.setLineWidth(0.5)
+        c.rect(x, y, w, h, stroke=1, fill=0)
+        proj = bulletin_doc.projector(bulletin_doc.map_points(S), w, h, 6 * mm)
+        if proj is None:
+            c.setFont(_BF("regular"), 8); c.setFillColorRGB(*GREY)
+            c.drawString(x + 3 * mm, y + h / 2, "no route with a stored road route to draw this month")
+            return
+        P = lambda lon, lat: tuple(a + b for a, b in zip((x, y), proj(lon, lat)))
     c.setLineCap(1); c.setLineJoin(1)
 
     def line(r):
@@ -1202,18 +1214,49 @@ def _draw_bulletin_schematic(c, S, x, y, w, h):
         c.drawPath(line(sct), stroke=1, fill=0)
         c.setStrokeColorRGB(*_hex_rgb(sct["color"])); c.setLineWidth(2.2)
         c.drawPath(line(sct), stroke=1, fill=0)
+    pins = []
     for p in S["places"]:
         if p.get("at") and p.get("letter"):
             px, py = P(*p["at"])
-            c.setFillColorRGB(*NAVY_RGB); c.circle(px, py, 4.2, stroke=0, fill=1)
-            c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 6.5)
-            c.drawCentredString(px, py - 2.3, p["letter"])
+            pins.append((px, py))
+            c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(0.8)
+            c.setFillColorRGB(*NAVY_RGB); c.circle(px, py, 4.6, stroke=1, fill=1)
+            c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 7)
+            c.drawCentredString(px, py - 2.5, p["letter"])
+    # 14 Oct 2026 (the publishing check): a control on a site covered its letter; it now steps off (up, then round
+    # the clock) to the first clear spot, with a thin leader back to where it is
     for z in S["controls"]:
         if z.get("at"):
-            px, py = P(*z["at"])
-            c.setFillColorRGB(*AMBER_RGB); c.rect(px - 4.2, py - 4.2, 8.4, 8.4, stroke=0, fill=1)
-            c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 6.5)
-            c.drawCentredString(px, py - 2.3, str(z["n"]))
+            ax, ay = P(*z["at"])
+            px, py = bulletin_doc.control_spot(ax, ay, pins)
+            if (px, py) != (ax, ay):
+                c.setStrokeColorRGB(*AMBER_RGB); c.setLineWidth(0.8)
+                c.line(ax, ay, px, py)
+                c.setFillColorRGB(*AMBER_RGB); c.circle(ax, ay, 1.4, stroke=0, fill=1)
+            pins.append((px, py))
+            c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(0.8)
+            c.setFillColorRGB(*AMBER_RGB); c.rect(px - 4.4, py - 4.4, 8.8, 8.8, stroke=1, fill=1)
+            c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 7)
+            c.drawCentredString(px, py - 2.5, str(z["n"]))
+
+
+def _scale_bar(c, v, w_pt, h_pt):
+    """14 Oct 2026: a scale bar, bottom right, on a basemap only (the schematic is not to scale): a round km length near
+    24 mm (basemap.scale), clear of the basemap's own credit."""
+    import basemap
+    k = w_pt / v["w"]
+    km, px = basemap.scale(v, 24 * mm / k)
+    bar = px * k
+    x1, y1 = w_pt - 6, 17
+    x0 = x1 - bar
+    c.saveState()
+    c.setFillColorRGB(1, 1, 1); c.setFillAlpha(0.85)
+    c.rect(x0 - 4, y1 - 4, bar + 8, 14, stroke=0, fill=1)
+    c.restoreState()
+    c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(1)
+    c.line(x0, y1, x1, y1); c.line(x0, y1 - 1.5, x0, y1 + 2.5); c.line(x1, y1 - 1.5, x1, y1 + 2.5)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("regular"), 7)
+    c.drawCentredString((x0 + x1) / 2, y1 + 2.2, f"{km:g} km")
 
 
 class _BulletinMap(Flowable):
@@ -1226,11 +1269,16 @@ class _BulletinMap(Flowable):
         return self.width, self.height
 
     def draw(self):
-        png = bulletin_map_png(self.S["map_routes"], self.S["places"], self.S["controls"], sections=self.S.get("map_sections"))
+        # 14 Oct 2026: the basemap alone from Mapbox (a short URL that always fits), the routes drawn on it in vector
+        import bulletin_doc
+        v, png, P = _basemap_box(bulletin_doc.map_points(self.S), self.width, self.height)
         if png:
             try:
-                self.canv.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=self.width, height=self.height,
-                                    preserveAspectRatio=True, anchor="c")
+                self.canv.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=self.width, height=self.height)
+                _draw_bulletin_schematic(self.canv, self.S, 0, 0, self.width, self.height, P=P)
+                _scale_bar(self.canv, v, self.width, self.height)
+                self.canv.setStrokeColorRGB(0.85, 0.85, 0.85); self.canv.setLineWidth(0.5)
+                self.canv.rect(0, 0, self.width, self.height, stroke=1, fill=0)
                 self.kind = "mapbox"
                 _map_tag(self.canv, self.S.get("map_demo_tag"), self.width, self.height)
                 return
@@ -1245,36 +1293,35 @@ class _BulletinMapCaption(Flowable):
     """The line under the map, written after it has drawn so it says which map it was."""
     def __init__(self, mp, n_routes):
         Flowable.__init__(self)
-        self.mp, self.n_routes, self.height = mp, n_routes, 8 * mm
+        self.mp, self.n_routes, self.height = mp, n_routes, 4.6 * mm
 
     def wrap(self, aw, ah):
         self.width = aw
         return aw, self.height
 
     def draw(self):
-        # 13 Oct 2026 (W11, the rendered PDF): one line ran off the page; the second line says which map it was
-        tail = ("Map © Mapbox © OpenStreetMap" if self.mp.kind == "mapbox"
-                else "A schematic from the stored road routes, not to scale (no map tiles).")
+        # NARROWED 14 Oct 2026 (the publishing check: legends too wordy): one line, the credit or "not to scale"
+        tail = ("© Mapbox © OpenStreetMap" if self.mp.kind == "mapbox"
+                else "Schematic from the stored road routes, not to scale.")
         self.canv.setFont(_BF("regular"), 7.5); self.canv.setFillColorRGB(*GREY)
-        self.canv.drawString(0, 4.6 * mm, f"Routes this month: {self.n_routes} · each route in the public map's Volume colour "
-                                          "for its two-way movements a day, one width")
-        self.canv.drawString(0, 1 * mm, tail)
+        self.canv.drawRightString(self.width, 1.4 * mm, tail)
 
 
 def _volume_legend(S, width):
     """W11: the route map's five swatches in one row, the public map's Volume legend (stepRanges wording)."""
     from reportlab.graphics.shapes import Drawing, Rect, String
     items = S["volume_legend"]
-    d = Drawing(width, 11)
+    d = Drawing(width, 12)
     lab = _pdf_safe(S["map_legend_title"] + ":")
-    d.add(String(0, 2.5, lab, fontName=_BF("bold"), fontSize=7, fillColor=colors.Color(*NAVY_RGB)))
-    x0 = rl_pdfmetrics_width(lab, _BF("bold"), 7) + 4 * mm
-    step = (width - x0) / len(items)
-    for i, g in enumerate(items):
-        x = x0 + i * step
-        d.add(Rect(x, 1, 14, 8, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(*_hex_rgb("#1F2024")),
+    d.add(String(0, 2.5, lab, fontName=_BF("bold"), fontSize=7.5, fillColor=colors.Color(*NAVY_RGB)))
+    x = rl_pdfmetrics_width(lab, _BF("bold"), 7.5) + 3 * mm
+    # 14 Oct 2026: each slot its swatch, its label and a gap (equal slots left wide holes), 7.5 pt
+    for g in items:
+        d.add(Rect(x, 1.5, 14, 7, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(*_hex_rgb("#1F2024")),
                    strokeWidth=0.6))
-        d.add(String(x + 17, 2.5, _pdf_safe(g["label"]), fontName=_BF("regular"), fontSize=6.8, fillColor=colors.Color(*NAVY_RGB)))
+        t = _pdf_safe(g["label"])
+        d.add(String(x + 17, 2.5, t, fontName=_BF("regular"), fontSize=7.5, fillColor=colors.Color(*NAVY_RGB)))
+        x += 17 + rl_pdfmetrics_width(t, _BF("regular"), 7.5) + 4 * mm
     return d
 
 
@@ -1318,20 +1365,23 @@ def _hex_rgb(h):
     return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
 
 
-def _draw_council_map(c, C, x, y, w, h):
+def _draw_council_map(c, C, x, y, w, h, P=None, alpha=1.0):
     """
     13 Oct 2026: the districts alone, each in the council layer's orange ramp (bulletin_doc.COUNCIL_RAMP, the
     public map's), drawn from the stored boundary polygons — no routes, no roads, no Mapbox. Holes kept (even-odd
     fill); "no figure" hatched; a white border between districts; one label per district at its label point.
     """
     import bulletin_doc
-    proj = bulletin_doc.projector(bulletin_doc.council_points(C), w, h, 3 * mm)
-    if proj is None:
-        c.setFont(_BF("regular"), 8); c.setFillColorRGB(*GREY)
-        c.drawString(x + 3 * mm, y + h / 2, "no district boundary to draw")
-        return
-    P = lambda lon, lat: tuple(a + b for a, b in zip((x, y), proj(lon, lat)))
+    if P is None:
+        proj = bulletin_doc.projector(bulletin_doc.council_points(C), w, h, 3 * mm)
+        if proj is None:
+            c.setFont(_BF("regular"), 8); c.setFillColorRGB(*GREY)
+            c.drawString(x + 3 * mm, y + h / 2, "no district boundary to draw")
+            return
+        P = lambda lon, lat: tuple(a + b for a, b in zip((x, y), proj(lon, lat)))
     even_odd = getattr(rl_canvas, "FILL_EVEN_ODD", 0)
+    c.saveState()
+    c.setFillAlpha(alpha)               # over the basemap: the public map's 0.8, so towns read through
 
     def outline(d):
         path = c.beginPath()
@@ -1357,13 +1407,19 @@ def _draw_council_map(c, C, x, y, w, h):
         else:
             c.setFillColorRGB(*_hex_rgb(d["fill"]))
             c.drawPath(outline(d), stroke=0, fill=1, fillMode=even_odd)
+    c.restoreState()                    # the borders and labels opaque
     c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(1.3); c.setLineJoin(1)
     for d in C["districts"]:
         c.drawPath(outline(d), stroke=1, fill=0)
-    for d in C["districts"]:
-        if not d.get("label_at"):
-            continue
-        px, py = P(*d["label_at"])
+    # 14 Oct 2026 (the publishing check): small districts' labels sat on each other; each label box is placed in turn and
+    # stepped down (then up) until it clears the ones already placed
+    spots = council_label_spots(c, C, P, x, y, w, h)
+    c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.5)
+    for d, px, py, ax, ay in spots:
+        if abs(py - ay) > 10 or abs(px - ax) > 10:
+            c.line(ax, ay, px, py + (-9.5 if py > ay else 9))
+            c.setFillColorRGB(*NAVY_RGB); c.circle(ax, ay, 1.2, stroke=0, fill=1)
+    for d, px, py, ax, ay in spots:
         for txt, font, size, dy in ((_pdf_safe(d["name"]), _BF("bold"), 7.5, 1.2), (_pdf_safe(d["text"]), _BF("regular"), 7.5, -7.4)):
             tw = c.stringWidth(txt, font, size)
             # a white halo (the glyphs stroked), then the ink filled on top: the map's ink-on-white-halo labels. The
@@ -1379,6 +1435,19 @@ def _draw_council_map(c, C, x, y, w, h):
             c.drawString(px - tw / 2, py + dy, txt)
 
 
+def council_label_spots(c, C, P, x0=None, y0=None, w=None, h=None):
+    """[(district, x, y, ax, ay)] — each district's label (name over figure), biggest figure first, at its label point
+    (ax, ay) or the nearest clear spot inside the map (bulletin_doc.place_labels, shared with the HTML page)."""
+    import bulletin_doc
+    ds = sorted((d for d in C["districts"] if d.get("label_at")), key=lambda d: -(d.get("co2_t") or d.get("a_day") or 0))
+    pts = [P(*d["label_at"]) for d in ds]
+    ent = [(ax, ay, max(c.stringWidth(_pdf_safe(d["name"]), _BF("bold"), 7.5),
+                        c.stringWidth(_pdf_safe(d["text"]), _BF("regular"), 7.5)) + 4) for d, (ax, ay) in zip(ds, pts)]
+    bounds = (x0 + 2, y0 + 2, x0 + w - 2, y0 + h - 16) if w is not None else None
+    spots = bulletin_doc.place_labels(ent, -9.5, 9, bounds)
+    return [(d, x, y, ax, ay) for d, (x, y), (ax, ay) in zip(ds, spots, pts)]
+
+
 class _CouncilMap(Flowable):
     def __init__(self, C, width, height):
         Flowable.__init__(self)
@@ -1388,8 +1457,27 @@ class _CouncilMap(Flowable):
         return self.width, self.height
 
     def draw(self):
-        _draw_council_map(self.canv, self.C, 0, 0, self.width, self.height)
+        # 14 Oct 2026 (the user: no map behind): the districts at the public map's 0.8 over the basemap, so the towns
+        # and roads read through; the schematic districts when no basemap can be had
+        import bulletin_doc
+        v, png, P = _basemap_box(bulletin_doc.council_points(self.C), self.width, self.height, 20)
+        self.kind = "schematic"
+        if png:
+            try:
+                self.canv.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=self.width, height=self.height)
+                _draw_council_map(self.canv, self.C, 0, 0, self.width, self.height, P=P, alpha=COUNCIL_FILL_ALPHA)
+                _scale_bar(self.canv, v, self.width, self.height)
+                self.canv.setStrokeColorRGB(0.85, 0.85, 0.85); self.canv.setLineWidth(0.5)
+                self.canv.rect(0, 0, self.width, self.height, stroke=1, fill=0)
+                self.kind = "mapbox"
+            except Exception:
+                png = None
+        if not png:
+            _draw_council_map(self.canv, self.C, 0, 0, self.width, self.height)
         _map_tag(self.canv, self.C.get("demo_tag"), self.width, self.height)
+
+
+COUNCIL_FILL_ALPHA = 0.8                 # map/index.html AREA_FILL_OPACITY
 
 
 def _council_legend(C, width, title="t CO2e in the month:"):
@@ -1398,67 +1486,70 @@ def _council_legend(C, width, title="t CO2e in the month:"):
     from reportlab.graphics.shapes import Drawing, Line, Rect, String, Group
     import bulletin_doc
     items = C["legend"]
-    d = Drawing(width, 11)
-    d.add(String(0, 2.5, title, fontName=_BF("bold"), fontSize=7, fillColor=colors.Color(*NAVY_RGB)))
+    d = Drawing(width, 12)
+    d.add(String(0, 2.5, title, fontName=_BF("bold"), fontSize=7.5, fillColor=colors.Color(*NAVY_RGB)))
     # 13 Oct 2026 (the rendered PDF): equal slots let "no approved laden route" run into the next swatch and the
     # swatches cut the title; each slot is now its swatch + its label + a gap, after the measured title
-    x0 = rl_pdfmetrics_width(title, _BF("bold"), 7) + 3 * mm
-    fs = 6.8
-    while fs > 5.5 and x0 + sum(10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), _BF("regular"), fs) + 8 for g in items) > width:
-        fs -= 0.2
-    xs, x = [], x0
+    # NARROWED 14 Oct 2026 (the publishing check: nothing under 7.5 pt): it shrank to 5.5 pt; now 7.5, down to 7 at most
+    x0 = rl_pdfmetrics_width(title, _BF("bold"), 7.5) + 3 * mm
+    fs = 7.5
+    while fs > 7.05 and x0 + sum(10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), _BF("regular"), fs) + 8 for g in items) > width:
+        fs = round(fs - 0.1, 1)
+    # 14 Oct 2026: when even 7 pt does not fit one row, the items run on to a second row (never under 7 pt, never past
+    # the page); the drawing grows to hold it
+    xs, x, row = [], x0, 0
     for g in items:
-        xs.append(x)
-        x += 10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), _BF("regular"), fs) + 8
+        wd = 10.5 + rl_pdfmetrics_width(_pdf_safe(g["label"]), _BF("regular"), fs)
+        if x + wd > width and x > x0:
+            x, row = x0, row + 1
+        xs.append((x, row))
+        x += wd + 8
+    if row:
+        d.height = 12 + 12 * row
+        for el in d.contents:
+            el.y += 12 * row
     for i, g in enumerate(items):
-        x = xs[i]
+        x, r_ = xs[i]
+        yo = -12 * r_ + 12 * row
         if g["hatch"]:
             grp = Group()
-            grp.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_PAPER)), strokeColor=None))
+            grp.add(Rect(x, 1 + yo, 8, 8, fillColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_PAPER)), strokeColor=None))
             for k in (0, 3, 6):
-                grp.add(Line(x + k, 1, x + min(8, k + 8), 1 + min(8, 8 - k), strokeColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_INK)), strokeWidth=0.8))
+                grp.add(Line(x + k, 1 + yo, x + min(8, k + 8), 1 + yo + min(8, 8 - k), strokeColor=colors.Color(*_hex_rgb(bulletin_doc.HATCH_INK)), strokeWidth=0.8))
             d.add(grp)
-            d.add(Rect(x, 1, 8, 8, fillColor=None, strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
+            d.add(Rect(x, 1 + yo, 8, 8, fillColor=None, strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
         else:
-            d.add(Rect(x, 1, 8, 8, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
-        d.add(String(x + 10.5, 2.5, _pdf_safe(g["label"]), fontName=_BF("regular"), fontSize=fs, fillColor=colors.Color(*NAVY_RGB)))
+            d.add(Rect(x, 1 + yo, 8, 8, fillColor=colors.Color(*_hex_rgb(g["fill"])), strokeColor=colors.Color(0.8, 0.8, 0.8), strokeWidth=0.3))
+        d.add(String(x + 10.5, 2.5 + yo, _pdf_safe(g["label"]), fontName=_BF("regular"), fontSize=fs, fillColor=colors.Color(*NAVY_RGB)))
     return d
 
 
-def _bulletin_chart(S, width):
-    """Two-way movements a day by route, each typed cap a dashed red mark (reportlab.graphics)."""
+def _route_bar(r, width, vmax):
+    """14 Oct 2026 (the publishing check): the route table's cell — the figure, then a bar in the route's map colour,
+    the planning flag a dashed red tick. It replaces the separate chart that repeated the table."""
     from reportlab.graphics.shapes import Drawing, Line, Rect, String
-    import bulletin_doc
-    rows = S["routes"][:bulletin_doc.CHART_MAX_ROUTES]
-    row_h, top, foot, lab_w = 8.6, 4.0, 14.0, 64 * mm
-    h = top + row_h * max(1, len(rows)) + foot
-    d = Drawing(width, h)
-    if not rows:
-        d.add(String(0, h / 2, "No route to chart this month.", fontName=_BF("regular"), fontSize=8,
-                     fillColor=colors.Color(*GREY)))
-        return d
-    bw = width - lab_w - 18 * mm
-    vmax = max([r["a_day"] or 0 for r in rows] + [r["cap"] or 0 for r in rows]) or 1
-    for i, r in enumerate(rows):
-        y = h - top - (i + 1) * row_h
-        lw = bw * (r["a_day"] or 0) / vmax
-        d.add(String(lab_w - 4, y + 2.5, _pdf_safe(r["label"])[:46], fontName=_BF("regular"), fontSize=6.8,
-                     textAnchor="end", fillColor=colors.Color(*NAVY_RGB)))
-        d.add(Rect(lab_w, y + 1.5, max(lw, 0.01), row_h - 3.5, fillColor=colors.Color(*PLAN_TINT_RGB),
-                   strokeColor=colors.Color(*PLAN_BLUE_RGB), strokeWidth=1.2))
-        d.add(String(lab_w + lw + 3, y + 2.5, r["a_day_text"], fontName=_BF("regular"), fontSize=6.8,
-                     fillColor=colors.Color(*NAVY_RGB)))
-        if r["cap"] is not None:
-            cx = lab_w + bw * r["cap"] / vmax
-            d.add(Line(cx, y, cx, y + row_h, strokeColor=colors.Color(*RED_RGB), strokeWidth=1.4,
-                       strokeDashArray=[2.5, 1.8]))
-            d.add(String(cx + 2, y + row_h - 3.2, f"flag {r['cap']:,}", fontName=_BF("regular"), fontSize=5.5,
-                         fillColor=colors.Color(*RED_RGB)))
-    d.add(Line(lab_w, foot - 4, lab_w + bw, foot - 4, strokeColor=colors.Color(0.75, 0.75, 0.75), strokeWidth=0.5))
-    d.add(String(lab_w, 2, "0", fontName=_BF("regular"), fontSize=6.5, fillColor=colors.Color(*GREY)))
-    d.add(String(lab_w + bw, 2, f"{vmax:,.0f} a day", fontName=_BF("regular"), fontSize=6.5, textAnchor="end",
-                 fillColor=colors.Color(*GREY)))
+    d = Drawing(width, 10)
+    num_w = 26
+    d.add(String(num_w - 2, 2.2, r["a_day_text"], fontName=_BF("bold"), fontSize=8, textAnchor="end",
+                 fillColor=colors.Color(*NAVY_RGB)))
+    bw = width - num_w - 4
+    lw = bw * (r["a_day"] or 0) / (vmax or 1)
+    d.add(Rect(num_w + 2, 1.5, max(lw, 0.5), 6.5, fillColor=colors.Color(*_hex_rgb(r.get("color") or "#5A96F6")),
+               strokeColor=None))
+    if r.get("cap") is not None:
+        cx = num_w + 2 + bw * r["cap"] / (vmax or 1)
+        d.add(Line(cx, 0, cx, 9.5, strokeColor=colors.Color(*RED_RGB), strokeWidth=1.2, strokeDashArray=[2, 1.5]))
     return d
+
+
+HEAD_TINT = colors.HexColor("#F1F5F9")
+REPORT_TINT = colors.HexColor("#FFF4E8")
+# 14 Oct 2026 (the publishing check): one table look — a pale head band in ink, a rule under it, hairlines between rows,
+# no box (the ink head bands and boxes made every page heavy)
+TABLE_LOOK = [ ("BACKGROUND", (0, 0), (-1, 0), HEAD_TINT),
+              ("VALIGN", (0, 0), (-1, -1), "TOP"),
+              ("LINEBELOW", (0, 0), (-1, 0), 0.9, colors.Color(*NAVY_RGB)),
+              ("LINEBELOW", (0, 1), (-1, -1), 0.3, colors.Color(0.85, 0.87, 0.9))]
 
 
 class _Kit:
@@ -1470,17 +1561,19 @@ class _Kit:
         st = ParagraphStyle("b", fontName=r, fontSize=8.5, leading=10.8)
         self.st = st
         self.st_r = ParagraphStyle("r", parent=st, alignment=2)
-        self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=8, leading=10, textColor=colors.white)
+        # 14 Oct 2026 (the publishing check): light table heads (ink on a pale band), not white on ink
+        self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=7.5, leading=9.5, textColor=colors.Color(*NAVY_RGB))
         self.st_hr = ParagraphStyle("hr", parent=self.st_h, alignment=2)
-        self.st_sec = ParagraphStyle("sec", parent=st, fontName=b, fontSize=10.5, leading=13, spaceBefore=4,
-                                     spaceAfter=2, textColor=colors.Color(*NAVY_RGB))
-        self.st_kick = ParagraphStyle("kick", parent=st, fontName=b, fontSize=7, leading=9, spaceBefore=2,
+        self.st_sec = ParagraphStyle("sec", parent=st, fontName=b, fontSize=11, leading=13.5, spaceBefore=7,
+                                     spaceAfter=2.5, textColor=colors.Color(*NAVY_RGB))
+        self.st_kick = ParagraphStyle("kick", parent=st, fontName=b, fontSize=7.5, leading=9, spaceBefore=0, spaceAfter=1,
                                       textColor=colors.HexColor("#C2410C"))
-        self.st_grey = ParagraphStyle("g", parent=st, fontSize=7.2, leading=9, textColor=colors.Color(*GREY))
+        self.st_grey = ParagraphStyle("g", parent=st, fontSize=7.5, leading=9.4, textColor=colors.Color(*GREY))
+        self.st_def = ParagraphStyle("def", parent=self.st_grey, fontSize=8, leading=10, spaceBefore=2)
         self.st_big = ParagraphStyle("big", parent=st, fontName=b, fontSize=17, leading=20, textColor=colors.Color(*NAVY_RGB))
-        self.st_lab = ParagraphStyle("lab", parent=st, fontSize=7.5, leading=9, textColor=colors.Color(*GREY))
+        self.st_lab = ParagraphStyle("lab", parent=st, fontSize=8, leading=9.6, textColor=colors.Color(*GREY))
         self.st_red = ParagraphStyle("red", parent=self.st_r, textColor=colors.Color(*RED_RGB), fontName=b)
-        self.st_lede = ParagraphStyle("lede", parent=st, fontSize=9.5, leading=12.5)
+        self.st_lede = ParagraphStyle("lede", parent=st, fontSize=10.5, leading=13.5)
         self.st_nr = ParagraphStyle("nr", parent=st, textColor=colors.Color(*GREY), fontName=it)
         self.st_bul = ParagraphStyle("bul", parent=st, fontSize=9, leading=11.8, leftIndent=9, bulletIndent=0, spaceAfter=1.5,
                                      bulletFontName=r)   # the bullet in Inter (its default is Times-Roman)
@@ -1494,12 +1587,8 @@ class _Kit:
 
     def grid(self, data, widths, total_row=False):
         t = LongTable(data, colWidths=widths, repeatRows=1)
-        style = [("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("BACKGROUND", (0, 0), (-1, 0), colors.Color(*NAVY_RGB)),
-                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                 ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.Color(0.85, 0.87, 0.9)),
-                 ("BOX", (0, 0), (-1, -1), 0.6, colors.Color(0.75, 0.78, 0.83)),
-                 ("TOPPADDING", (0, 0), (-1, -1), 2.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
-                 ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
+        style = [("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [("TOPPADDING", (0, 0), (-1, -1), 2.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+                              ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
         if total_row:
             style += [("BACKGROUND", (0, -1), (-1, -1), colors.Color(*BAND)),
                       ("LINEABOVE", (0, -1), (-1, -1), 0.8, colors.Color(*NAVY_RGB))]
@@ -1519,17 +1608,62 @@ class _Kit:
     def map_block(self, S, height):
         E, P = self.E, self.P
         mp = _BulletinMap(S, self.usable, height)
-        out = [mp, _BulletinMapCaption(mp, len(S["map_routes"])), _volume_legend(S, self.usable),
+        out = [P(E(S["map_title"]), self.st_sec), mp, _BulletinMapCaption(mp, len(S["map_routes"])), _volume_legend(S, self.usable),
                P(E(S["map_note"] + ((" " + S["sections_note"]) if S.get("sections_note") else "")), self.st_grey)]
-        legend = " · ".join(f"<b>{E(p['letter'])}</b> {E(p['name'])}" for p in S["places"] if p["letter"])
-        if S["controls"]:
-            legend += (" · " if legend else "") + "Local controls: " + " · ".join(
-                f"<b>{z['n']}</b> {E(z['name'])}" for z in S["controls"])
-        if legend:
-            out.append(P(legend, self.st_grey))
+        key = self.map_key(S)
+        if key:
+            out += [Spacer(1, 1.5 * mm), key]
         return out
 
-    def brief(self, S, title="This month in brief"):
+    def map_key(self, S):
+        """14 Oct 2026 (the publishing check): the map's key in two columns — the sites by letter, the road works and
+        limits by number — not one run-on grey line."""
+        E, P = self.E, self.P
+        sk = ParagraphStyle("key", parent=self.st, fontSize=7.8, leading=9.8)
+        skh = ParagraphStyle("keyh", parent=sk, fontName=_BF("bold"), textColor=colors.Color(*GREY))
+        sites = [P(f"<b>{E(p['letter'])}</b>  {E(p['name'])}", sk) for p in S["places"] if p["letter"]]
+        lims = [P(f"<font color='#{AMBER_HEX}'><b>{z['n']}</b></font>  {E(z['name'])}", sk) for z in S["controls"]]
+        if not sites and not lims:
+            return None
+        sites = sites or [P("none", sk)]
+        k = (len(sites) + 1) // 2
+        cols = [[P("SITES", skh)] + sites[:k], [P("", skh)] + sites[k:],
+                [P("ROAD WORKS AND LIMITS", skh)] + (lims or [P("none this month", sk)])]
+        n = max(len(x) for x in cols)
+        rows = [[x[i] if i < len(x) else P("", sk) for x in cols] for i in range(n)]     # an empty cell at the key's leading
+        u = self.usable
+        t = LongTable(rows, colWidths=[u * 0.31, u * 0.31, u * 0.38])
+        t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                               ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                               ("TOPPADDING", (0, 0), (-1, -1), 0.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 0.6),
+                               ("LINEBELOW", (0, 0), (-1, 0), 0.3, colors.Color(0.85, 0.87, 0.9))]))
+        return t
+
+    def routes_table(self, S):
+        """14 Oct 2026 (the publishing check): EVERY route in one table with its bar — it replaces "The busiest routes"
+        table and the chart below it, which printed the same figures twice."""
+        E, P, st_h, st_r = self.E, self.P, self.st_h, self.st_r
+        st_hr = self.st_hr
+        bar_w = self.usable * 0.25
+        vmax = max([r["a_day"] or 0 for r in S["routes"]] + [r["cap"] or 0 for r in S["routes"]] + [1])
+        sm = ParagraphStyle("rt", parent=self.st, fontSize=8, leading=9.8)
+        smr = ParagraphStyle("rtr", parent=sm, alignment=2)
+        prev = (S["prev_long"] or "Last month")[:3] if S.get("prev_long") else "Last month"
+        smg = ParagraphStyle("rtg", parent=sm, textColor=colors.Color(*GREY))
+        rows = [[P("Map", st_h), P("Route", st_h), P("Two-way movements a day", st_h), P("In the month", st_hr),
+                 P(E(prev), st_hr), P("Planning flag", st_hr)]]
+        for r in S["routes"]:
+            rows.append([P(E(r["letters"].replace(" to ", "–").replace(" → ", "–")), smg), P(E(r["label"]), sm),
+                         _route_bar(r, bar_w - 8, vmax), P(E(r["in_month_text"]), smr),
+                         P(E(r["last_month_text"].replace(" a day", "")), smr),
+                         P(E(r["flag_short"]), ParagraphStyle("rtf", parent=smr, textColor=colors.Color(*RED_RGB), fontName=_BF("bold"))
+                           if r["over_flag"] else smr)])
+        if not S["routes"]:
+            rows.append(["", P("No route with a stored road route carries approved lorries this month.", self.st_grey), "", "", "", ""])
+        u = self.usable
+        return self.grid(rows, [u * 0.06, u * 0.42, bar_w, u * 0.10, u * 0.07, u * 0.10])
+
+    def brief(self, S, title="Key points"):
         E, P = self.E, self.P
         return [P(E(title), self.st_sec)] + [P(E(b), self.st_bul, ) if False else Paragraph(E(b), self.st_bul, bulletText="•")
                                               for b in S["brief"]]
@@ -1538,33 +1672,64 @@ class _Kit:
         E, P = self.E, self.P
         rep = LongTable([[P(("<b>" + E(S["report"][k]) + "</b>") if k == "lorry" else E(S["report"][k]))] for k in lines],
                         colWidths=[self.usable])
-        rep.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("BOX", (0, 0), (-1, -1), 1.2, colors.Color(*NAVY_RGB)),
-                                 ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
-                                 ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
+        # 14 Oct 2026 (the publishing check): a warm strip with an orange edge, so "report a lorry" is found at a glance
+        rep.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("BACKGROUND", (0, 0), (-1, -1), REPORT_TINT),
+                                 ("LINEBEFORE", (0, 0), (0, -1), 3, colors.HexColor("#FF8312")),
+                                 ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                                 ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
         return KeepTogether([rep])
+
+    def sources(self, S):
+        """14 Oct 2026 (the publishing check): every source and method note once, numbered (the panel's rows carry the
+        numbers), at 7.5 pt."""
+        E, P = self.E, self.P
+        sm = ParagraphStyle("src", parent=self.st_grey, leftIndent=11, bulletIndent=0, bulletFontName=_BF("regular"),
+                            bulletFontSize=7.5, spaceAfter=1.5)
+        items = [(i, E(t).replace("CO₂e", "CO2e")) for i, t in enumerate(S.get("sources") or [], 1)]
+        if not items:
+            return []
+        # two columns, split where the running length is half the total, read down the left then the right
+        tot, run, cut_at = sum(len(t) + 60 for _, t in items), 0, len(items)
+        for k, (_, t) in enumerate(items):
+            run += len(t) + 60
+            if run >= tot / 2:
+                cut_at = k + 1
+                break
+        col = lambda part: [Paragraph(t, sm, bulletText=f"{i}") for i, t in part] or [""]
+        g = self.usable * 0.07              # a wide gutter, so text readers keep the two columns apart
+        tb = LongTable([[col(items[:cut_at]), "", col(items[cut_at:])]],
+                       colWidths=[(self.usable - g) / 2, g, (self.usable - g) / 2])
+        tb.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        return [P("Sources", self.st_sec), tb]
 
 
 def _band(S, kind):
     """The band for the newsletter ('monthly newsletter') or the leaflet ('leaflet'), the brand's words."""
     import brand_pdf
-    return {"height": 25 * mm, "fonts": brand_pdf.fonts(),
+    return {"height": 26 * mm, "fonts": brand_pdf.fonts(),
             "title": _pdf_safe(S["brand_title"]),
             "sub": _pdf_safe(f"{S['tenant']} · {kind} · counts are two-way movements"),
-            "right": _pdf_safe(f"{S['as_at']} · {S['issued']}")}
+            "right": _pdf_safe(f"{S['as_at']} · {S['issued']}"),
+            # 14 Oct 2026 (the publishing check): pages 2 on carry a slim running head, not the full band again
+            "running": 10.5 * mm, "right_later": _pdf_safe(f"{S['tenant']} · {kind}")}
 
 
-def _bulletin_doc(S, kind, buf):
+def _bulletin_doc(S, kind, buf, pages=None):
     W, H = A4
-    lm = rm = 14 * mm
+    lm = rm = 15 * mm
     notice = S.get("demo_notice")
-    band = _band(S, kind)
-    top = band["height"] + (12 * mm if notice else 6 * mm)
+    band = dict(_band(S, kind), pages=pages)
+    top = band["height"] + (13 * mm if notice else 7 * mm)
+    top_later = band["running"] + (13 * mm if notice else 7 * mm)
     on_page = page_frame(W, H, lm, rm, _pdf_safe(S["title"]), rule_y=H - 9 * mm, title_font=(_BF("bold"), 13),
                          title_y=H - 15 * mm,
                          notice=((_pdf_safe(notice), _BF("bold"), 8.5, DEMO_FG_RGB, H - band["height"] - 8.5 * mm)
                                  if notice else None),
                          foot=(_pdf_safe(S["foot"] + " · wayscope.co.uk"), _BF("regular"), 7, GREY), band=band)
-    doc = frame_doc(buf, W, H, lm, rm, top, 14 * mm, _pdf_safe(f"{S['title']} · {S['tenant']} · {kind}"), on_page)
+    doc = frame_doc(buf, W, H, lm, rm, top, 14 * mm, _pdf_safe(f"{S['title']} · {S['tenant']} · {kind}"), on_page,
+                    top_later=top_later)
     return doc, W - lm - rm
 
 
@@ -1585,21 +1750,42 @@ def build_bulletin_pdf(S):
         raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
     # page 1 must read on its own and stay on its page: the map gives way first (the http_smoke demo month pushed the
     # report box onto a page of its own at 64 mm), then the newsletter is as long as its content needs
-    for map_h in NEWSLETTER_MAP_HEIGHTS:
-        data, pages = _newsletter(S, map_h)
-        if pages <= 4:
-            return data
-    return data
+    # REVERSED 14 Oct 2026: the map is the biggest that keeps page 1 on its own page (it shrank until the WHOLE
+    # newsletter was four pages, so a long route table made the front-page map small)
+    with _sizing():
+        for map_h in NEWSLETTER_MAP_HEIGHTS:
+            data, pages, page2 = _newsletter(S, map_h)
+            if page2 == 2:
+                break
+    # 14 Oct 2026: built once more with the page total known, so each foot says "2 of 4", and with the basemap
+    return _newsletter(S, map_h, pages)[0]
 
 
-NEWSLETTER_MAP_HEIGHTS = (64 * mm, 54 * mm, 44 * mm, 34 * mm)
+NEWSLETTER_MAP_HEIGHTS = (100 * mm, 92 * mm, 84 * mm, 76 * mm, 68 * mm, 60 * mm, 52 * mm, 44 * mm, 36 * mm)
 
 
-def _newsletter(S, map_h):
-    """One build of the newsletter with the page-1 map at `map_h`: (bytes, pages)."""
-    from reportlab.platypus import PageBreak
+class _PageMark(Flowable):
+    """Draws nothing; remembers the page it landed on (the newsletter's page-1 fit check)."""
+    def __init__(self):
+        Flowable.__init__(self)
+        self.page = None
+
+    def wrap(self, aw, ah):
+        return 0, 0
+
+    def draw(self):
+        self.page = self.canv.getPageNumber()
+
+
+def _newsletter(S, map_h, pages=None):
+    """One build of the newsletter with the page-1 map at `map_h`: (bytes, pages). REVERSED 14 Oct 2026 (the publishing
+    check): page 1 is the front page (lede, figures, the definition once, the map with its key, key points, report);
+    page 2 one table of every route with its bar (it was a busiest table AND a chart of the same figures), what is moved,
+    the works; page 3 the councils; page 4 the carbon panel with numbered references, the glance, what changed, the four
+    terms, caveats and one numbered Sources list (sources were printed beside every row and on every page)."""
+    from reportlab.platypus import PageBreak, CondPageBreak
     buf = io.BytesIO()
-    doc, usable = _bulletin_doc(S, "monthly newsletter", buf)
+    doc, usable = _bulletin_doc(S, "monthly newsletter", buf, pages)
     K = _Kit(usable)
     E, P, grid = K.E, K.P, K.grid
     st, st_r, st_h, st_hr, st_sec, st_grey = K.st, K.st_r, K.st_h, K.st_hr, K.st_sec, K.st_grey
@@ -1611,63 +1797,54 @@ def _newsletter(S, map_h):
     # ---- 01 the month in brief (page 1 reads on its own)
     story.append(kicker("01", "The month in brief"))
     story.append(P(E(S["lede"]), K.st_lede))
-    story.append(Spacer(1, 2 * mm))
+    story.append(Spacer(1, 3 * mm))
     story.append(K.figures(S))
+    story.append(P(E(S["definition"]), K.st_def))
     if S["empty"] and S.get("empty_note"):
         story.append(Spacer(1, 1.5 * mm))
         story.append(P(E(S["empty_note"]), st_grey))
-    story.append(Spacer(1, 2.5 * mm))
     story += K.map_block(S, map_h)
     story += K.brief(S)
-    story += _glance_flow(K, S)
-    story.append(P("<b>" + E(S["counting_line"]) + "</b> " + E(S["two_way_sentence"] + " " + S["other_schemes"]), st_grey))
-    story.append(Spacer(1, 1.5 * mm))
-    story.append(K.report_box(S, ("lorry",)))
+    story.append(Spacer(1, 2.5 * mm))
+    # 14 Oct 2026 (the publishing check): how to report a lorry, the working hours and other formats on the FRONT page,
+    # once (the last page repeated them and spilled onto a fifth page)
+    story.append(K.report_box(S))
 
     # ---- 02 routes and roads
     story.append(PageBreak())
+    mark = _PageMark()
+    story.append(mark)
     story.append(kicker("02", "Routes and roads"))
-    story.append(P("The busiest routes this month", st_sec))
-    rows = [[P("Route", st_h), P("Two-way a day", st_hr), P("In the month", st_hr),
-             P(E(S["prev_long"] or "Last month") + " (a day)", st_hr), P("Planning flag", st_hr)]]
-    for r in S["busiest"]:
-        rows.append([P(E(r["label"]) + (f" <font color='#64748B'>{E(r['letters'])}</font>" if r["letters"] else "")),
-                     P(f"<b>{E(r['a_day_text'])}</b>", st_r), P(E(r["in_month_text"]), st_r),
-                     P(E(r["last_month_text"]), st_r), P(E(r["flag_text"]), K.st_red if r["over_flag"] else st_r)])
-    if not S["busiest"]:
-        rows.append([P("No route with a stored road route carries approved lorries this month.", st_grey), "", "", "", ""])
-    story.append(grid(rows, [usable * 0.37, usable * 0.12, usable * 0.12, usable * 0.16, usable * 0.23]))
-    story.append(P(E(f"A planning flag is a cap the scheme has typed, in two-way movements a day; it is never a legal "
-                     f"limit. {S['flagged_routes']} of {len(S['routes'])} routes carry one. Every route is charted below."), st_grey))
-    story.append(P("Two-way movements a day by route", st_sec))
-    story.append(_bulletin_chart(S, usable))
-    story.append(P("Bars: two-way movements a day, approved plan (light fill, solid edge). Dashed red mark: the "
-                   "planning flag typed on the route." + (f" The {bulletin_charted(S)} busiest routes of "
-                   f"{len(S['routes'])} are charted; every route is on the HTML page."
-                   if len(S["routes"]) > bulletin_charted(S) else ""), st_grey))
+    story.append(P("Every route this month", st_sec))
+    story.append(K.routes_table(S))
+    story.append(P(E(f"Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark "
+                     f"({S['flagged_routes']} of {len(S['routes'])} routes have one)."), st_grey))
     story.append(P("What is being moved", st_sec))
-    mv = [[P("Discipline", st_h), P("Two-way a day", st_hr), P("Vehicles", st_hr), P("Tonnes a day", st_hr)]]
+    mv = [[P("Material", st_h), P("Two-way a day", st_hr), P("Lorries", st_hr), P("Tonnes a day", st_hr)]]
     for m in S["moved"]:
         mv.append([P(E(m["name"])), P(E(m["a_day"]), st_r), P(E(m["vehicles"]), st_r), P(E(m["t_day"]), st_r)])
     mt = S["moved_total"]
     mv.append([P("<b>All routes</b>"), P(f"<b>{E(mt['a_day'])}</b>", st_r), P(f"<b>{E(mt['vehicles'])}</b>", st_r),
                P(f"<b>{E(mt['t_day'])}</b>", st_r)])
     story.append(grid(mv, [usable * 0.46, usable * 0.18, usable * 0.18, usable * 0.18], total_row=True))
-    story.append(P(E(f"Works affecting the roads in {S['month_long']}"), st_sec))
-    wk = [[P("Location", st_h), P("Works", st_h), P("When and who", st_h)]]
+    story.append(CondPageBreak(30 * mm))
+    story.append(P(E(f"Road works and limits, {S['month_long']}"), st_sec))
+    wk = [[P("Where", st_h), P("What", st_h), P("When and who", st_h)]]
     for w in S["works"]:
-        wk.append([P(E(w["where"])), P(E(w["line"]) + f"<br/><font size=7 color='#64748B'>{E(w['routes_text'])}</font>"),
-                   P(E(w["when"]) + f"<br/><font size=7 color='#64748B'>{E(w['who'])}</font>")])
+        wk.append([P(E(w["where"])), P(E(w["line"]) + f"<br/><font size=7.5 color='#64748B'>{E(w['routes_text'])}</font>"),
+                   P(E(w["when"]) + f"<br/><font size=7.5 color='#64748B'>{E(w['who'])}</font>")])
     for z in S["controls"]:
-        wk.append([P(f"<b>{z['n']}</b> " + E(z["name"])), P(E(z["kind"] + (f": {z['note']}" if z["note"] else ""))),
-                   P(E(z["when"]) + "<br/><font size=7 color='#64748B'>typed by the scheme</font>")])
+        wk.append([P(f"<font color='#{AMBER_HEX}'><b>{z['n']}</b></font> " + E(z["name"])), P(E(z["kind"] + (f": {z['note']}" if z["note"] else ""))),
+                   P(E(z["when"]) + "<br/><font size=7.5 color='#64748B'>set by the scheme</font>")])
     if len(wk) == 1:
-        wk.append([P("Nothing stored for this month.", st_grey), "", ""])
+        wk.append([P("Nothing listed for this month.", st_grey), "", ""])
     story.append(grid(wk, [usable * 0.26, usable * 0.46, usable * 0.28]))
     for line in S["checks"]:
         story.append(P(E(line), st_grey))
     for o in S["others"]:
         story.append(P(f"<b>{E(o['kind'])}.</b> " + E(o["text"]), st_grey))
+    story.append(KeepTogether([P("What changed since last month", st_sec),
+                               P(E(S["change_text"]) + " <font color='#64748B'>Each month's approved plan as it stands today.</font>")]))
 
     # ---- 03 councils (no council areas: the carbon panel takes the page)
     story.append(PageBreak())
@@ -1677,35 +1854,37 @@ def _newsletter(S, map_h):
         if M.get("error"):
             story += [P(E(M["title"]), st_sec), P(E(M["error"]), st_grey)]
         else:
-            mvc = [["", P("District", st_h), P("Two-way movements a day", st_hr), P("Routes", st_hr),
+            mvc = [["", P("District", st_h), P("Two-way a day", st_hr), P("Routes", st_hr),
                     P(E(M["distance_head"]), st_hr), P(E(M["change_head"]), st_h)]]
             for d in M["districts"]:
                 mvc.append([_swatch(d["fill"], d["cls"] == "nofig"), P(E(d["name"])), P(E(d["text"]), st_r),
                             P(str(d["routes"]), st_r), P(E(d["distance_text"]), st_r), P(E(d["change"]))])
-            story.append(KeepTogether([P(E(M["title"]), st_sec), P(E(M["lede"])), Spacer(1, 1.2 * mm),
-                                       grid(mvc, [5 * mm, usable * 0.28, usable * 0.17, usable * 0.09, usable * 0.17,
-                                                  usable * 0.29 - 5 * mm]),
-                                       Spacer(1, 0.8 * mm), _council_legend(M, usable, "Two-way movements a day:")]))
-            story.append(P(E(M["scheme_line"])))
-            for line in M["county_lines"] + M["notes"]:
+            story.append(KeepTogether([P(E(M["title"]), st_sec), P(E(M["lede"])), Spacer(1, 1.5 * mm),
+                                       grid(mvc, [6 * mm, usable * 0.28, usable * 0.15, usable * 0.09, usable * 0.17,
+                                                  usable * 0.31 - 6 * mm]),
+                                       Spacer(1, 1 * mm), _council_legend(M, usable, "Two-way movements a day:")]))
+            story.append(P(E(" ".join([M["scheme_line"]] + M["county_lines"])), st_grey))
+            for line in M["notes"]:
                 story.append(P(E(line), st_grey))
             story.append(P(E(M["footnote"]), st_grey))
     if C:
         if C.get("error"):
             story += [P(E(C["title"]), st_sec), P(E(C["error"]), st_grey)]
         else:
-            cc = [[P("District", st_h), P("Highway authority", st_h), P("t CO2e in the month", st_hr),
-                   P("Share of the scheme's", st_hr), P("Of the district's road transport, a month (2024)", st_hr)]]
+            cc = [[P("District", st_h), P("Highway authority", st_h), P("t CO2e", st_hr),
+                   P("Share of scheme", st_hr), P("Of the district's road CO2e, a month (2024)", st_hr)]]
             for d in C["districts"]:
                 cc.append([P(E(d["name"])), P(E(d["highway_authority"])), P(E(d["text"]), st_r), P(E(d["share"]), st_r),
                            P(E(d.get("la_share") or "—"), st_r)])
-            story.append(KeepTogether([P(E(C["title"]), st_sec), P(E(C["lede"])), Spacer(1, 1.2 * mm),
-                                       _CouncilMap(C, usable, 66 * mm), Spacer(1, 0.8 * mm), _council_legend(C, usable)]))
-            story.append(Spacer(1, 1.2 * mm))
-            story.append(grid(cc, [usable * 0.24, usable * 0.30, usable * 0.14, usable * 0.14, usable * 0.18]))
-            story.append(P(E(C["tally"]) + (" † A and minor roads only: the government figures give no motorway in "
-                                            "the district." if any("†" in (d.get("la_share") or "") for d in C["districts"]) else "")
-                           + " How it is worked out: page 4.", st_grey))
+            story.append(KeepTogether([P(E(C["title"]), st_sec), P(E(C["lede"])), Spacer(1, 1.5 * mm),
+                                       _CouncilMap(C, usable, 70 * mm), Spacer(1, 1 * mm), _council_legend(C, usable)]))
+            story.append(Spacer(1, 1.5 * mm))
+            story.append(grid(cc, [usable * 0.24, usable * 0.28, usable * 0.13, usable * 0.14, usable * 0.21]))
+            story.append(P(E(" ".join([C["tally"]] + C["county_lines"]) + (" † A and minor roads only: no motorway in the "
+                                            "district." if any("†" in (d.get("la_share") or "") for d in C["districts"]) else "")), st_grey))
+            story.append(P(E(C["basis"]), st_grey))
+            for line in C["notes"]:
+                story.append(P(E(line), st_grey))
     if not (M or C):
         story += _lot_flow(K, L)
 
@@ -1714,52 +1893,47 @@ def _newsletter(S, map_h):
     story.append(kicker("04", "Carbon and the small print"))
     if M or C:
         story += _lot_flow(K, L)
-    if C and not C.get("error"):
-        st_small = ParagraphStyle("sm", parent=st_grey, fontSize=6.6, leading=8.2)
-        story.append(P("Carbon by council: how it is worked out", st_sec))
-        for line in C["county_lines"] + C["notes"]:
-            story.append(P(E(line), st_small))
-        story.append(P(E(C["basis"] + " " + C["stamp"] + "."), st_small))
-        story.append(P(E(" ".join(([C["la_source"]] if C.get("la_source") else []) + C["sources"] + C["attribution"])), st_small))
-    story.append(P("What changed since last month", st_sec))
-    story.append(P(E(S["change_text"]) + " <font color='#64748B'>Plan against plan: each month's approved plan as it stands "
-                   "today. No earlier issue of this bulletin is stored.</font>"))
-    st_small = ParagraphStyle("sm2", parent=st_grey, fontSize=6.6, leading=8.2)
-    story.append(P("Terms explained", st_sec))
-    story.append(P(" ".join(f"<b>{E(k)}:</b> {E(v)}" for k, v in S["terms"]), st_small))
+    story += _glance_flow(K, S)
+    story.append(P("Terms", st_sec))
+    tt = LongTable([[P(f"<b>{E(k)}</b>", ParagraphStyle("tk", parent=st, fontSize=8, leading=10)),
+                     P(E(v[0].upper() + v[1:]), ParagraphStyle("tv", parent=st, fontSize=8, leading=10))] for k, v in S["terms"]],
+                   colWidths=[usable * 0.2, usable * 0.8])
+    tt.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                            ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+    story.append(tt)
     story.append(P("Caveats", st_sec))
-    story.append(P(" ".join("• " + E(cv) for cv in S["caveats"]), st_small))
-    story.append(Spacer(1, 2 * mm))
-    story.append(K.report_box(S))
+    for cv in S["caveats"]:
+        story.append(Paragraph(E(cv), ParagraphStyle("cv", parent=st_grey, leftIndent=9, bulletIndent=0,
+                                                     bulletFontName=_BF("regular")), bulletText="•"))
+    story += K.sources(S)
     doc.build(story)
-    return buf.getvalue(), doc.page
+    return buf.getvalue(), doc.page, mark.page
 
 
 def _glance_flow(K, S):
     """13 Oct 2026: the Sizewell C tracker — item, this month, the kind of data; observed items Not reported. Compact, so
     it sits on page 1 of the newsletter (the summary)."""
     E, P = K.E, K.P
-    sm = ParagraphStyle("gls", parent=K.st, fontSize=7.4, leading=8.8)
+    sm = ParagraphStyle("gls", parent=K.st, fontSize=7.8, leading=9.4)
     smr = ParagraphStyle("glr", parent=sm, alignment=2)
     smg = ParagraphStyle("glg", parent=sm, textColor=colors.Color(*GREY))
     smn = ParagraphStyle("gln", parent=smr, textColor=colors.Color(*GREY), fontName=_BF("italic"))
-    hd = ParagraphStyle("glh", parent=K.st_h, fontSize=7.2, leading=8.6)
+    hd = ParagraphStyle("glh", parent=K.st_h, fontSize=7.5, leading=9)
     gl = [[P("Item", hd), P("This month", ParagraphStyle("glhr", parent=hd, alignment=2)), P("Data", hd)]]
     for g in S["glance"]:
         gl.append([P(E(g["item"]), smg if g["not_reported"] else sm), P(E(g["figure"]), smn if g["not_reported"] else smr),
                    P(E(g["data"]), smg if g["not_reported"] else sm)])
     # the item column holds the longest item on one line (286 pt in Inter 7.4 with padding): a wrapped first column reads
     # back out of order when the PDF is read as text; the Data column may wrap (it is the last)
-    t = LongTable(gl, colWidths=[K.usable * 0.58, K.usable * 0.13, K.usable * 0.29], repeatRows=1)
-    t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("BACKGROUND", (0, 0), (-1, 0), colors.Color(*NAVY_RGB)), ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                           ("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.Color(0.85, 0.87, 0.9)),
-                           ("BOX", (0, 0), (-1, -1), 0.6, colors.Color(0.75, 0.78, 0.83)),
-                           ("TOPPADDING", (0, 0), (-1, -1), 1.1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.1),
+    t = LongTable(gl, colWidths=[K.usable * 0.57, K.usable * 0.14, K.usable * 0.29], repeatRows=1)
+    t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
+                           ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
                            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
+    # NARROWED 14 Oct 2026 (the publishing check): one short line under the table, at 7.5 pt
     return [P("This month at a glance", K.st_sec), t,
-            P("Forecast: from the approved plan. Not reported: what a monitoring report fills from observed records "
-              "(counts, gate and camera records, operators' returns). A planning forecast has none, so the line is "
-              "left empty, never estimated.", ParagraphStyle("gln2", parent=K.st_grey, fontSize=6.6, leading=8.2))]
+            P("Not reported: needs observed records (counts, gate or camera records). A forecast has none, so the line "
+              "is left empty, never estimated.", K.st_grey)]
 
 
 def _lot_flow(K, L):
@@ -1767,27 +1941,25 @@ def _lot_flow(K, L):
     if not L:
         return []
     E, P = K.E, K.P
-    st_lab2 = ParagraphStyle("lotl", parent=K.st, fontName=_BF("bold"), fontSize=7.2, leading=9, textColor=colors.Color(*GREY))
-    st_src = ParagraphStyle("lots", parent=K.st_grey, fontSize=6.6, leading=8.2)
+    st_lab2 = ParagraphStyle("lotl", parent=K.st, fontName=_BF("bold"), fontSize=7.5, leading=9.4, textColor=colors.Color(*GREY))
     rows = []
     for r in L["rows"]:
         stw = ""
         if r.get("status"):
             stw = f" <font color='{bulletin_doc_status(r.get('status_ok'))}'><b>{E(r['status'])}</b></font>"
-        cell = [P(E(r["text"]) + stw)]
-        if r.get("source") and r["source"] != "—":
-            cell.append(P("Source: " + E(r["source"]), st_src))
-        rows.append([P(E(r["label"].upper()), st_lab2), cell])
+        # REVERSED 14 Oct 2026 (the publishing check): the row's source is a reference number into Sources (end of page)
+        ref = f"<super><font color='#64748B'>{r['ref']}</font></super>" if r.get("ref") else ""
+        rows.append([P(E(r["label"].upper()), st_lab2), P(E(r["text"]) + ref + stw)])
     lt = LongTable(rows, colWidths=[K.usable * 0.25, K.usable * 0.75])
     lt.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.Color(0.85, 0.87, 0.9)),
-                            ("BOX", (0, 0), (-1, -1), 0.6, colors.Color(0.75, 0.78, 0.83)),
+                            ("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.Color(0.85, 0.87, 0.9)),
+                            ("LINEABOVE", (0, 0), (-1, 0), 0.9, colors.Color(*NAVY_RGB)),
                             ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
                             ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5)]))
     out = [KeepTogether([P(E(L["title"]), K.st_sec), P(E(L["lede"])), Spacer(1, 1.2 * mm), lt])]
-    if L.get("demo_note"):
-        out.append(P(f"<b>{E(L['demo_note'])}</b>", ParagraphStyle("ld", parent=K.st_grey, textColor=colors.Color(*DEMO_FG_RGB))))
-    out.append(P(E(L["checked"]), K.st_grey))
+    # 14 Oct 2026: the demo note and the factor check on one line
+    out.append(P((f"<font color='#{DEMO_FG_HEX}'><b>{E(L['demo_note'])}</b></font> " if L.get("demo_note") else "")
+                 + E(L["checked"]), K.st_grey))
     return out
 
 
@@ -1796,31 +1968,44 @@ def build_bulletin_leaflet_pdf(S):
     13 Oct 2026 (D43): the one-page LEAFLET for residents and the working group, from the same view model as the
     newsletter: the brand band, the lede, the four figures, the route map, "This month in brief", how to report a
     lorry, the working hours and other formats, and where to read the full newsletter. One A4 page, always (the
-    harness holds it): the map's height gives way before anything spills.
+    harness holds it): the map's height gives way before anything spills. 14 Oct 2026: the fit is found on sizing
+    passes (no basemap) and the final build fetches the basemap once.
     """
     if rl_canvas is None:
         raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
-    for map_h in (88 * mm, 74 * mm, 60 * mm, 46 * mm):
-        buf = io.BytesIO()
-        doc, usable = _bulletin_doc(S, "leaflet", buf)
-        K = _Kit(usable)
-        E, P = K.E, K.P
-        story = [P(E(S["lede"]), K.st_lede), Spacer(1, 2 * mm), K.figures(S), Spacer(1, 2.5 * mm)]
-        story += K.map_block(S, map_h)
-        story += K.brief(S)
-        story.append(Spacer(1, 2 * mm))
-        story.append(K.report_box(S))
-        story.append(Spacer(1, 1.5 * mm))
-        story.append(P(E(f"The full monthly newsletter, with every route, the councils and the carbon: {S['newsletter_where']}"), K.st))
-        story.append(P(E(S["counting_line"] + " " + (S.get("carbon_stamp") or "")), K.st_grey))
-        doc.build(story)
-        data = buf.getvalue()
-        if doc.page <= 1:
-            return data
-    return data
+    with _sizing():
+        for map_h in LEAFLET_MAP_HEIGHTS:
+            if _leaflet(S, map_h)[1] <= 1:
+                break
+    return _leaflet(S, map_h)[0]       # the final build, with the basemap
+
+
+LEAFLET_MAP_HEIGHTS = (100 * mm, 90 * mm, 80 * mm, 70 * mm, 60 * mm, 50 * mm)
+
+
+def _leaflet(S, map_h):
+    """One build of the leaflet with the map at `map_h`: (bytes, pages)."""
+    buf = io.BytesIO()
+    doc, usable = _bulletin_doc(S, "leaflet", buf)
+    K = _Kit(usable)
+    E, P = K.E, K.P
+    # 14 Oct 2026 (the publishing check): a heading a resident reads first (it says what the lede said), the four
+    # figures and the definition once, the map and its key, the key points and the report strip
+    st_head = ParagraphStyle("lh", parent=K.st, fontName=_BF("bold"), fontSize=17, leading=20.5,
+                             textColor=colors.Color(*NAVY_RGB))
+    story = [P(E(f"Lorries on your roads in {S['month_long']}"), st_head), Spacer(1, 3 * mm), K.figures(S),
+             P(E(S["definition"]), K.st_def)]
+    story += K.map_block(S, map_h)
+    story += K.brief(S)
+    story.append(Spacer(1, 2.5 * mm))
+    story.append(K.report_box(S))
+    story.append(Spacer(1, 1.5 * mm))
+    story.append(P(E(f"Every route, the councils and the carbon are in the monthly newsletter: {S['newsletter_where']}"), K.st))
+    story.append(P(E(S.get("carbon_stamp") or ""), K.st_grey))
+    doc.build(story)
+    return buf.getvalue(), doc.page
 
 
 def bulletin_charted(S):
-    """How many routes the PDF's chart draws (the rest are on the HTML page)."""
-    import bulletin_doc
-    return min(len(S["routes"]), bulletin_doc.CHART_MAX_ROUTES)
+    """How many routes the PDF's route table shows (14 Oct 2026: every route; it was the chart's first 24)."""
+    return len(S["routes"])

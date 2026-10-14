@@ -23,14 +23,16 @@ import subprocess
 import tempfile
 
 
-def pdf_text(pdf_bytes, fallback=None):
+def pdf_text(pdf_bytes, fallback=None, raw=False):
+    """The PDF's text by pdftotext: -layout (the page as laid out, the default) or, with raw=True, -raw (the order the
+    text is drawn in — two columns read one after the other, not across; 14 Oct 2026, the bulletin's Sources)."""
     if not shutil.which("pdftotext"):
         return pdf_bytes.decode("latin-1") if fallback is None else fallback
     fd, path = tempfile.mkstemp(suffix=".pdf")
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(pdf_bytes)
-        out = subprocess.run(["pdftotext", "-layout", "-enc", "UTF-8", "-eol", "unix", path, "-"],
+        out = subprocess.run(["pdftotext", "-raw" if raw else "-layout", "-enc", "UTF-8", "-eol", "unix", path, "-"],
                              capture_output=True, timeout=60)
         return out.stdout.decode("utf-8", errors="replace")
     finally:

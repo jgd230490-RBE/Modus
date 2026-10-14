@@ -609,6 +609,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
            and pn["rollup"]["breakdown"]["discipline"] == pg["rollup"]["breakdown"]["discipline"], f"{r2.status_code} {str(pn.get('scope'))}")
         # 12 Oct 2026 (C4): the bulletin as people read it, over HTTP — the PDF and the page, from the same roll-up.
         # Mapbox is never called: portable.offline() refuses the static-image fetch, so the map is the schematic.
+        # 14 Oct 2026: the fetch is now the basemap alone (basemap.py), refused the same way
         import export
         from portable import offline
         _real_open = offline(export)
@@ -617,6 +618,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
             _bt = pdf_text(r.content) if r.status_code == 200 else ""
             _bp = [" ".join(x.split()) for x in _bt.split("\f") if x.strip()]
             _bj = " ".join(_bt.split())
+            r_pdf_bytes = r.content if r.status_code == 200 else b""
             # NARROWED 12 Oct 2026 (the user, evening): movements in the month print whole ("583", was "582.8")
             _figs = (f"{hl['two_way_a_day']:,.0f}", f"{hl['movements_in_month']:,.0f}", f"{hl['routes_in_use']:,}", f"{hl['tonnes']:,.0f} t")
             ok("⭐ the bulletin PDF over HTTP: a PDF named for the month, not cached, \"fictional demo scheme\" on every page",
@@ -627,10 +629,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
             ok("⭐ ...page 1 carries the four headline figures equal to /api/bulletin/month's roll-up",
                bool(_bp) and all(f in _bp[0] for f in _figs), f"{_figs} | {_bp[0][:400] if _bp else ''}")
             ok("...the busiest route by its places, the stockpile over capacity, the never-checked routes, the carbon stamp, the planning flag",
-               "Kilby Ridge Quarry to Harborough Compound" in _bj and "Stockpile Tilton has a capacity of 40,000 t" in _bj
-               and "never checked for any of this month's routes" in _bj
-               and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in _bj
-               and "Route R016:" in _bj and "planning flag of 20 a day" in _bj, _bj[:600])
+               # NARROWED 14 Oct 2026 (the publishing check): plain words, the flagged route by its places (no "Route R016"),
+               # the stockpile as its balance against its capacity; the stamp is in Sources (two columns: read in drawing order)
+               "Kilby Ridge Quarry to Harborough Compound" in _bj and "above its 40,000 t capacity (weekly records so far)" in _bj
+               and "Stockpile Tilton:" in _bj and "Not checked against published road works" in _bj
+               and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in " ".join(pdf_text(r_pdf_bytes, raw=True).split())
+               and "Route R016" not in _bj and "above its planning flag of 20 a day." in _bj, _bj[:600])
             ok("🔴 ...no team id, none of the banned words",
                not re.search(r"\bIPT\s*[-_ ]?\s*[1-6]\b", _bj) and not re.search(r"\b(secure|real[- ]time|telematics|optimi[sz]e|predict|live tracking)\b", _bj, re.I)
                and not re.search(r"\bAI\b", _bj))
@@ -646,7 +650,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf")
                and r.headers.get("content-disposition") == 'attachment; filename="leaflet-2026-10.pdf"'
                and r.headers.get("cache-control") == "no-store" and len(_lp) == 1
-               and "fictional demo scheme" in _lp[0].lower() and all(f in _lp[0] for f in _figs) and "This month in brief" in _lp[0],
+               and "fictional demo scheme" in _lp[0].lower() and all(f in _lp[0] for f in _figs) and "Key points" in _lp[0],     # NARROWED 14 Oct 2026
                f"{r.status_code} {len(_lp)}")
             ok("⭐ D43 the newsletter PDF over HTTP is four pages, the brand band on each",
                len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)}")
