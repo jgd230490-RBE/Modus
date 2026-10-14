@@ -31,6 +31,9 @@ import db
 
 STRIP_ROUTE_M = 250
 STRIP_SITE_M = 500
+# the colour system's print rule for an outline: a light tint fill with the full colour as its edge — the PDF
+# (export.COMM_FILL_ALPHA) and the map (the payload's fill_alpha) read this one figure
+FILL_ALPHA = 0.22
 
 # One colour, one symbol and one word per kind, in the order every legend lists them. Colours from the free
 # hues the colour system leaves (notes/colour-system-1010.md): no Volume blue, no breach red, no orange, no
@@ -359,7 +362,7 @@ def credit_line(source_keys=None):
 def payload(kinds=None):
     """GET /api/community: the features as one GeoJSON FeatureCollection and the status beside it."""
     st = status()
-    return {"type": "FeatureCollection", "features": features(kinds), **{k: st[k] for k in (
+    return {"type": "FeatureCollection", "features": features(kinds), "fill_alpha": FILL_ALPHA, **{k: st[k] for k in (
         "state", "fetched_at", "strip", "counts", "kinds", "sources", "credit", "notes", "error")}}
 
 

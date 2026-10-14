@@ -2355,7 +2355,12 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
     return x0, y0, pw, ph
 
 
-COMM_FILL_ALPHA = 0.22          # the colour system's print rule: a 22 % tint fill, the full colour as its edge
+def _comm_alpha():
+    import community
+    return community.FILL_ALPHA     # the colour system's print rule (community.FILL_ALPHA)
+
+
+COMM_FILL_ALPHA = None          # read through _comm_alpha(); kept as a name for the harnesses' history
 
 
 def _comm_symbol(c, symbol, colour, x, y, r=3.2):
@@ -2399,7 +2404,7 @@ def _comm_legend_swatch(c, k, x, y):
         c.saveState(); c.setStrokeColorRGB(*rgb); c.setLineWidth(1.6); c.setDash(3, 2)
         c.line(x, y - 4.2, x + 12, y - 4.2); c.restoreState()
     elif k["symbol"] == "fill":
-        c.saveState(); c.setFillColorRGB(*rgb); c.setFillAlpha(COMM_FILL_ALPHA); c.setStrokeColorRGB(*rgb); c.setLineWidth(0.8)
+        c.saveState(); c.setFillColorRGB(*rgb); c.setFillAlpha(_comm_alpha()); c.setStrokeColorRGB(*rgb); c.setLineWidth(0.8)
         c.rect(x, y - 7.5, 12, 6.5, stroke=1, fill=1); c.restoreState()
     else:
         _comm_symbol(c, k["symbol"], k["colour"], x + 6, y - 4.2, 3.6)
@@ -2431,7 +2436,7 @@ def _draw_community(c, PL, P, layer):
                     for q in pts[1:]:
                         p.lineTo(*q)
                     p.close()
-                c.setFillColorRGB(*rgb); c.setFillAlpha(COMM_FILL_ALPHA)
+                c.setFillColorRGB(*rgb); c.setFillAlpha(_comm_alpha())
                 c.setStrokeColorRGB(*rgb); c.setStrokeAlpha(1); c.setLineWidth(0.5)
                 c.drawPath(p, stroke=1, fill=1, fillMode=0)
         elif layer == "under" and t == "LineString":

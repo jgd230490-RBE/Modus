@@ -3330,6 +3330,58 @@ function App(){
 // stated scale, as a PDF (prints at that scale on A4) or a PNG for a Word document. The same request the public map's
 // "Export route map (plan)" sends; staff only (this page is a planner's). The server says which scales each plan has
 // and which places a local or site plan can be centred on; the map is drawn on the server, nothing here computes it.
+// 14 Oct 2026 — the community considerations layer's place in the app (Config → Map and bulletin): when it was fetched
+// and from what, the count of each kind, the credit line, and "Fetch again" for a planner or an admin. The fetch reads
+// three public sources along the routes as they are stored now and takes a few minutes; the page asks every 5 s while it
+// runs. The layer itself is on the Route map (staff only) and on the three route map plans.
+function CommunityPanel({ access }){
+  const [st, setSt] = useState(null);
+  const [msg, setMsg] = useState("");
+  const canFetch = !!(access && (access.role === "planner" || access.role === "admin"));
+  const read = () => fetch(`${API}/community/status`).then(r => r.ok ? r.json() : null).then(j => { if(j) setSt(j); return j; }).catch(() => null);
+  useEffect(() => { read(); }, []);
+  useEffect(() => {
+    if(!st || st.state !== "running") return;
+    const t = setTimeout(read, 5000);
+    return () => clearTimeout(t);
+  }, [st]);
+  const start = () => {
+    setMsg("Starting…");
+    fetch(`${API}/community/refresh`, { method: "POST" })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(j.detail || "Not started."); })
+      .catch(e => setMsg("Not started: " + (e && e.message || e)));
+  };
+  const day = (s) => { if(!s) return "—"; const d = new Date(s.length > 10 ? s : s + "T12:00:00Z"); return isNaN(d) ? s : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+  return (
+    <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="community">
+      <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Community considerations</h3>
+      <p className="text-[14px] text-slate-600 mb-3">The schools, hospitals, health centres, community centres, sports facilities, stations, cycle routes, bus stops and homes near the routes: within {st ? st.strip.route_m : 250} m of every route and {st ? st.strip.site_m : 500} m of every site. Staff only: on the Route map and on the route map plans, never on the public map. Fetched again from the public sources when you press the button, never on a page view, so fetch again after adding or changing routes.</p>
+      {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
+        <>
+          <p className="text-[14px] text-slate-700 mb-2" data-community-state={st.state}>
+            {st.state === "running" ? "Fetching now…" : st.fetched_at ? `Fetched ${day(st.fetched_at)}${st.by ? ` by ${st.by}` : ""}.` : "Not fetched yet."}
+            {st.error ? <span className="text-amber-700"> {st.error}.</span> : null}
+          </p>
+          <table className="tbl text-[14px] mb-2">
+            <thead><tr><th scope="col">Source</th><th scope="col">Data as at</th><th scope="col" className="num">Items</th></tr></thead>
+            <tbody>{st.sources.map(s => (
+              <tr key={s.key}><td>{s.name}{s.error ? <div className="text-amber-700 text-[13px]">{s.error}</div> : null}</td>
+                <td>{day(s.data_date || s.fetched_at)}</td><td className="num tabular-nums">{s.count == null ? "—" : grp(s.count, 0)}</td></tr>
+            ))}</tbody>
+          </table>
+          <p className="text-[13px] text-slate-500 mb-3">{st.kinds.map(k => `${k.label} ${grp(k.count, 0)}`).join(" · ")}</p>
+          {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
+          {canFetch
+            ? <button type="button" className="btn btn-secondary" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
+            : <p className="text-[13px] text-slate-500">A planner or an admin fetches it.</p>}
+          {msg ? <span className="text-[13px] text-slate-600 ml-3" role="status">{msg}</span> : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RouteMapExportMenu({ months, ipts, picked }){
   const now = new Date();
   const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));
@@ -5741,58 +5793,6 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
 
 // 13 Oct 2026 (W12): the council colour bands a scheme reads until it types its own (backend config.COUNCIL_BREAKS_DEFAULT)
 const COUNCIL_BREAKS_DEFAULT = { movements: [50, 100, 200], carbon: [50, 100, 200] };
-// 14 Oct 2026 — the community considerations layer's place in the app (Config → Map and bulletin): when it was fetched
-// and from what, the count of each kind, the credit line, and "Fetch again" for a planner or an admin. The fetch reads
-// three public sources along the routes as they are stored now and takes a few minutes; the page asks every 5 s while it
-// runs. The layer itself is on the Route map (staff only) and on the three route map plans.
-function CommunityPanel({ access }){
-  const [st, setSt] = useState(null);
-  const [msg, setMsg] = useState("");
-  const canFetch = !!(access && (access.role === "planner" || access.role === "admin"));
-  const read = () => fetch(`${API}/community/status`).then(r => r.ok ? r.json() : null).then(j => { if(j) setSt(j); return j; }).catch(() => null);
-  useEffect(() => { read(); }, []);
-  useEffect(() => {
-    if(!st || st.state !== "running") return;
-    const t = setTimeout(read, 5000);
-    return () => clearTimeout(t);
-  }, [st]);
-  const start = () => {
-    setMsg("Starting…");
-    fetch(`${API}/community/refresh`, { method: "POST" })
-      .then(r => r.json().then(j => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(j.detail || "Not started."); })
-      .catch(e => setMsg("Not started: " + (e && e.message || e)));
-  };
-  const day = (s) => { if(!s) return "—"; const d = new Date(s.length > 10 ? s : s + "T12:00:00Z"); return isNaN(d) ? s : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
-  return (
-    <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="community">
-      <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Community considerations</h3>
-      <p className="text-[14px] text-slate-600 mb-3">The schools, hospitals, health centres, community centres, sports facilities, stations, cycle routes, bus stops and homes near the routes: within {st ? st.strip.route_m : 250} m of every route and {st ? st.strip.site_m : 500} m of every site. Staff only: on the Route map and on the route map plans, never on the public map. Fetched again from the public sources when you press the button, never on a page view, so fetch again after adding or changing routes.</p>
-      {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
-        <>
-          <p className="text-[14px] text-slate-700 mb-2" data-community-state={st.state}>
-            {st.state === "running" ? "Fetching now…" : st.fetched_at ? `Fetched ${day(st.fetched_at)}${st.by ? ` by ${st.by}` : ""}.` : "Not fetched yet."}
-            {st.error ? <span className="text-amber-700"> {st.error}.</span> : null}
-          </p>
-          <table className="tbl text-[14px] mb-2">
-            <thead><tr><th scope="col">Source</th><th scope="col">Data as at</th><th scope="col" className="num">Items</th></tr></thead>
-            <tbody>{st.sources.map(s => (
-              <tr key={s.key}><td>{s.name}{s.error ? <div className="text-amber-700 text-[13px]">{s.error}</div> : null}</td>
-                <td>{day(s.data_date || s.fetched_at)}</td><td className="num tabular-nums">{s.count == null ? "—" : grp(s.count, 0)}</td></tr>
-            ))}</tbody>
-          </table>
-          <p className="text-[13px] text-slate-500 mb-3">{st.kinds.map(k => `${k.label} ${grp(k.count, 0)}`).join(" · ")}</p>
-          {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
-          {canFetch
-            ? <button type="button" className="btn btn-secondary" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
-            : <p className="text-[13px] text-slate-500">A planner or an admin fetches it.</p>}
-          {msg ? <span className="text-[13px] text-slate-600 ml-3" role="status">{msg}</span> : null}
-        </>
-      )}
-    </div>
-  );
-}
-
 function ConfigPage({ meta, who, access }){
   const [doc, setDoc] = useState(null);
   const [orig, setOrig] = useState(null);

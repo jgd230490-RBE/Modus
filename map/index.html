@@ -7830,7 +7830,8 @@
     // fetches from the public sources. Outlines (residential areas, sports grounds) and cycle routes are drawn UNDER the
     // routes as light fills and dashed lines; the points are small symbols OVER them, with the sites above those.
     const COMM = { staff: false, data: null, on: false, off: new Set(), loading: false, popup: null };
-    const COMM_FILL_OPACITY = 0.22;          // the colour system's print tint: 22 % fill, the full colour as its edge
+    // the outline tint comes with the data (community.FILL_ALPHA on the server: the same figure the PDF uses)
+    const commAlpha = () => (COMM.data && COMM.data.fill_alpha) || 0;
     const COMM_LAYERS = ['community-fill', 'community-outline', 'community-line', 'community-points'];
     function communityStaff(staff) {
         COMM.staff = !!staff;
@@ -7874,7 +7875,7 @@
             dot: `<circle cx="7" cy="7" r="3.5" fill="${c}"/>`,
             circle: `<circle cx="7" cy="7" r="5" fill="${c}"/>`,
             dash: `<path d="M1 7 H13" stroke="${c}" stroke-width="2.5" stroke-dasharray="3 2"/>`,
-            fill: `<rect x="1.5" y="3" width="11" height="8" fill="${c}" fill-opacity="${COMM_FILL_OPACITY}" stroke="${c}" stroke-width="1.5"/>`,
+            fill: `<rect x="1.5" y="3" width="11" height="8" fill="${c}" fill-opacity="${commAlpha()}" stroke="${c}" stroke-width="1.5"/>`,
         }[k.symbol] || `<circle cx="7" cy="7" r="5" fill="${c}"/>`;
         return `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true" style="flex:none">${shape}</svg>`;
     }
@@ -7900,7 +7901,7 @@
         const vis = COMM.on ? 'visible' : 'none', before = areaBeforeId(), filt = communityFilter();
         const poly = ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]];
         if (!map.getLayer('community-fill')) map.addLayer({ id: 'community-fill', type: 'fill', source: 'community-source',
-            filter: ['all', poly, filt], layout: { visibility: vis }, paint: { 'fill-color': commColourExpr(), 'fill-opacity': COMM_FILL_OPACITY } }, before);
+            filter: ['all', poly, filt], layout: { visibility: vis }, paint: { 'fill-color': commColourExpr(), 'fill-opacity': commAlpha() } }, before);
         if (!map.getLayer('community-outline')) map.addLayer({ id: 'community-outline', type: 'line', source: 'community-source',
             filter: ['all', poly, filt], layout: { visibility: vis }, paint: { 'line-color': commColourExpr(), 'line-width': 1 } }, before);
         if (!map.getLayer('community-line')) map.addLayer({ id: 'community-line', type: 'line', source: 'community-source',

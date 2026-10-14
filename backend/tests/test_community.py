@@ -443,7 +443,10 @@ def _opener_short_then_range(req, timeout=0):
 cs_time = cs.time.sleep
 cs.time.sleep = lambda s: None
 dst = os.path.join(FX, "dl.bin")
-_r = cs.download("https://x/f", dst, opener=_opener_short_then_range, use_curl=False)
+try:
+    _r = cs.download("https://x/f", dst, opener=_opener_short_then_range, use_curl=False)
+except RuntimeError as _ex:
+    _r = (None, -1)
 ok("3: the downloader resumes a short read with a Range request and gets every byte",
    _r[1] == len(BODY) and open(dst, "rb").read() == BODY and _calls == [None, "bytes=3000-"], str(_calls))
 
@@ -640,8 +643,9 @@ _ex = read("backend/export.py")
 _b = _ex.split("def build_route_map_pdf(")[1].split("\ndef ")[0]
 ok("7: outlines and cycle routes are drawn BEFORE the routes, the symbols AFTER",
    _b.index('_draw_community(c, PL, P, "under")') < _b.index("_draw_bulletin_schematic(") < _b.index('_draw_community(c, PL, P, "over")'))
-ok("7: outlines are a 22 % tint with the full colour as the edge (the colour system's print rule)",
-   "COMM_FILL_ALPHA = 0.22" in _ex and "c.setFillAlpha(COMM_FILL_ALPHA)" in _ex.split("def _draw_community(")[1].split("\ndef ")[0])
+ok("7: outlines are a 22 % tint with the full colour as the edge (the colour system's print rule), one figure for PDF and map",
+   community.FILL_ALPHA == 0.22 and "c.setFillAlpha(_comm_alpha())" in _ex.split("def _draw_community(")[1].split("\ndef ")[0]
+   and main.community_layer(request=_Request())["fill_alpha"] == 0.22)
 _rp = read("backend/route_map_export.py")
 ok("7: plan() adds the layer unless asked not to", "def plan(S, kind=\"regional\", scale=None, at=None, community=True):" in _rp
    and 'P["community"] = community_in_frame(P["view"]) if (community and P["view"]) else None' in _rp)
@@ -666,7 +670,8 @@ ok("8: map — a non-staff answer hides the layers again", "if (!COMM.staff) { C
 ok("8: map — kinds, colours and symbols come from the data, one image per kind",
    "map.addImage(id, commSymbolImage(k.symbol, k.colour)" in MAP and "'icon-image': ['concat', 'comm-', ['get', 'kind']]" in MAP)
 ok("8: map — fills and cycle lines go under our layers, the points over them, the sites on top",
-   "paint: { 'fill-color': commColourExpr(), 'fill-opacity': COMM_FILL_OPACITY } }, before);" in MAP
+   "paint: { 'fill-color': commColourExpr(), 'fill-opacity': commAlpha() } }, before);" in MAP
+   and "const commAlpha = () => (COMM.data && COMM.data.fill_alpha) || 0;" in MAP
    and "'line-dasharray': [2, 1.5] } }, before);" in MAP and "raiseMarks();" in MAP.split("function ensureCommunityLayers(")[1].split("function communityPopup(")[0])
 ok("8: map — re-added after a basemap switch", "if (typeof COMM !== 'undefined' && COMM.data) ensureCommunityLayers();" in MAP)
 ok("8: map — the export card's leave-out box sends community=0",
