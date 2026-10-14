@@ -445,8 +445,16 @@ ok("6: no printable public value says 'truck'", not TRUCK.search(" ".join(string
 import bulletin_doc  # noqa: E402
 _bs = bulletin_doc.sheet(11, access.current())
 ok("6: the bulletin's view model says no 'truck'", not TRUCK.search(" ".join(strings(_bs))))
-if _have_pdf:
-    _bt = pdf_text(export.build_bulletin_pdf(_bs), "")
+try:
+    _bb = export.build_bulletin_pdf(_bs)
+    # 14 Oct 2026: a tenant with no council areas (the shipped demo package) put every source in the left column, and the
+    # empty right column ([""]) made reportlab fail the whole bulletin — fixed in export.Kit.sources
+    ok("6: the bulletin PDF builds for a tenant with no council areas (the sources' empty column)", _bb[:4] == b"%PDF")
+except Exception as e:
+    _bb = b""
+    ok("6: the bulletin PDF builds for a tenant with no council areas (the sources' empty column)", False, f"{type(e).__name__}: {e}")
+if _have_pdf and _bb:
+    _bt = pdf_text(_bb, "")
     ok("6: the bulletin PDF says no 'truck'", _bt != "" and not TRUCK.search(_bt))
 import clp  # noqa: E402
 import clp_pack  # noqa: E402
