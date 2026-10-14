@@ -928,6 +928,27 @@ if (loaded) {
       const fCfg3 = render("...and from the DOCUMENT when it has one",
         h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {}, doc: { fair_price: { ...fileDoc.fair_price, driver_eur_per_h: 25 } }, upd: () => {}, fileDoc }));
       ok("...the document's value wins and the note is gone", fCfg3.includes('value="25"') && !fCfg3.includes("no fair_price block yet"));
+      // 14 Oct 2026 (HU7): the file carries a set per country; a GB tenant is shown and offered the GB set
+      const gbSet = { _README: "Great Britain", _driver_source: "ONS", driver_eur_per_h: 24, vehicle_standing_eur_per_h: 13, running_eur_per_km: 0.12, margin_pct: 8,
+        consumption: { _source: "ICCT", l_per_100km_per_tonne: 0.4, rigid: { l_per_100km_empty: 31 }, artic: { l_per_100km_empty: 23.6 } },
+        season: { _source: "DOE", winter_months: [11, 12, 1, 2, 3], winter_consumption_uplift_pct: 8, thaw_months: [] } };
+      const fileDoc2 = { ...fileDoc, fair_price_by_country: { GB: gbSet } };
+      const cfgGb = (doc) => render("the Costing tab, a GB tenant", h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {}, doc, upd: () => {}, fileDoc: fileDoc2 }));
+      const fGbOld = cfgGb({ tenant: { country: "GB" }, fair_price: fileDoc.fair_price });
+      ok("⭐ HU7: a GB tenant whose document holds the EE set is offered the file's Great Britain set",
+        fGbOld.includes('data-fair-country-offer="GB"') && fGbOld.includes("Use the Great Britain set") && fGbOld.includes("Nothing changes until you Save.")
+        && fGbOld.includes('value="20"') && !/undefined|NaN/.test(fGbOld));
+      const fGbNone = cfgGb({ tenant: { country: "GB" } });
+      ok("...with no block on the document the inputs show the GB set (31 rigid, 24 driver), not the EE one, and no offer",
+        fGbNone.includes('value="24"') && fGbNone.includes('value="31"') && !fGbNone.includes('value="27"')
+        && !fGbNone.includes("data-fair-country-offer") && fGbNone.includes("the live document has no fair_price block yet"));
+      const fGbSame = cfgGb({ tenant: { country: "gb" }, fair_price: { ...gbSet, _README: "edited words only", _driver_source: "x" } });
+      ok("...the document already holding the GB numbers (sources reworded, country in lower case) gets no offer",
+        !fGbSame.includes("data-fair-country-offer") && fGbSame.includes('value="24"'));
+      const fEe = cfgGb({ tenant: { country: "EE" }, fair_price: fileDoc.fair_price });
+      const fNoC = cfgGb({ fair_price: { ...fileDoc.fair_price, driver_eur_per_h: 25 } });
+      ok("...an EE tenant, and a tenant with no country, are never offered a country set",
+        !fEe.includes("data-fair-country-offer") && !fNoC.includes("data-fair-country-offer") && fNoC.includes('value="25"'));
       const fNone = render("the widget renders with NO data at all", h(FuelWidget, { who: "t", access: planner, mode: "strip", initial: null }));
       ok("...as 'Index unavailable — type a price' for a planner, and nothing undefined",
         fNone.includes("Index unavailable — type a price") && !/undefined|NaN/.test(fNone));

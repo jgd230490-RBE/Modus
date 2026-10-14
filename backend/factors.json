@@ -483,6 +483,44 @@
     },
     "_sanity_source": "IRU (2025): goods transport in Europe costs EUR 0.50-2.00 per km all-in. A check on the model's output, not an input. On the test fixture (60 km round trip, 20 t, 1.73 h cycle, diesel 1.922) the model gives ~EUR 113/trip = EUR 1.88/km, and the Estonian list price found on 09 Sep (EUR 45 + 1.50/km each way) gives EUR 135 for the same trip."
   },
+  "_fair_price_by_country_note": "14 Oct 2026 (HU7): a coefficient set per country, used for a tenant whose country has one. fair_price above is the set for every other tenant (no country, or one without a set here; it is the Estonian set, in EUR). fairprice.params() fills a missing key from the tenant country's set, and Config -> Costing · fuel offers the country's set as one click. Each set is validated like fair_price.",
+  "fair_price_by_country": {
+    "GB": {
+      "_README": "Great Britain (country GB): the FAIR PRICE model's coefficients in £, each with its source; three are ASSUMPTIONS to replace (vehicle_new_price_eur behind vehicle_standing_eur_per_h, running_eur_per_km, margin_pct). Field names keep their _eur_ suffix: every figure is in the tenant's currency. The diesel price is NOT here: it is the DESNZ weekly road fuel prices row (fuel.py). Written 29 Sep 2026 (H1) for the demo tenant; in the seed since 14 Oct 2026 (HU7).",
+      "consumption": {
+        "_source": "artic laden ~34 L/100 km: ICCT 'Fuel efficiency technology in European heavy-duty vehicles' (2018), regional delivery cycle; +0.4 L/100 km per tonne of payload (low end): UK DfT 'Effects of payload on the fuel consumption of trucks' — both via lkw-control.com (read 2026-09-10). Empty = laden − 0.4 × payload, at a 26 t reference payload: artic 34 − 0.4 × 26 = 23.6. Rigid 32 t average-laden 38.6 L/100 km DERIVED from the DESNZ 2026 factors in this file (rigid >17 t 0.99773 kg CO2e/km ÷ 2.58354 kg CO2e/L diesel), then 38.6 − 0.4 × 20 = 30.6, rounded to 31 empty. The rigid figure is the weakest number in this block.",
+        "l_per_100km_per_tonne": 0.4,
+        "rigid": {
+          "l_per_100km_empty": 31.0
+        },
+        "artic": {
+          "l_per_100km_empty": 23.6
+        }
+      },
+      "_driver_source": "ONS Annual Survey of Hours and Earnings 2025 (provisional, Table 14, SOC 8211 large goods vehicle drivers), as quoted in DfT Road Freight Statistics 2025 'HGV driver vacancies in the UK' (27 May 2026): median hourly pay £16.25 GROSS, which includes overtime (£16.01 excluding overtime). RHA Pay Report 2026 (members, survey Nov 2025): BASIC hourly rate medians C+E £15.05, C £14.50. Taken as £16.25 × 1.28 employer on-costs / 0.85 productive = £24.5/h, rounded to £24. The 1.28 is an ASSUMED multiplier: employer NI 15 % above £5,000 a year (about 12.7 % effective at this pay), 3 % pension on qualifying earnings and 12.07 % holiday accrual. It holds only if £16.25 is paid per hour worked with holiday on top; if the hours already include paid leave it is about 1.15. Sick pay, training and the apprenticeship levy are not in it. Sources checked 14 Oct 2026.",
+      "driver_eur_per_h": 24.0,
+      "_vehicle_standing_source": "ASSUMPTION — no public UK source for a tipper fleet's standing cost. vehicle_new_price_eur £150,000 (a 44 t artic tipper outfit or an 8-wheeler tipper at the upper end) over 7 years to a 20 % residual = £17,143/yr; insurance 3 % of price = £4,500/yr; vehicle tax and HGV levy for a 44 t artic, Euro VI: levy £619 (gov.uk V149/1) plus VED band E1, which is £1 for a lorry taxed between 1 Jul 2026 and 30 Jun 2027 (gov.uk, a temporary rate) and was £580 before (RHA Cost Tables 2026), so £620/yr now and about £1,200 at the full rate; / 1,800 operating h/yr = £12.4/h now, £12.7/h at the full rate, rounded to £13. Corrected 14 Oct 2026: the 29 Sep text said about £1,300 for VED and levy. Only the derivation is shown; the price is the number to replace.",
+      "vehicle_new_price_eur": 150000,
+      "vehicle_standing_eur_per_h": 13.0,
+      "_running_source": "ASSUMPTION — tyres, maintenance and repairs per km, EXCLUDING fuel (fuel comes from the DESNZ index). £0.12/km ≈ 19 p/mile. RHA Cost Tables 2026 (public PDF), 44 t artic: tyres 3.13 + repairs and maintenance 14.61 = 17.74 p/mile for the tractor (about £0.11/km) and 9.92 p/mile more for the trailer (about £0.06/km), so about £0.17/km for the whole outfit; £0.12/km sits between the tractor alone and the outfit. RHA's 78.21 p/mile 'total mileage costs' adds fuel at 107.87 p/litre (year to Sep 2025) and AdBlue, and is not used. Replace with the fleet's own figure.",
+      "running_eur_per_km": 0.12,
+      "_margin_source": "ASSUMPTION — a haulier's margin on top of cost. Replace with the figure the client considers fair.",
+      "margin_pct": 8.0,
+      "season": {
+        "_source": "Winter: US DOE fueleconomy.gov/feg/coldweather.shtml — cars ~15 % worse at −7 °C in city driving; HGVs at road speed with warm engines suffer less, so +8 % Nov–Mar is an assumption inside a sourced range. Thaw: none — Great Britain has no spring axle-load season.",
+        "winter_months": [
+          11,
+          12,
+          1,
+          2,
+          3
+        ],
+        "winter_consumption_uplift_pct": 8.0,
+        "thaw_months": []
+      },
+      "_sanity_source": "IRU web page 'How much does goods transport cost per kilometre in 2025?': EUR 0.50–2.00 per km on average, with no method, source or scope given; a loose check on the model's output, not a benchmark and not an input. On the fixture trip (60 km round trip, 20 t, 1.73 h cycle) at £1.955/L the model gives £121.38 a trip = £2.02/km (14 Oct 2026; the 29 Sep text said it landed inside the band, which was wrong): just above the band's top, and the band is in EUR, so in £ it is further above. A short haul whose time is mostly loading and tipping costs more per km than an average trip; a figure far outside the band means a coefficient is wrong."
+    }
+  },
   "_routing_note": "vehicles[].routing holds HGV dimensions for HERE truck routing (weight kg, sizes cm, axle count).",
   "_materials_vehicles_note": "Which vehicles each category lists is advisory in the UI, not enforced: the Submit Forecast picker DISABLES a vehicle a category does not list (it stays visible, greyed), so every planning vehicle must be listed by at least one category or it is unselectable. The first vehicle the tenant is shown in a category's list is the Submit form's default for that material. 11 Oct 2026: the four EU type-approval entries were removed from every list. Correct any line freely.",
   "_labels_note": "labels.en per vehicle: the name the pickers show. The KEY is the canonical id and is what a forecast line stores; a label only changes what a picker shows. A missing label falls back to the key, never to an invented name. Another label language (labels.<lang>) is offered by the header's vehicle-name buttons only when a vehicle the tenant is offered carries a label in it (conversions.vehicle_labels, 'langs'). The seed's vehicles carry English only, so a new organisation is offered English alone and the header shows no buttons. Until 11 Oct 2026 the four EU type-approval entries also carried labels.eu (the EN/EU/EE toggle of 2026-09-02); a document that still carries them keeps that option for a tenant that is offered those vehicles.",

@@ -1173,6 +1173,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _cfgmod.invalidate()
     ok("W12: ...and the document put back reads the demo's bands again", r.status_code == 200
        and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [20, 50, 100])
+    # 14 Oct 2026 (HU7): the Config page reads the file's per-country fair-price sets from the same call
+    _fj = c.get("/api/config/factors", headers=PLAN).json()
+    _gbf = ((_fj.get("file") or {}).get("fair_price_by_country") or {}).get("GB") or {}
+    ok("⭐ HU7: GET /api/config/factors hands the page the file's GB fair-price set (£24/h driver, rigid 31, no thaw)",
+       _gbf.get("driver_eur_per_h") == 24.0 and _gbf["consumption"]["rigid"]["l_per_100km_empty"] == 31.0
+       and _gbf["season"]["thaw_months"] == [] and (_fj.get("file") or {}).get("fair_price", {}).get("driver_eur_per_h") == 20.0,
+       str(_gbf)[:200])
+    _bad = json.loads(json.dumps(_cfg)); _bad["fair_price_by_country"] = {"GB": dict(_gbf, driver_eur_per_h=-1)}
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _bad, "updated_by": "smoke"})
+    ok("🔴 HU7: a Config save with a negative GB driver rate in fair_price_by_country is refused (400), naming the field",
+       r.status_code == 400 and "fair_price_by_country.GB.driver_eur_per_h" in r.text, r.text[:200])
     # ------------------------------------------- 3d. the network behind the gate (12 Oct 2026, map review D18)
     # The twelve reads that needed no credential until today, read three ways: the staff COOKIE (this client, no
     # header), the planner CODE in the header with no cookie, and — at the end of this file — the MAP cookie and

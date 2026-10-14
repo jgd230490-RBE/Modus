@@ -52,6 +52,14 @@ Sources (read 2026-09-10 through the human's browser pane):
     taxes (33 % social + 0.8 % unemployment) ÷ 160 h ÷ 0.85 productive.
   * sanity band €0.50-2.00 per km all-in (IRU, Europe 2025) — a check, not an input.
 
+PER COUNTRY (14 Oct 2026, HU7)
+------------------------------
+The figures above are the Estonian set, `fair_price` in factors.json — the set for a tenant
+with no country or one the file has no set for. `fair_price_by_country` carries a set per
+country: GB today, in £ (driver from ONS ASHE via DfT, the 2026-derived rigid 31 L/100 km, no
+thaw season; the same three assumptions), the set the demo tenant was given on 29 Sep. A GB
+tenant's missing keys fall back to the GB set (params), and Config → Costing · fuel offers it.
+
 WHAT IS NOT HERE
 ----------------
 No route type: the product stores no surface or road class. The time term already
@@ -63,19 +71,30 @@ import os
 
 DEFAULTS_PATH = os.path.join(os.path.dirname(__file__), "factors.json")
 
-_FILE_CACHE = {"doc": None}
+_FILE_CACHE = {"doc": None, "by_country": None}
 
 
-def file_defaults():
-    """The `fair_price` block of factors.json — the seed, used when the live config
-    document predates the block (a config row saved before 10 Sep night)."""
+def file_defaults(country=None):
+    """The seed's coefficient set, used when the live config document predates the block (a
+    config row saved before 10 Sep night) or lacks a key: `fair_price_by_country[country]`
+    when factors.json has a set for that country (14 Oct 2026, HU7: GB), else `fair_price`
+    (the Estonian set, in EUR — every other tenant)."""
     if _FILE_CACHE["doc"] is None:
         try:
             with open(DEFAULTS_PATH, "r", encoding="utf-8") as f:
-                _FILE_CACHE["doc"] = (json.load(f).get("fair_price") or {})
+                d = json.load(f)
+            _FILE_CACHE["doc"] = d.get("fair_price") or {}
+            _FILE_CACHE["by_country"] = d.get("fair_price_by_country") or {}
         except Exception:
-            _FILE_CACHE["doc"] = {}
-    return _FILE_CACHE["doc"]
+            _FILE_CACHE["doc"], _FILE_CACHE["by_country"] = {}, {}
+    c = country.upper() if isinstance(country, str) and country else None
+    return (_FILE_CACHE["by_country"] or {}).get(c) or _FILE_CACHE["doc"]
+
+
+def tenant_country(factors):
+    """The tenant's ISO country from the factors document's tenant block, or None."""
+    c = ((factors or {}).get("tenant") or {}).get("country")
+    return c.upper() if isinstance(c, str) and c else None
 
 
 def _num(v, default=None):
@@ -88,9 +107,10 @@ def _num(v, default=None):
 def params(factors):
     """The model's coefficients from the live factors document, falling back to the file
     block key by key, so an older config row still prices. Numbers only; `_source`
-    lines are left where they are."""
+    lines are left where they are. The file block is the tenant country's set when the
+    file has one (HU7), so a GB tenant never falls back to Estonian figures."""
     live = (factors or {}).get("fair_price") or {}
-    base = file_defaults()
+    base = file_defaults(tenant_country(factors))
     out = {}
     for k in set(base) | set(live):
         if k.startswith("_"):
