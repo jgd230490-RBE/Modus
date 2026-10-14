@@ -841,6 +841,38 @@ with TestClient(main.app, base_url="https://testserver") as c:
        f"{r.status_code} {r.headers.get('content-type')} {r.content[:60]!r}")
     pdf_bytes = r.content
 
+    # ---- 14 Oct 2026 (D9, the mobile shell): the Day sheet, one weekday of the open week as a one-page PDF -------------
+    from portable import pdf_text as _pt
+    _cw = la.get("commit_week") or {}
+    _wds = [d["day_date"] for d in ((la.get("commit") or {}).get("lines") or [{}])[0].get("days", [])
+            if __import__("datetime").date.fromisoformat(d["day_date"]).weekday() <= 4]
+    _day = _wds[0] if _wds else _cw.get("from")
+    r = c.get("/api/forecast-weeks/day-sheet", params={"day": _day})
+    ok("🔴 DAY SHEET: without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/forecast-weeks/day-sheet", params={"day": _day}, headers=PLAN)
+    _dst = " ".join(_pt(r.content).split()) if r.status_code == 200 else ""
+    ok("⭐ DAY SHEET: the planner downloads one A4 portrait page (real reportlab), named after the day",
+       r.status_code == 200 and r.headers.get("content-type") == "application/pdf" and r.content[:5] == b"%PDF-"
+       and r.content.count(b"/Type /Page\n") == 1 and f'filename="day-sheet-{_day}.pdf"' in r.headers.get("content-disposition", "")
+       and b"/MediaBox [ 0 0 595." in r.content and "day sheet" in _dst and "not a delivery note" in _dst,
+       f"{r.status_code} pages={r.content.count(b'/Type /Page\n')} mb={r.content[r.content.find(b'/MediaBox'):r.content.find(b'/MediaBox')+40]!r} {_dst[-400:]}")
+    ok("...with the demo notice, team NAMES and no team id; NOT ROUTED counted, never the server's 'baked' working note",
+       "DEMO" in _dst and "Fictional demo scheme" in _dst and not re.search(r"\bIPT ?[1-6]\b", _dst)
+       and "NOT ROUTED on" in _dst and not re.search(r"\b(un)?baked?\b", _dst, re.I)
+       and any(t in _dst for t in ("North Team", "Central Team", "South Team")), _dst[:300])
+    r = c.get("/api/forecast-weeks/day-sheet", params={"day": _day}, headers=NORTH)
+    _dsn = " ".join(_pt(r.content).split()) if r.status_code == 200 else ""
+    ok("⭐ DAY SHEET: a team code gets ITS lines only (the page's own scope)",
+       r.status_code == 200 and ("North Team" in _dsn or "Nothing is planned on this day" in _dsn)
+       and "Central Team" not in _dsn and "South Team" not in _dsn, _dsn[:300])
+    _sat = (__import__("datetime").date.fromisoformat(_cw["from"]) + __import__("datetime").timedelta(days=5)).isoformat() if _cw.get("from") else "2000-01-01"
+    r1 = c.get("/api/forecast-weeks/day-sheet", params={"day": _sat}, headers=PLAN)
+    r2 = c.get("/api/forecast-weeks/day-sheet", params={"day": "2000-01-03"}, headers=PLAN)
+    r3 = c.get("/api/forecast-weeks/day-sheet", params={"day": "not-a-day"}, headers=PLAN)
+    ok("🔴 DAY SHEET: a weekend, a day outside the week and a non-date are each a 400 with the reason",
+       r1.status_code == 400 and r2.status_code == 400 and r3.status_code == 400 and "not a weekday of the week" in r1.text
+       and "YYYY-MM-DD" in r3.text, f"{r1.status_code} {r2.status_code} {r3.status_code} {r1.text[:120]}")
+
     try:
         import io
         import openpyxl

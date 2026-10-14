@@ -2819,8 +2819,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("PHONE CSS: tokens only (every look and accent follows), the active tab in the accent's control colour, the 14 px floor kept (13 px only for the tab words and notes)",
      _css.length > 3000 && !/#[0-9A-Fa-f]{3,6}\b/.test(_css) && /\.phone-tab\.is-on\{color:var\(--action\);/.test(_css)
      && /\.phone-tab\.is-on::before\{[^}]*background:var\(--action\);\}/.test(_css) && !/font(-size)?:[^;]*\b(9|10|11|12)px/.test(_css));
-  ok("PHONE CSS: the page header's actions wrap under the title below 768 px (no sideways page on a phone)",
-     /@media \(max-width:767px\)\{ \.ph-actions-box\{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;\} \}/.test(_css)
+  ok("PHONE CSS: the page header's actions wrap under the title (a phone, and 768–1023 px beside the open rail), the Look-ahead's flags wrap in their chips",
+     /\n  \.ph-actions-box\{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;\}/.test(_css)
+     && /\[data-guide="lookahead-flags"\] \.chip-st\{white-space:normal;/.test(_css)
+     && /\.chart-box>canvas\{max-width:100%;\}/.test(_css)
      && src.includes('{actions && <div className="flex items-center gap-2 shrink-0 ph-actions-box">{actions}</div>}'));
   ok("PHONE: the sheet stops at the tab bar, so More still shuts it; the bar keeps clear of a phone's home indicator",
      /\.phone-more\{position:absolute;left:0;right:0;bottom:calc\(57px \+ env\(safe-area-inset-bottom,0px\)\);/.test(_css)

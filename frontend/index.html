@@ -624,8 +624,19 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ph-more{width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--action);font:600 15px Inter,system-ui,sans-serif;cursor:pointer;}
   .ph-actions{display:flex;gap:10px;margin-top:12px;}
   .ph-actions>*{flex:1;min-height:48px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;}
-  /* the shared page header lets its actions wrap under the title on a phone instead of pushing the page sideways */
-  @media (max-width:767px){ .ph-actions-box{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;} }
+  /* the shared page header lets its actions wrap under the title instead of pushing the page sideways: on a phone, and
+     at 768–1023 px where the open rail leaves the page ~544 px (the browser matrix found the Dashboard 341 px and the Data
+     pages 413 px too wide there, on main as well) */
+  .ph-actions-box{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;}
+  /* the Look-ahead's flag line: a long flag wraps inside its own chip (it ran 300 px off a 768 px screen) */
+  [data-guide="lookahead-flags"] .chip-st{white-space:normal;align-items:flex-start;min-width:0;}
+  /* a chart not built yet (it is built once its box has a size) is the browser's 300 px canvas: keep it inside its box
+     (at 1024 px the Top routes box is 257 px and the page scrolled 6 px sideways until the chart was built) */
+  .chart-box>canvas{max-width:100%;}
+  /* ...and a header menu (More filters, Monthly bulletin) opens across the box under its button, not off the left edge */
+  @media (max-width:767px){ .ph-actions-box{position:relative;} .ph-actions-box .row-menu{position:static;} .ph-actions-box .row-menu-list{left:0;right:0;top:auto;min-width:0;margin-top:4px;white-space:normal;} }
+  /* the header on a narrow phone (360 px): less side padding, so Sign out stays on one line */
+  @media (max-width:399px){ .brand-bar>div{padding-left:12px;padding-right:12px;} .brand-bar .hdr-btn{white-space:nowrap;padding-left:12px;padding-right:12px;} }
   /* PHONE-SHELL-END */
   .kpi-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   /* Dashboard big-screen mode (11 Sep): larger labels; the figures scale with clamp() */

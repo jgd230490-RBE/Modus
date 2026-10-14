@@ -1401,6 +1401,91 @@ try:
 finally:
     db.query, db.execute = _orig_q, _orig_x
 
+# ---- 14 Oct 2026 (D9, the mobile shell): the Day sheet — one weekday of the open week on one A4 portrait page ----
+# The phone's Look-ahead button (mockup 10). Built from the same page read: the rows are the lines with something
+# planned that day, the server's own derived figures, heaviest first, team NAMES, the most serious flag first.
+_as("planner123")
+_pgd = lookahead.page(bucket="commit")
+_wdays = [d["day_date"] for d in _pgd["commit"]["lines"][0]["days"] if datetime.date.fromisoformat(d["day_date"]).weekday() <= 4]
+_dday = _wdays[2]
+_drows = export.day_sheet_rows(_pgd, _dday)
+_exp = [(l, d) for l in _pgd["commit"]["lines"] for d in l["days"]
+        if d["day_date"] == _dday and ((d.get("planned_qty") or 0) > 0 or ((d.get("derived") or {}).get("trips") or 0) > 0)]
+ok("⭐ DAY SHEET: one row per line with something planned that day, each with the server's own tonnes, loads and lorries",
+   len(_drows) == len(_exp) == 3
+   and sorted((r["route_id"], r["tonnes"], r["loads"]) for r in _drows)
+       == sorted((l["route_id"], (d.get("derived") or {}).get("tonnes"), (d.get("derived") or {}).get("trips") or 0) for l, d in _exp)
+   and all(r["lorries"] is None for r in _drows if not r["routed"]),
+   str([(r["route_id"], r["tonnes"], r["loads"], r["lorries"]) for r in _drows]))
+ok("DAY SHEET: heaviest first; places, never only an id; the team's NAME, never IPTn",
+   all((a["tonnes"] or 0) >= (b["tonnes"] or 0) for a, b in zip(_drows, _drows[1:]))
+   and all(r["origin"] != r["route_id"] and r["dest"] != r["route_id"] for r in _drows)
+   and not any(re.search(r"\bIPT ?\d\b", " ".join([r["team"]] + r["flag_texts"])) for r in _drows),
+   str([(r["route_id"], r["team"], r["origin"]) for r in _drows]))
+_rank = export.DAY_FLAG_RANK
+_byk = {}
+for _f in _pgd["clashes"]["flags"]:
+    _byk.setdefault(export._line_key(_f), []).append(_f)
+_firsts = [(r, sorted(_byk.get(r["key"], []), key=lambda x: _rank.index(x["code"]) if x["code"] in _rank else 99)) for r in _drows]
+ok("DAY SHEET: each row's flag is its line's most serious (the Look-ahead's order: a road limit first), +N other kinds",
+   any(r["flag"] for r in _drows)
+   and all((r["flag"] is None) == (not fl) and (not fl or r["flag"] == export._day_flag_word(fl[0])) for r, fl in _firsts)
+   and _rank[0] == "LIMIT" and export.DAY_FLAG_WORD["UNBAKED"] == "NOT ROUTED",
+   str([(r["route_id"], r["flag"], [x["code"] for x in fl]) for r, fl in _firsts]))
+_dtot = export.day_sheet_totals(_drows)
+ok("DAY SHEET: the totals are the rows' sums (lorries only over routed lines, none when no line is routed)",
+   _dtot["lines"] == 3 and abs(_dtot["tonnes"] - sum(r["tonnes"] or 0 for r in _drows)) < 1e-9
+   and _dtot["loads"] == sum(r["loads"] for r in _drows)
+   and _dtot["lorries"] == (sum(r["lorries"] or 0 for r in _drows if r["routed"]) if any(r["routed"] for r in _drows) else None)
+   and _dtot["confirmed"] is False)
+_dpb = export.build_day_sheet_pdf(_pgd, _dday)
+_dtxt = pdf_text(_dpb)
+_dd = datetime.date.fromisoformat(_dday)
+ok("⭐ DAY SHEET PDF: A4 PORTRAIT, ONE page, the day in words, the draft stamp, 'not a delivery note'",
+   _dpb[:5] == b"%PDF-" and re.search(r"/MediaBox \[ 0 0 595\.\d+ 841\.\d+ \]", _dpb.decode("latin-1")) is not None
+   and _dpb.count(b"/Type /Page\n") == 1 and f"{_dd:%A} {_dd.day} {_dd:%B %Y}" in _dtxt and "day sheet" in _dtxt
+   and "DRAFT - not confirmed" in _dtxt and "not a delivery note" in _dtxt and "page 1" in _dtxt, _dtxt[:300])
+ok("DAY SHEET PDF: the columns and the totals row as the page shows them; the flags spelt out under a count per kind",
+   all(k in _dtxt for k in ("FROM / TO", "MATERIAL / VEHICLE", "TONNES", "LOADS", "LORRIES", "FLAG")) and "Total · 3 lines" in _dtxt
+   and "Flags (a flag, never a stop)" in _dtxt and re.search(r"on \d+ lines?", _dtxt) is not None
+   and "each a two-way movement" in _dtxt and "Loads are loaded trips" in _dtxt)
+ok("🔴 DAY SHEET PDF: no team id, no 'truck', no 'baked' (the words a person reads)",
+   not re.search(r"\bIPT ?\d\b", _dtxt) and not re.search(r"\btrucks?\b", _dtxt, re.I) and not re.search(r"\b(un)?baked?\b", _dtxt, re.I))
+import export as _exm
+_ds_src = open(_exm.__file__, encoding="utf-8").read()
+ok("DAY SHEET PDF: the FLAG column keeps at least 25 mm with or without the PLAN column (it was squeezed to 6 mm on a typed day)",
+   "([48 * mm, 22 * mm, 34 * mm, 15 * mm] if plan_col else [55 * mm, 22 * mm, 37 * mm]) + [14 * mm, 12 * mm, 14 * mm]" in _ds_src
+   and 186 - (48 + 22 + 34 + 15 + 14 + 12 + 14) >= 25 and 186 - (55 + 22 + 37 + 14 + 12 + 14) >= 25)
+ok("DAY SHEET PDF: a PLAN column only when a line is planned in another unit than tonnes (or typed by hand)",
+   ("PLAN" in _dtxt.split("FROM / TO")[1][:120]) == any(r["unit"] not in ("t", "") or r["typed"] for r in _drows))
+_real_notice = export._demo_notice
+export._demo_notice = lambda: "Fictional demo scheme · nothing here is real"
+try:
+    _dtxt2 = pdf_text(export.build_day_sheet_pdf(_pgd, _dday))
+finally:
+    export._demo_notice = _real_notice
+ok("⭐ DAY SHEET PDF: on a demo tenant the notice is on the page (the demo bar: DEMO and the tenant's words)",
+   "DEMO" in _dtxt2 and "Fictional demo scheme" in _dtxt2)
+_sat = [d["day_date"] for d in _pgd["commit"]["lines"][0]["days"] if datetime.date.fromisoformat(d["day_date"]).weekday() == 5]
+ok("DAY SHEET PDF: a day with nothing planned says so instead of an empty table",
+   bool(_sat) and export.day_sheet_rows(_pgd, _sat[0]) == [] and "Nothing is planned on this day" in pdf_text(export.build_day_sheet_pdf(_pgd, _sat[0])))
+_bigd = _copy.deepcopy(_pgd)
+_bigd["commit"]["lines"] = [_copy.deepcopy(_pgd["commit"]["lines"][i % 3]) for i in range(60)]
+_bpb = export.build_day_sheet_pdf(_bigd, _dday)
+_bnp = _bpb.count(b"/Type /Page\n")
+ok("DAY SHEET PDF: sixty lines run on to more pages with the header row repeated on each page that has rows",
+   _bnp >= 2 and _bnp - 1 <= pdf_text(_bpb).count("FROM / TO") <= _bnp and "Total · 60 lines" in pdf_text(_bpb),
+   f"{_bnp} pages, {pdf_text(_bpb).count('FROM / TO')} headers")
+# the endpoint: any staff code, the page's own scope, a weekday of the open week only
+_mn = open(os.path.join(HERE, "..", "main.py"), encoding="utf-8").read()
+_ep = _mn[_mn.index('@app.get("/api/forecast-weeks/day-sheet")'):_mn.index('@app.put("/api/forecast-days")')]
+ok("DAY SHEET endpoint: GET, any staff code (_require_access), the page's own read and scope, the stored restriction check",
+   "acc = _require_access()" in _ep and 'lookahead.page(bucket=("next" if bucket == "next" else "commit"), route_id=route_id, acc=acc,' in _ep
+   and "with_restrictions=True" in _ep and "export.build_day_sheet_pdf(pg, day)" in _ep)
+ok("DAY SHEET endpoint: 400 for a day outside the week or a weekend; a download named after the day",
+   'if not (cw.get("from") and cw.get("to") and cw["from"] <= day <= cw["to"]) or d.weekday() > 4:' in _ep
+   and "raise HTTPException(400" in _ep and "filename=\"day-sheet-{day}.pdf\"" in _ep)
+
 # ---- the pool: psycopg2 is absent here, so the proxy and the retry are exercised on stand-ins
 class _FakeConn:
     def __init__(self, tx=0, closed=False, fail_first=False):

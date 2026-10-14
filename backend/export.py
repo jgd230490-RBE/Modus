@@ -907,7 +907,7 @@ def day_sheet_rows(page, day):
         flags = sorted(by_line.get(_line_key(l), []),
                        key=lambda x: DAY_FLAG_RANK.index(x.get("code")) if x.get("code") in DAY_FLAG_RANK else 99)
         out.append({
-            "route_id": l.get("route_id"),
+            "key": _line_key(l), "route_id": l.get("route_id"),
             "origin": c.get("origin_name") or c.get("origin_id") or "—",
             "dest": c.get("dest_name") or c.get("dest_id") or "—",
             "team": name(c.get("ipt")) or "No team", "section": c.get("section_id") or "",
@@ -1013,7 +1013,8 @@ def build_day_sheet_pdf(page, day):
         data.append([P(f"<b>Total</b> · {tot['lines']} line{'' if tot['lines'] == 1 else 's'}"), "", ""]
                     + ([""] if plan_col else [])
                     + [P(f"<b>{_n(tot['tonnes'])}</b>", st_r), P(f"<b>{_n(tot['loads'])}</b>", st_r), P(f"<b>{lor}</b>", st_r), ""])
-        widths = [64 * mm, 24 * mm, 36 * mm] + ([16 * mm] if plan_col else []) + [14 * mm, 12 * mm, 14 * mm]
+        # FLAG keeps at least ~27 mm ("ROAD LIMIT +1" on one line): the places and the material give way to PLAN
+        widths = ([48 * mm, 22 * mm, 34 * mm, 15 * mm] if plan_col else [55 * mm, 22 * mm, 37 * mm]) + [14 * mm, 12 * mm, 14 * mm]
         widths.append(usable - sum(widths))
         t = LongTable(data, colWidths=widths, repeatRows=1)
         t.setStyle(TableStyle([
@@ -1021,7 +1022,7 @@ def build_day_sheet_pdf(page, day):
             ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.Color(*NAVY_RGB)),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LINEBELOW", (0, 1), (-1, -2), 0.4, colors.Color(0.85, 0.87, 0.9)),
-            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
             ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
             ("BACKGROUND", (0, -1), (-1, -1), colors.Color(*BAND)),
             ("LINEABOVE", (0, -1), (-1, -1), 0.8, colors.Color(*NAVY_RGB)),
@@ -1031,10 +1032,12 @@ def build_day_sheet_pdf(page, day):
         story.append(P("Nothing is planned on this day: no approved line has a quantity or a load on it.", st_grey))
     story.append(Spacer(1, 4 * mm))
 
+    # NOT ROUTED is counted, not spelt out: its sentence is the server's working note, and the LORRIES column already
+    # shows "—" for those lines
     texts = []
     for r in rows:
         for x in r["flag_texts"]:
-            if x not in texts:
+            if x not in texts and not x.startswith(DAY_FLAG_WORD["UNBAKED"] + ":"):
                 texts.append(x)
     # one count per kind of flag (lines carrying it), then the first sentences: a busy day keeps to one page
     kinds = {}
@@ -1049,15 +1052,13 @@ def build_day_sheet_pdf(page, day):
     if len(texts) > DAY_FLAGS_SHOWN:
         fl.append(P(f"+{len(texts) - DAY_FLAGS_SHOWN} more: every flag is in the Look-ahead and its week sheet", st_grey))
     story.append(KeepTogether(fl))
-    story.append(Spacer(1, 3 * mm))
+    story.append(Spacer(1, 2 * mm))
 
-    ft = [P("Loads are loaded trips: each is one delivery and one two-way movement. Lorries are the vehicles the "
-            "day needs from each route's worked-out cycle; a line whose route is not worked out yet shows none. "
-            "† = a day typed by hand. Figures are planning figures, not plated weights.", st_grey),
-          P("Road restrictions are the road authority's stored check as of its own date, not re-read for this sheet.", st_grey),
-          P(("This week is confirmed. " if tot["confirmed"] else "This week is not confirmed yet: the plan can still change. ")
-            + "Made from the Look-ahead on " + datetime.date.today().isoformat() + ".", st_grey)]
-    story.append(KeepTogether(ft))
+    story.append(P("Loads are loaded trips: each is one delivery and one two-way movement. Lorries are the vehicles the day "
+                   "needs from each route's worked-out cycle (none where the route is not worked out yet). † = typed by hand. "
+                   "Planning figures, not plated weights. Road restrictions are the stored check, not re-read for this sheet. "
+                   + ("This week is confirmed. " if tot["confirmed"] else "This week is not confirmed yet: the plan can still change. ")
+                   + "Made from the Look-ahead on " + datetime.date.today().isoformat() + ".", st_grey))
     doc.build(story)
     return buf.getvalue()
 

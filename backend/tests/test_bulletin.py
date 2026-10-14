@@ -2004,10 +2004,11 @@ ok("🔴 the gate calls /bulletin/leaflet/ 'bulletin' (staff only); both endpoin
    and "export.build_bulletin_leaflet_pdf(sheet)" in _MS and "bulletin_doc.leaflet_html(bulletin_doc.sheet(" in _MS)
 
 # the frame, shared
-ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary and the bulletin",
-   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 3 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
+# NARROWED 14 Oct 2026 (D9): the Day sheet is a FOURTH caller of the same frame (it reuses it; it draws no frame of its own)
+ok("⭐ ONE page frame: export.py draws its frame in page_frame() alone, called by the week sheet, the carbon summary, the bulletin and the Day sheet",
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 4 and _EXP.count("c.line(lm, rule_y, W - rm, rule_y)") == 1
    and _EXP.count("BaseDocTemplate(buf") == 1 and "def page_frame(" in _EXP and "def frame_doc(" in _EXP
-   and _EXP.count("doc = frame_doc(") == 3)
+   and _EXP.count("doc = frame_doc(") == 4 and _EXP[_EXP.index("def build_day_sheet_pdf("):].count("on_page = page_frame(") >= 1)
 ok("…the bulletin's frame carries the demo notice on every page and the plan-only foot",
    # NARROWED 13 Oct 2026 (D45): the notice is passed in the demo red; page_frame draws it as the demo bar
    # NARROWED 13 Oct 2026 (W15): in Inter, under the brand band, with wayscope.co.uk in the foot; one call for both PDFs
@@ -2173,8 +2174,9 @@ ok("🔴 tables: a pale head band (#F1F5F9) in ink with a rule under it, hairlin
    'HEAD_TINT = colors.HexColor("#F1F5F9")' in _EXP and '("LINEBELOW", (0, 0), (-1, 0), 0.9, colors.Color(*NAVY_RGB))' in _EXP
    and 'self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=7.5, leading=9.5, textColor=colors.Color(*NAVY_RGB))' in _EXP
    and "th{{font-size:14px;font-weight:700;background:var(--head);border-bottom:2px solid var(--ink)}}" in read("backend/bulletin_doc.py"))
-ok("🔴 ONE page frame still: one on_page, the running head and the page total are page_frame's options, the three callers unchanged",
-   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 3 and _EXP.count("doc = frame_doc(") == 3
+# NARROWED 14 Oct 2026 (D9): four callers (+ the Day sheet)
+ok("🔴 ONE page frame still: one on_page, the running head and the page total are page_frame's options, the four callers unchanged",
+   _EXP.count("def on_page(") == 1 and _EXP.count("= page_frame(") == 4 and _EXP.count("doc = frame_doc(") == 4
    and 'later = doc.page > 1 and band.get("running")' in _EXP and "autoNextPageTemplate=\"later\"" in _EXP)
 ok("🔴 the report-a-lorry strip is on page 1 (all three lines) and not repeated at the end; the page keeps one at the foot too",
    "Working hours:" in _PB[0] and "Working hours:" not in _PB[3] and HTML10B.count('<div class="report">') == 2)
