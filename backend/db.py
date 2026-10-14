@@ -811,7 +811,12 @@ def init_lookahead_db():
                                 ("routes", "limits_status", "TEXT"),
                                 ("forecast_weeks", "actual_cost_eur", "REAL"),
                                 ("forecast_weeks", "calibrated_at", "TEXT"),
-                                ("forecast_weeks", "calibrated_qty", "REAL")):
+                                ("forecast_weeks", "calibrated_qty", "REAL"),
+                                # 14 Oct 2026 (bundle G): the site's CLP cap and each gate's open hours
+                                ("locations", "clp_cap_per_day", "REAL"),
+                                ("location_gates", "open_from", "TEXT"),
+                                ("location_gates", "open_to", "TEXT"),
+                                ("location_gates", "open_days", "TEXT")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -982,6 +987,10 @@ _TENANT_DDL = {
             capacity_qty       REAL,
             capacity_unit      TEXT,
             opening_qty        REAL,
+            -- 14 Oct 2026 (bundle G, W8): the site's CLP cap, LORRY VISITS a day agreed in the
+            -- Construction Logistics Plan (one visit = one lorry in and out). NULL = none typed,
+            -- never compared. ALTERed in init_lookahead_db() as well, or the rebuild drops it.
+            clp_cap_per_day    REAL,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -1225,6 +1234,13 @@ _TENANT_DDL = {
             note                    TEXT,
             created_at              TEXT,
             updated_at              TEXT,
+            -- 14 Oct 2026 (bundle G, W17): when the gate is open, for its capacity (open minutes ÷
+            -- safety_minutes). open_from / open_to 'HH:MM'; open_days seven '1'/'0' flags Monday
+            -- first ('1111100' = weekdays). NULL = the scheme's shift, every day. ALTERed in
+            -- init_lookahead_db() as well, or the SQLite rebuild drops them.
+            open_from               TEXT,
+            open_to                 TEXT,
+            open_days               TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,

@@ -547,9 +547,11 @@ if (loaded) {
       ok("⭐ GATE ARRIVALS: three gates, one red, one untyped, one holding, each a row with its data attribute",
         GA.gates.length === 3 && red.length === 1 && untyped.length === 1 && GA.gates.every(g => gP.includes(`data-ga-gate="${g.gate_id}"`) && gP.includes(`data-ga-flag="${g.flag || "none"}"`))
         && gOut.includes('data-gate-arrivals="set"') && gP.includes('>Gate arrivals<button type="button" class="ibtn" aria-label="About: Gate arrivals"'));   // 13 Oct 2026 (W3, narrowed): + its info box
-      ok("🔴 the red gate reads 'Queue likely' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
+      // NARROWED 14 Oct 2026 (bundle G, W17): the red word is now "Over gate capacity" ("Queue likely" is the amber 85 % step,
+      // which this fixture month does not reach — no chip says it)
+      ok("🔴 the red gate reads 'Over gate capacity' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
         // 13 Oct 2026 (W6, narrowed): the chip is RowStatus; red is its "bad" tone, once
-        (gP.match(/>Queue likely</g) || []).length === 1 && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
+        (gP.match(/>Over gate capacity</g) || []).length === 1 && !/>Queue likely</.test(gP) && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
         && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gP.match(/data-row-status="bad"/g) || []).length === 1
         && (gP.match(/data-row-status="none"/g) || []).length === 2 && !gP.includes('data-row-status="ok"'));
       ok("⭐ every figure is the server's, formatted to 1 dp, with the gap in the contract's words; the check-in is a word, never a bare 0",

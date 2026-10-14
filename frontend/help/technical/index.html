@@ -139,6 +139,14 @@ all teams summed at the gate a lorry arrives by: laden at the destination's entr
 origin's. Arrivals a day = trips ÷ working days. The gap is the shift's minutes ÷ arrivals, an average with no hourly
 peak. Red only when that gap is shorter than the gate's typed check-in; a gate with no check-in typed is never
 compared. A team code gets the totals and the team names, never another team's figure.</p>
+<p>Since 14 Oct 2026 (<code>backend/gate_hours.py</code>, the one rule for every screen and export): a gate's <strong>open
+minutes</strong> are its typed open hours (a window that ends before it starts runs past midnight) less the scheme's
+no-delivery peak bands (<code>planning.peak_bands</code>, Config → Planning) inside them; a gate with no hours typed uses
+the shift's minutes, and the peak bands cannot be taken off it (the shift has no clock times). Capacity a day = open
+minutes ÷ check-in minutes a lorry; the gap uses the same open minutes. Two steps: <strong>Queue likely</strong> (amber)
+at 85 % of capacity or more (<code>NEAR_PCT</code>), <strong>Over gate capacity</strong> (red) past it — the red rule
+above, renamed on screen. Open days (seven flags, Monday first) are tested on the Look-ahead's dated days only: a month
+figure is a working-day average. The reply carries <code>near_per_day</code> (85 % of capacity) for the chart's guide tick.</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
 <pre>balance at the week's end = opening + typed week actuals delivered there − typed consumption</pre>

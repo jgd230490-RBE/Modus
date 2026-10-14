@@ -500,9 +500,10 @@ async function gateArrivalsDom(){
   const d2 = mount(w.Dashboard, { meta: dMeta, initialData: CL });
   await settle(50);
   const redRow = d2.el.querySelector('[data-ga-flag="red"]');
-  ok("⭐ GATE DOM: the read lands: three rows, the red row's chip says Queue likely, the others Spacing holds / No check-in time typed",
+  // NARROWED 14 Oct 2026 (bundle G, W17): the red word is "Over gate capacity" now ("Queue likely" is the 85 % step)
+  ok("⭐ GATE DOM: the read lands: three rows, the red row's chip says Over gate capacity, the others Spacing holds / No check-in time typed",
      d2.el.querySelectorAll("[data-ga-gate]").length === 3 && !!d2.el.querySelector('[data-gate-arrivals="set"]')
-     && !!redRow && redRow.textContent.includes("Queue likely") && redRow.textContent.includes("East compound")
+     && !!redRow && redRow.textContent.includes("Over gate capacity") && redRow.textContent.includes("East compound")
      && d2.el.querySelectorAll('[data-ga-flag="none"]').length === 2
      && d2.el.textContent.includes("Spacing holds") && d2.el.textContent.includes("No check-in time typed")
      && d2.el.textContent.includes("one every 2.6 min if arrivals are spread evenly"));

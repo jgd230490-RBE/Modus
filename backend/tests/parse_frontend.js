@@ -2132,12 +2132,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && gac.includes("lorries a day at each gate") && gac.includes("The gate arrivals did not load.")
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?|booking|peak hour)\b/i.test(gac)
     && !/\bAI\b/.test(gac) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(gac) && !/style=\{\{ ?color/.test(gac));
-  ok("🔴 red only, and always with a word: the chip's dot is var(--red) for flag 'red' and var(--chart-none) otherwise; no amber or gold token in the block",
-    // 13 Oct 2026 (W6, narrowed): RowStatus — red ("bad") for flag red, grey ("none") otherwise; the server's reason
-    // (the old title) is the details' Status line
-    gac.includes('<RowStatus word={gaFlagWord(g)} tone={g.flag === "red" ? "bad" : "none"} />') && !/--gold|--amber|amber|"warn"|"ok"/.test(gac)
+  // REVERSED 14 Oct 2026 (bundle G, W17, the user's D42 follow-up): two steps, each always with a word — red "Over gate
+  // capacity" (the 11 Oct red rule, renamed) and amber "Queue likely" at 85 % (the gold token, RowStatus "warn"); no green tick
+  ok("🔴 always with a word: red 'Over gate capacity' ('bad'), amber 'Queue likely' ('warn', the gold token) and grey otherwise; no tick",
+    gac.includes('<RowStatus word={gaFlagWord(g)} tone={gaTone(g)} />') && !/"ok"/.test(gac)
+    && code.includes('const gaTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : "none";')
     && gac.includes('<RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>') && !gac.includes("title={g.reason}")
-    && gac.includes('g.flag === "red" ? "Queue likely"') && gac.includes('"data-ga-flag": g.flag || "none"'));
+    && code.includes('g.flag === "red" ? "Over gate capacity" : g.flag === "amber" ? "Queue likely"') && gac.includes('"data-ga-flag": g.flag || "none"'));
   ok("the browser derives nothing: no division, ceil or payload arithmetic in the block; it formats the server's fields",
     !/Math\.ceil|\/ *60|payload|\* *60|working_days *[*\/]|[*\/] *working_days/.test(gac)
     // NARROWED 11 Oct 2026 (review): `unbaked_note` was a field the server never sends; the block renders only the contract's
@@ -2172,7 +2173,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   // the rule in plain words to the panel's info box
   ok("the gate arrivals read and how the figure is made: the technical guide and the panel's info box",
     _tg.includes("<code>GET /api/gates/arrivals?month=N</code>") && _tg.includes("The gap is the shift's minutes ÷ arrivals, an average with no hourly")
-    && _tg.includes("all teams summed at the gate a lorry arrives by") && src.includes("the gap is the shift's minutes ÷ arrivals, an average with no peak hour")
+    // NARROWED 14 Oct 2026 (bundle G, W17): the info box's how-to now names the gate's open minutes and the peak bands
+    && _tg.includes("all teams summed at the gate a lorry arrives by")
+    && src.includes("Capacity = the gate's open minutes (its hours less any no-delivery peak bands, else the shift) ÷ its check-in minutes a lorry. Averages, no peak hour.")
+    && _tg.includes("<code>backend/gate_hours.py</code>") && _tg.includes("<strong>Queue likely</strong> (amber)")
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
@@ -2722,15 +2726,20 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _ga.includes('const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {') && _ga.includes("plugins: [capMarks] };")
      && (_ga.match(/grouped: false/g) || []).length === 2);
   ok("GATE CHART: 🔴 the browser draws the server's capacity and flag — it divides nothing; red only where the server's flag is red",
-     _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\" }))")
-     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60/.test(_ga) && _ga.includes("r.over ? REDg : (r.cap == null ? NONEg : C1g)"));
+     // NARROWED 14 Oct 2026 (W17): + near (the server's amber flag) in gold; the 85 % tick is the server's near_per_day
+     _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\", near: g.flag === \"amber\" }))")
+     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60|GA_NEAR *\/|\/ *100/.test(_ga) && _ga.includes("r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)")
+     && _ga.includes("x.getPixelForValue(r.g.near_per_day)"));
   ok("GATE CHART: every row says its figure in words (no hover on a TV or a print): 'N a day · P % of C', 'over capacity', 'no check-in time typed'",
-     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : "");')
-     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : "Every gate within its capacity"}'));
+     // NARROWED 14 Oct 2026 (W17): + "queue likely" on an amber row, and a headline for gates near capacity
+     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : r.near ? " · queue likely" : "");')
+     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}'));
   ok("GATE CHART: a key names the bar, the track, the marker, red and grey; the tooltip names the gate and how capacity is worked out",
-     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the shift ÷ the check-in time a lorry")
+     // NARROWED 14 Oct 2026 (W17): capacity is the gate's open hours (the shift where none are typed), and the key names the 85 % step
+     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the open hours ÷ the check-in time a lorry")
+     && _ga.includes('<i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely')
      && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
-     && _ga.includes("`capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`"));
+     && _ga.includes("`the ${ga.shift_hours} h shift`} ÷ ${+r.g.gate_minutes} min a lorry)`") && _ga.includes("`open ${r.g.open_hours}"));
 }
 
 // ---- report ------------------------------------------------------------------

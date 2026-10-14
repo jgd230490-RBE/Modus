@@ -2540,6 +2540,8 @@ class LocationIn(BaseModel):
     # was the only copy anywhere, and editable in the Locations panel since.
     vendor: Optional[str] = None
     detail: Optional[str] = None
+    # 14 Oct 2026 (bundle G, W8): the site's CLP cap, lorry visits a day; written only when sent
+    clp_cap_per_day: Optional[float] = None
 
 
 def _fields_set(model):
@@ -2571,10 +2573,16 @@ def _check_admin(token):
 @app.post("/api/admin/locations")
 def create_location(body: LocationIn, token: Optional[str] = None):
     _check_admin(token)
-    return network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
-                                   body.loc_type, supplies=body.supplies, receives=body.receives,
-                                   gate_lat=body.gate_lat, gate_lon=body.gate_lon,
-                                   vendor=body.vendor, detail=body.detail)
+    cp = network.clp_cap_problem(body.clp_cap_per_day)
+    if cp:
+        raise HTTPException(400, cp)
+    out = network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
+                                  body.loc_type, supplies=body.supplies, receives=body.receives,
+                                  gate_lat=body.gate_lat, gate_lon=body.gate_lon,
+                                  vendor=body.vendor, detail=body.detail)
+    if body.clp_cap_per_day is not None and out.get("id"):
+        network.set_clp_cap(out["id"], body.clp_cap_per_day)
+    return out
 
 
 @app.put("/api/admin/locations/{location_id}")
@@ -2584,13 +2592,22 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
     # know about gates (or an older client) would silently wipe one that was set
     gate_given = bool({"gate_lat", "gate_lon"} & set(_fields_set(body)))
     meta_given = bool({"vendor", "detail"} & set(_fields_set(body)))
-    return network.update_location(location_id, body.name, body.role, body.materials,
-                                   body.lat, body.lon, body.loc_type,
-                                   supplies=body.supplies, receives=body.receives,
-                                   gate_lat=body.gate_lat, gate_lon=body.gate_lon,
-                                   gate_given=gate_given,
-                                   vendor=body.vendor, detail=body.detail,
-                                   meta_given=meta_given)
+    # 14 Oct 2026 (W8): the CLP cap only when the client sent it, so an older client cannot blank it
+    clp_given = "clp_cap_per_day" in set(_fields_set(body))
+    if clp_given:
+        cp = network.clp_cap_problem(body.clp_cap_per_day)
+        if cp:
+            raise HTTPException(400, cp)
+    out = network.update_location(location_id, body.name, body.role, body.materials,
+                                  body.lat, body.lon, body.loc_type,
+                                  supplies=body.supplies, receives=body.receives,
+                                  gate_lat=body.gate_lat, gate_lon=body.gate_lon,
+                                  gate_given=gate_given,
+                                  vendor=body.vendor, detail=body.detail,
+                                  meta_given=meta_given)
+    if clp_given and not (isinstance(out, dict) and out.get("error")):
+        network.set_clp_cap(location_id, body.clp_cap_per_day)
+    return out
 
 
 @app.delete("/api/admin/locations/{location_id}")
@@ -2623,6 +2640,10 @@ class GateIn(BaseModel):
     active: bool = True
     note: Optional[str] = None
     gate_id: Optional[str] = None
+    # 14 Oct 2026 (bundle G, W17): when the gate is open (HH:MM, and seven on/off flags Monday first)
+    open_from: Optional[str] = None
+    open_to: Optional[str] = None
+    open_days: Optional[str] = None
 
 
 class GatePatch(BaseModel):
@@ -2635,6 +2656,9 @@ class GatePatch(BaseModel):
     is_default: Optional[bool] = None
     active: Optional[bool] = None
     note: Optional[str] = None
+    open_from: Optional[str] = None
+    open_to: Optional[str] = None
+    open_days: Optional[str] = None
 
 
 class RouteGatesIn(BaseModel):
@@ -2677,7 +2701,8 @@ def create_gate(body: GateIn, token: Optional[str] = None):
                              safety_minutes=body.safety_minutes,
                              internal_travel_minutes=body.internal_travel_minutes,
                              is_default=body.is_default, active=body.active,
-                             note=body.note, gate_id=body.gate_id)
+                             note=body.note, gate_id=body.gate_id,
+                             open_from=body.open_from, open_to=body.open_to, open_days=body.open_days)
 
 
 @app.patch("/api/admin/gates/{gate_id}")

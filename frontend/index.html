@@ -482,6 +482,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ga-key-cap{width:3px;height:14px;background:var(--ink);margin-left:0 !important;}
   .ga-key-track{width:18px;height:12px;border-radius:2px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
   .ga-key-red{width:16px;height:10px;border-radius:2px;background:var(--red);}
+  .ga-key-gold{width:16px;height:10px;border-radius:2px;background:var(--gold);}
   .ga-key-none{width:16px;height:10px;border-radius:2px;background:var(--chart-none);}
   .ga-more{margin-top:8px;}
   .ga-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:6px 0;}
@@ -774,8 +775,8 @@ const INFO = {
   "dash.tkm": { title: "Tonne-distance", text: "Tonnes × the route's distance, on routed lines: the usual measure of freight work.", tech: "t1-carbon" },
   "dash.peak_month": { title: "Peak month", text: "The month with the most planned tonnes in view." },
   "dash.target": { title: "Carbon target", text: "The scheme's carbon target and where the approved plan stands against it, with and without the agreed Carbon planner decisions. This figure is all-in: materials and transport.", guide: "6-5-reading-the-carbon-target", tech: "t1-carbon" },
-  "dash.gates": { title: "Gate arrivals", text: "Lorries a day at each gate in the month, every team together, and the average gap between them. Red when the gap is shorter than the gate's check-in time.",
-    how: "Each lorry counts at the gate it arrives by: loaded at the delivery site, empty at the loading site. Trips ÷ working days; the gap is the shift's minutes ÷ arrivals, an average with no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
+  "dash.gates": { title: "Gate arrivals", text: "Lorries a day at each gate in the month, every team together, against what the gate can check in. Amber, Queue likely, from 85 % of that; red, Over gate capacity, past it.",
+    how: "Each lorry counts at the gate it arrives by: loaded at the delivery site, empty at the loading site. Trips ÷ working days. Capacity = the gate's open minutes (its hours less any no-delivery peak bands, else the shift) ÷ its check-in minutes a lorry. Averages, no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
   "dash.today": { title: "Today", text: "What the Look-ahead plans for today. Each line says reported (an actual is typed), confirmed, edited (not yet confirmed) or planned (follows the week, not yet confirmed).", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_t": { title: "Tonnes today", text: "Each line's planned quantity for today, in tonnes, from the Look-ahead's commit week.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_trips": { title: "Trips today", text: "Loaded trips today: tonnes ÷ payload, rounded up for each line, and the lorry distance on lines with a route.", tech: "t1-trips" },
@@ -1223,9 +1224,26 @@ const gaMonthToday = (months) => {
   return Math.max(1, Math.min(n, (d.getFullYear() - sy) * 12 + d.getMonth() + 1));
 };
 const GA_SPREAD = "if arrivals are spread evenly";
+const GA_NEAR = 85;      // 14 Oct 2026 (W17): held equal to backend gate_hours.NEAR_PCT by parse_frontend
+// 14 Oct 2026 (bundle G, W8): held equal to backend config.EURO_CLASSES and gate_hours.MAX_PEAK_BANDS /
+// PEAK_PLACEHOLDER by parse_frontend
+const EURO_CLASSES = ["Euro IV", "Euro V", "Euro VI", "Zero emission"];
+const PEAK_BANDS_MAX = 4;
+const PEAK_BANDS_PLACEHOLDER = [{ from: "07:00", to: "10:00" }, { from: "16:00", to: "19:00" }];
+// 14 Oct 2026 (bundle G, W17): a gate's open days, seven flags Monday first ("" or null = every day)
+const GATE_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const gateDaysWords = (flags) => {
+  if(!flags || flags.length !== 7 || flags === "1111111") return "";
+  if(flags === "1111100") return "Mon–Fri";
+  if(flags === "1111110") return "Mon–Sat";
+  return GATE_DAYS.filter((d, i) => flags[i] === "1").join(", ");
+};
 // the chip's word, in the server's order of reasons: red; nothing approved yet (a gate listed for its pending
 // lines only: gap null); no check-in typed (nothing compared); otherwise the average holds
-const gaFlagWord = (g) => g.flag === "red" ? "Queue likely" : (g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds"));
+// 14 Oct 2026 (bundle G, W17): two steps, decided on the server (gate_hours.py) — red "Over gate capacity" (more than it can
+// check in; the 11 Oct red rule, renamed) and amber "Queue likely" (85 % of capacity or more)
+const gaFlagWord = (g) => g.flag === "red" ? "Over gate capacity" : g.flag === "amber" ? "Queue likely" : (g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds"));
+const gaTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : "none";
 const gaMin = (m) => m == null ? "—" : `${(+m).toFixed(1)} min`;
 // 14 Oct 2026 (the user: "gate arrivals should be a chart, measuring arrivals against capacity"): a gate's CAPACITY is
 // the most lorries it can check in a day if they arrive evenly = the shift's minutes ÷ the check-in minutes a lorry.
@@ -1243,11 +1261,12 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
   const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
   // the chart: one row a gate, the fullest first (by share of capacity; gates with none after, busiest first)
   const rowsC = gates.filter(g => g.arrivals_per_day != null && g.arrivals_per_day > 0)
-    .map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === "red" }))
+    .map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === "red", near: g.flag === "amber" }))
     .sort((a, b) => ((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day));
-  const nOverG = rowsC.filter(r => r.over).length;
+  const nOverG = rowsC.filter(r => r.over).length, nNearG = rowsC.filter(r => r.near).length;
+  const anyGateHours = gates.some(g => g.open_basis === "gate");
   const gaFs = 11;
-  const C1g = tok("--chart-1", "#E8590C"), REDg = tok("--red", "#DC2626"), NONEg = tok("--chart-none", "#A8A29E"), INKg = tok("--ink", "#1E293B");
+  const C1g = tok("--chart-1", "#E8590C"), REDg = tok("--red", "#DC2626"), NONEg = tok("--chart-none", "#A8A29E"), INKg = tok("--ink", "#1E293B"), GOLDg = tok("--gold", "#D97706");
   const xTop = Math.max(1, ...rowsC.map(r => Math.max(r.g.arrivals_per_day, r.cap || 0)));
   const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {
     const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx, A = chart.chartArea; if(!x || !A) return;   // 1 = the arrivals
@@ -1256,13 +1275,17 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
       const half = (el.height || 16) / 2 + 5;
       let right = el.x;
       if(r.cap){
+        // 14 Oct 2026 (W17): a short dashed tick at 85 % of capacity, the "Queue likely" step
+        const pg = x.getPixelForValue(r.g.near_per_day);
+        ctx.save(); ctx.strokeStyle = GOLDg; ctx.lineWidth = 1.5; ctx.setLineDash([3, 2]);
+        ctx.beginPath(); ctx.moveTo(pg, el.y - half + 2); ctx.lineTo(pg, el.y + half - 2); ctx.stroke(); ctx.restore();
         const px = x.getPixelForValue(r.cap); right = Math.max(right, px);
         ctx.strokeStyle = INKg; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(px, el.y - half); ctx.lineTo(px, el.y + half); ctx.stroke();
         ctx.fillStyle = INKg; ctx.beginPath(); ctx.moveTo(px - 5, el.y - half - 7); ctx.lineTo(px + 5, el.y - half - 7); ctx.lineTo(px, el.y - half); ctx.closePath(); ctx.fill();
       }
-      const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : "");
+      const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : r.near ? " · queue likely" : "");
       ctx.font = `600 ${gaFs + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
-      ctx.fillStyle = r.over ? REDg : INKg;
+      ctx.fillStyle = r.over ? REDg : INKg;   // the amber step is said in words; gold text fails contrast on white
       ctx.fillText(`${gaN1(r.g.arrivals_per_day)} a day${words}`, right + 10, el.y);
     });
     ctx.restore();
@@ -1274,12 +1297,12 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
       { label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap), backgroundColor: tok("--surface-3", "#F3F2EF"),
         borderColor: tok("--grey", "#E7E5E4"), borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
       { label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day),
-        backgroundColor: rowsC.map(r => r.over ? REDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
+        backgroundColor: rowsC.map(r => r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
     options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 12, right: 250 } },
       plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1, callbacks: {
         title: (items) => items.length ? `${rowsC[items[0].dataIndex].g.location_name}, ${rowsC[items[0].dataIndex].g.gate_name}` : "",
         label: (item) => { const r = rowsC[item.dataIndex]; return [`${gaN1(r.g.arrivals_per_day)} lorries a day ${GA_SPREAD}`,
-          r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (the ${ga.shift_hours} h shift ÷ ${+r.g.gate_minutes} min a lorry)`,
+          r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (${r.g.open_basis === "gate" ? `open ${r.g.open_hours}${r.g.peak_minutes ? `, less ${r.g.peak_minutes} min of peak bands` : ""}` : `the ${ga.shift_hours} h shift`} ÷ ${+r.g.gate_minutes} min a lorry)`,
           gaFlagWord(r.g)]; } } } },
       scales: { x: { min: 0, suggestedMax: xTop, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: gaFs } },
                      title: { display: true, text: "lorries a day", font: { size: gaFs } } },
@@ -1293,13 +1316,13 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
           {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}
         </select></label>
       </div>
-      <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across the {ga.shift_hours} h shift.</div>
+      <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across {anyGateHours ? `each gate's open hours (the ${ga.shift_hours} h shift where none are typed)` : `the ${ga.shift_hours} h shift`}.</div>
       {state === "none" && <EmptyState kind="none" title={`No approved lines in ${ga.label}`} body="Pick another month. Pending lines appear as a note until they are approved, then in the figures." />}
       {state === "set" && rowsC.length > 0 && (
         <div className="ga-chart" data-ga-chart="1">
           <div className="ga-head">
-            <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : "Every gate within its capacity"}</span>
-            <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the shift ÷ the check-in time a lorry <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
+            <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
+            <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the open hours ÷ the check-in time a lorry <i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
           </div>
           <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />
         </div>
@@ -1330,7 +1353,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
                     <td className="num" data-label="Arrivals a day">{gaN1(g.arrivals_per_day)}</td>
                     <td className="num" data-label="Average gap">{g.gap_minutes == null ? "none" : gaMin(g.gap_minutes)}</td>
                     <td className="num" data-label="Check-in a lorry">{g.gate_minutes == null ? "not typed" : `${+g.gate_minutes} min`}</td>
-                    <td className="rd-status" data-label="Status"><RowStatus word={gaFlagWord(g)} tone={g.flag === "red" ? "bad" : "none"} /></td>
+                    <td className="rd-status" data-label="Status"><RowStatus word={gaFlagWord(g)} tone={gaTone(g)} /></td>
                   </>}>
                   <RdItem t="Location">{g.location_name}</RdItem>
                   <RdItem t="Gate">{g.gate_name}</RdItem>
@@ -1341,6 +1364,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
                   <RdItem t="Average gap" wide>{g.gap_minutes == null ? "No approved arrivals." : `One every ${gaMin(g.gap_minutes)} ${GA_SPREAD}.`}</RdItem>
                   <RdItem t="Check-in" >{g.gate_minutes == null ? "Not typed: nothing is compared." : `${+g.gate_minutes} min a lorry`}</RdItem>
                   <RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>
+                  <RdItem t="Open">{g.open_basis === "gate" ? `${g.open_hours}${g.closed_days ? `, ${g.closed_days}` : ""}${g.peak_minutes ? ` (less ${g.peak_minutes} min of no-delivery peak bands)` : ""}` : null}</RdItem>
                   <RdItem t="Not all of this gate's traffic" wide>{g.origin_share_note}</RdItem>
                   <RdItem t="Waiting for approval" wide>{g.pending_lines > 0 ? `${g.pending_lines} pending line${g.pending_lines === 1 ? "" : "s"} would add ${gaN1(g.pending_per_day)} a day here once approved.` : null}</RdItem>
                 </RowDetails>
@@ -4715,7 +4739,7 @@ function ConfigPage({ meta, who, access }){
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle (id)", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -4729,6 +4753,12 @@ function ConfigPage({ meta, who, access }){
                       <td className="num w-28"><input className={inp + " text-right"} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km ?? ""} aria-label={`${k} kg CO2e per km`} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
                       <td className="num w-20"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${k} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
                       <td className="num w-20"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${k} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
+                      {/* 14 Oct 2026 (bundle G, W8): the Euro class the plan assumes for this vehicle type — optional, read only by
+                          the CLP section's chart 5; "not typed" deletes the key (never a guess) */}
+                      <td className="w-36"><select className={inp} value={v.euro_class || ""} aria-label={`${k} Euro class`} data-cfg-euro={k}
+                        onChange={e => upd(d => { if(e.target.value) d.vehicles[k].euro_class = e.target.value; else delete d.vehicles[k].euro_class; })}>
+                        <option value="">not typed</option>{EURO_CLASSES.map(x => <option key={x} value={x}>{x}</option>)}
+                      </select></td>
                       {/* 11 Oct 2026: a tick keeps the planning list's ORDER (the first is the payload fallback) and adds a
                           newly ticked vehicle at the end; until then every tick rebuilt the list in file order */}
                       <td className="text-center"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${k} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle && !kept.includes(x))]; })} /></td>
@@ -4737,7 +4767,7 @@ function ConfigPage({ meta, who, access }){
                 </tbody>
               </table>
               <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">
-                The id is what forecast lines and routes are stored under, so it cannot be renamed here. A vehicle the network is routed for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions are on the Everything tab.
+                The id is what forecast lines and routes are stored under, so it cannot be renamed here. A vehicle the network is routed for cannot be removed. Blank load/unload minutes use the planning defaults. Routing dimensions are on the Everything tab. The Euro class is what the plan assumes the hauliers will send for each vehicle type, for the CLP monitoring charts; it is not a check of anyone's fleet and changes no carbon figure.
               </p>
             </div>
           )}
@@ -4792,6 +4822,28 @@ function ConfigPage({ meta, who, access }){
                   <div className="hint">{help}</div>
                 </div>
               ))}
+              {/* 14 Oct 2026 (bundle G, W8 + the user's Q1): the CLP's no-delivery windows. Taken off each gate's open
+                  hours in its capacity (backend gate_hours.py); printed on the Dashboard's CLP monitoring and the CLP pack. */}
+              <div className="field" data-cfg="peak-bands">
+                <label>No-delivery peak bands (from the CLP)</label>
+                {((doc.planning || {}).peak_bands || []).map((b, i) => (
+                  <div key={i} className="flex items-center gap-2 mb-1.5" data-peak-band={i}>
+                    <input type="time" className="ctl w-32" value={b.from || ""} aria-label={`Peak band ${i + 1} from`}
+                      onChange={e => upd(d => { d.planning.peak_bands[i].from = e.target.value; })} />
+                    <span className="text-sm text-slate-500">to</span>
+                    <input type="time" className="ctl w-32" value={b.to || ""} aria-label={`Peak band ${i + 1} to`}
+                      onChange={e => upd(d => { d.planning.peak_bands[i].to = e.target.value; })} />
+                    <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "4px 10px" }}
+                      onClick={() => upd(d => { d.planning.peak_bands.splice(i, 1); if(!d.planning.peak_bands.length) delete d.planning.peak_bands; })}>Remove</button>
+                  </div>
+                ))}
+                {((doc.planning || {}).peak_bands || []).length < PEAK_BANDS_MAX && (
+                  <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }}
+                    onClick={() => upd(d => { d.planning = d.planning || {}; const pb = d.planning.peak_bands = d.planning.peak_bands || [];
+                      const ph = PEAK_BANDS_PLACEHOLDER[pb.length] || { from: "", to: "" }; pb.push({ from: ph.from, to: ph.to }); })}>Add a band</button>
+                )}
+                <div className="hint">Hours when the Construction Logistics Plan allows no deliveries, for example 07:00 to 10:00 and 16:00 to 19:00 (agree them with the planning authority). Each gate with open hours typed loses these minutes from what it can check in a day. Wayscope holds no arrival times, so it cannot check that lorries keep out of them. At most {PEAK_BANDS_MAX}.</div>
+              </div>
             </div>
           )}
 
@@ -8218,7 +8270,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       vendor: "", detail: "", lat: "", lon: "", gate_lat: "", gate_lon: "",
       // Week 1, Task D2. Blank means NOT RECORDED, which is not zero — the balance
       // still computes and `remaining` comes back unknown.
-      capacity_qty: "", capacity_unit: "t", opening_qty: "" });
+      capacity_qty: "", capacity_unit: "t", opening_qty: "", clp_cap_per_day: "" });
     setMode("add");
   };
   const openEditForNode = (id) => {
@@ -8236,7 +8288,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       gate_lon: p.gate_lon == null ? "" : p.gate_lon,
       capacity_qty: p.capacity_qty == null ? "" : p.capacity_qty,
       capacity_unit: p.capacity_unit || "t",
-      opening_qty: p.opening_qty == null ? "" : p.opening_qty });
+      opening_qty: p.opening_qty == null ? "" : p.opening_qty,
+      clp_cap_per_day: p.clp_cap_per_day == null ? "" : p.clp_cap_per_day });
     setMode("edit");
   };
   // Locations-table row click: centre the map on the node and open it for editing.
@@ -8268,6 +8321,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     vendor: (f.vendor || "").trim() || null,
     detail: (f.detail || "").trim() || null,
     lat, lon, ...gateFrom(f),
+    // 14 Oct 2026 (bundle G, W8): the site's CLP cap; blank = none (null, never 0)
+    clp_cap_per_day: (f.clp_cap_per_day === "" || f.clp_cap_per_day == null) ? null : +f.clp_cap_per_day,
   });
 
   // The build list's rule: the three storage fields show for Stockpile / Site /
@@ -8357,14 +8412,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const newGate = () => setGateForm({
     id: null, name: "", direction: "both", lat: "", lon: "",
     safety_minutes: "", internal_travel_minutes: "", is_default: !gateList.length,
-    active: true, note: "" });
+    active: true, note: "", open_from: "", open_to: "", open_days: "" });
 
   const editGate = (g) => setGateForm({
     id: g.id, name: g.name || "", direction: g.direction || "both",
     lat: g.lat, lon: g.lon,
     safety_minutes: g.safety_minutes == null ? "" : g.safety_minutes,
     internal_travel_minutes: g.internal_travel_minutes == null ? "" : g.internal_travel_minutes,
-    is_default: !!g.is_default, active: !!g.active, note: g.note || "" });
+    is_default: !!g.is_default, active: !!g.active, note: g.note || "",
+    open_from: g.open_from || "", open_to: g.open_to || "", open_days: g.open_days || "" });
 
   const numOrNull = (v) => (v === "" || v == null) ? null : Number(v);
 
@@ -8382,6 +8438,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       internal_travel_minutes: numOrNull(gateForm.internal_travel_minutes),
       is_default: !!gateForm.is_default, active: !!gateForm.active,
       note: gateForm.note || null,
+      // 14 Oct 2026 (bundle G, W17): blank = the scheme's shift, every day ("" clears a stored value)
+      open_from: gateForm.open_from || "", open_to: gateForm.open_to || "", open_days: gateForm.open_days || "",
     };
     try {
       const url = gateForm.id
@@ -9247,6 +9305,23 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 </div>
                 )}
 
+                {/* 14 Oct 2026 (bundle G, W8): the site's CLP cap — lorry visits a day agreed in the Construction
+                    Logistics Plan. Compared on the Dashboard's CLP monitoring; a flag, never a block. */}
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5" data-clp-cap-field="1">
+                  <label className="block">
+                    <span className="block text-sm font-medium text-slate-700 mb-1">CLP cap (optional)</span>
+                    <input value={form.clp_cap_per_day} onChange={e => setField("clp_cap_per_day", e.target.value)}
+                      inputMode="decimal" placeholder="none" aria-label="CLP cap: lorry visits a day"
+                      className="mt-0.5 w-40 border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
+                    <span className="ml-2 text-xs text-slate-500">lorry visits a day</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    The most lorries a day the Construction Logistics Plan allows at this site. One visit is one lorry in
+                    and out: a delivery, or a lorry coming to load. Leave it blank if the plan sets none. Planned visits
+                    over it are flagged on the Dashboard, never blocked.
+                  </p>
+                </div>
+
                 {/* Operator and free-text detail. Salvaged out of a1_data.js before that
                     file was retired — the quarry operator existed nowhere else in the
                     system — and editable here so it stays current. */}
@@ -9336,6 +9411,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           {g.internal_travel_minutes ? <span className="text-[10px] text-slate-500"
                             title="Flat gate-to-face travel. Ignored on a route that has a drawn haul road — that road already carries these minutes.">
                             {g.internal_travel_minutes}m internal</span> : null}
+                          {g.open_from && g.open_to ? <span className="text-[10px] text-slate-500" data-gate-hours={g.id}>
+                            open {g.open_from}–{g.open_to}{gateDaysWords(g.open_days) ? ` · ${gateDaysWords(g.open_days)}` : ""}</span> : null}
                           <span className="ml-auto flex gap-2">
                             <button onClick={() => editGate(g)}
                               className="text-[11px] text-slate-500 hover:underline">Edit</button>
@@ -9393,6 +9470,41 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             inputMode="decimal" placeholder="0"
                             className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
                         </label>
+                      </div>
+                      {/* 14 Oct 2026 (bundle G, W17): when the gate is open, for its capacity (open minutes ÷ the
+                          induction minutes a lorry). Blank = the scheme's shift, every day. */}
+                      <div className="rounded-lg border border-slate-200 p-2" data-gate-hours-form="1">
+                        <div className="text-sm font-medium text-slate-700">Open hours (optional)</div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <input type="time" value={gateForm.open_from} aria-label="Open from"
+                            onChange={e => setGateForm(g => ({ ...g, open_from: e.target.value }))}
+                            className="border border-slate-300 rounded-lg px-2 py-1 text-sm" />
+                          <span className="text-xs text-slate-500">to</span>
+                          <input type="time" value={gateForm.open_to} aria-label="Open to"
+                            onChange={e => setGateForm(g => ({ ...g, open_to: e.target.value }))}
+                            className="border border-slate-300 rounded-lg px-2 py-1 text-sm" />
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1.5" role="group" aria-label="Open days">
+                          {GATE_DAYS.map((d, i) => {
+                            const flags = gateForm.open_days || "1111111";
+                            const on = flags[i] === "1";
+                            return (
+                              <label key={d} className="flex items-center gap-1 text-xs text-slate-600 mr-1">
+                                <input type="checkbox" checked={on} onChange={e => setGateForm(g => {
+                                  const f = (g.open_days || "1111111").split("");
+                                  f[i] = e.target.checked ? "1" : "0";
+                                  const v = f.join("");
+                                  return { ...g, open_days: v === "1111111" ? "" : v };
+                                })} />{d}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Blank hours use the scheme's shift. What the gate can check in a day is its open minutes ÷ the
+                          induction minutes a lorry, less any no-delivery peak bands set on Config. Arrivals on a closed day
+                          are flagged on the Look-ahead, never blocked.
+                        </p>
                       </div>
                       <div className="flex items-center gap-4 text-xs text-slate-600">
                         <label className="flex items-center gap-1.5">
