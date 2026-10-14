@@ -242,6 +242,12 @@ def build(with_areas=False, out=None):
                         "with the fleet's own figures; the driver rate is derived from public statistics. "
                         "Field names keep their _eur_ suffix — every figure is in the tenant's currency, £.")
     doc["fair_price"] = fp
+    # 14 Oct 2026 (merging HU7 into civils materials): the seed's note on fair_price_by_country describes the OTHER set
+    # (the no-country one) by its country, and the package of a GB demo must name no Estonian source (test_h1_uk's leak
+    # check). The demo keeps the GB set the seed carries, with a note in its own terms.
+    doc["_fair_price_by_country_note"] = ("A coefficient set per country, used for a tenant whose country has one: this "
+                                          "demo tenant is GB, and its fair_price above is the GB set. Config -> Costing · "
+                                          "fuel offers the country's set as one click.")
     res = config.save(doc, by="tools/make_demo_tenant.py", network=network)
     assert res["ok"], res
     config.invalidate()
