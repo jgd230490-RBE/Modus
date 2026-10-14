@@ -266,7 +266,7 @@ def features(kinds=None, bbox=None):
             continue
         out.append({"type": "Feature", "geometry": g,
                     "properties": {"kind": r["kind"], "name": r["name"], "detail": r["detail"],
-                                   "source": SOURCES.get(r["source"], {}).get("name", r["source"]),
+                                   "source": SOURCES.get(r["source"], {}).get("name", r["source"]), "source_key": r["source"],
                                    "dist_m": r["dist_m"]}})
     order = {k: i for i, k in enumerate(KIND_KEYS)}
     out.sort(key=lambda f: order.get(f["properties"]["kind"], 99))

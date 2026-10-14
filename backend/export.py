@@ -2317,12 +2317,25 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
             items.append((10, site))
         if len(places) > len(shown):
             text(f"+{len(places) - len(shown)} more sites", R, 7.4, 9.2, GREY)
+    # 14 Oct 2026: the community considerations in the frame — only the kinds in view, each with its symbol
+    CM = PL.get("community") or {}
+    if CM.get("kinds"):
+        gap(4)
+        text("Community considerations", B, 7.8, 10)
+        for kd in CM["kinds"]:
+            def ck(x, y, kd=kd):
+                _comm_legend_swatch(c, kd, x, y)
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.4)
+                c.drawString(x + 17, y - 7.2, _pdf_safe(kd["label"])[:52])
+            items.append((9.6, ck))
     gap(4)
     if PL.get("view") and not basemap_ok:
         text("No basemap could be had: the routes alone, still to scale.", B, 7, 8.8, DEMO_FG_RGB)
     text(f"{S['as_at']}. Approved lines only. A planning document, not an approved CLP.", R, 6.8, 8.4, GREY)
     if basemap_ok:
         text("Map © Mapbox © OpenStreetMap.", R, 6.8, 8.4, GREY)
+    if CM.get("credit"):
+        text(CM["credit"], R, 6.6, 8.2, GREY)
     ph = sum(h for h, _ in items) + 2 * pad
     x0, y0 = fw - pw - 6, fh - ph - 6
     c.saveState()
@@ -2337,6 +2350,99 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
     if PL.get("view"):
         _north_arrow(c, x0 + pw - pad - 6, y0 + ph - pad - 26)
     return x0, y0, pw, ph
+
+
+COMM_FILL_ALPHA = 0.22          # the colour system's print rule: a 22 % tint fill, the full colour as its edge
+
+
+def _comm_symbol(c, symbol, colour, x, y, r=3.2):
+    """One community considerations symbol centred on (x, y), r points across half its width, with a white edge so it
+    reads on the basemap — the same shapes the map draws (map/index.html commSymbolPath)."""
+    rgb = _hex_rgb(colour)
+    c.saveState()
+
+    def path():
+        p = c.beginPath()
+        if symbol == "triangle":
+            p.moveTo(x, y + r); p.lineTo(x + r, y - r * 0.8); p.lineTo(x - r, y - r * 0.8); p.close()
+        elif symbol == "diamond":
+            p.moveTo(x, y + r); p.lineTo(x + r, y); p.lineTo(x, y - r); p.lineTo(x - r, y); p.close()
+        elif symbol in ("square", "square-h"):
+            p.rect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7)
+        elif symbol == "cross":
+            w = r * 0.42
+            p.moveTo(x - w, y + r); p.lineTo(x + w, y + r); p.lineTo(x + w, y + w); p.lineTo(x + r, y + w)
+            p.lineTo(x + r, y - w); p.lineTo(x + w, y - w); p.lineTo(x + w, y - r); p.lineTo(x - w, y - r)
+            p.lineTo(x - w, y - w); p.lineTo(x - r, y - w); p.lineTo(x - r, y + w); p.lineTo(x - w, y + w); p.close()
+        elif symbol == "dot":
+            p.circle(x, y, r * 0.62)
+        else:
+            p.circle(x, y, r * 0.85)
+        return p
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(1.1); c.setLineJoin(1)
+    c.drawPath(path(), stroke=1, fill=0)
+    c.setFillColorRGB(*rgb)
+    c.drawPath(path(), stroke=0, fill=1)
+    if symbol == "square-h":
+        c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), r * 1.5)
+        c.drawCentredString(x, y - r * 0.5, "H")
+    c.restoreState()
+
+
+def _comm_legend_swatch(c, k, x, y):
+    """The panel's swatch for a kind: its symbol, a dashed stroke (cycle) or a tinted box (outlines)."""
+    rgb = _hex_rgb(k["colour"])
+    if k["symbol"] == "dash":
+        c.saveState(); c.setStrokeColorRGB(*rgb); c.setLineWidth(1.6); c.setDash(3, 2)
+        c.line(x, y - 4.2, x + 12, y - 4.2); c.restoreState()
+    elif k["symbol"] == "fill":
+        c.saveState(); c.setFillColorRGB(*rgb); c.setFillAlpha(COMM_FILL_ALPHA); c.setStrokeColorRGB(*rgb); c.setLineWidth(0.8)
+        c.rect(x, y - 7.5, 12, 6.5, stroke=1, fill=1); c.restoreState()
+    else:
+        _comm_symbol(c, k["symbol"], k["colour"], x + 6, y - 4.2, 3.6)
+
+
+def _draw_community(c, PL, P, layer):
+    """The plan's community considerations: layer 'under' = outlines (light fills, 22 %) and cycle routes (dashed),
+    drawn before the routes; layer 'over' = the point symbols, drawn after them."""
+    CM = PL.get("community") or {}
+    feats = CM.get("features") or []
+    if not feats:
+        return
+    import community
+    from community_sources import polygons_of
+    kinds = {k["key"]: k for k in community.KINDS}
+    c.saveState()
+    for f in feats:
+        g, kind = f["geometry"], kinds.get(f["properties"]["kind"])
+        if not kind:
+            continue
+        rgb = _hex_rgb(kind["colour"])
+        t = g.get("type")
+        if layer == "under" and t in ("Polygon", "MultiPolygon"):
+            for poly in polygons_of(g):
+                p = c.beginPath()
+                for ring in poly:
+                    pts = [P(x, y) for x, y in ring]
+                    p.moveTo(*pts[0])
+                    for q in pts[1:]:
+                        p.lineTo(*q)
+                    p.close()
+                c.setFillColorRGB(*rgb); c.setFillAlpha(COMM_FILL_ALPHA)
+                c.setStrokeColorRGB(*rgb); c.setStrokeAlpha(1); c.setLineWidth(0.5)
+                c.drawPath(p, stroke=1, fill=1, fillMode=0)
+        elif layer == "under" and t == "LineString":
+            pts = [P(x, y) for x, y in g["coordinates"]]
+            p = c.beginPath(); p.moveTo(*pts[0])
+            for q in pts[1:]:
+                p.lineTo(*q)
+            c.setStrokeColorRGB(*rgb); c.setStrokeAlpha(1); c.setLineWidth(1.3); c.setDash(3, 2)
+            c.drawPath(p, stroke=1, fill=0)
+            c.setDash()
+        elif layer == "over" and t == "Point":
+            x, y = P(*g["coordinates"][:2])
+            _comm_symbol(c, kind["symbol"], kind["colour"], x, y)
+    c.restoreState()
 
 
 def _plan_scale_bar(c, v, fw):
@@ -2393,7 +2499,9 @@ def build_route_map_pdf(S):
         def P(lon, lat):
             x, y = basemap.project(v, lon, lat)
             return x * k, fh - y * k
+        _draw_community(c, PL, P, "under")       # 14 Oct 2026: outlines and cycle routes under the routes
         _draw_bulletin_schematic(c, S, 0, 0, fw, fh, P=P)
+        _draw_community(c, PL, P, "over")        # the symbols over them
     else:
         c.setFillColorRGB(*GREY); c.setFont(_BF("regular"), 10)
         c.drawCentredString((fw - rme.PANEL_W_MM * mm) / 2, fh / 2, "No approved line on the chosen routes in this month.")

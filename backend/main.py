@@ -2608,7 +2608,7 @@ def routes_summary():
     return network.summary()
 
 
-def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at):
+def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1):
     """
     14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
     template") — the route map export's one read: the map as it is filtered, as one of the CLOCS outline CLP template's
@@ -2626,7 +2626,8 @@ def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan
     S = route_map_export.sheet(month, route_ids=ids, team=team, acc=access.current(), origin=origin, dest=dest,
                                discipline=discipline)
     try:
-        route_map_export.plan(S, plan, scale, at)
+        # 14 Oct 2026: community=0 is the card's "Leave out the community considerations"
+        route_map_export.plan(S, plan, scale, at, community=bool(community))
     except route_map_export.PlanError as e:
         raise HTTPException(422, str(e))
     return S
@@ -2643,10 +2644,10 @@ def _route_map_file(S, month, ext):
 def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
-                         at: Optional[str] = None, request: Request = None):
+                         at: Optional[str] = None, community: int = 1, request: Request = None):
     """The plan as one A4 landscape page, exactly at its stated scale when printed at 100 % (_route_map_plan)."""
     from fastapi.responses import Response       # not in every test stub; imported here
-    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at)
+    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community)
     try:
         data = export.build_route_map_pdf(S)
     except RuntimeError as e:
@@ -2660,10 +2661,10 @@ def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: 
 def route_map_export_png(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
-                         at: Optional[str] = None, request: Request = None):
+                         at: Optional[str] = None, community: int = 1, request: Request = None):
     """The same plan as a PNG for a Word document: the PDF page rasterised, so the two never differ."""
     from fastapi.responses import Response
-    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at)
+    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community)
     try:
         data = export.route_map_png(export.build_route_map_pdf(S))
     except RuntimeError as e:

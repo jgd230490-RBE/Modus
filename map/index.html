@@ -602,6 +602,7 @@
         #rme-panel select{ width:100%; min-height:44px; font:14px Inter,system-ui,sans-serif; margin-bottom:10px; }
         #rme-panel .rme-field[hidden], #rme-panel select[hidden]{ display:none; }
         #rme-panel .rme-plan-what{ margin:-4px 0 10px; color:var(--muted); font-size:14px; }
+        #rme-panel .rme-check{ display:flex; gap:8px; align-items:center; min-height:44px; font-size:14px; margin:-2px 0 8px; }
         #rme-panel .share-row{ display:flex; gap:8px; }
         #rme-panel .rme-note{ margin:8px 0 0; color:var(--muted); font-size:14px; }
         #rme-status{ min-height:20px; font-size:14px; margin-top:6px; }
@@ -869,6 +870,18 @@
         <div class="area-note" id="area-attribution"></div>
     </div>
 
+    <!-- 14 Oct 2026: the community considerations layer (the CLOCS CLP template's "community considerations").
+         STAFF ONLY: hidden in the markup and shown only when /api/public/whoami answers level "staff" (as the
+         route map export is); the map password's view never sees it and /api/community refuses its cookie. Off by
+         default; a tick per kind, built from the kinds the server sends (their colour, symbol and words). -->
+    <div class="control-group" id="community-group" hidden>
+        <h3>Community considerations</h3>
+        <div class="control-item"><label><input type="checkbox" id="layer-community" onchange="toggleCommunity(this.checked)"> Show community considerations</label></div>
+        <div id="community-kinds" hidden></div>
+        <div class="area-note" id="community-when"></div>
+        <div class="area-note" id="community-attribution"></div>
+    </div>
+
     <!-- Phase 2.5a — road-restriction layers from the tenant country's road authority
          (Estonia's Tark Tee; since H1 also National Highways' planned closures for
          Great Britain), proxied and reprojected by the backend. See
@@ -1103,6 +1116,8 @@
   <select id="rme-scale"></select>
   <label class="rme-field" for="rme-at" id="rme-at-label" hidden>Centred on</label>
   <select id="rme-at" hidden></select>
+  <!-- 14 Oct 2026: the community considerations are drawn on the plan unless this is ticked -->
+  <label class="rme-check"><input type="checkbox" id="rme-no-community"> Leave out the community considerations</label>
   <div class="share-row"><button type="button" class="btn" id="rme-go" onclick="downloadRouteExport('pdf')">Download PDF</button>
     <button type="button" class="btn btn-ghost" id="rme-go-png" onclick="downloadRouteExport('png')">Download PNG</button></div>
   <p class="rme-note">Just the map, with its legend, scale and north arrow on it. The PDF prints at the stated scale on A4 at 100 %. The PNG is for a Word document: once it is resized, use the scale bar.</p>
@@ -3478,6 +3493,8 @@
         // §2.2b: the council areas ride on style.load too — re-added from the cached month, or probed once
         setupAreaCard();
         if (AREAS.data) { AREAS.drawn = ''; ensureAreaLayers(); renderAreas(); } else refreshAreas();
+        // 14 Oct 2026: the community considerations layer too (staff only; its symbols are images, which a switch drops)
+        if (typeof COMM !== 'undefined' && COMM.data) ensureCommunityLayers();
         // and so do the Tark Tee restriction layers. Already-fetched data is re-added
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
@@ -7695,7 +7712,8 @@
         try {
             fetch('/api/public/whoami', { credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : null)
-                .then(j => { RME.staff = !!(j && j.level === 'staff'); const b = document.getElementById('rme-open'); if (b) b.hidden = !RME.staff; })
+                .then(j => { RME.staff = !!(j && j.level === 'staff'); const b = document.getElementById('rme-open'); if (b) b.hidden = !RME.staff;
+                             communityStaff(RME.staff); })
                 .catch(() => {});
         } catch (e) {}
     }
@@ -7781,6 +7799,8 @@
         if (sc) q.set('scale', sc);
         const at = document.getElementById('rme-at');
         if (at && !at.hidden && at.value) q.set('at', at.value);
+        const noc = document.getElementById('rme-no-community');
+        if (noc && noc.checked) q.set('community', '0');     // 14 Oct 2026: on unless the box leaves it out
         return '/api/routes/map-export.' + (kind === 'png' ? 'png' : 'pdf') + '?' + q.toString();
     }
     async function downloadRouteExport(kind) {
@@ -7802,6 +7822,155 @@
             setTimeout(() => URL.revokeObjectURL(a.href), 2000);
             if (st) st.textContent = 'Downloaded.';
         } catch (e) { if (st) st.textContent = 'Not downloaded: ' + (e && e.message || e); }
+    }
+    // ---------------------------------------------------------------- the community considerations layer (14 Oct 2026)
+    // STAFF ONLY. The group shows when whoami says staff (communityStaff, from checkRouteExportStaff); nothing is read
+    // until the box is ticked. The kinds — their order, colour, symbol and words — come with the data from
+    // /api/community, which reads what a planner fetched along the routes (Config → Map and bulletin); a page view never
+    // fetches from the public sources. Outlines (residential areas, sports grounds) and cycle routes are drawn UNDER the
+    // routes as light fills and dashed lines; the points are small symbols OVER them, with the sites above those.
+    const COMM = { staff: false, data: null, on: false, off: new Set(), loading: false, popup: null };
+    const COMM_FILL_OPACITY = 0.22;          // the colour system's print tint: 22 % fill, the full colour as its edge
+    const COMM_LAYERS = ['community-fill', 'community-outline', 'community-line', 'community-points'];
+    function communityStaff(staff) {
+        COMM.staff = !!staff;
+        const g = document.getElementById('community-group');
+        if (g) g.hidden = !COMM.staff;
+        if (!COMM.staff) { COMM.on = false; COMM_LAYERS.forEach(l => { try { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'none'); } catch (e) {} }); }
+    }
+    function commKind(key) { return ((COMM.data && COMM.data.kinds) || []).find(k => k.key === key) || null; }
+    // one symbol per kind, drawn here (white edge so it reads on every basemap); the legend draws the same as SVG
+    function commSymbolPath(ctx, symbol, s) {
+        const c = s / 2, r = s * 0.36;
+        ctx.beginPath();
+        if (symbol === 'triangle') { ctx.moveTo(c, c - r); ctx.lineTo(c + r, c + r * 0.8); ctx.lineTo(c - r, c + r * 0.8); ctx.closePath(); }
+        else if (symbol === 'diamond') { ctx.moveTo(c, c - r); ctx.lineTo(c + r, c); ctx.lineTo(c, c + r); ctx.lineTo(c - r, c); ctx.closePath(); }
+        else if (symbol === 'square' || symbol === 'square-h') { ctx.rect(c - r * 0.85, c - r * 0.85, r * 1.7, r * 1.7); }
+        else if (symbol === 'cross') { const w = r * 0.42; ctx.rect(c - w, c - r, w * 2, r * 2); ctx.rect(c - r, c - w, r * 2, w * 2); }
+        else if (symbol === 'dot') { ctx.arc(c, c, r * 0.62, 0, Math.PI * 2); }
+        else { ctx.arc(c, c, r * 0.85, 0, Math.PI * 2); }
+    }
+    function commSymbolImage(symbol, colour) {
+        const s = 40, cv = document.createElement('canvas'); cv.width = cv.height = s;
+        const ctx = cv.getContext('2d');
+        commSymbolPath(ctx, symbol, s);
+        ctx.lineWidth = 6; ctx.strokeStyle = '#FFFFFF'; ctx.lineJoin = 'round'; ctx.stroke();
+        commSymbolPath(ctx, symbol, s);
+        ctx.fillStyle = colour; ctx.fill();
+        if (symbol === 'square-h') {
+            ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 20px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('H', s / 2, s / 2 + 1);
+        }
+        return ctx.getImageData(0, 0, s, s);
+    }
+    function commSymbolSvg(k) {
+        const c = escHtml(k.colour), s = 14;
+        const shape = {
+            triangle: `<path d="M7 2 L12.5 11.5 L1.5 11.5 Z" fill="${c}"/>`,
+            diamond: `<path d="M7 1.5 L12.5 7 L7 12.5 L1.5 7 Z" fill="${c}"/>`,
+            square: `<rect x="2" y="2" width="10" height="10" fill="${c}"/>`,
+            'square-h': `<rect x="1.5" y="1.5" width="11" height="11" fill="${c}"/><text x="7" y="10.5" font-size="9" font-weight="700" text-anchor="middle" fill="#fff" font-family="system-ui">H</text>`,
+            cross: `<path d="M5 1.5h4v3.5h3.5v4H9v3.5H5V9H1.5V5H5Z" fill="${c}"/>`,
+            dot: `<circle cx="7" cy="7" r="3.5" fill="${c}"/>`,
+            circle: `<circle cx="7" cy="7" r="5" fill="${c}"/>`,
+            dash: `<path d="M1 7 H13" stroke="${c}" stroke-width="2.5" stroke-dasharray="3 2"/>`,
+            fill: `<rect x="1.5" y="3" width="11" height="8" fill="${c}" fill-opacity="${COMM_FILL_OPACITY}" stroke="${c}" stroke-width="1.5"/>`,
+        }[k.symbol] || `<circle cx="7" cy="7" r="5" fill="${c}"/>`;
+        return `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true" style="flex:none">${shape}</svg>`;
+    }
+    function communityFilter() {
+        const off = [...COMM.off];
+        return off.length ? ['!', ['in', ['get', 'kind'], ['literal', off]]] : true;
+    }
+    function commColourExpr() {
+        const pairs = [];
+        ((COMM.data && COMM.data.kinds) || []).forEach(k => { pairs.push(k.key, k.colour); });
+        return pairs.length ? ['match', ['get', 'kind'], ...pairs, '#64748B'] : '#64748B';
+    }
+    function ensureCommunityLayers() {
+        if (!COMM.data || !COMM.staff) return;
+        if (!map.isStyleLoaded()) { map.once('idle', ensureCommunityLayers); return; }
+        ((COMM.data.kinds) || []).forEach(k => {
+            const id = 'comm-' + k.key;
+            try { if (map.hasImage && !map.hasImage(id)) map.addImage(id, commSymbolImage(k.symbol, k.colour), { pixelRatio: 2 }); } catch (e) {}
+        });
+        const data = { type: 'FeatureCollection', features: COMM.data.features || [] };
+        if (!map.getSource('community-source')) map.addSource('community-source', { type: 'geojson', data, attribution: COMM.data.credit || '' });
+        else map.getSource('community-source').setData(data);
+        const vis = COMM.on ? 'visible' : 'none', before = areaBeforeId(), filt = communityFilter();
+        const poly = ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]];
+        if (!map.getLayer('community-fill')) map.addLayer({ id: 'community-fill', type: 'fill', source: 'community-source',
+            filter: ['all', poly, filt], layout: { visibility: vis }, paint: { 'fill-color': commColourExpr(), 'fill-opacity': COMM_FILL_OPACITY } }, before);
+        if (!map.getLayer('community-outline')) map.addLayer({ id: 'community-outline', type: 'line', source: 'community-source',
+            filter: ['all', poly, filt], layout: { visibility: vis }, paint: { 'line-color': commColourExpr(), 'line-width': 1 } }, before);
+        if (!map.getLayer('community-line')) map.addLayer({ id: 'community-line', type: 'line', source: 'community-source',
+            filter: ['all', ['==', ['geometry-type'], 'LineString'], filt], layout: { visibility: vis, 'line-cap': 'round' },
+            paint: { 'line-color': commColourExpr(), 'line-width': 2.5, 'line-dasharray': [2, 1.5] } }, before);
+        if (!map.getLayer('community-points')) {
+            map.addLayer({ id: 'community-points', type: 'symbol', source: 'community-source',
+                filter: ['all', ['==', ['geometry-type'], 'Point'], filt],
+                layout: { visibility: vis, 'icon-image': ['concat', 'comm-', ['get', 'kind']], 'icon-allow-overlap': true,
+                          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1] } });
+            ['community-points', 'community-fill', 'community-line'].forEach(l => {
+                map.on('click', l, e => communityPopup(e));
+                map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; });
+                map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; });
+            });
+        }
+        COMM_LAYERS.forEach(l => { try { map.setFilter(l, l === 'community-points' ? ['all', ['==', ['geometry-type'], 'Point'], filt]
+            : l === 'community-line' ? ['all', ['==', ['geometry-type'], 'LineString'], filt] : ['all', poly, filt]); map.setLayoutProperty(l, 'visibility', vis); } catch (e) {} });
+        raiseMarks();
+    }
+    function communityPopup(e) {
+        const f = e.features && e.features[0];
+        if (!f || !COMM.on) return;
+        const p = f.properties || {}, k = commKind(p.kind) || { label: p.kind };
+        const d = (p.dist_m === null || p.dist_m === undefined || p.dist_m === 'null') ? '' :
+            (Number(p.dist_m) === 0 ? 'On a route or a site' : `${fmtDist(Number(p.dist_m) / 1000, 2)} ${DU()} from the nearest route or site`);
+        const html = `<div style="font:13px system-ui;max-width:260px"><b>${escHtml(p.name || k.label)}</b>` +
+            `<div>${escHtml(k.label)}${p.detail ? ' · ' + escHtml(p.detail) : ''}</div>` +
+            (d ? `<div style="color:#64748B">${escHtml(d)}</div>` : '') +
+            `<div style="color:#64748B">Source: ${escHtml(p.source || '')}</div></div>`;
+        if (COMM.popup) COMM.popup.remove();
+        COMM.popup = new mapboxgl.Popup({ closeButton: true, maxWidth: '280px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
+    }
+    function renderCommunityPanel() {
+        const box = document.getElementById('community-kinds'), when = document.getElementById('community-when'),
+              att = document.getElementById('community-attribution');
+        const D = COMM.data;
+        if (!box || !when) return;
+        if (!D) { box.hidden = true; when.textContent = COMM.loading ? 'Reading the layer…' : ''; return; }
+        const total = (D.features || []).length;
+        box.hidden = !COMM.on || !total;
+        box.innerHTML = (D.kinds || []).map(k => `<div class="control-item" style="padding-left:23px"><label style="display:flex;gap:6px;align-items:center">` +
+            `<input type="checkbox" data-comm-kind="${escHtml(k.key)}" ${COMM.off.has(k.key) ? '' : 'checked'} ${k.count ? '' : 'disabled'} ` +
+            `onchange="toggleCommunityKind(this.dataset.commKind, this.checked)"> ${commSymbolSvg(k)} ${escHtml(k.label)} (${k.count})</label></div>`).join('');
+        const day = s => { if (!s) return null; const d = new Date(s.length > 10 ? s : s + 'T12:00:00Z'); return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
+        const src = (D.sources || []).filter(s => s.fetched_at).map(s => `${s.name} (${day(s.data_date || s.fetched_at)})`);
+        when.textContent = !total && !D.fetched_at
+            ? 'Not fetched yet. A planner fetches it on Config → Map and bulletin.'
+            : `Fetched ${day(D.fetched_at)} from ${src.join(', ')}. Within ${D.strip.route_m} m of the routes and ${D.strip.site_m} m of the sites. ` +
+              'Fetched again on Config → Map and bulletin.' + (D.error ? ' ' + D.error + '.' : '');
+        if (att) att.textContent = D.credit || '';
+    }
+    function loadCommunity() {
+        if (!COMM.staff || COMM.loading) return;
+        COMM.loading = true; renderCommunityPanel();
+        fetch('/api/community', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 401 ? 'only staff can see this layer' : 'not read (' + r.status + ')')))
+            .then(j => { COMM.data = j; COMM.loading = false; renderCommunityPanel(); ensureCommunityLayers(); })
+            .catch(e => { COMM.loading = false; const w = document.getElementById('community-when'); if (w) w.textContent = 'Not read: ' + (e && e.message || e); });
+    }
+    function toggleCommunity(on) {
+        COMM.on = !!on && COMM.staff;
+        if (COMM.on && !COMM.data) loadCommunity();
+        renderCommunityPanel();
+        if (COMM.data) ensureCommunityLayers();
+        if (!COMM.on && COMM.popup) { COMM.popup.remove(); COMM.popup = null; }
+    }
+    function toggleCommunityKind(kind, on) {
+        if (on) COMM.off.delete(kind); else COMM.off.add(kind);
+        ensureCommunityLayers();
     }
     checkRouteExportStaff();
 

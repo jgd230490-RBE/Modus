@@ -186,11 +186,12 @@ def centre_choices(S):
     return [p["name"] for p in sorted(ps, key=lambda p: (p.get("end") != "dest", p["letter"]))]
 
 
-def plan(S, kind="regional", scale=None, at=None):
+def plan(S, kind="regional", scale=None, at=None, community=True):
     """
     Adds S["plan"]: which plan, its stated scale, the basemap view drawn exactly at that scale (FRAME_W_MM wide), the
     place it is centred on, and the places inside the frame (the panel lists those). Raises PlanError on a plan, scale or
-    place it does not offer.
+    place it does not offer. 14 Oct 2026: `community` (on unless the card's box leaves it out) adds the community
+    considerations in the frame (community_in_frame), which the PDF draws and lists.
     """
     import basemap
     import bulletin_doc
@@ -244,5 +245,44 @@ def plan(S, kind="regional", scale=None, at=None):
                     inside.append(p)
         P["places"] = inside
     P["centre_choices"] = choices
+    P["community"] = community_in_frame(P["view"]) if (community and P["view"]) else None
+    P["community_asked"] = bool(community)
     S["plan"] = P
     return S
+
+
+def community_in_frame(v):
+    """14 Oct 2026 — the community considerations layer on a plan: the stored features with a vertex inside the frame,
+    or an outline that covers the frame's centre (a residential area larger than a site plan), the kinds among them in
+    the legend's order, and the credit line for the sources those features came from. None when nothing is stored."""
+    import basemap
+    import community
+    from community_sources import polygons_of, in_polygons
+    feats = community.features()
+    if not feats:
+        return None
+    w, h = v["w"], v["h"]
+    keep = []
+    for f in feats:
+        g = f["geometry"]
+        t = g.get("type")
+        if t == "Point":
+            cs = [g["coordinates"]]
+        elif t == "LineString":
+            cs = g["coordinates"]
+        else:
+            cs = [c for poly in polygons_of(g) for ring in poly for c in ring]
+        hit = False
+        for c in cs:
+            x, y = basemap.project(v, c[0], c[1])
+            if 0 <= x <= w and 0 <= y <= h:
+                hit = True
+                break
+        if not hit and t in ("Polygon", "MultiPolygon"):
+            lon, lat = basemap.unproject(v, w / 2, h / 2)
+            hit = in_polygons(lon, lat, polygons_of(g))
+        if hit:
+            keep.append(f)
+    kinds = [dict(k) for k in community.KINDS if any(f["properties"]["kind"] == k["key"] for f in keep)]
+    sources = sorted({f["properties"].get("source_key") for f in keep if f["properties"].get("source_key")})
+    return {"features": keep, "kinds": kinds, "credit": community.credit_line(sources) if keep else ""}
