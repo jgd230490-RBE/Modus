@@ -516,6 +516,10 @@ _vt = _vt[:_vt.index("</tbody>")]
 ok("7: Config's vehicle table: no placeholder or label reads the bare key",
    "placeholder={k}" not in _vt and "aria-label={`${k} " not in _vt and "aria-label={`${nm} " in _vt
    and '"Vehicle (id)"' not in APP)
+# a stored English name equal to its id (the live demo's config row) counts as none typed: the box is empty and its
+# placeholder shows the name the rule gives (browser check, 14 Oct 2026: the box showed the stored id-like text)
+ok("7: Config's English-name box shows a label equal to the id as empty, the rule's name as its placeholder",
+   "value={(lab.en && lab.en !== k) ? lab.en : \"\"} placeholder={vehWord(k)}" in _vt and "value={lab.en || \"\"}" not in _vt)
 for label, gone, now in (
     ("route drawer caption", "mat+' · '+veh+' · payload", "mat+' · '+vehN+' · payload"),
     ("route drawer, several lines", "+' · '+(r.vehicle_type||'—')", "+' · '+(vehName(r.vehicle_type,r.vehicle_name)||'—')"),

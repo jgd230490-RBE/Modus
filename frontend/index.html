@@ -5847,7 +5847,7 @@ function ConfigPage({ meta, who, access }){
                     return (
                     <tr key={k}>
                       <td><div className="font-medium text-slate-800 leading-tight" data-cfg-vehname>{nm}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
-                      <td className="min-w-[190px]"><input className={inp} value={lab.en || ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
+                      <td className="min-w-[190px]"><input className={inp} value={(lab.en && lab.en !== k) ? lab.en : ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
                       {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={vehWord(k)} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
                       <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${nm} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
                       <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${nm} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
