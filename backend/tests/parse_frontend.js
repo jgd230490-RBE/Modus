@@ -2994,18 +2994,30 @@ ok("...and it collapses with the rail like every other item (label behind railSh
 // ---- 14 Oct 2026 (backlog item 2): the route map export from the Routes page --------------------------------------------
 {
   const _rm = (src.match(/function RouteMapExportMenu\([\s\S]*?\n\}\n/) || [""])[0];
-  ok("⭐ ROUTE MAP EXPORT (Routes page): one menu on the Routes list's bar, the month, every route or the one picked, a team, two options",
+  // NARROWED 14 Oct 2026, evening (the user: "just the map … certain scales as in the CLP template"): the two options gave
+  // way to the CLP template's three plans
+  ok("⭐ ROUTE MAP EXPORT (Routes page): one menu on the Routes list's bar, the month, every route or the one picked, a team, the plan",
      _rm.length > 1500 && (code.match(/<RouteMapExportMenu /g) || []).length === 1
      && code.includes("<RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />")
      && _rm.includes('aria-label="Route map month"') && _rm.includes('<option value="all">Every route</option>')
      && _rm.includes('{picked && <option value="picked">Only the route picked in the list</option>}')
-     && _rm.includes("Map only, with the legend on the map") && _rm.includes("Add the National Highways Carbon Tool rows"));
-  ok("...it asks the one staff-only endpoint with the same parameters as the public map (routes, team, map_only, carbon_tool)",
-     _rm.includes("fetch(`${API}/routes/map-export.pdf?${q.toString()}`)") && _rm.includes('if(scope === "picked" && picked) q.set("routes", picked);')
-     && _rm.includes('if(mapOnly) q.set("map_only", "1"); else if(carbonTool) q.set("carbon_tool", "1");'));
-  ok("...team NAMES in its list (teamText), never an id; the Carbon Tool box is not drawn under map only",
-     _rm.includes("{(ipts || []).map(i => <option key={i.id} value={i.id}>{teamText(i.id)}</option>)}")
-     && _rm.includes("{!mapOnly && <label className=\"rme-tick\">"));
+     && _rm.includes('<option value="regional">Regional plan: the whole routes</option>')
+     && _rm.includes('<option value="local">Local plan: around a site, 1:2,000 to 1:3,000</option>')
+     && _rm.includes('<option value="site">Site plan: around a site, 1:500 to 1:1,000</option>'));
+  // REVERSED 14 Oct 2026, evening: no map-only switch and no Carbon Tool rows — the export is only ever the map
+  ok("🔴 ...no 'map only' switch, no Carbon Tool rows, no tick-box style left behind",
+     !/map_only|carbon_tool|mapOnly|carbonTool|Carbon Tool rows/.test(_rm) && !src.includes(".bulletin-menu .rme-tick"));
+  ok("...it asks the one staff-only endpoint with the same parameters as the public map (routes, team, plan, scale, at), PDF or PNG",
+     _rm.includes("fetch(`${API}/routes/map-export.${kind}?${q.toString()}`)") && _rm.includes('if(scope === "picked" && picked) q.set("routes", picked);')
+     && _rm.includes('q.set("plan", plan);') && _rm.includes('if(scale) q.set("scale", scale);')
+     && _rm.includes('if(spec && spec.centred && at) q.set("at", at);')
+     && _rm.includes('onClick={() => download("pdf")}') && _rm.includes('onClick={() => download("png")}'));
+  ok("...the scales and the places to centre on come from the server for the month, routes and team chosen (read again when they change)",
+     _rm.includes("fetch(`${API}/routes/map-export/places?${query().toString()}`)")
+     && _rm.includes("useEffect(() => { if(open) load(); }, [open, m, scope, team, picked]);")
+     && _rm.includes("{(spec ? spec.scales : []).map(n =>") && _rm.includes("{spec && spec.centred && <label><span>Centred on</span>"));
+  ok("...team NAMES in its list (teamText), never an id",
+     _rm.includes("{(ipts || []).map(i => <option key={i.id} value={i.id}>{teamText(i.id)}</option>)}"));
   ok("...it says what it is (approved lines, not an approved CLP), and a refusal in words",
      _rm.includes("Approved lines only. A planning document, not an approved CLP.") && _rm.includes('setErr("The route map could not be made: " + (e.message || e));'));
   ok("...placed after App, outside the Dashboard's read-only stock slice (that pin scans DashboardStockChart → App)",

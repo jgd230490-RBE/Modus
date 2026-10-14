@@ -96,6 +96,81 @@ def scale(v, target_px):
     return km, km * 1000 / m_per_px
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# 14 Oct 2026 (the CLP plans, the user's CLOCS outline CLP template §2.2 / §4): a view at a STATED SCALE, 1:N when the
+# map is printed `frame_w_mm` wide. Mapbox's zoom is fractional (two decimals in the URL), so the zoom is worked out from
+# the scale and the latitude: ground metres per image pixel = N / 1000 × frame_w_mm / w_px. Rounding the zoom to two
+# decimals moves the scale by at most ±0.35 %; Web Mercator's scale also changes with latitude, so 1:N holds at the
+# map's centre (a 1:125,000 plan of 25 km north-south is about 0.4 % off at its top and bottom edges).
+M_EQUATOR = 40075016.686         # metres round the equator, the sphere Web Mercator uses
+MAX_ZOOM = 22.0                  # the Static Images API's deepest zoom
+
+
+def m_per_px(lat, zoom):
+    """Ground metres per image pixel (before @2x) at latitude `lat` and zoom `zoom`."""
+    return M_EQUATOR * math.cos(math.radians(lat)) / (TILE * 2 ** zoom)
+
+
+def zoom_for_scale(denom, lat, frame_w_mm, w_px):
+    """The zoom (two decimals) at which an image w_px wide, printed frame_w_mm wide, is at 1:denom at latitude `lat`."""
+    want = float(denom) / 1000.0 * float(frame_w_mm) / float(w_px)
+    z = math.log2(M_EQUATOR * math.cos(math.radians(lat)) / (TILE * want))
+    return round(max(0.0, min(MAX_ZOOM, z)), 2)
+
+
+def scale_denominator(v, frame_w_mm):
+    """The N of 1:N that view v really is at its centre, printed frame_w_mm wide."""
+    return m_per_px(v["lat"], v["zoom"]) * v["w"] / float(frame_w_mm) * 1000.0
+
+
+def view_centred(lon, lat, zoom, w_px, h_px, reserve_right_px=0):
+    """The view at `zoom` with (lon, lat) in the middle of the image — or, with `reserve_right_px`, in the middle of what
+    is left of it once a strip at the right is kept for a legend."""
+    w_px, h_px = int(min(MAX_PX, w_px)), int(min(MAX_PX, h_px))
+    r = max(0, min(int(reserve_right_px), w_px // 2))
+    mx, my = _merc(lon, lat)
+    lon_c, lat_c = _unmerc(mx + (r / 2) / (TILE * 2 ** zoom), my)
+    lon_c, lat_c = round(lon_c, 5), round(lat_c, 5)     # what the URL says, so project() uses exactly that centre
+    cx, cy = _merc(lon_c, lat_c)
+    return {"lon": lon_c, "lat": lat_c, "zoom": zoom, "w": w_px, "h": h_px, "cx": cx, "cy": cy}
+
+
+def view_to_scale(points, series, frame_w_mm, w_px, h_px, pad_px=24, reserve_right_px=0):
+    """(N, view): the first scale 1:N of `series` (largest scale first) at which every point fits the image with pad_px
+    round it and the right strip kept free; the last of the series when none fits. (None, None) with no points."""
+    pts = [p for p in points if p]
+    if not pts or not series:
+        return None, None
+    w_px, h_px = int(min(MAX_PX, w_px)), int(min(MAX_PX, h_px))
+    r = max(0, min(int(reserve_right_px), w_px // 2))
+    ms = [_merc(*p) for p in pts]
+    x0, x1 = min(m[0] for m in ms), max(m[0] for m in ms)
+    y0, y1 = min(m[1] for m in ms), max(m[1] for m in ms)
+    clon, clat = _unmerc((x0 + x1) / 2, (y0 + y1) / 2)
+    for n in series:
+        z = zoom_for_scale(n, clat, frame_w_mm, w_px)
+        k = TILE * 2 ** z
+        if (x1 - x0) * k <= w_px - r - 2 * pad_px and (y1 - y0) * k <= h_px - 2 * pad_px:
+            return n, view_centred(clon, clat, z, w_px, h_px, r)
+    n = series[-1]
+    return n, view_centred(clon, clat, zoom_for_scale(n, clat, frame_w_mm, w_px), w_px, h_px, r)
+
+
+def bar_metres(v, target_px):
+    """(metres, px): a scale-bar length of 1, 2 or 5 × 10^k metres, the longest not over target_px image pixels."""
+    mpp = m_per_px(v["lat"], v["zoom"])
+    want, best = target_px * mpp, 1
+    for e in range(0, 7):
+        for f in (1, 2, 5):
+            if f * 10 ** e <= want:
+                best = f * 10 ** e
+    return best, best / mpp
+
+
+def length_words(metres):
+    return f"{metres / 1000:g} km" if metres >= 1000 else f"{metres:g} m"
+
+
 def fetch(v, token=None, timeout=12, retina=True):
     """The basemap PNG for view v, or None (no view, no token, Mapbox refused or unreachable). Cached for a day."""
     if not v:

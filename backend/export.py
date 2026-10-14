@@ -2241,180 +2241,192 @@ def bulletin_charted(S):
 
 
 # ------------------------------------------------------------------ the route map export (14 Oct 2026, backlog item 2)
-# The map as filtered (route_map_export.sheet), A4 landscape: the basemap (basemap.py) with the chosen routes drawn on it
-# by the bulletin's own drawing (_draw_bulletin_schematic: Volume colours, letter pins, scale bar, Mapbox credit), the
-# legend, then one row per route and the block the scheme fills in. Staff only. Never a screenshot of the browser map.
-class _RouteMap(_BulletinMap):
-    """The bulletin's map flowable on the export's view model (same keys: map_routes, map_sections, places, controls).
-    With `inset` (the map-only export) the legend is drawn INSIDE the map, top right (the demo tag is top left, the
-    Mapbox logo bottom left, the scale bar and the credit bottom right)."""
-    def __init__(self, S, width, height, inset=False):
-        _BulletinMap.__init__(self, S, width, height)
-        self.inset = inset
-        self.reserve_right = (ROUTE_MAP_INSET_W + 12) if inset else 0      # routes framed clear of the legend
-
-    def draw(self):
-        _BulletinMap.draw(self)
-        if self.inset:
-            _inset_legend(self.canv, self.S, self.width, self.height)
+# 14 Oct 2026, evening (the user: "the only map export to be just the map so it can be added into documents … add certain
+# scales as in the CLP template"): ONE A4 landscape page, the map filling it inside a 6 mm margin, drawn at the stated
+# scale of one of the CLOCS outline CLP template's three plans (route_map_export.PLANS). The basemap (basemap.py) with the
+# chosen routes drawn on it by the bulletin's own drawing (_draw_bulletin_schematic: Volume colours, casings, letter pins),
+# clipped to the frame; INSIDE the map a panel top right (the plan, scheme, month, scale, north arrow, legend, the sites
+# in frame, what it is, the credit), the scale bar bottom right, the demo tag top left. The PNG for a Word document is
+# this page rasterised (route_map_png), so the two never differ. Staff only. Never a screenshot of the browser map.
+ROUTE_MAP_PANEL_MAX_PLACES = 16          # sites listed in the panel; more say "+N more sites"
+ROUTE_MAP_PNG_DPI = 228                  # the frame (285 mm) comes out ≈ 2,560 px wide: the basemap's own @2x pixels
 
 
-ROUTE_MAP_INSET_MAX_PLACES = 16          # sites listed in the inset key; more say "+N more sites"
-ROUTE_MAP_INSET_W = 62 * mm              # the inset legend's width
+def _wrap(text, font, size, width):
+    from reportlab.lib.utils import simpleSplit
+    return simpleSplit(_pdf_safe(text), font, size, width)
 
 
-def _inset_legend(c, S, w, h):
-    """The legend inside the map: the Volume swatches, then the site letters, on a white panel with a keyline."""
-    places = [p for p in S["places"] if p.get("letter")]
-    shown = places[:ROUTE_MAP_INSET_MAX_PLACES]
-    more = len(places) - len(shown)
-    rows = 1 + len(S["volume_legend"]) + (1 + len(shown) if shown else 0) + (1 if more > 0 else 0)
-    lh, pad = 10.5, 6
-    pw = ROUTE_MAP_INSET_W
-    ph = rows * lh + 2 * pad + (3 if shown else 0)
-    x0, y0 = w - pw - 6, h - ph - 6
+def _north_arrow(c, x, y, h=16):
+    """A north arrow, the map being north up: a split triangle (left half filled), 'N' above. (x, y) is its foot."""
+    w = h * 0.55
     c.saveState()
-    c.setFillColorRGB(1, 1, 1); c.setFillAlpha(0.92)
+    c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.7); c.setLineJoin(1)
+    for fill, sx in ((NAVY_RGB, -1), ((1, 1, 1), 1)):
+        p = c.beginPath(); p.moveTo(x, y + h); p.lineTo(x + sx * w / 2, y); p.lineTo(x, y + h * 0.28); p.close()
+        c.setFillColorRGB(*fill); c.drawPath(p, stroke=1, fill=1)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("bold"), 8)
+    c.drawCentredString(x, y + h + 2.5, "N")
+    c.restoreState()
+
+
+def _plan_panel(c, S, fw, fh, basemap_ok):
+    """The panel inside the map, top right. Returns (x0, y0, w, h)."""
+    import route_map_export as rme
+    PL = S["plan"]
+    pw, pad = rme.PANEL_W_MM * mm, 6
+    tw = pw - 2 * pad
+    R, B = _BF("regular"), _BF("bold")
+    items = []                                              # (height, draw(x, y_top)) top to bottom
+
+    def text(s, font=R, size=7.4, lead=9.2, rgb=NAVY_RGB, width=tw):
+        for ln in _wrap(s, font, size, width):
+            items.append((lead, lambda x, y, ln=ln: (c.setFillColorRGB(*rgb), c.setFont(font, size),
+                                                      c.drawString(x, y - size, ln))))
+
+    def gap(h):
+        items.append((h, lambda x, y: None))
+    text(PL["name"], B, 12, 15, width=tw - 16)
+    text(S["tenant"], B, 8, 10)
+    if PL.get("scale_words"):
+        text(f"Scale {PL['scale_words']} at A4" + (" (fitted to the routes)" if PL.get("fitted") else ""), B, 8.6, 11)
+    if PL.get("centre"):
+        text(f"Centred on {PL['centre']}", R, 7.4, 9.2)
+    text(S["filter_words"], R, 7.2, 9, GREY)
+    gap(4)
+    text(S["map_legend_title"], B, 7.8, 10)
+    for g in S["volume_legend"]:
+        def sw(x, y, g=g):
+            c.setFillColorRGB(*_hex_rgb(g["fill"])); c.setStrokeColorRGB(*_hex_rgb("#1F2024")); c.setLineWidth(0.6)
+            c.rect(x, y - 8, 16, 6.5, stroke=1, fill=1)
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.4)
+            c.drawString(x + 21, y - 7.6, _pdf_safe(g["label"]))
+        items.append((9.6, sw))
+    places = [p for p in PL.get("places") or [] if p.get("letter")]
+    shown = places[:ROUTE_MAP_PANEL_MAX_PLACES]
+    if shown:
+        gap(4)
+        text("Sites", B, 7.8, 10)
+        for p in shown:
+            def site(x, y, p=p):
+                c.setFillColorRGB(*NAVY_RGB); c.circle(x + 4, y - 4.6, 4, stroke=0, fill=1)
+                c.setFillColorRGB(1, 1, 1); c.setFont(B, 6.5)
+                c.drawCentredString(x + 4, y - 6.9, p["letter"])
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.4)
+                c.drawString(x + 12, y - 7.4, _pdf_safe(p["name"])[:44])
+            items.append((10, site))
+        if len(places) > len(shown):
+            text(f"+{len(places) - len(shown)} more sites", R, 7.4, 9.2, GREY)
+    gap(4)
+    if PL.get("view") and not basemap_ok:
+        text("No basemap could be had: the routes alone, still to scale.", B, 7, 8.8, DEMO_FG_RGB)
+    text(f"{S['as_at']}. Approved lines only. A planning document, not an approved CLP.", R, 6.8, 8.4, GREY)
+    if basemap_ok:
+        text("Map © Mapbox © OpenStreetMap.", R, 6.8, 8.4, GREY)
+    ph = sum(h for h, _ in items) + 2 * pad
+    x0, y0 = fw - pw - 6, fh - ph - 6
+    c.saveState()
+    c.setFillColorRGB(1, 1, 1); c.setFillAlpha(0.93)
     c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6)
     c.rect(x0, y0, pw, ph, stroke=1, fill=1)
     c.restoreState()
-    y = y0 + ph - pad - 8
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("bold"), 8)
-    c.drawString(x0 + pad, y, _pdf_safe(S["map_legend_title"]))
-    for g in S["volume_legend"]:
-        y -= lh
-        c.setFillColorRGB(*_hex_rgb(g["fill"])); c.setStrokeColorRGB(*_hex_rgb("#1F2024")); c.setLineWidth(0.6)
-        c.rect(x0 + pad, y - 1, 16, 7, stroke=1, fill=1)
-        c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("regular"), 7.5)
-        c.drawString(x0 + pad + 21, y, _pdf_safe(g["label"]))
-    if shown:
-        y -= lh + 3
-        c.setFont(_BF("bold"), 8); c.drawString(x0 + pad, y, "Sites")
-        for p in shown:
-            y -= lh
-            c.setFillColorRGB(*NAVY_RGB); c.circle(x0 + pad + 4, y + 2.4, 4, stroke=0, fill=1)
-            c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 6.5)
-            c.drawCentredString(x0 + pad + 4, y + 0.3, p["letter"])
-            c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("regular"), 7.5)
-            c.drawString(x0 + pad + 12, y, _pdf_safe(p["name"])[:44])
-        if more > 0:
-            y -= lh
-            c.setFillColorRGB(*GREY); c.drawString(x0 + pad + 12, y, f"+{more} more sites")
+    y = y0 + ph - pad
+    for h, draw in items:
+        draw(x0 + pad, y)
+        y -= h
+    if PL.get("view"):
+        _north_arrow(c, x0 + pw - pad - 6, y0 + ph - pad - 26)
+    return x0, y0, pw, ph
+
+
+def _plan_scale_bar(c, v, fw):
+    """The scale bar, bottom right: 1, 2 or 5 × 10^k metres near 50 mm, in four segments, 0 / half / whole labelled."""
+    import basemap
+    k = fw / v["w"]
+    metres, px = basemap.bar_metres(v, 50 * mm / k)
+    bar = px * k
+    x1, y = fw - 16, 24
+    x0 = x1 - bar
+    c.saveState()
+    c.setFillColorRGB(1, 1, 1); c.setFillAlpha(0.9)
+    c.rect(x0 - 10, y - 6, bar + 22, 20, stroke=0, fill=1)
+    c.restoreState()
+    c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6)
+    for i in range(4):
+        c.setFillColorRGB(*(NAVY_RGB if i % 2 == 0 else (1, 1, 1)))
+        c.rect(x0 + i * bar / 4, y - 1.5, bar / 4, 3.5, stroke=1, fill=1)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("regular"), 6.8)
+    c.drawCentredString(x0, y + 4.5, "0")
+    c.drawCentredString(x0 + bar / 2, y + 4.5, basemap.length_words(metres / 2).replace(" km", "").replace(" m", ""))
+    c.drawCentredString(x1, y + 4.5, basemap.length_words(metres))
+    return metres
 
 
 def build_route_map_pdf(S):
+    """The plan as ONE A4 landscape page: exactly at its stated scale (route_map_export.plan) when printed at 100 %."""
     if rl_canvas is None:
         raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
+    import basemap
+    import route_map_export as rme
+    if not S.get("plan"):
+        rme.plan(S)
+    PL = S["plan"]
     buf = io.BytesIO()
     W, H = landscape(A4)
-    lm = rm = 10 * mm
-    notice = S.get("demo_notice")
-    top, bottom = (25 if notice else 20) * mm, 12 * mm
-    usable = W - lm - rm
-    on_page = page_frame(W, H, lm, rm, _pdf_safe(f"{S['tenant']} · {S['title']}"), rule_y=H - 8 * mm,
-                         title_font=(_BF("bold"), 14), title_y=H - 14 * mm,
-                         right=(_pdf_safe(S["as_at"]), _BF("regular"), 8, GREY),
-                         sub=(_pdf_safe(S["filter_words"] + " · a planning document, not an approved CLP"), _BF("regular"),
-                              7.5, GREY, H - 18 * mm),
-                         notice=((_pdf_safe(notice), _BF("bold"), 8.5, DEMO_FG_RGB, H - 22.5 * mm) if notice else None),
-                         foot=("Wayscope · route map export", _BF("regular"), 7, GREY))
-    doc = frame_doc(buf, W, H, lm, rm, top, bottom, S["title"], on_page)
-
-    st = ParagraphStyle("b", fontName=_BF("regular"), fontSize=8, leading=10)
-    st_h = ParagraphStyle("h", parent=st, fontName=_BF("bold"), fontSize=7.5, leading=9, textColor=colors.Color(*NAVY_RGB))
-    st_hr = ParagraphStyle("hr", parent=st_h, alignment=2)
-    st_r = ParagraphStyle("r", parent=st, alignment=2)
-    st_g = ParagraphStyle("g", parent=st, fontSize=7.5, leading=9.5, textColor=colors.Color(*GREY))
-    st_sec = ParagraphStyle("s", parent=st, fontName=_BF("bold"), fontSize=10, leading=13, textColor=colors.Color(*NAVY_RGB),
-                            spaceBefore=4, spaceAfter=2)
-
-    def P(t, s=st):
-        return Paragraph(str(t), s)
-
-    def E(v):
-        return _pdf_safe(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-    story = []
-    if S.get("map_only"):
-        # the map-only export: ONE page, the map filling the frame, the legend inside it, a one-line note under it
-        mp = _RouteMap(S, usable, H - top - bottom - 11 * mm, inset=True)
-        story.append(mp)
-        story.append(_BulletinMapCaption(mp, len(S["rows"])))
-        story.append(P(E(S["two_way_sentence"]) + " Routes coloured by their own figure; figures by route are in the full "
-                       "export.", st_g))
-        doc.build(story)
-        return buf.getvalue()
-    map_h = 92 * mm           # with the legend and the key, the table and the scheme's block fit page 1 for ~6 routes
-    mp = _RouteMap(S, usable, map_h)
-    story.append(mp)
-    story.append(_BulletinMapCaption(mp, len(S["rows"])))
-    story.append(_volume_legend(S, usable))
-    keys = "   ".join(f"<b>{E(p['letter'])}</b> {E(p['name'])}" for p in S["places"])
-    if keys:
-        story.append(P(keys, st_g))
-    story.append(Spacer(1, 2 * mm))
-
-    # the routes, one row each, full width (a long list runs on to the next page with its header row), then the block the
-    # scheme fills in as a 2 × 2 grid (14 Oct 2026: side by side, every route of the demo could not fit one page)
-    if S["rows"]:
-        head = [P("ROUTE", st_h), P("TWO-WAY<br/>A DAY", st_hr), P("LOADS IN<br/>THE MONTH", st_hr), P("TONNES", st_hr),
-                P("VEHICLES", st_h), P("LORRIES<br/>NEEDED", st_hr), P("PLANNING FLAG", st_h), P("CLOSURES<br/>CHECKED", st_h)]
-        data = [head]
-        for r in S["rows"]:
-            data.append([P(f"<font color='#{r['color'].lstrip('#')}'>&#9632;</font> <b>{E(r['letters'])}</b> {E(r['places'])}"),
-                         P(f"<b>{E(r['a_day_text'])}</b>", st_r), P(E(r["loads_text"]), st_r), P(E(r["tonnes_text"]), st_r),
-                         P(E(r["vehicles_text"])), P(E(r["lorries_text"]), st_r),
-                         P((f"<font color='#DC2626'><b>{E(r['flag_text'])}</b></font>" if r["flag_over"] else E(r["flag_text"]))),
-                         P(E(r["checked_text"]))])
-        widths = [usable * x for x in (0.32, 0.08, 0.09, 0.09, 0.15, 0.07, 0.11, 0.09)]
-        t = LongTable(data, colWidths=widths, repeatRows=1)
-        t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")), ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.Color(*NAVY_RGB)),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 1), (-1, -1), 0.4, colors.Color(0.85, 0.87, 0.9)),
-            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
-            ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]))
-        story.append(t)
-        story.append(Spacer(1, 1.5 * mm))
-        story.append(P(E(S["two_way_sentence"]) + " Loads in the month: one load is one two-way movement. " + E(S["flag_words"])
-                       + " Closures: the road authority's stored check, as of the date shown.", st_g))
+    m = rme.MARGIN_MM * mm
+    fw, fh = W - 2 * m, H - 2 * m
+    c = rl_canvas.Canvas(buf, pagesize=(W, H))
+    c.setTitle(_pdf_safe(f"{S['tenant']} · {PL['name']} · {S['month_long']}"))
+    c.setAuthor("Wayscope")
+    c.translate(m, m)
+    v = PL.get("view")
+    png = basemap.fetch(v) if (v and not getattr(_SIZING, "on", False)) else None
+    c.saveState()
+    clip = c.beginPath(); clip.rect(0, 0, fw, fh); c.clipPath(clip, stroke=0, fill=0)
+    if png:
+        c.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=fw, height=fh)
     else:
-        story.append(P("No approved line on the chosen routes in this month.", st_g))
-    story.append(Spacer(1, 3 * mm))
-    cell = lambda k, hint: P(f"<b>{E(k)}</b><br/><font color='#64748B'>{E(hint)}</font><br/>&nbsp;")
-    f = list(S["scheme_fields"])
-    grid = [[P("To be completed by the scheme", st_h), ""]]
-    for n in range(0, len(f), 2):
-        grid.append([cell(*f[n]), cell(*f[n + 1]) if n + 1 < len(f) else ""])
-    grid.append([P("Wayscope does not hold these; they belong to the scheme's own CLP or CTMP.", st_g), ""])
-    bt = LongTable(grid, colWidths=[usable / 2, usable / 2])
-    bt.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.8, colors.Color(*NAVY_RGB)), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
-                            ("SPAN", (0, 0), (-1, 0)), ("SPAN", (0, -1), (-1, -1)),
-                            ("LINEBELOW", (0, 0), (-1, -2), 0.4, colors.Color(0.85, 0.87, 0.9)),
-                            ("LINEAFTER", (0, 1), (0, -2), 0.4, colors.Color(0.85, 0.87, 0.9)),
-                            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-                            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
-    story.append(KeepTogether([bt]))
+        c.setFillColorRGB(0.965, 0.969, 0.973); c.rect(0, 0, fw, fh, stroke=0, fill=1)
+    if v:
+        k = fw / v["w"]
 
-    ct = S.get("carbon_tool")
-    if ct is not None:
-        places = {r["route_id"]: r["places"] for r in S["rows"]}
-        story.append(P("National Highways Carbon Tool: transport inputs for the month (optional block)", st_sec))
-        if ct.get("rows"):
-            data = [[P("CARBON TOOL SHEET", st_h), P("MATERIAL", st_h), P("FROM / TO", st_h), P("TONNES", st_hr),
-                     P("ONE-WAY LOADED KM", st_hr), P("VEHICLE", st_h)]]
-            for r in ct["rows"]:
-                data.append([P(E(r["sheet"])), P(E(r["material"])), P(E(places.get(r["route_id"], r["route_id"]))),
-                             P(f"{r['tonnes']:,.0f}", st_r), P("—" if r["one_way_km"] is None else f"{r['one_way_km']:,.1f}", st_r),
-                             P(E(r["vehicle"]))])
-            t = LongTable(data, colWidths=[usable * x for x in (0.14, 0.18, 0.34, 0.09, 0.11, 0.14)], repeatRows=1)
-            t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
-                                   ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.Color(0.85, 0.87, 0.9)),
-                                   ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
-            story.append(t)
-            story.append(P("Typed into the Carbon Tool's transport rows by the scheme: tonnes and one-way loaded km per origin and "
-                           "destination. Wayscope's own carbon figures are not Carbon Tool figures.", st_g))
-        else:
-            story.append(P("No rows: " + ("the carbon figures could not be read for this month." if ct.get("error")
-                                          else "no approved line on these routes in this month."), st_g))
-    doc.build(story)
+        def P(lon, lat):
+            x, y = basemap.project(v, lon, lat)
+            return x * k, fh - y * k
+        _draw_bulletin_schematic(c, S, 0, 0, fw, fh, P=P)
+    else:
+        c.setFillColorRGB(*GREY); c.setFont(_BF("regular"), 10)
+        c.drawCentredString((fw - rme.PANEL_W_MM * mm) / 2, fh / 2, "No approved line on the chosen routes in this month.")
+    c.restoreState()
+    PL["drawn"] = "mapbox" if png else ("routes only" if v else "empty")
+    _map_tag(c, S.get("map_demo_tag"), fw, fh)
+    _plan_panel(c, S, fw, fh, bool(png))
+    if v:
+        _plan_scale_bar(c, v, fw)
+    c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6)
+    c.rect(0, 0, fw, fh, stroke=1, fill=0)
+    c.showPage()
+    c.save()
     return buf.getvalue()
+
+
+def route_map_png(pdf_bytes, dpi=ROUTE_MAP_PNG_DPI):
+    """The plan's PDF page as a PNG for a Word document: rasterised (pypdfium2), the white margin cut off, the DPI written
+    into the file so Word places it at its printed width (285 mm; Word shrinks it to the page's margins)."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        raise RuntimeError("the PNG needs pypdfium2, which is not installed here (backend/requirements.txt)")
+    import route_map_export as rme
+    pdf = pdfium.PdfDocument(pdf_bytes)
+    try:
+        page = pdf[0]
+        img = page.render(scale=dpi / 72.0).to_pil()
+        page.close()
+    finally:
+        pdf.close()
+    cut = max(0, int(round(rme.MARGIN_MM / 25.4 * dpi)) - 1)      # keep the frame's keyline
+    img = img.crop((cut, cut, img.width - cut, img.height - cut)).convert("RGB")
+    out = io.BytesIO()
+    img.save(out, "PNG", dpi=(dpi, dpi))
+    return out.getvalue()
