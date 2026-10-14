@@ -483,6 +483,17 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ga-key-track{width:18px;height:12px;border-radius:2px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
   .ga-key-red{width:16px;height:10px;border-radius:2px;background:var(--red);}
   .ga-key-gold{width:16px;height:10px;border-radius:2px;background:var(--gold);}
+  /* 14 Oct 2026 (bundle G, W7): CLP monitoring — two columns from 1280 px, a wide card spans both */
+  .clp-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
+  @media (min-width:1280px){.clp-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.clp-card.clp-wide{grid-column:1 / -1;}}
+  .clp-head{font-size:15px;font-weight:600;color:var(--ink);margin:2px 0 6px;}
+  .clp-sub{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:2px;}
+  .clp-pair{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;}
+  @media (min-width:1024px){.clp-pair{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  .clp-note{font-size:13px;color:var(--muted);margin-top:6px;}
+  .clp-src{font-size:13px;color:var(--muted);margin-top:4px;}
+  .clp-how{margin-top:6px;font-size:13px;color:var(--muted);}
+  .clp-how summary{cursor:pointer;color:var(--action);}
   .ga-key-none{width:16px;height:10px;border-radius:2px;background:var(--chart-none);}
   .ga-more{margin-top:8px;}
   .ga-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:6px 0;}
@@ -777,6 +788,23 @@ const INFO = {
   "dash.target": { title: "Carbon target", text: "The scheme's carbon target and where the approved plan stands against it, with and without the agreed Carbon planner decisions. This figure is all-in: materials and transport.", guide: "6-5-reading-the-carbon-target", tech: "t1-carbon" },
   "dash.gates": { title: "Gate arrivals", text: "Lorries a day at each gate in the month, every team together, against what the gate can check in. Amber, Queue likely, from 85 % of that; red, Over gate capacity, past it.",
     how: "Each lorry counts at the gate it arrives by: loaded at the delivery site, empty at the loading site. Trips ÷ working days. Capacity = the gate's open minutes (its hours less any no-delivery peak bands, else the shift) ÷ its check-in minutes a lorry. Averages, no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
+  // 14 Oct 2026 (bundle G, W7): the CLP monitoring section
+  "dash.clp": { title: "CLP monitoring", text: "The Construction Logistics Plan's figures from the approved plan: caps, vehicles, councils, carbon and trips avoided. Planned, not observed: Wayscope holds no gate log or arrival times.",
+    how: "Each chart says what is missing when it cannot be drawn. The CLP pack prints the same charts for a month.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.route_caps": { title: "Routes against their planning cap", text: "Two-way movements a day on each route in the month against the cap typed on the route. Red past the cap. A flag, never a block.",
+    how: "One load is one movement: the month's approved loads ÷ working days, as the bulletin counts. The Look-ahead's ROUTE CAP compares the same cap with the lorries needed on a day.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.site_caps": { title: "Sites against their CLP cap", text: "Lorry visits a day at each site against the CLP cap typed on the location. A visit is one lorry in and out. Red past the cap.",
+    how: "Deliveries where the site is the destination plus lorries coming to load where it is the origin, every team together, ÷ working days.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.vehicle_types": { title: "Movements by vehicle type", text: "Each vehicle type's share of the approved loads, month by month.",
+    how: "Loads are trips rounded up per forecast month, the Dashboard's trips. One load is one movement.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.euro_class": { title: "Movements by Euro class", text: "The approved loads by the Euro class typed for each vehicle type on Config → Vehicles: an assumption about the hauliers' fleets, not a check. Untyped vehicles show as Not typed.",
+    guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.councils": { title: "Movements and lorry distance by council", text: "Two-way movements a day and the lorry distance driven, laden and empty, inside each council area in the month.",
+    how: "The bulletin's figures: a route counts in every area its laden leg enters, so the areas add up to more than the scheme.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.carbon_rate": { title: "Carbon per delivery and per tonne", text: "All-in carbon (making the material, transport and waste) a tonne and a load each month, as planned and with the agreed decisions, against the carbon target shared out over the tonnes.",
+    how: "Per load has no target line: moving material to a bigger lorry makes fewer, heavier loads, so the carbon a load can rise while the total falls.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.trips_avoided": { title: "Lorry trips avoided", text: "Loads each month as planned and with the decisions agreed with the carbon target, and the difference.",
+    how: "Only a decision that changes the lorry, the supplier or the route changes trips; one that changes only the material does not.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "dash.today": { title: "Today", text: "What the Look-ahead plans for today. Each line says reported (an actual is typed), confirmed, edited (not yet confirmed) or planned (follows the week, not yet confirmed).", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_t": { title: "Tonnes today", text: "Each line's planned quantity for today, in tonnes, from the Look-ahead's commit week.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_trips": { title: "Trips today", text: "Loaded trips today: tonnes ÷ payload, rounded up for each line, and the lorry distance on lines with a route.", tech: "t1-trips" },
@@ -1513,7 +1541,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -2041,6 +2069,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         </div>
             </div>
           </details>
+          {/* 14 Oct 2026 (bundle G, W7): the CLP charts, folded; read the first time the section is opened */}
+          <ClpMonitoring months={months} initial={initialClp} />
           <details className="dash-more">
             <summary>Stockpile capacity</summary>
             <div className="pt-3"><DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} /></div>
@@ -2478,6 +2508,191 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
 // with the access code (like the Carbon summary) and saved; the HTML page opens in a new tab, where the staff
 // cookie set at sign-in opens it (/bulletin/ is staff-only, like the guide). The month defaults to this
 // calendar month inside the programme. Every figure is the server's (bulletin_doc.sheet); nothing is computed here.
+// ---- 14 Oct 2026 (bundle G, W7): CLP monitoring --------------------------------------------------
+// GET /api/clp/monitoring?month=N (any signed-in code), read the FIRST time the section is opened, so a closed section
+// costs nothing. The SERVER (backend/clp.py) builds every chart from the module that owns its figure and decides each
+// one's state: "set", or "empty" with the field to fill in, in words — never a zero. The browser draws and formats; it
+// divides nothing. Planned figures only (D42: Wayscope holds no gate log or arrival times). Colours from the chart
+// slots, the status red and the "none" grey; a target or a cap is the ink marker the Gate arrivals chart uses.
+const CLP_NOT_TYPED = "Not typed";
+const clpN1 = (n) => n == null ? "—" : (+n).toFixed(1);
+function ClpCard({ c, info, children, wide }){
+  return (
+    <div className={"card p-4 chart-card clp-card" + (wide ? " clp-wide" : "")} data-clp-chart={c.key} data-clp-state={c.state}>
+      <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">{c.title}{c.subtitle && <span className="text-slate-400 font-normal"> · {c.subtitle}</span>}{info}</div>
+      {c.state !== "set" ? <EmptyState kind="none" title="Not enough to draw this yet" body={c.missing} /> : <>
+        {c.headline && <div className="clp-head" data-clp-head={c.key}>{c.headline}</div>}
+        {children}
+        {c.basis && <details className="clp-how"><summary>How it is worked out</summary><p>{c.basis}</p></details>}
+        {c.source && <div className="clp-src">Source: {c.source}</div>}
+      </>}
+    </div>
+  );
+}
+// a bullet chart, one row a route or a site: a pale track to the cap, the planned figure inside it (red past the cap), an
+// ink marker at the cap, and the figure in words beside it (no hover on a print or a TV). Rows with no cap are a sentence.
+function clpBulletCfg(rows, valKey, nameKey, word){
+  const C1 = tok("--chart-1", "#E8590C"), RED = tok("--red", "#DC2626"), INK = tok("--ink", "#1E293B");
+  const fs = 11;
+  const marks = { id: "clpCapMarks", afterDatasetsDraw: (chart) => {
+    const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx; if(!x) return;
+    ctx.save();
+    meta.data.forEach((el, i) => { const r = rows[i]; if(!r) return;
+      const half = (el.height || 16) / 2 + 5, px = x.getPixelForValue(r.cap);
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(px, el.y - half); ctx.lineTo(px, el.y + half); ctx.stroke();
+      ctx.font = `600 ${fs + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.fillStyle = r.over ? RED : INK;
+      ctx.fillText(`${clpN1(r[valKey])} ${word} · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : ""), Math.max(el.x, px) + 10, el.y);
+    });
+    ctx.restore();
+  } };
+  return { type: "bar",
+    data: { labels: rows.map(r => r[nameKey]), datasets: [
+      { label: "Cap a day", data: rows.map(r => r.cap), backgroundColor: tok("--surface-3", "#F3F2EF"), borderColor: tok("--grey", "#E7E5E4"),
+        borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
+      { label: `Planned ${word}`, data: rows.map(r => r[valKey]), backgroundColor: rows.map(r => r.over ? RED : C1), borderWidth: 0,
+        borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 8, right: 230 } },
+      plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1 } },
+      scales: { x: { min: 0, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: fs } },
+                     title: { display: true, text: word, font: { size: fs } } },
+                y: { grid: { display: false }, ticks: { font: { size: fs + 1 } } } } },
+    plugins: [marks] };
+}
+// a 100 % stacked bar a month: each group's share of the month's loads, the share and the loads in the tooltip
+function clpShareCfg(c){
+  const SURF = tok("--surface", "#FFFFFF");
+  let slot = 0;
+  return { type: "bar",
+    data: { labels: (c.months || []).map(m => m.label), datasets: (c.series || []).map(s => ({
+      label: s.label, data: s.pct, stack: "s", borderWidth: { top: 2 }, borderColor: SURF, borderSkipped: "start",
+      backgroundColor: s.group === CLP_NOT_TYPED ? tok("--chart-none", "#A8A29E") : colorOf(slot++) })) },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (it) => { const s = c.series[it.datasetIndex]; return `${s.label}: ${grp(s.loads[it.dataIndex])} loads (${s.pct[it.dataIndex] == null ? "—" : s.pct[it.dataIndex] + " %"})`; } } } },
+      scales: { x: { stacked: true, grid: { display: false } },
+                y: { stacked: true, max: 100, ticks: { callback: (v) => v + " %" } } } } };
+}
+function clpCouncilCfg(c){
+  const C1 = tok("--chart-1", "#E8590C"), C3 = tok("--chart-3", "#0D9488"), INK = tok("--ink", "#1E293B");
+  const rows = c.rows || [];
+  const words = { id: "clpCouncilWords", afterDatasetsDraw: (chart) => {
+    const meta = chart.getDatasetMeta(1), ctx = chart.ctx; ctx.save();
+    ctx.font = "600 12px Inter, system-ui, sans-serif"; ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillStyle = INK;
+    meta.data.forEach((el, i) => { const r = rows[i]; if(!r) return;
+      ctx.fillText(`${clpN1(r.movements_per_day)} movements a day · ${grp(r.distance)} ${c.distance_word}`, el.x + 8, el.y); });
+    ctx.restore();
+  } };
+  return { type: "bar",
+    data: { labels: rows.map(r => r.council), datasets: [
+      { label: `Laden ${c.distance_word}`, data: rows.map(r => r.laden_distance), backgroundColor: C1, stack: "d", borderWidth: 0 },
+      { label: `Empty ${c.distance_word}`, data: rows.map(r => r.empty_distance), backgroundColor: C3, stack: "d", borderWidth: 0 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { right: 250 } },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { x: { stacked: true, grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") } }, y: { stacked: true, grid: { display: false } } } },
+    plugins: [words] };
+}
+function clpCarbonCfg(c, per){
+  const C1 = tok("--chart-1", "#E8590C"), C3 = tok("--chart-3", "#0D9488"), INK = tok("--ink", "#1E293B");
+  const m = c.months || [];
+  const k = per === "tonne" ? "kg_per_tonne" : "kg_per_load";
+  const ds = [{ label: "As planned", data: m.map(r => r[k]), borderColor: C1, backgroundColor: C1, pointRadius: 4, tension: 0 }];
+  if(m.some(r => r[k + "_decisions"] != null)) ds.push({ label: "With the agreed decisions", data: m.map(r => r[k + "_decisions"]), borderColor: C3, backgroundColor: C3, pointRadius: 4, tension: 0 });
+  if(per === "tonne" && c.target_kg_per_tonne != null) ds.push({ label: "The target, shared out", data: m.map(() => c.target_kg_per_tonne), borderColor: INK, borderDash: [6, 4], borderWidth: 2, pointRadius: 0 });
+  return { type: "line", data: { labels: m.map(r => r.label), datasets: ds },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { x: { grid: { display: false } }, y: { title: { display: true, text: per === "tonne" ? "kg CO₂e a tonne" : "kg CO₂e a load" } } } } };
+}
+function clpTripsCfg(c){
+  const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)");
+  const m = c.months || [];
+  return { type: "bar", data: { labels: m.map(r => r.label), datasets: [
+      { label: "Loads as planned", data: m.map(r => r.loads_planned), backgroundColor: C1S, borderColor: C1, borderWidth: 1 },
+      { label: "With the agreed decisions", data: m.map(r => r.loads_with_decisions), backgroundColor: C1, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+      tooltip: { callbacks: { footer: (items) => items.length ? `${grp(m[items[0].dataIndex].avoided)} trips avoided` : "" } } },
+      scales: { x: { grid: { display: false } } } } };
+}
+function ClpUncapped({ rows, nameKey, valKey, word, what }){
+  const left = (rows || []).filter(r => r.cap == null);
+  if(!left.length) return null;
+  return <div className="clp-note" data-clp-uncapped={what}>{left.length} {left.length === 1 ? what : what + "s"} with no cap typed, not compared: {left.map(r => `${r[nameKey]} (${clpN1(r[valKey])} ${word})`).join(", ")}.</div>;
+}
+function ClpMonitoring({ months, initial }){
+  const [open, setOpen] = useState(!!initial);
+  const [month, setMonth] = useState(() => (initial && initial.month) || gaMonthToday(months));
+  const [data, setData] = useState(initial || null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    if(!open) return;
+    if(data && data.month === month) return;      // folded and opened again: the same month is not read twice
+    let live = true;
+    setErr(false);
+    fetch(`${API}/clp/monitoring?month=${month}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+      if(live) setData(j);
+    }).catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, [open, month]);
+  const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
+  const C = (data && data.charts) || {};
+  const capped = (rows) => (rows || []).filter(r => r.cap != null);
+  return (
+    <details className="dash-more" data-clp="1" data-guide="dash-clp" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>
+      <div className="pt-3" data-clp-body="1">
+        <div className="ct-row mb-2">
+          <span className="ct-line">The Construction Logistics Plan's figures from the approved plan<InfoTip id="dash.clp" /></span>
+          <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => setMonth(+e.target.value)} aria-label="CLP month">
+            {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}
+          </select></label>
+        </div>
+        {err && <div className="ct-line" data-clp-error="1">The CLP figures did not load.</div>}
+        {!data && !err && <div className="ct-line">Loading the CLP figures…</div>}
+        {data && <>
+          <div className="ct-note">{data.scope_line} {data.limit}</div>
+          {data.peak_words && <div className="ct-note" data-clp-peak="1">{data.peak_words}</div>}
+          <div className="clp-grid">
+            <ClpCard c={C.route_caps} info={<InfoTip id="clp.route_caps" />} wide>
+              {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "movements a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
+              <ClpUncapped rows={C.route_caps.rows} nameKey="route" valKey="movements_per_day" word="a day" what="route" />
+            </ClpCard>
+            <ClpCard c={C.site_caps} info={<InfoTip id="clp.site_caps" />} wide>
+              {capped(C.site_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.site_caps.rows), "visits_per_day", "site", "visits a day")} height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />}
+              <ClpUncapped rows={C.site_caps.rows} nameKey="site" valKey="visits_per_day" word="a day" what="site" />
+            </ClpCard>
+            <ClpCard c={C.vehicle_types} info={<InfoTip id="clp.vehicle_types" />}>
+              <ChartCanvas config={clpShareCfg(C.vehicle_types)} />
+            </ClpCard>
+            <ClpCard c={C.euro_class} info={<InfoTip id="clp.euro_class" />}>
+              <ChartCanvas config={clpShareCfg(C.euro_class)} />
+              {(C.euro_class.vehicles_untyped || []).length > 0 && <div className="clp-note">No Euro class typed for: {C.euro_class.vehicles_untyped.join(", ")} (Config → Vehicles).</div>}
+            </ClpCard>
+            <ClpCard c={C.councils} info={<InfoTip id="clp.councils" />} wide>
+              <ChartCanvas config={clpCouncilCfg(C.councils)} height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />
+              {C.councils.double_count && <div className="clp-note">{C.councils.double_count}</div>}
+              {(C.councils.attribution || []).map((a, i) => <div key={i} className="clp-src">{a}</div>)}
+            </ClpCard>
+            <ClpCard c={C.carbon_rate} info={<InfoTip id="clp.carbon_rate" />} wide>
+              <div className="clp-pair">
+                <div><div className="clp-sub">Per tonne</div><ChartCanvas config={clpCarbonCfg(C.carbon_rate, "tonne")} /></div>
+                <div><div className="clp-sub">Per load</div><ChartCanvas config={clpCarbonCfg(C.carbon_rate, "load")} /></div>
+              </div>
+              {C.carbon_rate.target_note && <div className="clp-note" data-clp-no-target="1">{C.carbon_rate.target_note}</div>}
+              {C.carbon_rate.invalid && <div className="clp-note">{C.carbon_rate.invalid}</div>}
+              {C.carbon_rate.per_load_note && <div className="clp-note">{C.carbon_rate.per_load_note}</div>}
+            </ClpCard>
+            <ClpCard c={C.trips_avoided} info={<InfoTip id="clp.trips_avoided" />}>
+              <ChartCanvas config={clpTripsCfg(C.trips_avoided)} />
+              {C.trips_avoided.distance_saved != null && <div className="clp-note">{grp(Math.abs(C.trips_avoided.distance_saved))} {C.trips_avoided.distance_word} {C.trips_avoided.distance_saved >= 0 ? "saved" : "added"} over the months shown.</div>}
+              {(C.trips_avoided.decisions || []).length > 0 && <div className="clp-note">The agreed decisions: {C.trips_avoided.decisions.join("; ")}.</div>}
+            </ClpCard>
+          </div>
+        </>}
+      </div>
+    </details>
+  );
+}
+
 function BulletinMenu({ months }){
   const now = new Date();
   const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));

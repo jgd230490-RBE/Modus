@@ -618,6 +618,51 @@ if (loaded) {
         !dSet.includes("data-gate-arrivals") && !dSet.includes("About: Gate arrivals") && !dNone.includes("data-gate-arrivals") && !dNone.includes("ga-table")
         && !dSet.includes("<code>/api/gates/arrivals</code>") && dSet.includes("technical guide</a>"));
     }
+    // ---- 14 Oct 2026 (bundle G, W7): CLP monitoring, from fixtures/clp_monitoring.json (test_clp.py writes it: Oct 2026, every
+    // chart set). The section is folded and read on first open; with the fixture handed in (initialClp) it renders open.
+    const clpPath = path.join(__dirname, "fixtures", "clp_monitoring.json");
+    ok("the CLP fixture exists (test_clp.py writes it from a clean run)", fs.existsSync(clpPath));
+    if (fs.existsSync(clpPath)) {
+      const CLPF = JSON.parse(fs.readFileSync(clpPath, "utf8"));
+      const escH = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
+      const cOut = render("the Dashboard renders with the CLP section open (initialClp)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: CLPF, onOpen(){} }));
+      const cP = seg(cOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
+      ok("⭐ CLP: the section is a folded <details> after More charts, open when its figures are handed in, with its summary",
+        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>")
+        && cOut.indexOf('data-clp="1"') > cOut.indexOf("<summary>More charts") && cOut.indexOf('data-clp="1"') < cOut.indexOf("<summary>Stockpile capacity"));
+      ok("⭐ CLP: seven cards in the server's order, each in state set, each headline the server's words",
+        CLPF.order.every(k => cP.includes(`data-clp-chart="${k}" data-clp-state="set"`))
+        && CLPF.order.every((k, i) => i === 0 || cP.indexOf(`data-clp-chart="${CLPF.order[i - 1]}"`) < cP.indexOf(`data-clp-chart="${k}"`))
+        && CLPF.order.every(k => cP.includes(`data-clp-head="${k}">${escH(CLPF.charts[k].headline)}<`)),
+        CLPF.order.filter(k => !cP.includes(`data-clp-chart="${k}" data-clp-state="set"`)).join(", "));
+      ok("CLP: each card names its title, its source, an info box and how it is worked out; the scope, the limit and the peak bands are said once",
+        ["Routes against their planning cap", "Sites against their CLP cap", "Movements by vehicle type", "Movements by Euro class",
+         "Movements and lorry distance by council", "Carbon per delivery and per tonne", "Lorry trips avoided"].every(t => cP.includes(`aria-label="About: ${t}"`))
+        && (cP.match(/<summary>How it is worked out<\/summary>/g) || []).length === 7 && (cP.match(/class="clp-src">Source: Wayscope/g) || []).length === 7
+        && cP.includes(escH(CLPF.scope_line)) && cP.includes(escH(CLPF.limit)) && cP.includes('data-clp-peak="1">' + escH(CLPF.peak_words) + "<")
+        && cP.includes('aria-label="About: CLP monitoring"'));
+      ok("CLP: the routes and sites with no cap are one line each, never a bar; the councils' double-count sentence and licence lines print",
+        cP.includes('data-clp-uncapped="route">2 routes with no cap typed, not compared: ') && cP.includes('data-clp-uncapped="site">')
+        && cP.includes(escH(CLPF.charts.councils.double_count)) && CLPF.charts.councils.attribution.every(a => cP.includes(escH(a))));
+      ok("CLP: the carbon card draws per tonne and per load, says why per load has no target line, and names the decision on the trips card",
+        cP.includes('<div class="clp-sub">Per tonne</div>') && cP.includes('<div class="clp-sub">Per load</div>') && cP.includes(escH(CLPF.charts.carbon_rate.per_load_note))
+        && cP.includes(escH("The agreed decisions: " + CLPF.charts.trips_avoided.decisions.join("; ") + ".")));
+      ok("🔴 CLP: no undefined / NaN, no team id, none of the banned words in the rendered section",
+        !/undefined|NaN|\bIPT ?[1-6]\b/.test(cP) && !/\b(bake[ds]?|line-month|cached|geometry|server|endpoint|token|real-time|telematics|optimi[sz]\w*|predict\w*|trucks?)\b/i.test(cP.replace(/<[^>]+>/g, " ")));
+      const E = JSON.parse(JSON.stringify(CLPF));
+      E.charts.euro_class = { ...E.charts.euro_class, state: "empty", missing: "No Euro class typed for the vehicles the plan uses (Config → Vehicles → Euro class)." };
+      const eC = seg(render("the Dashboard renders a CLP chart with no data", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: E, onOpen(){} })),
+                     '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
+      const eCard = seg(eC, 'data-clp-chart="euro_class"', 'data-clp-chart="councils"');
+      ok("⭐ CLP: an empty chart is an empty state naming the field to fill in — no headline, no canvas, no figure",
+        eCard.includes('data-clp-state="empty"') && eCard.includes('data-empty="none"') && eCard.includes(">Not enough to draw this yet<")
+        && eCard.includes(">No Euro class typed for the vehicles the plan uses (Config → Vehicles → Euro class).<")
+        && !eCard.includes("data-clp-head") && !eCard.includes("<canvas") && !/\b0 %|>0</.test(eCard));
+      const zOut = render("the Dashboard renders the CLP section folded (no figures yet)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, onOpen(){} }));
+      const zP = seg(zOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
+      ok("CLP: with nothing handed in, the section is folded (no open attribute) and holds no chart",
+        zP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp">') && !zP.includes("data-clp-chart") && zP.includes("Loading the CLP figures"));
+    }
     // R2: a cap 2.0 tCO2e over (approved 7 361.1, with the decisions 7 002.8, cap 7 000.8) reads OVER on the Dashboard, as on the
     // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
     const dCap2 = dash(CAP2);

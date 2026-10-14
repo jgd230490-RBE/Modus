@@ -464,6 +464,56 @@ async function infoTipDom(){
   act(() => { root2.unmount(); }); box2.remove();
 }
 
+// ---- 14 Oct 2026 (bundle G, W7): CLP monitoring in a real DOM — read on FIRST OPEN only, the month select re-reads, a
+// failed read says so, an empty chart names its field. fetch is a stub answering with test_clp.py's fixture.
+async function clpDom(){
+  const CLPF = FIX("clp_monitoring.json");
+  const calls = [];
+  // the stub answers for the month that was asked (the server's month rides on the reply)
+  const srv = { clp: (m) => reply(200, { ...CLPF, month: m }) };
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (String(url).startsWith("/api/clp/monitoring")) return srv.clp(+String(url).split("month=")[1]);
+    return new Promise(() => {});
+  };
+  const el = w.document.createElement("div"); w.document.body.appendChild(el);
+  const r = w.ReactDOM.createRoot(el);
+  act(() => { r.render(w.React.createElement(w.ClpMonitoring, { months: metaMin.months })); });
+  await settle(30);
+  const _d = new Date(), thisMonth = Math.max(1, Math.min(metaMin.months.count, (_d.getFullYear() - metaMin.months.start_year) * 12 + _d.getMonth() + 1));
+  ok("⭐ CLP DOM: a folded section reads NOTHING (a closed section costs nothing)", calls.length === 0 && !el.querySelector("details[data-clp]").open);
+  const det = el.querySelector("details[data-clp]");
+  await act(async () => { det.open = true; det.dispatchEvent(new w.Event("toggle")); await sleep(30); });
+  ok("⭐ CLP DOM: opening it reads this month once, as a GET, and draws the seven cards",
+     calls.length === 1 && calls[0].url === `/api/clp/monitoring?month=${thisMonth}` && calls[0].method === "GET"
+     && el.querySelectorAll('[data-clp-state="set"]').length === 7, JSON.stringify(calls));
+  ok("CLP DOM: the headlines are the server's words",
+     CLPF.order.every(k => (el.querySelector(`[data-clp-head="${k}"]`) || {}).textContent === CLPF.charts[k].headline));
+  await act(async () => { det.open = false; det.dispatchEvent(new w.Event("toggle")); await sleep(10); });
+  await act(async () => { det.open = true; det.dispatchEvent(new w.Event("toggle")); await sleep(10); });
+  ok("CLP DOM: folding and opening it again does not read again for the same month", calls.length === 1, JSON.stringify(calls));
+  const other = thisMonth === 3 ? 4 : 3;
+  const sel = el.querySelector('select[aria-label="CLP month"]');
+  await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(sel, String(other));
+    sel.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(30); });
+  ok("⭐ CLP DOM: picking another month reads that month, and nothing else", calls.length === 2 && calls[1].url === `/api/clp/monitoring?month=${other}`, JSON.stringify(calls));
+  srv.clp = () => reply(500, "boom");
+  const third = other === 5 ? 6 : 5;
+  await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(sel, String(third));
+    sel.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(30); });
+  ok("CLP DOM: a failed read says so in one line", !!el.querySelector('[data-clp-error="1"]') && el.querySelector('[data-clp-error="1"]').textContent === "The CLP figures did not load.");
+  const E = JSON.parse(JSON.stringify(CLPF));
+  E.charts.trips_avoided = { ...E.charts.trips_avoided, state: "empty", missing: "No decisions agreed yet: a planner sets them with the carbon target in the Carbon planner." };
+  srv.clp = (m) => reply(200, { ...E, month: m });
+  await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(sel, String(thisMonth));
+    sel.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(30); });
+  const tc = el.querySelector('[data-clp-chart="trips_avoided"]');
+  ok("⭐ CLP DOM: an empty chart names what is missing and where, with no figure",
+     !!tc && tc.getAttribute("data-clp-state") === "empty" && tc.textContent.includes("No decisions agreed yet: a planner sets them with the carbon target in the Carbon planner.")
+     && !tc.querySelector("canvas") && !tc.querySelector("[data-clp-head]"));
+  act(() => { r.unmount(); }); el.remove();
+}
+
 async function gateArrivalsDom(){
   const GA = FIX("gate_arrivals.json"), CTX = FIX("carbon_target.json"), CL = FIX("cost_lines.json");
   const calls = [];
@@ -1209,6 +1259,8 @@ function keptAppLoader(){
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
   try { await gateArrivalsDom(); ok("GATE DOM: the section ran to the end", true); }
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await clpDom(); ok("CLP DOM: the section ran to the end", true); }
+  catch (e) { ok("CLP DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await infoTipDom(); ok("INFO BOX: the section ran to the end", true); }
   catch (e) { ok("INFO BOX: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await chartBoxDom(); ok("CHART BOX: the section ran to the end", true); }

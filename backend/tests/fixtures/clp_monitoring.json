@@ -1,0 +1,394 @@
+{
+ "month": 10,
+ "label": "Oct 2026",
+ "working_days": 22.0,
+ "distance_unit": "km",
+ "months": [
+  {
+   "month_index": 10,
+   "label": "Oct 2026"
+  },
+  {
+   "month_index": 11,
+   "label": "Nov 2026"
+  }
+ ],
+ "order": [
+  "route_caps",
+  "site_caps",
+  "vehicle_types",
+  "euro_class",
+  "councils",
+  "carbon_rate",
+  "trips_avoided"
+ ],
+ "charts": {
+  "route_caps": {
+   "number": "1",
+   "title": "Routes against their planning cap",
+   "serves": "TfL CLP guidance: estimated vehicle movements, kept within what was agreed",
+   "key": "route_caps",
+   "state": "set",
+   "missing": null,
+   "rows": [
+    {
+     "route_id": "R001",
+     "route": "Pit West → Yard East",
+     "movements_per_day": 4.545,
+     "cap": 4,
+     "pct": 114,
+     "over": true,
+     "over_by": 0.545
+    },
+    {
+     "route_id": "R002",
+     "route": "Pit North → Yard North",
+     "movements_per_day": 4.545,
+     "cap": null,
+     "pct": null,
+     "over": false,
+     "over_by": null
+    },
+    {
+     "route_id": "R003",
+     "route": "Pit West → Yard North",
+     "movements_per_day": 0.909,
+     "cap": null,
+     "pct": null,
+     "over": false,
+     "over_by": null
+    }
+   ],
+   "routes_with_cap": 1,
+   "routes_without_cap": 2,
+   "over": 1,
+   "headline": "1 route over its cap",
+   "subtitle": "two-way movements a day, Oct 2026",
+   "basis": "Two-way movements a day: one load = one movement; the month's approved loads ÷ 22 working days, against the cap typed on the route. A flag, never a block. The Look-ahead's ROUTE CAP flag compares the same cap with the lorries needed on a day; this chart, like the bulletin, compares it with movements a day.",
+   "source": "Wayscope: the approved plan and each route's typed cap"
+  },
+  "site_caps": {
+   "number": "1",
+   "title": "Sites against their CLP cap",
+   "serves": "TfL CLP guidance: the peak number of vehicles a site can take",
+   "key": "site_caps",
+   "state": "set",
+   "missing": null,
+   "rows": [
+    {
+     "location_id": "L002",
+     "site": "Yard East",
+     "visits_per_day": 4.5,
+     "laden_per_day": 4.5,
+     "empty_per_day": 0.0,
+     "cap": 4.0,
+     "pct": 114,
+     "over": true,
+     "over_by": 0.5
+    },
+    {
+     "location_id": "L001",
+     "site": "Pit West",
+     "visits_per_day": 5.5,
+     "laden_per_day": 0.0,
+     "empty_per_day": 5.5,
+     "cap": null,
+     "pct": null,
+     "over": false,
+     "over_by": null
+    },
+    {
+     "location_id": "L004",
+     "site": "Yard North",
+     "visits_per_day": 5.5,
+     "laden_per_day": 5.5,
+     "empty_per_day": 0.0,
+     "cap": null,
+     "pct": null,
+     "over": false,
+     "over_by": null
+    },
+    {
+     "location_id": "L003",
+     "site": "Pit North",
+     "visits_per_day": 4.5,
+     "laden_per_day": 0.0,
+     "empty_per_day": 4.5,
+     "cap": null,
+     "pct": null,
+     "over": false,
+     "over_by": null
+    }
+   ],
+   "sites_with_cap": 1,
+   "over": 1,
+   "headline": "1 site over its CLP cap",
+   "subtitle": "lorry visits a day, Oct 2026",
+   "basis": "A visit is one lorry in and out: a delivery where the site is the destination, or a lorry coming to load where it is the origin; the month's approved trips ÷ 22 working days, every team together, against the CLP cap typed on the location. A flag, never a block.",
+   "source": "Wayscope: the approved plan and each site's typed CLP cap"
+  },
+  "vehicle_types": {
+   "number": "4",
+   "title": "Movements by vehicle type",
+   "serves": "TfL CLP guidance: vehicle movements by type and size",
+   "key": "vehicle_types",
+   "state": "set",
+   "missing": null,
+   "months": [
+    {
+     "month_index": 10,
+     "label": "Oct 2026"
+    },
+    {
+     "month_index": 11,
+     "label": "Nov 2026"
+    }
+   ],
+   "series": [
+    {
+     "group": "Artic Tipper (44t)",
+     "label": "Artic Tipper (44t)",
+     "loads": [
+      120,
+      50
+     ],
+     "pct": [
+      54.5,
+      100.0
+     ],
+     "total": 170
+    },
+    {
+     "group": "Rigid 8-wheeler (32t)",
+     "label": "Rigid 8-wheeler (32t)",
+     "loads": [
+      100,
+      0
+     ],
+     "pct": [
+      45.5,
+      0.0
+     ],
+     "total": 100
+    }
+   ],
+   "totals": [
+    220,
+    50
+   ],
+   "headline": "Artic Tipper (44t) carries 63 % of the loads",
+   "subtitle": "share of approved loads each month (one load = one movement)",
+   "basis": "Approved loads (trips, rounded up per forecast month) by the vehicle each line plans to use.",
+   "source": "Wayscope: the approved plan; vehicle types from Config → Vehicles"
+  },
+  "euro_class": {
+   "number": "5",
+   "title": "Movements by Euro class",
+   "serves": "TfL CLP guidance: vehicle age and emissions standard",
+   "key": "euro_class",
+   "state": "set",
+   "missing": null,
+   "months": [
+    {
+     "month_index": 10,
+     "label": "Oct 2026"
+    },
+    {
+     "month_index": 11,
+     "label": "Nov 2026"
+    }
+   ],
+   "series": [
+    {
+     "group": "Euro VI",
+     "label": "Euro VI",
+     "loads": [
+      120,
+      50
+     ],
+     "pct": [
+      54.5,
+      100.0
+     ],
+     "total": 170
+    },
+    {
+     "group": "Not typed",
+     "label": "Not typed",
+     "loads": [
+      100,
+      0
+     ],
+     "pct": [
+      45.5,
+      0.0
+     ],
+     "total": 100
+    }
+   ],
+   "totals": [
+    220,
+    50
+   ],
+   "vehicles_untyped": [
+    "Rigid 8-wheeler (32t)"
+   ],
+   "headline": "Euro VI: 63 % of the loads",
+   "subtitle": "share of approved loads each month, by the Euro class typed for each vehicle type",
+   "basis": "The Euro class the plan assumes for each vehicle type (Config → Vehicles), not a check of any haulier's fleet. A vehicle type with none typed is counted as Not typed, never guessed.",
+   "source": "Wayscope: the approved plan; Euro classes typed on Config → Vehicles"
+  },
+  "councils": {
+   "number": "6",
+   "title": "Movements and lorry distance by council",
+   "serves": "TfL CLP guidance: routes and the roads the scheme's lorries use",
+   "key": "councils",
+   "state": "set",
+   "missing": null,
+   "rows": [
+    {
+     "area_id": "W",
+     "council": "Westshire",
+     "movements_per_day": 9.1,
+     "laden_distance": 743.5,
+     "empty_distance": 2117.2,
+     "distance": 2860.7,
+     "routes": 2
+    },
+    {
+     "area_id": "S",
+     "council": "Southshire",
+     "movements_per_day": 0.0,
+     "laden_distance": 0.0,
+     "empty_distance": 1518.6,
+     "distance": 1518.6,
+     "routes": 0
+    },
+    {
+     "area_id": "E",
+     "council": "Eastshire",
+     "movements_per_day": 4.5,
+     "laden_distance": 338.1,
+     "empty_distance": 338.0,
+     "distance": 676.1,
+     "routes": 1
+    }
+   ],
+   "tier": "district",
+   "unit": "km",
+   "distance_word": "lorry-km",
+   "scheme_movements_per_day": 9.1,
+   "headline": "Westshire takes the most: 9.1 movements a day",
+   "subtitle": "lorry-km in Oct 2026, laden and empty, and two-way movements a day",
+   "basis": "Two-way movements a day: one load = one two-way movement. An area counts the month's approved loads of every route whose laden leg enters it, divided by the working days; the empty return adds none. A route counts in every area its laden leg enters, so the areas' figures add up to more than the scheme's. A laden leg enters an area when at least 200 m of it is inside (the boundaries are generalised to 200 m); a route inside by less adds its km and carbon there, not its movements. Distance: every lorry-km driven inside the area, laden and empty.",
+   "double_count": "A route counts in every area its laden leg enters, so the areas' figures add up to more than the scheme's.",
+   "attribution": [
+    "Source: Office for National Statistics licensed under the Open Government Licence v.3.0",
+    "Contains OS data © Crown copyright and database right 2026"
+   ],
+   "source": "Wayscope: the approved plan on the stored road routes; council boundaries as the map prints them"
+  },
+  "carbon_rate": {
+   "number": "10",
+   "title": "Carbon per delivery and per tonne against the target",
+   "serves": "The scheme's carbon target",
+   "key": "carbon_rate",
+   "state": "set",
+   "missing": null,
+   "months": [
+    {
+     "month_index": 10,
+     "label": "Oct 2026",
+     "loads": 220,
+     "tonnes": 5480.0,
+     "kg_per_load": 216.9,
+     "kg_per_tonne": 8.71,
+     "kg_per_load_decisions": 245.7,
+     "kg_per_tonne_decisions": 8.47
+    },
+    {
+     "month_index": 11,
+     "label": "Nov 2026",
+     "loads": 50,
+     "tonnes": 1450.0,
+     "kg_per_load": 239.0,
+     "kg_per_tonne": 8.24,
+     "kg_per_load_decisions": 239.0,
+     "kg_per_tonne_decisions": 8.24
+    }
+   ],
+   "unit_note": "All-in",
+   "headline": "8.61 kg CO₂e a tonne planned; the target allows 8.42",
+   "plan_kg_per_load": 221.0,
+   "plan_kg_per_tonne": 8.61,
+   "target_kg_per_tonne": 8.42,
+   "target_t": 58.381,
+   "per_load_note": "Per load has no target line: a decision that moves material to a bigger lorry makes fewer, heavier loads, so the carbon a load can rise while the total falls.",
+   "target_scope": "scheme",
+   "target_note": null,
+   "invalid": null,
+   "lines_unrouted": 1,
+   "subtitle": "kg CO₂e per load and per tonne, all-in (making the material, transport and waste disposal)",
+   "basis": "All-in carbon of the approved plan each month ÷ its loads and ÷ its tonnes; with the agreed decisions where a target is set. The target line is the carbon target shared out evenly over the tonnes: the target ÷ the whole plan's tonnes. Per load has no target line: a decision that moves material to a bigger lorry makes fewer, heavier loads, so the carbon a load can rise while the total falls. 1 forecast month with no road route yet carries no transport carbon here.",
+   "source": "Wayscope Carbon planner: DESNZ 2026 conversion factors and the factors it names; the target set on the Carbon planner"
+  },
+  "trips_avoided": {
+   "number": "16",
+   "title": "Lorry trips avoided by the agreed decisions",
+   "serves": "TfL CLP guidance: measures that reduce vehicle trips",
+   "key": "trips_avoided",
+   "state": "set",
+   "missing": null,
+   "months": [
+    {
+     "month_index": 10,
+     "label": "Oct 2026",
+     "loads_planned": 220,
+     "loads_with_decisions": 189,
+     "avoided": 31
+    },
+    {
+     "month_index": 11,
+     "label": "Nov 2026",
+     "loads_planned": 50,
+     "loads_with_decisions": 50,
+     "avoided": 0
+    }
+   ],
+   "avoided": 31,
+   "distance_saved": 1147.9,
+   "distance_word": "lorry-km",
+   "decisions": [
+    "Vehicle choice: Artic Tipper (44t) — route R002: Pit North → Yard North"
+   ],
+   "headline": "31 lorry trips avoided",
+   "subtitle": "approved loads each month, as planned and with the agreed decisions",
+   "basis": "Loads as planned against the same plan with the decisions agreed with the carbon target (a bigger lorry, a nearer supplier, another route). A decision that changes only the material changes no trips. Planned, not observed.",
+   "source": "Wayscope Carbon planner: the decisions stored with the carbon target"
+  }
+ },
+ "with_data": [
+  "route_caps",
+  "site_caps",
+  "vehicle_types",
+  "euro_class",
+  "councils",
+  "carbon_rate",
+  "trips_avoided"
+ ],
+ "peak_bands": [
+  {
+   "from": "07:00",
+   "to": "10:00"
+  },
+  {
+   "from": "16:00",
+   "to": "19:00"
+  }
+ ],
+ "peak_words": "No deliveries 07:00–10:00 and 16:00–19:00 (the CLP's peak bands, taken off each gate's open hours where they are typed).",
+ "scope": "scheme",
+ "scope_line": "Every team's approved lines.",
+ "limit": "Planned figures, not observed: Wayscope holds no gate log or arrival times.",
+ "demo_notice": null
+}

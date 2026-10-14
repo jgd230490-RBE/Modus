@@ -56,6 +56,7 @@ import limits        # 13 Oct 2026 — lorry limits (weight / height / width) fr
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
+import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -2691,6 +2692,26 @@ def gate_arrivals_month(month: Optional[int] = None):
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
     factors = conversions.load_factors()
     return gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=_working_days(factors))
+
+
+@app.get("/api/clp/monitoring")
+def clp_monitoring(month: Optional[int] = None):
+    """
+    14 Oct 2026 (bundle G, W7) — the CLP monitoring charts for one month and the months around it
+    (clp.monitoring): routes and sites against their caps, movements by vehicle type and Euro class,
+    movements and lorry distance by council, all-in carbon per load and per tonne against the
+    target, and the trips the agreed decisions avoid. Any signed-in code; a team code gets its own
+    lines for the vehicle, carbon and trip charts and the scheme's for the caps and councils (the
+    public map's figures). Each chart says what is missing when it has no data. Reads only.
+    """
+    acc = _require_access()
+    if month is None:
+        import datetime as _dt
+        month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
+    if not (1 <= int(month) <= MONTH_COUNT):
+        raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    factors = conversions.load_factors()
+    return clp.monitoring(int(month), acc, factors=factors, working_days=_working_days(factors))
 
 
 @app.post("/api/admin/gates")

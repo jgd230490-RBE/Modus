@@ -1999,7 +1999,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
     && code.includes("<Dashboard meta={meta} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature)
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, onWall, onOpen })")
+    // NARROWED 14 Oct 2026 (bundle G, W7: the render harness's prop initialClp joins the signature)
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2525,8 +2526,11 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
      && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
   // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
-  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile and gate charts, whose height follows their rows)",
-     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 2 && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
+  // NARROWED 14 Oct 2026 (bundle G, W7): + the CLP section's three row charts (routes, sites, councils), one row each too
+  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile, gate and CLP row charts, whose height follows their rows)",
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 5
+     && src.includes('height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />') && src.includes('height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />')
+     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
@@ -2740,6 +2744,60 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _ga.includes('<i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely')
      && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
      && _ga.includes("`the ${ga.shift_hours} h shift`} ÷ ${+r.g.gate_minutes} min a lorry)`") && _ga.includes("`open ${r.g.open_hours}"));
+}
+
+// ---- 14 Oct 2026 (bundle G, W7 + W8): CLP monitoring and the CLP data fields, source level ---------------
+{
+  const _cs = src.indexOf("// ---- 14 Oct 2026 (bundle G, W7): CLP monitoring ----"), _ce = src.indexOf("function BulletinMenu({ months }){");
+  const clpc = _cs > 0 && _ce > _cs ? src.slice(_cs, _ce) : "";
+  ok("CLP: one block before BulletinMenu holds the section, its cards and its five chart builders",
+     clpc.length > 4000 && ["function ClpCard(", "function clpBulletCfg(", "function clpShareCfg(", "function clpCouncilCfg(", "function clpCarbonCfg(",
+       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));
+  ok("⭐ CLP: read on FIRST OPEN only: the effect waits for open, GETs /api/clp/monitoring?month=N, keyed on open and the month",
+     clpc.includes("if(!open) return;") && clpc.includes("fetch(`${API}/clp/monitoring?month=${month}`)") && clpc.includes("}, [open, month]);")
+     && clpc.includes('onToggle={e => setOpen(e.currentTarget.open)}') && (clpc.match(/fetch\(/g) || []).length === 1);
+  ok("⭐ CLP: the Dashboard mounts it once, folded, after More charts and before Stockpile capacity",
+     (src.match(/<ClpMonitoring months=\{months\} initial=\{initialClp\} \/>/g) || []).length === 1
+     && src.indexOf("<ClpMonitoring") > src.indexOf("<summary>More charts: trips") && src.indexOf("<ClpMonitoring") < src.indexOf("<summary>Stockpile capacity</summary>"));
+  ok("🔴 CLP: the browser divides nothing — no division, ceil or rounding of a figure; it draws the server's fields",
+     // (the one division left is drawing, not a figure: half a bar's height in pixels for the cap marker)
+     clpc.includes("const half = (el.height || 16) / 2 + 5")
+     && !/[\w)\]]\s*\/\s*[\w(]/.test(clpc.replace("(el.height || 16) / 2", "").replace(/<\/?[A-Za-z][^>]*>/g, "").replace(/\/\/[^\n]*/g, "").replace(/"[^"\n]*"|`[^`\n]*`/g, '""'))
+     && !/Math\.(ceil|round|floor)/.test(clpc));
+  ok("CLP: an empty chart is an EmptyState carrying the server's missing sentence; a set one its headline, how it is worked out and its source",
+     clpc.includes('{c.state !== "set" ? <EmptyState kind="none" title="Not enough to draw this yet" body={c.missing} /> : <>')
+     && clpc.includes('<details className="clp-how"><summary>How it is worked out</summary><p>{c.basis}</p></details>') && clpc.includes("Source: {c.source}"));
+  ok("CLP: each card carries its own literal info box (seven) and the section one",
+     ["clp.route_caps", "clp.site_caps", "clp.vehicle_types", "clp.euro_class", "clp.councils", "clp.carbon_rate", "clp.trips_avoided", "dash.clp"]
+       .every(id => clpc.includes(`<InfoTip id="${id}" />`)));
+  ok("🔴 CLP colours are tokens only: the chart slots, the status red, the none grey, ink for a cap or target; Not typed is grey",
+     !/#[0-9A-Fa-f]{6}\b(?!")/.test(clpc.replace(/tok\("[^"]+", "#[0-9A-Fa-f]{6}"\)/g, "")) && clpc.includes('s.group === CLP_NOT_TYPED ? tok("--chart-none", "#A8A29E") : colorOf(slot++)')
+     && clpc.includes('const CLP_NOT_TYPED = "Not typed";'));
+  ok("CLP: per load is drawn without a target line; the target shared out per tonne is a dashed ink line",
+     clpc.includes('if(per === "tonne" && c.target_kg_per_tonne != null) ds.push({ label: "The target, shared out", data: m.map(() => c.target_kg_per_tonne), borderColor: INK, borderDash: [6, 4]')
+     && !clpc.includes("target_kg_per_load"));
+  ok("CLP: every bullet row says its figure in words (no hover on a print or a TV): 'N word · P % of C' and 'over the cap'",
+     clpc.includes('ctx.fillText(`${clpN1(r[valKey])} ${word} · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : "")'));
+  // W8: the data fields
+  ok("⭐ W8: the location form carries the CLP cap (lorry visits a day), sends null for blank, never 0",
+     src.includes('data-clp-cap-field="1"') && src.includes('aria-label="CLP cap: lorry visits a day"')
+     && src.includes('clp_cap_per_day: (f.clp_cap_per_day === "" || f.clp_cap_per_day == null) ? null : +f.clp_cap_per_day,')
+     && src.includes('clp_cap_per_day: p.clp_cap_per_day == null ? "" : p.clp_cap_per_day'));
+  ok("⭐ W17: the gate form carries open hours (two time boxes) and seven day boxes; every day ticked is sent as blank (the shift, every day)",
+     src.includes('data-gate-hours-form="1"') && src.includes('aria-label="Open from"') && src.includes('aria-label="Open to"')
+     && src.includes('return { ...g, open_days: v === "1111111" ? "" : v };') && src.includes('open_from: gateForm.open_from || "", open_to: gateForm.open_to || "", open_days: gateForm.open_days || "",')
+     && src.includes('const GATE_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];'));
+  const _cfgPy = fs.readFileSync(path.join(ROOT, "backend", "config.py"), "utf8"), _ghPy = fs.readFileSync(path.join(ROOT, "backend", "gate_hours.py"), "utf8");
+  ok("🔴 W8: the Euro classes, the peak-band cap and placeholder and the 85 % step are held equal to the backend",
+     /EURO_CLASSES = \("Euro IV", "Euro V", "Euro VI", "Zero emission"\)/.test(_cfgPy) && src.includes('const EURO_CLASSES = ["Euro IV", "Euro V", "Euro VI", "Zero emission"];')
+     && /MAX_PEAK_BANDS = 4\b/.test(_ghPy) && src.includes("const PEAK_BANDS_MAX = 4;")
+     && /PEAK_PLACEHOLDER = \[\{"from": "07:00", "to": "10:00"\}, \{"from": "16:00", "to": "19:00"\}\]/.test(_ghPy)
+     && src.includes('const PEAK_BANDS_PLACEHOLDER = [{ from: "07:00", to: "10:00" }, { from: "16:00", to: "19:00" }];')
+     && /NEAR_PCT = 85\b/.test(_ghPy) && src.includes("const GA_NEAR = 85;"));
+  ok("W8: Config → Vehicles has a Euro class column ('not typed' deletes the key); Config → Planning the no-delivery peak bands, at most four",
+     src.includes('"Unload min", "Euro class", "Planning"]') && src.includes('data-cfg-euro={k}') && src.includes("else delete d.vehicles[k].euro_class;")
+     && src.includes('data-cfg="peak-bands"') && src.includes("No-delivery peak bands (from the CLP)") && src.includes("((doc.planning || {}).peak_bands || []).length < PEAK_BANDS_MAX")
+     && src.includes("Wayscope holds no arrival times, so it cannot check that lorries keep out of them."));
 }
 
 // ---- report ------------------------------------------------------------------
