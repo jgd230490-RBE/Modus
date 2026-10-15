@@ -345,9 +345,10 @@ ok("H2: the show week (12–18 Oct = Oct W3) and the week after are populated fo
 # NARROWED 14 Oct 2026 (the user took the recommendation): "the scheme and its plan are invented", was "nothing here is
 # real" (the bulletin quotes real government figures); still "Fictional demo scheme" first, still under 121 characters
 ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validates as short text or null",
-   main.meta()["tenant"]["demo_notice"] == "Fictional demo scheme · the scheme and its plan are invented"
+   # NARROWED 15 Oct 2026 (the user): the demo's bar wording is "Fictional scheme" behind the bar's DEMO badge
+   main.meta()["tenant"]["demo_notice"] == "Fictional scheme"
    and "nothing here is real" not in json.dumps(DEMO, ensure_ascii=False)
-   and 'DEMO_NOTICE = "Fictional demo scheme · the scheme and its plan are invented"' in open(os.path.join(BACKEND, "tools", "make_demo_tenant.py"), encoding="utf-8").read()
+   and 'DEMO_NOTICE = "Fictional scheme"' in open(os.path.join(BACKEND, "tools", "make_demo_tenant.py"), encoding="utf-8").read()
    and config.validate(dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]), tenant={"name": "x", "demo_notice": "y" * 121})) != []
    and "demo_notice" in config.TENANT_DEFAULTS)
 # 12 Oct 2026 (map review 2.1 / 2.3): "Report a concern" on the public map writes to a TYPED tenant address. The demo

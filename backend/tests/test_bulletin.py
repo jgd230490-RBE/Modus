@@ -2013,8 +2013,10 @@ ok("Key points (hand): November says its two-way movements a day, down from Octo
 # D41: the tag on the maps
 ok("⭐ D41 'Fictional demo scheme' ON both maps of a demo tenant: the route map and the council map, PDF and page; none without "
    "a demo notice",
-   S10B["map_demo_tag"] == "Fictional demo scheme" and S10B["council"]["demo_tag"] == "Fictional demo scheme"
-   and _PB[0].count("Fictional demo scheme") >= 2 and _PB[2].count("Fictional demo scheme") >= 2
+   # NARROWED 15 Oct 2026 (the user): the tag reads "Demo - fictional scheme"; the page bar keeps the tenant's notice
+   S10B["map_demo_tag"] == "Demo - fictional scheme" and S10B["council"]["demo_tag"] == "Demo - fictional scheme"
+   and _PB[0].count("Demo - fictional scheme") >= 1 and _PB[2].count("Demo - fictional scheme") >= 1
+   and "Fictional demo scheme · nothing here is real" in _PB[0]
    and HTML10B.count('<g class="map-tag">') == 2 and LH10B.count('<g class="map-tag">') == 1
    and bulletin_doc._svg_tag(None) == "" and "map_demo_tag" in read("backend/bulletin_doc.py"))
 # the HTML: the band, the brief, the leaflet links
