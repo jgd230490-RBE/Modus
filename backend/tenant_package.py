@@ -76,6 +76,8 @@ ORDER = [
     "route_area_km",        # 12 Oct 2026 (§2.2b): derived from route_geometry and areas, so after both
     "forecasts", "forecast_weeks", "forecast_days",
     "stockpile_weeks",
+    # 14 Oct 2026: the community considerations layer (fetched along the routes; no foreign keys)
+    "community_features", "community_meta",
 ]
 
 # "Empty" for import purposes: the tables a person's work lands in. config is not in

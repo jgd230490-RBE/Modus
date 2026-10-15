@@ -5069,7 +5069,9 @@ function qrRead(mod) {
   ok("...Escape shuts the export card first; every control there is 44 px or more and 14 px type",
      /if \(rp && !rp\.hidden\) \{ closeRouteExport\(\); return; \}\n        const sp = document\.getElementById\('share-panel'\);/.test(src)
      // NARROWED 14 Oct 2026, evening: no tick-boxes left; the selects are 44 px, the notes 14 px
-     && /#rme-panel select\{ width:100%; min-height:44px; font:14px /.test(html) && !html.includes("#rme-panel .rme-check")
+     // NARROWED 14 Oct 2026, night: one tick box again (Leave out the community considerations), 44 px tall at 14 px type
+     && /#rme-panel select\{ width:100%; min-height:44px; font:14px /.test(html)
+     && /#rme-panel \.rme-check\{[^}]*min-height:44px; font-size:14px;/.test(html)
      && /#rme-panel \.rme-note\{[^}]*font-size:14px; \}/.test(html) && /#rme-panel \.rme-plan-what\{[^}]*font-size:14px; \}/.test(html));
   ok("...a refusal says so in words (401: only staff; a plan it cannot draw: the server's sentence), never a raw code alone",
      fnSrc("downloadRouteExport").includes("r.status === 401 ? 'only staff can export the route map: sign in to the app' : (d || 'the export failed (' + r.status + ')')"));

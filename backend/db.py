@@ -67,6 +67,10 @@ TENANTED_TABLES = {
     # (one row per polygon) and the per-route clip against them: both one tenant's data,
     # both carried in its package. Registered in the same edit as the tables.
     "areas", "route_area_km",
+    # 14 Oct 2026 (the community considerations layer): the schools, bus stops, residential areas … a
+    # tenant fetched from public sources along ITS routes, and the one row saying when and from what. One
+    # tenant's data (the strip is its routes), carried in its package like the council areas.
+    "community_features", "community_meta",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -450,6 +454,9 @@ def init_network_db():
         # in the key, so no migration; a plain CREATE IF NOT EXISTS on both backends.
         _create_tenanted(cur, "areas")
         _create_tenanted(cur, "route_area_km")
+        # 14 Oct 2026: the community considerations layer. Born with tenant_id in the key.
+        _create_tenanted(cur, "community_features")
+        _create_tenanted(cur, "community_meta")
         conn.commit()
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
@@ -1184,6 +1191,40 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, area_id)
         )
     """,
+    # 14 Oct 2026 (the community considerations layer, community.py): one row per feature fetched along the
+    # tenant's routes — its kind (community.KINDS), the source it came from and that source's own id, a name and
+    # a short detail, the geometry as GeoJSON text (Point, LineString or Polygon / MultiPolygon, WGS84) and its
+    # distance in metres from the nearest route or site. Rewritten source by source by community.refresh().
+    "community_features": """
+        CREATE TABLE community_features (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            feature_id     TEXT NOT NULL,
+            kind           TEXT NOT NULL,
+            source         TEXT NOT NULL,
+            source_ref     TEXT,
+            name           TEXT,
+            detail         TEXT,
+            geometry_json  TEXT NOT NULL,
+            dist_m         REAL,
+            fetched_at     TEXT,
+            PRIMARY KEY (tenant_id, feature_id)
+        )
+    """,
+    # 14 Oct 2026: what the layer was fetched from and when — one row ('current'): the strip widths, every
+    # source's file, date, licence and attribution line, its counts or the words of its failure, and the
+    # running state of a refresh (idle / running / done / failed) so the page can say so.
+    "community_meta": """
+        CREATE TABLE community_meta (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            meta_id        TEXT NOT NULL,
+            state          TEXT,
+            started_at     TEXT,
+            fetched_at     TEXT,
+            by_whom        TEXT,
+            detail_json    TEXT,
+            PRIMARY KEY (tenant_id, meta_id)
+        )
+    """,
     # 12 Oct 2026 (§2.2b). Km of each route's PRIMARY polyline (per vehicle profile and leg)
     # inside each area, and one row per leg with area_id '*' carrying the leg's whole length.
     # Derived by areas.rebuild() and rewritten whole — never typed.
@@ -1508,6 +1549,8 @@ _TENANT_PK = {
     "route_sections": "(tenant_id, leg, section_id)",
     "areas": "(tenant_id, area_id)",
     "route_area_km": "(tenant_id, route_id, vehicle_profile, leg, area_id)",
+    "community_features": "(tenant_id, feature_id)",
+    "community_meta": "(tenant_id, meta_id)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

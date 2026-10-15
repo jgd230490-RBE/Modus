@@ -141,6 +141,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 ...and so are its PNG and the card's list of places (14 Oct, evening) — 401",
        c.get("/api/routes/map-export.png?month=10").status_code == 401
        and c.get("/api/routes/map-export/places?month=10").status_code == 401)
+    # 14 Oct 2026 (night): the community considerations layer is staff only, and fetching it is a planner's
+    ok("🔴 COMMUNITY CONSIDERATIONS: the layer, its status and a fetch without a credential — 401 each",
+       c.get("/api/community").status_code == 401 and c.get("/api/community/status").status_code == 401
+       and c.post("/api/community/refresh", headers={"X-Wayscope": "1"}).status_code == 401)
     # 13 Oct 2026 (D43): the one-page leaflet, page and PDF, the bulletin's staff rule
     r = c.get("/bulletin/leaflet/?month=10")
     ok("🔴 the leaflet page is closed without a staff sign-in — 401, the bulletin's sign-in page",
@@ -1404,6 +1408,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
        c.get("/api/routes/map-export.pdf?month=10").status_code == 401 and c.get("/api/public/whoami").json().get("level") == "map"
        and c.get("/api/routes/map-export.png?month=10").status_code == 401
        and c.get("/api/routes/map-export/places?month=10").status_code == 401)
+    # 14 Oct 2026 (night): the community considerations layer is never on the password view
+    ok("…and 🔴 not the community considerations layer (staff only, the user 14 Oct): the map password's cookie gets 401",
+       c.get("/api/community").status_code == 401 and c.get("/api/community/status").status_code == 401)
+    _cm = c.get("/api/community", headers=PLAN)
+    _cj = _cm.json() if _cm.status_code == 200 else {}
+    ok("⭐ …a planner's code reads it: 200, a FeatureCollection, the nine kinds, nothing fetched yet on this deployment",
+       _cm.status_code == 200 and _cj.get("type") == "FeatureCollection" and len(_cj.get("kinds") or []) == 9
+       and _cj.get("state") == "never" and _cj.get("features") == [] and _cj.get("fill_alpha") == 0.22, _cm.text[:200])
+    ok("🔴 …a team code may read it but not fetch it: 403 (no refresh is started from this harness: it would go online)",
+       c.get("/api/community", headers=NORTH).status_code == 200
+       and c.post("/api/community/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",

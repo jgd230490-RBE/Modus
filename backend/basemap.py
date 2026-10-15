@@ -80,6 +80,13 @@ def project(v, lon, lat):
     return v["w"] / 2 + (mx - v["cx"]) * k, v["h"] / 2 + (my - v["cy"]) * k
 
 
+def unproject(v, x, y):
+    """(lon, lat) of an image pixel (x, y; y down) of view v — the inverse of project(). 14 Oct 2026: a plan asks
+    whether a residential area larger than its frame covers the frame's centre."""
+    k = TILE * (2 ** v["zoom"])
+    return _unmerc(v["cx"] + (x - v["w"] / 2) / k, v["cy"] + (y - v["h"] / 2) / k)
+
+
 def url(v, token, retina=True):
     return (f"https://api.mapbox.com/styles/v1/{STYLE}/static/{v['lon']:.5f},{v['lat']:.5f},{v['zoom']:.2f},0/"
             f"{v['w']}x{v['h']}{'@2x' if retina else ''}?access_token=" + urllib.parse.quote(token))

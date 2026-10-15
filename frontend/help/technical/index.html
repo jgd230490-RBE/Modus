@@ -294,6 +294,30 @@ used to name for loading an organisation are: <code>POST /api/admin/tenant/impor
 <code>PUT /api/admin/overlay</code> (the map overlay) and <code>GET /api/admin/tenant/export</code> (the organisation
 as one file). After an import, bake the network: imported routes read &ldquo;not routed yet&rdquo; until then.</p>
 
+<h1 id="t8-community">T8 The community considerations layer</h1>
+<p>Staff only (14 Oct 2026). <code>GET /api/community</code> serves what is stored as one GeoJSON FeatureCollection with the
+kinds, each source's date and the credit line; <code>GET /api/community/status</code> the same without the features. Both
+answer 401 to the map password's cookie and to no credential. <code>POST /api/community/refresh</code> (a planner or an
+admin; 403 for a team code) starts a fetch on a thread: a few minutes, never on a page view.</p>
+<div class="tbl"><table><thead><tr><th>Source</th><th>Kinds</th><th>How it is read</th><th>Licence and credit</th></tr></thead><tbody>
+<tr><td class="k">OpenStreetMap</td><td>residential areas, hospitals, health centres, community centres, sports facilities, cycle routes and paths, nurseries</td>
+<td>A Geofabrik county extract (<code>.osm.pbf</code>; the counties whose outlines the routes touch, from Geofabrik's region index),
+filtered with pyosmium. Not the public Overpass servers: their usage policy asks a commercial app not to use them as its
+backend, and on 14 Oct 2026 they failed 7 of 11 queries. The extract's dated file name is the data's date.</td>
+<td>ODbL 1.0, &ldquo;&copy; OpenStreetMap contributors&rdquo;</td></tr>
+<tr><td class="k">DfE Get Information about Schools</td><td>schools (open, and open but proposed to close)</td>
+<td>The daily all-establishments CSV (about 65 MB, streamed); easting and northing converted to WGS84 (about 3&ndash;5 m).</td>
+<td>Open Government Licence v3.0</td></tr>
+<tr><td class="k">DfT NaPTAN</td><td>bus stops (on-street and bus stations), rail stations, tram and metro stops</td>
+<td>The access-nodes CSV for the transport areas the routes cross (<code>backend/data/naptan_areas.json</code>, from the NPTG)
+and area 910 (rail). Active stops only.</td><td>Open Government Licence v3.0</td></tr>
+</tbody></table></div>
+<p>The strip is 250 m each side of every stored route line (both legs, every vehicle) and 500 m round every site; a
+feature is kept when any part of it is inside, and its distance is stored. A source that fails keeps what it had and
+the page says so. The rows live per organisation (<code>community_features</code>, <code>community_meta</code>) and travel
+in its package. A download that arrives short is resumed with a Range request where the source allows it, and otherwise
+handed to curl (on 14 Oct 2026 Python's own reads were cut short on the build laptop, not curl's).</p>
+
 </main>
 <a id="top" href="#">↑ top</a>
 </body></html>

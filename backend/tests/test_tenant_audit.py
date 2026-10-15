@@ -91,6 +91,9 @@ TENANTED = {
     # 12 Oct 2026 (public map review §2.2b, D27). The council boundaries and the per-route
     # clip against them. Registered in the same edit as the tables — six and seven.
     "areas", "route_area_km",
+    # 14 Oct 2026 (the community considerations layer). The features fetched along one tenant's routes and
+    # the row saying when and from what. Registered in the same edit as the tables — eight and nine.
+    "community_features", "community_meta",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is
