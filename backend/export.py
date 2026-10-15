@@ -2323,7 +2323,7 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
             text(f"+{len(places) - len(shown)} more sites", R, 7.4, 9.2, GREY)
     # 14 Oct 2026: the community considerations in the frame — only the kinds in view, each with its symbol
     CM = PL.get("community") or {}
-    if CM.get("kinds"):
+    if CM.get("kinds") or CM.get("left_out"):
         gap(4)
         text("Community considerations", B, 7.8, 10)
         for kd in CM["kinds"]:
@@ -2335,6 +2335,9 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
                     c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.4)
                     c.drawString(x + 17, y - 7.2, ln)
                 items.append((9.6 if i == len(lines) - 1 else 8.8, ck))
+        # 15 Oct 2026: a kind this plan leaves out (bus stops on the regional plan) is named, not dropped silently
+        if CM.get("left_out"):
+            text(" and ".join(CM["left_out"]) + " are on the local and site plans.", R, 6.8, 8.4, GREY)
     gap(4)
     if PL.get("view") and not basemap_ok:
         text("No basemap could be had: the routes alone, still to scale.", B, 7, 8.8, DEMO_FG_RGB)
