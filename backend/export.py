@@ -37,6 +37,7 @@ import os
 import urllib.parse
 import urllib.request
 
+import conversions
 import db
 
 MISSING = {}
@@ -203,7 +204,7 @@ def _line_rows(page, weekdays_only=True):
                 "date": d["day_date"], "origin": c.get("origin_name") or c.get("origin_id"),
                 "dest": c.get("dest_name") or c.get("dest_id"), "ipt": _team(c.get("ipt")) or "",
                 "ws": c.get("section_id") or "", "discipline": c.get("discipline") or "",
-                "material": c.get("material_type") or "", "vehicle": c.get("vehicle_short") or c.get("vehicle_type") or "",
+                "material": c.get("material_type") or "", "vehicle": c.get("vehicle_short") or conversions.vehicle_word_rule(c.get("vehicle_type")) or "",
                 "qty": d.get("planned_qty"), "unit": c.get("unit"),
                 "tonnes": f.get("tonnes"), "trips": f.get("trips"), "veh": f.get("vehicles"),
                 "km_trip": _dist(c.get("km_trip")), "km_day": _dist(f.get("km_day")), "tonne_km": _dist(f.get("tonne_km")),
@@ -769,7 +770,7 @@ def build_pdf(page):
                P(f"<b>{E(r['dest'])}</b><br/><font size=6.5 color='#64748B'>{_coord(d.get('lat'), d.get('lon'))}</font>", st),
                P(f"{E(_nm_rows(c.get('ipt')) or '—')}<br/>{E(c.get('section_id') or '')}", st),
                P(E(c.get("material_type") or "—"), st),
-               P(f"{E(c.get('vehicle_short') or c.get('vehicle_type') or '—')}"
+               P(f"{E(c.get('vehicle_short') or conversions.vehicle_word_rule(c.get('vehicle_type')) or '—')}"
                  + ("" if c.get("baked") else "<br/><font size=6 color='#B45309'>not baked</font>"), st)]
         for iso in dates:
             x = by_date.get(iso)
@@ -925,7 +926,7 @@ def day_sheet_rows(page, day):
             "dest": c.get("dest_name") or c.get("dest_id") or "—",
             "team": name(c.get("ipt")) or "No team", "section": c.get("section_id") or "",
             "material": c.get("material_type") or "—",
-            "vehicle": c.get("vehicle_short") or c.get("vehicle_type") or "—",
+            "vehicle": c.get("vehicle_short") or conversions.vehicle_word_rule(c.get("vehicle_type")) or "—",
             "qty": d.get("planned_qty"), "unit": l.get("unit") or c.get("unit") or "",
             "typed": d.get("status") == "edited",
             "tonnes": f.get("tonnes"), "loads": f.get("trips") or 0,
@@ -1924,7 +1925,10 @@ class _Kit:
             if run >= tot / 2:
                 cut_at = k + 1
                 break
-        col = lambda part: [Paragraph(t, sm, bulletText=f"{i}") for i, t in part] or [""]
+        # 14 Oct 2026 (found by the civils harness): an EMPTY column was [""] — a list holding a bare string, which
+        # reportlab cannot lay out, so every bulletin whose sources all fell in the left column (a tenant with no council
+        # areas: the shipped demo package) failed to build. An empty column is now a zero-height spacer.
+        col = lambda part: [Paragraph(t, sm, bulletText=f"{i}") for i, t in part] or [Spacer(1, 0)]
         g = self.usable * 0.07              # a wide gutter, so text readers keep the two columns apart
         tb = LongTable([[col(items[:cut_at]), "", col(items[cut_at:])]],
                        colWidths=[(self.usable - g) / 2, g, (self.usable - g) / 2])

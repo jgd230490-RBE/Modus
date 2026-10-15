@@ -285,7 +285,10 @@ ok("...payload 3.5 t below the twin (ZEHID), the draft +2 t allowance NOT applie
 ok("every material category names its Government class",
    {k: c.get("carbon_material") for k, c in FILE["material_categories"].items() if not k.startswith("_")}
    == {"Earthworks / soil": "soils", "Small aggregate": "aggregates", "Large aggregate / ballast": "aggregates",
-       "Precast / concrete": "concrete", "Steel / rail": "metals", "General / imported": "average_construction"})
+       "Precast / concrete": "concrete", "Steel / rail": "metals", "General / imported": "average_construction",
+       # NARROWED 14 Oct 2026 (civils materials): the four categories added, each on its Government class
+       "Ready-mixed concrete": "concrete", "Precast units": "concrete", "Structural steel / rebar": "metals",
+       "Asphalt": "asphalt"})
 ok("⭐ the file passes config.validate as it stands", config.validate(FILE) == [], str(config.validate(FILE)))
 
 # =========================================================================== #

@@ -182,6 +182,8 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
     word = team_word or taxonomy._team_word()
     section_names = section_names or {}
     fb_name = (payloads[0] or {}).get("payload_fallback_vehicle") if payloads else None
+    # 14 Oct 2026: the NAME a reader sees (the key may say "Truck mixer"; conversions.vehicle_label)
+    fb_name = conversions.vehicle_label(conversions.load_factors(), fb_name) if fb_name else None
 
     m_veh, m_qty, m_t, m_fleet, m_co2 = [], [], [], [], []
     routes_in, not_drawn = set(), {}

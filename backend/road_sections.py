@@ -75,6 +75,7 @@ import json
 import math
 from datetime import datetime, timezone
 
+import conversions
 import db
 import taxonomy
 
@@ -805,7 +806,7 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
         notes.append(f"{unbaked_lines} line(s) on a route with no stored road route for the "
                      f"line's vehicle: counted in the movements, left out of the vehicles.")
     if off_index:
-        notes.append(f"The sections are worked out on the {profile} road routes; "
+        notes.append(f"The sections are worked out on the {conversions.vehicle_label(conversions.load_factors(), profile)} road routes; "
                      f"{len(off_index)} route(s) with volume have none stored for it and are "
                      "on no section (they are in the totals).")
     if leg == "return":

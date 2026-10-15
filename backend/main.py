@@ -2415,7 +2415,8 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
             "route_id": r["route_id"], "discipline": r.get("discipline") or "",
             "section_id": r.get("section_id") or "", "ipt": r.get("ipt"),
             "material_type": r.get("material_type") or "",
-            "vehicle_type": v, "unit": r["unit"],
+            # 14 Oct 2026: vehicle_name is what the map prints; vehicle_type stays the stored key
+            "vehicle_type": v, "vehicle_name": conversions.vehicle_label(factors, v), "unit": r["unit"],
             "qty_unit": conversions.round_for_unit(conversions.convert_row(r, unit, factors), unit),
             "qty_t": round(t, 3),
             "vehicle_loads": round(t / payload, 3) if payload else 0.0,
@@ -2448,7 +2449,9 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
     co2_to_date = [{"route_id": k[0], "discipline": k[1], "section_id": k[2], "co2_t": round(v, 3)}
                    for k, v in sorted(to_date.items())]
     out = {"month": int(month), "unit": unit, "working_days": wd,
-           "payload_fallback_vehicle": fb_name, "lines": lines,
+           "payload_fallback_vehicle": fb_name,
+           "payload_fallback_name": conversions.vehicle_label(factors, fb_name) if fb_name else None,
+           "lines": lines,
            "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
     if co2_error:
         out["co2_error"] = co2_error
@@ -2550,6 +2553,7 @@ def public_forecast_matrix(
             "material_type": r["material_type"],
             "material_description": r.get("material_description"),
             "vehicle_type": r["vehicle_type"],
+            "vehicle_name": conversions.vehicle_label(factors, r["vehicle_type"]),   # 14 Oct 2026: what the map prints
             "monthly": {}, "total": 0.0,
         })
         v = conversions.convert_row(r, unit, factors)

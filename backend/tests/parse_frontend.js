@@ -231,11 +231,18 @@ ok("⭐ the picker's option VALUE is the canonical id, the text is the label",
 ok("a fallback slot is marked, not passed off as a translation",
   /vehIsFallback\(v\) && !\["en", "eu"\]\.includes\(VEH\.lang\) \? " \*"/.test(code)
   && !/vehIsFallback\(v\) && VEH\.lang !== "eu" \? " \*"/.test(code));
-ok("vehLabel falls back to the id itself", /\|\| v \|\| ""/.test(code));
+// NARROWED 14 Oct 2026 (civils materials): the fallback is the id through the word rule ("Truck mixer …" reads
+// "Concrete mixer …"; every other id unchanged), and a label equal to its id passes the rule too
+ok("vehLabel falls back to the id itself, through the word rule",
+  code.includes('const vehLabel = (v, lang) => { const l = (VEH.labels[v] || {})[lang || VEH.lang]; return (l && l !== v) ? l : vehWord(v || ""); };')
+  && /const vehWord = \(v\) => String\(v == null \? "" : v\)\.replace\(\/\^\\s\*truck\\s\+mixer\\b\/i, "Concrete mixer"\);/.test(code));
 ok("the save still posts the stored id", code.includes("vehicle_type: vehicle,"));
 // 13 Oct 2026 (W6, narrowed): the Forecasts vehicle is in the row's details: the label, and the stored name beside it when they differ
-ok("tables show the label with the stored id in the title",
-  code.includes('<RdItem t="Vehicle">{vehLabel(g.vehicle)}</RdItem>') && code.includes('<RdItem t="Vehicle, full name">{g.vehicle && g.vehicle !== vehLabel(g.vehicle) ? g.vehicle : null}</RdItem>'));
+// REVERSED 14 Oct 2026 (civils materials): the stored id never reaches a screen; "full name" is the full NAME, shown when
+// the short form (the name without Artic/Rigid) differs from it
+ok("tables show the label, and the full NAME (never the stored id) beside a short one",
+  code.includes('<RdItem t="Vehicle">{vehLabel(g.vehicle)}</RdItem>') && code.includes('<RdItem t="Vehicle, full name">{g.vehicle && vehShort(g.vehicle) !== vehLabel(g.vehicle) ? vehLabel(g.vehicle) : null}</RdItem>')
+  && !code.includes('g.vehicle !== vehLabel(g.vehicle) ? g.vehicle : null'));
 // NARROWED (G2): the header still carries the control, but offers the local-language
 // option only to a tenant whose country it is local to.
 ok("the header carries the control", /VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.map\(\(\[k, l\]\) =>/.test(code));
@@ -261,8 +268,9 @@ ok("11 Oct 2026: Config → Vehicles' Planning tick keeps the planning list's or
   code.includes("const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith(\"_\") && d.vehicles[x].planning_vehicle && !kept.includes(x))];")
   && !code.includes("d.planning_vehicles = Object.keys(d.vehicles).filter("));
 // NARROWED 11 Oct 2026 (review): the label said "(shown only when offered)"; the column now follows the country alone
-ok("11 Oct 2026: Config → Vehicles' Estonian column (an Estonian tenant's) shows the id as its placeholder, not 'falls back to EU'",
-  !src.includes('placeholder="falls back to EU"') && code.includes('value={lab.ee || ""} placeholder={k}'));
+// NARROWED 14 Oct 2026 (civils materials): the placeholder is the id through the word rule (vehWord), never "Truck mixer"
+ok("11 Oct 2026: Config → Vehicles' Estonian column (an Estonian tenant's) shows the id (word rule applied) as its placeholder, not 'falls back to EU'",
+  !src.includes('placeholder="falls back to EU"') && code.includes('value={lab.ee || ""} placeholder={vehWord(k)}'));
 // 11 Oct 2026 (review): gated on what the server OFFERS, the column needed an Estonian name to exist before one could
 // be typed — on the new seed (English names only) an Estonian organisation never saw it. The column follows the
 // country rule alone; the header's buttons still need a choice (vehLangShown, above).

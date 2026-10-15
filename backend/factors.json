@@ -7,7 +7,7 @@
     "currency": "EUR",
     "country": null
   },
-  "_materials_note": "Broad, enterprise-generic categories any large-construction project recognises. Each carries a planning density (loose, as-hauled t/m3), a default input unit, whether volume<->weight conversion is meaningful, and the vehicles typically used. Densities vary with moisture/compaction; treat as editable defaults. carbon_material (10 Oct 2026) names the UK Government 2026 'Material use — Construction' class the carbon planner prices the category's material-production carbon with (aggregates, asphalt, concrete, metals, soils, average_construction); a category without one is excluded from material carbon and says so, never guessed.",
+  "_materials_note": "Broad, enterprise-generic categories any large-construction project recognises. Each carries a planning density (loose, as-hauled t/m3), a default input unit, whether volume<->weight conversion is meaningful, and the vehicles typically used. Densities vary with moisture/compaction; treat as editable defaults. carbon_material (10 Oct 2026) names the UK Government 2026 'Material use — Construction' class the carbon planner prices the category's material-production carbon with (aggregates, asphalt, concrete, metals, soils, average_construction); a category without one is excluded from material carbon and says so, never guessed. 14 Oct 2026 (civils materials): four categories ADDED — Ready-mixed concrete (m3, mixers only), Precast units, Structural steel / rebar, Asphalt — each with its density's source in _density_basis; nothing renamed (keys are stored on forecasts, locations and routes).",
   "material_categories": {
     "Earthworks / soil": {
       "density_t_per_m3": 1.5,
@@ -46,11 +46,10 @@
       "volume_convertible": true,
       "vehicles": [
         "Artic Flatbed (44t)",
-        "Rigid 8-wheeler (32t)",
-        "Truck mixer 8 m³ (32t)",
-        "Truck mixer 6 m³ (26t)"
+        "Rigid 8-wheeler (32t)"
       ],
-      "carbon_material": "concrete"
+      "carbon_material": "concrete",
+      "_vehicles_note": "14 Oct 2026: the two concrete mixers left this list for 'Ready-mixed concrete' (mixers only); the key is unchanged because forecast lines, locations and routes store it. New precast work can use 'Precast units'."
     },
     "Steel / rail": {
       "density_t_per_m3": 7.85,
@@ -71,6 +70,49 @@
       ],
       "carbon_material": "average_construction"
     },
+    "Ready-mixed concrete": {
+      "density_t_per_m3": 2.4,
+      "default_unit": "m3",
+      "volume_convertible": true,
+      "vehicles": [
+        "Truck mixer 8 m³ (32t)",
+        "Truck mixer 6 m³ (26t)"
+      ],
+      "carbon_material": "concrete",
+      "_density_basis": "Normal-weight concrete 24 kN/m3, BS EN 1991-1-1 (Eurocode 1) Annex A, Table A.1 (unreinforced) = 2.4 t/m3 on the Eurocode's 10 m/s2 convention; BS EN 206 calls 2.0-2.6 t/m3 (oven-dry) normal-weight. The same 2.4 the mixers' payload_t is worked out on. Added 14 Oct 2026; a mix's own density from the supplier wins."
+    },
+    "Precast units": {
+      "density_t_per_m3": 2.5,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)",
+        "Rigid 8-wheeler (32t)"
+      ],
+      "carbon_material": "concrete",
+      "_density_basis": "Normal reinforced concrete 25 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026) = 2.5 t/m3. Stored, not used: a precast unit is planned in tonnes (or pieces, later), never converted from m3. Added 14 Oct 2026."
+    },
+    "Structural steel / rebar": {
+      "density_t_per_m3": 7.85,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)"
+      ],
+      "carbon_material": "metals",
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for structural steel. Stored, not used: steel is planned in tonnes. Added 14 Oct 2026."
+    },
+    "Asphalt": {
+      "density_t_per_m3": 2.3,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Rigid 8-wheeler (32t)",
+        "Artic Tipper (44t)"
+      ],
+      "carbon_material": "asphalt",
+      "_density_basis": "ASSUMPTION, stated: 2.3 t/m3 compacted. No UK public source was found that gives one figure: it depends on the mix and its air voids (published EPDs for dense asphalt concrete mixes give 2.26-2.34 t/m3, environdec.com, read 14 Oct 2026). Stored, not used: asphalt is ordered and planned in tonnes, never converted from m3. Replace with the mix's registered density. Added 14 Oct 2026 (the user asked for it)."
+    },
     "_default": {
       "density_t_per_m3": 1.6,
       "default_unit": "t",
@@ -80,7 +122,7 @@
       ]
     }
   },
-  "_vehicles_note": "Road HGVs over 3.5 t (no site plant): six UK trade-name entries, two UK truck mixers (H1, 29 Sep 2026) and three battery-electric variants of the haulage lorries — artic tipper, artic flatbed, 8-wheeler (carbon planner, 10 Oct 2026; the mixers and the smaller rigids have none yet). payload_t = typical carrying limit; emissions_kg_co2e_per_km = DESNZ 2026 GHG conversion factors, average laden, per vehicle-km, tank-to-wheel (verified 10 Oct 2026 against the gov.uk flat file v1.2; see each entry's _emissions_basis). fuel = 'diesel' (default) or 'electric'; an electric entry has no stored per-km figure — conversions._emissions() derives it as kwh_per_km × the UK electricity factor in the `carbon` block, so the two cannot drift. scenario_only: true keeps a profile out of the forecast pickers (it has no baked geometry of its own; geometry_twin names the diesel profile whose routed distances it reads). load_minutes/unload_minutes are per-vehicle turnaround estimates and override planning.load_minutes/unload_minutes, which remain the fallback. Starting estimates, not measured — edit to match your operation. 11 Oct 2026: the four EU type-approval planning entries added on 2026-09-01 were removed from the seed (and from every category list and vehicle set below); a live document or tenant package that still carries them keeps loading and resolving, because nothing in the code names them.",
+  "_vehicles_note": "Road HGVs over 3.5 t (no site plant): six UK trade-name entries, two UK concrete mixers (H1, 29 Sep 2026; keyed 'Truck mixer …', shown as 'Concrete mixer …' since 14 Oct 2026) and three battery-electric variants of the haulage lorries — artic tipper, artic flatbed, 8-wheeler (carbon planner, 10 Oct 2026; the mixers and the smaller rigids have none yet). payload_t = typical carrying limit; emissions_kg_co2e_per_km = DESNZ 2026 GHG conversion factors, average laden, per vehicle-km, tank-to-wheel (verified 10 Oct 2026 against the gov.uk flat file v1.2; see each entry's _emissions_basis). fuel = 'diesel' (default) or 'electric'; an electric entry has no stored per-km figure — conversions._emissions() derives it as kwh_per_km × the UK electricity factor in the `carbon` block, so the two cannot drift. scenario_only: true keeps a profile out of the forecast pickers (it has no baked geometry of its own; geometry_twin names the diesel profile whose routed distances it reads). load_minutes/unload_minutes are per-vehicle turnaround estimates and override planning.load_minutes/unload_minutes, which remain the fallback. Starting estimates, not measured — edit to match your operation. 11 Oct 2026: the four EU type-approval planning entries added on 2026-09-01 were removed from the seed (and from every category list and vehicle set below); a live document or tenant package that still carries them keeps loading and resolving, because nothing in the code names them.",
   "vehicles": {
     "Rigid 7.5t": {
       "eu_category": "N2",
@@ -254,12 +296,13 @@
       "_routing_note": "height 3.9 m is a typical UK truck-mixer overall height (drum), width the legal 2.55 m; length and axles from the chassis class. Typical figures, not a specific vehicle — edit to your fleet's.",
       "load_minutes": 10,
       "unload_minutes": 20,
-      "_turnaround_note": "10 min under the batching plant, 20 min discharge on site — typical planning figures, not measured; edit.",
+      "_turnaround_note": "ASSUMPTION, no public source: 10 min under the batching plant, 20 min discharge on site — typical planning figures, not measured; edit.",
       "labels": {
-        "en": "Truck mixer 8 m³ (32t)"
+        "en": "Concrete mixer 8 m³ (32t)"
       },
       "country_hint": "GB",
-      "fuel": "diesel"
+      "fuel": "diesel",
+      "_label_note": "14 Oct 2026: the key keeps its 26 Sep 2026 trade name (forecast lines, routes and baked geometry store it; keys are never renamed); every screen and export shows labels.en, 'Concrete mixer …' (UK copy says lorry, never truck)."
     },
     "Truck mixer 6 m³ (26t)": {
       "planning_vehicle": true,
@@ -283,12 +326,13 @@
       "_routing_note": "height 3.9 m is a typical UK truck-mixer overall height (drum), width the legal 2.55 m; length and axles from the chassis class. Typical figures, not a specific vehicle — edit to your fleet's.",
       "load_minutes": 10,
       "unload_minutes": 20,
-      "_turnaround_note": "10 min under the batching plant, 20 min discharge on site — typical planning figures, not measured; edit.",
+      "_turnaround_note": "ASSUMPTION, no public source: 10 min under the batching plant, 20 min discharge on site — typical planning figures, not measured; edit.",
       "labels": {
-        "en": "Truck mixer 6 m³ (26t)"
+        "en": "Concrete mixer 6 m³ (26t)"
       },
       "country_hint": "GB",
-      "fuel": "diesel"
+      "fuel": "diesel",
+      "_label_note": "14 Oct 2026: the key keeps its 26 Sep 2026 trade name (forecast lines, routes and baked geometry store it; keys are never renamed); every screen and export shows labels.en, 'Concrete mixer …' (UK copy says lorry, never truck)."
     },
     "Artic Tipper (44t) — electric": {
       "fuel": "electric",

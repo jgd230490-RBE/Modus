@@ -419,9 +419,11 @@ dc = tenant_package.counts(demo)
 # NARROWED (11 Oct 2026, carbon planner phase 4): + a fictional landfill and a fictional soil-recycling
 # hub (2 locations, 2 gates), a muck-away route to each (2 routes), four approved months of surplus cut
 # to the landfill (4 forecasts). Every row that was there before is unchanged (diffed when regenerated).
-ok("demo: 13 locations, 20 routes, 3 teams, 8 sections, 78 forecasts (76 approved + 1 pending + 1 rejected), 16 gates, 5 zones, 6 haul links",
-   dc["locations"] == 13 and dc["routes"] == 20 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 78
-   and dc["location_gates"] == 16 and dc["zones"] == 5 and dc["route_haul_roads"] == 6, str(dc))
+# NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
+# 10 m³ lines (3 of them in October, two on one route)
+ok("demo: 14 locations, 22 routes, 3 teams, 8 sections, 88 forecasts (86 approved + 1 pending + 1 rejected), 17 gates, 5 zones, 6 haul links",
+   dc["locations"] == 14 and dc["routes"] == 22 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 88
+   and dc["location_gates"] == 17 and dc["zones"] == 5 and dc["route_haul_roads"] == 6, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}
 ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries four approved "
@@ -438,8 +440,10 @@ ok("⭐ demo (carbon): the package carries the carbon block, carbon_material on 
    == ["Artic Flatbed (44t) — electric", "Artic Tipper (44t) — electric", "Rigid 8-wheeler (32t) — electric"]
    and all(v.get("scenario_only") for v in _dfac["vehicles"].values() if isinstance(v, dict) and v.get("fuel") == "electric"))
 _st = {s_: sum(1 for r in demo["tables"]["forecasts"] if r["status"] == s_) for s_ in ("Approved", "Pending", "Rejected")}
-ok("demo: 76 Approved (72 + the four muck-away months, 11 Oct), exactly one Pending and one Rejected (with a reason)",
-   _st == {"Approved": 76, "Pending": 1, "Rejected": 1}
+# NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
+# 10 m³ lines (3 of them in October, two on one route)
+ok("demo: 86 Approved (72 + the four muck-away months, 11 Oct + the ten concrete-pour line-months, 14 Oct), exactly one Pending and one Rejected (with a reason)",
+   _st == {"Approved": 86, "Pending": 1, "Rejected": 1}
    and all(r["reject_reason"] for r in demo["tables"]["forecasts"] if r["status"] == "Rejected"), str(_st))
 ok("demo: weeks are materialised and some actuals typed",
    dc["forecast_weeks"] > 0 and any(r.get("actual_qty") for r in demo["tables"]["forecast_weeks"]))
@@ -559,7 +563,8 @@ ok("demo: /api/meta reads the tenant back — £, Team, GB",
 ok("demo: the pickers see three teams and eight sections",
    len(m3["ipts"]) == 3 and len(m3["work_sections"]) == 8)
 ok("demo: the routes reach /api/meta with no distance (unbaked)",
-   len(m3["routes"]) == 20 and all(not r.get("distance_km") for r in m3["routes"]))
+   # NARROWED 14 Oct 2026: 22 routes (the two concrete-pour routes)
+   len(m3["routes"]) == 22 and all(not r.get("distance_km") for r in m3["routes"]))
 
 # --- 5a-bis. Postgres booleans (29 Sep 2026: the first demo import on Render) ---------
 # `psycopg2.errors.DatatypeMismatch: column "in_scope" is of type boolean but expression

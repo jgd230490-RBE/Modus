@@ -40,8 +40,17 @@ def _cat(raw):
 _known_cats = None
 
 
+def invalidate_categories():
+    """Forget the cached category names. config.save() and config.invalidate() call it, so a
+    category added (or removed) on the Config page is known to route validation at once."""
+    global _known_cats
+    _known_cats = None
+
+
 def _categories():
-    """Our material category names, from factors.json (cached)."""
+    """Our material category names, from the live factors document (cached until the next
+    Config save). 14 Oct 2026 (civils materials): until then the cache lived for the whole
+    process, so a category added on the Config page stayed unknown here until a restart."""
     global _known_cats
     if _known_cats is None:
         try:
@@ -1784,7 +1793,7 @@ def promote_alternative(route_id, profile, alt_index, leg="loaded"):
                              f"is routed as a single option. Detach the haul road to get "
                              f"alternatives back.",
                     "haul_zones": on_haul, "alternatives_available": sorted(have)}
-        return {"error": f"no alternative {alt_index} cached for {profile} / {leg}"}
+        return {"error": f"no alternative {alt_index} cached for {conversions.vehicle_label(conversions.load_factors(), profile)} / {leg}"}
 
     TMP = -1
     # tenant_id is a WHERE condition on all three legs of the swap and never appears in

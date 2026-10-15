@@ -1322,8 +1322,9 @@ ok("⭐ B2: the baked line's co2_t equals month-kpis' (one costlines figure) and
    abs(_pmb["WS1"]["co2_t"]["9"] - _k2["WS1"]["co2_t"]) < 1e-9 and _pmb["WS2"]["co2_t"]["9"] is None
    and _pmb["WS3"]["co2_t"]["9"] is None)
 ok("B2: the response shape is otherwise identical — the keys the detail table and the drawer read, plus co2_t, and no co2_error",
+   # NARROWED 14 Oct 2026 (civils materials): plus vehicle_name, the NAME the drawer prints (vehicle_type stays the key)
    set(_pmb["WS1"]) == {"route_id", "discipline", "section_id", "material_type", "material_description", "vehicle_type",
-                        "monthly", "total", "co2_t"}
+                        "vehicle_name", "monthly", "total", "co2_t"}
    # NARROWED 12 Oct 2026 (the review and fix pass): plus the Carbon page's stamp, which the route drawer prints
    and set(_pm) == {"unit", "from", "to", "working_days", "routes", "carbon_stamp"}
    and _pm["carbon_stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures", str(sorted(_pmb["WS1"])))

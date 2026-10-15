@@ -311,7 +311,8 @@ ok("H2: the scheme is a road — tenant name, overlay note, discipline words; no
    and [d["label"] for d in _T["disciplines"] if d["id"] == "superstructure"] == ["Pavement"]
    and [d["in_scope"] for d in _T["disciplines"] if d["id"] == "stations"] == [0])
 ok("H2: every site has a gate at its own coordinates; the quarries and the town compound enter and leave by different gates",
-   len(_T["location_gates"]) == 16 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
+   # NARROWED 14 Oct 2026 (civils materials): 17 gates — the batching plant's
+   len(_T["location_gates"]) == 17 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
    and all(g["lat"] and g["lon"] for g in _T["location_gates"])
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L001") == ["access", "egress"]
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
@@ -337,9 +338,10 @@ ok("H2: daily vehicle caps on the two village routes, so ROUTE_CAP has something
    {r["id"]: r["max_vehicles_per_day"] for r in _T["routes"] if r["max_vehicles_per_day"]} == {"R016": 20, "R018": 30})
 ok("H2: the show week (12–18 Oct = Oct W3) and the week after are populated for every approved line, and October W1/W2 carry typed actuals",
    # NARROWED (11 Oct 2026): 19 approved October lines — the muck-away line joined the 18
-   sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 3)) == 19
-   and sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 4)) == 19
-   and sum(1 for w in _T["forecast_weeks"] if w["month_index"] == 10 and w["week_index"] in (1, 2) and w.get("actual_qty") is not None) == 38)
+   # NARROWED 14 Oct 2026 (civils materials): 22 — the three October concrete-pour lines joined, actuals typed on them too
+   sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 3)) == 22
+   and sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 4)) == 22
+   and sum(1 for w in _T["forecast_weeks"] if w["month_index"] == 10 and w["week_index"] in (1, 2) and w.get("actual_qty") is not None) == 44)
 # NARROWED 14 Oct 2026 (the user took the recommendation): "the scheme and its plan are invented", was "nothing here is
 # real" (the bulletin quotes real government figures); still "Fictional demo scheme" first, still under 121 characters
 ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validates as short text or null",

@@ -128,6 +128,9 @@ def vehicle_short(vehicle, factors):
     vehicle in the seed carries a code any more (only the four EU type-approval entries
     did, until they were removed), so the seed's chips print "8-wheeler (32t)" and so on;
     the code branch stays for a tenant package whose vehicles carry one.
+    14 Oct 2026 (civils materials): from the vehicle's NAME (conversions.vehicle_label: its
+    labels.en, else the key through the word rule), not from the key, as `vehShort` does in the
+    app — the key "Truck mixer 8 m³ (32t)" printed itself on every chip, PDF and XLSX row.
     """
     if not vehicle:
         return None
@@ -135,10 +138,11 @@ def vehicle_short(vehicle, factors):
     code = (v.get("code") or "").strip()
     if code:
         return code
+    name = conversions.vehicle_label(factors, vehicle)
     for pre in ("Artic ", "Rigid "):
-        if vehicle.startswith(pre):
-            return vehicle[len(pre):]
-    return vehicle
+        if name.startswith(pre):
+            return name[len(pre):]
+    return name
 
 
 KM_BASES = ("round_trip", "loaded")
@@ -283,8 +287,11 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
         "section_id": line.get("section_id"),
         "material_type": line.get("material_type"),
         "vehicle_type": veh, "vehicle_short": vehicle_short(veh, factors),
+        # 14 Oct 2026: the full NAME a person reads (vehicle_type stays the stored key)
+        "vehicle_name": conversions.vehicle_label(factors, veh) if veh else None,
         "unit": line.get("unit"),
         "payload_t": payload, "payload_fallback": fb,
+        "payload_fallback_name": conversions.vehicle_label(factors, fb) if fb else None,
         "baked": baked, "return_baked": return_baked,
         "distance_km": round(dist, 2) if dist is not None else None,
         "return_km": round(ret, 2) if ret is not None else None,

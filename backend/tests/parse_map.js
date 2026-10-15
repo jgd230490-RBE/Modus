@@ -2669,10 +2669,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       let api = null, err = "", moving = null;
       try {
         api = new Function("document", "window", "TL", "KPI", "CONFIG", "fetch", "a1_data", "routePassesFilters", "monthLabel", "teamText", "TEAM",
-          "renderKpiSwitch", "showMoving", "positionWarnStack", "selectRoute",
+          "renderKpiSwitch", "showMoving", "positionWarnStack", "selectRoute", "vehName",
           src.slice(a, b) + "\nreturn { calculateKPIs, kpiFetchMonth };")(
           document, { WS_NAMES: {} }, TL, KPI, { FORECAST_UNIT: "vehicles", API_BASE: "" }, fetch, a1_data, () => true, monthLabel, x => x, "Team",
-          () => {}, on => { moving = !!on; }, () => {}, () => {});
+          () => {}, on => { moving = !!on; }, () => {}, () => {}, (k, n) => n || k);   // 14 Oct 2026: the map's vehicle-name helper
       } catch (e) { err = e.message; }
       ok("F1 sandbox: the figures bar runs against a fake DOM", !!api, err);
       if (api) {
