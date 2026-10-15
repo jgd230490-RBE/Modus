@@ -150,6 +150,26 @@ def electric_kg_per_km(factors, v, basis="ttw"):
     return kwh * per_kwh
 
 
+UNIT_WORDS = {"m3": "m³", "t": "tonnes", "vehicles": "vehicles"}
+
+
+def allowed_units(factors, material):
+    """15 Oct 2026 (the user: "steel should only be in tonnes"): the units a line of this material may be typed in —
+    the category's own `units` list when it carries one (the steel categories: ["t"]), else every unit. A category with
+    no volume conversion still hides m³ in the Submit form (volume_convertible), as before; this is the stricter rule a
+    category opts into."""
+    cats = (factors or {}).get("material_categories") or {}
+    c = cats.get(material) if isinstance(cats.get(material), dict) else None
+    want = (c or {}).get("units")
+    if isinstance(want, list) and want:
+        return [u for u in UNITS if u in want]
+    return list(UNITS)
+
+
+def units_words(units):
+    return " or ".join(UNIT_WORDS.get(u, u) for u in units)
+
+
 def material_names(factors):
     return [k for k in factors.get("material_categories", {}) if not k.startswith("_")]
 

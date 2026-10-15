@@ -7,7 +7,7 @@
     "currency": "EUR",
     "country": null
   },
-  "_materials_note": "Broad, enterprise-generic categories any large-construction project recognises. Each carries a planning density (loose, as-hauled t/m3), a default input unit, whether volume<->weight conversion is meaningful, and the vehicles typically used. Densities vary with moisture/compaction; treat as editable defaults. carbon_material (10 Oct 2026) names the UK Government 2026 'Material use — Construction' class the carbon planner prices the category's material-production carbon with (aggregates, asphalt, concrete, metals, soils, average_construction); a category without one is excluded from material carbon and says so, never guessed. 14 Oct 2026 (civils materials): four categories ADDED — Ready-mixed concrete (m3, mixers only), Precast units, Structural steel / rebar, Asphalt — each with its density's source in _density_basis; nothing renamed (keys are stored on forecasts, locations and routes).",
+  "_materials_note": "Broad, enterprise-generic categories any large-construction project recognises. Each carries a planning density (loose, as-hauled t/m3), a default input unit, whether volume<->weight conversion is meaningful, and the vehicles typically used. Densities vary with moisture/compaction; treat as editable defaults. carbon_material (10 Oct 2026) names the UK Government 2026 'Material use — Construction' class the carbon planner prices the category's material-production carbon with (aggregates, asphalt, concrete, metals, soils, average_construction); a category without one is excluded from material carbon and says so, never guessed. 14 Oct 2026 (civils materials): four categories ADDED — Ready-mixed concrete (m3, mixers only), Precast units, Structural steel / rebar, Asphalt — each with its density's source in _density_basis; nothing renamed (keys are stored on forecasts, locations and routes). 15 Oct 2026: a category may carry `units`, the only units its lines may be typed in; the two steel categories are tonnes only.",
   "material_categories": {
     "Earthworks / soil": {
       "density_t_per_m3": 1.5,
@@ -58,7 +58,11 @@
       "vehicles": [
         "Artic Flatbed (44t)"
       ],
-      "carbon_material": "metals"
+      "carbon_material": "metals",
+      "units": [
+        "t"
+      ],
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three."
     },
     "General / imported": {
       "density_t_per_m3": 1.5,
@@ -100,7 +104,11 @@
         "Artic Flatbed (44t)"
       ],
       "carbon_material": "metals",
-      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for structural steel. Stored, not used: steel is planned in tonnes. Added 14 Oct 2026."
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for structural steel. Stored, not used: steel is planned in tonnes. Added 14 Oct 2026.",
+      "units": [
+        "t"
+      ],
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three."
     },
     "Asphalt": {
       "density_t_per_m3": 2.3,

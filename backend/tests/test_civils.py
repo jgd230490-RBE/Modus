@@ -544,6 +544,51 @@ ok("7: the guide names the four categories and the Concrete mixers with their so
    all(k in GUIDE for k in NEW) and "Concrete mixer 8 m³ (32t) 18 t" in GUIDE and "BS EN 1991-1-1" in GUIDE
    and "concrete mixers 10 + 20 (an assumption with no published source)" in GUIDE)
 
+# --------------------------------------------------------------------------- #
+#  9. Steel in tonnes only (the user, 15 Oct 2026)                             #
+# --------------------------------------------------------------------------- #
+STEEL = ("Steel / rail", "Structural steel / rebar")
+F9 = conversions.load_factors_file()
+ok("9: both steel categories are tonnes only in the seed, with the reason",
+   all(F9["material_categories"][k].get("units") == ["t"] and F9["material_categories"][k].get("default_unit") == "t"
+       and "tonnes only" in F9["material_categories"][k].get("_units_note", "") for k in STEEL))
+ok("9: no other category is restricted (they keep every unit)",
+   all("units" not in c for k, c in F9["material_categories"].items() if k not in STEEL and isinstance(c, dict)))
+ok("9: allowed_units: steel → tonnes only; another material, or one the document lacks → all three",
+   conversions.allowed_units(F9, "Steel / rail") == ["t"] and conversions.allowed_units(F9, "Structural steel / rebar") == ["t"]
+   and conversions.allowed_units(F9, "Small aggregate") == ["m3", "t", "vehicles"]
+   and conversions.allowed_units(F9, "Unknown stuff") == ["m3", "t", "vehicles"]
+   and conversions.units_words(["t"]) == "tonnes")
+ok("9: the seed validates with the new key", config.validate(F9) == [])
+_b9 = json.loads(json.dumps(F9))
+_b9["material_categories"]["Steel / rail"]["units"] = ["tons"]
+_b9["material_categories"]["Structural steel / rebar"]["default_unit"] = "vehicles"
+_p9 = config.validate(_b9)
+ok("9: Config refuses a unit that is not m³, tonnes or vehicles, and a default unit outside a material's units",
+   any("Steel / rail" in x and "units must be a list" in x for x in _p9)
+   and any("Structural steel / rebar" in x and "default unit is not one of its units" in x for x in _p9), str(_p9))
+boot()
+access.set_current("planner123")
+for _u, _want in (("vehicles", True), ("m3", True), ("t", False)):
+    _row = main.MatrixRow(route_id="R-none", discipline="structures", section_id="", material_type="Steel / rail",
+                          vehicle_type="Artic Flatbed (44t)", unit=_u, cells=[], ipt="IPT1")
+    try:
+        main.save_matrix_row(_row)
+        _e9 = None
+    except Exception as e:      # noqa: BLE001
+        _e9 = e
+    _refused = getattr(_e9, "status_code", None) == 400 and "is planned in tonnes only" in str(getattr(_e9, "detail", ""))
+    ok(f"9: the server {'refuses' if _want else 'accepts'} a steel line typed in {_u}" + (" — 400, in words" if _want else ""),
+       _refused == _want, f"{_e9!r}"[:200])
+APP9 = read("frontend/index.html")
+ok("9: the Submit form offers only the category's units, and moves off a unit the category does not allow",
+   'const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u)));' in APP9
+   and '(catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);' in APP9)
+ok("9: Config → Materials has a 'Tonnes only' tick that sets units ['t'] and the default unit, or removes the rule",
+   '"Tonnes only"' in APP9 and 'if(e.target.checked){ m.units = ["t"]; m.default_unit = "t"; } else delete m.units;' in APP9
+   and "disabled={isTonnesOnly(c)}" in APP9)
+ok("9: the guide says steel can only be typed in tonnes", "can only be typed in tonnes" in read("frontend/help/index.html"))
+
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)

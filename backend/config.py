@@ -299,6 +299,13 @@ def validate(doc, network=None):
                 p.append(f"material '{k}': density_t_per_m3 must be a positive number")
             if c.get("default_unit") not in (None, "m3", "t", "vehicles"):
                 p.append(f"material '{k}': default_unit must be m3, t or vehicles")
+            # 15 Oct 2026: `units` — the only units a line of this material may be typed in (steel: ["t"])
+            un = c.get("units")
+            if un is not None:
+                if not isinstance(un, list) or not un or any(u not in ("m3", "t", "vehicles") for u in un):
+                    p.append(f"material '{k}': units must be a list of m3, t or vehicles (or left out for all three)")
+                elif c.get("default_unit") not in (None,) and c.get("default_unit") not in un:
+                    p.append(f"material '{k}': its default unit is not one of its units")
             for v in c.get("vehicles") or []:
                 if isinstance(vs, dict) and v not in vs:
                     p.append(f"material '{k}' lists vehicle '{v}', which does not exist")
