@@ -101,7 +101,7 @@ random.seed(20260916)
 OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
 AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
 TENANT_NAME = "Wolds Link dualling — demo scheme"
-DEMO_NOTICE = "Fictional demo scheme · the scheme and its plan are invented"   # 14 Oct 2026: was "· nothing here is real"
+DEMO_NOTICE = "Fictional scheme"   # 15 Oct 2026 (the user): the bar reads DEMO · FICTIONAL SCHEME (its badge says DEMO)
 START_YEAR = 2026
 MONTHS = [9, 10, 11, 12]          # Sep–Dec 2026, month_index == month for 2026
 
@@ -679,7 +679,7 @@ def build(with_areas=False, out=None):
                       "UNBAKED until then, and the works-zone geofence only re-routes what is baked. Diesel index: fetched "
                       "automatically from DESNZ weekly road fuel prices (H1); fuel_index below is a typed placeholder applied "
                       "on import if the GB row is empty. Distances read in miles (tenant.distance_unit); km is what is stored. "
-                      "tenant.demo_notice puts 'Fictional demo scheme' on every screen and export. Carbon planner "
+                      "tenant.demo_notice puts 'DEMO · Fictional scheme' on every screen and export. Carbon planner "
                       "(10 Oct 2026): Langton Compound's surplus cut goes to a fictional inert landfill (four approved "
                       "months); a fictional soil-recycling hub nearer by has a route and no forecast — the disposal "
                       "alternative. The two electric lorry profiles are scenario-only: they read the diesel twin's "

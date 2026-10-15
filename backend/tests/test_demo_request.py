@@ -456,7 +456,7 @@ _new_guide = 'Each page offers a short tour in a small "New here?" box'
 for _part, _label in ((dr.email_text("Ada Example", _c), "plain"), (dr.email_html("Ada Example", _c), "HTML"),
                       (dr.access_page("Ada Example", _c), "access page")):
     ok(f"guide update: the {_label} says nothing pops up and how to start the tour from the demo bar",
-       _new_guide in _part and "Nothing pops up by itself." in _part and "Fictional demo" in _part
+       _new_guide in _part and "Nothing pops up by itself." in _part and "DEMO · Fictional scheme" in _part   # NARROWED 15 Oct 2026
        and "starts the tour for the page you are on" in _part)
     ok(f"🔴 ...and the {_label} no longer says a guide opens on each page or sits in the corner",
        "opens on each page the first time" not in _part and "in the corner" not in _part)

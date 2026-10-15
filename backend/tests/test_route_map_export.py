@@ -448,8 +448,9 @@ try:
 finally:
     export._demo_notice = _rn
 # NARROWED 14 Oct 2026, evening: no page bar any more (the page is the map); the tag ON the map says it
-ok("⭐ on a demo tenant: the 'Fictional demo scheme' tag on the map itself", SDm["map_demo_tag"] == bulletin_doc.DEMO_MAP_TAG
-   and "Fictional demo scheme" in TD)
+# NARROWED 15 Oct 2026 (the user: the bar reads DEMO · FICTIONAL SCHEME; the map tag "Demo - fictional scheme")
+ok("⭐ on a demo tenant: the 'Demo - fictional scheme' tag on the map itself", SDm["map_demo_tag"] == bulletin_doc.DEMO_MAP_TAG
+   and bulletin_doc.DEMO_MAP_TAG == "Demo - fictional scheme" and "Demo - fictional scheme" in TD)
 _many = rme.plan(rme.sheet(10, acc=PLANNER))
 _many["plan"] = dict(_many["plan"], places=[{"letter": bulletin_doc._letters(i), "name": f"Site {i}", "at": None} for i in range(20)])
 ok("...the panel lists at most 16 sites, then '+N more sites'",

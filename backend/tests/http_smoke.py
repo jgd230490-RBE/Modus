@@ -293,7 +293,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # NARROWED 14 Oct 2026 (the user took the recommendation): the demo package's notice is "the scheme and its plan are
     # invented" (was "nothing here is real", which the bulletin's real government figures contradicted); same three places
     ok("⭐ .../map/ on its own gets the password page WITH the notice pill (no bar above it)",
-       r_alone.status_code == 401 and '<div class="demo-notice">Fictional demo scheme · the scheme and its plan are invented</div>' in r_alone.text,
+       r_alone.status_code == 401 and '<div class="demo-notice">Fictional scheme</div>' in r_alone.text,   # NARROWED 15 Oct 2026 (the user)
        str(r_alone.status_code))
     ok("🔴 ...and /map/?embed=1 typed into the tab (a top-level page) keeps the pill too",
        r_typed.status_code == 401 and 'class="demo-notice"' in r_typed.text, str(r_typed.status_code))
@@ -556,7 +556,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("⭐ the carbon summary over HTTP: a one-page PDF, stamped, with the fictional-scheme notice and the commentary as typed",
            r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-"
            and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in _st
-           and "Fictional demo scheme" in _st and "Smoke check & <nothing> else" in _st
+           and "DEMO Fictional scheme" in _st and "Smoke check & <nothing> else" in _st   # NARROWED 15 Oct 2026 (the user)
            and "Battery electric lorries, where Config has an electric profile for that lorry — route R001" in _st,
            f"{r.status_code} {_st[:300]}")
         r = c.post("/api/carbon/summary.pdf", headers=PLAN, json={"commentary": "x" * 1501})
@@ -574,7 +574,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
            r.status_code == 200 and pg["month"] == {"index": 10, "label": "Oct 2026", "label_long": "October 2026",
                                                      "from": "2026-10-01", "to": "2026-10-31"}
            and all(hl.get(k) is not None for k in ("two_way_a_day", "movements_in_month", "routes_in_use", "tonnes"))
-           and _wd and hl["working_days"] == _wd and pg["demo_notice"] == "Fictional demo scheme · the scheme and its plan are invented" and "nothing here is real" not in r.text
+           and _wd and hl["working_days"] == _wd and pg["demo_notice"] == "Fictional scheme" and "nothing here is real" not in r.text   # NARROWED 15 Oct 2026
            and pg["plan_only"] is True, f"{r.status_code} {str(pg)[:300]}")
         _kp = c.get("/api/public/month-kpis?month=10", headers=PLAN).json()
         _r001 = [l for l in _kp["lines"] if l["route_id"] == "R001"]
@@ -641,7 +641,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and r.content.count(b"/Type /Page\n") == 1
                and re.search(r'filename="route-map-2026-10-regional(-1-\d+)?\.pdf"', r.headers.get("content-disposition", "")) is not None
                and r.headers.get("cache-control") == "no-store"
-               and "Regional plan" in _rt and "Fictional demo scheme" in _rt and "Two-way movements a day" in _rt
+               and "Regional plan" in _rt and "Demo - fictional scheme" in _rt and "Two-way movements a day" in _rt   # NARROWED 15 Oct 2026
                and "not an approved CLP" in _rt, f"{r.status_code} {r.headers.get('content-disposition')} {_rt[:300]}")
             ok("🔴 ...no team id, no 'truck', no 'baked' in it; no table, no scheme's block, no Carbon Tool rows (just the map)",
                not re.search(r"\bIPT ?[1-6]\b", _rt) and not re.search(r"\btrucks?\b", _rt, re.I)
@@ -694,7 +694,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-"
                and r.headers.get("content-disposition") == 'attachment; filename="bulletin-2026-10.pdf"'
                and r.headers.get("cache-control") == "no-store" and len(_bp) >= 2
-               and all("fictional demo scheme" in x.lower() for x in _bp), f"{r.status_code} {len(_bp)} pages")
+               and all("demo fictional scheme" in " ".join(x.split()).lower() for x in _bp), f"{r.status_code} {len(_bp)} pages")   # NARROWED 15 Oct 2026: "DEMO Fictional scheme" on every page
             ok("⭐ ...page 1 carries the four headline figures equal to /api/bulletin/month's roll-up",
                bool(_bp) and all(f in _bp[0] for f in _figs), f"{_figs} | {_bp[0][:400] if _bp else ''}")
             # REVERSED 14 Oct 2026 (the user took the recommendation): the stockpile over capacity is a site matter and is
@@ -714,14 +714,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
                and r.headers.get("cache-control") == "no-store" and all(f in r.text for f in _figs)
                and 'href="/api/bulletin/month.pdf?month=10">Download the PDF</a>' in r.text
-               and "Fictional demo scheme · the scheme and its plan are invented" in r.text, f"{r.status_code} {r.text[:200]}")
+               and "Fictional scheme" in r.text, f"{r.status_code} {r.text[:200]}")   # NARROWED 15 Oct 2026 (the user)
             r = c.get("/api/bulletin/leaflet.pdf?month=10", headers=PLAN)
             _lp = [" ".join(x.split()) for x in pdf_text(r.content).split("\f") if x.strip()] if r.status_code == 200 else []
             ok("⭐ D43 the leaflet PDF over HTTP: one page, named for the month, not cached, the demo bar, the four figures, the brief",
                r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf")
                and r.headers.get("content-disposition") == 'attachment; filename="leaflet-2026-10.pdf"'
                and r.headers.get("cache-control") == "no-store" and len(_lp) == 1
-               and "fictional demo scheme" in _lp[0].lower() and all(f in _lp[0] for f in _figs) and "Key points" in _lp[0],     # NARROWED 14 Oct 2026
+               and "demo fictional scheme" in " ".join(_lp[0].split()).lower() and all(f in _lp[0] for f in _figs) and "Key points" in _lp[0],     # NARROWED 14 Oct 2026; and 15 Oct (the wording)
                f"{r.status_code} {len(_lp)}")
             ok("⭐ D43 the newsletter PDF over HTTP is four pages, the brand band on each",
                len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)}")
@@ -970,7 +970,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and b"/MediaBox [ 0 0 595." in r.content and "day sheet" in _dst and "not a delivery note" in _dst,
        f"{r.status_code} pages={r.content.count(b'/Type /Page\n')} mb={r.content[r.content.find(b'/MediaBox'):r.content.find(b'/MediaBox')+40]!r} {_dst[-400:]}")
     ok("...with the demo notice, team NAMES and no team id; NOT ROUTED counted, never the server's 'baked' working note",
-       "DEMO" in _dst and "Fictional demo scheme" in _dst and not re.search(r"\bIPT ?[1-6]\b", _dst)
+       "DEMO Fictional scheme" in _dst and not re.search(r"\bIPT ?[1-6]\b", _dst)   # NARROWED 15 Oct 2026 (the user)
        and "NOT ROUTED on" in _dst and not re.search(r"\b(un)?baked?\b", _dst, re.I)
        and any(t in _dst for t in ("North Team", "Central Team", "South Team")), _dst[:300])
     r = c.get("/api/forecast-weeks/day-sheet", params={"day": _day}, headers=NORTH)

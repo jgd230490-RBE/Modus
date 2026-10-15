@@ -254,7 +254,7 @@ Three things to try:
 2. Look-ahead: this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.
 3. Public map: press Play to watch a month of haul unfold.
 
-Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the "Fictional demo scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.
+Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the red "DEMO · Fictional scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.
 
 If you'd like a walkthrough of the planner's side, approving forecasts and confirming the week, just reply to this email.
 
@@ -278,7 +278,7 @@ def email_html(name, c):
 <li><b>Look-ahead:</b> this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.</li>
 <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
 </ol>
-<p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the "Fictional demo scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>
+<p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the red "DEMO · Fictional scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>
 <p>If you'd like a walkthrough of the planner's side, approving forecasts and confirming the week, just reply to this email.</p>
 <p>John Davis<br>Wayscope · <a href="{landing_url()}/">wayscope.co.uk</a></p>
 <p style="font-size:12px;color:#5B6470">You're receiving this because you requested a demo at wayscope.co.uk. <a href="{landing_url()}/privacy.html">Privacy notice</a></p>
@@ -495,7 +495,7 @@ def access_page(name, c):
     <li><b>Look-ahead:</b> this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.</li>
     <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
   </ol>
-  <p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the "Fictional demo scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>
+  <p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the red "DEMO · Fictional scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>
   <p>If you'd like a walkthrough of the planner's side, approving forecasts and confirming the week, email <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a>.</p>
   <p class="fine">You asked for this at wayscope.co.uk. <a href="{lu}/privacy.html">Privacy notice</a> · <a href="{lu}/">Back to Wayscope</a></p>
 </main>

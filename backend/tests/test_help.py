@@ -295,7 +295,8 @@ ok("11 Oct 2026: ⭐ the guide names none of the four EU type-approval vehicles,
    and "Rigid 7.5t is hidden" in src and "a vehicle without its own figures 12 + 8 (the default)" in src
    and "UK trade names such as Rigid 8-wheeler and Artic Tipper" in src)
 ok("⭐ the demo bar and its Guide button, the New here? box, the dots, Don't show again; nothing opens by itself",
-   "FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL" in src and "<strong>Guide</strong>, at the right-hand end of the bar" in src
+   "DEMO · FICTIONAL SCHEME" in src   # NARROWED 15 Oct 2026: the bar's wording (the user)
+   and "FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL" not in src and "<strong>Guide</strong>, at the right-hand end of the bar" in src
    and "Nothing opens by itself." in src and "<strong>Take the tour</strong>" in src and "pulsing orange dots" in src
    and "<strong>Don't show again</strong>" in src and "Your organisation's own site has no bar and no tour." in src)
 

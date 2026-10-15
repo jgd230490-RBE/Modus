@@ -583,7 +583,8 @@ def _lot(mi, month_long, prev_long, R, prev, H, council, acc, demo):
 
 # 13 Oct 2026 (W15, D43): the newsletter's page 1 and the one-page leaflet share these words, from the view model only.
 BRAND_TITLE = "Lorry movements bulletin"
-DEMO_MAP_TAG = "Fictional demo scheme"          # D41: on each map itself as well as in the page bar
+DEMO_MAP_TAG = "Demo - fictional scheme"        # D41: on each map itself as well as in the page bar (15 Oct 2026, the user:
+                                                # "DEMO - FICTIONAL SCHEME"; was "Fictional demo scheme")
 NEWSLETTER_URL_PLACEHOLDER = f"[link {PLACEHOLDER}]"
 
 
