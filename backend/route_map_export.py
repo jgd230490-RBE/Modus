@@ -245,13 +245,19 @@ def plan(S, kind="regional", scale=None, at=None, community=True):
                     inside.append(p)
         P["places"] = inside
     P["centre_choices"] = choices
-    P["community"] = community_in_frame(P["view"]) if (community and P["view"]) else None
+    P["community"] = community_in_frame(P["view"], omit=PLAN_OMITS.get(kind, ())) if (community and P["view"]) else None
     P["community_asked"] = bool(community)
     S["plan"] = P
     return S
 
 
-def community_in_frame(v):
+# 15 Oct 2026 (the user: "leave bus stops off the regional plan"): kinds a plan leaves out of the community considerations.
+# At a regional plan's scale (1:20,000 and smaller) the bus stops crowd every town into a smear; the local and site plans
+# keep them. The panel says where they are, so the leaving out is never silent.
+PLAN_OMITS = {"regional": ("bus_stops",)}
+
+
+def community_in_frame(v, omit=()):
     """14 Oct 2026 — the community considerations layer on a plan: the stored features with a vertex inside the frame,
     or an outline that covers the frame's centre (a residential area larger than a site plan), the kinds among them in
     the legend's order, and the credit line for the sources those features came from. None when nothing is stored."""
@@ -283,6 +289,8 @@ def community_in_frame(v):
             hit = in_polygons(lon, lat, polygons_of(g))
         if hit:
             keep.append(f)
+    left_out = [k["label"] for k in community.KINDS if k["key"] in omit and any(f["properties"]["kind"] == k["key"] for f in keep)]
+    keep = [f for f in keep if f["properties"]["kind"] not in omit]
     kinds = [dict(k) for k in community.KINDS if any(f["properties"]["kind"] == k["key"] for f in keep)]
     sources = sorted({f["properties"].get("source_key") for f in keep if f["properties"].get("source_key")})
-    return {"features": keep, "kinds": kinds, "credit": community.credit_line(sources) if keep else ""}
+    return {"features": keep, "kinds": kinds, "credit": community.credit_line(sources) if keep else "", "left_out": left_out}

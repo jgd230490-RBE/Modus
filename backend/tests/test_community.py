@@ -622,6 +622,15 @@ ok("7: the features in the frame and ONLY the kinds among them, in the legend's 
    and set(kinds_in) == {f["properties"]["kind"] for f in CMf["features"]}, str(kinds_in))
 ok("7: ...the credit line names the sources in the frame", CMf["credit"].startswith("Community considerations:"))
 far_v = basemap.view_centred(-0.5, 52.0, v["zoom"], v["w"], v["h"])
+# 15 Oct 2026 (the user: "leave bus stops off the regional plan")
+ok("7: the regional plan leaves the bus stops out; the local and site plans keep them",
+   route_map_export.PLAN_OMITS == {"regional": ("bus_stops",)}
+   and 'community_in_frame(P["view"], omit=PLAN_OMITS.get(kind, ())) if (community and P["view"])' in read("backend/route_map_export.py"))
+_om = route_map_export.community_in_frame(v, omit=("bus_stops",))
+ok("7: ...left out, no bus stop is drawn or listed, and the panel is told which kind went (never silently)",
+   "bus_stops" in kinds_in and not any(f["properties"]["kind"] == "bus_stops" for f in _om["features"])
+   and "bus_stops" not in [k["key"] for k in _om["kinds"]] and _om["left_out"] == ["Bus stops"]
+   and CMf["left_out"] == [], str(_om["left_out"]))
 ok("7: a frame with none of them in it has no community block", (route_map_export.community_in_frame(far_v) or {}).get("kinds") == [])
 # a sheet and its PDF (an empty month: the frame still centres; the panel lists the kinds)
 S = {"tenant": "Test scheme", "month_long": "October 2026", "filter_words": "All routes", "map_legend_title": "Two-way movements a day",
@@ -634,6 +643,11 @@ _t = " ".join(pdf_text(_pdf, "").split()) if shutil.which("pdftotext") else ""
 ok("7: the plan's panel lists 'Community considerations', the kinds in view and the sources' credit",
    not _t or ("Community considerations" in _t and all(community.KIND_BY_KEY[k]["label"].split(" (")[0] in _t for k in kinds_in)
               and "Open Government Licence" in _t), _t[-600:])
+S["plan"]["community"] = _om
+_tr = " ".join(pdf_text(export.build_route_map_pdf(S), "").split()) if shutil.which("pdftotext") else ""
+ok("7: ...the regional plan's panel says 'Bus stops are on the local and site plans.' and lists no Bus stops row",
+   not _tr or ("Bus stops are on the local and site plans." in _tr and _tr.count("Bus stops") == 1), _tr[-500:])
+S["plan"]["community"] = CMf
 _absent = [k["label"] for k in community.KINDS if k["key"] not in kinds_in]
 ok("7: ...and not the kinds out of view", not _t or not any(a in _t for a in _absent if a not in ("Schools",)), str(_absent))
 S["plan"]["community"] = None
@@ -648,7 +662,8 @@ ok("7: outlines are a 22 % tint with the full colour as the edge (the colour sys
    and main.community_layer(request=_Request())["fill_alpha"] == 0.22)
 _rp = read("backend/route_map_export.py")
 ok("7: plan() adds the layer unless asked not to", "def plan(S, kind=\"regional\", scale=None, at=None, community=True):" in _rp
-   and 'P["community"] = community_in_frame(P["view"]) if (community and P["view"]) else None' in _rp)
+   # NARROWED 15 Oct 2026: the plan's own omissions (bus stops off the regional plan) ride along
+   and 'P["community"] = community_in_frame(P["view"], omit=PLAN_OMITS.get(kind, ())) if (community and P["view"]) else None' in _rp)
 
 # --------------------------------------------------------------------------- #
 #  8. Source level                                                             #
@@ -701,7 +716,8 @@ ok("8: nothing is fetched on a page view: only refresh() reaches the downloaders
 GUIDE, TECH = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
 ok("8: the user guide says what the layer is, who sees it, where it comes from and how old it is",
    "Community considerations" in GUIDE and "250 m" in GUIDE and "OpenStreetMap" in GUIDE and "NaPTAN" in GUIDE
-   and "Get Information about Schools" in GUIDE and "staff" in GUIDE.split("Community considerations")[1][:3000].lower())
+   and "Get Information about Schools" in GUIDE and "staff" in GUIDE.split("Community considerations")[1][:3000].lower()
+   and "the regional plan leaves the bus stops out" in GUIDE)
 ok("8: the technical guide says how it is fetched (Geofabrik, not the public Overpass) and the licences",
    "Geofabrik" in TECH and "Overpass" in TECH and "ODbL" in TECH and "Open Government Licence" in TECH)
 
