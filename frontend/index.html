@@ -4636,6 +4636,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const cat = material_categories[material] || {};
   const suggestedVehicles = (cat.vehicles && cat.vehicles.length) ? cat.vehicles : vehicles;
   const volumeOk = cat.volume_convertible !== false;
+  // 15 Oct 2026: a category may name the only units its lines are typed in (steel: tonnes only); none = all three
+  const catUnits = (Array.isArray(cat.units) && cat.units.length) ? cat.units : null;
 
   // ---- discipline + work section ----
   // Both belong on the LINE, not on the route or the location. A lorry of track ballast
@@ -4731,7 +4733,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
 
   // category change -> sensible default unit + primary vehicle
   useEffect(() => {
-    setUnit(u => (u === "m3" && !volumeOk) ? (cat.default_unit || "t") : u);
+    setUnit(u => ((u === "m3" && !volumeOk) || (catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);
     setVehicle(v => suggestedVehicles.includes(v) ? v : (firstShown(suggestedVehicles) || v));
   }, [material]);
 
@@ -4830,7 +4832,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   // averaged two haul cycles that are not close -- an Artic Flatbed turns round in 45
   // minutes against a Tipper's 24 -- and hid that inside a single number.
   const effPayload = payload(factors, vehicle);
-  const allowedUnits = units.filter(u => (u !== "m3" || volumeOk));
+  const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u)));
 
   // Totals run across the WHOLE range, not one year — the brief's requirement and the
   // only reading that makes sense once a save can cover 2026-2027.
@@ -5793,6 +5795,9 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
 
 // 13 Oct 2026 (W12): the council colour bands a scheme reads until it types its own (backend config.COUNCIL_BREAKS_DEFAULT)
 const COUNCIL_BREAKS_DEFAULT = { movements: [50, 100, 200], carbon: [50, 100, 200] };
+// 15 Oct 2026: a material whose only unit is tonnes (steel, the user)
+const isTonnesOnly = (c) => !!(c && Array.isArray(c.units) && c.units.length === 1 && c.units[0] === "t");
+
 function ConfigPage({ meta, who, access }){
   const [doc, setDoc] = useState(null);
   const [orig, setOrig] = useState(null);
@@ -5949,7 +5954,7 @@ function ConfigPage({ meta, who, access }){
             <div className="overflow-auto">
               <table className="tbl">
                 <thead>
-                  <tr>{["Material", "Density t/m³", "Default unit", "Volume ↔ weight", "Vehicles used"].map(h => <th key={h} scope="col" className={h === "Density t/m³" ? "num" : ""}>{h}</th>)}</tr>
+                  <tr>{["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h => <th key={h} scope="col" className={h === "Density t/m³" ? "num" : ""}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {materials.map(k => { const c = doc.material_categories[k]; return (
@@ -5957,10 +5962,14 @@ function ConfigPage({ meta, who, access }){
                       <td className="font-medium text-slate-800">{k}</td>
                       <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
                       <td className="w-32">
-                        <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
+                        <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
                           <option value="m3">m³</option><option value="t">tonnes</option><option value="vehicles">vehicles</option>
                         </select>
                       </td>
+                      {/* 15 Oct 2026 (the user: steel in tonnes only): lines of this material are typed in tonnes alone — the
+                          Submit form offers nothing else and Wayscope refuses another unit; unticked, all three units */}
+                      <td className="text-center"><input type="checkbox" checked={isTonnesOnly(c)} aria-label={`${k} is planned in tonnes only`} data-cfg-tonnes-only={k}
+                        onChange={e => upd(d => { const m = d.material_categories[k]; if(e.target.checked){ m.units = ["t"]; m.default_unit = "t"; } else delete m.units; })} /></td>
                       <td className="text-center"><input type="checkbox" checked={c.volume_convertible !== false} aria-label={`${k} converts volume to weight`} onChange={e => upd(d => { d.material_categories[k].volume_convertible = e.target.checked; })} /></td>
                       <td style={{ whiteSpace: "normal", height: "auto", padding: "8px 12px" }}>
                         <div className="flex flex-wrap gap-x-3 gap-y-1">

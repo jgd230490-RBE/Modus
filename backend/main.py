@@ -1246,6 +1246,10 @@ def save_matrix_row(row: MatrixRow):
     """
     if row.unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+    # 15 Oct 2026: a material that is planned in one unit only (steel: tonnes) refuses the others, in words
+    _ok_units = conversions.allowed_units(conversions.load_factors(), row.material_type)
+    if row.unit not in _ok_units:
+        raise HTTPException(400, f"{row.material_type} is planned in {conversions.units_words(_ok_units)} only")
 
     disc = row.discipline or ""
     sect = row.section_id or ""
