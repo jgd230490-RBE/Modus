@@ -3086,7 +3086,7 @@ def build_collision_evidence_pdf(S):
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, "a place in the list below")
     y -= 14
     t = (f"Drawn: the {len(near)} collisions within {S['near_route_m']} m of this route's road route, both directions."
-         if S["fetched"] else "Not fetched yet: a planner fetches the collision history on Config → Map and bulletin.")
+         if S["fetched"] else "Not fetched yet: a planner fetches the collision history on the Config page, Map and bulletin.")
     c.setFillColorRGB(*GREY); c.setFont(R, 7.6); c.drawString(m, y - 7.6, _pdf_safe(t))
     y -= 16
 
