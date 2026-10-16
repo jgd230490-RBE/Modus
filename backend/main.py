@@ -3336,6 +3336,8 @@ class GateIn(BaseModel):
     open_from: Optional[str] = None
     open_to: Optional[str] = None
     open_days: Optional[str] = None
+    # 16 Oct 2026: the haul road drawn from the public road to this gate (a zone id); None = none
+    access_zone_id: Optional[str] = None
 
 
 class GatePatch(BaseModel):
@@ -3351,6 +3353,7 @@ class GatePatch(BaseModel):
     open_from: Optional[str] = None
     open_to: Optional[str] = None
     open_days: Optional[str] = None
+    access_zone_id: Optional[str] = None
 
 
 class RouteGatesIn(BaseModel):
@@ -3447,7 +3450,8 @@ def create_gate(body: GateIn, token: Optional[str] = None):
                              internal_travel_minutes=body.internal_travel_minutes,
                              is_default=body.is_default, active=body.active,
                              note=body.note, gate_id=body.gate_id,
-                             open_from=body.open_from, open_to=body.open_to, open_days=body.open_days)
+                             open_from=body.open_from, open_to=body.open_to, open_days=body.open_days,
+                             access_zone_id=body.access_zone_id)
 
 
 @app.patch("/api/admin/gates/{gate_id}")
@@ -3464,8 +3468,11 @@ def update_gate(gate_id: str, body: GatePatch, token: Optional[str] = None):
         # route that uses it is stale. The re-bake is NOT run here — its cost is quoted
         # in the UI first, as zone and haul-road writes already do.
         moved = bool({"lat", "lon", "direction", "active"} & sent)
-        out["rebake_needed"] = moved
+        out["rebake_needed"] = moved or ("access_zone_id" in sent)
         out["routes_affected"] = gates.routes_using(gate_id) if moved else []
+        # 16 Oct 2026: a new or cleared access road changes every route at the gate's location
+        if "access_zone_id" in sent:
+            out["routes_affected"] = sorted(set(out["routes_affected"]) | set(gates.routes_at_location(out["location_id"])))
     return out
 
 
@@ -3887,12 +3894,14 @@ def delete_zone(zone_id: str, token: Optional[str] = None):
         # with nothing to find and the affected legs baked through a road that is gone.
         inval = haul.invalidate_for_zone(zone_id)
         detached = haul.clear_links_for_zone(zone_id)
+        gates_cleared = gates.clear_access_for_zone(zone_id)      # 16 Oct 2026: no gate keeps a deleted access road
         res = zones.delete_zone(zone_id)
         if res.get("error"):
             raise HTTPException(404, res["error"])
         haul.refresh_origin_temp_km()
         out = _zone_write_result({"deleted": zone_id, "was": before}, inval)
         out["detached_from_routes"] = detached
+        out["access_road_of_gates"] = gates_cleared
         return out
 
     was_routes = (before["affects_routing"] and before["active"]

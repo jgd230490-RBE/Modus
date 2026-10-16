@@ -139,6 +139,7 @@ import access  # noqa: E402
 import config  # noqa: E402
 import costing  # noqa: E402
 import gates  # noqa: E402
+import zones  # noqa: E402
 import tenant_package  # noqa: E402
 import export  # noqa: E402
 import basemap  # noqa: E402
@@ -306,10 +307,30 @@ ok("⭐ the gates the BAKE uses: entry = the access gate (default for arriving),
    e["name"] == "North gate" and e["hours"] == "07:00–18:00" and e["closed"] == "closed on Saturdays and Sundays"
    and x_["name"] == "South gate" and x_["hours"] is None and x_["closed"] is None, f"{e} {x_}")
 ok("...the scheme's no-delivery windows in words", S["peak_words"] == "07:00–09:00 and 15:00–16:00")
-ok("⭐ the leg's gap to its gate, in metres, by hand: 33 m to the North gate (drawn, no note), 334 m to the South gate (a note)",
+# CHANGED 16 Oct 2026 (the user: "gates are usually right by the public road with a suitable bellmouth … ensure there is a
+# haul road drawn to every gate"): the note says what to do — draw the gate's access road (none here) — and the threshold
+# fell from 200 m to 50 m (a bellmouth for two 16.5 m lorries, and a margin): a route with its access road ends AT the gate
+ok("⭐ the leg's gap to its gate, in metres, by hand: 33 m to the North gate (inside 50 m: no note), 334 m to the South gate "
+   "(a note: draw its access road)",
    e["gap_m"] == round(hav(e["at"], LOADED[-1])) == 33 and x_["gap_m"] == round(hav(x_["at"], RETURN[0])) == 334
-   and S["gate_notes"] == ["The return route on file starts 334 m from South gate: work the route out again if the gate has moved."]
-   and S["same_gate"] is False, f"{e['gap_m']} {x_['gap_m']} {S['gate_notes']}")
+   and S["gate_notes"] == ["The return route on file starts 334 m from South gate: draw the gate's access road from the public "
+                           "road, then work the route out again."]
+   and S["same_gate"] is False and rs.GATE_FAR_M == 50.0, f"{e['gap_m']} {x_['gap_m']} {S['gate_notes']}")
+# a gate that HAS its access road but whose stored route ends far from it: the route is stale, so the note says re-work it
+_zr = zones.create_zone("South gate access road", {"type": "LineString", "coordinates": [[-0.9, LAT - 0.0035], [-0.9, LAT - 0.003]]},
+                        kind=zones.HAUL_KIND, speed_kph=10, haul_mode="splice")
+gates.update_gate(G_OUT["id"], access_zone_id=_zr["id"])
+ok("...a gate WITH its access road and a route ending far from it: 'work the route out again (the gate or its access road has "
+   "moved since)'", rs.sheet("R1", acc=PLANNER)["gate_notes"] == [
+       "The return route on file starts 334 m from South gate: work the route out again (the gate or its access road has moved since)."])
+gates.update_gate(G_OUT["id"], access_zone_id="")
+db.execute("UPDATE route_geometry SET geometry = ? WHERE route_id = 'R1' AND vehicle_profile = ? AND leg = 'return'",
+           (json.dumps([[-0.9, LAT - 0.003 + 0.0002]] + [list(c) for c in RETURN]), ART))
+ok("🔴 ...a leg starting 22 m from its gate (inside the bellmouth threshold) gets no note",
+   rs.sheet("R1", acc=PLANNER)["gate_notes"] == [] and rs.sheet("R1", acc=PLANNER)["exit"]["gap_m"] == 22,
+   str(rs.sheet("R1", acc=PLANNER)["exit"]["gap_m"]))
+db.execute("UPDATE route_geometry SET geometry = ? WHERE route_id = 'R1' AND vehicle_profile = ? AND leg = 'return'",
+           (json.dumps([list(c) for c in RETURN]), ART))
 ok("...the typed words and the site rules at BOTH ends", S["route_reason"] == "Agreed in the CLP: avoids the village centre."
    and S["site_rules_dest"] == "15 mph on site." and S["site_rules_origin"] == "Report to the weighbridge.")
 # a route gate id picks the gate (the bake's rule): R1 told to use the South gate both ways is refused for entry (egress only)
@@ -326,7 +347,8 @@ _geom("R3", ART, "return", [(-1.19, LAT), (-0.9, LAT)], 20.0, 0.5)
 S3 = rs.sheet("R3", acc=PLANNER)
 ok("⭐ ONE gate both ways: drawn and named once; a leg ending 677 m from it gets ONE note for both",
    S3["same_gate"] is True and S3["entry"]["name"] == S3["exit"]["name"] == "Pit gate"
-   and S3["gate_notes"] == [f"The route on file ends and starts {S3['entry']['gap_m']:,} m from Pit gate: work the route out again if the gate has moved."]
+   and S3["gate_notes"] == [f"The route on file ends and starts {S3['entry']['gap_m']:,} m from Pit gate: draw the gate's access "
+                            "road from the public road, then work the route out again."]
    and S3["entry"]["gap_m"] == round(hav((-1.2, LAT), (-1.19, LAT))), str(S3["gate_notes"]))
 db.execute("DELETE FROM route_geometry WHERE route_id = 'R3'")
 db.execute("UPDATE routes SET origin_id = 'L1', dest_id = 'L2' WHERE id = 'R3'")

@@ -133,6 +133,8 @@ def _row(g):
         "open_from": g.get("open_from"),
         "open_to": g.get("open_to"),
         "open_days": gate_hours.clean_days(g.get("open_days")),
+        # 16 Oct 2026: the haul road drawn from the public road to this gate; None = none drawn
+        "access_zone_id": g.get("access_zone_id") or None,
         "created_at": g.get("created_at"),
         "updated_at": g.get("updated_at"),
     }
@@ -301,10 +303,24 @@ def _clean_hhmm(v):
     return None if v in (None, "") else str(v).strip()
 
 
+def access_problem(zone_id):
+    """16 Oct 2026: None for no access road (blank) or the id of a haul-road zone; else the problem in words."""
+    if zone_id in (None, ""):
+        return None
+    rows = db.query("SELECT kind FROM zones WHERE tenant_id = ? AND id = ?", (db.current_tenant(), str(zone_id)))
+    if not rows:
+        return f"no zone {zone_id}"
+    import zones
+    if rows[0]["kind"] != zones.HAUL_KIND:
+        return f"{zone_id} is not a haul road: a gate's access road is drawn as a haul road"
+    return None
+
+
 def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=None,
                 internal_travel_minutes=None, is_default=False, active=True,
-                note=None, gate_id=None, open_from=None, open_to=None, open_days=None):
-    hp = _hours_problem(open_from, open_to, open_days)
+                note=None, gate_id=None, open_from=None, open_to=None, open_days=None,
+                access_zone_id=None):
+    hp = _hours_problem(open_from, open_to, open_days) or access_problem(access_zone_id)
     if hp:
         return {"error": hp}
     if not (location_id or "").strip():
@@ -325,13 +341,13 @@ def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=No
     db.execute(
         "INSERT INTO location_gates (tenant_id, id, location_id, name, direction, "
         "lat, lon, safety_minutes, internal_travel_minutes, is_default, active, note, "
-        "created_at, updated_at, open_from, open_to, open_days) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "created_at, updated_at, open_from, open_to, open_days, access_zone_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (db.current_tenant(), gid, location_id, name.strip(),
          _clean_direction(direction), la, lo, _clean_minutes(safety_minutes),
          _clean_minutes(internal_travel_minutes), bool(is_default), bool(active),
          (note or None), now, now, _clean_hhmm(open_from), _clean_hhmm(open_to),
-         gate_hours.clean_days(open_days)),
+         gate_hours.clean_days(open_days), (access_zone_id or None)),
     )
     if is_default:
         _clear_other_defaults(location_id, gid)
@@ -388,6 +404,11 @@ def update_gate(gate_id, **fields):
                 sets.append(f"{key} = ?"); params.append(_clean_hhmm(fields[key]))
         if "open_days" in fields:
             sets.append("open_days = ?"); params.append(gate_hours.clean_days(fields["open_days"]))
+    if "access_zone_id" in fields:              # 16 Oct 2026: the gate's access road; blank clears
+        ap = access_problem(fields["access_zone_id"])
+        if ap:
+            return {"error": ap}
+        sets.append("access_zone_id = ?"); params.append(fields["access_zone_id"] or None)
     if "active" in fields:
         sets.append("active = ?"); params.append(bool(fields["active"]))
     if "is_default" in fields:
@@ -428,6 +449,23 @@ def delete_gate(gate_id):
     db.execute("DELETE FROM location_gates WHERE tenant_id = ? AND id = ?",
                (db.current_tenant(), gate_id))
     return {"deleted": gate_id}
+
+
+def clear_access_for_zone(zone_id):
+    """16 Oct 2026: a deleted haul road stops being any gate's access road. Returns the gate ids it was."""
+    ids = [g["id"] for g in db.query("SELECT id FROM location_gates WHERE tenant_id = ? AND access_zone_id = ?",
+                                     (db.current_tenant(), zone_id))]
+    if ids:
+        db.execute("UPDATE location_gates SET access_zone_id = NULL WHERE tenant_id = ? AND access_zone_id = ?",
+                   (db.current_tenant(), zone_id))
+    return ids
+
+
+def routes_at_location(location_id):
+    """Every route that starts or ends at a location: the routes a change to one of its gates can move."""
+    return [r["id"] for r in db.query(
+        "SELECT id FROM routes WHERE tenant_id = ? AND (origin_id = ? OR dest_id = ?) ORDER BY id",
+        (db.current_tenant(), location_id, location_id))]
 
 
 def routes_using(gate_id):

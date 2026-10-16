@@ -504,16 +504,27 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
     else:
         a, a_role, a_gate = d, "exit", d_gate      # leaves the destination
         b, b_role, b_gate = o, "entry", o_gate     # arrives back at the origin
-    gbl = gates_by_loc if gates_by_loc is not None else {}
-    a_lat, a_lon = _waypoint(a, a_role, a_gate, gbl.get(a.get("id")))
-    b_lat, b_lon = _waypoint(b, b_role, b_gate, gbl.get(b.get("id")))
+    if gates_by_loc is None:
+        # 16 Oct 2026: the gates' access roads need the gate ROWS, so a single-route bake fetches them too
+        try:
+            gates_by_loc = gates.gates_by_location()
+        except Exception:
+            gates_by_loc = {}
+    gbl = gates_by_loc
+    a_res = _waypoint_full(a, a_role, a_gate, gbl.get(a.get("id")))
+    b_res = _waypoint_full(b, b_role, b_gate, gbl.get(b.get("id")))
+    a_lat, a_lon = a_res["lat"], a_res["lon"]
+    b_lat, b_lon = b_res["lat"], b_res["lon"]
+    a_row = next((g for g in gbl.get(a.get("id")) or [] if g["id"] == a_res.get("gate_id")), None)
+    b_row = next((g for g in gbl.get(b.get("id")) or [] if g["id"] == b_res.get("gate_id")), None)
 
     # Phase 4: which haul roads this leg runs through, in traversal order. Empty for
     # every route nobody has attached one to, and route_with_haul() then reduces to the
     # plain here_routing.routes() call this used to be — so a network with no haul roads
     # behaves exactly as it did before, same call, same cost.
+    # 16 Oct 2026: plus the access road of the gate the leg leaves by (first) and arrives by (last)
     try:
-        steps = haul.plan_leg(r["id"], [a_lon, a_lat], [b_lon, b_lat], leg)
+        steps = haul.leg_steps(r["id"], [a_lon, a_lat], [b_lon, b_lat], leg, a_row, b_row)
     except Exception:
         steps = []          # route_haul_roads may not exist yet on a cold database
     haul_tag = ",".join([s["zone_id"] for s in steps])
@@ -739,6 +750,8 @@ def public_map_data(profile=None):
         map_gates = gates.gates_by_location()
     except Exception:
         map_gates = {}   # location_gates may not exist yet on a cold database
+    # 16 Oct 2026: the gates' access roads (no extra query) — they do not carry gate-to-face minutes
+    access_ids = {g["access_zone_id"] for gl in map_gates.values() for g in gl if g.get("access_zone_id")}
 
     # every primary-option geometry, in one query rather than per route
     geo = {}
@@ -780,8 +793,7 @@ def public_map_data(profile=None):
             # the public map's cycle must be the SAME total route_analysis() computes,
             # from the same function. Two places adding up the same components is the
             # exact shape of the 125% disagreement recorded at main.py:588.
-            has_drawn_road = bool((loaded.get("haul_zones") or "")
-                                  or (ret is not None and (ret.get("haul_zones") or "")))
+            has_drawn_road = drawn_road_on((loaded, ret), access_ids)
             cycle_hr = out_hr + back_hr + _turnaround_parts(
                 used, factors, origin=o, dest=d, route=r,
                 has_drawn_road=has_drawn_road,
@@ -2355,6 +2367,34 @@ def _turnaround_minutes(profile, factors):
 INTERNAL_TRAVEL_SOURCES = ("drawn_road", "flat", "none")
 
 
+def gate_access_zone_ids():
+    """16 Oct 2026: the haul roads that are some gate's ACCESS ROAD (public road -> gate). One query."""
+    try:
+        return {g["access_zone_id"] for g in db.query(
+            "SELECT access_zone_id FROM location_gates WHERE tenant_id = ? AND access_zone_id IS NOT NULL",
+            (db.current_tenant(),)) if g.get("access_zone_id")}
+    except Exception:
+        return set()     # location_gates may not have the column yet on a cold database
+
+
+def drawn_road_on(rows, access_ids=None):
+    """
+    B5(c): does a drawn haul road on these geometry rows already carry the gate-to-face minutes?
+
+    16 Oct 2026: a gate's ACCESS ROAD does not count. It runs from the public road to the gate (the bellmouth), not
+    from the gate to the face, so a route along one still pays the gate's flat gate-to-face minutes. Without this,
+    drawing an access road to every gate (the user, 16 Oct) would have quietly dropped every gate's internal travel.
+    """
+    access_ids = gate_access_zone_ids() if access_ids is None else access_ids
+    for g in rows:
+        if not g:
+            continue
+        for z in (g.get("haul_zones") or "").split(","):
+            if z.strip() and z.strip() not in access_ids:
+                return True
+    return False
+
+
 def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
                       has_drawn_road=False, gates_by_loc=None):
     """
@@ -2476,6 +2516,8 @@ def route_analysis(route_id, profiles=None, pre=None):
             gates_by_loc = {}   # location_gates may not exist yet on a cold database
         if pre is not None:
             pre["gates"] = gates_by_loc
+    # 16 Oct 2026: the gates' access roads, from the rows already read (no extra query): they do not carry gate-to-face
+    access_ids = {g["access_zone_id"] for gl in gates_by_loc.values() for g in gl if g.get("access_zone_id")}
 
     rows_by = {}
     geo_by = pre.setdefault("geom", {}) if pre is not None else {}
@@ -2515,8 +2557,7 @@ def route_analysis(route_id, profiles=None, pre=None):
             # rows actually being costed, not off route_haul_roads — an attachment that
             # has not been baked yet contributes nothing to duration_hr, so charging it
             # as "already counted" would drop the flat figure for minutes nobody has.
-            has_drawn_road = bool((lg.get("haul_zones") or "")
-                                  or (rg is not None and (rg.get("haul_zones") or "")))
+            has_drawn_road = drawn_road_on((lg, rg), access_ids)
             parts = _turnaround_parts(prof, factors, origin=o_loc, dest=d_loc,
                                       route=route_row, has_drawn_road=has_drawn_road,
                                       gates_by_loc=gates_by_loc)

@@ -255,7 +255,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
        # NARROWED 14 Oct 2026 (civils materials, D13): + 2 routes, 10 forecasts, 46 weeks, 1 gate (the concrete pour)
        res.get("inserted", {}).get("routes") == 22 and res["inserted"].get("forecasts") == 88
        and res["inserted"].get("forecast_weeks") == 388 and res["inserted"].get("location_gates") == 17
-       and res["inserted"].get("zones") == 5 and res["inserted"].get("route_haul_roads") == 6, str(res.get("inserted")))
+       # NARROWED 16 Oct 2026 (an access road to every gate, the user): + 17 zones (Z006-Z022)
+       and res["inserted"].get("zones") == 22 and res["inserted"].get("route_haul_roads") == 6, str(res.get("inserted")))
     ok("...and the GB diesel price applied", res.get("fuel_index_applied") == ["GB"], str(res.get("fuel_index_applied")))
     r = c.post("/api/admin/tenant/import", params=TOKEN, json=DEMO)
     ok("🔴 a second import into a non-empty tenant is refused — 400",

@@ -30,7 +30,9 @@ MAP1_W_MM, MAP1_H_MM = PAGE_W_MM - 2 * MARGIN_MM, 80.0          # the whole rout
 MAP2_W_MM, MAP2_H_MM = 96.0, 70.0                               # the last mile, left half
 PX_PER_MM = 1280 / MAP1_W_MM                                    # basemap.MAX_PX across the widest map
 LAST_MILE_M = 1500.0                                            # how far along each leg the last mile reaches
-GATE_FAR_M = 200.0                                              # a leg ending further than this from its gate is noted
+# 16 Oct 2026 (the user): a gate is by the public road, a bellmouth for one or two lorries in from it (2 × 16.5 m). With
+# its access road drawn, a stored route ENDS at the gate; a leg ending further than this from its gate is noted.
+GATE_FAR_M = 50.0
 
 NOT_TYPED = "Not typed"
 
@@ -87,6 +89,7 @@ def _gate_words(loc, role, gate_id, gate_list):
         "closed": gate_hours.closed_days_words(g) if g else None,
         "at": (r["lon"], r["lat"]),
         "source": r.get("source"),
+        "access_zone_id": (g or {}).get("access_zone_id"),
     }
 
 
@@ -181,10 +184,10 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
 
     entry = _gate_words(d, "entry", r.get("dest_gate_id"), gbl.get(r["dest_id"]))
     exit_site = _gate_words(d, "exit", r.get("dest_gate_id"), gbl.get(r["dest_id"]))
-    # Each gate is drawn where it is typed. A stored road route ends on the public road nearest the gate (the access road
-    # inside a site is not on the road network), usually under ~150 m away; a leg that ends further than GATE_FAR_M from
-    # its gate was most likely worked out before the gate was placed, and the sheet says so in metres (16 Oct 2026: on the
-    # local demo copy the legs end 84-685 m from their gates).
+    # Each gate is drawn where it is typed. With the gate's access road drawn (a haul road from the public road to the
+    # gate, network._bake_leg splices it), a stored route ends AT the gate. A leg ending further than GATE_FAR_M from its
+    # gate has no access road to follow, or was worked out before the gate or its road was placed; the sheet says so in
+    # metres and says which (16 Oct 2026: on the local demo copy, before the access roads, the legs ended 84-685 m off).
     entry["gap_m"] = round(_haversine_m(entry["at"], loaded[-1])) if loaded else None
     exit_site["gap_m"] = round(_haversine_m(exit_site["at"], ret[0])) if ret else None
     # one gate both ways (a gate with direction "both"): drawn once, named once
@@ -192,13 +195,15 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
     far = [(g, leg) for g, leg in ((entry, "loaded"), (exit_site, "return"))
            if g.get("gap_m") is not None and g["gap_m"] > GATE_FAR_M and g.get("name")]
     gate_notes = []
+    def fix(g):
+        return ("work the route out again (the gate or its access road has moved since)" if g.get("access_zone_id")
+                else "draw the gate's access road from the public road, then work the route out again")
     if same_gate and len(far) == 2 and far[0][0]["gap_m"] == far[1][0]["gap_m"]:
-        gate_notes.append(f"The route on file ends and starts {entry['gap_m']:,} m from {entry['name']}: "
-                          "work the route out again if the gate has moved.")
+        gate_notes.append(f"The route on file ends and starts {entry['gap_m']:,} m from {entry['name']}: {fix(entry)}.")
     else:
         for g, leg in far:
             gate_notes.append(f"The {leg} route on file {'ends' if leg == 'loaded' else 'starts'} {g['gap_m']:,} m from "
-                              f"{g['name']}: work the route out again if the gate has moved.")
+                              f"{g['name']}: {fix(g)}.")
     load_exit = _gate_words(o, "exit", r.get("origin_gate_id"), gbl.get(r["origin_id"]))
     bands = gate_hours.peak_bands(factors)
     lim_status, lim_lines = _limits_words(route_id, used, vehicle_text) if used else ("not_checked", [

@@ -32,7 +32,8 @@ that use them, three geofences (a works-zone closure that re-routes three routes
 advisory 7.5 t village limit, an advisory works area), daily vehicle caps on the village
 routes, and the tenant's demo notice on every screen and export. Since 14 Oct 2026 (civils
 materials, D13): a fictional ready-mix batching plant and a concrete pour — two mixer routes
-to Tilton and Melton Compounds, three lines in m³ on the two concrete mixers.
+to Tilton and Melton Compounds, three lines in m³ on the two concrete mixers. Since 16 Oct 2026: every gate
+35 m in from a public road (OpenStreetMap), with its access road drawn as a haul road (a bellmouth for two lorries).
 
 NOTHING IN IT IS ANYONE'S DATA. Every name is invented; the quantities are made up to
 look plausible; the coordinates are chosen so HERE's truck routing finds sensible roads.
@@ -661,6 +662,53 @@ def build(with_areas=False, out=None):
     }
     res = tenant_package.set_overlay(overlay, by="tools/make_demo_tenant.py")
     assert res["ok"], res
+
+    # --- 16 Oct 2026: EVERY GATE BY THE PUBLIC ROAD, WITH ITS ACCESS ROAD DRAWN --------------------------------
+    # The user, 16 Oct 2026: "gates are usually right by the public road with a suitable bellmouth, maybe enough to fit
+    # one or two vehicles before the gate. Please ensure there is a haul road drawn to every gate." Until now a gate sat
+    # 150–310 m from its site's centre with no road near it, and the routes stopped 84–685 m short of it (measured on a
+    # local bake). Now each gate is moved to BELLMOUTH_M in from the nearest lorry road, and that stretch is drawn as the
+    # gate's access road (a haul road, spliced, at 10 km/h): every route arriving by the gate ends along it and every
+    # route leaving starts along it (haul.leg_steps). Done last, after every gate exists, so the zone ids above
+    # (Z001–Z005) and every other row are unchanged; the access roads take the next ids in gate order.
+    # The road points: the nearest OpenStreetMap way of class trunk / primary / secondary / tertiary / unclassified
+    # (residential streets left out on purpose: no quarry gate on a housing close) to each gate's v2 position, one
+    # Overpass query, 16 Oct 2026. OSM data © OpenStreetMap contributors (ODbL); a point on a road, nothing else kept.
+    BELLMOUTH_M = 35.0          # two 16.5 m artics off the carriageway before the gate
+    ROAD_AT = {   # (site, gate): ([lon, lat] on the road, the road's name in OSM)
+        ("Kilby Ridge Quarry", "Weighbridge (in)"): ([-1.237463, 52.559127], "Marion's Way"),
+        ("Kilby Ridge Quarry", "Main road exit"): ([-1.235117, 52.55825], "Marion's Way"),
+        ("Northfield Quarry", "Weighbridge (in)"): ([-1.136478, 52.72641], "Leicester Road"),
+        ("Northfield Quarry", "A46 exit"): ([-1.130968, 52.72813], "A6"),
+        ("Brook Pit", "Pit entrance"): ([-0.749217, 52.693492], "Ashwell Road"),
+        ("Harborough Rail Freight Terminal", "Terminal gate"): ([-0.920385, 52.480157], "Doddridge Road"),
+        ("Harborough Compound", "Station Road entrance (in)"): ([-0.904551, 52.5023], "A6"),
+        ("Harborough Compound", "Mill Lane exit"): ([-0.892606, 52.502515], "Welham Lane"),
+        ("Langton Compound", "Compound gate"): ([-0.894045, 52.554637], "Harborough Road"),
+        ("Tilton Compound", "Compound gate"): ([-0.873635, 52.646823], "Hyde Lodge Road"),
+        ("Melton Compound", "Compound gate"): ([-0.862296, 52.742055], "A606"),
+        ("Stockpile South", "Stockpile gate"): ([-0.908941, 52.52207], "Bowden Road"),
+        ("Stockpile Tilton", "Stockpile gate"): ([-0.891951, 52.636202], "Loddington Road"),
+        ("Stockpile North", "Stockpile gate"): ([-0.877212, 52.705444], "Burrough Road"),
+        ("Wolds Link Inert Landfill (fictional)", "Weighbridge"): ([-0.800099, 52.519765], "Medbourne Road"),
+        ("Wolds Link Soil Recycling Hub (fictional)", "Site gate"): ([-0.865023, 52.566747], "Goadby Road"),
+        ("Wolds Link Batching Plant (fictional)", "Plant gate"): ([-0.861343, 52.744406], "New Road"),
+    }
+    names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
+    for g in gates.list_gates():
+        road, road_name = ROAD_AT[(names[g["location_id"]], g["name"])]     # a KeyError here = a gate with no road point
+        # set back along the line from the road point towards where the gate was (into the site)
+        kx = 111320.0 * math.cos(math.radians(road[1]))
+        dx, dy = (g["lon"] - road[0]) * kx, (g["lat"] - road[1]) * 111320.0
+        d = math.hypot(dx, dy) or 1.0
+        at = offset(road, BELLMOUTH_M * dx / d, BELLMOUTH_M * dy / d)
+        z = zones.create_zone(f"{names[g['location_id']]}: {g['name']} access road",
+                              {"type": "LineString", "coordinates": [list(road), at]},
+                              kind=zones.HAUL_KIND, affects_routing=True, speed_kph=10, haul_mode="splice",
+                              note=f"Bellmouth off {road_name} to the gate: room for two lorries off the road (fictional).")
+        assert "error" not in z, z
+        res = gates.update_gate(g["id"], lat=at[1], lon=at[0], access_zone_id=z["id"])
+        assert "error" not in res, res
 
     # --- council areas, only when asked (--with-areas; §2.2b) -------------------------
     if with_areas:

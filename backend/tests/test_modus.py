@@ -421,9 +421,11 @@ dc = tenant_package.counts(demo)
 # to the landfill (4 forecasts). Every row that was there before is unchanged (diffed when regenerated).
 # NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
 # 10 m³ lines (3 of them in October, two on one route)
-ok("demo: 14 locations, 22 routes, 3 teams, 8 sections, 88 forecasts (86 approved + 1 pending + 1 rejected), 17 gates, 5 zones, 6 haul links",
+# NARROWED 16 Oct 2026 (an access road to every gate, the user): + 17 zones, one haul road per gate (Z006-Z022)
+ok("demo: 14 locations, 22 routes, 3 teams, 8 sections, 88 forecasts (86 approved + 1 pending + 1 rejected), 17 gates, 22 zones "
+   "(5 + 17 gate access roads), 6 haul links",
    dc["locations"] == 14 and dc["routes"] == 22 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 88
-   and dc["location_gates"] == 17 and dc["zones"] == 5 and dc["route_haul_roads"] == 6, str(dc))
+   and dc["location_gates"] == 17 and dc["zones"] == 22 and dc["route_haul_roads"] == 6, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}
 ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries four approved "

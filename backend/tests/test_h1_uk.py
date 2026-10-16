@@ -318,9 +318,16 @@ ok("H2: every site has a gate at its own coordinates; the quarries and the town 
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
 ok("H2: every route names its origin and destination gate",
    all(r["origin_gate_id"] and r["dest_gate_id"] for r in _T["routes"]))
+# NARROWED 16 Oct 2026 (the user: "ensure there is a haul road drawn to every gate"): the demo also draws an ACCESS ROAD to
+# each of its 17 gates (Z006-Z022, test_gate_access.py); the two haul roads ATTACHED to routes are still Z001 and Z002
+_access = {g["access_zone_id"] for g in _T["location_gates"]}
 ok("H2: two haul roads, spliced (HERE does not know them), attached to the routes that use them",
-   [(z["id"], z["haul_mode"]) for z in _T["zones"] if z["kind"] == "haul_road"] == [("Z001", "splice"), ("Z002", "splice")]
+   [(z["id"], z["haul_mode"]) for z in _T["zones"] if z["kind"] == "haul_road" and z["id"] not in _access]
+   == [("Z001", "splice"), ("Z002", "splice")]
    and sorted((l["route_id"], l["zone_id"]) for l in _T["route_haul_roads"]) == [("R004", "Z001"), ("R005", "Z001"), ("R006", "Z001"), ("R014", "Z001"), ("R016", "Z002"), ("R018", "Z002")])
+ok("16 Oct 2026: and one access road per gate, all spliced haul roads, none attached to a route",
+   len(_access) == 17 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
+   and not ({l["zone_id"] for l in _T["route_haul_roads"]} & _access))
 ok("H2: three geofences — a closure that re-routes (Tilton, in force before the show), an advisory 7.5 t village limit, an advisory works area",
    [(z["kind"], z["affects_routing"], z["starts_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
    == [("closure", 1, "2026-10-05"), ("weight_limit", 0, "2026-09-01"), ("works", 0, "2026-10-01")])

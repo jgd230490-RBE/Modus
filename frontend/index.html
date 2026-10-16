@@ -9924,7 +9924,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const newGate = () => setGateForm({
     id: null, name: "", direction: "both", lat: "", lon: "",
     safety_minutes: "", internal_travel_minutes: "", is_default: !gateList.length,
-    active: true, note: "", open_from: "", open_to: "", open_days: "" });
+    active: true, note: "", open_from: "", open_to: "", open_days: "", access_zone_id: "" });
 
   const editGate = (g) => setGateForm({
     id: g.id, name: g.name || "", direction: g.direction || "both",
@@ -9932,7 +9932,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     safety_minutes: g.safety_minutes == null ? "" : g.safety_minutes,
     internal_travel_minutes: g.internal_travel_minutes == null ? "" : g.internal_travel_minutes,
     is_default: !!g.is_default, active: !!g.active, note: g.note || "",
-    open_from: g.open_from || "", open_to: g.open_to || "", open_days: g.open_days || "" });
+    open_from: g.open_from || "", open_to: g.open_to || "", open_days: g.open_days || "",
+    access_zone_id: g.access_zone_id || "" });
 
   const numOrNull = (v) => (v === "" || v == null) ? null : Number(v);
 
@@ -9952,6 +9953,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       note: gateForm.note || null,
       // 14 Oct 2026 (bundle G, W17): blank = the scheme's shift, every day ("" clears a stored value)
       open_from: gateForm.open_from || "", open_to: gateForm.open_to || "", open_days: gateForm.open_days || "",
+      // 16 Oct 2026: the haul road drawn from the public road to this gate; blank = none
+      access_zone_id: gateForm.access_zone_id || null,
     };
     try {
       const url = gateForm.id
@@ -9968,7 +9971,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       // the cost is quoted, then spent — a gate move invalidates cached geometry
       const affected = j.routes_affected || [];
       if(affected.length && confirm(
-          `Moving this gate changes where routes start or end.\n\n` +
+          `This change moves where routes start or end.\n\n` +
           `${affected.length} worked-out route(s) use it: ${affected.join(", ")}.\n\n` +
           `Re-route them now? Each costs HERE calls.`)){
         const { rebaked } = await rebakeAffected(affected);
@@ -10942,6 +10945,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             {g.internal_travel_minutes}m internal</span> : null}
                           {g.open_from && g.open_to ? <span className="text-[10px] text-slate-500" data-gate-hours={g.id}>
                             open {g.open_from}–{g.open_to}{gateDaysWords(g.open_days) ? ` · ${gateDaysWords(g.open_days)}` : ""}</span> : null}
+                          {/* 16 Oct 2026: every gate should have its access road drawn from the public road */}
+                          {g.access_zone_id
+                            ? <span className="text-[10px] text-slate-500" data-gate-access={g.id}>
+                                access road: {((haulRoadList || []).find(z => z.id === g.access_zone_id) || {}).name || g.access_zone_id}</span>
+                            : <span className="text-[10px] text-amber-700" data-gate-access-missing={g.id}
+                                title="Draw a haul road on Zones from the public road to this gate, then pick it here">no access road drawn</span>}
                           <span className="ml-auto flex gap-2">
                             <button onClick={() => editGate(g)}
                               className="text-[11px] text-slate-500 hover:underline">Edit</button>
@@ -11000,6 +11009,22 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
                         </label>
                       </div>
+                      {/* 16 Oct 2026 (the user: "gates are usually right by the public road with a suitable bellmouth …
+                          ensure there is a haul road drawn to every gate"): the gate's access road */}
+                      <label className="block rounded-lg border border-slate-200 p-2" data-gate-access-form="1">
+                        <span className="block text-sm font-medium text-slate-700">Access road from the public road</span>
+                        <select value={gateForm.access_zone_id || ""} aria-label="Access road from the public road"
+                          onChange={e => setGateForm(g => ({ ...g, access_zone_id: e.target.value }))}
+                          className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+                          <option value="">None drawn</option>
+                          {(haulRoadList || []).map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                        </select>
+                        <span className="block text-[11px] text-slate-400 mt-1">
+                          The haul road from the public road to this gate: the bellmouth, long enough for a lorry or two to
+                          pull off the road. Draw it on Zones as a haul road. Every route arriving by this gate ends along it and
+                          every route leaving by it starts along it.
+                        </span>
+                      </label>
                       {/* 14 Oct 2026 (bundle G, W17): when the gate is open, for its capacity (open minutes ÷ the
                           induction minutes a lorry). Blank = the scheme's shift, every day. */}
                       <div className="rounded-lg border border-slate-200 p-2" data-gate-hours-form="1">
