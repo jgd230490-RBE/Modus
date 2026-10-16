@@ -93,7 +93,9 @@ def _ensure_location_columns():
                      ("capacity_qty", "REAL"), ("capacity_unit", "TEXT"),
                      ("opening_qty", "REAL"),
                      # 14 Oct 2026 (bundle G, W8): the site's CLP cap — set_clp_cap()
-                     ("clp_cap_per_day", "REAL")):
+                     ("clp_cap_per_day", "REAL"),
+                     # 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers — set_site_rules()
+                     ("site_rules", "TEXT")):
         try:
             if db.IS_PG:
                 db.execute(f"ALTER TABLE locations ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -811,6 +813,10 @@ def public_map_data(profile=None):
                     # the public map can show a plan against it as a planning flag. On BOTH
                     # legs (a filter on either must find it); None when nobody typed one.
                     "max_vehicles_per_day": r.get("max_vehicles_per_day"),
+                    # 16 Oct 2026 (CLOCS v5 C2, §5.6f): why this route and the permitted diversions, as
+                    # typed, for the route card; None when nobody typed them. On both legs, like the cap.
+                    "route_reason": r.get("route_reason"),
+                    "permitted_deviations": r.get("permitted_deviations"),
                 },
                 "geometry": {"type": "LineString",
                              "coordinates": json.loads(g["geometry"])},
@@ -1036,7 +1042,9 @@ def locations_geojson():
                            "capacity_unit": l.get("capacity_unit"),
                            "opening_qty": l.get("opening_qty"),
                            # 14 Oct 2026 (bundle G, W8): lorry visits a day agreed in the CLP; null = none
-                           "clp_cap_per_day": l.get("clp_cap_per_day")},
+                           "clp_cap_per_day": l.get("clp_cap_per_day"),
+                           # 16 Oct 2026 (CLOCS v5 C3): printed on the route sheet; null = none typed
+                           "site_rules": l.get("site_rules")},
             "geometry": {"type": "Point", "coordinates": [l["lon"], l["lat"]]},
         })
     return {"type": "FeatureCollection", "features": feats}
@@ -1074,6 +1082,45 @@ def set_clp_cap(location_id, value):
     db.execute("UPDATE locations SET clp_cap_per_day = ? WHERE tenant_id = ? AND id = ?",
                (v, db.current_tenant(), location_id))
     return {"id": location_id, "clp_cap_per_day": v}
+
+
+# 16 Oct 2026 (CLOCS v5 C2 / C3): the route sheet's typed words. Plain text, trimmed; blank clears (None).
+# A cap on length keeps one route sheet to one A4 page: each block has room for about this many characters.
+SHEET_TEXT_MAX = 400
+
+
+def sheet_text_problem(v, what="the text"):
+    """None for a blank or a string up to SHEET_TEXT_MAX characters once trimmed; else the problem in words."""
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        return f"{what} must be text"
+    if len(v.strip()) > SHEET_TEXT_MAX:
+        return f"{what} is {len(v.strip())} characters: at most {SHEET_TEXT_MAX} fit on the route sheet"
+    return None
+
+
+def _sheet_text(v):
+    """Trimmed text, or None for a blank (never an empty string in the database)."""
+    return (str(v).strip() or None) if v is not None else None
+
+
+def set_site_rules(location_id, value):
+    """
+    16 Oct 2026 (CLOCS v5 C3, §5.5a.v "communicates routes and site rules to the operator"). The site's rules for
+    drivers as typed (speed limit, wheel wash, PPE, where to wait), printed on every route sheet that loads or delivers
+    here. Blank clears it. Nothing else changes: no re-bake.
+    """
+    _ensure_location_columns()
+    p = sheet_text_problem(value, "the site rules")
+    if p:
+        return {"error": p}
+    if not db.query("SELECT id FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), location_id)):
+        return {"error": "not found"}
+    v = _sheet_text(value)
+    db.execute("UPDATE locations SET site_rules = ? WHERE tenant_id = ? AND id = ?",
+               (v, db.current_tenant(), location_id))
+    return {"id": location_id, "site_rules": v}
 
 
 def routes_touching(location_id):
@@ -1551,6 +1598,9 @@ def routes_status():
             "rate_eur_per_t": r.get("rate_eur_per_t"),
             "rate_eur_per_km": r.get("rate_eur_per_km"),
             "km_basis": (r.get("km_basis") or "round_trip"),
+            # 16 Oct 2026 (CLOCS v5 C2): the route sheet's words, as typed; None = not typed
+            "route_reason": r.get("route_reason"),
+            "permitted_deviations": r.get("permitted_deviations"),
             "gate_blockers": gates.bake_blockers(r, o, d, gates_by_loc),
             "profiles": profs,
         })
@@ -1610,6 +1660,39 @@ def set_route_planning(route_id, given, **vals):
     out = {"id": route_id}
     out.update(new)
     out["km_basis"] = new["km_basis"] or "round_trip"
+    return out
+
+
+SHEET_TEXT_FIELDS = ("route_reason", "permitted_deviations")
+SHEET_TEXT_WORDS = {"route_reason": "why this route", "permitted_deviations": "the permitted diversions"}
+
+
+def set_route_sheet_text(route_id, given, **vals):
+    """
+    16 Oct 2026 (CLOCS v5 C2: §5.2b.iii "identified acceptable reasons for deviation", §5.6d "clearly communicate
+    permitted deviations", §5.6f "the reasons behind adopting a specific vehicle route"). Why this route was chosen and
+    the diversions a driver may take, as typed on ONE route. Only the fields in `given` are written; a blank clears.
+    Words, never figures: nothing here touches geometry, gates, forecasts or the checks.
+    """
+    given = set(given or ())
+    tenant = db.current_tenant()
+    cur = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (tenant, route_id))
+    if not cur:
+        return {"error": "route not found"}
+    cur = cur[0]
+    new = {}
+    for f in SHEET_TEXT_FIELDS:
+        if f not in given:
+            new[f] = cur.get(f)
+            continue
+        p = sheet_text_problem(vals.get(f), SHEET_TEXT_WORDS[f])
+        if p:
+            return {"error": p}
+        new[f] = _sheet_text(vals.get(f))
+    db.execute("UPDATE routes SET route_reason = ?, permitted_deviations = ? WHERE tenant_id = ? AND id = ?",
+               (new["route_reason"], new["permitted_deviations"], tenant, route_id))
+    out = {"id": route_id}
+    out.update(new)
     return out
 
 
