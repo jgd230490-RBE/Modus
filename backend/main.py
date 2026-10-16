@@ -2617,6 +2617,32 @@ def routes_summary():
     return network.summary()
 
 
+@app.get("/api/routes/{route_id}/route-sheet.pdf")
+def route_sheet_pdf(route_id: str, vehicle: Optional[str] = None, request: Request = None):
+    """
+    16 Oct 2026 (CLOCS v5 C3, §5.5a.v, §5.6c/d/f/g): the ROUTE SHEET for drivers, one A4 portrait page for one route:
+    the whole route (loaded and empty legs), the last mile, the gates in and out with their hours and the scheme's
+    no-delivery windows, the stored lorry-limits check for the vehicle, and the typed words (why this route, the
+    permitted diversions, the site rules). STAFF ONLY, like the route map export: a valid code, a login or the staff
+    cookie; the map password's cookie gets 401. A team code reads its own team's routes only (404 for another's).
+    `vehicle` = which baked vehicle's road route to draw (the default lorry, else the first baked, without one).
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the route sheet is for staff")
+    try:
+        S = route_sheet.sheet(route_id, vehicle=vehicle, acc=access.current())
+    except route_sheet.SheetError as e:
+        raise HTTPException(404, str(e))
+    try:
+        data = export.build_route_sheet_pdf(S)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{route_sheet.file_name(S)}"',
+                             "Cache-Control": "no-store"})
+
+
 def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1):
     """
     14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
@@ -2694,32 +2720,6 @@ def route_map_export_places(month: int = Query(..., ge=1, le=MONTH_COUNT), origi
             "plans": [{"kind": k, "name": v["name"], "what": v["what"], "centred": v["centred"],
                        "scales": list(v["scales"]), "default": v["default"]} for k, v in route_map_export.PLANS.items()],
             "regional_fitted": S["plan"]["denom"]}
-
-
-@app.get("/api/routes/{route_id}/route-sheet.pdf")
-def route_sheet_pdf(route_id: str, vehicle: Optional[str] = None, request: Request = None):
-    """
-    16 Oct 2026 (CLOCS v5 C3, §5.5a.v, §5.6c/d/f/g): the ROUTE SHEET for drivers, one A4 portrait page for one route:
-    the whole route (loaded and empty legs), the last mile, the gates in and out with their hours and the scheme's
-    no-delivery windows, the stored lorry-limits check for the vehicle, and the typed words (why this route, the
-    permitted diversions, the site rules). STAFF ONLY, like the route map export: a valid code, a login or the staff
-    cookie; the map password's cookie gets 401. A team code reads its own team's routes only (404 for another's).
-    `vehicle` = which baked vehicle's road route to draw (the default lorry, else the first baked, without one).
-    """
-    from fastapi.responses import Response       # not in every test stub; imported here
-    if not _staff_request(request):
-        raise HTTPException(401, "sign in — the route sheet is for staff")
-    try:
-        S = route_sheet.sheet(route_id, vehicle=vehicle, acc=access.current())
-    except route_sheet.SheetError as e:
-        raise HTTPException(404, str(e))
-    try:
-        data = export.build_route_sheet_pdf(S)
-    except RuntimeError as e:
-        raise HTTPException(503, str(e))
-    return Response(content=data, media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="{route_sheet.file_name(S)}"',
-                             "Cache-Control": "no-store"})
 
 
 @app.get("/api/community")

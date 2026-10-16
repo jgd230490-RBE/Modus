@@ -683,6 +683,10 @@
             #route-hover-card{ display:none !important; }
             body .guide-strip{ max-width:calc(100vw - 100px); }   /* clear of the 44 px zoom buttons on the right */
         }
+        /* 16 Oct 2026 (CLOCS v5 C2): the route's typed words on the phone's route card AND the desktop's route analysis,
+           so outside the phone block */
+        .route-words{ margin:10px 0; } .route-words h4{ margin:8px 0 2px; font-size:14px; color:inherit; }
+        .route-words p{ margin:0; font-size:14px; line-height:1.45; white-space:pre-line; }
         @media (max-height:480px) and (max-width:767px){
             /* Track C review (12 Oct): a phone on its side (740 x 360): the peek is one row — the month and the two
                figures inline — and the chips row with Play folds into the half state, so the peek takes about a third of
@@ -5793,6 +5797,7 @@
                 card(cycleH.toFixed(2)+' h','Est. haul cycle','Drive + '+(P.load_minutes+P.unload_minutes)+' min handling')+
                 card(tripsPerDay.toFixed(1),'Trips / day / lorry','@ '+P.shift_hours_per_day+' h shift, '+Math.round(distU(P.avg_haul_speed_kmh))+' '+SPD())+
             '</div>'+
+            routeWordsHTML(routeId)+
             '<div id="an-fc-slot" class="an-sub" style="margin-top:12px;">Loading forecast…</div>';
         try{
             const mtx=await fetchMatrix('t');
@@ -8530,6 +8535,14 @@
         });
         return { lines: n, loads, twoWay: wd > 0 ? loads / wd : 0, tonnesDay: wd > 0 ? t / wd : 0, vehicles, unbaked };
     }
+    // 16 Oct 2026 (CLOCS v5 C2, §5.6f "the reasons behind adopting a specific vehicle route are clearly communicated"):
+    // why this route and the permitted diversions, as the scheme typed them on the route; nothing when neither is typed.
+    function routeWordsHTML(rid) {
+        const rp = routePropsById()[rid] || {};
+        const rows = [['Why this route', rp.route_reason], ['Permitted diversions', rp.permitted_deviations]]
+            .filter(r => r[1] && String(r[1]).trim());
+        return rows.length ? '<div class="route-words">' + rows.map(r => '<h4>' + r[0] + '</h4><p>' + escHtml(String(r[1]).trim()) + '</p>').join('') + '</div>' : '';
+    }
     function routeCardHTML(rid) {
         const rp = routePropsById()[rid] || {};
         const info = ROUTEINFO[String(rid).trim().toLowerCase()] || {};
@@ -8550,6 +8563,7 @@
         }
         const conds = (month && WARN.liveMonth === month ? (WARN.live || []) : []).filter(i => i.who === rid);
         html += conds.length ? '<h3>Conditions on this route</h3>' + condRowsHTML(conds) : '';
+        html += routeWordsHTML(rid);
         html += '<p class="mt-note">Hours, the responsible organisation and the consent reference have not been typed for this scheme'
               + (TENANT.demo_notice ? ' (placeholders on the fictional demo scheme)' : '') + '.</p>'
               + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the route card</button>';

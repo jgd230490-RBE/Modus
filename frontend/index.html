@@ -8253,6 +8253,101 @@ function RoutePlanning({ route, token, onSaved }){
   );
 }
 
+// ---- 16 Oct 2026 (CLOCS v5 C2 / C3): the route sheet for drivers ----------------------------------------------------
+// The two typed words on ONE route (why this route, the permitted diversions) with their own save, and the download.
+// Words, never figures: nothing here touches the route on the map. At most SHEET_TEXT_MAX characters each — what fits
+// on the one A4 page (the server refuses more, in words).
+const SHEET_TEXT_MAX = 400;
+async function downloadRouteSheet(routeId){
+  const r = await fetch(`${API}/routes/${encodeURIComponent(routeId)}/route-sheet.pdf`);
+  if(!r.ok){
+    const txt = await r.text();
+    let d = "";
+    try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+    throw new Error(d || `error ${r.status}`);
+  }
+  const blob = await r.blob();
+  const cd = r.headers.get("content-disposition") || "";
+  const fm = cd.match(/filename="([^"]+)"/);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fm ? fm[1] : `route-sheet-${routeId}.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function RouteSheetButton({ routeId }){
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const go = async () => {
+    setBusy(true); setErr(null);
+    try { await downloadRouteSheet(routeId); } catch(e){ setErr("The route sheet could not be made: " + (e.message || e)); }
+    setBusy(false);
+  };
+  return (
+    <span className="inline-flex flex-col items-end" data-route-sheet="1">
+      <button className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }} onClick={go}
+        disabled={busy || !routeId} title={routeId ? "One A4 page for the drivers on the route picked in the list" : "Pick a route in the list first"}>
+        {busy ? "Making…" : "Route sheet (drivers)"}</button>
+      {err && <span className="text-xs" style={{ color: "var(--red)" }}>{err}</span>}
+    </span>
+  );
+}
+function RouteSheetText({ route, token, onSaved }){
+  const [v, setV] = useState({ route_reason: "", permitted_deviations: "" });
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setV({ route_reason: route.route_reason || "", permitted_deviations: route.permitted_deviations || "" });
+    setMsg("");
+  }, [route.id]);
+  const save = async () => {
+    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
+    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+    setBusy(true);
+    try {
+      const res = await fetch(`${API}/admin/routes/${encodeURIComponent(route.id)}/sheet-text${qs}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ route_reason: v.route_reason.trim() || null, permitted_deviations: v.permitted_deviations.trim() || null }) });
+      if(!res.ok){
+        const t = await res.text();
+        let d = "";
+        try { const j = JSON.parse(t); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+        throw new Error(d || `${res.status}`);
+      }
+      await res.json();
+      setMsg("Saved the route sheet words.");
+      if(onSaved) await onSaved();
+    } catch(e){ setMsg("Couldn't save: " + e.message); }
+    setBusy(false);
+  };
+  const over = k => v[k].trim().length > SHEET_TEXT_MAX;
+  const box = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
+  const T = ({ k, label, hint }) => (
+    <label className="block">
+      <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
+      <textarea className={box} rows={3} placeholder={hint} value={v[k]} aria-label={label}
+        onChange={e => setV(x => ({ ...x, [k]: e.target.value }))} />
+      <span className={"block text-[11px]" + (over(k) ? "" : " text-slate-400")} style={over(k) ? { color: "var(--red)" } : undefined}>
+        {v[k].trim().length} of {SHEET_TEXT_MAX} characters{over(k) ? ": too long for the route sheet" : ""}</span>
+    </label>
+  );
+  return (
+    <div className="border-t border-slate-200 pt-3 mt-3 space-y-2" data-route-sheet-text="1">
+      <div className="text-sm font-semibold text-slate-700">Route sheet · drivers</div>
+      <p className="text-[11px] text-slate-400">Printed on this route's sheet for drivers and on the public map's route card, as typed. Blank = "Not typed" on the sheet.</p>
+      {T({ k: "route_reason", label: "Why this route", hint: "e.g. agreed in the CLP: keeps lorries out of the village centre and away from the school" })}
+      {T({ k: "permitted_deviations", label: "Permitted diversions", hint: "e.g. if the A-road is closed, the signed diversion only" })}
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={save} disabled={busy || over("route_reason") || over("permitted_deviations")}
+          className="w-full py-2 rounded-lg text-sm font-semibold border disabled:opacity-50"
+          style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)" }}>{busy ? "Saving…" : "Save the words"}</button>
+        <RouteSheetButton routeId={route.id} />
+      </div>
+      {msg && <p className="text-xs text-slate-500">{msg}</p>}
+    </div>
+  );
+}
+
 // ---- Task D2's stock grid (W1–W4 × two months of consumption inputs) was REMOVED on
 // 10 Sep: consumption is typed on the Look-ahead's Account view for the account week
 // (one box per stockpile), and the read-only balances live on the Dashboard.
@@ -9684,7 +9779,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       vendor: "", detail: "", lat: "", lon: "", gate_lat: "", gate_lon: "",
       // Week 1, Task D2. Blank means NOT RECORDED, which is not zero — the balance
       // still computes and `remaining` comes back unknown.
-      capacity_qty: "", capacity_unit: "t", opening_qty: "", clp_cap_per_day: "" });
+      capacity_qty: "", capacity_unit: "t", opening_qty: "", clp_cap_per_day: "", site_rules: "" });
     setMode("add");
   };
   const openEditForNode = (id) => {
@@ -9703,7 +9798,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       capacity_qty: p.capacity_qty == null ? "" : p.capacity_qty,
       capacity_unit: p.capacity_unit || "t",
       opening_qty: p.opening_qty == null ? "" : p.opening_qty,
-      clp_cap_per_day: p.clp_cap_per_day == null ? "" : p.clp_cap_per_day });
+      clp_cap_per_day: p.clp_cap_per_day == null ? "" : p.clp_cap_per_day,
+      site_rules: p.site_rules || "" });
     setMode("edit");
   };
   // Locations-table row click: centre the map on the node and open it for editing.
@@ -9737,6 +9833,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     lat, lon, ...gateFrom(f),
     // 14 Oct 2026 (bundle G, W8): the site's CLP cap; blank = none (null, never 0)
     clp_cap_per_day: (f.clp_cap_per_day === "" || f.clp_cap_per_day == null) ? null : +f.clp_cap_per_day,
+    // 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers, on every route sheet that loads or delivers here
+    site_rules: (f.site_rules || "").trim() || null,
   });
 
   // The build list's rule: the three storage fields show for Stockpile / Site /
@@ -10736,6 +10834,23 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </p>
                 </div>
 
+                {/* 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers, printed on the route sheet of every route
+                    that loads or delivers here, as typed. */}
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5" data-site-rules-field="1">
+                  <label className="block">
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Site rules for drivers (optional)</span>
+                    <textarea value={form.site_rules} onChange={e => setField("site_rules", e.target.value)} rows={3}
+                      placeholder="e.g. 15 mph on site, wheel wash on the way out, wait in the lay-by not on the road"
+                      aria-label="Site rules for drivers"
+                      className="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
+                  </label>
+                  <p className={"text-[11px] mt-1" + ((form.site_rules || "").trim().length > SHEET_TEXT_MAX ? "" : " text-slate-400")}
+                     style={(form.site_rules || "").trim().length > SHEET_TEXT_MAX ? { color: "var(--red)" } : undefined}>
+                    {(form.site_rules || "").trim().length} of {SHEET_TEXT_MAX} characters. Printed on the route sheet of every
+                    route that loads or delivers here, as typed.
+                  </p>
+                </div>
+
                 {/* Operator and free-text detail. Salvaged out of a1_data.js before that
                     file was retired — the quarry operator existed nowhere else in the
                     system — and editable here so it stays current. */}
@@ -11315,6 +11430,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               {routeMsg && <p className="text-xs text-slate-500">{routeMsg}</p>}
               <p className="text-[11px] text-slate-400">Destinations sharing no material with the origin are greyed out. Ticked vehicles are routed through HERE as soon as the route is created.</p>
               {editingRoute && <RoutePlanning route={(status || []).find(r => r.id === editingRoute) || {}} token={token} onSaved={reloadNetwork} />}
+              {editingRoute && <RouteSheetText route={(status || []).find(r => r.id === editingRoute) || {}} token={token} onSaved={reloadNetwork} />}
             </div>
           </div>
           )}
@@ -11419,6 +11535,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <span className="flex items-center gap-2">
             {/* 14 Oct 2026 (backlog item 2): the route map export (replaces the per-route sheet) */}
             <RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />
+            {/* 16 Oct 2026 (CLOCS v5 C3): the route sheet for drivers, for the route picked in the list */}
+            <RouteSheetButton routeId={selected} />
             {/* Bulk bake. Vehicles come from the tick-boxes on the Create route panel so
                 there is one vehicle list on the tab rather than two that can disagree. */}
             <select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)} className={sel}
