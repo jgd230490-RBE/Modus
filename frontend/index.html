@@ -3416,7 +3416,7 @@ function CollisionPanel({ access }){
             {st.state === "running" ? "Fetching now…" : st.fetched_at ? `Fetched ${day(st.fetched_at)}${st.by ? ` by ${st.by}` : ""}: ${st.period}.` : "Not fetched yet."}
             {st.error ? <span className="text-amber-700"> {st.error}.</span> : null}
           </p>
-          {st.fetched_at ? <p className="text-[13px] text-slate-500 mb-2">{grp(st.counts.all, 0)} collisions, {grp(st.counts.ksi, 0)} of them killed or seriously injured, {grp(st.counts.vru, 0)} with a vulnerable road user hurt.</p> : null}
+          {st.fetched_at ? <p className="text-[13px] text-slate-500 mb-2">{grp(st.counts.all, 0)} collisions along the routes and round the sites, {grp(st.counts.ksi, 0)} of them killed or seriously injured, {grp(st.counts.vru, 0)} with a vulnerable road user hurt.{st.alternatives_only && st.alternatives_only.all ? ` Another ${grp(st.alternatives_only.all, 0)} (${grp(st.alternatives_only.ksi, 0)} killed or seriously injured) are along the stored alternative routes only: on the Route map while Alternative routes is ticked, and in each route's collision evidence beside the route.` : ""}</p> : null}
           {(st.notes || []).map((n, i) => <p key={i} className="text-[13px] text-slate-500 mb-2">{n}</p>)}
           {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
           {canFetch

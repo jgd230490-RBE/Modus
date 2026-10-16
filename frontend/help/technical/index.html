@@ -340,7 +340,10 @@ the collisions kept. All or nothing: a failure keeps what was stored.</td></tr>
 <tr><td class="k">The strip</td><td>The community layer's: 250 m each side of every stored road route (both legs, every vehicle, and the
 stored alternatives, each under its own key) and 500 m round every site. Each collision keeps its distance to each route it is
 near. &ldquo;On the route&rdquo; = within 25 m (on the 2025 data the count flattens after 20 m; 25 m allows for a dual carriageway).
-Places = two or more collisions within 50 m of each other (single linkage), ordered along the primary loaded leg.</td></tr>
+Places = two or more collisions within 50 m of each other (single linkage), ordered along the primary loaded leg.
+Each collision is marked <code>along</code> = <code>route</code> (near a primary route or a site) or <code>alternative</code> (near a stored
+alternative only). The map draws the alternatives' only with the Alternative routes layer; the counts and the plans use
+<code>route</code> only and count the others apart (<code>alternatives_only</code>).</td></tr>
 <tr><td class="k">Codes</td><td>Severity 1 fatal, 2 serious, 3 slight (KSI = 1 or 2). Vulnerable road users (the CLOCS v5 definition):
 pedestrian (<code>casualty_class</code> 3), cyclist (type 1), motorcyclist (2, 3, 4, 5, 23, 97), horse rider (16), e-scooter or
 powered transporter (33, or <code>escooter_flag</code> 1), mobility scooter (22). Goods vehicle over 3.5 t: vehicle type 20, 21 or 98.

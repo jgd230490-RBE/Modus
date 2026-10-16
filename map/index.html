@@ -4845,7 +4845,11 @@
         return !!(cb && cb.checked);
     }
 
-    function toggleAlts(visible) { toggleLayer('route-alt-lines', visible); }
+    function toggleAlts(visible) {
+        toggleLayer('route-alt-lines', visible);
+        // 16 Oct 2026: the collisions along the alternatives come and go with them
+        if (typeof COLL !== 'undefined' && COLL.data) { ensureCollisionLayers(); renderCollisionPanel(); }
+    }
 
     function gatesVisible() {
         const cb = document.getElementById('layer-gates');
@@ -8165,16 +8169,26 @@
         if (g) g.hidden = !COLL.staff;
         if (!COLL.staff) { COLL.on = false; COLL_LAYERS.forEach(l => { try { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'none'); } catch (e) {} }); }
     }
+    // 16 Oct 2026 (found on live): a collision near a stored ALTERNATIVE only (along = 'alternative') is drawn only while the
+    // Alternative routes layer is on — otherwise it sat on a road the map shows no route on
+    function altsShown() { return !!(document.getElementById('layer-alts') || {}).checked; }
     function collisionFilter() {
         const slight = !!(document.getElementById('coll-slight') || {}).checked;
         const vru = !!(document.getElementById('coll-vru') || {}).checked;
         const f = ['all'];
+        if (!altsShown()) f.push(['==', ['get', 'along'], 'route']);
         if (!slight) f.push(['<=', ['get', 'severity'], 2]);
         if (vru) f.push(['==', ['get', 'vru_any'], true]);
         return f;
     }
     function ensureCollisionLayers() {
         if (!COLL.data || !COLL.staff) return;
+        // 16 Oct 2026: a filter or visibility change on a layer that already exists goes straight on — isStyleLoaded()
+        // is also false while tiles load, and waiting for 'idle' then left the Alternative routes tick unapplied
+        if (map.getLayer('collision-points')) {
+            try { map.setFilter('collision-points', collisionFilter()); map.setLayoutProperty('collision-points', 'visibility', COLL.on ? 'visible' : 'none'); } catch (e) {}
+            return;
+        }
         if (!map.isStyleLoaded()) { map.once('idle', ensureCollisionLayers); return; }
         const data = { type: 'FeatureCollection', features: COLL.data.features || [] };
         if (!map.getSource('collision-source')) map.addSource('collision-source', { type: 'geojson', data, attribution: COLL.data.credit || '' });
@@ -8223,7 +8237,8 @@
         if (!box || !when) return;
         if (!D) { box.hidden = true; when.textContent = COLL.loading ? 'Reading the layer…' : ''; return; }
         const n = D.counts || { all: 0, ksi: 0 };
-        box.hidden = !COLL.on || !n.all;
+        const alt = D.alternatives_only || { all: 0, ksi: 0 };
+        box.hidden = !COLL.on || !(n.all || alt.all);
         const dot = (r, fill, stroke) => `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" style="flex:none"><circle cx="7" cy="7" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/></svg>`;
         if (leg) leg.innerHTML = `<span style="display:inline-flex;gap:4px;align-items:center">${dot(5.5, COLL_INK, '#fff')} Fatal</span> · ` +
             `<span style="display:inline-flex;gap:4px;align-items:center">${dot(4.2, COLL_INK, '#fff')} Serious</span> · ` +
@@ -8232,7 +8247,10 @@
         when.textContent = !D.fetched_at
             ? 'Not fetched yet. A planner fetches it on Config → Map and bulletin.'
             : `Police-reported injury collisions, ${D.period}: ${n.all} within ${D.strip.route_m} m of the routes or ${D.strip.site_m} m of the sites, ` +
-              `${n.ksi} of them killed or seriously injured. Fetched ${day(D.fetched_at)}. Evidence for a route risk assessment, not the assessment.` +
+              `${n.ksi} of them killed or seriously injured.` +
+              (alt.all ? ` Another ${alt.all} (${alt.ksi} killed or seriously injured) are along the alternative routes only: ` +
+                         (altsShown() ? 'drawn while Alternative routes is ticked.' : 'tick Alternative routes to see them.') : '') +
+              ` Fetched ${day(D.fetched_at)}. Evidence for a route risk assessment, not the assessment.` +
               (D.error ? ' ' + D.error + '.' : '');
         if (att) att.textContent = D.credit || '';
     }
