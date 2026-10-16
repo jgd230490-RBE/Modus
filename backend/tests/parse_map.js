@@ -5220,6 +5220,85 @@ function qrRead(mod) {
      !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bAI\b|IPT\d/i.test(v3));
 }
 
+// 16 Oct 2026: pressing the basemap ALREADY showing (☀️ on first load) blanked the map (90 -> 54 layers, no
+// routes): GL 2.14.1 setStyle(sameUrl) diffs the style against itself, deletes our layers and fires no
+// style.load. Both controls go through changeBasemap, which holds what is shown and skips a same pick.
+{
+  const src = html;
+  const i0 = src.indexOf("const BASEMAP = {");
+  const i1 = src.indexOf("function maaametOrthoStyle()");
+  const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
+  ok("🔴 basemap: the held basemap starts on the map's own first style (light-v11) and becomes 'shown' only on a style.load",
+     bm.includes("const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null };")
+     && src.includes("style: 'mapbox://styles/mapbox/light-v11', center:")
+     && bm.includes("map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } });"));
+  ok("🔴 basemap: a pick equal to the one showing (or on its way) returns before setStyle",
+     /if \(styleUrl === \(BASEMAP\.pending \|\| BASEMAP\.shown\)\) return;[\s\S]*map\.setStyle\(/.test(bm));
+  ok("basemap: going back to the shown style while another is pending is a full rebuild (diff: false); other switches keep the default",
+     bm.includes("if (back) map.setStyle(style, { diff: false }); else map.setStyle(style);"));
+  ok("basemap: Maa-amet is still a style object, chosen by its key",
+     bm.includes("const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;"));
+  const ct = (src.match(/window\.changeTheme = function\(btn, styleUrl\) \{([^}]*)\};/) || [])[1] || "";
+  ok("🔴 basemap: the widget's changeTheme calls changeBasemap and nothing else (no second setStyle path)",
+     ct.trim() === "changeBasemap(styleUrl);");
+  ok("🔴 basemap: exactly two setStyle calls in the page, both inside changeBasemap",
+     (src.match(/\.setStyle\(/g) || []).length === 2 && (bm.match(/map\.setStyle\(/g) || []).length === 2);
+  ok("basemap: each widget button names its style (data-basemap), the select and widget are synced, also when the widget arrives",
+     ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].every(k =>
+       src.includes(`data-basemap="mapbox://styles/mapbox/${k}" onclick="changeTheme(this, 'mapbox://styles/mapbox/${k}')"`))
+     && src.includes("syncBasemapControls(BASEMAP.pending || BASEMAP.shown);   // a pick made in the select")
+     && bm.includes("b.classList.toggle('active', b.dataset.basemap === styleUrl)"));
+
+  // run the real block against a fake map: record setStyle, fire style.load by hand
+  const calls = [], handlers = [];
+  const fakeMap = { on: (e, f) => { if (e === 'style.load') handlers.push(f); }, setStyle: (st, o) => calls.push([st, o]) };
+  const opts = ["mapbox://styles/mapbox/light-v11", "mapbox://styles/mapbox/dark-v11",
+                "mapbox://styles/mapbox/satellite-streets-v12", "maaamet-ortho"].map(v => ({ value: v, hidden: v === "maaamet-ortho" }));
+  const sel = { options: opts, value: opts[0].value, selectedIndex: 0 };
+  Object.defineProperty(sel, "value", { get() { return this.selectedIndex >= 0 ? opts[this.selectedIndex].value : ""; },
+                                        set(v) { this.selectedIndex = opts.findIndex(o => o.value === v); } });
+  const btns = ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].map(k => {
+    const cls = new Set(k === "light-v11" ? ["active"] : []);
+    return { dataset: { basemap: "mapbox://styles/mapbox/" + k }, classList: { toggle: (c, on) => on ? cls.add(c) : cls.delete(c), has: c => cls.has(c) } };
+  });
+  const fakeDoc = { getElementById: id => id === "basemap-select" ? sel : null, querySelectorAll: () => btns };
+  let api = null;
+  try {
+    api = new Function("map", "document", "maaametOrthoStyle",
+      bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }));
+  } catch (e) { ok("basemap sandbox: the block runs", false, String(e)); }
+  if (api) {
+    const L = "mapbox://styles/mapbox/light-v11", D = "mapbox://styles/mapbox/dark-v11", S = "mapbox://styles/mapbox/streets-v12";
+    const lit = () => btns.filter(b => b.classList.has("active")).map(b => b.dataset.basemap);
+    const load = () => handlers.forEach(f => f());
+    api.changeBasemap(L);
+    ok("⭐ sandbox: pressing Light while Light shows calls setStyle NOT AT ALL (the 90 -> 54 layer blank)", calls.length === 0);
+    api.changeBasemap(D);
+    ok("sandbox: Dark is one setStyle, the default diff (no options), and the widget and select follow",
+       calls.length === 1 && calls[0][0] === D && calls[0][1] === undefined && sel.value === D && lit().join() === D);
+    api.changeBasemap(D);
+    ok("sandbox: Dark again while Dark is still loading: no second setStyle", calls.length === 1);
+    load();
+    ok("sandbox: style.load makes Dark the shown basemap", api.BASEMAP.shown === D && api.BASEMAP.pending === null);
+    api.changeBasemap(D);
+    ok("⭐ sandbox: Dark pressed while Dark shows: still no second setStyle", calls.length === 1);
+    api.changeBasemap(S);
+    ok("sandbox: Streets (widget only) leaves the select blank, so any pick there fires a change; only 🛣️ lit",
+       calls.length === 2 && sel.selectedIndex === -1 && lit().join() === S);
+    api.changeBasemap(D);
+    ok("⭐ sandbox: back to the shown Dark before Streets loaded: a full rebuild (diff: false), so style.load re-adds the layers",
+       calls.length === 3 && calls[2][0] === D && calls[2][1] && calls[2][1].diff === false && api.BASEMAP.pending === null);
+    load();
+    api.changeBasemap("mapbox://styles/mapbox/standard");    // a style GL 2.14 rejects: no style.load ever comes
+    api.changeBasemap(D);
+    ok("⭐ sandbox: after a rejected style, picking the basemap still showing rebuilds it (diff: false) instead of diffing it blank",
+       calls.length === 5 && calls[4][0] === D && calls[4][1] && calls[4][1].diff === false && api.BASEMAP.shown === D);
+    api.changeBasemap("maaamet-ortho");
+    ok("sandbox: Maa-amet is set as a style object, never as the string key",
+       calls.length === 6 && typeof calls[5][0] === "object" && calls[5][0].version === 8);
+  }
+}
+
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();

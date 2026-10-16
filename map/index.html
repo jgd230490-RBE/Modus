@@ -3863,9 +3863,36 @@
 
     if (map.loaded()) initNetwork(); else map.once('load', initNetwork);
 
+    // 🔴 16 Oct 2026: pressing the basemap that is ALREADY showing (☀️ on first load) blanked the map:
+    // 90 -> 54 layers, no routes, under a bar still counting them. On GL JS 2.14.1 setStyle(sameUrl)
+    // diffs the style against itself, deletes every layer the Mapbox style does not list (all of ours)
+    // and fires no 'style.load', so the re-add above never runs. map.getStyle() carries no URL (and
+    // Maa-amet is an object), so the basemap is held here: BASEMAP.shown is set only by a style.load
+    // (a style GL rejects, like Standard (3D) on 2.14, never becomes "shown"); BASEMAP.pending is the
+    // pick on its way. A pick equal to the one showing or on its way is a no-op. Going BACK to the
+    // shown style while another is pending is a full rebuild ({ diff: false }): a diff there would
+    // blank the map the same way, and the shown style is known to be valid. diff:false is NOT used for
+    // every switch: on a style GL rejects it would drop the working basemap first and leave nothing.
+    const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null };
+    map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } });
     function changeBasemap(styleUrl) {
-        if (styleUrl === 'maaamet-ortho') { map.setStyle(maaametOrthoStyle()); return; }
-        map.setStyle(styleUrl);
+        syncBasemapControls(styleUrl);
+        if (styleUrl === (BASEMAP.pending || BASEMAP.shown)) return;
+        const back = styleUrl === BASEMAP.shown;
+        BASEMAP.pending = back ? null : styleUrl;
+        const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;
+        if (back) map.setStyle(style, { diff: false }); else map.setStyle(style);
+    }
+    // the Layers select and the bottom-left widget show the same pick: a basemap one of them does not
+    // offer leaves the select blank (so any choice there fires a change) and no widget button lit
+    function syncBasemapControls(styleUrl) {
+        const sel = document.getElementById('basemap-select');
+        if (sel) {
+            const opt = Array.from(sel.options).find(o => o.value === styleUrl && !o.hidden);
+            if (opt) sel.value = styleUrl; else sel.selectedIndex = -1;
+        }
+        document.querySelectorAll('.custom-map-widget .widget-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.basemap === styleUrl));
     }
     function maaametOrthoStyle() {
         // Estonian Land Board (Maa-amet) orthophoto, all-zoom TMS tile pyramid (EPSG:3857).
@@ -5470,16 +5497,17 @@
                         this._container = document.createElement('div');
                         this._container.className = 'mapboxgl-ctrl custom-map-widget';
                         this._container.innerHTML = `
-                            <button type="button" class="widget-btn active" title="Light Theme" aria-label="Light basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/light-v11')">☀️</button>
-                            <button type="button" class="widget-btn" title="Dark Theme" aria-label="Dark basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/dark-v11')">🌙</button>
-                            <button type="button" class="widget-btn" title="Satellite" aria-label="Satellite basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/satellite-streets-v12')">🌍</button>
-                            <button type="button" class="widget-btn" title="Streets" aria-label="Streets basemap" onclick="changeTheme(this, 'mapbox://styles/mapbox/streets-v12')">🛣️</button>
+                            <button type="button" class="widget-btn active" title="Light Theme" aria-label="Light basemap" data-basemap="mapbox://styles/mapbox/light-v11" onclick="changeTheme(this, 'mapbox://styles/mapbox/light-v11')">☀️</button>
+                            <button type="button" class="widget-btn" title="Dark Theme" aria-label="Dark basemap" data-basemap="mapbox://styles/mapbox/dark-v11" onclick="changeTheme(this, 'mapbox://styles/mapbox/dark-v11')">🌙</button>
+                            <button type="button" class="widget-btn" title="Satellite" aria-label="Satellite basemap" data-basemap="mapbox://styles/mapbox/satellite-streets-v12" onclick="changeTheme(this, 'mapbox://styles/mapbox/satellite-streets-v12')">🌍</button>
+                            <button type="button" class="widget-btn" title="Streets" aria-label="Streets basemap" data-basemap="mapbox://styles/mapbox/streets-v12" onclick="changeTheme(this, 'mapbox://styles/mapbox/streets-v12')">🛣️</button>
                         `;
                         return this._container;
                     }
                     onRemove() { this._container.parentNode.removeChild(this._container); this._map = undefined; }
                 }
                 map.addControl(new BasemapWidgetControl(), 'bottom-left');
+                syncBasemapControls(BASEMAP.pending || BASEMAP.shown);   // a pick made in the select before the widget arrived
 
                 // Identify Base Data Source
                 let allSources = Object.keys(map.getStyle().sources);
@@ -5571,11 +5599,9 @@
             }
         }, 500);
 
-        window.changeTheme = function(btn, styleUrl) {
-            document.querySelectorAll('.widget-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            map.setStyle(styleUrl);
-        };
+        // one path for both basemap controls: changeBasemap holds what is showing, skips a press of the
+        // basemap already there (16 Oct 2026: that blanked every overlay) and keeps the select in step
+        window.changeTheme = function(btn, styleUrl) { changeBasemap(styleUrl); };
 
         // --------------------------------------------------------------------
         // FORECAST ENGINE
