@@ -28,3 +28,6 @@ modus-tenant-*.json
 
 # local test environments (CLAUDE.md: keep them out of git)
 .venv-*/
+
+# the UI audit's runs (backend/tests/ui_audit.js): screenshots and reports, hundreds of files a run
+ui-audit/
