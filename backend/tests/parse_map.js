@@ -1499,9 +1499,12 @@ ok("⭐ no callout component survives anywhere",
   && !/OD_MAX/.test(code) && !/OD_BOX_W/.test(code));
 ok("the ends are marked by stamping is_end on the Node feature",
   /function markRouteEnds\(\)/.test(code) && /f\.properties\.is_end = on/.test(code));
+// NARROWED 16 Oct 2026 (V7, sites as dots): the case moved into locIconImage(), which the layer calls, and the in-use
+// image is the key + (the dot suffix) + '-on'
 ok("⭐ ...which the ONE locations layer reads as a bigger image, not a second layer",
-  /'icon-image': \['case', \['coalesce', \['get', 'is_end'\], false\],/.test(code)
-  && /\['concat', \['get', 'loc_icon'\], '-on'\]/.test(code)
+  /'icon-image': locIconImage\(\),/.test(code)
+  && /return \['case', \['coalesce', \['get', 'is_end'\], false\],/.test(code)
+  && /\['concat', \['get', 'loc_icon'\], dot \+ '-on'\]/.test(code)
   // exactly one symbol layer draws a location, in either state
   && (code.match(/id: 'locations', type: 'symbol'/g) || []).length === 1);
 // ⚠️ REVERSED 2026-09-08 (pm), not deleted. This pinned "+2 px with a 1 px halo", which
@@ -3768,7 +3771,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("C3 link: written on change — applyFilters ends with the write; a layer box or Show forecast schedules it; a stop of playback writes it",
      /markRouteEnds\(\);\s*raiseMarks\(\);\s*if \(typeof scheduleViewWrite === 'function'\) scheduleViewWrite\(\);\s*\}/.test(code)
      // narrowed at the merge with C1: the change hook may also name the Road load / Carbon boxes (LINK_MODE_BOXES)
-     && /if \(\/\^\(layer-\|restr-\)\/\.test\(id\) \|\| id === 'toggle-forecast'( \|\| LINK_MODE_BOXES\.includes\(id\))?\) scheduleViewWrite\(\);/.test(code)
+     // NARROWED 16 Oct 2026 (V7): ...and the "Show sites as dots" box (loc-dots)
+     && /if \(\/\^\(layer-\|restr-\)\/\.test\(id\) \|\| id === 'toggle-forecast'( \|\| id === 'loc-dots')?( \|\| LINK_MODE_BOXES\.includes\(id\))?\) scheduleViewWrite\(\);/.test(code)
      && code.includes("observeEl('tl-play', { attributes: true, attributeFilter: ['aria-pressed'] }, () => { syncPlayButtons(); if (!TL.playing) scheduleViewWrite(); });"));
   ok("C3 link: never written during Play (Safari caps replaceState); written with history.replaceState; the app's embed / v kept in the frame, stripped from the shared link",
      code.includes("if (!VIEW.ready || TL.playing) return;") && code.includes("try { history.replaceState(history.state, '', url); } catch (e) {}")
@@ -4571,7 +4575,8 @@ function qrRead(mod) {
   ok("⭐ limits link / council view: the boxes are layer-* boxes, so layerBoxes() (the link) and councilOtherBoxes() (remember / restore) take them",
      code.includes("return [...document.querySelectorAll('input[type=checkbox][id^=\"layer-\"], input[type=checkbox][id^=\"restr-\"], #toggle-road-load, #toggle-carbon, #toggle-forecast')];")
      && code.includes(".filter(cb => cb.id.indexOf('layer-areas-') !== 0 && cb.id.indexOf('layer-zone-') !== 0);")
-     && code.includes("if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || LINK_MODE_BOXES.includes(id)) scheduleViewWrite();"));
+     // NARROWED 16 Oct 2026 (V7): the hook also names the dots box
+     && code.includes("if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || id === 'loc-dots' || LINK_MODE_BOXES.includes(id)) scheduleViewWrite();"));
   ok("⭐ limits presets: 'Closures and restrictions' ticks the limit boxes while the group offers them; presetMatches reads the same presetLayers",
      code.includes("if (k.indexOf('limit-') === 0 && presetLimitsAvailable()) on.add(k);")
      && /function presetLimitsAvailable\(\) \{/.test(code) && code.includes("const want = presetLayers(p);\n        return layerBoxes()"));
@@ -4830,9 +4835,11 @@ function qrRead(mod) {
      && nbc.includes("if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof closeLayersSheet === 'function') closeLayersSheet();"));
   ok("⭐ presets link: the council colouring travels as &council=carbon (only while By council is on), and is read back before the boxes are ticked",
      nbc.includes("if (v.council === 'carbon') q.set('council', 'carbon');")
-     && nbc.includes("council: q.get('council') === 'carbon' ? 'carbon' : null };")
-     && nbc.includes("council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null };")
-     && /if \(v\.council === 'carbon' && typeof AREAS !== 'undefined'\) AREAS\.mode = 'carbon';\s*if \(v\.layers\) \{/.test(nbc)
+     // NARROWED 16 Oct 2026 (V7): decode and currentView go on to the marks; the dots box is set between the colouring
+     // and the boxes, so the colouring is still read back before the boxes are ticked
+     && nbc.includes("council: q.get('council') === 'carbon' ? 'carbon' : null,")
+     && nbc.includes("council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null,")
+     && /if \(v\.council === 'carbon' && typeof AREAS !== 'undefined'\) AREAS\.mode = 'carbon';[\s\S]{0,400}?if \(v\.layers\) \{/.test(nbc)
      && code.includes("if (typeof scheduleViewWrite === 'function') scheduleViewWrite();\n        if (typeof schedulePresetRender === 'function') schedulePresetRender();\n    }"));
   ok("presets: the banned public words are not in the preset labels or note",
      !/\b(optimi[sz]e|predict|real-time|AI|secure|live tracking)\b/i.test(cut0(html, 'id="preset-group"', '</div>\n\n') + cut0(nb, 'const PRESETS = [', '];')));
@@ -5079,6 +5086,78 @@ function qrRead(mod) {
   ok("🔴 no screenshot of the browser map: the PDF and the PNG are both the server's (D29 stands)",
      // (the one toDataURL in the page is buildLocLegend's 34 px swatch, not the map)
      !/preserveDrawingBuffer:\s*true|getCanvas\(\)\.(toBlob|toDataURL)/.test(src));
+}
+
+// ---- 16 Oct 2026 (the user, v2 list V7): the sites as icons or plain dots ---------------------------------------
+{
+  const fnSrcV7 = (name) => { const i = src.indexOf("    function " + name + "("); if (i < 0) return ""; const j = src.indexOf("\n    }\n", i); return src.slice(i, j + 6); };
+  ok("V7: one box 'Show sites as dots' under the location legend, OFF by default, calling toggleLocDots",
+     html.includes('<label><input type="checkbox" id="loc-dots" onchange="toggleLocDots()"> Show sites as dots</label>')
+     && html.indexOf('id="loc-dots"') > html.indexOf('id="loc-legend"') && !/id="loc-dots"[^>]*checked/.test(html));
+  ok("⭐ V7: it is NOT a layer- box, so the preset views, presetMatches and the council view's remember / restore never touch it",
+     !/id="layer-dots"|id="layer-loc-dots"/.test(html) && !/^layer-|^restr-/.test('loc-dots'));
+  ok("V7: both dot states are added beside the icons, on style.load, behind hasImage",
+     fnSrcV7("addLocationImages").includes("if (!m.hasImage(key + '-dot')) m.addImage(key + '-dot', locDot(spec.kind, spec.fill, false, spec.stock), { pixelRatio: 2 });")
+     && fnSrcV7("addLocationImages").includes("if (!m.hasImage(key + '-dot-on')) m.addImage(key + '-dot-on', locDot(spec.kind, spec.fill, true, spec.stock), { pixelRatio: 2 });"));
+  ok("V7: the switch is ONE setLayoutProperty on the one locations layer, and the legend's pictures follow (rows not rebuilt)",
+     fnSrcV7("toggleLocDots").includes("map.setLayoutProperty('locations', 'icon-image', locIconImage());")
+     && fnSrcV7("toggleLocDots").includes("refreshLocLegendSwatches();")
+     && !fnSrcV7("refreshLocLegendSwatches").includes("buildLocLegend")
+     && html.includes('data-loc-kind="${k}"'));
+  ok("V7: the state is read from the box, never a module variable (style.load re-adds the layer)",
+     /function locDotsOn\(\) \{\s*const cb = document\.getElementById\('loc-dots'\);\s*return !!\(cb && cb\.checked\);/.test(code));
+  // the expression, run
+  let E = null, err7 = '';
+  try {
+    const box = { checked: false };
+    const doc = { getElementById: id => id === 'loc-dots' ? box : null };
+    E = new Function("document", fnSrcV7("locDotsOn") + fnSrcV7("locIconImage") + "\nreturn { locIconImage, box: arguments[1] };")(doc, box);
+    E.box = box;
+  } catch (e) { err7 = String(e && e.stack || e); }
+  ok("V7: the image expression runs", !!E, err7.slice(0, 300));
+  if (E) {
+    const icon = JSON.stringify(E.locIconImage());
+    E.box.checked = true;
+    const dot = JSON.stringify(E.locIconImage());
+    ok("⭐ V7: icons: key / key-on; dots: key-dot / key-dot-on — the in-use ring kept in both",
+       icon === JSON.stringify(['case', ['coalesce', ['get', 'is_end'], false], ['concat', ['get', 'loc_icon'], '-on'], ['concat', ['get', 'loc_icon'], '']])
+       && dot === JSON.stringify(['case', ['coalesce', ['get', 'is_end'], false], ['concat', ['get', 'loc_icon'], '-dot-on'], ['concat', ['get', 'loc_icon'], '-dot']]), dot);
+  }
+  // the painter, run on a fake canvas: what it fills and whether the rim is dashed
+  let D = null, errD = '';
+  const calls = [];
+  try {
+    const g = new Proxy({}, { get: (t, k) => (k in t) ? t[k] : (...a) => { calls.push([k, a]); return k === 'getImageData' ? { data: [] } : undefined; },
+                              set: (t, k, v) => { t[k] = v; calls.push(['set ' + k, [v]]); return true; } });
+    const doc = { createElement: () => ({ getContext: () => g }) };
+    D = new Function("document", "LOC_IMG_S", "LOC_FILL", "STOCK_OVER",
+      "const LOC_DOT_R = 12, LOC_DOT_R_OTHER = 7;\n" + fnSrcV7("locDotFill") + fnSrcV7("locDot") + "\nreturn { locDot, locDotFill };")(
+      doc, 72, { Stockpile: '#E7E1D1', Site: '#6D28D9' }, '#DC2626');
+  } catch (e) { errD = String(e && e.stack || e); }
+  ok("V7: the dot painter runs", !!D, errD.slice(0, 300));
+  if (D) {
+    ok("⭐ V7: a dot keeps the type's colour; a stockpile over capacity stays red (the dot claims no reading the icon would not)",
+       D.locDotFill('Site', '#6D28D9', null) === '#6D28D9' && D.locDotFill('Quarry', '#ffd700', null) === '#ffd700'
+       && D.locDotFill('Stockpile', '#E7E1D1', 'over') === '#DC2626' && D.locDotFill('Stockpile', '#E7E1D1', '40') === '#E7E1D1');
+    calls.length = 0; D.locDot('Stockpile', '#E7E1D1', false, 'na');
+    ok("V7: a stockpile with no recorded capacity keeps its dashed rim as a dot",
+       calls.some(c => c[0] === 'setLineDash' && JSON.stringify(c[1][0]) === '[4,3]'));
+    calls.length = 0; D.locDot('Site', '#6D28D9', true, null);
+    const arcs = calls.filter(c => c[0] === 'arc').map(c => c[1][2]);
+    ok("V7: the in-use dot draws the white ring and its rim OUTSIDE the dot (r+6, r+8.5), the dot itself unchanged",
+       JSON.stringify(arcs) === '[18,20.5,12]' && calls.some(c => c[0] === 'set strokeStyle' && c[1][0] === '#ffffff'), JSON.stringify(arcs));
+    calls.length = 0; D.locDot('Other', '#999', false, null);
+    ok("V7: 'Other' stays the small dot", JSON.stringify(calls.filter(c => c[0] === 'arc').map(c => c[1][2])) === '[7]');
+  }
+  ok("⭐ V7: the link carries it as &marks=dots (icons are the default and write nothing); decode accepts only 'dots'",
+     src.includes("if (v.marks === 'dots') q.set('marks', 'dots');")
+     && src.includes("marks: q.get('marks') === 'dots' ? 'dots' : null };")
+     && src.includes("marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null };"));
+  ok("V7: a link with marks=dots ticks the box BEFORE the layer boxes, through its change event (toggleLocDots and the link listener run)",
+     /const dots = document\.getElementById\('loc-dots'\);\s*if \(dots && dots\.checked !== \(v\.marks === 'dots'\)\) \{ dots\.checked = v\.marks === 'dots'; dots\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\); \}\s*if \(v\.layers\) \{/.test(code));
+  ok("V7: the legend's swatch draws a circle while dots are on, the type's shape otherwise",
+     /if \(locDotsOn\(\)\) \{ g\.beginPath\(\); g\.arc\(S \/ 2, S \/ 2, kind === 'Other' \? 5 : 9, 0, Math\.PI \* 2\); \}\s*else locShapePath\(g, kind, S \/ 2, S \/ 2, kind === 'Other' \? 6 : 13\);/.test(code));
+  ok("🔴 V7: no banned public word and no 'truck' in the new box", !/truck|real-time|live tracking|telematics/i.test('Show sites as dots'));
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
