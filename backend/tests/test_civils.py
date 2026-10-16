@@ -417,7 +417,10 @@ for ws in openpyxl.load_workbook(io.BytesIO(export.build_xlsx(PG)), read_only=Tr
 _x = " ".join(_x)
 ok("6: the Look-ahead XLSX names the Concrete mixer and never says 'truck'", N8 in _x and not TRUCK.search(_x), str(TRUCK.findall(_x))[:100])
 _have_pdf = bool(shutil.which("pdftotext"))
-_p = " ".join(pdf_text(export.build_pdf(PG), "").split()) if _have_pdf else ""     # words, not the PDF's line breaks
+# -raw, not -layout (16 Oct 2026): the Vehicle cell wraps "Concrete / mixer 8 m³ / (32t)" over three lines, and -layout
+# reads each line across the row, so "Concrete" and "mixer" sit apart with the day columns between them. Xpdf (this
+# laptop) happened to print one wrapped cell alone and passed; poppler (CI) did not. -raw keeps a cell's lines together.
+_p = " ".join(pdf_text(export.build_pdf(PG), "", raw=True).split()) if _have_pdf else ""     # words, not line breaks
 ok("6: the Look-ahead PDF names the Concrete mixer and never says 'truck'",
    not _have_pdf or ("Concrete mixer" in _p and not TRUCK.search(_p)), _p[:0])
 _ds = " ".join(pdf_text(export.build_day_sheet_pdf(PG, TODAY.isoformat()), "").split()) if _have_pdf else ""
