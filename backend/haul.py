@@ -65,11 +65,23 @@ Everything about live HERE behaviour, because HERE is never called from the sand
 None of the three can be answered by a test in this repo. Run the diagnostic.
 """
 import json
+import math
 from datetime import datetime, timezone
 
 import db
 import zones
 import here_routing
+
+#: 16 Oct 2026: two points closer than this are the same place. A splice sub-call between them (the gate and the gate
+#: end of its own access road) is not sent to HERE: it would be a request from a point to itself.
+SAME_POINT_M = 15.0
+
+
+def _metres(a_lat, a_lon, b_lat, b_lon):
+    p1, p2 = math.radians(a_lat), math.radians(b_lat)
+    h = (math.sin((p2 - p1) / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(math.radians(b_lon - a_lon) / 2) ** 2)
+    return 2 * 6371008.8 * math.asin(math.sqrt(min(1.0, h)))
 
 # See the module docstring. 'splice' is the default because its failure mode is visible.
 MODES = ("splice", "via")
@@ -100,12 +112,21 @@ def routes_for_zone(zone_id):
 
 
 def link_counts():
-    """zone_id -> number of routes attached, for the zones table's 'used by' column."""
-    out = {}
-    for r in db.query("SELECT zone_id, COUNT(*) AS n FROM route_haul_roads "
-                      "WHERE tenant_id = ? GROUP BY zone_id", (db.current_tenant(),)):
-        out[r["zone_id"]] = r["n"]
-    return out
+    """zone_id -> number of routes that use it, for the zones table's 'used by' column and the map's popup.
+    16 Oct 2026: a gate's access road is used by every route starting or ending at the gate's site, plus any route it
+    is attached to (counted once)."""
+    users = {}
+    for r in db.query("SELECT zone_id, route_id FROM route_haul_roads WHERE tenant_id = ?", (db.current_tenant(),)):
+        users.setdefault(r["zone_id"], set()).add(r["route_id"])
+    try:
+        import gates as _gates
+        for g in db.query("SELECT location_id, access_zone_id FROM location_gates WHERE tenant_id = ? "
+                          "AND access_zone_id IS NOT NULL", (db.current_tenant(),)):
+            if g.get("access_zone_id"):
+                users.setdefault(g["access_zone_id"], set()).update(_gates.routes_at_location(g["location_id"]))
+    except Exception:
+        pass             # location_gates may not have the column yet on a cold database
+    return {z: len(rs) for z, rs in users.items() if rs}
 
 
 def attach(route_id, zone_id, seq=None):
@@ -248,6 +269,49 @@ def plan_leg(route_id, origin_pt, dest_pt, leg="loaded", on=None):
         })
         cursor = line[-1]
     return out
+
+
+def gate_access_step(gate, role, on=None):
+    """
+    16 Oct 2026 (the user: "gates are usually right by the public road with a suitable bellmouth … ensure there is a
+    haul road drawn to every gate"). The gate's ACCESS ROAD as one leg step, or None (no access road, or one that is
+    inactive, out of its dates or not set to affect routing). Oriented from the gate for a lorry LEAVING by it
+    (role 'exit': the step starts at the gate end) and to the gate for one ARRIVING (role 'entry': it ends there).
+    Always spliced: the bellmouth is drawn because the road network does not show it.
+    """
+    zid = (gate or {}).get("access_zone_id")
+    if not zid:
+        return None
+    z = next((x for x in zones.haul_roads(on=on) if x["id"] == zid), None)
+    if not z or not z["affects_routing"]:
+        return None
+    line = zones.as_line(z["geometry"])
+    if not line or len(line) < 2:
+        return None
+    g_lat, g_lon = float(gate["lat"]), float(gate["lon"])
+    gate_first = (_metres(line[0][1], line[0][0], g_lat, g_lon) <= _metres(line[-1][1], line[-1][0], g_lat, g_lon))
+    starts_at_gate = (role == "exit")
+    rev = (gate_first != starts_at_gate)
+    line = [list(p) for p in (list(reversed(line)) if rev else line)]
+    return {"zone_id": z["id"], "name": z["name"], "mode": "splice", "speed_kph": z["speed_kph"],
+            "line": line, "length_km": round(zones.line_length_km(line), 3),
+            "entry": (line[0][1], line[0][0]), "exit": (line[-1][1], line[-1][0]),
+            "reversed": rev, "gate_id": gate.get("id"), "gate_role": role}
+
+
+def leg_steps(route_id, origin_pt, dest_pt, leg="loaded", a_gate=None, b_gate=None, on=None):
+    """
+    Every drawn road one leg runs along, in order: the access road of the gate it LEAVES by, the haul roads attached
+    to the route (plan_leg), the access road of the gate it ARRIVES by. `a_gate` / `b_gate` are the gate rows the
+    bake resolved at each end (gates.resolve). A road that is both a gate's access road and attached to the route is
+    run once, as the gate's.
+    """
+    dep = gate_access_step(a_gate, "exit", on)
+    arr = gate_access_step(b_gate, "entry", on)
+    start = [dep["line"][-1][0], dep["line"][-1][1]] if dep else origin_pt
+    used = {s["zone_id"] for s in (dep, arr) if s}
+    mid = [s for s in plan_leg(route_id, start, dest_pt, leg, on=on) if s["zone_id"] not in used]
+    return [s for s in [dep] + mid + [arr] if s]
 
 
 def haul_km_for_route(route_id, on=None):
@@ -394,13 +458,15 @@ def _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
 
     for s in steps:
         e_lat, e_lon = s["entry"]
-        r = here_routing.routes(cur_lat, cur_lon, e_lat, e_lon, profile, factors,
-                                avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
-        calls += 1
-        coords = _join(coords, r["geometry"])
-        dist += r["distance_km"]
-        here_hr += r["duration_hr"]
-        adjusted_hr += r["duration_hr"]
+        # 16 Oct 2026: a gate's access road starts at the gate the leg leaves from — no HERE call from a point to itself
+        if _metres(cur_lat, cur_lon, e_lat, e_lon) > SAME_POINT_M:
+            r = here_routing.routes(cur_lat, cur_lon, e_lat, e_lon, profile, factors,
+                                    avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
+            calls += 1
+            coords = _join(coords, r["geometry"])
+            dist += r["distance_km"]
+            here_hr += r["duration_hr"]
+            adjusted_hr += r["duration_hr"]
 
         # the haul stretch itself: drawn geometry, drawn length, assigned duration.
         # HERE is not asked about it and contributes nothing to duration_hr_here, which
@@ -421,13 +487,15 @@ def _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
                                 "cycle. Set a speed on the haul road.")})
         cur_lat, cur_lon = s["exit"]
 
-    r = here_routing.routes(cur_lat, cur_lon, d_lat, d_lon, profile, factors,
-                            avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
-    calls += 1
-    coords = _join(coords, r["geometry"])
-    dist += r["distance_km"]
-    here_hr += r["duration_hr"]
-    adjusted_hr += r["duration_hr"]
+    # ...and ends at the gate the leg arrives at: no HERE call from the end of its access road to the gate
+    if _metres(cur_lat, cur_lon, d_lat, d_lon) > SAME_POINT_M:
+        r = here_routing.routes(cur_lat, cur_lon, d_lat, d_lon, profile, factors,
+                                avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
+        calls += 1
+        coords = _join(coords, r["geometry"])
+        dist += r["distance_km"]
+        here_hr += r["duration_hr"]
+        adjusted_hr += r["duration_hr"]
 
     return [{
         "geometry": coords,
@@ -544,6 +612,11 @@ def invalidate_for_zone(zone_id, dry_run=False):
     unchanged.
     """
     linked = set(routes_for_zone(zone_id))
+    # 16 Oct 2026: a gate's access road is used by every route that starts or ends at the gate's location
+    import gates as _gates
+    for g in db.query("SELECT location_id FROM location_gates WHERE tenant_id = ? AND access_zone_id = ?",
+                      (db.current_tenant(), zone_id)):
+        linked.update(_gates.routes_at_location(g["location_id"]))
     rows = db.query("SELECT route_id, vehicle_profile, leg, haul_zones FROM route_geometry "
                     "WHERE tenant_id = ?", (db.current_tenant(),))
     keys, why = [], {}
@@ -610,19 +683,47 @@ def _here_calls_for(legs):
     before spending it, so it has to count the splices rather than the legs.
     """
     total = 0
-    plans = {}
     for rid, _prof, leg in legs:
-        if rid not in plans:
-            ends = _route_endpoints(rid)
-            plans[rid] = ends
-        ends = plans[rid]
-        if not ends:
+        plan = _leg_plan(rid, leg)
+        if not plan:
             total += 1
             continue
-        steps = plan_leg(rid, ends[0], ends[1], leg)
+        a, b, steps = plan
         splices = [s for s in steps if s["mode"] != "via"]
-        total += (len(splices) + 1) if splices else 1
+        if not splices:
+            total += 1
+            continue
+        # 16 Oct 2026: one call per stretch BETWEEN drawn roads, none for a stretch from a point to itself (a gate
+        # and its own access road), so a leg along two gate access roads and nothing else costs one call
+        pts = [a] + [p for s in steps for p in (s["entry"], s["exit"])] + [b]
+        total += sum(1 for i in range(0, len(pts), 2) if _metres(*pts[i], *pts[i + 1]) > SAME_POINT_M)
     return total
+
+
+def _leg_plan(route_id, leg):
+    """((lat, lon) start, (lat, lon) end, steps) for one leg as the bake would route it, or None. The gates are
+    resolved the bake's way (gates.resolve, the route's own gate ids, each end's role)."""
+    import gates as _gates
+    r = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route_id))
+    if not r:
+        return None
+    r = r[0]
+    locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ? AND id IN (?, ?)",
+                                         (db.current_tenant(), r["origin_id"], r["dest_id"]))}
+    o, d = locs.get(r["origin_id"]), locs.get(r["dest_id"])
+    if not o or not d:
+        return None
+    gbl = _gates.gates_by_location()
+    if leg == "loaded":
+        ends = ((o, "exit", r.get("origin_gate_id")), (d, "entry", r.get("dest_gate_id")))
+    else:
+        ends = ((d, "exit", r.get("dest_gate_id")), (o, "entry", r.get("origin_gate_id")))
+    res = [_gates.resolve(loc, role, gid, gates=gbl.get(loc["id"], [])) for loc, role, gid in ends]
+    rows = [next((g for g in gbl.get(loc["id"], []) if g["id"] == x.get("gate_id")), None)
+            for (loc, _r, _g), x in zip(ends, res)]
+    a, b = (res[0]["lat"], res[0]["lon"]), (res[1]["lat"], res[1]["lon"])
+    steps = leg_steps(route_id, [a[1], a[0]], [b[1], b[0]], leg, rows[0], rows[1])
+    return a, b, steps
 
 
 # --------------------------------------------------------------------------- #

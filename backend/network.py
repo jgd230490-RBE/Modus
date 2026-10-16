@@ -93,7 +93,9 @@ def _ensure_location_columns():
                      ("capacity_qty", "REAL"), ("capacity_unit", "TEXT"),
                      ("opening_qty", "REAL"),
                      # 14 Oct 2026 (bundle G, W8): the site's CLP cap — set_clp_cap()
-                     ("clp_cap_per_day", "REAL")):
+                     ("clp_cap_per_day", "REAL"),
+                     # 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers — set_site_rules()
+                     ("site_rules", "TEXT")):
         try:
             if db.IS_PG:
                 db.execute(f"ALTER TABLE locations ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -502,16 +504,27 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
     else:
         a, a_role, a_gate = d, "exit", d_gate      # leaves the destination
         b, b_role, b_gate = o, "entry", o_gate     # arrives back at the origin
-    gbl = gates_by_loc if gates_by_loc is not None else {}
-    a_lat, a_lon = _waypoint(a, a_role, a_gate, gbl.get(a.get("id")))
-    b_lat, b_lon = _waypoint(b, b_role, b_gate, gbl.get(b.get("id")))
+    if gates_by_loc is None:
+        # 16 Oct 2026: the gates' access roads need the gate ROWS, so a single-route bake fetches them too
+        try:
+            gates_by_loc = gates.gates_by_location()
+        except Exception:
+            gates_by_loc = {}
+    gbl = gates_by_loc
+    a_res = _waypoint_full(a, a_role, a_gate, gbl.get(a.get("id")))
+    b_res = _waypoint_full(b, b_role, b_gate, gbl.get(b.get("id")))
+    a_lat, a_lon = a_res["lat"], a_res["lon"]
+    b_lat, b_lon = b_res["lat"], b_res["lon"]
+    a_row = next((g for g in gbl.get(a.get("id")) or [] if g["id"] == a_res.get("gate_id")), None)
+    b_row = next((g for g in gbl.get(b.get("id")) or [] if g["id"] == b_res.get("gate_id")), None)
 
     # Phase 4: which haul roads this leg runs through, in traversal order. Empty for
     # every route nobody has attached one to, and route_with_haul() then reduces to the
     # plain here_routing.routes() call this used to be — so a network with no haul roads
     # behaves exactly as it did before, same call, same cost.
+    # 16 Oct 2026: plus the access road of the gate the leg leaves by (first) and arrives by (last)
     try:
-        steps = haul.plan_leg(r["id"], [a_lon, a_lat], [b_lon, b_lat], leg)
+        steps = haul.leg_steps(r["id"], [a_lon, a_lat], [b_lon, b_lat], leg, a_row, b_row)
     except Exception:
         steps = []          # route_haul_roads may not exist yet on a cold database
     haul_tag = ",".join([s["zone_id"] for s in steps])
@@ -737,6 +750,8 @@ def public_map_data(profile=None):
         map_gates = gates.gates_by_location()
     except Exception:
         map_gates = {}   # location_gates may not exist yet on a cold database
+    # 16 Oct 2026: the gates' access roads (no extra query) — they do not carry gate-to-face minutes
+    access_ids = {g["access_zone_id"] for gl in map_gates.values() for g in gl if g.get("access_zone_id")}
 
     # every primary-option geometry, in one query rather than per route
     geo = {}
@@ -778,8 +793,7 @@ def public_map_data(profile=None):
             # the public map's cycle must be the SAME total route_analysis() computes,
             # from the same function. Two places adding up the same components is the
             # exact shape of the 125% disagreement recorded at main.py:588.
-            has_drawn_road = bool((loaded.get("haul_zones") or "")
-                                  or (ret is not None and (ret.get("haul_zones") or "")))
+            has_drawn_road = drawn_road_on((loaded, ret), access_ids)
             cycle_hr = out_hr + back_hr + _turnaround_parts(
                 used, factors, origin=o, dest=d, route=r,
                 has_drawn_road=has_drawn_road,
@@ -811,6 +825,10 @@ def public_map_data(profile=None):
                     # the public map can show a plan against it as a planning flag. On BOTH
                     # legs (a filter on either must find it); None when nobody typed one.
                     "max_vehicles_per_day": r.get("max_vehicles_per_day"),
+                    # 16 Oct 2026 (CLOCS v5 C2, §5.6f): why this route and the permitted diversions, as
+                    # typed, for the route card; None when nobody typed them. On both legs, like the cap.
+                    "route_reason": r.get("route_reason"),
+                    "permitted_deviations": r.get("permitted_deviations"),
                 },
                 "geometry": {"type": "LineString",
                              "coordinates": json.loads(g["geometry"])},
@@ -1036,7 +1054,9 @@ def locations_geojson():
                            "capacity_unit": l.get("capacity_unit"),
                            "opening_qty": l.get("opening_qty"),
                            # 14 Oct 2026 (bundle G, W8): lorry visits a day agreed in the CLP; null = none
-                           "clp_cap_per_day": l.get("clp_cap_per_day")},
+                           "clp_cap_per_day": l.get("clp_cap_per_day"),
+                           # 16 Oct 2026 (CLOCS v5 C3): printed on the route sheet; null = none typed
+                           "site_rules": l.get("site_rules")},
             "geometry": {"type": "Point", "coordinates": [l["lon"], l["lat"]]},
         })
     return {"type": "FeatureCollection", "features": feats}
@@ -1074,6 +1094,45 @@ def set_clp_cap(location_id, value):
     db.execute("UPDATE locations SET clp_cap_per_day = ? WHERE tenant_id = ? AND id = ?",
                (v, db.current_tenant(), location_id))
     return {"id": location_id, "clp_cap_per_day": v}
+
+
+# 16 Oct 2026 (CLOCS v5 C2 / C3): the route sheet's typed words. Plain text, trimmed; blank clears (None).
+# A cap on length keeps one route sheet to one A4 page: each block has room for about this many characters.
+SHEET_TEXT_MAX = 400
+
+
+def sheet_text_problem(v, what="the text"):
+    """None for a blank or a string up to SHEET_TEXT_MAX characters once trimmed; else the problem in words."""
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        return f"{what} must be text"
+    if len(v.strip()) > SHEET_TEXT_MAX:
+        return f"{what} is {len(v.strip())} characters: at most {SHEET_TEXT_MAX} fit on the route sheet"
+    return None
+
+
+def _sheet_text(v):
+    """Trimmed text, or None for a blank (never an empty string in the database)."""
+    return (str(v).strip() or None) if v is not None else None
+
+
+def set_site_rules(location_id, value):
+    """
+    16 Oct 2026 (CLOCS v5 C3, §5.5a.v "communicates routes and site rules to the operator"). The site's rules for
+    drivers as typed (speed limit, wheel wash, PPE, where to wait), printed on every route sheet that loads or delivers
+    here. Blank clears it. Nothing else changes: no re-bake.
+    """
+    _ensure_location_columns()
+    p = sheet_text_problem(value, "the site rules")
+    if p:
+        return {"error": p}
+    if not db.query("SELECT id FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), location_id)):
+        return {"error": "not found"}
+    v = _sheet_text(value)
+    db.execute("UPDATE locations SET site_rules = ? WHERE tenant_id = ? AND id = ?",
+               (v, db.current_tenant(), location_id))
+    return {"id": location_id, "site_rules": v}
 
 
 def routes_touching(location_id):
@@ -1551,6 +1610,9 @@ def routes_status():
             "rate_eur_per_t": r.get("rate_eur_per_t"),
             "rate_eur_per_km": r.get("rate_eur_per_km"),
             "km_basis": (r.get("km_basis") or "round_trip"),
+            # 16 Oct 2026 (CLOCS v5 C2): the route sheet's words, as typed; None = not typed
+            "route_reason": r.get("route_reason"),
+            "permitted_deviations": r.get("permitted_deviations"),
             "gate_blockers": gates.bake_blockers(r, o, d, gates_by_loc),
             "profiles": profs,
         })
@@ -1610,6 +1672,39 @@ def set_route_planning(route_id, given, **vals):
     out = {"id": route_id}
     out.update(new)
     out["km_basis"] = new["km_basis"] or "round_trip"
+    return out
+
+
+SHEET_TEXT_FIELDS = ("route_reason", "permitted_deviations")
+SHEET_TEXT_WORDS = {"route_reason": "why this route", "permitted_deviations": "the permitted diversions"}
+
+
+def set_route_sheet_text(route_id, given, **vals):
+    """
+    16 Oct 2026 (CLOCS v5 C2: §5.2b.iii "identified acceptable reasons for deviation", §5.6d "clearly communicate
+    permitted deviations", §5.6f "the reasons behind adopting a specific vehicle route"). Why this route was chosen and
+    the diversions a driver may take, as typed on ONE route. Only the fields in `given` are written; a blank clears.
+    Words, never figures: nothing here touches geometry, gates, forecasts or the checks.
+    """
+    given = set(given or ())
+    tenant = db.current_tenant()
+    cur = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (tenant, route_id))
+    if not cur:
+        return {"error": "route not found"}
+    cur = cur[0]
+    new = {}
+    for f in SHEET_TEXT_FIELDS:
+        if f not in given:
+            new[f] = cur.get(f)
+            continue
+        p = sheet_text_problem(vals.get(f), SHEET_TEXT_WORDS[f])
+        if p:
+            return {"error": p}
+        new[f] = _sheet_text(vals.get(f))
+    db.execute("UPDATE routes SET route_reason = ?, permitted_deviations = ? WHERE tenant_id = ? AND id = ?",
+               (new["route_reason"], new["permitted_deviations"], tenant, route_id))
+    out = {"id": route_id}
+    out.update(new)
     return out
 
 
@@ -2272,6 +2367,34 @@ def _turnaround_minutes(profile, factors):
 INTERNAL_TRAVEL_SOURCES = ("drawn_road", "flat", "none")
 
 
+def gate_access_zone_ids():
+    """16 Oct 2026: the haul roads that are some gate's ACCESS ROAD (public road -> gate). One query."""
+    try:
+        return {g["access_zone_id"] for g in db.query(
+            "SELECT access_zone_id FROM location_gates WHERE tenant_id = ? AND access_zone_id IS NOT NULL",
+            (db.current_tenant(),)) if g.get("access_zone_id")}
+    except Exception:
+        return set()     # location_gates may not have the column yet on a cold database
+
+
+def drawn_road_on(rows, access_ids=None):
+    """
+    B5(c): does a drawn haul road on these geometry rows already carry the gate-to-face minutes?
+
+    16 Oct 2026: a gate's ACCESS ROAD does not count. It runs from the public road to the gate (the bellmouth), not
+    from the gate to the face, so a route along one still pays the gate's flat gate-to-face minutes. Without this,
+    drawing an access road to every gate (the user, 16 Oct) would have quietly dropped every gate's internal travel.
+    """
+    access_ids = gate_access_zone_ids() if access_ids is None else access_ids
+    for g in rows:
+        if not g:
+            continue
+        for z in (g.get("haul_zones") or "").split(","):
+            if z.strip() and z.strip() not in access_ids:
+                return True
+    return False
+
+
 def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
                       has_drawn_road=False, gates_by_loc=None):
     """
@@ -2393,6 +2516,8 @@ def route_analysis(route_id, profiles=None, pre=None):
             gates_by_loc = {}   # location_gates may not exist yet on a cold database
         if pre is not None:
             pre["gates"] = gates_by_loc
+    # 16 Oct 2026: the gates' access roads, from the rows already read (no extra query): they do not carry gate-to-face
+    access_ids = {g["access_zone_id"] for gl in gates_by_loc.values() for g in gl if g.get("access_zone_id")}
 
     rows_by = {}
     geo_by = pre.setdefault("geom", {}) if pre is not None else {}
@@ -2432,8 +2557,7 @@ def route_analysis(route_id, profiles=None, pre=None):
             # rows actually being costed, not off route_haul_roads — an attachment that
             # has not been baked yet contributes nothing to duration_hr, so charging it
             # as "already counted" would drop the flat figure for minutes nobody has.
-            has_drawn_road = bool((lg.get("haul_zones") or "")
-                                  or (rg is not None and (rg.get("haul_zones") or "")))
+            has_drawn_road = drawn_road_on((lg, rg), access_ids)
             parts = _turnaround_parts(prof, factors, origin=o_loc, dest=d_loc,
                                       route=route_row, has_drawn_road=has_drawn_road,
                                       gates_by_loc=gates_by_loc)

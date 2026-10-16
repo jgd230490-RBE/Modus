@@ -55,6 +55,7 @@ import road_sections  # 12 Oct 2026 — shared road sections (public map review 
 import areas         # 12 Oct 2026 — movements and carbon per council (public map review §2.2b, D27)
 import limits        # 13 Oct 2026 — lorry limits (weight / height / width) from OpenStreetMap and HERE
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
+import route_sheet  # 16 Oct 2026 — the route sheet for drivers (CLOCS v5 C3)
 import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
 import community     # 14 Oct 2026 — the community considerations layer (staff map and the CLP plans)
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
@@ -2616,6 +2617,32 @@ def routes_summary():
     return network.summary()
 
 
+@app.get("/api/routes/{route_id}/route-sheet.pdf")
+def route_sheet_pdf(route_id: str, vehicle: Optional[str] = None, request: Request = None):
+    """
+    16 Oct 2026 (CLOCS v5 C3, §5.5a.v, §5.6c/d/f/g): the ROUTE SHEET for drivers, one A4 portrait page for one route:
+    the whole route (loaded and empty legs), the last mile, the gates in and out with their hours and the scheme's
+    no-delivery windows, the stored lorry-limits check for the vehicle, and the typed words (why this route, the
+    permitted diversions, the site rules). STAFF ONLY, like the route map export: a valid code, a login or the staff
+    cookie; the map password's cookie gets 401. A team code reads its own team's routes only (404 for another's).
+    `vehicle` = which baked vehicle's road route to draw (the default lorry, else the first baked, without one).
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the route sheet is for staff")
+    try:
+        S = route_sheet.sheet(route_id, vehicle=vehicle, acc=access.current())
+    except route_sheet.SheetError as e:
+        raise HTTPException(404, str(e))
+    try:
+        data = export.build_route_sheet_pdf(S)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{route_sheet.file_name(S)}"',
+                             "Cache-Control": "no-store"})
+
+
 def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1):
     """
     14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
@@ -3190,6 +3217,8 @@ class LocationIn(BaseModel):
     detail: Optional[str] = None
     # 14 Oct 2026 (bundle G, W8): the site's CLP cap, lorry visits a day; written only when sent
     clp_cap_per_day: Optional[float] = None
+    # 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers, printed on the route sheet; written only when sent
+    site_rules: Optional[str] = None
 
 
 def _fields_set(model):
@@ -3226,7 +3255,7 @@ def _check_admin(token):
 @app.post("/api/admin/locations")
 def create_location(body: LocationIn, token: Optional[str] = None):
     _check_admin(token)
-    cp = network.clp_cap_problem(body.clp_cap_per_day)
+    cp = network.clp_cap_problem(body.clp_cap_per_day) or network.sheet_text_problem(body.site_rules, "the site rules")
     if cp:
         raise HTTPException(400, cp)
     out = network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
@@ -3235,6 +3264,8 @@ def create_location(body: LocationIn, token: Optional[str] = None):
                                   vendor=body.vendor, detail=body.detail)
     if body.clp_cap_per_day is not None and out.get("id"):
         network.set_clp_cap(out["id"], body.clp_cap_per_day)
+    if body.site_rules is not None and out.get("id"):
+        network.set_site_rules(out["id"], body.site_rules)
     return out
 
 
@@ -3251,6 +3282,12 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
         cp = network.clp_cap_problem(body.clp_cap_per_day)
         if cp:
             raise HTTPException(400, cp)
+    # 16 Oct 2026 (CLOCS v5 C3): the site rules only when sent, the same rule as the cap
+    rules_given = "site_rules" in set(_fields_set(body))
+    if rules_given:
+        rp = network.sheet_text_problem(body.site_rules, "the site rules")
+        if rp:
+            raise HTTPException(400, rp)
     out = network.update_location(location_id, body.name, body.role, body.materials,
                                   body.lat, body.lon, body.loc_type,
                                   supplies=body.supplies, receives=body.receives,
@@ -3260,6 +3297,8 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
                                   meta_given=meta_given)
     if clp_given and not (isinstance(out, dict) and out.get("error")):
         network.set_clp_cap(location_id, body.clp_cap_per_day)
+    if rules_given and not (isinstance(out, dict) and out.get("error")):
+        network.set_site_rules(location_id, body.site_rules)
     return out
 
 
@@ -3297,6 +3336,8 @@ class GateIn(BaseModel):
     open_from: Optional[str] = None
     open_to: Optional[str] = None
     open_days: Optional[str] = None
+    # 16 Oct 2026: the haul road drawn from the public road to this gate (a zone id); None = none
+    access_zone_id: Optional[str] = None
 
 
 class GatePatch(BaseModel):
@@ -3312,6 +3353,7 @@ class GatePatch(BaseModel):
     open_from: Optional[str] = None
     open_to: Optional[str] = None
     open_days: Optional[str] = None
+    access_zone_id: Optional[str] = None
 
 
 class RouteGatesIn(BaseModel):
@@ -3408,7 +3450,8 @@ def create_gate(body: GateIn, token: Optional[str] = None):
                              internal_travel_minutes=body.internal_travel_minutes,
                              is_default=body.is_default, active=body.active,
                              note=body.note, gate_id=body.gate_id,
-                             open_from=body.open_from, open_to=body.open_to, open_days=body.open_days)
+                             open_from=body.open_from, open_to=body.open_to, open_days=body.open_days,
+                             access_zone_id=body.access_zone_id)
 
 
 @app.patch("/api/admin/gates/{gate_id}")
@@ -3425,8 +3468,11 @@ def update_gate(gate_id: str, body: GatePatch, token: Optional[str] = None):
         # route that uses it is stale. The re-bake is NOT run here — its cost is quoted
         # in the UI first, as zone and haul-road writes already do.
         moved = bool({"lat", "lon", "direction", "active"} & sent)
-        out["rebake_needed"] = moved
+        out["rebake_needed"] = moved or ("access_zone_id" in sent)
         out["routes_affected"] = gates.routes_using(gate_id) if moved else []
+        # 16 Oct 2026: a new or cleared access road changes every route at the gate's location
+        if "access_zone_id" in sent:
+            out["routes_affected"] = sorted(set(out["routes_affected"]) | set(gates.routes_at_location(out["location_id"])))
     return out
 
 
@@ -3515,6 +3561,26 @@ def set_route_planning(route_id: str, body: RoutePlanning, token: Optional[str] 
     _check_admin(token)
     sent = set(_fields_set(body))
     res = network.set_route_planning(route_id, sent, **{k: getattr(body, k) for k in sent})
+    if res.get("error"):
+        raise HTTPException(404 if res["error"] == "route not found" else 400, res["error"])
+    return res
+
+
+class RouteSheetText(BaseModel):
+    route_reason: Optional[str] = None
+    permitted_deviations: Optional[str] = None
+
+
+@app.put("/api/admin/routes/{route_id}/sheet-text")
+def set_route_sheet_text(route_id: str, body: RouteSheetText, token: Optional[str] = None):
+    """
+    16 Oct 2026 (CLOCS v5 C2): why this route was chosen and the diversions a driver may take, typed on one route,
+    printed on its route sheet and the public map's route card. Only sent fields are written; a null or blank clears.
+    At most network.SHEET_TEXT_MAX characters each; a longer text answers 400 and nothing is written.
+    """
+    _check_admin(token)
+    sent = set(_fields_set(body))
+    res = network.set_route_sheet_text(route_id, sent, **{k: getattr(body, k) for k in sent})
     if res.get("error"):
         raise HTTPException(404 if res["error"] == "route not found" else 400, res["error"])
     return res
@@ -3828,12 +3894,14 @@ def delete_zone(zone_id: str, token: Optional[str] = None):
         # with nothing to find and the affected legs baked through a road that is gone.
         inval = haul.invalidate_for_zone(zone_id)
         detached = haul.clear_links_for_zone(zone_id)
+        gates_cleared = gates.clear_access_for_zone(zone_id)      # 16 Oct 2026: no gate keeps a deleted access road
         res = zones.delete_zone(zone_id)
         if res.get("error"):
             raise HTTPException(404, res["error"])
         haul.refresh_origin_temp_km()
         out = _zone_write_result({"deleted": zone_id, "was": before}, inval)
         out["detached_from_routes"] = detached
+        out["access_road_of_gates"] = gates_cleared
         return out
 
     was_routes = (before["affects_routing"] and before["active"]

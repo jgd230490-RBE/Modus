@@ -823,7 +823,13 @@ def init_lookahead_db():
                                 ("locations", "clp_cap_per_day", "REAL"),
                                 ("location_gates", "open_from", "TEXT"),
                                 ("location_gates", "open_to", "TEXT"),
-                                ("location_gates", "open_days", "TEXT")):
+                                ("location_gates", "open_days", "TEXT"),
+                                # 16 Oct 2026 (CLOCS v5 C2 / C3): the route sheet's typed words
+                                ("routes", "route_reason", "TEXT"),
+                                ("routes", "permitted_deviations", "TEXT"),
+                                ("locations", "site_rules", "TEXT"),
+                                # 16 Oct 2026: the gate's access road (a haul-road zone id)
+                                ("location_gates", "access_zone_id", "TEXT")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1092,6 +1098,10 @@ _TENANT_DDL = {
             -- Construction Logistics Plan (one visit = one lorry in and out). NULL = none typed,
             -- never compared. ALTERed in init_lookahead_db() as well, or the rebuild drops it.
             clp_cap_per_day    REAL,
+            -- 16 Oct 2026 (CLOCS v5 C3, the route sheet): the site's rules for drivers, as typed,
+            -- printed on every route sheet that loads or delivers here. NULL = none typed.
+            -- ALTERed in init_lookahead_db() as well, or the rebuild drops it.
+            site_rules         TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -1134,6 +1144,11 @@ _TENANT_DDL = {
             limits_hits TEXT,
             limits_checked_at TEXT,
             limits_status TEXT,
+            -- 16 Oct 2026 (CLOCS v5 C2, §5.2b.iii / §5.6d / §5.6f): why this route was chosen and
+            -- the diversions a driver may take, as typed. Printed on the route sheet and the
+            -- public map's route card. NULL = not typed. ALTERed in init_lookahead_db() too.
+            route_reason TEXT,
+            permitted_deviations TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -1376,6 +1391,12 @@ _TENANT_DDL = {
             open_from               TEXT,
             open_to                 TEXT,
             open_days               TEXT,
+            -- 16 Oct 2026 (the user: "gates are usually right by the public road with a suitable
+            -- bellmouth … ensure there is a haul road drawn to every gate"): the gate's ACCESS ROAD,
+            -- a haul-road zone drawn from the public road to the gate. A leg leaving by the gate
+            -- starts along it, a leg arriving ends along it (haul.leg_steps). NULL = none drawn.
+            -- ALTERed in init_lookahead_db() as well, or the SQLite rebuild drops it.
+            access_zone_id          TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,

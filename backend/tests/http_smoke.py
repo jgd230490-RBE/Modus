@@ -141,6 +141,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 ...and so are its PNG and the card's list of places (14 Oct, evening) — 401",
        c.get("/api/routes/map-export.png?month=10").status_code == 401
        and c.get("/api/routes/map-export/places?month=10").status_code == 401)
+    # 16 Oct 2026 (CLOCS v5 C3): the route sheet is staff only too, and writing its words is an admin's
+    r = c.get("/api/routes/R016/route-sheet.pdf")
+    ok("🔴 ROUTE SHEET: without a staff sign-in — 401", r.status_code == 401, str(r.status_code))
+    r = c.put("/api/admin/routes/R016/sheet-text", json={"route_reason": "x"}, headers={"X-Wayscope": "1"})
+    ok("🔴 ...and its words cannot be written without the admin token — 403, nothing written", r.status_code == 403, str(r.status_code))
     # 14 Oct 2026 (night): the community considerations layer is staff only, and fetching it is a planner's
     ok("🔴 COMMUNITY CONSIDERATIONS: the layer, its status and a fetch without a credential — 401 each",
        c.get("/api/community").status_code == 401 and c.get("/api/community/status").status_code == 401
@@ -250,7 +255,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
        # NARROWED 14 Oct 2026 (civils materials, D13): + 2 routes, 10 forecasts, 46 weeks, 1 gate (the concrete pour)
        res.get("inserted", {}).get("routes") == 22 and res["inserted"].get("forecasts") == 88
        and res["inserted"].get("forecast_weeks") == 388 and res["inserted"].get("location_gates") == 17
-       and res["inserted"].get("zones") == 5 and res["inserted"].get("route_haul_roads") == 6, str(res.get("inserted")))
+       # NARROWED 16 Oct 2026 (an access road to every gate, the user): + 17 zones (Z006-Z022)
+       and res["inserted"].get("zones") == 22 and res["inserted"].get("route_haul_roads") == 6, str(res.get("inserted")))
     ok("...and the GB diesel price applied", res.get("fuel_index_applied") == ["GB"], str(res.get("fuel_index_applied")))
     r = c.post("/api/admin/tenant/import", params=TOKEN, json=DEMO)
     ok("🔴 a second import into a non-empty tenant is refused — 400",
@@ -673,6 +679,33 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and r.headers.get("content-type") == "image/png" and r.content[:8] == b"\x89PNG\r\n\x1a\n"
                and re.search(r'filename="route-map-2026-10-regional(-1-\d+)?\.png"', r.headers.get("content-disposition", "")) is not None
                and r.headers.get("cache-control") == "no-store", f"{r.status_code} {r.headers.get('content-type')} {r.text[:120] if r.status_code != 200 else ''}")
+            # ---- 16 Oct 2026 (CLOCS v5 C2 / C3): the route sheet for drivers over HTTP (the demo package) ----
+            r = c.put("/api/admin/routes/R016/sheet-text", params=TOKEN,
+                      json={"route_reason": "  Agreed in the outline CLP.  ", "permitted_deviations": "The signed diversion only."})
+            ok("⭐ ROUTE SHEET: the admin types why this route and the permitted diversions (stored trimmed)",
+               r.status_code == 200 and r.json() == {"id": "R016", "route_reason": "Agreed in the outline CLP.",
+                                                     "permitted_deviations": "The signed diversion only."}, r.text[:200])
+            r = c.put("/api/admin/routes/R016/sheet-text", params=TOKEN, json={"route_reason": "x" * 401})
+            ok("🔴 ...401 characters: 400 Bad Request with the sentence, and the reason is unchanged",
+               r.status_code == 400 and r.json().get("detail") == "why this route is 401 characters: at most 400 fit on the route sheet"
+               and next(x for x in c.get("/api/routes/status").json() if x["id"] == "R016")["route_reason"] == "Agreed in the outline CLP.",
+               r.text[:200])
+            ok("🔴 ...an unknown route: 404", c.put("/api/admin/routes/R999/sheet-text", params=TOKEN, json={"route_reason": "a"}).status_code == 404)
+            r = c.get("/api/routes/R016/route-sheet.pdf", headers=PLAN)
+            _st = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
+            ok("⭐ ...the planner downloads it: ONE A4 PORTRAIT page named for the route, not cached, the typed words on it, the demo "
+               "heading; the demo package carries no road routes, so the map says so",
+               r.status_code == 200 and r.headers.get("content-type") == "application/pdf"
+               and b"/MediaBox [ 0 0 595.2756 841.8898 ]" in r.content and r.content.count(b"/Type /Page\n") == 1
+               and 'filename="route-sheet-R016.pdf"' in r.headers.get("content-disposition", "")
+               and r.headers.get("cache-control") == "no-store" and "Route sheet" in _st
+               and "Agreed in the outline CLP." in _st and "The signed diversion only." in _st and "DEMO · " in _st
+               and "No road route has been worked out for this route yet." in _st, f"{r.status_code} {_st[:300]}")
+            ok("🔴 ...no team id, no 'truck', no 'baked' on it", not re.search(r"\bIPT ?[1-6]\b", _st)
+               and not re.search(r"\btrucks?\b", _st, re.I) and not re.search(r"\b(un)?baked?\b", _st, re.I), _st[:300])
+            ok("🔴 ...a team code gets its OWN team's route (R016, North) and a 404 for another team's (R001, South)",
+               c.get("/api/routes/R016/route-sheet.pdf", headers=NORTH).status_code == 200
+               and c.get("/api/routes/R001/route-sheet.pdf", headers=NORTH).status_code == 404)
             r = c.get("/api/routes/map-export.pdf", params={"month": 10, "team": "IPT2"}, headers=NORTH)
             _rn = " ".join(pdf_text(r.content).split()) if r.status_code == 200 else ""
             ok("🔴 ...a team code asking for another team gets its OWN team's routes",

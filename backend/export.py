@@ -2553,3 +2553,319 @@ def route_map_png(pdf_bytes, dpi=ROUTE_MAP_PNG_DPI):
     out = io.BytesIO()
     img.save(out, "PNG", dpi=(dpi, dpi))
     return out.getvalue()
+
+
+# =====================================================================================================================
+# 16 Oct 2026 (CLOCS v5 C3; notes/clocs-v5-gap-1016.md) — the ROUTE SHEET for drivers: one A4 portrait page per route
+# (route_sheet.py gathers it). Top to bottom: the heading; the whole route (loaded solid, empty return dashed, A = load
+# point, B = site); the last mile beside "Arriving" / "Leaving" / "Lorry limits"; then the typed words (why this route,
+# the permitted diversions, the site rules at B and A) in two columns; the footer. The body text steps down a size
+# until the page fits, so the longest typed words (network.SHEET_TEXT_MAX each) still make ONE page.
+RS_LOADED = "#2563EB"            # the staff Data map's route blue: the loaded leg
+RS_RETURN = "#475569"            # slate, dashed: the empty return
+RS_IN, RS_OUT = "#15803D", "#B91C1C"      # the gate a lorry comes in by / leaves by (squares on the last mile)
+RS_BOTH = "#1F2024"              # one gate both ways (navy)
+RS_BODY_SIZES = (8.4, 7.8, 7.2)
+
+
+def _rs_offset(pts, d):
+    """A polyline (page points) moved `d` points to the left of its direction of travel: each vertex along the mean of
+    its two segments' normals. The return leg is drawn beside the loaded one, so on a road both use both still show."""
+    if not d or len(pts) < 2:
+        return pts
+    import math as _m
+    normals = []
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        L = _m.hypot(x2 - x1, y2 - y1) or 1.0
+        normals.append((-(y2 - y1) / L, (x2 - x1) / L))
+    out = []
+    for i, (x, y) in enumerate(pts):
+        a = normals[max(0, i - 1)]
+        b = normals[min(len(normals) - 1, i)]
+        nx, ny = a[0] + b[0], a[1] + b[1]
+        L = _m.hypot(nx, ny)
+        nx, ny = (nx / L, ny / L) if L > 1e-9 else a
+        out.append((x + nx * d, y + ny * d))
+    return out
+
+
+def _rs_line(c, P, coords, colour, width, dash=None, offset=0.0):
+    if len(coords) < 2:
+        return
+    pts = _rs_offset([P(*q) for q in coords], offset)
+    p = c.beginPath()
+    p.moveTo(*pts[0])
+    for q in pts[1:]:
+        p.lineTo(*q)
+    c.saveState()
+    c.setLineCap(1); c.setLineJoin(1)
+    if not dash:                 # a white edge under a solid line; none under dashes, which ride on the loaded line
+        c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(width + 1.6)
+        c.drawPath(p, stroke=1, fill=0)
+    c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(width)
+    if dash:
+        c.setDash(*dash)
+    c.drawPath(p, stroke=1, fill=0)
+    c.restoreState()
+
+
+def _rs_pin(c, x, y, letter, rgb=NAVY_RGB, r=5.2):
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(0.9)
+    c.setFillColorRGB(*rgb); c.circle(x, y, r, stroke=1, fill=1)
+    c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 7.4)
+    c.drawCentredString(x, y - 2.6, letter)
+
+
+def _rs_gate(c, x, y, colour):
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(0.9)
+    c.setFillColorRGB(*_hex_rgb(colour)); c.rect(x - 3.6, y - 3.6, 7.2, 7.2, stroke=1, fill=1)
+
+
+def _rs_map(c, S, v, x, y, w, h, coords_sets, *, pins=(), gates=(), community=None, empty_words=""):
+    """One map box at (x, y), w x h points: the basemap, the legs, the pins, the scale bar, the north arrow.
+    Returns True when a basemap was drawn."""
+    import basemap
+    c.saveState()
+    c.translate(x, y)
+    clip = c.beginPath(); clip.rect(0, 0, w, h); c.clipPath(clip, stroke=0, fill=0)
+    png = basemap.fetch(v) if (v and not getattr(_SIZING, "on", False)) else None
+    if png:
+        c.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=w, height=h)
+    else:
+        c.setFillColorRGB(0.965, 0.969, 0.973); c.rect(0, 0, w, h, stroke=0, fill=1)
+    k = w / v["w"] if v else 1
+
+    def P(lon, lat):
+        px, py = basemap.project(v, lon, lat)
+        return px * k, h - py * k
+    if v:
+        if community:
+            _draw_community(c, {"community": community}, P, "under")
+        for coords, colour, dash in coords_sets:       # the return (dashed) 3 points to the side of the loaded line
+            _rs_line(c, P, coords, colour, 1.8 if dash else 2.8, dash, offset=3.2 if dash else 0.0)
+        if community:
+            _draw_community(c, {"community": community}, P, "over")
+    else:
+        c.setFillColorRGB(*GREY); c.setFont(_BF("regular"), 9)
+        c.drawCentredString(w / 2, h / 2, _pdf_safe(empty_words))
+    c.restoreState()
+    c.saveState()
+    c.translate(x, y)
+    _map_tag(c, S.get("map_demo_tag"), w, h)
+    if v:
+        _plan_scale_bar(c, v, w)
+        _north_arrow(c, w - 14, h - 30)
+        # the gates and the pins last, so the scale bar's box can never cover B (clipped to the frame like the lines)
+        clip = c.beginPath(); clip.rect(0, 0, w, h); c.clipPath(clip, stroke=0, fill=0)
+        for at, colour in gates:
+            if at:
+                _rs_gate(c, *P(*at), colour)
+        for at, letter in pins:
+            if at:
+                _rs_pin(c, *P(*at), letter)
+    c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6)
+    c.rect(0, 0, w, h, stroke=1, fill=0)
+    c.restoreState()
+    return bool(png)
+
+
+def _rs_block(c, x, y, w, head, body, size, draw=True, grey_body=False):
+    """A heading and its wrapped lines; body is a string or a list of strings. Returns the height used."""
+    R, B = _BF("regular"), _BF("bold")
+    lead = size * 1.28
+    used = 0.0
+    if head:
+        for ln in _wrap(head, B, size + 0.8, w) or [""]:
+            if draw:
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B, size + 0.8)
+                c.drawString(x, y - used - (size + 0.8), ln)
+            used += (size + 0.8) * 1.3
+        used += 2
+    paras = body if isinstance(body, list) else [body]
+    for para in paras:
+        for ln in _wrap(para or "", R, size, w) or [""]:
+            if draw:
+                c.setFillColorRGB(*(GREY if grey_body else NAVY_RGB)); c.setFont(R, size)
+                c.drawString(x, y - used - size, ln)
+            used += lead
+        used += 1.5
+    return used + 4
+
+
+def route_sheet_lines(S):
+    """The words of the Arriving and Leaving blocks (route_sheet.sheet's gates, hours and no-delivery windows)."""
+    e, x_, lo = S["entry"], S["exit"], S["load_exit"]
+    arriving = [f"Gate in: {e['name'] or 'the site (no gate typed)'}",
+                ("Open " + e["hours"] if e.get("hours") else "Open hours: not typed")
+                + (f", {e['closed']}" if e.get("closed") else ""),
+                ("No deliveries " + S["peak_words"] + " (the scheme's no-delivery windows)") if S.get("peak_words")
+                else "No-delivery windows: none typed for the scheme"]
+    leaving = [f"Gate out: {x_['name'] or 'the site (no gate typed)'}",
+               "Then follow the dashed route back to A" + (f": {S['return_words']}." if S.get("return_words") else ".")]
+    if lo.get("name"):
+        leaving.append(f"At A, leave loaded by {lo['name']}.")
+    return arriving, leaving
+
+
+def route_sheet_blocks(S):
+    """The typed words in the order printed: (heading, text, not_typed). Site rules at A always shown, so an
+    empty field reads "Not typed" rather than vanishing."""
+    import route_sheet as rs
+    out = []
+    for head, v in (("Why this route", S.get("route_reason")),
+                    ("Permitted diversions", S.get("permitted_deviations")),
+                    (f"Site rules at B, {S['dest']}", S.get("site_rules_dest")),
+                    (f"Site rules at A, {S['origin']}", S.get("site_rules_origin"))):
+        out.append((head, v if v else rs.NOT_TYPED, not v))
+    return out
+
+
+def build_route_sheet_pdf(S):
+    """The route sheet as ONE A4 portrait page (route_sheet.sheet + route_sheet.views)."""
+    if rl_canvas is None:
+        raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
+    import route_sheet as rs
+    if "view1" not in S:
+        rs.views(S)
+    W, H = A4
+    m = rs.MARGIN_MM * mm
+    cw = W - 2 * m
+    R, B = _BF("regular"), _BF("bold")
+    words_blocks = route_sheet_blocks(S)
+    arriving, leaving = route_sheet_lines(S)
+    e, x_ = S["entry"], S["exit"]
+
+    def layout(size, draw, c=None):
+        """Lays the page out top down at body size `size`; returns the lowest y used (points from the bottom)."""
+        y = H - m
+        if draw:
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 18); c.drawString(m, y - 18, "Route sheet")
+            c.setFont(B, 9); c.drawRightString(W - m, y - 9, _pdf_safe(S["tenant"]))
+            c.setFillColorRGB(*GREY); c.setFont(R, 8); c.drawRightString(W - m, y - 20, f"Issued {S['issued']}")
+            if S.get("demo_notice"):
+                c.setFillColorRGB(*DEMO_FG_RGB); c.setFont(B, 8)
+                c.drawRightString(W - m, y - 31, _pdf_safe("DEMO · " + S["demo_notice"]))
+        y -= 26
+        for ln in _wrap(f"{S['origin']}  →  {S['dest']}", B, 13, cw * 0.72):
+            if draw:
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 13); c.drawString(m, y - 13, ln)
+            y -= 16
+        sub = " · ".join(w for w in (S["route_id"], S.get("team"), S.get("material"),
+                                     (f"drawn for the {S['vehicle_text']}" if S.get("vehicle_text") else None)) if w)
+        for ln in _wrap(sub, R, 8.4, cw):
+            if draw:
+                c.setFillColorRGB(*GREY); c.setFont(R, 8.4); c.drawString(m, y - 8.4, ln)
+            y -= 11
+        y -= 4
+        # the whole route
+        h1 = rs.MAP1_H_MM * mm
+        if draw:
+            S["basemap"] = _rs_map(c, S, S.get("view1"), m, y - h1, cw, h1,
+                                   [(S["loaded"], RS_LOADED, None), (S["return"], RS_RETURN, (4, 3))],
+                                   pins=((S["loaded"][0] if S["loaded"] else None, "A"),
+                                         (S["loaded"][-1] if S["loaded"] else None, "B")),
+                                   empty_words="No road route has been worked out for this route yet.")
+        y -= h1 + 4
+        if draw:                                   # the legend under it
+            lx = m
+            for colour, dash, words in ((RS_LOADED, None, "Loaded, A to B" + (f": {S['loaded_words']}" if S.get("loaded_words") else "")),
+                                        (RS_RETURN, (4, 3), "Empty, back to A")):
+                c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(1.8 if dash else 2.8)
+                if dash:
+                    c.setDash(*dash)
+                c.line(lx, y - 4, lx + 18, y - 4); c.restoreState()
+                t = _pdf_safe(words)
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.8); c.drawString(lx + 22, y - 6.6, t)
+                lx += 22 + c.stringWidth(t, R, 7.8) + 14
+            for letter, words in (("A", "load point"), ("B", "site")):
+                _rs_pin(c, lx + 5, y - 4, letter, r=4.6)
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.8); c.drawString(lx + 13, y - 6.6, words)
+                lx += 13 + c.stringWidth(words, R, 7.8) + 12
+        y -= 16
+        # the last mile, and beside it arriving / leaving / limits
+        w2, h2 = rs.MAP2_W_MM * mm, rs.MAP2_H_MM * mm
+        if draw:
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 9.2)
+            c.drawString(m, y - 9.2, f"The last mile: about {rs.LAST_MILE_M / 1000:g} km in and out of B")
+        top2 = y - 14
+        if draw:
+            _rs_map(c, S, S.get("view2"), m, top2 - h2, w2, h2,
+                    [(S["last_mile_in"], RS_LOADED, None), (S["last_mile_out"], RS_RETURN, (4, 3))],
+                    pins=((S["loaded"][-1] if S["loaded"] else None, "B"),),
+                    gates=(((e.get("at"), RS_BOTH),) if S.get("same_gate") else ((e.get("at"), RS_IN), (x_.get("at"), RS_OUT)))
+                          if S.get("drawn") else (),
+                    community=S.get("community"), empty_words="No road route to draw.")
+        yl = top2 - h2 - 3
+        CM = S.get("community") or {}
+        gates_drawn = [(cl, wd) for at, cl, wd in (((e.get("at"), RS_BOTH, "Gate in and out"),) if S.get("same_gate") else
+                                                   ((e.get("at"), RS_IN, "Gate in"), (x_.get("at"), RS_OUT, "Gate out")))
+                       if at and S.get("drawn")]
+        if draw:                                   # the last mile's legend: the gates drawn, the community kinds in view
+            lx = m
+            for colour, words in gates_drawn:
+                _rs_gate(c, lx + 4, yl - 4, colour)
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.4); c.drawString(lx + 11, yl - 6.4, words)
+                lx += 11 + c.stringWidth(words, R, 7.4) + 10
+        yl -= 11 if gates_drawn else 0
+        for note in S.get("gate_notes") or []:     # a leg that ends far from its gate, in metres
+            for ln in _wrap(note, R, 7.2, w2):
+                if draw:
+                    c.setFillColorRGB(*DEMO_FG_RGB); c.setFont(R, 7.2); c.drawString(m, yl - 6.4, ln)
+                yl -= 9
+            yl -= 2
+        kinds = CM.get("kinds") or []
+        if kinds:
+            row_x = m
+            for kd in kinds:
+                t = _pdf_safe(kd["label"])
+                tw = c.stringWidth(t, R, 7.0) if c else len(t) * 3.6
+                if row_x + 15 + tw > m + w2:
+                    row_x, yl = m, yl - 10
+                if draw:
+                    _comm_legend_swatch(c, kd, row_x, yl)
+                    c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.0); c.drawString(row_x + 15, yl - 6.4, t)
+                row_x += 15 + tw + 8
+            yl -= 11
+        rx, rw = m + w2 + 5 * mm, cw - w2 - 5 * mm
+        yr = top2
+        yr -= _rs_block(c, rx, yr, rw, f"Arriving at B, {S['dest']}", arriving, size, draw)
+        yr -= _rs_block(c, rx, yr, rw, "Leaving B", leaving, size, draw)
+        lim_head = {"over": "Lorry limits: this lorry is over", "look": "Lorry limits to look at"}.get(
+            S["limits_status"], "Lorry limits")
+        yr -= _rs_block(c, rx, yr, rw, lim_head, S["limits_lines"], size, draw)
+        y = min(yl, yr) - 4
+        # the typed words, two columns
+        colw = (cw - 6 * mm) / 2
+        for i in range(0, len(words_blocks), 2):
+            hs = [_rs_block(c, m + j * (colw + 6 * mm), y, colw, head, body, size, draw, grey_body=grey)
+                  for j, (head, body, grey) in enumerate(words_blocks[i:i + 2])]
+            y -= max(hs)
+        return y
+
+    footer_h = 26
+    buf = io.BytesIO()
+    c = rl_canvas.Canvas(buf, pagesize=A4)
+    # the sizing pass: the largest body size that leaves room for the footer (measured on this canvas, nothing drawn)
+    size = RS_BODY_SIZES[-1]
+    for s in RS_BODY_SIZES:
+        if layout(s, False, c) >= m + footer_h:
+            size = s
+            break
+    S["body_size"] = size
+    c.setTitle(_pdf_safe(f"{S['tenant']} · Route sheet · {S['route_id']}"))
+    c.setAuthor("Wayscope")
+    S["lowest_y"] = layout(size, True, c)
+    S["footer_top"] = m + footer_h
+    foot = [f"From the scheme's routes as stored in Wayscope on {S['issued']}. A planning document: the site team's "
+            "instructions and the road signs come first."]
+    if S.get("basemap"):
+        foot.append("Map © Mapbox © OpenStreetMap.")
+    if (S.get("community") or {}).get("credit"):
+        foot.append(S["community"]["credit"])
+    fy = m + footer_h - 8
+    for ln in _wrap(" ".join(foot), R, 6.8, cw)[:3]:
+        c.setFillColorRGB(*GREY); c.setFont(R, 6.8); c.drawString(m, fy, ln)
+        fy -= 8.4
+    c.showPage()
+    c.save()
+    return buf.getvalue()
