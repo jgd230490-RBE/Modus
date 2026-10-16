@@ -3869,19 +3869,23 @@
     // and fires no 'style.load', so the re-add above never runs. map.getStyle() carries no URL (and
     // Maa-amet is an object), so the basemap is held here: BASEMAP.shown is set only by a style.load
     // (a style GL rejects, like Standard (3D) on 2.14, never becomes "shown"); BASEMAP.pending is the
-    // pick on its way. A pick equal to the one showing or on its way is a no-op. Going BACK to the
-    // shown style while another is pending is a full rebuild ({ diff: false }): a diff there would
-    // blank the map the same way, and the shown style is known to be valid. diff:false is NOT used for
-    // every switch: on a style GL rejects it would drop the working basemap first and leave nothing.
-    const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null };
+    // pick on its way. A pick equal to the one showing or on its way is a no-op.
+    // The styles this page offers are set with { diff: false }: a full rebuild, which always fires
+    // style.load and cancels a style still loading, so the LAST pick wins (measured: Dark then Light in
+    // one tick, with the default diff, a late Dark fetch landed after Light and the widget lied).
+    // A rebuild is what GL fell back to for these anyway (the diff fails on their sprites). Any other
+    // style keeps the default: GL validates it first and keeps the working basemap if it rejects it,
+    // where diff:false would drop the basemap and every overlay before finding out.
+    const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null,
+        rebuild: new Set(['mapbox://styles/mapbox/light-v11', 'mapbox://styles/mapbox/dark-v11',
+            'mapbox://styles/mapbox/satellite-streets-v12', 'mapbox://styles/mapbox/streets-v12', 'maaamet-ortho']) };
     map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } });
     function changeBasemap(styleUrl) {
         syncBasemapControls(styleUrl);
         if (styleUrl === (BASEMAP.pending || BASEMAP.shown)) return;
-        const back = styleUrl === BASEMAP.shown;
-        BASEMAP.pending = back ? null : styleUrl;
+        BASEMAP.pending = styleUrl;
         const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;
-        if (back) map.setStyle(style, { diff: false }); else map.setStyle(style);
+        if (BASEMAP.rebuild.has(styleUrl)) map.setStyle(style, { diff: false }); else map.setStyle(style);
     }
     // the Layers select and the bottom-left widget show the same pick: a basemap one of them does not
     // offer leaves the select blank (so any choice there fires a change) and no widget button lit

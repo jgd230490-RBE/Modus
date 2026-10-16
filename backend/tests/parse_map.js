@@ -5229,13 +5229,15 @@ function qrRead(mod) {
   const i1 = src.indexOf("function maaametOrthoStyle()");
   const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
   ok("🔴 basemap: the held basemap starts on the map's own first style (light-v11) and becomes 'shown' only on a style.load",
-     bm.includes("const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null };")
+     bm.includes("const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null,")
      && src.includes("style: 'mapbox://styles/mapbox/light-v11', center:")
      && bm.includes("map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } });"));
   ok("🔴 basemap: a pick equal to the one showing (or on its way) returns before setStyle",
      /if \(styleUrl === \(BASEMAP\.pending \|\| BASEMAP\.shown\)\) return;[\s\S]*map\.setStyle\(/.test(bm));
-  ok("basemap: going back to the shown style while another is pending is a full rebuild (diff: false); other switches keep the default",
-     bm.includes("if (back) map.setStyle(style, { diff: false }); else map.setStyle(style);"));
+  ok("basemap: the page's own styles are a full rebuild (diff: false: style.load always fires, the last pick wins); any other keeps GL's validate-first diff",
+     bm.includes("if (BASEMAP.rebuild.has(styleUrl)) map.setStyle(style, { diff: false }); else map.setStyle(style);")
+     && ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].every(k => bm.includes(`'mapbox://styles/mapbox/${k}'`))
+     && bm.includes("'maaamet-ortho']) };") && !bm.includes("mapbox://styles/mapbox/standard"));
   ok("basemap: Maa-amet is still a style object, chosen by its key",
      bm.includes("const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;"));
   const ct = (src.match(/window\.changeTheme = function\(btn, styleUrl\) \{([^}]*)\};/) || [])[1] || "";
@@ -5274,8 +5276,8 @@ function qrRead(mod) {
     api.changeBasemap(L);
     ok("⭐ sandbox: pressing Light while Light shows calls setStyle NOT AT ALL (the 90 -> 54 layer blank)", calls.length === 0);
     api.changeBasemap(D);
-    ok("sandbox: Dark is one setStyle, the default diff (no options), and the widget and select follow",
-       calls.length === 1 && calls[0][0] === D && calls[0][1] === undefined && sel.value === D && lit().join() === D);
+    ok("sandbox: Dark is one setStyle, a full rebuild (diff: false), and the widget and select follow",
+       calls.length === 1 && calls[0][0] === D && calls[0][1] && calls[0][1].diff === false && sel.value === D && lit().join() === D);
     api.changeBasemap(D);
     ok("sandbox: Dark again while Dark is still loading: no second setStyle", calls.length === 1);
     load();
@@ -5284,18 +5286,20 @@ function qrRead(mod) {
     ok("⭐ sandbox: Dark pressed while Dark shows: still no second setStyle", calls.length === 1);
     api.changeBasemap(S);
     ok("sandbox: Streets (widget only) leaves the select blank, so any pick there fires a change; only 🛣️ lit",
-       calls.length === 2 && sel.selectedIndex === -1 && lit().join() === S);
+       calls.length === 2 && calls[1][1].diff === false && sel.selectedIndex === -1 && lit().join() === S);
     api.changeBasemap(D);
     ok("⭐ sandbox: back to the shown Dark before Streets loaded: a full rebuild (diff: false), so style.load re-adds the layers",
-       calls.length === 3 && calls[2][0] === D && calls[2][1] && calls[2][1].diff === false && api.BASEMAP.pending === null);
+       calls.length === 3 && calls[2][0] === D && calls[2][1] && calls[2][1].diff === false && api.BASEMAP.pending === D);
     load();
     api.changeBasemap("mapbox://styles/mapbox/standard");    // a style GL 2.14 rejects: no style.load ever comes
+    ok("sandbox: a style the page does not list keeps GL's default diff (validated first; a rejection keeps the basemap)",
+       calls.length === 4 && calls[3][1] === undefined);
     api.changeBasemap(D);
     ok("⭐ sandbox: after a rejected style, picking the basemap still showing rebuilds it (diff: false) instead of diffing it blank",
        calls.length === 5 && calls[4][0] === D && calls[4][1] && calls[4][1].diff === false && api.BASEMAP.shown === D);
     api.changeBasemap("maaamet-ortho");
-    ok("sandbox: Maa-amet is set as a style object, never as the string key",
-       calls.length === 6 && typeof calls[5][0] === "object" && calls[5][0].version === 8);
+    ok("sandbox: Maa-amet is set as a style object, never as the string key, as a full rebuild",
+       calls.length === 6 && typeof calls[5][0] === "object" && calls[5][0].version === 8 && calls[5][1].diff === false);
   }
 }
 
