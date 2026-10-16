@@ -393,8 +393,12 @@ ok("4: the five years' collision files asked for; vehicles and casualties only f
    sorted(u.rsplit("/", 1)[-1] for u in CALLS) == sorted(
        [f"dft-road-casualty-statistics-collision-{y}.csv" for y in range(2021, 2026)]
        + ["dft-road-casualty-statistics-vehicle-2025.csv", "dft-road-casualty-statistics-casualty-2025.csv"]), str(CALLS))
-ok("4: the counts: 6 collisions, 4 KSI, 5 with a vulnerable road user hurt",
-   st["counts"] == {"all": 6, "ksi": 4, "vru": 5}, str(st["counts"]))
+# NARROWED 16 Oct 2026 (found on live): the counts are the collisions along the routes and round the sites; C4, near the
+# alternative only, is counted apart (it was 6 / 4 / 5 with it)
+ok("4: the counts: 5 collisions along the routes and round the sites, 3 KSI, 5 with a vulnerable road user hurt",
+   st["counts"] == {"all": 5, "ksi": 3, "vru": 5}, str(st["counts"]))
+ok("4: ...and the one near the alternative only (C4, serious) counted apart",
+   st["alternatives_only"] == {"all": 1, "ksi": 1}, str(st.get("alternatives_only")))
 ok("4: the files read are listed in words", "2025 casualties" in " ".join(st["files"]) and "2025 vehicles" in " ".join(st["files"]))
 ok("4: the work folder is removed (every downloaded file gone)",
    {d for d in os.listdir(tempfile.gettempdir()) if d.startswith("wayscope_collisions_")} <= _temps_before | {os.path.basename(TMP)})
@@ -436,6 +440,17 @@ _cols = [c.lower() for c in db._columns_of(db.get_conn().cursor(), "collision_re
 ok("5: stored with the year and month only — no day, date or time column (R6)",
    "year" in _cols and "month" in _cols and not any(c in _cols for c in ("date", "day", "time", "day_of_week")), str(_cols))
 PL = cl.payload()
+# 16 Oct 2026 (found on live: 1,013 of 1,887 were near a stored alternative only, drawn on roads the map shows no route on)
+_al = {f"{Y}{k}": cl.along(keep[f"{Y}{k}"]) for k in ("C1", "C2", "C3", "C4", "C7", "C8")}
+ok("5: along: near a primary route or a site is 'route'; near a stored alternative only is 'alternative'",
+   _al == {f"{Y}C1": "route", f"{Y}C2": "route", f"{Y}C3": "route", f"{Y}C4": "alternative", f"{Y}C7": "route",
+           f"{Y}C8": "route"}, str(_al))
+ok("5: ...a collision near both a route and an alternative is 'route'", cl.along({"routes": {"R1": 9, "R1@1": 40}, "sites": {}}) == "route"
+   and cl.along({"routes": {"R1@1": 40, "R1@2": 9}, "sites": {}}) == "alternative" and cl.along({"routes": {}, "sites": {"LB": 400}}) == "route")
+ok("5: every feature carries along; the payload still carries all of them (the map filters) and the split counts",
+   all(f["properties"]["along"] in ("route", "alternative") for f in PL["features"])
+   and sum(f["properties"]["along"] == "alternative" for f in PL["features"]) == 1
+   and PL["alternatives_only"] == {"all": 1, "ksi": 1})
 ok("5: the payload is a FeatureCollection of points, fatal last so they draw on top",
    PL["type"] == "FeatureCollection" and len(PL["features"]) == 6
    and [f["properties"]["severity"] for f in PL["features"]] == sorted([f["properties"]["severity"] for f in PL["features"]], reverse=True))
@@ -621,6 +636,10 @@ ok("9: the regional plan draws the killed or seriously injured only; the local a
    route_map_export.COLLISION_KSI_ONLY == ("regional",) and _reg["ksi_only"] and not _loc["ksi_only"]
    and all(c["ksi"] for c in _reg["records"]) and any(not c["ksi"] for c in _loc["records"])
    and len(_reg["records"]) < len(_loc["records"]), str((len(_reg["records"]), len(_loc["records"]))))
+ok("9: a plan draws no alternatives, so it leaves out a collision near a stored alternative only (C4)",
+   not any(c["collision_id"].endswith("C4") for c in _loc["records"] + _reg["records"])
+   and all(c["along"] == "route" for c in _loc["records"])
+   and 'or c["along"] != "route":' in read("backend/route_map_export.py"))
 ok("9: ...in the frame only, with the period and the credit", _loc["period"] == "2021–2025" and _loc["credit"] == PL["credit"]
    and _loc["severities"] == [1, 2, 3])
 _far = basemap.view_centred(-0.5, 52.0, v["zoom"], v["w"], v["h"])
@@ -668,6 +687,19 @@ ok("10: map — the popup gives the month and year, never the day or time (R6), 
 ok("10: map — one ink, size by severity, slight a hollow ring (no colour that claims a rating)",
    "'circle-color': ['case', ['==', ['get', 'severity'], 3], '#FFFFFF', COLL_INK]" in MAP
    and "['match', ['get', 'severity'], 1, 4.5, 2, 3.4, 2.2]" in MAP)
+ok("10: map — a collision near an alternative only is drawn only while Alternative routes is ticked, and comes and goes with it",
+   "if (!altsShown()) f.push(['==', ['get', 'along'], 'route']);" in MAP
+   and "function altsShown() { return !!(document.getElementById('layer-alts') || {}).checked; }" in MAP
+   and "if (typeof COLL !== 'undefined' && COLL.data) { ensureCollisionLayers(); renderCollisionPanel(); }"
+       in MAP.split("function toggleAlts(")[1].split("\n    }")[0])
+_ecl = MAP.split("function ensureCollisionLayers(")[1].split("function collisionPopup(")[0]
+ok("10: map — a tick on an existing layer goes straight on (the filter is not left waiting for the map to go idle)",
+   _ecl.index("if (map.getLayer('collision-points')) {") < _ecl.index("if (!map.isStyleLoaded()) { map.once('idle', ensureCollisionLayers); return; }")
+   and "map.setFilter('collision-points', collisionFilter());" in _ecl.split("if (!map.isStyleLoaded())")[0])
+ok("10: map — the group's words count the alternatives' apart and say how to see them",
+   "are along the alternative routes only: " in MAP and "tick Alternative routes to see them." in MAP)
+ok("10: app — the Config panel counts them apart too",
+   "are along the stored alternative routes only: on the Route map while Alternative routes is ticked" in APP)
 ok("10: map — re-added after a basemap switch", "if (typeof COLL !== 'undefined' && COLL.data) ensureCollisionLayers();" in MAP)
 ok("10: map — the export card's box adds collisions=1, off by default",
    "if (col && col.checked) q.set('collisions', '1');" in MAP and 'id="rme-collisions"' in MAP
@@ -701,6 +733,9 @@ _g = GUIDE.split("<li><strong>Collision history</strong>")[1].split("</li>")[0] 
 ok("10: the user guide says what it is, who sees it, where it comes from, what it cannot tell you, and that it is not the assessment",
    _g and "staff only" in _g and "STATS19" in _g and "250 m" in _g and "not the assessment" in _g
    and "police" in _g and "2016" in _g and "never the day or time" in _g and "Collision evidence (PDF)" in _g)
+ok("10: the guides say the alternatives' collisions show with Alternative routes and the plans leave them out",
+   "those near a stored alternative route only appear while <em>Alternative routes</em>" in _g
+   and "<code>alternatives_only</code>" in TECH)
 ok("10: the technical guide: the endpoints, the files, the years rule, the codes, the licence",
    'id="t9-collisions"' in TECH and "/api/collisions" in TECH and "data.dft.gov.uk" in TECH and "late July" in TECH
    and "casualty_class" in TECH and "Open Government Licence v3.0" in TECH)

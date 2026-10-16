@@ -261,7 +261,8 @@ COLLISION_KSI_ONLY = ("regional",)
 
 def collisions_in_frame(v, kind):
     """The stored collisions inside the plan's frame (the KSI only on the regional plan), with the words its panel
-    prints. None when nothing has been fetched."""
+    prints. None when nothing has been fetched. 16 Oct 2026: only those along the routes the plan draws (or round a
+    site): a plan draws no alternatives, so a collision near a stored alternative only is left out (collisions.along)."""
     import basemap
     import collisions as cl
     st = cl.status()
@@ -270,7 +271,7 @@ def collisions_in_frame(v, kind):
     ksi_only = kind in COLLISION_KSI_ONLY
     keep = []
     for c in cl.records():
-        if ksi_only and not c["ksi"]:
+        if (ksi_only and not c["ksi"]) or c["along"] != "route":
             continue
         x, y = basemap.project(v, c["lon"], c["lat"])
         if 0 <= x <= v["w"] and 0 <= y <= v["h"]:

@@ -361,6 +361,14 @@ def replace_all(records, fetched_at):
     return len(rows)
 
 
+def along(c):
+    """'route' when a collision is near a PRIMARY road route (the ones the map draws) or a site; 'alternative' when it is
+    near a stored alternative only (16 Oct 2026, found on live: 1,013 of 1,887 were, and the map drew them on roads it
+    shows no route on). The map, the counts and the CLP plans use 'route'; the alternatives' show with the map's
+    Alternative routes layer, and each route's evidence sheet sets the alternatives in their own columns."""
+    return "route" if (c.get("sites") or any("@" not in k for k in c.get("routes") or {})) else "alternative"
+
+
 def _load(r):
     c = dict(r)
     for k, dflt in (("vru_json", []), ("vru_ksi_json", []), ("routes_json", {}), ("sites_json", {})):
@@ -370,6 +378,7 @@ def _load(r):
             c[k[:-5]] = dflt
     c["goods"] = bool(c.get("goods"))
     c["ksi"] = c.get("severity") in (1, 2)
+    c["along"] = along(c)
     return c
 
 
@@ -388,10 +397,23 @@ def records(route_keys=None):
 def status():
     row = _meta_row()
     det = _detail(row)
+    # 16 Oct 2026: the counts are the collisions along the routes the map draws (and round the sites); those near a
+    # stored alternative only are counted apart (alternatives_only)
     n = {"all": 0, "ksi": 0, "vru": 0}
-    for r in db.query("SELECT severity, vru_json FROM collision_records WHERE tenant_id = ?", (db.current_tenant(),)):
+    alt = {"all": 0, "ksi": 0}
+    for r in db.query("SELECT severity, vru_json, routes_json, sites_json FROM collision_records WHERE tenant_id = ?",
+                      (db.current_tenant(),)):
+        try:
+            c = {"routes": json.loads(r["routes_json"] or "{}"), "sites": json.loads(r["sites_json"] or "{}")}
+        except (TypeError, ValueError):
+            c = {"routes": {}, "sites": {}}
+        ksi = r["severity"] in (1, 2)
+        if along(c) == "alternative":
+            alt["all"] += 1
+            alt["ksi"] += 1 if ksi else 0
+            continue
         n["all"] += 1
-        n["ksi"] += 1 if r["severity"] in (1, 2) else 0
+        n["ksi"] += 1 if ksi else 0
         n["vru"] += 1 if (r["vru_json"] or "[]") != "[]" else 0
     state = (row or {}).get("state") or "never"
     if state == "running" and row and row.get("started_at"):
@@ -406,7 +428,8 @@ def status():
             "by": (row or {}).get("by_whom"), "error": det.get("error"), "notes": det.get("notes") or [],
             "years": years, "period": period_words(years), "files": det.get("files") or [],
             "strip": {"route_m": NEAR_ROUTE_M, "site_m": NEAR_SITE_M, "on_route_m": ON_ROUTE_M},
-            "counts": n, "source": SOURCE, "credit": credit_line() if n["all"] or years else "",
+            "counts": n, "alternatives_only": alt, "source": SOURCE,
+            "credit": credit_line() if n["all"] or alt["all"] or years else "",
             "name": LAYER_NAME, "what": WHAT}
 
 
@@ -426,7 +449,8 @@ def _feature(c):
          "year": c["year"], "month": c["month"], "road": c["road"], "road2": c["road2"], "junction": c["junction"],
          "road_type": c["road_type"], "speed_limit": c["speed_limit"], "light": c["light"],
          "vru": c["vru"], "vru_words": [VRU_LABEL[k] for k in c["vru"]], "vru_any": bool(c["vru"]),
-         "vru_ksi": c["vru_ksi"], "goods": c["goods"], "dist_m": c["dist_m"], "routes": sorted(c["routes"])}
+         "vru_ksi": c["vru_ksi"], "goods": c["goods"], "dist_m": c["dist_m"], "routes": sorted(c["routes"]),
+         "along": c["along"]}
     return {"type": "Feature", "geometry": {"type": "Point", "coordinates": [c["lon"], c["lat"]]}, "properties": p}
 
 
@@ -436,7 +460,7 @@ def payload():
     st = status()
     feats = [_feature(c) for c in sorted(records(), key=lambda c: -c["severity"])]
     return {"type": "FeatureCollection", "features": feats, "severity": [{"key": k, "label": v} for k, v in SEVERITY.items()],
-            "vru_kinds": VRU, **{k: st[k] for k in ("state", "fetched_at", "years", "period", "strip", "counts",
+            "vru_kinds": VRU, **{k: st[k] for k in ("state", "fetched_at", "years", "period", "strip", "counts", "alternatives_only",
                                                     "credit", "notes", "error", "name", "what")}}
 
 
@@ -444,7 +468,7 @@ def in_view(bbox, ksi_only=False):
     """For a plan: the stored collisions inside the frame [w, s, e, n]."""
     out = []
     for c in records():
-        if ksi_only and not c["ksi"]:
+        if (ksi_only and not c["ksi"]) or c["along"] != "route":
             continue
         if bbox[0] <= c["lon"] <= bbox[2] and bbox[1] <= c["lat"] <= bbox[3]:
             out.append(c)
