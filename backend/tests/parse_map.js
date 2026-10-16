@@ -2941,7 +2941,12 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /id: 'area-fill', type: 'fill'/.test(blk) && /id: 'area-outline', type: 'line'/.test(blk)
      && /id: 'area-label', type: 'symbol'/.test(blk) && /id: 'area-county-outline', type: 'line'/.test(blk)
      && /filter: \['==', \['get', 'tier'\], 'county'\]/.test(blk) && /'line-dasharray': \[3, 2\]/.test(blk));
-  ok("§2.2b: the label is 14 px (the floor) with a white halo", /'text-field': \['get', 'label'\], 'text-size': 14,/.test(blk));
+  // NARROWED 16 Oct 2026 (V3, the user: the label improvements on the council view): the label is a card now - white,
+  // edged in the colouring's hue, so no halo - and 14 px is still the floor at every zoom; the figure is larger
+  ok("§2.2b: the label is 14 px (the floor) on a white card",
+     /'text-size': \['interpolate', \['linear'\], \['zoom'\], 9, 14, 12, 16\]/.test(blk)
+     && /const AREA_LABEL_PAINT = \{ 'text-color': AREA_INK, 'text-halo-width': 0 \};/.test(blk)
+     && /'icon-text-fit': 'both'/.test(blk) && !/'font-scale': 0\.\d/.test(blk));
   ok("§2.2b: the colour-by switch has two modes, movements first (D27: movements first, carbon second)",
      /mode: 'movements'/.test(blk) && /\[\['movements', 'Two-way movements a day'\], \['carbon', 't CO(?:₂|\\u2082)e this month'\]\]/.test(blk)
      && /function setAreaMode\(mode\)/.test(blk));
@@ -3073,7 +3078,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     ok("§2.2b: both boxes go through the one rule (toggleAreaTier and ensureAreaLayers read areaVisibility)",
        /const vis = areaVisibility\(\);\s*AREA_LAYERS\.concat\(AREA_COUNTY_LAYERS\)\.forEach\(l => toggleLayer\(l, vis\[l\] === 'visible'\)\);/.test(blk)
        && /const vis = areaVisibility\(\), dVis = vis\['area-fill'\], cVis = vis\['area-county-outline'\];/.test(blk)
-       && /visibility: vis\['area-county-label'\]/.test(blk));
+       // NARROWED 16 Oct 2026 (V3): the county label's layout comes from areaLabelLayout(vis['area-county-label'])
+       && /(visibility: |areaLabelLayout\()vis\['area-county-label'\]/.test(blk));
   }
   ok("⭐ §2.2b: the card counts the sites as the mockup does — '8 of 13' from the server's total",
      card(Object.assign({}, A, { sites_count: 8 }), { totals: { routes_with_volume: 18, co2_t: 482, sites: 13 } }, "Oct 2026").includes("<b>8 of 13</b>")
@@ -5158,6 +5164,60 @@ function qrRead(mod) {
   ok("V7: the legend's swatch draws a circle while dots are on, the type's shape otherwise",
      /if \(locDotsOn\(\)\) \{ g\.beginPath\(\); g\.arc\(S \/ 2, S \/ 2, kind === 'Other' \? 5 : 9, 0, Math\.PI \* 2\); \}\s*else locShapePath\(g, kind, S \/ 2, S \/ 2, kind === 'Other' \? 6 : 13\);/.test(code));
   ok("🔴 V7: no banned public word and no 'truck' in the new box", !/truck|real-time|live tracking|telematics/i.test('Show sites as dots'));
+}
+
+// ---- 16 Oct 2026 (the user, v2 list V3): the By council labels as cards -------------------------------------------
+{
+  const cutV3 = (a, b) => { const i = src.indexOf(a); return i < 0 ? "" : src.slice(i, src.indexOf(b, i)); };
+  const v3 = cutV3("    const AREA_BADGE_EDGE = ", "    // a district row's figure breaks only");
+  ok("V3: the block is there (badge edges, the bold fontstack, the parts, the field, the card, the layout)",
+     /const AREA_BADGE_EDGE = \{ movements: '#2D4E95', carbon: '#B8470A' \};/.test(v3)
+     && /const AREA_LABEL_BOLD = \['Open Sans Bold', 'Arial Unicode MS Bold'\];/.test(v3)
+     && ["areaNum", "areaLabelParts", "areaLabelField", "areaBadgeImage", "addAreaBadges", "areaLabelLayout"].every(f => v3.includes("    function " + f + "(")));
+  ok("V3: the edges are the darkest step of each ramp (blue movements, orange carbon)",
+     /AREA_RAMP = \[[^\]]*'#2D4E95'\]/.test(src) && /AREA_RAMP_CARBON = \[[^\]]*'#B8470A', '#7C2D06'\]/.test(src));
+  let P = null, errP = '';
+  try { P = new Function(cutV3("    function areaNum(", "    // name, then") + "\nreturn { areaNum, areaLabelParts };")(); } catch (e) { errP = String(e); }
+  ok("V3: the label parts run", !!P, errP.slice(0, 300));
+  if (P) {
+    const m = P.areaLabelParts({ name: 'Harborough', movements_per_day: 238.4, routes_count: 15 }, 'movements');
+    ok("⭐ V3 movements: the NAME, the figure with 'a day' (bold, large), then the routes — the legend carries 'two-way movements a day'",
+       m.lb_name === 'HARBOROUGH' && m.lb_fig === '238 a day' && m.lb_sub === '15 routes' && m.lb_badge === 'area-badge-movements', JSON.stringify(m));
+    const c = P.areaLabelParts({ name: 'Hinckley and Bosworth', co2_t: 1.44 }, 'carbon');
+    ok("⭐ V3 carbon: the figure with its unit and nothing under it — no month name repeated on every district",
+       c.lb_fig === '1.4 t CO₂e' && c.lb_sub === '' && c.lb_badge === 'area-badge-carbon' && !/2026|Oct/.test(JSON.stringify(c)), JSON.stringify(c));
+    ok("V3: the legend still names what the figure counts (so the card can stay short)",
+       /'Two-way movements a day on roads a laden leg uses'/.test(src) && /'t CO₂e' \+ \(when \? ' in ' \+ when : ' in the month'\)/.test(src));
+    ok("V3: the numbers round as areaFigureText does (whole from 10, one decimal below)",
+       P.areaNum(150.4) === '150' && P.areaNum(9.96) === '10' && P.areaNum(1234) === '1,234' && P.areaNum(0.44) === '0.4');
+    ok("⭐ V3: a gap stays a gap, in words, with no figure: no month, no carbon figure, not clipped yet, no route, empties only",
+       P.areaLabelParts({ name: 'A', nofig: true }, 'movements').lb_fig === '' && P.areaLabelParts({ name: 'A', nofig: true }, 'movements').lb_sub === ''
+       && P.areaLabelParts({ name: 'A', co2_t: null }, 'carbon').lb_sub === 'no carbon figure'
+       && P.areaLabelParts({ name: 'A', co2_t: 0, unclipped: 2 }, 'carbon').lb_sub === 'no figure yet'
+       && P.areaLabelParts({ name: 'A', movements_per_day: 0, unclipped: 1 }, 'movements').lb_sub === 'no figure yet'
+       && P.areaLabelParts({ name: 'A', movements_per_day: 0, return_only_routes: ['R1'] }, 'movements').lb_sub === 'empties only'
+       && P.areaLabelParts({ name: 'A', movements_per_day: 0 }, 'movements').lb_sub === 'no approved route'
+       && P.areaLabelParts({ name: 'A', movements_per_day: 0 }, 'movements').lb_fig === ''
+       && P.areaLabelParts({ name: 'A', movements_per_day: 3, routes_count: 1 }, 'movements').lb_sub === '1 route');
+  }
+  ok("V3: the field is ONE format expression — name, the figure in the bold fontstack at 1.35, what it counts; an empty part draws no line",
+     /return \['format',/.test(v3) && v3.includes("{ 'font-scale': 1.35, 'text-font': ['literal', AREA_LABEL_BOLD] }")
+     && v3.includes("const br = k => ['case', ['==', ['coalesce', ['get', k], ''], ''], '', '\\n'];")
+     && v3.includes("['coalesce', ['get', 'lb_name'], ['get', 'label']], {},"));
+  ok("⭐ V3: the busiest district's label wins a collision (symbol-sort-key: a larger figure is placed first)",
+     v3.includes("'symbol-sort-key': ['-', 0, ['get', 'v']],"));
+  ok("V3: BOTH label layers (district and county) take the one layout and paint",
+     src.includes("layout: areaLabelLayout(vis['area-county-label']), paint: AREA_LABEL_PAINT }, before);")
+     && src.includes("layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, before);")
+     && !/'text-field': \['get', 'label'\], 'text-size': 14/.test(src));
+  ok("V3: the two cards are re-added after a basemap switch, behind hasImage, beside the hatch",
+     v3.includes("if (!m.hasImage(id)) m.addImage(id, areaBadgeImage(AREA_BADGE_EDGE[k]),")
+     && src.includes("try { if (map.hasImage) addAreaBadges(map); } catch (e) {}"));
+  ok("V3: the features carry the parts, and keep `label` (the plain text other readers use)",
+     src.includes("if (typeof areaLabelParts === 'function') Object.assign(props, areaLabelParts(a, mode));")
+     && src.includes("label: String(a.name || '').toUpperCase() + (a.nofig ? '' : '\\n' + areaFigureText(a, mode, when)) };"));
+  ok("🔴 V3: no banned public word, no 'truck' and no team id in the new words",
+     !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bAI\b|IPT\d/i.test(v3));
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

@@ -4105,6 +4105,74 @@
         return (a.movements_per_day >= 10 ? Math.round(a.movements_per_day) : Math.round(a.movements_per_day * 10) / 10).toLocaleString('en-GB')
             + ' a day · ' + n + (n === 1 ? ' route' : ' routes');
     }
+    // ---- 16 Oct 2026 (the user, v2 list V3: "the label improvements, particularly on the carbon and movement by council
+    // layer") — the label on the map, as a card ------------------------------------------------------------------------
+    // Seen in Chrome before: 14 px regular type on a thin halo over the dark steps (hard to read), the name as big as the
+    // figure, "in Oct 2026" on every district (the bar already says the month) and "a day" saying nothing of what is
+    // counted. Now: the name, the figure large and bold with its unit, the routes under it (14 px stays the floor), on a white card edged in the
+    // colouring's own hue (blue movements, orange carbon); the busiest district's label wins a collision. The figures are
+    // areaFigureText's, rounded the same way; the side panel's rows and the bulletin are unchanged.
+    const AREA_BADGE_EDGE = { movements: '#2D4E95', carbon: '#B8470A' };      // the darkest step of each ramp
+    const AREA_LABEL_BOLD = ['Open Sans Bold', 'Arial Unicode MS Bold'];      // the bold of the style's default fontstack
+    function areaNum(n) { return (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toLocaleString('en-GB'); }
+    function areaLabelParts(a, mode) {
+        const out = { lb_name: String(a.name || '').toUpperCase(), lb_fig: '', lb_sub: '',
+                      lb_badge: mode === 'carbon' ? 'area-badge-carbon' : 'area-badge-movements' };
+        if (a.nofig) return out;                        // no month on screen: the name alone (the group says to pick one)
+        if (mode === 'carbon') {
+            if (a.co2_t === null || a.co2_t === undefined) out.lb_sub = 'no carbon figure';
+            else if (!(a.co2_t > 0) && a.unclipped) out.lb_sub = 'no figure yet';
+            else if (!(a.co2_t > 0)) out.lb_sub = 'no approved route';
+            else out.lb_fig = areaNum(a.co2_t) + ' t CO₂e';     // the month is the bar's and the legend's
+            return out;
+        }
+        if (!(a.movements_per_day > 0) && a.unclipped) { out.lb_sub = 'no figure yet'; return out; }
+        if (!(a.movements_per_day > 0)) { out.lb_sub = (a.return_only_routes || []).length ? 'empties only' : 'no approved route'; return out; }
+        const n = a.routes_count || 0;
+        // "two-way movements a day" is the legend's title and the bar's; on the card it would wrap and hide neighbours
+        out.lb_fig = areaNum(a.movements_per_day) + ' a day';
+        out.lb_sub = n + (n === 1 ? ' route' : ' routes');
+        return out;
+    }
+    // name, then (a line break and) the figure in bold, then what it counts; an empty part draws no line
+    function areaLabelField() {
+        const br = k => ['case', ['==', ['coalesce', ['get', k], ''], ''], '', '\n'];
+        return ['format',
+                ['coalesce', ['get', 'lb_name'], ['get', 'label']], {},
+                br('lb_fig'), {},
+                ['coalesce', ['get', 'lb_fig'], ''], { 'font-scale': 1.35, 'text-font': ['literal', AREA_LABEL_BOLD] },
+                br('lb_sub'), {},
+                ['coalesce', ['get', 'lb_sub'], ''], {}];
+    }
+    // the card behind a label: white, rounded, a 2 px edge in the colouring's hue, stretched to the text
+    function areaBadgeImage(edge) {
+        const S = 26, c = document.createElement('canvas'); c.width = S; c.height = S;
+        const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.strokeStyle = edge; g.lineWidth = 2;
+        const r = 6, x = 1, y = 1, w = S - 2, h = S - 2;
+        g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+        g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h);
+        g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
+        g.fill(); g.stroke();
+        return { width: S, height: S, data: g.getImageData(0, 0, S, S).data };
+    }
+    function addAreaBadges(m) {
+        Object.keys(AREA_BADGE_EDGE).forEach(k => {
+            const id = 'area-badge-' + k;
+            if (!m.hasImage(id)) m.addImage(id, areaBadgeImage(AREA_BADGE_EDGE[k]),
+                { pixelRatio: 1, stretchX: [[7, 19]], stretchY: [[7, 19]], content: [7, 5, 19, 21] });
+        });
+    }
+    // the layout both label layers share (the district's and the county's)
+    function areaLabelLayout(visibility) {
+        return { visibility: visibility, 'text-field': areaLabelField(),
+                 // 14 px is the floor (the name and the line under the figure); the figure is 1.35 times that
+                 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 14, 12, 16], 'text-max-width': 20,
+                 'text-line-height': 1.15, 'symbol-placement': 'point', 'text-padding': 4,
+                 'symbol-sort-key': ['-', 0, ['get', 'v']],
+                 'icon-image': ['coalesce', ['get', 'lb_badge'], 'area-badge-movements'],
+                 'icon-text-fit': 'both', 'icon-text-fit-padding': [2, 6, 2, 6] };
+    }
+    const AREA_LABEL_PAINT = { 'text-color': AREA_INK, 'text-halo-width': 0 };
     // a district row's figure breaks only at its ' · ' ("257 a day ·" over "16 routes"), never inside a figure
     function areaRowFigure(t) { return String(t).split(' · ').map(x => x.replace(/ /g, ' ')).join(' · '); }
     function areaFeatures(payload, mode, off, when) {
@@ -4115,6 +4183,8 @@
             if (a.nofig) v = -2; else if (a.unclipped && !(v > 0)) v = -1;
             const props = { area_id: a.area_id, name: a.name, tier: a.tier, v: v, off: off.has(a.area_id),
                             label: String(a.name || '').toUpperCase() + (a.nofig ? '' : '\n' + areaFigureText(a, mode, when)) };
+            // 16 Oct 2026 (the user, v2 V3): the label on the map is drawn from three parts on a card (areaLabelField)
+            if (typeof areaLabelParts === 'function') Object.assign(props, areaLabelParts(a, mode));
             feats.push({ type: 'Feature', geometry: a.geometry, properties: props });
             // the label rides on ONE point inside the area (the server's label_point): a label on the polygon
             // itself is repeated by Mapbox on every tile the polygon crosses (Chrome, 12 Oct: Harborough twice)
@@ -4316,6 +4386,7 @@
         const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
         // the hatch for "no figure" (an image of our own: re-added after a basemap switch, which drops images)
         try { if (map.hasImage && !map.hasImage('area-hatch')) map.addImage('area-hatch', areaHatchImage()); } catch (e) {}
+        try { if (map.hasImage) addAreaBadges(map); } catch (e) {}      // 16 Oct 2026 (V3): the label cards, same rule
         if (!map.getSource('areas-source')) {
             map.addSource('areas-source', { type: 'geojson', data: areaFeatures(AREAS.data, AREAS.mode, AREAS.off, when),
                                             attribution: (AREAS.data.attribution || []).join(' · ') });
@@ -4343,11 +4414,9 @@
         // its label only while the districts are off (with them on, their labels sit where it would)
         if (!map.getLayer('area-county-label')) map.addLayer({ id: 'area-county-label', type: 'symbol', source: 'areas-source',
             filter: ['all', ['==', ['get', 'tier'], 'county'], labelPt],
-            layout: { visibility: vis['area-county-label'], 'text-field': ['get', 'label'], 'text-size': 14, 'text-max-width': 14, 'symbol-placement': 'point' },
-            paint: { 'text-color': AREA_INK, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } }, before);
+            layout: areaLabelLayout(vis['area-county-label']), paint: AREA_LABEL_PAINT }, before);
         if (!map.getLayer('area-label')) map.addLayer({ id: 'area-label', type: 'symbol', source: 'areas-source', filter: district.concat([labelPt]),
-            layout: { visibility: dVis, 'text-field': ['get', 'label'], 'text-size': 14, 'text-max-width': 14, 'symbol-placement': 'point' },
-            paint: { 'text-color': AREA_INK, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } }, before);
+            layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, before);
     }
     // 8 x 8 px: a diagonal stroke two pixels wide on a warm grey, mockup 4's hatch (#B8B2A8 on #F3F1EC)
     function areaHatchImage() {
