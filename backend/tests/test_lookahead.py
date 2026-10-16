@@ -656,11 +656,12 @@ ok("🔴 computed, NOT stored — the read created exactly the day rows slice 1 
    db.query("SELECT COUNT(*) AS n FROM forecast_days WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
    == len(DATES) * 4 and n_days_before == 0)
 # NARROWED 14 Oct 2026 (night): and without community_features / community_meta (the community considerations layer)
+# NARROWED 16 Oct 2026: and without collision_records / collision_meta (the collision history, CLOCS v5 C1)
 ok("...no new table, no new column: sixteen tenanted tables, forecast_days' DDL unchanged",
    # NARROWED 12 Oct 2026: the sixteen are counted without route_sections (§2.2d), the one
    # table added since; slice 2 itself still added none
    # NARROWED again 12 Oct 2026: and without areas / route_area_km (§2.2b), the two added after it
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta"} <= db.TENANTED_TABLES
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta"} <= db.TENANTED_TABLES
    and "trips" not in db._TENANT_DDL["forecast_days"].lower())
 
 # ---- context chips
@@ -895,9 +896,10 @@ ok("forecast_weeks gained actual_cost_eur, calibrated_at, calibrated_qty",
    all(c in [x.lower() for x in db._columns_of(db.get_conn().cursor(), "forecast_weeks")]
        for c in ("actual_cost_eur", "calibrated_at", "calibrated_qty")))
 # NARROWED 14 Oct 2026 (night): and without community_features / community_meta (the community considerations layer)
+# NARROWED 16 Oct 2026: and without collision_records / collision_meta (the collision history, CLOCS v5 C1)
 ok("...and still sixteen tenanted tables — no new table for slices 3-6 (NARROWED 12 Oct 2026: counted without "
    "route_sections, §2.2d, and NARROWED again the same day without areas and route_area_km, §2.2b)",
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta"} <= db.TENANTED_TABLES)
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta"} <= db.TENANTED_TABLES)
 db.init_lookahead_db()
 ok("init_lookahead_db() is idempotent on a table that already has the columns", True)
 

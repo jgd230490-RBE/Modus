@@ -78,6 +78,8 @@ ORDER = [
     "stockpile_weeks",
     # 14 Oct 2026: the community considerations layer (fetched along the routes; no foreign keys)
     "community_features", "community_meta",
+    # 16 Oct 2026: the collision history (CLOCS v5 C1; fetched along the routes; no foreign keys)
+    "collision_records", "collision_meta",
 ]
 
 # "Empty" for import purposes: the tables a person's work lands in. config is not in

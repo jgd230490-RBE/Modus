@@ -2338,6 +2338,25 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
         # 15 Oct 2026: a kind this plan leaves out (bus stops on the regional plan) is named, not dropped silently
         if CM.get("left_out"):
             text(" and ".join(CM["left_out"]) + " are on the local and site plans.", R, 6.8, 8.4, GREY)
+    # 16 Oct 2026 (CLOCS v5 C1): the collision history, when the card added it
+    CO = PL.get("collisions")
+    if CO is not None:
+        gap(4)
+        if not CO.get("fetched"):
+            text("Collision history: not fetched yet (Config, Map and bulletin).", R, 7.2, 9, GREY)
+        else:
+            text(f"Police-reported injury collisions, {CO['period']} (DfT)", B, 7.8, 10)
+            sev = CO.get("severities") or []
+            for s_, word in ((1, "Fatal"), (2, "Serious"), (3, "Slight")):
+                if s_ in sev:
+                    items.append((9.6, lambda x, y, s_=s_, word=word: (_ce_dot(c, x + 5, y - 4.4, s_),
+                                                                       c.setFillColorRGB(*NAVY_RGB), c.setFont(R, 7.4),
+                                                                       c.drawString(x + 17, y - 7.2, word))))
+            if not sev:
+                text("None in this frame.", R, 7.2, 9, GREY)
+            if CO.get("ksi_only"):
+                text("Killed or seriously injured only; the slight ones are on the local and site plans.", R, 6.8, 8.4, GREY)
+            text("Evidence for a route risk assessment, not the assessment.", R, 6.8, 8.4, GREY)
     gap(4)
     if PL.get("view") and not basemap_ok:
         text("No basemap could be had: the routes alone, still to scale.", B, 7, 8.8, DEMO_FG_RGB)
@@ -2346,6 +2365,8 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
         text("Map © Mapbox © OpenStreetMap.", R, 6.8, 8.4, GREY)
     if CM.get("credit"):
         text(CM["credit"], R, 6.6, 8.2, GREY)
+    if (CO or {}).get("credit") and (CO or {}).get("records"):
+        text(CO["credit"], R, 6.6, 8.2, GREY)
     ph = sum(h for h, _ in items) + 2 * pad
     x0, y0 = fw - pw - 6, fh - ph - 6
     c.saveState()
@@ -2517,6 +2538,10 @@ def build_route_map_pdf(S):
         _draw_community(c, PL, P, "under")       # 14 Oct 2026: outlines and cycle routes under the routes
         _draw_bulletin_schematic(c, S, 0, 0, fw, fh, P=P)
         _draw_community(c, PL, P, "over")        # the symbols over them
+        for sev in (3, 2, 1):                     # 16 Oct 2026 (CLOCS v5 C1): the collision history, KSI on top
+            for r in (PL.get("collisions") or {}).get("records") or []:
+                if r["severity"] == sev:
+                    _ce_dot(c, *P(r["lon"], r["lat"]), sev)
     else:
         c.setFillColorRGB(*GREY); c.setFont(_BF("regular"), 10)
         c.drawCentredString((fw - rme.PANEL_W_MM * mm) / 2, fh / 2, "No approved line on the chosen routes in this month.")
@@ -2869,3 +2894,354 @@ def build_route_sheet_pdf(S):
     c.showPage()
     c.save()
     return buf.getvalue()
+
+
+# --------------------------------------------------------------------------- #
+#  16 Oct 2026 (CLOCS v5 C1) — the ROUTE COLLISION EVIDENCE (collisions.evidence)
+# --------------------------------------------------------------------------- #
+# A4 portrait, as many pages as the places need. Top to bottom: the heading; the route with the collisions within
+# 250 m on a basemap (size by severity, slight as a hollow ring; the numbered places); the counts table, the route and
+# each stored alternative in adjacent columns, on the route (25 m) and within 250 m; the places with more than one
+# collision in order along the route, with the community considerations near each; on every page DfT's caveats, "not
+# the assessment" and the credit line. Counts only: no score, no rate, no ranking, no colour status (R5).
+CE_INK = "#27272A"               # the collision symbol: one ink, size by severity (a hue would claim a meaning)
+CE_RADIUS = {1: 4.4, 2: 3.2, 3: 2.2}
+CE_MAP_H_MM = 92.0
+
+
+def _ce_dot(c, x, y, severity):
+    r = CE_RADIUS.get(severity, 2.2)
+    c.saveState()
+    if severity == 3:                  # slight: a hollow ring, so it recedes behind the KSI
+        c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(2.0); c.circle(x, y, r, stroke=1, fill=0)
+        c.setStrokeColorRGB(*_hex_rgb(CE_INK)); c.setLineWidth(0.9); c.circle(x, y, r, stroke=1, fill=0)
+    else:
+        c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(0.9)
+        c.setFillColorRGB(*_hex_rgb(CE_INK)); c.circle(x, y, r, stroke=1, fill=1)
+    c.restoreState()
+
+
+def _ce_tag(c, x, y, n):
+    t = str(n)
+    R = _BF("bold")
+    w = c.stringWidth(t, R, 6.6) + 5
+    c.saveState()
+    c.setFillColorRGB(1, 1, 1); c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6)
+    c.roundRect(x + 4, y + 2, w, 9, 2, stroke=1, fill=1)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 6.6); c.drawString(x + 6.5, y + 4.6, t)
+    c.restoreState()
+
+
+def collision_evidence_view(S, w_mm, h_mm):
+    import basemap
+    import route_sheet as rs
+    pts = list(S["loaded"]) + list(S["return"])
+    if not pts:
+        return None
+    return basemap.view(pts, int(round(w_mm * rs.PX_PER_MM)), int(round(h_mm * rs.PX_PER_MM)), pad_px=60, max_zoom=15.0)
+
+
+def collision_count_cells(S):
+    """The counts table as rows of strings: [label, on, near, on, near, ...] (one pair per column)."""
+    out = []
+    for key, label in S["rows"]:
+        out.append([label] + [str(col[b][key]) for col in S["columns"] for b in ("on", "near")])
+    return out
+
+
+def collision_location_cells(L):
+    where = " / ".join(L["roads"]) or "Road not recorded"
+    if L["junction"]:
+        where += ", " + " and ".join(j[0].lower() + j[1:] if not j.startswith("T ") else j for j in L["junction"])
+    near = "; ".join((f"{x['kind']}: {x['name']} {x['m']} m" if x["name"] != x["kind"] else f"{x['kind']} {x['m']} m")
+                     for x in L.get("community") or []) or "—"
+    yrs = L["years"]
+    return [str(L["no"]), (L.get("along_words") + ": " if L.get("along_words") else "") + where,
+            str(L["fatal"]), str(L["serious"]), str(L["slight"]),
+            ", ".join(L["vru_words"]) or "—", str(L["goods"]) if L["goods"] else "—",
+            (f"{yrs[0]}–{yrs[-1]}" if len(yrs) > 1 else (str(yrs[0]) if yrs else "")), near]
+
+
+def build_collision_evidence_pdf(S):
+    """The Route collision evidence (collisions.evidence) as A4 portrait pages."""
+    if rl_canvas is None:
+        raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
+    import collisions as cl
+    import basemap
+    W, H = A4
+    m = 12 * mm
+    cw = W - 2 * m
+    R, B = _BF("regular"), _BF("bold")
+    buf = io.BytesIO()
+    c = rl_canvas.Canvas(buf, pagesize=A4)
+    c.setTitle(_pdf_safe(f"{S['tenant']} · {S['title']} · {S['route_id']}"))
+    c.setAuthor("Wayscope")
+    footer_h = 40
+    page = [1]
+    S["pages"] = 1
+
+    def footer():
+        foot = [S["caveat"], S["not_a_verdict"], S["credit"]]
+        if S.get("basemap"):
+            foot.append("Map © Mapbox © OpenStreetMap.")
+        fy = m + footer_h - 8
+        c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.5); c.line(m, m + footer_h - 2, W - m, m + footer_h - 2)
+        for ln in _wrap(" ".join(foot), R, 6.6, cw - 40)[:4]:
+            c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawString(m, fy, ln)
+            fy -= 8.2
+        c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawRightString(W - m, m + footer_h - 10, f"Page {page[0]}")
+
+    def new_page():
+        footer()
+        c.showPage()
+        page[0] += 1
+        S["pages"] = page[0]
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10)
+        c.drawString(m, H - m - 10, _pdf_safe(f"{S['title']} · {S['route_id']} · {S['origin']} → {S['dest']}"))
+        return H - m - 22
+
+    # the heading
+    y = H - m
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 18); c.drawString(m, y - 18, S["title"])
+    c.setFont(B, 9); c.drawRightString(W - m, y - 9, _pdf_safe(S["tenant"]))
+    c.setFillColorRGB(*GREY); c.setFont(R, 8); c.drawRightString(W - m, y - 20, f"Issued {S['issued']}")
+    if S.get("demo_notice"):
+        c.setFillColorRGB(*DEMO_FG_RGB); c.setFont(B, 8)
+        c.drawRightString(W - m, y - 31, _pdf_safe("DEMO · " + S["demo_notice"]))
+    y -= 26
+    for ln in _wrap(f"{S['origin']}  →  {S['dest']}", B, 13, cw * 0.72):
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 13); c.drawString(m, y - 13, ln)
+        y -= 16
+    period = (f"{cl.WHAT}, {S['period']} (DfT, final data)" if S.get("period")
+              else "The collision history has not been fetched yet")
+    sub = " · ".join(w for w in (S["route_id"], (f"drawn for the {S['vehicle_text']}" if S.get("vehicle_text") else None),
+                                 period) if w)
+    for ln in _wrap(sub, R, 8.4, cw):
+        c.setFillColorRGB(*GREY); c.setFont(R, 8.4); c.drawString(m, y - 8.4, ln)
+        y -= 11
+    y -= 4
+
+    # the map
+    h1 = CE_MAP_H_MM * mm
+    v = collision_evidence_view(S, cw / mm, CE_MAP_H_MM)
+    S["view"] = v
+    key = cl.route_key(S["route_id"])
+    near = [r for r in S["records"] if key in r["routes"]]
+    S["drawn_count"] = len(near) if v else 0
+    k = (cw / v["w"]) if v else 1
+
+    def P(lon, lat):
+        px, py = basemap.project(v, lon, lat)
+        return px * k, h1 - py * k
+    c.saveState()
+    c.translate(m, y - h1)
+    clip = c.beginPath(); clip.rect(0, 0, cw, h1); c.clipPath(clip, stroke=0, fill=0)
+    png = basemap.fetch(v) if (v and not getattr(_SIZING, "on", False)) else None
+    S["basemap"] = bool(png)
+    if png:
+        c.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=cw, height=h1)
+    else:
+        c.setFillColorRGB(0.965, 0.969, 0.973); c.rect(0, 0, cw, h1, stroke=0, fill=1)
+    if v:
+        _rs_line(c, P, S["loaded"], RS_LOADED, 2.6)
+        _rs_line(c, P, S["return"], RS_RETURN, 1.6, (4, 3), offset=3.0)
+        for sev in (3, 2, 1):            # slight first, so the KSI sit on top
+            for r in near:
+                if r["severity"] == sev:
+                    _ce_dot(c, *P(r["lon"], r["lat"]), sev)
+        for L in S["locations"]:
+            _ce_tag(c, *P(L["lon"], L["lat"]), L["no"])
+    else:
+        c.setFillColorRGB(*GREY); c.setFont(R, 9)
+        c.drawCentredString(cw / 2, h1 / 2, "No road route has been worked out for this route yet.")
+    c.restoreState()
+    c.saveState()
+    c.translate(m, y - h1)
+    _map_tag(c, S.get("map_demo_tag"), cw, h1)
+    if v:
+        _plan_scale_bar(c, v, cw)
+        _north_arrow(c, cw - 14, h1 - 30)
+        clip = c.beginPath(); clip.rect(0, 0, cw, h1); c.clipPath(clip, stroke=0, fill=0)
+        if S["loaded"]:
+            _rs_pin(c, *P(*S["loaded"][0]), "A")
+            _rs_pin(c, *P(*S["loaded"][-1]), "B")
+    c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6); c.rect(0, 0, cw, h1, stroke=1, fill=0)
+    c.restoreState()
+    y -= h1 + 5
+    # its legend
+    lx = m
+    for sev, word in ((1, "Fatal"), (2, "Serious"), (3, "Slight")):
+        _ce_dot(c, lx + 5, y - 4, sev)
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, word)
+        lx += 12 + c.stringWidth(word, R, 7.6) + 12
+    for colour, dash, words in ((RS_LOADED, None, "Loaded, A to B"), (RS_RETURN, (4, 3), "Empty, back to A")):
+        c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(1.6 if dash else 2.6)
+        if dash:
+            c.setDash(*dash)
+        c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 20, y - 6.6, words)
+        lx += 20 + c.stringWidth(words, R, 7.6) + 12
+    if S["locations"]:
+        _ce_tag(c, lx - 4, y - 8, 1)
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, "a place in the list below")
+    y -= 14
+    t = (f"Drawn: the {len(near)} collisions within {S['near_route_m']} m of this route's road route, both directions."
+         if S["fetched"] else "Not fetched yet: a planner fetches the collision history on the Config page, Map and bulletin.")
+    c.setFillColorRGB(*GREY); c.setFont(R, 7.6); c.drawString(m, y - 7.6, _pdf_safe(t))
+    y -= 16
+
+    if not S["fetched"]:
+        footer(); c.showPage(); c.save()
+        return buf.getvalue()
+
+    # the counts table
+    cols = S["columns"]
+    lab_w = max(cw - len(cols) * 2 * 22 * mm, 62 * mm)
+    cell_w = (cw - lab_w) / (2 * len(cols))
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "How many, and where")
+    y -= 15
+    for i, col in enumerate(cols):      # two header rows: the route / alternative and its length, over on / within
+        x0 = m + lab_w + i * 2 * cell_w
+        head = col["label"] + (f", {col['length']}" if col.get("length") else "")
+        c.setFillColorRGB(*BAND); c.rect(x0 + 1, y - 12, 2 * cell_w - 2, 12, stroke=0, fill=1)
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 7.4)
+        c.drawCentredString(x0 + cell_w, y - 8.6, _pdf_safe(head)[:40])
+        for j, words in enumerate((f"On the route ({S['on_route_m']} m)", f"Within {S['near_route_m']} m")):
+            c.setFont(R, 6.8); c.setFillColorRGB(*GREY)
+            c.drawCentredString(x0 + j * cell_w + cell_w / 2, y - 20.5, words)
+    y -= 26
+    for n, row in enumerate(collision_count_cells(S)):
+        if n % 2 == 0:
+            c.setFillColorRGB(0.975, 0.977, 0.98); c.rect(m, y - 10.5, cw, 11, stroke=0, fill=1)
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B if n == 0 else R, 7.6)
+        c.drawString(m + 2, y - 7.8, _pdf_safe(row[0]))
+        for j, val in enumerate(row[1:]):
+            c.drawCentredString(m + lab_w + j * cell_w + cell_w / 2, y - 7.8, val)
+        y -= 11
+    y -= 4
+    ny = len(S['years'])
+    for ln in _wrap(f"{ny} year{'s' if ny != 1 else ''} of final data ({S['period']}). Counts only, each collision once in each "
+                    f"column it is near. On the route means within {S['on_route_m']} m of the road route; within "
+                    f"{S['near_route_m']} m includes side and parallel roads.", R, 7.2, cw):
+        c.setFillColorRGB(*GREY); c.setFont(R, 7.2); c.drawString(m, y - 7.2, ln)
+        y -= 9
+    y -= 8
+
+    # the places with more than one collision
+    heads = ["", "Where (along the route from A)", "Fatal", "Serious", "Slight", "Vulnerable road users hurt",
+             "Goods vehicle over 3.5 t", "Years", "Nearby (within 250 m)"]
+    widths = [7, 48, 10, 12, 10, 28, 15, 15, 0]
+    widths[-1] = cw / mm - sum(widths)
+    widths = [w_ * mm for w_ in widths]
+
+    def heads_row(y):
+        wrapped = [_wrap(h_, B, 6.8, w_ - 4) or [""] for h_, w_ in zip(heads, widths)]
+        hh = max(len(w_) for w_ in wrapped) * 8.0 + 4
+        c.setFillColorRGB(*BAND); c.rect(m, y - hh, cw, hh, stroke=0, fill=1)
+        x = m
+        for lines_, w_ in zip(wrapped, widths):
+            for i, ln in enumerate(lines_):
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.8); c.drawString(x + 2, y - 8.4 - i * 8.0, ln)
+            x += w_
+        return y - hh - 2
+
+    if y - 60 < m + footer_h:
+        y = new_page()
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5)
+    c.drawString(m, y - 10.5, f"Places with more than one collision ({S['cluster_m']} m apart or less), along the route")
+    y -= 15
+    if not S["locations"]:
+        for ln in _wrap(f"None: no two collisions within {S['near_route_m']} m of this route are within {S['cluster_m']} m "
+                        f"of each other in {S['period']}.", R, 8, cw):
+            c.setFillColorRGB(*GREY); c.setFont(R, 8); c.drawString(m, y - 8, ln)
+            y -= 10
+    else:
+        y = heads_row(y)
+        for L in S["locations"]:
+            cells = collision_location_cells(L)
+            wrapped = [_wrap(t_, R, 7.0, w_ - 4) or [""] for t_, w_ in zip(cells, widths)]
+            hgt = max(len(w_) for w_ in wrapped) * 8.6 + 3
+            if y - hgt < m + footer_h:
+                y = heads_row(new_page())
+            x = m
+            for lines_, w_ in zip(wrapped, widths):
+                yy = y - 7.4
+                for ln in lines_:
+                    c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.0); c.drawString(x + 2, yy, ln)
+                    yy -= 8.6
+                x += w_
+            c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.4); c.line(m, y - hgt, W - m, y - hgt)
+            y -= hgt + 1
+    footer()
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def build_collision_evidence_xlsx(S):
+    """The same evidence as a workbook: Summary (the counts), Places, Collisions (one row each), About."""
+    if openpyxl is None:
+        raise RuntimeError("openpyxl is not installed: " + MISSING.get("xlsx", ""))
+    import collisions as cl
+    wb = openpyxl.Workbook()
+    head = Font(bold=True, color="FFFFFF")
+    fill = PatternFill("solid", fgColor=NAVY)
+
+    def header(ws, titles, row=1):
+        for j, t in enumerate(titles, 1):
+            cell = ws.cell(row=row, column=j, value=t)
+            cell.font, cell.fill = head, fill
+            ws.column_dimensions[get_column_letter(j)].width = max(10, min(44, len(str(t)) + 6))
+
+    ws = wb.active
+    ws.title = "Summary"
+    ws.cell(row=1, column=1, value=f"{S['title']} · {S['route_id']} · {S['origin']} to {S['dest']}").font = Font(bold=True)
+    ws.cell(row=2, column=1, value=(f"{cl.WHAT}, {S['period']} (DfT, final data)" if S.get("period")
+                                    else "The collision history has not been fetched yet."))
+    if S.get("demo_notice"):
+        ws.cell(row=3, column=1, value="DEMO · " + S["demo_notice"]).font = Font(bold=True, color=DEMO_FG_HEX)
+    titles = ["What"] + [f"{col['label']}: {w}" for col in S["columns"]
+                         for w in (f"on the route ({S['on_route_m']} m)", f"within {S['near_route_m']} m")]
+    header(ws, titles, row=5)
+    ws.column_dimensions["A"].width = 52
+    for i, row in enumerate(collision_count_cells(S), 6):
+        for j, v in enumerate(row, 1):
+            ws.cell(row=i, column=j, value=int(v) if j > 1 else v)
+    ws.freeze_panes = "A6"
+
+    wp = wb.create_sheet("Places")
+    pt = ["No", "Where (along the route from A)", "Fatal", "Serious", "Slight", "Vulnerable road users hurt",
+          "Goods vehicle over 3.5 t", "Years", "Nearby (within 250 m)", "DfT collision references"]
+    header(wp, pt)
+    for i, L in enumerate(S["locations"], 2):
+        cells = collision_location_cells(L) + [", ".join(L["ids"])]
+        for j, v in enumerate(cells, 1):
+            wp.cell(row=i, column=j, value=int(v) if j in (1, 3, 4, 5) else v)
+    wp.freeze_panes = "A2"
+
+    wc = wb.create_sheet("Collisions")
+    key = cl.route_key(S["route_id"])
+    ct = ["DfT collision reference", "Year", "Month", "Severity", "Road", "Second road", "Junction", "Road type",
+          "Speed limit (mph)", "Light", "Vulnerable road users hurt", "Of them killed or seriously injured",
+          "Goods vehicle over 3.5 t", "Metres from this route", f"On the route ({S['on_route_m']} m)",
+          "Longitude", "Latitude", "Highway authority (ONS code)"]
+    header(wc, ct)
+    rows = sorted((r for r in S["records"] if key in r["routes"]), key=lambda r: (r["routes"][key], r["collision_id"]))
+    for i, r in enumerate(rows, 2):
+        vals = [r["collision_id"], r["year"], r["month"], cl.SEVERITY[r["severity"]], r["road"], r["road2"], r["junction"],
+                r["road_type"], r["speed_limit"], r["light"], ", ".join(cl.VRU_LABEL[k] for k in r["vru"]),
+                ", ".join(cl.VRU_LABEL[k] for k in r["vru_ksi"]), "yes" if r["goods"] else "",
+                round(r["routes"][key]), "yes" if r["routes"][key] <= S["on_route_m"] else "",
+                r["lon"], r["lat"], r["authority"]]
+        for j, v in enumerate(vals, 1):
+            wc.cell(row=i, column=j, value=v)
+    wc.freeze_panes = "A2"
+
+    wa = wb.create_sheet("About")
+    for i, t in enumerate([S["caveat"], S["not_a_verdict"], S["credit"],
+                           f"Source: {cl.SOURCE['name']}, {cl.SOURCE['url']}", f"Issued {S['issued']}."], 1):
+        wa.cell(row=i, column=1, value=t)
+    wa.column_dimensions["A"].width = 120
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()

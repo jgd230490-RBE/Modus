@@ -318,6 +318,40 @@ the page says so. The rows live per organisation (<code>community_features</code
 in its package. A download that arrives short is resumed with a Range request where the source allows it, and otherwise
 handed to curl (on 14 Oct 2026 Python's own reads were cut short on the build laptop, not curl's).</p>
 
+<h1 id="t9-collisions">T9 The collision history (CLOCS v5 C1)</h1>
+<p>Staff only (16 Oct 2026). <code>GET /api/collisions</code> serves what is stored as one GeoJSON FeatureCollection (year and month,
+never the day or time) with the years held and the credit line; <code>GET /api/collisions/status</code> the same without the
+features. Both answer 401 to the map password's cookie and to no credential. <code>POST /api/collisions/refresh</code> (a
+planner or an admin; 403 for a team code) starts a fetch on a thread. <code>GET /api/routes/{id}/collision-evidence.pdf</code>
+and <code>.xlsx</code> give one route's evidence (staff; a team code its own team's routes only, 404 for another's). The plan
+endpoints take <code>collisions=1</code> (off by default).</p>
+<div class="tbl"><table><thead><tr><th>Question</th><th>Answer (checked 16 Oct 2026)</th></tr></thead><tbody>
+<tr><td class="k">Source</td><td>GOV.UK &ldquo;Road safety open data&rdquo; (DfT STATS19), Great Britain from 1979. Three CSV tables a year,
+<code>dft-road-casualty-statistics-{collision,vehicle,casualty}-{year}.csv</code> on <code>data.dft.gov.uk</code>, joined on
+<code>collision_index</code>.</td></tr>
+<tr><td class="k">Licence</td><td>Open Government Licence v3.0; the credit line names DfT road safety data.</td></tr>
+<tr><td class="k">Years read</td><td>The latest five FINAL years. Final data for a year comes out in late July of the next; from August the
+newest year is last year, before it the year before. If the newest file is not published yet (HTTP 404) the five years step
+back one and the page says so. Provisional mid-year data is not read (DfT calls it unvalidated).</td></tr>
+<tr><td class="k">How it is read</td><td>Each table downloaded whole (the server refuses HEAD and ignores Range requests; about 19&ndash;21 MB a table
+a year, about 250 MB for five years), read row by row, and deleted before the next, so the disk holds one file at a time.
+Collisions outside the strip's box are dropped before any distance is worked out; vehicles and casualties are read only for
+the collisions kept. All or nothing: a failure keeps what was stored.</td></tr>
+<tr><td class="k">The strip</td><td>The community layer's: 250 m each side of every stored road route (both legs, every vehicle, and the
+stored alternatives, each under its own key) and 500 m round every site. Each collision keeps its distance to each route it is
+near. &ldquo;On the route&rdquo; = within 25 m (on the 2025 data the count flattens after 20 m; 25 m allows for a dual carriageway).
+Places = two or more collisions within 50 m of each other (single linkage), ordered along the primary loaded leg.</td></tr>
+<tr><td class="k">Codes</td><td>Severity 1 fatal, 2 serious, 3 slight (KSI = 1 or 2). Vulnerable road users (the CLOCS v5 definition):
+pedestrian (<code>casualty_class</code> 3), cyclist (type 1), motorcyclist (2, 3, 4, 5, 23, 97), horse rider (16), e-scooter or
+powered transporter (33, or <code>escooter_flag</code> 1), mobility scooter (22). Goods vehicle over 3.5 t: vehicle type 20, 21 or 98.
+Junction from <code>junction_detail</code> (0 = not at or within 20 m of a junction).</td></tr>
+<tr><td class="k">Severity</td><td>As the police reported it. DfT's adjusted figures (for forces not using injury-based reporting) are not used;
+the caveat on every output says severity recording changed after 2016.</td></tr>
+</tbody></table></div>
+<p>The rows live per organisation (<code>collision_records</code>, <code>collision_meta</code>) and travel in its package.
+The words on every output: &ldquo;police-reported injury collisions&rdquo;, the period beside every count, and &ldquo;evidence for a
+route risk assessment, not the assessment&rdquo;. No score, rate, ranking or colour status.</p>
+
 </main>
 <a id="top" href="#">↑ top</a>
 </body></html>

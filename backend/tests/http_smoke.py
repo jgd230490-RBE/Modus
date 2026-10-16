@@ -150,6 +150,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 COMMUNITY CONSIDERATIONS: the layer, its status and a fetch without a credential — 401 each",
        c.get("/api/community").status_code == 401 and c.get("/api/community/status").status_code == 401
        and c.post("/api/community/refresh", headers={"X-Wayscope": "1"}).status_code == 401)
+    # 16 Oct 2026 (CLOCS v5 C1): the collision history and each route's evidence are staff only; fetching is a planner's
+    ok("🔴 COLLISION HISTORY: the layer, its status, a fetch and a route's evidence without a credential — 401 each",
+       c.get("/api/collisions").status_code == 401 and c.get("/api/collisions/status").status_code == 401
+       and c.post("/api/collisions/refresh", headers={"X-Wayscope": "1"}).status_code == 401
+       and c.get("/api/routes/R016/collision-evidence.pdf").status_code == 401
+       and c.get("/api/routes/R016/collision-evidence.xlsx").status_code == 401)
     # 13 Oct 2026 (D43): the one-page leaflet, page and PDF, the bulletin's staff rule
     r = c.get("/bulletin/leaflet/?month=10")
     ok("🔴 the leaflet page is closed without a staff sign-in — 401, the bulletin's sign-in page",
@@ -1452,6 +1458,22 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 …a team code may read it but not fetch it: 403 (no refresh is started from this harness: it would go online)",
        c.get("/api/community", headers=NORTH).status_code == 200
        and c.post("/api/community/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)
+    # 16 Oct 2026 (CLOCS v5 C1): the collision history is never on the password view either (R6)
+    ok("…and 🔴 not the collision history (staff only, R6): the map password's cookie gets 401, the evidence too",
+       c.get("/api/collisions").status_code == 401 and c.get("/api/collisions/status").status_code == 401
+       and c.get("/api/routes/R016/collision-evidence.pdf").status_code == 401)
+    _co = c.get("/api/collisions", headers=PLAN)
+    _coj = _co.json() if _co.status_code == 200 else {}
+    ok("⭐ …a planner's code reads it: 200, a FeatureCollection, nothing fetched yet on this deployment",
+       _co.status_code == 200 and _coj.get("type") == "FeatureCollection" and _coj.get("state") == "never"
+       and _coj.get("features") == [] and _coj.get("strip") == {"route_m": 250, "site_m": 500, "on_route_m": 25}, _co.text[:200])
+    _ce = c.get("/api/routes/R016/collision-evidence.pdf", headers=PLAN)
+    ok("⭐ …and a route's evidence PDF before any fetch: 200, a PDF that says it has not been fetched",
+       _ce.status_code == 200 and _ce.content[:5] == b"%PDF-" and "no-store" in _ce.headers.get("cache-control", ""),
+       str(_ce.status_code))
+    ok("🔴 …a team code may read it but not fetch it: 403 (no fetch is started from this harness: it would go online)",
+       c.get("/api/collisions", headers=NORTH).status_code == 200
+       and c.post("/api/collisions/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",

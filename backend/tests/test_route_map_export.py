@@ -512,8 +512,11 @@ ok("the read passes the map's filters and the Routes page's list; a plan it cann
    "route_ids=ids, team=team, acc=access.current(), origin=origin, dest=dest," in _ep
    and "except route_map_export.PlanError as e:\n        raise HTTPException(422, str(e))" in _ep
    and "carbon_tool" not in _ep and "map_only" not in _ep)
+# NARROWED 16 Oct 2026: the collision evidence's two endpoints (CLOCS v5 C1) sit after these in main.py; the two counted
+# are the route map's own, before them
 ok("both files are named by month, plan and scale (route-map-2026-10-local-1-2500.pdf), never cached",
-   'return f"route-map-{y}-{m:02d}-{PL[\'kind\']}{tail}.{ext}"' in _ep and _ep.count('"Cache-Control": "no-store"') == 2
+   'return f"route-map-{y}-{m:02d}-{PL[\'kind\']}{tail}.{ext}"' in _ep
+   and _ep.split('@app.get("/api/collisions")')[0].count('"Cache-Control": "no-store"') == 2
    and 'media_type="image/png"' in _ep and "export.route_map_png(export.build_route_map_pdf(S))" in _ep)
 ok("one read, nothing stored: the module writes nothing", "db.execute" not in read("backend/route_map_export.py")
    and "INSERT" not in read("backend/route_map_export.py") and "UPDATE" not in read("backend/route_map_export.py"))

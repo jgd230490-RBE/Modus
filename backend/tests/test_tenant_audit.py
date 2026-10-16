@@ -94,6 +94,9 @@ TENANTED = {
     # 14 Oct 2026 (the community considerations layer). The features fetched along one tenant's routes and
     # the row saying when and from what. Registered in the same edit as the tables — eight and nine.
     "community_features", "community_meta",
+    # 16 Oct 2026 (the collision history, CLOCS v5 C1). The police-reported collisions fetched along one tenant's
+    # routes and the row saying which years and when. Registered in the same edit as the tables — ten and eleven.
+    "collision_records", "collision_meta",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is
