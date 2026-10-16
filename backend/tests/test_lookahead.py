@@ -304,7 +304,8 @@ MI, WI = days.commit_bucket()
 DATES = days.bucket_dates(MI, WI)
 ISO = [d.isoformat() for d in DATES]
 NWD = len(days.weekdays_in(DATES))
-ok("the commit bucket is inside the seeded horizon", 1 <= MI <= 24 and 1 <= WI <= 4)
+ok("the commit bucket is inside the seeded horizon (a month owns 4 or 5 weeks: the Thursday rule)",
+   1 <= MI <= 24 and 1 <= WI <= weeks.weeks_in_month(MI))
 
 r = days.materialise_commit_week()
 ok("nothing materialises while no line is Approved", r["created"] == 0 and _line_days() == [])
