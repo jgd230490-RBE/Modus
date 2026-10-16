@@ -802,6 +802,9 @@
              cannot drift between the map and the legend. -->
         <div class="control-item"><label><input type="checkbox" id="layer-nodes" checked onchange="toggleNodes(this.checked)"> Sites &amp; assets</label><span class="color-dot" style="background:#2563EB;"></span></div>
         <div id="loc-legend" style="padding-left:23px;margin:-2px 0 4px;"></div>
+        <!-- 16 Oct 2026 (the user, v2 list V7): icons or plain dots. The colour still says the type; the shape goes. A way
+             of DRAWING, not a layer, so it is not a layer- box: the preset views and the council view leave it alone. -->
+        <div class="control-item" style="padding-left:23px;margin-top:-2px;"><label><input type="checkbox" id="loc-dots" onchange="toggleLocDots()"> Show sites as dots</label></div>
         <!-- Phase 5a. The access point on the public road, which for a large site is
              nowhere near the marker in the middle of it. Routes start and end at these,
              not at the site marker — that gap is the information, not a drawing error. -->
@@ -2005,7 +2008,52 @@
             const spec = LOC_ICONS[key];
             if (!m.hasImage(key)) m.addImage(key, locGlyph(spec.kind, spec.fill, false, spec.stock), { pixelRatio: 2 });
             if (!m.hasImage(key + '-on')) m.addImage(key + '-on', locGlyph(spec.kind, spec.fill, true, spec.stock), { pixelRatio: 2 });
+            // 16 Oct 2026 (V7): the dot of the same key, both states, so the switch is one setLayoutProperty
+            if (!m.hasImage(key + '-dot')) m.addImage(key + '-dot', locDot(spec.kind, spec.fill, false, spec.stock), { pixelRatio: 2 });
+            if (!m.hasImage(key + '-dot-on')) m.addImage(key + '-dot-on', locDot(spec.kind, spec.fill, true, spec.stock), { pixelRatio: 2 });
         });
+    }
+    // ---- 16 Oct 2026 (the user, v2 list V7): the same marks as plain dots -----------------
+    // The type's colour (a quarry's material fill too), the dark rim, the white in-use ring: only the shape goes. A
+    // stockpile over capacity stays red and one with no recorded capacity keeps its dashed rim, so the dot claims no
+    // reading the icon would not. The CLP map export already draws lettered dots and does not change (D62).
+    const LOC_DOT_R = 12, LOC_DOT_R_OTHER = 7;
+    function locDotFill(kind, fill, stock) {
+        if (kind === 'Stockpile') return stock === 'over' ? STOCK_OVER : LOC_FILL.Stockpile;
+        return fill;
+    }
+    function locDot(kind, fill, active, stock) {
+        const S = LOC_IMG_S, c = document.createElement('canvas');
+        c.width = S; c.height = S;
+        const g = c.getContext('2d'), cx = S / 2, cy = S / 2;
+        const r = kind === 'Other' ? LOC_DOT_R_OTHER : LOC_DOT_R;
+        if (active) {
+            g.beginPath(); g.arc(cx, cy, r + 6, 0, Math.PI * 2);
+            g.lineWidth = 5; g.strokeStyle = '#ffffff'; g.stroke();
+            g.beginPath(); g.arc(cx, cy, r + 8.5, 0, Math.PI * 2);
+            g.lineWidth = 2; g.strokeStyle = 'rgba(10,20,70,0.75)'; g.stroke();
+        }
+        g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2);
+        g.fillStyle = locDotFill(kind, fill, stock); g.fill();
+        if (kind === 'Stockpile' && stock === 'na') g.setLineDash([4, 3]);
+        g.lineWidth = 2.4; g.strokeStyle = '#1F2024'; g.stroke(); g.setLineDash([]);
+        return { width: S, height: S, data: g.getImageData(0, 0, S, S).data };
+    }
+    // read from the BOX, never a module variable (the rule below for every layer: style.load re-adds the layer)
+    function locDotsOn() {
+        const cb = document.getElementById('loc-dots');
+        return !!(cb && cb.checked);
+    }
+    // the one locations layer's image: the in-use state picks '-on', the switch picks '-dot'
+    function locIconImage() {
+        const dot = locDotsOn() ? '-dot' : '';
+        return ['case', ['coalesce', ['get', 'is_end'], false],
+                ['concat', ['get', 'loc_icon'], dot + '-on'],
+                ['concat', ['get', 'loc_icon'], dot]];
+    }
+    function toggleLocDots() {
+        if (map && map.getLayer && map.getLayer('locations')) map.setLayoutProperty('locations', 'icon-image', locIconImage());
+        refreshLocLegendSwatches();
     }
     // ---- visibility ------------------------------------------------------------------
     // Read from the CHECKBOXES, never a module variable — style.load re-adds every layer
@@ -2094,19 +2142,26 @@
     // the swatch is the SAME geometry and the SAME colour as the mark on the map — a
     // hand-written swatch is how the sidebar's alignment gradient ended up two palettes
     // out of date and survived it.
+    // 16 Oct 2026 (V7): the swatch follows "Show sites as dots", so the legend draws what the map draws
+    function locSwatch(kind) {
+        const S = 34, c = document.createElement('canvas');
+        c.width = S; c.height = S;
+        const g = c.getContext('2d');
+        const fill = kind === 'Quarry' ? QUARRY_DEFAULT_FILL : LOC_FILL[kind];
+        if (locDotsOn()) { g.beginPath(); g.arc(S / 2, S / 2, kind === 'Other' ? 5 : 9, 0, Math.PI * 2); }
+        else locShapePath(g, kind, S / 2, S / 2, kind === 'Other' ? 6 : 13);
+        g.fillStyle = fill; g.fill();
+        g.lineWidth = 2; g.strokeStyle = '#1F2024'; g.stroke();
+        return c.toDataURL();
+    }
+    // only the pictures: rebuilding the rows would lose which types are ticked
+    function refreshLocLegendSwatches() {
+        document.querySelectorAll('#loc-legend img[data-loc-kind]').forEach(img => { img.src = locSwatch(img.getAttribute('data-loc-kind')); });
+    }
     function buildLocLegend() {
         const box = document.getElementById('loc-legend');
         if (!box) return;
-        const swatch = (kind) => {
-            const S = 34, c = document.createElement('canvas');
-            c.width = S; c.height = S;
-            const g = c.getContext('2d');
-            const fill = kind === 'Quarry' ? QUARRY_DEFAULT_FILL : LOC_FILL[kind];
-            locShapePath(g, kind, S / 2, S / 2, kind === 'Other' ? 6 : 13);
-            g.fillStyle = fill; g.fill();
-            g.lineWidth = 2; g.strokeStyle = '#1F2024'; g.stroke();
-            return c.toDataURL();
-        };
+        const swatch = locSwatch;
         // Quarry says what its fill means, because its fill is the only one that varies
         const note = { Quarry: 'fill = material' };
         box.innerHTML = LOC_KINDS.map(k =>
@@ -2114,7 +2169,7 @@
             `<label style="font-size:12.5px;color:#57534E;font-weight:500;">` +
             `<input type="checkbox" id="loc-kind-${k.toLowerCase()}" checked onchange="toggleLocKind()"> ` +
             `${k}${note[k] ? ` <span style="color:#a2a8b0">· ${note[k]}</span>` : ''}</label>` +
-            `<img alt="" src="${swatch(k)}" style="width:15px;height:15px;margin-left:auto;">` +
+            `<img alt="" data-loc-kind="${k}" src="${swatch(k)}" style="width:15px;height:15px;margin-left:auto;">` +
             `</div>`).join('');
     }
 
@@ -3193,9 +3248,8 @@
                       // ⭐ ['literal', …] is NOT needed for concat, but the `in` filter
                       // above DOES need it — a bare array as an expression output is
                       // what silently dropped four route layers on 2026-09-01.
-                      'icon-image': ['case', ['coalesce', ['get', 'is_end'], false],
-                                     ['concat', ['get', 'loc_icon'], '-on'],
-                                     ['get', 'loc_icon']],
+                      // 16 Oct 2026 (V7): built by locIconImage(), which adds '-dot' while "Show sites as dots" is ticked
+                      'icon-image': locIconImage(),
                       'icon-size': ['interpolate', ['linear'], ['zoom'], 6, 0.55, 12, 0.9, 16, 1.1],
                       'icon-allow-overlap': true, 'icon-ignore-placement': true,
                       'icon-anchor': 'center' },
@@ -7462,11 +7516,13 @@
         const f = VIEW_FILTER_KEYS.filter(k => v.filters && v.filters[k] && v.filters[k] !== 'ALL').map(k => k + ':' + v.filters[k]);
         if (f.length) q.set('filters', f.join('|'));
         if (v.council === 'carbon') q.set('council', 'carbon');     // 13 Oct 2026: the districts' colouring (movements is the default)
+        if (v.marks === 'dots') q.set('marks', 'dots');             // 16 Oct 2026 (V7): sites drawn as dots (icons are the default)
         return q.toString();
     }
     function decodeView(search) {
         const q = new URLSearchParams(search || '');
-        const out = { month: null, layers: null, filters: {}, council: q.get('council') === 'carbon' ? 'carbon' : null };
+        const out = { month: null, layers: null, filters: {}, council: q.get('council') === 'carbon' ? 'carbon' : null,
+                      marks: q.get('marks') === 'dots' ? 'dots' : null };
         if (q.has('month')) out.month = monthFromParam(q.get('month'));
         if (q.has('layers')) out.layers = (q.get('layers') || '').split('.').map(x => x.trim()).filter(x => /^-?[a-z0-9_-]+$/i.test(x));
         (q.get('filters') || '').split('|').forEach(part => {
@@ -7489,7 +7545,8 @@
                  filters: { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'),
                             team: selectedText('filter-ipt') },       // the team's NAME as the option shows it
                  // 13 Oct 2026: the districts' colouring, only while By council is on (a carbon colouring left behind is not a view)
-                 council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null };
+                 council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null,
+                 marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null };
     }
     // the link a person shares: this page's address with the view, without the app's embed / cache-buster parameters;
     // monthOnly = the short form for a QR code that cannot hold the whole view
@@ -7535,6 +7592,9 @@
         setSel('filter-discipline', v.filters.discipline); setSel('filter-ipt', v.filters.team, true);
         // 13 Oct 2026: the colouring before the boxes, so the districts' first paint is the shared one
         if (v.council === 'carbon' && typeof AREAS !== 'undefined') AREAS.mode = 'carbon';
+        // 16 Oct 2026 (V7): dots before the boxes; the change event runs toggleLocDots and the link listener
+        const dots = document.getElementById('loc-dots');
+        if (dots && dots.checked !== (v.marks === 'dots')) { dots.checked = v.marks === 'dots'; dots.dispatchEvent(new Event('change', { bubbles: true })); }
         if (v.layers) {
             const want = new Set(layersFromChanges(VIEW.defaults, v.layers));
             layerBoxes().forEach(cb => {
@@ -7560,7 +7620,7 @@
     }
     document.addEventListener('change', (e) => {
         const id = (e.target && e.target.id) || '';
-        if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || LINK_MODE_BOXES.includes(id)) scheduleViewWrite();
+        if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || id === 'loc-dots' || LINK_MODE_BOXES.includes(id)) scheduleViewWrite();
         if (/^(layer-|restr-)/.test(id) || id === 'toggle-forecast' || id === 'heat-off' || LINK_MODE_BOXES.includes(id)) schedulePresetRender();
     });
 
