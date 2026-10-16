@@ -210,7 +210,8 @@ PROJECT_TERMS = [r"\bRBE\b", r"Rail\s?Baltic", r"\bAlliance\s?1\b", r"OnEST", r"
 SHIPPED_EXT = (".py", ".html", ".js", ".json", ".yaml", ".yml", ".md", ".txt", ".example")
 hits = {}
 for dirpath, dirs, files in os.walk(ROOT):
-    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules")]
+    # ui-audit/ (16 Oct 2026): the UI audit's runs, ignored in git; their reports quote the pages' own markup
+    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules", "ui-audit")]
     for fn in files:
         if not fn.endswith(SHIPPED_EXT):
             continue
@@ -890,7 +891,8 @@ for rel in ("backend/export.py",):
 # keys are lower-case identifiers, kept on purpose, and do not match \bModus\b.
 _modus_hits = {}
 for dirpath, dirs, files in os.walk(ROOT):
-    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules")]
+    # ui-audit/ (16 Oct 2026): the UI audit's runs, ignored in git; their reports quote the pages' own markup
+    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules", "ui-audit")]
     for fn in files:
         if not fn.endswith(SHIPPED_EXT + (".css", ".webmanifest", ".svg")):
             continue
@@ -1072,8 +1074,8 @@ _audit = read("backend/tests/ui_audit.js")
 ok("ui_audit.js says it is not in the default suite, what it measures (sideways scroll, axe WCAG AA, 24 px targets, "
    "a visible focus) and what it does not prove",
    "NOT PART OF THE DEFAULT SUITE" in _audit and "WHAT IT DOES NOT PROVE" in _audit
-   and all(s in _audit for s in ("no-sideways-scroll", "axe-serious", "targets-24px", "focus-visible", "wcag22aa", "2.5.8", "2.4.7"))
-   and 'exclude: [[".mapboxgl-ctrl"]]' in _audit and "passed, ${FAIL.length} failed" in _audit)
+   and all(s in _audit for s in ("no-sideways-scroll", "axe-wcag", "targets-24px", "focus-visible", "wcag22aa", "2.5.8", "2.4.7"))
+   and 'exclude: [[".mapboxgl-ctrl-attrib"]]' in _audit and "passed, ${FAIL.length} failed" in _audit)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
