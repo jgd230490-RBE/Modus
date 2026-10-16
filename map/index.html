@@ -61,6 +61,7 @@
            Community considerations on the password view, and By council on an organisation with no council areas */
         .control-group[hidden] { display:none; }
         #community-group h3, #community-group .control-item{ font-size:14px; }
+        #collision-group h3, #collision-group .control-item{ font-size:14px; }
         .control-item { display:flex; align-items:center; justify-content:space-between; font-size:13.5px; padding:7px 2px; }
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
@@ -893,6 +894,22 @@
         <div class="area-note" id="community-attribution"></div>
     </div>
 
+    <!-- 16 Oct 2026 (CLOCS v5 C1): the collision history — the police-reported injury collisions (DfT STATS19) along the
+         routes, as evidence for the route risk assessment. STAFF ONLY like the community considerations: hidden in the
+         markup, shown only when whoami says staff; /api/collisions refuses the map password's cookie. Off by default;
+         read only when ticked; the slight ones off until their own box is ticked. Size by severity, one ink. -->
+    <div class="control-group" id="collision-group" hidden>
+        <h3>Collision history</h3>
+        <div class="control-item"><label><input type="checkbox" id="layer-collisions" onchange="toggleCollisions(this.checked)"> Show collision history</label></div>
+        <div id="collision-filters" hidden>
+            <div class="control-item" style="padding-left:23px"><label><input type="checkbox" id="coll-slight" onchange="collisionFilterChanged()"> Include slight injuries</label></div>
+            <div class="control-item" style="padding-left:23px"><label><input type="checkbox" id="coll-vru" onchange="collisionFilterChanged()"> Only where a vulnerable road user was hurt</label></div>
+            <div class="area-note" id="collision-legend"></div>
+        </div>
+        <div class="area-note" id="collision-when"></div>
+        <div class="area-note" id="collision-attribution"></div>
+    </div>
+
     <!-- Phase 2.5a — road-restriction layers from the tenant country's road authority
          (Estonia's Tark Tee; since H1 also National Highways' planned closures for
          Great Britain), proxied and reprojected by the backend. See
@@ -1129,6 +1146,8 @@
   <select id="rme-at" hidden></select>
   <!-- 14 Oct 2026: the community considerations are drawn on the plan unless this is ticked -->
   <label class="rme-check"><input type="checkbox" id="rme-no-community"> Leave out the community considerations</label>
+  <!-- 16 Oct 2026 (CLOCS v5 C1): the collision history is left off the plan unless this is ticked -->
+  <label class="rme-check"><input type="checkbox" id="rme-collisions"> Add the collision history (killed or seriously injured only on the regional plan)</label>
   <div class="share-row"><button type="button" class="btn" id="rme-go" onclick="downloadRouteExport('pdf')">Download PDF</button>
     <button type="button" class="btn btn-ghost" id="rme-go-png" onclick="downloadRouteExport('png')">Download PNG</button></div>
   <p class="rme-note">Just the map, with its legend, scale and north arrow on it. The PDF prints at the stated scale on A4 at 100 %. The PNG is for a Word document: once it is resized, use the scale bar.</p>
@@ -3562,6 +3581,8 @@
         if (AREAS.data) { AREAS.drawn = ''; ensureAreaLayers(); renderAreas(); } else refreshAreas();
         // 14 Oct 2026: the community considerations layer too (staff only; its symbols are images, which a switch drops)
         if (typeof COMM !== 'undefined' && COMM.data) ensureCommunityLayers();
+        // 16 Oct 2026: and the collision history (staff only)
+        if (typeof COLL !== 'undefined' && COLL.data) ensureCollisionLayers();
         // and so do the Tark Tee restriction layers. Already-fetched data is re-added
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
@@ -7856,7 +7877,7 @@
             fetch('/api/public/whoami', { credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : null)
                 .then(j => { RME.staff = !!(j && j.level === 'staff'); const b = document.getElementById('rme-open'); if (b) b.hidden = !RME.staff;
-                             communityStaff(RME.staff); })
+                             communityStaff(RME.staff); collisionStaff(RME.staff); })
                 .catch(() => {});
         } catch (e) {}
     }
@@ -7944,6 +7965,8 @@
         if (at && !at.hidden && at.value) q.set('at', at.value);
         const noc = document.getElementById('rme-no-community');
         if (noc && noc.checked) q.set('community', '0');     // 14 Oct 2026: on unless the box leaves it out
+        const col = document.getElementById('rme-collisions');
+        if (col && col.checked) q.set('collisions', '1');     // 16 Oct 2026: off unless the box adds it
         return '/api/routes/map-export.' + (kind === 'png' ? 'png' : 'pdf') + '?' + q.toString();
     }
     async function downloadRouteExport(kind) {
@@ -8127,6 +8150,108 @@
         if (on) COMM.off.delete(kind); else COMM.off.add(kind);
         ensureCommunityLayers();
     }
+    // ---------------------------------------------------------------- the collision history (16 Oct 2026, CLOCS v5 C1)
+    // STAFF ONLY, like the community considerations: the group shows when whoami says staff (collisionStaff, from
+    // checkRouteExportStaff); nothing is read until the box is ticked. /api/collisions reads what a planner fetched from
+    // DfT along the routes (Config → Map and bulletin); a page view never fetches from DfT. Evidence, not a verdict: one
+    // ink, size by severity, slight as a hollow ring and off until ticked; no colour that would claim a rating. The
+    // popup gives the year and month, never the day or time (the user's decision R6).
+    const COLL = { staff: false, data: null, on: false, loading: false, popup: null };
+    const COLL_INK = '#27272A';
+    const COLL_LAYERS = ['collision-points'];
+    function collisionStaff(staff) {
+        COLL.staff = !!staff;
+        const g = document.getElementById('collision-group');
+        if (g) g.hidden = !COLL.staff;
+        if (!COLL.staff) { COLL.on = false; COLL_LAYERS.forEach(l => { try { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'none'); } catch (e) {} }); }
+    }
+    function collisionFilter() {
+        const slight = !!(document.getElementById('coll-slight') || {}).checked;
+        const vru = !!(document.getElementById('coll-vru') || {}).checked;
+        const f = ['all'];
+        if (!slight) f.push(['<=', ['get', 'severity'], 2]);
+        if (vru) f.push(['==', ['get', 'vru_any'], true]);
+        return f;
+    }
+    function ensureCollisionLayers() {
+        if (!COLL.data || !COLL.staff) return;
+        if (!map.isStyleLoaded()) { map.once('idle', ensureCollisionLayers); return; }
+        const data = { type: 'FeatureCollection', features: COLL.data.features || [] };
+        if (!map.getSource('collision-source')) map.addSource('collision-source', { type: 'geojson', data, attribution: COLL.data.credit || '' });
+        else map.getSource('collision-source').setData(data);
+        const vis = COLL.on ? 'visible' : 'none';
+        if (!map.getLayer('collision-points')) {
+            map.addLayer({ id: 'collision-points', type: 'circle', source: 'collision-source', filter: collisionFilter(),
+                layout: { visibility: vis, 'circle-sort-key': ['-', 4, ['get', 'severity']] },
+                paint: {
+                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, ['match', ['get', 'severity'], 1, 4.5, 2, 3.4, 2.2],
+                                      15, ['match', ['get', 'severity'], 1, 8, 2, 6, 4.5]],
+                    'circle-color': ['case', ['==', ['get', 'severity'], 3], '#FFFFFF', COLL_INK],
+                    'circle-stroke-color': ['case', ['==', ['get', 'severity'], 3], COLL_INK, '#FFFFFF'],
+                    'circle-stroke-width': ['case', ['==', ['get', 'severity'], 3], 1.4, 1.2],
+                } });
+            map.on('click', 'collision-points', e => collisionPopup(e));
+            map.on('mouseenter', 'collision-points', () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', 'collision-points', () => { map.getCanvas().style.cursor = ''; });
+        }
+        try { map.setFilter('collision-points', collisionFilter()); map.setLayoutProperty('collision-points', 'visibility', vis); } catch (e) {}
+        raiseMarks();
+    }
+    function collisionPopup(e) {
+        const f = e.features && e.features[0];
+        if (!f || !COLL.on) return;
+        const p = f.properties || {};
+        const arr = v => { try { return Array.isArray(v) ? v : JSON.parse(v || '[]'); } catch (err) { return []; } };
+        const month = p.month ? new Date(p.month + '-15T12:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : String(p.year || '');
+        const road = [p.road, p.road2].filter(x => x && x !== 'null').join(' / ');
+        const where = [road, (p.junction && p.junction !== 'null') ? p.junction : null].filter(Boolean).join(', ');
+        const users = arr(p.vru_words);
+        const d = (p.dist_m === null || p.dist_m === undefined || p.dist_m === 'null') ? '' : `${Math.round(Number(p.dist_m))} m from the nearest route or site`;
+        const html = `<div style="font:14px system-ui;max-width:270px"><b>${escHtml(p.severity_word || '')} injury collision</b>` +
+            `<div>${escHtml(month)}</div>` + (where ? `<div>${escHtml(where)}</div>` : '') +
+            (users.length ? `<div>Hurt: ${escHtml(users.join(', '))}</div>` : '') +
+            (String(p.goods) === 'true' ? '<div>A goods vehicle over 3.5 t was involved</div>' : '') +
+            (d ? `<div style="color:#64748B">${escHtml(d)}</div>` : '') +
+            '<div style="color:#64748B">Police-reported (DfT road safety data). Evidence for a route risk assessment, not the assessment.</div></div>';
+        if (COLL.popup) COLL.popup.remove();
+        COLL.popup = new mapboxgl.Popup({ closeButton: true, maxWidth: '290px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
+    }
+    function renderCollisionPanel() {
+        const box = document.getElementById('collision-filters'), when = document.getElementById('collision-when'),
+              att = document.getElementById('collision-attribution'), leg = document.getElementById('collision-legend');
+        const D = COLL.data;
+        if (!box || !when) return;
+        if (!D) { box.hidden = true; when.textContent = COLL.loading ? 'Reading the layer…' : ''; return; }
+        const n = D.counts || { all: 0, ksi: 0 };
+        box.hidden = !COLL.on || !n.all;
+        const dot = (r, fill, stroke) => `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" style="flex:none"><circle cx="7" cy="7" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/></svg>`;
+        if (leg) leg.innerHTML = `<span style="display:inline-flex;gap:4px;align-items:center">${dot(5.5, COLL_INK, '#fff')} Fatal</span> · ` +
+            `<span style="display:inline-flex;gap:4px;align-items:center">${dot(4.2, COLL_INK, '#fff')} Serious</span> · ` +
+            `<span style="display:inline-flex;gap:4px;align-items:center">${dot(3, '#fff', COLL_INK)} Slight</span>`;
+        const day = s => { if (!s) return null; const d = new Date(s.length > 10 ? s : s + 'T12:00:00Z'); return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
+        when.textContent = !D.fetched_at
+            ? 'Not fetched yet. A planner fetches it on Config → Map and bulletin.'
+            : `Police-reported injury collisions, ${D.period}: ${n.all} within ${D.strip.route_m} m of the routes or ${D.strip.site_m} m of the sites, ` +
+              `${n.ksi} of them killed or seriously injured. Fetched ${day(D.fetched_at)}. Evidence for a route risk assessment, not the assessment.` +
+              (D.error ? ' ' + D.error + '.' : '');
+        if (att) att.textContent = D.credit || '';
+    }
+    function loadCollisions() {
+        if (!COLL.staff || COLL.loading) return;
+        COLL.loading = true; renderCollisionPanel();
+        fetch('/api/collisions', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 401 ? 'only staff can see this layer' : 'not read (' + r.status + ')')))
+            .then(j => { COLL.data = j; COLL.loading = false; renderCollisionPanel(); ensureCollisionLayers(); })
+            .catch(e => { COLL.loading = false; const w = document.getElementById('collision-when'); if (w) w.textContent = 'Not read: ' + (e && e.message || e); });
+    }
+    function toggleCollisions(on) {
+        COLL.on = !!on && COLL.staff;
+        if (COLL.on && !COLL.data) loadCollisions();
+        renderCollisionPanel();
+        if (COLL.data) ensureCollisionLayers();
+        if (!COLL.on && COLL.popup) { COLL.popup.remove(); COLL.popup = null; }
+    }
+    function collisionFilterChanged() { ensureCollisionLayers(); }
     checkRouteExportStaff();
 
     // ---------------------------------------------------------------- the QR code, drawn here (ISO/IEC 18004; no library)

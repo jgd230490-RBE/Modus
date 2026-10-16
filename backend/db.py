@@ -71,6 +71,9 @@ TENANTED_TABLES = {
     # tenant fetched from public sources along ITS routes, and the one row saying when and from what. One
     # tenant's data (the strip is its routes), carried in its package like the council areas.
     "community_features", "community_meta",
+    # 16 Oct 2026 (CLOCS v5 C1, collisions.py): the police-reported injury collisions (DfT STATS19) along ITS
+    # routes, and the one row saying which years and when. One tenant's data, carried in its package.
+    "collision_records", "collision_meta",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -457,6 +460,9 @@ def init_network_db():
         # 14 Oct 2026: the community considerations layer. Born with tenant_id in the key.
         _create_tenanted(cur, "community_features")
         _create_tenanted(cur, "community_meta")
+        # 16 Oct 2026: the collision history (CLOCS v5 C1). Born with tenant_id in the key.
+        _create_tenanted(cur, "collision_records")
+        _create_tenanted(cur, "collision_meta")
         conn.commit()
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
@@ -1240,6 +1246,52 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, meta_id)
         )
     """,
+    # 16 Oct 2026 (CLOCS v5 C1, collisions.py): one row per police-reported injury collision (DfT STATS19) within the
+    # strip along the tenant's routes — the year and month only (never the day or time), the position, the severity,
+    # the road and junction in words, the vulnerable road users hurt (and those killed or seriously injured), whether a
+    # goods vehicle over 3.5 t was involved, and its distance in metres to every route (and alternative) it is near.
+    # Rewritten whole by collisions.refresh().
+    "collision_records": """
+        CREATE TABLE collision_records (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            collision_id   TEXT NOT NULL,
+            year           INTEGER,
+            month          TEXT,
+            lon            REAL,
+            lat            REAL,
+            severity       INTEGER,
+            road           TEXT,
+            road2          TEXT,
+            junction       TEXT,
+            road_type      TEXT,
+            speed_limit    INTEGER,
+            light          TEXT,
+            authority      TEXT,
+            n_casualties   INTEGER,
+            n_vehicles     INTEGER,
+            vru_json       TEXT,
+            vru_ksi_json   TEXT,
+            goods          INTEGER,
+            dist_m         REAL,
+            routes_json    TEXT,
+            sites_json     TEXT,
+            fetched_at     TEXT,
+            PRIMARY KEY (tenant_id, collision_id)
+        )
+    """,
+    # 16 Oct 2026: which years the collision history holds, the files read, when, by whom, and the state of a fetch.
+    "collision_meta": """
+        CREATE TABLE collision_meta (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            meta_id        TEXT NOT NULL,
+            state          TEXT,
+            started_at     TEXT,
+            fetched_at     TEXT,
+            by_whom        TEXT,
+            detail_json    TEXT,
+            PRIMARY KEY (tenant_id, meta_id)
+        )
+    """,
     # 12 Oct 2026 (§2.2b). Km of each route's PRIMARY polyline (per vehicle profile and leg)
     # inside each area, and one row per leg with area_id '*' carrying the leg's whole length.
     # Derived by areas.rebuild() and rewritten whole — never typed.
@@ -1572,6 +1624,8 @@ _TENANT_PK = {
     "route_area_km": "(tenant_id, route_id, vehicle_profile, leg, area_id)",
     "community_features": "(tenant_id, feature_id)",
     "community_meta": "(tenant_id, meta_id)",
+    "collision_records": "(tenant_id, collision_id)",
+    "collision_meta": "(tenant_id, meta_id)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

@@ -3382,6 +3382,53 @@ function CommunityPanel({ access }){
   );
 }
 
+// 16 Oct 2026 (CLOCS v5 C1) — the collision history's place in the app (Config → Map and bulletin): which years it holds
+// and when it was fetched, the counts, the credit line, and "Fetch again" for a planner or an admin. The fetch reads DfT's
+// road safety data (five years, about 250 MB) along the routes as they are stored now and takes a few minutes; the page
+// asks every 5 s while it runs. The layer is on the Route map (staff only), the three route map plans (when added) and
+// each route's Route collision evidence. Evidence for a route risk assessment, not the assessment.
+function CollisionPanel({ access }){
+  const [st, setSt] = useState(null);
+  const [msg, setMsg] = useState("");
+  const canFetch = !!(access && (access.role === "planner" || access.role === "admin"));
+  const read = () => fetch(`${API}/collisions/status`).then(r => r.ok ? r.json() : null).then(j => { if(j) setSt(j); return j; }).catch(() => null);
+  useEffect(() => { read(); }, []);
+  useEffect(() => {
+    if(!st || st.state !== "running") return;
+    const t = setTimeout(read, 5000);
+    return () => clearTimeout(t);
+  }, [st]);
+  const start = () => {
+    setMsg("Starting…");
+    fetch(`${API}/collisions/refresh`, { method: "POST" })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(j.detail || "Not started."); })
+      .catch(e => setMsg("Not started: " + (e && e.message || e)));
+  };
+  const day = (s) => { if(!s) return "—"; const d = new Date(s.length > 10 ? s : s + "T12:00:00Z"); return isNaN(d) ? s : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+  return (
+    <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="collisions">
+      <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Collision history</h3>
+      <p className="text-[14px] text-slate-600 mb-3">Police-reported injury collisions from DfT's road safety data (Great Britain, the latest five years of final data) within {st ? st.strip.route_m : 250} m of every route and {st ? st.strip.site_m : 500} m of every site: evidence for the route risk assessment the CLOCS Standard asks for. It is not the assessment. Staff only: on the Route map, on each route's collision evidence (Routes page) and, when added, on the route map plans; never on the public map or the bulletin. Fetched again when you press the button, never on a page view, so fetch again after adding or changing routes, and once a year after DfT's late-July release.</p>
+      {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
+        <>
+          <p className="text-[14px] text-slate-700 mb-2" data-collision-state={st.state}>
+            {st.state === "running" ? "Fetching now…" : st.fetched_at ? `Fetched ${day(st.fetched_at)}${st.by ? ` by ${st.by}` : ""}: ${st.period}.` : "Not fetched yet."}
+            {st.error ? <span className="text-amber-700"> {st.error}.</span> : null}
+          </p>
+          {st.fetched_at ? <p className="text-[13px] text-slate-500 mb-2">{grp(st.counts.all, 0)} collisions, {grp(st.counts.ksi, 0)} of them killed or seriously injured, {grp(st.counts.vru, 0)} with a vulnerable road user hurt.</p> : null}
+          {(st.notes || []).map((n, i) => <p key={i} className="text-[13px] text-slate-500 mb-2">{n}</p>)}
+          {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
+          {canFetch
+            ? <button type="button" className="btn btn-secondary" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
+            : <p className="text-[13px] text-slate-500">A planner or an admin fetches it.</p>}
+          {msg ? <span className="text-[13px] text-slate-600 ml-3" role="status">{msg}</span> : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RouteMapExportMenu({ months, ipts, picked }){
   const now = new Date();
   const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));
@@ -3392,6 +3439,7 @@ function RouteMapExportMenu({ months, ipts, picked }){
   const [scale, setScale] = useState("");
   const [at, setAt] = useState("");
   const [noComm, setNoComm] = useState(false);     // 14 Oct 2026: the community considerations, on unless left out
+  const [addColl, setAddColl] = useState(false);   // 16 Oct 2026 (CLOCS v5 C1): the collision history, off unless added
   const [opts, setOpts] = useState({ plans: [], places: [], regional_fitted: null });
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -3420,6 +3468,7 @@ function RouteMapExportMenu({ months, ipts, picked }){
       if(scale) q.set("scale", scale);
       if(spec && spec.centred && at) q.set("at", at);
       if(noComm) q.set("community", "0");
+      if(addColl) q.set("collisions", "1");
       const r = await fetch(`${API}/routes/map-export.${kind}?${q.toString()}`);
       if(!r.ok){
         const txt = await r.text();
@@ -3462,6 +3511,7 @@ function RouteMapExportMenu({ months, ipts, picked }){
         {spec && spec.centred && <label><span>Centred on</span><select value={at} onChange={e => setAt(e.target.value)} aria-label="Centred on">
           {(opts.places || []).map(n => <option key={n} value={n}>{n}</option>)}</select></label>}
         <label className="flex items-center gap-2" style={{ flexDirection: "row" }}><input type="checkbox" checked={noComm} onChange={e => setNoComm(e.target.checked)} data-rme-no-community="1" /> Leave out the community considerations</label>
+        <label className="flex items-center gap-2" style={{ flexDirection: "row" }}><input type="checkbox" checked={addColl} onChange={e => setAddColl(e.target.checked)} data-rme-collisions="1" /> Add the collision history (killed or seriously injured only on the regional plan)</label>
         <button type="button" onClick={() => download("pdf")} disabled={busy || noPlace}>{busy ? "Drawing the map…" : "Download PDF"}</button>
         <button type="button" onClick={() => download("png")} disabled={busy || noPlace}>Download PNG</button>
         <div className="row-menu-note">Just the map, with its legend, scale and north arrow on it. Approved lines only. A planning document, not an approved CLP. The PDF prints at the stated scale on A4 at 100 %; in a Word document, use the scale bar.</div>
@@ -6050,6 +6100,7 @@ function ConfigPage({ meta, who, access }){
                 );
               })}
               <CommunityPanel access={access} />
+              <CollisionPanel access={access} />
             </div>
           )}
 
@@ -8288,6 +8339,47 @@ function RouteSheetButton({ routeId }){
       <button className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }} onClick={go}
         disabled={busy || !routeId} title={routeId ? "One A4 page for the drivers on the route picked in the list" : "Pick a route in the list first"}>
         {busy ? "Making…" : "Route sheet (drivers)"}</button>
+      {err && <span className="text-xs" style={{ color: "var(--red)" }}>{err}</span>}
+    </span>
+  );
+}
+// ---- 16 Oct 2026 (CLOCS v5 C1): the route collision evidence ---------------------------------------------------------
+// For the person writing the route risk assessment: the police-reported injury collisions on and near the route picked in
+// the list, as a PDF (map, counts, the places with more than one collision) or a spreadsheet. Drawn on the server from
+// what was fetched on Config → Map and bulletin; nothing here counts.
+async function downloadCollisionEvidence(routeId, kind){
+  const r = await fetch(`${API}/routes/${encodeURIComponent(routeId)}/collision-evidence.${kind}`);
+  if(!r.ok){
+    const txt = await r.text();
+    let d = "";
+    try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
+    throw new Error(d || `error ${r.status}`);
+  }
+  const blob = await r.blob();
+  const cd = r.headers.get("content-disposition") || "";
+  const fm = cd.match(/filename="([^"]+)"/);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fm ? fm[1] : `route-collision-evidence-${routeId}.${kind}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function CollisionEvidenceButton({ routeId }){
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState(null);
+  const go = async (kind) => {
+    setBusy(kind); setErr(null);
+    try { await downloadCollisionEvidence(routeId, kind); } catch(e){ setErr("The collision evidence could not be made: " + (e.message || e)); }
+    setBusy(null);
+  };
+  const tip = routeId ? "Police-reported injury collisions on and near the route picked in the list, for the route risk assessment" : "Pick a route in the list first";
+  const st = { width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 };
+  return (
+    <span className="inline-flex flex-col items-end" data-collision-evidence="1">
+      <span className="inline-flex gap-1">
+        <button className="btn-sec" style={st} onClick={() => go("pdf")} disabled={!!busy || !routeId} title={tip}>{busy === "pdf" ? "Making…" : "Collision evidence (PDF)"}</button>
+        <button className="btn-sec" style={st} onClick={() => go("xlsx")} disabled={!!busy || !routeId} title={tip}>{busy === "xlsx" ? "Making…" : "XLSX"}</button>
+      </span>
       {err && <span className="text-xs" style={{ color: "var(--red)" }}>{err}</span>}
     </span>
   );
@@ -11562,6 +11654,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />
             {/* 16 Oct 2026 (CLOCS v5 C3): the route sheet for drivers, for the route picked in the list */}
             <RouteSheetButton routeId={selected} />
+            {/* 16 Oct 2026 (CLOCS v5 C1): the route collision evidence, for the route risk assessment */}
+            <CollisionEvidenceButton routeId={selected} />
             {/* Bulk bake. Vehicles come from the tick-boxes on the Create route panel so
                 there is one vehicle list on the tab rather than two that can disagree. */}
             <select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)} className={sel}

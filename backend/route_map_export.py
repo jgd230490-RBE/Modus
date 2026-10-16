@@ -186,12 +186,13 @@ def centre_choices(S):
     return [p["name"] for p in sorted(ps, key=lambda p: (p.get("end") != "dest", p["letter"]))]
 
 
-def plan(S, kind="regional", scale=None, at=None, community=True):
+def plan(S, kind="regional", scale=None, at=None, community=True, collisions=False):
     """
     Adds S["plan"]: which plan, its stated scale, the basemap view drawn exactly at that scale (FRAME_W_MM wide), the
     place it is centred on, and the places inside the frame (the panel lists those). Raises PlanError on a plan, scale or
     place it does not offer. 14 Oct 2026: `community` (on unless the card's box leaves it out) adds the community
-    considerations in the frame (community_in_frame), which the PDF draws and lists.
+    considerations in the frame (community_in_frame), which the PDF draws and lists. 16 Oct 2026 (CLOCS v5 C1):
+    `collisions` (off unless the card's box adds it) adds the collision history in the frame (collisions_in_frame).
     """
     import basemap
     import bulletin_doc
@@ -247,8 +248,35 @@ def plan(S, kind="regional", scale=None, at=None, community=True):
     P["centre_choices"] = choices
     P["community"] = community_in_frame(P["view"], omit=PLAN_OMITS.get(kind, ())) if (community and P["view"]) else None
     P["community_asked"] = bool(community)
+    P["collisions"] = collisions_in_frame(P["view"], kind) if (collisions and P["view"]) else None
+    P["collisions_asked"] = bool(collisions)
     S["plan"] = P
     return S
+
+
+# 16 Oct 2026 (CLOCS v5 C1): the regional plan draws the killed-or-seriously-injured collisions only (slight ones crowd
+# a 1:20,000 map the way bus stops do); the local and site plans draw all three. The panel says so.
+COLLISION_KSI_ONLY = ("regional",)
+
+
+def collisions_in_frame(v, kind):
+    """The stored collisions inside the plan's frame (the KSI only on the regional plan), with the words its panel
+    prints. None when nothing has been fetched."""
+    import basemap
+    import collisions as cl
+    st = cl.status()
+    if not st["fetched_at"]:
+        return {"records": [], "period": "", "credit": "", "ksi_only": False, "fetched": False}
+    ksi_only = kind in COLLISION_KSI_ONLY
+    keep = []
+    for c in cl.records():
+        if ksi_only and not c["ksi"]:
+            continue
+        x, y = basemap.project(v, c["lon"], c["lat"])
+        if 0 <= x <= v["w"] and 0 <= y <= v["h"]:
+            keep.append(c)
+    return {"records": keep, "period": st["period"], "credit": cl.credit_line(), "ksi_only": ksi_only, "fetched": True,
+            "severities": sorted({c["severity"] for c in keep})}
 
 
 # 15 Oct 2026 (the user: "leave bus stops off the regional plan"): kinds a plan leaves out of the community considerations.

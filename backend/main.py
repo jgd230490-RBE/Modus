@@ -58,6 +58,7 @@ import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the m
 import route_sheet  # 16 Oct 2026 — the route sheet for drivers (CLOCS v5 C3)
 import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
 import community     # 14 Oct 2026 — the community considerations layer (staff map and the CLP plans)
+import collisions    # 16 Oct 2026 — the collision history along the routes (CLOCS v5 C1; staff only)
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
@@ -2643,7 +2644,7 @@ def route_sheet_pdf(route_id: str, vehicle: Optional[str] = None, request: Reque
                              "Cache-Control": "no-store"})
 
 
-def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1):
+def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1, collisions=0):
     """
     14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
     template") — the route map export's one read: the map as it is filtered, as one of the CLOCS outline CLP template's
@@ -2662,7 +2663,8 @@ def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan
                                discipline=discipline)
     try:
         # 14 Oct 2026: community=0 is the card's "Leave out the community considerations"
-        route_map_export.plan(S, plan, scale, at, community=bool(community))
+        # 16 Oct 2026 (CLOCS v5 C1): collisions=1 is the card's "Add the collision history" (off unless ticked)
+        route_map_export.plan(S, plan, scale, at, community=bool(community), collisions=bool(collisions))
     except route_map_export.PlanError as e:
         raise HTTPException(422, str(e))
     return S
@@ -2679,10 +2681,11 @@ def _route_map_file(S, month, ext):
 def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
-                         at: Optional[str] = None, community: int = 1, request: Request = None):
+                         at: Optional[str] = None, community: int = 1, collisions: int = 0,
+                         request: Request = None):
     """The plan as one A4 landscape page, exactly at its stated scale when printed at 100 % (_route_map_plan)."""
     from fastapi.responses import Response       # not in every test stub; imported here
-    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community)
+    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community, collisions)
     try:
         data = export.build_route_map_pdf(S)
     except RuntimeError as e:
@@ -2696,10 +2699,11 @@ def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: 
 def route_map_export_png(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
-                         at: Optional[str] = None, community: int = 1, request: Request = None):
+                         at: Optional[str] = None, community: int = 1, collisions: int = 0,
+                         request: Request = None):
     """The same plan as a PNG for a Word document: the PDF page rasterised, so the two never differ."""
     from fastapi.responses import Response
-    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community)
+    S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community, collisions)
     try:
         data = export.route_map_png(export.build_route_map_pdf(S))
     except RuntimeError as e:
@@ -2755,6 +2759,85 @@ def community_refresh(request: Request = None):
     if acc.get("role") not in ("planner", "admin"):
         raise HTTPException(403, "only a planner or an admin can fetch the community considerations again")
     return community.start_refresh(by=acc.get("name") or acc.get("label") or acc.get("role"))
+
+
+@app.get("/api/collisions")
+def collision_layer(request: Request = None):
+    """
+    16 Oct 2026 (CLOCS v5 C1, 4.1a / 5.1a / 5.6a) — the COLLISION HISTORY (collisions.py): the police-reported injury
+    collisions (DfT road safety data, STATS19, the latest five final years) stored along the tenant's routes, as one
+    GeoJSON FeatureCollection (year and month, never the day or time), with which years and when. STAFF ONLY (the
+    user's decision R6, 16 Oct): a valid code, a login or the staff cookie; the map password's cookie gets 401.
+    Reads what is stored: nothing is fetched on a page view.
+    """
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the collision history is for staff")
+    return collisions.payload()
+
+
+@app.get("/api/collisions/status")
+def collision_status(request: Request = None):
+    """Which years the collision history holds, when it was fetched, the counts and the state of a fetch. Staff only."""
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the collision history is for staff")
+    return collisions.status()
+
+
+@app.post("/api/collisions/refresh")
+def collision_refresh(request: Request = None):
+    """Fetch the collision history again along the routes as they are stored now (DfT's files for five years, about
+    250 MB read on a thread, a few minutes). A planner or an admin; a team code may look but not fetch."""
+    acc = access.current()
+    if not acc:
+        raise HTTPException(401, "sign in — a valid access code is required")
+    if acc.get("role") not in ("planner", "admin"):
+        raise HTTPException(403, "only a planner or an admin can fetch the collision history again")
+    return collisions.start_refresh(by=acc.get("name") or acc.get("label") or acc.get("role"))
+
+
+def _collision_evidence(route_id, request):
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the route collision evidence is for staff")
+    try:
+        return collisions.evidence(route_id, acc=access.current())
+    except collisions.EvidenceError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/api/routes/{route_id}/collision-evidence.pdf")
+def collision_evidence_pdf(route_id: str, request: Request = None):
+    """
+    16 Oct 2026 (CLOCS v5 C1): the ROUTE COLLISION EVIDENCE for one route, for the person writing the route risk
+    assessment: the route and its stored alternatives side by side, the police-reported injury collisions on the route
+    (within 25 m) and within 250 m over the five years held, the places with more than one collision in order along the
+    route, the community considerations near each, a map, DfT's own caveats. Counts only: no score, rate or ranking.
+    STAFF ONLY; a team code reads its own team's routes (404 for another's).
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    S = _collision_evidence(route_id, request)
+    try:
+        data = export.build_collision_evidence_pdf(S)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{collisions.file_name(S)}"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/api/routes/{route_id}/collision-evidence.xlsx")
+def collision_evidence_xlsx(route_id: str, request: Request = None):
+    """The same evidence as a spreadsheet: the counts, the locations, and one row per collision (for an assessor who
+    wants to filter). Staff only, like the PDF."""
+    from fastapi.responses import Response
+    S = _collision_evidence(route_id, request)
+    try:
+        data = export.build_collision_evidence_xlsx(S)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{collisions.file_name(S, "xlsx")}"',
+                             "Cache-Control": "no-store"})
 
 
 @app.get("/api/public/route-alternatives")

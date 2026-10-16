@@ -603,10 +603,11 @@ access.current = lambda: {"role": "ipt", "label": "North Team", "ipt": "IPT1"}
 _e = raises(lambda: main.community_refresh(request=_Request()))
 ok("6: ...a team code's POST is refused, 403", getattr(_e, "status_code", None) == 403)
 access.current = _orig_cur
+# NARROWED 16 Oct 2026: the plan endpoints also take `collisions` (CLOCS v5 C1) after `community`
 ok("6: the plan endpoints carry `community` through to route_map_export.plan",
-   "community: int = 1, request: Request = None):" in _src_main.split("def route_map_export_pdf(")[1][:600]
-   and "community: int = 1, request: Request = None):" in _src_main.split("def route_map_export_png(")[1][:600]
-   and "route_map_export.plan(S, plan, scale, at, community=bool(community))" in _src_main)
+   "community: int = 1, collisions: int = 0," in _src_main.split("def route_map_export_pdf(")[1][:600]
+   and "community: int = 1, collisions: int = 0," in _src_main.split("def route_map_export_png(")[1][:600]
+   and "route_map_export.plan(S, plan, scale, at, community=bool(community), collisions=bool(collisions))" in _src_main)
 
 # --------------------------------------------------------------------------- #
 #  7. The CLP plans                                                            #
@@ -661,7 +662,8 @@ ok("7: outlines are a 22 % tint with the full colour as the edge (the colour sys
    community.FILL_ALPHA == 0.22 and "c.setFillAlpha(_comm_alpha())" in _ex.split("def _draw_community(")[1].split("\ndef ")[0]
    and main.community_layer(request=_Request())["fill_alpha"] == 0.22)
 _rp = read("backend/route_map_export.py")
-ok("7: plan() adds the layer unless asked not to", "def plan(S, kind=\"regional\", scale=None, at=None, community=True):" in _rp
+# NARROWED 16 Oct 2026: plan() also takes collisions=False (CLOCS v5 C1) after community=True
+ok("7: plan() adds the layer unless asked not to", "def plan(S, kind=\"regional\", scale=None, at=None, community=True, collisions=False):" in _rp
    # NARROWED 15 Oct 2026: the plan's own omissions (bus stops off the regional plan) ride along
    and 'P["community"] = community_in_frame(P["view"], omit=PLAN_OMITS.get(kind, ())) if (community and P["view"]) else None' in _rp)
 
@@ -703,7 +705,8 @@ ok("8: app — the Routes page menu's leave-out box", 'if(noComm) q.set("communi
 ok("8: app — no page reads the layer on load except the panel's status", APP.count("/community/status") == 1)
 ok("8: the tables are tenanted, in the package (after the work tables) and in the audit's registry",
    {"community_features", "community_meta"} <= set(db.TENANTED_TABLES)
-   and tenant_package.ORDER[-2:] == ["community_features", "community_meta"]
+   # NARROWED 16 Oct 2026: the collision history's two tables (CLOCS v5 C1) come after them, so the last four
+   and tenant_package.ORDER[-4:-2] == ["community_features", "community_meta"]
    and '"community_features", "community_meta",' in read("backend/tests/test_tenant_audit.py"))
 _sql = read("backend/community.py")
 import ast  # noqa: E402
