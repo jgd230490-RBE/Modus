@@ -31,9 +31,10 @@
  *     - the look and accent asked for are the ones on <html>, and the page is the one named (its header)           (fail)
  *     - text smaller than 12 px (charts' SVG text included), labels cut with an ellipsis, a native confirm()/alert()  (warn)
  *     - a screenshot: the real fold first; when the page or the portal's scroller is taller, the viewport is grown to
- *       the content — the scroller plus what sits above and below it (on a phone the tab bar) — then measured again
- *       and grown again until the height holds (the chart boxes are sized in vh and grow with the viewport); max
- *       4,000 px, marked when cut. Never for the map.
+ *       the content — the scroller plus what sits above and below it (on a phone the tab bar). Elements sized in vh
+ *       (the chart boxes, clamp(200px, 28vh, 420px); the 62vh maps; the 60vh textarea) are pinned at their fold height
+ *       first, so they do not inflate with the viewport; then the height is measured again and grown again until it
+ *       holds. Max 4,500 px, marked when cut. Never for the map.
  *   once per screen, at the widest width of the run, in the first look (the "deep" stops):
  *     - keyboard: from the top of the page, Tab up to 40 times; every stop must show a visible change (WCAG 2.4.7;
  *       a transparent outline is no outline), be on screen, not be the same element twice in a row (a trap); the
@@ -78,7 +79,7 @@ const BACKEND = path.join(ROOT, "backend");
 function parseArgs(argv) {
   const o = { full: false, headed: false, blockMapbox: false, keepServer: false, guide: false, deep: true, out: path.join(ROOT, "ui-audit"),
               db: path.join(BACKEND, "forecasts_local.db"), python: null, base: null, code: "ui-planner", teamCode: "ui-team-1",
-              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4000 };
+              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => argv[++i];
     if (a === "--full") o.full = true;
@@ -460,17 +461,46 @@ function contentHeight() {
   const rootHidden = /hidden|clip/.test(getComputedStyle(doc).overflowY) || /hidden|clip/.test(getComputedStyle(document.body).overflowY);
   return !rootHidden && doc.scrollHeight > doc.clientHeight + 4 ? doc.scrollHeight : 0;
 }
+// an element whose height follows the viewport — vh in a rule's height / min-height / max-height (the chart boxes,
+// clamp(200px, 28vh, 420px); Tailwind's h-[60vh], max-h-[72vh]) or in its inline style (the 62vh maps) — keeps the
+// size it has at the fold while the viewport is grown. Else a grown shot shows them taller than any screen draws them
+// and the end of the page falls below the height measured at the fold (17 Oct: the 390 px Dashboard, 3,968 px tall,
+// had lost its last gate rows and the Gate by gate expander this way; at 1366 the charts grew from 215 to 420 px).
+// Runs inside the page; returns how many were pinned. unpinViewportUnits() puts their inline styles back.
+function pinViewportUnits() {
+  const sels = [];
+  // a rule's own style first, then what it nests: a plain style rule has a (usually empty) cssRules list of its own
+  const walk = (rules) => { for (const r of rules) {
+    if (r.style && r.selectorText && /\d(vh|svh|dvh|lvh)\b/.test(r.style.height + " " + r.style.minHeight + " " + r.style.maxHeight)) sels.push(r.selectorText);
+    if (r.cssRules && r.cssRules.length) walk(r.cssRules); } };
+  for (const ss of document.styleSheets) { try { walk(ss.cssRules); } catch (e) {} }   // a cross-origin sheet (Mapbox's) cannot be read: skipped
+  const els = new Set();
+  for (const s of sels) { try { document.querySelectorAll(s).forEach(e => els.add(e)); } catch (e) {} }
+  for (const e of document.querySelectorAll("[style*='vh']")) els.add(e);
+  let n = 0;
+  for (const el of els) {
+    if (el === document.documentElement || el === document.body) continue;
+    const h = el.getBoundingClientRect().height; if (!h) continue;   // hidden: nothing to pin
+    el.setAttribute("data-ui-audit-style", el.getAttribute("style") || "");
+    el.style.setProperty("height", h + "px", "important"); el.style.setProperty("min-height", "0", "important"); el.style.setProperty("max-height", "none", "important");
+    n++;
+  }
+  return n;
+}
+function unpinViewportUnits() {
+  for (const el of document.querySelectorAll("[data-ui-audit-style]")) { const s = el.getAttribute("data-ui-audit-style"); if (s) el.setAttribute("style", s); else el.removeAttribute("style"); el.removeAttribute("data-ui-audit-style"); }
+}
 async function shoot(page, file, width, height, contentH, fixed) {
   // the real fold first; a page or a portal scroller taller than the viewport is pictured whole by growing the viewport
   // (never a fixed page: the map re-tiles to the new size and shows a screen no phone shows). A fullscreen window
-  // (the big screen) cannot be resized, and is shot as it is. Once grown, the content can grow too — the chart boxes
-  // are sized in vh (28vh, capped at 420 px) and a panel can draw late — so the height is measured again and the
-  // viewport grown again until it holds (17 Oct: the 390 px Dashboard, 3,968 px tall, had lost its last gate rows and
-  // the Gate by gate expander below the height measured at the fold).
+  // (the big screen) cannot be resized, and is shot as it is. Before growing, what is sized in vh is pinned at its
+  // fold height (pinViewportUnits); once grown, the content can still grow — a panel that draws late — so the height
+  // is measured again and the viewport grown again until it holds.
   const full = await page.evaluate(() => !!document.fullscreenElement).catch(() => false);
   let want = (!fixed && !full && contentH > height + 4) ? Math.min(Math.ceil(contentH), OPT.maxShot) : height;
-  let truncated = !fixed && contentH > OPT.maxShot, regrown = 0;
+  let truncated = !fixed && contentH > OPT.maxShot, regrown = 0, pinned = 0;
   if (want > height) {
+    pinned = await page.evaluate(pinViewportUnits).catch(() => 0);
     await page.setViewportSize({ width, height: want }); await page.waitForTimeout(150);
     for (let i = 0; i < 4 && want < OPT.maxShot; i++) {
       await page.waitForTimeout(250);
@@ -482,8 +512,8 @@ async function shoot(page, file, width, height, contentH, fixed) {
     }
   }
   await page.screenshot({ path: file, fullPage: false });
-  if (want > height) { await page.setViewportSize({ width, height }); await page.waitForTimeout(100); }
-  return { grown: want > height ? want : 0, regrown, truncated };
+  if (want > height) { await page.setViewportSize({ width, height }); await page.evaluate(unpinViewportUnits).catch(() => {}); await page.waitForTimeout(100); }
+  return { grown: want > height ? want : 0, regrown, truncated, pinned };
 }
 async function leaveFullscreen(page) {
   await page.evaluate(() => document.fullscreenElement && document.exitFullscreen && document.exitFullscreen()).catch(() => {});
@@ -509,7 +539,13 @@ async function audit(page, store, meta) {
   // a 401 / 403 is the gate working on the signed-out screens, and on the Users page opened with a CODE (it asks for
   // the admin token first: the list answers 403 until it is typed — by design, G3)
   const signedOut = SIGNED_OUT.test(meta.name) || (meta.page === "users" && !OPT.email && !/login-user/.test(meta.name));
-  const errors = drained.errors.filter(e => !ALLOWED_CONSOLE.some(re => re.test(e)) && !(signedOut && /status of (401|403)/.test(e)));
+  // a stop whose premise is a request the harness CUT (meta.cut: the read it aborted, or every request while the context
+  // is offline): the browser's own "Failed to load resource" line for it and the request itself are the premise, not a
+  // defect — a pageerror (the app not coping) still counts
+  const cut = meta.cut || null;
+  const errors = drained.errors.filter(e => !ALLOWED_CONSOLE.some(re => re.test(e)) && !(signedOut && /status of (401|403)/.test(e))
+    && !(cut && /^console: Failed to load resource: net::ERR_(FAILED|INTERNET_DISCONNECTED|ABORTED)/.test(e)));
+  const failedReqs = cut ? drained.failed.filter(f => !cut.test(f)) : drained.failed;
   const mapboxErr = OPT.blockMapbox ? errors.filter(e => /mapbox|tile|style|glyph|sprite/i.test(e)) : [];
   const realErr = errors.filter(e => !mapboxErr.includes(e));
   const http = drained.http.filter(h => !(signedOut && (h.status === 401 || h.status === 403)));
@@ -545,7 +581,7 @@ async function audit(page, store, meta) {
   if (dom.offEdge && dom.offEdge.length) warnings.push({ id: "controls-off-edge", detail: dom.offEdge });
   if (dom.badges) warnings.push({ id: "badges-under-12px", detail: dom.badges });
   if (third.length) warnings.push({ id: "third-party-http", detail: third });
-  if (drained.failed.length) warnings.push({ id: "requests-failed", detail: drained.failed });
+  if (failedReqs.length) warnings.push({ id: "requests-failed", detail: failedReqs });
   if (drained.dialogs.length) warnings.push({ id: "native-dialog", detail: drained.dialogs });
   if (mapboxErr.length) warnings.push({ id: "mapbox-offline", detail: mapboxErr });
   // the two guides are chapters, each an h1 — a recorded design (test_help.py), not counted; a shell whose content is an iframe has the map's h1 in the map's stop
@@ -554,9 +590,10 @@ async function audit(page, store, meta) {
   if (store.settleWhy) warnings.push({ id: "not-settled", detail: store.settleWhy });
   if (shot.truncated) warnings.push({ id: "shot-truncated", detail: { contentH: dom.contentH, maxShot: OPT.maxShot } });
   for (const c of checks) ok(`${label}: ${c.id}`, c.ok, c.ok ? "" : JSON.stringify(c.detail).slice(0, 300));
-  const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
+  const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, shotPinned: shot.pinned || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
                  theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks };
   delete stop.base;
+  if (cut) stop.cut = cut.source;   // on the record as text (a RegExp would serialise as {})
   REPORT.stops.push(stop);
   const bad = checks.filter(c => !c.ok).map(c => c.id);
   process.stdout.write(`${bad.length ? "FAIL" : "ok  "} ${label.padEnd(46)} ${String(t).padStart(5)} ms  ${bad.join(" ")}${warnings.length ? "  (" + warnings.map(w => w.id).join(" ") + ")" : ""}\n`);
@@ -909,7 +946,7 @@ async function errorStates(page, ctx, store, meta, w) {
   await gotoPage(page, "dashboard"); await page.waitForTimeout(300);
   await gotoPage(page, "forecasts");
   await page.waitForSelector('[data-empty="error"], [role="alert"]', { timeout: 15000 }).catch(() => {});
-  isApp(await audit(page, store, meta("forecasts-error", w, { portal: true, page: "forecasts" })), "Forecasts", await shown());
+  isApp(await audit(page, store, meta("forecasts-error", w, { portal: true, page: "forecasts", cut: /\/api\/forecasts(\?|$)/ })), "Forecasts", await shown());
   await ctx.unroute(/\/api\/forecasts(\?|$)/);
   await gotoPage(page, "dashboard"); await page.waitForTimeout(300); await gotoPage(page, "forecasts");
   await settle(page, store);
@@ -917,7 +954,7 @@ async function errorStates(page, ctx, store, meta, w) {
   if (await search.count()) { await search.fill("zzzz-no-such-line"); await page.waitForTimeout(500); await audit(page, store, meta("forecasts-nomatch", w)); await search.fill(""); }
   await ctx.setOffline(true);
   await gotoPage(page, "lookahead"); await page.waitForTimeout(1500);
-  isApp(await audit(page, store, meta("offline-lookahead", w, { portal: true, page: "lookahead" })), "Look-ahead", await shown());
+  isApp(await audit(page, store, meta("offline-lookahead", w, { portal: true, page: "lookahead", cut: /./ })), "Look-ahead", await shown());
   await ctx.setOffline(false);
 }
 
