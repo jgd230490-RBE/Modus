@@ -140,13 +140,17 @@ the country's set in one click when the figures differ.</p>
 <h2 id="t1-gates">Gate arrivals</h2>
 <p>Read from <code>GET /api/gates/arrivals?month=N</code> (<code>backend/gate_arrivals.py</code>). The same trips rule,
 all teams summed at the gate a lorry arrives by: laden at the destination's entry gate, empty (coming to load) at the
-origin's. Arrivals a day = trips ÷ working days. The gap is the shift's minutes ÷ arrivals, an average with no hourly
+origin's. Arrivals a day = trips ÷ working days. The gap is the gate's open minutes ÷ arrivals, an average with no hourly
 peak. Red only when that gap is shorter than the gate's typed check-in; a gate with no check-in typed is never
 compared. A team code gets the totals and the team names, never another team's figure.</p>
 <p>Since 14 Oct 2026 (<code>backend/gate_hours.py</code>, the one rule for every screen and export): a gate's <strong>open
-minutes</strong> are its typed open hours (a window that ends before it starts runs past midnight) less the scheme's
-no-delivery peak bands (<code>planning.peak_bands</code>, Config → Planning) inside them; a gate with no hours typed uses
-the shift's minutes, and the peak bands cannot be taken off it (the shift has no clock times). Capacity a day = open
+minutes</strong> are its typed open hours (a window that ends before it starts runs past midnight) — since 17 Oct 2026 a
+gate with no hours typed is open the default gate hours (<code>planning.default_gate_hours</code>, Config → Planning,
+08:00–17:00 when not set; applied when read, never stored on the gate) — less the scheme's no-delivery peak bands
+(<code>planning.peak_bands</code>, Config → Planning) and the gate's own shut windows (<code>shut_windows</code>, at most
+four, each within one day, stored as <code>08:30-09:15,12:00-12:30</code>) inside them, taken off as one set so an overlap
+counts once. A shut time wholly outside the gate's hours, or shut times that leave it no open minute, are refused when
+typed. The lorry shift (<code>planning.shift_hours_per_day</code>) is no longer any gate's day. Capacity a day = open
 minutes ÷ check-in minutes a lorry; the gap uses the same open minutes. Two steps: <strong>Queue likely</strong> (amber)
 at 85 % of capacity or more (<code>NEAR_PCT</code>), <strong>Over gate capacity</strong> (red) past it — the red rule
 above, renamed on screen. Open days (seven flags, Monday first) are tested on the Look-ahead's dated days only: a month
@@ -155,11 +159,12 @@ figure is a working-day average. The reply carries <code>near_per_day</code> (85
 hour</strong>, from an average working day of the month played lorry by lorry. Each approved line's trips ÷ working days
 is rounded down or up to whole loads (the day's total is the month's average day rounded; the gates are kept as close as
 they can be to the figures above, then the smallest change to each line, then the lowest route numbers). Each gate's
-arrivals are spread evenly over its open minutes, the peak bands taken off (a gate with no hours typed takes the shift
-placed at 07:00, stood in). The busiest hour is the clock hour with most arrivals; the gate can check in 60 ÷ its
+arrivals are spread evenly over its open minutes, the peak bands and its shut windows taken off (a gate with no hours
+typed takes the default gate hours). No lorry is placed before its gate opens: each sets off its route's drive time earlier,
+so the first lorries set off before the opening. The busiest hour is the clock hour with most arrivals; the gate can check in 60 ÷ its
 check-in minutes an hour. The same day, with a scenario (open hours, check-in, peak bands, a concrete pour), is
 <code>GET /api/sim/day?month=N</code>: one lane at each gate, first come first served; a lorry that comes while the gate
-is shut waits for it to open, and one still waiting after the last open minute is checked in late and counted; the
+is shut (before it opens, in a band or in one of its shut windows) waits for it to open, and one still waiting after the last open minute is checked in late and counted; the
 bottleneck is the first wait longer than the check-in. Nothing is saved. A window past midnight is refused.</p>
 
 <h2 id="t1-stock">Stockpiles</h2>

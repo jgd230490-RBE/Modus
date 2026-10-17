@@ -397,6 +397,10 @@ def validate(doc, network=None):
         pb = gate_hours.peak_bands_problem(plan.get("peak_bands"))
         if pb:
             p.append(f"planning.{pb}" if pb.startswith("peak_bands") else f"planning.peak_bands: {pb}")
+        # 17 Oct 2026 (the user): the scheme's default gate hours, for every gate with none of its own (absent = 08:00–17:00)
+        dg = gate_hours.default_hours_problem(plan.get("default_gate_hours"))
+        if dg:
+            p.append(f"planning.{dg}")
     # 10 Oct 2026: the carbon block, when present. Every shape the carbon planner reads is
     # checked, so a Config save can never leave a document that makes every scenario fail:
     # the sub-blocks are objects, every factor a number >= 0 (null switches a figure off), a

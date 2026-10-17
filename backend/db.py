@@ -835,7 +835,9 @@ def init_lookahead_db():
                                 ("routes", "permitted_deviations", "TEXT"),
                                 ("locations", "site_rules", "TEXT"),
                                 # 16 Oct 2026: the gate's access road (a haul-road zone id)
-                                ("location_gates", "access_zone_id", "TEXT")):
+                                ("location_gates", "access_zone_id", "TEXT"),
+                                # 17 Oct 2026: the gate's shut windows ('08:30-09:15,12:00-12:30')
+                                ("location_gates", "shut_windows", "TEXT")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1438,11 +1440,17 @@ _TENANT_DDL = {
             updated_at              TEXT,
             -- 14 Oct 2026 (bundle G, W17): when the gate is open, for its capacity (open minutes ÷
             -- safety_minutes). open_from / open_to 'HH:MM'; open_days seven '1'/'0' flags Monday
-            -- first ('1111100' = weekdays). NULL = the scheme's shift, every day. ALTERed in
-            -- init_lookahead_db() as well, or the SQLite rebuild drops them.
+            -- first ('1111100' = weekdays). NULL = the default gate hours (17 Oct 2026: 08:00–17:00,
+            -- or the scheme's planning.default_gate_hours; applied when read, never stored here),
+            -- every day. ALTERed in init_lookahead_db() as well, or the SQLite rebuild drops them.
             open_from               TEXT,
             open_to                 TEXT,
             open_days               TEXT,
+            -- 17 Oct 2026 (the user: "planned close times throughout the day"): the gate's SHUT
+            -- WINDOWS, start-sorted 'HH:MM-HH:MM' joined by commas ('08:30-09:15,12:00-12:30'), at
+            -- most 4, each within one day, taken off its open minutes (gate_hours.open_minutes).
+            -- NULL = none. ALTERed in init_lookahead_db() as well, or the SQLite rebuild drops it.
+            shut_windows            TEXT,
             -- 16 Oct 2026 (the user: "gates are usually right by the public road with a suitable
             -- bellmouth … ensure there is a haul road drawn to every gate"): the gate's ACCESS ROAD,
             -- a haul-road zone drawn from the public road to the gate. A leg leaving by the gate

@@ -3426,6 +3426,8 @@ class GateIn(BaseModel):
     open_days: Optional[str] = None
     # 16 Oct 2026: the haul road drawn from the public road to this gate (a zone id); None = none
     access_zone_id: Optional[str] = None
+    # 17 Oct 2026: the gate's shut windows during the day, [{from, to}] (gate_hours.shut_problem); None or [] = none
+    shut_windows: Optional[List[dict]] = None
 
 
 class GatePatch(BaseModel):
@@ -3442,6 +3444,7 @@ class GatePatch(BaseModel):
     open_to: Optional[str] = None
     open_days: Optional[str] = None
     access_zone_id: Optional[str] = None
+    shut_windows: Optional[List[dict]] = None
 
 
 class RouteGatesIn(BaseModel):
@@ -3461,7 +3464,8 @@ def gate_arrivals_month(month: Optional[int] = None):
     """
     11 Oct 2026 — lorries a day at each gate for one month, every team summed: laden arrivals at the
     destination's entry gate plus empty arrivals (coming to load) at the origin's entry gate, approved
-    lines only, ÷ working days; the average gap is the shift's minutes ÷ arrivals, flagged red only
+    lines only, ÷ working days; the average gap is the gate's open minutes ÷ arrivals (its hours, else the
+    default gate hours, less the no-delivery bands and its shut windows; 17 Oct 2026), flagged red only
     when it is shorter than the gate's typed check-in. Any signed-in code; a team code gets the totals
     and the team names, never another team's figure (gate_arrivals.arrivals masks per_team from acc).
     Reads only. No hourly peak exists in the data, so every figure says "if arrivals are spread evenly".
@@ -3492,7 +3496,8 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
     """
     16 Oct 2026 (S3) — the haulage simulation: an average working day of one month at every gate, lorry by lorry
     (sim.py; the example the user approved on 16 Oct is its spec). Whole loads per line, each gate's arrivals spread
-    evenly over its open hours less the no-delivery bands (D59), an optional concrete pour as a burst, one lane at each
+    evenly over its open hours less the no-delivery bands and its shut windows (D59), an optional concrete pour as a
+    burst, one lane at each
     gate, the busiest hour, the bottleneck (D85), the minutes lost, late check-ins (D89). The scenario is these query
     parameters and nothing else: no write, nothing saved, no link (D86). Any signed-in code, like the Gate arrivals
     panel; a team code sees other teams' lines by route only. `legs=1` adds each route's line for the drawing.
@@ -3578,7 +3583,7 @@ def create_gate(body: GateIn, token: Optional[str] = None):
                              is_default=body.is_default, active=body.active,
                              note=body.note, gate_id=body.gate_id,
                              open_from=body.open_from, open_to=body.open_to, open_days=body.open_days,
-                             access_zone_id=body.access_zone_id)
+                             access_zone_id=body.access_zone_id, shut_windows=body.shut_windows)
 
 
 @app.patch("/api/admin/gates/{gate_id}")

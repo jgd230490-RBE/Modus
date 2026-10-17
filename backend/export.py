@@ -62,6 +62,7 @@ except Exception as e:                                   # pragma: no cover
     MISSING["pdf"] = str(e)
 
 import config
+import gate_hours
 
 # Wayscope theme (29 Sep): ink #1F2024 for headings, the accent red for over/short, grey for notes.
 NAVY = "1F2024"
@@ -256,7 +257,8 @@ FLAG_LABEL = {"SHORTAGE": "SHORTAGE", "DAYS_NE_WEEK": "DAYS ≠ WEEK", "STOCKPIL
               "GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"}
 
 #: 14 Oct 2026 (W17): printed wherever a gate flag is — the figures are planned, not observed
-GATE_LIMIT = "Gate capacity: planned arrivals spread evenly over the gate's open hours; no hourly peak is known."
+#: 17 Oct 2026: built from gate_hours.LIMIT_WORDS (it now names the shut times and bands), so the two cannot drift
+GATE_LIMIT = "Gate capacity: " + gate_hours.LIMIT_WORDS[0].lower() + gate_hours.LIMIT_WORDS[1:]
 
 
 def _has_gate_flag(page):
@@ -2720,12 +2722,20 @@ def _rs_block(c, x, y, w, head, body, size, draw=True, grey_body=False):
 def route_sheet_lines(S):
     """The words of the Arriving and Leaving blocks (route_sheet.sheet's gates, hours and no-delivery windows)."""
     e, x_, lo = S["entry"], S["exit"], S["load_exit"]
+    # 17 Oct 2026: a gate with no hours typed says so and names the default the planning rests on (never printed as if
+    # the gate's own); the gate's shut windows, when typed, on their own line
     arriving = [f"Gate in: {e['name'] or 'the site (no gate typed)'}",
-                ("Open " + e["hours"] if e.get("hours") else "Open hours: not typed")
-                + (f", {e['closed']}" if e.get("closed") else ""),
+                ("Open " + e["hours"] if e.get("hours")
+                 else (f"Open hours: none typed for this gate (planned on {e['default_hours']}, the default)"
+                       if e.get("default_hours") else "Open hours: not typed"))
+                + (f", {e['closed']}" if e.get("closed") else "")]
+    if e.get("shut"):
+        arriving.append(f"Gate shut {e['shut']}")
+    arriving += [
                 ("No deliveries " + S["peak_words"] + " (the scheme's no-delivery windows)") if S.get("peak_words")
                 else "No-delivery windows: none typed for the scheme"]
-    leaving = [f"Gate out: {x_['name'] or 'the site (no gate typed)'}",
+    leaving = [f"Gate out: {x_['name'] or 'the site (no gate typed)'}"
+               + (f" (shut {x_['shut']})" if x_.get("shut") and x_.get("at") != e.get("at") else ""),
                "Then follow the dashed route back to A" + (f": {S['return_words']}." if S.get("return_words") else ".")]
     if lo.get("name"):
         leaving.append(f"At A, leave loaded by {lo['name']}.")

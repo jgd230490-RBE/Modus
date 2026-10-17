@@ -76,8 +76,10 @@ def _coords(geometry_json):
     return out
 
 
-def _gate_words(loc, role, gate_id, gate_list):
-    """{name, hours, closed, source} for the gate a leg uses at one end (gates.resolve, the bake's own rule)."""
+def _gate_words(loc, role, gate_id, gate_list, factors=None):
+    """{name, hours, default_hours, shut, closed, source} for the gate a leg uses at one end (gates.resolve, the bake's
+    own rule). `hours` only when typed on the gate; a gate row with none typed carries `default_hours` (17 Oct 2026),
+    which the sheet prints as the default, never as the gate's own. `shut` = the gate's shut windows in words."""
     import gates
     import gate_hours
     r = gates.resolve(loc, role, gate_id, gates=gate_list)
@@ -86,6 +88,8 @@ def _gate_words(loc, role, gate_id, gate_list):
     return {
         "name": r.get("gate_name") or ("the site's access point" if r.get("source") == "legacy_pair" else None),
         "hours": f"{g['open_from'].strip()}–{g['open_to'].strip()}" if w else None,
+        "default_hours": (gate_hours.default_words(factors) if (g and not w and factors is not None) else None),
+        "shut": gate_hours.peak_words(gate_hours.shut_windows(g)) if g else None,
         "closed": gate_hours.closed_days_words(g) if g else None,
         "at": (r["lon"], r["lat"]),
         "source": r.get("source"),
@@ -182,8 +186,8 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
             out += f", about {m // 60} h {m % 60:02d} min driving" if m >= 60 else f", about {m} min driving"
         return out
 
-    entry = _gate_words(d, "entry", r.get("dest_gate_id"), gbl.get(r["dest_id"]))
-    exit_site = _gate_words(d, "exit", r.get("dest_gate_id"), gbl.get(r["dest_id"]))
+    entry = _gate_words(d, "entry", r.get("dest_gate_id"), gbl.get(r["dest_id"]), factors)
+    exit_site = _gate_words(d, "exit", r.get("dest_gate_id"), gbl.get(r["dest_id"]), factors)
     # Each gate is drawn where it is typed. With the gate's access road drawn (a haul road from the public road to the
     # gate, network._bake_leg splices it), a stored route ends AT the gate. A leg ending further than GATE_FAR_M from its
     # gate has no access road to follow, or was worked out before the gate or its road was placed; the sheet says so in

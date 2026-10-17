@@ -17,15 +17,17 @@ WHAT A DAY IS (each step is one function below)
    on the worst gate difference); on a very large month it stops after NODE_BUDGET steps and says so (`exact`).
 2. ARRIVALS. A laden lorry arrives at the destination's entry gate, an empty one (coming to load) at the origin's:
    gate_arrivals.entry_gate, the Dashboard's ends.
-3. RELEASE (D59). Each gate's arrivals are spread evenly over its open minutes, the peak bands taken off, all teams'
-   lines interleaved: arrival i of n at (i + ½) / n of the open minutes. A boundary minute belongs to the NEXT
-   interval (a band 07:00–10:00 on 05:00–17:00: open minute 120 is 10:00, never 07:00).
+3. RELEASE (D59). Each gate's arrivals are spread evenly over its open minutes, the peak bands and the gate's own
+   shut windows taken off (17 Oct 2026), all teams' lines interleaved: arrival i of n at (i + ½) / n of the open
+   minutes. A boundary minute belongs to the NEXT interval (a band 07:00–10:00 on 05:00–17:00: open minute 120 is
+   10:00, never 07:00). So no lorry is placed before its gate opens: it sets off its drive time earlier (step 7) —
+   before 08:00 for a gate opening at 08:00 — and arrives from the opening (the user, 17 Oct 2026).
 4. THE POUR (a typed what-if until V5 holds pours): ceil(m³ ÷ m³ a load) mixers, one every (m³ a load ÷ pour rate)
    hours from the start, on top of the gate's day. The default mixer is the app's "Truck mixer 8 m³ (32t)"
    (payload_m3 7.5 in factors.json). A pour whose last mixer would come after 23:59 is refused.
 5. THE QUEUE. One lane at each gate, first come first served, each lorry taking the gate's check-in minutes
-   (`safety_minutes`). A lorry that comes while the gate is shut (before it opens, or in a no-delivery band) waits
-   for it to open. One still waiting after the last open minute is checked in late and COUNTED (D89), queue or not.
+   (`safety_minutes`). A lorry that comes while the gate is shut (before it opens, in a no-delivery band or in one of
+   the gate's shut windows) waits for it to open. One still waiting after the last open minute is checked in late and COUNTED (D89), queue or not.
    A gate with no check-in typed never queues.
 6. FIGURES. Per gate: the busiest clock hour, when the first lorry waits (`queue_start`), the BOTTLENECK — the first
    wait LONGER than the gate's check-in (D85; the example marked any wait) —, the most waiting at once, the minutes
@@ -36,9 +38,13 @@ WHAT A DAY IS (each step is one function below)
    was, said). Haul stretches — where the route runs within HAUL_NEAR_M of a haul road it was routed along — run at
    the road's assigned speed, the rest at whatever speed makes up the route's stored time (haul.py's rule).
 
-OPEN HOURS. A gate's typed `open_from`–`open_to`; a gate with none typed takes the scheme's shift placed on the clock
-at 07:00 (STOOD IN, and the reply says so). A window that ends at or before it starts — past midnight — is refused
-(D93): typed on a gate, that gate is left out and named; asked for in a scenario, the request is refused in words.
+OPEN HOURS. A gate's typed `open_from`–`open_to`; a gate with none typed takes the DEFAULT GATE HOURS (17 Oct 2026, the
+user: 08:00–17:00, or the scheme's own on Config — gate_hours.default_hours; until then the lorry shift placed at 07:00
+stood in), and the reply says so. A window that ends at or before it starts — past midnight — is refused (D93): typed on
+a gate, that gate is left out and named; asked for in a scenario, the request is refused in words.
+SHUT WINDOWS (17 Oct 2026): each gate's own, as typed on it (gate_hours.shut_windows), always on — under a scenario's
+hours too, and the bands switch does not touch them (they are the gate's agreements, not a what-if). Taken off like a
+band; an overlap with a band counts once.
 PEAK BANDS: `planning.peak_bands` as typed, on by default when typed; switched on with none typed, Config's example
 bands (gate_hours.PEAK_PLACEHOLDER) stand in and the reply says so.
 
@@ -62,8 +68,9 @@ import gates
 import taxonomy
 import zones
 
-#: the scheme's shift, placed on the clock from here when a gate has no hours typed (stood in)
-STAND_IN_START = 7 * 60
+#: 17 Oct 2026: the playback window when a day has no lorry at all — the default gate hours (was the 07:00 stand-in)
+EMPTY_DAY_WINDOW = (gate_hours.minutes_of(gate_hours.DEFAULT_GATE_HOURS["from"]),
+                    gate_hours.minutes_of(gate_hours.DEFAULT_GATE_HOURS["to"]))
 #: the app's own mixer: its legal fill is the pour's default m³ a load (factors.json, itself a stated assumption)
 MIXER_NAME = "Truck mixer 8 m³ (32t)"
 MIXER_M3_FALLBACK = 7.5
@@ -593,7 +600,8 @@ def simulate(inp, scen):
                                                  "route": l["route_id"], "phase": ph, "leg": l.get("empty_leg")})
     ivs = {}
     for g, A in by_gate.items():
-        ivs[g] = open_intervals(G[g]["window"], bands) if G[g]["window"] is not None else []
+        # 17 Oct 2026: the gate's own shut windows come off with the bands (open_intervals: an overlap counts once)
+        ivs[g] = open_intervals(G[g]["window"], bands + list(G[g].get("shut") or [])) if G[g]["window"] is not None else []
         place(A, ivs[g])
 
     # 4. the pour, a burst on top
@@ -664,7 +672,7 @@ def simulate(inp, scen):
     if deps and dones:
         win = (max(0, math.floor((min(deps) - 10) / 30) * 30), min(24 * 60, math.ceil((max(dones) + 10) / 30) * 30))
     else:
-        win = (STAND_IN_START, STAND_IN_START + 600)
+        win = EMPTY_DAY_WINDOW
     return {"per_line": per_line, "rounding_exact": rnd["exact"], "rounding_worst": rnd["worst"],
             "gates": out_g, "pour": pour, "haul": haul, "window": win, "total": sum(per_line)}
 
@@ -910,8 +918,10 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     bands_src = ("typed" if typed_bands else "example") if bands_on else None
     bands = (typed_bands or gate_hours.PEAK_PLACEHOLDER) if bands_on else []
 
-    shift = gate_hours.shift_minutes(factors)
-    st_start = STAND_IN_START if STAND_IN_START + shift <= 1440 else max(0.0, 1440 - shift)
+    # 17 Oct 2026 (the user): a gate with no hours typed is open the default gate hours (never past midnight: Config
+    # refuses it), no longer the lorry shift placed at 07:00
+    dflt = gate_hours.default_hours(factors)
+    dwin = (gate_hours.minutes_of(dflt["from"]), gate_hours.minutes_of(dflt["to"]))
     G, notes, refused = {}, [], []
     for gid in gate_ids:
         grow = gate_rows.get(gid) or {}
@@ -928,10 +938,12 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             else:
                 win, basis = (a, b), "gate"
         else:
-            win, basis = (st_start, st_start + shift), "stood_in"
+            win, basis = dwin, "default"
         ci = sc["check_in"][gid] if gid in sc["check_in"] else grow.get("safety_minutes")
         ci = float(ci) if ci not in (None, "") and float(ci) > 0 else None
-        G[gid] = {"window": win, "basis": basis, "check_in": ci, "typed": typed}
+        shut = gate_hours.shut_windows(grow)
+        G[gid] = {"window": win, "basis": basis, "check_in": ci, "typed": typed,
+                  "shut": band_intervals(shut), "shut_typed": shut}
 
     # 17 Oct 2026: a gate's ACCESS ROAD (location_gates.access_zone_id) is a haul-road zone too, and lorries still cross
     # it at its speed (the legs above are untouched), but it is the last few metres to a gate, not a haul road a planner
@@ -956,9 +968,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         teams = sorted({lines[a["line"]]["team"] for a in f["queued"]
                         if a["line"] is not None and lines[a["line"]]["team"]})
         words = None
-        if G[gid]["basis"] == "stood_in":
-            words = (f"No open hours typed for this gate: the scheme's {shift / 60:g} h shift is placed at "
-                     f"{hhmm(win[0])}–{hhmm(win[1])} (stood in).")
+        if G[gid]["basis"] == "default":
+            words = f"No open hours typed for this gate: open {hhmm(win[0])}–{hhmm(win[1])}, the default gate hours."
         elif G[gid]["basis"] == "refused":
             words = (f"Open {grow.get('open_from')}–{grow.get('open_to')} runs past midnight: the simulation shows one "
                      f"day, midnight to midnight, so this gate is left out.")
@@ -971,6 +982,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             "panel_per_day": (panel_by.get(gid) or {}).get("arrivals_per_day"),
             "open_from": hhmm(win[0]) if win else None, "open_to": hhmm(win[1]) if win else None,
             "open_basis": G[gid]["basis"], "open_words": words,
+            # 17 Oct 2026: the gate's shut windows as typed (always applied) and their words
+            "shut_windows": G[gid]["shut_typed"], "shut_words": gate_hours.peak_words(G[gid]["shut_typed"]),
             "arrivals": f["arrivals"], "laden": f["laden"], "empty": f["empty"], "pour": f["pour"],
             "unplaced": f["unplaced"],
             "open_minutes": f["open_minutes"], "intervals": f["intervals"], "last_open": f["last_open"],
@@ -1052,9 +1065,12 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         notes.append("Open hours past midnight are not simulated (one day, midnight to midnight): "
                      + ", ".join(f"{(locations.get((gate_rows.get(g) or {}).get('location_id')) or {}).get('name') or g}" for g in refused)
                      + " left out.")
-    if any(G[g]["basis"] == "stood_in" for g in gate_ids):
-        notes.append(f"Gates with no open hours typed take the scheme's {shift / 60:g} h shift placed at "
-                     f"{hhmm(st_start)}–{hhmm(st_start + shift)} (stood in). Type each gate's open hours on Config.")
+    if any(G[g]["basis"] == "default" for g in gate_ids):
+        notes.append(f"Gates with no open hours typed are open {hhmm(dwin[0])}–{hhmm(dwin[1])}, the default gate hours "
+                     f"(Config → Planning). Type a gate's own hours and shut times on its gate, under Data → Locations.")
+    if any(G[g]["shut_typed"] for g in gate_ids):
+        notes.append("Each gate's shut times are taken off its open hours; a lorry that comes while its gate is shut "
+                     "waits for it to open.")
     if bands_src == "example":
         notes.append(f"No peak bands are typed: Config's example bands ({gate_hours.peak_words(bands)}) stand in.")
     if not res["rounding_exact"]:
@@ -1083,7 +1099,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                   "words": gate_hours.peak_words(bands)},
         "mixer": {"m3_per_load": mx, "vehicle": mx_name,
                   "vehicle_label": conversions.vehicle_label(factors, mx_name) if mx_name else None},
-        "stand_in": {"from": hhmm(st_start), "to": hhmm(st_start + shift), "shift_hours": shift / 60.0},
+        # 17 Oct 2026: the default gate hours (was "stand_in", the lorry shift placed at 07:00)
+        "default_hours": {"from": hhmm(dwin[0]), "to": hhmm(dwin[1])},
         "near_pct": gate_hours.NEAR_PCT,
         "checks": {"arrivals_listed": len(arrivals), "arrivals_expected": expect,
                    "table_equals_arrivals": total_arr == len(arrivals) == expect - sum(g["unplaced"] for g in out_gates),
@@ -1110,10 +1127,12 @@ def busiest(month_index, acc, factors, working_days, panel):
                              "hours": [f"{h:02d}:00" for h in g["busiest_hours"]],
                              "per_hour": g["per_hour"], "open_basis": g["open_basis"],
                              "open_from": g["open_from"], "open_to": g["open_to"]}
-    stood = any(g["open_basis"] == "stood_in" for g in d["gates"])
+    dflt = any(g["open_basis"] == "default" for g in d["gates"])
+    shut = any(g["shut_windows"] for g in d["gates"])
     note = (f"Busiest hour: the lorries arriving in the busiest clock hour of an average working day, {d['loads']} "
             f"whole loads spread evenly over each gate's open hours"
-            + (f" ({d['stand_in']['from']}–{d['stand_in']['to']} stood in where none are typed)" if stood else "")
-            + (f", the no-delivery bands {d['bands']['words']} taken off" if d["bands"]["on"] else "")
+            + (f" ({d['default_hours']['from']}–{d['default_hours']['to']} where none are typed)" if dflt else "")
+            + (", its shut times" if shut and d["bands"]["on"] else (", its shut times taken off" if shut else ""))
+            + (f"{' and' if shut else ','} the no-delivery bands {d['bands']['words']} taken off" if d["bands"]["on"] else "")
             + ". No pour.")
     return {"gates": out, "note": note, "loads": d["loads"]}
