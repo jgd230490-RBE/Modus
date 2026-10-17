@@ -2310,6 +2310,15 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("S7: below 768 px one card a gate, read-only, and the desktop note; the scenario controls are not there",
     panelSrc.includes("? <><div className=\"ct-note\" data-sim-phone=\"1\">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>")
     && !fn("SimPhoneList", "function SimulationPanel(").includes("<input"));
+  // 17 Oct 2026 (found on live): the pour's gates and default are the server's (working sites only); the gate access roads
+  // are not listed with the haul roads, and the screen says so in one line
+  const scnSrc = fn("SimScenario", "const gateBandWords");
+  ok("⭐ S7 fix: the pour's gate list and default are the server's (D.pour_gates, D.pour_default); no site to pour at says so; no list worked out here",
+    scnSrc.includes("const sites = D.pour_gates || [];") && scnSrc.includes("gate: p.gate || D.pour_default || \"\"")
+    && !scnSrc.includes("origin_share_note") && !scnSrc.includes("(sites[0] || {}).gate_id")
+    && scnSrc.includes('data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).<'));
+  ok("S7 fix: one quiet line under the haul roads when gate access roads were left out (the server's count)",
+    panelSrc.includes('{D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}'));
   ok("S7: the info box entry (≤ 40 words) and the controls are named for a screen reader",
     /"dash\.sim": \{ title: "Simulation", text: "[^"]+", *\n? *how: "[^"]+", tech: "t1-gates" \}/.test(src)
     && ["Simulation month", "Playback speed", "Every gate opens at", "Every gate closes at", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));

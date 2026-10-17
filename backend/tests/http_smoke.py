@@ -922,6 +922,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ S3: the example pour at Harborough Compound (160 m³, the app's 7.5 m³ mixer, 60 m³ an hour): 22 mixers, a queue",
        r.status_code == 200 and (sp.get("pour") or {}).get("loads") == 22 and hp.get("pour") == 22
        and hp.get("arrivals") == hb_sd.get("arrivals", -99) + 22 and hp.get("queue_start") is not None, r.text[:300])
+    # 17 Oct 2026 (found on live): a pour goes to a working site only, and defaults to the one with the most laden lorries
+    _pgn = [x["location_name"] for x in sd.get("pour_gates", [])]
+    ok("⭐ S7 fix: on the demo package the pour is offered at the compounds only (no landfill, soil recycling, batching plant, "
+       "stockpile, quarry or terminal), and defaults to Harborough Compound",
+       bool(_pgn) and all(n.endswith("Compound") for n in _pgn)
+       and next((x["location_name"] for x in sd["pour_gates"] if x["gate_id"] == sd.get("pour_default")), None) == "Harborough Compound",
+       str(_pgn))
+    _lf = [g for g in c.get("/api/gates").json().get("gates", []) if g.get("location_id") == "L012"]
+    r = c.get(f"/api/sim/day?month=9&pour_gate={_lf[0]['id'] if _lf else 'G015'}&pour_start=10:00&pour_m3=160&pour_rate=60", headers=PLAN)
+    ok("🔴 S7 fix: a pour at the inert landfill is refused in words — 400",
+       bool(_lf) and r.status_code == 400 and "A pour goes to a working site" in r.text and "is a landfill" in r.text, r.text[:200])
     r = c.get("/api/sim/day?month=9&hours=G001=18:00-07:00", headers=PLAN)
     ok("🔴 S3: a window past midnight is refused in words — 400 (D93)", r.status_code == 400 and "past midnight" in r.text, r.text[:200])
     r = c.get("/api/sim/day?month=9&pour_gate=G007&pour_start=23:00&pour_m3=160&pour_rate=60", headers=PLAN)

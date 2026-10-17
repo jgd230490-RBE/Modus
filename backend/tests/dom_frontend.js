@@ -628,6 +628,9 @@ async function simDom(){
   ok("⭐ SIM DOM: switching the pour on reads the day again after a pause: no lines, the pour's gate, start, m³ and rate, a GET",
      simCalls().length === 2 && !c2.url.includes("legs=1") && c2.url.includes("pour_gate=G007") && c2.url.includes("pour_start=10%3A00")
      && c2.url.includes("pour_m3=160") && c2.url.includes("pour_rate=60") && c2.method === "GET", JSON.stringify(simCalls()));
+  ok("SIM DOM fix: the pour's gate list is the server's working sites (four compounds) and the tick took the server's default",
+     [...m.el.querySelectorAll('select[aria-label="Pour gate"] option')].map(o => o.value).join(",") === SIM.pour_gates.map(x => x.gate_id).join(",")
+     && SIM.pour_default === "G007" && m.el.querySelector('select[aria-label="Pour gate"]').value === "G007");
   // the server refuses a pour past midnight: its words, the start put back, the last good day kept
   srv.day = () => reply(400, { detail: "That pour would run past midnight (last mixer at 25:38); the simulation shows one day." });
   const start = m.el.querySelector('input[aria-label="Pour starts at"]');
