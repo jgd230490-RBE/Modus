@@ -606,7 +606,10 @@ async function simDom(){
   await act(async () => { play().click(); });
   frames(11);
   ok("SIM DOM: at 2× one second of frames is 24 minutes (05:42 → 06:06)", clock() === "06:06", clock());
-  await act(async () => { play().click(); });
+  await toggle(det, false);
+  frames(10);
+  ok("SIM DOM: folding the section while it plays pauses it (nothing plays unseen)", play().textContent === "Play" && clock() === "06:06" && queued.size === 0, clock());
+  await toggle(det, true);
   w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
   const restart = byText(m.el, "button", "Restart");
   await act(async () => { restart.click(); await sleep(20); });

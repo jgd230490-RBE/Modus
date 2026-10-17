@@ -2259,7 +2259,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const _dbS = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
   const _dbSW = _dbS.slice(_dbS.indexOf("{!wall ? ("), _dbS.indexOf("      ) : (\n        <>\n")), _dbSWl = _dbS.slice(_dbS.indexOf("      ) : (\n        <>\n"));
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
-    simSrc.length > 20000 && ["function SimulationPanel({ meta, months, phone, initial })", "function SimPlayer({ meta, D, store, scenario })",
+    simSrc.length > 20000 && ["function SimulationPanel({ meta, months, phone, initial })", "function SimPlayer({ meta, D, store, scenario, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
       "function SimMap({ meta, D, store, frame })", "function SimTimeline({ D, t, onSeek })", "const SimScenario = React.memo(function SimScenario(",
       "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f)));
   ok("⭐ S7: under Gate arrivals on the desk Dashboard, before the folded sections; never on the big screen",

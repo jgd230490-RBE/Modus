@@ -8459,7 +8459,7 @@ function SimTimeline({ D, t, onSeek }){
 }
 
 // the player: the clock, play / pause / restart / speed / jump, the map, the gates now and the timeline
-function SimPlayer({ meta, D, store, scenario }){
+function SimPlayer({ meta, D, store, scenario, open }){
   const [t, setT] = useState(D.window.start);
   const [playing, setPlaying] = useState(false);
   const [sp, setSp] = useState("1");
@@ -8467,6 +8467,7 @@ function SimPlayer({ meta, D, store, scenario }){
   tRef.current = t; spRef.current = +sp;
   const s0 = D.window.start, s1 = D.window.end;
   useEffect(() => { setT(x => Math.max(s0, Math.min(s1, x))); }, [s0, s1]);
+  useEffect(() => { if(!open) setPlaying(false); }, [open]);                 // folded: nothing plays unseen
   useEffect(() => {
     if(!playing){ last.current = null; return; }
     const step = (ts) => {
@@ -8718,7 +8719,7 @@ function SimulationPanel({ meta, months, phone, initial }){
           {phone
             ? <><div className="ct-note" data-sim-phone="1">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>
             : <>
-              <SimPlayer meta={meta} D={D} store={store} scenario={<SimScenario key={resetN} D={D} sc={sc} onChange={onScenario} onReset={() => { setMsg(""); setSc(SIM_SC0()); setResetN(n => n + 1); }} msg={msg} />} />
+              <SimPlayer meta={meta} D={D} store={store} open={open} scenario={<SimScenario key={resetN} D={D} sc={sc} onChange={onScenario} onReset={() => { setMsg(""); setSc(SIM_SC0()); setResetN(n => n + 1); }} msg={msg} />} />
               <h4 className="sim-h4">Busiest hour at each gate</h4>
               <p className="ct-note">Counted from the same arrivals the map plays: laden lorries arrive at the delivery site's gate, empty lorries at the loading site's gate. Open hours and check-in minutes can be changed here for this screen only.</p>
               <SimTable D={D} editable onHours={onHours} onCheckIn={onCheckIn} resetN={resetN} />
