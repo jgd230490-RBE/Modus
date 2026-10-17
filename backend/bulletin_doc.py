@@ -806,7 +806,9 @@ def sheet(month_index, acc=None, now=None):
          "label": "material moved"},
     ]
 
-    # what is being moved: the bar's own panel, by discipline; rows add up to the headline
+    # what is being moved: the bar's own panel, by discipline; rows add up to the headline. 17 Oct 2026: each row is
+    # the tenant's discipline LABEL (bulletin.discipline_names) under a "Discipline" heading — it read the ids
+    # ("superstructure") under "Material"
     moved = [{"name": d["name"], "a_day": n0(d["two_way_a_day"]), "vehicles": n0(d["vehicles_a_day"]),
               "t_day": n0(d["tonnes_a_day"])} for d in (R.get("breakdown") or {}).get("discipline") or []]
 
@@ -1580,7 +1582,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 {routes}
 
 <h2>What is being moved</h2>
-<div class="tw"><table><thead><tr><th>Material</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">Tonnes a day</th></tr></thead>
+<div class="tw"><table data-bulletin="moved"><thead><tr><th>Discipline</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">Tonnes a day</th></tr></thead>
 <tbody>{moved}<tr class="this"><td>All routes</td><td class="n">{mt_a_day}</td><td class="n">{mt_vehicles}</td>
 <td class="n">{mt_t_day}</td></tr></tbody></table></div>
 
