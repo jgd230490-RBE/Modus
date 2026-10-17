@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-GB">
 <head>
     <meta charset="utf-8">
     <title>Wayscope — public map</title>
@@ -751,14 +751,14 @@
 
     <div class="control-group">
         <h3>Route filtering</h3>
-        <select id="filter-origin" onchange="applyFilters()"><option value="ALL">All origins</option></select>
-        <select id="filter-dest" onchange="applyFilters()"><option value="ALL">All destinations</option></select>
+        <select id="filter-origin" onchange="applyFilters()" aria-label="Origin"><option value="ALL">All origins</option></select>
+        <select id="filter-dest" onchange="applyFilters()" aria-label="Destination"><option value="ALL">All destinations</option></select>
         <!-- was the legacy 'leg' filter (Primary/Direct, Hub Distribution). The routing
              network has no such field; discipline is the Phase 2 replacement and is the
              view senior managers actually asked for. Populated from approved forecasts,
              so it stays disabled until some exist. -->
-        <select id="filter-discipline" onchange="applyFilters()"><option value="ALL">All disciplines</option></select>
-        <select id="filter-ipt" onchange="applyFilters()"><option value="ALL">All teams</option></select>
+        <select id="filter-discipline" onchange="applyFilters()" aria-label="Discipline"><option value="ALL">All disciplines</option></select>
+        <select id="filter-ipt" onchange="applyFilters()" aria-label="Team"><option value="ALL">All teams</option></select>
         <button class="btn btn-ghost" onclick="resetFilters()">Reset filters</button>
         <!-- 14 Oct 2026 (backlog item 2): the route map export, STAFF ONLY (the user, 14 Oct). Hidden until
              /api/public/whoami says staff; the endpoint refuses anyone else (401) whatever the page shows. -->
@@ -776,7 +776,7 @@
              "measure-light", "config", "batched-model" ...) and the map stays on the basemap it had while
              the menu says Standard. The 3D look GL 2.14 can draw is the "3D buildings" overlay below.
              Offer here only styles GL 2.14 validates: the classic -v11 / -v12 styles and raster styles. -->
-        <select id="basemap-select" onchange="changeBasemap(this.value)">
+        <select id="basemap-select" onchange="changeBasemap(this.value)" aria-label="Basemap">
             <option value="mapbox://styles/mapbox/light-v11" selected>Light</option>
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
             <option value="mapbox://styles/mapbox/satellite-streets-v12" id="basemap-satellite">Satellite (Mapbox)</option>
@@ -1246,6 +1246,10 @@
     function applyTenantVocabulary() {
         const ipt = document.querySelector('#filter-ipt option[value="ALL"]');
         if (ipt) ipt.textContent = 'All ' + TEAM.toLowerCase() + 's';
+        // 16 Oct 2026 (UI audit #4): the team select's accessible name is the tenant's team word (the markup says
+        // "Team" until the tenant has answered). A page whose panel is not built has no such element: guard the null.
+        const iptSel = document.getElementById('filter-ipt');
+        if (iptSel) iptSel.setAttribute('aria-label', TEAM);
         const bm = document.getElementById('basemap-maaamet');
         if (bm) bm.hidden = (TENANT.country || '').toUpperCase() !== 'EE';
         // H1 (29 Sep 2026): a British tenant reads Mapbox Satellite as its "Aerial" basemap
