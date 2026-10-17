@@ -202,10 +202,15 @@ def ipt_share(lines):
     IPT_SHARE: two+ IPTs with quantity the same day on the same route_id, the same
     origin+dest, or the same haul-road id. One flag per (line, day, reason).
     """
-    haul = {}
-    for r in db.query("SELECT route_id, zone_id FROM route_haul_roads WHERE tenant_id = ?",
-                      (db.current_tenant(),)):
+    haul, haul_name = {}, {}
+    # the haul road's NAME rides on the same read (a join, no second query): the text names it
+    for r in db.query("SELECT h.route_id, h.zone_id, z.name FROM route_haul_roads h "
+                      "LEFT JOIN zones z ON z.tenant_id = h.tenant_id AND z.id = h.zone_id "
+                      "WHERE h.tenant_id = ?", (db.current_tenant(),)):
         haul.setdefault(r["route_id"], set()).add(r["zone_id"])
+        if r.get("name"):
+            haul_name[r["zone_id"]] = r["name"]
+    od_name = {}                              # "L014→L007" -> "Harborough → Langton"
     # group key -> date -> {ipt: [lines]}
     groups = {}
     for l in lines:
@@ -215,7 +220,10 @@ def ipt_share(lines):
         c = l.get("context") or {}
         keys = [("route", l["route_id"])]
         if c.get("origin_id") and c.get("dest_id"):
-            keys.append(("od", f"{c['origin_id']}→{c['dest_id']}"))
+            od = f"{c['origin_id']}→{c['dest_id']}"
+            keys.append(("od", od))
+            if c.get("origin_name") and c.get("dest_name"):
+                od_name.setdefault(od, f"{c['origin_name']} → {c['dest_name']}")
         for z in haul.get(l["route_id"], ()):
             keys.append(("haul", z))
         for d in l.get("days", []) or []:
@@ -235,11 +243,16 @@ def ipt_share(lines):
                     if sig in seen:
                         continue
                     seen.add(sig)
-                    where = {"route": f"on {what}", "od": f"on the same haul {what}",
-                             "haul": f"on haul road {what}"}[kind]
-                    # ids in the text, on purpose: naming them here would cost a read on
-                    # the page path. The app (teamText) and the exports (team_text) show
-                    # the tenant's names — ids never reach a person (G2).
+                    # 17 Oct 2026: the text names the PLACES. Until then it printed the location
+                    # ids ("on the same haul L014→L007") and the haul road's zone id, which no
+                    # page turns into a name. The route keeps its id: R021 is the route's
+                    # reference a person reads everywhere (Routes page, row details "Route",
+                    # route sheet, ROUTE_CAP's text). The team ids stay in the text — the app
+                    # (teamText) and the exports (team_text) show the tenant's team names (G2).
+                    # share_id keeps the ids (machine field, never printed).
+                    where = {"route": f"on route {what}",
+                             "od": f"on the same haul {od_name.get(what) or 'between the same two places'}",
+                             "haul": f"on {haul_name.get(what) or 'the same haul road'}"}[kind]
                     out.append(_flag("IPT_SHARE", l,
                                      f"{' + '.join(ipts)} {where} on {day}",
                                      day_date=day, ipts=ipts, share=kind, share_id=what))

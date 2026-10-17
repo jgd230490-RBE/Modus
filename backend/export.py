@@ -2055,7 +2055,7 @@ def _newsletter(S, map_h, pages=None):
     story.append(P(E(f"Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark "
                      f"({S['flagged_routes']} of {len(S['routes'])} routes have one)."), st_grey))
     story.append(P("What is being moved", st_sec))
-    mv = [[P("Material", st_h), P("Two-way a day", st_hr), P("Lorries", st_hr), P("Tonnes a day", st_hr)]]
+    mv = [[P("Discipline", st_h), P("Two-way a day", st_hr), P("Lorries", st_hr), P("Tonnes a day", st_hr)]]
     for m in S["moved"]:
         mv.append([P(E(m["name"])), P(E(m["a_day"]), st_r), P(E(m["vehicles"]), st_r), P(E(m["t_day"]), st_r)])
     mt = S["moved_total"]

@@ -597,8 +597,25 @@ ok("...creates ONE map and keeps it (the guard), and never draws an unbaked rout
 ok("...colours lines by IPT from palette C, and is not rendered under the render harness",
   _cmBody.includes("IPT_PALETTE_C[iptKey(") && _laBody.includes("!initialPage && <CommitMap"));
 // 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
+// NARROWED 17 Oct 2026 (UI fix 2, claude/ui-fix-dark, finding 2): the wash is var(--navy-soft) INLINE — the .tbl th rule
+// out-ranks a bg-blue-50 class — so the dark look paints today's column in its own tint (the figures were 1.14:1 on #eff6ff)
 ok("today's column carries the wash and the '· today' suffix",
-  _laBody.includes('", today"') && _laBody.includes('#eff6ff'));
+  _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft)" } : {}}'));
+ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ahead; seven inline var(--navy-soft) washes (today's th and td, the summary row, the Horizon's commit th and two td); the week pill reads var(--muted) when off",
+  !/#eff6ff|#64748b|#B45309/i.test(_laBody)
+  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 7
+  && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
+ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
+  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
+  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}'));
+// 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
+ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
+  _laBody.includes('style={view === id ? { background: "var(--navy)", color: "var(--control-fg)", borderColor: "var(--navy)" }') && !/color: "white"/.test(_laBody));
+ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
+  (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
+  && (code.match(/var\(--ok-btn\)/g) || []).length === 2 && (code.match(/var\(--ok-btn-fg\)/g) || []).length === 2
+  && _laBody.includes('font-semibold rounded-lg" style={{ background: "var(--ok-btn)", color: "var(--ok-btn-fg)" }}>Confirm week</button>')
+  && !/text-white[^<]{0,400}var\(--green\)/.test(code));
 // NARROWED (H1): the unit word is DU() — km, or mi for a tenant that reads miles
 // 13 Oct 2026 (W6, narrowed): the ▶ row's string became the details row, one fact a line, labels in the tenant's unit
 ok("the expanded row prints km/trip, km/week, t·km, cycle and € or 'rate not set' — in the tenant's unit",
@@ -624,7 +641,8 @@ ok("⭐ export downloads through fetch + blob, never a bare <a href> (the access
   /fetch\(`\$\{API\}\/forecast-weeks\/export\?format=\$\{format\}&bucket=\$\{bucket\}`\)/.test(_laBody)
   && _laBody.includes("URL.createObjectURL(blob)") && !/href=\{`\$\{API\}\/forecast-weeks\/export/.test(code));
 ok("...the mock's bar: Export XLSX beside the green Confirm week, PDF as a smaller second button",
-  _laBody.includes(">Export XLSX<") && _laBody.includes('download("pdf")') && _laBody.includes('background: "var(--green)" }}>{anyConfirmed'));
+  // NARROWED 17 Oct 2026 (UI fix 2, finding 6): the button reads its own pair, --ok-btn / --ok-btn-fg
+  _laBody.includes(">Export XLSX<") && _laBody.includes('download("pdf")') && _laBody.includes('background: "var(--ok-btn)", color: "var(--ok-btn-fg)" }}>{anyConfirmed'));
 ok("no email and no upload in the page", !/mailto:|sendEmail|<input type="file"/.test(_laBody));
 // slice 5 — rates and the confirmed cost
 ok("⭐ the confirmed cost is sent ONLY when its box was touched — an absent field leaves it alone",
@@ -1127,6 +1145,9 @@ ok("there is a shared empty state", code.includes("function EmptyState("));
 
 // ---- 4f. 10 Sep evening — the fuel widget, target rate and Quote + BAF ---------------
 const _fwBody = code.slice(code.indexOf("function FuelWidget("), code.indexOf("function LookAhead("));
+// 17 Oct 2026 (UI fix 2, finding 2): the BAF figure's "no share" grey is the token (identical in Ink; 3.42:1 -> 6.25:1 in Dark)
+ok("UI fix 2 (#2): the fuel card's BAF figure reads var(--navy) or var(--muted), never the light-look grey literal",
+  _fwBody.includes('style={{ color: sum.baf_pct != null ? "var(--navy)" : "var(--muted)" }} title={baseTxt}>{bafTxt}</span>') && !/#64748b/i.test(_fwBody));
 const _ctBody = code.slice(code.indexOf("function CostingTab("), code.indexOf("function ConfigPage("));
 ok("⭐ ONE FuelWidget component, mounted THREE times: Commit (compact), Account (strip), Config (config)",
   (code.match(/function FuelWidget\(/g) || []).length === 1 && (code.match(/<FuelWidget\b/g) || []).length === 3
@@ -2540,6 +2561,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes('const rdKey = (table) => "modus_rows_" + table;') && /window\.sessionStorage\.setItem\(rdKey\(table\)/.test(src)
      && src.includes('window.localStorage.getItem("modus_units_" + page)') && src.includes('return UNIT_CHOICES.some(c => c[0] === v) ? v : "tonnes";')
      && src.includes('const UNIT_CHOICES = [["loads", "Loads"], ["tonnes", "Tonnes"], ["lorries", "Lorries"]];'));
+  // 17 Oct 2026 (UI fix 2, finding 1): the pressed word reads the control's text colour (white on the dark look's orange was 2.33:1)
+  ok("UI fix 2 (#1): the pressed Loads / Tonnes / Lorries word is var(--control-fg) on var(--navy), no #fff literal",
+     html.includes('.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}') && !/\.unit-sw-seg[^\n]*#fff/.test(html));
   ok("W6: the switch is a labelled group of three aria-pressed buttons with its info box, on the Look-ahead, the Dashboard and Forecasts (not Gate arrivals: all lorries)",
      src.includes('<span className="unit-sw-seg" role="group" aria-label="Show the figures as">') && src.includes('aria-pressed={value === k ? "true" : "false"}')
      && src.includes('<InfoTip id="units" />') && ["lookahead", "dashboard", "forecasts"].every(p => src.includes(`useUnits("${p}")`))
@@ -3287,6 +3311,24 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _rw.includes('<textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)"'));
   ok("names #14: no other aria-label on a staff screen says JSON (the exemption covers the tab's own words only)",
      [...src.matchAll(/aria-label="([^"]*)"/g)].map(m => m[1]).filter(n => /\bJSON\b/.test(n)).every(n => n === "Everything (JSON)"));
+}
+
+// ---- 17 Oct 2026 (D114): the Dashboard's default range is this month ± 6 -----------------------------------------------
+{
+  ok("⭐ D114: the Dashboard's From / To start from dashRangeDefault (this month ± DASH_RANGE_EITHER_SIDE), not month 1 and the last month",
+     src.includes("const [fromM, setFromM] = useState(() => dashRangeDefault(months)[0]);")
+     && src.includes("const [toM, setToM] = useState(() => dashRangeDefault(months)[1]);")
+     && !src.includes("const [fromM, setFromM] = useState(1);") && !src.includes("const [toM, setToM] = useState(months.count);"));
+  ok("D114: six months either side, clamped to the horizon, from the same 'this month' the Gate arrivals panel uses",
+     src.includes("const DASH_RANGE_EITHER_SIDE = 6;")
+     && src.includes("return [Math.max(1, c - DASH_RANGE_EITHER_SIDE), Math.min(n, c + DASH_RANGE_EITHER_SIDE)];")
+     && /const dashRangeDefault = \(months\) => \{\s*const n = \(months && months\.count\) \|\| 60, c = gaMonthToday\(months\);/.test(src));
+  ok("D114: one button between the default and the whole programme ('Whole programme' / 'This month ± 6'), not shown on the big screen",
+     src.includes(">Whole programme</button>") && src.includes(">This month ± 6</button>")
+     && src.indexOf(">Whole programme</button>") > src.indexOf('aria-label="To month"')
+     && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
+  ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
+     src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
 }
 
 // ---- report ------------------------------------------------------------------

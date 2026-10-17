@@ -793,6 +793,24 @@ async function gateArrivalsDom(){
      && !!d1.el.querySelector('[data-carbon-target="set"]') && !d1.el.querySelector("[data-ga-gate]"));
   ok("GATE DOM: ...it asked for this month, once, as a GET",
      gaCalls().length === 1 && gaCalls()[0].url === `/api/gates/arrivals?month=${thisMonth}` && gaCalls()[0].method === "GET");
+  // 17 Oct 2026 (D114): the Dashboard opens on THIS month ± 6, clamped to the horizon — not on every month
+  {
+    const fromSel = d1.el.querySelector('select[aria-label="From month"]'), toSel = d1.el.querySelector('select[aria-label="To month"]');
+    const lo = Math.max(1, thisMonth - 6), hi = Math.min(dMeta.months.count, thisMonth + 6);
+    const rbtn = () => d1.el.querySelector("button.dash-range-btn");
+    ok("⭐ D114 DOM: the Dashboard opens on this month ± 6 (From and To), clamped to the horizon — was every month",
+       !!fromSel && !!toSel && +fromSel.value === lo && +toSel.value === hi && !(lo === 1 && hi === dMeta.months.count),
+       `${fromSel && fromSel.value}–${toSel && toSel.value} for ${lo}–${hi}`);
+    ok("D114 DOM: ...a 'Whole programme' button beside the range", !!rbtn() && rbtn().textContent === "Whole programme");
+    click(rbtn());
+    ok("⭐ D114 DOM: 'Whole programme' sets every month of the horizon, and the button turns into 'This month ± 6'",
+       +d1.el.querySelector('select[aria-label="From month"]').value === 1
+       && +d1.el.querySelector('select[aria-label="To month"]').value === dMeta.months.count && rbtn().textContent === "This month ± 6");
+    click(rbtn());
+    ok("D114 DOM: ...and 'This month ± 6' brings the default back",
+       +d1.el.querySelector('select[aria-label="From month"]').value === lo && +d1.el.querySelector('select[aria-label="To month"]').value === hi
+       && rbtn().textContent === "Whole programme");
+  }
   d1.done();
 
   // (2) the read lands

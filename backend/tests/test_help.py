@@ -706,5 +706,10 @@ ok("⭐ W10: the guide offers the CLP pack beside the month and says what it hol
    and "the charts that cannot be drawn yet are listed with what they need" in src
    and "<code>GET /api/clp/pack.pdf?month=N</code>" in open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read())
 
+ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",
+   "the page opens on this month and six months either side, and <strong>Whole programme</strong> beside them shows every month"
+   in src and "<strong>This month ± 6</strong> brings the default back" in src
+   and "(it keeps the months you had: this month ± 6 unless you picked others first)" in src)
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

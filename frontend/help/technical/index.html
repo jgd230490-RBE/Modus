@@ -216,7 +216,11 @@ past bakes went the way they did.</li>
 <li><strong>Haul roads.</strong> <em>Splice</em> assumes HERE has never heard of the road: route to one end, use the
 drawn line, route on from the other end (two HERE calls per leg). <em>Via</em> lets HERE find its own way through (one
 call). Which end is the entry is worked out per leg from the geometry, so the order the road was drawn in does not
-matter. HERE will not accept a custom speed, so the haul stretch's time is substituted afterwards.</li>
+matter. HERE will not accept a custom speed, so the haul stretch's time is substituted afterwards. A leg that runs
+along a haul road comes back as ONE option (alternatives on each sub-call cannot be ranked against each other), so there
+is nothing to make primary on it. A gate's access road (the bellmouth from the public road to the gate) is the exception:
+when a leg's only drawn roads are the access roads at its two ends, the one HERE call between them asks for alternatives
+and each is spliced between the same two access roads.</li>
 <li><strong>Restrictions.</strong> Checked against the stored route when it is baked and refreshed on demand; the
 check reports what lies within its distance of the baked line, not that it is on your carriageway. The Look-ahead says
 which providers were not checked since baking.</li>

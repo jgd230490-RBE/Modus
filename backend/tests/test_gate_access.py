@@ -301,6 +301,89 @@ try:
     ok("...two HERE calls for the two legs", len(CALLS) == 2)
     ok("⭐ the HERE-call estimate counts the same (one a leg here, not three)",
        haul._here_calls_for([("R1", ART, "loaded"), ("R1", ART, "return")]) == 2)
+
+    # ---- 17 Oct 2026 (D109): a leg whose only drawn roads are its two gate access roads keeps HERE's alternatives ----
+    def _fake_alts(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None, alternatives=1, laden=True,
+                   via=None, pass_through=False):
+        CALLS.append(((o_lat, o_lon), (d_lat, d_lon), alternatives))
+        return [{"geometry": [[o_lon, o_lat], [(o_lon + d_lon) / 2, (o_lat + d_lat) / 2 + 0.01 * i], [d_lon, d_lat]],
+                 "distance_km": 10.0 + i, "duration_hr": 0.25 + 0.05 * i, "sections": []}
+                for i in range(max(1, int(alternatives or 1)))]
+    here_routing.routes = _fake_alts
+    S_OUT, S_IN = haul.gate_access_step(gq, "exit"), haul.gate_access_step(gin, "entry")
+    ok("D109: access_roads_only — the leaving gate's road and / or the arriving gate's road, and nothing else",
+       haul.access_roads_only([S_OUT, S_IN]) and haul.access_roads_only([S_OUT]) and haul.access_roads_only([S_IN])
+       and not haul.access_roads_only([]) and not haul.access_roads_only([S_IN, S_OUT])
+       and not haul.access_roads_only([S_OUT, {"zone_id": ZMID, "mode": "splice"}, S_IN])
+       and not haul.access_roads_only([{"zone_id": ZMID, "mode": "splice"}]))
+    CALLS.clear()
+    OPTS = haul.route_with_haul(GQ[1], GQ[0], GIN[1], GIN[0], ART,
+                                haul.leg_steps("R1", [GQ[0], GQ[1]], [GIN[0], GIN[1]], "loaded", gq, gin), alternatives=3)
+    ok("⭐ D109: a leg between two gate access roads returns HERE's THREE options from ONE call (road end to road end, asked for 3)",
+       len(OPTS) == 3 and len(CALLS) == 1 and CALLS[0] == ((RQ[1], RQ[0]), (RIN[1], RIN[0]), 3)
+       and all(o["haul_calls"] == 1 for o in OPTS), str(CALLS))
+    ok("⭐ D109: ...EACH option is spliced with both access roads: it starts AT the leaving gate, ends AT the arriving gate, "
+       "carries both roads' 70 m in its distance and their time, and is tagged with both",
+       all(o["geometry"][0] == GQ and o["geometry"][-1] == GIN and o["haul_zones"] == [ZQ, ZIN]
+           and abs(o["haul_km"] - 0.07) < 0.002 and len(o["haul_detail"]) == 2 for o in OPTS)
+       and [round(o["distance_km"], 2) for o in OPTS] == [10.07, 11.07, 12.07]
+       and all(abs(o["duration_hr"] - (o["duration_hr_here"] + 0.07 / 10)) < 0.0006 for o in OPTS),
+       str([(o["distance_km"], o["duration_hr"], o["geometry"][:1], o["geometry"][-1:]) for o in OPTS]))
+    ok("...in HERE's order, and each option's middle is its own (not three copies of the first)",
+       [o["duration_hr_here"] for o in OPTS] == [0.25, 0.3, 0.35]
+       and len({json.dumps(o["geometry"]) for o in OPTS}) == 3)
+    CALLS.clear()
+    _one = haul.route_with_haul(GQ[1], GQ[0], GIN[1], GIN[0], ART,
+                                haul.leg_steps("R1", [GQ[0], GQ[1]], [GIN[0], GIN[1]], "loaded", gq, gin), alternatives=1)
+    ok("...asked for one option it is the old splice exactly: one option, one call for one",
+       len(_one) == 1 and CALLS == [((RQ[1], RQ[0]), (RIN[1], RIN[0]), 1)] and _one[0]["distance_km"] == 10.07)
+    haul.attach("R1", ZMID)
+    CALLS.clear()
+    _mid = haul.route_with_haul(GQ[1], GQ[0], GIN[1], GIN[0], ART,
+                                haul.leg_steps("R1", [GQ[0], GQ[1]], [GIN[0], GIN[1]], "loaded", gq, gin), alternatives=3)
+    ok("🔴 D109: a leg with a REAL haul road between the gates still returns ONE option, every sub-call asked for one "
+       "(the cross product of sub-call alternatives is not comparable: the rule stands)",
+       len(_mid) == 1 and _mid[0]["haul_zones"] == [ZQ, ZMID, ZIN] and CALLS and all(c[2] == 1 for c in CALLS), str(CALLS))
+    haul.detach("R1", ZMID)
+    # through the REAL bake: three rows stored, and a spliced alternative can be made primary
+    CALLS.clear()
+    db.execute("DELETE FROM route_geometry WHERE route_id = 'R1'")
+    n3, e3 = network._bake_leg(R, L["L1"], L["L2"], ART, "loaded", conversions.load_factors(), alternatives=3, avoid=[], zone_tag="")
+    _rows = db.query("SELECT alt_index, geometry, distance_km, haul_zones FROM route_geometry WHERE route_id = 'R1' AND "
+                     "vehicle_profile = ? AND leg = 'loaded' ORDER BY alt_index", (ART,))
+    ok("⭐ D109: THE BAKE stores the three options (alt_index 0, 1, 2), each from gate to gate, each tagged with both roads",
+       (n3, e3) == (3, None) and [r_["alt_index"] for r_ in _rows] == [0, 1, 2]
+       and all(json.loads(r_["geometry"])[0] == GQ and json.loads(r_["geometry"])[-1] == GIN
+               and r_["haul_zones"] == f"{ZQ},{ZIN}" for r_ in _rows), str([(r_["alt_index"], r_["haul_zones"]) for r_ in _rows]))
+    _pr = network.promote_alternative("R1", ART, 2, leg="loaded")
+    _after = {r_["alt_index"]: r_["distance_km"] for r_ in db.query(
+        "SELECT alt_index, distance_km FROM route_geometry WHERE route_id = 'R1' AND vehicle_profile = ? AND leg = 'loaded'", (ART,))}
+    ok("⭐ D109: promote_alternative works on a spliced alternative: option 2 becomes primary, the old primary is kept as 2",
+       _pr.get("promoted") == 2 and _after == {0: 12.07, 1: 11.07, 2: 10.07}, str(_pr) + str(_after))
+    db.execute("DELETE FROM route_geometry WHERE route_id = 'R1'")
+    network._bake_leg(R, L["L1"], L["L2"], ART, "loaded", conversions.load_factors(), alternatives=1, avoid=[], zone_tag="")
+    _miss = network.promote_alternative("R1", ART, 1, leg="loaded")
+    ok("🔴 D109: on an access-road-only leg with one option stored, the miss is a plain one — never \"this leg runs through "
+       "haul road(s) … detach the haul road\" (an access road is not to be detached)",
+       "error" in _miss and "haul road" not in _miss["error"] and "haul_zones" not in _miss, str(_miss))
+    haul.attach("R1", ZMID)
+    db.execute("DELETE FROM route_geometry WHERE route_id = 'R1'")
+    network._bake_leg(R, L["L1"], L["L2"], ART, "loaded", conversions.load_factors(), alternatives=3, avoid=[], zone_tag="")
+    _hm = network.promote_alternative("R1", ART, 1, leg="loaded")
+    ok("...while a leg through a REAL haul road still says so, naming only that road (not the gates' access roads)",
+       _hm.get("haul_zones") == [ZMID] and "single option" in _hm.get("error", ""), str(_hm))
+    haul.detach("R1", ZMID)
+    # the sections below read R1 as the first bake left it: both legs, one option each
+    db.execute("DELETE FROM route_geometry WHERE route_id = 'R1'")
+    here_routing.routes = _fake_routes
+    network._bake_leg(R, L["L1"], L["L2"], ART, "loaded", conversions.load_factors(), alternatives=1, avoid=[], zone_tag="")
+    network._bake_leg(R, L["L1"], L["L2"], ART, "return", conversions.load_factors(), alternatives=1, avoid=[], zone_tag="")
+    ok("D109: the HERE-call estimate is unchanged: alternatives ride on the one middle call",
+       haul._here_calls_for([("R1", ART, "loaded"), ("R1", ART, "return")]) == 2)
+    _hsrc = read("backend/haul.py")
+    ok("D109: the docstring says the one-option rule is for a haul road MID-LEG, and names the exception",
+       "Only ONE option is returned whenever a haul road applies MID-LEG" in _hsrc and "def access_roads_only(steps):" in _hsrc
+       and "_route_access_alternatives" in _hsrc)
 finally:
     here_routing.routes = _real_routes
     here_routing.configured = _real_conf
@@ -391,19 +474,23 @@ for g in T["location_gates"]:
     c = geo["coordinates"]
     if len(c) != 2 or abs(hav(c[0], c[1]) - 35) > 0.6 or hav(c[1], (g["lon"], g["lat"])) > 0.5:
         bad.append((g["id"], round(hav(c[0], c[1]), 1), round(hav(c[1], (g["lon"], g["lat"])), 1)))
-ok("⭐ THE DEMO: every one of the 17 gates has an access road — a spliced haul road from the road point to the gate, 35 m",
-   len(T["location_gates"]) == 17 and not bad, str(bad))
-ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geofences); the access roads are Z006-Z022",
+# RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): 19 gates (the asphalt plant's weighbridge and Welland Ready-Mix's gate);
+# their access roads Z023 and Z024; the seven advisory zones of the programme come after them (Z025–Z031)
+ok("⭐ THE DEMO: every one of the 19 gates has an access road — a spliced haul road from the road point to the gate, 35 m",
+   len(T["location_gates"]) == 19 and not bad, str(bad))
+ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geofences); the access roads are Z006-Z024, "
+   "the advisory zones after them",
    [z["id"] for z in T["zones"]][:5] == ["Z001", "Z002", "Z003", "Z004", "Z005"]
    and [ZB[i]["name"] for i in ("Z001", "Z002")] == ["Langton haul road", "Stockpile North haul road"]
-   and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 23)])
+   and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 25)]
+   and all(z["kind"] != "haul_road" and not z["affects_routing"] for z in T["zones"] if int(z["id"][1:]) > 24))
 ok("...named for the site and gate, the road named in the note, 10 km/h, no end date",
    all(re.match(r"^.+: .+ access road$", ZB[g["access_zone_id"]]["name"]) for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["note"].startswith("Bellmouth off ") for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["speed_kph"] == 10 and ZB[g["access_zone_id"]]["ends_on"] is None for g in T["location_gates"]))
 _gen = read("backend/tools/make_demo_tenant.py")
 ok("the generator's road points cover every gate by (site, gate) and leave residential streets out on purpose",
-   _gen.count('): ([-') == 17 and "BELLMOUTH_M = 35.0" in _gen and "residential streets left out on purpose" in _gen)
+   _gen.count('): ([-') == 19 and "BELLMOUTH_M = 35.0" in _gen and "residential streets left out on purpose" in _gen)
 
 print()
 for f_ in FAIL:

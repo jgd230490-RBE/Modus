@@ -555,7 +555,10 @@ def _geom(rid, prof, leg, km, hr):
 for _rid in ("R1", "R2"):
     _geom(_rid, V8, "loaded", 30.0, 0.75)
     _geom(_rid, V8, "return", 30.0, 0.65)         # 60 km round trip, 5 cycles / 10 h
-MONTHS = tuple(range(1, 25))
+# NARROWED 17 Oct 2026 (demo redesign R2, D104): was a fixed range(1, 25), which runs out on Mon 3 Jan 2028 (the real
+# commit week falls in month 25, unseeded, and L["WS1"] is missing). As test_lookahead (PR #82): at least two years and
+# always two months past the commit month, so the real week is seeded whatever the date.
+MONTHS = tuple(range(1, max(24, days.commit_bucket()[0] + 2) + 1))
 
 
 def _line(rid, sect, qty):

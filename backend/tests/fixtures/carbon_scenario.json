@@ -594,6 +594,7 @@
   {
    "baked": true,
    "carbon_material": "aggregates",
+   "discipline": "earthworks",
    "disposal_kg_per_t": null,
    "disposal_route": null,
    "disposal_t": null,
@@ -623,6 +624,7 @@
   {
    "baked": true,
    "carbon_material": "soils",
+   "discipline": "earthworks",
    "disposal_kg_per_t": 19.554,
    "disposal_route": "landfill",
    "disposal_t": 113.412,
@@ -652,6 +654,7 @@
   {
    "baked": false,
    "carbon_material": "aggregates",
+   "discipline": "earthworks",
    "disposal_kg_per_t": null,
    "disposal_route": null,
    "disposal_t": null,
