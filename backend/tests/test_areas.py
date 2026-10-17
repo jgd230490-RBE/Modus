@@ -383,18 +383,19 @@ _pkg = json.loads(read("demo/uk-corridor.package.json"))
 tenant_package.import_rows("locations", _pkg["tables"]["locations"])
 sp = {a["name"]: a for a in areas.area_load(10)["areas"]}
 # NARROWED 14 Oct 2026 (civils materials): the batching plant sits in Melton (14 sites)
-ok("3. ⭐ the demo's 14 sites by point-in-polygon: Harborough 8, Melton 3, Blaby 1, Charnwood 1, Rutland 1 (the mockup's recount, not the chain's 9)",
+# RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): the asphalt plant and Welland Ready-Mix both sit in Harborough (16 sites)
+ok("3. ⭐ the demo's 16 sites by point-in-polygon: Harborough 10, Melton 3, Blaby 1, Charnwood 1, Rutland 1 (the mockup's recount, not the chain's 9)",
    {n: sp[n]["sites_count"] for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland", "Leicester",
                                        "Oadby and Wigston", "Hinckley and Bosworth")}
-   == {"Harborough": 8, "Melton": 3, "Blaby": 1, "Charnwood": 1, "Rutland": 1, "Leicester": 0,
+   == {"Harborough": 10, "Melton": 3, "Blaby": 1, "Charnwood": 1, "Rutland": 1, "Leicester": 0,
        "Oadby and Wigston": 0, "Hinckley and Bosworth": 0}
-   and sp["Leicestershire"]["sites_count"] == 13 and len(_pkg["tables"]["locations"]) == 14,
+   and sp["Leicestershire"]["sites_count"] == 15 and len(_pkg["tables"]["locations"]) == 16,
    str({n: a["sites_count"] for n, a in sp.items()}))
 ok("3. ...Kilby Ridge in Blaby, Northfield in Charnwood, Brook Pit in Rutland",
    sp["Blaby"]["sites"] == ["Kilby Ridge Quarry"] and sp["Charnwood"]["sites"] == ["Northfield Quarry"]
    and sp["Rutland"]["sites"] == ["Brook Pit"])
-ok("3. ...and the totals say 14 sites, so the card reads Harborough '8 of 14' (NARROWED 14 Oct: the batching plant)",
-   areas.area_load(10)["totals"]["sites"] == 14)
+ok("3. ...and the totals say 16 sites, so the card reads Harborough '10 of 16' (NARROWED 14 Oct: the batching plant; RE-PINNED 17 Oct: the two plants)",
+   areas.area_load(10)["totals"]["sites"] == 16)
 _seed_areas = {a["name"]: a for a in areas.area_load(10)["areas"]}
 ok("3. ⭐ every seed area carries ONE label point, inside its own polygon (the map's one label per area)",
    len(_seed_areas) == 9 and all(a["label_point"] and areas.Area(a["area_id"], a["geometry"]).contains(*a["label_point"])
@@ -402,8 +403,13 @@ ok("3. ⭐ every seed area carries ONE label point, inside its own polygon (the 
    str({n: a["label_point"] for n, a in _seed_areas.items()}))
 # NARROWED 13 Oct 2026 (bundle C regenerated the package once): a fresh export lists every tenanted table, so the
 # `areas` and `route_area_km` tables are present — EMPTY. The intent holds: the shipped demo carries no area rows.
-ok("3. ⭐ the shipped demo package carries no area ROWS (the option is off by default); the tables may be listed, empty",
-   not (_pkg["tables"].get("areas") or []) and not (_pkg["tables"].get("route_area_km") or []))
+# REVERSED 17 Oct 2026 (R2, D102): the shipped package is built WITH --with-areas, so the By council view works straight
+# after an import with no admin step: the nine seeded areas ship (8 districts and the county, the seed's own ids); the
+# clip (route_area_km) stays empty until a bake. The generator's option is still off by default (checked below).
+_seed_ids = sorted(f["properties"]["area_id"] for f in seed["features"])
+ok("3. ⭐ the shipped demo package carries the nine seeded area ROWS (D102) and no clip rows (no geometry until a bake)",
+   sorted(a["area_id"] for a in (_pkg["tables"].get("areas") or [])) == _seed_ids and len(_seed_ids) == 9
+   and not (_pkg["tables"].get("route_area_km") or []))
 gen = read("backend/tools/make_demo_tenant.py")
 ok("3. the demo generator has the documented --with-areas option, off by default, through areas.import_collection",
    'ap.add_argument("--with-areas", action="store_true"' in gen and "def build(with_areas=False, out=None):" in gen

@@ -589,8 +589,19 @@ _ct = [r for r in _pk["tables"]["config"] if r.get("key") == "carbon_target"]
 ok("⭐ the tenant package carries the target like every config row (key, value, updated_by)",
    len(_ct) == 1 and json.loads(_ct[0]["value"])["pct_below"] == 73.098745 and _ct[0]["updated_by"] == "Sam (planner)")   # NARROWED 11 Oct 2026 (6 dp)
 _demo = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
-ok("🔴 the demo package ships NO target (a planner sets one at the show)",
-   [r["key"] for r in _demo["tables"]["config"]] == ["costing", "factors", "overlay"])
+# REVERSED 17 Oct 2026 (demo redesign R2, D105): the demo SHIPS its target — exactly the four config rows the generator
+# writes, carbon_target among them, a % target from two decisions that work before a bake (Langton's surplus R019 to the
+# recycling hub R020; recycled aggregate on "Large aggregate / ballast"), set by the server's own sums
+_dct = [json.loads(r["value"]) for r in _demo["tables"]["config"] if r["key"] == "carbon_target"]
+ok("⭐ the demo package ships its carbon target (D105): the four config rows, a % target from the disposal and recycled-aggregate decisions",
+   sorted(r["key"] for r in _demo["tables"]["config"]) == ["carbon_target", "costing", "factors", "overlay"]
+   and len(_dct) == 1 and _dct[0]["mode"] == "pct" and 0 < _dct[0]["pct_below"] < 100
+   and sorted(lv["driver"] for lv in _dct[0]["levers"]) == ["disposal", "recycled"]
+   and [lv for lv in _dct[0]["levers"] if lv["driver"] == "disposal"][0]["scope"] == {"route_id": "R019"}
+   and [lv for lv in _dct[0]["levers"] if lv["driver"] == "disposal"][0]["to_route"] == "R020"
+   and [lv for lv in _dct[0]["levers"] if lv["driver"] == "recycled"][0]["scope"] == {"category": "Large aggregate / ballast"}
+   and abs(_dct[0]["set_at_alternative_t"] - _dct[0]["cap_t"]) < 1e-6 and _dct[0]["set_at_approved_t"] > _dct[0]["cap_t"],
+   str(_dct)[:300])
 
 # =========================================================================== #
 #  9. Decisions that stop applying                                              #
