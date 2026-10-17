@@ -874,13 +874,18 @@ def build_pdf(page):
 
 
 # ------------------------------------------------------------------ the Day sheet (14 Oct 2026, D9; mockup 10)
-#: the Look-ahead's order of seriousness (frontend LA_FLAG_RANK): a lorry over a road limit first
-DAY_FLAG_RANK = ("LIMIT", "RESTRICTION", "SHORTAGE", "ROUTE_CAP", "STOCKPILE_OVER", "IPT_SHARE", "DAYS_NE_WEEK",
-                 "PARENT_CHANGED", "UNBAKED")
-#: the words a person reads on the sheet (the grid's LINE_FLAG_LABEL, with the restriction's own word from the flag)
+#: the Look-ahead's order of seriousness (frontend LA_FLAG_RANK): a lorry over a road limit first.
+#: 17 Oct 2026: + the gate flags where the grid ranks them (GATE_OVER 3.5 beside the route cap, GATE_NEAR 7.5 with the
+#: warnings); they had no rank and sorted after NOT ROUTED, so a gate over capacity hid behind SHARE
+DAY_FLAG_RANK = ("LIMIT", "RESTRICTION", "SHORTAGE", "ROUTE_CAP", "GATE_OVER", "STOCKPILE_OVER", "IPT_SHARE",
+                 "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "UNBAKED")
+#: the words a person reads on the sheet (the grid's LINE_FLAG_LABEL, with the restriction's own word from the flag).
+#: 17 Oct 2026: + GATE OVER / GATE NEAR, the grid's and the phone day card's words (the sheet printed "GATE_OVER"); the
+#: rail's longer GATE OVER CAPACITY (FLAG_LABEL) would wrap the FLAG column, and the sentence under it names the capacity
 DAY_FLAG_WORD = {"LIMIT": "ROAD LIMIT", "RESTRICTION": "RESTRICTION", "SHORTAGE": "SHORT", "ROUTE_CAP": "CAP",
                  "STOCKPILE_OVER": "STOCKPILE OVER", "IPT_SHARE": "SHARE", "DAYS_NE_WEEK": "DAYS NOT = WEEK",
-                 "PARENT_CHANGED": "MONTH CHANGED", "UNBAKED": "NOT ROUTED"}
+                 "PARENT_CHANGED": "MONTH CHANGED", "UNBAKED": "NOT ROUTED",
+                 "GATE_OVER": "GATE OVER", "GATE_NEAR": "GATE NEAR"}
 
 
 #: flag sentences printed in full under the counts; the rest are counted (every one is in the Look-ahead)
@@ -904,10 +909,16 @@ def day_sheet_rows(page, day):
     quantity or a load), heaviest first. Each row carries the server's own figures for that day (derived tonnes,
     trips, vehicles), the line's flags most serious first, and the places, team NAME, material and vehicle a person
     reads. The phone's day card (PhoneLookAhead) lists the same lines in the same order.
+
+    17 Oct 2026: a flag dated to one day (`day_date`: a gate over capacity, a route cap, a share) belongs on that
+    day's sheet only — the flags were joined by line key alone, so Wednesday's gate printed on Monday's sheet too.
+    A flag with no date (a road limit, a restriction, not routed…) is the line's all week and stays on every day.
     """
     name = _team_namer()
     by_line = {}
     for f in ((page.get("clashes") or {}).get("flags") or []):
+        if f.get("day_date") and f["day_date"] != day:
+            continue
         by_line.setdefault(_line_key(f), []).append(f)
     out = []
     for l in (page.get("commit") or {}).get("lines", []):
@@ -933,6 +944,7 @@ def day_sheet_rows(page, day):
             "lorries": f.get("vehicles") if c.get("baked") else None, "routed": bool(c.get("baked")),
             "week_status": (l.get("week") or {}).get("status"),
             "flag": _day_flag_word(flags[0]) if flags else None, "more": len({x.get("code") for x in flags}) - 1 if flags else 0,
+            "codes": [x.get("code") for x in flags],
             # the flag's own sentence already names the route's places, so it is printed as it is (team ids in words)
             "flag_texts": [f"{_day_flag_word(x)}: {name(x.get('text') or '')}" for x in flags],
         })
@@ -1065,6 +1077,9 @@ def build_day_sheet_pdf(page, day):
     fl += [P(E(x), st_red) for x in texts[:DAY_FLAGS_SHOWN]] or [P("none on these lines", st_grey)]
     if len(texts) > DAY_FLAGS_SHOWN:
         fl.append(P(f"+{len(texts) - DAY_FLAGS_SHOWN} more: every flag is in the Look-ahead and its week sheet", st_grey))
+    # 17 Oct 2026: the gate figures are planned, not observed — the limit under the flags, as the week's PDF and XLSX
+    if any(c in ("GATE_OVER", "GATE_NEAR") for r in rows for c in r["codes"]):
+        fl.append(P(E(GATE_LIMIT), st_grey))
     story.append(KeepTogether(fl))
     story.append(Spacer(1, 2 * mm))
 
