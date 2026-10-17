@@ -8005,9 +8005,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
                               onBlur={() => saveConsumed(s)} />
                           </td>
-                          <td className="px-2 py-2 text-right tabular-nums font-semibold" style={{ color: s.over ? "var(--red)" : "var(--navy-deep)" }}>{grp(s.closing, 1)}</td>
+                          <td className="px-2 py-2 text-right tabular-nums font-semibold" style={{ color: s.over ? "var(--bad-text)" : "var(--navy-deep)" }}>{grp(s.closing, 1)}</td>
                           <td className="px-2 py-2 text-right tabular-nums text-slate-600">{s.capacity_qty == null ? <span className="text-slate-500">not recorded</span> : grp(s.capacity_qty)}</td>
-                          <td className="px-2 py-2 text-right tabular-nums font-medium" style={{ color: s.over ? "var(--red)" : "var(--ok-text)" }}>
+                          <td className="px-2 py-2 text-right tabular-nums font-medium" style={{ color: s.over ? "var(--bad-text)" : "var(--ok-text)" }}>
                             {s.remaining == null ? "—" : s.over ? `OVER by ${grp(-s.remaining, 1)}` : grp(s.remaining, 1)}
                           </td>
                         </tr>
