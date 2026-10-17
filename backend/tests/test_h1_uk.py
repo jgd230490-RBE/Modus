@@ -949,6 +949,94 @@ ok("W16: Blue shades' navy header is the Ink look's only (white on it 10.36:1); 
    _eff("blue-shades", "ink")["hdr-bg"] == "#1E3A8A" and round(_cr("#FFFFFF", "#1E3A8A"), 2) == 10.36
    and _eff("blue-shades", "light")["hdr-bg"] == "#FFFFFF" and _eff("blue", "ink")["hdr-bg"] == "#1F2024")
 
+# --- 17 Oct 2026: UI fix 2 (claude/ui-fix-dark) — the dark look's contrast failures that needed no decision -------------
+# (notes/ui-audit-findings-1016.md, findings 1, 2 and 6's button). Ratios by the WCAG relative-luminance formula above.
+# Finding 6: the Confirm week button has its own pair in every look. The status WORDS keep --green (open question 2).
+_bad6 = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        for name, a, b, need in [("the Confirm week button's text on the button", t["ok-btn-fg"], t["ok-btn"], 4.5),
+                                  ("the Confirm week button's edge on the page", t["ok-btn"], t["bg"], 3.0)]:
+            r = _cr(a, b)
+            if r < need:
+                _bad6.append(f"{_a}/{_l}: {name} {a} on {b} = {r:.2f} < {need}")
+ok("UI fix 2 (#6): the Confirm week pair --ok-btn / --ok-btn-fg reads 4.5:1 in all 12 looks × accents and 3:1 against the page — ink #047857 / white 5.48:1, dark #34D399 / #1F2024 8.47:1",
+   not _bad6 and _ROOT["ok-btn"] == "#047857" and _ROOT["ok-btn-fg"] == "#FFFFFF" and _DARK["ok-btn"] == "#34D399" and _DARK["ok-btn-fg"] == "#1F2024"
+   and round(_cr("#FFFFFF", "#047857"), 2) == 5.48 and round(_cr("#1F2024", "#34D399"), 2) == 8.47, "; ".join(_bad6[:4]))
+ok("...only :root and the dark block define the pair (no accent touches it), and white on --green — the old button — fails 4.5:1 in every look (3.77 ink, 1.92 dark), which is why the words stay an open question",
+   _css.count("--ok-btn:") == 2 and _css.count("--ok-btn-fg:") == 2
+   and all(_cr("#FFFFFF", _eff(a, l)["green"]) < 4.5 for a in _ACC for l in ("ink", "light", "dark"))
+   and round(_cr("#FFFFFF", _eff("orange", "ink")["green"]), 2) == 3.77 and round(_cr("#FFFFFF", _eff("orange", "dark")["green"]), 2) == 1.92)
+# Finding 1: a filled control is `text-white` beside an INLINE background (no bg-[color:var(--navy)] utility since 7 Oct, so
+# the old remap selector matched nothing and every primary button in Dark was white on orange, 2.33:1). The rule at the end
+# of the DARK-REMAP block matches the inline form; here every text-white in the markup is classified by the fill it sits on.
+_TW = re.compile(r"text-white(?!/)")
+_FILLS = [("navy", 'var(--navy)'), ("blue", 'var(--blue)'), ("slate-800", "bg-slate-800"), ("team palette", "IPT_PALETTE_C"),
+          ("zone colour", "ZONE_HAUL"), ("zone colour", "ZONE_ROUTING"), ("red", 'var(--red)'), ("green", 'var(--green)'), ("ok-btn", 'var(--ok-btn)')]
+_sites = {}
+for _m in _TW.finditer(_fe_wo):
+    _start = _fe_wo.rfind("<", 0, _m.start())
+    _win = _fe_wo[_start:_start + 600]
+    _found = sorted((_win.find(mark), kind) for kind, mark in _FILLS if mark in _win)
+    _sites.setdefault(_found[0][1] if _found else "unknown", []).append(_win)
+ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 14 on an inline var(--navy) and 1 on var(--blue) (the dark rule maps them to --control-fg), 2 on bg-slate-800 (remapped), the team pill, 4 zone buttons (finding 7, open) — none on var(--green) or the Confirm pair, none unknown",
+   len(_sites.get("navy", [])) == 14 and len(_sites.get("blue", [])) == 1 and len(_sites.get("slate-800", [])) == 2
+   and len(_sites.get("team palette", [])) == 1 and len(_sites.get("zone colour", [])) == 4
+   and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
+ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
+   len(_sites.get("red", [])) == 1 and ">Delete</button>" in _sites.get("red", [""])[0])
+ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / `\"var(--blue)\"` (the form React writes as `background: var(--navy);`, which the rule's [style*=] matches), and the rule reads --control-fg",
+   'html[data-theme="dark"] .text-white[style*="var(--navy)"],html[data-theme="dark"] .text-white[style*="var(--blue)"]{color:var(--control-fg)}' in _dark
+   and ".bg-\\[color\\:var\\(--navy\\)\\]" not in fe
+   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') >= 14 and _fe_wo.count('background: "var(--blue)"') >= 1
+   and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
+_bad1 = []
+for _a in _ACC:
+    t = _eff(_a, "dark")
+    for name, a, b in [("text on a --navy fill", t["control-fg"], t["navy"]), ("text on a --blue fill", t["control-fg"], t["blue"])]:
+        r = _cr(a, b)
+        if r < 4.5:
+            _bad1.append(f"{_a}/dark: {name} {a} on {b} = {r:.2f}")
+ok("...in the dark look --control-fg reads 4.5:1 on both fills in every accent (#1F2024 on #FF8C14 6.99:1, on #FFA10A 8.02:1; #141518 on #5B8FF0 5.77:1, on #8FB3F5 8.64:1) — the Ink/Light --blue fill stays white (3.68:1 on #3B82F6, the gate-place toggle; not this fix)",
+   not _bad1 and round(_cr("#1F2024", "#FF8C14"), 2) == 6.99 and round(_cr("#FFFFFF", "#FF8C14"), 2) == 2.33, "; ".join(_bad1))
+ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values are LEFT as they are (open question 3)",
+   '<div className="text-[10px] uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
+   and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' in fe
+   and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}' in fe)
+# Every selector in the DARK-REMAP block must match something in the markup — the reverse of the coverage check above.
+# (The selector this fix replaced, .bg-[color:var(--navy)].text-white, had matched nothing since 7 Oct and nobody noticed.)
+_UTIL = set(_PAL.findall(_fe_wo))
+_dead = []
+for _line in _dark.splitlines():
+    _line = _line.strip()
+    if not _line.startswith('html[data-theme="dark"]'):
+        continue
+    for _sel in _re.split(r"(?<!\\),", _line[:_line.index("{")]):     # a comma between selectors, not an escaped one inside a class
+        _rest = _sel.strip()[len('html[data-theme="dark"]'):].strip()
+        if _rest.startswith(".mapboxgl-"):          # a class Mapbox GL adds at run time; never in the markup
+            continue
+        if not _rest.startswith("."):
+            _tag = _re.match(r"[a-z]+", _rest).group(0)
+            if f"<{_tag}" not in _fe_wo:
+                _dead.append(_sel.strip())
+            continue
+        _i, _cls = 1, ""
+        while _i < len(_rest):
+            if _rest[_i] == "\\":
+                _cls += _rest[_i + 1]; _i += 2; continue
+            if _rest[_i] in ":[ ":
+                break
+            _cls += _rest[_i]; _i += 1
+        _attr = _re.search(r'\[style\*="([^"]+)"\]', _rest[_i:])
+        _used = (_cls in _UTIL) if _PAL.fullmatch(_cls) else (_cls in _fe_wo)
+        if _attr and _attr.group(1) not in _fe_wo:
+            _used = False
+        if not _used:
+            _dead.append(_sel.strip())
+ok("UI fix 2: every selector in the DARK-REMAP block has a use in the markup — the four stale remaps found this way on 17 Oct (bg-[rgba(37,99,235,.06)], bg-slate-200, hover:text-slate-800 / -900: utilities no longer in the file) are gone",
+   not _dead and _dark.count('html[data-theme="dark"]') >= 48 and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
+
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)
