@@ -1917,9 +1917,16 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     fetch(`${API}/costing/lines?status=All`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
       if(!live) return;
       setData(j); setErr(false); setStamp(new Date());
+      // 17 Oct 2026 (D114 fix): the first read used to widen From / To to every month with lines, which undid the
+      // this-month ± 6 default on live (the harness mounted with initialData, which skips this read). It now keeps the
+      // default, and moves to the months that have lines only when not one of them falls inside it (a programme that has
+      // not started yet, or has finished), so the page never opens on a window with no lines at all. The lines counted
+      // are the Approved ones, the status the page opens on (all of them when nothing is approved yet).
       if(tick === 0){
-        const idx = (j.lines || []).map(x => x.month_index);
-        if(idx.length){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }
+        const all = j.lines || [], ap = all.filter(x => x.status === "Approved");
+        const idx = (ap.length ? ap : all).map(x => x.month_index);
+        const [lo, hi] = dashRangeDefault(months);
+        if(idx.length && !idx.some(m => m >= lo && m <= hi)){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }
       }
     }).catch(() => { if(live && !data) setErr(true); });
     return () => { live = false; };

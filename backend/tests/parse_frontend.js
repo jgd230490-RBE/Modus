@@ -3307,6 +3307,15 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
   ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
      src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
+  // 17 Oct 2026 (D114 fix): seen on live — the Dashboard opened on Jan 26 – Dec 30 because its first read of the lines
+  // widened From / To to every month with lines, after the ± 6 default had been set
+  ok("🔴 D114 fix: the Dashboard's first read no longer widens From / To to every month with lines; it keeps this month ± 6 "
+     + "and falls back to the lines' own months only when none falls inside it",
+     src.includes("if(idx.length && !idx.some(m => m >= lo && m <= hi)){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }")
+     && src.includes("const [lo, hi] = dashRangeDefault(months);")
+     && src.includes('const all = j.lines || [], ap = all.filter(x => x.status === "Approved");')
+     && src.includes("const idx = (ap.length ? ap : all).map(x => x.month_index);")
+     && !src.includes("if(idx.length){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }"));
 }
 
 // ---- report ------------------------------------------------------------------
