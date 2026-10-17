@@ -2,7 +2,9 @@
  * ui_audit.js — the whole app in a REAL browser, every screen × width × look × accent, measured.  16 Oct 2026.
  *
  * ⚠️ NOT PART OF THE DEFAULT SUITE (run_suite.py lists it in BROWSER_ONLY; test_modus.py asserts that). It needs:
- *   - Playwright with its Chromium and axe-core, found through NODE_PATH:
+ *   - Playwright and axe-core, found through NODE_PATH, and Google Chrome installed — the browser it drives (the user,
+ *     17 Oct 2026: "use chrome for all tests"); Playwright's own Chromium only with --browser chromium, or when Chrome
+ *     is missing (the report says so):
  *         npm install -g playwright axe-core ; npx playwright install chromium
  *         $env:NODE_PATH = (npm root -g)
  *   - a Python with backend/requirements.txt (the .venv-smoke of this checkout, or of ..\Modus);
@@ -79,7 +81,7 @@ const BACKEND = path.join(ROOT, "backend");
 function parseArgs(argv) {
   const o = { full: false, headed: false, blockMapbox: false, keepServer: false, guide: false, deep: true, out: path.join(ROOT, "ui-audit"),
               db: path.join(BACKEND, "forecasts_local.db"), python: null, base: null, code: "ui-planner", teamCode: "ui-team-1",
-              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500 };
+              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500, browser: "chrome" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => argv[++i];
     if (a === "--full") o.full = true;
@@ -104,6 +106,7 @@ function parseArgs(argv) {
     else if (a === "--accents") o.accents = v().split(",");
     else if (a === "--pages") o.pages = v().split(",");
     else if (a === "--max-shot") o.maxShot = +v();
+    else if (a === "--browser") { o.browser = v(); if (!/^(chrome|chromium)$/.test(o.browser)) { console.error("ui_audit.js: --browser chrome | chromium"); process.exit(2); } }
     else { console.error("ui_audit.js: unknown option " + a); process.exit(2); }
   }
   return o;
@@ -209,7 +212,7 @@ const SHOTS = path.join(RUN_DIR, "shots");
 fs.mkdirSync(SHOTS, { recursive: true });
 
 function gitHead() { try { return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT }).toString().trim(); } catch (e) { return null; } }
-const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide },
+const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide, browser: OPT.browser },
                  stops: [], timings: {}, notes: [], totals: { passed: 0, failed: 0 } };
 
 let PASS = 0;
@@ -1109,7 +1112,7 @@ function findingKeys(stop) {
   }
   return keys;
 }
-function sameShape(a, b) { return JSON.stringify([a.widths, a.looks, a.extraAccents, a.pages]) === JSON.stringify([b.widths, b.looks, b.extraAccents, b.pages]); }
+function sameShape(a, b) { return JSON.stringify([a.widths, a.looks, a.extraAccents, a.pages, a.browser || "chromium"]) === JSON.stringify([b.widths, b.looks, b.extraAccents, b.pages, b.browser || "chromium"]); }   // a run before 17 Oct was the bundled Chromium
 async function compareRuns(browser, prevPath) {
   if (prevPath === "latest") {
     const runs = fs.readdirSync(OPT.out).filter(d => d !== STAMP && fs.existsSync(path.join(OPT.out, d, "report.json"))).sort().reverse();
@@ -1196,7 +1199,7 @@ function summaryTables() {
 }
 function writeSummaryMd(t) {
   const lines = [`# UI audit ${REPORT.stamp} — ${REPORT.head || "?"}`, "",
-    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""} · ${REPORT.secs} s`,
+    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""} · ${REPORT.browser ? REPORT.browser.ran + " " + REPORT.browser.version : ""} · ${REPORT.secs} s`,
     `**${PASS} passed, ${FAIL.length} failed.** First paint of the public view ${REPORT.timings.publicFirstPaintMs} ms; the portal's first data after sign-in ${REPORT.timings.portalFirstDataMs} ms.`, "",
     "## Checks (one per stop)", "", "| Check | Pass | Fail | Failing widths |", "|---|---:|---:|---|"];
   for (const [k, v] of Object.entries(t.byCheck)) lines.push(`| ${k} | ${v.pass} | ${v.fail} | ${Object.entries(v.widths).map(([w, n]) => w + " (" + n + ")").join(", ")} |`);
@@ -1290,7 +1293,16 @@ draw();
   try {
     server = await startServer({});
     console.log(`ui_audit: server ${server.base}${server.tenant ? " · tenant " + server.tenant : ""} · widths ${WIDTHS.join(",")} · looks ${LOOKS.join(",")} · accents orange${EXTRA_ACCENTS.length ? "," + EXTRA_ACCENTS.join(",") : ""} · out ${RUN_DIR}`);
-    browser = await chromium.launch({ headless: !OPT.headed });
+    // the browser: the installed Google Chrome (the user's); Playwright's bundled Chromium only when asked or when Chrome is missing
+    if (OPT.browser === "chrome") {
+      try { browser = await chromium.launch({ headless: !OPT.headed, channel: "chrome" }); }
+      catch (e) { note("Google Chrome did not launch (" + String(e.message || e).split("\n")[0].slice(0, 100) + "): Playwright's bundled Chromium ran instead"); }
+    }
+    const ranChrome = !!browser;
+    if (!browser) browser = await chromium.launch({ headless: !OPT.headed });
+    REPORT.browser = { asked: OPT.browser, ran: ranChrome ? "chrome" : "chromium", version: browser.version() };
+    REPORT.options.browser = REPORT.browser.ran;   // what ran is the run's shape, not what was asked
+    console.log(`ui_audit: browser ${REPORT.browser.ran} ${REPORT.browser.version}`);
     // the app confirms with the browser's own confirm() boxes — outside every look, axe and the screenshots; their number is on the record
     try { const src = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8"); const n = (src.match(/\bconfirm\(/g) || []).length;
       REPORT.nativeConfirms = n; note(`frontend/index.html confirms with the browser's own confirm() box in ${n} places (unstyled, in no look, not pictured)`); } catch (e) {}

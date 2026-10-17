@@ -1092,6 +1092,9 @@ ok("ui_audit.js captures what its stops claim: the app comes back before the err
                              "the stop is the app's ${want} page", "shows the failure it is named for",
                              'page.goto("about:blank")', "embeddedMap(page)", "const cut = meta.cut || null",
                              "cut: /./", "const gone = meta.expectGone || null")))
+ok("ui_audit.js drives the installed Google Chrome (the user, 17 Oct 2026), the bundled Chromium only when asked or when Chrome "
+   "is missing, and the report says which ran",
+   'channel: "chrome"' in _audit and 'browser: "chrome" }' in _audit and "--browser" in _audit and "REPORT.browser = {" in _audit)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
