@@ -817,7 +817,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     # the routes' times (and lines): each line's OWN vehicle where it was worked out, else the first that was (said)
     per, zone_rows = _legs_for(sorted({l["route_id"] for l in lines}), with_lines)
     speed = {z: (zone_rows[z].get("speed_kph") or 0) for z in zone_rows}
-    legs, leg_minutes, leg_meta = {}, {}, {}
+    legs, leg_minutes, leg_meta, used_zones = {}, {}, {}, set()
     for l in lines:
         prof = per.get(l["route_id"]) or {}
         used = l["vehicle"] if l["vehicle"] in prof else (sorted(prof)[0] if prof else None)
@@ -843,6 +843,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                     coords = None
                 hz = [z for z in (src.get("haul_zones") or "").split(",") if z]
                 roads = {z: zones.as_line(zone_rows[z]["geometry"]) for z in hz if z in zone_rows}
+                used_zones.update(roads)
                 built = build_leg(coords, mins, roads, speed) if coords else None
                 if built and g is None:
                     built = reversed_leg(built, speed)
@@ -902,7 +903,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
 
     inp = {"lines": lines, "gates": G, "legs": legs, "leg_minutes": leg_minutes,
            "panel": {g["gate_id"]: g["arrivals_per_day"] for g in panel.get("gates") or []},
-           "haul_roads": {z: zone_rows[z] for z in zone_rows} if with_lines else {}}
+           # the haul roads some leg of the day was routed along (an unused or switched-off road is not listed)
+           "haul_roads": {z: zone_rows[z] for z in sorted(used_zones)} if with_lines else {}}
     if p:
         sc = dict(sc, pour=p)
     res = simulate(inp, {"bands": bands, "pour": sc.get("pour")})
@@ -980,10 +982,13 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     for z, h in res["haul"].items():
         zr = zone_rows.get(z) or {}
         b = max(h["hours"]) if h["hours"] else 0
+        line = zones.as_line(zr.get("geometry")) if (send_lines and zr.get("geometry")) else None
         haul.append({"zone_id": z, "name": zr.get("name"), "speed_kph": zr.get("speed_kph"),
                      "length_km": zr.get("length_km"), "lorries": h["n"], "busiest": b,
                      "busiest_hour": (f"{h['hours'].index(b):02d}:00" if b else None),
-                     "routes": sorted(h["routes"])})
+                     "routes": sorted(h["routes"]),
+                     # 17 Oct 2026 (S7): the drawn road, for the Dashboard's map (legs=1 only)
+                     "coords": ([[round(float(p[0]), 6), round(float(p[1]), 6)] for p in line] if line else None)})
     haul.sort(key=lambda h: h["zone_id"])
 
     out_legs = {}

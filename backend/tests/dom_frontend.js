@@ -537,6 +537,130 @@ async function clpDom(){
   act(() => { r.unmount(); }); el.remove();
 }
 
+// ---- 16 Oct 2026 (S7): the Simulation section in a real DOM ----------------------------------------------------------
+// What the static harnesses cannot see: the read on FIRST OPEN (with the routes' lines once), folding and opening again,
+// Play / Pause / Restart / Jump moving the clock, a scenario change reading the day again (no lines, the scenario as
+// query parameters, a GET), a scenario the server refuses (its words shown, the inputs put back), one the screen
+// refuses itself, Back to the scheme's figures, and the phone (the table only). fetch is a stub answering the fixture
+// test_sim.py writes (the example's day with the pour). jsdom draws no map (no Mapbox here); two points a leg stand in
+// for each route's line so the drawing's counts can run.
+async function simDom(){
+  const SIM = FIX("sim_day.json");
+  const withLines = (d) => ({ ...d, legs: Object.fromEntries(Object.entries(d.legs).map(([k, v]) => [k, { ...v, coords: [[-1, 52], [-0.9, 52.1]],
+    cum: [0, 13000], len_m: 13000, parts: [[0, 13000, 13000 / (v.minutes || 30), null, 0, v.minutes || 30]], plan_minutes: v.minutes || 30 }])) });
+  const calls = [];
+  const srv = { day: (url) => reply(200, url.includes("legs=1") ? withLines(SIM) : SIM) };
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (String(url).startsWith("/api/sim/day")) return srv.day(String(url));
+    return new Promise(() => {});
+  };
+  const simCalls = () => calls.filter(c => c.url.startsWith("/api/sim/day"));
+  const _d = new Date(), thisMonth = Math.max(1, Math.min(metaMin.months.count, (_d.getFullYear() - metaMin.months.start_year) * 12 + _d.getMonth() + 1));
+  const mount = (props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    act(() => { r.render(w.React.createElement(w.SimulationPanel, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+  const toggle = (det, on) => act(async () => { det.open = on; det.dispatchEvent(new w.Event("toggle")); await sleep(40); });
+
+  const m = mount({ meta: metaMin, months: metaMin.months });
+  await settle(30);
+  const det = m.el.querySelector("details[data-sim]");
+  ok("⭐ SIM DOM: a folded Simulation reads NOTHING", simCalls().length === 0 && !!det && !det.open);
+  await toggle(det, true);
+  await settle(40);
+  ok("⭐ SIM DOM: opening it reads this month's day once, as a GET, with the routes' lines (legs=1)",
+     simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}&legs=1` && simCalls()[0].method === "GET", JSON.stringify(calls));
+  const lead = (m.el.querySelector("[data-sim-lead]") || {}).textContent || "";
+  ok("⭐ SIM DOM: the day is drawn from the reply: the lead line, eleven gate rows, the three checks all ticked",
+     m.el.querySelector('[data-sim-state="set"]') && lead.startsWith("Sep 2026: an average working day, 312 loads (646 lorry arrivals at the gates, 22 of them mixers)")
+     && m.el.querySelectorAll("[data-sim-table] tr[data-sim-gate]").length === 11
+     && [...m.el.querySelectorAll("[data-sim-checks] .sim-ok")].length === 3 && !m.el.querySelector("[data-sim-checks] .sim-bad"), lead);
+  const hb = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G007"]');
+  ok("SIM DOM: Harborough's row carries the server's figures: 101 arrivals, 84 % used, 12 waiting at 12:38, 1776 minutes lost, longest wait 56",
+     !!hb && hb.textContent.includes("101") && hb.textContent.includes("84 % used") && hb.textContent.includes("at 12:38")
+     && hb.textContent.includes("1776") && hb.textContent.includes("longest wait 56 min") && hb.textContent.includes("first wait 10:00"), hb && hb.textContent);
+  ok("SIM DOM: the timeline marks Harborough's bottleneck in words", (m.el.querySelector('[data-sim-tl-gate="G007"]') || {}).textContent && m.el.querySelector('[data-sim-tl-gate="G007"]').textContent.includes("bottleneck from"));
+  await toggle(det, false); await toggle(det, true);
+  ok("SIM DOM: folding and opening again reads nothing more", simCalls().length === 1, JSON.stringify(simCalls()));
+
+  // the clock
+  const clock = () => m.el.querySelector("[data-sim-clock]").textContent;
+  const play = () => m.el.querySelector("[data-sim-play]");
+  ok("SIM DOM: the clock starts at the first lorry setting off (05:30) and the button says Play", clock() === "05:30" && play().textContent === "Play");
+  await act(async () => { play().click(); });
+  await settle(400);
+  const ran = clock();
+  ok("⭐ SIM DOM: Play moves the clock and the button says Pause", ran !== "05:30" && play().textContent === "Pause", ran);
+  await act(async () => { play().click(); });
+  await settle(60);
+  const held = clock();
+  await settle(200);
+  ok("SIM DOM: Pause holds the clock", clock() === held && play().textContent === "Play", held + " " + clock());
+  const restart = byText(m.el, "button", "Restart");
+  await act(async () => { restart.click(); await sleep(20); });
+  ok("SIM DOM: Restart puts the clock back to 05:30", clock() === "05:30");
+  const jump = m.el.querySelector('input[type=range][aria-label="Jump to a time of day"]');
+  await setVal(jump, String(12 * 60 + 40));
+  await settle(20);
+  const g7now = m.el.querySelector('[data-sim-now-gate="G007"]');
+  ok("⭐ SIM DOM: Jump to 12:40 — the clock reads 12:40 and Harborough has lorries waiting in Gates now",
+     clock() === "12:40" && !!g7now && g7now.className.includes("sim-q") && /\d+ waiting/.test(g7now.textContent), g7now && g7now.textContent);
+
+  // a scenario: the pour switched on reads the day again, without the lines, with the pour as query parameters
+  const pourBox = [...m.el.querySelectorAll("[data-sim-scenario] label.sim-check")].find(l => /Concrete pour/.test(l.textContent)).querySelector("input");
+  await act(async () => { pourBox.click(); await sleep(450); });
+  const c2 = simCalls()[simCalls().length - 1];
+  ok("⭐ SIM DOM: switching the pour on reads the day again after a pause: no lines, the pour's gate, start, m³ and rate, a GET",
+     simCalls().length === 2 && !c2.url.includes("legs=1") && c2.url.includes("pour_gate=G007") && c2.url.includes("pour_start=10%3A00")
+     && c2.url.includes("pour_m3=160") && c2.url.includes("pour_rate=60") && c2.method === "GET", JSON.stringify(simCalls()));
+  // the server refuses a pour past midnight: its words, the start put back, the last good day kept
+  srv.day = () => reply(400, { detail: "That pour would run past midnight (last mixer at 25:38); the simulation shows one day." });
+  const start = m.el.querySelector('input[aria-label="Pour starts at"]');
+  await setVal(start, "23:00");
+  await settle(450);
+  const msg = m.el.querySelector(".sim-msg");
+  ok("⭐ SIM DOM: a refused scenario shows the server's words and puts the input back; the day on screen stays",
+     !!msg && msg.textContent === "That pour would run past midnight (last mixer at 25:38); the simulation shows one day."
+     && m.el.querySelector('input[aria-label="Pour starts at"]').value === "10:00" && m.el.querySelectorAll("[data-sim-table] tr[data-sim-gate]").length === 11,
+     msg && msg.textContent);
+  srv.day = (url) => reply(200, url.includes("legs=1") ? withLines(SIM) : SIM);
+  const nBefore = simCalls().length;
+  await settle(400);
+  ok("SIM DOM: the scenario put back is the one on screen: nothing read again", simCalls().length === nBefore, JSON.stringify(simCalls().slice(nBefore)));
+  // a window past midnight typed in the table: refused on the screen, nothing read
+  const closes = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G001"] input[aria-label$="closes at"]');
+  await setVal(closes, "06:00");
+  await settle(400);
+  ok("⭐ SIM DOM: a gate closing before it opens is refused on the screen in words (D93), and nothing is read",
+     simCalls().length === nBefore && (m.el.querySelector(".sim-msg") || {}).textContent === "Kilby Ridge Quarry: the gate must close after it opens; a window past midnight is not simulated.",
+     (m.el.querySelector(".sim-msg") || {}).textContent);
+  const ci = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G012"] input[type=number]');
+  await setVal(ci, "20");
+  await settle(450);
+  const c3 = simCalls()[simCalls().length - 1];
+  ok("SIM DOM: a check-in typed in the table reads the day again with it (check_in=G012=20), the pour still on",
+     simCalls().length === nBefore + 1 && c3.url.includes("check_in=G012%3D20") && c3.url.includes("pour_gate=G007"), JSON.stringify(c3));
+  const back = byText(m.el, "button", "Back to the scheme's figures");
+  await act(async () => { back.click(); });
+  await settle(450);
+  const c4 = simCalls()[simCalls().length - 1];
+  ok("⭐ SIM DOM: Back to the scheme's figures reads the plain month again (no scenario, no lines); every call was a GET",
+     c4.url === `/api/sim/day?month=${thisMonth}` && calls.every(c => c.method === "GET"), JSON.stringify(c4));
+  m.done();
+
+  // the phone: the table only, no lines asked for, no player, nothing to type
+  calls.length = 0;
+  const p = mount({ meta: metaMin, months: metaMin.months, phone: true });
+  await settle(20);
+  await toggle(p.el.querySelector("details[data-sim]"), true);
+  await settle(40);
+  ok("⭐ SIM DOM: on a phone the day is read without the lines; one card a gate, read-only, with the desktop note",
+     simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}` && !!p.el.querySelector('[data-sim-phone="1"]')
+     && !p.el.querySelector("[data-sim-player]") && p.el.querySelectorAll("[data-sim-table] li[data-sim-gate]").length === 11
+     && (p.el.querySelector('li[data-sim-gate="G007"] [data-sim-busy]') || {}).textContent === "16 at 10:00"
+     && !p.el.querySelector("[data-sim-table] input") && !p.el.querySelector("[data-sim-scenario]"));
+  p.done();
+}
+
 async function gateArrivalsDom(){
   const GA = FIX("gate_arrivals.json"), CTX = FIX("carbon_target.json"), CL = FIX("cost_lines.json");
   const calls = [];
@@ -1655,6 +1779,8 @@ async function g3LoginsDom(){
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
   try { await gateArrivalsDom(); ok("GATE DOM: the section ran to the end", true); }
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await simDom(); ok("SIM DOM: the section ran to the end", true); }
+  catch (e) { ok("SIM DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await clpDom(); ok("CLP DOM: the section ran to the end", true); }
   catch (e) { ok("CLP DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await infoTipDom(); ok("INFO BOX: the section ran to the end", true); }

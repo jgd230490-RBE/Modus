@@ -506,6 +506,87 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .clp-note{font-size:13px;color:var(--muted);margin-top:6px;}
   .clp-src{font-size:13px;color:var(--muted);margin-top:4px;}
   .clp-how{margin-top:6px;font-size:13px;color:var(--muted);}
+  /* 16 Oct 2026 (S7): the Simulation section on the staff Dashboard. Lorries are blue, mixers orange in every accent
+     (the dots mean a kind of lorry, not a series), a waiting lorry is the status red with a word on its gate */
+  :root{--sim-lorry:#2563EB;--sim-mixer:#E8590C;}
+  html[data-theme="dark"]{--sim-lorry:#5B8FF0;--sim-mixer:#E8681E;}
+  .sim-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+  .sim-chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:13px;color:var(--muted);background:var(--surface);}
+  .sim-chip-staff{color:var(--navy);background:var(--navy-soft);border-color:transparent;font-weight:600;}
+  .sim-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
+  @media (min-width:1024px){.sim-grid{grid-template-columns:minmax(0,1fr) 340px;}}
+  .sim-map-wrap{position:relative;align-self:start;min-width:0;}
+  .sim-map{height:520px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .sim-legend{position:absolute;left:10px;bottom:10px;background:rgba(255,255,255,.95);border:1px solid #E7E5E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1E293B;z-index:2;}
+  .sim-legend div{display:flex;align-items:center;gap:7px;margin:2px 0;}
+  .sim-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-sizing:border-box;}
+  .sim-dot-laden{background:var(--sim-lorry);}
+  .sim-dot-empty{background:#FFFFFF;border:2px solid var(--sim-lorry);}
+  .sim-dot-pour{background:var(--sim-mixer);}
+  .sim-dot-wait{background:#FFFFFF;border:2px solid #DC2626;}
+  .sim-dot-gate{background:#FFFFFF;border:1.5px solid #1E293B;width:9px;height:9px;}
+  .sim-line{display:inline-block;width:18px;height:0;flex:0 0 auto;}
+  .sim-line-end{border-top:1.5px dashed #94A3B8;}
+  .sim-line-haul{border-top:3px dashed #7C3AED;}
+  .sim-badge{background:#FFFFFF;border:1px solid #DC2626;color:#B91C1C;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.12);}
+  .sim-side{display:flex;flex-direction:column;gap:12px;min-width:0;}
+  .sim-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface);color:var(--ink);}
+  .sim-card-h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
+  .sim-clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;color:var(--ink);}
+  .sim-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
+  .sim-lbl{font-size:14px;color:var(--ink);display:inline-flex;align-items:center;gap:6px;}
+  .sim-jump{display:flex;margin-top:10px;}
+  .sim-jump input{flex:1;min-width:0;min-height:24px;}
+  .sim-now{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .sim-now th{font-size:13px;font-weight:600;color:var(--muted);text-align:left;padding:3px 2px;}
+  .sim-now td{padding:3px 2px;border-top:1px solid var(--line);}
+  .sim-now .num,.sim-table .num{text-align:right;}
+  .sim-now tr.sim-q td{color:var(--red);font-weight:600;}
+  .sim-tag{display:inline-block;font-size:12px;font-weight:600;border-radius:4px;padding:0 6px;background:var(--surface-3);color:var(--ink);margin-left:4px;}
+  .sim-ctl{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--ink);}
+  .sim-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;}
+  .sim-check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;}
+  .sim-check input[type=checkbox]{width:18px;height:18px;flex:0 0 auto;margin-top:2px;}
+  .sim-table td:first-child{min-width:200px;}
+  .sim-pour{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-left:26px;}
+  .sim-pour label{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .sim-off{opacity:.6;}
+  .sim-ctl input:not([type=checkbox]),.sim-table input{font:inherit;font-size:14px;border:1px solid var(--grey);border-radius:6px;padding:2px 6px;color:var(--ink);background:var(--surface);min-height:28px;}
+  .sim-ctl input[type=time],.sim-table input[type=time]{width:108px;}
+  .sim-num{width:76px;}
+  .sim-msg{color:var(--red);font-size:14px;font-weight:600;}
+  .sim-h4{font-size:15px;font-weight:600;color:var(--ink);margin:16px 0 2px;}
+  .sim-tl{border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden;cursor:pointer;margin-top:6px;}
+  .sim-tl svg{display:block;}
+  .sim-tl-open{fill:rgba(5,150,105,.07);}
+  .sim-tl-pour{fill:var(--sim-mixer);}
+  .sim-tl-grid{stroke:var(--line);}
+  .sim-tl-hour{font-size:12px;fill:var(--muted);}
+  .sim-tl-name{font-size:13px;fill:var(--ink);}
+  .sim-tl-ok{font-size:14px;fill:var(--green);}
+  .sim-tl-wait{fill:rgba(220,38,38,.16);stroke:var(--red);stroke-width:1.2;}
+  .sim-tl-mark{stroke:var(--red);stroke-width:2;}
+  .sim-tl-marktext{font-size:12px;font-weight:600;fill:var(--red);}
+  .sim-tl-note{font-size:12px;fill:var(--muted);}
+  .sim-tl-cursor{stroke:var(--ink);stroke-width:1.5;}
+  .sim-scroll{margin-top:6px;border:1px solid var(--line);border-radius:8px;}
+  .sim-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  .sim-table{width:100%;min-width:1180px;border-collapse:collapse;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .sim-table th{font-size:13px;font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);background:var(--surface-2);color:var(--ink);vertical-align:bottom;}
+  .sim-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .sim-th-sub,.sim-sub{font-size:13px;font-weight:400;color:var(--muted);}
+  .sim-warn{color:#B45309;}
+  html[data-theme="dark"] .sim-warn{color:var(--gold);}
+  .sim-red{color:var(--red);}
+  .sim-checks{margin-top:10px;font-size:14px;color:var(--ink);display:flex;flex-direction:column;gap:2px;}
+  .sim-ok{color:var(--green);font-weight:700;}
+  .sim-plist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .sim-pcard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface);color:var(--ink);}
+  .sim-pc-h{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:15px;}
+  .sim-pc-dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:8px 0 0;}
+  .sim-pc-dl dt{font-size:13px;color:var(--muted);}
+  .sim-pc-dl dd{margin:0;font-size:14px;font-variant-numeric:tabular-nums;}
+  .sim-bad{color:var(--red);font-weight:700;}
   .clp-how summary{cursor:pointer;color:var(--action);}
   .clp-pack{display:inline-flex;gap:8px;flex-wrap:wrap;}
   /* 14 Oct 2026 (bundle G, W17): the Look-ahead's gates this week */
@@ -921,6 +1002,9 @@ const INFO = {
   "dash.gates": { title: "Gate arrivals", text: "Lorries a day at each gate in the month, every team together, against what the gate can check in. Amber, Queue likely, from 85 % of that; red, Over gate capacity, past it.",
     how: "Each lorry counts at the gate it arrives by: loaded at the delivery site, empty at the loading site. Trips ÷ working days. Capacity = the gate's open minutes (its hours less any no-delivery peak bands, else the shift) ÷ its check-in minutes a lorry. Averages, no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
   // 14 Oct 2026 (bundle G, W7): the CLP monitoring section
+  // 16 Oct 2026 (S7): the Simulation section
+  "dash.sim": { title: "Simulation", text: "An average working day of the month, lorry by lorry: each gate's arrivals spread evenly over its open hours, one lane at each gate. Try other hours, check-in times, bands or a pour; nothing is saved.",
+    how: "Each line's loads a day are rounded to whole loads, keeping each gate as close as it can be to Gate arrivals. A lorry sets off its route's drive time before it arrives. The bottleneck is the first lorry that waits longer than the gate's check-in.", tech: "t1-gates" },
   "dash.clp": { title: "CLP monitoring", text: "The Construction Logistics Plan's figures from the approved plan: caps, vehicles, councils, carbon and trips avoided. Planned, not observed: Wayscope holds no gate log or arrival times.",
     how: "Each chart says what is missing when it cannot be drawn. The CLP pack prints the same charts for a month.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.route_caps": { title: "Routes against their planning cap", text: "Two-way movements a day on each route in the month against the cap typed on the route. Red past the cap. A flag, never a block.",
@@ -1690,7 +1774,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen, phone }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialSim, onWall, onOpen, phone }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -2157,6 +2241,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
           <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
+          {/* 16 Oct 2026 (S7): the simulation, folded, under Gate arrivals; read the first time it is opened (D86: staff only) */}
+          <SimulationPanel meta={meta} months={months} phone={phone} initial={initialSim} />
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
             <div className="pt-3"><DashboardToday meta={meta} week={week} err={weekErr} wall={wall} /></div>
@@ -8128,6 +8214,530 @@ function PhoneLookAhead({ meta, initialPage }){
         </>
       )}
     </div>
+  );
+}
+
+// ---- 16 Oct 2026 (S7): the Simulation on the staff Dashboard -----------------------------------------------------
+// The haulage simulation the user approved as an example on 16 Oct (notes/sim-example-1016/), as a Dashboard section
+// (D86: here and nowhere else; never on the public map, D36 / D58). GET /api/sim/day?month=N (backend/sim.py, the one
+// engine) is read the FIRST time the section is opened, with each route's line (legs=1) once a month; a scenario
+// change reads the day again with the scenario as query parameters. Nothing is saved and nothing goes in the address.
+// The SERVER works out every figure: whole loads, each arrival's minute, check-in, wait and departure, the busiest
+// hour, the bottleneck (D85), minutes lost, late check-ins. The browser DRAWS: where each lorry is at the clock's
+// minute (along its own route's line at the speeds the server sends, or in its gate's one lane) and the waiting count
+// over the day. Dots, not icons (D81); the month's average day (D82); about 60 s a day at 1× (D83). Its own map, like
+// CommitMap; the never-unmounted Mapbox instance is Data Management's and is not touched. Below 768 px: the table only.
+const SIM_PLAY_SECONDS = 60;
+const SIM_QUEUE_M = 25;                 // drawing only: a waiting lorry every 25 m back along its own road
+const SIM_SPEEDS = [["0.5", "½×"], ["1", "1×"], ["2", "2×"], ["4", "4×"]];
+const SIM_SC0 = () => ({ all: null, hours: {}, check_in: {}, bands: null, pour: { on: false, gate: "", start: "10:00", m3: "160", mpl: "", rate: "60" } });
+const simHM = (m) => { if(m == null || !isFinite(m)) return "—"; const r = Math.round(m); return String(Math.floor(r / 60)).padStart(2, "0") + ":" + String(((r % 60) + 60) % 60).padStart(2, "0"); };
+const simN1 = (n) => n == null ? "—" : (+n).toFixed(1);
+// the scenario as the query the server reads (scenario_from_query); nothing else carries it
+function simQS(month, sc, legs){
+  const q = [`month=${month}`];
+  if(sc.all) q.push(`hours=${encodeURIComponent("all=" + sc.all[0] + "-" + sc.all[1])}`);
+  Object.keys(sc.hours).forEach(g => q.push(`hours=${encodeURIComponent(g + "=" + sc.hours[g][0] + "-" + sc.hours[g][1])}`));
+  Object.keys(sc.check_in).forEach(g => q.push(`check_in=${encodeURIComponent(g + "=" + sc.check_in[g])}`));
+  if(sc.bands != null) q.push(`bands=${sc.bands ? "on" : "off"}`);
+  const p = sc.pour;
+  if(p.on && p.gate){
+    q.push(`pour_gate=${encodeURIComponent(p.gate)}`, `pour_start=${encodeURIComponent(p.start)}`, `pour_m3=${encodeURIComponent(p.m3)}`, `pour_rate=${encodeURIComponent(p.rate)}`);
+    if(p.mpl !== "") q.push(`pour_m3_per_load=${encodeURIComponent(p.mpl)}`);
+  }
+  if(legs) q.push("legs=1");
+  return q.join("&");
+}
+// drawing: metres along a leg after `el` minutes of driving, from the server's parts [a, b, metres a minute, zone, t0, t1]
+function simDistAt(parts, el){
+  for(const p of parts){ if(el <= p[5]) return p[0] + (el - p[4]) * p[2]; }
+  return parts.length ? parts[parts.length - 1][1] : 0;
+}
+// drawing: the point `d` metres along the leg's line
+function simPointAt(leg, d){
+  const c = leg.cum, n = c.length;
+  d = Math.max(0, Math.min(leg.len_m, d));
+  let lo = 0, hi = n - 1;
+  while(hi - lo > 1){ const m = (lo + hi) >> 1; if(c[m] <= d) lo = m; else hi = m; }
+  const seg = (c[hi] - c[lo]) || 1, u = (d - c[lo]) / seg, A = leg.coords[lo], B = leg.coords[hi];
+  return [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u];
+}
+// drawing: every lorry on the road or in a gate's lane at minute t, and each gate's waiting and minutes lost so far
+function simFrame(D, legs, t){
+  const lanes = {}, gates = {};
+  (D.gates || []).forEach(g => { gates[g.gate_id] = { w: 0, lost: 0 }; });
+  for(const a of D.arrivals){
+    const G = gates[a.gate] || (gates[a.gate] = { w: 0, lost: 0 });
+    if(a.at <= t && t < a.start){ (lanes[a.gate] || (lanes[a.gate] = [])).push(a); G.w++; }
+    if(a.at < t) G.lost += Math.max(0, Math.min(t, a.start) - a.at);
+  }
+  Object.keys(lanes).forEach(g => lanes[g].sort((x, y) => x.start - y.start));      // the gate's one lane, in check-in order
+  const feats = []; let laden = 0, empty = 0, mixers = 0, waiting = 0;
+  for(const a of D.arrivals){
+    if(a.depart == null || t < a.depart || t >= a.start) continue;
+    const leg = legs && legs[a.leg];
+    if(!leg || !leg.coords) continue;
+    let pos, k = a.kind;
+    if(t < a.at){
+      pos = simPointAt(leg, simDistAt(leg.parts, (t - a.depart) + (a.t_from || 0)));
+      if(k === "laden") laden++; else if(k === "empty") empty++; else mixers++;
+    } else {
+      const q = lanes[a.gate].indexOf(a);
+      pos = simPointAt(leg, leg.len_m - Math.max(0, q) * SIM_QUEUE_M); k = "wait"; waiting++;
+    }
+    feats.push({ type: "Feature", properties: { k }, geometry: { type: "Point", coordinates: pos } });
+  }
+  return { feats, laden, empty, mixers, waiting, gates };
+}
+const simGateName = (g) => (g.location_name || "").replace(" Rail Freight Terminal", " Terminal");
+const simWord = (g) => g.arrivals === 0 ? "No arrivals" : g.check_in == null ? "No check-in time typed" : g.flag === "red" ? "Over gate capacity" : g.flag === "amber" ? "Queue likely" : "Spacing holds";
+const simTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : "none";
+
+// the map: its own Mapbox instance (CommitMap's pattern), drawn from the reply and redrawn at each clock minute
+function SimMap({ meta, D, store, frame }){
+  const div = useRef(null), mapObj = useRef(null), badges = useRef({});
+  const [ready, setReady] = useState(false);
+  const [mapErr, setMapErr] = useState("");
+  useEffect(() => {
+    if(mapObj.current || !div.current || !window.mapboxgl) return;
+    window.mapboxgl.accessToken = meta.mapbox_token;
+    let m;
+    try {
+      m = new window.mapboxgl.Map({ container: div.current, style: "mapbox://styles/mapbox/light-v11", center: UK_VIEW.center, zoom: UK_VIEW.zoom, attributionControl: true });
+    } catch(e){ setMapErr(`The map could not start (${e && e.message ? e.message : e}).`); return; }
+    m.addControl(new window.mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+    m.on("load", () => {
+      const empty = { type: "FeatureCollection", features: [] };
+      ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
+      m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
+      m.addLayer({ id: "sim-ends", type: "line", source: "sim-ends", paint: { "line-color": "#94A3B8", "line-width": 1, "line-dasharray": [2, 2] } });
+      m.addLayer({ id: "sim-haul", type: "line", source: "sim-haul", paint: { "line-color": tok("--chart-4", "#7C3AED"), "line-width": 4, "line-dasharray": [1.5, 1] } });
+      m.addLayer({ id: "sim-haul-label", type: "symbol", source: "sim-haul", layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, -1] },
+                   paint: { "text-color": "#5B21B6", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+      m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 4, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 1.5 } });
+      m.addLayer({ id: "sim-gate-labels", type: "symbol", source: "sim-gates", layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.1], "text-anchor": "top" },
+                   paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+      m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries", paint: {
+        "circle-radius": ["match", ["get", "k"], "wait", 4.5, 4],
+        "circle-color": ["match", ["get", "k"], "laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"],
+        "circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")],
+        "circle-stroke-width": ["match", ["get", "k"], "laden", 1, "pour", 1, 2] } });
+      setReady(true);
+    });
+    mapObj.current = m;
+    // never removed here (CommitMap's rule); the map watches its own box: the section opens folded at 0 × 0
+    if(typeof ResizeObserver !== "undefined" && div.current){
+      const ro = new ResizeObserver(() => { try { if(div.current && div.current.clientWidth > 0) m.resize(); } catch(e){} });
+      ro.observe(div.current);
+      return () => ro.disconnect();
+    }
+  }, []);
+  // the still parts: each route's line, its end to its gate, the haul roads, the gates
+  useEffect(() => {
+    const m = mapObj.current;
+    if(!m || !ready || !store || !D) return;
+    const legs = store.legs || {}, gateBy = {};
+    (D.gates || []).forEach(g => { gateBy[g.gate_id] = g; });
+    const lines = [], ends = [], b = new window.mapboxgl.LngLatBounds();
+    const legGate = {};
+    (D.lines || []).forEach(l => { if(l.laden_leg) legGate[l.laden_leg] = l.laden_gate; if(l.empty_leg) legGate[l.empty_leg] = l.empty_gate; });
+    Object.keys(legs).forEach(k => {
+      const lg = legs[k];
+      if(!lg || !lg.coords || lg.coords.length < 2) return;
+      lines.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: lg.coords } });
+      lg.coords.forEach(c => b.extend(c));
+      const g = gateBy[legGate[k]];
+      if(g && g.lon != null && g.lat != null) ends.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [lg.coords[lg.coords.length - 1], [+g.lon, +g.lat]] } });
+    });
+    const haul = (store.haul || []).filter(h => h.coords && h.coords.length > 1).map(h => ({ type: "Feature",
+      properties: { label: `${h.name} · ${h.speed_kph == null ? "no speed typed" : Math.round(speed(h.speed_kph)) + " " + SPD()}` }, geometry: { type: "LineString", coordinates: h.coords } }));
+    const gpts = (D.gates || []).filter(g => g.lon != null && g.lat != null).map(g => ({ type: "Feature", properties: { name: simGateName(g) }, geometry: { type: "Point", coordinates: [+g.lon, +g.lat] } }));
+    gpts.forEach(f => b.extend(f.geometry.coordinates));
+    m.getSource("sim-routes").setData({ type: "FeatureCollection", features: lines });
+    m.getSource("sim-ends").setData({ type: "FeatureCollection", features: ends });
+    m.getSource("sim-haul").setData({ type: "FeatureCollection", features: haul });
+    m.getSource("sim-gates").setData({ type: "FeatureCollection", features: gpts });
+    // the "N waiting" badges, one a gate (words, never a colour alone)
+    Object.values(badges.current).forEach(x => { try { x.m.remove(); } catch(e){} });
+    badges.current = {};
+    (D.gates || []).forEach(g => {
+      if(g.lon == null || g.lat == null) return;
+      const el = document.createElement("div");
+      el.className = "sim-badge"; el.style.display = "none";
+      badges.current[g.gate_id] = { el, m: new window.mapboxgl.Marker({ element: el, anchor: "left", offset: [7, -10] }).setLngLat([+g.lon, +g.lat]).addTo(m) };
+    });
+    if(!b.isEmpty() && !store.framed){ try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){} }
+  }, [ready, store, D]);
+  // the moving part
+  useEffect(() => {
+    const m = mapObj.current;
+    if(!m || !ready || !D || !store || !frame) return;
+    const f = frame;
+    try { m.getSource("sim-lorries").setData({ type: "FeatureCollection", features: f.feats }); } catch(e){}
+    Object.keys(badges.current).forEach(gid => {
+      const x = badges.current[gid], w = (f.gates[gid] || {}).w || 0;
+      x.el.style.display = w > 0 ? "" : "none";
+      if(w > 0) x.el.textContent = `${w} waiting`;
+    });
+  }, [frame, ready]);
+  return (
+    <div className="sim-map-wrap">
+      <div ref={div} className="sim-map" role="region" aria-label="Simulation map" />
+      <div className="sim-legend" aria-label="Map key">
+        <div><i className="sim-dot sim-dot-laden" aria-hidden="true"></i>Lorry, laden</div>
+        <div><i className="sim-dot sim-dot-empty" aria-hidden="true"></i>Lorry, empty</div>
+        <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>{(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)</div>
+        <div><i className="sim-dot sim-dot-wait" aria-hidden="true"></i>Waiting at a gate (one lane, 25 m apart)</div>
+        <div><i className="sim-dot sim-dot-gate" aria-hidden="true"></i>Entry gate</div>
+        <div><i className="sim-line sim-line-end" aria-hidden="true"></i>Route end to its gate</div>
+        <div><i className="sim-line sim-line-haul" aria-hidden="true"></i>Haul road (assigned speed)</div>
+      </div>
+      {mapErr && <div className="ct-note" style={{ color: "var(--red)" }}>{mapErr}</div>}
+    </div>
+  );
+}
+
+// the timeline: one row a gate where a lorry waits; the shaded band is lorries waiting; the red mark is the bottleneck
+// (D85: the first wait longer than the gate's check-in). Click to move the clock there.
+const SIM_TL_LEFT = 150;
+function SimTimeline({ D, t, onSeek }){
+  const box = useRef(null);
+  const [W, setW] = useState(900);
+  useEffect(() => {
+    const f = () => { if(box.current && box.current.clientWidth) setW(box.current.clientWidth); };
+    f();
+    if(typeof ResizeObserver === "undefined" || !box.current) return;
+    const ro = new ResizeObserver(f); ro.observe(box.current); return () => ro.disconnect();
+  }, []);
+  const s0 = D.window.start, s1 = D.window.end;
+  const tx = (m) => SIM_TL_LEFT + (m - s0) / Math.max(1, s1 - s0) * (W - SIM_TL_LEFT - 10);
+  const qg = (D.gates || []).filter(g => g.queue_start != null);
+  const rowH = 32, H = 34 + Math.max(1, qg.length) * rowH + 8;
+  const still = useMemo(() => {
+    const parts = [];
+    const iv = (D.gates[0] || {}).intervals || [];
+    const same = D.gates.every(g => JSON.stringify(g.intervals) === JSON.stringify(iv));
+    if(same) iv.forEach(([a, b], i) => parts.push(<rect key={"o" + i} x={tx(a)} y={18} width={Math.max(0, tx(b) - tx(a))} height={H - 26} className="sim-tl-open" />));
+    const pourAt = D.arrivals.filter(a => a.kind === "pour").map(a => a.at);
+    if(pourAt.length) parts.push(<rect key="pour" x={tx(pourAt[0])} y={13} height={4} width={Math.max(2, tx(pourAt[pourAt.length - 1]) - tx(pourAt[0]))} className="sim-tl-pour" />);
+    for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++){
+      const x = tx(h * 60);
+      parts.push(<g key={"h" + h}><line x1={x} x2={x} y1={18} y2={H - 8} className="sim-tl-grid" /><text x={x} y={12} className="sim-tl-hour" textAnchor="middle">{String(h).padStart(2, "0")}:00</text></g>);
+    }
+    if(!qg.length) parts.push(<text key="none" x={SIM_TL_LEFT} y={34 + rowH / 2} className="sim-tl-ok">No lorry waits at any gate in this scenario.</text>);
+    qg.forEach((g, i) => {
+      const y0 = 34 + i * rowH, base = y0 + rowH - 6, mx = Math.max(1, g.most_waiting);
+      const arr = D.arrivals.filter(a => a.gate === g.gate_id && a.wait > 0.01);
+      const pts = [];
+      for(let m = s0; m <= s1; m += 2){ const w = arr.filter(a => a.at <= m && m < a.start).length; pts.push(`${tx(m).toFixed(1)},${(base - w / mx * (rowH - 12)).toFixed(1)}`); }
+      parts.push(<g key={g.gate_id} data-sim-tl-gate={g.gate_id}>
+        <text x={4} y={base - 6} className="sim-tl-name">{simGateName(g)}</text>
+        <polyline points={`${tx(s0)},${base} ${pts.join(" ")} ${tx(s1)},${base}`} className="sim-tl-wait" />
+        {g.bottleneck_at != null
+          ? <><line x1={tx(g.bottleneck_at)} x2={tx(g.bottleneck_at)} y1={y0 + 2} y2={base} className="sim-tl-mark" />
+              <text x={tx(g.bottleneck_at) + 4} y={y0 + 11} className="sim-tl-marktext">bottleneck from {simHM(g.bottleneck_at)} · up to {g.most_waiting} waiting</text></>
+          : <text x={tx(g.queue_start) + 4} y={y0 + 11} className="sim-tl-note">waits from {simHM(g.queue_start)}, none longer than the {+g.check_in} min check-in</text>}
+      </g>);
+    });
+    return parts;
+  }, [D, W]);
+  const click = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    onSeek(s0 + (e.clientX - r.left - SIM_TL_LEFT) / Math.max(1, r.width - SIM_TL_LEFT - 10) * (s1 - s0));
+  };
+  return (
+    <div ref={box} className="sim-tl" data-sim-timeline="1">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} onClick={click} role="img" aria-label={qg.length ? `Waiting lorries over the day at ${qg.length} gate${qg.length === 1 ? "" : "s"}` : "No lorry waits in this scenario"}>
+        {still}
+        <line x1={tx(t)} x2={tx(t)} y1={16} y2={H - 6} className="sim-tl-cursor" />
+      </svg>
+    </div>
+  );
+}
+
+// the player: the clock, play / pause / restart / speed / jump, the map, the gates now and the timeline
+function SimPlayer({ meta, D, store, scenario }){
+  const [t, setT] = useState(D.window.start);
+  const [playing, setPlaying] = useState(false);
+  const [sp, setSp] = useState("1");
+  const raf = useRef(null), last = useRef(null), tRef = useRef(t), spRef = useRef(1);
+  tRef.current = t; spRef.current = +sp;
+  const s0 = D.window.start, s1 = D.window.end;
+  useEffect(() => { setT(x => Math.max(s0, Math.min(s1, x))); }, [s0, s1]);
+  useEffect(() => {
+    if(!playing){ last.current = null; return; }
+    const step = (ts) => {
+      if(last.current != null){
+        let n = tRef.current + (ts - last.current) / 1000 * (s1 - s0) / SIM_PLAY_SECONDS * spRef.current;
+        if(n >= s1){ n = s1; setPlaying(false); }
+        setT(n);
+      }
+      last.current = ts;
+      raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => { if(raf.current) cancelAnimationFrame(raf.current); raf.current = null; };
+  }, [playing, s0, s1]);
+  const seek = (m) => { setT(Math.max(s0, Math.min(s1, m))); };
+  const f = useMemo(() => simFrame(D, store ? store.legs : {}, t), [D, store, t]);
+  const order = (D.gates || []).slice().sort((a, b) => (b.arrivals - a.arrivals) || (a.gate_id < b.gate_id ? -1 : 1));
+  const playWord = playing ? "Pause" : (t >= s1 ? "Play again" : "Play");
+  return (
+    <div className="sim-play" data-sim-player="1">
+      <div className="sim-grid">
+        <SimMap meta={meta} D={D} store={store} frame={f} />
+        <div className="sim-side">
+          <div className="sim-card">
+            <div className="sim-clock" aria-live="off" data-sim-clock="1">{simHM(t)}</div>
+            <div className="ct-note">{D.label}, an average working day · {D.window.from}–{D.window.to} plays in about {SIM_PLAY_SECONDS} s at 1×</div>
+            <div className="sim-btns">
+              <button type="button" className="btn-pri" onClick={() => { if(t >= s1) setT(s0); setPlaying(p => !p); }} data-sim-play="1">{playWord}</button>
+              <button type="button" className="btn-sec" onClick={() => { setPlaying(false); setT(s0); }}>Restart</button>
+              <label className="sim-lbl">Speed <select className="ga-sel" value={sp} onChange={e => setSp(e.target.value)} aria-label="Playback speed">
+                {SIM_SPEEDS.map(([v, w]) => <option key={v} value={v}>{w}</option>)}</select></label>
+            </div>
+            <label className="sim-lbl sim-jump">Jump to <input type="range" min={s0} max={s1} step={5} value={Math.round(t)} onChange={e => { setPlaying(false); seek(+e.target.value); }} aria-label="Jump to a time of day" /></label>
+            <div className="ct-note" data-sim-now="1">On the road now: {f.laden} laden · {f.empty} empty{f.mixers ? ` · ${f.mixers} mixer${f.mixers === 1 ? "" : "s"}` : ""} · {f.waiting} waiting at gates</div>
+          </div>
+          <div className="sim-card">
+            <div className="sim-card-h">Gates now</div>
+            <table className="sim-now"><thead><tr><th scope="col">Gate</th><th scope="col" className="num">Waiting now</th><th scope="col" className="num">Minutes lost so far</th></tr></thead>
+              <tbody>{order.map(g => { const n = f.gates[g.gate_id] || { w: 0, lost: 0 };
+                return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
+          </div>
+          {scenario}
+        </div>
+      </div>
+      <h4 className="sim-h4">When queues start</h4>
+      <p className="ct-note">Each row is a gate where a lorry has to wait. The shaded band is lorries waiting; the red mark is the bottleneck, the first lorry that waits longer than the gate's check-in. Click to move the clock there.</p>
+      <SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} />
+    </div>
+  );
+}
+
+// the scenario, on screen only (D86): open hours, the peak bands, a pour; the holding area comes with V1
+const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, msg }){
+  const [allF, setAllF] = useState(sc.all ? sc.all[0] : D.stand_in.from);
+  const [allT, setAllT] = useState(sc.all ? sc.all[1] : D.stand_in.to);
+  const stood = (D.gates || []).some(g => g.open_basis === "stood_in");
+  const p = sc.pour;
+  const sites = (D.gates || []).filter(g => !g.origin_share_note);
+  const setPour = (k, v) => onChange({ ...sc, pour: { ...p, [k]: v } });
+  return (
+    <div className="sim-card" data-sim-scenario="1">
+      <div className="sim-card-h">Scenario <span className="sim-tag">on screen only, not saved</span></div>
+      <div className="sim-ctl">
+        <div className="sim-row">
+          <span>Open hours, every gate</span>
+          <input type="time" step={900} value={allF} onChange={e => setAllF(e.target.value)} aria-label="Every gate opens at" />
+          <span>to</span>
+          <input type="time" step={900} value={allT} onChange={e => setAllT(e.target.value)} aria-label="Every gate closes at" />
+          <button type="button" className="btn-sec" onClick={() => onChange({ ...sc, all: [allF, allT], hours: {} })}>Apply</button>
+        </div>
+        {stood && <div className="ct-note">No open hours typed for {(D.gates || []).filter(g => g.open_basis === "stood_in").length === D.gates.length ? "any gate" : "some gates"}: the scheme's {D.stand_in.shift_hours} h shift stands in at {D.stand_in.from}–{D.stand_in.to}.</div>}
+        <label className="sim-check"><input type="checkbox" checked={sc.bands != null ? sc.bands : !!D.bands.on} onChange={e => onChange({ ...sc, bands: e.target.checked })} />
+          <span>No-delivery peak bands {(D.bands.on ? D.bands.words : gateBandWords(D.bands.typed)) || gateBandWords(PEAK_BANDS_PLACEHOLDER)}
+          {(!D.bands.typed || !D.bands.typed.length) && <span className="sim-tag">example bands, none typed</span>}</span></label>
+        <label className="sim-check"><input type="checkbox" checked={p.on} onChange={e => onChange({ ...sc, pour: { ...p, on: e.target.checked, gate: p.gate || (sites[0] || {}).gate_id || "" } })} />
+          <span>Concrete pour <span className="sim-tag">a what-if</span></span></label>
+        <div className={"sim-pour" + (p.on ? "" : " sim-off")}>
+          <label>Gate <select className="ga-sel" value={p.gate} onChange={e => setPour("gate", e.target.value)} disabled={!p.on} aria-label="Pour gate">
+            {sites.map(g => <option key={g.gate_id} value={g.gate_id}>{simGateName(g)}</option>)}</select></label>
+          <label>Starts <input type="time" step={900} value={p.start} onChange={e => setPour("start", e.target.value)} disabled={!p.on} aria-label="Pour starts at" /></label>
+          <label>Volume <input type="number" min={1} step={1} value={p.m3} onChange={e => setPour("m3", e.target.value)} disabled={!p.on} aria-label="Pour volume in cubic metres" className="sim-num" /> m³</label>
+          <label>Mixer <input type="number" min={0.5} step={0.5} value={p.mpl === "" ? D.mixer.m3_per_load : p.mpl} onChange={e => setPour("mpl", e.target.value)} disabled={!p.on} aria-label="Cubic metres a mixer load" className="sim-num" /> m³ a load</label>
+          <label>Pour rate <input type="number" min={5} step={5} value={p.rate} onChange={e => setPour("rate", e.target.value)} disabled={!p.on} aria-label="Pour rate in cubic metres an hour" className="sim-num" /> m³ an hour</label>
+          <div className="ct-note">{D.mixer.m3_per_load} m³: the {D.mixer.vehicle_label || "concrete mixer"} legal fill.{D.pour ? ` ${D.pour.loads} mixers, one every ${simN1(D.pour.gap_minutes)} min, ${D.pour.start}–${D.pour.end}.` : ""}</div>
+        </div>
+        <label className="sim-check sim-off" title="Comes with holding areas (V1)"><input type="checkbox" disabled /><span>Holding area: lorries wait off the highway</span></label>
+        <div className="ct-note">Comes with holding areas (V1).</div>
+        {msg && <div className="sim-msg" role="alert">{msg}</div>}
+        <div><button type="button" className="btn-sec" onClick={onReset}>Back to the scheme's figures</button></div>
+      </div>
+    </div>
+  );
+});
+const gateBandWords = (bands) => (bands || []).length ? bands.map(b => `${b.from}–${b.to}`).join(" and ") : "";
+
+// the busiest hour at each gate: counted by the server from the same arrivals the map plays; open hours and check-in
+// editable here (the scenario), read-only on a phone
+const SimTable = React.memo(function SimTable({ D, editable, onHours, onCheckIn, resetN }){
+  const order = (D.gates || []).slice().sort((a, b) => (b.arrivals - a.arrivals) || (a.gate_id < b.gate_id ? -1 : 1));
+  return (
+    <div className="overflow-auto sim-scroll" tabIndex={0} role="region" aria-label="Busiest hour at each gate"><table className="sim-table" data-sim-table="1">
+      <thead><tr><th scope="col">Gate</th><th scope="col">{TEAMS()}</th><th scope="col" className="num">Lorry arrivals this day<div className="sim-th-sub">laden · empty · pour</div></th>
+        <th scope="col" className="num">Dashboard average a day</th><th scope="col">Open hours</th><th scope="col" className="num">Check-in<div className="sim-th-sub">min a lorry</div></th>
+        <th scope="col" className="num">Can check in a day</th><th scope="col" className="num">Busiest hour</th><th scope="col" className="num">Can check in an hour</th>
+        <th scope="col">Queue</th><th scope="col" className="num">Most waiting</th><th scope="col" className="num">Minutes lost</th><th scope="col">Whole day, Dashboard rule</th></tr></thead>
+      <tbody>{order.map(g => {
+        const hs = g.busiest_hours || [];
+        const bh = hs.length > 1 ? `${String(hs[0]).padStart(2, "0")}:00 and ${hs.length - 1} more hour${hs.length > 2 ? "s" : ""}` : (hs.length ? `${String(hs[0]).padStart(2, "0")}:00` : "");
+        return (
+          <tr key={g.gate_id} data-sim-gate={g.gate_id} data-sim-flag={g.flag || "none"}>
+            <td><b>{g.location_name}</b><div className="sim-sub">{g.gate_name}</div>{g.origin_share_note && <div className="sim-sub sim-warn">{g.origin_share_note}</div>}</td>
+            <td>{(g.teams || []).map(x => teamText(x)).join(", ")}</td>
+            <td className="num"><b>{g.arrivals}</b><div className="sim-sub">{g.laden} · {g.empty} · {g.pour}</div></td>
+            <td className="num">{simN1(g.panel_per_day)}</td>
+            <td>{editable && g.open_basis !== "refused"
+              ? <span className="sim-hours" key={g.gate_id + g.open_from + g.open_to + resetN}>
+                  <input type="time" step={900} defaultValue={g.open_from} aria-label={`${g.location_name}, ${g.gate_name}: opens at`} onChange={e => onHours(g, e.target.value, null)} />
+                  <span> – </span>
+                  <input type="time" step={900} defaultValue={g.open_to} aria-label={`${g.location_name}, ${g.gate_name}: closes at`} onChange={e => onHours(g, null, e.target.value)} />
+                </span>
+              : <span>{g.open_from ? `${g.open_from}–${g.open_to}` : "—"}</span>}
+              <div className="sim-sub">{g.open_basis === "stood_in" ? "stood in" : g.open_basis === "scenario" ? "this scenario" : g.open_basis === "refused" ? "left out" : "as typed"} · {Math.round(g.open_minutes)} open min{D.bands.on ? " after the bands" : ""}</div>
+              {g.open_basis === "refused" && <div className="sim-sub sim-warn">{g.open_words}</div>}</td>
+            <td className="num">{editable
+              ? <input type="number" min={0} step={0.5} className="sim-num" key={g.gate_id + String(g.check_in) + resetN} defaultValue={g.check_in == null ? "" : g.check_in} placeholder="none"
+                  aria-label={`${g.location_name}, ${g.gate_name}: check-in minutes a lorry`} onChange={e => onCheckIn(g, e.target.value)} />
+              : (g.check_in == null ? "not typed" : `${+g.check_in} min`)}</td>
+            <td className="num">{simN1(g.capacity)}<div className="sim-sub">{g.pct != null ? `${g.pct} % used` : ""}</div></td>
+            <td className="num" data-sim-busy={g.busiest}><b>{g.busiest}</b><div className="sim-sub">{bh}{g.even_rate != null ? ` · even spread ${simN1(g.even_rate)} an hour` : ""}</div></td>
+            <td className="num">{simN1(g.per_hour)}</td>
+            <td>{g.queue_start == null ? "No queue" : <><b className="sim-red">{g.bottleneck_at != null ? `bottleneck ${simHM(g.bottleneck_at)}` : `short waits from ${simHM(g.queue_start)}`}</b>
+              <div className="sim-sub">first wait {simHM(g.queue_start)}</div></>}
+              {g.late > 0 && <div className="sim-sub sim-warn">{g.late} checked in after the last open minute ({simHM(g.last_open)}), the last done at {simHM(g.last_done)}</div>}</td>
+            <td className="num">{g.most_waiting || 0}{g.most_at != null && <div className="sim-sub">at {simHM(g.most_at)}</div>}</td>
+            <td className="num">{Math.round(g.minutes_lost || 0)}{g.longest_wait > 0.01 && <div className="sim-sub">longest wait {Math.round(g.longest_wait)} min</div>}</td>
+            <td className="rd-status"><RowStatus word={simWord(g)} tone={simTone(g)} /></td>
+          </tr>);
+      })}</tbody>
+    </table></div>
+  );
+});
+
+// below 768 px: one card a gate with the figures that matter on a phone (the app's tables become cards there too)
+function SimPhoneList({ D }){
+  const order = (D.gates || []).slice().sort((a, b) => (b.arrivals - a.arrivals) || (a.gate_id < b.gate_id ? -1 : 1));
+  return (
+    <ul className="sim-plist" data-sim-table="1" aria-label="Busiest hour at each gate">
+      {order.map(g => (
+        <li key={g.gate_id} className="sim-pcard" data-sim-gate={g.gate_id} data-sim-flag={g.flag || "none"}>
+          <div className="sim-pc-h"><b>{g.location_name}</b><RowStatus word={simWord(g)} tone={simTone(g)} /></div>
+          <div className="sim-sub">{g.gate_name} · open {g.open_from ? `${g.open_from}–${g.open_to}` : "—"}{g.open_basis === "stood_in" ? " (stood in)" : ""}</div>
+          <dl className="sim-pc-dl">
+            <div><dt>Lorry arrivals this day</dt><dd>{g.arrivals}{g.pour ? ` (${g.pour} mixers)` : ""}</dd></div>
+            <div><dt>Busiest hour</dt><dd data-sim-busy={g.busiest}>{g.busiest ? `${g.busiest} at ${g.busiest_hour}` : "—"}</dd></div>
+            <div><dt>Can check in an hour</dt><dd>{simN1(g.per_hour)}</dd></div>
+            <div><dt>Queue</dt><dd>{g.queue_start == null ? "No queue" : (g.bottleneck_at != null ? `bottleneck ${simHM(g.bottleneck_at)}` : `short waits from ${simHM(g.queue_start)}`)}</dd></div>
+            <div><dt>Most waiting</dt><dd>{g.most_waiting || 0}{g.most_at != null ? ` at ${simHM(g.most_at)}` : ""}</dd></div>
+            <div><dt>Minutes lost</dt><dd>{Math.round(g.minutes_lost || 0)}</dd></div>
+          </dl>
+          {g.late > 0 && <div className="sim-sub sim-warn">{g.late} checked in after the last open minute</div>}
+          {g.origin_share_note && <div className="sim-sub sim-warn">{g.origin_share_note}</div>}
+        </li>))}
+    </ul>
+  );
+}
+
+function SimulationPanel({ meta, months, phone, initial }){
+  const [open, setOpen] = useState(!!initial);
+  const [month, setMonth] = useState(() => (initial && initial.month) || gaMonthToday(months));
+  const [sc, setSc] = useState(SIM_SC0);
+  const [data, setData] = useState(initial || null);
+  const [store, setStore] = useState(() => initial ? { month: initial.month, legs: initial.legs, haul: initial.haul_roads } : null);
+  const [loadErr, setLoadErr] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [resetN, setResetN] = useState(0);
+  const good = useRef(SIM_SC0());
+  const scKey = JSON.stringify(sc);
+  // the day on screen is for this month and scenario: folding and opening again, or a refused scenario put back, reads nothing
+  const shown = useRef(initial ? `${initial.month}|${JSON.stringify(SIM_SC0())}` : null);
+  useEffect(() => {
+    if(!open) return;
+    const key = `${month}|${scKey}`;
+    if(data && shown.current === key) return;
+    let live = true;
+    const wantLines = !phone && !(store && store.month === month);
+    const go = () => {
+      setBusy(true);
+      fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`).then(async r => {
+        const j = await r.json().catch(() => ({}));
+        if(!r.ok) throw { status: r.status, detail: (j && typeof j.detail === "string") ? j.detail : "" };
+        return j;
+      }).then(j => {
+        if(!live) return;
+        good.current = sc; shown.current = key;
+        if(wantLines) setStore({ month, legs: j.legs, haul: j.haul_roads });
+        setData(j); setLoadErr(false); setMsg(""); setBusy(false);
+      }).catch(e => {
+        if(!live) return;
+        setBusy(false);
+        if(e && e.status === 400){ setMsg(e.detail || "That scenario cannot be simulated."); setSc(good.current); setResetN(n => n + 1); }
+        else setLoadErr(true);
+      });
+    };
+    const h = setTimeout(go, data ? 300 : 0);
+    return () => { live = false; clearTimeout(h); };
+  }, [open, month, scKey]);
+  const onHours = (g, f, t) => {
+    if(f === "" || t === "") return;                        // a time still being typed
+    const cur = (sc.hours[g.gate_id] || [g.open_from, g.open_to]);
+    const nx = [f || cur[0], t || cur[1]];
+    if(nx[1] <= nx[0]){ setMsg(`${g.location_name}: the gate must close after it opens; a window past midnight is not simulated.`); setResetN(n => n + 1); return; }
+    setMsg(""); setSc(s => ({ ...s, hours: { ...s.hours, [g.gate_id]: nx } }));
+  };
+  const onCheckIn = (g, v) => {
+    const x = String(v).trim();
+    if(x !== "" && !(+x >= 0)){ setMsg("A check-in is minutes a lorry, 0 or more; empty for none."); return; }
+    setMsg(""); setSc(s => ({ ...s, check_in: { ...s.check_in, [g.gate_id]: x === "" || +x === 0 ? "" : x } }));
+  };
+  const onScenario = (nx) => {
+    if(nx.all && nx.all[1] <= nx.all[0]){ setMsg("Every gate: the closing time must be after the opening time; a window past midnight is not simulated."); return; }
+    setMsg(""); setSc(nx);
+  };
+  const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
+  const D = data;
+  const played = D ? D.arrivals.filter(a => a.depart != null && a.depart >= D.window.start - 1e-9 && a.done <= D.window.end + 1e-9
+    && store && store.legs && store.legs[a.leg] && store.legs[a.leg].coords).length : 0;
+  const pourN = D && D.pour ? D.pour.loads : 0;
+  const other = D ? (D.lines || []).filter(l => l.vehicle_as_planned === false) : [];
+  const ok = (c) => <span className={c ? "sim-ok" : "sim-bad"} aria-hidden="true">{c ? "✓" : "✗"}</span>;
+  return (
+    <details className="dash-more" data-sim="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>Simulation: an average working day, lorry by lorry at every gate</summary>
+      <div className="pt-3" data-sim-state={!D ? (loadErr ? "error" : "loading") : (D.loads > 0 ? "set" : "none")}>
+        <div className="ct-row">
+          <div className="sim-chips"><span className="sim-chip sim-chip-staff">Staff only · never on the public map</span><span className="sim-chip">Planning view, not a record of what happened</span>
+            <span className="sim-chip">Congestion on the public road is not modelled</span><InfoTip id="dash.sim" /></div>
+          <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
+            {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}</select></label>
+        </div>
+        {loadErr && <div className="ct-line" style={{ color: "var(--red)" }}>The simulation did not load.</div>}
+        {!D && !loadErr && <div className="ct-note">Working out the day…</div>}
+        {D && D.loads === 0 && <EmptyState kind="none" title={`No approved lines in ${D.label}`} body="Pick another month. The simulation plays the approved lines of a month's average working day." />}
+        {D && D.loads > 0 && <>
+          <div className="ct-line" data-sim-lead="1">{D.label}: an average working day, {grp(D.loads)} loads ({grp(D.gate_arrivals)} lorry arrivals at the gates{pourN ? `, ${pourN} of them mixers` : ""}). Each gate's arrivals are spread evenly over its open hours{D.bands.on ? `, the no-delivery bands ${D.bands.words} taken off` : ""}; one lane at each gate.{busy ? " Working it out…" : ""}</div>
+          {(D.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
+          {phone
+            ? <><div className="ct-note" data-sim-phone="1">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>
+            : <>
+              <SimPlayer meta={meta} D={D} store={store} scenario={<SimScenario key={resetN} D={D} sc={sc} onChange={onScenario} onReset={() => { setMsg(""); setSc(SIM_SC0()); setResetN(n => n + 1); }} msg={msg} />} />
+              <h4 className="sim-h4">Busiest hour at each gate</h4>
+              <p className="ct-note">Counted from the same arrivals the map plays: laden lorries arrive at the delivery site's gate, empty lorries at the loading site's gate. Open hours and check-in minutes can be changed here for this screen only.</p>
+              <SimTable D={D} editable onHours={onHours} onCheckIn={onCheckIn} resetN={resetN} />
+              {(D.haul_roads || []).length > 0 && <>
+                <h4 className="sim-h4">Haul roads</h4>
+                <p className="ct-note">Lorries on each drawn haul road, both ways. No capacity is typed for a haul road, so none is flagged here.</p>
+                <div className="overflow-auto sim-scroll" tabIndex={0} role="region" aria-label="Haul roads"><table className="sim-table" data-sim-haul="1"><thead><tr><th scope="col">Haul road</th><th scope="col" className="num">Assigned speed</th><th scope="col" className="num">Length</th>
+                  <th scope="col" className="num">Lorries on it this day</th><th scope="col" className="num">Busiest hour</th><th scope="col" className="num">Routes</th></tr></thead>
+                  <tbody>{D.haul_roads.map(h => <tr key={h.zone_id}><td><b>{h.name}</b></td><td className="num">{h.speed_kph == null ? "not typed" : `${Math.round(speed(h.speed_kph))} ${SPD()}`}</td>
+                    <td className="num">{h.length_km == null ? "—" : `${fmtDist(h.length_km, 1)} ${DU()}`}</td><td className="num"><b>{h.lorries}</b></td>
+                    <td className="num">{h.busiest || 0}<div className="sim-sub">{h.busiest_hour || ""}</div></td><td className="num">{(h.routes || []).length}</td></tr>)}</tbody></table></div>
+              </>}
+              <div className="sim-checks" data-sim-checks="1">
+                <div>{ok(D.checks.table_equals_arrivals && played === D.gate_arrivals)} {grp(D.loads)} loads in the day, each arriving at its gate at both ends, plus {pourN} mixer{pourN === 1 ? "" : "s"}: the table counts {grp(D.gate_arrivals)} lorry arrivals and the map plays {grp(played)} between {D.window.from} and {D.window.to}.</div>
+                <div>{ok(D.checks.hours_add_up)} Each gate's hours add up to its day.</div>
+                {D.checks.largest_panel_difference != null && <div>{ok(D.checks.largest_panel_difference < 1)} Leaving out the pour, every gate is within {simN1(D.checks.largest_panel_difference)} of a lorry of the Dashboard's {D.label} average: a day has whole lorries, the Dashboard a decimal average.</div>}
+              </div>
+              {(D.not_drawn || []).length > 0 && <div className="ct-note">Not drawn (no route worked out): {D.not_drawn.join(", ")}. Their lorries still count at the gates.</div>}
+              {other.length > 0 && <div className="ct-note">Drawn on another vehicle's route (none worked out for their own): {other.map(l => `${l.route_id} (${vehLabel(l.vehicle)}, drawn as ${vehLabel(l.vehicle_drawn)})`).join("; ")}.</div>}
+              <div className="ct-note">A lorry held up at a gate is not late for anything afterwards: each arrival is placed by its gate's open hours, not by the lorry's last trip. Distances in {DU() === "mi" ? "miles" : "kilometres"}.</div>
+            </>}
+        </>}
+      </div>
+    </details>
   );
 }
 
