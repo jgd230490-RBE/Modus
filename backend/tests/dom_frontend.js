@@ -680,6 +680,88 @@ async function simDom(){
   p.done();
 }
 
+// ---- 17 Oct 2026: the Simulation on the BIG SCREEN (SimWall, the sixth section) in a real DOM --------------------------
+// What the static harnesses cannot see: no read while the section is hidden; the plain month (no pour) read once with the
+// lines; the day played ONCE a pass in Rotate (then its last picture held), started again at the first lorry each pass,
+// looped in One section after the hold; paused while hidden; read again on the 5-minute refresh without restarting; a new
+// month read and started at its first lorry; no scenario control and no table on the TV. The month rule (simWallMonth):
+// the display's choice, else this month, else the next month with approved lines, else the last one before. Frames are
+// driven by the test (a frame every 100 ms of page time; a day = 60 s at 1×, so one second of frames is 12 minutes).
+async function simWallDom(){
+  const SIM = FIX("sim_day.json");
+  const withLines = (d) => ({ ...d, legs: Object.fromEntries(Object.entries(d.legs).map(([k, v]) => [k, { ...v, coords: [[-1, 52], [-0.9, 52.1]],
+    cum: [0, 13000], len_m: 13000, parts: [[0, 13000, 13000 / (v.minutes || 30), null, 0, v.minutes || 30]], plan_minutes: v.minutes || 30 }])) });
+  const calls = [];
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (String(url).startsWith("/api/sim/day")) { const m = +((/month=(\d+)/.exec(String(url)) || [])[1]); return reply(200, { ...withLines(SIM), month: m, label: m === 9 ? "Sep 2026" : "Oct 2026" }); }
+    return new Promise(() => {});
+  };
+  const swm = w.eval("simWallMonth"), months = metaMin.months;
+  const _d = new Date(), thisMonth = Math.max(1, Math.min(months.count, (_d.getFullYear() - months.start_year) * 12 + _d.getMonth() + 1));
+  ok("⭐ SIM WALL DOM: the month rule — the display's choice; else this month; else the next month with approved lines; else the last before",
+     swm("9", months, []) === 9 && swm("", months, [thisMonth, thisMonth + 2]) === thisMonth && swm("", months, [thisMonth - 3, thisMonth + 2, thisMonth + 5]) === thisMonth + 2
+     && swm("", months, [thisMonth - 3, thisMonth - 1]) === thisMonth - 1 && swm("", months, []) === thisMonth && swm("99", months, [thisMonth]) === thisMonth);
+  const realRaf = w.requestAnimationFrame, realCaf = w.cancelAnimationFrame, queued = new Map();
+  let rafId = 0, pageMs = 1000;
+  w.requestAnimationFrame = (cb) => { queued.set(++rafId, cb); return rafId; };
+  w.cancelAnimationFrame = (id) => { queued.delete(id); };
+  const frames = (n) => act(() => { for (let i = 0; i < n; i++){ const due = [...queued.values()]; queued.clear(); pageMs += 100; due.forEach(cb => cb(pageMs)); } });
+  const el = w.document.createElement("div"); w.document.body.appendChild(el);
+  const root = w.ReactDOM.createRoot(el);
+  const draw = (props) => act(() => { root.render(w.React.createElement(w.SimWall, { meta: metaMin, month: 9, show: false, pass: 0, loop: false, fill: true, tick: 0, ...props })); });
+  const clock = () => (el.querySelector("[data-sim-wall-clock]") || {}).textContent;
+  draw({});
+  await settle(30);
+  ok("⭐ SIM WALL DOM: a hidden section reads nothing", calls.length === 0 && !el.querySelector('[data-sim-wall="1"]'));
+  draw({ show: true });
+  await settle(40);
+  ok("⭐ SIM WALL DOM: shown, it reads the plain month once with the lines — no pour, no scenario — as a GET",
+     calls.length === 1 && calls[0].url === "/api/sim/day?month=9&legs=1" && calls[0].method === "GET", JSON.stringify(calls));
+  const sub = (el.querySelector("[data-sim-wall-sub]") || {}).textContent || "";
+  ok("⭐ SIM WALL DOM: the TV shows the map, the clock at the first lorry, Gates now and the timeline; it says no pour and the stood-in hours",
+     !!el.querySelector('[data-sim-wall="1"] .sim-map') && clock() === "05:30" && !!el.querySelector("[data-sim-timeline]") && el.querySelectorAll("[data-sim-now-gate]").length === 8
+     && sub.includes("Sep 2026, an average working day: 312 loads · no pour · gates open 07:00–17:00 (stood in: no open hours typed)")
+     && el.textContent.includes("Staff only · never on the public map") && el.textContent.includes("Planning view, not a record of what happened"), sub);
+  ok("🔴 SIM WALL DOM: no scenario control and no table on the TV (nobody touches it): no input, select, scenario card or busiest-hour table",
+     el.querySelectorAll("input,select,textarea,button").length === 0 && !el.querySelector("[data-sim-scenario]") && !el.querySelector("[data-sim-table]"));
+  frames(11);
+  ok("SIM WALL DOM: it plays at 1×: one second of frames is 12 minutes (05:30 → 05:42)", clock() === "05:42", clock());
+  frames(700);
+  ok("⭐ SIM WALL DOM: in Rotate the day plays ONCE and holds its last picture: 17:30, and no frame asked for after it",
+     clock() === "17:30" && queued.size === 0, clock() + " " + queued.size);
+  draw({ show: true, pass: 1 });
+  await settle(10);
+  ok("⭐ SIM WALL DOM: the next pass starts the day again at the first lorry (05:30) and plays", clock() === "05:30" && queued.size === 1, clock());
+  frames(11);
+  draw({ show: false, pass: 1 });
+  frames(20);
+  const hiddenAt = clock();
+  ok("SIM WALL DOM: hidden, it stops playing (no frame asked for) and reads nothing", queued.size === 0 && hiddenAt === "05:42" && calls.length === 1, hiddenAt);
+  draw({ show: true, pass: 1, loop: true });
+  await settle(10);
+  frames(11);
+  ok("SIM WALL DOM: shown again on the same month and refresh it reads nothing more and carries on", calls.length === 1 && clock() === "05:54", clock());
+  // from 05:54 the day's end (17:30) is 696 minutes = 58 s = 580 frames away; then the last picture holds 5 s (50 frames)
+  frames(600);
+  const atEnd = clock();
+  frames(40);
+  ok("⭐ SIM WALL DOM: in One section it loops: the day's last picture is held 5 s, then the day starts again at the first lorry",
+     atEnd === "17:30" && /^05:[34]\d$/.test(clock()), atEnd + " → " + clock());
+  const beforeRefresh = clock();
+  draw({ show: true, pass: 1, loop: true, tick: 1 });
+  await settle(30);
+  ok("SIM WALL DOM: the 5-minute refresh reads the day again without restarting the clock",
+     calls.length === 2 && calls[1].url === "/api/sim/day?month=9&legs=1" && clock() === beforeRefresh, JSON.stringify(calls.slice(1)) + " " + beforeRefresh + " " + clock());
+  frames(30);
+  draw({ show: true, pass: 1, loop: true, tick: 1, month: 10 });
+  await settle(30);
+  ok("SIM WALL DOM: a new month on this display is read and starts at its first lorry",
+     calls.length === 3 && calls[2].url === "/api/sim/day?month=10&legs=1" && clock() === "05:30" && (el.querySelector("[data-sim-wall-sub]") || {}).textContent.startsWith("Oct 2026"));
+  act(() => { root.unmount(); }); el.remove();
+  w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
+}
+
 async function gateArrivalsDom(){
   const GA = FIX("gate_arrivals.json"), CTX = FIX("carbon_target.json"), CL = FIX("cost_lines.json");
   const calls = [];
@@ -1800,6 +1882,8 @@ async function g3LoginsDom(){
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await simDom(); ok("SIM DOM: the section ran to the end", true); }
   catch (e) { ok("SIM DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  try { await simWallDom(); ok("SIM WALL DOM: the section ran to the end", true); }
+  catch (e) { ok("SIM WALL DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await clpDom(); ok("CLP DOM: the section ran to the end", true); }
   catch (e) { ok("CLP DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await infoTipDom(); ok("INFO BOX: the section ran to the end", true); }

@@ -1293,10 +1293,11 @@ ok("0915: four sections, named, in the page's own order",
    && ["today", "kpis", "charts", "stock"].every(k => new RegExp(`key: "${k}"`).test(src))
    && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4
    // 14 Oct 2026 (narrowed): a FIFTH, More charts, added LAST so #dashboard/1 … /4 keep their screens
-   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n\];/.test(src));
-ok("0915: every one of the five (14 Oct: was four) is wrapped, and each wraps a DIFFERENT index",
-   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
-   && [0, 1, 2, 3, 4].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
+   // 17 Oct 2026 (narrowed): a SIXTH, Simulation, added LAST after it, so #dashboard/1 … /5 keep their screens
+   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n  \/\/ 17 Oct 2026 \(the user\): the Simulation, added LAST[^\n]*\n  \{ key: "sim",    title: "Simulation" \},\n\];/.test(src));
+ok("0915: every one of the six (14 Oct: five; 17 Oct: six) is wrapped, and each wraps a DIFFERENT index",
+   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6
+   && [0, 1, 2, 3, 4, 5].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
 ok("0915: 🔴 a hidden section is HIDDEN, not unmounted — the Mapbox instance survives",
    // the wrapper renders its children unconditionally and toggles `hidden`
    // (13 Oct 2026, W5: narrowed — the wrapper no longer needs a ref, it fires nothing)
@@ -1314,10 +1315,13 @@ ok("0915: ...and a section coming back into view is re-measured (13 Oct: each bo
    && /function CommitMap[\s\S]{0,9000}new ResizeObserver\(\(\) => \{ try \{ if\(mapDiv\.current && mapDiv\.current\.clientWidth > 0\) m\.resize\(\);/.test(src));
 ok("0915: the WORKING view always shows all four, whatever the big screen remembered",
    /const sectionShown = \(i\) => !wall \|\| wallLayout === "all" \|\| wallSection === i;/.test(src));
+// NARROWED 17 Oct 2026: a timeout per section instead of one interval, so each section has its own time on screen — the
+// Simulation its whole day (SIM_WALL_SECONDS), the others the rotate setting
 ok("0915: the rotate timer runs only on the big screen, and is cleared",
    /if\(!wall \|\| wallLayout !== "rotate"\) return;/.test(src)
-   && /setInterval\(\(\) => setWallSection\(s => \(s \+ 1\) % DASH_SECTIONS\.length\), rotateSecs \* 1000\)/.test(src)
-   && /return \(\) => clearInterval\(id\);/.test(src));
+   && /setTimeout\(\(\) => setWallSection\(s => \(s \+ 1\) % DASH_SECTIONS\.length\), dwellNow \* 1000\)/.test(src)
+   && /return \(\) => clearTimeout\(id\);\n  \}, \[wall, wallLayout, rotateSecs, wallSection\]\);/.test(src)
+   && src.includes('const dwellNow = (DASH_SECTIONS[wallSection] || {}).key === "sim" ? SIM_WALL_SECONDS : rotateSecs;'));
 ok("0915: a screen can be pinned by URL, 1-based, and a bad number is ignored not clamped",
    /function screenFromHash\(max\)/.test(src)
    && /return \(n >= 1 && n <= max\) \? n : null;/.test(src)
@@ -1950,7 +1954,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
     // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
-    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
+    // 17 Oct 2026 (narrowed): six WallSections — the sixth is the Simulation (SimWall), no chart in it
+    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
     && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
   ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
     ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
@@ -2214,7 +2219,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
-    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
+    // 17 Oct 2026 (narrowed): six sections (the Simulation); the Gate arrivals panel is still not on it
+    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
 }
 
@@ -2255,7 +2261,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const simSrc = s0 > 0 && s1 > s0 ? src.slice(s0, s1) : "";
   const simc = simSrc.split("\n").map(l => l.replace(/^\s*\/\/.*$/, "")).join("\n");
   const fn = (name, next) => simSrc.slice(simSrc.indexOf(`function ${name}(`), next ? simSrc.indexOf(next) : undefined);
-  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPanel");
+  // 17 Oct 2026: the panel ends where the big screen's SimWall begins (same block)
+  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPanel", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN");
   const _dbS = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
   const _dbSW = _dbS.slice(_dbS.indexOf("{!wall ? ("), _dbS.indexOf("      ) : (\n        <>\n")), _dbSWl = _dbS.slice(_dbS.indexOf("      ) : (\n        <>\n"));
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
@@ -2269,7 +2276,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("⭐ S7: folded, read on FIRST OPEN with one GET of /api/sim/day (the lines once a month), keyed on open, the month and the scenario",
     panelSrc.includes('<details className="dash-more" data-sim="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>')
     && panelSrc.includes("if(!open) return;") && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [open, month, scKey]);")
-    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (simc.match(/fetch\(/g) || []).length === 1);
+    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 1
+    // NARROWED 17 Oct 2026: the block holds the big screen's SimWall too, with its own one read (the plain month, with the lines)
+    && (simc.match(/fetch\(/g) || []).length === 2 && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
   ok("🔴 S7 (D86): nothing written, nothing kept, nothing in the address — no method, no storage, no history, no location in the block",
     !/method:|localStorage|sessionStorage|history\.|location\.|postJSON|navigator\.clipboard/.test(simc));
   ok("⭐ S7: the scenario reaches the server only as the query its parser reads (hours, check_in, bands, pour_*, legs=1)",
@@ -2277,7 +2286,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      "`bands=${sc.bands ? \"on\" : \"off\"}`", "`pour_gate=${encodeURIComponent(p.gate)}`", "`pour_m3_per_load=${encodeURIComponent(p.mpl)}`", 'q.push("legs=1")'].every(t => simSrc.includes(t)));
   ok("🔴 S7: the browser works out no figure: the table and the cards print the server's fields; no capacity, share, wait or rounding of a day here",
     ["g.busiest", "g.pct", "g.capacity", "g.minutes_lost", "g.bottleneck_at", "g.most_waiting", "g.longest_wait", "g.late", "g.per_hour", "g.panel_per_day", "D.checks.table_equals_arrivals", "D.checks.largest_panel_difference"].every(f => simSrc.includes(f))
-    && !/60 \/ |\* 100|\/ g\.check_in|open_minutes \//.test(simc)
+    // NARROWED 17 Oct 2026: "* 100" no longer matches "* 1000" (the big screen's hold in milliseconds); a percentage still does
+    && !/60 \/ |\* 100(?!0)|\/ g\.check_in|open_minutes \//.test(simc)
     // the one ceil is the timeline's first hour tick (drawing)
     && (simc.match(/Math\.ceil/g) || []).length === 1 && simc.includes("for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++)"));
   ok("⭐ S7 (D85): the timeline's red mark is the server's bottleneck (the first wait longer than the check-in), said in words",
@@ -2319,6 +2329,46 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && scnSrc.includes('data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).<'));
   ok("S7 fix: one quiet line under the haul roads when gate access roads were left out (the server's count)",
     panelSrc.includes('{D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}'));
+  // 17 Oct 2026: the big screen's sixth section (SimWall) and the one-screen layout of this section
+  const wallSrc = fn("SimWall", "function CommitMap(");
+  const wallTop = simSrc.slice(simSrc.indexOf("// ---- 17 Oct 2026: the Simulation on the BIG SCREEN"), simSrc.indexOf("function SimWall("));
+  ok("⭐ SIM BIG SCREEN: the sixth section is last (key sim), wrapped like the others, and plays SimWall with this display's month, the pass, the loop and the refresh",
+    _dbS.includes('<WallSection show={sectionShown(5)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[5].title}>')
+    && _dbS.includes('<SimWall meta={meta} month={simMonth} show={wall && sectionShown(5)} pass={simPass} loop={wallLayout !== "rotate"} fill={fill} tick={tick} />')
+    && _dbSWl.indexOf("<SimWall ") > _dbSWl.indexOf("<ChartCanvas config={splitCfg} />") && !_dbSW.includes("<SimWall "));
+  ok("⭐ SIM BIG SCREEN: in Rotate the Simulation stays its whole day (a day at 1× + a 5 s hold), whatever the rotate setting; the others keep theirs",
+    wallTop.includes("const SIM_WALL_HOLD_S = 5;") && wallTop.includes("const SIM_WALL_SECONDS = SIM_PLAY_SECONDS + SIM_WALL_HOLD_S;")
+    && _dbS.includes('const dwellNow = (DASH_SECTIONS[wallSection] || {}).key === "sim" ? SIM_WALL_SECONDS : rotateSecs;'));
+  ok("⭐ SIM BIG SCREEN: each pass starts the day again (simPass counts the section coming round); the play loop restarts on it",
+    _dbS.includes("useEffect(() => { if(wall && sectionShown(simIdx)) setSimPass(p => p + 1); }, [wall, wallLayout, wallSection]);")
+    && wallSrc.includes("useEffect(() => { if(dRef.current){ tRef.current = dRef.current.window.start; setT(dRef.current.window.start); } }, [pass]);")
+    && wallSrc.includes("}, [show, D, loop, pass]);") && wallSrc.includes("if(!loop){ tRef.current = n; setT(n); raf = null; return; }"));
+  ok("🔴 SIM BIG SCREEN (D86): the month is a per-display setting in localStorage, said in a comment to be NOT a saved or shared scenario; nothing goes in the address",
+    wallTop.includes('const SIM_WALL_MONTH_KEY = "modus_dash_sim_month";') && /NOT a saved or shared scenario: D86 stands/.test(wallTop)
+    && _dbS.includes("localStorage.setItem(SIM_WALL_MONTH_KEY, v)")
+    && /A display setting in this browser's localStorage, like the rotate time — NOT a saved or shared\n\s*\/\/ scenario \(D86 stands/.test(src)
+    && _dbS.includes('aria-label="Simulation month on this display"') && _dbS.includes('<option value="">this month</option>')
+    && !/localStorage|sessionStorage|history\.|location\./.test(wallSrc));
+  ok("SIM BIG SCREEN: the bar keeps one line — the month choice only while the Simulation is on screen (or in All sections), and no costing range beside it",
+    (_dbS.match(/\(wallLayout === "all" \|\| wallSection === simIdx\) && </g) || []).length === 2
+    && _dbS.includes("{fill && wallSection !== simIdx && <span className=\"dash-wallbar-note\" title="));
+  ok("SIM: the map's key names the concrete mixer only on a day with a pour",
+    mapSrc.includes('{D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>'));
+  ok("🔴 SIM BIG SCREEN: no scenario controls and no table on the TV; it reads the plain month (no pour) only while shown",
+    !/<input|<select|<button|SimScenario|SimTable|pour_gate|onHours|onCheckIn/.test(wallSrc)
+    && wallSrc.includes("if(!show) return;") && wallSrc.includes("fetch(`${API}/sim/day?month=${month}&legs=1`)") && wallSrc.includes("no pour"));
+  ok("SIM BIG SCREEN: it fills the TV in Rotate / One section (.dash-fill) with the map large, the clock and Gates now beside it, the timeline under the map",
+    /\.sim-wall\{display:grid;[^}]*grid-template-areas:"map side" "tl side";\}/.test(html) && /\.dash-wall\.dash-fill \.sim-wall-fill\{height:100%;grid-template-rows:minmax\(0,1fr\) auto;\}/.test(html)
+    && /\.sim-wall-fill \.sim-map\{height:100%;\}/.test(html) && /\.sim-wall-clock\{font-size:clamp\(/.test(html)
+    && wallSrc.includes('<div className={"sim-wall" + (fill ? " sim-wall-fill" : "")} data-sim-wall="1">'));
+  ok("⭐ SIM ONE SCREEN: from 1024 px the map and its timeline sit left, the clock / Gates now / scenario beside them; the table and the haul roads fold away (closed)",
+    fn("SimPlayer", "const SimScenario").includes('<div className="sim-main">\n          <SimMap meta={meta} D={D} store={store} frame={f} />')
+    && /<div className="sim-main">[\s\S]{0,700}<SimTimeline D=\{D\} t=\{t\}/.test(fn("SimPlayer", "const SimScenario"))
+    && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:clamp\(260px,calc\(100vh - 420px\),680px\);\}\}/.test(html)
+    // found in Chrome: in the flex column the map's box shrank to nothing (align-self:start); it stretches across its column
+    && /\.sim-main>\.sim-map-wrap\{align-self:stretch;\}/.test(html)
+    && panelSrc.includes('<details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>')
+    && panelSrc.includes('<details className="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>') && !/data-sim-fold="[a-z]+" open/.test(panelSrc));
   ok("S7: the info box entry (≤ 40 words) and the controls are named for a screen reader",
     /"dash\.sim": \{ title: "Simulation", text: "[^"]+", *\n? *how: "[^"]+", tech: "t1-gates" \}/.test(src)
     && ["Simulation month", "Playback speed", "Every gate opens at", "Every gate closes at", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));
@@ -2826,7 +2876,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /@media \(min-width:1024px\)\{\.wall-charts\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);\}\}/.test(html)
      && _db.includes('[["all", "All sections"], ["rotate", "Rotate"], ["single", "One section"]]') && !_db.includes('"All four"'));
   ok("BIG SCREEN: the rotation shows a line that fills over the section's time and names the next one; no motion when reduced motion is asked for",
-     _db.includes('<i key={wallSection + "-" + rotateSecs} style={{ animationDuration: rotateSecs + "s" }}></i>')
+     // NARROWED 17 Oct 2026: the line fills over THIS section's time (dwellNow: the Simulation's whole day, else the setting)
+     _db.includes('<i key={wallSection + "-" + dwellNow} style={{ animationDuration: dwellNow + "s" }}></i>')
      && _db.includes("next: {DASH_SECTIONS[(wallSection + 1) % DASH_SECTIONS.length].title}")
      && /@media \(prefers-reduced-motion:reduce\)\{\.dash-rot>i\{animation:none;/.test(html));
   ok("BIG SCREEN: the page header folds into the bar (range, updated, a clock, Exit); no tour and no menu over the TV",
