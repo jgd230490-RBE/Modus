@@ -597,8 +597,25 @@ ok("...creates ONE map and keeps it (the guard), and never draws an unbaked rout
 ok("...colours lines by IPT from palette C, and is not rendered under the render harness",
   _cmBody.includes("IPT_PALETTE_C[iptKey(") && _laBody.includes("!initialPage && <CommitMap"));
 // 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
+// NARROWED 17 Oct 2026 (UI fix 2, claude/ui-fix-dark, finding 2): the wash is var(--navy-soft) INLINE — the .tbl th rule
+// out-ranks a bg-blue-50 class — so the dark look paints today's column in its own tint (the figures were 1.14:1 on #eff6ff)
 ok("today's column carries the wash and the '· today' suffix",
-  _laBody.includes('", today"') && _laBody.includes('#eff6ff'));
+  _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft)" } : {}}'));
+ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ahead; seven inline var(--navy-soft) washes (today's th and td, the summary row, the Horizon's commit th and two td); the week pill reads var(--muted) when off",
+  !/#eff6ff|#64748b|#B45309/i.test(_laBody)
+  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 7
+  && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
+ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
+  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
+  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}'));
+// 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
+ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
+  _laBody.includes('style={view === id ? { background: "var(--navy)", color: "var(--control-fg)", borderColor: "var(--navy)" }') && !/color: "white"/.test(_laBody));
+ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
+  (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
+  && (code.match(/var\(--ok-btn\)/g) || []).length === 2 && (code.match(/var\(--ok-btn-fg\)/g) || []).length === 2
+  && _laBody.includes('font-semibold rounded-lg" style={{ background: "var(--ok-btn)", color: "var(--ok-btn-fg)" }}>Confirm week</button>')
+  && !/text-white[^<]{0,400}var\(--green\)/.test(code));
 // NARROWED (H1): the unit word is DU() — km, or mi for a tenant that reads miles
 // 13 Oct 2026 (W6, narrowed): the ▶ row's string became the details row, one fact a line, labels in the tenant's unit
 ok("the expanded row prints km/trip, km/week, t·km, cycle and € or 'rate not set' — in the tenant's unit",
@@ -624,7 +641,8 @@ ok("⭐ export downloads through fetch + blob, never a bare <a href> (the access
   /fetch\(`\$\{API\}\/forecast-weeks\/export\?format=\$\{format\}&bucket=\$\{bucket\}`\)/.test(_laBody)
   && _laBody.includes("URL.createObjectURL(blob)") && !/href=\{`\$\{API\}\/forecast-weeks\/export/.test(code));
 ok("...the mock's bar: Export XLSX beside the green Confirm week, PDF as a smaller second button",
-  _laBody.includes(">Export XLSX<") && _laBody.includes('download("pdf")') && _laBody.includes('background: "var(--green)" }}>{anyConfirmed'));
+  // NARROWED 17 Oct 2026 (UI fix 2, finding 6): the button reads its own pair, --ok-btn / --ok-btn-fg
+  _laBody.includes(">Export XLSX<") && _laBody.includes('download("pdf")') && _laBody.includes('background: "var(--ok-btn)", color: "var(--ok-btn-fg)" }}>{anyConfirmed'));
 ok("no email and no upload in the page", !/mailto:|sendEmail|<input type="file"/.test(_laBody));
 // slice 5 — rates and the confirmed cost
 ok("⭐ the confirmed cost is sent ONLY when its box was touched — an absent field leaves it alone",
@@ -790,7 +808,10 @@ ok("a zone still needs three corners and a haul road two",
 ok("saving re-bakes what it invalidated", code.includes("rebakeAfterZone"));
 ok("the re-bake drives the existing batch endpoint rather than a new one",
   code.includes("`${API}/admin/bake-routes?${q}`"));
-ok("the re-bake loop has a guard against spinning forever", code.includes("guard++ < 200"));
+// NARROWED 17 Oct 2026 (Route all 502s): the guard is no longer a cap of 200 calls (short, time-boxed batches could
+// reach it on a big network) but "stop when `remaining` stops falling"; test_route_all.py asserts both loops
+ok("the re-bake loop has a guard against spinning forever",
+  /const rebakeAfterZone = async[\s\S]*?if\(left >= last\) throw new Error\(`\$\{left\} leg\(s\) left and not falling`\);/.test(code));
 ok("only the affected vehicle profiles are re-baked",
   code.includes("legs.map(l => l.vehicle_profile)"));
 ok("the invalidated leg count is surfaced to the user", code.includes("inv.leg_count"));
@@ -1124,6 +1145,9 @@ ok("there is a shared empty state", code.includes("function EmptyState("));
 
 // ---- 4f. 10 Sep evening — the fuel widget, target rate and Quote + BAF ---------------
 const _fwBody = code.slice(code.indexOf("function FuelWidget("), code.indexOf("function LookAhead("));
+// 17 Oct 2026 (UI fix 2, finding 2): the BAF figure's "no share" grey is the token (identical in Ink; 3.42:1 -> 6.25:1 in Dark)
+ok("UI fix 2 (#2): the fuel card's BAF figure reads var(--navy) or var(--muted), never the light-look grey literal",
+  _fwBody.includes('style={{ color: sum.baf_pct != null ? "var(--navy)" : "var(--muted)" }} title={baseTxt}>{bafTxt}</span>') && !/#64748b/i.test(_fwBody));
 const _ctBody = code.slice(code.indexOf("function CostingTab("), code.indexOf("function ConfigPage("));
 ok("⭐ ONE FuelWidget component, mounted THREE times: Commit (compact), Account (strip), Config (config)",
   (code.match(/function FuelWidget\(/g) || []).length === 1 && (code.match(/<FuelWidget\b/g) || []).length === 3
@@ -1293,10 +1317,11 @@ ok("0915: four sections, named, in the page's own order",
    && ["today", "kpis", "charts", "stock"].every(k => new RegExp(`key: "${k}"`).test(src))
    && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4
    // 14 Oct 2026 (narrowed): a FIFTH, More charts, added LAST so #dashboard/1 … /4 keep their screens
-   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n\];/.test(src));
-ok("0915: every one of the five (14 Oct: was four) is wrapped, and each wraps a DIFFERENT index",
-   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
-   && [0, 1, 2, 3, 4].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
+   // 17 Oct 2026 (narrowed): a SIXTH, Simulation, added LAST after it, so #dashboard/1 … /5 keep their screens
+   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n  \/\/ 17 Oct 2026 \(the user\): the Simulation, added LAST[^\n]*\n  \{ key: "sim",    title: "Simulation" \},\n\];/.test(src));
+ok("0915: every one of the six (14 Oct: five; 17 Oct: six) is wrapped, and each wraps a DIFFERENT index",
+   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6
+   && [0, 1, 2, 3, 4, 5].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
 ok("0915: 🔴 a hidden section is HIDDEN, not unmounted — the Mapbox instance survives",
    // the wrapper renders its children unconditionally and toggles `hidden`
    // (13 Oct 2026, W5: narrowed — the wrapper no longer needs a ref, it fires nothing)
@@ -1314,10 +1339,13 @@ ok("0915: ...and a section coming back into view is re-measured (13 Oct: each bo
    && /function CommitMap[\s\S]{0,9000}new ResizeObserver\(\(\) => \{ try \{ if\(mapDiv\.current && mapDiv\.current\.clientWidth > 0\) m\.resize\(\);/.test(src));
 ok("0915: the WORKING view always shows all four, whatever the big screen remembered",
    /const sectionShown = \(i\) => !wall \|\| wallLayout === "all" \|\| wallSection === i;/.test(src));
+// NARROWED 17 Oct 2026: a timeout per section instead of one interval, so each section has its own time on screen — the
+// Simulation its whole day (SIM_WALL_SECONDS), the others the rotate setting
 ok("0915: the rotate timer runs only on the big screen, and is cleared",
    /if\(!wall \|\| wallLayout !== "rotate"\) return;/.test(src)
-   && /setInterval\(\(\) => setWallSection\(s => \(s \+ 1\) % DASH_SECTIONS\.length\), rotateSecs \* 1000\)/.test(src)
-   && /return \(\) => clearInterval\(id\);/.test(src));
+   && /setTimeout\(\(\) => setWallSection\(s => \(s \+ 1\) % DASH_SECTIONS\.length\), dwellNow \* 1000\)/.test(src)
+   && /return \(\) => clearTimeout\(id\);\n  \}, \[wall, wallLayout, rotateSecs, wallSection\]\);/.test(src)
+   && src.includes('const dwellNow = (DASH_SECTIONS[wallSection] || {}).key === "sim" ? SIM_WALL_SECONDS : rotateSecs;'));
 ok("0915: a screen can be pinned by URL, 1-based, and a bad number is ignored not clamped",
    /function screenFromHash\(max\)/.test(src)
    && /return \(n >= 1 && n <= max\) \? n : null;/.test(src)
@@ -1950,7 +1978,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
     // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
-    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
+    // 17 Oct 2026 (narrowed): six WallSections — the sixth is the Simulation (SimWall), no chart in it
+    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
     && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
   ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
     ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
@@ -2214,7 +2243,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
-    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
+    // 17 Oct 2026 (narrowed): six sections (the Simulation); the Gate arrivals panel is still not on it
+    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
 }
 
@@ -2255,7 +2285,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const simSrc = s0 > 0 && s1 > s0 ? src.slice(s0, s1) : "";
   const simc = simSrc.split("\n").map(l => l.replace(/^\s*\/\/.*$/, "")).join("\n");
   const fn = (name, next) => simSrc.slice(simSrc.indexOf(`function ${name}(`), next ? simSrc.indexOf(next) : undefined);
-  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPanel");
+  // 17 Oct 2026: the panel ends where the big screen's SimWall begins (same block)
+  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPanel", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN");
   const _dbS = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
   const _dbSW = _dbS.slice(_dbS.indexOf("{!wall ? ("), _dbS.indexOf("      ) : (\n        <>\n")), _dbSWl = _dbS.slice(_dbS.indexOf("      ) : (\n        <>\n"));
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
@@ -2269,7 +2300,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("⭐ S7: folded, read on FIRST OPEN with one GET of /api/sim/day (the lines once a month), keyed on open, the month and the scenario",
     panelSrc.includes('<details className="dash-more" data-sim="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>')
     && panelSrc.includes("if(!open) return;") && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [open, month, scKey]);")
-    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (simc.match(/fetch\(/g) || []).length === 1);
+    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 1
+    // NARROWED 17 Oct 2026: the block holds the big screen's SimWall too, with its own one read (the plain month, with the lines)
+    && (simc.match(/fetch\(/g) || []).length === 2 && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
   ok("🔴 S7 (D86): nothing written, nothing kept, nothing in the address — no method, no storage, no history, no location in the block",
     !/method:|localStorage|sessionStorage|history\.|location\.|postJSON|navigator\.clipboard/.test(simc));
   ok("⭐ S7: the scenario reaches the server only as the query its parser reads (hours, check_in, bands, pour_*, legs=1)",
@@ -2277,7 +2310,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      "`bands=${sc.bands ? \"on\" : \"off\"}`", "`pour_gate=${encodeURIComponent(p.gate)}`", "`pour_m3_per_load=${encodeURIComponent(p.mpl)}`", 'q.push("legs=1")'].every(t => simSrc.includes(t)));
   ok("🔴 S7: the browser works out no figure: the table and the cards print the server's fields; no capacity, share, wait or rounding of a day here",
     ["g.busiest", "g.pct", "g.capacity", "g.minutes_lost", "g.bottleneck_at", "g.most_waiting", "g.longest_wait", "g.late", "g.per_hour", "g.panel_per_day", "D.checks.table_equals_arrivals", "D.checks.largest_panel_difference"].every(f => simSrc.includes(f))
-    && !/60 \/ |\* 100|\/ g\.check_in|open_minutes \//.test(simc)
+    // NARROWED 17 Oct 2026: "* 100" no longer matches "* 1000" (the big screen's hold in milliseconds); a percentage still does
+    && !/60 \/ |\* 100(?!0)|\/ g\.check_in|open_minutes \//.test(simc)
     // the one ceil is the timeline's first hour tick (drawing)
     && (simc.match(/Math\.ceil/g) || []).length === 1 && simc.includes("for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++)"));
   ok("⭐ S7 (D85): the timeline's red mark is the server's bottleneck (the first wait longer than the check-in), said in words",
@@ -2319,6 +2353,55 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && scnSrc.includes('data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).<'));
   ok("S7 fix: one quiet line under the haul roads when gate access roads were left out (the server's count)",
     panelSrc.includes('{D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}'));
+  // 17 Oct 2026: the big screen's sixth section (SimWall) and the one-screen layout of this section
+  const wallSrc = fn("SimWall", "function CommitMap(");
+  const wallTop = simSrc.slice(simSrc.indexOf("// ---- 17 Oct 2026: the Simulation on the BIG SCREEN"), simSrc.indexOf("function SimWall("));
+  ok("⭐ SIM BIG SCREEN: the sixth section is last (key sim), wrapped like the others, and plays SimWall with this display's month, the pass, the loop and the refresh",
+    _dbS.includes('<WallSection show={sectionShown(5)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[5].title}>')
+    && _dbS.includes('<SimWall meta={meta} month={simMonth} show={wall && sectionShown(5)} pass={simPass} loop={wallLayout !== "rotate"} fill={fill} tick={tick} />')
+    && _dbSWl.indexOf("<SimWall ") > _dbSWl.indexOf("<ChartCanvas config={splitCfg} />") && !_dbSW.includes("<SimWall "));
+  ok("⭐ SIM BIG SCREEN: in Rotate the Simulation stays its whole day (a day at 1× + a 5 s hold), whatever the rotate setting; the others keep theirs",
+    wallTop.includes("const SIM_WALL_HOLD_S = 5;") && wallTop.includes("const SIM_WALL_SECONDS = SIM_PLAY_SECONDS + SIM_WALL_HOLD_S;")
+    && _dbS.includes('const dwellNow = (DASH_SECTIONS[wallSection] || {}).key === "sim" ? SIM_WALL_SECONDS : rotateSecs;'));
+  ok("⭐ SIM BIG SCREEN: each pass starts the day again (simPass counts the section coming round); the play loop restarts on it",
+    _dbS.includes("useEffect(() => { if(wall && sectionShown(simIdx)) setSimPass(p => p + 1); }, [wall, wallLayout, wallSection]);")
+    && wallSrc.includes("useEffect(() => { if(dRef.current){ tRef.current = dRef.current.window.start; setT(dRef.current.window.start); } }, [pass]);")
+    && wallSrc.includes("}, [show, D, loop, pass]);") && wallSrc.includes("if(!loop){ tRef.current = n; setT(n); raf = null; return; }"));
+  ok("🔴 SIM BIG SCREEN (D86): the month is a per-display setting in localStorage, said in a comment to be NOT a saved or shared scenario; nothing goes in the address",
+    wallTop.includes('const SIM_WALL_MONTH_KEY = "modus_dash_sim_month";') && /NOT a saved or shared scenario: D86 stands/.test(wallTop)
+    && _dbS.includes("localStorage.setItem(SIM_WALL_MONTH_KEY, v)")
+    && /A display setting in this browser's localStorage, like the rotate time — NOT a saved or shared\n\s*\/\/ scenario \(D86 stands/.test(src)
+    && _dbS.includes('aria-label="Simulation month on this display"') && _dbS.includes('<option value="">this month</option>')
+    && !/localStorage|sessionStorage|history\.|location\./.test(wallSrc));
+  ok("SIM BIG SCREEN: the bar keeps one line — the month choice only while the Simulation is on screen (or in All sections), and no costing range beside it",
+    (_dbS.match(/\(wallLayout === "all" \|\| wallSection === simIdx\) && </g) || []).length === 2
+    && _dbS.includes("{fill && wallSection !== simIdx && <span className=\"dash-wallbar-note\" title="));
+  // 17 Oct 2026 (the user: "entry gate and empty lorry icons look too similar")
+  ok("⭐ SIM: an entry gate never reads as a lorry — a bullseye (radius 7, thick ink rim, ink centre) against the empty lorry's small blue ring (radius 4); the key draws the same",
+    mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });')
+    && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });')
+    && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")]')
+    && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
+    && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
+  ok("SIM: the map's key is a named group (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
+    mapSrc.includes('<div className="sim-legend" role="group" aria-label="Map key">') && !mapSrc.includes('<div className="sim-legend" aria-label='));
+  ok("SIM: the map's key names the concrete mixer only on a day with a pour",
+    mapSrc.includes('{D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>'));
+  ok("🔴 SIM BIG SCREEN: no scenario controls and no table on the TV; it reads the plain month (no pour) only while shown",
+    !/<input|<select|<button|SimScenario|SimTable|pour_gate|onHours|onCheckIn/.test(wallSrc)
+    && wallSrc.includes("if(!show) return;") && wallSrc.includes("fetch(`${API}/sim/day?month=${month}&legs=1`)") && wallSrc.includes("no pour"));
+  ok("SIM BIG SCREEN: it fills the TV in Rotate / One section (.dash-fill) with the map large, the clock and Gates now beside it, the timeline under the map",
+    /\.sim-wall\{display:grid;[^}]*grid-template-areas:"map side" "tl side";\}/.test(html) && /\.dash-wall\.dash-fill \.sim-wall-fill\{height:100%;grid-template-rows:minmax\(0,1fr\) auto;\}/.test(html)
+    && /\.sim-wall-fill \.sim-map\{height:100%;\}/.test(html) && /\.sim-wall-clock\{font-size:clamp\(/.test(html)
+    && wallSrc.includes('<div className={"sim-wall" + (fill ? " sim-wall-fill" : "")} data-sim-wall="1">'));
+  ok("⭐ SIM ONE SCREEN: from 1024 px the map and its timeline sit left, the clock / Gates now / scenario beside them; the table and the haul roads fold away (closed)",
+    fn("SimPlayer", "const SimScenario").includes('<div className="sim-main">\n          <SimMap meta={meta} D={D} store={store} frame={f} />')
+    && /<div className="sim-main">[\s\S]{0,700}<SimTimeline D=\{D\} t=\{t\}/.test(fn("SimPlayer", "const SimScenario"))
+    && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:clamp\(260px,calc\(100vh - 420px\),680px\);\}\}/.test(html)
+    // found in Chrome: in the flex column the map's box shrank to nothing (align-self:start); it stretches across its column
+    && /\.sim-main>\.sim-map-wrap\{align-self:stretch;\}/.test(html)
+    && panelSrc.includes('<details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>')
+    && panelSrc.includes('<details className="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>') && !/data-sim-fold="[a-z]+" open/.test(panelSrc));
   ok("S7: the info box entry (≤ 40 words) and the controls are named for a screen reader",
     /"dash\.sim": \{ title: "Simulation", text: "[^"]+", *\n? *how: "[^"]+", tech: "t1-gates" \}/.test(src)
     && ["Simulation month", "Playback speed", "Every gate opens at", "Every gate closes at", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));
@@ -2476,6 +2559,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes('const rdKey = (table) => "modus_rows_" + table;') && /window\.sessionStorage\.setItem\(rdKey\(table\)/.test(src)
      && src.includes('window.localStorage.getItem("modus_units_" + page)') && src.includes('return UNIT_CHOICES.some(c => c[0] === v) ? v : "tonnes";')
      && src.includes('const UNIT_CHOICES = [["loads", "Loads"], ["tonnes", "Tonnes"], ["lorries", "Lorries"]];'));
+  // 17 Oct 2026 (UI fix 2, finding 1): the pressed word reads the control's text colour (white on the dark look's orange was 2.33:1)
+  ok("UI fix 2 (#1): the pressed Loads / Tonnes / Lorries word is var(--control-fg) on var(--navy), no #fff literal",
+     html.includes('.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}') && !/\.unit-sw-seg[^\n]*#fff/.test(html));
   ok("W6: the switch is a labelled group of three aria-pressed buttons with its info box, on the Look-ahead, the Dashboard and Forecasts (not Gate arrivals: all lorries)",
      src.includes('<span className="unit-sw-seg" role="group" aria-label="Show the figures as">') && src.includes('aria-pressed={value === k ? "true" : "false"}')
      && src.includes('<InfoTip id="units" />') && ["lookahead", "dashboard", "forecasts"].every(p => src.includes(`useUnits("${p}")`))
@@ -2826,7 +2912,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /@media \(min-width:1024px\)\{\.wall-charts\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);\}\}/.test(html)
      && _db.includes('[["all", "All sections"], ["rotate", "Rotate"], ["single", "One section"]]') && !_db.includes('"All four"'));
   ok("BIG SCREEN: the rotation shows a line that fills over the section's time and names the next one; no motion when reduced motion is asked for",
-     _db.includes('<i key={wallSection + "-" + rotateSecs} style={{ animationDuration: rotateSecs + "s" }}></i>')
+     // NARROWED 17 Oct 2026: the line fills over THIS section's time (dwellNow: the Simulation's whole day, else the setting)
+     _db.includes('<i key={wallSection + "-" + dwellNow} style={{ animationDuration: dwellNow + "s" }}></i>')
      && _db.includes("next: {DASH_SECTIONS[(wallSection + 1) % DASH_SECTIONS.length].title}")
      && /@media \(prefers-reduced-motion:reduce\)\{\.dash-rot>i\{animation:none;/.test(html));
   ok("BIG SCREEN: the page header folds into the bar (range, updated, a clock, Exit); no tour and no menu over the TV",
@@ -3145,6 +3232,51 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      _rm.includes("Approved lines only. A planning document, not an approved CLP.") && _rm.includes('setErr("The route map could not be made: " + (e.message || e));'));
   ok("...placed after App, outside the Dashboard's read-only stock slice (that pin scans DashboardStockChart → App)",
      code.indexOf("function RouteMapExportMenu(") > code.indexOf("function App(") && code.indexOf("function RouteMapExportMenu(") < code.indexOf("function Header("));
+}
+
+// ---- 16 Oct 2026 (the UI audit, finding #14): names for the staff map's header selects and the Config JSON textarea ----
+// axe-core select-name and label (WCAG 4.1.2, Level A): on Locations, Routes and Zones the header announced "Light,
+// combo box" and "Artic Tipper (44t), combo box" with no word for what changes, and two selects were named only by a
+// title. The visible word beside a select is in its name (WCAG 2.5.3): "Basemap" → Basemap, "Show" → Show vehicle.
+{
+  const _h0 = src.indexOf('<span className="text-xs text-slate-400">Basemap</span>');
+  const _hd = _h0 < 0 ? "" : src.slice(_h0, src.indexOf('placeholder="Admin token"', _h0));
+  ok("names #14: the header of Locations / Routes / Zones is one block with four selects (Basemap, Show, direction, route option)",
+     _h0 > 0 && _hd.length > 200 && _hd.length < 2500 && (_hd.match(/<select\b/g) || []).length === 4, String(_hd.length));
+  ok("🔴 names #14: the Basemap select is named Basemap, the word shown beside it",
+     _hd.includes('<span className="text-xs text-slate-400">Basemap</span>\n          <select value={basemap} onChange={e => changeStyle(e.target.value)} className={sel} aria-label="Basemap">'));
+  ok("🔴 names #14: the vehicle select is named 'Show vehicle' — the visible word 'Show' first in the name (2.5.3)",
+     _hd.includes('<span className="text-xs text-slate-400 ml-1">Show</span>\n          <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel} aria-label="Show vehicle">'));
+  ok("🔴 names #14: the two selects that had only a title carry names — Direction drawn, Route option drawn — and keep their titles",
+     _hd.includes('<select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw" aria-label="Direction drawn">')
+     && _hd.includes('<select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which HERE option to draw" aria-label="Route option drawn">'));
+  const _names = [..._hd.matchAll(/<select [^\n]*aria-label="([^"]*)"/g)].map(m => m[1]);
+  ok("names #14: all four are named, in words that pass the word rule (no bake, server, endpoint, token, cached, geometry) and say lorry never truck",
+     _names.length === 4 && _names.every(n => n.length > 3 && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(n)), JSON.stringify(_names));
+  const _rw = src.slice(src.indexOf('{tab === "raw" && ('), src.indexOf('<div className="savebar" data-cfg-savebar="1">'));
+  ok('🔴 names #14: the Config "Everything (JSON)" textarea is named exactly "Everything (JSON)" — the tab\'s own words, the one JSON wording the word rule exempts',
+     (_rw.match(/<textarea\b/g) || []).length === 1
+     && _rw.includes('<textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)"'));
+  ok("names #14: no other aria-label on a staff screen says JSON (the exemption covers the tab's own words only)",
+     [...src.matchAll(/aria-label="([^"]*)"/g)].map(m => m[1]).filter(n => /\bJSON\b/.test(n)).every(n => n === "Everything (JSON)"));
+}
+
+// ---- 17 Oct 2026 (D114): the Dashboard's default range is this month ± 6 -----------------------------------------------
+{
+  ok("⭐ D114: the Dashboard's From / To start from dashRangeDefault (this month ± DASH_RANGE_EITHER_SIDE), not month 1 and the last month",
+     src.includes("const [fromM, setFromM] = useState(() => dashRangeDefault(months)[0]);")
+     && src.includes("const [toM, setToM] = useState(() => dashRangeDefault(months)[1]);")
+     && !src.includes("const [fromM, setFromM] = useState(1);") && !src.includes("const [toM, setToM] = useState(months.count);"));
+  ok("D114: six months either side, clamped to the horizon, from the same 'this month' the Gate arrivals panel uses",
+     src.includes("const DASH_RANGE_EITHER_SIDE = 6;")
+     && src.includes("return [Math.max(1, c - DASH_RANGE_EITHER_SIDE), Math.min(n, c + DASH_RANGE_EITHER_SIDE)];")
+     && /const dashRangeDefault = \(months\) => \{\s*const n = \(months && months\.count\) \|\| 60, c = gaMonthToday\(months\);/.test(src));
+  ok("D114: one button between the default and the whole programme ('Whole programme' / 'This month ± 6'), not shown on the big screen",
+     src.includes(">Whole programme</button>") && src.includes(">This month ± 6</button>")
+     && src.indexOf(">Whole programme</button>") > src.indexOf('aria-label="To month"')
+     && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
+  ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
+     src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
 }
 
 // ---- report ------------------------------------------------------------------
