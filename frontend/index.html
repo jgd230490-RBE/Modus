@@ -10382,6 +10382,30 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     } catch(e){ setRouteMsg("Delete failed: " + e.message); }
   };
 
+  // 17 Oct 2026 (Route all 502s): one batch request, shared by Route all and the re-route after a
+  // zone write. Render answered 502 on most batches (each ran for minutes; the lorry-limits check
+  // was the time). The batch now stops itself after ~20 s, and a 502 / 503 / 504 or no answer at
+  // all (a restart during a deploy) is tried again after 30, 60 and 90 s before the loop stops.
+  // Finished legs are kept server-side, so a try again only resumes.
+  const ROUTE_RETRY_S = [30, 60, 90];
+  const postRouteBatch = async (q, say) => {
+    for(let attempt = 0; ; attempt++){
+      let res = null, why = "";
+      try { res = await fetch(`${API}/admin/bake-routes?${q}`, { method: "POST" }); }
+      catch(e){ why = "no answer"; }
+      if(res && res.ok) return res.json();
+      if(res && ![502, 503, 504].includes(res.status)){
+        const t = await res.text();
+        throw new Error(res.status === 403 ? "admin token rejected" : `${res.status} ${t.slice(0,120)}`);
+      }
+      if(res) why = String(res.status);
+      if(attempt >= ROUTE_RETRY_S.length) throw new Error(`${why} — tried ${attempt + 1} times`);
+      const wait = ROUTE_RETRY_S[attempt];
+      say(`Wayscope did not answer (${why}). Trying again in ${wait} s (${attempt + 1} of ${ROUTE_RETRY_S.length})…`);
+      await new Promise(r => setTimeout(r, wait * 1000));
+    }
+  };
+
   // Bulk bake. The backend endpoint /api/admin/bake-routes never went away — only its
   // UI did, when the bake panel was rehomed. That was fine while the network was already
   // baked, but a cold network needs 107 routes x 2 legs per vehicle, and the per-route
@@ -10403,21 +10427,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     setRouteBusy(true);
     try {
       for(const prof of profs){
-        let guard = 0;                 // the endpoint is the authority on 'remaining';
-        while(guard++ < 200){          // this only stops a bug becoming an infinite loop
+        // the endpoint is the authority on 'remaining'; the loop stops if it ever fails to
+        // fall (a bug, not a slow batch: every batch does at least one leg). 17 Oct 2026: was a
+        // cap of 200 calls, which a short batch could reach on a big network.
+        let last = Infinity;
+        while(true){
           const q = new URLSearchParams({ profile: prof, limit: "30" });
           if(bakeLegs === "loaded") q.set("legs", "loaded");
           if(tokenRef.current) q.set("token", tokenRef.current);
-          const res = await fetch(`${API}/admin/bake-routes?${q}`, { method: "POST" });
-          if(!res.ok){
-            const t = await res.text();
-            throw new Error(res.status === 403 ? "admin token rejected" : `${res.status} ${t.slice(0,120)}`);
-          }
-          const j = await res.json();
+          const j = await postRouteBatch(q, setRouteMsg);
           const left = j.remaining ?? 0;
           setRouteMsg(`Routing ${vehShort(prof)} — ${left} leg(s) remaining…`);
           await reloadNetwork();
           if(left <= 0) break;
+          if(left >= last) throw new Error(`${left} leg(s) left and not falling`);
+          last = left;
         }
       }
       await reloadNetwork();
@@ -10545,19 +10569,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const profs = Array.from(new Set(legs.map(l => l.vehicle_profile)));
     let done = 0;
     for(const prof of profs){
-      let guard = 0;
-      while(guard++ < 200){
+      let last = Infinity;             // 17 Oct 2026: as Route all, stop only if 'remaining' stops falling
+      while(true){
         const q = new URLSearchParams({ profile: prof, limit: "30" });
         if(tokenRef.current) q.set("token", tokenRef.current);
-        const res = await fetch(`${API}/admin/bake-routes?${q}`, { method: "POST" });
-        if(!res.ok){
-          const t = await res.text();
-          throw new Error(res.status === 403 ? "admin token rejected" : `${res.status} ${t.slice(0,120)}`);
-        }
-        const j = await res.json();
+        const j = await postRouteBatch(q, setZoneMsg);
         done += j.baked || 0;
-        setZoneMsg(`Re-routing ${vehShort(prof)} — ${j.remaining ?? 0} leg(s) left…`);
-        if((j.remaining ?? 0) <= 0) break;
+        const left = j.remaining ?? 0;
+        setZoneMsg(`Re-routing ${vehShort(prof)} — ${left} leg(s) left…`);
+        if(left <= 0) break;
+        if(left >= last) throw new Error(`${left} leg(s) left and not falling`);
+        last = left;
       }
     }
     await reloadNetwork();

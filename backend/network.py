@@ -7,6 +7,8 @@ the cached geometry as GeoJSON for the map.
 """
 import os
 import json
+import time
+import functools
 from datetime import datetime, timezone
 
 import db
@@ -320,6 +322,24 @@ def apply_node_meta(path=None):
 LEGS = ("loaded", "return")
 ALTERNATIVES = 3
 
+#: 17 Oct 2026 (Route all 502s): seconds one bake batch may spend before it stops starting new
+#: legs. The page loops on `remaining`, so a short batch only means one more request; a batch that
+#: ran for minutes was cut off by Render with a 502 and the page stopped. The leg in progress always
+#: finishes, and every batch does at least one leg, so a slow HERE answer still makes progress.
+BAKE_BUDGET_S = 20.0
+
+
+def _limits_once(fn):
+    """17 Oct 2026: run a bake inside limits.checks_batched() — each route it stores is checked
+    against the stored lorry limits once, at the end, instead of after every leg. Imported late,
+    as _upsert_geom has always done."""
+    @functools.wraps(fn)
+    def inner(*a, **k):
+        import limits as _limits
+        with _limits.checks_batched():
+            return fn(*a, **k)
+    return inner
+
 
 def _waypoint_full(loc, role="entry", gate_id=None, gate_list=None):
     """
@@ -408,9 +428,10 @@ def _upsert_geom(route_id, profile, geometry, dist, dur, error, leg="loaded", al
         road_sections._rebuild_quietly("geometry upsert")
         # 13 Oct 2026: the lorry-limits check is a DB read against stored limits (no
         # external call), so it is recomputed for this route straight away.
+        # 17 Oct 2026: straight away, or once at the end of the bake that stored it (_limits_once)
         try:
             import limits as _limits
-            _limits.store_checks([route_id])
+            _limits.check_soon(route_id)
         except Exception as e:
             print("limits: route check not stored:", str(e)[:120])
 
@@ -556,12 +577,19 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
 # 12 Oct 2026 (the review and fix pass): every leg the batch upserts marks the shared-section
 # index dirty and it is rebuilt ONCE when the batch ends — it used to be rebuilt after every
 # primary upsert, about 25 full rebuilds a batch
+@_limits_once                                  # 17 Oct 2026: one lorry-limits check a route
 @road_sections.rebuild_once("bake batch")
-def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERNATIVES):
+def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERNATIVES,
+               budget_s=None):
     """
     Route up to `limit` not-yet-attempted (route, leg) pairs for a profile and cache
     the geometry. Idempotent — call repeatedly until 'remaining' is 0. To recompute
     existing routes, clear_geometry() first.
+
+    17 Oct 2026: `budget_s` (the endpoint passes BAKE_BUDGET_S) stops the batch starting
+    another leg once that many seconds have gone, so one request never runs long enough
+    for Render to cut it off. `remaining` counts what was not reached either way, and
+    `stopped_for_time` says the budget, not `limit`, ended it.
 
     `limit` counts legs, not routes. A full network of 107 routes over both legs is 214
     legs. ⚠️ Since Phase 4 a leg is no longer necessarily ONE HERE call: a leg spliced
@@ -599,7 +627,14 @@ def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERN
     haul_legs = here_calls = refused = 0
     samples = []
     blocked_routes = []
+    t0 = time.monotonic()
+    done = 0
+    stopped_for_time = False
     for r, leg in todo[:limit]:
+        if budget_s is not None and done and time.monotonic() - t0 >= budget_s:
+            stopped_for_time = True
+            break
+        done += 1
         o = locs.get(r["origin_id"]); d = locs.get(r["dest_id"])
         if not o or not d:
             _upsert_geom(r["id"], profile, None, None, None,
@@ -636,9 +671,13 @@ def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERN
                            (db.current_tenant(), r["id"], profile, leg))
             if row and (row[0].get("haul_zones") or ""):
                 haul_legs += 1
-    remaining = max(0, len(todo) - min(limit, len(todo)))
+    remaining = max(0, len(todo) - done)
     return {"profile": profile, "baked": baked, "errors": errors,
             "remaining": remaining, "legs": list(legs), "error_samples": samples,
+            # 17 Oct 2026: legs this batch reached (baked + errors + refused), and whether
+            # the time budget ended it before `limit` did
+            "attempted": done, "stopped_for_time": stopped_for_time,
+            "seconds": round(time.monotonic() - t0, 1),
             "zones_applied": [z for z in zone_tag.split(",") if z],
             "avoid_areas": avoid,
             # Phase 5a (B2): legs not attempted because a selected gate is deactivated
@@ -1453,6 +1492,7 @@ def clear_routes():
     return {"cleared": n}
 
 
+@_limits_once                                  # 17 Oct 2026: one lorry-limits check
 @road_sections.rebuild_once("route bake")      # 12 Oct 2026: both legs, one index rebuild
 def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERNATIVES):
     """

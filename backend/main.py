@@ -3259,10 +3259,14 @@ def bake_routes(profile: str = network.DEFAULT_PROFILE,
 
     'limit' counts legs rather than routes — each leg is one HERE call. Pass
     legs='loaded' to skip the unladen return and halve the call count.
+
+    17 Oct 2026: each call also stops starting legs after network.BAKE_BUDGET_S seconds,
+    so it answers well inside Render's request limit (Route all used to 502 on most batches).
     """
     _check_admin(token)
     want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else network.LEGS
-    return network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS)
+    return network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS,
+                              budget_s=network.BAKE_BUDGET_S)
 
 
 @app.post("/api/admin/clear-geometry")
