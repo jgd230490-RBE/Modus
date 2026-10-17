@@ -5303,6 +5303,39 @@ function qrRead(mod) {
   }
 }
 
+// ===== 16 Oct 2026: the basemap menu offers only styles the loaded GL JS can draw =====
+// "Standard (3D)" (mapbox://styles/mapbox/standard) needs GL JS v3. On 2.14.1, checked in Chromium with real
+// Mapbox: setStyle logged 695 validation errors ("measure-light", "config", "batched-model", "vertical-range")
+// and the map stayed on the basemap it had, while the menu said Standard. The option is removed.
+{
+  const glv = (html.match(/api\.mapbox\.com\/mapbox-gl-js\/v(\d+)\.(\d+)\.(\d+)\/mapbox-gl\.js/) || []).slice(1).map(Number);
+  const sel = (html.match(/<select id="basemap-select"[^>]*>([\s\S]*?)<\/select>/) || [])[1] || "";
+  const opts = [...sel.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].map(m => ({ value: m[1], label: m[2] }));
+  const widget = [...src.matchAll(/changeTheme\(this, '([^']+)'\)/g)].map(m => m[1]);   // src, not code: code's comment strip cuts 'mapbox://...' at the //
+  const CLASSIC = /^mapbox:\/\/styles\/mapbox\/[a-z-]+-v\d+$/;   // light-v11, dark-v11, satellite-streets-v12, streets-v12 ...
+  const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
+  ok("basemap 16 Oct: the page still loads GL JS 2.x (v3 would draw the Standard style; this block assumes it does not)",
+     glv.length === 3 && glv[0] === 2);
+  ok("🔴 basemap 16 Oct: 'Standard (3D)' is gone from the Basemap menu (mapbox/standard needs GL JS v3; on 2.14 it drew nothing new)",
+     opts.length >= 3 && !opts.some(o => /mapbox\/standard/.test(o.value) || /standard/i.test(o.label)));
+  ok("🔴 basemap 16 Oct: nothing in the page's code sets the Standard style (no setStyle / changeTheme with mapbox/standard)",
+     !/mapbox:\/\/styles\/mapbox\/standard/.test(src) && /mapbox:\/\/styles\/mapbox\/light-v11/.test(src));
+  ok("basemap 16 Oct: every Basemap option is a classic Mapbox style (-vNN) or the Maa-amet raster style, which GL 2.14 validates",
+     opts.length > 0 && opts.every(o => CLASSIC.test(o.value) || o.value === "maaamet-ortho"));
+  ok("basemap 16 Oct: the menu still offers Light (selected), Dark and Satellite, plus the hidden Maa-amet orthophoto",
+     opts.map(o => o.value).join("|") === "mapbox://styles/mapbox/light-v11|mapbox://styles/mapbox/dark-v11|mapbox://styles/mapbox/satellite-streets-v12|maaamet-ortho"
+     && /<option value="mapbox:\/\/styles\/mapbox\/light-v11" selected>Light<\/option>/.test(sel)
+     && /<option value="maaamet-ortho" id="basemap-maaamet" hidden>/.test(sel));
+  ok("basemap 16 Oct: the four quick buttons at the bottom left are classic styles too (Light, Dark, Satellite, Streets)",
+     widget.length === 4 && widget.every(u => CLASSIC.test(u)));
+  ok("basemap 16 Oct: the 3D look GL 2.14 can draw stays — the 3D buildings overlay (fill-extrusion on the composite source)",
+     html.includes('<input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label>')
+     && code.includes("id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',"));
+  ok("basemap 16 Oct: the in-app guide lists the basemaps the menu offers, without Standard (3D)",
+     guide.includes("Light (default), Dark and Satellite (Mapbox; called Aerial for a British organisation)")
+     && !/Standard \(3D\)/.test(guide));
+}
+
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();

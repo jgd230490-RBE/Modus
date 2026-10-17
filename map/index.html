@@ -771,9 +771,13 @@
     <summary>Layers and basemap</summary>
     <div class="control-group">
         <h3>Basemap</h3>
+        <!-- 16 Oct 2026: "Standard (3D)" (mapbox://styles/mapbox/standard) is gone. That style needs
+             Mapbox GL JS v3; on the 2.14.1 loaded above, setStyle rejects it (695 validation errors:
+             "measure-light", "config", "batched-model" ...) and the map stays on the basemap it had while
+             the menu says Standard. The 3D look GL 2.14 can draw is the "3D buildings" overlay below.
+             Offer here only styles GL 2.14 validates: the classic -v11 / -v12 styles and raster styles. -->
         <select id="basemap-select" onchange="changeBasemap(this.value)">
             <option value="mapbox://styles/mapbox/light-v11" selected>Light</option>
-            <option value="mapbox://styles/mapbox/standard">Standard (3D)</option>
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
             <option value="mapbox://styles/mapbox/satellite-streets-v12" id="basemap-satellite">Satellite (Mapbox)</option>
             <option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia orthophoto (Maa-amet)</option>
