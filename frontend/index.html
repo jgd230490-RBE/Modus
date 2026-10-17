@@ -138,10 +138,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      looks reads the muted text colour (#64748B: 4.76:1 on white, 4.56:1 on the rail and on a card's second surface) in
      place of Tailwind's slate-400 (#94A3B8, 2.56:1). One rule, written with :where() so it weighs as little as the utility
      it corrects and the hover utilities (hover:text-slate-700) still win; the dark look is remapped in the block below.
-     On a selected row (.bg-blue-50 — #EFF6FF, or #FFF4E6 in Orange shades) the muted colour reaches only 4.37:1, so the
-     greys on that row step one more to slate-600 (#475569, 6.96:1). */
+     On a washed surface — a selected row (.bg-blue-50: #EFF6FF, or #FFF4E6 in Orange shades), the Look-ahead's today column
+     and the Horizon's commit week (an inline var(--navy-soft) wash, #EEF3FD) and the Account's short rows (an inline 5 % rose
+     wash, #FCF5F6) — the muted colour reaches only 4.28–4.43:1, so the greys there step one more to slate-600 (#475569,
+     6.8:1 and better). The washes are inline styles (the dark fix chose inline because .tbl th out-ranks a class), so the
+     rule matches them the way the dark remap matches a filled control: [style*=]. A var() is kept verbatim in the style
+     attribute, but a colour is re-serialised by the browser (rgba(191, 46, 85, 0.05)), so the rose wash is matched both ways. */
   html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}
-  html:where(:not([data-theme="dark"])) :where(.bg-blue-50) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50) .text-slate-500{color:#475569}
+  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}
   /* CAPTIONS-END */
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage both ways
      (17 Oct 2026: every utility has a remap, and every remap has a utility — four stale lines went that day) */
@@ -7376,10 +7380,10 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
         <div className="text-lg leading-8 font-bold tabular-nums truncate" style={{ color: "var(--navy-deep)" }}>
           {hasIndex ? price : <span className="text-base text-amber-700">Index unavailable</span>}{staleChip}
         </div>
-        <div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5 truncate" title={bafTxt}>
+        <div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">
           diesel {country} · {hasIndex ? `${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}` : "type a price on Config"}{rf.running ? " · updating…" : ""}
         </div>
-        <div className="text-xs text-slate-500 mt-0.5 truncate">{bafTxt}</div>
+        <div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>
       </div>
     );
   }
@@ -7909,7 +7913,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               onBlur={() => saveActual(r)} />
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums font-medium"
-                            style={{ color: r.variance == null ? "var(--muted)" : r.variance > 0 && !r.held ? "var(--red)" : "var(--ok-text)" }}>
+                            style={{ color: r.variance == null ? "var(--muted)" : r.variance > 0 && !r.held ? "var(--bad-text)" : "var(--ok-text)" }}>
                             {r.variance == null ? "—" : (r.variance > 0 ? "+" : "") + grp(r.variance, 1)}
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums text-slate-600">
@@ -7932,7 +7936,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               onBlur={() => saveActual(r)} />
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums font-medium"
-                            style={{ color: r.eur_variance == null ? "var(--muted)" : r.eur_variance < 0 ? "var(--red)" : "var(--ok-text)" }}>
+                            style={{ color: r.eur_variance == null ? "var(--muted)" : r.eur_variance < 0 ? "var(--bad-text)" : "var(--ok-text)" }}>
                             {r.eur_variance == null ? "—" : (r.eur_variance > 0 ? "+" : "") + grp(r.eur_variance)}
                           </td>
                           <td className="px-2 py-2">
@@ -11865,8 +11869,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                                      (g.active ? "hover:bg-slate-50" : "opacity-60 bg-slate-50")}>
                           <span className="font-medium text-slate-700">{g.name}</span>
                           <span className="text-slate-400">{g.id}</span>
-                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
-                            style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>
+                          <span className="rd-chip">
                             {g.direction === "access" ? "in only"
                               : g.direction === "egress" ? "out only" : "in + out"}
                           </span>
@@ -12652,10 +12655,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                                title="Routes attached to this road are sent through it — it is never in HERE's avoid list">
                                Routed through{z.speed_kph ? ` @ ${z.speed_kph}` : ""}
                              </span>
-                           : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500" title="Drawn but not open to traffic">Not open</span>)
+                           : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600" title="Drawn but not open to traffic">Not open</span>)
                         : z.affects_routing
                         ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: ZONE_ROUTING }}>Avoided</span>
-                        : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500">Advisory</span>}
+                        : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
                     </td>
                     <td className="px-3 py-2 text-slate-500">{z.starts_on || "—"}</td>
                     <td className="px-3 py-2 text-slate-500">{z.ends_on || "—"}</td>

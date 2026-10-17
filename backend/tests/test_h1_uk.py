@@ -1108,7 +1108,7 @@ ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the marku
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 ok("...nor var(--gold): the 7 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot and the flag chip's triangle; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
    not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
-ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips (bad-text)",
+ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's two variance figures on a short row's rose wash (bad-text: --red is 4.83:1 on white but 4.4:1 on the wash)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
    and 'const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";' in fe
@@ -1119,7 +1119,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    and '.sim-warn{color:var(--warn-text);}' in fe and ".sim-warn{color:var(--gold)" not in fe
    and 'style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span>' in fe
    and 'style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>' in fe
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 2 and _fe_wo.count("var(--warn-text)") == 2)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 4 and _fe_wo.count("var(--warn-text)") == 2
+   and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe)
 ok("UI fix 4 (decision 1): 🔴 one rule maps text-slate-400 to --muted in the Ink and Light looks, written html:where(:not([data-theme=\"dark\"])) so it weighs as little as the utility and hover:text-slate-700 still wins; the dark look keeps its remap, whose value IS the dark --muted",
    'html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}' in fe
    and 'html[data-theme="dark"] .text-slate-400{color:#9AA1AB}' in _dark and _DARK["muted"] == "#9AA1AB"
@@ -1135,10 +1136,13 @@ for _a in _ACC:
 ok("...--muted reads 4.5:1 or better on a card, the page, the rail, a second surface and a slate-50 head in all 12 looks × accents: ink #64748B on white 4.76, on the rail #FAFAF9 4.56, on a slate-50 head 4.55; dark #9AA1AB on #1F2024 6.25 — where slate-400 (#94A3B8) read 2.56 on white and slate-300 (#CBD5E1) 1.48",
    not _mb and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#64748B", "#FAFAF9"), 2) == 4.56 and round(_cr("#64748B", "#F8FAFC"), 2) == 4.55
    and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25 and round(_cr("#94A3B8", "#FFFFFF"), 2) == 2.56 and round(_cr("#CBD5E1", "#FFFFFF"), 2) == 1.48, "; ".join(_mb[:4]))
-ok("...on a selected row --muted falls short (4.37 on the blue-50 #EFF6FF, 4.38 on Orange shades' #FFF4E6), so the second rule steps the greys on .bg-blue-50 to slate-600 #475569 (6.96 and 6.98), again with :where() so a hover utility still wins",
+ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-50 #EFF6FF; 4.38 on Orange shades' #FFF4E6), 4.28 on the Horizon's commit-week wash (navy-soft over white, #EEF3FD) and 4.43 on the Account's short-row wash (5 % rose, #FCF5F6) — so the second rule steps the greys there to slate-600 #475569 (6.96, 6.98, 6.81, 7.05), matching the inline washes by [style*=], again with :where() so a hover utility still wins",
    round(_cr("#64748B", "#EFF6FF"), 2) == 4.37 and round(_cr("#64748B", "#FFF4E6"), 2) == 4.38
+   and round(_cr("#64748B", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 4.28 and round(_cr("#64748B", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 4.43
    and round(_cr("#475569", "#EFF6FF"), 2) == 6.96 and round(_cr("#475569", "#FFF4E6"), 2) == 6.98
-   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50) .text-slate-500{color:#475569}' in fe
+   and round(_cr("#475569", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 6.81 and round(_cr("#475569", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 7.05
+   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}' in fe
+   and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2
    and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
 ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
    ".rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe

@@ -3286,7 +3286,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const _cat = code.slice(code.indexOf("function CatChips("), code.indexOf("\n}\n", code.indexOf("function CatChips(")));
   ok("🔴 captions #3 (decision 1): ONE rule maps text-slate-400 to --muted outside the dark look, weighed with :where() so hover:text-slate-700 still wins; the dark remap keeps its line; a second rule steps the greys on a selected row (.bg-blue-50) to slate-600",
      html.includes('html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}')
-     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50) .text-slate-500{color:#475569}')
+     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}')
      && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9AA1AB}')
      && code.includes("text-slate-400 hover:text-slate-700") && (code.match(/\btext-slate-400\b/g) || []).length >= 120);
   ok("captions #3: the rail's group headings have no opacity, the big screen's labels read --muted (no #9aa1ac), the Dashboard group title defaults to --muted (no #94a3b8), and no text-slate-300 is left in the markup — every placeholder reads slate-500 (the dark remap line went with it)",
@@ -3318,11 +3318,16 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
      && _cat.includes('<span key={c} className="text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"')
      && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
-     && code.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"\n                            style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>') && !code.includes("rgba(31,86,168,.1)")
+     && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
      && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 2
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 1 && /text-\[9px\] uppercase tracking-wide text-slate-400">\{roleLbl\[role\]/.test(code));
+  ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
+     !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
+     && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')
+     && _fw.includes('<div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
+     && !_fw.includes("text-slate-500 mt-0.5 truncate") && !_fw.includes('mt-0.5 truncate" title={bafTxt}'));
   ok("🔴 captions #20: the Config fuel widget has no 9, 10 or 11 px text (text-xs text-slate-500 captions, the DESNZ attribution among them) and its three admin buttons are btn-sec btn-sm; the Dashboard's figure labels and sub-lines, the Today card's captions and the group titles are 12 px; the never-rendered Kpi component is gone",
      !/text-\[(9|10|11)px\]/.test(_fw) && _fw.includes('const attribution = <span className="text-xs text-slate-500"') && (_fw.match(/className="btn-sec btn-sm disabled:opacity-40"/g) || []).length === 3
      && !_fw.includes("hover:bg-slate-50 disabled:opacity-40") && _fw.includes('<span className="text-xs uppercase tracking-wide text-slate-500">Diesel {country}</span>') && _fw.includes('<span className="w-full text-xs text-slate-500">The base is locked')
