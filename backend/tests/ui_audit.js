@@ -2,7 +2,9 @@
  * ui_audit.js — the whole app in a REAL browser, every screen × width × look × accent, measured.  16 Oct 2026.
  *
  * ⚠️ NOT PART OF THE DEFAULT SUITE (run_suite.py lists it in BROWSER_ONLY; test_modus.py asserts that). It needs:
- *   - Playwright with its Chromium and axe-core, found through NODE_PATH:
+ *   - Playwright and axe-core, found through NODE_PATH, and Google Chrome installed — the browser it drives (the user,
+ *     17 Oct 2026: "use chrome for all tests"); Playwright's own Chromium only with --browser chromium, or when Chrome
+ *     is missing (the report says so):
  *         npm install -g playwright axe-core ; npx playwright install chromium
  *         $env:NODE_PATH = (npm root -g)
  *   - a Python with backend/requirements.txt (the .venv-smoke of this checkout, or of ..\Modus);
@@ -31,7 +33,10 @@
  *     - the look and accent asked for are the ones on <html>, and the page is the one named (its header)           (fail)
  *     - text smaller than 12 px (charts' SVG text included), labels cut with an ellipsis, a native confirm()/alert()  (warn)
  *     - a screenshot: the real fold first; when the page or the portal's scroller is taller, the viewport is grown to
- *       the content (max 4,000 px, marked when cut). Never for the map.
+ *       the content — the scroller plus what sits above and below it (on a phone the tab bar). Elements sized in vh
+ *       (the chart boxes, clamp(200px, 28vh, 420px); the 62vh maps; the 60vh textarea) are pinned at their fold height
+ *       first, so they do not inflate with the viewport; then the height is measured again and grown again until it
+ *       holds. Max 4,500 px, marked when cut. Never for the map.
  *   once per screen, at the widest width of the run, in the first look (the "deep" stops):
  *     - keyboard: from the top of the page, Tab up to 40 times; every stop must show a visible change (WCAG 2.4.7;
  *       a transparent outline is no outline), be on screen, not be the same element twice in a row (a trap); the
@@ -76,7 +81,7 @@ const BACKEND = path.join(ROOT, "backend");
 function parseArgs(argv) {
   const o = { full: false, headed: false, blockMapbox: false, keepServer: false, guide: false, deep: true, out: path.join(ROOT, "ui-audit"),
               db: path.join(BACKEND, "forecasts_local.db"), python: null, base: null, code: "ui-planner", teamCode: "ui-team-1",
-              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4000 };
+              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500, browser: "chrome" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => argv[++i];
     if (a === "--full") o.full = true;
@@ -101,6 +106,7 @@ function parseArgs(argv) {
     else if (a === "--accents") o.accents = v().split(",");
     else if (a === "--pages") o.pages = v().split(",");
     else if (a === "--max-shot") o.maxShot = +v();
+    else if (a === "--browser") { o.browser = v(); if (!/^(chrome|chromium)$/.test(o.browser)) { console.error("ui_audit.js: --browser chrome | chromium"); process.exit(2); } }
     else { console.error("ui_audit.js: unknown option " + a); process.exit(2); }
   }
   return o;
@@ -206,7 +212,7 @@ const SHOTS = path.join(RUN_DIR, "shots");
 fs.mkdirSync(SHOTS, { recursive: true });
 
 function gitHead() { try { return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT }).toString().trim(); } catch (e) { return null; } }
-const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide },
+const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide, browser: OPT.browser },
                  stops: [], timings: {}, notes: [], totals: { passed: 0, failed: 0 } };
 
 let PASS = 0;
@@ -237,7 +243,6 @@ function domChecks(arg) {
   // a document whose root or body is overflow:hidden cannot be scrolled by a reader, whatever its scrollHeight says
   const rootHidden = /hidden|clip/.test(getComputedStyle(doc).overflowY) || /hidden|clip/.test(getComputedStyle(document.body).overflowY);
   const docScrolls = !rootHidden && doc.scrollHeight > doc.clientHeight + 4;
-  const mainScrolls = !!main && main.scrollHeight > main.clientHeight + 4;
   const header = document.querySelector('[data-guide="page-header"] h2');
   const out = { vw: innerWidth, vh: innerHeight, theme: doc.getAttribute("data-theme"), accent: doc.getAttribute("data-accent"), title: document.title,
     pageTitle: header ? header.textContent.trim() : null, signedIn: !!document.querySelector('[data-guide="rail"], .phone-tabs'),
@@ -245,7 +250,6 @@ function domChecks(arg) {
     docHScroll: doc.scrollWidth > doc.clientWidth + 1 ? doc.scrollWidth - doc.clientWidth : 0,
     mainHScroll: main && main.scrollWidth > main.clientWidth + 1 ? main.scrollWidth - main.clientWidth : 0,
     docVScroll: docScrolls ? doc.scrollHeight - doc.clientHeight : 0,
-    contentH: mainScrolls ? main.scrollHeight + main.getBoundingClientRect().top : docScrolls ? doc.scrollHeight : 0,
     h1: document.querySelectorAll("h1").length, offRight: [], innerScroll: [], tinyTargets: [], smallTargets: [], smallText: [], clipped: [], masks: [] };
   // what pokes out to the right (the cause of a sideways scroll, when there is one), and what extends a fixed page downwards
   if (out.docHScroll || out.mainHScroll) {
@@ -444,16 +448,75 @@ async function settle(page, store, quiet = 700, cap = 15000) {
   await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))).catch(() => {});
   return Date.now() - t0;
 }
+// how tall the viewport must be to show the whole page (0 when nothing scrolls). Runs inside the page. The portal's
+// own scroller (<main.overflow-auto>, else the last <main>) when it scrolls: its content plus what sits ABOVE it (the
+// header, the demo bar) and BELOW it — on a phone the tab bar, .phone-tabs, a flex sibling under the scroller; left
+// out of the sum until 17 Oct, every phone shot lost its last ~57 px under the bar. Else a document that scrolls: its
+// scrollHeight. A root or body that is overflow:hidden cannot be scrolled by a reader, whatever its scrollHeight says.
+function contentHeight() {
+  const doc = document.documentElement;
+  const mains = [...document.querySelectorAll("main")];
+  const main = document.querySelector("main.overflow-auto") || mains[mains.length - 1] || null;
+  if (main && main.scrollHeight > main.clientHeight + 4) {
+    const r = main.getBoundingClientRect();
+    return Math.ceil(main.scrollHeight + r.top + Math.max(0, innerHeight - r.bottom));
+  }
+  const rootHidden = /hidden|clip/.test(getComputedStyle(doc).overflowY) || /hidden|clip/.test(getComputedStyle(document.body).overflowY);
+  return !rootHidden && doc.scrollHeight > doc.clientHeight + 4 ? doc.scrollHeight : 0;
+}
+// an element whose height follows the viewport — vh in a rule's height / min-height / max-height (the chart boxes,
+// clamp(200px, 28vh, 420px); Tailwind's h-[60vh], max-h-[72vh]) or in its inline style (the 62vh maps) — keeps the
+// size it has at the fold while the viewport is grown. Else a grown shot shows them taller than any screen draws them
+// and the end of the page falls below the height measured at the fold (17 Oct: the 390 px Dashboard, 3,968 px tall,
+// had lost its last gate rows and the Gate by gate expander this way; at 1366 the charts grew from 215 to 420 px).
+// Runs inside the page; returns how many were pinned. unpinViewportUnits() puts their inline styles back.
+function pinViewportUnits() {
+  const sels = [];
+  // a rule's own style first, then what it nests: a plain style rule has a (usually empty) cssRules list of its own
+  const walk = (rules) => { for (const r of rules) {
+    if (r.style && r.selectorText && /\d(vh|svh|dvh|lvh)\b/.test(r.style.height + " " + r.style.minHeight + " " + r.style.maxHeight)) sels.push(r.selectorText);
+    if (r.cssRules && r.cssRules.length) walk(r.cssRules); } };
+  for (const ss of document.styleSheets) { try { walk(ss.cssRules); } catch (e) {} }   // a cross-origin sheet (Mapbox's) cannot be read: skipped
+  const els = new Set();
+  for (const s of sels) { try { document.querySelectorAll(s).forEach(e => els.add(e)); } catch (e) {} }
+  for (const e of document.querySelectorAll("[style*='vh']")) els.add(e);
+  let n = 0;
+  for (const el of els) {
+    if (el === document.documentElement || el === document.body) continue;
+    const h = el.getBoundingClientRect().height; if (!h) continue;   // hidden: nothing to pin
+    el.setAttribute("data-ui-audit-style", el.getAttribute("style") || "");
+    el.style.setProperty("height", h + "px", "important"); el.style.setProperty("min-height", "0", "important"); el.style.setProperty("max-height", "none", "important");
+    n++;
+  }
+  return n;
+}
+function unpinViewportUnits() {
+  for (const el of document.querySelectorAll("[data-ui-audit-style]")) { const s = el.getAttribute("data-ui-audit-style"); if (s) el.setAttribute("style", s); else el.removeAttribute("style"); el.removeAttribute("data-ui-audit-style"); }
+}
 async function shoot(page, file, width, height, contentH, fixed) {
   // the real fold first; a page or a portal scroller taller than the viewport is pictured whole by growing the viewport
   // (never a fixed page: the map re-tiles to the new size and shows a screen no phone shows). A fullscreen window
-  // (the big screen) cannot be resized, and is shot as it is.
+  // (the big screen) cannot be resized, and is shot as it is. Before growing, what is sized in vh is pinned at its
+  // fold height (pinViewportUnits); once grown, the content can still grow — a panel that draws late — so the height
+  // is measured again and the viewport grown again until it holds.
   const full = await page.evaluate(() => !!document.fullscreenElement).catch(() => false);
-  const want = (!fixed && !full && contentH > height + 4) ? Math.min(Math.ceil(contentH), OPT.maxShot) : height;
-  if (want > height) { await page.setViewportSize({ width, height: want }); await page.waitForTimeout(150); }
+  let want = (!fixed && !full && contentH > height + 4) ? Math.min(Math.ceil(contentH), OPT.maxShot) : height;
+  let truncated = !fixed && contentH > OPT.maxShot, regrown = 0, pinned = 0;
+  if (want > height) {
+    pinned = await page.evaluate(pinViewportUnits).catch(() => 0);
+    await page.setViewportSize({ width, height: want }); await page.waitForTimeout(150);
+    for (let i = 0; i < 4 && want < OPT.maxShot; i++) {
+      await page.waitForTimeout(250);
+      const again = await page.evaluate(contentHeight).catch(() => 0);
+      if (again <= want + 4) break;
+      if (again > OPT.maxShot) truncated = true;
+      want = regrown = Math.min(Math.ceil(again), OPT.maxShot);
+      await page.setViewportSize({ width, height: want }); await page.waitForTimeout(150);
+    }
+  }
   await page.screenshot({ path: file, fullPage: false });
-  if (want > height) { await page.setViewportSize({ width, height }); await page.waitForTimeout(100); }
-  return { grown: want > height ? want : 0, truncated: !fixed && contentH > OPT.maxShot };
+  if (want > height) { await page.setViewportSize({ width, height }); await page.evaluate(unpinViewportUnits).catch(() => {}); await page.waitForTimeout(100); }
+  return { grown: want > height ? want : 0, regrown, truncated, pinned };
 }
 async function leaveFullscreen(page) {
   await page.evaluate(() => document.fullscreenElement && document.exitFullscreen && document.exitFullscreen()).catch(() => {});
@@ -471,6 +534,7 @@ async function audit(page, store, meta) {
   const fixed = FIXED_PAGES.test(meta.name) || !!meta.fixed;
   const t = await settle(page, store);
   const dom = await page.evaluate(domChecks, { narrow: meta.width < 768, fixed });
+  dom.contentH = await page.evaluate(contentHeight).catch(() => 0);
   const axe = await runAxe(page);
   const drained = drain(store);
   const file = `${meta.name}__${meta.width}__${meta.look}__${meta.accent}.png`.replace(/[^A-Za-z0-9_.+-]/g, "-");
@@ -478,10 +542,19 @@ async function audit(page, store, meta) {
   // a 401 / 403 is the gate working on the signed-out screens, and on the Users page opened with a CODE (it asks for
   // the admin token first: the list answers 403 until it is typed — by design, G3)
   const signedOut = SIGNED_OUT.test(meta.name) || (meta.page === "users" && !OPT.email && !/login-user/.test(meta.name));
-  const errors = drained.errors.filter(e => !ALLOWED_CONSOLE.some(re => re.test(e)) && !(signedOut && /status of (401|403)/.test(e)));
+  // a stop whose premise is a request the harness CUT (meta.cut: the read it aborted, or every request while the context
+  // is offline): the browser's own "Failed to load resource" line for it and the request itself are the premise, not a
+  // defect — a pageerror (the app not coping) still counts
+  const cut = meta.cut || null;
+  // a dead link (the linkerr stop): /api/auth/check answers 410 Gone by design (G3) — the premise, as 401 / 403 are above
+  const gone = meta.expectGone || null;
+  const errors = drained.errors.filter(e => !ALLOWED_CONSOLE.some(re => re.test(e)) && !(signedOut && /status of (401|403)/.test(e))
+    && !(cut && /^console: Failed to load resource: net::ERR_(FAILED|INTERNET_DISCONNECTED|ABORTED)/.test(e))
+    && !(gone && /status of 410 \(Gone\)/.test(e)));
+  const failedReqs = cut ? drained.failed.filter(f => !cut.test(f.split(" ")[0])) : drained.failed;   // the entry is "url reason"
   const mapboxErr = OPT.blockMapbox ? errors.filter(e => /mapbox|tile|style|glyph|sprite/i.test(e)) : [];
   const realErr = errors.filter(e => !mapboxErr.includes(e));
-  const http = drained.http.filter(h => !(signedOut && (h.status === 401 || h.status === 403)));
+  const http = drained.http.filter(h => !(signedOut && (h.status === 401 || h.status === 403)) && !(gone && h.status === 410 && gone.test(h.url)));
   const sameOrigin = http.filter(h => h.url.startsWith(meta.base));
   const third = http.filter(h => !h.url.startsWith(meta.base) && !(OPT.blockMapbox && /mapbox/.test(h.url)));
   const axeFail = axe.violations.filter(WCAG);
@@ -514,7 +587,7 @@ async function audit(page, store, meta) {
   if (dom.offEdge && dom.offEdge.length) warnings.push({ id: "controls-off-edge", detail: dom.offEdge });
   if (dom.badges) warnings.push({ id: "badges-under-12px", detail: dom.badges });
   if (third.length) warnings.push({ id: "third-party-http", detail: third });
-  if (drained.failed.length) warnings.push({ id: "requests-failed", detail: drained.failed });
+  if (failedReqs.length) warnings.push({ id: "requests-failed", detail: failedReqs });
   if (drained.dialogs.length) warnings.push({ id: "native-dialog", detail: drained.dialogs });
   if (mapboxErr.length) warnings.push({ id: "mapbox-offline", detail: mapboxErr });
   // the two guides are chapters, each an h1 — a recorded design (test_help.py), not counted; a shell whose content is an iframe has the map's h1 in the map's stop
@@ -523,9 +596,11 @@ async function audit(page, store, meta) {
   if (store.settleWhy) warnings.push({ id: "not-settled", detail: store.settleWhy });
   if (shot.truncated) warnings.push({ id: "shot-truncated", detail: { contentH: dom.contentH, maxShot: OPT.maxShot } });
   for (const c of checks) ok(`${label}: ${c.id}`, c.ok, c.ok ? "" : JSON.stringify(c.detail).slice(0, 300));
-  const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
+  const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, shotPinned: shot.pinned || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
                  theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks };
   delete stop.base;
+  if (cut) stop.cut = cut.source;   // on the record as text (a RegExp would serialise as {})
+  if (gone) stop.expectGone = gone.source;
   REPORT.stops.push(stop);
   const bad = checks.filter(c => !c.ok).map(c => c.id);
   process.stdout.write(`${bad.length ? "FAIL" : "ok  "} ${label.padEnd(46)} ${String(t).padStart(5)} ms  ${bad.join(" ")}${warnings.length ? "  (" + warnings.map(w => w.id).join(" ") + ")" : ""}\n`);
@@ -664,15 +739,26 @@ async function signIn(page, base, how) {
 }
 
 // ---------------------------------------------------------------- the walks ------------------------------------------
-async function waitForMap(page) {
-  // the map is a top-level `let` in a classic script: visible to evaluate by name, not as window.map
+async function waitForMap(target) {
+  // the map is a top-level `let` in a classic script: visible to evaluate by name, not as window.map. `target` is the
+  // map page, or the public view's iframe (embeddedMap)
   const t0 = Date.now();
   while (Date.now() - t0 < 30000) {
-    const st = await page.evaluate(() => { try { return (typeof map !== "undefined" && map && map.loaded && map.loaded()) ? "loaded" : (document.querySelector("#p") ? "password" : "loading"); } catch (e) { return "error:" + e.message; } }).catch(() => "nav");
+    const st = await target.evaluate(() => { try { return (typeof map !== "undefined" && map && map.loaded && map.loaded()) ? "loaded" : (document.querySelector("#p") ? "password" : "loading"); } catch (e) { return "error:" + e.message; } }).catch(() => "nav");
     if (st === "loaded" || st === "password" || st.startsWith("error")) return st;
-    await page.waitForTimeout(300);
+    await new Promise(r => setTimeout(r, 300));
   }
   return "timeout";
+}
+// the public view's map is an iframe (/map/?embed=1): its frame, once it has its address; null when none appears in time
+async function embeddedMap(page, cap = 10000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < cap) {
+    const f = page.frames().find(fr => fr !== page.mainFrame() && /\/map\//.test(fr.url()));
+    if (f) return f;
+    await page.waitForTimeout(200);
+  }
+  return null;
 }
 async function mapStop(page, store, meta) { meta.mapState = await waitForMap(page); return audit(page, store, meta); }
 async function evalCall(page, code) { return page.evaluate(code).then(() => true).catch(e => { note(`${code}: ${String(e.message || e).slice(0, 120)}`); return false; }); }
@@ -839,13 +925,35 @@ async function mapStates(page, store, meta, w, phone) {
   if (await page.locator("#tl-play").count()) { await page.locator("#tl-play").click().catch(() => {}); await page.waitForTimeout(2500); await mapStop(page, store, meta("map-page+playing", w)); await page.locator("#tl-play").click().catch(() => {}); }
 }
 
-// a read that fails, a search with no match, the app offline
+// a read that fails, a search with no match, the app offline. The walk before this ends on the landing page's error
+// page, and gotoPage only sets the hash: so the app comes back first (the session cookie signs it back in; the code
+// again if not), and each error stop asserts that it is the app's page — the title the portal carries, the header the
+// page named — and that the page shows the failure it is named for. Until 17 Oct "forecasts-error" and
+// "offline-lookahead" were pictures of /landing/error.html.
 async function errorStates(page, ctx, store, meta, w) {
+  const base = meta("", w).base;
+  await signIn(page, base, OPT.email ? { email: OPT.email, password: OPT.password } : { code: OPT.code });
+  const appTitle = await page.title();
+  drain(store);
+  // what the page shows for the failure: the app's EmptyState (data-empty="error", an alert) or its inline notice
+  const shown = () => page.evaluate(() => {
+    const re = /did not load|Couldn't load|did not answer|Try again/;
+    const el = document.querySelector('[data-empty="error"], [role="alert"]')
+      || [...document.querySelectorAll("main *")].find(e => re.test(e.textContent) && ![...e.children].some(c => re.test(c.textContent)));
+    if (!el) return "";
+    const how = el.getAttribute("data-empty") ? "data-empty=" + el.getAttribute("data-empty") : el.getAttribute("role") ? "role=" + el.getAttribute("role") : "notice";
+    return how + ": " + el.textContent.trim().replace(/\s+/g, " ").slice(0, 90);
+  }).catch(() => "");
+  const isApp = (stop, want, state) => {
+    stop.errorShown = state || undefined;
+    ok(`${stop.name}: the stop is the app's ${want} page, not a document (title "${stop.title}", header "${stop.pageTitle}")`, stop.title === appTitle && stop.pageTitle === want);
+    ok(`${stop.name}: the page shows the failure it is named for`, !!state, "no error state or notice found on the page");
+  };
   await ctx.route(/\/api\/forecasts(\?|$)/, r => r.abort());
   await gotoPage(page, "dashboard"); await page.waitForTimeout(300);
   await gotoPage(page, "forecasts");
   await page.waitForSelector('[data-empty="error"], [role="alert"]', { timeout: 15000 }).catch(() => {});
-  await audit(page, store, meta("forecasts-error", w));
+  isApp(await audit(page, store, meta("forecasts-error", w, { portal: true, page: "forecasts", cut: /\/api\/forecasts(\?|$)/ })), "Forecasts", await shown());
   await ctx.unroute(/\/api\/forecasts(\?|$)/);
   await gotoPage(page, "dashboard"); await page.waitForTimeout(300); await gotoPage(page, "forecasts");
   await settle(page, store);
@@ -853,7 +961,7 @@ async function errorStates(page, ctx, store, meta, w) {
   if (await search.count()) { await search.fill("zzzz-no-such-line"); await page.waitForTimeout(500); await audit(page, store, meta("forecasts-nomatch", w)); await search.fill(""); }
   await ctx.setOffline(true);
   await gotoPage(page, "lookahead"); await page.waitForTimeout(1500);
-  await audit(page, store, meta("offline-lookahead", w));
+  isApp(await audit(page, store, meta("offline-lookahead", w, { portal: true, page: "lookahead", cut: /./ })), "Look-ahead", await shown());
   await ctx.setOffline(false);
 }
 
@@ -923,12 +1031,25 @@ async function walkLogin(browser, base) {
     await page.waitForSelector('[data-guide="rail"]', { timeout: 30000 }).catch(() => {});
     await audit(page, store, meta("login-user-resumed", { portal: true, page: "forecasts" }));   // the page it was on (the hash wins)
     ok("a reload keeps a login signed in (the session cookie)", !!(await page.locator('[data-guide="rail"]').count()), resumed ? "" : "no resume notice seen");
-    // sign out, then a dead invite link
+    // sign out: the public view, whose map is an iframe — let the map finish (loaded, or its password page) and set
+    // its events aside, so nothing of it counts against the next stop (what it did is on the record as a note). Then
+    // a dead invite link, from a BLANK page: the app reads an email link once, as the page loads, and a goto that
+    // changes only the hash is no load — until 17 Oct the "linkerr" stop was this public view, its map blank, the
+    // frame's "… is not defined" errors counted against it; the dead-link note was never pictured.
     await page.getByRole("button", { name: "Sign out" }).click().catch(() => {});
+    const frame = await embeddedMap(page);
+    const mapAfter = frame ? await waitForMap(frame) : "no iframe";
+    await settle(page, store);
+    const left = drain(store);
+    if ((mapAfter !== "loaded" && mapAfter !== "password") || left.errors.length) note(`after Sign out, the public view's map: ${mapAfter}${left.errors.length ? `, ${left.errors.length} error(s), first: ${left.errors[0]}` : ""}`);
+    await page.goto("about:blank");
     await page.goto(base + "/#invite=" + "x".repeat(40), { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".auth-card, [role='status']", { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(800);
-    await audit(page, store, meta("linkerr", w));
+    await page.waitForSelector(".auth-card", { timeout: 30000 }).catch(() => {});
+    const card = await page.locator(".auth-card h1").first().textContent({ timeout: 1000 }).catch(() => "");
+    const dead = await audit(page, store, meta("linkerr", { expectGone: /\/api\/auth\/check$/ }));
+    dead.cardTitle = card || undefined;
+    ok(`linkerr: a dead invite link shows the app's note, not the public view (card "${card}", title "${dead.title}")`,
+       /no longer works/.test(card) && !(await page.locator("iframe").count()));
     await ctx.close();
   }
 }
@@ -991,7 +1112,7 @@ function findingKeys(stop) {
   }
   return keys;
 }
-function sameShape(a, b) { return JSON.stringify([a.widths, a.looks, a.extraAccents, a.pages]) === JSON.stringify([b.widths, b.looks, b.extraAccents, b.pages]); }
+function sameShape(a, b) { return JSON.stringify([a.widths, a.looks, a.extraAccents, a.pages, a.browser || "chromium"]) === JSON.stringify([b.widths, b.looks, b.extraAccents, b.pages, b.browser || "chromium"]); }   // a run before 17 Oct was the bundled Chromium
 async function compareRuns(browser, prevPath) {
   if (prevPath === "latest") {
     const runs = fs.readdirSync(OPT.out).filter(d => d !== STAMP && fs.existsSync(path.join(OPT.out, d, "report.json"))).sort().reverse();
@@ -1078,7 +1199,7 @@ function summaryTables() {
 }
 function writeSummaryMd(t) {
   const lines = [`# UI audit ${REPORT.stamp} — ${REPORT.head || "?"}`, "",
-    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""} · ${REPORT.secs} s`,
+    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""} · ${REPORT.browser ? REPORT.browser.ran + " " + REPORT.browser.version : ""} · ${REPORT.secs} s`,
     `**${PASS} passed, ${FAIL.length} failed.** First paint of the public view ${REPORT.timings.publicFirstPaintMs} ms; the portal's first data after sign-in ${REPORT.timings.portalFirstDataMs} ms.`, "",
     "## Checks (one per stop)", "", "| Check | Pass | Fail | Failing widths |", "|---|---:|---:|---|"];
   for (const [k, v] of Object.entries(t.byCheck)) lines.push(`| ${k} | ${v.pass} | ${v.fail} | ${Object.entries(v.widths).map(([w, n]) => w + " (" + n + ")").join(", ")} |`);
@@ -1172,7 +1293,16 @@ draw();
   try {
     server = await startServer({});
     console.log(`ui_audit: server ${server.base}${server.tenant ? " · tenant " + server.tenant : ""} · widths ${WIDTHS.join(",")} · looks ${LOOKS.join(",")} · accents orange${EXTRA_ACCENTS.length ? "," + EXTRA_ACCENTS.join(",") : ""} · out ${RUN_DIR}`);
-    browser = await chromium.launch({ headless: !OPT.headed });
+    // the browser: the installed Google Chrome (the user's); Playwright's bundled Chromium only when asked or when Chrome is missing
+    if (OPT.browser === "chrome") {
+      try { browser = await chromium.launch({ headless: !OPT.headed, channel: "chrome" }); }
+      catch (e) { note("Google Chrome did not launch (" + String(e.message || e).split("\n")[0].slice(0, 100) + "): Playwright's bundled Chromium ran instead"); }
+    }
+    const ranChrome = !!browser;
+    if (!browser) browser = await chromium.launch({ headless: !OPT.headed });
+    REPORT.browser = { asked: OPT.browser, ran: ranChrome ? "chrome" : "chromium", version: browser.version() };
+    REPORT.options.browser = REPORT.browser.ran;   // what ran is the run's shape, not what was asked
+    console.log(`ui_audit: browser ${REPORT.browser.ran} ${REPORT.browser.version}`);
     // the app confirms with the browser's own confirm() boxes — outside every look, axe and the screenshots; their number is on the record
     try { const src = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8"); const n = (src.match(/\bconfirm\(/g) || []).length;
       REPORT.nativeConfirms = n; note(`frontend/index.html confirms with the browser's own confirm() box in ${n} places (unstyled, in no look, not pictured)`); } catch (e) {}
