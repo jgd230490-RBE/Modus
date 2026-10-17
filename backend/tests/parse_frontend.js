@@ -1557,8 +1557,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && cb.includes("Every return leg is counted empty: back-loads are not modelled") && !cb.includes("Laden share of km"));
   // NARROWED 11 Oct 2026 (the process layout: the "By material" table became step 2's one row per category, with the NH
   // category on the name's hover; three tables remain, each inside a closed details)
+  // NARROWED 17 Oct 2026 (UI audit #15, claude/ui-fix-keyboard): the two step-5 reference tables wrap their cells (tbl-wrap)
   ok("the tables use the app's .tbl style with a caption, and the NH category takes NH's own name for waste",
-     (cb.match(/<table className="tbl">/g) || []).length === 3 && (cb.match(/<table\b/g) || []).length === 3 && (cb.match(/<caption><b>/g) || []).length === 3
+     (cb.match(/<table className="tbl(?: tbl-wrap)?">/g) || []).length === 3 && (cb.match(/<table className="tbl tbl-wrap">/g) || []).length === 2
+     && (cb.match(/<table\b/g) || []).length === 3 && (cb.match(/<caption><b>/g) || []).length === 3
      && cb.includes('"Waste": "Waste + Waste Transport"')
      && cb.includes('title={`National Highways Carbon Tool category: ${bc ? (CARBON_NH_CATEGORY[bc.sheet] || bc.sheet || "no category") : "no category"}`}'));
   // after the show (11 Oct 2026, notes/carbon-ui-1011 items 8, 9, 11–15): every figure from the server
@@ -3259,6 +3261,34 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _rw.includes('<textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)"'));
   ok("names #14: no other aria-label on a staff screen says JSON (the exemption covers the tab's own words only)",
      [...src.matchAll(/aria-label="([^"]*)"/g)].map(m => m[1]).filter(n => /\bJSON\b/.test(n)).every(n => n === "Everything (JSON)"));
+}
+
+// ---- 17 Oct 2026 (the UI audit's keyboard findings #15 and #16, claude/ui-fix-keyboard) -----------------------------
+// #16: the rail's "Find a page" box was the one control with no focus ring (its input has outline:0); the ring now goes on
+// the label that frames it, via :focus-within, the same ring as .auth-input:focus. #15: the Locations table scrolls in a
+// 40 vh box whose rows are mouse-only, so a keyboard user could reach none of it: the box is a named region with tabindex 0
+// and a ring. The Carbon planner's two step-5 reference tables wrap their cells instead of scrolling the Reference column
+// 1,200 px off a 772 px box. The big screen's Today list (open question 6) and the rows themselves (open question 16) wait.
+{
+  ok("🔴 #16: the Find a page box shows a ring when its input has the focus — the same ring as the sign-in fields",
+     html.includes(".rail-search:focus-within{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}")
+     && html.includes(".auth-input:focus{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}")
+     && html.includes('<label className="rail-search" title="Find a page (Ctrl K)">')
+     && /\.rail-search input\{[^}]*outline:0;/.test(html));
+  ok("🔴 #15: the Locations table's scroll box is a named region a keyboard user can Tab to (tabindex 0, role region, 'Locations table'), with a ring",
+     src.includes('<div className="overflow-auto kb-scroll" style={{ maxHeight: "40vh" }} tabIndex={0} role="region" aria-label="Locations table">')
+     && html.includes(".kb-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}"));
+  const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
+  ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
+     _regions.length === 3 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+       && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
+  ok("#15: the Locations rows are still mouse-only (open question 16 — pinned as found, not fixed here)",
+     src.includes('<tr key={l.id} onClick={() => locateNode(l.id)}\n') && !/<tr key=\{l\.id\} onClick=\{\(\) => locateNode\(l\.id\)\}[^\n]*tabIndex/.test(src));
+  ok("🔴 #15: the Carbon planner's two step-5 reference tables wrap their cells (tbl-wrap; the figures stay on one line), so the Reference column no longer scrolls off",
+     html.includes(".tbl.tbl-wrap td{white-space:normal;} .tbl.tbl-wrap td.num{white-space:nowrap;}")
+     && src.includes('<table className="tbl tbl-wrap">\n                  <caption><b>How the plan compares</b>')
+     && src.includes('<table className="tbl tbl-wrap">\n                  <caption><b>Transport only</b>')
+     && (src.match(/className="tbl tbl-wrap"/g) || []).length === 2);
 }
 
 // ---- report ------------------------------------------------------------------

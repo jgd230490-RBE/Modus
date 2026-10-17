@@ -1225,7 +1225,7 @@ def _map_block_html(S):
     """The map's title, the map, its legend and note, the key — the newsletter page and the leaflet page alike."""
     svg = _svg_map(S)
     S["_map_img"] = "<image " in svg
-    return (f'<h2 class="mt">{_e(S["map_title"])}</h2><div class="mapwrap" data-bulletin="map">{svg}</div>'
+    return (f'<h2 class="mt">{_e(S["map_title"])}</h2><div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="{_e(S["map_title"])}">{svg}</div>'
             + _volume_legend_html(S) + _key_html(S))
 
 
@@ -1278,7 +1278,8 @@ LEAFLET_CSS = (":root{color-scheme:light} *{box-sizing:border-box} body{margin:0
                " .fig .v{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums} .fig .l{font-size:14px;color:#57534E}"
                " svg{width:100%;height:auto;display:block} svg .pin{fill:#fff;font:700 14px Inter,Arial,sans-serif}"
                " svg .tagt{fill:#B91C1C;font:700 14px Inter,Arial,sans-serif}"
-               " .mapwrap{overflow-x:auto} .mapwrap svg{min-width:720px} .legend{font-size:14px;color:#57534E;margin:6px 0}"
+               " .mapwrap{overflow-x:auto} .mapwrap svg{min-width:720px} .mapwrap:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}"
+               " .legend{font-size:14px;color:#57534E;margin:6px 0}"
                " .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;"
                "border:1px solid rgba(0,0,0,.08)} .cc-legend .lg{display:inline-block;margin-right:12px;white-space:nowrap}"
                " h2{font-size:19px;margin:24px 0 8px;padding-top:12px;border-top:2px solid #1F2024} p,li{font-size:15px}"
@@ -1347,7 +1348,7 @@ def _council_mv_html(M):
     notes = "".join(f"<li>{e(x)}</li>" for x in M["county_lines"] + M["notes"])
     return (f'<h2>{e(M["title"])}</h2>'
             f'<p>{e(M["lede"])}</p>'
-            f'<div class="tw"><table data-bulletin="council-movements"><thead><tr><th>District</th>'
+            f'<div class="tw" tabindex="0" role="region" aria-label="{e(M["title"])}"><table data-bulletin="council-movements"><thead><tr><th>District</th>'
             f'<th class="n">Two-way movements a day</th><th class="n">Routes</th><th class="n">{e(M["distance_head"])}</th><th>{e(M["change_head"])}</th>'
             f'</tr></thead><tbody>{rows}</tbody></table></div>'
             f'<p class="legend cc-legend">Two-way movements a day: {sw}</p>'
@@ -1391,9 +1392,9 @@ def _council_html(C):
     notes = "".join(f"<li>{e(_co2(x))}</li>" for x in C["county_lines"] + C["notes"])
     return (f'<h2>{e(C["title"])}</h2>'
             f'<p>{e(_co2(C["lede"]))}</p>'
-            f'<div class="mapwrap" data-bulletin="council-map">{_svg_council(C)}</div>'
+            f'<div class="mapwrap" data-bulletin="council-map" tabindex="0" role="region" aria-label="{e(C["title"])} (map)">{_svg_council(C)}</div>'
             f'<p class="legend cc-legend">t CO₂e in the month: {sw}</p>'
-            f'<div class="tw"><table data-bulletin="council"><thead><tr><th>District</th><th>Highway authority</th>'
+            f'<div class="tw" tabindex="0" role="region" aria-label="{e(C["title"])} (table)"><table data-bulletin="council"><thead><tr><th>District</th><th>Highway authority</th>'
             f'<th class="n">t CO₂e</th><th class="n">Share of scheme</th><th class="n">Of the district&#39;s road CO₂e, a month (2024)</th></tr></thead><tbody>{rows}</tbody></table></div>'
             f'<p>{e(_co2(C["tally"]))}</p>'
             + (f'<ul>{notes}</ul>' if notes else "")
@@ -1420,7 +1421,7 @@ def _routes_html(S):
                    f'style="width:{100 * (r["a_day"] or 0) / vmax:.1f}%;background:{r["color"]}"></span>{cap}</span></td>'
                    f'<td class="n">{e(r["in_month_text"])}</td><td class="n">{e(r["last_month_text"].replace(" a day", ""))}</td>'
                    f'<td class="n{" flag" if r["over_flag"] else ""}">{e(r["flag_short"])}</td></tr>')
-    return ('<div class="tw"><table data-bulletin="routes"><thead><tr><th>Map</th><th>Route</th><th>Two-way movements a day</th>'
+    return ('<div class="tw" tabindex="0" role="region" aria-label="Every route this month"><table data-bulletin="routes"><thead><tr><th>Map</th><th>Route</th><th>Two-way movements a day</th>'
             f'<th class="n">In the month</th><th class="n">{e(prev)}</th><th class="n">Planning flag</th></tr></thead>'
             f'<tbody>{"".join(out)}</tbody></table></div>'
             f'<p class="legend">Bars in each route\'s map colour. Planning flag: the scheme\'s own daily limit, the dashed red '
@@ -1526,6 +1527,7 @@ svg{{width:100%;height:auto;display:block}} svg .pin{{fill:#fff;font:700 14px In
 .key h3{{font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;border-bottom:1px solid var(--line);padding-bottom:2px}}
 .kl{{list-style:none;margin:0;padding:0}} .kl li{{margin:2px 0}} .kl.two{{columns:2;column-gap:24px}}
 .tw{{overflow-x:auto}} table{{border-collapse:collapse;width:100%}} th,td{{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line)}}
+.mapwrap:focus-visible,.tw:focus-visible{{outline:2px solid #1D4ED8;outline-offset:2px}}   /* the wrappers that scroll on a phone are tab stops (tabindex 0, a named region): a ring says where the focus is */
 th{{font-size:14px;font-weight:700;background:var(--head);border-bottom:2px solid var(--ink)}} td.n,th.n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
 td.flag{{color:var(--flag);font-weight:700}} tr.this td{{font-weight:700}} td.lt{{color:var(--muted);white-space:nowrap}}
 td.bar{{min-width:200px;white-space:nowrap}} .bn{{display:inline-block;width:2.2em;text-align:right;font-weight:700;margin-right:8px;font-variant-numeric:tabular-nums}}
@@ -1580,7 +1582,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 {routes}
 
 <h2>What is being moved</h2>
-<div class="tw"><table><thead><tr><th>Material</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">Tonnes a day</th></tr></thead>
+<div class="tw" tabindex="0" role="region" aria-label="What is being moved"><table><thead><tr><th>Material</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">Tonnes a day</th></tr></thead>
 <tbody>{moved}<tr class="this"><td>All routes</td><td class="n">{mt_a_day}</td><td class="n">{mt_vehicles}</td>
 <td class="n">{mt_t_day}</td></tr></tbody></table></div>
 
@@ -1590,7 +1592,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 <ul>{checks}{others}</ul>
 
 <h2>What changed since last month</h2>
-<div class="tw"><table><thead><tr><th>Month</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">CO₂e a day</th><th class="n">Routes</th></tr></thead>
+<div class="tw" tabindex="0" role="region" aria-label="What changed since last month"><table><thead><tr><th>Month</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">CO₂e a day</th><th class="n">Routes</th></tr></thead>
 <tbody>{change}</tbody></table></div>
 <p>{change_text} <span class="muted">Each month's approved plan as it stands today.</span></p>
 
