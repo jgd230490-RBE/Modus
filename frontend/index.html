@@ -256,6 +256,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .rail-search{display:flex;align-items:center;gap:6px;margin:0 8px 12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
   .rail-search input{border:0;outline:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);width:100%;min-width:0;}
   .rail-search kbd{font:11px ui-monospace,Consolas,monospace;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
+  .rail-search:focus-within{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}   /* 17 Oct 2026 (UI audit #16): the input has outline:0, so the ring goes on the label that frames it — the same ring as .auth-input:focus */
   .nav-ic{width:18px;height:18px;flex:none;}
   .kicker{font:600 12px ui-monospace,'SF Mono',Consolas,'Liberation Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--action);margin-bottom:4px;}
   .kicker::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--action);margin-right:8px;vertical-align:1px;}
@@ -275,6 +276,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .tbl th.sortable{cursor:pointer;user-select:none;}
   .tbl th.sorted{color:var(--ink);} .tbl th.sorted::after{content:" ▾";} .tbl th.sorted.asc::after{content:" ▴";}
   .tbl.compact th,.tbl.compact td{height:32px;}
+  .tbl.tbl-wrap td{white-space:normal;} .tbl.tbl-wrap td.num{white-space:nowrap;}   /* 17 Oct 2026 (UI audit #15): the Carbon planner's two reference tables wrap their words instead of scrolling the Reference column off the screen */
   .filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;}
   .ctl{border:1px solid var(--grey);border-radius:6px;background:var(--surface);color:var(--ink);padding:7px 10px;font-size:14px;line-height:1.3;}
   .applied-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;min-height:28px;}
@@ -607,6 +609,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-tl-cursor{stroke:var(--ink);stroke-width:1.5;}
   .sim-scroll{margin-top:6px;border:1px solid var(--line);border-radius:8px;}
   .sim-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  .kb-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}   /* 17 Oct 2026 (UI audit #15): a scrolling table a keyboard user can Tab to (tabindex 0, role region) */
   .sim-hours{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
   .sim-table td:nth-child(2){min-width:110px;}
   .sim-table td:nth-child(8){min-width:130px;}
@@ -6946,7 +6949,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
             <summary>How the plan compares</summary>
             <div>
               <div className="overflow-x-auto mt-2">
-                <table className="tbl">
+                <table className="tbl tbl-wrap">
                   <caption><b>How the plan compares</b> · against published references, never an invented limit</caption>
                   <thead><tr><th scope="col">Measure</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th><th scope="col">Reference</th></tr></thead>
                   <tbody>
@@ -6976,7 +6979,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
             <summary>Three ways to count the same haul</summary>
             <div>
               <div className="overflow-x-auto mt-2">
-                <table className="tbl">
+                <table className="tbl tbl-wrap">
                   <caption><b>Transport only</b> · tCO2e, by method</caption>
                   <thead><tr><th scope="col">Method</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th></tr></thead>
                   <tbody>
@@ -12503,7 +12506,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             + Add location
           </button>
         </div>
-        <div className="overflow-auto" style={{ maxHeight: "40vh" }}>
+        <div className="overflow-auto kb-scroll" style={{ maxHeight: "40vh" }} tabIndex={0} role="region" aria-label="Locations table">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0">
               <tr>

@@ -23,9 +23,9 @@ main{margin-left:280px;padding:28px 44px 80px;max-width:1040px}
 h1{color:var(--deep);font-size:26px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--line)}h1:first-child{border-top:0;margin-top:0}
 h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:var(--blue);font-size:16px;margin:22px 0 6px}
 p{margin:0 0 10px}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EEF1F5;padding:1px 4px;border-radius:4px}
-pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font:12.5px/1.45 Consolas,ui-monospace,monospace}
+pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}
 ul{margin:0 0 12px;padding-left:22px}li{margin:0 0 6px}
-.tbl{overflow-x:auto;margin:6px 0 18px}table{border-collapse:collapse;width:100%;font-size:13.5px}
+.tbl{overflow-x:auto;margin:6px 0 18px}.tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}table{border-collapse:collapse;width:100%;font-size:13.5px}
 th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight:600}td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:nth-child(even) td{background:var(--panel)}td.k{font-weight:600;color:var(--navy);white-space:nowrap}
 .callout{border-left:5px solid;border-radius:8px;padding:10px 14px;margin:12px 0 18px}.callout .ct{font-weight:700;margin-bottom:4px}.callout p{margin:0 0 6px}
 .callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:var(--blue)}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:var(--red)}
@@ -228,7 +228,7 @@ which providers were not checked since baking.</li>
 </ul>
 
 <h1 id="t3-sources">T3 Where each screen reads from</h1>
-<div class="tbl"><table><thead><tr><th>Screen</th><th>Read</th><th>Notes</th></tr></thead><tbody>
+<div class="tbl" tabindex="0" role="region" aria-label="Where each screen reads from"><table><thead><tr><th>Screen</th><th>Read</th><th>Notes</th></tr></thead><tbody>
 <tr><td class="k">Dashboard figures, charts, route table</td><td><code>GET /api/costing/lines</code></td><td>The Look-ahead's functions; one row per forecast month with totals and the costing block.</td></tr>
 <tr><td class="k">Dashboard: Today, this week, last week</td><td><code>GET /api/lookahead</code> (the commit bucket)</td><td>The Look-ahead's own read; nothing is derived in the browser.</td></tr>
 <tr><td class="k">Dashboard: Gate arrivals</td><td><code>GET /api/gates/arrivals?month=N</code></td><td>Its own read, per month; the busiest hour from <code>backend/sim.py</code>.</td></tr>
@@ -294,7 +294,7 @@ ignored).</li>
 </tbody></table></div>
 
 <h1 id="t6-words">T6 Old words, new words</h1>
-<div class="tbl"><table><thead><tr><th>Older screens, notes and exports</th><th>The screens now</th></tr></thead><tbody>
+<div class="tbl" tabindex="0" role="region" aria-label="Old words, new words"><table><thead><tr><th>Older screens, notes and exports</th><th>The screens now</th></tr></thead><tbody>
 <tr><td class="k">baked / not baked / unbaked</td><td>routed / not routed yet</td></tr>
 <tr><td class="k">bake / re-bake / bulk bake</td><td>route / route again / route the whole network</td></tr>
 <tr><td class="k">cached geometry, geometry</td><td>stored route, route line</td></tr>
@@ -319,7 +319,7 @@ as one file). After an import, bake the network: imported routes read &ldquo;not
 kinds, each source's date and the credit line; <code>GET /api/community/status</code> the same without the features. Both
 answer 401 to the map password's cookie and to no credential. <code>POST /api/community/refresh</code> (a planner or an
 admin; 403 for a team code) starts a fetch on a thread: a few minutes, never on a page view.</p>
-<div class="tbl"><table><thead><tr><th>Source</th><th>Kinds</th><th>How it is read</th><th>Licence and credit</th></tr></thead><tbody>
+<div class="tbl" tabindex="0" role="region" aria-label="The community considerations layer: sources"><table><thead><tr><th>Source</th><th>Kinds</th><th>How it is read</th><th>Licence and credit</th></tr></thead><tbody>
 <tr><td class="k">OpenStreetMap</td><td>residential areas, hospitals, health centres, community centres, sports facilities, cycle routes and paths, nurseries</td>
 <td>A Geofabrik county extract (<code>.osm.pbf</code>; the counties whose outlines the routes touch, from Geofabrik's region index),
 filtered with pyosmium. Not the public Overpass servers: their usage policy asks a commercial app not to use them as its

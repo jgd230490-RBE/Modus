@@ -13,6 +13,7 @@ browser.
 """
 import os
 import re
+import struct
 import sys
 from html.parser import HTMLParser
 
@@ -706,6 +707,36 @@ ok("⭐ W10: the guide offers the CLP pack beside the month and says what it hol
    and "the charts that cannot be drawn yet are listed with what they need" in src
    and "<code>GET /api/clp/pack.pdf?month=N</code>" in open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read())
 
+# 17 Oct 2026 (UI audit #17, claude/ui-fix-keyboard): the 27 lazy figure images had no size, so a figure grew from 2 px to
+# its height as it loaded and pushed the focused "open it in the app" link (and anything a nav link scrolled to) off the
+# screen. Each <img> now carries its file's own pixel size (the box is reserved before the picture arrives), and the CSS
+# keeps height:auto so a narrowed figure keeps its shape.
+def _png_size(path):
+    with open(path, "rb") as f:
+        head = f.read(24)
+    return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else None
+_itags = re.findall(r"<img [^>]*>", src)
+_iattrs = [dict(re.findall(r'([a-z-]+)="([^"]*)"', t)) for t in _itags]
+_isizes = {a["src"]: _png_size(os.path.join(ROOT, "frontend", "help", a["src"])) for a in _iattrs}
+ok3("\U0001f534 #17 every figure image (%d) carries width and height equal to its file's own pixels, and keeps loading=\"lazy\"" % len(_itags),
+   len(_itags) == 27 and all(a.get("loading") == "lazy" and _isizes[a["src"]]
+                             and (int(a.get("width", 0)), int(a.get("height", 0))) == _isizes[a["src"]] for a in _iattrs),
+   str([(a["src"], a.get("width"), a.get("height"), _isizes[a["src"]]) for a in _iattrs
+        if (int(a.get("width", 0)), int(a.get("height", 0))) != _isizes[a["src"]]]))
+ok("#17 ...the figure CSS keeps height:auto beside max-width:100%, so a narrowed image keeps its shape (the size reserves the box, it never stretches it)",
+   "figure img{max-width:100%;height:auto;border:1px solid var(--line);" in src)
+
+# 17 Oct 2026 (UI audit #15): the technical guide's formula blocks were cut mid-line on a phone, and the CLP block at a desk
+# width, with no keyboard way to scroll them: <pre> now wraps at every width. Three of its five tables still scroll sideways
+# on a phone (nowrap first columns, long paths): each is a named region with tabindex 0 and a ring; the two whose columns wrap are plain.
+_tg2 = open(TECH, encoding="utf-8").read()
+ok("\U0001f534 #15 the technical guide's <pre> blocks wrap (pre-wrap, overflow-wrap anywhere) at every width, so none scrolls sideways",
+   "pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;"
+   "overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}" in _tg2)
+_tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
+ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
+   [l for _, l in _tgr] == ["Where each screen reads from", "", "Old words, new words", "The community considerations layer: sources", ""]
+   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count("tabindex=") == 3, str(_tgr))
 ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",
    "the page opens on this month and six months either side, and <strong>Whole programme</strong> beside them shows every month"
    in src and "<strong>This month ± 6</strong> brings the default back" in src
