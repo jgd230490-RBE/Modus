@@ -392,6 +392,11 @@ def validate(doc, network=None):
             x = plan.get(f)
             if not num(x) or x <= 0:
                 p.append(f"planning.{f} must be a positive number")
+        # 17 Oct 2026 (the user: UK drivers' hours): a driver's day is at most 13 h (the 11 h daily rest in every 24)
+        import drivers_hours
+        sp = drivers_hours.shift_problem(plan.get("shift_hours_per_day"))
+        if sp:
+            p.append(sp)
         # 14 Oct 2026 (bundle G, W8 + the user's Q1): the CLP's no-delivery windows, taken off each gate's open hours
         import gate_hours
         pb = gate_hours.peak_bands_problem(plan.get("peak_bands"))

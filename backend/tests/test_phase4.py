@@ -817,8 +817,20 @@ ok("the adjusted cycle is longer here", row["cycle_hr"] > row["cycle_hr_here"])
 ok("haul_km covers both legs", abs(row["haul_km"] - 11.6) < 1e-6)
 ok("the road is named on the row", row["haul_zones"] == ["Z001"])
 ok("and the row flags that a speed was applied", row["haul_speed_applied"] is True)
-ok("trips per day therefore falls out of the adjusted cycle",
-   row["trips_per_day"] == int(an["planning"]["shift_hours_per_day"] // row["cycle_hr"]))
+# REVERSED 17 Oct 2026 (the user: UK drivers' hours): the shift alone held 3 cycles; 3 × 174 min driving = 522 (under 9 h)
+# but 594 min of work + the 45-min break = 639 > 600, so 2. The haul road's assigned-speed minutes are DRIVING (inside the
+# legs), so on HERE's own timing the same rule gives 3
+import drivers_hours  # noqa: E402
+ok("trips per day therefore falls out of the adjusted cycle — under the UK drivers' hours: 2 (the shift alone held 3)",
+   row["trips_per_day"] == 2 == drivers_hours.lorry_day(an["planning"]["shift_hours_per_day"], row["drive_min"],
+                                                         row["other_work_min"])["trips"]
+   and int(an["planning"]["shift_hours_per_day"] // row["cycle_hr"]) == 3
+   and row["lorry_day"]["trips_without_rules"] == 3 and row["lorry_day"]["limited_by"] == "breaks"
+   and row["lorry_day"]["break_minutes"] == 45.0, str(row.get("lorry_day")))
+ok("...the haul road's minutes count as driving (they are inside the legs): driving = both legs as stored",
+   abs(row["drive_min"] - (row["loaded_hr"] + row["return_hr"]) * 60.0 - row["turnaround_parts"]["internal_travel_minutes"]) < 0.5
+   and drivers_hours.lorry_day(10, (1.20 + 1.10) * 60.0 + row["turnaround_parts"]["internal_travel_minutes"],
+                               row["other_work_min"])["trips"] == 3, str(row["drive_min"]))
 
 
 # =========================================================================== #

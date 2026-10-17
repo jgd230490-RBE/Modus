@@ -94,10 +94,21 @@ which say how many lines they exclude. It is excluded, never estimated. The load
 own (Config → Vehicles, seeded from <code>backend/factors.json</code>); blank minutes use the planning defaults.</p>
 
 <h2 id="t1-vehicles">Vehicles and peak fleet</h2>
-<pre>trips per vehicle-day = floor(shift hours ÷ cycle)
+<pre>trips per vehicle-day = drivers_hours.lorry_day(shift, driving, other work)["trips"]   — 17 Oct 2026
 vehicles (per line)   = trips per day ÷ trips per vehicle-day      — the server's `vehicles`
 peak fleet            = the largest same-month sum of vehicles needed across the lines in view</pre>
-<p>That is trips ÷ (working days × what one vehicle does in a shift). An unbaked line has no cycle, so it needs an
+<p>Since 17 Oct 2026 the trips one vehicle makes in a day follow the UK drivers&#39; hours (<code>backend/drivers_hours.py</code>,
+called by <code>network.route_analysis</code>, the public map&#39;s route figures and the Carbon planner — never a second
+formula): the largest n with n × driving ≤ 540 min (Reg 561/2006 Art 6) and n × cycle + ONE break ≤ the shift, the break
+45 min once driving passes 270 min (Art 7) or work passes 540, else 30 min once work passes 360 (Road Transport (Working
+Time) Regulations 2005 reg 5) — never the two added. Driving = both legs as routed (haul roads and gate access roads are
+inside them) + gate-to-face minutes; other work = load + unload + the gate check-in (<code>safety_minutes</code>). The shift
+is at most 13 h (Config refuses more; a stored figure is capped). An electric lorry&#39;s charging comes on top of the break
+(<code>carbon.ev_day</code>, <code>drivers_hours.ev_trips</code>). Each row carries <code>drive_min</code>,
+<code>other_work_min</code> and <code>lorry_day</code> (<code>limited_by</code> shift / breaks / driving / none, the break,
+<code>trips_without_rules</code> = the old floor(shift ÷ cycle)). Not modelled: weekly limits, night work, the twice-a-week
+10 h driving day, GB domestic rules. The gate figures keep the full shift (a gate stays open while drivers take breaks).</p>
+<p>That is trips ÷ (working days × what one vehicle does in a driver&#39;s day). An unbaked line has no cycle, so it needs an
 unknown number of vehicles and is left out of the sum. Trips are not vehicles: a fleet worked out as tonnes ÷ payload
 alone is a trip count.</p>
 

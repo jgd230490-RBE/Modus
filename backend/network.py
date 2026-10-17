@@ -19,6 +19,7 @@ import zones          # Phase 3 — supplies the avoid[areas] the bake path send
 import haul           # Phase 4 — threads temporary haul roads into the bake path
 import road_sections  # 12 Oct 2026 (§2.2d) — the shared-section index, rebuilt when a primary geometry changes
 import gates          # Phase 5a — resolves which gate each leg enters and leaves by
+import drivers_hours  # 17 Oct 2026 — trips a lorry a day under the UK drivers' hours (the one rule)
 
 DEFAULT_PROFILE = "Artic Tipper (44t)"
 # G2, 16 Sep 2026: the product ships NO network. seed_network(path) loads one from an
@@ -780,8 +781,8 @@ def public_map_data(profile=None):
     only the roads drawn since.
     """
     factors = conversions.load_factors()
-    plan = factors.get("planning", {}) or {}
-    shift_hr = float(plan.get("shift_hours_per_day") or 10)
+    # 17 Oct 2026 (the user): trips a lorry a day under the UK drivers' hours — drivers_hours.lorry_day, the one rule
+    shift_hr, _capped = drivers_hours.shift_hours(factors)
 
     locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?",
                                         (db.current_tenant(),))}
@@ -833,11 +834,13 @@ def public_map_data(profile=None):
             # from the same function. Two places adding up the same components is the
             # exact shape of the 125% disagreement recorded at main.py:588.
             has_drawn_road = drawn_road_on((loaded, ret), access_ids)
-            cycle_hr = out_hr + back_hr + _turnaround_parts(
+            _parts = _turnaround_parts(
                 used, factors, origin=o, dest=d, route=r,
                 has_drawn_road=has_drawn_road,
-                gates_by_loc=map_gates)["turnaround_hr"]
-            trips = int(shift_hr // cycle_hr) if cycle_hr > 0 else 0
+                gates_by_loc=map_gates)
+            cycle_hr = out_hr + back_hr + _parts["turnaround_hr"]
+            # 17 Oct 2026: route_analysis's own rule and split (drivers_hours), so the map and the Routes page agree
+            trips = drivers_hours.lorry_day(shift_hr, *drivers_hours.split_cycle(out_hr, back_hr, _parts))["trips"]
 
         for leg_name, g in (("loaded", loaded), ("return", ret)):
             if not g or not g["geometry"]:
@@ -2532,7 +2535,9 @@ def route_analysis(route_id, profiles=None, pre=None):
 
     factors = conversions.load_factors()
     plan = factors.get("planning", {}) or {}
-    shift_hr = float(plan.get("shift_hours_per_day") or 10)
+    # 17 Oct 2026 (the user: "please use uk rules"): the lorry's day is the shift (at most 13 h) less the breaks the UK
+    # drivers' hours rules require, driving at most 9 h — drivers_hours.lorry_day, the one rule every surface reads
+    shift_hr, shift_capped = drivers_hours.shift_hours(factors)
     work_days = float(plan.get("working_days_per_month") or 22)
     veh = factors.get("vehicles", {}) or {}
     default_veh = veh.get("_default", {}) or {}
@@ -2606,7 +2611,10 @@ def route_analysis(route_id, profiles=None, pre=None):
                                       gates_by_loc=gates_by_loc)
             turnaround_hr = parts["turnaround_hr"]
             cycle_hr = l_hr + r_hr + turnaround_hr
-            trips = int(shift_hr // cycle_hr) if cycle_hr > 0 else 0
+            # driving = both legs + gate-to-face travel; other work = loading, unloading, the gate check-in
+            drive_min, other_min = drivers_hours.split_cycle(l_hr, r_hr, parts)
+            day = drivers_hours.lorry_day(shift_hr, drive_min, other_min)
+            trips = day["trips"]
             total_km = round(l_km + r_km, 2)
             out.append({
                 "profile": prof, "alt_index": alt,
@@ -2637,6 +2645,14 @@ def route_analysis(route_id, profiles=None, pre=None):
                     "total_minutes": round(parts["total_minutes"], 3),
                 },
                 "return_estimated": rg is None,
+                # 17 Oct 2026: the lorry's day under the UK drivers' hours — what the trips a day rest on, in parts and
+                # words; trips_without_rules is the old floor(shift ÷ cycle), so a figure that moved can say why
+                "drive_min": round(drive_min, 2), "other_work_min": round(other_min, 2),
+                "lorry_day": {"limited_by": day["limited_by"], "break_minutes": day["break_minutes"],
+                              "driving_minutes": round(day["driving_minutes"], 1),
+                              "work_minutes": round(day["work_minutes"], 1),
+                              "trips_without_rules": day["trips_without_rules"],
+                              "words": drivers_hours.words(day)},
                 # Phase 4: how much of this cycle is drawn haul road, and what the cycle
                 # would have been on HERE's own timing. Surfaced rather than folded in
                 # silently — an assigned speed is a planning assumption, and a cycle time
@@ -2658,6 +2674,8 @@ def route_analysis(route_id, profiles=None, pre=None):
     return {
         "route_id": route_id,
         "planning": {"shift_hours_per_day": shift_hr,
-                     "working_days_per_month": work_days},
+                     "working_days_per_month": work_days,
+                     # 17 Oct 2026: the rule the trips a day rest on, in words, and whether the typed shift was capped
+                     "drivers_hours": drivers_hours.RULE_WORDS, "shift_capped": shift_capped},
         "rows": out,
     }

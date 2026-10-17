@@ -76,6 +76,7 @@ import os
 
 import access
 import conversions
+import drivers_hours
 import costlines
 import db
 import derived
@@ -444,24 +445,30 @@ def electric_kg_per_km(factors, v, basis="ttw"):
     return conversions.electric_kg_per_km(factors, v, basis)
 
 
-def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw):
+def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw, drive_min=None):
     """
     Cycles one electric lorry can run in a shift once charging is counted, simulated trip by
     trip: the battery starts the shift full; a trip's energy must fit the usable battery; before
     a trip that does not fit, the lorry charges — only what the rest of the shift needs, up to a
     full battery — at charge_kw (minutes = kWh ÷ kW × 60). Returns {cycles, charges,
     charge_minutes, minutes_per_charge, kwh_per_trip, kwh_day, range_per_charge_km, feasible}.
+    17 Oct 2026: the driver keeps the UK drivers' hours (drivers_hours): driving at most 9 h and the required break,
+    CHARGING ON TOP OF THE BREAK (the cautious reading). `drive_min` = the driving minutes of one cycle; None counts the
+    whole cycle as driving (the cautious stand-in).
     """
     cyc, km, kwh, bat, kw = (_num(cycle_min), _num(km_trip), _num(kwh_per_km), _num(battery_kwh), _num(charge_kw))
-    shift_min = float(shift_hours or 10) * 60.0
+    shift_h = drivers_hours.shift_hours({"planning": {"shift_hours_per_day": shift_hours}})[0]
+    shift_min = shift_h * 60.0
     out = {"cycles": 0, "charges": 0, "charge_minutes": 0.0, "minutes_per_charge": None,
            "kwh_per_trip": None, "kwh_day": 0.0, "range_per_charge_km": None, "feasible": True}
     if not cyc or cyc <= 0 or km is None or not kwh:
         return dict(out, feasible=False)
     e_trip = km * kwh
     out["kwh_per_trip"] = e_trip
+    drv = min(cyc, _num(drive_min)) if _num(drive_min) is not None else cyc
+    oth = max(0.0, cyc - drv)
     if not bat or bat <= 0 or not kw or kw <= 0:
-        n = int(shift_min // cyc)                       # no battery figures: the diesel cycle, stated
+        n = drivers_hours.lorry_day(shift_h, drv, oth)["trips"]   # no battery figures: the diesel day, stated
         return dict(out, cycles=n, kwh_day=n * e_trip)
     out["range_per_charge_km"] = bat / kwh
     if e_trip > bat + 1e-9:
@@ -478,13 +485,12 @@ def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw):
             soc -= e_trip
         return stops, kwh_in / kw * 60.0
 
-    n = int(shift_min // cyc)
-    while n > 0:
+    # 17 Oct 2026: the largest n whose trips, charging and the required break fit the driver's day (drivers_hours)
+    n = drivers_hours.ev_trips(shift_h, drv, oth, lambda m: charging(m)[1])
+    if n > 0:
         stops, minutes = charging(n)
-        if n * cyc + minutes <= shift_min + 1e-9:
-            return dict(out, cycles=n, charges=stops, charge_minutes=minutes,
-                        minutes_per_charge=(minutes / stops if stops else None), kwh_day=n * e_trip)
-        n -= 1
+        return dict(out, cycles=n, charges=stops, charge_minutes=minutes,
+                    minutes_per_charge=(minutes / stops if stops else None), kwh_day=n * e_trip)
     return dict(out, cycles=0, feasible=False)
 
 
@@ -790,13 +796,14 @@ def _eval(line, s, ctx):
 
     # ---- distance and cycle ---------------------------------------------------------
     one_way = ret = km_trip = cycle_min = None
-    cycles = None
+    cycles = line_drive = None
     if base_baked and unchanged_geo:
         one_way = _num(line.get("distance_km"))
         ret = _num(line.get("return_km"))                     # None when the return is not baked
         km_trip = _num(line.get("km_trip"))
         cycle_min = _num(line.get("cycle_min"))
         cycles = line.get("cycles_per_vehicle_day")
+        line_drive = _num(line.get("drive_min"))
         if ret is None:
             flags.append(FLAG_RETURN_ESTIMATED)
     elif base_baked:
@@ -824,7 +831,12 @@ def _eval(line, s, ctx):
             km_trip = one_way + (ret or 0.0)
             travel_hr = (float(row.get("loaded_hr") or 0) + float(row.get("return_hr") or 0)) * scale
             cycle_min = round((travel_hr + float(row.get("turnaround_hr") or 0)) * 60.0, 1)
-            cycles = int((plan["shift_h"] * 60.0) // cycle_min) if cycle_min and cycle_min > 0 else 0
+            # 17 Oct 2026: route_analysis's own rule on the swapped route (drivers_hours.lorry_day), never a third formula:
+            # driving = both legs (scaled) + gate-to-face; other work = loading, unloading, check-in
+            drive_min, other_min = drivers_hours.split_cycle(travel_hr, 0.0, row.get("turnaround_parts"))
+            line_drive = drive_min
+            cycles = (drivers_hours.lorry_day(plan["shift_h"], drive_min, other_min)["trips"]
+                      if cycle_min and cycle_min > 0 else 0)
         else:
             base_baked = False
     if not base_baked:
@@ -835,7 +847,8 @@ def _eval(line, s, ctx):
     ev = None
     if electric and base_baked and cycle_min:
         ev_km = (one_way or 0.0) + (ret if ret is not None else (one_way or 0.0))   # the lorry drives home either way
-        ev = ev_day(cycle_min, ev_km, plan["shift_h"], v.get("kwh_per_km"), v.get("battery_kwh_usable"), v.get("charge_kw"))
+        ev = ev_day(cycle_min, ev_km, plan["shift_h"], v.get("kwh_per_km"), v.get("battery_kwh_usable"), v.get("charge_kw"),
+                    drive_min=line_drive)
         if not ev["feasible"] and twin:
             r = _eval(line, dict(s, vehicle=twin), ctx)
             r["flags"] = r["flags"] + [FLAG_EV_INFEASIBLE]
@@ -1079,7 +1092,8 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
         return cm_cache[cat]
 
     ctx = {"cp": cp, "doc": doc, "vs": vs, "geo": _Geo(), "locs": locs, "routes": routes, "cm": cm_of,
-           "plan": {"shift_h": float(plan.get("shift_hours_per_day") or 10),
+           # 17 Oct 2026: the shift as the drivers' hours rule reads it (at most 13 h)
+           "plan": {"shift_h": drivers_hours.shift_hours({"planning": plan})[0],
                     "work_days": float(plan.get("working_days_per_month") or 22)}}
     _check_allocation(allocation)
     _check_levers(baseline_levers, vs, routes)

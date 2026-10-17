@@ -3309,6 +3309,25 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
 }
 
+// ---- 17 Oct 2026 (the user: UK drivers' hours): the words that state how trips a lorry a day are worked out ----------
+ok("⭐ Config → Planning: 'Shift hours a day' is a driver's working day, at most 13 h, the trips what fit after the "
+   + "required breaks with driving at most 9 h; the old 'shift ÷ cycle time' is gone",
+   src.includes("A driver's working day, at most 13 hours (the 11-hour daily rest). The trips one lorry makes on a route are what fit in it after the breaks the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9; 30 min once work passes 6), with driving at most 9 hours. Weekly limits are not checked.")
+   && !src.includes("Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time."));
+ok("⭐ the Routes table: Trips/day is what fits in a driver's day (driving = out, back and gate to face), § marks a route the "
+   + "rules hold below the shift alone, the cell's title gives the server's words",
+   src.includes("Trips/day is what fits in a driver's day: the {data.planning.shift_hours_per_day} h")
+   && src.includes("9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why).")
+   && src.includes('title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}')
+   && !src.includes("Trips/day assumes a {data.planning.shift_hours_per_day} h"));
+ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon page puts charging on top of the break",
+   src.includes("the trips one vehicle can do in a driver's day on its route") && src.includes("what one vehicle does in a driver's day on that route")
+   && !src.includes("the trips one vehicle can do in a shift on its route") && !src.includes("what one vehicle does in a shift on that route")
+   && src.includes('c.lorry_day.limited_by === "driving" ? "the 9 h driving limit"')
+   && src.includes("charging time comes out of the shift, on top of the driver's required break"));
+ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'compliant' or 'legal'",
+   !/drivers'? hours[^"`]{0,200}\b(compliant|compliance|legal)\b/i.test(src));
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

@@ -5649,6 +5649,30 @@ function qrRead(mod) {
   }
 }
 
+// ---- 17 Oct 2026 (the user: UK drivers' hours): the route drawer's trips a lorry a day ------------------------------
+// lorryDayTrips is the server's drivers_hours.lorry_day in the page (the drawer's rough estimate at the average speed).
+// The table is test_drivers_hours.py's CASES, row for row: the two languages are held to one answer.
+{
+  const grabLD = code.match(/function lorryDayTrips\(shiftH, driveMin, otherMin\)\{[\s\S]*?\n    \}/);
+  ok("⭐ the drawer has lorryDayTrips (the drivers' hours rule) and no longer divides the shift by the cycle",
+     !!grabLD && !code.includes("P.shift_hours_per_day/cycleH") && code.includes("lorryDayTrips(P.shift_hours_per_day, (round/P.avg_haul_speed_kmh)*60, P.load_minutes+P.unload_minutes)"));
+  if (grabLD) {
+    const lorryDayTrips = new Function(grabLD[0] + "; return lorryDayTrips;")();
+    const CASES = [[10, 60, 0, 9], [10, 69, 24, 5], [10, 45, 24, 8], [10, 84, 20, 5], [10, 174, 24, 2], [10, 600, 0, 0],
+                   [5, 54, 0, 5], [5, 54.01, 0, 4], [13, 60, 30, 8], [8, 30, 30, 7]];
+    const got = CASES.map(([sh, d, o]) => lorryDayTrips(sh, d, o));
+    ok("⭐ lorryDayTrips gives the server's answer on every one of test_drivers_hours.py's cases",
+       CASES.every(([sh, d, o, n], i) => got[i] === n), JSON.stringify(got));
+    ok("...a shift over 13 h is read as 13 (the daily rest), and nothing typed as 10",
+       lorryDayTrips(15, 60, 30) === lorryDayTrips(13, 60, 30) && lorryDayTrips(0, 60, 0) === lorryDayTrips(10, 60, 0));
+  }
+  ok("the drawer's card names the day: the shift less breaks, at most 9 h driving; whole trips, the literal kept",
+     code.includes("card(String(tripsPerDay),'Trips / day / lorry','@ '+Math.min(13, P.shift_hours_per_day)+' h shift less breaks, at most 9 h driving, '"));
+  ok("the bar's note and the month table's note say the vehicles are worked out in a driver's day",
+     code.includes("(the cycle time of its stored road route) in a driver's day under the UK drivers' hours (the shift less the required breaks, at most 9 h driving)")
+     && code.includes("what one vehicle can do in a driver\\'s day on that route (the shift less the required breaks, at most 9 h driving)"));
+}
+
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();

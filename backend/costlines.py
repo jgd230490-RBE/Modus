@@ -178,6 +178,8 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
             "distance_km": ctx.get("distance_km"), "return_km": ctx.get("return_km"),
             "payload_t": ctx.get("payload_t"), "dest_id": ctx.get("dest_id"), "origin_id": ctx.get("origin_id"),
             "cycle_min": ctx.get("cycle_min"), "cycles_per_vehicle_day": (cycles if baked else None),
+            # 17 Oct 2026: the driving minutes of one cycle (the Carbon planner's electric day reads it)
+            "drive_min": ctx.get("drive_min"),
             "km": km, "tonne_km": f.get("tonne_km"), "co2_t": co2_t,
             "planned": planned, "fair": fair,
             "actual_qty": act["qty"], "actual_tonnes": actual_t, "actual_eur": act["eur"],
