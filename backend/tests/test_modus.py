@@ -423,30 +423,43 @@ dc = tenant_package.counts(demo)
 # NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
 # 10 m³ lines (3 of them in October, two on one route)
 # NARROWED 16 Oct 2026 (an access road to every gate, the user): + 17 zones, one haul road per gate (Z006-Z022)
-ok("demo: 14 locations, 22 routes, 3 teams, 8 sections, 88 forecasts (86 approved + 1 pending + 1 rejected), 17 gates, 22 zones "
-   "(5 + 17 gate access roads), 6 haul links",
-   dc["locations"] == 14 and dc["routes"] == 22 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 88
-   and dc["location_gates"] == 17 and dc["zones"] == 22 and dc["route_haul_roads"] == 6, str(dc))
+# RE-PINNED 17 Oct 2026 (demo redesign R2, notes/demo-redesign-1016.md §3a): the four-year programme — + the asphalt plant
+# and Welland Ready-Mix (2 locations, 2 gates, 2 access roads), routes R023–R043, 905 approved line-months, 7 advisory
+# zones after the access roads, the Langton haul road on all nine routes into Langton Compound. Teams 3 and sections 8 stay.
+ok("demo: 16 locations, 43 routes, 3 teams, 8 sections, 907 forecasts (905 approved + 1 pending + 1 rejected), 19 gates, 31 zones "
+   "(5 + 19 gate access roads + 7 advisory), 11 haul links",
+   dc["locations"] == 16 and dc["routes"] == 43 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 907
+   and dc["location_gates"] == 19 and dc["zones"] == 31 and dc["route_haul_roads"] == 11, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}
-ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries four approved "
-   "months of surplus cut; R020 to a fictional Soil recycling hub has a route and no forecast",
+# RE-PINNED 17 Oct 2026 (R2, §3a): R019 carries the Langton cutting's surplus Apr 2027 – Sep 2028 (months 16–33) and the
+# compound platform stone lifted Jan–May 2030 (49–53), read once from the regenerated package
+ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries the surplus cut "
+   "(Apr 2027 – Sep 2028) and the lifted platform stone (Jan–May 2030); R020 to a fictional Soil recycling hub has a route and no forecast",
    _locs[_rts["R019"]["dest_id"]]["loc_type"] == "Landfill" and _locs[_rts["R020"]["dest_id"]]["loc_type"] == "Soil recycling"
    and _rts["R019"]["origin_id"] == _rts["R020"]["origin_id"] and "fictional" in _locs[_rts["R019"]["dest_id"]]["name"]
    and "fictional" in _locs[_rts["R020"]["dest_id"]]["name"]
-   and sorted(f["month_index"] for f in demo["tables"]["forecasts"] if f["route_id"] == "R019" and f["status"] == "Approved") == [9, 10, 11, 12]
+   and sorted(f["month_index"] for f in demo["tables"]["forecasts"] if f["route_id"] == "R019" and f["status"] == "Approved")
+   == list(range(16, 34)) + list(range(49, 54))
    and not [f for f in demo["tables"]["forecasts"] if f["route_id"] == "R020"])
 _dfac = json.loads([r for r in demo["tables"]["config"] if r["key"] == "factors"][0]["value"])
-ok("⭐ demo (carbon): the package carries the carbon block, carbon_material on every category and the three scenario-only electric profiles",
-   "carbon" in _dfac and all(c.get("carbon_material") for k, c in _dfac["material_categories"].items() if not k.startswith("_"))
+# NARROWED 17 Oct 2026 (R2; D112, not in §3a): every category carries a carbon_material EXCEPT the asphalt plant's feed,
+# whose class is null ON PURPOSE (the asphalt's own factor already covers its aggregate) — present and null, never absent
+ok("⭐ demo (carbon): the package carries the carbon block, carbon_material on every category but the asphalt plant's feed "
+   "(null on purpose, D112) and the three scenario-only electric profiles",
+   "carbon" in _dfac and all(c.get("carbon_material") for k, c in _dfac["material_categories"].items()
+                             if not k.startswith("_") and k != "Aggregate for the asphalt plant")
+   and "carbon_material" in _dfac["material_categories"]["Aggregate for the asphalt plant"]
+   and _dfac["material_categories"]["Aggregate for the asphalt plant"]["carbon_material"] is None
    and sorted(k for k, v in _dfac["vehicles"].items() if isinstance(v, dict) and v.get("fuel") == "electric")
    == ["Artic Flatbed (44t) — electric", "Artic Tipper (44t) — electric", "Rigid 8-wheeler (32t) — electric"]
    and all(v.get("scenario_only") for v in _dfac["vehicles"].values() if isinstance(v, dict) and v.get("fuel") == "electric"))
 _st = {s_: sum(1 for r in demo["tables"]["forecasts"] if r["status"] == s_) for s_ in ("Approved", "Pending", "Rejected")}
 # NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
 # 10 m³ lines (3 of them in October, two on one route)
-ok("demo: 86 Approved (72 + the four muck-away months, 11 Oct + the ten concrete-pour line-months, 14 Oct), exactly one Pending and one Rejected (with a reason)",
-   _st == {"Approved": 86, "Pending": 1, "Rejected": 1}
+# RE-PINNED 17 Oct 2026 (R2, §3a): the programme's 905 approved line-months; Pending 1 and Rejected 1 kept
+ok("demo: 905 Approved (the four-year programme, 17 Oct), exactly one Pending and one Rejected (with a reason)",
+   _st == {"Approved": 905, "Pending": 1, "Rejected": 1}
    and all(r["reject_reason"] for r in demo["tables"]["forecasts"] if r["status"] == "Rejected"), str(_st))
 ok("demo: weeks are materialised and some actuals typed",
    dc["forecast_weeks"] > 0 and any(r.get("actual_qty") for r in demo["tables"]["forecast_weeks"]))
@@ -566,8 +579,8 @@ ok("demo: /api/meta reads the tenant back — £, Team, GB",
 ok("demo: the pickers see three teams and eight sections",
    len(m3["ipts"]) == 3 and len(m3["work_sections"]) == 8)
 ok("demo: the routes reach /api/meta with no distance (unbaked)",
-   # NARROWED 14 Oct 2026: 22 routes (the two concrete-pour routes)
-   len(m3["routes"]) == 22 and all(not r.get("distance_km") for r in m3["routes"]))
+   # NARROWED 14 Oct 2026: 22 routes (the two concrete-pour routes). RE-PINNED 17 Oct 2026 (R2): 43 (R001–R043)
+   len(m3["routes"]) == 43 and all(not r.get("distance_km") for r in m3["routes"]))
 
 # --- 5a-bis. Postgres booleans (29 Sep 2026: the first demo import on Render) ---------
 # `psycopg2.errors.DatatypeMismatch: column "in_scope" is of type boolean but expression

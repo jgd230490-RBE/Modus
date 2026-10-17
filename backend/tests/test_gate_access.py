@@ -470,19 +470,23 @@ for g in T["location_gates"]:
     c = geo["coordinates"]
     if len(c) != 2 or abs(hav(c[0], c[1]) - 35) > 0.6 or hav(c[1], (g["lon"], g["lat"])) > 0.5:
         bad.append((g["id"], round(hav(c[0], c[1]), 1), round(hav(c[1], (g["lon"], g["lat"])), 1)))
-ok("⭐ THE DEMO: every one of the 17 gates has an access road — a spliced haul road from the road point to the gate, 35 m",
-   len(T["location_gates"]) == 17 and not bad, str(bad))
-ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geofences); the access roads are Z006-Z022",
+# RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): 19 gates (the asphalt plant's weighbridge and Welland Ready-Mix's gate);
+# their access roads Z023 and Z024; the seven advisory zones of the programme come after them (Z025–Z031)
+ok("⭐ THE DEMO: every one of the 19 gates has an access road — a spliced haul road from the road point to the gate, 35 m",
+   len(T["location_gates"]) == 19 and not bad, str(bad))
+ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geofences); the access roads are Z006-Z024, "
+   "the advisory zones after them",
    [z["id"] for z in T["zones"]][:5] == ["Z001", "Z002", "Z003", "Z004", "Z005"]
    and [ZB[i]["name"] for i in ("Z001", "Z002")] == ["Langton haul road", "Stockpile North haul road"]
-   and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 23)])
+   and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 25)]
+   and all(z["kind"] != "haul_road" and not z["affects_routing"] for z in T["zones"] if int(z["id"][1:]) > 24))
 ok("...named for the site and gate, the road named in the note, 10 km/h, no end date",
    all(re.match(r"^.+: .+ access road$", ZB[g["access_zone_id"]]["name"]) for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["note"].startswith("Bellmouth off ") for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["speed_kph"] == 10 and ZB[g["access_zone_id"]]["ends_on"] is None for g in T["location_gates"]))
 _gen = read("backend/tools/make_demo_tenant.py")
 ok("the generator's road points cover every gate by (site, gate) and leave residential streets out on purpose",
-   _gen.count('): ([-') == 17 and "BELLMOUTH_M = 35.0" in _gen and "residential streets left out on purpose" in _gen)
+   _gen.count('): ([-') == 19 and "BELLMOUTH_M = 35.0" in _gen and "residential streets left out on purpose" in _gen)
 
 print()
 for f_ in FAIL:

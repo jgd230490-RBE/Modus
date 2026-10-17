@@ -41,15 +41,22 @@ merge; columns matched to the live schema; `tenant_id` never read from the file)
 ### The demo tenant
 
 `demo/uk-corridor.package.json` is a **fictional** organisation — the Wolds Link, a
-31.8 km corridor in the English East Midlands with three quarries, a railhead, four
-compounds, three stockpiles, three teams, eight work sections, eighteen routes, four
-months of approved forecasts (Sep–Dec 2026), two weeks of typed actuals, a confirmed
-commit week, contract rates, a GBP diesel price and a map overlay. Every name, quantity
-and rate is invented. Rebuild it with:
+31.8 km A-road dualling in the English East Midlands, as a four-year programme (January 2026
+to December 2030, north to south): three quarries, a railhead, four compounds, three
+stockpiles, a batching plant, a southern ready-mix plant and an on-site asphalt plant,
+a landfill and a soil recycling hub (sixteen sites), three teams, eight work sections,
+43 routes, 905 approved line-months, history typed up to a fixed date (26 Nov 2026:
+actuals, confirmations, the stockpile draw), contract rates and a target rate, a carbon
+target, the nine council areas, a GBP diesel price and a map overlay. Every name is
+invented; the quantities are sanity-checked against published UK schemes and are
+otherwise assumptions. Rebuild the shipped file with:
 
 ```
-python3 backend/tools/make_demo_tenant.py
+python3 backend/tools/make_demo_tenant.py --with-areas
 ```
+
+`--as-of YYYY-MM-DD --out <a path outside the checkout>` types the history up to another
+date (a live refresh); the generator's docstring says more.
 
 It boots the product against a scratch SQLite database, writes every row through the
 same functions the app uses, and exports the result — so the demo also exercises the
