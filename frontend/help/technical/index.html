@@ -149,8 +149,10 @@ gate with no hours typed is open the default gate hours (<code>planning.default_
 08:00–17:00 when not set; applied when read, never stored on the gate) — less the scheme's no-delivery peak bands
 (<code>planning.peak_bands</code>, Config → Planning) and the gate's own shut windows (<code>shut_windows</code>, at most
 four, each within one day, stored as <code>08:30-09:15,12:00-12:30</code>) inside them, taken off as one set so an overlap
-counts once. A shut time wholly outside the gate's hours, or shut times that leave it no open minute, are refused when
-typed. The lorry shift (<code>planning.shift_hours_per_day</code>) is no longer any gate's day. Capacity a day = open
+counts once. A shut time wholly outside the gate's hours, or shut times and bands that leave it no open minute, are
+refused when typed (<code>gate_hours.fit_problem</code>); a Config save that changes the default gate hours or the bands is
+refused by the same rule, naming each gate it would break (<code>config.gate_problems</code>). A gate left with no open
+minute anyway (a package import) reads "No open time" everywhere: red with any arrival, capacity 0. The lorry shift (<code>planning.shift_hours_per_day</code>) is no longer any gate's day. Capacity a day = open
 minutes ÷ check-in minutes a lorry; the gap uses the same open minutes. Two steps: <strong>Queue likely</strong> (amber)
 at 85 % of capacity or more (<code>NEAR_PCT</code>), <strong>Over gate capacity</strong> (red) past it — the red rule
 above, renamed on screen. Open days (seven flags, Monday first) are tested on the Look-ahead's dated days only: a month

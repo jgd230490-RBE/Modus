@@ -629,6 +629,13 @@ _moved = {   # inventory §1 row → its key phrase in the technical guide
 _lost = [k for k, v in _moved.items() if v not in tg]
 ok3("⭐ W4 nothing lost: every passage W3 took off a screen is in the technical guide (%d phrases)" % len(_moved),
    not _lost, ", ".join(_lost))
+# 17 Oct 2026 (gate shut times, the review): the technical guide says where the default and shut times live and the rules
+ok("⭐ the technical guide: the default gate hours (planning.default_gate_hours, 08:00–17:00), shut_windows taken off once "
+   "with the bands, the refusals (gate and Config) and 'No open time'",
+   "<code>planning.default_gate_hours</code>" in tg and "08:00–17:00 when not set; applied when read, never stored on the gate" in tg
+   and "taken off as one set so an overlap\ncounts once" in tg.replace("\r\n", "\n")
+   and "<code>gate_hours.fit_problem</code>" in tg and "<code>config.gate_problems</code>" in tg
+   and 'reads "No open time" everywhere: red with any arrival, capacity 0' in tg.replace("\r\n", "\n").replace("\n", " "))
 ok("...it maps the old screen words to the new ones, and says the exports keep the old words (decision A)",
    "baked / not baked / unbaked</td><td>routed / not routed yet" in tg and "line-month</td><td>forecast month" in tg
    and "UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED" in tg and "The XLSX and PDF exports and the clash text made on the server still say" in tg)
