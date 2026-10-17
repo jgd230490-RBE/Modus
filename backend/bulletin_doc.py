@@ -1175,7 +1175,9 @@ def _svg_tag(text):
             f'stroke-width="1.5"/><text x="12" y="23" class="tagt">{_e(text)}</text></g>')
 
 
-ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5          # the map's CARBON_LINE_WIDTH / CARBON_CASING_WIDTH, in SVG units
+# the map's CARBON_LINE_WIDTH / CARBON_CASING_WIDTH until 16 Oct 2026, in SVG units; the map's are 6 / 8.5 since then
+# (D115: two flow lanes fit inside the line), and this map draws no lanes, so it keeps 5 / 7.5
+ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5
 
 
 def _volume_legend_html(S):
