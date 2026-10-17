@@ -2217,6 +2217,31 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
 }
 
+// ---- 16 Oct 2026 (S3): the busiest hour on the Gate arrivals panel ----------------------------------------------------
+// Source-level. What they prove: the "Gate by gate" table carries a sixth column, "Busiest hour", read from the server's
+// `busiest_hour` (sim.py's average working day) and formatted only; the details line says the hour and what the gate can
+// check in an hour; the server's note is printed under the table. Not covered here: the loaded rows (render_frontend.js).
+{
+  const b0 = src.indexOf("// ---- 11 Oct 2026: Gate arrivals on the Dashboard");
+  const b1 = src.indexOf("// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast");
+  const gb = src.slice(b0, b1).split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  const gbW = gb.slice(gb.indexOf("const gaBusyCell"), gb.indexOf("function GateArrivalsPanel"));
+  ok("⭐ S3: the gate table has a sixth column, Busiest hour, with its phone label, and the details row spans six",
+    gb.includes('<th scope="col" className="num">Busiest hour</th><th scope="col">Status</th>')
+    && gb.includes("colSpan={6}") && !gb.includes("colSpan={5}")
+    && ["Arrivals a day", "Average gap", "Check-in a lorry", "Busiest hour", "Status"].every(l => gb.includes(`data-label="${l}"`)));
+  ok("S3: the cell and the details line format the server's busiest_hour (lorries, hour, hours, per_hour); nothing is worked out",
+    gbW.includes('const gaBusyCell = (b) => b && b.lorries ? `${b.lorries} at ${b.hour}` : "—";')
+    && gb.includes("{gaBusyCell(g.busiest_hour)}") && gb.includes('<RdItem t="Busiest hour" wide>{gaBusyWords(g.busiest_hour)}</RdItem>')
+    && gbW.includes("`The gate can check in ${gaN1(b.per_hour)} an hour.`") && gbW.includes("No check-in time typed, so nothing is compared.")
+    && gbW.length > 200 && !/Math\.(ceil|floor|round|max)\(|\/ *60|\* *60/.test(gbW));
+  ok("S3: the server's note on where the busiest hour comes from is printed under the notes",
+    gb.includes('{ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}')
+    && gb.indexOf("data-ga-busy-note") > gb.indexOf("(ga.notes || []).map("));
+  ok("S3: no banned word and no 'peak hour' in the new words",
+    !/\b(secure|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|trucks?|peak hour)\b/i.test(gbW));
+}
+
 // ---- 11 Oct 2026 — the guide update: the tour text that was wrong or stale ------------------------
 // Source-level. What they prove: the dashboard, look-ahead, data and forecast steps say what the pages show
 // today, on the same anchors; the old promises are gone. Not covered: how a card reads on screen (dom_frontend.js

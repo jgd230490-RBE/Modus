@@ -151,6 +151,16 @@ minutes ÷ check-in minutes a lorry; the gap uses the same open minutes. Two ste
 at 85 % of capacity or more (<code>NEAR_PCT</code>), <strong>Over gate capacity</strong> (red) past it — the red rule
 above, renamed on screen. Open days (seven flags, Monday first) are tested on the Look-ahead's dated days only: a month
 figure is a working-day average. The reply carries <code>near_per_day</code> (85 % of capacity) for the chart's guide tick.</p>
+<p>Since 16 Oct 2026 (<code>backend/sim.py</code>, the haulage simulation): each gate also carries its <strong>busiest
+hour</strong>, from an average working day of the month played lorry by lorry. Each approved line's trips ÷ working days
+is rounded down or up to whole loads (the day's total is the month's average day rounded; the gates are kept as close as
+they can be to the figures above, then the smallest change to each line, then the lowest route numbers). Each gate's
+arrivals are spread evenly over its open minutes, the peak bands taken off (a gate with no hours typed takes the shift
+placed at 07:00, stood in). The busiest hour is the clock hour with most arrivals; the gate can check in 60 ÷ its
+check-in minutes an hour. The same day, with a scenario (open hours, check-in, peak bands, a concrete pour), is
+<code>GET /api/sim/day?month=N</code>: one lane at each gate, first come first served; a lorry that comes while the gate
+is shut waits for it to open, and one still waiting after the last open minute is checked in late and counted; the
+bottleneck is the first wait longer than the check-in. Nothing is saved. A window past midnight is refused.</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
 <pre>balance at the week's end = opening + typed week actuals delivered there − typed consumption</pre>
@@ -211,7 +221,7 @@ which providers were not checked since baking.</li>
 <div class="tbl"><table><thead><tr><th>Screen</th><th>Read</th><th>Notes</th></tr></thead><tbody>
 <tr><td class="k">Dashboard figures, charts, route table</td><td><code>GET /api/costing/lines</code></td><td>The Look-ahead's functions; one row per forecast month with totals and the costing block.</td></tr>
 <tr><td class="k">Dashboard: Today, this week, last week</td><td><code>GET /api/lookahead</code> (the commit bucket)</td><td>The Look-ahead's own read; nothing is derived in the browser.</td></tr>
-<tr><td class="k">Dashboard: Gate arrivals</td><td><code>GET /api/gates/arrivals?month=N</code></td><td>Its own read, per month.</td></tr>
+<tr><td class="k">Dashboard: Gate arrivals</td><td><code>GET /api/gates/arrivals?month=N</code></td><td>Its own read, per month; the busiest hour from <code>backend/sim.py</code>.</td></tr>
 <tr><td class="k">Dashboard and Forecasts: carbon target</td><td><code>GET /api/carbon/target</code></td><td>The all-in figure.</td></tr>
 <tr><td class="k">Config → Costing: target rate</td><td>its own endpoint, saved separately from the configuration document</td><td>The page's Save button does not save it; it has its own button.</td></tr>
 <tr><td class="k">Configuration</td><td>the configuration table (seeded from <code>backend/factors.json</code>)</td><td>See T4.</td></tr>
