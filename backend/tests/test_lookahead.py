@@ -296,7 +296,10 @@ db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L
 db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L2", "Site", 58.6, 24.4))
 db.execute("INSERT INTO routes (id, origin_id, dest_id) VALUES (?, ?, ?)", ("R1", "L1", "L2"))
 db.execute("INSERT INTO routes (id, origin_id, dest_id) VALUES (?, ?, ?)", ("R2", "L1", "L2"))
-MONTHS = tuple(range(1, 25))                 # two years, so today is always covered
+# NARROWED 16 Oct: was a fixed range(1, 25), which ran out on 20 Dec 2027 (the early-warning
+# week fell in month 25, unseeded). Now at least two years and always two months past the
+# commit month, so the commit / make-ready / early-warning weeks are seeded whatever the date.
+MONTHS = tuple(range(1, max(24, days.commit_bucket()[0] + 2) + 1))
 seed_line(route_id="R1", disc="earthworks", sect="WS1", months=MONTHS, qty=4000.0)
 seed_line(route_id="R2", disc="earthworks", sect="WS9", months=MONTHS, qty=800.0)   # stays Pending
 
@@ -305,7 +308,7 @@ DATES = days.bucket_dates(MI, WI)
 ISO = [d.isoformat() for d in DATES]
 NWD = len(days.weekdays_in(DATES))
 ok("the commit bucket is inside the seeded horizon (a month owns 4 or 5 weeks: the Thursday rule)",
-   1 <= MI <= 24 and 1 <= WI <= weeks.weeks_in_month(MI))
+   1 <= MI <= max(MONTHS) - 2 and 1 <= WI <= weeks.weeks_in_month(MI))
 
 r = days.materialise_commit_week()
 ok("nothing materialises while no line is Approved", r["created"] == 0 and _line_days() == [])
@@ -401,7 +404,7 @@ ok("Sat/Sun are typeable — 0 is a default, not a rule",
 #  4. Actuals — rule 6, the freeze trap, and no calibration                    #
 # =========================================================================== #
 before_next = weeks.get_week("R1", *weeks.next_week(MI, WI)[:1], "earthworks", "WS1", weeks.next_week(MI, WI)[1]) \
-    if weeks.next_week(MI, WI)[0] <= 24 else None
+    if weeks.next_week(MI, WI)[0] <= max(MONTHS) else None   # was <= 24: skipped from 27 Dec 2027
 r = main.set_forecast_day_actual(main.DayActual(route_id="R1", month_index=MI, discipline="earthworks",
                                                 section_id="WS1", day_date=first_wd, actual_qty=10.0))
 w = weeks.get_week("R1", MI, "earthworks", "WS1", WI)
@@ -467,7 +470,10 @@ ok("...and the chosen week is outside BOTH day buckets (commit and next)", (om, 
 #  6. Calibrate — next week only, and the opt-in spread                       #
 # =========================================================================== #
 # calibrating INTO a confirmed commit week still 400s, spread or not
-pm, pw = (MI, WI - 1) if WI > 1 else (MI - 1, 4)
+# NARROWED 16 Oct: the week before the commit week comes from weeks.prev_week. The old
+# `(MI - 1, 4)` assumed every month ends at week 4; after a five-week month (Oct 2026)
+# it picked a week whose next week is NOT the commit week, and the test crashed.
+pm, pw = weeks.prev_week(MI, WI)
 weeks.set_actual("R1", pm, "earthworks", "WS1", pw, actual_qty=1.0)
 r = days.calibrate("R1", pm, "earthworks", "WS1", pw, spread=True)
 ok("🔴 calibrate into a confirmed commit week is refused, spread or not", r.get("blocked_by") == "confirmed")

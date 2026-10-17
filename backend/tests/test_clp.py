@@ -598,6 +598,108 @@ access.set_current("")
 _e401 = _raises(lambda: main.clp_pack_pdf(10))
 access.set_current("planner123")
 ok("🔴 W10 endpoints: no code -> 401", getattr(_e401, "status_code", None) == 401)
+ok("W10 PDF: the trips avoided are written over the month's pair ('31 avoided') where there is room", "31 avoided" in _pt, _pt[-400:])
+
+# 17 Oct 2026: a 24-month window with loads in every month (the four-year demo, branch claude/demo-programme) made the
+# vehicle and Euro class tables 49 columns across, and build_pdf failed in reportlab ("negative availWidth") -> the pack
+# PDF answered 500. On paper those two tables now run one row a month, and any table too wide for A4 is split into column
+# groups that repeat the first column. The figures and the XLSX are unchanged.
+import brand_pdf as _brand_pdf  # noqa: E402
+from reportlab.pdfbase.pdfmetrics import stringWidth as _sw  # noqa: E402
+_M24 = copy.deepcopy(MP)
+_lab24 = [f"{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i % 12]} {2026 + i // 12}" for i in range(24)]
+_NAMES9 = [f"Vehicle type number {i} with a long name ({20 + i}t)" for i in range(1, 9)] + [clp_pack.NOT_TYPED]
+for _k in ("vehicle_types", "euro_class"):
+    _c = _M24["charts"][_k]
+    _c["months"] = [{"month_index": i + 1, "label": _lab24[i]} for i in range(24)]
+    _names = _NAMES9 if _k == "vehicle_types" else ["Euro VI", "Euro V", clp_pack.NOT_TYPED]
+    _lds = [[1000 + 37 * _j + 101 * i for i in range(24)] for _j in range(len(_names))]
+    _c["totals"] = [sum(ld[i] for ld in _lds) for i in range(24)]
+    _c["series"] = [{"group": _nm, "label": _nm, "loads": _ld, "total": sum(_ld),
+                     "pct": [round(100.0 * x / _c["totals"][i], 1) for i, x in enumerate(_ld)]} for _nm, _ld in zip(_names, _lds)]
+for _k in ("carbon_rate", "trips_avoided"):
+    _c = _M24["charts"][_k]
+    _c["months"] = [dict(_c["months"][0], label=_lab24[i], month_index=i + 1) for i in range(24)]
+for _i, _m in enumerate(_M24["charts"]["trips_avoided"]["months"]):
+    _m["avoided"] = 31 + _i
+    _m["loads_with_decisions"] = _m["loads_planned"] - _m["avoided"]
+_F = _brand_pdf.fonts()
+_usable = _export.A4[0] - 28 * _export.mm
+try:
+    _p24 = clp_pack.build_pdf(_M24, generated="17 Oct 2026")
+    _e24 = ""
+except Exception as e:  # noqa: BLE001
+    _p24, _e24 = b"", f"{type(e).__name__}: {e}"
+ok("⭐ 24-month window: the CLP pack PDF builds (49 columns across used to fail in reportlab -> a 500)", _p24[:4] == b"%PDF", _e24)
+_t24 = re.sub(r"\s+", " ", _pdf_text(_p24) or "") if _p24 else ""
+ok("⭐ 24-month window: every chart with data is in the PDF with its table, every month of the window named",
+   all(_M24["charts"][k]["title"] in _t24 for k in _M24["with_data"])
+   and _t24.count("How it is worked out: ") == len(_M24["with_data"])
+   and all(_t24.count(m) >= 4 for m in _lab24), [m for m in _lab24 if _t24.count(m) < 4][:5])
+ok("24-month window: nothing truncated — every vehicle type's full name is printed (the key used to cut at 30 letters)",
+   all(n in _t24 for n in _NAMES9), [n for n in _NAMES9 if n not in _t24][:3])
+ok("24-month window: where '31 avoided' does not fit over a pair, every month's figure stands alone and the key says what it is",
+   "Figure over a pair: trips avoided" in _t24 and not re.search(r"\d avoided", _t24)
+   and all(f"{31 + i}" in _t24 for i in range(24)), _t24[-600:])
+_M24b = copy.deepcopy(_M24)
+for _i, _m in enumerate(_M24b["charts"]["trips_avoided"]["months"]):
+    _m["loads_planned"], _m["avoided"], _m["loads_with_decisions"] = 9000, 1200 + _i, 9000 - 1200 - _i
+_t24b = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_M24b, generated="17 Oct 2026")) or "")
+ok("24-month window: where not even every figure fits over its pair, none is drawn there and the key points to the table, "
+   "which still holds every month", "Trips avoided each month: the table below" in _t24b and "Figure over a pair" not in _t24b
+   and all(f"{_lab24[i]} 9 000 {_n24} {_a24}" in _t24b for i, _n24, _a24 in
+           [(i, f"{(9000 - 1200 - i):,}".replace(",", " "), f"{1200 + i:,}".replace(",", " ")) for i in range(24)]),
+   _t24b[-500:])
+
+
+def _fits(tb):
+    """Every column at least as wide as its widest figure; the table no wider than the page."""
+    if tb["widths"] is None:
+        return len(tb["header"][0]) <= 8
+    good = sum(tb["widths"]) <= _usable + 0.01
+    for r in tb["rows"]:
+        for x, w in zip(r, tb["widths"]):
+            if clp_pack.FIGURE.match(str(x)) and _sw(str(x), _F["regular"], 7) > w - 2 * clp_pack.PAD + 0.01:
+                good = False
+    return good
+
+
+_all_fit = True
+for _k in _M24["with_data"]:
+    for _tb in clp_pack.pdf_tables(_M24["charts"][_k], _M24, _usable, _F):
+        _all_fit = _all_fit and _fits(_tb)
+ok("⭐ 24-month window: every table on paper fits A4 and no figure is narrower than its column", _all_fit)
+_vt = clp_pack.pdf_tables(_M24["charts"]["vehicle_types"], _M24, _usable, _F)
+ok("24-month window: nine vehicle types do not fit one table — split into column groups, each repeating the Month column",
+   len(_vt) >= 2 and all(tb["header"][0][0] == "Month" and [r[0] for r in tb["rows"]] == _lab24 for tb in _vt), str(len(_vt)))
+# every figure of the XLSX's table is on paper, in its month and vehicle type's place
+_h, _rows = clp_pack.table_of(_M24["charts"]["vehicle_types"], _M24)
+_paper = {}
+for _tb in _vt:
+    _top, _sub = _tb["header"]
+    _cur = None
+    for _j in range(1, len(_top)):
+        _cur = _top[_j] if _top[_j] else _cur
+        for _r in _tb["rows"]:
+            _paper[(_r[0], _cur, _sub[_j] or _top[_j])] = _r[_j]
+_want = {}
+for _r in _rows:
+    for _i, _m in enumerate(_lab24):
+        if _r[0] == "All loads":
+            _want[(_m, "All loads", "All loads")] = _r[1 + _i]
+        else:
+            _want[(_m, _r[0], "Loads")] = _r[1 + _i]
+            _want[(_m, _r[0], "Share")] = _r[25 + _i]
+ok("⭐ 24-month window: the paper tables hold exactly the XLSX table's figures (one row a month, the same strings)",
+   _paper == _want, str(len(_paper)) + " vs " + str(len(_want)))
+ok("24-month window: the XLSX is unchanged — one column a month for loads and for share",
+   len(_h) == 49 and _h[0] == "Vehicle type" and _h[1] == f"{_lab24[0]} loads" and _h[25] == f"{_lab24[0]} share")
+_wb24 = _openpyxl.load_workbook(_io.BytesIO(clp_pack.build_xlsx(_M24)))
+_vs = [[c.value for c in r] for r in _wb24[clp_pack.SHEET["vehicle_types"]].iter_rows()]
+ok("24-month window: the XLSX sheet's header row is table_of's 49 columns", _h in [r[:49] for r in _vs])
+_rt = clp_pack.pdf_tables(MP["charts"]["route_caps"], MP, _usable, _F)
+ok("a table that already fits A4 keeps its layout: one table, the XLSX's header, reportlab sharing the width out",
+   len(_rt) == 1 and _rt[0]["widths"] is None and _rt[0]["header"] == [clp_pack.table_of(MP["charts"]["route_caps"], MP)[0]])
 _doc["tenant"]["demo_notice"] = None
 config.save(_doc, by="tester"); config.invalidate()
 

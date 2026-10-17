@@ -599,7 +599,21 @@ if (loaded) {
       ok("🔴 a pending-only gate reads 'No approved arrivals' as the chip's word and 'no approved arrivals' as its gap; never 'Spacing holds' or 'one every —'",
         // 13 Oct 2026 (W6, narrowed): the gap cell reads "none", the details "No approved arrivals."
         (pP.match(/>No approved arrivals</g) || []).length === 1 && pP.includes(">none<") && pP.includes(">No approved arrivals.<") && !pP.includes("Spacing holds") && !/one every/i.test(pP)
-        && !pP.includes("—") && pP.includes('data-ga-flag="none"') && pP.includes(">1 pending line would add 5.0 a day here once approved.<") && !/undefined|NaN/.test(pP));
+        // NARROWED 16 Oct 2026 (S3): the Busiest hour cell reads "—" when the server sends no busiest hour (this fixture
+        // predates it); no other dash on the row
+        && (pP.match(/data-ga-busy="0">—</g) || []).length === 1 && !pP.replace(/data-ga-busy="0">—</g, "").includes("—") && pP.includes('data-ga-flag="none"') && pP.includes(">1 pending line would add 5.0 a day here once approved.<") && !/undefined|NaN/.test(pP));
+      // 16 Oct 2026 (S3): the busiest hour, as GET /api/gates/arrivals sends it (sim.py's average working day). Injected into
+      // the fixture here: test_gate_arrivals.py writes the module's reply, and the busiest hour is added by the endpoint.
+      const GAB = { ...GA, busiest_note: "Busiest hour: the lorries arriving in the busiest clock hour of an average working day, 312 whole loads spread evenly over each gate's open hours (07:00–17:00 stood in where none are typed). No pour.",
+        gates: GA.gates.map((g, i) => ({ ...g, busiest_hour: i === 0 ? { lorries: 26, hour: "07:00", hours: ["07:00", "09:00", "12:00"], per_hour: 30.0 }
+                                                       : i === 1 ? { lorries: 1, hour: "16:00", hours: ["16:00"], per_hour: null } : null })) };
+      const bP = gaSeg(render("the Dashboard renders gate arrivals with the busiest hour", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAB, onOpen(){} })));
+      ok("⭐ S3: the Busiest hour cell and details line show the server's figures; a gate with none reads —; the note is printed",
+        bP.includes('data-ga-busy="26">26 at 07:00<') && bP.includes('data-ga-busy="1">1 at 16:00<') && bP.includes('data-ga-busy="0">—<')
+        && bP.includes("26 lorries arriving in the busiest clock hour (07:00 and 2 more hours) of an average working day. The gate can check in 30.0 an hour.")
+        && bP.includes("1 lorry arriving in the busiest clock hour (16:00) of an average working day. No check-in time typed, so nothing is compared.")
+        && (bP.match(/<dt>Busiest hour<\/dt>/g) || []).length === 2 && bP.includes('data-ga-busy-note="1">Busiest hour: the lorries arriving in the busiest clock hour')
+        && bP.includes(">Busiest hour</th>") && !/undefined|NaN|IPT ?\d/.test(bP));
       const selP = seg(gP, '<select class="ga-sel"', "</select>");
       ok("the month select shows the fixture's month in the Dashboard's words (Sep 26), 24 months of the horizon",
         /<option value="9" selected="">Sep 26<\/option>/.test(selP) && (selP.match(/<option/g) || []).length === ctMeta.months.count && (selP.match(/selected/g) || []).length === 1

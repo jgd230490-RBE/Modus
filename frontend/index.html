@@ -1414,6 +1414,17 @@ const gaMin = (m) => m == null ? "—" : `${(+m).toFixed(1)} min`;
 // status word cannot disagree (test_gate_arrivals checks it). The bar is red only when the server's flag is.
 // No check-in typed = no capacity: the bar is grey and says so, never compared.
 const gaN1 = (n) => n == null ? "—" : (+n).toFixed(1);
+// 16 Oct 2026 (S3): the busiest clock hour at each gate, from the simulation's average working day (sim.py on the server,
+// whole loads spread evenly over each gate's open hours, no pour). The server sends the lorries, the hour and what the
+// gate can check in an hour; nothing is worked out here.
+const gaBusyCell = (b) => b && b.lorries ? `${b.lorries} at ${b.hour}` : "—";
+const gaBusyWords = (b) => {
+  if(!b || !b.lorries) return null;
+  const hs = b.hours || [];
+  const when = hs.length > 1 ? `${hs[0]} and ${hs.length - 1} more hour${hs.length > 2 ? "s" : ""}` : (hs[0] || b.hour);
+  return `${b.lorries} lorr${b.lorries === 1 ? "y" : "ies"} arriving in the busiest clock hour (${when}) of an average working day. `
+    + (b.per_hour == null ? "No check-in time typed, so nothing is compared." : `The gate can check in ${gaN1(b.per_hour)} an hour.`);
+};
 function GateArrivalsPanel({ ga, err, month, months, onMonth }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
   if(!ga) return err
@@ -1500,14 +1511,14 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
             every figure on this table is already lorries.
         */}
         <div className="overflow-auto rd-scroll"><table className="ga-table rd-table" data-rd-table="gates">
-          <thead><tr><th scope="col">Gate</th><th scope="col" className="num">Arrivals a day</th><th scope="col" className="num">Average gap</th><th scope="col" className="num">Check-in a lorry</th><th scope="col">Status</th></tr></thead>
+          <thead><tr><th scope="col">Gate</th><th scope="col" className="num">Arrivals a day</th><th scope="col" className="num">Average gap</th><th scope="col" className="num">Check-in a lorry</th><th scope="col" className="num">Busiest hour</th><th scope="col">Status</th></tr></thead>
           <tbody>
             {gates.map(g => {
               const teams = (g.teams || []).map(t => teamText(t) || "—");
               const chips = teams.length <= 2 ? teams : [teams[0], `+${teams.length - 1} more`];
               const k = String(g.gate_id);
               return (
-                <RowDetails key={k} rowKey={"ga-" + k} isOpen={gaOpen(k)} onToggle={() => gaToggle(k)} colSpan={5}
+                <RowDetails key={k} rowKey={"ga-" + k} isOpen={gaOpen(k)} onToggle={() => gaToggle(k)} colSpan={6}
                   label={`Details for ${g.location_name}, ${g.gate_name}`}
                   rowProps={{ "data-ga-gate": g.gate_id, "data-ga-flag": g.flag || "none" }}
                   summary={<>{g.location_name}<div className="ga-gate">{g.gate_name}</div></>}
@@ -1516,6 +1527,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
                     <td className="num" data-label="Arrivals a day">{gaN1(g.arrivals_per_day)}</td>
                     <td className="num" data-label="Average gap">{g.gap_minutes == null ? "none" : gaMin(g.gap_minutes)}</td>
                     <td className="num" data-label="Check-in a lorry">{g.gate_minutes == null ? "not typed" : `${+g.gate_minutes} min`}</td>
+                    <td className="num" data-label="Busiest hour" data-ga-busy={g.busiest_hour && g.busiest_hour.lorries ? g.busiest_hour.lorries : 0}>{gaBusyCell(g.busiest_hour)}</td>
                     <td className="rd-status" data-label="Status"><RowStatus word={gaFlagWord(g)} tone={gaTone(g)} /></td>
                   </>}>
                   <RdItem t="Location">{g.location_name}</RdItem>
@@ -1526,6 +1538,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
                   {(g.per_team || []).map((t, i) => <RdItem key={i} t={`${teamText(t.team) || "—"}, a day`}>{gaN1(t.arrivals_per_day)}</RdItem>)}
                   <RdItem t="Average gap" wide>{g.gap_minutes == null ? "No approved arrivals." : `One every ${gaMin(g.gap_minutes)} ${GA_SPREAD}.`}</RdItem>
                   <RdItem t="Check-in" >{g.gate_minutes == null ? "Not typed: nothing is compared." : `${+g.gate_minutes} min a lorry`}</RdItem>
+                  <RdItem t="Busiest hour" wide>{gaBusyWords(g.busiest_hour)}</RdItem>
                   <RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>
                   <RdItem t="Open">{g.open_basis === "gate" ? `${g.open_hours}${g.closed_days ? `, ${g.closed_days}` : ""}${g.peak_minutes ? ` (less ${g.peak_minutes} min of no-delivery peak bands)` : ""}` : null}</RdItem>
                   <RdItem t="Not all of this gate's traffic" wide>{g.origin_share_note}</RdItem>
@@ -1538,6 +1551,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
         </details>
       )}
       {(ga.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
+      {ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}
     </section>
   );
 }
