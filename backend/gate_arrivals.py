@@ -117,6 +117,37 @@ def trips_for(row, factors):
     return int(derived.day_figures(row.get("quantity"), ctx, factors)["trips"])
 
 
+def entry_gate(loc, named, loc_gates):
+    """
+    (resolved, blocked) — the gate a lorry ARRIVES by at `loc`: gates.resolve(loc, 'entry', the route's named gate).
+    A named gate that is inactive or no longer recorded (`blocked`) still has lorries arriving, so they are counted at
+    the location's default entry gate. 16 Oct 2026 (S3): pulled out of arrivals() so the simulation (sim.py) and
+    week_by_day() resolve every end by this one rule.
+    """
+    r = gates.resolve(loc, "entry", named, gates=loc_gates)
+    blocked = r.get("blocked")
+    if blocked:
+        r = gates.resolve(loc, "entry", None, gates=loc_gates)
+    return r, blocked
+
+
+def judge(arr_raw, open_m, gm):
+    """
+    The panel's verdict for one gate, from arrivals a day (raw), its open minutes and its check-in minutes:
+    {gap, cap_raw, cap_pct, red, amber, flag}. RED when the DISPLAYED gap (one decimal place) is shorter than the
+    check-in; AMBER "Queue likely" at gate_hours.NEAR_PCT % of capacity or more; no check-in typed, never compared.
+    16 Oct 2026 (S3): pulled out of arrivals() unchanged, so the simulation's day is judged by the same rule.
+    """
+    total = arr_raw is not None and arr_raw > 0
+    gap = r1(open_m / arr_raw) if (total and open_m > 0) else (0.0 if total else None)
+    red = gm is not None and gap is not None and gap < gm
+    cap_raw = gate_hours.capacity(open_m, gm)
+    cap_pct = (round(arr_raw * 100.0 / cap_raw) if (cap_raw and total) else None)
+    amber = (not red) and cap_raw is not None and total and arr_raw * 100.0 / cap_raw >= gate_hours.NEAR_PCT - 1e-9
+    return {"gap": gap, "cap_raw": cap_raw, "cap_pct": cap_pct, "red": red, "amber": amber,
+            "flag": "red" if red else ("amber" if amber else None)}
+
+
 def _new_gate_acc():
     return {"laden": 0, "empty": 0, "team_trips": {}, "roles": set(), "pending_roles": set(),
             "pending_trips": 0, "pending_lines": 0, "fallthrough": set()}
@@ -192,14 +223,11 @@ def arrivals(month_index, acc, factors=None, working_days=None):
                 continue
             named = route.get(gate_key)
             loc_gates = gbl.get(loc["id"]) or []
-            r = gates.resolve(loc, "entry", named, gates=loc_gates)
-            blocked = r.get("blocked")
+            # the route names a gate that is inactive or no longer recorded: resolve refuses to pick another (the bake
+            # must not quietly move to a different road), but the lorries on an approved line still arrive, so
+            # entry_gate counts them at the location's default entry gate, and a note here says so.
+            r, blocked = entry_gate(loc, named, loc_gates)
             if blocked:
-                # the route names a gate that is inactive or no longer recorded. resolve
-                # refuses to pick another (the bake must not quietly move to a different
-                # road), but the lorries on an approved line still arrive: count them at
-                # the location's default entry gate and say so in a note.
-                r = gates.resolve(loc, "entry", None, gates=loc_gates)
                 b = blocked_at.setdefault((loc["id"], named), {
                     "loc": loc, "blocked": dict(blocked), "to": r.get("gate_name"), "routes": set()})
                 b["routes"].add(route["id"])
@@ -239,19 +267,16 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         # no-delivery windows), else the scheme's shift — gate_hours.open_minutes, the one rule
         om = gate_hours.open_minutes(grow, factors)
         open_g = om["minutes"]
-        gap = r1(open_g / arr_raw) if (total > 0 and open_g > 0) else (0.0 if total > 0 else None)
         gm = grow.get("safety_minutes")
         gm = float(gm) if gm is not None else None
-        red = gm is not None and gap is not None and gap < gm
         # 14 Oct 2026 (the Dashboard's gate chart): the gate's CAPACITY, the most lorries it can check in a day if they
         # arrive evenly = the open minutes ÷ its check-in minutes a lorry — the red rule turned round (gap < check-in
         # ⇔ arrivals > capacity), sent from here so the browser only draws it. No check-in typed: no capacity.
-        cap_raw = gate_hours.capacity(open_g, gm)
+        # 14 Oct 2026 (W17, the user's 85 % step): amber "Queue likely" at 85 % of capacity or more, below the red rule.
+        # 16 Oct 2026 (S3): the rule lives in judge(), which the simulation's day reads too
+        jd = judge(arr_raw, open_g, gm)
+        gap, red, cap_raw, cap_pct, amber, flag = jd["gap"], jd["red"], jd["cap_raw"], jd["cap_pct"], jd["amber"], jd["flag"]
         cap = r1(cap_raw) if cap_raw is not None else None
-        cap_pct = (round(arr_raw * 100.0 / cap_raw) if (cap_raw and total > 0) else None)
-        # 14 Oct 2026 (W17, the user's 85 % step): amber "Queue likely" at 85 % of capacity or more, below the red rule
-        amber = (not red) and cap_raw is not None and total > 0 and arr_raw * 100.0 / cap_raw >= gate_hours.NEAR_PCT - 1e-9
-        flag = "red" if red else ("amber" if amber else None)
         roles = g["roles"] or g["pending_roles"]
         role = "both" if len(roles) == 2 else (next(iter(roles)) if roles else "destination")
         teams = sorted(((team_name(k), k) for k in g["team_trips"]),
@@ -425,10 +450,7 @@ def week_by_day(lines, factors=None, dates=None):
             loc = locations.get(route.get(loc_key))
             if not loc:
                 continue
-            loc_gates = gbl.get(loc["id"]) or []
-            r = gates.resolve(loc, "entry", route.get(gate_key), gates=loc_gates)
-            if r.get("blocked"):
-                r = gates.resolve(loc, "entry", None, gates=loc_gates)
+            r, _blocked = entry_gate(loc, route.get(gate_key), gbl.get(loc["id"]) or [])
             gid = r.get("gate_id")
             if gid is None:
                 continue

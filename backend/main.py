@@ -63,6 +63,7 @@ import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one 
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
+import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -3468,7 +3469,46 @@ def gate_arrivals_month(month: Optional[int] = None):
     if not (1 <= int(month) <= MONTH_COUNT):
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
     factors = conversions.load_factors()
-    return gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=_working_days(factors))
+    wd = _working_days(factors)
+    out = gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=wd)
+    # 16 Oct 2026 (S3): the busiest clock hour at each gate, from the simulation's average day (sim.py, the one engine;
+    # no pour, the gates as typed). Never fails the panel: a day that cannot be simulated adds nothing.
+    b = sim.busiest(int(month), acc, factors, wd, out)
+    for g in out.get("gates") or []:
+        g["busiest_hour"] = (b.get("gates") or {}).get(g["gate_id"])
+    out["busiest_note"] = b.get("note")
+    return out
+
+
+@app.get("/api/sim/day")
+def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None),
+            check_in: Optional[List[str]] = Query(None), bands: Optional[str] = None,
+            pour_gate: Optional[str] = None, pour_start: Optional[str] = None, pour_m3: Optional[str] = None,
+            pour_m3_per_load: Optional[str] = None, pour_rate: Optional[str] = None, legs: Optional[str] = None):
+    """
+    16 Oct 2026 (S3) — the haulage simulation: an average working day of one month at every gate, lorry by lorry
+    (sim.py; the example the user approved on 16 Oct is its spec). Whole loads per line, each gate's arrivals spread
+    evenly over its open hours less the no-delivery bands (D59), an optional concrete pour as a burst, one lane at each
+    gate, the busiest hour, the bottleneck (D85), the minutes lost, late check-ins (D89). The scenario is these query
+    parameters and nothing else: no write, nothing saved, no link (D86). Any signed-in code, like the Gate arrivals
+    panel; a team code sees other teams' lines by route only. `legs=1` adds each route's line for the drawing.
+    400 in words for a scenario that cannot be simulated (a window past midnight, D93; a pour past midnight).
+    """
+    acc = _require_access()
+    if month is None:
+        import datetime as _dt
+        month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
+    if not (1 <= int(month) <= MONTH_COUNT):
+        raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    factors = conversions.load_factors()
+    try:
+        sc = sim.scenario_from_query(hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
+                                     pour_start=pour_start, pour_m3=pour_m3, pour_m3_per_load=pour_m3_per_load,
+                                     pour_rate=pour_rate)
+        return sim.day(int(month), acc, factors=factors, working_days=_working_days(factors), scenario=sc,
+                       send_lines=str(legs or "").lower() in ("1", "true", "yes"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/clp/monitoring")

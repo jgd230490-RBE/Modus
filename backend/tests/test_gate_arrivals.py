@@ -486,7 +486,13 @@ ok("a pending-only gate would list with no approved arrivals: gap None and the n
 #  7. The endpoint                                                             #
 # =========================================================================== #
 ep = main.gate_arrivals_month(9)
-ok("the endpoint: main.gate_arrivals_month(9) returns the same dict as gate_arrivals.arrivals(9, acc, …)", ep == res)
+# NARROWED 16 Oct 2026 (S3): the endpoint adds the simulation's busiest hour to each gate (busiest_hour) and one note
+# (busiest_note); everything arrivals() sends is unchanged
+_ep_core = {k: v for k, v in ep.items() if k != "busiest_note"}
+_ep_core["gates"] = [{k: v for k, v in g.items() if k != "busiest_hour"} for g in ep["gates"]]
+ok("the endpoint: main.gate_arrivals_month(9) returns gate_arrivals.arrivals(9, acc, …) plus each gate's busiest hour and its note",
+   _ep_core == res and all("busiest_hour" in g for g in ep["gates"]) and "busiest_note" in ep
+   and all((g["busiest_hour"] or {}).get("lorries", 0) > 0 for g in ep["gates"] if g["arrivals_per_day"] > 0))
 e0, e61 = _raises(lambda: main.gate_arrivals_month(0)), _raises(lambda: main.gate_arrivals_month(61))
 ok("month 0 and 61 raise 400 with the sentence",
    getattr(e0, "status_code", None) == 400 and getattr(e61, "status_code", None) == 400 and "month must be 1..60" in str(e0))
