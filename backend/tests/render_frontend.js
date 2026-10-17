@@ -576,7 +576,10 @@ if (loaded) {
         && !/IPT ?[1-6]/.test(gP) && !/G00[1-9]|\bL[1-9]\b|\bR[1-9]\b|scheme</.test(gP.replace(/data-ga-gate="G00\d"|(?:id|aria-controls|data-rd|data-rd-details)="(?:rd-)?ga-G00\d"/g, "")));
       ok("the month's words under the header, and the two notes under the table, in the server's words",
         // NARROWED 11 Oct 2026 (review): "every teams" was ungrammatical — "all teams together"
-        gP.includes("Sep 2026: lorries a day at each gate, all teams together, if arrivals are spread evenly across the 10 h shift.") && !gP.includes("every teams")
+        // NARROWED 17 Oct 2026: the gates rest on their hours, the default gate hours where none are typed (07:00–17:00 set on
+        // Config by test_gate_arrivals, which writes this fixture), never the lorry shift
+        gP.includes("Sep 2026: lorries a day at each gate, all teams together, if arrivals are spread evenly across each gate&#x27;s open hours (07:00–17:00, the default, where none are typed).")
+        && !gP.includes("h shift") && !gP.includes("every teams")
         && GA.notes.every(n => gP.includes(n.replace(/'/g, "&#x27;"))) && gP.indexOf("</table>") < gP.indexOf("Averages only, if arrivals are spread evenly"));
       const GAT = { ...GA, scope: "team", gates: GA.gates.map(g => ({ ...g, per_team: g.per_team.filter(t => t.team === "Team 2") })) };
       const tOut = render("the Dashboard renders a team code's gate arrivals (per_team already stripped by the server)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAT, onOpen(){} }));
@@ -904,10 +907,12 @@ if (loaded) {
         && (gS.match(/data-row-status="bad"/g) || []).length === GW.gates.slice(0, 6).reduce((n, g) => n + g.days.filter(d => d.flag === "red").length, 0)
         && gS.includes(`${GW.gates[0].days[0].day}: Over gate capacity (${GW.gates[0].days[0].pct} %)`));
       ok("W17: a gate with no check-in says nothing is compared; each gate says what it can check in and how",
-        gS.includes("No check-in time typed: nothing is compared.") && gS.includes("Can check in 200 a day (the shift ÷ 3 min a lorry).")
-        && gS.includes("Can check in 300 a day (the shift ÷ 2 min a lorry)."));
+        // NARROWED 17 Oct 2026: the hours the capacity rests on are named (the default gate hours here), never "the shift"
+        gS.includes("No check-in time typed: nothing is compared.") && gS.includes("Can check in 200 a day (open 07:00–17:00 by default ÷ 3 min a lorry).")
+        && gS.includes("Can check in 300 a day (open 07:00–17:00 by default ÷ 2 min a lorry).") && !gS.includes("the shift ÷"));
       ok("🔴 W17: the honest limit and the week-split sentence are printed under the gates",
-        gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours; no hourly peak is known.")
+        // NARROWED 17 Oct 2026: the limit names the shut times and the bands
+        gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours, less its shut times and the no-delivery bands; no hourly peak is known.")
         && gS.includes("so a day can be busier than the Dashboard&#x27;s month average"));
       ok("W17: without the week's gates (an older page) the card is not drawn", !commitOut.includes('data-gates-week="1"'));
     }

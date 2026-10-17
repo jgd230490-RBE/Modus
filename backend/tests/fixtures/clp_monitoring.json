@@ -386,7 +386,7 @@
    "to": "19:00"
   }
  ],
- "peak_words": "No deliveries 07:00–10:00 and 16:00–19:00 (the CLP's peak bands, taken off each gate's open hours where they are typed).",
+ "peak_words": "No deliveries 07:00–10:00 and 16:00–19:00 (the CLP's peak bands, taken off each gate's open hours: 08:00–17:00 where none are typed).",
  "scope": "scheme",
  "scope_line": "Every team's approved lines.",
  "limit": "Planned figures, not observed: Wayscope holds no gate log or arrival times.",

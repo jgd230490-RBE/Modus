@@ -606,7 +606,9 @@ _moved = {   # inventory §1 row → its key phrase in the technical guide
     "1 ...the CO₂e formula and the factor wording": "DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config)",
     "1 ...peak fleet": "the largest same-month sum of vehicles needed across the lines in view",
     "2 the gate arrivals read": "<code>GET /api/gates/arrivals?month=N</code>",
-    "2 ...and its rule": "The gap is the shift's minutes ÷ arrivals, an average with no hourly",
+    # NARROWED 17 Oct 2026: the gap is the gate's open minutes (its hours or the default gate hours, less its shut times
+    # and the bands), no longer the shift's
+    "2 ...and its rule": "The gap is the gate's open minutes ÷ arrivals, an average with no hourly",
     "3 stored per km": "stored per km whatever unit the tenant reads",
     "4 the target rate's own endpoint": "its own endpoint, saved separately from the configuration document",
     "5 ADMIN_TOKEN": "It is checked against <code>ADMIN_TOKEN</code> on Render",
@@ -666,7 +668,10 @@ ok("E (W5): the guide says the left menu shows icons only below 768 px and opens
 # and the two steps are named: gold "Queue likely" from 85 %, red "Over gate capacity" past it
 ok("the guide explains the gate chart: the track, the bar, the marker, capacity worked out, the 85 % step, red and grey, Gate by gate",
    "<strong>Gate arrivals</strong> shows" in src and "its open minutes ÷ the check-in time a lorry" in src
-   and "less any no-delivery peak bands set on Configuration → Planning" in src
+   # NARROWED 17 Oct 2026: the default gate hours where none are typed, and the gate's shut times come off with the bands
+   and "a gate with no hours typed is open the default gate hours, 08:00 to 17:00 unless changed on Configuration → Planning" in src
+   and "less its shut times and any no-delivery peak bands set on Configuration → Planning (a shut time inside a band counts once)" in src
+   and "a gate with no hours typed uses the shift" not in src and "9 hours at 3 minutes a lorry is 180 a day" in src
    and "<strong>Queue likely</strong>" in src and "<strong>Over gate capacity</strong>" in src
    and "A grey bar has no check-in time typed" in src and "<strong>Gate by gate</strong> under the chart opens the table" in src)
 # 14 Oct 2026 (bundle G, W7): the CLP monitoring section, in the guide and its contents, with the honest limit
@@ -682,7 +687,12 @@ ok("⭐ the guide's §3.5 CLP monitoring: in the contents, says planned not obse
 # 14 Oct 2026 (bundle G, W8 + W17): the new fields and the gates week, in the guide where a person looks for them
 ok("⭐ the guide names the W8 fields where they are typed: the CLP cap (Locations), open hours (the gates), the peak bands (Planning), the Euro class (Vehicles)",
    "<strong>CLP cap (optional)</strong> — the most lorry visits a day the Construction Logistics Plan allows at the site" in src
-   and "<strong>Open hours (optional)</strong> — from and to, and the days the gate is open; blank uses the scheme's shift, every day." in src
+   # NARROWED 17 Oct 2026: blank = the default gate hours; the shut times are named where they are typed
+   and "<strong>Open hours (optional)</strong> — from and to, and the days the gate is open; blank uses the default gate hours (08:00 to 17:00 unless changed on Configuration → Planning), every day." in src
+   and "<strong>Shut during the day (optional)</strong> — up to four times inside its hours when the gate takes no lorries" in src
+   and "<strong>Default gate hours</strong> (when a gate with no hours of its own is open: 08:00 to 17:00 unless you change them" in src
+   and "blank uses the scheme's shift" not in src
+   and "<tr><td>Gate open hours</td><td>08:00 to 17:00 every day, no shut times, until typed on the gate" in src
    and "<strong>No-delivery peak bands (from the CLP)</strong>" in src and "Wayscope holds no arrival times, so it cannot check that lorries keep out of them." in src
    and "<strong>Euro class</strong> (optional: what the plan assumes the hauliers will send for that vehicle type" in src)
 ok("⭐ the guide's Commit view explains Gates this week, the 85 % step and the honest limit; §12.1 lists GATE OVER / NEAR CAPACITY",

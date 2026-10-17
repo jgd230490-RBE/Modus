@@ -200,6 +200,9 @@ CLOSURE = zones.create_zone("A closure", {"type": "Polygon", "coordinates": [[[0
 ok("⭐ the column is in the DDL (the SQLite rebuild keeps only those) AND ALTERed on an existing database",
    "access_zone_id          TEXT" in db._TENANT_DDL["location_gates"]
    and '("location_gates", "access_zone_id", "TEXT")' in read("backend/db.py"))
+ok("⭐ 17 Oct 2026: the gate's shut windows column too — in the DDL AND ALTERed (or the SQLite rebuild drops it)",
+   "shut_windows            TEXT" in db._TENANT_DDL["location_gates"]
+   and '("location_gates", "shut_windows", "TEXT")' in read("backend/db.py"))
 gq = gates.create_gate("L1", "Quarry gate", GQ[1], GQ[0], direction="both", is_default=True, access_zone_id=ZQ, internal_travel_minutes=6)
 gin = gates.create_gate("L2", "North gate (in)", GIN[1], GIN[0], direction="access", is_default=True, access_zone_id=ZIN,
                         internal_travel_minutes=3, safety_minutes=4)
@@ -363,7 +366,7 @@ _fe = read("frontend/index.html")
 ok("⭐ the gate form: 'Access road from the public road', a choice of the drawn haul roads or 'None drawn', sent as null when blank",
    "Access road from the public road" in _fe and '<option value="">None drawn</option>' in _fe
    and "(haulRoadList || []).map(z => <option key={z.id} value={z.id}>{z.name}</option>)" in _fe
-   and "access_zone_id: gateForm.access_zone_id || null," in _fe and 'access_zone_id: g.access_zone_id || "" });' in _fe)
+   and "access_zone_id: gateForm.access_zone_id || null," in _fe and 'access_zone_id: g.access_zone_id || "", shut_windows:' in _fe)
 ok("⭐ the gate list says each gate's access road, or 'no access road drawn' in amber",
    "access road: {((haulRoadList || []).find(z => z.id === g.access_zone_id) || {}).name || g.access_zone_id}" in _fe
    and 'className="text-[10px] text-amber-700" data-gate-access-missing={g.id}' in _fe and "no access road drawn" in _fe)

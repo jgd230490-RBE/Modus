@@ -463,6 +463,29 @@ ok("⭐ the LONGEST case (400 characters in all four fields, eight limits over, 
    and SL["body_size"] < export.RS_BODY_SIZES[0], f"{SL['body_size']} {SL['lowest_y']:.1f} {SL['footer_top']:.1f}")
 ok("...the sizes step 8.4, 7.8, 7.2 and the normal case keeps the largest", export.RS_BODY_SIZES == (8.4, 7.8, 7.2)
    and S["body_size"] == 8.4)
+
+# 17 Oct 2026 (the user): the default gate hours (08:00–17:00) and a gate's shut times, on the drivers' sheet
+ok("⭐ a gate with no hours typed never has the default printed as its own: `hours` stays None, the default rides beside",
+   S["exit"]["hours"] is None and S["exit"]["default_hours"] == "08:00–17:00" and S["entry"]["default_hours"] is None
+   and S["entry"]["hours"] == "07:00–18:00", f"{S['entry']} {S['exit']}")
+_arr0, _lv0 = export.route_sheet_lines(dict(S, entry=dict(S["entry"], hours=None, default_hours="08:00–17:00")))
+ok("...an untyped gate in reads 'Open hours: none typed for this gate (planned on 08:00–17:00, the default)' — not 'Not typed'",
+   _arr0[1] == "Open hours: none typed for this gate (planned on 08:00–17:00, the default), closed on Saturdays and Sundays"
+   and "Not typed" not in _arr0[1], str(_arr0))
+gates.update_gate(G_IN["id"], shut_windows=[{"from": "12:00", "to": "12:30"}, {"from": "08:30", "to": "09:15"}])
+S2 = rs.sheet("R1", acc=PLANNER)
+P2 = export.build_route_sheet_pdf(S2)
+T3 = flat(P2)
+ok("⭐ the gate in's shut times print on their own line ('Gate shut 08:30–09:15 and 12:00–12:30'), the sheet still one page",
+   S2["entry"]["name"] == "North gate" and S2["entry"]["shut"] == "08:30–09:15 and 12:00–12:30"
+   and "Gate shut 08:30–09:15 and 12:00–12:30" in T3 and P2.count(b"/Type /Page\n") == 1, T3[:500])
+_arr1, _lv1 = export.route_sheet_lines(dict(S2, exit=dict(S2["exit"], shut="12:00–12:30")))
+ok("...a different gate out names its own shut times on the 'Gate out' line; one gate both ways does not repeat them",
+   _lv1[0] == "Gate out: South gate (shut 12:00–12:30)"
+   and export.route_sheet_lines(dict(S2, exit=dict(S2["entry"])))[1][0] == "Gate out: North gate", str(_lv1))
+gates.update_gate(G_IN["id"], shut_windows=[])
+ok("clearing the shut times takes the line off the sheet", rs.sheet("R1", acc=PLANNER)["entry"]["shut"] is None
+   and "Gate shut" not in flat(export.build_route_sheet_pdf(rs.sheet("R1", acc=PLANNER))))
 _lim(None, None, None)
 TE = flat(export.build_route_sheet_pdf(rs.sheet("R3", acc=PLANNER)))
 ok("🔴 a route with no stored road route still makes its page, and says so on the map",

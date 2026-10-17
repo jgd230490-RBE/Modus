@@ -4,6 +4,7 @@
  "working_days": 22.0,
  "shift_hours": 10.0,
  "open_minutes": 600.0,
+ "default_hours": "07:00–17:00",
  "scope": "scheme",
  "gates": [
   {
@@ -24,9 +25,12 @@
    "flag": null,
    "status_word": null,
    "open_minutes": 600.0,
-   "open_basis": "shift",
-   "open_hours": null,
+   "open_basis": "default",
+   "open_hours": "07:00–17:00",
    "peak_minutes": 0.0,
+   "shut_windows": [],
+   "shut_minutes": 0.0,
+   "shut_words": null,
    "closed_days": null,
    "reason": "One every 2.4 min if arrivals are spread evenly, against a 2 min check-in: spacing holds on the average. No hourly peak is typed.",
    "pending_lines": 1,
@@ -70,9 +74,12 @@
    "flag": "red",
    "status_word": "Over gate capacity",
    "open_minutes": 600.0,
-   "open_basis": "shift",
-   "open_hours": null,
+   "open_basis": "default",
+   "open_hours": "07:00–17:00",
    "peak_minutes": 0.0,
+   "shut_windows": [],
+   "shut_minutes": 0.0,
+   "shut_words": null,
    "closed_days": null,
    "reason": "231.8 arrivals a day, one every 2.6 min if arrivals are spread evenly, shorter than the 3 min check-in: a queue even with perfect spacing.",
    "pending_lines": 0,
@@ -112,9 +119,12 @@
    "flag": null,
    "status_word": null,
    "open_minutes": 600.0,
-   "open_basis": "shift",
-   "open_hours": null,
+   "open_basis": "default",
+   "open_hours": "07:00–17:00",
    "peak_minutes": 0.0,
+   "shut_windows": [],
+   "shut_minutes": 0.0,
+   "shut_words": null,
    "closed_days": null,
    "reason": "No check-in time typed for this gate, so nothing is compared.",
    "pending_lines": 1,
@@ -134,9 +144,9 @@
  ],
  "notes": [
   "1 pending line in Sep 2026 would add 5.0 lorries a day (10.0 gate arrivals across the gates below); they are not in the figures.",
-  "Averages only, if arrivals are spread evenly across the 10 h shift. No hourly peak is typed."
+  "Averages only, if arrivals are spread evenly across each gate's open hours (07:00–17:00 where none are typed). No hourly peak is typed."
  ],
  "near_pct": 85,
  "peak_bands": [],
- "limit": "Planned arrivals spread evenly over the gate's open hours; no hourly peak is known."
+ "limit": "Planned arrivals spread evenly over the gate's open hours, less its shut times and the no-delivery bands; no hourly peak is known."
 }

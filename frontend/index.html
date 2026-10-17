@@ -1604,7 +1604,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
       plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1, callbacks: {
         title: (items) => items.length ? `${rowsC[items[0].dataIndex].g.location_name}, ${rowsC[items[0].dataIndex].g.gate_name}` : "",
         label: (item) => { const r = rowsC[item.dataIndex]; return [`${gaN1(r.g.arrivals_per_day)} lorries a day ${GA_SPREAD}`,
-          r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? ", the default" : ""}${r.g.peak_minutes ? `, less ${r.g.peak_minutes} min of peak bands` : ""}${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`,
+          r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? " by default" : ""}${r.g.peak_minutes ? `, less ${r.g.peak_minutes} min of peak bands` : ""}${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`,
           gaFlagWord(r.g)]; } } } },
       scales: { x: { min: 0, suggestedMax: xTop, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: gaFs } },
                      title: { display: true, text: "lorries a day", font: { size: gaFs } } },
@@ -7205,7 +7205,7 @@ function GatesWeek({ gw }){
           <div key={g.gate_id} className="gw-gate" data-gw-gate={g.gate_id} data-gw-flag={g.flag || "none"}>
             <div className="text-sm font-semibold text-slate-700">{g.location_name}<span className="text-slate-400 font-normal"> · {g.gate_name}</span></div>
             <div className="clp-note">{g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
-              : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? ", the default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
+              : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? " by default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
             <ChartCanvas config={gwCfg(g, gw.days)} />
             <div className="gw-days">
               {g.days.filter(d => d.flag).map(d => (

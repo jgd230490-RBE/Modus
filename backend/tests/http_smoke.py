@@ -881,6 +881,30 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and any(g["gate_name"] == "Weighbridge (in)" and g.get("fallthrough_routes") for g in ga.get("gates", [])))
     ok("🔴 nothing in month 9 is red, and the response says so in words rather than inventing a peak",
        all(g.get("flag") is None for g in ga.get("gates", [])) and any("No hourly peak is typed" in n for n in ga.get("notes", [])))
+    # 17 Oct 2026 (the user: "default time for gates should be 0800-1700"): the demo types no gate hours, so every gate is on
+    # the default — 540 open minutes, its hours in words — and the note says so
+    ok("⭐ the demo's gates (none typed) are open the default 08:00–17:00: 540 open minutes each, said in the note",
+       ga.get("default_hours") == "08:00–17:00" and ga.get("gates")
+       and all(g["open_basis"] == "default" and g["open_hours"] == "08:00–17:00" and g["open_minutes"] == 540.0
+               and g["shut_windows"] == [] for g in ga.get("gates", []))
+       and any("(08:00–17:00 where none are typed)" in n for n in ga.get("notes", [])), str(ga.get("notes")))
+    _hbid = hb.get("gate_id")
+    r = c.patch(f"/api/admin/gates/{_hbid}", params=TOKEN, json={"shut_windows": [{"from": "12:00", "to": "12:30"}]})
+    ok("⭐ PATCH a shut time on Harborough's gate (the admin write): stored and read back, nothing to route again",
+       r.status_code == 200 and r.json().get("shut_windows") == [{"from": "12:00", "to": "12:30"}]
+       and r.json().get("rebake_needed") is False, r.text[:200])
+    _hb2 = {g["gate_id"]: g for g in c.get("/api/gates/arrivals?month=9", headers=PLAN).json().get("gates", [])}.get(_hbid) or {}
+    ok("...and Gate arrivals takes it off: 510 open minutes, the shut time in words",
+       _hb2.get("open_minutes") == 510.0 and _hb2.get("shut_words") == "12:00–12:30" and _hb2.get("shut_minutes") == 30.0, str(_hb2)[:200])
+    r = c.patch(f"/api/admin/gates/{_hbid}", params=TOKEN, json={"shut_windows": [{"from": "18:00", "to": "19:00"}]})
+    ok("🔴 a shut time outside the gate's hours is refused in words (and the stored one stays)",
+       r.status_code == 200 and r.json().get("error") == "shut time 18:00–19:00 is outside the open hours 08:00–17:00 (the default)"
+       and ({g["gate_id"]: g for g in c.get("/api/gates/arrivals?month=9", headers=PLAN).json().get("gates", [])}.get(_hbid) or {}).get("shut_words") == "12:00–12:30",
+       r.text[:200])
+    r = c.patch(f"/api/admin/gates/{_hbid}", json={"shut_windows": []})
+    ok("🔴 the shut times are an admin write: no token, no change", r.status_code in (401, 403), str(r.status_code))
+    r = c.patch(f"/api/admin/gates/{_hbid}", params=TOKEN, json={"shut_windows": []})
+    ok("...an empty list clears them", r.status_code == 200 and r.json().get("shut_windows") == [], r.text[:200])
     ok("🔴 the banned words appear nowhere in the planner's response",
        not re.search(r"real-time|live tracking|telematics|optimi[sz]|predict|\bAI\b|\btrucks?\b|booking|peak hour", r.text, re.I))
     r = c.get("/api/gates/arrivals?month=10", headers=PLAN)
