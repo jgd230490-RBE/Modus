@@ -1076,6 +1076,17 @@ ok("ui_audit.js says it is not in the default suite, what it measures (sideways 
    "NOT PART OF THE DEFAULT SUITE" in _audit and "WHAT IT DOES NOT PROVE" in _audit
    and all(s in _audit for s in ("no-sideways-scroll", "axe-wcag", "targets-24px", "focus-visible", "wcag22aa", "2.5.8", "2.4.7"))
    and 'exclude: [[".mapboxgl-ctrl-attrib"]]' in _audit and "passed, ${FAIL.length} failed" in _audit)
+# 17 Oct 2026 (the capture fixes, claude/ui-audit-capture): a stop must picture what it claims. The error and offline
+# stops go back to the app before they are taken and assert the app's title and header (they had been pictures of the
+# landing page's error page); a grown phone shot counts the tab bar under the scroller (every phone shot had lost its
+# last ~57 px); a grown viewport is measured again and grown again (the chart boxes are sized in vh, so the content
+# grows with the viewport); the dead link is loaded afresh after the public view's map has settled (a goto that
+# changes only the hash is no load, and the app reads an email link once, as the page loads).
+ok("ui_audit.js captures what its stops claim: the app comes back before the error stops, the tab bar is in a grown "
+   "phone shot, a grown viewport is measured again, the dead link is a fresh load",
+   all(s in _audit for s in ("function contentHeight()", "innerHeight - r.bottom", "page.evaluate(contentHeight)",
+                             "the stop is the app's ${want} page", "shows the failure it is named for",
+                             'page.goto("about:blank")', "embeddedMap(page)")))
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

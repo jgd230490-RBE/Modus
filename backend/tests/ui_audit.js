@@ -31,7 +31,9 @@
  *     - the look and accent asked for are the ones on <html>, and the page is the one named (its header)           (fail)
  *     - text smaller than 12 px (charts' SVG text included), labels cut with an ellipsis, a native confirm()/alert()  (warn)
  *     - a screenshot: the real fold first; when the page or the portal's scroller is taller, the viewport is grown to
- *       the content (max 4,000 px, marked when cut). Never for the map.
+ *       the content — the scroller plus what sits above and below it (on a phone the tab bar) — then measured again
+ *       and grown again until the height holds (the chart boxes are sized in vh and grow with the viewport); max
+ *       4,000 px, marked when cut. Never for the map.
  *   once per screen, at the widest width of the run, in the first look (the "deep" stops):
  *     - keyboard: from the top of the page, Tab up to 40 times; every stop must show a visible change (WCAG 2.4.7;
  *       a transparent outline is no outline), be on screen, not be the same element twice in a row (a trap); the
@@ -237,7 +239,6 @@ function domChecks(arg) {
   // a document whose root or body is overflow:hidden cannot be scrolled by a reader, whatever its scrollHeight says
   const rootHidden = /hidden|clip/.test(getComputedStyle(doc).overflowY) || /hidden|clip/.test(getComputedStyle(document.body).overflowY);
   const docScrolls = !rootHidden && doc.scrollHeight > doc.clientHeight + 4;
-  const mainScrolls = !!main && main.scrollHeight > main.clientHeight + 4;
   const header = document.querySelector('[data-guide="page-header"] h2');
   const out = { vw: innerWidth, vh: innerHeight, theme: doc.getAttribute("data-theme"), accent: doc.getAttribute("data-accent"), title: document.title,
     pageTitle: header ? header.textContent.trim() : null, signedIn: !!document.querySelector('[data-guide="rail"], .phone-tabs'),
@@ -245,7 +246,6 @@ function domChecks(arg) {
     docHScroll: doc.scrollWidth > doc.clientWidth + 1 ? doc.scrollWidth - doc.clientWidth : 0,
     mainHScroll: main && main.scrollWidth > main.clientWidth + 1 ? main.scrollWidth - main.clientWidth : 0,
     docVScroll: docScrolls ? doc.scrollHeight - doc.clientHeight : 0,
-    contentH: mainScrolls ? main.scrollHeight + main.getBoundingClientRect().top : docScrolls ? doc.scrollHeight : 0,
     h1: document.querySelectorAll("h1").length, offRight: [], innerScroll: [], tinyTargets: [], smallTargets: [], smallText: [], clipped: [], masks: [] };
   // what pokes out to the right (the cause of a sideways scroll, when there is one), and what extends a fixed page downwards
   if (out.docHScroll || out.mainHScroll) {
@@ -444,16 +444,46 @@ async function settle(page, store, quiet = 700, cap = 15000) {
   await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))).catch(() => {});
   return Date.now() - t0;
 }
+// how tall the viewport must be to show the whole page (0 when nothing scrolls). Runs inside the page. The portal's
+// own scroller (<main.overflow-auto>, else the last <main>) when it scrolls: its content plus what sits ABOVE it (the
+// header, the demo bar) and BELOW it — on a phone the tab bar, .phone-tabs, a flex sibling under the scroller; left
+// out of the sum until 17 Oct, every phone shot lost its last ~57 px under the bar. Else a document that scrolls: its
+// scrollHeight. A root or body that is overflow:hidden cannot be scrolled by a reader, whatever its scrollHeight says.
+function contentHeight() {
+  const doc = document.documentElement;
+  const mains = [...document.querySelectorAll("main")];
+  const main = document.querySelector("main.overflow-auto") || mains[mains.length - 1] || null;
+  if (main && main.scrollHeight > main.clientHeight + 4) {
+    const r = main.getBoundingClientRect();
+    return Math.ceil(main.scrollHeight + r.top + Math.max(0, innerHeight - r.bottom));
+  }
+  const rootHidden = /hidden|clip/.test(getComputedStyle(doc).overflowY) || /hidden|clip/.test(getComputedStyle(document.body).overflowY);
+  return !rootHidden && doc.scrollHeight > doc.clientHeight + 4 ? doc.scrollHeight : 0;
+}
 async function shoot(page, file, width, height, contentH, fixed) {
   // the real fold first; a page or a portal scroller taller than the viewport is pictured whole by growing the viewport
   // (never a fixed page: the map re-tiles to the new size and shows a screen no phone shows). A fullscreen window
-  // (the big screen) cannot be resized, and is shot as it is.
+  // (the big screen) cannot be resized, and is shot as it is. Once grown, the content can grow too — the chart boxes
+  // are sized in vh (28vh, capped at 420 px) and a panel can draw late — so the height is measured again and the
+  // viewport grown again until it holds (17 Oct: the 390 px Dashboard, 3,968 px tall, had lost its last gate rows and
+  // the Gate by gate expander below the height measured at the fold).
   const full = await page.evaluate(() => !!document.fullscreenElement).catch(() => false);
-  const want = (!fixed && !full && contentH > height + 4) ? Math.min(Math.ceil(contentH), OPT.maxShot) : height;
-  if (want > height) { await page.setViewportSize({ width, height: want }); await page.waitForTimeout(150); }
+  let want = (!fixed && !full && contentH > height + 4) ? Math.min(Math.ceil(contentH), OPT.maxShot) : height;
+  let truncated = !fixed && contentH > OPT.maxShot, regrown = 0;
+  if (want > height) {
+    await page.setViewportSize({ width, height: want }); await page.waitForTimeout(150);
+    for (let i = 0; i < 4 && want < OPT.maxShot; i++) {
+      await page.waitForTimeout(250);
+      const again = await page.evaluate(contentHeight).catch(() => 0);
+      if (again <= want + 4) break;
+      if (again > OPT.maxShot) truncated = true;
+      want = regrown = Math.min(Math.ceil(again), OPT.maxShot);
+      await page.setViewportSize({ width, height: want }); await page.waitForTimeout(150);
+    }
+  }
   await page.screenshot({ path: file, fullPage: false });
   if (want > height) { await page.setViewportSize({ width, height }); await page.waitForTimeout(100); }
-  return { grown: want > height ? want : 0, truncated: !fixed && contentH > OPT.maxShot };
+  return { grown: want > height ? want : 0, regrown, truncated };
 }
 async function leaveFullscreen(page) {
   await page.evaluate(() => document.fullscreenElement && document.exitFullscreen && document.exitFullscreen()).catch(() => {});
@@ -471,6 +501,7 @@ async function audit(page, store, meta) {
   const fixed = FIXED_PAGES.test(meta.name) || !!meta.fixed;
   const t = await settle(page, store);
   const dom = await page.evaluate(domChecks, { narrow: meta.width < 768, fixed });
+  dom.contentH = await page.evaluate(contentHeight).catch(() => 0);
   const axe = await runAxe(page);
   const drained = drain(store);
   const file = `${meta.name}__${meta.width}__${meta.look}__${meta.accent}.png`.replace(/[^A-Za-z0-9_.+-]/g, "-");
@@ -523,7 +554,7 @@ async function audit(page, store, meta) {
   if (store.settleWhy) warnings.push({ id: "not-settled", detail: store.settleWhy });
   if (shot.truncated) warnings.push({ id: "shot-truncated", detail: { contentH: dom.contentH, maxShot: OPT.maxShot } });
   for (const c of checks) ok(`${label}: ${c.id}`, c.ok, c.ok ? "" : JSON.stringify(c.detail).slice(0, 300));
-  const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
+  const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
                  theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks };
   delete stop.base;
   REPORT.stops.push(stop);
@@ -664,15 +695,26 @@ async function signIn(page, base, how) {
 }
 
 // ---------------------------------------------------------------- the walks ------------------------------------------
-async function waitForMap(page) {
-  // the map is a top-level `let` in a classic script: visible to evaluate by name, not as window.map
+async function waitForMap(target) {
+  // the map is a top-level `let` in a classic script: visible to evaluate by name, not as window.map. `target` is the
+  // map page, or the public view's iframe (embeddedMap)
   const t0 = Date.now();
   while (Date.now() - t0 < 30000) {
-    const st = await page.evaluate(() => { try { return (typeof map !== "undefined" && map && map.loaded && map.loaded()) ? "loaded" : (document.querySelector("#p") ? "password" : "loading"); } catch (e) { return "error:" + e.message; } }).catch(() => "nav");
+    const st = await target.evaluate(() => { try { return (typeof map !== "undefined" && map && map.loaded && map.loaded()) ? "loaded" : (document.querySelector("#p") ? "password" : "loading"); } catch (e) { return "error:" + e.message; } }).catch(() => "nav");
     if (st === "loaded" || st === "password" || st.startsWith("error")) return st;
-    await page.waitForTimeout(300);
+    await new Promise(r => setTimeout(r, 300));
   }
   return "timeout";
+}
+// the public view's map is an iframe (/map/?embed=1): its frame, once it has its address; null when none appears in time
+async function embeddedMap(page, cap = 10000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < cap) {
+    const f = page.frames().find(fr => fr !== page.mainFrame() && /\/map\//.test(fr.url()));
+    if (f) return f;
+    await page.waitForTimeout(200);
+  }
+  return null;
 }
 async function mapStop(page, store, meta) { meta.mapState = await waitForMap(page); return audit(page, store, meta); }
 async function evalCall(page, code) { return page.evaluate(code).then(() => true).catch(e => { note(`${code}: ${String(e.message || e).slice(0, 120)}`); return false; }); }
@@ -839,13 +881,35 @@ async function mapStates(page, store, meta, w, phone) {
   if (await page.locator("#tl-play").count()) { await page.locator("#tl-play").click().catch(() => {}); await page.waitForTimeout(2500); await mapStop(page, store, meta("map-page+playing", w)); await page.locator("#tl-play").click().catch(() => {}); }
 }
 
-// a read that fails, a search with no match, the app offline
+// a read that fails, a search with no match, the app offline. The walk before this ends on the landing page's error
+// page, and gotoPage only sets the hash: so the app comes back first (the session cookie signs it back in; the code
+// again if not), and each error stop asserts that it is the app's page — the title the portal carries, the header the
+// page named — and that the page shows the failure it is named for. Until 17 Oct "forecasts-error" and
+// "offline-lookahead" were pictures of /landing/error.html.
 async function errorStates(page, ctx, store, meta, w) {
+  const base = meta("", w).base;
+  await signIn(page, base, OPT.email ? { email: OPT.email, password: OPT.password } : { code: OPT.code });
+  const appTitle = await page.title();
+  drain(store);
+  // what the page shows for the failure: the app's EmptyState (data-empty="error", an alert) or its inline notice
+  const shown = () => page.evaluate(() => {
+    const re = /did not load|Couldn't load|did not answer|Try again/;
+    const el = document.querySelector('[data-empty="error"], [role="alert"]')
+      || [...document.querySelectorAll("main *")].find(e => re.test(e.textContent) && ![...e.children].some(c => re.test(c.textContent)));
+    if (!el) return "";
+    const how = el.getAttribute("data-empty") ? "data-empty=" + el.getAttribute("data-empty") : el.getAttribute("role") ? "role=" + el.getAttribute("role") : "notice";
+    return how + ": " + el.textContent.trim().replace(/\s+/g, " ").slice(0, 90);
+  }).catch(() => "");
+  const isApp = (stop, want, state) => {
+    stop.errorShown = state || undefined;
+    ok(`${stop.name}: the stop is the app's ${want} page, not a document (title "${stop.title}", header "${stop.pageTitle}")`, stop.title === appTitle && stop.pageTitle === want);
+    ok(`${stop.name}: the page shows the failure it is named for`, !!state, "no error state or notice found on the page");
+  };
   await ctx.route(/\/api\/forecasts(\?|$)/, r => r.abort());
   await gotoPage(page, "dashboard"); await page.waitForTimeout(300);
   await gotoPage(page, "forecasts");
   await page.waitForSelector('[data-empty="error"], [role="alert"]', { timeout: 15000 }).catch(() => {});
-  await audit(page, store, meta("forecasts-error", w));
+  isApp(await audit(page, store, meta("forecasts-error", w, { portal: true, page: "forecasts" })), "Forecasts", await shown());
   await ctx.unroute(/\/api\/forecasts(\?|$)/);
   await gotoPage(page, "dashboard"); await page.waitForTimeout(300); await gotoPage(page, "forecasts");
   await settle(page, store);
@@ -853,7 +917,7 @@ async function errorStates(page, ctx, store, meta, w) {
   if (await search.count()) { await search.fill("zzzz-no-such-line"); await page.waitForTimeout(500); await audit(page, store, meta("forecasts-nomatch", w)); await search.fill(""); }
   await ctx.setOffline(true);
   await gotoPage(page, "lookahead"); await page.waitForTimeout(1500);
-  await audit(page, store, meta("offline-lookahead", w));
+  isApp(await audit(page, store, meta("offline-lookahead", w, { portal: true, page: "lookahead" })), "Look-ahead", await shown());
   await ctx.setOffline(false);
 }
 
@@ -923,12 +987,25 @@ async function walkLogin(browser, base) {
     await page.waitForSelector('[data-guide="rail"]', { timeout: 30000 }).catch(() => {});
     await audit(page, store, meta("login-user-resumed", { portal: true, page: "forecasts" }));   // the page it was on (the hash wins)
     ok("a reload keeps a login signed in (the session cookie)", !!(await page.locator('[data-guide="rail"]').count()), resumed ? "" : "no resume notice seen");
-    // sign out, then a dead invite link
+    // sign out: the public view, whose map is an iframe — let the map finish (loaded, or its password page) and set
+    // its events aside, so nothing of it counts against the next stop (what it did is on the record as a note). Then
+    // a dead invite link, from a BLANK page: the app reads an email link once, as the page loads, and a goto that
+    // changes only the hash is no load — until 17 Oct the "linkerr" stop was this public view, its map blank, the
+    // frame's "… is not defined" errors counted against it; the dead-link note was never pictured.
     await page.getByRole("button", { name: "Sign out" }).click().catch(() => {});
+    const frame = await embeddedMap(page);
+    const mapAfter = frame ? await waitForMap(frame) : "no iframe";
+    await settle(page, store);
+    const left = drain(store);
+    if ((mapAfter !== "loaded" && mapAfter !== "password") || left.errors.length) note(`after Sign out, the public view's map: ${mapAfter}${left.errors.length ? `, ${left.errors.length} error(s), first: ${left.errors[0]}` : ""}`);
+    await page.goto("about:blank");
     await page.goto(base + "/#invite=" + "x".repeat(40), { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".auth-card, [role='status']", { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(800);
-    await audit(page, store, meta("linkerr", w));
+    await page.waitForSelector(".auth-card", { timeout: 30000 }).catch(() => {});
+    const card = await page.locator(".auth-card h1").first().textContent({ timeout: 1000 }).catch(() => "");
+    const dead = await audit(page, store, meta("linkerr", w));
+    dead.cardTitle = card || undefined;
+    ok(`linkerr: a dead invite link shows the app's note, not the public view (card "${card}", title "${dead.title}")`,
+       /no longer works/.test(card) && !(await page.locator("iframe").count()));
     await ctx.close();
   }
 }
