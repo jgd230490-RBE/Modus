@@ -433,6 +433,12 @@ for L in FX["legs"]:
 ok("⭐ the haul-stretch finder (within 4 m of the drawn road) finds the example's stretches on all 36 legs",
    all(_found.values()), str([k for k, v in _found.items() if not v]))
 ok("every route is drawn on the fixture: not_drawn is empty", D["not_drawn"] == [])
+ok("S7: with the lines, each haul road carries its drawn line (the map draws it); without them, none",
+   all(h["coords"] and len(h["coords"]) >= 2 for h in D["haul_roads"]) and all(h["coords"] is None for h in D_nolines_h["haul_roads"])
+   if (D_nolines_h := sim.day(9, acc_planner, factors=factors, working_days=WD)) else False)
+_z3 = zones.create_zone("Unused haul road", {"type": "LineString", "coordinates": [[-0.5, 52.5], [-0.49, 52.51]]}, kind=zones.HAUL_KIND, speed_kph=15)
+ok("S7: a haul road no route of the day runs along is not listed", [h["zone_id"] for h in sim.day(9, acc_planner, factors=factors, working_days=WD, send_lines=True)["haul_roads"]] == ["Z001", "Z002"])
+zones.delete_zone(_z3["id"])
 # a route whose return was never worked out: the empty lorries drive the loaded line backwards, said
 db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = 'R018' AND leg = 'return'", (db.current_tenant(),))
 Drev = sim.day(9, acc_planner, factors=factors, working_days=WD, send_lines=True)
@@ -562,6 +568,44 @@ for bad in (dict(hours=["G001"]), dict(hours=["G001=7-17"]), dict(check_in=["G00
     ok(f"a scenario that cannot be read is refused in words: {bad}", isinstance(raises(lambda: sim.scenario_from_query(**bad)), ValueError))
 e4 = raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scenario=sim.scenario_from_query(hours=["G999=07:00-17:00"])))
 ok("a gate the scheme does not have is refused", isinstance(e4, ValueError) and "G999" in str(e4))
+
+# 17 Oct 2026 (found on live): where a pour can go, and its default
+_pg = D["pour_gates"]
+ok("⭐ the pour goes to a working site only: the four compounds' entry gates, busiest first (laden a day), never a quarry, railhead or stockpile",
+   [x["gate_id"] for x in _pg] == ["G007", "G009", "G011", "G010"]
+   and [x["laden_per_day"] for x in _pg] == [79.3, 74.2, 38.5, 29.0] and all("Compound" in x["location_name"] for x in _pg), str(_pg))
+ok("⭐ the default pour gate is the working site with the most laden lorries a day: Harborough Compound (79.3, ahead of Langton's 74.2)",
+   D["pour_default"] == "G007" and Doff["pour_default"] == "G007")
+e_sp = raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scenario=sim.scenario_from_query(**dict(POUR, pour_gate="G012"))))
+ok("a pour at a stockpile is refused in words", isinstance(e_sp, ValueError) and "A pour goes to a working site (a compound or a site): Stockpile South is a stockpile." == str(e_sp), str(e_sp))
+db.execute("INSERT INTO locations (id, name, loc_type, role, lat, lon) VALUES (?, ?, ?, ?, ?, ?)",
+           ("L012", "Wolds Link Inert Landfill (fictional)", "Landfill", "destination", 52.6, -0.95))
+_lg = gates.create_gate("L012", "Weighbridge", 52.601, -0.951, direction="both", safety_minutes=4, is_default=True, gate_id="G015")
+e_lf = raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scenario=sim.scenario_from_query(**dict(POUR, pour_gate="G015"))))
+ok("⭐ a pour at the inert landfill is refused in words, and the landfill is never offered",
+   isinstance(e_lf, ValueError) and str(e_lf) == "A pour goes to a working site (a compound or a site): Wolds Link Inert Landfill (fictional) is a landfill."
+   and "G015" not in [x["gate_id"] for x in sim.day(9, acc_planner, factors=factors, working_days=WD)["pour_gates"]], str(e_lf))
+ok("pour_site: Compound and Site (any case, spaces), nothing else",
+   all(sim.pour_site({"loc_type": t}) for t in ("Compound", " site ", "COMPOUND"))
+   and not any(sim.pour_site({"loc_type": t}) for t in ("Landfill", "Soil recycling", "Batching plant", "Stockpile", "Quarry", "Railhead", "Port", "Other", "", None)))
+ok("the pour-site types are the working destinations the app already has (network._role_for; the Locations form's types)",
+   all(network._role_for(t) == "destination" for t in sim.POUR_SITE_TYPES)
+   and all(f'"{t.title()}"' in open(os.path.join(ROOT, "frontend", "index.html"), encoding="utf-8").read().split("const LOC_TYPES = [", 1)[1].split("]", 1)[0]
+           for t in sim.POUR_SITE_TYPES))
+db.execute("DELETE FROM location_gates WHERE tenant_id = ? AND id = 'G015'", (db.current_tenant(),))
+db.execute("DELETE FROM locations WHERE tenant_id = ? AND id = 'L012'", (db.current_tenant(),))
+
+# 17 Oct 2026 (found on live): a gate's ACCESS ROAD is driven at its speed but not listed with the haul roads
+_before = sim.day(9, acc_planner, factors=factors, working_days=WD, scenario=sim.scenario_from_query(**POUR), send_lines=True)
+gates.update_gate("G009", access_zone_id="Z001")          # Langton's gate takes Langton haul road as its access road
+_after = sim.day(9, acc_planner, factors=factors, working_days=WD, scenario=sim.scenario_from_query(**POUR), send_lines=True)
+ok("⭐ a gate's access road is left out of the haul roads (Z001 now Langton's access road); the other haul road is still listed; the reply says one was left out",
+   [h["zone_id"] for h in _after["haul_roads"]] == ["Z002"] and _after["access_roads_hidden"] == 1
+   and [h["zone_id"] for h in _before["haul_roads"]] == ["Z001", "Z002"] and _before["access_roads_hidden"] == 0)
+ok("⭐ ...and the drive is unchanged: every arrival's minute, check-in, wait and departure, and each leg's plan, are the same",
+   _after["arrivals"] == _before["arrivals"] and _after["window"] == _before["window"]
+   and all(_after["legs"][k].get("parts") == _before["legs"][k].get("parts") for k in _before["legs"]))
+gates.update_gate("G009", access_zone_id=None)
 
 # typed open hours past midnight: the gate is left out and named
 gates.update_gate("G009", open_from="22:00", open_to="06:00")
@@ -703,6 +747,18 @@ _after = {t: db.query(f"SELECT COUNT(*) AS n FROM {t} WHERE tenant_id = ?", (db.
 ok("🔴 a simulation writes nothing (D86): every table's row count is the same after it", _before == _after, str(_after))
 
 # =========================================================================== #
+#  10. The fixture for the frontend harnesses (S7): the example's day with the pour, without the routes' lines    #
+#      Written LAST and only from a clean run, LF on disk; the same every run (no date in it).                    #
+# =========================================================================== #
+_fix_path = os.path.join(HERE, "fixtures", "sim_day.json")
+if not FAIL:
+    with open(_fix_path, "w", encoding="utf-8", newline="\n") as _fh:
+        _fh.write(json.dumps(D_nolines, ensure_ascii=False, separators=(",", ":")) + "\n")
+_fx = json.load(open(_fix_path, encoding="utf-8")) if os.path.exists(_fix_path) else {}
+ok("the fixture backend/tests/fixtures/sim_day.json is the example's day with the pour (646 arrivals, 22 mixers, no lines)",
+   _fx.get("gate_arrivals") == 646 and (_fx.get("pour") or {}).get("loads") == 22
+   and all("coords" not in v for v in (_fx.get("legs") or {}).values()) and b"\r\n" not in open(_fix_path, "rb").read())
+
 print()
 for f in FAIL:
     print("  FAIL ", f)

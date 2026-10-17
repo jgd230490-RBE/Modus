@@ -993,6 +993,22 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ S3: the example pour at Harborough Compound (160 m³, the app's 7.5 m³ mixer, 60 m³ an hour): 22 mixers, a queue",
        r.status_code == 200 and (sp.get("pour") or {}).get("loads") == 22 and hp.get("pour") == 22
        and hp.get("arrivals") == hb_sd.get("arrivals", -99) + 22 and hp.get("queue_start") is not None, r.text[:300])
+    # 17 Oct 2026 (found on live): a pour goes to a working site only, and defaults to the one with the most laden lorries
+    # RE-PINNED 17 Oct 2026 (demo redesign R3, merging PR #89): on the four-year demo the simulated day is Apr 2027 (month
+    # 16), where the compound with the most laden lorries is Melton Compound, not Harborough (Sep 2026 on the old demo):
+    # the default is pinned to that rule, read from the Gate arrivals panel of the same month
+    _pgn = [x["location_name"] for x in sd.get("pour_gates", [])]
+    _most = max((g for g in ga.get("gates", []) if g.get("loc_type") == "Compound"),
+                key=lambda g: g.get("laden_per_day") or 0, default={}).get("location_name")
+    ok("⭐ S7 fix: on the demo package the pour is offered at the compounds only (no landfill, soil recycling, batching plant, "
+       "stockpile, quarry or terminal), and defaults to the compound with the most laden lorries (Melton Compound in Apr 2027)",
+       bool(_pgn) and all(n.endswith("Compound") for n in _pgn) and _most == "Melton Compound"
+       and next((x["location_name"] for x in sd["pour_gates"] if x["gate_id"] == sd.get("pour_default")), None) == _most,
+       str(_pgn) + " " + str(_most))
+    _lf = [g for g in c.get("/api/gates").json().get("gates", []) if g.get("location_id") == "L012"]
+    r = c.get(f"/api/sim/day?month=16&pour_gate={_lf[0]['id'] if _lf else 'G015'}&pour_start=10:00&pour_m3=160&pour_rate=60", headers=PLAN)
+    ok("🔴 S7 fix: a pour at the inert landfill is refused in words — 400",
+       bool(_lf) and r.status_code == 400 and "A pour goes to a working site" in r.text and "is a landfill" in r.text, r.text[:200])
     r = c.get("/api/sim/day?month=16&hours=G001=18:00-07:00", headers=PLAN)
     ok("🔴 S3: a window past midnight is refused in words — 400 (D93)", r.status_code == 400 and "past midnight" in r.text, r.text[:200])
     r = c.get("/api/sim/day?month=16&pour_gate=G007&pour_start=23:00&pour_m3=160&pour_rate=60", headers=PLAN)
@@ -1020,7 +1036,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
        not re.search(r"real-time|live tracking|telematics|optimi[sz]|predict|\bAI\b|\btrucks?\b|booking|peak hour", _sd_words, re.I)
        and not re.search(r"\bIPT ?[1-6]\b", json.dumps(sd)) and "Concrete mixer" in _sd_words, _sd_words[:200])
     # the demo figures for the session report (not asserted beyond the ranges above)
-    print("  gate arrivals, month 9 (demo package):")
+    print("  gate arrivals, month 16 (demo package):")
     for g in ga.get("gates", []):
         print(f"    {g['location_name']} · {g['gate_name']}: {g['arrivals_per_day']}/day "
               f"(laden {g['laden_per_day']}, empty {g['empty_per_day']}), gap {g['gap_minutes']} min, "
