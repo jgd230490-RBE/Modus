@@ -1054,11 +1054,13 @@ ok("…every route in one table, each bar in its map colour, the flag a dashed r
 ok("…no chart wrapper; offline the map is the inline schematic: no basemap image and no Mapbox credit",
    "chartwrap" not in HTML10 and "mapbox" not in HTML10.lower() and "<image " not in HTML10
    and "Schematic, not to scale." in HTML_TEXT)
+# NARROWED 17 Oct 2026 (UI audit #5, claude/ui-fix-keyboard): the wrapper is a named region a keyboard user can Tab to
 ok("🔴 the 14 px floor on a phone: the bar column never squeezes (a min width; the table scrolls in its wrapper)",
-   "td.bar{min-width:200px;white-space:nowrap}" in HTML10 and '<div class="tw"><table data-bulletin="routes">' in HTML10)
+   "td.bar{min-width:200px;white-space:nowrap}" in HTML10
+   and '<div class="tw" tabindex="0" role="region" aria-label="Every route this month"><table data-bulletin="routes">' in HTML10)
 # 12 Oct 2026 (Track C review): the schematic map is 720 units wide with 14 px pin letters; at width:100% on a 375 px
 # phone they drew at about 6.7 px. It now sits in a scrolling wrapper and never draws narrower than its viewBox.
-_mv = re.search(r'<div class="mapwrap" data-bulletin="map"><svg viewBox="0 0 (\d+) \d+" role="img"', HTML10)
+_mv = re.search(r'<div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="[^"]+"><svg viewBox="0 0 (\d+) \d+" role="img"', HTML10)   # NARROWED 17 Oct 2026 (UI audit #5)
 _mm = re.search(r"\.mapwrap svg\{min-width:(\d+)px\}", HTML10)
 ok("🔴 the 14 px floor on a phone: the schematic map never draws narrower than its viewBox (it scrolls instead)",
    bool(_mv and _mm) and int(_mm.group(1)) >= int(_mv.group(1)) and ".mapwrap{overflow-x:auto" in HTML10,
@@ -1227,7 +1229,8 @@ ok("🔴 council PDF: the only requests are basemaps (no route or polygon in any
 ok("⭐ council PDF: 'fictional demo scheme' still on every page, which now number at least three",
    len([p for p in T10A.split("\f") if p.strip()]) >= 3 and all("fictional demo scheme" in p.lower() for p in T10A.split("\f") if p.strip()))
 ok("⭐ council page: an inline SVG of the districts (even-odd fill, white 2.5 px borders), each label with name and figure; offline no basemap",
-   '<div class="mapwrap" data-bulletin="council-map"><svg viewBox="0 0 720 560"' in HTML10A
+   # NARROWED 17 Oct 2026 (UI audit #5): the map wrapper is a named region with tabindex 0
+   '<div class="mapwrap" data-bulletin="council-map" tabindex="0" role="region" aria-label="Carbon by council in October 2026 (map)"><svg viewBox="0 0 720 560"' in HTML10A
    and HTML10A.count('fill-rule="evenodd" stroke="#FFFFFF" stroke-width="2.5"') == 3
    and f'<tspan class="cn">Eastshire</tspan>' in HTML10A and f'dy="17">{_tt(0.5 * _CT)}</tspan>' in HTML10A
    and "mapbox" not in HTML10A.lower() and "<polyline" not in HTML10A.split('data-bulletin="council-map"')[1].split("</svg>")[0])
@@ -1391,7 +1394,7 @@ ok("⭐ W11 (hand): R1 (~65 a day) is #0B55CB, R2 (~23 a day) #5A96F6; no width 
    _MR["R1"]["color"] == "#0B55CB" and _MR["R2"]["color"] == "#5A96F6" and near(_MR["R1"]["a_day"], _r1, 1e-3)
    and all("weight" not in r for r in S10["map_routes"]), str(S10["map_routes"]))
 ok("W11: drawn quietest first, so the busiest route is on top", [r["route_id"] for r in S10["map_routes"]] == ["R2", "R1"])
-_svgm = HTML10.split('data-bulletin="map">')[1].split("</svg>")[0]
+_svgm = HTML10.split('data-bulletin="map"')[1].split("</svg>")[0]   # 17 Oct 2026: the wrapper carries tabindex / role / aria-label after the marker
 ok("⭐ W11 page: every route at ONE width (5) in its Volume colour over a 7.5 casing in the map's ink; never the plan blue",
    _svgm.count('stroke-width="5"') == 2 and _svgm.count('stroke="#1F2024" stroke-width="7.5"') == 2
    and 'stroke="#0B55CB" stroke-width="5"' in _svgm and 'stroke="#5A96F6" stroke-width="5"' in _svgm
@@ -1446,7 +1449,7 @@ ok("⭐ W11 (hand): ONE shared section (R1 and R2's common road) at BOTH routes'
    and S10S["map_sections"][0]["color"] == "#0B55CB" and S10S["map_sections"][0]["routes"] == 2
    and near(S10S["map_sections"][0]["a_day"], _RL10["runs"][0]["movements_per_day"], 1e-9)
    and {r["route_id"]: r["color"] for r in S10S["map_routes"]}["R2"] == "#5A96F6", str((_rb, S10S["map_sections"][:1] and S10S["map_sections"][0]["a_day"])))
-_svgs = HTML10S.split('data-bulletin="map">')[1].split("</svg>")[0]
+_svgs = HTML10S.split('data-bulletin="map"')[1].split("</svg>")[0]
 ok("⭐ W11 page: the shared section is drawn ON TOP of the routes (after them), with its own casing, in its summed colour",
    _svgs.count('class="sec"') == 2 and _svgs.rindex('stroke="#5A96F6"') < _svgs.index('class="sec"')
    and 'stroke="#0B55CB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by 2 routes: 98 two-way movements a day</title>' in _svgs
@@ -2063,6 +2066,31 @@ ok("🔴 the leaflet page: the 14 px floor, a viewport, the demo notice, the map
    _pxL and min(_pxL) >= 14 and '<meta name="viewport" content="width=device-width,initial-scale=1">' in LH10B
    and f'<div class="notice">{NOTICE}</div>' in LH10B and ".mapwrap svg{min-width:720px}" in LH10B, str(sorted(set(_pxL))))
 ok("🔴 the leaflet page: word ban and UK words", not _BANNED.search(re.sub(r"<[^>]+>", " ", LH10B)) and not _trucks(re.sub(r"<[^>]+>", " ", LH10B)))
+
+# 17 Oct 2026 (UI audit #5, claude/ui-fix-keyboard): on a phone the two maps and five of the seven tables scroll sideways
+# (the 720 px map floor and the nowrap figure columns are deliberate). Each such wrapper is now a named region a keyboard
+# user can Tab to and scroll (tabindex 0; the role is required — a bare aria-label on a div is ignored), with a visible
+# ring; the two tables whose every column wraps (works, glance) are not tab stops. The sideways scroll itself stays
+# (open question 5: a phone-fit render).
+_REG = re.compile(r'<div class="(mapwrap|tw)"( data-bulletin="[a-z-]+")? tabindex="0" role="region" aria-label="([^"]*)">')
+_regB = [(m.group(1), m.group(3)) for m in _REG.finditer(HTML10B)]
+ok("🔴 #5 the seven scrolling wrappers of the full bulletin are named regions with tabindex 0 — two maps, five tables, in page order, named by their headings",
+   [c for c, _ in _regB] == ["mapwrap", "tw", "tw", "tw", "tw", "mapwrap", "tw"]
+   and [l for _, l in _regB] == ["Planned lorry routes, October 2026", "Every route this month", "What is being moved",
+                                 "What changed since last month", "Movements by council in October 2026",
+                                 "Carbon by council in October 2026 (map)", "Carbon by council in October 2026 (table)"], str(_regB))
+ok("#5 …the works and glance tables, whose columns wrap, stay plain wrappers (no needless tab stop); no other tabindex on the page; the names pass the word ban",
+   '<div class="tw"><table data-bulletin="works">' in HTML10B and '<div class="tw"><table data-bulletin="glance">' in HTML10B
+   and HTML10B.count('tabindex="0"') == len(_regB) == 7 and all(l.strip() for _, l in _regB)
+   and not _BANNED.search(" ".join(l for _, l in _regB)) and not _trucks(" ".join(l for _, l in _regB)))
+ok("#5 …a visible ring on a focused region in the page and in the leaflet (the link blue), and the leaflet's map is the same named region",
+   ".mapwrap:focus-visible,.tw:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}" in HTML10B
+   and ".mapwrap:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}" in LH10B
+   and '<div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="Planned lorry routes, October 2026"><svg' in LH10B
+   and LH10B.count('tabindex="0"') == 1)
+ok("#5 …the sideways scroll itself is unchanged (open question 5): the map's 720 px floor and the wrappers' overflow-x stay",
+   ".mapwrap{overflow-x:auto;border:1px solid var(--line)} .mapwrap svg{min-width:720px}" in HTML10B and ".tw{overflow-x:auto}" in HTML10B
+   and "tabindex" not in T10AJ)
 _MS = read("backend/main.py")
 # the leaflet endpoints, staff only like the bulletin (D10)
 ok("🔴 the gate calls /bulletin/leaflet/ 'bulletin' (staff only); both endpoints check staff before reading anything",
