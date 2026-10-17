@@ -433,6 +433,12 @@ for L in FX["legs"]:
 ok("⭐ the haul-stretch finder (within 4 m of the drawn road) finds the example's stretches on all 36 legs",
    all(_found.values()), str([k for k, v in _found.items() if not v]))
 ok("every route is drawn on the fixture: not_drawn is empty", D["not_drawn"] == [])
+ok("S7: with the lines, each haul road carries its drawn line (the map draws it); without them, none",
+   all(h["coords"] and len(h["coords"]) >= 2 for h in D["haul_roads"]) and all(h["coords"] is None for h in D_nolines_h["haul_roads"])
+   if (D_nolines_h := sim.day(9, acc_planner, factors=factors, working_days=WD)) else False)
+_z3 = zones.create_zone("Unused haul road", {"type": "LineString", "coordinates": [[-0.5, 52.5], [-0.49, 52.51]]}, kind=zones.HAUL_KIND, speed_kph=15)
+ok("S7: a haul road no route of the day runs along is not listed", [h["zone_id"] for h in sim.day(9, acc_planner, factors=factors, working_days=WD, send_lines=True)["haul_roads"]] == ["Z001", "Z002"])
+zones.delete_zone(_z3["id"])
 # a route whose return was never worked out: the empty lorries drive the loaded line backwards, said
 db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = 'R018' AND leg = 'return'", (db.current_tenant(),))
 Drev = sim.day(9, acc_planner, factors=factors, working_days=WD, send_lines=True)
@@ -703,6 +709,18 @@ _after = {t: db.query(f"SELECT COUNT(*) AS n FROM {t} WHERE tenant_id = ?", (db.
 ok("🔴 a simulation writes nothing (D86): every table's row count is the same after it", _before == _after, str(_after))
 
 # =========================================================================== #
+#  10. The fixture for the frontend harnesses (S7): the example's day with the pour, without the routes' lines    #
+#      Written LAST and only from a clean run, LF on disk; the same every run (no date in it).                    #
+# =========================================================================== #
+_fix_path = os.path.join(HERE, "fixtures", "sim_day.json")
+if not FAIL:
+    with open(_fix_path, "w", encoding="utf-8", newline="\n") as _fh:
+        _fh.write(json.dumps(D_nolines, ensure_ascii=False, separators=(",", ":")) + "\n")
+_fx = json.load(open(_fix_path, encoding="utf-8")) if os.path.exists(_fix_path) else {}
+ok("the fixture backend/tests/fixtures/sim_day.json is the example's day with the pour (646 arrivals, 22 mixers, no lines)",
+   _fx.get("gate_arrivals") == 646 and (_fx.get("pour") or {}).get("loads") == 22
+   and all("coords" not in v for v in (_fx.get("legs") or {}).values()) and b"\r\n" not in open(_fix_path, "rb").read())
+
 print()
 for f in FAIL:
     print("  FAIL ", f)

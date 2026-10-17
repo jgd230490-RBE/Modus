@@ -629,7 +629,9 @@ import re as _re2
 _fits = [m.start() for m in _re2.finditer(r"\.fitBounds\(", fe)]
 ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the Look-ahead map white-screened the whole app)",
    # NARROWED 13 Oct 2026 (W1): four, the Routes / Zones map now frames the scheme's locations on first load
-   len(_fits) == 4 and all("try {" in fe[max(0, i - 60):i] for i in _fits), str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
+   # NARROWED 16 Oct 2026 (S7): five, the Dashboard's Simulation map frames the day's routes once a month
+   len(_fits) == 5 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
 _SKIP = re.compile(r'^(?:\w+:)?(?:text-white|bg-white/\d+|border-white/\d+|text-white/\d+|bg-black/\d+|\w+-transparent|\w+-current|(?:bg|text|border|ring)-\[color:var|ring-\[)')
