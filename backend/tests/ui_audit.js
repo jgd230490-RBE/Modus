@@ -11,9 +11,10 @@
  *   - a demo database (backend/forecasts_local.db, or --db). It is COPIED to a temporary folder and the
  *     server runs against the copy, so the database you point it at is never written. The tenant is read from it.
  *
- *     node backend/tests/ui_audit.js                 # quick: 390 and 1366 px, Ink and Dark, ~10 min
- *     node backend/tests/ui_audit.js --full          # 320 360 390 768 1024 1366 1920 × Ink Light Dark, + the other accents at 1920
+ *     node backend/tests/ui_audit.js                 # quick: 390 and 1366 px, Ink and Dark, + Dark with the Blue accent at 1366, ~15 min
+ *     node backend/tests/ui_audit.js --full          # 320 360 390 768 1024 1366 1920 × Ink Light Dark, + the other accents and Dark / Blue at 1920
  *     node backend/tests/ui_audit.js --compare latest    # ...and say what changed since the previous run of the same shape
+ *     node backend/tests/ui_audit.js --strict-44         # the 44 px rule on a phone graded as a failure (decision 14; OFF by default, see below)
  *     node backend/tests/ui_audit.js --base http://127.0.0.1:8834 --code <planner code> --map-password <pw>
  *     node backend/tests/ui_audit.js --base https://… --email you@… --password …     # a server whose codes are gone (D49)
  *
@@ -28,9 +29,24 @@
  *       what axe could not decide (text over the map or an image: "incomplete")                                     (warn, axe-needs-review)
  *     - at EVERY width: a visible control whose hit area is under 24 × 24 px and not set apart (WCAG 2.5.8: the hit
  *       area is measured by hit-testing, so a padded ::after counts; the spacing exception and the sentence exception
- *       are applied; axe's own target-size rule is dropped for native checkboxes and radios, which 2.5.8 exempts)    (fail)
- *       below 768 px, a hit area under 44 × 44 (the platform guides)                                                (warn)
+ *       are applied; axe's own target-size rule is dropped for native checkboxes and radios, which 2.5.8 exempts;
+ *       Mapbox GL's attribution and logo are the library's markup and are not measured)                              (fail)
+ *       below 768 px, a hit area under 44 × 44 (the platform guides; one under 24 × 24 and crowded is the 24 px failure
+ *       above, not listed twice): set apart — its 44 px circle touches no other control, nor the 44 px circle of another
+ *       control under 44 (the 24 px rule's spacing test at this rule's size; `spaced: true` on the row) — or inline     (warn)
+ *       neither set apart nor inline: a warning today, a FAILURE (the check targets-44px) with --strict-44.
+ *       Decision 14, 17 Oct 2026: --strict-44 is OFF by default; it turns on by default once the phone branch has merged
+ *       (claude/ui-fix-phone — decisions 8, 9 and 10: the map's tour dots retired on the phone, the demo bar's pill with
+ *       its 44 px halo, the help TOC rows padded to 44 px). The flag is a grading, not part of the run's shape, so a
+ *       strict run pairs with a plain one in --compare.
  *     - the look and accent asked for are the ones on <html>, and the page is the one named (its header)           (fail)
+ *       the passes: every look at every width with the Orange accent; the other accents at the widest width in the first
+ *       look (--full); and, decision 15 (17 Oct 2026), the Dark look with the Blue accent at the widest width (1366 in the
+ *       quick shape, 1920 in --full) — the pair no other pass measures, where white figures on --navy #5B8FF0 fail (3.17:1).
+ *       The portal pages only, ~3 min; part of the run's recorded shape (REPORT.options.extraPasses), so --compare pairs
+ *       like with like and a run from before it does not pair. Off when --looks or --accents chose the passes by hand.
+ *     - one h1 on the page (h1-none / h1-many); the two guides are chapters, each an h1, and are exempt from h1-many
+ *       (decision 7, 17 Oct 2026 — the recorded design, test_help.py)                                                 (warn)
  *     - text smaller than 12 px (charts' SVG text included), labels cut with an ellipsis, a native confirm()/alert()  (warn)
  *     - a screenshot: the real fold first; when the page or the portal's scroller is taller, the viewport is grown to
  *       the content — the scroller plus what sits above and below it (on a phone the tab bar). Elements sized in vh
@@ -81,7 +97,7 @@ const BACKEND = path.join(ROOT, "backend");
 function parseArgs(argv) {
   const o = { full: false, headed: false, blockMapbox: false, keepServer: false, guide: false, deep: true, out: path.join(ROOT, "ui-audit"),
               db: path.join(BACKEND, "forecasts_local.db"), python: null, base: null, code: "ui-planner", teamCode: "ui-team-1",
-              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500, browser: "chrome" };
+              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500, strict44: false, browser: "chrome" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => argv[++i];
     if (a === "--full") o.full = true;
@@ -91,6 +107,7 @@ function parseArgs(argv) {
     else if (a === "--keep-server") o.keepServer = true;
     else if (a === "--no-deep") o.deep = false;
     else if (a === "--guide") o.guide = true;
+    else if (a === "--strict-44") o.strict44 = true;   // decision 14: the 44 px rule on a phone fails; OFF by default until the phone branch has merged
     else if (a === "--out") o.out = path.resolve(v());
     else if (a === "--db") o.db = path.resolve(v());
     else if (a === "--python") o.python = v();
@@ -121,6 +138,12 @@ const LOOKS = OPT.looks || (OPT.full ? ["ink", "light", "dark"] : ["ink", "dark"
 const EXTRA_ACCENTS = OPT.accents || (OPT.full ? ["blue", "blue-shades", "orange-shades"] : []);
 const PORTAL_PAGES = OPT.pages || ["dashboard", "submit", "forecasts", "carbon", "lookahead", "locations", "routes", "zones", "config", "users", "map"];
 const DESK_W = Math.max(...WIDTHS);           // where the deep stops and the keyboard pass run
+// decision 15 (17 Oct 2026): one more pass, the Dark look with the Blue accent at the desk width (1366 in the quick shape, 1920
+// in --full): the Blue accent's --navy is #5B8FF0 in Dark, where white figures on it fail (3.17:1) — a pair no other pass
+// measures (the extra accents run in the first look, Ink). The portal pages only (first = false: no public / sign-in / deep
+// stops), ~3 min. Part of the run's shape (sameShape), so a run from before it does not pair in --compare. Off when the looks
+// or accents were chosen by hand (--looks / --accents: a custom run says what it wants).
+const EXTRA_PASSES = (OPT.looks || OPT.accents) ? [] : [{ look: "dark", accent: "blue", widths: [DESK_W] }];
 const PHONE_W = Math.min(...WIDTHS);
 const CONFIG_TABS = ["Vehicles", "Materials", "Planning", "Costing · fuel", "Seasonal restrictions", "Map and bulletin", "Everything (JSON)"];
 // what the page header says on each portal page (the NAV labels, except Config); the map page has no header
@@ -212,7 +235,7 @@ const SHOTS = path.join(RUN_DIR, "shots");
 fs.mkdirSync(SHOTS, { recursive: true });
 
 function gitHead() { try { return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT }).toString().trim(); } catch (e) { return null; } }
-const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide, browser: OPT.browser },
+const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, extraPasses: EXTRA_PASSES, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide, browser: OPT.browser, strict44: OPT.strict44 },
                  stops: [], timings: {}, notes: [], totals: { passed: 0, failed: 0 } };
 
 let PASS = 0;
@@ -284,7 +307,7 @@ function domChecks(arg) {
   const q = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="tab"], [role="menuitem"], [role="checkbox"], [role="switch"]';
   const all = [];
   for (const el of document.querySelectorAll(q)) {
-    if (!vis(el) || !onTop(el) || el.closest(".mapboxgl-ctrl-attrib") || el.tabIndex < 0 && !el.matches("a[href], button, input, select, textarea, summary")) continue;
+    if (!vis(el) || !onTop(el) || el.closest(".mapboxgl-ctrl-attrib, .mapboxgl-ctrl-logo") || el.tabIndex < 0 && !el.matches("a[href], button, input, select, textarea, summary")) continue;
     const r = el.getBoundingClientRect();
     // a checkbox or radio with a label (around it, or <label for>) has the label as its target too
     const labEl = (el.type === "checkbox" || el.type === "radio") ? (el.labels && el.labels[0]) || el.closest("label") : null;
@@ -312,19 +335,23 @@ function domChecks(arg) {
       || (!!block && getComputedStyle(el).display.startsWith("inline") && (block.textContent || "").trim().length - ownText >= 20 && lineH <= lh + 2));
     all.push({ el, box, w: Math.round(box.r - box.l), h: Math.round(inline ? lineH : box.b - box.t), has24, has44, inline });
   }
-  const circleHits = (a, b) => {   // does a's 24 px circle touch b's box or b's circle?
+  // the spacing test, at the rule's size: does a's circle of radius r (12 for the 24 px rule, 22 for the 44 px rule) touch
+  // b's box, or b's circle when b is under that size too? A control it touches nothing with is set apart.
+  const circleHits = (a, b, r) => {
     const cx = (a.box.l + a.box.r) / 2, cy = (a.box.t + a.box.b) / 2;
     const nx = Math.max(b.box.l, Math.min(cx, b.box.r)), ny = Math.max(b.box.t, Math.min(cy, b.box.b));
-    if (Math.hypot(cx - nx, cy - ny) < 12) return true;
+    if (Math.hypot(cx - nx, cy - ny) < r) return true;
     const bx = (b.box.l + b.box.r) / 2, by = (b.box.t + b.box.b) / 2;
-    return !b.has24 && Math.hypot(cx - bx, cy - by) < 24;
+    return !(r > 12 ? b.has44 : b.has24) && Math.hypot(cx - bx, cy - by) < 2 * r;
   };
+  const crowded = (a, r) => all.some(b => b !== a && circleHits(a, b, r));
   for (const a of all) {
-    if (a.inline) continue;   // the sentence exception, for the 24 px rule and the 44 px warning alike
+    if (a.inline) continue;   // the sentence exception, for the 24 px rule and the 44 px rule alike
     const row = { sel: sel(a.el), w: a.w, h: a.h, text: name(a.el) };
-    if (a.has24) { if (arg.narrow && !a.has44) out.smallTargets.push(row); continue; }
-    const crowded = all.some(b => b !== a && circleHits(a, b));
-    if (crowded) out.tinyTargets.push(row); else if (arg.narrow) out.smallTargets.push({ ...row, spaced: true });
+    if (!a.has24 && crowded(a, 12)) { out.tinyTargets.push(row); continue; }   // the 24 px failure (every width); not listed under 44 as well
+    // the 44 px rule on a phone (decision 14, 17 Oct 2026): set apart at 44 (spaced: true — a warning in every mode) or
+    // not (a warning; a FAILURE with --strict-44, the check targets-44px)
+    if (arg.narrow && !a.has44) out.smallTargets.push(crowded(a, 22) ? row : { ...row, spaced: true });
   }
   // text under 12 px (SVG text — the charts' labels — included), with its contrast against the nearest painted
   // background, smallest first. Not counted: icon glyphs (aria-hidden text, a one-character control that carries an
@@ -577,10 +604,16 @@ async function audit(page, store, meta) {
   }
   if (fixed) checks.push({ id: "no-page-scroll", ok: !dom.docVScroll, detail: dom.docVScroll ? { by: dom.docVScroll, offBottom: dom.offBottom } : null });
   if (meta.mapState) checks.push({ id: "map-loaded", ok: meta.mapState === "loaded", detail: meta.mapState });
+  // the 44 px rule on a phone (decision 14): with --strict-44 a control under 44 × 44 that is neither inline nor set apart
+  // FAILS (the check targets-44px); the set-apart rows (spaced: true) stay a warning; without the flag every row is a warning
+  const small44 = meta.width < 768 ? dom.smallTargets : [];
+  const strict44 = OPT.strict44 ? small44.filter(r => !r.spaced) : [];
+  if (OPT.strict44 && meta.width < 768) checks.push({ id: "targets-44px", ok: strict44.length === 0, detail: strict44 });
+  const warn44 = OPT.strict44 ? small44.filter(r => r.spaced) : small44;
   const warnings = [];
   if (axeWarn.length) warnings.push({ id: "axe-minor", detail: axeWarn });
   if (axe.incomplete.length) warnings.push({ id: "axe-needs-review", detail: axe.incomplete });
-  if (meta.width < 768 && dom.smallTargets.length) warnings.push({ id: "targets-44px", detail: dom.smallTargets });
+  if (warn44.length) warnings.push({ id: "targets-44px", detail: warn44 });
   if (dom.smallText.length) warnings.push({ id: "text-under-12px", detail: dom.smallText });
   if (dom.clipped.length) warnings.push({ id: "text-clipped", detail: dom.clipped });
   if (dom.innerScroll.length) warnings.push({ id: "inner-sideways", detail: dom.innerScroll });
@@ -590,7 +623,7 @@ async function audit(page, store, meta) {
   if (failedReqs.length) warnings.push({ id: "requests-failed", detail: failedReqs });
   if (drained.dialogs.length) warnings.push({ id: "native-dialog", detail: drained.dialogs });
   if (mapboxErr.length) warnings.push({ id: "mapbox-offline", detail: mapboxErr });
-  // the two guides are chapters, each an h1 — a recorded design (test_help.py), not counted; a shell whose content is an iframe has the map's h1 in the map's stop
+  // the two guides are chapters, each an h1 — a recorded design (test_help.py), exempt from h1-many by decision 7 (17 Oct 2026); a shell whose content is an iframe has the map's h1 in the map's stop
   if (dom.h1 === 0 && !/^(public|map)$/.test(meta.name)) warnings.push({ id: "h1-none", detail: 0 });
   else if (dom.h1 > 1 && !/^help/.test(meta.name)) warnings.push({ id: "h1-many", detail: dom.h1 });
   if (store.settleWhy) warnings.push({ id: "not-settled", detail: store.settleWhy });
@@ -1112,7 +1145,9 @@ function findingKeys(stop) {
   }
   return keys;
 }
-function sameShape(a, b) { return JSON.stringify([a.widths, a.looks, a.extraAccents, a.pages, a.browser || "chromium"]) === JSON.stringify([b.widths, b.looks, b.extraAccents, b.pages, b.browser || "chromium"]); }   // a run before 17 Oct was the bundled Chromium
+// a run before 17 Oct was the bundled Chromium; one from before the Dark / Blue pass (decision 15) has no extraPasses and does
+// not pair with one that has it. --strict-44 is a grading, not a shape, of the same stops: a strict run pairs with a plain one.
+function sameShape(a, b) { const k = (o) => [o.widths, o.looks, o.extraAccents, o.extraPasses || [], o.pages, o.browser || "chromium"]; return JSON.stringify(k(a)) === JSON.stringify(k(b)); }
 async function compareRuns(browser, prevPath) {
   if (prevPath === "latest") {
     const runs = fs.readdirSync(OPT.out).filter(d => d !== STAMP && fs.existsSync(path.join(OPT.out, d, "report.json"))).sort().reverse();
@@ -1195,16 +1230,20 @@ function summaryTables() {
     p.nodes++; p.looks.add(s.look); p.screens.add(s.name);
   }
   const colourPairs = Object.values(pairs).map(p => ({ ...p, looks: [...p.looks], screens: [...p.screens] })).sort((a, b) => a.ratio - b.ratio || b.nodes - a.nodes);
-  return { byCheck, warnBy, axeBy: Object.fromEntries(Object.entries(axeBy).map(([k, v]) => [k, { ...v, where: [...v.where] }])), colourPairs };
+  // what --strict-44 would fail in a plain run: the 44 px rows that are not set apart (a strict run counts them in byCheck instead)
+  let strict44Would = 0;
+  if (!OPT.strict44) for (const s of REPORT.stops) for (const w of s.warnings || []) if (w.id === "targets-44px") strict44Would += w.detail.filter(r => !r.spaced).length;
+  return { byCheck, warnBy, axeBy: Object.fromEntries(Object.entries(axeBy).map(([k, v]) => [k, { ...v, where: [...v.where] }])), colourPairs, strict44Would };
 }
 function writeSummaryMd(t) {
   const lines = [`# UI audit ${REPORT.stamp} — ${REPORT.head || "?"}`, "",
-    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""} · ${REPORT.browser ? REPORT.browser.ran + " " + REPORT.browser.version : ""} · ${REPORT.secs} s`,
+    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""}${EXTRA_PASSES.map(p => " · + " + p.look + " / " + p.accent + " at " + p.widths.join(", ")).join("")}${OPT.strict44 ? " · strict 44 px" : ""} · ${REPORT.browser ? REPORT.browser.ran + " " + REPORT.browser.version : ""} · ${REPORT.secs} s`,
     `**${PASS} passed, ${FAIL.length} failed.** First paint of the public view ${REPORT.timings.publicFirstPaintMs} ms; the portal's first data after sign-in ${REPORT.timings.portalFirstDataMs} ms.`, "",
     "## Checks (one per stop)", "", "| Check | Pass | Fail | Failing widths |", "|---|---:|---:|---|"];
   for (const [k, v] of Object.entries(t.byCheck)) lines.push(`| ${k} | ${v.pass} | ${v.fail} | ${Object.entries(v.widths).map(([w, n]) => w + " (" + n + ")").join(", ")} |`);
   lines.push("", "## Warnings (not counted as failures)", "", "| Warning | Items across all stops |", "|---|---:|");
   for (const [k, v] of Object.entries(t.warnBy)) lines.push(`| ${k} | ${v} |`);
+  if (t.strict44Would) lines.push("", `targets-44px: ${t.strict44Would} of the rows above are neither inline nor set apart and FAIL with --strict-44 (decision 14; off by default until the phone branch has merged).`);
   lines.push("", "## axe rules hit", "", "| Rule | Impact | Stops | Nodes | Screens |", "|---|---|---:|---:|---|");
   for (const [k, v] of Object.entries(t.axeBy).sort((a, b) => b[1].stops - a[1].stops)) lines.push(`| ${k} | ${v.impact} | ${v.stops} | ${v.nodes} | ${v.where.slice(0, 8).join(", ")}${v.where.length > 8 ? " …" : ""} |`);
   if (t.colourPairs.length) { lines.push("", "## Colour pairs failing contrast (one token value fixes every node that shares it), worst first", "", "| Ratio | Foreground on background | Size | Nodes | Looks | Screens | Sample |", "|---:|---|---|---:|---|---|---|");
@@ -1292,7 +1331,7 @@ draw();
   const started = Date.now();
   try {
     server = await startServer({});
-    console.log(`ui_audit: server ${server.base}${server.tenant ? " · tenant " + server.tenant : ""} · widths ${WIDTHS.join(",")} · looks ${LOOKS.join(",")} · accents orange${EXTRA_ACCENTS.length ? "," + EXTRA_ACCENTS.join(",") : ""} · out ${RUN_DIR}`);
+    console.log(`ui_audit: server ${server.base}${server.tenant ? " · tenant " + server.tenant : ""} · widths ${WIDTHS.join(",")} · looks ${LOOKS.join(",")} · accents orange${EXTRA_ACCENTS.length ? "," + EXTRA_ACCENTS.join(",") : ""}${EXTRA_PASSES.map(p => " · + " + p.look + "/" + p.accent + " at " + p.widths.join(",")).join("")}${OPT.strict44 ? " · strict 44 px" : ""} · out ${RUN_DIR}`);
     // the browser: the installed Google Chrome (the user's); Playwright's bundled Chromium only when asked or when Chrome is missing
     if (OPT.browser === "chrome") {
       try { browser = await chromium.launch({ headless: !OPT.headed, channel: "chrome" }); }
@@ -1310,6 +1349,8 @@ draw();
     for (const look of LOOKS) { await walkPortal(browser, server.base, look, "orange", first, WIDTHS); first = false; }
     // the accents change the controls and the chart colours only: the desk width alone, in the first look
     for (const accent of EXTRA_ACCENTS) await walkPortal(browser, server.base, LOOKS[0], accent, false, [DESK_W]);
+    // decision 15: the Dark look with the Blue accent at the desk width — the portal pages only (first = false)
+    for (const p of EXTRA_PASSES) await walkPortal(browser, server.base, p.look, p.accent, false, p.widths);
     if (OPT.deep) {
       await walkTeam(browser, server.base);
       if (!server.external) { await walkLogin(browser, server.base); await walkEmpty(browser); }
@@ -1334,6 +1375,7 @@ draw();
   console.log("\n" + "=".repeat(64));
   for (const [k, v] of Object.entries(t.byCheck)) console.log(`${k.padEnd(22)} ${String(v.pass).padStart(5)} pass ${String(v.fail).padStart(5)} fail`);
   console.log(`warnings: ${Object.entries(t.warnBy).map(([k, v]) => k + " " + v).join(" · ") || "none"}`);
+  if (t.strict44Would) console.log(`targets-44px: ${t.strict44Would} row(s) would FAIL with --strict-44 (not inline, not set apart)`);
   console.log(`report: ${path.join(RUN_DIR, "report.html")}  (${REPORT.secs} s; a full run is ~70 MB of screenshots — delete the runs you no longer compare against)`);
   if (FAIL.length) { console.log("\nFailures:"); for (const f of FAIL) console.log("  ✗ " + f); }
   console.log(`\n${PASS} passed, ${FAIL.length} failed`);
