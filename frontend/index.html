@@ -1511,6 +1511,14 @@ const gaMonthToday = (months) => {
   const sy = (months && months.start_year) || 2026, n = (months && months.count) || 60, d = new Date();
   return Math.max(1, Math.min(n, (d.getFullYear() - sy) * 12 + d.getMonth() + 1));
 };
+// 17 Oct 2026 (D114): the Dashboard opens on THIS month and six either side (13 months), not every month of the horizon:
+// on a 60-month programme the whole span made "Deliveries a day" a programme average and the charts 60 thin bars.
+// Clamped to the horizon. Only the default: From / To and "Whole programme" still pick any span.
+const DASH_RANGE_EITHER_SIDE = 6;
+const dashRangeDefault = (months) => {
+  const n = (months && months.count) || 60, c = gaMonthToday(months);
+  return [Math.max(1, c - DASH_RANGE_EITHER_SIDE), Math.min(n, c + DASH_RANGE_EITHER_SIDE)];
+};
 const GA_SPREAD = "if arrivals are spread evenly";
 const GA_NEAR = 85;      // 14 Oct 2026 (W17): held equal to backend gate_hours.NEAR_PCT by parse_frontend
 // 14 Oct 2026 (bundle G, W8): held equal to backend config.EURO_CLASSES and gate_hours.MAX_PEAK_BANDS /
@@ -1832,8 +1840,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [vehicle, setVehicle] = useState("All");
   const [ipt, setIpt] = useState("All");
   const [discipline, setDiscipline] = useState("All");
-  const [fromM, setFromM] = useState(1);
-  const [toM, setToM] = useState(months.count);
+  const [fromM, setFromM] = useState(() => dashRangeDefault(months)[0]);   // 17 Oct 2026 (D114): this month ± 6, was 1
+  const [toM, setToM] = useState(() => dashRangeDefault(months)[1]);       // ...and was months.count
   const [sortKey, setSortKey] = useState("t");
   const [sortDir, setSortDir] = useState("desc");
   const [lineKey, setLineKey] = useState(null);      // a clicked route row narrows the charts and figures
@@ -2199,6 +2207,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
             <span className="self-center text-slate-400 text-sm">→</span>
             <select className={sel} value={toM} onChange={e => setToM(+e.target.value)} aria-label="To month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
+            {/* 17 Oct 2026 (D114): one click between this month ± 6 (the default) and the whole programme */}
+            {(Math.min(fromM, toM) === 1 && Math.max(fromM, toM) === months.count)
+              ? <button type="button" className="btn-sec dash-range-btn" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}
+                  onClick={() => { const [a, b] = dashRangeDefault(months); setFromM(a); setToM(b); }}
+                  title="Show this month and six months either side">This month ± 6</button>
+              : <button type="button" className="btn-sec dash-range-btn" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}
+                  onClick={() => { setFromM(1); setToM(months.count); }}
+                  title="Show every month of the programme">Whole programme</button>}
             <select className={sel} value={ipt} onChange={e => setIpt(e.target.value)} title={TEAM()} aria-label={TEAM()}><option value="All">All {TEAMS()}</option>{ipts.map(i => <option key={i} value={i}>{teamText(i)}</option>)}{rows.some(r => !r.ipt) && <option value="none">No {TEAM().toLowerCase()} set</option>}</select>
             <select className={sel} value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">{["Approved", "Pending", "All"].map(s => <option key={s}>{s}</option>)}</select>
             <details className="row-menu">
