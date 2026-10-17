@@ -1038,7 +1038,7 @@ const INFO = {
   // 14 Oct 2026 (bundle G, W7): the CLP monitoring section
   // 16 Oct 2026 (S7): the Simulation section
   "dash.sim": { title: "Simulation", text: "An average working day of the month, lorry by lorry: each gate's arrivals spread evenly over its open hours, one lane at each gate. Try other hours, check-in times, bands or a pour; nothing is saved.",
-    how: "Each line's loads a day are rounded to whole loads, keeping each gate as close as it can be to Gate arrivals. No lorry is placed before its gate opens: it sets off its route's drive time earlier, so the first set off before the opening. One that comes while its gate is shut waits. The bottleneck is the first lorry that waits longer than the gate's check-in.", tech: "t1-gates" },
+    how: "Each line's loads a day are rounded to whole loads, keeping each gate as close as it can be to Gate arrivals. No lorry is placed before its gate opens: each sets off its route's drive time earlier, so the first lorries set off before the opening. At a gate with a check-in time, a lorry that comes while the gate is shut waits for it to open; a pour you type can bring mixers then, and the notes say how many. The bottleneck is the first lorry that waits longer than the gate's check-in.", tech: "t1-gates" },
   "dash.clp": { title: "CLP monitoring", text: "The Construction Logistics Plan's figures from the approved plan: caps, vehicles, councils, carbon and trips avoided. Planned, not observed: Wayscope holds no gate log or arrival times.",
     how: "Each chart says what is missing when it cannot be drawn. The CLP pack prints the same charts for a month.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.route_caps": { title: "Routes against their planning cap", text: "Two-way movements a day on each route in the month against the cap typed on the route. Red past the cap. A flag, never a block.",
@@ -1604,7 +1604,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
       plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1, callbacks: {
         title: (items) => items.length ? `${rowsC[items[0].dataIndex].g.location_name}, ${rowsC[items[0].dataIndex].g.gate_name}` : "",
         label: (item) => { const r = rowsC[item.dataIndex]; return [`${gaN1(r.g.arrivals_per_day)} lorries a day ${GA_SPREAD}`,
-          r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? " by default" : ""}${r.g.peak_minutes ? `, less ${r.g.peak_minutes} min of peak bands` : ""}${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`,
+          r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? " by default" : ""}${r.g.peak_minutes ? `, less ${r.g.peak_minutes} min of peak bands` : ""}${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`,
           gaFlagWord(r.g)]; } } } },
       scales: { x: { min: 0, suggestedMax: xTop, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: gaFs } },
                      title: { display: true, text: "lorries a day", font: { size: gaFs } } },
@@ -6237,13 +6237,15 @@ function ConfigPage({ meta, who, access }){
                       <input type="time" className="ctl w-32" aria-label={`Default gate hours ${k}`}
                         value={((doc.planning || {}).default_gate_hours || GATE_DEFAULT_HOURS)[k] || ""}
                         onChange={e => upd(d => { d.planning = d.planning || {};
+                          // 17 Oct 2026 (review): clearing one box to retype it keeps the other half (a half-typed pair is
+                          // refused on Save, in words); only both blank, or the default itself, removes the setting
                           const v = { ...GATE_DEFAULT_HOURS, ...(d.planning.default_gate_hours || {}), [k]: e.target.value };
-                          if(!e.target.value || (v.from === GATE_DEFAULT_HOURS.from && v.to === GATE_DEFAULT_HOURS.to)) delete d.planning.default_gate_hours;
+                          if((!v.from && !v.to) || (v.from === GATE_DEFAULT_HOURS.from && v.to === GATE_DEFAULT_HOURS.to)) delete d.planning.default_gate_hours;
                           else d.planning.default_gate_hours = v; })} />
                     </React.Fragment>
                   ))}
                 </div>
-                <div className="hint">When a gate is open where its own hours are not typed on Data → Locations: {GATE_DEFAULT_HOURS.from} to {GATE_DEFAULT_HOURS.to} unless you change them here. Take them from the scheme's noise consent or planning conditions. Used for each gate's capacity, Gates this week and the Simulation. A gate's own hours and shut times (a school run, a lunch) are typed on the gate.</div>
+                <div className="hint">The hours a gate is open when none of its own are typed on Data → Locations; {GATE_DEFAULT_HOURS.from} to {GATE_DEFAULT_HOURS.to} unless you change them here. Take them from the scheme's noise consent or planning conditions. Used for each gate's capacity, Gates this week and the Simulation. A gate's own hours and shut times (a school run, a lunch) are typed on the gate. A change that would leave a gate's shut times outside its hours, or the gate no open time, is refused and names the gate.</div>
               </div>
               {/* 14 Oct 2026 (bundle G, W8 + the user's Q1): the CLP's no-delivery windows. Taken off each gate's open
                   hours in its capacity (backend gate_hours.py); printed on the Dashboard's CLP monitoring and the CLP pack. */}
@@ -7204,7 +7206,8 @@ function GatesWeek({ gw }){
         {shown.map(g => (
           <div key={g.gate_id} className="gw-gate" data-gw-gate={g.gate_id} data-gw-flag={g.flag || "none"}>
             <div className="text-sm font-semibold text-slate-700">{g.location_name}<span className="text-slate-400 font-normal"> · {g.gate_name}</span></div>
-            <div className="clp-note">{g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
+            <div className="clp-note">{g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."
+              : g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
               : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? " by default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
             <ChartCanvas config={gwCfg(g, gw.days)} />
             <div className="gw-days">
@@ -12001,7 +12004,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         </div>
                         {/* 17 Oct 2026 (the user: "planned close times throughout the day"): the gate's shut windows */}
                         <div className="mt-2" data-gate-shut-form="1">
-                          <div className="text-xs font-medium text-slate-600">Shut during the day (optional)</div>
+                          <div className="text-xs font-medium text-slate-600" id="gate-shut-h">Shut during the day (optional)</div>
+                          <div role="group" aria-labelledby="gate-shut-h">
                           {(gateForm.shut_windows || []).map((w, i) => (
                             <div key={i} className="flex flex-wrap items-center gap-2 mt-1" data-gate-shut-row={i}>
                               <input type="time" value={w.from || ""} aria-label={`Shut time ${i + 1} from`}
@@ -12011,10 +12015,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                               <input type="time" value={w.to || ""} aria-label={`Shut time ${i + 1} to`}
                                 onChange={e => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.map((x, j) => j === i ? { ...x, to: e.target.value } : x) }))}
                                 className="border border-slate-300 rounded-lg px-2 py-1 text-sm" />
-                              <button type="button" className="text-xs text-slate-500 underline"
+                              <button type="button" className="text-xs text-slate-500 underline px-2 py-1" aria-label={`Remove shut time ${i + 1}`}
                                 onClick={() => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.filter((_, j) => j !== i) }))}>Remove</button>
                             </div>
                           ))}
+                          </div>
                           {(gateForm.shut_windows || []).length < GATE_SHUT_MAX && (
                             <button type="button" className="mt-1 text-xs border border-slate-300 rounded-lg px-2 py-1 text-slate-600 hover:bg-slate-50"
                               onClick={() => setGateForm(g => { const ws = g.shut_windows || [];
@@ -12023,8 +12028,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           )}
                         </div>
                         <p className="text-[11px] text-slate-400 mt-1">
-                          Blank hours use the default gate hours ({GATE_DEFAULT_HOURS.from}–{GATE_DEFAULT_HOURS.to} unless
-                          changed on Config → Planning). Shut times are when the gate takes no lorries inside its hours, for
+                          Blank hours use the default gate hours set on Config → Planning ({GATE_DEFAULT_HOURS.from}–{GATE_DEFAULT_HOURS.to}
+                          unless the scheme changed them). Shut times are when the gate takes no lorries inside its hours, for
                           example a school run or a lunch, every day it is open; at most {GATE_SHUT_MAX}. What the gate can check
                           in a day is its open minutes ÷ the induction minutes a lorry, less its shut times and any no-delivery
                           peak bands set on Config (an overlap counts once). A lorry may set off before the gate opens; the

@@ -68,7 +68,8 @@ import gates
 import taxonomy
 import zones
 
-#: 17 Oct 2026: the playback window when a day has no lorry at all — the default gate hours (was the 07:00 stand-in)
+#: 17 Oct 2026: the playback window when a day has no lorry at all and no scheme default is passed in (inp's
+#: "empty_window", the scheme's default gate hours, wins) — the shipped default gate hours (was the 07:00 stand-in)
 EMPTY_DAY_WINDOW = (gate_hours.minutes_of(gate_hours.DEFAULT_GATE_HOURS["from"]),
                     gate_hours.minutes_of(gate_hours.DEFAULT_GATE_HOURS["to"]))
 #: the app's own mixer: its legal fill is the pour's default m³ a load (factors.json, itself a stated assumption)
@@ -617,8 +618,12 @@ def simulate(inp, scen):
         if into:
             order = sorted(range(len(into)), key=lambda i: into[i]["len_m"])
             approach = into_keys[order[0]]
+        # 17 Oct 2026 (review; the user: a lorry "should [not] arrive before 0800"): a pour is typed, so its mixers can
+        # come while the gate is shut — before it opens, in a band or a shut time. They wait (step 5); the reply says how many.
+        shut_n = sum(1 for t in b["times"] if not any(a <= t < z for a, z in ivs[p["gate"]]))
         pour = {"gate": p["gate"], "start": p["start"], "m3": p["m3"], "m3_per_load": p["m3_per_load"],
-                "rate": p["rate"], "loads": b["loads"], "gap": b["gap"], "end": b["end"], "approach_leg": approach}
+                "rate": p["rate"], "loads": b["loads"], "gap": b["gap"], "end": b["end"], "approach_leg": approach,
+                "while_shut": shut_n}
         for t in b["times"]:
             by_gate[p["gate"]].append({"gate": p["gate"], "kind": "pour", "line": None, "route": None, "phase": None,
                                        "leg": approach, "t": t})
@@ -672,7 +677,7 @@ def simulate(inp, scen):
     if deps and dones:
         win = (max(0, math.floor((min(deps) - 10) / 30) * 30), min(24 * 60, math.ceil((max(dones) + 10) / 30) * 30))
     else:
-        win = EMPTY_DAY_WINDOW
+        win = tuple(inp.get("empty_window") or EMPTY_DAY_WINDOW)
     return {"per_line": per_line, "rounding_exact": rnd["exact"], "rounding_worst": rnd["worst"],
             "gates": out_g, "pour": pour, "haul": haul, "window": win, "total": sum(per_line)}
 
@@ -932,6 +937,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             win, basis = sc["all"], "scenario"
         elif gate_hours.window_of(grow):
             a, b = gate_hours.window_of(grow)
+            b = gate_hours._end(a, b)       # 17 Oct 2026: closing at 00:00 = the end of the same day, not past midnight
             if b <= a:
                 win, basis = None, "refused"
                 refused.append(gid)
@@ -949,7 +955,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     # it at its speed (the legs above are untouched), but it is the last few metres to a gate, not a haul road a planner
     # watches: it is not listed or counted with the haul roads. The reply says how many were left out.
     access_ids = {g.get("access_zone_id") for g in gate_rows.values() if g.get("access_zone_id")}
-    inp = {"lines": lines, "gates": G, "legs": legs, "leg_minutes": leg_minutes,
+    inp = {"lines": lines, "gates": G, "legs": legs, "leg_minutes": leg_minutes, "empty_window": dwin,
            "panel": {g["gate_id"]: g["arrivals_per_day"] for g in panel.get("gates") or []},
            # the haul roads some leg of the day was routed along (an unused or switched-off road is not listed)
            "haul_roads": {z: zone_rows[z] for z in sorted(used_zones - access_ids)} if with_lines else {}}
@@ -1055,7 +1061,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     if pour:
         pour = {"gate": pour["gate"], "start": hhmm(pour["start"]), "m3": pour["m3"],
                 "m3_per_load": pour["m3_per_load"], "rate": pour["rate"], "loads": pour["loads"],
-                "gap_minutes": _r2(pour["gap"]), "end": hhmm(pour["end"]), "approach_leg": pour["approach_leg"]}
+                "gap_minutes": _r2(pour["gap"]), "end": hhmm(pour["end"]), "approach_leg": pour["approach_leg"],
+                "while_shut": pour.get("while_shut", 0)}
 
     n_pour = pour["loads"] if pour else 0
     total_arr = sum(g["arrivals"] for g in out_gates)
@@ -1071,6 +1078,18 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     if any(G[g]["shut_typed"] for g in gate_ids):
         notes.append("Each gate's shut times are taken off its open hours; a lorry that comes while its gate is shut "
                      "waits for it to open.")
+    # 17 Oct 2026 (review): a gate whose bands and shut times leave no open minute places none of its lorries — said
+    for g in gate_ids:
+        if G[g]["window"] is not None and res["gates"][g]["open_minutes"] <= 0 and res["gates"][g]["unplaced"]:
+            _gr = gate_rows.get(g) or {}
+            notes.append(f"{(locations.get(_gr.get('location_id')) or {}).get('name') or g}, {_gr.get('name') or g}: the "
+                         f"no-delivery bands and its shut times leave no open time, so its {res['gates'][g]['unplaced']} "
+                         f"lorries are not placed.")
+    if res["pour"] and res["pour"].get("while_shut"):
+        _pg = gate_rows.get(res["pour"]["gate"]) or {}
+        _pn = (locations.get(_pg.get("location_id")) or {}).get("name") or res["pour"]["gate"]
+        notes.append(f"{res['pour']['while_shut']} of the pour's {res['pour']['loads']} mixers come while {_pn} is shut "
+                     f"(before it opens, in a no-delivery band or a shut time); they wait for it to open.")
     if bands_src == "example":
         notes.append(f"No peak bands are typed: Config's example bands ({gate_hours.peak_words(bands)}) stand in.")
     if not res["rounding_exact"]:
@@ -1101,6 +1120,9 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                   "vehicle_label": conversions.vehicle_label(factors, mx_name) if mx_name else None},
         # 17 Oct 2026: the default gate hours (was "stand_in", the lorry shift placed at 07:00)
         "default_hours": {"from": hhmm(dwin[0]), "to": hhmm(dwin[1])},
+        # COMPATIBILITY, one release (review, 17 Oct 2026): a Dashboard opened before the deploy still reads
+        # D.stand_in.from when its Simulation section mounts, and the page would go blank without it. Remove after.
+        "stand_in": {"from": hhmm(dwin[0]), "to": hhmm(dwin[1]), "shift_hours": (dwin[1] - dwin[0]) / 60.0},
         "near_pct": gate_hours.NEAR_PCT,
         "checks": {"arrivals_listed": len(arrivals), "arrivals_expected": expect,
                    "table_equals_arrivals": total_arr == len(arrivals) == expect - sum(g["unplaced"] for g in out_gates),

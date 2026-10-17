@@ -71,6 +71,10 @@ import weeks
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 SPREAD = "if arrivals are spread evenly"
+#: 17 Oct 2026 (review): a gate whose no-delivery bands and shut times cover all its hours — one meaning everywhere:
+#: shut all day, so any arrival is over what it can check in (red), with these words, never "no check-in typed"
+NO_OPEN_TIME = ("No open time: the no-delivery bands and this gate's shut times cover all its hours, so every arrival "
+                "is more than it can check in.")
 
 
 def r1(x):
@@ -285,6 +289,10 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         jd = judge(arr_raw, open_g, gm)
         gap, red, cap_raw, cap_pct, amber, flag = jd["gap"], jd["red"], jd["cap_raw"], jd["cap_pct"], jd["amber"], jd["flag"]
         cap = r1(cap_raw) if cap_raw is not None else None
+        shut_all_day = open_g <= 0
+        if shut_all_day:
+            # 17 Oct 2026 (review): no open minute left — red whenever lorries come, check-in typed or not, capacity 0
+            red, amber, flag, cap, cap_pct = total > 0, False, ("red" if total > 0 else None), 0.0, None
         roles = g["roles"] or g["pending_roles"]
         role = "both" if len(roles) == 2 else (next(iter(roles)) if roles else "destination")
         teams = sorted(((team_name(k), k) for k in g["team_trips"]),
@@ -314,7 +322,7 @@ def arrivals(month_index, acc, factors=None, working_days=None):
             "capacity_per_day": cap,
             "capacity_pct": cap_pct,
             # 14 Oct 2026 (W17): the "Queue likely" step in lorries a day (85 % of capacity), for the chart's guide tick
-            "near_per_day": (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None),
+            "near_per_day": (0.0 if shut_all_day else (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None)),
             "flag": flag,
             "status_word": gate_hours.STATUS_WORDS.get(flag),
             "open_minutes": open_g,
@@ -325,8 +333,9 @@ def arrivals(month_index, acc, factors=None, working_days=None):
             "shut_windows": om["shut"],
             "shut_minutes": om["shut_minutes"],
             "shut_words": om["shut_words"],
+            "no_open_time": shut_all_day,
             "closed_days": gate_hours.closed_days_words(grow),
-            "reason": _reason(arr if total > 0 else None, gap, gm, cap_pct, amber),
+            "reason": (NO_OPEN_TIME if (shut_all_day and total > 0) else _reason(arr if total > 0 else None, gap, gm, cap_pct, amber)),
             "pending_lines": g["pending_lines"],
             "pending_per_day": r1(g["pending_trips"] / wd),
             "teams": [t[0] for t in teams],
@@ -502,14 +511,17 @@ def week_by_day(lines, factors=None, dates=None):
             days_out.append({"date": iso, "day": day_words(iso), "arrivals": arr, "capacity": cap_day, "pct": pct,
                              "open": open_today, "flag": flag, "status_word": gate_hours.STATUS_WORDS.get(flag),
                              "_lines": keys.get((gid, iso), [])})
+        no_open = om["minutes"] <= 0
         out.append({"gate_id": gid, "gate_name": grow.get("name"), "location_id": grow.get("location_id"),
                     "location_name": loc.get("name") or grow.get("location_id") or "",
                     "check_in_minutes": gm, "open_minutes": om["minutes"], "open_basis": om["basis"],
                     "open_hours": om["hours"], "peak_minutes": om["peak_minutes"],
                     "shut_windows": om["shut"], "shut_minutes": om["shut_minutes"], "shut_words": om["shut_words"],
+                    # 17 Oct 2026 (review): the bands and shut times leave no open minute — every day is shut
+                    "no_open_time": no_open,
                     "closed_days": gate_hours.closed_days_words(grow),
-                    "capacity_per_day": (r1(cap_raw) if cap_raw is not None else None),
-                    "near_per_day": (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None),
+                    "capacity_per_day": (0.0 if no_open else (r1(cap_raw) if cap_raw is not None else None)),
+                    "near_per_day": (0.0 if no_open else (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None)),
                     "peak_pct": peak_pct, "flag": worst, "status_word": gate_hours.STATUS_WORDS.get(worst),
                     "days": days_out})
     order = {"red": 0, "amber": 1, None: 2}

@@ -435,7 +435,9 @@ ok("the response carries every key of the contract on every gate",
                   "teams", "per_team", "origin_share_note", "fallthrough_routes",
                   "status_word", "open_minutes", "open_basis", "open_hours", "peak_minutes", "closed_days", "near_per_day",
                   # 17 Oct 2026 (narrowed): the gate's shut windows, the minutes they take off and their words
-                  "shut_windows", "shut_minutes", "shut_words"} for g in gl)
+                  "shut_windows", "shut_minutes", "shut_words",
+                  # 17 Oct 2026 (narrowed, the review): a gate whose bands and shut times leave no open minute says so
+                  "no_open_time"} for g in gl)
    and set(res) == {"month", "label", "working_days", "shift_hours", "open_minutes", "scope", "gates", "notes",
                     "near_pct", "peak_bands", "limit", "default_hours"})
 
@@ -689,16 +691,48 @@ _sbad = [gates.update_gate("G003", shut_windows=[{"from": "12:00", "to": "11:00"
          gates.update_gate("G003", shut_windows=[{"from": "07:00", "to": "17:00"}]),
          gates.update_gate("G003", shut_windows="junk"),
          gates.update_gate("G003", shut_windows=[{"from": "12:00", "to": "12:00"}])]
+# NARROWED 17 Oct 2026 (the review): each refusal names the shut time as typed, never its place in the list (the form
+# drops blank rows, so a number would not match the row on screen)
 ok("🔴 the gate write refuses a shut time that ends before it starts, overlapping ones, a non-time, more than four, one "
-   "outside the gate's hours, ones that leave no open time, a bad shape and the same time twice — each in words",
-   [b.get("error") for b in _sbad] == ["shut time 1 must end after it starts (a shut time stays within one day)",
-                                       "shut time 2 overlaps another shut time",
-                                       "shut time 1: from and to must be 24-hour times such as 12:00",
+   "outside the gate's hours, ones that leave no open time, a bad shape and the same time twice — each in words, naming it",
+   [b.get("error") for b in _sbad] == ["shut time 12:00–11:00 must end after it starts (a shut time stays within one day)",
+                                       "shut time 08:30–10:00 overlaps another shut time",
+                                       "shut time 1pm–13:30: from and to must be 24-hour times such as 12:00",
                                        "at most 4 shut times a gate",
                                        "shut time 18:00–19:00 is outside the open hours 07:00–17:00 (the default)",
                                        "the shut times leave the gate no open time within 07:00–17:00 (the default)",
                                        "shut times must be a list of from–to times",
-                                       "shut time 1: from and to are the same time"], str(_sbad))
+                                       "shut time 12:00–12:00: from and to are the same time"], str(_sbad))
+ok("🔴 a half-typed shut time (one box blank) is refused in words that say both times are needed",
+   gates.update_gate("G003", shut_windows=[{"from": "12:00", "to": ""}]).get("error")
+   == "a shut time needs both times, from and to (12:00 to blank)")
+_s4 = gates.update_gate("G003", shut_windows=[{"from": "1%d:00" % i, "to": "1%d:10" % i} for i in range(4)])
+ok("⭐ exactly four shut times are accepted (the cap is four, not three) and two back to back are too",
+   len(_s4.get("shut_windows") or []) == 4
+   and gates.update_gate("G003", shut_windows=[{"from": "09:00", "to": "10:00"}, {"from": "08:00", "to": "09:00"}]).get("shut_windows")
+   == [{"from": "08:00", "to": "09:00"}, {"from": "09:00", "to": "10:00"}], str(_s4))
+gates.update_gate("G003", shut_windows=[])
+_ng = gates.create_gate("L3", "Late gate", 58.703, 24.203, direction="access", safety_minutes=2, open_from="18:00",
+                        open_to="02:00", shut_windows=[{"from": "23:00", "to": "00:00"}])
+ok("⭐ a shut time can end at midnight (23:00–00:00, 'to 00:00' is the end of the day): on an 18:00–02:00 gate, 480 − 60 = 420",
+   _ng.get("shut_windows") == [{"from": "23:00", "to": "00:00"}]
+   and gate_hours.open_minutes(_ng, factors)["minutes"] == 420.0 and gate_hours.open_minutes(_ng, factors)["shut_minutes"] == 60.0, str(_ng))
+gates.update_gate(_ng["id"], active=False)
+ok("the stored shut text in the API's own shape (a JSON list, as another tool might write it) reads too",
+   gate_hours.shut_windows({"shut_windows": '[{"from": "08:30", "to": "09:15"}]'}) == [{"from": "08:30", "to": "09:15"}]
+   and gate_hours.shut_windows({"shut_windows": '[{"from": "08:30"'}) == [])
+# creating a gate with shut times (the INSERT's 19 columns), and refused at creation as on an edit
+_cs = gates.create_gate("L3", "Shut gate", 58.704, 24.204, direction="access", safety_minutes=2,
+                        shut_windows=[{"from": "15:00", "to": "15:45"}, {"from": "08:30", "to": "09:15"}])
+_csrow = db.query("SELECT shut_windows, safety_minutes, open_from, access_zone_id FROM location_gates WHERE tenant_id = ? AND id = ?",
+                  (db.current_tenant(), _cs.get("id")))[0]
+ok("⭐ a gate CREATED with shut times stores them start-sorted beside its other columns, and one outside the hours is refused",
+   _cs.get("shut_windows") == [{"from": "08:30", "to": "09:15"}, {"from": "15:00", "to": "15:45"}]
+   and _csrow["shut_windows"] == "08:30-09:15,15:00-15:45" and _csrow["safety_minutes"] == 2.0 and _csrow["open_from"] is None
+   and _csrow["access_zone_id"] is None
+   and gates.create_gate("L3", "Bad shut", 58.7, 24.2, shut_windows=[{"from": "18:00", "to": "19:00"}]).get("error")
+   == "shut time 18:00–19:00 is outside the open hours 07:00–17:00 (the default)", str(_csrow))
+gates.update_gate(_cs["id"], active=False)
 _s3 = gates.update_gate("G003", shut_windows=[{"from": "15:00", "to": "15:45"}, {"from": "08:30", "to": "09:15"}])
 _s3row = db.query("SELECT shut_windows FROM location_gates WHERE tenant_id = ? AND id = ?", (db.current_tenant(), "G003"))[0]
 ok("⭐ shut times are stored start-sorted ('08:30-09:15,15:00-15:45') and read back as typed",
@@ -715,6 +749,15 @@ _rsb = {g["gate_id"]: g for g in gate_arrivals.arrivals(9, acc_planner, factors=
 ok("⭐ a shut time inside a no-delivery band counts once: 600 − the band 180 − 15:00–15:45 = 375 (08:30–09:15 is in the band)",
    _rsb["G003"]["open_minutes"] == 375.0 and _rsb["G003"]["peak_minutes"] == 180.0 and _rsb["G003"]["shut_minutes"] == 45.0,
    str(_rsb.get("G003"))[:300])
+_fpo = _copy.deepcopy(factors)
+_fpo["planning"]["peak_bands"] = [{"from": "07:00", "to": "10:00"}]
+_gpo = {"open_from": None, "open_to": None, "shut_windows": "09:30-10:30"}
+ok("⭐ a shut time PARTLY inside a band counts its other part only: 09:30–10:30 against 07:00–10:00 = 600 − 180 − 30 = 390",
+   (gate_hours.open_minutes(_gpo, _fpo)["minutes"], gate_hours.open_minutes(_gpo, _fpo)["peak_minutes"],
+    gate_hours.open_minutes(_gpo, _fpo)["shut_minutes"]) == (390.0, 180.0, 30.0))
+ok("...and one across the closing time counts its part inside the hours (16:30–17:30 on 07:00–17:00 takes 30) and is accepted",
+   gate_hours.open_minutes({"shut_windows": "16:30-17:30"}, factors)["shut_minutes"] == 30.0
+   and gate_hours.fit_problem({"shut_windows": "16:30-17:30"}, factors) is None)
 ok("the averages note says the shut times come off", any(n.startswith("Averages only") and "less its shut times" in n
    for n in gate_arrivals.arrivals(9, acc_planner, factors=factors, working_days=WD)["notes"]))
 ok("🔴 new hours that would leave a stored shut time outside them are refused, naming it; the hours stay as they were",
@@ -831,6 +874,53 @@ ok("🔴 W17: a team code sees the gate's total (same arrivals as the planner) b
    [d["arrivals"] for d in {g["gate_id"]: g for g in _pgt["gates_week"]["gates"]}["G003"]["days"]] == [d["arrivals"] for d in _gwg["G003"]["days"]]
    and {f["route_id"] for f in _pgt["clashes"]["flags"] if f["code"] in ("GATE_OVER", "GATE_NEAR")} <= {"R3"}
    and any(f["code"] == "GATE_OVER" for f in _pgt["clashes"]["flags"]), str({f["route_id"] for f in _pgt["clashes"]["flags"]}))
+# 17 Oct 2026 (the review): a gate whose shut times and the scheme's bands leave it NO open time — one meaning everywhere.
+# The gate write and a Config save from the page both refuse it; it can still arrive by a package or a save made
+# elsewhere, so the read says it in words: shut all day, red when lorries come, capacity 0, never "no check-in typed".
+import network as _network  # noqa: E402
+_cfg0 = json.loads(json.dumps(config.load(conversions, use_cache=False)))
+ok("the gate write accepts 10:00–16:00 on East compound while the scheme has no bands",
+   gates.update_gate("G003", shut_windows=[{"from": "10:00", "to": "16:00"}]).get("shut_windows") == [{"from": "10:00", "to": "16:00"}])
+_cfgb = json.loads(json.dumps(_cfg0))
+_cfgb["planning"]["peak_bands"] = [{"from": "07:00", "to": "10:00"}, {"from": "16:00", "to": "19:00"}]
+_gp = config.gate_problems(_cfgb, before=_cfg0)
+ok("⭐ a Config save that adds bands leaving a gate no open time is REFUSED from the page, naming the gate and why",
+   "Default gate hours and no-delivery bands: East compound, Compound gate: the shut times and the no-delivery bands leave the "
+   "gate no open time within 07:00–17:00 (the default). Change the gate on Data → Locations first, or keep the hours." in _gp
+   and config.save(_cfgb, by="test", network=_network)["ok"] is False
+   and config.gate_problems(_cfg0, before=_cfg0) == [], str(_gp))
+_cfgd = json.loads(json.dumps(_cfg0))
+_cfgd["planning"]["default_gate_hours"] = {"from": "11:00", "to": "17:00"}
+gates.update_gate("G001", shut_windows=[{"from": "08:00", "to": "08:45"}])
+ok("⭐ ...and one that moves the default gate hours off a gate's shut time names it too (the shut time would take nothing off)",
+   any("West pit, Weighbridge (in): shut time 08:00–08:45 is outside the open hours 11:00–17:00 (the default)" in p
+       for p in config.gate_problems(_cfgd, before=_cfg0)), str(config.gate_problems(_cfgd, before=_cfg0)))
+gates.update_gate("G001", shut_windows=[])
+config.save(_cfgb, by="test (no page check)")              # as a package or a hand edit could leave it
+config.invalidate()
+_pgz = lookahead.page("commit", today=_TODAY)
+_gz = {g["gate_id"]: g for g in _pgz["gates_week"]["gates"]}.get("G003") or {}
+_fz = [f for f in _pgz["clashes"]["flags"] if f["code"] == "GATE_OVER" and f["gate_id"] == "G003"]
+ok("⭐ Gates this week: no open time = every day shut (capacity 0, any arrival red), said so, and the rail says why, not 'closed'",
+   _gz.get("no_open_time") is True and _gz.get("capacity_per_day") == 0.0 and _gz.get("open_minutes") == 0.0
+   and all(d["open"] is False and d["capacity"] == 0.0 and (d["arrivals"] == 0 or d["flag"] == "red") for d in _gz.get("days", []))
+   and _fz and all(f["text"].endswith("but the no-delivery bands and the gate's shut times leave it no open time") for f in _fz),
+   str(_fz[:1]) + str(_gz)[:200])
+_mz = {g["gate_id"]: g for g in gate_arrivals.arrivals(9, acc_planner, factors=conversions.load_factors(), working_days=WD)["gates"]}["G003"]
+ok("⭐ the Dashboard's month: the same gate is red 'Over gate capacity' with the no-open-time words and capacity 0",
+   _mz["no_open_time"] is True and _mz["flag"] == "red" and _mz["status_word"] == "Over gate capacity"
+   and _mz["capacity_per_day"] == 0.0 and _mz["reason"] == gate_arrivals.NO_OPEN_TIME, str(_mz)[:300])
+assert config.save(_cfg0, by="test (restore)")["ok"]
+config.invalidate()
+gates.update_gate("G003", shut_windows=[])
+# 17 Oct 2026 (the review): the default gate hours are a GATE's day; the lorry shift that sets trips per lorry is untouched
+ok("🔴 the lorry figures never read the gate hours: derived.py names neither the default gate hours nor gate_hours, and the "
+   "trips rule gives the same with the default absent or 06:00–20:00",
+   "default_gate_hours" not in open(os.path.join(BACKEND, "derived.py"), encoding="utf-8").read()
+   and "gate_hours" not in open(os.path.join(BACKEND, "derived.py"), encoding="utf-8").read()
+   and all(gate_arrivals.trips_for(r, {**factors, "planning": {**factors["planning"], "default_gate_hours": {"from": "06:00", "to": "20:00"}}})
+           == gate_arrivals.trips_for(r, _fdef) for r in db.query("SELECT * FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),))))
+
 # the frontend fixture: the planner's committed week with its gates (the Look-ahead's W17 card reads it)
 _fx_w = os.path.join(HERE, "fixtures", "lookahead_gates_week.json")
 if not FAIL:

@@ -161,7 +161,8 @@ is rounded down or up to whole loads (the day's total is the month's average day
 they can be to the figures above, then the smallest change to each line, then the lowest route numbers). Each gate's
 arrivals are spread evenly over its open minutes, the peak bands and its shut windows taken off (a gate with no hours
 typed takes the default gate hours). No lorry is placed before its gate opens: each sets off its route's drive time earlier,
-so the first lorries set off before the opening. The busiest hour is the clock hour with most arrivals; the gate can check in 60 ÷ its
+so the first lorries set off before the opening (a concrete pour is typed, so its mixers can come while the gate is shut;
+they wait, and the reply says how many). The busiest hour is the clock hour with most arrivals; the gate can check in 60 ÷ its
 check-in minutes an hour. The same day, with a scenario (open hours, check-in, peak bands, a concrete pour), is
 <code>GET /api/sim/day?month=N</code>: one lane at each gate, first come first served; a lorry that comes while the gate
 is shut (before it opens, in a band or in one of its shut windows) waits for it to open, and one still waiting after the last open minute is checked in late and counted; the

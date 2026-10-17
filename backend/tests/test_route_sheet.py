@@ -483,6 +483,28 @@ _arr1, _lv1 = export.route_sheet_lines(dict(S2, exit=dict(S2["exit"], shut="12:0
 ok("...a different gate out names its own shut times on the 'Gate out' line; one gate both ways does not repeat them",
    _lv1[0] == "Gate out: South gate (shut 12:00–12:30)"
    and export.route_sheet_lines(dict(S2, exit=dict(S2["entry"])))[1][0] == "Gate out: North gate", str(_lv1))
+_arr2, _lv2 = export.route_sheet_lines(dict(S2, load_entry={"name": "Weighbridge (in)", "hours": None, "default_hours": "08:00–17:00",
+                                                             "shut": "12:00–12:30", "closed": "closed on Sundays"}))
+ok("⭐ the review: A's gate IN (where the lorry comes to load, timed by the Dashboard and the Simulation) gets its hours or the "
+   "default said so, closed days and shut times, before 'leave loaded by'",
+   "At A, come in by Weighbridge (in): open hours none typed (planned on 08:00–17:00, the default), closed on Sundays, shut 12:00–12:30." in _lv2
+   and _lv2.index("At A, come in by Weighbridge (in): open hours none typed (planned on 08:00–17:00, the default), closed on Sundays, shut 12:00–12:30.")
+   < next((i for i, x in enumerate(_lv2) if x.startswith("At A, leave loaded by")), 99)
+   and not any(x.startswith("At A, leave loaded by") for x in export.route_sheet_lines(dict(S2, load_entry={}))[1] if not S2["load_exit"].get("name")),
+   str(_lv2))
+# the LONGEST case again with every new line: four shut times on the gate in, four on the gate out, A's gate in typed
+gates.update_gate(G_IN["id"], shut_windows=[{"from": "08:00", "to": "08:30"}, {"from": "10:00", "to": "10:30"},
+                                            {"from": "12:00", "to": "12:30"}, {"from": "15:00", "to": "15:30"}])
+gates.update_gate(G_OUT["id"], shut_windows=[{"from": "08:10", "to": "08:40"}, {"from": "10:10", "to": "10:40"},
+                                             {"from": "12:10", "to": "12:40"}, {"from": "15:10", "to": "15:40"}])
+SL2 = rs.sheet("R1", acc=PLANNER)
+PL2 = export.build_route_sheet_pdf(SL2)
+TL2 = flat(PL2)
+ok("⭐ the LONGEST case with four shut times on each gate is still ONE page above the footer, both shut lines printed",
+   PL2.count(b"/Type /Page\n") == 1 and SL2["lowest_y"] >= SL2["footer_top"]
+   and "Gate shut 08:00–08:30, 10:00–10:30, 12:00–12:30 and 15:00–15:30" in TL2 and "(shut 08:10–08:40," in TL2,
+   f"{SL2['body_size']} {SL2['lowest_y']:.1f} {SL2['footer_top']:.1f} " + TL2[:200])
+gates.update_gate(G_OUT["id"], shut_windows=[])
 gates.update_gate(G_IN["id"], shut_windows=[])
 ok("clearing the shut times takes the line off the sheet", rs.sheet("R1", acc=PLANNER)["entry"]["shut"] is None
    and "Gate shut" not in flat(export.build_route_sheet_pdf(rs.sheet("R1", acc=PLANNER))))

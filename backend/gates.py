@@ -306,11 +306,10 @@ def _hours_problem(open_from, open_to, open_days, shut_windows=None):
     sp = gate_hours.shut_problem(shut_windows)
     if sp:
         return sp
-    if gate_hours.clean_shut(shut_windows):
-        import conversions
-        return gate_hours.shut_fit_problem({"open_from": f, "open_to": t, "shut_windows": shut_windows},
-                                           conversions.load_factors())
-    return None
+    # 17 Oct 2026 (review): the shut times must fit the hours, and the hours less the shut times AND the scheme's
+    # no-delivery bands must leave some open time — checked against the live Config (gate_hours.fit_problem)
+    import conversions
+    return gate_hours.fit_problem({"open_from": f, "open_to": t, "shut_windows": shut_windows}, conversions.load_factors())
 
 
 def _clean_hhmm(v):

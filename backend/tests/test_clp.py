@@ -390,11 +390,15 @@ _doc["planning"]["peak_bands"] = [{"from": "07:00", "to": "10:00"}, {"from": "16
 ok("a valid Euro class and two peak bands pass", config.validate(_doc) == [], str(config.validate(_doc)))
 # 17 Oct 2026 (the user): the scheme's default gate hours on Config → Planning, checked by config.validate
 _dg = lambda v: config.validate({**_doc, "planning": {**_doc["planning"], "default_gate_hours": v}})
-ok("🔴 Config refuses default gate hours that close before they open (or past midnight), that are not times, or not an object",
-   "planning.default_gate_hours: the gate must close after it opens (the default stays within one day)" in _dg({"from": "17:00", "to": "08:00"})
-   and "planning.default_gate_hours: the gate must close after it opens (the default stays within one day)" in _dg({"from": "08:00", "to": "08:00"})
-   and "planning.default_gate_hours: from and to must be 24-hour times such as 08:00" in _dg({"from": "8am", "to": "17:00"})
-   and "planning.default_gate_hours must be an object with from and to" in _dg("08:00-17:00"), str(_dg({"from": "17:00", "to": "08:00"})))
+# NARROWED 17 Oct 2026 (the review): the refusals are worded for the field a person sees, not the setting's path
+ok("🔴 Config refuses default gate hours that close before they open (or past midnight), that are not times, half-typed, or "
+   "not two times — in the field's own words",
+   "Default gate hours: the closing time must be after the opening time (they stay within one day)" in _dg({"from": "17:00", "to": "08:00"})
+   and "Default gate hours: the closing time must be after the opening time (they stay within one day)" in _dg({"from": "08:00", "to": "08:00"})
+   and "Default gate hours: type both times, as 24-hour times such as 08:00" in _dg({"from": "8am", "to": "17:00"})
+   and "Default gate hours: type both times, as 24-hour times such as 08:00" in _dg({"from": "", "to": "18:00"})
+   and "Default gate hours must be two times, from and to" in _dg("08:00-17:00")
+   and not any("planning.default_gate_hours" in p for p in _dg({"from": "17:00", "to": "08:00"})), str(_dg({"from": "17:00", "to": "08:00"})))
 ok("default gate hours of the scheme's own pass (08:00–18:00), and leaving them out means 08:00–17:00",
    _dg({"from": "08:00", "to": "18:00"}) == [] and "default_gate_hours" not in _doc["planning"]
    and gate_hours.default_hours(_doc) == {"from": "08:00", "to": "17:00"}

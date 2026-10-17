@@ -401,7 +401,9 @@ ok("open hours: the scheme's default gate hours, 07:00–17:00 here, on every ga
    "says so and where a gate's own hours are typed (Data → Locations; it said 'on Config', which was wrong)",
    all(g["open_basis"] == "default" and g["open_from"] == "07:00" and g["open_to"] == "17:00"
        and "the default gate hours" in (g["open_words"] or "") for g in D["gates"])
-   and D["default_hours"] == {"from": "07:00", "to": "17:00"} and "stand_in" not in D
+   and D["default_hours"] == {"from": "07:00", "to": "17:00"}
+   # NARROWED 17 Oct 2026 (the review): `stand_in` stays one release as the same hours, for Dashboards open across the deploy
+   and D["stand_in"] == {"from": "07:00", "to": "17:00", "shift_hours": 10.0}
    and any("07:00–17:00, the default gate hours" in n and "Data → Locations" in n for n in D["notes"])
    and not any("stood in" in n or "on Config." in n for n in D["notes"]), str(D["notes"]))
 ok("⭐ D84: the quarries and the terminal carry the share note, the compounds and stockpiles do not",
@@ -721,6 +723,10 @@ gab = {g["gate_id"]: g for g in GA["gates"]}
 # simulation's day on 08:00–17:00 — the same engine, the same day, read two ways
 _D8off = sim.day(9, acc_planner, factors=factors_code, working_days=WD)
 _busy_8 = {g["gate_id"]: (g["busiest"], g["busiest_hours"][0]) for g in _D8off["gates"]}
+# 17 Oct 2026 (the review): pinned as figures, as the example's are — the same month on 08:00–17:00
+ok("⭐ the busiest clock hour at every gate on the shipped 08:00–17:00 (lorries, first busiest hour), pinned",
+   _busy_8 == {"G005": (15, 8), "G001": (12, 8), "G007": (9, 8), "G009": (9, 10), "G003": (7, 8), "G011": (5, 9),
+               "G014": (5, 9), "G012": (4, 8), "G010": (4, 10), "G013": (3, 12), "G006": (2, 9)}, str(_busy_8))
 ok("⭐ GET /api/gates/arrivals carries each gate's busiest hour from the simulation's day (no pour, 08:00–17:00)",
    all(g.get("busiest_hour") for g in GA["gates"])
    and {k: (v["busiest_hour"]["lorries"], v["busiest_hour"]["hour"]) for k, v in gab.items()}
@@ -780,6 +786,19 @@ ok("⭐ the example's pour on the 9-hour default: 101 arrivals, 94 % of what Har
    and g7d["most_waiting"] == 14 and hm(g7d["most_at"]) == "12:38" and sim.js_round(g7d["minutes_lost"]) == 2765
    and sim.js_round(g7d["longest_wait"]) == 67,
    str({k: g7d[k] for k in ("arrivals", "pct", "flag", "most_waiting", "minutes_lost", "longest_wait")}))
+_D8b = sim.day(9, acc_planner, factors=factors_code, working_days=WD, scenario=sim.scenario_from_query(bands="on"))
+ok("the example bands on the shipped default: 540 − 08:00–10:00 − 16:00–17:00 = 360 open minutes at every gate",
+   all(g["open_minutes"] == 360 for g in _D8b["gates"]), str({g["gate_id"]: g["open_minutes"] for g in _D8b["gates"]}))
+ok("a day with no lorry plays the scheme's own default gate hours (07:00–17:00 set here; 08:00–17:00 shipped)",
+   sim.day(10, acc_planner, factors=factors, working_days=WD)["window"]["from"] == "07:00"
+   and sim.day(10, acc_planner, factors=factors_code, working_days=WD)["window"] == {"start": 480, "end": 1020, "from": "08:00", "to": "17:00"})
+_Dp7 = sim.day(9, acc_planner, factors=factors_code, working_days=WD, scenario=sim.scenario_from_query(**dict(POUR, pour_start="07:00")))
+ok("⭐ a pour typed for 07:00 at a gate opening 08:00: 8 of its 22 mixers come while it is shut, they wait, and the notes say so",
+   _Dp7["pour"]["while_shut"] == 8
+   and any(n.startswith("8 of the pour's 22 mixers come while Harborough Compound is shut") for n in _Dp7["notes"])
+   and all(a["start"] >= 480 for a in _Dp7["arrivals"] if a["gate"] == "G007"), str(_Dp7["notes"]))
+ok("the example pour at 10:00 comes while the gate is open: no such note", D8["pour"]["while_shut"] == 0
+   and not any("mixers come while" in n for n in D8["notes"]))
 ok("pour off on the default: still no lorry waits anywhere (the busiest gate is under 100 %)",
    all(g["queue_start"] is None for g in _D8off["gates"]) and max(g["pct"] or 0 for g in _D8off["gates"]) < 100)
 
@@ -794,6 +813,7 @@ ok("⭐ Harborough shut 12:00–12:30: 570 open minutes of 07:00–17:00, two op
    s7["open_minutes"] == 570 and s7["intervals"] == [[420, 720], [750, 1020]]
    and s7["shut_windows"] == [{"from": "12:00", "to": "12:30"}] and s7["shut_words"] == "12:00–12:30",
    str({k: s7[k] for k in ("open_minutes", "intervals", "shut_words")}))
+ok("the pour's four mixers due inside 12:00–12:30 are counted as coming while the gate is shut", Ds["pour"]["while_shut"] == 4)
 ok("⭐ no regular lorry is placed inside the shut time, and no check-in starts inside it (a mixer that comes then waits)",
    not any(720 <= a["at"] < 750 for a in _q if a["kind"] != "pour") and not any(720 <= a["start"] < 750 for a in _q)
    and any(a["kind"] == "pour" and 720 <= a["at"] < 750 and a["start"] >= 750 for a in _q))
@@ -815,6 +835,20 @@ ok("⭐ one rule: the Dashboard's Gate arrivals takes the same minutes off as th
    and _g7p["shut_minutes"] == 75 and _g7p["shut_words"] == "08:30–09:15 and 12:00–12:30", str(_g7p["open_minutes"]))
 ok("the busiest hour's note says the shut times are taken off",
    "its shut times taken off" in sim.busiest(9, acc_planner, factors, WD, _gap)["note"])
+# a gate whose shut times and the bands leave it no open time (the gate write cannot see a scenario's bands)
+gates.update_gate("G007", shut_windows=[{"from": "10:00", "to": "16:00"}])
+_Dz = sim.day(9, acc_planner, factors=factors_code, working_days=WD, scenario=sim.scenario_from_query(bands="on"))
+_z7 = {g["gate_id"]: g for g in _Dz["gates"]}["G007"]
+ok("⭐ no open time left (08:00–17:00 less the bands and 10:00–16:00): none of Harborough's lorries is placed, and a note "
+   "says so naming the gate", _z7["open_minutes"] == 0 and _z7["arrivals"] == 0 and _z7["unplaced"] > 0 and any(n.startswith("Harborough Compound, Station Road entrance (in): the no-delivery bands and its "
+                                                "shut times leave no open time, so its") for n in _Dz["notes"]), str(_Dz["notes"]))
+gates.update_gate("G007", shut_windows=[])
+# a gate closing at midnight is a same-day window (the Dashboard counted it; the simulation used to leave it out)
+gates.update_gate("G012", open_from="16:00", open_to="00:00")
+_g12m = {g["gate_id"]: g for g in sim.day(9, acc_planner, factors=factors, working_days=WD)["gates"]}["G012"]
+ok("⭐ a gate open 16:00–00:00 is simulated 16:00 to midnight (480 open minutes), not left out as past midnight",
+   _g12m["open_basis"] == "gate" and _g12m["open_minutes"] == 480 and _g12m["intervals"] == [[960, 1440]], str(_g12m)[:200])
+gates.update_gate("G012", open_from="", open_to="")
 gates.update_gate("G007", shut_windows=[])
 ok("clearing the shut times puts Harborough back to the whole day", gates.get_gate("G007")["shut_windows"] == []
    and {g["gate_id"]: g for g in sim.day(9, acc_planner, factors=factors, working_days=WD)["gates"]}["G007"]["open_minutes"] == 600)

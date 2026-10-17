@@ -209,6 +209,9 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
             gate_notes.append(f"The {leg} route on file {'ends' if leg == 'loaded' else 'starts'} {g['gap_m']:,} m from "
                               f"{g['name']}: {fix(g)}.")
     load_exit = _gate_words(o, "exit", r.get("origin_gate_id"), gbl.get(r["origin_id"]))
+    # 17 Oct 2026 (review): the gate a lorry comes IN by to load at A — the gate the Dashboard and the Simulation time the
+    # empty arrival against — with its hours (or the default, said so), closed days and shut times
+    load_entry = _gate_words(o, "entry", r.get("origin_gate_id"), gbl.get(r["origin_id"]), factors)
     bands = gate_hours.peak_bands(factors)
     lim_status, lim_lines = _limits_words(route_id, used, vehicle_text) if used else ("not_checked", [
         "No road route has been worked out for this route yet."])
@@ -233,7 +236,7 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         "last_mile_in": within(loaded, LAST_MILE_M, from_end=True),
         "last_mile_out": within(ret, LAST_MILE_M),
         "last_mile_m": LAST_MILE_M,
-        "load_exit": load_exit, "entry": entry, "exit": exit_site,
+        "load_exit": load_exit, "load_entry": load_entry, "entry": entry, "exit": exit_site,
         "peak_words": gate_hours.peak_words(bands),
         "gate_notes": gate_notes, "same_gate": same_gate,
         "route_reason": r.get("route_reason"), "permitted_deviations": r.get("permitted_deviations"),

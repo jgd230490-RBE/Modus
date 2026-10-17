@@ -400,7 +400,8 @@ def validate(doc, network=None):
         # 17 Oct 2026 (the user): the scheme's default gate hours, for every gate with none of its own (absent = 08:00–17:00)
         dg = gate_hours.default_hours_problem(plan.get("default_gate_hours"))
         if dg:
-            p.append(f"planning.{dg}")
+            # worded for the field a person sees (Config → Planning → Default gate hours), not the setting's path
+            p.append(dg)
     # 10 Oct 2026: the carbon block, when present. Every shape the carbon planner reads is
     # checked, so a Config save can never leave a document that makes every scenario fail:
     # the sub-blocks are objects, every factor a number >= 0 (null switches a figure off), a
@@ -577,9 +578,44 @@ def _vehicle_names_in(problems, doc):
     return out
 
 
+def gate_problems(doc, before=None):
+    """
+    17 Oct 2026 (review of the gate shut times): when a save changes the default gate hours or the no-delivery bands,
+    every active gate must still fit — its shut times inside its hours (typed, or the new default) and some open time
+    left after the shut times and the bands (gate_hours.fit_problem, the gate write's own rule). Otherwise a Config
+    change would silently stop a gate's shut times counting, or shut it all day, and then refuse that gate's next save.
+    [] when nothing about the gates' day changed, or every gate fits; else one sentence a gate, naming it.
+    """
+    import gate_hours
+    plan = (doc or {}).get("planning") or {}
+    old = ((before or {}).get("planning") or {}) if before is not None else None
+    if old is not None and old.get("default_gate_hours") == plan.get("default_gate_hours") \
+            and old.get("peak_bands") == plan.get("peak_bands"):
+        return []
+    try:
+        rows = db.query("SELECT * FROM location_gates WHERE tenant_id = ?", (db.current_tenant(),))
+        locs = {r["id"]: r.get("name") for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?",
+                                                          (db.current_tenant(),))}
+    except Exception:
+        return []            # no gates table yet (a cold database, or a test)
+    out = []
+    for g in sorted(rows, key=lambda r: r["id"]):
+        if g.get("active") in (False, 0, "0", "f", "false"):
+            continue
+        fp = gate_hours.fit_problem(g, doc)
+        if fp:
+            out.append(f"Default gate hours and no-delivery bands: {locs.get(g.get('location_id')) or g.get('location_id')}, "
+                       f"{g.get('name')}: {fp}. Change the gate on Data → Locations first, or keep the hours.")
+    return out
+
+
 def save(doc, by=None, network=None):
     """Validate and store. Returns {ok, problems}."""
     problems = validate(doc, network=network)
+    if not problems and network is not None:
+        # 17 Oct 2026: a Config save from the page (network passed) is checked against the gates' shut times
+        cur = get_row()
+        problems = gate_problems(doc, before=(cur or {}).get("doc") if cur else None)
     if problems:
         return {"ok": False, "problems": problems}
     if get_row():

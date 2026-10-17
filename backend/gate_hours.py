@@ -84,10 +84,16 @@ def days_problem(v):
 
 
 def _intervals(a, b):
-    """The window [a, b) in minutes of the day; one that ends at or before it starts runs past midnight."""
+    """The window [a, b) in minutes of the day; one that ends at or before it starts runs past midnight (one that
+    ends at 00:00 runs to the end of the day: no empty piece after midnight, 17 Oct 2026)."""
     if b > a:
         return [(a, b)]
-    return [(a, 1440), (0, b)]
+    return [(a, 1440)] + ([(0, b)] if b > 0 else [])
+
+
+def _end(a, z):
+    """17 Oct 2026: a time that ends at 00:00 after a start later in the day means the end of THAT day (1440)."""
+    return 1440 if (z == 0 and a is not None and a > 0) else z
 
 
 def _overlap(xs, ys):
@@ -123,6 +129,15 @@ def _shut_list(v):
     None for a shape that is none of these."""
     if v is None or v == "" or v == []:
         return []
+    if isinstance(v, str) and v.strip().startswith("["):
+        # 17 Oct 2026 (review): the API's own shape stored as text (a package written by another tool) reads too
+        try:
+            import json
+            v = json.loads(v)
+        except ValueError:
+            return None
+        if v == []:
+            return []
     if isinstance(v, str):
         v = [p for p in v.split(",") if p.strip()]
     if not isinstance(v, (list, tuple)):
@@ -154,16 +169,21 @@ def shut_problem(v):
     if len(ws) > MAX_SHUT_WINDOWS:
         return f"at most {MAX_SHUT_WINDOWS} shut times a gate"
     seen = []
-    for i, (f, t) in enumerate(ws):
+    # 17 Oct 2026 (review): each refusal names the shut time as typed, not its place in the list (the form drops blank
+    # rows, so a number would not match the row on screen); 00:00 as the end means midnight, the end of the day
+    for f, t in ws:
+        if not f or not t:
+            return f"a shut time needs both times, from and to ({f or 'blank'} to {t or 'blank'})"
         a, z = minutes_of(f), minutes_of(t)
         if a is None or z is None:
-            return f"shut time {i + 1}: from and to must be 24-hour times such as 12:00"
+            return f"shut time {f}–{t}: from and to must be 24-hour times such as 12:00"
+        z = _end(a, z)
         if a == z:
-            return f"shut time {i + 1}: from and to are the same time"
+            return f"shut time {f}–{t}: from and to are the same time"
         if z < a:
-            return f"shut time {i + 1} must end after it starts (a shut time stays within one day)"
+            return f"shut time {f}–{t} must end after it starts (a shut time stays within one day)"
         if _overlap([(a, z)], seen):
-            return f"shut time {i + 1} overlaps another shut time"
+            return f"shut time {f}–{t} overlaps another shut time"
         seen.append((a, z))
     return None
 
@@ -187,17 +207,23 @@ def shut_windows(gate):
     return [{"from": f, "to": t} for f, t in ws]
 
 
+def _shut_iv(shut):
+    """[(a, b)] minutes of the day for shut windows as read (a window ending 00:00 runs to the end of the day)."""
+    return [(minutes_of(s["from"]), _end(minutes_of(s["from"]), minutes_of(s["to"]))) for s in shut or []]
+
+
 def default_hours_problem(v):
     """17 Oct 2026: None when `v` (planning.default_gate_hours) is absent or {from, to} on one day, else the problem."""
     if v is None:
         return None
+    # worded for the field a person sees on Config → Planning (the review, 17 Oct 2026), not the setting's path
     if not isinstance(v, dict):
-        return "default_gate_hours must be an object with from and to"
+        return "Default gate hours must be two times, from and to"
     a, z = minutes_of(v.get("from")), minutes_of(v.get("to"))
     if a is None or z is None:
-        return "default_gate_hours: from and to must be 24-hour times such as 08:00"
+        return "Default gate hours: type both times, as 24-hour times such as 08:00"
     if z <= a:
-        return "default_gate_hours: the gate must close after it opens (the default stays within one day)"
+        return "Default gate hours: the closing time must be after the opening time (they stay within one day)"
     return None
 
 
@@ -296,7 +322,7 @@ def open_minutes(gate, factors):
     band_iv = [x for b in bands for x in _intervals(minutes_of(b["from"]), minutes_of(b["to"]))]
     after_bands = subtract(iv, band_iv)
     shut = shut_windows(gate)
-    left = subtract(after_bands, [(minutes_of(s["from"]), minutes_of(s["to"])) for s in shut])
+    left = subtract(after_bands, _shut_iv(shut))
     m_bands, m_left = sum(b - a for a, b in after_bands), sum(b - a for a, b in left)
     hours = (f"{gate['open_from'].strip()}–{gate['open_to'].strip()}" if basis == "gate"
              else f"{_hhmm(w[0])}–{_hhmm(w[1])}")
@@ -305,25 +331,30 @@ def open_minutes(gate, factors):
             "shut_words": peak_words(shut), "intervals": left}
 
 
-def shut_fit_problem(gate, factors):
+def fit_problem(gate, factors):
     """
-    17 Oct 2026, on a write: None when the gate's shut windows fit its hours (typed, or the default), else the problem
-    in words — a shut time wholly outside the hours (a typing slip: it would take nothing off), or shut times that
-    leave the gate no open time at all. The peak bands are the scheme's and are not counted here.
+    17 Oct 2026, on a write (the gate's, or a Config save that changes the default hours or the bands): None when the
+    gate keeps some open time and each of its shut windows lies at least partly inside its hours (typed, or the
+    default), else the problem in words — a shut time wholly outside the hours (a typing slip: it would take nothing
+    off), or hours that the shut times and the scheme's no-delivery bands cover entirely (the review: the bands count).
     """
     shut = shut_windows(gate)
-    if not shut:
-        return None
     w, basis = effective_window(gate, factors)
     iv = _intervals(*w)
     hours = (f"{gate['open_from'].strip()}–{gate['open_to'].strip()}" if basis == "gate"
              else f"{_hhmm(w[0])}–{_hhmm(w[1])} (the default)")
-    for s in shut:
-        if not _overlap(iv, [(minutes_of(s["from"]), minutes_of(s["to"]))]):
+    for s, si in zip(shut, _shut_iv(shut)):
+        if not _overlap(iv, [si]):
             return f"shut time {s['from']}–{s['to']} is outside the open hours {hours}"
-    if not subtract(iv, [(minutes_of(s["from"]), minutes_of(s["to"])) for s in shut]):
-        return f"the shut times leave the gate no open time within {hours}"
+    if open_minutes(gate, factors)["minutes"] <= 0:
+        what = ("the shut times and the no-delivery bands" if (shut and peak_bands(factors))
+                else ("the shut times" if shut else "the no-delivery bands"))
+        return f"{what} leave the gate no open time within {hours}"
     return None
+
+
+#: kept for callers written before the review (17 Oct 2026); fit_problem is the rule
+shut_fit_problem = fit_problem
 
 
 def is_open_on(gate, date):

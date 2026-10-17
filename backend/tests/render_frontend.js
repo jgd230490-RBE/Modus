@@ -607,7 +607,8 @@ if (loaded) {
         && (pP.match(/data-ga-busy="0">—</g) || []).length === 1 && !pP.replace(/data-ga-busy="0">—</g, "").includes("—") && pP.includes('data-ga-flag="none"') && pP.includes(">1 pending line would add 5.0 a day here once approved.<") && !/undefined|NaN/.test(pP));
       // 16 Oct 2026 (S3): the busiest hour, as GET /api/gates/arrivals sends it (sim.py's average working day). Injected into
       // the fixture here: test_gate_arrivals.py writes the module's reply, and the busiest hour is added by the endpoint.
-      const GAB = { ...GA, busiest_note: "Busiest hour: the lorries arriving in the busiest clock hour of an average working day, 312 whole loads spread evenly over each gate's open hours (07:00–17:00 stood in where none are typed). No pour.",
+      // NARROWED 17 Oct 2026 (the review): the injected note in the server's current words (the stood-in words are gone)
+      const GAB = { ...GA, busiest_note: "Busiest hour: the lorries arriving in the busiest clock hour of an average working day, 312 whole loads spread evenly over each gate's open hours (08:00–17:00 where none are typed). No pour.",
         gates: GA.gates.map((g, i) => ({ ...g, busiest_hour: i === 0 ? { lorries: 26, hour: "07:00", hours: ["07:00", "09:00", "12:00"], per_hour: 30.0 }
                                                        : i === 1 ? { lorries: 1, hour: "16:00", hours: ["16:00"], per_hour: null } : null })) };
       const bP = gaSeg(render("the Dashboard renders gate arrivals with the busiest hour", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAB, onOpen(){} })));
@@ -617,6 +618,16 @@ if (loaded) {
         && bP.includes("1 lorry arriving in the busiest clock hour (16:00) of an average working day. No check-in time typed, so nothing is compared.")
         && (bP.match(/<dt>Busiest hour<\/dt>/g) || []).length === 2 && bP.includes('data-ga-busy-note="1">Busiest hour: the lorries arriving in the busiest clock hour')
         && bP.includes(">Busiest hour</th>") && !/undefined|NaN|IPT ?\d/.test(bP));
+      // 17 Oct 2026 (the review): a gate WITH shut times, and one left no open time — drawn, not only read in the source
+      const GAS = { ...GA, gates: GA.gates.map((g, i) => i === 0 ? { ...g, shut_windows: [{ from: "12:00", to: "12:30" }], shut_minutes: 30, shut_words: "12:00–12:30" }
+                                                 : i === 1 ? { ...g, no_open_time: true, capacity_per_day: 0, capacity_pct: null, flag: "red", status_word: "Over gate capacity",
+                                                              reason: "No open time: the no-delivery bands and this gate's shut times cover all its hours, so every arrival is more than it can check in." } : g) };
+      const sgP = gaSeg(render("the Dashboard renders gate arrivals with shut times and a gate with no open time", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAS, onOpen(){} })));
+      ok("⭐ the review: a gate's shut times are drawn in its details ('12:00–12:30 (30 min off the open hours)'); the gate with no open "
+         + "time reads its reason in words; no undefined / NaN / team id",
+        sgP.includes("<dt>Shut</dt>") && sgP.includes("12:00–12:30 (30 min off the open hours)")
+        && sgP.includes("No open time: the no-delivery bands and this gate&#x27;s shut times cover all its hours")
+        && !/undefined|NaN|IPT ?\d/.test(sgP), sgP.slice(0, 200));
       const selP = seg(gP, '<select class="ga-sel"', "</select>");
       ok("the month select shows the fixture's month in the Dashboard's words (Sep 26), 24 months of the horizon",
         /<option value="9" selected="">Sep 26<\/option>/.test(selP) && (selP.match(/<option/g) || []).length === ctMeta.months.count && (selP.match(/selected/g) || []).length === 1
@@ -724,6 +735,13 @@ if (loaded) {
       ok("SIM: the haul roads table: Langton haul road 148 lorries, Stockpile North haul road 78, both ways",
         sP.includes('data-sim-haul="1"') && sTxt.includes("Langton haul road") && sTxt.includes("Stockpile North haul road")
         && seg(sP, "Langton haul road", "</tr>").includes("<b>148</b>") && seg(sP, "Stockpile North haul road", "</tr>").includes("<b>78</b>"));
+      // 17 Oct 2026 (the review): a gate with shut times in the Simulation's table
+      const SIMS = { ...SIMD, gates: SIMD.gates.map(g => g.gate_id === "G007" ? { ...g, shut_windows: [{ from: "12:00", to: "12:30" }], shut_words: "12:00–12:30" } : g) };
+      const ssP = seg(render("the Dashboard renders the Simulation with a shut time", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialSim: SIMS, onOpen(){} })), '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      ok("⭐ the review: the Simulation's table names Harborough's shut time under its hours and says the open minutes are after it",
+        seg(ssP, 'data-sim-gate="G007"', "</tr>").includes('data-sim-shut="G007">shut 12:00–12:30<')
+        && seg(ssP, 'data-sim-gate="G007"', "</tr>").includes("open min after the shut times")
+        && !/undefined|NaN/.test(seg(ssP, 'data-sim-gate="G007"', "</tr>")));
       ok("🔴 SIM: no undefined / NaN, no team id, none of the banned words or the word-rule words in the rendered section; lorries, never trucks",
         !/undefined|NaN|\bIPT ?[1-6]\b/.test(sP) && !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure)\b/i.test(sTxt));
       // 17 Oct 2026 (one screen): the timeline sits under the map in the left column; the table and the haul roads fold away
@@ -914,6 +932,14 @@ if (loaded) {
         // NARROWED 17 Oct 2026: the limit names the shut times and the bands
         gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours, less its shut times and the no-delivery bands; no hourly peak is known.")
         && gS.includes("so a day can be busier than the Dashboard&#x27;s month average"));
+      // 17 Oct 2026 (the review): the week card with a gate's shut times and one left no open time
+      const GWS = { ...GW, gates: GW.gates.map((g, i) => i === 0 ? { ...g, shut_minutes: 45, shut_words: "08:30–09:15" }
+                                                   : i === 1 ? { ...g, no_open_time: true, capacity_per_day: 0 } : g) };
+      const gwO = render("the Commit view renders the week with shut times", h(LookAhead, { meta: laMeta, who: "t", initialPage: { ...fixture, gates_week: GWS }, initialView: "commit" }));
+      const gwS = (() => { const i = gwO.indexOf('data-gates-week="1"'); return i < 0 ? "" : gwO.slice(i, gwO.indexOf("</section>", i)); })();
+      ok("⭐ the review: the week card says 'less 45 min shut' for a gate with shut times and 'No open time' for one with none left",
+        gwS.includes("less 45 min shut ÷") && gwS.includes("No open time: the no-delivery bands and this gate&#x27;s shut times cover all its hours.")
+        && !/undefined|NaN/.test(gwS), gwS.slice(0, 300));
       ok("W17: without the week's gates (an older page) the card is not drawn", !commitOut.includes('data-gates-week="1"'));
     }
     ok("...with the KPI strip, the clash rail and one row per line",

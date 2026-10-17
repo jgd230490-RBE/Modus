@@ -2721,7 +2721,7 @@ def _rs_block(c, x, y, w, head, body, size, draw=True, grey_body=False):
 
 def route_sheet_lines(S):
     """The words of the Arriving and Leaving blocks (route_sheet.sheet's gates, hours and no-delivery windows)."""
-    e, x_, lo = S["entry"], S["exit"], S["load_exit"]
+    e, x_, lo, li = S["entry"], S["exit"], S["load_exit"], S.get("load_entry") or {}
     # 17 Oct 2026: a gate with no hours typed says so and names the default the planning rests on (never printed as if
     # the gate's own); the gate's shut windows, when typed, on their own line
     arriving = [f"Gate in: {e['name'] or 'the site (no gate typed)'}",
@@ -2737,6 +2737,13 @@ def route_sheet_lines(S):
     leaving = [f"Gate out: {x_['name'] or 'the site (no gate typed)'}"
                + (f" (shut {x_['shut']})" if x_.get("shut") and x_.get("at") != e.get("at") else ""),
                "Then follow the dashed route back to A" + (f": {S['return_words']}." if S.get("return_words") else ".")]
+    if li.get("name"):
+        # 17 Oct 2026 (review): A's gate in, with its hours or the default (said so), closed days and shut times
+        hw = ("open " + li["hours"]) if li.get("hours") else (
+            f"open hours none typed (planned on {li['default_hours']}, the default)" if li.get("default_hours")
+            else "open hours not typed")
+        leaving.append(f"At A, come in by {li['name']}: {hw}" + (f", {li['closed']}" if li.get("closed") else "")
+                       + (f", shut {li['shut']}" if li.get("shut") else "") + ".")
     if lo.get("name"):
         leaving.append(f"At A, leave loaded by {lo['name']}.")
     return arriving, leaving

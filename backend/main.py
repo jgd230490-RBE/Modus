@@ -16,7 +16,7 @@ import os
 from html import escape as _html_escape
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -3426,8 +3426,9 @@ class GateIn(BaseModel):
     open_days: Optional[str] = None
     # 16 Oct 2026: the haul road drawn from the public road to this gate (a zone id); None = none
     access_zone_id: Optional[str] = None
-    # 17 Oct 2026: the gate's shut windows during the day, [{from, to}] (gate_hours.shut_problem); None or [] = none
-    shut_windows: Optional[List[dict]] = None
+    # 17 Oct 2026: the gate's shut windows during the day, [{from, to}] (gate_hours.shut_problem); None or [] = none.
+    # Also the stored text ('08:30-09:15,12:00-12:30') or a list of 'HH:MM-HH:MM': any other shape is refused in words
+    shut_windows: Optional[Union[List[dict], List[str], str]] = None
 
 
 class GatePatch(BaseModel):
@@ -3444,7 +3445,7 @@ class GatePatch(BaseModel):
     open_to: Optional[str] = None
     open_days: Optional[str] = None
     access_zone_id: Optional[str] = None
-    shut_windows: Optional[List[dict]] = None
+    shut_windows: Optional[Union[List[dict], List[str], str]] = None
 
 
 class RouteGatesIn(BaseModel):
@@ -3594,16 +3595,33 @@ def update_gate(gate_id: str, body: GatePatch, token: Optional[str] = None):
     # Locations PUT hit when a node drag started wiping salvaged vendor names.
     sent = set(_fields_set(body))
     fields = {k: getattr(body, k) for k in sent}
+    before = gates.get_gate(gate_id)
     out = gates.update_gate(gate_id, **fields)
     if not out.get("error"):
         # moving a gate moves the point HERE routed to, so any cached geometry on a
         # route that uses it is stale. The re-bake is NOT run here — its cost is quoted
         # in the UI first, as zone and haul-road writes already do.
-        moved = bool({"lat", "lon", "direction", "active"} & sent)
-        out["rebake_needed"] = moved or ("access_zone_id" in sent)
+        # 17 Oct 2026 (review): the gate form sends every field on every save, so a field SENT is not a field CHANGED —
+        # a planner typing a shut time was asked to re-route (and spend HERE calls) for nothing. Compared with the row
+        # as it was; a gate that did not exist before keeps the old rule (anything sent counts).
+        def changed(k):
+            if k not in sent:
+                return False
+            if before.get("error"):
+                return True
+            a, b = before.get(k), out.get(k)
+            if k in ("lat", "lon"):
+                try:
+                    return abs(float(a) - float(b)) > 1e-9
+                except (TypeError, ValueError):
+                    return a != b
+            return (a or None) != (b or None)
+        moved = any(changed(k) for k in ("lat", "lon", "direction", "active"))
+        road = changed("access_zone_id")
+        out["rebake_needed"] = moved or road
         out["routes_affected"] = gates.routes_using(gate_id) if moved else []
         # 16 Oct 2026: a new or cleared access road changes every route at the gate's location
-        if "access_zone_id" in sent:
+        if road:
             out["routes_affected"] = sorted(set(out["routes_affected"]) | set(gates.routes_at_location(out["location_id"])))
     return out
 

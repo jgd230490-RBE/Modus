@@ -355,7 +355,8 @@ ok("⭐ a deleted haul road is nobody's access road: clear_access_for_zone retur
 _mn = read("backend/main.py")
 ok("...the zone DELETE does it (after working out what to clear, before deleting); the gate PATCH reports a re-route",
    "gates_cleared = gates.clear_access_for_zone(zone_id)" in _mn and 'out["access_road_of_gates"] = gates_cleared' in _mn
-   and 'out["rebake_needed"] = moved or ("access_zone_id" in sent)' in _mn
+   # NARROWED 17 Oct 2026 (the review): a CHANGED access road (not merely sent) asks for the re-route
+   and 'out["rebake_needed"] = moved or road' in _mn and 'road = changed("access_zone_id")' in _mn
    and "set(gates.routes_at_location(out[\"location_id\"]))" in _mn
    and "access_zone_id: Optional[str] = None" in _mn and "access_zone_id=body.access_zone_id" in _mn)
 

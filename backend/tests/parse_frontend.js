@@ -3059,18 +3059,32 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes('data-cfg="default-gate-hours"') && src.includes("<label>Default gate hours</label>")
      && src.includes("aria-label={`Default gate hours ${k}`}")
      && src.includes("value={((doc.planning || {}).default_gate_hours || GATE_DEFAULT_HOURS)[k] || \"\"}")
-     && src.includes("if(!e.target.value || (v.from === GATE_DEFAULT_HOURS.from && v.to === GATE_DEFAULT_HOURS.to)) delete d.planning.default_gate_hours;"));
+     // NARROWED 17 Oct 2026 (the review): clearing ONE box keeps the other half; only both blank or the default deletes it
+     && src.includes("if((!v.from && !v.to) || (v.from === GATE_DEFAULT_HOURS.from && v.to === GATE_DEFAULT_HOURS.to)) delete d.planning.default_gate_hours;")
+     && !src.includes("if(!e.target.value || (v.from === GATE_DEFAULT_HOURS.from"));
   ok("🔴 the lorry shift no longer stands in for a gate anywhere on a screen: no 'stood in', no stand_in, no 'h shift stands in'",
      !src.includes('open_basis === "stood_in"') && !src.includes("D.stand_in") && !src.includes("stands in at")
      && !src.includes("(stood in") && !src.includes("Blank hours use the scheme's shift") && !src.includes("open_basis === \"shift\""));
-  const _gNew = [src.slice(src.indexOf('<div className="hint">When a gate is open where its own hours are not typed'), src.indexOf("</div>", src.indexOf('<div className="hint">When a gate is open where its own hours are not typed'))),
-                 src.slice(src.indexOf("Blank hours use the default gate hours"), src.indexOf("never blocked.", src.indexOf("Blank hours use the default gate hours")))];
+  const _h1 = '<div className="hint">The hours a gate is open when none of its own are typed on Data → Locations';
+  const _gNew = [src.slice(src.indexOf(_h1), src.indexOf("</div>", src.indexOf(_h1))),
+                 src.slice(src.indexOf("Blank hours use the default gate hours set on Config"), src.indexOf("never blocked.", src.indexOf("Blank hours use the default gate hours set on Config")))];
   ok("🔴 the new words pass the word rule (no server, endpoint, token, geometry, bake, JSON) and say lorry, never truck",
      _gNew.every(t => t.length > 100 && !/\b(servers?|endpoints?|tokens?|geometry|bak\w*|JSON|trucks?)\b/i.test(t)), JSON.stringify(_gNew.map(t => t.length)));
   ok("the Simulation and the big screen say the default gate hours and the shut times, from the reply",
      src.includes("open {D.default_hours.from}–{D.default_hours.to}, the default gate hours.")
      && src.includes("(the default: no open hours typed)`") && src.includes('", their shut times taken off"')
-     && src.includes("data-sim-shut={g.gate_id}") && src.includes("No lorry is placed before its gate opens: it sets off its route's drive time earlier"));
+     // NARROWED 17 Oct 2026 (the review): the noun, the check-in condition and a typed pour
+     && src.includes("data-sim-shut={g.gate_id}") && src.includes("No lorry is placed before its gate opens: each sets off its route's drive time earlier, so the first lorries set off before the opening.")
+     && src.includes("a pour you type can bring mixers then, and the notes say how many"));
+  ok("🔴 the review: each shut time's Remove is named for its row and has a 24 px hit area; the rows are one named group",
+     src.includes("aria-label={`Remove shut time ${i + 1}`}") && src.includes('className="text-xs text-slate-500 underline px-2 py-1"')
+     && src.includes('<div role="group" aria-labelledby="gate-shut-h">') && src.includes('id="gate-shut-h">Shut during the day (optional)</div>'));
+  ok("⭐ the review: a gate left no open time says so on the chart's tooltip and the week's card, never 'no check-in time typed'",
+     src.includes('r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null')
+     && src.includes(`g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."`));
+  ok("the Config hint is a sentence and says a change that strands a gate is refused, naming it",
+     src.includes(_h1 + "; {GATE_DEFAULT_HOURS.from} to {GATE_DEFAULT_HOURS.to} unless you change them here.")
+     && src.includes("A change that would leave a gate's shut times outside its hours, or the gate no open time, is refused and names the gate."));
 }
 
 // ---- 14 Oct 2026 (D9 + D14, the mobile shell; notes/session-1014-mobile-shell.md) ----------------------------------------
