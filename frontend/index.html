@@ -514,10 +514,10 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:13px;color:var(--muted);background:var(--surface);}
   .sim-chip-staff{color:var(--navy);background:var(--navy-soft);border-color:transparent;font-weight:600;}
   .sim-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
-  @media (min-width:1024px){.sim-grid{grid-template-columns:minmax(0,1fr) 340px;}}
+  @media (min-width:1280px){.sim-grid{grid-template-columns:minmax(0,1fr) 340px;}}
   .sim-map-wrap{position:relative;align-self:start;min-width:0;}
   .sim-map{height:520px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
-  .sim-legend{position:absolute;left:10px;bottom:10px;background:rgba(255,255,255,.95);border:1px solid #E7E5E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1E293B;z-index:2;}
+  .sim-legend{position:absolute;left:10px;bottom:10px;background:#FFFFFF;border:1px solid #E7E5E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1E293B;z-index:2;}
   .sim-legend div{display:flex;align-items:center;gap:7px;margin:2px 0;}
   .sim-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-sizing:border-box;}
   .sim-dot-laden{background:var(--sim-lorry);}
@@ -571,7 +571,10 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-tl-cursor{stroke:var(--ink);stroke-width:1.5;}
   .sim-scroll{margin-top:6px;border:1px solid var(--line);border-radius:8px;}
   .sim-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
-  .sim-table{width:100%;min-width:1180px;border-collapse:collapse;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .sim-hours{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  .sim-table td:nth-child(2){min-width:110px;}
+  .sim-table td:nth-child(8){min-width:130px;}
+  .sim-table{width:100%;min-width:1360px;border-collapse:collapse;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
   .sim-table th{font-size:13px;font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);background:var(--surface-2);color:var(--ink);vertical-align:bottom;}
   .sim-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
   .sim-th-sub,.sim-sub{font-size:13px;font-weight:400;color:var(--muted);}
@@ -8468,8 +8471,10 @@ function SimPlayer({ meta, D, store, scenario }){
     if(!playing){ last.current = null; return; }
     const step = (ts) => {
       if(last.current != null){
+        // the loop keeps its own time: a frame that comes before React has drawn the last one still moves the clock on
         let n = tRef.current + (ts - last.current) / 1000 * (s1 - s0) / SIM_PLAY_SECONDS * spRef.current;
         if(n >= s1){ n = s1; setPlaying(false); }
+        tRef.current = n;
         setT(n);
       }
       last.current = ts;
@@ -8592,7 +8597,7 @@ const SimTable = React.memo(function SimTable({ D, editable, onHours, onCheckIn,
                   aria-label={`${g.location_name}, ${g.gate_name}: check-in minutes a lorry`} onChange={e => onCheckIn(g, e.target.value)} />
               : (g.check_in == null ? "not typed" : `${+g.check_in} min`)}</td>
             <td className="num">{simN1(g.capacity)}<div className="sim-sub">{g.pct != null ? `${g.pct} % used` : ""}</div></td>
-            <td className="num" data-sim-busy={g.busiest}><b>{g.busiest}</b><div className="sim-sub">{bh}{g.even_rate != null ? ` · even spread ${simN1(g.even_rate)} an hour` : ""}</div></td>
+            <td className="num" data-sim-busy={g.busiest}><b>{g.busiest}</b><div className="sim-sub">{bh}</div>{g.even_rate != null && <div className="sim-sub">even spread {simN1(g.even_rate)} an hour</div>}</td>
             <td className="num">{simN1(g.per_hour)}</td>
             <td>{g.queue_start == null ? "No queue" : <><b className="sim-red">{g.bottleneck_at != null ? `bottleneck ${simHM(g.bottleneck_at)}` : `short waits from ${simHM(g.queue_start)}`}</b>
               <div className="sim-sub">first wait {simHM(g.queue_start)}</div></>}

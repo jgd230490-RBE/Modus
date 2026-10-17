@@ -582,19 +582,32 @@ async function simDom(){
   await toggle(det, false); await toggle(det, true);
   ok("SIM DOM: folding and opening again reads nothing more", simCalls().length === 1, JSON.stringify(simCalls()));
 
-  // the clock
+  // the clock. The test drives the animation frames itself (jsdom's own frames race React's act and made this flaky):
+  // a frame every 100 ms of page time; 05:30–17:30 plays in 60 s at 1×, so one second of frames is 12 minutes of the day
   const clock = () => m.el.querySelector("[data-sim-clock]").textContent;
   const play = () => m.el.querySelector("[data-sim-play]");
+  const realRaf = w.requestAnimationFrame, realCaf = w.cancelAnimationFrame, queued = new Map();
+  let rafId = 0, pageMs = 1000;
+  w.requestAnimationFrame = (cb) => { queued.set(++rafId, cb); return rafId; };
+  w.cancelAnimationFrame = (id) => { queued.delete(id); };
+  const frames = (n) => act(() => { for (let i = 0; i < n; i++){ const due = [...queued.values()]; queued.clear(); pageMs += 100; due.forEach(cb => cb(pageMs)); } });
   ok("SIM DOM: the clock starts at the first lorry setting off (05:30) and the button says Play", clock() === "05:30" && play().textContent === "Play");
   await act(async () => { play().click(); });
-  await settle(400);
+  frames(11);
   const ran = clock();
-  ok("⭐ SIM DOM: Play moves the clock and the button says Pause", ran !== "05:30" && play().textContent === "Pause", ran);
+  ok("⭐ SIM DOM: Play moves the clock — one second of frames is 12 minutes of the day (05:30 → 05:42) — and the button says Pause",
+     ran === "05:42" && play().textContent === "Pause", ran);
   await act(async () => { play().click(); });
-  await settle(60);
   const held = clock();
-  await settle(200);
-  ok("SIM DOM: Pause holds the clock", clock() === held && play().textContent === "Play", held + " " + clock());
+  frames(10);
+  ok("SIM DOM: Pause holds the clock (no frame is asked for while paused)", clock() === held && held === "05:42" && play().textContent === "Play" && queued.size === 0, held + " " + clock());
+  const twoX = m.el.querySelector('select[aria-label="Playback speed"]');
+  await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(twoX, "2"); twoX.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  await act(async () => { play().click(); });
+  frames(11);
+  ok("SIM DOM: at 2× one second of frames is 24 minutes (05:42 → 06:06)", clock() === "06:06", clock());
+  await act(async () => { play().click(); });
+  w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
   const restart = byText(m.el, "button", "Restart");
   await act(async () => { restart.click(); await sleep(20); });
   ok("SIM DOM: Restart puts the clock back to 05:30", clock() === "05:30");

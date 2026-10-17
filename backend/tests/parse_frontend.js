@@ -2289,7 +2289,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && /:root\{--sim-lorry:#2563EB;--sim-mixer:#E8590C;\}/.test(html) && /html\[data-theme="dark"\]\{--sim-lorry:#5B8FF0;--sim-mixer:#E8681E;\}/.test(html));
   ok("🔴 S7: its own Mapbox instance (CommitMap's pattern), never removed; the only .remove() is a waiting badge's marker; no new script",
     (mapSrc.match(/new window\.mapboxgl\.Map\(/g) || []).length === 1 && (mapSrc.match(/\.remove\(\)/g) || []).length === 1 && mapSrc.includes("try { x.m.remove(); } catch(e){}")
-    && !/<script|createElement\("script"\)/.test(simSrc) && (html.match(/<script[^>]+src=/g) || []).length === (html.match(/<script[^>]+src=/g) || []).length);
+    // no new third-party script: the page loads the same six scripts it loaded on main ba295a4
+    && !/<script|createElement\("script"\)/.test(simSrc) && (html.match(/<script[^>]*src=/g) || []).length === 6);
   ok("⭐ S7: the drawing reads the server's plan: each lorry along its own leg at the parts' speeds, waiting lorries 25 m apart in the gate's one lane",
     simSrc.includes("for(const p of parts){ if(el <= p[5]) return p[0] + (el - p[4]) * p[2]; }") && simSrc.includes("const SIM_QUEUE_M = 25;")
     && simSrc.includes("Object.keys(lanes).forEach(g => lanes[g].sort((x, y) => x.start - y.start));") && simSrc.includes("leg.len_m - Math.max(0, q) * SIM_QUEUE_M"));
