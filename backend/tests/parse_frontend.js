@@ -2028,7 +2028,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && code.includes("<Dashboard meta={meta} phone={narrow} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature); 14 Oct 2026: + phone
     // NARROWED 14 Oct 2026 (bundle G, W7: the render harness's prop initialClp joins the signature too; merged with D9's phone)
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen, phone })")
+    // NARROWED 16 Oct 2026 (S7: the render harness's prop initialSim joins the signature)
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialSim, onWall, onOpen, phone })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2217,6 +2218,112 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
 }
 
+// ---- 16 Oct 2026 (S3): the busiest hour on the Gate arrivals panel ----------------------------------------------------
+// Source-level. What they prove: the "Gate by gate" table carries a sixth column, "Busiest hour", read from the server's
+// `busiest_hour` (sim.py's average working day) and formatted only; the details line says the hour and what the gate can
+// check in an hour; the server's note is printed under the table. Not covered here: the loaded rows (render_frontend.js).
+{
+  const b0 = src.indexOf("// ---- 11 Oct 2026: Gate arrivals on the Dashboard");
+  const b1 = src.indexOf("// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast");
+  const gb = src.slice(b0, b1).split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  const gbW = gb.slice(gb.indexOf("const gaBusyCell"), gb.indexOf("function GateArrivalsPanel"));
+  ok("⭐ S3: the gate table has a sixth column, Busiest hour, with its phone label, and the details row spans six",
+    gb.includes('<th scope="col" className="num">Busiest hour</th><th scope="col">Status</th>')
+    && gb.includes("colSpan={6}") && !gb.includes("colSpan={5}")
+    && ["Arrivals a day", "Average gap", "Check-in a lorry", "Busiest hour", "Status"].every(l => gb.includes(`data-label="${l}"`)));
+  ok("S3: the cell and the details line format the server's busiest_hour (lorries, hour, hours, per_hour); nothing is worked out",
+    gbW.includes('const gaBusyCell = (b) => b && b.lorries ? `${b.lorries} at ${b.hour}` : "—";')
+    && gb.includes("{gaBusyCell(g.busiest_hour)}") && gb.includes('<RdItem t="Busiest hour" wide>{gaBusyWords(g.busiest_hour)}</RdItem>')
+    && gbW.includes("`The gate can check in ${gaN1(b.per_hour)} an hour.`") && gbW.includes("No check-in time typed, so nothing is compared.")
+    && gbW.length > 200 && !/Math\.(ceil|floor|round|max)\(|\/ *60|\* *60/.test(gbW));
+  ok("S3: the server's note on where the busiest hour comes from is printed under the notes",
+    gb.includes('{ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}')
+    && gb.indexOf("data-ga-busy-note") > gb.indexOf("(ga.notes || []).map("));
+  ok("S3: no banned word and no 'peak hour' in the new words",
+    !/\b(secure|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|trucks?|peak hour)\b/i.test(gbW));
+}
+
+// ---- 16 Oct 2026 (S7): the Simulation on the staff Dashboard ----------------------------------------------------------
+// Source-level. What they prove: the section sits under Gate arrivals on the desk Dashboard only (not the big screen),
+// folded and read on first open with one GET; it writes nothing and keeps nothing (no storage, no address: D86); the
+// figures are the server's (the browser draws positions and counts what it draws, nothing else); dots not icons (D81);
+// its own Mapbox instance, never removed; no new script; no hourly HERE switch (D92); the holding area greyed; the words.
+// Not covered here: the rendered section (render_frontend.js), the reads and the clock (dom_frontend.js), a browser.
+{
+  const s0 = src.indexOf("// ---- 16 Oct 2026 (S7): the Simulation on the staff Dashboard ----");
+  const s1 = src.indexOf("function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){");
+  const simSrc = s0 > 0 && s1 > s0 ? src.slice(s0, s1) : "";
+  const simc = simSrc.split("\n").map(l => l.replace(/^\s*\/\/.*$/, "")).join("\n");
+  const fn = (name, next) => simSrc.slice(simSrc.indexOf(`function ${name}(`), next ? simSrc.indexOf(next) : undefined);
+  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPanel");
+  const _dbS = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
+  const _dbSW = _dbS.slice(_dbS.indexOf("{!wall ? ("), _dbS.indexOf("      ) : (\n        <>\n")), _dbSWl = _dbS.slice(_dbS.indexOf("      ) : (\n        <>\n"));
+  ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
+    simSrc.length > 20000 && ["function SimulationPanel({ meta, months, phone, initial })", "function SimPlayer({ meta, D, store, scenario, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
+      "function SimMap({ meta, D, store, frame })", "function SimTimeline({ D, t, onSeek })", "const SimScenario = React.memo(function SimScenario(",
+      "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f)));
+  ok("⭐ S7: under Gate arrivals on the desk Dashboard, before the folded sections; never on the big screen",
+    _dbSW.includes("<SimulationPanel meta={meta} months={months} phone={phone} initial={initialSim} />")
+    && _dbSW.indexOf("<SimulationPanel") > _dbSW.indexOf("<GateArrivalsPanel") && _dbSW.indexOf("<SimulationPanel") < _dbSW.indexOf('<details className="dash-more"')
+    && !_dbSWl.includes("<SimulationPanel") && (code.match(/<SimulationPanel /g) || []).length === 1);
+  ok("⭐ S7: folded, read on FIRST OPEN with one GET of /api/sim/day (the lines once a month), keyed on open, the month and the scenario",
+    panelSrc.includes('<details className="dash-more" data-sim="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>')
+    && panelSrc.includes("if(!open) return;") && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [open, month, scKey]);")
+    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (simc.match(/fetch\(/g) || []).length === 1);
+  ok("🔴 S7 (D86): nothing written, nothing kept, nothing in the address — no method, no storage, no history, no location in the block",
+    !/method:|localStorage|sessionStorage|history\.|location\.|postJSON|navigator\.clipboard/.test(simc));
+  ok("⭐ S7: the scenario reaches the server only as the query its parser reads (hours, check_in, bands, pour_*, legs=1)",
+    ["`hours=${encodeURIComponent(\"all=\" + sc.all[0] + \"-\" + sc.all[1])}`", "`check_in=${encodeURIComponent(g + \"=\" + sc.check_in[g])}`",
+     "`bands=${sc.bands ? \"on\" : \"off\"}`", "`pour_gate=${encodeURIComponent(p.gate)}`", "`pour_m3_per_load=${encodeURIComponent(p.mpl)}`", 'q.push("legs=1")'].every(t => simSrc.includes(t)));
+  ok("🔴 S7: the browser works out no figure: the table and the cards print the server's fields; no capacity, share, wait or rounding of a day here",
+    ["g.busiest", "g.pct", "g.capacity", "g.minutes_lost", "g.bottleneck_at", "g.most_waiting", "g.longest_wait", "g.late", "g.per_hour", "g.panel_per_day", "D.checks.table_equals_arrivals", "D.checks.largest_panel_difference"].every(f => simSrc.includes(f))
+    && !/60 \/ |\* 100|\/ g\.check_in|open_minutes \//.test(simc)
+    // the one ceil is the timeline's first hour tick (drawing)
+    && (simc.match(/Math\.ceil/g) || []).length === 1 && simc.includes("for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++)"));
+  ok("⭐ S7 (D85): the timeline's red mark is the server's bottleneck (the first wait longer than the check-in), said in words",
+    simSrc.includes("{g.bottleneck_at != null") && simSrc.includes("bottleneck from {simHM(g.bottleneck_at)} · up to {g.most_waiting} waiting")
+    && simSrc.includes("none longer than the {+g.check_in} min check-in"));
+  ok("⭐ S7 (D81): lorries are dots (one circle layer, laden filled, empty hollow, mixers orange, waiting red); no icons",
+    mapSrc.includes('m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries"') && !/icon-image|loadImage|addImage/.test(mapSrc)
+    && mapSrc.includes('"laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"')
+    && /:root\{--sim-lorry:#2563EB;--sim-mixer:#E8590C;\}/.test(html) && /html\[data-theme="dark"\]\{--sim-lorry:#5B8FF0;--sim-mixer:#E8681E;\}/.test(html));
+  ok("🔴 S7: its own Mapbox instance (CommitMap's pattern), never removed; the only .remove() is a waiting badge's marker; no new script",
+    (mapSrc.match(/new window\.mapboxgl\.Map\(/g) || []).length === 1 && (mapSrc.match(/\.remove\(\)/g) || []).length === 1 && mapSrc.includes("try { x.m.remove(); } catch(e){}")
+    // no new third-party script: the page loads the same six scripts it loaded on main ba295a4
+    && !/<script|createElement\("script"\)/.test(simSrc) && (html.match(/<script[^>]*src=/g) || []).length === 6);
+  ok("⭐ S7: the drawing reads the server's plan: each lorry along its own leg at the parts' speeds, waiting lorries 25 m apart in the gate's one lane",
+    simSrc.includes("for(const p of parts){ if(el <= p[5]) return p[0] + (el - p[4]) * p[2]; }") && simSrc.includes("const SIM_QUEUE_M = 25;")
+    && simSrc.includes("Object.keys(lanes).forEach(g => lanes[g].sort((x, y) => x.start - y.start));") && simSrc.includes("leg.len_m - Math.max(0, q) * SIM_QUEUE_M"));
+  ok("⭐ S7 (D83): about 60 s a day at 1×, ½× to 4×, Play / Pause / Restart, a jump slider; the timeline click jumps too",
+    simSrc.includes("const SIM_PLAY_SECONDS = 60;") && simSrc.includes('const SIM_SPEEDS = [["0.5", "½×"], ["1", "1×"], ["2", "2×"], ["4", "4×"]];')
+    && simSrc.includes('playing ? "Pause" : (t >= s1 ? "Play again" : "Play")') && simSrc.includes(">Restart</button>")
+    && simSrc.includes('aria-label="Jump to a time of day"') && simSrc.includes("onClick={click}"));
+  ok("⭐ S7: the words — staff only, a planning view, congestion not modelled; the holding area greyed for V1; no hourly HERE switch (D92)",
+    simSrc.includes(">Staff only · never on the public map<") && simSrc.includes(">Planning view, not a record of what happened<")
+    && simSrc.includes(">Congestion on the public road is not modelled<") && simSrc.includes('<input type="checkbox" disabled /><span>Holding area: lorries wait off the highway</span>')
+    && simSrc.includes("Comes with holding areas (V1).") && !/\bHERE\b/.test(simc) && !/hour of day|hourly drive/i.test(simc));
+  ok("🔴 S7: no banned word and no word-rule word on screen; lorries never trucks; teams through teamText; the tenant's distance unit and speed",
+    // GeoJSON's own key (geometry) and Mapbox's token setting are code, not words on a screen
+    !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure|booking)\b/i.test(simc.replace(/accessToken|mapbox_token|geometry: \{|\.geometry\b/g, ""))
+    && simSrc.includes("teamText(x)") && simSrc.includes("${Math.round(speed(h.speed_kph))} ${SPD()}") && simSrc.includes("${fmtDist(h.length_km, 1)} ${DU()}")
+    && simSrc.includes("D.mixer.vehicle_label") && !/IPT ?[1-6]/.test(simSrc));
+  ok("S7: below 768 px one card a gate, read-only, and the desktop note; the scenario controls are not there",
+    panelSrc.includes("? <><div className=\"ct-note\" data-sim-phone=\"1\">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>")
+    && !fn("SimPhoneList", "function SimulationPanel(").includes("<input"));
+  // 17 Oct 2026 (found on live): the pour's gates and default are the server's (working sites only); the gate access roads
+  // are not listed with the haul roads, and the screen says so in one line
+  const scnSrc = fn("SimScenario", "const gateBandWords");
+  ok("⭐ S7 fix: the pour's gate list and default are the server's (D.pour_gates, D.pour_default); no site to pour at says so; no list worked out here",
+    scnSrc.includes("const sites = D.pour_gates || [];") && scnSrc.includes("gate: p.gate || D.pour_default || \"\"")
+    && !scnSrc.includes("origin_share_note") && !scnSrc.includes("(sites[0] || {}).gate_id")
+    && scnSrc.includes('data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).<'));
+  ok("S7 fix: one quiet line under the haul roads when gate access roads were left out (the server's count)",
+    panelSrc.includes('{D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}'));
+  ok("S7: the info box entry (≤ 40 words) and the controls are named for a screen reader",
+    /"dash\.sim": \{ title: "Simulation", text: "[^"]+", *\n? *how: "[^"]+", tech: "t1-gates" \}/.test(src)
+    && ["Simulation month", "Playback speed", "Every gate opens at", "Every gate closes at", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));
+}
+
 // ---- 11 Oct 2026 — the guide update: the tour text that was wrong or stale ------------------------
 // Source-level. What they prove: the dashboard, look-ahead, data and forecast steps say what the pages show
 // today, on the same anchors; the old promises are gone. Not covered: how a card reads on screen (dom_frontend.js
@@ -2342,9 +2449,12 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("🔴 W1: no map opens on the old [24.7, 58.5] default, and the location form's placeholders are not 58.5 / 24.7",
      !/24\.7,\s*58\.5/.test(html) && !/placeholder="(?:58\.5|24\.7)"/.test(html)
      && /placeholder="52\.6"/.test(html) && /placeholder="-1\.5"/.test(html));
-  ok("W1: both maps the app creates open on UK_VIEW (the Look-ahead map and the Routes / Zones map)",
-     (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 2
-     && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 2);
+  // NARROWED 16 Oct 2026 (S7): a third map, the Dashboard's Simulation (SimMap, its own instance like CommitMap), opens
+  // on UK_VIEW too, then frames the day's routes
+  ok("W1: every map the app creates opens on UK_VIEW (the Look-ahead map, the Routes / Zones map, the Simulation map)",
+     (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 3
+     && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 3
+     && /function SimMap\(\{ meta, D, store, frame \}\)\{[\s\S]{0,700}new window\.mapboxgl\.Map\(\{ container: div\.current, style: "mapbox:\/\/styles\/mapbox\/light-v11", center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html));
   const locFetch = (html.match(/fetch\(`\$\{API\}\/locations\/geojson`\)\.then\(r => r\.json\(\)\)\.then\(gj => \{([\s\S]*?)\n    \}\)\.catch/) || ["", ""])[1];
   ok("⭐ W1: the Routes / Zones map frames the scheme's locations the FIRST time they load, once (a ref), finite points only, inside a try",
      /const framedRef = useRef\(false\);/.test(html) && /if\(!framedRef\.current\)\{/.test(locFetch)
@@ -2585,8 +2695,11 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && ["c-demand", "c-top", "c-progress", "c-cost"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
      && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="pt-3 dash-more-charts">')
      && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
-  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone)",
-     (src.match(/new ResizeObserver\(/g) || []).length === 3 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src));
+  // NARROWED 16 Oct 2026 (S7): two more observers, the Simulation's map (it opens folded at 0 × 0, like the Today map)
+  // and its timeline (it redraws to its own width)
+  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone); so do the Simulation's map and timeline",
+     (src.match(/new ResizeObserver\(/g) || []).length === 5 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src)
+     && (src.slice(src.indexOf("function SimMap("), src.indexOf("function SimPlayer(")).match(/new ResizeObserver\(/g) || []).length === 2);
   // REVERSED 14 Oct 2026 (D9, the mobile shell): below 768 px there is NO rail (not even icons); the bottom tab bar
   // (PhoneTabs) takes its place. The same one breakpoint; the over-the-page "peek" and its CSS are gone.
   ok("W5 → D9 (14 Oct): below 768 px the rail is not drawn at all; the peek state, its class and its CSS are gone",
@@ -2672,7 +2785,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
   ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
      !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
-     && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)/g) || []).length);
+     // NARROWED 16 Oct 2026 (S7): the Simulation's lorry dots read their token --sim-lorry, with #2563EB as the fallback
+     // (map data: a lorry, in every accent; the token block holds the value)
+     && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)|tok\("--sim-lorry", "#2563EB"\)/g) || []).length);
 }
 
 // ---- 14 Oct 2026: the big screen fills the screen in EVERY section (the user: "the screen still don't fill up on

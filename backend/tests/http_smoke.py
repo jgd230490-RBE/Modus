@@ -902,6 +902,63 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("month 0 is refused — 400", r.status_code == 400, str(r.status_code))
     r = c.get("/api/gates/arrivals", headers=PLAN)
     ok("no month -> today's month, clamped to the horizon, 200", r.status_code == 200 and 1 <= r.json().get("month", 0) <= 60, str(r.status_code))
+    # ---- 16 Oct 2026 (S3): the busiest hour on the panel, and the simulation's own read ----------------------------
+    ok("⭐ S3: every gate in month 9 carries its busiest hour from the simulation's day, and the reply says where it comes from",
+       ga.get("gates") and all((g.get("busiest_hour") or {}).get("lorries", 0) > 0 and re.fullmatch(r"\d\d:00", g["busiest_hour"]["hour"])
+                               for g in ga["gates"])
+       and "Busiest hour" in (ga.get("busiest_note") or "") and "No pour" in ga["busiest_note"], str(ga.get("busiest_note"))[:200])
+    r = c.get("/api/sim/day?month=9")
+    ok("🔴 S3: the simulation without a code — 401 (staff only, never on the public map)", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/sim/day?month=9", headers=PLAN)
+    sd = r.json() if r.status_code == 200 else {}
+    ok("⭐ S3: the planner's simulated day of month 9: whole loads, every arrival listed once, the table equals the list",
+       r.status_code == 200 and sd.get("loads", 0) > 0 and sd.get("gate_arrivals") == len(sd.get("arrivals", []))
+       and sd.get("checks", {}).get("table_equals_arrivals") is True and sd.get("checks", {}).get("hours_add_up") is True
+       and sd.get("pour") is None and (sd.get("checks", {}).get("largest_panel_difference") or 0) < 1.0, r.text[:300])
+    hb_sd = next((g for g in sd.get("gates", []) if g["location_name"] == "Harborough Compound"), {})
+    r = c.get(f"/api/sim/day?month=9&pour_gate={hb_sd.get('gate_id', 'G007')}&pour_start=10:00&pour_m3=160&pour_rate=60", headers=PLAN)
+    sp = r.json() if r.status_code == 200 else {}
+    hp = next((g for g in sp.get("gates", []) if g["location_name"] == "Harborough Compound"), {})
+    ok("⭐ S3: the example pour at Harborough Compound (160 m³, the app's 7.5 m³ mixer, 60 m³ an hour): 22 mixers, a queue",
+       r.status_code == 200 and (sp.get("pour") or {}).get("loads") == 22 and hp.get("pour") == 22
+       and hp.get("arrivals") == hb_sd.get("arrivals", -99) + 22 and hp.get("queue_start") is not None, r.text[:300])
+    # 17 Oct 2026 (found on live): a pour goes to a working site only, and defaults to the one with the most laden lorries
+    _pgn = [x["location_name"] for x in sd.get("pour_gates", [])]
+    ok("⭐ S7 fix: on the demo package the pour is offered at the compounds only (no landfill, soil recycling, batching plant, "
+       "stockpile, quarry or terminal), and defaults to Harborough Compound",
+       bool(_pgn) and all(n.endswith("Compound") for n in _pgn)
+       and next((x["location_name"] for x in sd["pour_gates"] if x["gate_id"] == sd.get("pour_default")), None) == "Harborough Compound",
+       str(_pgn))
+    _lf = [g for g in c.get("/api/gates").json().get("gates", []) if g.get("location_id") == "L012"]
+    r = c.get(f"/api/sim/day?month=9&pour_gate={_lf[0]['id'] if _lf else 'G015'}&pour_start=10:00&pour_m3=160&pour_rate=60", headers=PLAN)
+    ok("🔴 S7 fix: a pour at the inert landfill is refused in words — 400",
+       bool(_lf) and r.status_code == 400 and "A pour goes to a working site" in r.text and "is a landfill" in r.text, r.text[:200])
+    r = c.get("/api/sim/day?month=9&hours=G001=18:00-07:00", headers=PLAN)
+    ok("🔴 S3: a window past midnight is refused in words — 400 (D93)", r.status_code == 400 and "past midnight" in r.text, r.text[:200])
+    r = c.get("/api/sim/day?month=9&pour_gate=G007&pour_start=23:00&pour_m3=160&pour_rate=60", headers=PLAN)
+    ok("🔴 S3: a pour past midnight is refused in words — 400", r.status_code == 400 and "past midnight" in r.text, r.text[:200])
+    r = c.get("/api/sim/day?month=9&legs=1", headers=PLAN)
+    sl = r.json() if r.status_code == 200 else {}
+    # the demo package carries no route lines (they are worked out after an import), so here every route is "not drawn"
+    # and its lorries still count at the gates; test_sim.py checks the lines on the live demo's
+    ok("S3: legs=1 answers 200; routes with no line worked out are named in not_drawn and still counted at the gates",
+       r.status_code == 200 and isinstance(sl.get("legs"), dict) and isinstance(sl.get("not_drawn"), list)
+       and set(sl["not_drawn"]) == {l["route_id"] for l in sl.get("lines", []) if not (sl["legs"].get(l.get("laden_leg") or "") or {}).get("drawn")}
+       and sl.get("gate_arrivals") == sd.get("gate_arrivals"), r.text[:200])
+    r = c.get("/api/sim/day?month=9", headers=NORTH)
+    sn = r.json() if r.status_code == 200 else {}
+    ok("🔴 S3: the North Team code: scope team, the same gate figures, other teams' lines by route only",
+       r.status_code == 200 and sn.get("scope") == "team"
+       and [(g["gate_id"], g["arrivals"]) for g in sn.get("gates", [])] == [(g["gate_id"], g["arrivals"]) for g in sd.get("gates", [])]
+       and all("loads" not in l for l in sn.get("lines", []) if l.get("team") != "North Team")
+       and any("loads" in l for l in sn.get("lines", [])), r.text[:300])
+    # the vehicle KEYS (ids such as "Truck mixer 8 m³ (32t)") travel in the reply for the drawing; what a person reads is
+    # each *_label field, so the scan drops the keys and keeps the labels
+    _sd_words = json.dumps({k: v for k, v in sd.items() if k not in ("legs",)}, ensure_ascii=False)
+    _sd_words = re.sub(r'"(vehicle|vehicle_drawn|laden_leg|empty_leg|leg|approach_leg)": "[^"]*"', "", _sd_words)
+    ok("🔴 S3: no banned word and no team id in the simulation's reply (vehicle keys aside; their labels kept)",
+       not re.search(r"real-time|live tracking|telematics|optimi[sz]|predict|\bAI\b|\btrucks?\b|booking|peak hour", _sd_words, re.I)
+       and not re.search(r"\bIPT ?[1-6]\b", json.dumps(sd)) and "Concrete mixer" in _sd_words, _sd_words[:200])
     # the demo figures for the session report (not asserted beyond the ranges above)
     print("  gate arrivals, month 9 (demo package):")
     for g in ga.get("gates", []):

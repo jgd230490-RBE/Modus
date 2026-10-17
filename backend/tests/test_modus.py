@@ -210,7 +210,8 @@ PROJECT_TERMS = [r"\bRBE\b", r"Rail\s?Baltic", r"\bAlliance\s?1\b", r"OnEST", r"
 SHIPPED_EXT = (".py", ".html", ".js", ".json", ".yaml", ".yml", ".md", ".txt", ".example")
 hits = {}
 for dirpath, dirs, files in os.walk(ROOT):
-    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules")]
+    # ui-audit/ (16 Oct 2026): the UI audit's runs, ignored in git; their reports quote the pages' own markup
+    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules", "ui-audit")]
     for fn in files:
         if not fn.endswith(SHIPPED_EXT):
             continue
@@ -890,7 +891,8 @@ for rel in ("backend/export.py",):
 # keys are lower-case identifiers, kept on purpose, and do not match \bModus\b.
 _modus_hits = {}
 for dirpath, dirs, files in os.walk(ROOT):
-    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules")]
+    # ui-audit/ (16 Oct 2026): the UI audit's runs, ignored in git; their reports quote the pages' own markup
+    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules", "ui-audit")]
     for fn in files:
         if not fn.endswith(SHIPPED_EXT + (".css", ".webmanifest", ".svg")):
             continue
@@ -1054,6 +1056,26 @@ ok("restrictions: the User-Agent is Wayscope", '"User-Agent": "Wayscope/1.0"' in
 ok("the seed's tenant name and config.TENANT_DEFAULTS are Wayscope",
    json.load(open(os.path.join(ROOT, "backend", "factors.json"), encoding="utf-8"))["tenant"]["name"] == "Wayscope"
    and config.TENANT_DEFAULTS["name"] == "Wayscope")
+
+# 16 Oct 2026 (the UI audit, backend/tests/ui_audit.js): a harness that drives a REAL browser is never in the default
+# suite — CI has no browser, and run_suite.py fails a harness that prints no count. So every backend/tests/*.js that
+# requires Playwright must be named in run_suite.BROWSER_ONLY, the audit's runs (hundreds of screenshots) must be
+# ignored in git, and the audit must say what it measures and what it does not prove, like every other harness.
+import glob as _glob
+_suite = read("backend/tests/run_suite.py")
+_browser_only = set(re.findall(r'"([a-z_]+\.js)"', _suite.split("BROWSER_ONLY = {", 1)[1].split("}", 1)[0]))
+_needs_browser = {os.path.basename(f) for f in _glob.glob(os.path.join(ROOT, "backend", "tests", "*.js"))
+                  if 'playwright")' in open(f, encoding="utf-8").read()}
+ok("every JS harness that requires Playwright is in run_suite.BROWSER_ONLY, so CI never runs it",
+   _needs_browser and _needs_browser <= _browser_only, str(_needs_browser - _browser_only))
+ok("ui_audit.js is one of them, and its output folder ui-audit/ is ignored in git",
+   "ui_audit.js" in _browser_only and "ui_audit.js" in _needs_browser and "\nui-audit/\n" in read(".gitignore"))
+_audit = read("backend/tests/ui_audit.js")
+ok("ui_audit.js says it is not in the default suite, what it measures (sideways scroll, axe WCAG AA, 24 px targets, "
+   "a visible focus) and what it does not prove",
+   "NOT PART OF THE DEFAULT SUITE" in _audit and "WHAT IT DOES NOT PROVE" in _audit
+   and all(s in _audit for s in ("no-sideways-scroll", "axe-wcag", "targets-24px", "focus-visible", "wcag22aa", "2.5.8", "2.4.7"))
+   and 'exclude: [[".mapboxgl-ctrl-attrib"]]' in _audit and "passed, ${FAIL.length} failed" in _audit)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

@@ -1378,10 +1378,12 @@ ok("⭐ W11 PDF: page 1 carries the legend (title and the five ranges); 'thicker
    and "Volume colour for its two-way movements a day, one width" not in PAGES[0] and "thicker" not in T10J)
 ok("🔴 W11 source: no line width is worked out from a volume in the bulletin's drawing code or the view model any more",
    all(x not in _EXB + read("backend/bulletin_doc.py") for x in ('r["weight"]', "r['weight']", '"weight":', "1.5 + 5 *", "0.8 + 3.2 *")))
+# NARROWED 16 Oct 2026 (D115, the public map's flow lanes): the map's heat-map ribbon is 6 / 8.5 px now, so its two
+# flow lanes fit inside it; the bulletin's map draws no lanes and keeps 5 / 7.5 — still one fixed width, never by volume
 ok("🔴 W11 source: the schematic and the page draw the casing then the colour, at fixed widths",
    'c.setLineWidth(3.4)' in _EXB and 'c.setLineWidth(2.2)' in _EXB and "_hex_rgb(r[\"color\"])" in _EXB
    and "ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5" in read("backend/bulletin_doc.py")
-   and "const CARBON_LINE_WIDTH = 5, CARBON_CASING_WIDTH = 7.5;" in MAP)
+   and "const CARBON_LINE_WIDTH = 6, CARBON_CASING_WIDTH = 8.5;" in MAP)
 
 # W11 — the shared road sections, each by its routes summed (the map's Volume heat map: routes by their own figure,
 # shared sections summed on top). R1 and R2 run the same road in the fixture, so after the index is built it is ONE shared

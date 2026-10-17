@@ -599,7 +599,21 @@ if (loaded) {
       ok("🔴 a pending-only gate reads 'No approved arrivals' as the chip's word and 'no approved arrivals' as its gap; never 'Spacing holds' or 'one every —'",
         // 13 Oct 2026 (W6, narrowed): the gap cell reads "none", the details "No approved arrivals."
         (pP.match(/>No approved arrivals</g) || []).length === 1 && pP.includes(">none<") && pP.includes(">No approved arrivals.<") && !pP.includes("Spacing holds") && !/one every/i.test(pP)
-        && !pP.includes("—") && pP.includes('data-ga-flag="none"') && pP.includes(">1 pending line would add 5.0 a day here once approved.<") && !/undefined|NaN/.test(pP));
+        // NARROWED 16 Oct 2026 (S3): the Busiest hour cell reads "—" when the server sends no busiest hour (this fixture
+        // predates it); no other dash on the row
+        && (pP.match(/data-ga-busy="0">—</g) || []).length === 1 && !pP.replace(/data-ga-busy="0">—</g, "").includes("—") && pP.includes('data-ga-flag="none"') && pP.includes(">1 pending line would add 5.0 a day here once approved.<") && !/undefined|NaN/.test(pP));
+      // 16 Oct 2026 (S3): the busiest hour, as GET /api/gates/arrivals sends it (sim.py's average working day). Injected into
+      // the fixture here: test_gate_arrivals.py writes the module's reply, and the busiest hour is added by the endpoint.
+      const GAB = { ...GA, busiest_note: "Busiest hour: the lorries arriving in the busiest clock hour of an average working day, 312 whole loads spread evenly over each gate's open hours (07:00–17:00 stood in where none are typed). No pour.",
+        gates: GA.gates.map((g, i) => ({ ...g, busiest_hour: i === 0 ? { lorries: 26, hour: "07:00", hours: ["07:00", "09:00", "12:00"], per_hour: 30.0 }
+                                                       : i === 1 ? { lorries: 1, hour: "16:00", hours: ["16:00"], per_hour: null } : null })) };
+      const bP = gaSeg(render("the Dashboard renders gate arrivals with the busiest hour", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAB, onOpen(){} })));
+      ok("⭐ S3: the Busiest hour cell and details line show the server's figures; a gate with none reads —; the note is printed",
+        bP.includes('data-ga-busy="26">26 at 07:00<') && bP.includes('data-ga-busy="1">1 at 16:00<') && bP.includes('data-ga-busy="0">—<')
+        && bP.includes("26 lorries arriving in the busiest clock hour (07:00 and 2 more hours) of an average working day. The gate can check in 30.0 an hour.")
+        && bP.includes("1 lorry arriving in the busiest clock hour (16:00) of an average working day. No check-in time typed, so nothing is compared.")
+        && (bP.match(/<dt>Busiest hour<\/dt>/g) || []).length === 2 && bP.includes('data-ga-busy-note="1">Busiest hour: the lorries arriving in the busiest clock hour')
+        && bP.includes(">Busiest hour</th>") && !/undefined|NaN|IPT ?\d/.test(bP));
       const selP = seg(gP, '<select class="ga-sel"', "</select>");
       ok("the month select shows the fixture's month in the Dashboard's words (Sep 26), 24 months of the horizon",
         /<option value="9" selected="">Sep 26<\/option>/.test(selP) && (selP.match(/<option/g) || []).length === ctMeta.months.count && (selP.match(/selected/g) || []).length === 1
@@ -663,6 +677,76 @@ if (loaded) {
       const zP = seg(zOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
       ok("CLP: with nothing handed in, the section is folded (no open attribute) and holds no chart",
         zP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp">') && !zP.includes("data-clp-chart") && zP.includes("Loading the CLP figures"));
+    }
+    // ---- 16 Oct 2026 (S7): the Simulation, from fixtures/sim_day.json (test_sim.py writes it: the live demo's Sep 2026 with the
+    // example pour). Folded and read on first open; with the day handed in (initialSim) it renders open. The routes' lines are
+    // not in the fixture: two points a leg stand in, so the drawing's count can run (no map is drawn here).
+    const simPath = path.join(__dirname, "fixtures", "sim_day.json");
+    ok("the simulation fixture exists (test_sim.py writes it from a clean run)", fs.existsSync(simPath));
+    if (fs.existsSync(simPath)) {
+      const SIMF = JSON.parse(fs.readFileSync(simPath, "utf8"));
+      const SIMD = { ...SIMF, legs: Object.fromEntries(Object.entries(SIMF.legs).map(([k, v]) => [k, { ...v, coords: [[-1, 52], [-0.9, 52.1]], cum: [0, 1000], len_m: 1000,
+        parts: [[0, 1000, 1000 / (v.minutes || 30), null, 0, v.minutes || 30]] }])) };
+      const hm = (m) => { const r = Math.round(m); return String(Math.floor(r / 60)).padStart(2, "0") + ":" + String(r % 60).padStart(2, "0"); };
+      const sOut = render("the Dashboard renders with the Simulation open (initialSim)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialSim: SIMD, onOpen(){} }));
+      const sP = seg(sOut, '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      const sTxt = sP.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+      ok("⭐ SIM: the section is a folded <details> under Gate arrivals, open when its day is handed in, with its summary and the three limits",
+        sP.startsWith('<details class="dash-more" data-sim="1" open=""') && sP.includes("<summary>Simulation: an average working day, lorry by lorry at every gate</summary>")
+        && sOut.indexOf('data-sim="1"') > sOut.indexOf("data-gate-arrivals") && sOut.indexOf('data-sim="1"') < sOut.indexOf("<summary>This week and today")
+        && sP.includes(">Staff only · never on the public map<") && sP.includes(">Planning view, not a record of what happened<")
+        && sP.includes(">Congestion on the public road is not modelled<") && sP.includes('aria-label="About: Simulation"'));
+      ok("⭐ SIM: the lead line, the player (clock at the first departure, Play, Restart, speed, jump), the scenario card and the map's key",
+        sTxt.includes("Sep 2026: an average working day, 312 loads (646 lorry arrivals at the gates, 22 of them mixers).")
+        && sP.includes(`data-sim-clock="1">${SIMF.window.from}<`) && sP.includes('data-sim-play="1">Play<') && sP.includes(">Restart<")
+        && sP.includes('aria-label="Playback speed"') && sP.includes('aria-label="Jump to a time of day"') && sP.includes('data-sim-scenario="1"')
+        && ["Lorry, laden", "Lorry, empty", "Concrete mixer 8 m³ (32t) (pour)", "Waiting at a gate (one lane, 25 m apart)", "Entry gate", "Route end to its gate", "Haul road (assigned speed)"].every(t => sTxt.includes(t)),
+        sTxt.slice(0, 300));
+      const hbR = seg(sP, 'data-sim-gate="G007"', "</tr>");
+      const g7 = SIMF.gates.find(g => g.gate_id === "G007");
+      ok("⭐ SIM: eleven gate rows; Harborough's carries the server's figures (101 · 79 · 0 · 22, 84 % used, the bottleneck, 12 at 12:38, 1776, longest 56)",
+        (sP.match(/<tr data-sim-gate="/g) || []).length === 11 && hbR.includes(">101<") && hbR.includes("79 · 0 · 22") && hbR.includes("84 % used")
+        && hbR.includes(`bottleneck ${hm(g7.bottleneck_at)}`) && hbR.includes("first wait 10:00") && hbR.includes("at 12:38") && hbR.includes(">1776")
+        && hbR.includes("longest wait 56 min") && hbR.includes("Spacing holds"), hbR.slice(0, 400));
+      ok("SIM: the timeline marks the bottleneck at Harborough only (the one gate where a lorry waits), in words",
+        (sP.match(/data-sim-tl-gate="/g) || []).length === 1 && seg(sP, 'data-sim-tl-gate="G007"', "</g>").includes(`bottleneck from ${hm(g7.bottleneck_at)} · up to 12 waiting`));
+      ok("⭐ SIM: the three checks are ticked: the table counts 646 and the drawing plays 646; each gate's hours add up; every gate within 0.6 of the Dashboard",
+        (sP.match(/class="sim-ok"/g) || []).length === 3 && !sP.includes('class="sim-bad"')
+        && sTxt.includes("the table counts 646 lorry arrivals and the map plays 646 between 05:30 and 17:30")
+        && sTxt.includes(`every gate is within ${(+SIMF.checks.largest_panel_difference).toFixed(1)} of a lorry of the Dashboard's Sep 2026 average`));
+      ok("SIM: the quarries and the railhead say they serve other customers; the flatbed lines say they are drawn on the tipper's route",
+        (sP.match(/Serves other customers too: only this scheme&#x27;s lorries are counted/g) || []).length === 4
+        && sP.includes("Drawn on another vehicle&#x27;s route (none worked out for their own): R003 (Artic Flatbed (44t), drawn as Artic Tipper (44t)); R006 ")
+        && (sP.match(/drawn as Artic Tipper \(44t\)/g) || []).length === 4);
+      ok("SIM: the haul roads table: Langton haul road 148 lorries, Stockpile North haul road 78, both ways",
+        sP.includes('data-sim-haul="1"') && sTxt.includes("Langton haul road") && sTxt.includes("Stockpile North haul road")
+        && seg(sP, "Langton haul road", "</tr>").includes("<b>148</b>") && seg(sP, "Stockpile North haul road", "</tr>").includes("<b>78</b>"));
+      ok("🔴 SIM: no undefined / NaN, no team id, none of the banned words or the word-rule words in the rendered section; lorries, never trucks",
+        !/undefined|NaN|\bIPT ?[1-6]\b/.test(sP) && !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure)\b/i.test(sTxt));
+      // 17 Oct 2026 (found on live): the pour's gates are the server's working sites, busiest first; the access-road line
+      const selPour = seg(sP, 'aria-label="Pour gate"', "</select>");
+      ok("⭐ SIM fix: the pour's gate list is the four compounds, busiest first (Harborough, Langton, Melton, Tilton); no quarry, stockpile, terminal or landfill",
+        (selPour.match(/<option /g) || []).length === 4 && SIMF.pour_default === "G007"
+        && selPour.indexOf("Harborough Compound") < selPour.indexOf("Langton Compound") && selPour.indexOf("Langton Compound") < selPour.indexOf("Melton Compound")
+        && selPour.indexOf("Melton Compound") < selPour.indexOf("Tilton Compound") && !/Quarry|Pit|Stockpile|Terminal|Landfill/.test(selPour), selPour.slice(0, 300));
+      const aP = seg(render("the Dashboard renders the Simulation with gate access roads left out", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT,
+        initialSim: { ...SIMD, access_roads_hidden: 17 }, onOpen(){} })), '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      ok("SIM fix: with 17 access roads left out, one line says so; with none, no line",
+        aP.includes('data-sim-access-hidden="1">Gate access roads are not listed (17): lorries still cross them at their typed speed.<') && !sP.includes("data-sim-access-hidden"));
+      const nP = seg(render("the Dashboard renders the Simulation with no site to pour at", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT,
+        initialSim: { ...SIMD, pour_gates: [], pour_default: null }, onOpen(){} })), '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      ok("SIM fix: with no compound or site, the pour switch is off and greyed, and says why",
+        nP.includes('data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).<')
+        && /<label class="sim-check sim-off"><input type="checkbox" disabled=""/.test(nP));
+      const pP = seg(render("the Dashboard renders the Simulation on a phone", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialSim: SIMD, phone: true, onOpen(){} })),
+                     '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      ok("⭐ SIM: on a phone, one card a gate (eleven), the desktop note, no player, no map, nothing to type",
+        (pP.match(/<li class="sim-pcard" data-sim-gate="/g) || []).length === 11 && pP.includes('data-sim-phone="1">The map, the playback and the what-if controls open on a desktop.<')
+        && !pP.includes("data-sim-player") && !pP.includes("sim-map") && !pP.includes("<input") && seg(pP, 'data-sim-gate="G007"', "</li>").includes("16 at 10:00"));
+      const zS = seg(render("the Dashboard renders the Simulation folded", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, onOpen(){} })),
+                     '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      ok("SIM: with nothing handed in, the section is folded (no open attribute) and holds no gate",
+        zS.startsWith('<details class="dash-more" data-sim="1">') && !zS.includes("data-sim-gate") && zS.includes("Working out the day"));
     }
     // R2: a cap 2.0 tCO2e over (approved 7 361.1, with the decisions 7 002.8, cap 7 000.8) reads OVER on the Dashboard, as on the
     // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
