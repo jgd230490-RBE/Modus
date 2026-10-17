@@ -980,6 +980,33 @@ ok("🔴 IPT_SHARE: IPT1 + IPT2 on the same route_id the same day — and on the
    and all(f["ipts"] == ["IPT1", "IPT2"] for f in flags if f["code"] == "IPT_SHARE"))
 ok("...R3 (IPT3 alone, a different origin) raises no share flag",
    not any(f["route_id"] == "R3" for f in flags if f["code"] == "IPT_SHARE"))
+# 17 Oct 2026: the share text names the PLACES, never the location or haul-road ids (R3's browser check on the
+# four-year demo read "IPT1 + IPT2 on the same haul L014→L007"). The route keeps its id: R1 is the reference a
+# person reads on the Routes page, the row details and ROUTE_CAP's own text.
+_sh_txt = {f["share"]: f["text"] for f in flags if f["code"] == "IPT_SHARE"}
+ok("🔴 IPT_SHARE (same origin + destination) names the places: \"on the same haul Pit → Site\", no location id",
+   "on the same haul Pit → Site on " in _sh_txt.get("od", "")
+   and not any(re.search(r"\bL\d+\b", f["text"]) for f in flags if f["code"] == "IPT_SHARE"), str(_sh_txt))
+ok("…the route kind keeps the route's reference, said as a route: \"IPT1 + IPT2 on route R1 on …\"",
+   _sh_txt.get("route", "").startswith("IPT1 + IPT2 on route R1 on "), str(_sh_txt))
+ok("…share_id keeps the ids (a machine field, never printed): L1→L2 for the od kind",
+   {f["share_id"] for f in flags if f["code"] == "IPT_SHARE" and f["share"] == "od"} == {"L1→L2"})
+# a haul road on R1: the text names the haul road (its zone name), never its zone id
+db.execute("INSERT INTO zones (tenant_id, id, name, kind) VALUES (?, ?, ?, ?)",
+           (db.current_tenant(), "Z77", "Pit haul road", "haul_road"))
+db.execute("INSERT INTO route_haul_roads (tenant_id, route_id, zone_id, seq) VALUES (?, ?, ?, ?)",
+           (db.current_tenant(), "R1", "Z77", 0))
+_pg_haul = lookahead.page(bucket="commit")
+_hl = [f for f in _pg_haul["clashes"]["flags"] if f["code"] == "IPT_SHARE" and f["share"] == "haul"]
+ok("🔴 IPT_SHARE on a haul road names it: \"IPT1 + IPT2 on Pit haul road on …\", never Z77",
+   len(_hl) >= 2 and all(f["text"].startswith("IPT1 + IPT2 on Pit haul road on ") and "Z77" not in f["text"]
+                         and f["share_id"] == "Z77" for f in _hl), str(_hl[:1]))
+db.execute("UPDATE zones SET name = '' WHERE tenant_id = ? AND id = 'Z77'", (db.current_tenant(),))
+_hl0 = [f for f in lookahead.page(bucket="commit")["clashes"]["flags"] if f["code"] == "IPT_SHARE" and f["share"] == "haul"]
+ok("…a haul road with no name reads \"on the same haul road\" — the id never stands in",
+   _hl0 and all("on the same haul road on " in f["text"] and "Z77" not in f["text"] for f in _hl0), str(_hl0[:1]))
+db.execute("DELETE FROM route_haul_roads WHERE tenant_id = ? AND zone_id = 'Z77'", (db.current_tenant(),))
+db.execute("DELETE FROM zones WHERE tenant_id = ? AND id = 'Z77'", (db.current_tenant(),))
 # a cap EQUAL to the day's vehicles is not exceeded: R3 runs 1 veh/day; cap it at 1
 network.set_route_planning("R3", {"max_vehicles_per_day"}, max_vehicles_per_day=1)
 _pg_cap = lookahead.page(bucket="commit")
@@ -1281,6 +1308,10 @@ ok("...a priced row carries €",
 _sh = lambda n: wb[n] if n in wb.sheetnames else None
 ok("...the Clashes sheet has every flag the rail has",
    _sh("Clashes") is not None and _sh("Clashes").max_row - 1 == pg["clashes"]["count"])
+# 17 Oct 2026: the exports print the flag text — the places by name, no location id
+_clash_cells = [str(c.value or "") for row in _sh("Clashes").iter_rows() for c in row] if _sh("Clashes") is not None else []
+ok("🔴 ...the Clashes sheet names the shared haul's places (Pit → Site) and prints no location id",
+   any("on the same haul Pit → Site" in v for v in _clash_cells) and not any("L1→L2" in v for v in _clash_cells))
 ok("...the About sheet says Mon–Fri only",
    _sh("About") is not None and any("Mon–Fri only" in str(_sh("About").cell(row=i, column=2).value or "") for i in range(1, _sh("About").max_row + 1)))
 from portable import pdf_text, offline   # tests/pdf_text.py: portable pdftotext, no live Mapbox
@@ -1290,6 +1321,19 @@ ok("the PDF builds", isinstance(pb, bytes) and pb[:5] == b"%PDF-")
 ptxt = pb.decode("latin-1")
 ok("🔴 the PDF is LANDSCAPE A4 (10 Sep, the human)", re.search(r"/MediaBox \[ 0 0 841\.\d+ 595\.\d+ \]", ptxt) is not None, ptxt[ptxt.find("/MediaBox"):ptxt.find("/MediaBox") + 40])
 _txt = pdf_text(pb, ptxt)
+# the sheets list the most serious flags first (ROUTE_CAP outranks SHARE here), so the share text is read from a page
+# whose rail holds only the od share flags — the same builders, the same text
+_pg_od = dict(pg, clashes=dict(pg["clashes"], flags=[f for f in pg["clashes"]["flags"]
+                                                     if f["code"] == "IPT_SHARE" and f["share"] == "od"]))
+# the sheets set the arrow as "to" (the day sheet read "L1toL2" before the fix), so any join counts
+_ID_PAIR = re.compile(r"\bL\d+\s*(?:→|->|to)\s*L\d+\b")
+_od_pdf = " ".join(pdf_text(export.build_pdf(_pg_od)).split())
+ok("🔴 ...the PDF prints the share flag with the places by name, no location id (17 Oct 2026)",
+   "same haul Pit" in _od_pdf and not _ID_PAIR.search(_od_pdf), _od_pdf[-500:])
+_ds_day = next(d["day_date"] for d in pg["commit"]["lines"][0]["days"] if datetime.date.fromisoformat(d["day_date"]).weekday() <= 4)
+_ds_txt = " ".join(pdf_text(export.build_day_sheet_pdf(_pg_od, _ds_day)).split())
+ok("🔴 ...the day sheet does the same (17 Oct 2026)",
+   "same haul Pit" in _ds_txt and not _ID_PAIR.search(_ds_txt), _ds_txt[-500:])
 ok("...and carries the disclaimer, the flags heading, the footer lines and a page number",
    # G2: the road-user-charge line is country-neutral now ("Road-user charges are not on this sheet")
    "not a delivery note" in _txt and "not a stop" in _txt and "Road-user charges are not on this sheet" in _txt
