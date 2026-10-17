@@ -2983,8 +2983,26 @@
         //
         // Width keeps growing instead: at zoom 16 a 2.5 px line on a 40 px-wide road looks
         // like a scratch.
+        //
+        // 🔴 17 Oct 2026 — BOTH LEGS GO LEFT OF THEIR OWN TRAVEL (OFFSET_OUT = OFFSET_IN).
+        // `line-offset` is measured from each line's OWN direction (negative = left), and
+        // every stored leg runs the way its lorry drives: the laden leg origin -> destination,
+        // the return its own HERE route destination -> origin (network.py bakes it d_exit ->
+        // o_entry). OFFSET_OUT used to be the mirror (+4 at zoom 12): right of the return's
+        // own travel, which is the SAME side as the laden leg wherever a route comes back the
+        // way it went — the green dots sat on the amber ones on one edge of the road (the
+        // amber showing only in the green's gaps) instead of either side. Measured on a demo
+        // copy, R014 at zoom 13, + = left of the laden leg: laden +3.3 px, empty +3.4 px.
+        // Now each leg sits on its own carriageway, left of travel as the UK drives, which is
+        // the rule the flow lanes use too (forecast-flow, D115). So the SIDE says which way a
+        // lorry is going and the COLOUR says laden or empty. Consequence: a laden leg and
+        // ANOTHER route's empty leg going the same way down one road share a side (green on
+        // top, add order below), as they share the carriageway. On the demo copy a laden and
+        // an empty leg share 219 km of road: the mirror hid the amber under the green on
+        // 218.5 km of it, this on 27.8 km (only 0.5 km of which the mirror had split).
+        // Do not "restore" the mirror: two signs only work if every laden leg ran one way.
         const OFFSET_IN  = ['interpolate', ['linear'], ['zoom'], 7, -1, 12, -4, 14, -3, 17, 0];
-        const OFFSET_OUT = ['interpolate', ['linear'], ['zoom'], 7,  1, 12,  4, 14,  3, 17, 0];
+        const OFFSET_OUT = OFFSET_IN;
         // Phase 5b map change 3 — routes are a DOTTED line, and the numbers below are
         // coupled to each other in two ways that are easy to break later.
         //
@@ -3006,6 +3024,25 @@
         //    7.5, clearing by 0.5 px. At k = 1.4 the casings would be 8.4 px and would
         //    OVERLAP. The old casing (7 px) cleared by 1.0 px, so this does tighten it
         //    — worth a look at zoom 11–13 where two routes run parallel.
+        // ⚠️ 17 Oct 2026 — that paragraph ASSUMED opposite signs (the two legs either side of
+        //    one road). Until today a route that came back the way it went drew both legs on
+        //    the SAME side, 0 px apart, so the clearance it worked out was never drawn there.
+        //    With both legs left of their own travel (OFFSET_OUT = OFFSET_IN, above) a laden
+        //    and an empty leg going opposite ways down one road ARE 2 x |offset| apart. Redone
+        //    with today's widths (two thinnings since: core w, casing 1.25w):
+        //
+        //    zoom  |offset|  centres  core w  core gap  casing  casing gap
+        //     11     3.4       6.8     3.47     3.3      4.34      2.5
+        //     12     4.0       8.0     4.00     4.0      5.00      3.0
+        //     13     3.5       7.0     4.70     2.3      5.88      1.1
+        //     14     3.0       6.0     5.40     0.6      6.75     -0.75  (white halos touch)
+        //     15+    collapsing on purpose (2.5a): the legs close onto the road by 17
+        //
+        //    So zoom 12 is no longer the tight one (k could reach 2.0 there); zoom 14 is,
+        //    where the halos already overlap and the dots clear by 0.6 px. Measured in the
+        //    browser on a demo copy (R014, a straight stretch, + = left of the laden leg):
+        //    zoom 11 laden +3.3 / empty -3.6 px, 12 +3.7 / -4.3, 13 +3.3 / -3.7, 14 +2.8 / -3.3.
+        //    Raise k only after looking at zoom 14.
         // 2026-09-01: another ~15% off, at the user's request after seeing it live.
         // The 1.25x casing ratio is preserved at every stop — see below for why it
         // has to be.
@@ -3309,6 +3346,11 @@
         // COLOUR (green laden-out, amber empty-back, both in the sidebar legend)
         // and the ±4 px offset, which separates the two carriageways without
         // saying which is which.
+        // 17 Oct 2026: the offset is now the same sign for both legs, left of each
+        // leg's own travel (see OFFSET_OUT), so the side a dot sits on IS the way it
+        // is going, to a reader who knows the UK drives on the left. That is a hint,
+        // not a direction channel: nothing on the map says so, and colour still
+        // carries laden / empty.
         //
         // ⭐ There is no cost to putting them back — the layers were self-contained
         // and are recorded in git. If direction is ever wanted again, restore this
