@@ -2362,6 +2362,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")]')
     && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
     && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
+  ok("SIM: the map's key is a named group (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
+    mapSrc.includes('<div className="sim-legend" role="group" aria-label="Map key">') && !mapSrc.includes('<div className="sim-legend" aria-label='));
   ok("SIM: the map's key names the concrete mixer only on a day with a pour",
     mapSrc.includes('{D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>'));
   ok("🔴 SIM BIG SCREEN: no scenario controls and no table on the TV; it reads the plain month (no pour) only while shown",

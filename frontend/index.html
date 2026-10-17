@@ -8449,7 +8449,7 @@ function SimMap({ meta, D, store, frame }){
   return (
     <div className="sim-map-wrap">
       <div ref={div} className="sim-map" role="region" aria-label="Simulation map" />
-      <div className="sim-legend" aria-label="Map key">
+      <div className="sim-legend" role="group" aria-label="Map key">
         <div><i className="sim-dot sim-dot-laden" aria-hidden="true"></i>Lorry, laden</div>
         <div><i className="sim-dot sim-dot-empty" aria-hidden="true"></i>Lorry, empty</div>
         {D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>{(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)</div>}
