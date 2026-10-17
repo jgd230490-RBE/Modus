@@ -514,7 +514,38 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:13px;color:var(--muted);background:var(--surface);}
   .sim-chip-staff{color:var(--navy);background:var(--navy-soft);border-color:transparent;font-weight:600;}
   .sim-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
-  @media (min-width:1280px){.sim-grid{grid-template-columns:minmax(0,1fr) 340px;}}
+  /* 17 Oct 2026 (one screen): from 1024 px the map and its timeline on the left, the clock / Gates now / scenario beside
+     them; the map takes what the screen's height leaves for it, so the map, the clock and the queues fit one screen */
+  @media (min-width:1024px){.sim-grid{grid-template-columns:minmax(0,1fr) 300px;align-items:start;}
+    .sim-main .sim-map{height:clamp(260px,calc(100vh - 420px),680px);}}
+  .sim-main{min-width:0;display:flex;flex-direction:column;gap:6px;}
+  .sim-main>.sim-map-wrap{align-self:stretch;}   /* the map takes its column's width (a flex column would shrink it to nothing) */
+  /* 1024–1279 px: the narrower column wraps the lines above the map, so the map gives back 40 px to keep the queues on screen */
+  @media (min-width:1024px) and (max-width:1279px){.sim-main .sim-map{height:clamp(260px,calc(100vh - 460px),680px);}}
+  .sim-tl-head{font-size:13px;color:var(--muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sim-tl-head b{color:var(--ink);font-weight:600;}
+  .sim-fold{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:0 12px;background:var(--surface);}
+  .sim-fold>summary{cursor:pointer;padding:10px 0;font-size:15px;font-weight:600;color:var(--ink);}
+  .sim-fold[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px;}
+  .sim-fold>.sim-scroll{margin-bottom:12px;}
+  /* 17 Oct 2026: the Simulation on the big screen (SimWall): the map large, the clock and Gates now beside it, the queue
+     timeline under the map; in Rotate / One section it fills the TV (.dash-fill) */
+  .sim-wall{display:grid;gap:clamp(10px,1.4vh,24px);grid-template-columns:minmax(0,1fr) clamp(280px,24vw,640px);grid-template-areas:"map side" "tl side";}
+  .sim-wall-main{grid-area:map;min-width:0;min-height:0;}
+  .sim-wall-side{grid-area:side;min-width:0;min-height:0;display:flex;flex-direction:column;gap:clamp(8px,1.2vh,20px);overflow:hidden;}
+  .sim-wall-tl{grid-area:tl;min-width:0;}
+  .sim-wall .sim-map{height:60vh;}
+  .dash-wall.dash-fill .sim-wall-fill{height:100%;grid-template-rows:minmax(0,1fr) auto;}
+  .sim-wall-fill .sim-wall-main>.sim-map-wrap{height:100%;}
+  .sim-wall-fill .sim-map{height:100%;}
+  .sim-wall .sim-legend{font-size:clamp(12px,1.35vh,22px);}
+  .sim-wall-clock{font-size:clamp(2.5rem,9vh,10rem);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .sim-wall-sub{font-size:clamp(13px,1.55vh,26px);color:var(--muted);line-height:1.4;}
+  .sim-wall-now{font-size:clamp(14px,2vh,34px);color:var(--ink);font-weight:600;}
+  .sim-wall-gates{font-size:clamp(13px,1.7vh,28px);}
+  .sim-wall-gates th{font-size:clamp(12px,1.35vh,22px);}
+  .sim-wall .sim-tl-hour,.sim-wall .sim-tl-marktext,.sim-wall .sim-tl-note{font-size:clamp(12px,1.25vh,20px);}
+  .sim-wall .sim-tl-name,.sim-wall .sim-tl-ok{font-size:clamp(13px,1.4vh,22px);}
   .sim-map-wrap{position:relative;align-self:start;min-width:0;}
   .sim-map{height:520px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   .sim-legend{position:absolute;left:10px;bottom:10px;background:#FFFFFF;border:1px solid #E7E5E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1E293B;z-index:2;}
@@ -524,7 +555,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-dot-empty{background:#FFFFFF;border:2px solid var(--sim-lorry);}
   .sim-dot-pour{background:var(--sim-mixer);}
   .sim-dot-wait{background:#FFFFFF;border:2px solid #DC2626;}
-  .sim-dot-gate{background:#FFFFFF;border:1.5px solid #1E293B;width:9px;height:9px;}
+  .sim-dot-gate{background:radial-gradient(circle,#1E293B 0 2.5px,#FFFFFF 3px);border:2.5px solid #1E293B;width:15px;height:15px;}
   .sim-line{display:inline-block;width:18px;height:0;flex:0 0 auto;}
   .sim-line-end{border-top:1.5px dashed #94A3B8;}
   .sim-line-haul{border-top:3px dashed #7C3AED;}
@@ -1444,6 +1475,8 @@ const DASH_SECTIONS = [
   { key: "charts", title: "Charts" },
   { key: "stock",  title: "Stockpiles" },
   { key: "more",   title: "More charts" },
+  // 17 Oct 2026 (the user): the Simulation, added LAST so #dashboard/1 … /5 still open the same screens; #dashboard/6 pins it
+  { key: "sim",    title: "Simulation" },
 ];
 const DASH_ROTATE_CHOICES = [10, 15, 20, 30, 45, 60, 120];
 
@@ -1839,14 +1872,28 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const pickRotate = (n) => { setRotateSecs(n); try { localStorage.setItem("modus_dash_rotate_s", String(n)); } catch(e){} };
   // the timer exists only while rotating ON the big screen — never on the working view,
   // where a section quietly changing under the reader would be a fault, not a feature
+  // 17 Oct 2026: each section has its own time on screen. The Simulation stays the whole day it plays (SIM_WALL_SECONDS,
+  // a day at 1× and a short hold), whatever the rotate setting, so the day is never cut off; the others keep the setting.
+  const dwellNow = (DASH_SECTIONS[wallSection] || {}).key === "sim" ? SIM_WALL_SECONDS : rotateSecs;
   useEffect(() => {
     if(!wall || wallLayout !== "rotate") return;
-    const id = setInterval(() => setWallSection(s => (s + 1) % DASH_SECTIONS.length), rotateSecs * 1000);
-    return () => clearInterval(id);
-  }, [wall, wallLayout, rotateSecs]);
+    const id = setTimeout(() => setWallSection(s => (s + 1) % DASH_SECTIONS.length), dwellNow * 1000);
+    return () => clearTimeout(id);
+  }, [wall, wallLayout, rotateSecs, wallSection]);
   // ⚠️ `all` is the only layout that shows everything; the working view ALWAYS does,
   // whatever is remembered, so leaving the big screen can never hide half the page.
   const sectionShown = (i) => !wall || wallLayout === "all" || wallSection === i;
+  // 17 Oct 2026: the Simulation's month on THIS display (the wall bar's choice; "" = this month, or the next month with
+  // approved lines). A display setting in this browser's localStorage, like the rotate time — NOT a saved or shared
+  // scenario (D86 stands: a scenario is never saved and never put in the address). Each time the section comes round
+  // (`simPass`) the day starts again at the first lorry.
+  const simIdx = DASH_SECTIONS.findIndex(x => x.key === "sim");
+  const [simMonthPref, setSimMonthPref] = useState(() => { try { return localStorage.getItem(SIM_WALL_MONTH_KEY) || ""; } catch(e){ return ""; } });
+  const pickSimMonth = (v) => { setSimMonthPref(v); try { if(v) localStorage.setItem(SIM_WALL_MONTH_KEY, v); else localStorage.removeItem(SIM_WALL_MONTH_KEY); } catch(e){} };
+  const [simPass, setSimPass] = useState(0);
+  useEffect(() => { if(wall && sectionShown(simIdx)) setSimPass(p => p + 1); }, [wall, wallLayout, wallSection]);
+  const simApproved = useMemo(() => [...new Set(((data && data.lines) || []).filter(l => l.status === "Approved").map(l => l.month_index))], [data]);
+  const simMonth = simWallMonth(simMonthPref, months, simApproved);
 
   useEffect(() => {
     if(initialData) return;
@@ -2188,18 +2235,26 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   className={"dash-wallbar-btn" + (wallSection === i ? " is-on" : "")}
                   title={`Section ${i + 1} · ${s.title} · pin a screen to it with #dashboard/${i + 1}`}>{i + 1}. {s.title}</button>)}
         {wallLayout === "rotate" && <span className="dash-wallbar-note" data-rotate-next="1">
-          <span className="dash-rot" aria-hidden="true"><i key={wallSection + "-" + rotateSecs} style={{ animationDuration: rotateSecs + "s" }}></i></span>
+          <span className="dash-rot" aria-hidden="true"><i key={wallSection + "-" + dwellNow} style={{ animationDuration: dwellNow + "s" }}></i></span>
           {" "}next: {DASH_SECTIONS[(wallSection + 1) % DASH_SECTIONS.length].title}</span>}
         {wallLayout === "rotate" && <React.Fragment>
           <span className="dash-wallbar-sep" />
           <span className="dash-wallbar-lbl">every</span>
           <select className="dash-wallbar-sel" value={rotateSecs} onChange={e => pickRotate(+e.target.value)}
-                  title="How long each section stays on screen">
+                  title="How long each section stays on screen (the Simulation stays for its whole day)">
             {DASH_ROTATE_CHOICES.map(n => <option key={n} value={n}>{n < 60 ? `${n} s` : `${n / 60} min`}</option>)}
           </select>
         </React.Fragment>}
+        {/* the Simulation's month: offered while the Simulation is on screen (or every section is), so the bar keeps one line */}
+        {(wallLayout === "all" || wallSection === simIdx) && <span className="dash-wallbar-sep" />}
+        {(wallLayout === "all" || wallSection === simIdx) && <label className="dash-wallbar-lbl" data-sim-wall-month="1">Simulation
+          <select className="dash-wallbar-sel" value={simMonthPref} onChange={e => pickSimMonth(e.target.value)} aria-label="Simulation month on this display"
+                  title="The month the Simulation section plays on this display, kept on this display only (nothing is saved)">
+            <option value="">this month</option>
+            {Array.from({ length: (months && months.count) || 60 }, (_, i) => i + 1).map(i => <option key={i} value={String(i)}>{monthLabelAbs(i, (months && months.start_year) || 2026)}</option>)}
+          </select></label>}
         {wallLayout === "single" && !fill && <span className="dash-wallbar-note">this screen is showing section {wallSection + 1} of {DASH_SECTIONS.length} · open <code>#dashboard/{wallSection + 1}</code> on another display to pin it there</span>}
-        {fill && <span className="dash-wallbar-note" title={`Pin a display to this section with #dashboard/${wallSection + 1}`}>{rangeLabel} · {status === "All" ? "all forecasts" : status.toLowerCase()}{stamp ? ` · updated ${hhmm(stamp)}` : ""}</span>}
+        {fill && wallSection !== simIdx && <span className="dash-wallbar-note" title={`Pin a display to this section with #dashboard/${wallSection + 1}`}>{rangeLabel} · {status === "All" ? "all forecasts" : status.toLowerCase()}{stamp ? ` · updated ${hhmm(stamp)}` : ""}</span>}
         {/* 14 Oct 2026: a clock, as wall dashboards carry, at the bar's right end (the data's own time is "updated" above) */}
         <span className="dash-clock" data-wall-clock="1">{hhmm(clock)}</span>
         {fill && <button type="button" className="dash-wallbar-btn" onClick={toggleWall} title="Back to the working view (Esc)">Exit</button>}
@@ -2491,6 +2546,11 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <ChartCanvas config={splitCfg} />
         </div>
       </div>
+      </WallSection>
+
+      {/* 17 Oct 2026: the Simulation on the big screen — the month's day played once a pass; no scenario, no table */}
+      <WallSection show={sectionShown(5)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[5].title}>
+        <SimWall meta={meta} month={simMonth} show={wall && sectionShown(5)} pass={simPass} loop={wallLayout !== "rotate"} fill={fill} tick={tick} />
       </WallSection>
         </>
       )}
@@ -8317,7 +8377,10 @@ function SimMap({ meta, D, store, frame }){
       m.addLayer({ id: "sim-haul", type: "line", source: "sim-haul", paint: { "line-color": tok("--chart-4", "#7C3AED"), "line-width": 4, "line-dasharray": [1.5, 1] } });
       m.addLayer({ id: "sim-haul-label", type: "symbol", source: "sim-haul", layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, -1] },
                    paint: { "text-color": "#5B21B6", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
-      m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 4, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 1.5 } });
+      // 17 Oct 2026 (the user: the gate and an empty lorry looked too alike, both a small white dot with a rim): the gate is a
+      // BULLSEYE — a bigger white ring with a thick dark rim and a dark centre — so it never reads as a lorry
+      m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });
+      m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });
       m.addLayer({ id: "sim-gate-labels", type: "symbol", source: "sim-gates", layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.1], "text-anchor": "top" },
                    paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
       m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries", paint: {
@@ -8386,10 +8449,10 @@ function SimMap({ meta, D, store, frame }){
   return (
     <div className="sim-map-wrap">
       <div ref={div} className="sim-map" role="region" aria-label="Simulation map" />
-      <div className="sim-legend" aria-label="Map key">
+      <div className="sim-legend" role="group" aria-label="Map key">
         <div><i className="sim-dot sim-dot-laden" aria-hidden="true"></i>Lorry, laden</div>
         <div><i className="sim-dot sim-dot-empty" aria-hidden="true"></i>Lorry, empty</div>
-        <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>{(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)</div>
+        {D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>{(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)</div>}
         <div><i className="sim-dot sim-dot-wait" aria-hidden="true"></i>Waiting at a gate (one lane, 25 m apart)</div>
         <div><i className="sim-dot sim-dot-gate" aria-hidden="true"></i>Entry gate</div>
         <div><i className="sim-line sim-line-end" aria-hidden="true"></i>Route end to its gate</div>
@@ -8427,7 +8490,7 @@ function SimTimeline({ D, t, onSeek }){
       const x = tx(h * 60);
       parts.push(<g key={"h" + h}><line x1={x} x2={x} y1={18} y2={H - 8} className="sim-tl-grid" /><text x={x} y={12} className="sim-tl-hour" textAnchor="middle">{String(h).padStart(2, "0")}:00</text></g>);
     }
-    if(!qg.length) parts.push(<text key="none" x={SIM_TL_LEFT} y={34 + rowH / 2} className="sim-tl-ok">No lorry waits at any gate in this scenario.</text>);
+    if(!qg.length) parts.push(<text key="none" x={SIM_TL_LEFT} y={34 + rowH / 2} className="sim-tl-ok">No lorry waits at any gate on this day.</text>);
     qg.forEach((g, i) => {
       const y0 = 34 + i * rowH, base = y0 + rowH - 6, mx = Math.max(1, g.most_waiting);
       const arr = D.arrivals.filter(a => a.gate === g.gate_id && a.wait > 0.01);
@@ -8450,7 +8513,7 @@ function SimTimeline({ D, t, onSeek }){
   };
   return (
     <div ref={box} className="sim-tl" data-sim-timeline="1">
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} onClick={click} role="img" aria-label={qg.length ? `Waiting lorries over the day at ${qg.length} gate${qg.length === 1 ? "" : "s"}` : "No lorry waits in this scenario"}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} onClick={click} role="img" aria-label={qg.length ? `Waiting lorries over the day at ${qg.length} gate${qg.length === 1 ? "" : "s"}` : "No lorry waits on this day"}>
         {still}
         <line x1={tx(t)} x2={tx(t)} y1={16} y2={H - 6} className="sim-tl-cursor" />
       </svg>
@@ -8490,8 +8553,14 @@ function SimPlayer({ meta, D, store, scenario, open }){
   const playWord = playing ? "Pause" : (t >= s1 ? "Play again" : "Play");
   return (
     <div className="sim-play" data-sim-player="1">
+      {/* 17 Oct 2026 (one screen): the map with the queue timeline under it on the left, the clock, Gates now and the
+          scenario beside it; the busiest-hour table and the haul roads fold away below (SimulationPanel) */}
       <div className="sim-grid">
-        <SimMap meta={meta} D={D} store={store} frame={f} />
+        <div className="sim-main">
+          <SimMap meta={meta} D={D} store={store} frame={f} />
+          <div className="sim-tl-head" title="Each row is a gate where a lorry waits; the shaded band is lorries waiting. The red mark is the bottleneck: the first lorry that waits longer than the gate's check-in. Click the timeline to move the clock there."><b>When queues start</b> · the red mark is the bottleneck</div>
+          <SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} />
+        </div>
         <div className="sim-side">
           <div className="sim-card">
             <div className="sim-clock" aria-live="off" data-sim-clock="1">{simHM(t)}</div>
@@ -8514,9 +8583,6 @@ function SimPlayer({ meta, D, store, scenario, open }){
           {scenario}
         </div>
       </div>
-      <h4 className="sim-h4">When queues start</h4>
-      <p className="ct-note">Each row is a gate where a lorry has to wait. The shaded band is lorries waiting; the red mark is the bottleneck, the first lorry that waits longer than the gate's check-in. Click to move the clock there.</p>
-      <SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} />
     </div>
   );
 }
@@ -8725,18 +8791,18 @@ function SimulationPanel({ meta, months, phone, initial }){
             ? <><div className="ct-note" data-sim-phone="1">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>
             : <>
               <SimPlayer meta={meta} D={D} store={store} open={open} scenario={<SimScenario key={resetN} D={D} sc={sc} onChange={onScenario} onReset={() => { setMsg(""); setSc(SIM_SC0()); setResetN(n => n + 1); }} msg={msg} />} />
-              <h4 className="sim-h4">Busiest hour at each gate</h4>
+              <details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>
               <p className="ct-note">Counted from the same arrivals the map plays: laden lorries arrive at the delivery site's gate, empty lorries at the loading site's gate. Open hours and check-in minutes can be changed here for this screen only.</p>
               <SimTable D={D} editable onHours={onHours} onCheckIn={onCheckIn} resetN={resetN} />
-              {(D.haul_roads || []).length > 0 && <>
-                <h4 className="sim-h4">Haul roads</h4>
+              </details>
+              {(D.haul_roads || []).length > 0 && <details className="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>
                 <p className="ct-note">Lorries on each drawn haul road, both ways. No capacity is typed for a haul road, so none is flagged here.</p>
                 <div className="overflow-auto sim-scroll" tabIndex={0} role="region" aria-label="Haul roads"><table className="sim-table" data-sim-haul="1"><thead><tr><th scope="col">Haul road</th><th scope="col" className="num">Assigned speed</th><th scope="col" className="num">Length</th>
                   <th scope="col" className="num">Lorries on it this day</th><th scope="col" className="num">Busiest hour</th><th scope="col" className="num">Routes</th></tr></thead>
                   <tbody>{D.haul_roads.map(h => <tr key={h.zone_id}><td><b>{h.name}</b></td><td className="num">{h.speed_kph == null ? "not typed" : `${Math.round(speed(h.speed_kph))} ${SPD()}`}</td>
                     <td className="num">{h.length_km == null ? "—" : `${fmtDist(h.length_km, 1)} ${DU()}`}</td><td className="num"><b>{h.lorries}</b></td>
                     <td className="num">{h.busiest || 0}<div className="sim-sub">{h.busiest_hour || ""}</div></td><td className="num">{(h.routes || []).length}</td></tr>)}</tbody></table></div>
-              </>}
+              </details>}
               {D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}
               <div className="sim-checks" data-sim-checks="1">
                 <div>{ok(D.checks.table_equals_arrivals && played === D.gate_arrivals)} {grp(D.loads)} loads in the day, each arriving at its gate at both ends, plus {pourN} mixer{pourN === 1 ? "" : "s"}: the table counts {grp(D.gate_arrivals)} lorry arrivals and the map plays {grp(played)} between {D.window.from} and {D.window.to}.</div>
@@ -8750,6 +8816,99 @@ function SimulationPanel({ meta, months, phone, initial }){
         </>}
       </div>
     </details>
+  );
+}
+
+// ---- 17 Oct 2026: the Simulation on the BIG SCREEN (the sixth section, DASH_SECTIONS "sim") -------------------------
+// What a site-office TV shows (the user, 17 Oct): the month's average working day, played ONCE each time the section
+// comes round in Rotate (it stays on screen for the whole day, SIM_WALL_SECONDS, whatever the rotate setting), and again
+// and again in One section / All sections. The map, the clock, Gates now and the queue timeline with the bottleneck mark;
+// no scenario controls and no table (nobody touches a TV). The day is the plain month: no pour, the gates' open hours as
+// typed (the scheme's shift placed at 07:00 where none are typed, and the screen says so).
+// The month is THIS DISPLAY's choice on the wall bar (Dashboard: SIM_WALL_MONTH_KEY in this browser's localStorage, like
+// the rotate time): "this month", or — when this month has no approved lines — the next month that has (the last one
+// before, failing that). It is a display setting, NOT a saved or shared scenario: D86 stands (a scenario is never saved
+// and never put in the address). Its own map like the Dashboard section's (SimMap), never unmounted: a hidden section
+// keeps its map, which re-measures when the section comes back. It reads its day only while shown, again on the
+// 5-minute refresh, and plays only while shown.
+const SIM_WALL_HOLD_S = 5;                                     // the day's last picture holds this long
+const SIM_WALL_SECONDS = SIM_PLAY_SECONDS + SIM_WALL_HOLD_S;    // the section's time on screen in Rotate
+const SIM_WALL_MONTH_KEY = "modus_dash_sim_month";             // per display, like modus_dash_rotate_s (D86: not a scenario)
+function simWallMonth(pref, months, approved){
+  const n = (months && months.count) || 60, p = parseInt(pref, 10);
+  if(p >= 1 && p <= n) return p;
+  const now = gaMonthToday(months), have = (approved || []).slice().sort((a, b) => a - b);
+  if(!have.length || have.includes(now)) return now;
+  const next = have.find(m => m > now);
+  return next != null ? next : have[have.length - 1];
+}
+function SimWall({ meta, month, show, pass, loop, fill, tick }){
+  const [D, setD] = useState(null);
+  const [store, setStore] = useState(null);
+  const [err, setErr] = useState(false);
+  const [t, setT] = useState(0);
+  const tRef = useRef(0), loaded = useRef(""), dRef = useRef(null);
+  useEffect(() => {
+    if(!show) return;
+    const key = `${month}|${tick}`;
+    if(loaded.current === key) return;
+    let live = true;
+    fetch(`${API}/sim/day?month=${month}&legs=1`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+      if(!live) return;
+      loaded.current = key;
+      if(!dRef.current || dRef.current.month !== j.month){ tRef.current = j.window.start; setT(j.window.start); }   // a new month starts at its first lorry
+      dRef.current = j;
+      setStore({ month: j.month, legs: j.legs, haul: j.haul_roads }); setD(j); setErr(false);
+    }).catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, [show, month, tick]);
+  // each pass starts the day again at the first lorry setting off
+  useEffect(() => { if(dRef.current){ tRef.current = dRef.current.window.start; setT(dRef.current.window.start); } }, [pass]);
+  useEffect(() => {
+    if(!show || !D || !(D.loads > 0)) return;
+    const s0 = D.window.start, s1 = D.window.end;
+    let raf = null, last = null, held = null;
+    const step = (ts) => {
+      if(last != null){
+        let n = tRef.current + (ts - last) / 1000 * (s1 - s0) / SIM_PLAY_SECONDS;
+        if(n >= s1){
+          n = s1;
+          if(!loop){ tRef.current = n; setT(n); raf = null; return; }        // Rotate: the day once, its last picture held
+          if(held == null) held = ts;
+          if(ts - held >= SIM_WALL_HOLD_S * 1000){ n = s0; held = null; }    // One section / All sections: again after a hold
+        }
+        tRef.current = n; setT(n);
+      }
+      last = ts;
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { if(raf) cancelAnimationFrame(raf); };
+  }, [show, D, loop, pass]);              // a new pass plays again even after the day ended
+  if(!D) return err ? <div className="ct-line" style={{ color: "var(--red)" }} data-sim-wall="error">The simulation did not load.</div>
+                    : <div className="ct-note" data-sim-wall="loading">Working out the day…</div>;
+  if(!(D.loads > 0)) return <div data-sim-wall="none"><EmptyState kind="none" title={`No approved lines in ${D.label}`} body="Pick another month for the Simulation on the bar above." /></div>;
+  const f = simFrame(D, store ? store.legs : {}, t);
+  const stood = (D.gates || []).filter(g => g.open_basis === "stood_in").length;
+  const hoursWords = !stood ? "the gates' open hours as typed"
+    : stood === (D.gates || []).length ? `gates open ${D.stand_in.from}–${D.stand_in.to} (stood in: no open hours typed)`
+    : `the gates' open hours as typed, ${D.stand_in.from}–${D.stand_in.to} stood in where none are typed`;
+  // the gates a TV has room for: any that queues first, then the busiest
+  const order = (D.gates || []).slice().sort((a, b) => ((a.queue_start == null) - (b.queue_start == null)) || (b.arrivals - a.arrivals) || (a.gate_id < b.gate_id ? -1 : 1)).slice(0, 8);
+  return (
+    <div className={"sim-wall" + (fill ? " sim-wall-fill" : "")} data-sim-wall="1">
+      <div className="sim-wall-main"><SimMap meta={meta} D={D} store={store} frame={f} /></div>
+      <div className="sim-wall-side">
+        <div className="sim-wall-clock" data-sim-wall-clock="1">{simHM(t)}</div>
+        <div className="sim-wall-sub" data-sim-wall-sub="1">{D.label}, an average working day: {grp(D.loads)} loads · no pour · {hoursWords}</div>
+        <div className="sim-wall-now" data-sim-now="1">On the road: {f.laden} laden · {f.empty} empty · {f.waiting} waiting at gates</div>
+        <table className="sim-now sim-wall-gates"><thead><tr><th scope="col">Gate</th><th scope="col" className="num">Waiting now</th><th scope="col" className="num">Minutes lost</th></tr></thead>
+          <tbody>{order.map(g => { const n = f.gates[g.gate_id] || { w: 0, lost: 0 };
+            return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
+        <div className="sim-chips"><span className="sim-chip sim-chip-staff">Staff only · never on the public map</span><span className="sim-chip">Planning view, not a record of what happened</span></div>
+      </div>
+      <div className="sim-wall-tl"><SimTimeline D={D} t={t} onSeek={(m) => { tRef.current = m; setT(m); }} /></div>
+    </div>
   );
 }
 
