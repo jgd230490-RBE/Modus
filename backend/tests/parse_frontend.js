@@ -790,7 +790,10 @@ ok("a zone still needs three corners and a haul road two",
 ok("saving re-bakes what it invalidated", code.includes("rebakeAfterZone"));
 ok("the re-bake drives the existing batch endpoint rather than a new one",
   code.includes("`${API}/admin/bake-routes?${q}`"));
-ok("the re-bake loop has a guard against spinning forever", code.includes("guard++ < 200"));
+// NARROWED 17 Oct 2026 (Route all 502s): the guard is no longer a cap of 200 calls (short, time-boxed batches could
+// reach it on a big network) but "stop when `remaining` stops falling"; test_route_all.py asserts both loops
+ok("the re-bake loop has a guard against spinning forever",
+  /const rebakeAfterZone = async[\s\S]*?if\(left >= last\) throw new Error\(`\$\{left\} leg\(s\) left and not falling`\);/.test(code));
 ok("only the affected vehicle profiles are re-baked",
   code.includes("legs.map(l => l.vehicle_profile)"));
 ok("the invalidated leg count is surfaced to the user", code.includes("inv.leg_count"));

@@ -58,6 +58,8 @@ NOT VERIFIED
 Overpass and HERE are never called by the test harnesses (stubbed). HERE has never been
 called at all. The 13 Oct Overpass query above is the only live read.
 """
+import contextlib
+import contextvars
 import json
 import math
 import re
@@ -286,7 +288,57 @@ def _bbox_near(a, b, pad_deg):
 def along_m(limit_coords, route_line):
     """Metres of the limit's own segments whose BOTH ends lie within MATCH_M of the route —
     how far the route travels along it. A crossing scores ~0 (the bridge trap)."""
-    near = [_pt_line_m(c, route_line) <= MATCH_M for c in limit_coords]
+    return _along(limit_coords, lambda c: _pt_line_m(c, route_line) <= MATCH_M)
+
+
+class _LineIndex:
+    """
+    A route line's segments filed in a grid, so "is this point within X m of the route" looks at
+    the few segments near the point instead of all of them (17 Oct 2026, Route all 502s).
+
+    Measured locally (HERE stubbed with real HERE lines from the live backup, 1,631 stored limits,
+    the demo's 22 routes): the brute check, every limit vertex against every route segment, took
+    ~9 s a leg and was 99 % of a Route all batch, so a 30-leg batch ran ~4.6 min here and longer
+    on Render. The answer is the SAME: a segment is filed in every cell its box padded by `reach`
+    touches (padded a little more than needed), so every segment that could be within `reach` of
+    a point is among that point's candidates, and each candidate is measured with the same
+    _pt_seg_m the brute check uses. test_limits asserts the hits are identical.
+    """
+    CELL_DEG = 0.005        # ~550 m north-south, ~330 m east-west at 53°N
+
+    def __init__(self, line, reach_m):
+        self.line = line
+        self.reach_m = reach_m
+        self.grid = {}
+        c = self.CELL_DEG
+        pad_lat = reach_m / 110540.0 * 1.05
+        for i in range(len(line) - 1):
+            a, b = line[i], line[i + 1]
+            w, e = min(a[0], b[0]), max(a[0], b[0])
+            s_, n = min(a[1], b[1]), max(a[1], b[1])
+            # _pt_seg_m scales longitude at the POINT's latitude; the smallest cosine a point
+            # within reach could have bounds the pad from above
+            lat_far = min(89.0, max(abs(s_), abs(n)) + pad_lat)
+            pad_lon = reach_m / (111320.0 * math.cos(math.radians(lat_far))) * 1.05
+            for gx in range(math.floor((w - pad_lon) / c), math.floor((e + pad_lon) / c) + 1):
+                for gy in range(math.floor((s_ - pad_lat) / c), math.floor((n + pad_lat) / c) + 1):
+                    self.grid.setdefault((gx, gy), []).append(i)
+
+    def candidates(self, p):
+        c = self.CELL_DEG
+        return self.grid.get((math.floor(p[0] / c), math.floor(p[1] / c)), ())
+
+    def near(self, p, within_m):
+        """True when some segment of the line is within `within_m` (<= reach) of p."""
+        line = self.line
+        for i in self.candidates(p):
+            if _pt_seg_m(p, line[i], line[i + 1]) <= within_m:
+                return True
+        return False
+
+
+def _along(limit_coords, is_near):
+    near = [is_near(c) for c in limit_coords]
     total = 0.0
     for i in range(len(limit_coords) - 1):
         if near[i] and near[i + 1]:
@@ -888,20 +940,22 @@ def check_route(route_id, _limits=None):
         if not line or len(line) < 2:
             continue
         lb = _bbox(line)
+        idx = None          # built on the first limit near the line (17 Oct 2026: see _LineIndex)
         for L in lims:
             coords = L["geometry"]
             if L["geom_type"] == "Point":
                 if not _bbox_near((coords[0], coords[1], coords[0], coords[1]), lb, pad):
                     continue
-                d = _pt_line_m(coords, line)
-                if d > POINT_M:
+                idx = idx or _LineIndex(line, max(MATCH_M, POINT_M))
+                if not idx.near(coords, POINT_M):
                     continue
                 along, point = None, True
             else:
                 fb = _bbox(coords)
                 if not fb or not _bbox_near(fb, lb, pad):
                     continue
-                along = along_m(coords, line)
+                idx = idx or _LineIndex(line, max(MATCH_M, POINT_M))
+                along = _along(coords, lambda c: idx.near(c, MATCH_M))
                 need = min(ALONG_MIN_M, ALONG_SHARE * (L.get("length_m") or _line_len_m(coords)))
                 if along <= 0 or along < need:
                     continue
@@ -956,6 +1010,43 @@ def store_checks(route_ids=None):
                    "WHERE tenant_id = ? AND id = ?",
                    (json.dumps(hits) if hits is not None else None, now, status, tenant, rid))
     return {"status": "ok", "routes": len(ids), "hits": n, "limits": len(lims), "checked_at": now}
+
+
+# 17 Oct 2026 (Route all 502s): a bake used to re-check its route after EVERY leg it stored
+# (_upsert_geom -> store_checks([route_id])), and each check covers every baked leg of the route,
+# so a 30-leg batch checked some legs a dozen times. Inside checks_batched() the hook only notes the
+# route; the block's end checks each noted route ONCE, against one read of the stored limits.
+_DEFER = contextvars.ContextVar("limits_defer", default=None)
+
+
+@contextlib.contextmanager
+def checks_batched():
+    """Hold every check_soon() inside the block and check the noted routes once at its end (also
+    when the block raises: geometry may have been stored before it did). Nested blocks defer to the
+    outermost."""
+    if _DEFER.get() is not None:
+        yield
+        return
+    box = set()
+    tok = _DEFER.set(box)
+    try:
+        yield
+    finally:
+        _DEFER.reset(tok)
+        if box:
+            try:
+                store_checks(sorted(box))
+            except Exception as e:
+                print("limits: route checks not stored:", str(e)[:120])
+
+
+def check_soon(route_id):
+    """The hook the bake calls after storing a primary leg: now, or at the end of checks_batched()."""
+    box = _DEFER.get()
+    if box is not None:
+        box.add(route_id)
+        return None
+    return store_checks([route_id])
 
 
 def stored_checks(route_ids=None):
