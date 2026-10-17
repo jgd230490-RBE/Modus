@@ -2352,6 +2352,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("SIM BIG SCREEN: the bar keeps one line — the month choice only while the Simulation is on screen (or in All sections), and no costing range beside it",
     (_dbS.match(/\(wallLayout === "all" \|\| wallSection === simIdx\) && </g) || []).length === 2
     && _dbS.includes("{fill && wallSection !== simIdx && <span className=\"dash-wallbar-note\" title="));
+  // 17 Oct 2026 (the user: "entry gate and empty lorry icons look too similar")
+  ok("⭐ SIM: an entry gate never reads as a lorry — a bullseye (radius 7, thick ink rim, ink centre) against the empty lorry's small blue ring (radius 4); the key draws the same",
+    mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });')
+    && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });')
+    && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")]')
+    && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
+    && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
   ok("SIM: the map's key names the concrete mixer only on a day with a pour",
     mapSrc.includes('{D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>'));
   ok("🔴 SIM BIG SCREEN: no scenario controls and no table on the TV; it reads the plain month (no pour) only while shown",

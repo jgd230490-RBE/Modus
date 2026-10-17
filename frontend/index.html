@@ -555,7 +555,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-dot-empty{background:#FFFFFF;border:2px solid var(--sim-lorry);}
   .sim-dot-pour{background:var(--sim-mixer);}
   .sim-dot-wait{background:#FFFFFF;border:2px solid #DC2626;}
-  .sim-dot-gate{background:#FFFFFF;border:1.5px solid #1E293B;width:9px;height:9px;}
+  .sim-dot-gate{background:radial-gradient(circle,#1E293B 0 2.5px,#FFFFFF 3px);border:2.5px solid #1E293B;width:15px;height:15px;}
   .sim-line{display:inline-block;width:18px;height:0;flex:0 0 auto;}
   .sim-line-end{border-top:1.5px dashed #94A3B8;}
   .sim-line-haul{border-top:3px dashed #7C3AED;}
@@ -8377,7 +8377,10 @@ function SimMap({ meta, D, store, frame }){
       m.addLayer({ id: "sim-haul", type: "line", source: "sim-haul", paint: { "line-color": tok("--chart-4", "#7C3AED"), "line-width": 4, "line-dasharray": [1.5, 1] } });
       m.addLayer({ id: "sim-haul-label", type: "symbol", source: "sim-haul", layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, -1] },
                    paint: { "text-color": "#5B21B6", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
-      m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 4, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 1.5 } });
+      // 17 Oct 2026 (the user: the gate and an empty lorry looked too alike, both a small white dot with a rim): the gate is a
+      // BULLSEYE — a bigger white ring with a thick dark rim and a dark centre — so it never reads as a lorry
+      m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });
+      m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });
       m.addLayer({ id: "sim-gate-labels", type: "symbol", source: "sim-gates", layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.1], "text-anchor": "top" },
                    paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
       m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries", paint: {
