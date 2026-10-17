@@ -1921,7 +1921,10 @@ def promote_alternative(route_id, profile, alt_index, leg="loaded"):
             "vehicle_profile = ? AND leg = ? AND alt_index = 0",
             (db.current_tenant(), route_id, profile, leg))
         tag = (primary[0].get("haul_zones") if primary else None) or ""
-        on_haul = [z.strip() for z in tag.split(",") if z.strip()]
+        # 17 Oct 2026 (D109): a gate's access road is not "a haul road on this leg" here — a leg with only access
+        # roads keeps HERE's alternatives (haul.route_with_haul), so a missing index there is a plain cache miss
+        _access = gate_access_zone_ids()
+        on_haul = [z.strip() for z in tag.split(",") if z.strip() and z.strip() not in _access]
         if on_haul:
             return {"error": f"no alternative {alt_index}: this leg runs through haul "
                              f"road(s) {', '.join(on_haul)}, and a leg with a haul road "
