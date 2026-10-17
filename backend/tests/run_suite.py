@@ -41,7 +41,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 
-BROWSER_ONLY = {"browser_check.js", "help_browser_check.js", "look_check.js", "map_browser_check.js"}
+BROWSER_ONLY = {"browser_check.js", "help_browser_check.js", "look_check.js", "map_browser_check.js", "ui_audit.js"}
 KEYS = ("HERE_API_KEY", "MAPBOX_TOKEN", "MAPBOX_PUBLIC_TOKEN", "GOOGLE_MAPS_API_KEY", "GOOGLE_STREETVIEW_KEY",
         "SMTP_USER", "SMTP_PASSWORD", "DATABASE_URL", "TENANT_ID", "ALLOW_DEMO_CODES", "MAP_GATE")
 COUNT = re.compile(r"(\d+) passed, (\d+) failed")
