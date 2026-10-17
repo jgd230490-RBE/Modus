@@ -543,12 +543,15 @@ async function audit(page, store, meta) {
   // is offline): the browser's own "Failed to load resource" line for it and the request itself are the premise, not a
   // defect — a pageerror (the app not coping) still counts
   const cut = meta.cut || null;
+  // a dead link (the linkerr stop): /api/auth/check answers 410 Gone by design (G3) — the premise, as 401 / 403 are above
+  const gone = meta.expectGone || null;
   const errors = drained.errors.filter(e => !ALLOWED_CONSOLE.some(re => re.test(e)) && !(signedOut && /status of (401|403)/.test(e))
-    && !(cut && /^console: Failed to load resource: net::ERR_(FAILED|INTERNET_DISCONNECTED|ABORTED)/.test(e)));
-  const failedReqs = cut ? drained.failed.filter(f => !cut.test(f)) : drained.failed;
+    && !(cut && /^console: Failed to load resource: net::ERR_(FAILED|INTERNET_DISCONNECTED|ABORTED)/.test(e))
+    && !(gone && /status of 410 \(Gone\)/.test(e)));
+  const failedReqs = cut ? drained.failed.filter(f => !cut.test(f.split(" ")[0])) : drained.failed;   // the entry is "url reason"
   const mapboxErr = OPT.blockMapbox ? errors.filter(e => /mapbox|tile|style|glyph|sprite/i.test(e)) : [];
   const realErr = errors.filter(e => !mapboxErr.includes(e));
-  const http = drained.http.filter(h => !(signedOut && (h.status === 401 || h.status === 403)));
+  const http = drained.http.filter(h => !(signedOut && (h.status === 401 || h.status === 403)) && !(gone && h.status === 410 && gone.test(h.url)));
   const sameOrigin = http.filter(h => h.url.startsWith(meta.base));
   const third = http.filter(h => !h.url.startsWith(meta.base) && !(OPT.blockMapbox && /mapbox/.test(h.url)));
   const axeFail = axe.violations.filter(WCAG);
@@ -594,6 +597,7 @@ async function audit(page, store, meta) {
                  theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks };
   delete stop.base;
   if (cut) stop.cut = cut.source;   // on the record as text (a RegExp would serialise as {})
+  if (gone) stop.expectGone = gone.source;
   REPORT.stops.push(stop);
   const bad = checks.filter(c => !c.ok).map(c => c.id);
   process.stdout.write(`${bad.length ? "FAIL" : "ok  "} ${label.padEnd(46)} ${String(t).padStart(5)} ms  ${bad.join(" ")}${warnings.length ? "  (" + warnings.map(w => w.id).join(" ") + ")" : ""}\n`);
@@ -1039,7 +1043,7 @@ async function walkLogin(browser, base) {
     await page.goto(base + "/#invite=" + "x".repeat(40), { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".auth-card", { timeout: 30000 }).catch(() => {});
     const card = await page.locator(".auth-card h1").first().textContent({ timeout: 1000 }).catch(() => "");
-    const dead = await audit(page, store, meta("linkerr", w));
+    const dead = await audit(page, store, meta("linkerr", { expectGone: /\/api\/auth\/check$/ }));
     dead.cardTitle = card || undefined;
     ok(`linkerr: a dead invite link shows the app's note, not the public view (card "${card}", title "${dead.title}")`,
        /no longer works/.test(card) && !(await page.locator("iframe").count()));

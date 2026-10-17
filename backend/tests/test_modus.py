@@ -1091,7 +1091,7 @@ ok("ui_audit.js captures what its stops claim: the app comes back before the err
                              "function pinViewportUnits()", "page.evaluate(pinViewportUnits)", "unpinViewportUnits",
                              "the stop is the app's ${want} page", "shows the failure it is named for",
                              'page.goto("about:blank")', "embeddedMap(page)", "const cut = meta.cut || null",
-                             "cut: /./")))
+                             "cut: /./", "const gone = meta.expectGone || null")))
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
