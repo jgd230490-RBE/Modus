@@ -723,6 +723,21 @@ if (loaded) {
         && seg(sP, "Langton haul road", "</tr>").includes("<b>148</b>") && seg(sP, "Stockpile North haul road", "</tr>").includes("<b>78</b>"));
       ok("🔴 SIM: no undefined / NaN, no team id, none of the banned words or the word-rule words in the rendered section; lorries, never trucks",
         !/undefined|NaN|\bIPT ?[1-6]\b/.test(sP) && !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure)\b/i.test(sTxt));
+      // 17 Oct 2026 (found on live): the pour's gates are the server's working sites, busiest first; the access-road line
+      const selPour = seg(sP, 'aria-label="Pour gate"', "</select>");
+      ok("⭐ SIM fix: the pour's gate list is the four compounds, busiest first (Harborough, Langton, Melton, Tilton); no quarry, stockpile, terminal or landfill",
+        (selPour.match(/<option /g) || []).length === 4 && SIMF.pour_default === "G007"
+        && selPour.indexOf("Harborough Compound") < selPour.indexOf("Langton Compound") && selPour.indexOf("Langton Compound") < selPour.indexOf("Melton Compound")
+        && selPour.indexOf("Melton Compound") < selPour.indexOf("Tilton Compound") && !/Quarry|Pit|Stockpile|Terminal|Landfill/.test(selPour), selPour.slice(0, 300));
+      const aP = seg(render("the Dashboard renders the Simulation with gate access roads left out", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT,
+        initialSim: { ...SIMD, access_roads_hidden: 17 }, onOpen(){} })), '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      ok("SIM fix: with 17 access roads left out, one line says so; with none, no line",
+        aP.includes('data-sim-access-hidden="1">Gate access roads are not listed (17): lorries still cross them at their typed speed.<') && !sP.includes("data-sim-access-hidden"));
+      const nP = seg(render("the Dashboard renders the Simulation with no site to pour at", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT,
+        initialSim: { ...SIMD, pour_gates: [], pour_default: null }, onOpen(){} })), '<details class="dash-more" data-sim="1"', "<summary>This week and today");
+      ok("SIM fix: with no compound or site, the pour switch is off and greyed, and says why",
+        nP.includes('data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).<')
+        && /<label class="sim-check sim-off"><input type="checkbox" disabled=""/.test(nP));
       const pP = seg(render("the Dashboard renders the Simulation on a phone", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialSim: SIMD, phone: true, onOpen(){} })),
                      '<details class="dash-more" data-sim="1"', "<summary>This week and today");
       ok("⭐ SIM: on a phone, one card a gate (eleven), the desktop note, no player, no map, nothing to type",

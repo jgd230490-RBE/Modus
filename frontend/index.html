@@ -8527,7 +8527,10 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
   const [allT, setAllT] = useState(sc.all ? sc.all[1] : D.stand_in.to);
   const stood = (D.gates || []).some(g => g.open_basis === "stood_in");
   const p = sc.pour;
-  const sites = (D.gates || []).filter(g => !g.origin_share_note);
+  // 17 Oct 2026: where a pour can go is the server's (working sites only: a compound or a site, never a landfill, a
+  // stockpile, a quarry or a batching plant), busiest first; its first is the default. A site with two entry gates names both.
+  const sites = D.pour_gates || [];
+  const twoGates = (g) => sites.filter(x => x.location_id === g.location_id).length > 1;
   const setPour = (k, v) => onChange({ ...sc, pour: { ...p, [k]: v } });
   return (
     <div className="sim-card" data-sim-scenario="1">
@@ -8544,11 +8547,13 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
         <label className="sim-check"><input type="checkbox" checked={sc.bands != null ? sc.bands : !!D.bands.on} onChange={e => onChange({ ...sc, bands: e.target.checked })} />
           <span>No-delivery peak bands {(D.bands.on ? D.bands.words : gateBandWords(D.bands.typed)) || gateBandWords(PEAK_BANDS_PLACEHOLDER)}
           {(!D.bands.typed || !D.bands.typed.length) && <span className="sim-tag">example bands, none typed</span>}</span></label>
-        <label className="sim-check"><input type="checkbox" checked={p.on} onChange={e => onChange({ ...sc, pour: { ...p, on: e.target.checked, gate: p.gate || (sites[0] || {}).gate_id || "" } })} />
+        <label className={"sim-check" + (sites.length ? "" : " sim-off")}><input type="checkbox" checked={p.on} disabled={!sites.length}
+            onChange={e => onChange({ ...sc, pour: { ...p, on: e.target.checked, gate: p.gate || D.pour_default || "" } })} />
           <span>Concrete pour <span className="sim-tag">a what-if</span></span></label>
+        {!sites.length && <div className="ct-note" data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).</div>}
         <div className={"sim-pour" + (p.on ? "" : " sim-off")}>
           <label>Gate <select className="ga-sel" value={p.gate} onChange={e => setPour("gate", e.target.value)} disabled={!p.on} aria-label="Pour gate">
-            {sites.map(g => <option key={g.gate_id} value={g.gate_id}>{simGateName(g)}</option>)}</select></label>
+            {sites.map(g => <option key={g.gate_id} value={g.gate_id}>{simGateName(g)}{twoGates(g) ? `, ${g.gate_name}` : ""}</option>)}</select></label>
           <label>Starts <input type="time" step={900} value={p.start} onChange={e => setPour("start", e.target.value)} disabled={!p.on} aria-label="Pour starts at" /></label>
           <label>Volume <input type="number" min={1} step={1} value={p.m3} onChange={e => setPour("m3", e.target.value)} disabled={!p.on} aria-label="Pour volume in cubic metres" className="sim-num" /> m³</label>
           <label>Mixer <input type="number" min={0.5} step={0.5} value={p.mpl === "" ? D.mixer.m3_per_load : p.mpl} onChange={e => setPour("mpl", e.target.value)} disabled={!p.on} aria-label="Cubic metres a mixer load" className="sim-num" /> m³ a load</label>
@@ -8732,6 +8737,7 @@ function SimulationPanel({ meta, months, phone, initial }){
                     <td className="num">{h.length_km == null ? "—" : `${fmtDist(h.length_km, 1)} ${DU()}`}</td><td className="num"><b>{h.lorries}</b></td>
                     <td className="num">{h.busiest || 0}<div className="sim-sub">{h.busiest_hour || ""}</div></td><td className="num">{(h.routes || []).length}</td></tr>)}</tbody></table></div>
               </>}
+              {D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}
               <div className="sim-checks" data-sim-checks="1">
                 <div>{ok(D.checks.table_equals_arrivals && played === D.gate_arrivals)} {grp(D.loads)} loads in the day, each arriving at its gate at both ends, plus {pourN} mixer{pourN === 1 ? "" : "s"}: the table counts {grp(D.gate_arrivals)} lorry arrivals and the map plays {grp(played)} between {D.window.from} and {D.window.to}.</div>
                 <div>{ok(D.checks.hours_add_up)} Each gate's hours add up to its day.</div>

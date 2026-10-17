@@ -79,6 +79,10 @@ HAUL_NEAR_M = 4.0
 SIMPLIFY_M = 15.0
 #: whole_loads() stops searching after this many steps and keeps the best day found (`exact` False)
 NODE_BUDGET = 300_000
+#: 17 Oct 2026: a concrete pour goes to a WORKING site — the location types the app treats as one (network._role_for's
+#: compound and site; the Locations form offers Quarry, Port, Compound, Site, Railhead, Stockpile, Other). Never a quarry,
+#: a railhead, a stockpile, a landfill, a soil recycling hub or a batching plant. Matched without regard to case.
+POUR_SITE_TYPES = ("compound", "site")
 
 NOTE_ORIGIN = "Serves other customers too: only this scheme's lorries are counted, so a queue here is the least it could be."
 LIMITS = ("Planning view, not a record of what happened.",
@@ -730,6 +734,29 @@ def scenario_from_query(hours=None, check_in=None, bands=None, pour_gate=None, p
     return sc
 
 
+def pour_site(loc):
+    """True for a location a pour can go to: its type is Compound or Site (POUR_SITE_TYPES)."""
+    return str((loc or {}).get("loc_type") or "").strip().lower() in POUR_SITE_TYPES
+
+
+def pour_gates(gate_rows, locations, laden_by_gate):
+    """
+    The gates a pour can go to — the active entry gates of the working sites (pour_site) — busiest first: the most
+    laden lorries a day in the month (the Dashboard's Gate arrivals figure), then the site's name. The first is the
+    default pour gate. [{gate_id, gate_name, location_id, location_name, laden_per_day}]
+    """
+    out = []
+    for gid, g in gate_rows.items():
+        loc = locations.get(g.get("location_id")) or {}
+        if not g.get("active") or not gates.serves(g, "entry") or not pour_site(loc):
+            continue
+        out.append({"gate_id": gid, "gate_name": g.get("name"), "location_id": g.get("location_id"),
+                    "location_name": loc.get("name") or g.get("location_id") or "",
+                    "laden_per_day": float(laden_by_gate.get(gid) or 0.0)})
+    out.sort(key=lambda x: (-x["laden_per_day"], x["location_name"], x["gate_id"]))
+    return out
+
+
 def mixer_m3(factors):
     """(m³ a load, vehicle name) — the app's own mixer's legal fill; the first mixer typed; else 7.5 (stated)."""
     vs = (factors or {}).get("vehicles") or {}
@@ -858,10 +885,15 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             if g and g not in gate_ids:
                 gate_ids.append(g)
     p = sc.get("pour")
+    pgates = pour_gates(gate_rows, locations, {g["gate_id"]: g.get("laden_per_day") for g in panel.get("gates") or []})
     if p:
         pg = gate_rows.get(p["gate"])
         if not pg or not pg.get("active") or not gates.serves(pg, "entry"):
             raise ValueError("The pour's gate is not one of this scheme's entry gates.")
+        if p["gate"] not in {x["gate_id"] for x in pgates}:
+            ploc = locations.get(pg.get("location_id")) or {}
+            raise ValueError(f"A pour goes to a working site (a compound or a site): {ploc.get('name') or p['gate']} "
+                             f"is {('a ' + str(ploc.get('loc_type')).strip().lower()) if ploc.get('loc_type') else 'not one'}.")
         if p.get("m3_per_load") is None:
             p = dict(p, m3_per_load=mixer_m3(factors)[0])
         prob = pour_problem(p["start"], p["m3"], p["m3_per_load"], p["rate"])
@@ -901,10 +933,14 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         ci = float(ci) if ci not in (None, "") and float(ci) > 0 else None
         G[gid] = {"window": win, "basis": basis, "check_in": ci, "typed": typed}
 
+    # 17 Oct 2026: a gate's ACCESS ROAD (location_gates.access_zone_id) is a haul-road zone too, and lorries still cross
+    # it at its speed (the legs above are untouched), but it is the last few metres to a gate, not a haul road a planner
+    # watches: it is not listed or counted with the haul roads. The reply says how many were left out.
+    access_ids = {g.get("access_zone_id") for g in gate_rows.values() if g.get("access_zone_id")}
     inp = {"lines": lines, "gates": G, "legs": legs, "leg_minutes": leg_minutes,
            "panel": {g["gate_id"]: g["arrivals_per_day"] for g in panel.get("gates") or []},
            # the haul roads some leg of the day was routed along (an unused or switched-off road is not listed)
-           "haul_roads": {z: zone_rows[z] for z in sorted(used_zones)} if with_lines else {}}
+           "haul_roads": {z: zone_rows[z] for z in sorted(used_zones - access_ids)} if with_lines else {}}
     if p:
         sc = dict(sc, pour=p)
     res = simulate(inp, {"bands": bands, "pour": sc.get("pour")})
@@ -1034,6 +1070,9 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         "loads": res["total"], "loads_month": sum(l["trips"] for l in lines),
         "gate_arrivals": total_arr,
         "lines": out_lines, "gates": out_gates, "arrivals": arrivals, "pour": pour, "haul_roads": haul,
+        "access_roads_hidden": (len(used_zones & access_ids) if with_lines else 0),
+        # 17 Oct 2026: where a pour can go (working sites only), busiest first; the first is the screen's default
+        "pour_gates": pgates, "pour_default": (pgates[0]["gate_id"] if pgates else None),
         "legs": out_legs,
         # routes the drawing cannot show: no route worked out for any vehicle (their lorries still count at the gates)
         "not_drawn": (sorted({l["route_id"] for l in lines if not (l["laden_leg"] and legs.get(l["laden_leg"]))})
