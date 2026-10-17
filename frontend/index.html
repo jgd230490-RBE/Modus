@@ -6251,7 +6251,7 @@ function ConfigPage({ meta, who, access }){
           {tab === "raw" && (
             <div className="px-6 pb-6">
               <p className="text-sm text-slate-500 mb-2">The whole document. Anything the other sections do not cover — routing dimensions, the notes — is here. Saving from this section sends exactly this text.</p>
-              <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw}
+              <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)"
                 onChange={e => { setRaw(e.target.value); setRawErr(""); try { setDoc(JSON.parse(e.target.value)); } catch(err){} }} />
               {rawErr && <div className="text-sm mt-1" style={{ color: "var(--red)" }}>{rawErr}</div>}
             </div>
@@ -11406,19 +11406,19 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           : "Haul roads, restricted areas and the other polygons routing is aware of. A haul road is a zone a route can be told to use."}
         actions={<>
           <span className="text-xs text-slate-400">Basemap</span>
-          <select value={basemap} onChange={e => changeStyle(e.target.value)} className={sel}>
+          <select value={basemap} onChange={e => changeStyle(e.target.value)} className={sel} aria-label="Basemap">
             {basemapsFor(TENANT.country).map(([label, val]) => <option key={val} value={val}>{label}</option>)}
           </select>
           <span className="text-xs text-slate-400 ml-1">Show</span>
-          <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel}>
+          <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel} aria-label="Show vehicle">
             {vehicles.filter(v => vehShown(v, showProfile)).map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}
           </select>
           {/* the map can only draw one of the baked geometries at a time */}
-          <select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw">
+          <select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw" aria-label="Direction drawn">
             <option value="loaded">Laden out</option>
             <option value="return">Empty back</option>
           </select>
-          <select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which HERE option to draw">
+          <select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which HERE option to draw" aria-label="Route option drawn">
             <option value={0}>Primary route</option>
             <option value={1}>Alt 1</option>
             <option value={2}>Alt 2</option>

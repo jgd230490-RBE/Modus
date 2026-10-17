@@ -5355,6 +5355,50 @@ function qrRead(mod) {
      && !/Standard \(3D\)/.test(guide));
 }
 
+// ===== 16 Oct 2026 (the UI audit, finding #4): the public map's language and the names of its selects =====
+// axe-core html-has-lang and select-name (WCAG 3.1.1 and 4.1.2, both Level A): the one public page was read in the
+// synthesiser's default language, and a screen-reader or voice-control user met "All origins, combo box" four times
+// with no word for which filter was which. The team select's name is the tenant's team word, set in
+// applyTenantVocabulary like the rest of its vocabulary, behind a null check (a document without the panel).
+{
+  ok("🔴 names #4: the page declares its language, British English, on its one <html> tag",
+     (html.match(/<html\b/g) || []).length === 1 && /^<!DOCTYPE html>\n<html lang="en-GB">\n<head>/.test(html));
+  const tagOf = (id) => (html.match(new RegExp('<select id="' + id + '"[^>]*>')) || [""])[0];
+  const nameOf = (id) => (tagOf(id).match(/aria-label="([^"]*)"/) || [])[1] || null;
+  ok("🔴 names #4: the four filter selects are named Origin, Destination, Discipline and Team in the markup (before any script runs)",
+     nameOf("filter-origin") === "Origin" && nameOf("filter-dest") === "Destination"
+     && nameOf("filter-discipline") === "Discipline" && nameOf("filter-ipt") === "Team",
+     JSON.stringify(["filter-origin", "filter-dest", "filter-discipline", "filter-ipt"].map(nameOf)));
+  ok("🔴 names #4: the basemap select is named Basemap, its handler as it was",
+     nameOf("basemap-select") === "Basemap" && tagOf("basemap-select").includes('onchange="changeBasemap(this.value)"'));
+  ok("names #4: the filters' handlers are as they were (a name was added, nothing else changed)",
+     ["filter-origin", "filter-dest", "filter-discipline", "filter-ipt"].every(id => tagOf(id).includes('onchange="applyFilters()"')));
+  // every select in the static markup has a name: an aria-label, or a <label for> (the export card's four)
+  const unnamed = [...html.matchAll(/<select id="([^"]+)"[^>]*>/g)]
+    .filter(m => !/aria-label="[^"]+"/.test(m[0]) && !new RegExp('<label [^>]*for="' + m[1] + '"').test(html)).map(m => m[1]);
+  ok("names #4: every <select> in the markup is named — an aria-label, or a <label for> (the export card's four)",
+     unnamed.length === 0 && (html.match(/<select id="/g) || []).length >= 10, JSON.stringify(unnamed));
+  // the team word at run time
+  const atv = src.slice(src.indexOf("    function applyTenantVocabulary() {"), src.indexOf("    function barAbove(){"));
+  ok("names #4: applyTenantVocabulary names the team select after TEAM, behind a null check, beside the 'All …s' option text",
+     atv.length > 200 && atv.includes("if (ipt) ipt.textContent = 'All ' + TEAM.toLowerCase() + 's';\n")
+     && atv.includes("const iptSel = document.getElementById('filter-ipt');\n        if (iptSel) iptSel.setAttribute('aria-label', TEAM);"));
+  const runVocab = (withSelect, team) => {
+    const attrs = {};
+    const el = { textContent: "", hidden: false, setAttribute(k, v) { attrs[k] = String(v); }, closest() { return null; }, remove() {} };
+    const cls = new Set();
+    const document = { getElementById: (id) => (withSelect && id === "filter-ipt") ? el : null, querySelector: () => null, createElement: () => el,
+                       body: { classList: { toggle(c, on) { if (on) cls.add(c); else cls.delete(c); }, contains: (c) => cls.has(c) }, appendChild() {} } };
+    const f = new Function("document", "window", "TENANT", "TEAM", "EMBED", "barAbove", "setupGuide", atv + "\nreturn applyTenantVocabulary;");
+    f(document, { evr_rail_data: null, OVERLAY_VERSION: null }, { country: "GB" }, team, true, () => true, () => {})();
+    return attrs;
+  };
+  ok("⭐ names #4: run with the select on the page, its name is the tenant's team word (a tenant whose teams are crews reads Crew)",
+     runVocab(true, "Crew")["aria-label"] === "Crew" && runVocab(true, "Team")["aria-label"] === "Team");
+  let vocabThrew = null; try { runVocab(false, "Crew"); } catch (e) { vocabThrew = e; }
+  ok("names #4: run on a document without the select (the guide sandbox above, a page whose panel is not built), nothing throws",
+     vocabThrew === null, vocabThrew && String(vocabThrew));
+}
 // ===== 16 Oct 2026 (D115, S17): the public map's flow — each direction its own lane, spacing by movements a day =====
 // The user: flow dashes only on the public map (no lorries, no simulation: D36 / D86); each direction side by side,
 // left of its direction of travel; bigger, round-capped dashes with clear gaps; spacing by movements a day on FIXED
