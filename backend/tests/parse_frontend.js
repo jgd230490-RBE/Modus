@@ -3291,6 +3291,24 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && (src.match(/className="tbl tbl-wrap"/g) || []).length === 2);
 }
 
+// ---- 17 Oct 2026 (D114): the Dashboard's default range is this month ± 6 -----------------------------------------------
+{
+  ok("⭐ D114: the Dashboard's From / To start from dashRangeDefault (this month ± DASH_RANGE_EITHER_SIDE), not month 1 and the last month",
+     src.includes("const [fromM, setFromM] = useState(() => dashRangeDefault(months)[0]);")
+     && src.includes("const [toM, setToM] = useState(() => dashRangeDefault(months)[1]);")
+     && !src.includes("const [fromM, setFromM] = useState(1);") && !src.includes("const [toM, setToM] = useState(months.count);"));
+  ok("D114: six months either side, clamped to the horizon, from the same 'this month' the Gate arrivals panel uses",
+     src.includes("const DASH_RANGE_EITHER_SIDE = 6;")
+     && src.includes("return [Math.max(1, c - DASH_RANGE_EITHER_SIDE), Math.min(n, c + DASH_RANGE_EITHER_SIDE)];")
+     && /const dashRangeDefault = \(months\) => \{\s*const n = \(months && months\.count\) \|\| 60, c = gaMonthToday\(months\);/.test(src));
+  ok("D114: one button between the default and the whole programme ('Whole programme' / 'This month ± 6'), not shown on the big screen",
+     src.includes(">Whole programme</button>") && src.includes(">This month ± 6</button>")
+     && src.indexOf(">Whole programme</button>") > src.indexOf('aria-label="To month"')
+     && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
+  ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
+     src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

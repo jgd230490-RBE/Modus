@@ -335,19 +335,28 @@ ok("5: config.invalidate() clears the network's cache (source)", "net.invalidate
 DEMO = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
 T = DEMO["tables"]
 _bp = [l for l in T["locations"] if l["loc_type"] == "Batching plant"]
-ok("6: the demo has ONE batching plant, fictional, supplying ready-mixed concrete",
-   len(_bp) == 1 and "fictional" in _bp[0]["name"].lower() and json.loads(_bp[0]["supplies"]) == ["Ready-mixed concrete"])
-_bp_id = _bp[0]["id"] if _bp else None
-_pr = [r for r in T["routes"] if r["origin_id"] == _bp_id]
-ok("6: two mixer routes leave it, to two compounds, with named gates",
-   len(_pr) == 2 and all(r["material_category"] == "Ready-mixed concrete" and r["origin_gate_id"] and r["dest_gate_id"] for r in _pr))
+# RE-PINNED 17 Oct 2026 (demo redesign R2, §3a, D100): TWO batching plants — the Melton plant and Welland Ready-Mix for the
+# south. The on-site asphalt plant has its own type ("Asphalt plant"), so it is not counted here.
+ok("6: the demo has TWO batching plants (Melton and Welland Ready-Mix), each fictional, supplying only ready-mixed concrete",
+   sorted(l["name"] for l in _bp) == ["Welland Ready-Mix (fictional)", "Wolds Link Batching Plant (fictional)"]
+   and all(json.loads(l["supplies"]) == ["Ready-mixed concrete"] for l in _bp)
+   and [l["loc_type"] for l in T["locations"] if "Asphalt Plant" in l["name"]] == ["Asphalt plant"])
+_bp_id = {l["name"]: l["id"] for l in _bp}
+_pr = {n: sorted(r["id"] for r in T["routes"] if r["origin_id"] == i) for n, i in _bp_id.items()}
+ok("6: the mixer routes leave each plant by id (Melton R021, R022, R033, R034; Welland R035, R036), each with both gates named",
+   _pr == {"Wolds Link Batching Plant (fictional)": ["R021", "R022", "R033", "R034"], "Welland Ready-Mix (fictional)": ["R035", "R036"]}
+   and all(r["material_category"] == "Ready-mixed concrete" and r["origin_gate_id"] and r["dest_gate_id"]
+           for r in T["routes"] if r["origin_id"] in _bp_id.values()))
 _pl = [f for f in T["forecasts"] if f["material_type"] == "Ready-mixed concrete"]
 _lines = {(f["route_id"], f["discipline"], f["section_id"], f["vehicle_type"]) for f in _pl}
-ok("6: three mixer lines (two structures, one substructure), in m³, approved, both mixers used",
-   len(_lines) == 3 and all(f["unit"] == "m3" and f["status"] == "Approved" for f in _pl)
-   and {l[3] for l in _lines} == {M8, M6} and sorted(l[1] for l in _lines) == ["structures", "structures", "substructure"])
-ok("6: every existing line is kept: 78 others, all on their old vehicles",
-   len([f for f in T["forecasts"] if f["material_type"] != "Ready-mixed concrete"]) == 78
+# RE-PINNED 17 Oct 2026 (R2, §3a): the mixer line keys read once from the regenerated package — 16 lines (structures on the
+# 8 m³ mixer, kerbs and surrounds on the 6 m³), 210 line-months
+ok("6: sixteen mixer lines (11 structures, 5 substructure), 210 line-months in m³, approved, both mixers used",
+   len(_lines) == 16 and len(_pl) == 210 and all(f["unit"] == "m3" and f["status"] == "Approved" for f in _pl)
+   and {l[3] for l in _lines} == {M8, M6} and sorted(l[1] for l in _lines).count("structures") == 11
+   and all((l[1] == "structures") == (l[3] == M8) for l in _lines))
+ok("6: every other line is on a lorry, never a mixer: 697 others (the programme's 905 approved less 210, + Pending and Rejected)",
+   len([f for f in T["forecasts"] if f["material_type"] != "Ready-mixed concrete"]) == 697
    and not any("mixer" in (f["vehicle_type"] or "").lower() for f in T["forecasts"] if f["material_type"] != "Ready-mixed concrete"))
 ok("6: the package's own factors carry the new categories and the mixer names",
    all(k in json.loads(next(r["value"] for r in T["config"] if r["key"] == "factors"))["material_categories"] for k in NEW)
@@ -355,7 +364,10 @@ ok("6: the package's own factors carry the new categories and the mixer names",
 ok("6: the package's readme tells the importer to bake the mixers too", "concrete mixers" in DEMO.get("_readme", ""))
 
 boot()
-res = tenant_package.import_tenant(DEMO, replace=True)
+# NARROWED 17 Oct 2026 (demo redesign R2, D102, §3a): the shipped package now carries the nine council areas; the bulletin
+# check below is about a tenant WITHOUT areas (the sources' empty column), so this copy is imported with no area rows
+DEMO_NO_AREAS = dict(DEMO, tables=dict(DEMO["tables"], areas=[], route_area_km=[]))
+res = tenant_package.import_tenant(DEMO_NO_AREAS, replace=True)
 ok("6: the demo imports into an empty tenant", res.get("ok") is True, str(res)[:200])
 config.invalidate(); costing.invalidate()
 FAC = conversions.load_factors()

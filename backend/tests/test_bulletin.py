@@ -226,6 +226,11 @@ for _rid, _o, _d, _ipt, _cap in (("R1", "L1", "L2", "IPT 1", 60), ("R2", "L3", "
 tenant_package.import_rows("ipts", [
     {"id": "IPT1", "label": "North Team", "manager": None, "active": True, "merged_into": None},
     {"id": "IPT2", "label": "Central Team", "manager": None, "active": True, "merged_into": None}])
+# 17 Oct 2026: the disciplines carry LABELS unlike their ids (as the demo's "superstructure" reads "Pavement"), so a table
+# that prints the id is caught. "structures" has no row: an id the tenant does not define falls back to itself.
+tenant_package.import_rows("disciplines", [
+    {"id": "earthworks", "label": "Bulk earthworks", "sort_order": 10, "in_scope": True, "scope_note": None, "active": True},
+    {"id": "substructure", "label": "Foundations", "sort_order": 20, "in_scope": False, "scope_note": None, "active": True}])
 
 
 def _geom(rid, prof, leg, km, hr):
@@ -822,6 +827,7 @@ PAGES11 = [" ".join(p.split()) for p in pdf_text(PDF11).split("") if p.strip()]
 T10R = " ".join(pdf_text(PDF10, raw=True).split())
 PAGESR = [" ".join(p.split()) for p in pdf_text(PDF10, raw=True).split("\f") if p.strip()]
 HTML_TEXT = " ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", " ", HTML10, flags=re.S)).split())
+S10_ROLLUP_DISC = bulletin.month_page(10, PLANNER)["rollup"]["breakdown"]["discipline"]
 import html as _hm  # noqa: E402
 HTML_TEXT = _hm.unescape(HTML_TEXT)
 
@@ -891,11 +897,35 @@ ok("⭐ page 2: every route with its bar, what is being moved, the road works an
                                "What changed since last month"))
    and all(h in PAGES[-1] for h in ("Terms", "Caveats", "Sources"))
    and "Two-way movements a day by route" not in T10J and "Terms explained" not in T10J)
+# 17 Oct 2026: "What is being moved" printed the discipline IDS under a "Material" heading (R3's browser check on the
+# four-year demo: "superstructure", "substructure"). It names each row by the tenant's discipline label, under "Discipline".
+_MV = [m["name"] for m in S10["moved"]]
+ok("🔴 What is being moved: each row is the tenant's discipline label (Bulk earthworks, Foundations), never the id",
+   "Bulk earthworks" in _MV and "Foundations" in _MV and "earthworks" not in _MV and "substructure" not in _MV
+   and "Structures" not in _MV and "structures" in _MV, str(_MV))
+ok("…out of scope counts too (a line may still carry one): substructure is out of scope here and still reads Foundations",
+   bulletin.discipline_names().get("substructure") == "Foundations")
+_mv_html = HTML10[HTML10.index('data-bulletin="moved"'):HTML10.index("</table>", HTML10.index('data-bulletin="moved"'))]
+ok("🔴 …the page's table: headed Discipline, the labels in its rows, no id",
+   "<th>Discipline</th>" in _mv_html and "<th>Material</th>" not in HTML10 and "Bulk earthworks" in _mv_html
+   and "Foundations" in _mv_html and ">earthworks<" not in _mv_html and ">substructure<" not in _mv_html, _mv_html[:400])
+_p2 = PAGES[1][PAGES[1].index("What is being moved"):PAGES[1].index("Road works and limits")]
+ok("🔴 …the PDF's table (page 2): headed Discipline, the labels, no id",
+   "Discipline" in _p2 and "Material" not in _p2 and "Bulk earthworks" in _p2 and "Foundations" in _p2
+   and not re.search(r"(?<![A-Za-z])(earthworks|substructure)\b", _p2.replace("Bulk earthworks", "")), _p2)
+ok("…the roll-up keeps the id as the KEY (the filters and the sort read it); the pure roll-up with no names keeps name = key",
+   {r["key"] for r in S10_ROLLUP_DISC} >= {"earthworks", "substructure"}
+   and all(r["name"] == r["key"] for r in R["breakdown"]["discipline"]))
+ok("…and month_rollup names them the same way (the bar's window roll-up)",
+   {r["key"]: r["name"] for r in bulletin.month_rollup(10, PLANNER)["breakdown"]["discipline"]}.get("earthworks") == "Bulk earthworks")
 ok("…the table's note names the bar colours and the dashed planning flag; the chart's caption and its 'flag 60' label are gone",
    "Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark (1 of 2 routes have one)." in T10J
    and "Dashed red mark: the planning flag typed on the route" not in T10J and "flag 60" not in T10J)
+# NARROWED 17 Oct 2026 (no ids in text): the rows are the bar's panel's rows in its order, each named by the tenant's
+# discipline label (BD is the pure roll-up, which has no names to hand: its name is the id)
 ok("…what is being moved is the bar's discipline panel, with an All routes row equal to the headline",
-   [m["name"] for m in S10["moved"]] == [d["name"] for d in BD["discipline"]] and S10["moved_total"]["a_day"] == _fig["two_way"]
+   [m["name"] for m in S10["moved"]] == [bulletin.discipline_names().get(d["key"], d["name"]) for d in BD["discipline"]]
+   and S10["moved_total"]["a_day"] == _fig["two_way"]
    and S10["moved_total"]["vehicles"] == f"{FLEET:,}")
 ok("⭐ works affecting the roads: the stored A6 closure in October with its dates and provider; the ENDED closure is not there",
    "A6 Resurfacing" in T10J and "16 Oct 2026 to 17 Oct 2026" in T10J and "A46 Barrier repairs" not in T10J

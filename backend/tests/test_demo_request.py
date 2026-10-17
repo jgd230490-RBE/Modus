@@ -464,7 +464,10 @@ for _part, _label in ((dr.email_text("Ada Example", _c), "plain"), (dr.email_htm
     # are in the Dashboard's folded "This week and today" section; the Look-ahead opens on this week.
     ok(f"🔴 the {_label}'s things to try: the Dashboard is the plan with today one click down; the Look-ahead is this week",
        "the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today." in _part
-       and "this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead." in _part
+       # NARROWED 17 Oct 2026 (demo redesign R2, §4.1, D113): the demo's Look-ahead raises no route-cap flag (the Burrough cap
+       # shows on the public pages only) and its closures are National Highways' own: the sentence says what is true
+       and "this week committed by route and by day, with National Highways road closures and lorry limits flagged; switch to next week to plan ahead." in _part
+       and "route caps flagged" not in _part
        and "today's tonnes, trips and vehicles, and this week against plan" not in _part
        and "next week committed by route and by day" not in _part)
     ok(f"...the {_label} offers a walkthrough of approving forecasts and confirming the week, not 'approving a week'",
