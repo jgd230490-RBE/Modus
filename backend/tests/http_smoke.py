@@ -1336,15 +1336,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and [(a["area_id"], a["movements_per_day"]) for a in r.json()["areas"]] == [(a["area_id"], a["movements_per_day"]) for a in ar["areas"]], r.text[:200])
     # 13 Oct 2026 (W12, bundle B): the council colour bands per scheme, saved through Config, served with the areas
     # NARROWED 13 Oct 2026 (bundle C regenerated the demo package once with carbon 20 / 50 / 100): the demo's own bands
-    ok("⭐ W12: both area payloads carry the scheme's bands — the demo package's (carbon 20 / 50 / 100, movements default)",
-       sh.get("stops") == {"movements": [50, 100, 200], "carbon": [20, 50, 100]} and ar.get("stops") == sh.get("stops"),
+    # RE-PINNED 18 Oct 2026 (demo redesign R3b): the package now carries both measures, re-chosen from the live four-year
+    # demo's district figures — movements 25 / 50 / 100 a day, carbon 10 / 25 / 50 t in the month
+    ok("⭐ W12: both area payloads carry the scheme's bands — the demo package's (movements 25 / 50 / 100, carbon 10 / 25 / 50)",
+       sh.get("stops") == {"movements": [25, 50, 100], "carbon": [10, 25, 50]} and ar.get("stops") == sh.get("stops"),
        str((sh.get("stops"), ar.get("stops"))))
     _cfg = c.get("/api/config/factors", headers=PLAN).json()["doc"]
     _bad = json.loads(json.dumps(_cfg)); _bad.setdefault("tenant", {})["council_breaks"] = {"carbon": [100, 50, 20]}
     r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _bad, "updated_by": "smoke"})
     ok("🔴 W12: a Config save with falling bands is refused (400) with the plain-words reason, nothing stored",
        r.status_code == 400 and "tenant.council_breaks.carbon must rise from left to right" in r.text
-       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [20, 50, 100], r.text[:200])
+       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [10, 25, 50], r.text[:200])   # RE-PINNED 18 Oct 2026 (R3b)
     _good = json.loads(json.dumps(_cfg)); _good.setdefault("tenant", {})["council_breaks"] = {"carbon": [25, 60, 120]}
     r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _good, "updated_by": "smoke"})
     import config as _cfgmod
@@ -1355,8 +1357,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 200 and _s2 == _a2 == {"movements": [50, 100, 200], "carbon": [25, 60, 120]}, str((r.status_code, _s2, _a2)))
     r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _cfg, "updated_by": "smoke"})
     _cfgmod.invalidate()
+    # RE-PINNED 18 Oct 2026 (R3b): the demo's bands are movements 25 / 50 / 100 and carbon 10 / 25 / 50, both put back
     ok("W12: ...and the document put back reads the demo's bands again", r.status_code == 200
-       and c.get("/api/public/areas/shapes").json().get("stops", {}).get("carbon") == [20, 50, 100])
+       and c.get("/api/public/areas/shapes").json().get("stops") == {"movements": [25, 50, 100], "carbon": [10, 25, 50]})
     # 14 Oct 2026 (HU7): the Config page reads the file's per-country fair-price sets from the same call
     _fj = c.get("/api/config/factors", headers=PLAN).json()
     _gbf = ((_fj.get("file") or {}).get("fair_price_by_country") or {}).get("GB") or {}
