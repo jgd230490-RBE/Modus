@@ -20,13 +20,18 @@ its electric day all call it; nothing works trips a lorry a day out a second way
   and OTHER WORK (loading, unloading, the gate check-in). gov.uk: off-road driving between rest periods counts toward
   the daily driving limit (it is recorded as other work); counting it toward the 4.5 h break trigger too is cautious.
 * n trips need n × the cycle plus the breaks: 45 min once driving passes 4.5 h (Art 7) or working time passes 9 h (2005
-  Regs reg 7(3)), else 30 min once working time passes 6 h (reg 7(2)), else none — ONE break, the 45 covering the 30;
-  and since no more than 6 h of work may run without a break (reg 7(1)), working time over 12 h needs a second break of
-  at least 15 min (reg 7(4)): 60 min in all. "Passes" is strictly more than ("exceeds", reg 7; Art 7's break is due
-  after a driving period of 4.5 h, and a day of exactly 4.5 h driving that then stops needs none).
+  Regs reg 7(3)), else 30 min once working time passes 6 h (reg 7(2)), else none — ONE break, the 45 covering the 30.
+  No further break past 12 h of work (18 Oct 2026, the user): the 45 may be taken as 15 + 30 (Art 7; reg 7(4) lets a
+  break be periods of at least 15 min), which lets every stretch of work be kept to 6 h (reg 7(1)) in a day of up to
+  18 h — more than one driver's 13 h — with the 15 before the 30 and the parts placed to suit (where they fall is not
+  modelled). (The first build added 15 min past 12 h: stricter than the law, so dropped.) "Passes" is
+  strictly more than ("exceeds", reg 7; Art 7's break is due after a driving period of 4.5 h, and a day of exactly 4.5 h
+  driving that ends on the drive back needs none).
 * Driving is at most DRIVING_MAX_MIN (9 h a day, Art 6(1); the twice-a-week 10 h is not assumed).
-* An electric lorry's charging is attended, so it is WORKING TIME (reg 2): it comes on top of the break and counts when
-  the break is chosen.
+* An electric lorry's charging is counted as WORKING TIME: on top of the break and counted when the break is chosen.
+  The cautious reading — no rule says yet whether attended charging is work or a break (DfT's 2024–25 zero-emission vans
+  consultation asked operators; its November 2025 response did not settle it); reg 2's working time, and DfT's 2007
+  guidance (monitoring a discharge from the vehicle counts as working time), point that way.
 * Trips a lorry a day = the largest n that fits. It can be 0: one round trip that does not fit a driver's day — every
   reader then counts one lorry a trip (a planning floor) and says so.
 NOT MODELLED (NOT_MODELLED_WORDS, said wherever the figure is explained): the weekly limits (56 h driving, 90 h in two
@@ -43,13 +48,12 @@ DRIVING_MAX_MIN = 540.0
 #: Art 7: after a driving period of 4.5 hours, a break of at least 45 minutes
 DRIVING_BEFORE_BREAK_MIN = 270.0
 BREAK_LONG_MIN = 45.0
-#: Road Transport (Working Time) Regulations 2005 (SI 2005/639) reg 7: work over 6 h, 30 min; over 9 h, 45 min; no more
-#: than 6 h of work without a break, so work over 12 h needs a second break (each at least 15 min, reg 7(4))
+#: Road Transport (Working Time) Regulations 2005 (SI 2005/639) reg 7: work over 6 h, 30 min; over 9 h, 45 min (a break
+#: may be periods of at least 15 min, reg 7(4), so a 45 taken as 15 + 30 lets every stretch of work in a 13 h day be kept
+#: to 6 h)
 WORK_SHORT_BREAK_AFTER_MIN = 360.0
 WORK_LONG_BREAK_AFTER_MIN = 540.0
-WORK_SECOND_BREAK_AFTER_MIN = 720.0
 BREAK_SHORT_MIN = 30.0
-BREAK_SECOND_MIN = 15.0
 #: Art 8: a daily rest of 11 hours in every 24 leaves one driver a working day of at most 13 hours
 SHIFT_MAX_H = 13.0
 SHIFT_DEFAULT_H = 10.0
@@ -98,23 +102,19 @@ def shift_note(factors):
 
 
 def break_minutes(driving_min, work_min):
-    """The breaks a day of `driving_min` driving and `work_min` working time needs (minutes): 45 once driving passes 4.5 h
-    or work passes 9 h, else 30 once work passes 6 h, else 0 — never the 45 and the 30 added — plus a second break of 15
-    once work passes 12 h (no more than 6 h of work without a break)."""
+    """The break a day of `driving_min` driving and `work_min` working time needs (minutes): 45 once driving passes 4.5 h
+    or work passes 9 h, else 30 once work passes 6 h, else 0 — never the 45 and the 30 added, and no further break past
+    12 h of work (the 45 may be taken as 15 + 30)."""
     if driving_min > DRIVING_BEFORE_BREAK_MIN + EPS or work_min > WORK_LONG_BREAK_AFTER_MIN + EPS:
-        b = BREAK_LONG_MIN
-    elif work_min > WORK_SHORT_BREAK_AFTER_MIN + EPS:
-        b = BREAK_SHORT_MIN
-    else:
-        b = 0.0
-    if work_min > WORK_SECOND_BREAK_AFTER_MIN + EPS:
-        b += BREAK_SECOND_MIN
-    return b
+        return BREAK_LONG_MIN
+    if work_min > WORK_SHORT_BREAK_AFTER_MIN + EPS:
+        return BREAK_SHORT_MIN
+    return 0.0
 
 
 def fits(n, drive_min, other_min, shift_min, extra_min=0.0):
     """True when n round trips (each `drive_min` driving + `other_min` other work) fit a driver's day of `shift_min`:
-    driving at most 9 h, and the trips, `extra_min` (an electric lorry's charging — attended, so working time) and the
+    driving at most 9 h, and the trips, `extra_min` (an electric lorry's charging, counted as working time — the cautious reading) and the
     breaks inside it."""
     driving, work = n * drive_min, n * (drive_min + other_min) + extra_min
     if driving > DRIVING_MAX_MIN + EPS:
@@ -175,8 +175,9 @@ def lorry_day(shift_h, drive_min, other_min, typed_shift_h=None):
 def ev_trips(shift_h, drive_min, other_min, charge_minutes_for):
     """
     An electric lorry's day: the largest n whose trips, charging (`charge_minutes_for(n)`, the battery simulated trip by
-    trip in carbon.ev_day) and breaks fit, driving at most 9 h. Charging is attended, so it is working time: it comes ON
-    TOP of the break and counts when the break is chosen (the cautious reading) — the Carbon planner says so. The cheap
+    trip in carbon.ev_day) and the break fit, driving at most 9 h. Charging is counted as working time: it comes ON
+    TOP of the break and counts when the break is chosen (the cautious reading; no rule says yet) — the Carbon planner
+    says so. The cheap
     tests run before the battery is simulated. Returns n (0 when not one trip fits).
     """
     drive_min, other_min = _clean(drive_min), _clean(other_min)

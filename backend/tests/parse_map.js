@@ -5739,7 +5739,7 @@ function qrRead(mod) {
     const lorryDayTrips = new Function(grabLD[0] + "; return lorryDayTrips;")();
     const CASES = [[10, 60, 0, 9], [10, 69, 24, 5], [10, 45, 24, 8], [10, 84, 20, 5], [10, 174, 24, 2], [10, 600, 0, 0],
                    [5, 54, 0, 5], [5, 54.01, 0, 4], [13, 60, 30, 8], [8, 30, 30, 7], [13, 60, 0, 9], [11, 20, 50, 8],
-                   [6, 30, 30, 6], [9.5, 30, 30, 9], [13, 60, 21, 8], [10, 15, 5, 27]];
+                   [6, 30, 30, 6], [9.5, 30, 30, 9], [13, 60, 21, 9], [10, 15, 5, 27]];
     const got = CASES.map(([sh, d, o]) => lorryDayTrips(sh, d, o));
     ok("⭐ lorryDayTrips gives the server's answer on every one of test_drivers_hours.py's cases",
        CASES.every(([sh, d, o, n], i) => got[i] === n), JSON.stringify(got));
@@ -5761,8 +5761,10 @@ function qrRead(mod) {
      && !code.includes("(tripsPerDay>0)?Math.ceil(peakLoads/"));
   if (grabLD) {
     const lorryDayTrips = new Function(grabLD[0] + "; return lorryDayTrips;")();
-    ok("⭐ the review: the twin knows the second break past 12 h of work (13 h, 60 + 21 a cycle: 9 would need 789 min)",
-       lorryDayTrips(13, 60, 21) === 8 && lorryDayTrips(13, 60, 30) === 8);
+    // REVERSED 18 Oct 2026 (the user: the law allows the 45 as 15 + 30): was "the twin knows the second break past 12 h"
+    // (13 h, 60 + 21 a cycle gave 8). No further break past 12 h of work: 9 × 81 = 729 + 45 = 774 ≤ 780
+    ok("⭐ the twin adds nothing past 12 h of work (the 45 may be taken as 15 + 30): 13 h, 60 + 21 a cycle gives 9",
+       lorryDayTrips(13, 60, 21) === 9 && lorryDayTrips(13, 60, 30) === 8 && !grabLD[0].includes("720"));
   }
   // NARROWED 17 Oct 2026 (the review): one break ("the required break") and the planning-figure caveat
   ok("the bar's note and the month table's note say the vehicles are worked out in a driver's day",
