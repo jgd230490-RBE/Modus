@@ -1130,6 +1130,28 @@ ok("ui_audit.js grades the 44 px rule behind --strict-44, off by default, says w
 ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and still exempts them",
    "exempt from h1-many" in _audit and "decision 7" in _audit
    and 'else if (dom.h1 > 1 && !/^help/.test(meta.name)) warnings.push({ id: "h1-many", detail: dom.h1 });' in _audit)
+# 17 Oct 2026 (findings #32–#34 of notes/ui-audit-findings-1016.md §I, claude/ui-audit-guide-stop): the audit measures the
+# map's tour dots and the demo bar's Guide pill, so --strict-44 can verify decisions 8 and 9 once the phone branch has built
+# them. The first-visitor context of map-page+guide carries the signed-in context's cookies (it had none, so the stop was the
+# map's PASSWORD page in every run) and the stop asserts the tour strip and at least one dot; dashboard+guide, on the phone in
+# the first look, asserts the pill; both put the counts on the record (guideDots, guideStrip, guidePill). The hit-area test
+# credits the control itself or its label, never an ancestor (the pill, 21 px in a 45 px bar, had passed 44 × 44 on the bar's
+# area and was never a row). The harness's server origin is stripped from the compare keys (the port is picked per run).
+ok("ui_audit.js measures the guide hints: the first-visitor context carries the signed-in cookies, the two guide stops assert "
+   "what they are for (guide-shown) and put the counts on the record",
+   all(s in _audit for s in ("async function guideContext(browser, ctx, base, look, accent, w)", "g.addCookies(await ctx.cookies(base))",
+                             'waitForSelector(".guide-dot"', 'id: "guide-shown"', 'guide: "map"', 'guide: "portal"',
+                             '"map-page+guide"', '"dashboard+guide"', "stop.guideDots = dom.guide.dots",
+                             'stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null',
+                             'document.querySelectorAll(".guide-dot")', 'document.querySelectorAll("button.demo-bar-guide")')))
+ok("ui_audit.js credits a control's hit area to the control itself or its label, never to an ancestor (finding #33: the demo "
+   "bar's 21 px pill had passed 44 × 44 on the bar's area)",
+   "const lands = (h) => !!h && (h === el || el.contains(h) || (!!labEl && (h === labEl || labEl.contains(h))))" in _audit
+   and "const reach = (d) => lands(hit(cx - d, cy)) && lands(hit(cx + d, cy)) && lands(hit(cx, cy - d)) && lands(hit(cx, cy + d))" in _audit
+   and "owns(el, hit(cx" not in _audit)
+ok("ui_audit.js strips the harness's server origin from the compare keys (finding #34: the port is picked per run)",
+   'const noOrigin = (s) => String(s).replace(/^https?:\\/\\/(127\\.0\\.0\\.1|localhost|\\[::1\\])(:\\d+)?/, "")' in _audit
+   and "(x.url ? noOrigin(x.url) : null)" in _audit and "noOrigin(x).slice(0, 80)" in _audit)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
