@@ -1148,11 +1148,18 @@ ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and
 # area and was never a row). The harness's server origin is stripped from the compare keys (the port is picked per run).
 ok("ui_audit.js measures the guide hints: the first-visitor context carries the signed-in cookies, the two guide stops assert "
    "what they are for (guide-shown) and put the counts on the record",
+   # NARROWED 18 Oct 2026 (claude/ui-fix-phone, decision 8): the wait is for a dot OR the strip — the map draws no dot on a phone
    all(s in _audit for s in ("async function guideContext(browser, ctx, base, look, accent, w)", "g.addCookies(await ctx.cookies(base))",
-                             'waitForSelector(".guide-dot"', 'id: "guide-shown"', 'guide: "map"', 'guide: "portal"',
+                             'waitForSelector(".guide-dot, .guide-strip"', 'id: "guide-shown"', 'guide: "map"', 'guide: "portal"',
                              '"map-page+guide"', '"dashboard+guide"', "stop.guideDots = dom.guide.dots",
                              'stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null',
                              'document.querySelectorAll(".guide-dot")', 'document.querySelectorAll("button.demo-bar-guide")')))
+# 18 Oct 2026 (claude/ui-fix-phone, decision 8 built): the map's guide stop wants the strip and, below 768 px, NO dot — a dot on
+# the phone is the failure now; at a desk width it still wants at least one. The portal's stop is unchanged (the pill).
+ok("ui_audit.js's guide-shown wants the map's strip with no dot on a phone and with its dots at a desk (decision 8), the pill on the portal",
+   "const mapGuideOk = dom.guide.strip > 0 && (meta.width < 768 ? dom.guide.dots === 0 : dom.guide.dots > 0);" in _audit
+   and 'ok: meta.guide === "map" ? mapGuideOk : dom.guide.pill > 0' in _audit
+   and "dom.guide.strip > 0 && dom.guide.dots > 0 :" not in _audit)
 ok("ui_audit.js credits a control's hit area to the control itself or its label, never to an ancestor (finding #33: the demo "
    "bar's 21 px pill had passed 44 × 44 on the bar's area)",
    "const lands = (h) => !!h && (h === el || el.contains(h) || (!!labEl && (h === labEl || labEl.contains(h))))" in _audit

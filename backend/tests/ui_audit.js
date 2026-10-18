@@ -50,10 +50,11 @@
  *       credited — until 17 Oct 2026 it was, so a small control inside a bigger parent (the demo bar's 21 px Guide pill,
  *       centred in a 45 px bar on a phone) passed 44 × 44 on the parent's area and was never a row (finding #33).
  *     - the demo guide's hints as a first visitor sees them (17 Oct 2026, findings #32 / #33), two stops on the phone in the
- *       first look: map-page+guide (the map's tour strip and dots; opened with the signed-in context's cookies — without them
- *       it was the map's password page in every run) and dashboard+guide (the portal's strip and dots, the demo bar's Guide
- *       pill). Each asserts what it is for is on the page (guide-shown; guideDots / guideStrip / guidePill on the record), so
- *       the 24 / 44 px rules measure the dots and the pill — decisions 8 and 9 are verified here once built.           (fail)
+ *       first look: map-page+guide (the map's tour strip — and NO dot on the phone since decision 8, 18 Oct 2026: the strip's
+ *       "Take the tour" carries the tips there, a desk keeps its dots; opened with the signed-in context's cookies — without
+ *       them it was the map's password page in every run) and dashboard+guide (the portal's strip and dots, the demo bar's
+ *       Guide pill). Each asserts what it is for is on the page (guide-shown; guideDots / guideStrip / guidePill on the
+ *       record), so the 24 / 44 px rules measure the dots and the pill — decisions 8 and 9 are verified here.          (fail)
  *     - one h1 on the page (h1-none / h1-many); the two guides are chapters, each an h1, and are exempt from h1-many
  *       (decision 7, 17 Oct 2026 — the recorded design, test_help.py)                                                 (warn)
  *     - text smaller than 12 px (charts' SVG text included), labels cut with an ellipsis, a native confirm()/alert()  (warn)
@@ -625,9 +626,11 @@ async function audit(page, store, meta) {
   if (fixed) checks.push({ id: "no-page-scroll", ok: !dom.docVScroll, detail: dom.docVScroll ? { by: dom.docVScroll, offBottom: dom.offBottom } : null });
   if (meta.mapState) checks.push({ id: "map-loaded", ok: meta.mapState === "loaded", detail: meta.mapState });
   // the guide stops (meta.guide, 17 Oct 2026 — findings #32 and #33): what the stop is FOR must be on the page, else it fails —
-  // the map's tour strip and at least one dot ("map": map-page+guide), the demo bar's Guide pill ("portal": dashboard+guide).
+  // the map's tour strip ("map": map-page+guide) with its dots at a desk and NONE below 768 px (decision 8, 18 Oct 2026: the
+  // map draws no dot on a phone — a dot there is the failure now), the demo bar's Guide pill ("portal": dashboard+guide).
   // The counts go on the record (guideDots, guideStrip, guidePill), so a run says what the 24 / 44 px rules had to measure.
-  if (meta.guide) checks.push({ id: "guide-shown", ok: meta.guide === "map" ? dom.guide.strip > 0 && dom.guide.dots > 0 : dom.guide.pill > 0, detail: dom.guide });
+  const mapGuideOk = dom.guide.strip > 0 && (meta.width < 768 ? dom.guide.dots === 0 : dom.guide.dots > 0);
+  if (meta.guide) checks.push({ id: "guide-shown", ok: meta.guide === "map" ? mapGuideOk : dom.guide.pill > 0, detail: dom.guide });
   // the 44 px rule on a phone (decision 14): with --strict-44 a control under 44 × 44 that is neither inline nor set apart
   // FAILS (the check targets-44px); the set-apart rows (spaced: true) stay a warning; without the flag every row is a warning
   const small44 = meta.width < 768 ? dom.smallTargets : [];
@@ -829,8 +832,9 @@ async function guideContext(browser, ctx, base, look, accent, w) {
   return { gp, gs, close: () => g.close() };
 }
 // the hints draw once the tenant is known (the map: its overlay; the app: /api/meta) and are re-placed every second: wait for
-// a dot (8 s at most; a page that draws none is measured as it is, and guide-shown says so)
-const waitGuide = (page) => page.waitForSelector(".guide-dot", { timeout: 8000 }).catch(() => {});
+// a dot or the strip (8 s at most; the map draws no dot on a phone since decision 8, so its strip is the sign there; a page
+// that draws neither is measured as it is, and guide-shown says so)
+const waitGuide = (page) => page.waitForSelector(".guide-dot, .guide-strip", { timeout: 8000 }).catch(() => {});
 async function evalCall(page, code) { return page.evaluate(code).then(() => true).catch(e => { note(`${code}: ${String(e.message || e).slice(0, 120)}`); return false; }); }
 
 async function walkPortal(browser, base, look, accent, first, widths) {
@@ -913,10 +917,10 @@ async function walkPortal(browser, base, look, accent, first, widths) {
         if (OPT.deep && w === DESK_W) { await keyboardPass(page, meta("map-page", w)); await mapStates(page, store, meta, w, false); }
         if (OPT.deep && w === PHONE_W && w < 768) {
           await mapStates(page, store, meta, w, true);
-          // a first visitor's phone: the map's tour strip and dots on (their own stop, so the dots are measured once and named).
-          // The context carries this context's cookies — the map access — and the guide storage is not switched off: until
+          // a first visitor's phone: the map's tour strip on (its own stop, so the hints are measured once and named). The
+          // context carries this context's cookies — the map access — and the guide storage is not switched off: until
           // 17 Oct 2026 it had no cookie, so this stop was the map's PASSWORD page in every run (finding #32) and the dots were
-          // never measured; it asserts the strip and the dots (guide-shown) and that the map loaded.
+          // never measured; it asserts the strip, NO dot on the phone (decision 8, 18 Oct 2026) and that the map loaded.
           const { gp, gs, close } = await guideContext(browser, ctx, base, look, accent, w);
           await gp.goto(base + "/map/", { waitUntil: "domcontentloaded" });
           const st = await waitForMap(gp); await waitGuide(gp);
