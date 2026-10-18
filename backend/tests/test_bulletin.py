@@ -2289,6 +2289,22 @@ ok("🔴 the publishing check's words: no '[a typed field this scheme has not se
    and "Terms explained" not in T10BJ + HTML_TEXT_B and "by route" not in T10BJ)
 
 # =========================================================================== #
+#  17 Oct 2026 (the user: UK drivers' hours; the review): the bulletin's words for lorries needed                       #
+# =========================================================================== #
+_bsrc, _bdsrc = read("backend/bulletin.py"), read("backend/bulletin_doc.py")
+ok("⭐ drivers' hours: the vehicles rule names a driver's day under the UK drivers' hours, ONE required break, the 9 h "
+   "cap, and says it is a planning figure (weekly limits and drivers' own hours not checked)",
+   "day under the UK drivers' hours: the shift less the required break, at most 9 h driving; a planning " in _bsrc
+   and "figure, weekly limits and drivers' own hours not checked), rounded up per line" in _bsrc
+   and "the required breaks" not in _bsrc)
+ok("...the newsletter's 'Lorries needed' term says the same in its own words (and the page count holds: four pages, "
+   "http_smoke D43)",
+   "driver's day under the UK drivers' hours (break taken, at most 9 h driving; a planning figure)." in _bdsrc
+   and "(breaks taken, at most 9 hours of driving)" not in _bdsrc)
+ok("🔴 no compliance claim in the bulletin's drivers' hours words: never 'compliant', 'compliance' or 'legal'",
+   not re.search(r"drivers' hours[^\"]{0,200}\b(compliant|compliance|legal)\b", _bsrc + _bdsrc, re.I))
+
+# =========================================================================== #
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)

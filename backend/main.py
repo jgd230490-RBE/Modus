@@ -2406,7 +2406,9 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
                 res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None)
                 for row in res.get("rows", []):
                     if row.get("alt_index") == 0 and (not vehicle or row.get("profile") == vehicle):
-                        tpv = row.get("trips_per_day")
+                        # 17 Oct 2026 (drivers' hours): a routed line where not one round trip fits a driver's day counts
+                        # one lorry a trip (the floor every reader uses), never "not routed"
+                        tpv = max(1, int(row.get("trips_per_day") or 0))
                         break
             except Exception:
                 tpv = None

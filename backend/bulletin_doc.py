@@ -925,7 +925,8 @@ def sheet(month_index, acc=None, now=None):
         ("Two-way movement", "one lorry there and back (out loaded, back empty), counted once. "
          + page["terms"]["other_schemes"].split(":")[0] + "."),
         ("Forecast", f"the month's approved plan spread over its {wd_text(wd)} working days: planned, not counted."),
-        ("Lorries needed", "how many lorries the plan needs on a working day, from each route's round-trip time."),
+        ("Lorries needed", "how many lorries the plan needs on a working day, from each route's round-trip time and a "
+                           "driver's day under the UK drivers' hours (break taken, at most 9 h driving; a planning figure)."),
         ("Planning flag", "a daily limit the scheme set itself on a route. It flags, never blocks, and is not a legal limit."),
     ]
     caveats = ["Planned, not counted: this is a forecast from the approved plan, not a monitoring report.",

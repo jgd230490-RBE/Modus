@@ -630,8 +630,12 @@ ok("the drawn vehicle is named on every feature", inb["vehicle_profile"] == PROF
 ok("the default profile is not flagged as a fallback", inb["profile_is_fallback"] is False)
 ok("cycle time uses both legs plus per-vehicle turnaround",
    abs(inb["cycle_hr"] - round(OUT_HR + BACK_HR + tip / 60.0, 2)) < 1e-9, str(inb["cycle_hr"]))
-ok("trips per day is derived from that cycle",
-   inb["trips_per_day"] == int(10 // (OUT_HR + BACK_HR + tip / 60.0)), str(inb["trips_per_day"]))
+# REVERSED 17 Oct 2026 (the user: UK drivers' hours): 6 cycles of 69 min driving + 24 min loading = 558 min of work,
+# past 9 h, so a 45-min break is due: 603 > 600. The shift alone held 6; the rule holds 5 — the same rule as route_analysis
+import drivers_hours  # noqa: E402
+ok("trips per day is derived from that cycle under the UK drivers' hours: 5 (the shift alone held 6; the 45-min break takes one)",
+   inb["trips_per_day"] == 5 == drivers_hours.lorry_day(10, (OUT_HR + BACK_HR) * 60.0, tip)["trips"]
+   and int(10 // (OUT_HR + BACK_HR + tip / 60.0)) == 6, str(inb["trips_per_day"]))
 ok("routes carry a disciplines list for the map filter",
    isinstance(inb["disciplines"], list))
 
