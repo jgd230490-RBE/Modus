@@ -45,6 +45,14 @@
  *       quick shape, 1920 in --full) — the pair no other pass measures, where white figures on --navy #5B8FF0 fail (3.17:1).
  *       The portal pages only, ~3 min; part of the run's recorded shape (REPORT.options.extraPasses), so --compare pairs
  *       like with like and a run from before it does not pair. Off when --looks or --accents chose the passes by hand.
+ *       A control's hit area is ITS OWN (or its label's, for a checkbox / radio): a tap that lands on an ancestor is not
+ *       credited — until 17 Oct 2026 it was, so a small control inside a bigger parent (the demo bar's 21 px Guide pill,
+ *       centred in a 45 px bar on a phone) passed 44 × 44 on the parent's area and was never a row (finding #33).
+ *     - the demo guide's hints as a first visitor sees them (17 Oct 2026, findings #32 / #33), two stops on the phone in the
+ *       first look: map-page+guide (the map's tour strip and dots; opened with the signed-in context's cookies — without them
+ *       it was the map's password page in every run) and dashboard+guide (the portal's strip and dots, the demo bar's Guide
+ *       pill). Each asserts what it is for is on the page (guide-shown; guideDots / guideStrip / guidePill on the record), so
+ *       the 24 / 44 px rules measure the dots and the pill — decisions 8 and 9 are verified here once built.           (fail)
  *     - one h1 on the page (h1-none / h1-many); the two guides are chapters, each an h1, and are exempt from h1-many
  *       (decision 7, 17 Oct 2026 — the recorded design, test_help.py)                                                 (warn)
  *     - text smaller than 12 px (charts' SVG text included), labels cut with an ellipsis, a native confirm()/alert()  (warn)
@@ -318,7 +326,13 @@ function domChecks(arg) {
       if (a.position === "absolute" && a.content !== "none" && a.content !== "normal") { const n = (v) => { const f = parseFloat(v); return isNaN(f) ? 0 : Math.max(0, -f); };
         box.l -= n(a.left); box.r += n(a.right); box.t -= n(a.top); box.b += n(a.bottom); } }
     const cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2;
-    const reach = (d) => owns(el, hit(cx - d, cy)) && owns(el, hit(cx + d, cy)) && owns(el, hit(cx, cy - d)) && owns(el, hit(cx, cy + d));
+    // what a tap d px out must land on: the control itself (a padded ::before / ::after hit-tests as its element), something
+    // in it, or — a checkbox / radio — its label (the label IS its target). NOT an ancestor: until 17 Oct 2026 this used
+    // `owns`, which credits one (as onTop must), so a small control inside a bigger parent passed on the parent's area —
+    // the demo bar's 21 px Guide pill, centred in a 45 px bar on a phone, passed 44 × 44 and was never a row (finding #33).
+    // A tap on the bar beside the pill does nothing.
+    const lands = (h) => !!h && (h === el || el.contains(h) || (!!labEl && (h === labEl || labEl.contains(h))));
+    const reach = (d) => lands(hit(cx - d, cy)) && lands(hit(cx + d, cy)) && lands(hit(cx, cy - d)) && lands(hit(cx, cy + d));
     const inBox = (d) => box.r - box.l >= 2 * d && box.b - box.t >= 2 * d;
     const has24 = inBox(12) || (cx - 12 >= 0 && cy - 12 >= 0 && cx + 12 <= innerWidth && cy + 12 <= innerHeight && reach(11.5));
     const has44 = inBox(22) || (cx - 22 >= 0 && cy - 22 >= 0 && cx + 22 <= innerWidth && cy + 22 <= innerHeight && reach(21.5));
@@ -391,6 +405,10 @@ function domChecks(arg) {
     else if (cs.display.startsWith("inline") && !/\s/.test((el.textContent || "").trim()) && (el.textContent || "").trim().length > 1 && el.getClientRects().length > 1)
       out.clipped.push({ sel: sel(el), text: name(el), wrapped: true });
   }
+  // the demo guide's hints, counted at the same instant as the targets (the guide stops assert them, 17 Oct 2026): the map's
+  // (#guide-strip) or the app's (.guide-strip) tour strip, the dots, and the demo bar's Guide pill
+  out.guide = { dots: [...document.querySelectorAll(".guide-dot")].filter(vis).length, strip: [...document.querySelectorAll(".guide-strip, #guide-strip")].filter(vis).length,
+                pill: [...document.querySelectorAll("button.demo-bar-guide")].filter(vis).length };
   // what the compare must ignore: the map's canvas, the clock, "updated HH:MM" — they change every run
   for (const el of document.querySelectorAll(".mapboxgl-canvas, .dash-clock, canvas")) { const r = el.getBoundingClientRect(); if (r.width && r.height) out.masks.push([Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]); }
   for (const el of document.querySelectorAll("span, div, time")) { if (el.childElementCount === 0 && /\bupdated \d\d:\d\d\b|^\d\d:\d\d$/.test(el.textContent.trim())) { const r = el.getBoundingClientRect(); if (r.width) out.masks.push([Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]); } }
@@ -604,6 +622,10 @@ async function audit(page, store, meta) {
   }
   if (fixed) checks.push({ id: "no-page-scroll", ok: !dom.docVScroll, detail: dom.docVScroll ? { by: dom.docVScroll, offBottom: dom.offBottom } : null });
   if (meta.mapState) checks.push({ id: "map-loaded", ok: meta.mapState === "loaded", detail: meta.mapState });
+  // the guide stops (meta.guide, 17 Oct 2026 — findings #32 and #33): what the stop is FOR must be on the page, else it fails —
+  // the map's tour strip and at least one dot ("map": map-page+guide), the demo bar's Guide pill ("portal": dashboard+guide).
+  // The counts go on the record (guideDots, guideStrip, guidePill), so a run says what the 24 / 44 px rules had to measure.
+  if (meta.guide) checks.push({ id: "guide-shown", ok: meta.guide === "map" ? dom.guide.strip > 0 && dom.guide.dots > 0 : dom.guide.pill > 0, detail: dom.guide });
   // the 44 px rule on a phone (decision 14): with --strict-44 a control under 44 × 44 that is neither inline nor set apart
   // FAILS (the check targets-44px); the set-apart rows (spaced: true) stay a warning; without the flag every row is a warning
   const small44 = meta.width < 768 ? dom.smallTargets : [];
@@ -632,6 +654,7 @@ async function audit(page, store, meta) {
   const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, shotPinned: shot.pinned || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
                  theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks };
   delete stop.base;
+  if (meta.guide) { stop.guideDots = dom.guide.dots; stop.guideStrip = dom.guide.strip; stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null; }
   if (cut) stop.cut = cut.source;   // on the record as text (a RegExp would serialise as {})
   if (gone) stop.expectGone = gone.source;
   REPORT.stops.push(stop);
@@ -794,6 +817,18 @@ async function embeddedMap(page, cap = 10000) {
   return null;
 }
 async function mapStop(page, store, meta) { meta.mapState = await waitForMap(page); return audit(page, store, meta); }
+// a first visitor's context (the guide storage not switched off — the existing guide flag of newContext) that carries THIS
+// context's cookies: the map access and the staff session the signed-in context has (Playwright hands over the HttpOnly ones
+// too). The two guide stops open in one (17 Oct 2026, findings #32 / #33). Returns the page, its store and a close().
+async function guideContext(browser, ctx, base, look, accent, w) {
+  const g = await newContext(browser, look, accent, w, true);
+  await g.addCookies(await ctx.cookies(base));
+  const gp = await g.newPage(); const gs = newStore(); watch(gp, gs);
+  return { gp, gs, close: () => g.close() };
+}
+// the hints draw once the tenant is known (the map: its overlay; the app: /api/meta) and are re-placed every second: wait for
+// a dot (8 s at most; a page that draws none is measured as it is, and guide-shown says so)
+const waitGuide = (page) => page.waitForSelector(".guide-dot", { timeout: 8000 }).catch(() => {});
 async function evalCall(page, code) { return page.evaluate(code).then(() => true).catch(e => { note(`${code}: ${String(e.message || e).slice(0, 120)}`); return false; }); }
 
 async function walkPortal(browser, base, look, accent, first, widths) {
@@ -849,6 +884,23 @@ async function walkPortal(browser, base, look, accent, first, widths) {
       // the phone's More sheet, once, at the narrowest width (a sheet over the page: not grown, the controls under it not counted)
       if (w === PHONE_W && w < 768 && id === "dashboard" && first) {
         if (await clickText(page, ".phone-tabs button", "More")) { await audit(page, store, meta("phone-more", w, { fixed: true })); await page.keyboard.press("Escape"); await page.waitForTimeout(300); }
+        // a first visitor's phone Dashboard with the guide ON (17 Oct 2026, finding #33): a fresh context whose guide storage is
+        // not switched off, signed in again (this context's cookies come along, but a code sign-in leaves no hint for the app
+        // to resume from, so signIn fills the code; "already" when a login's cookie resumes). As a first visitor sees it: the
+        // strip above the tab bar and the dots on the page's features; the tour's own card opens only on "Take the tour" and
+        // is not opened. The demo bar's Guide pill is on every portal stop (it needs no guide) — this stop asserts it is on
+        // the page (guide-shown) and pictures the hints on a phone, which no other stop does.
+        if (OPT.deep) {
+          const { gp, gs, close } = await guideContext(browser, ctx, base, look, accent, w);
+          try {
+            await signIn(gp, base, OPT.email ? { email: OPT.email, password: OPT.password } : { code: OPT.code }); drain(gs);
+            await gotoPage(gp, "dashboard");
+            await gp.waitForFunction(() => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === "Dashboard"; }, null, { timeout: 20000 }).catch(() => {});
+            await waitGuide(gp);
+            await audit(gp, gs, meta("dashboard+guide", w, { portal: true, page: "dashboard", guide: "portal" }));
+          } catch (e) { note(`dashboard+guide at ${w}: ${String(e.message || e).split("\n")[0].slice(0, 160)}`); }
+          await close();
+        }
       }
     }
     // 4. the public map on its own (the staff cookie opens it) and the documents: they take no look, so the first look only
@@ -859,10 +911,15 @@ async function walkPortal(browser, base, look, accent, first, widths) {
         if (OPT.deep && w === DESK_W) { await keyboardPass(page, meta("map-page", w)); await mapStates(page, store, meta, w, false); }
         if (OPT.deep && w === PHONE_W && w < 768) {
           await mapStates(page, store, meta, w, true);
-          // a first visitor's phone: the map's tour strip and dots on (their own stop, so the dots are measured once and named)
-          const g = await newContext(browser, look, accent, w, true); const gp = await g.newPage(); const gs = newStore(); watch(gp, gs);
-          await gp.goto(base + "/map/", { waitUntil: "domcontentloaded" }); await mapStop(gp, gs, meta("map-page+guide", w, { fixed: true }));
-          await g.close();
+          // a first visitor's phone: the map's tour strip and dots on (their own stop, so the dots are measured once and named).
+          // The context carries this context's cookies — the map access — and the guide storage is not switched off: until
+          // 17 Oct 2026 it had no cookie, so this stop was the map's PASSWORD page in every run (finding #32) and the dots were
+          // never measured; it asserts the strip and the dots (guide-shown) and that the map loaded.
+          const { gp, gs, close } = await guideContext(browser, ctx, base, look, accent, w);
+          await gp.goto(base + "/map/", { waitUntil: "domcontentloaded" });
+          const st = await waitForMap(gp); await waitGuide(gp);
+          await audit(gp, gs, { ...meta("map-page+guide", w, { fixed: true, guide: "map" }), mapState: st });
+          await close();
         }
       } catch (e) { note(`map states at ${w}: ${String(e.message || e).split("\n")[0].slice(0, 160)}`); drain(store); }
       const month = await page.evaluate(async () => { const m = await (await fetch("/api/meta")).json(); const d = new Date(); const sy = m && m.months && m.months.start_year;
@@ -1134,9 +1191,13 @@ async function walkUnsigned(browser, base) {
 }
 
 // ---------------------------------------------------------------- compare with an earlier run -------------------------
+// the harness's own server origin (http://127.0.0.1:<port>) is stripped from a URL or a message in a key: the port is picked per
+// run (8834, 8836, …), so until 17 Oct 2026 a run on another port showed each no-http-errors / requests-failed row as one new +
+// one gone (finding #34). Both runs' keys are made here from their reports, so the change itself shows nothing in a compare.
+const noOrigin = (s) => String(s).replace(/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?/, "");
 function findingKeys(stop) {
   const keys = [];
-  const one = (id, x) => `${stop.name}|${stop.width}|${stop.look}|${stop.accent}|${id}|${x && typeof x === "object" && (x.id || x.sel || x.url || x.tag) ? (x.id || x.sel || x.url || x.tag) + (x.text ? " " + x.text : "") : typeof x === "string" ? x.slice(0, 80) : ""}`;
+  const one = (id, x) => `${stop.name}|${stop.width}|${stop.look}|${stop.accent}|${id}|${x && typeof x === "object" && (x.id || x.sel || x.url || x.tag) ? (x.id || x.sel || (x.url ? noOrigin(x.url) : null) || x.tag) + (x.text ? " " + x.text : "") : typeof x === "string" ? noOrigin(x).slice(0, 80) : ""}`;
   for (const c of (stop.checks || [])) if (!c.ok) {
     if (Array.isArray(c.detail)) for (const x of c.detail) keys.push(one(c.id, x)); else keys.push(one(c.id, null));
   }
