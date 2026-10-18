@@ -5,12 +5,15 @@ THE ASK (the user): "regards driving hours please use uk rules" → "a lorry's d
 rules require, with driving capped at 9 h". Sources (gov.uk / legislation.gov.uk, checked 17 Oct 2026; notes not in git:
 notes/drivers-hours-1017.md): the assimilated Reg 561/2006 Arts 6–8 (9 h driving; a 45-min break after 4.5 h driving;
 11 h daily rest, so one driver's day of at most 13 h) and the Road Transport (Working Time) Regulations 2005 reg 7 (30 min
-once work passes 6 h, 45 min once it passes 9 h; no more than 6 h of work without a break, so 15 min more past 12 h).
+once work passes 6 h, 45 min once it passes 9 h; a break may be periods of at least 15 min, so the 45 taken as 15 + 30
+keeps every stretch of work to 6 h — no further break past 12 h: 18 Oct 2026, the user, after a source check found the
+first build's extra 15 min stricter than the law).
 
-What is asserted: the break (one, never the 45 and the 30 added; the second break past 12 h), each threshold on both
+What is asserted: the break (one, never the 45 and the 30 added; nothing more past 12 h), each threshold on both
 sides, the 9 h cap, one driver's 13 h day (and Config NOT refusing a longer shift: a lorry can be double-shifted), the
 limit named ('shift' / 'breaks' / 'driving' / 'driver_day' / 'none'), the old floor(typed shift ÷ cycle) kept beside it,
-the electric day (charging is attended, so working time: on top of the break and counted when it is chosen), the split
+the electric day (charging counted as working time, the cautious reading: on top of the break and counted when it is
+chosen), the split
 of a cycle (gate-to-face is driving, check-in other work), the words; the public map's JavaScript twin gives the same
 answers on the same cases (parse_map.js holds the same table); every place that worked trips a day out now calls the
 rule (source level); 0 trips counts one lorry a trip everywhere; the gate figures keep the FULL shift.
@@ -65,9 +68,18 @@ ok("⭐ 45 min once driving passes 4.5 h (Art 7) or work passes 9 h",
    dh.break_minutes(271, 300) == 45 and dh.break_minutes(100, 541) == 45)
 ok("🔴 the two are never added: 300 min driving and 500 min of work need ONE 45-min break, not 75",
    dh.break_minutes(300, 500) == 45 and dh.break_minutes(540, 600) == 45)
-ok("⭐ the review: no more than 6 h of work without a break, so work past 12 h needs 15 min more (reg 7(1), 7(4)); "
-   "12 h exactly does not", dh.break_minutes(300, 720) == 45 and dh.break_minutes(300, 721) == 60
-   and dh.break_minutes(0, 721) == 60)
+# REVERSED 18 Oct 2026 (the user: "drop the extra 15-minute break past 12 hours of work (the law allows the 45 as 15 + 30)"):
+# was "work past 12 h needs 15 min more" (break_minutes(300, 721) == 60). Reg 7(4) lets a break be periods of at least
+# 15 min and Art 7 allows 15 + 30, which keeps every stretch of work to 6 h (reg 7(1)) in any day one driver can work.
+ok("⭐ no further break past 12 h of work: the 45 may be taken as 15 + 30 (reg 7(4), Art 7), so 721 and 780 min of work "
+   "still need ONE 45-min break", dh.break_minutes(300, 720) == 45 and dh.break_minutes(300, 721) == 45
+   and dh.break_minutes(0, 721) == 45 and dh.break_minutes(540, 780) == 45)
+ok("...and the second-break constants are gone from the rule (no 720 threshold, no 15-min top-up)",
+   not hasattr(dh, "WORK_SECOND_BREAK_AFTER_MIN") and not hasattr(dh, "BREAK_SECOND_MIN")
+   and "720" not in read("backend/drivers_hours.py").split('"""', 2)[2])
+ok("18 Oct 2026 (the user: soften it): charging is 'counted as working time — the cautious reading' everywhere in the rule, "
+   "never stated as fact ('attended, so')", "attended, so" not in read("backend/drivers_hours.py")
+   and "attended, so" not in read("backend/carbon.py") and "the cautious reading" in read("backend/drivers_hours.py"))
 
 # =========================================================================== #
 #  2. Trips a lorry a day                                                      #
@@ -81,13 +93,13 @@ CASES = [  # shift h, driving min a cycle, other work min a cycle -> trips, limi
     (10, 600, 0, 0, "none", 0, 1),         # one cycle of 10 h driving: not one trip fits
     (5, 54, 0, 5, "shift", 0, 5),          # 270 min driving exactly: no break due, 5 fit 5 h
     (5, 54.01, 0, 4, "breaks", 0, 5),      # a hair over 4.5 h: the 45-min break takes one
-    (13, 60, 30, 8, "shift", 45, 8),       # a 13 h day: 8 × 90 = 720 + 45 = 765 ≤ 780 (720 exactly: no second break)
+    (13, 60, 30, 8, "shift", 45, 8),       # a 13 h day: 8 × 90 = 720 + 45 = 765 ≤ 780 (9 would drive 540 but work 810)
     (8, 30, 30, 7, "breaks", 30, 8),       # 7 × 60 = 420 min of work: a 30-min break (driving 210)
     (13, 60, 0, 9, "driving", 45, 13),     # a 13 h day of driving: the 9 h cap, not the day
     (11, 20, 50, 8, "breaks", 45, 9),      # the 45 from WORK past 9 h (560 min), driving only 160
     (6, 30, 30, 6, "shift", 0, 6),         # 6 h of work exactly: no break due
     (9.5, 30, 30, 9, "shift", 30, 9),      # 9 h of work exactly, 4.5 h of driving exactly: still the 30
-    (13, 60, 21, 8, "breaks", 45, 9),      # 9 would be 729 min of work: 45 + the second 15 = 789 > 780
+    (13, 60, 21, 9, "shift", 45, 9),       # REVERSED 18 Oct (no second break): 9 × 81 = 729 + 45 = 774 ≤ 780 (was 8)
     (10, 15, 5, 27, "breaks", 45, 30),     # short cycles: the 45 takes three
 ]
 for sh, d, o, n, lim, brk, plain in CASES:
@@ -150,7 +162,7 @@ ok("the electric day: charging comes ON TOP of the break (10 h, 60 + 0 a cycle, 
    "9 × 60 + 20 is work past 9 h, + 45 > 600)",
    dh.ev_trips(10, 60, 0, lambda n: 20.0) == 8 and dh.ev_trips(10, 30, 30, lambda n: 0.0) == dh.lorry_day(10, 30, 30)["trips"]
    and dh.ev_trips(10, 30, 30, lambda n: 60.0) < dh.lorry_day(10, 30, 30)["trips"])
-ok("⭐ the review: charging is WORKING TIME, counted when the break is chosen — 10 h, 30 + 30 a cycle, 30 min charging: "
+ok("⭐ the review: charging counted as WORKING TIME (the cautious reading), counted when the break is chosen — 10 h, 30 + 30 a cycle, 30 min charging: "
    "9 trips would be 540 + 30 = 570 min of work (past 9 h → 45) = 615 > 600, so 8 (on top of a 30 break it would be 9)",
    dh.ev_trips(10, 30, 30, lambda n: 30.0) == 8 and dh.fits(9, 30, 30, 600) and not dh.fits(9, 30, 30, 600, extra_min=30.0))
 

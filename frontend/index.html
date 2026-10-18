@@ -6248,7 +6248,7 @@ function ConfigPage({ meta, who, access }){
           {tab === "planning" && (
             <div className="px-6 pb-6 max-w-xl">
               {[["working_days_per_month", "Working days a month", "Loads a day and vehicle counts divide by this. Every export prints it."],
-                ["shift_hours_per_day", "Shift hours a day", "A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; 15 min more once work passes 12), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled."],
+                ["shift_hours_per_day", "Shift hours a day", "A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; the 45 may be taken as 15 + 30), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled."],
                 ["avg_haul_speed_kmh", "Average haul speed, km/h", "Used only where HERE has no timing for a route. A stand-in until the route is routed."],
                 ["load_minutes", "Loading time, minutes (default)", "Used when a vehicle has no figure of its own."],
                 ["unload_minutes", "Unloading time, minutes (default)", "Likewise."]].map(([k, l, help]) => (
@@ -6836,7 +6836,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
                       <div key={p.vehicle}>{vehLabel(p.vehicle)}: payload {p.payload_t} t (diesel {p.twin_payload_t} t) · {p.kwh_per_km} kWh per km · battery {p.battery_kwh_usable} kWh usable · charger {p.charge_kw} kW <Chip s={p.status} /></div>
                     ))}
                     <div>Range on one charge {fc.range_per_charge_km_min == null ? "no data" : `${fmtDist(fc.range_per_charge_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} plan line${fc.infeasible_lines === 1 ? "" : "s"} left out of both columns: a trip needs more than one battery` : ""}</div>
-                    <div className={hint}>The battery starts each shift full; charging time comes out of the shift. The driver attends it, so it counts as working time: it comes on top of the required break and counts toward it (the UK drivers' hours; driving at most 9 hours).</div>
+                    <div className={hint}>The battery starts each shift full; charging time comes out of the shift. Wayscope counts it as the driver's working time under the UK drivers' hours (driving at most 9 hours): on top of the required break, and toward the hours that decide how long that break is — the cautious reading, as no rule yet says whether attended charging is work or a break.</div>
                   </div>
                 </>
               )}

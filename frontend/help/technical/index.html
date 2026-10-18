@@ -100,13 +100,17 @@ peak fleet            = the largest same-month sum of vehicles needed across the
 <p>Since 17 Oct 2026 the trips one vehicle makes in a day follow the UK drivers&#39; hours (<code>backend/drivers_hours.py</code>,
 called by <code>network.route_analysis</code>, the public map&#39;s route figures and the Carbon planner — never a second
 formula): the largest n with n × driving ≤ 540 min (Reg 561/2006 Art 6) and n × cycle + the break ≤ the shift, the break
-45 min once driving passes 270 min (Art 7) or work passes 540, else 30 min once work passes 360, plus 15 min once work
-passes 720 (Road Transport (Working Time) Regulations 2005 reg 7, the six-hour rule applied again) — the Art 7 and reg 7
-breaks are one break, never added. Driving = both legs as routed (haul roads and gate access roads are
+45 min once driving passes 270 min (Art 7) or work passes 540, else 30 min once work passes 360 (Road Transport (Working
+Time) Regulations 2005 reg 7) — the Art 7 and reg 7 breaks are one break, never added. No further break past 720 min of
+work: the 45 may be taken as 15 + 30 (Art 7; reg 7(4)), which lets every stretch of work be kept to 6 h (reg 7(1)) in a
+13 h day — the 15 before the 30, placed to suit; where they fall is not modelled (18 Oct 2026; the first build's extra
+15 min was stricter than the law). Driving = both legs as routed (haul roads and gate access roads are
 inside them) + gate-to-face minutes; other work = load + unload + the gate check-in (<code>safety_minutes</code>). One
 driver&#39;s day is read as at most 13 h (the 11 h daily rest); Config accepts a longer shift (a double-shifted lorry, a
 gate&#39;s stand-in window) and <code>planning.shift_note</code> says the trips use 13. An electric lorry&#39;s charging is
-attended, so it is working time: on top of the break and counted when the break is chosen (<code>carbon.ev_day</code>,
+counted as working time (the cautious reading: no rule says yet; DfT's 2024–25 zero-emission vans consultation asked
+operators, and its November 2025 response did not settle it): on top of
+the break and counted when the break is chosen (<code>carbon.ev_day</code>,
 <code>drivers_hours.ev_trips</code>); a day that holds no trip is <code>day_fits</code> False, not a battery failure. Each row carries <code>drive_min</code>,
 <code>other_work_min</code> and <code>lorry_day</code> (<code>limited_by</code> shift / breaks / driving / driver_day / none, the break,
 <code>trips_without_rules</code> = the old floor(typed shift ÷ cycle)). 0 trips = not one round trip fits a driver&#39;s day:

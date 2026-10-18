@@ -453,7 +453,8 @@ def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw, 
     full battery — at charge_kw (minutes = kWh ÷ kW × 60). Returns {cycles, charges,
     charge_minutes, minutes_per_charge, kwh_per_trip, kwh_day, range_per_charge_km, feasible}.
     17 Oct 2026: the driver keeps the UK drivers' hours (drivers_hours): driving at most 9 h and the required breaks;
-    charging is attended, so it is WORKING TIME — on top of the break and counted when the break is chosen. `drive_min` /
+    charging is counted as WORKING TIME (the cautious reading; no rule says yet) — on top of the break and counted when
+    the break is chosen. `drive_min` /
     `other_min` = one cycle's driving and other work (route_analysis's split); with no split the whole cycle counts as
     driving (the cautious stand-in). A battery that holds the trip but a day that holds no trip is FEASIBLE with 0 cycles
     (`day_fits` False): the lorry count's floor (one a trip) applies, never the battery flag.
