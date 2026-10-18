@@ -1776,7 +1776,16 @@ ok("...and it collapses with the rail like every other item (label behind railSh
       && gf.includes("const [stripBottom, setStripBottom] = useState(16);") && gf.includes("document.querySelector('[data-sticky-foot]')")
       && gf.includes("Math.round(window.innerHeight - fr.top) + 8 : 16;") && gf.indexOf("useState(16)") < gf.indexOf("if(!step) return hintsEl;")
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
-      && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
+      // NARROWED 18 Oct 2026 (decision 17): ...and none on a phone
+      && gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }"));
+    // 18 Oct 2026 (UI audit decision 17, the user): the app's own dots are retired on the phone like the map's (decision 8) —
+    // the effect draws none there, the strip stays (its "Take the tour" carries the tips), the ≤ 767 px rule hides a dot left
+    // by a wider window until the next pass; a desk keeps its dots, named "Tip: <the step's title>"
+    ok("🔴 decision 17: the app draws no guide dot on a phone (the dots effect bails on `phone`, which is in its deps), keeps the strip there, and the phone rule hides .guide-dot; a desk keeps its dots",
+      gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }") && gf.includes("}, [hints, key, steps.length, phone]);")
+      && gf.includes("{strip && (") && gf.includes('className="guide-dot" style={{ top: d.top, left: d.left }} aria-label={`Tip: ${d.title}`}')
+      && /@media \(max-width:767px\)\{\.guide-dot\{display:none\}\}/.test(html) && (html.match(/\.guide-dot\{display:none\}/g) || []).length === 1
+      && !/\.guide-dot\{display:none\}/.test(html.split("@media (max-width:767px){.guide-dot{display:none}}")[0]));
   }
   // REVERSED 11 Oct 2026 (the demo bar, the user: the map's strip "on every page"): the header badge and PR #20's
   // logic that hid it under the embedded map are gone — the bar under the header carries the notice on every view,
@@ -3401,8 +3410,11 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("🔴 the 44 px rule: on a touch screen the two text links under Sign in are 44 px rows (padding 12 px 0 on their 20 px line); a mouse keeps the tight row (padding 0)",
      /@media \(pointer:coarse\)\{\.auth-links button\{padding:12px 0;\}\}/.test(html) && /\.auth-links button\{background:none;border:0;padding:0;font:inherit;/.test(html)
      && code.includes('<button type="button" onClick={() => go(forgot ? "email" : "forgot")}>{forgot ? "Back to sign in" : "Forgot your password?"}</button>'));
-  ok("the app's guide strip × (Hide the tips, 23 × 20) taps at 45 × 44 through a halo (10 px to the left = the strip's gap, short of 'Take the tour'; 12 px the other ways) and the strip keeps its height",
-     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -12px -12px -10px\}/.test(html)
+  // RE-PINNED 18 Oct 2026 (decision 18, the user): the halos are for a coarse pointer only, and "Take the tour" has one too
+  ok("🔴 decision 18: on a coarse pointer the app strip's × (23 × 20) taps at 44 × 44 and 'Take the tour' (93 × 24) at 44 tall through ::after halos, both positioned; the × reaches 9 px into the strip's 10 px gap, so the halos never overlap; a mouse keeps the drawn boxes",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-strip-go\{position:relative;font:inherit;/.test(html)
+     && /@media \(pointer:coarse\)\{\.guide-strip \.guide-strip-go::after\{content:"";position:absolute;inset:-10px 0\}\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -12px -12px -9px\}\}/.test(html)
+     && (html.match(/\.guide-x::after/g) || []).length === 1 && (html.match(/\.guide-strip-go::after/g) || []).length === 1
      && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html)
      && code.includes('<button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>'));
   // decision 12 / #13: the tick rows
