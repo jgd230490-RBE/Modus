@@ -1053,10 +1053,109 @@ for _a in _ACC:
             _bad1.append(f"{_a}/dark: {name} {a} on {b} = {r:.2f}")
 ok("...in the dark look --control-fg reads 4.5:1 on both fills in every accent (#1F2024 on #FF8C14 6.99:1, on #FFA10A 8.02:1; #141518 on #5B8FF0 5.77:1, on #8FB3F5 8.64:1) — the Ink/Light --blue fill stays white (3.68:1 on #3B82F6, the gate-place toggle; not this fix)",
    not _bad1 and round(_cr("#1F2024", "#FF8C14"), 2) == 6.99 and round(_cr("#FFFFFF", "#FF8C14"), 2) == 2.33, "; ".join(_bad1))
-ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values are LEFT as they are (open question 3)",
+ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values went with UI fix 4 (decision 3, 17 Oct)",
    '<div className="text-[10px] uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
-   and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' in fe
+   and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' not in fe
    and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}' in fe)
+
+# --- 17 Oct 2026: UI fix 4 (claude/ui-fix-captions) — the captions (finding 3, decision 1), the status WORDS (finding 6's words,
+# finding 19, decision 2), the Submit strip's peak values (decision 3) and the small chips / captions (findings 19, 20). Ratios by the
+# WCAG relative-luminance formula above; a token's effective value per look × accent from _eff; a tint laid over its surface by _over.
+_TXT = {"ok-text": "#047857", "warn-text": "#B45309", "bad-text": "#B91C1C"}
+_TXT_DARK = {"ok-text": "#34D399", "warn-text": "#FBBF24", "bad-text": "#F87171"}
+ok("UI fix 4 (decision 2): three text-grade status colours, defined once in :root and once in the dark block and nowhere else — ok-text #047857, warn-text #B45309, bad-text #B91C1C; dark #34D399 / #FBBF24 / #F87171, which ARE the dark look's status colours, so Dark reads as before",
+   all(_ROOT[k] == v for k, v in _TXT.items()) and all(_DARK[k] == v for k, v in _TXT_DARK.items())
+   and all(_css.count(f"--{k}:") == 2 for k in _TXT)
+   and _DARK["ok-text"] == _DARK["green"] and _DARK["warn-text"] == _DARK["gold"] and _DARK["bad-text"] == _DARK["red"])
+_bad4 = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        _surfs = [("a card", t["surface"]), ("the page", t["bg"]), ("the rail", t["rail-bg"]), ("a second surface", t["surface-2"]),
+                  ("a slate-50 table head", t["surface-2"] if _l == "dark" else "#F8FAFC"), ("a selected row", "#FFF4E6" if _a == "orange-shades" and _l != "dark" else "#EFF6FF" if _l != "dark" else _over(t["navy-soft"], t["surface"]))]
+        for name in _TXT:
+            for where, bgc in _surfs:
+                r = _cr(t[name], bgc)
+                if r < 4.5:
+                    _bad4.append(f"{_a}/{_l}: {name} on {where} {t[name]} on {bgc} = {r:.2f}")
+        for name, tint in [("ok-text", "rgba(3,158,134,.12)"), ("ok-text", "rgba(3,158,134,.10)"), ("ok-text", "rgba(3,158,134,.06)"),
+                           ("bad-text", "rgba(197,48,48,.12)"), ("bad-text", "rgba(191,46,85,.12)"), ("warn-text", "rgba(217,119,6,.10)")]:
+            r = _cr(t[name], _over(tint, t["surface"]))
+            if r < 4.5:
+                _bad4.append(f"{_a}/{_l}: {name} on its chip tint {tint} = {r:.2f}")
+ok("UI fix 4 (decision 2): 🔴 in all 12 looks × accents the three read 4.5:1 or better on a card, the page, the rail, a second surface, a slate-50 head and a selected row, and on their chip tints (ok-text on the 12 %, 10 % and 6 % green tints, bad-text on the two 12 % red tints, warn-text on the 10 % amber tint)",
+   not _bad4, "; ".join(_bad4[:6]))
+ok("...the headline figures: ok-text 5.48:1 on white and 4.77:1 on the 12 % green tint; warn-text 5.02:1 on white and 4.50:1 on a 10 % amber tint (4.33:1 on the 14 % tint the stale chip had, which is why its tint came down); bad-text 6.47:1 on white and 5.38:1 on the red tint; dark 8.47 / 9.75 / 5.88 on the surface",
+   round(_cr("#047857", "#FFFFFF"), 2) == 5.48 and round(_cr("#047857", _over("rgba(3,158,134,.12)", "#FFFFFF")), 2) == 4.77
+   and round(_cr("#B45309", "#FFFFFF"), 2) == 5.02 and round(_cr("#B45309", _over("rgba(217,119,6,.10)", "#FFFFFF")), 2) == 4.50
+   and round(_cr("#B45309", _over("rgba(217,119,6,.14)", "#FFFFFF")), 2) == 4.33
+   and round(_cr("#B91C1C", "#FFFFFF"), 2) == 6.47 and round(_cr("#B91C1C", _over("rgba(197,48,48,.12)", "#FFFFFF")), 2) == 5.38
+   and round(_cr("#34D399", "#1F2024"), 2) == 8.47 and round(_cr("#FBBF24", "#1F2024"), 2) == 9.75 and round(_cr("#F87171", "#1F2024"), 2) == 5.88)
+ok("...and why the words moved: the green status colour reads 3.77:1 on white and the amber 3.19:1 — under 4.5:1 for text, fine for a fill or a dot (3:1)",
+   round(_cr(_ROOT["green"], "#FFFFFF"), 2) == 3.77 and round(_cr(_ROOT["gold"], "#FFFFFF"), 2) == 3.19
+   and _cr(_ROOT["green"], "#FFFFFF") >= 3 and _cr(_ROOT["gold"], "#FFFFFF") >= 3)
+# at source level: the green and the amber are never a TEXT colour any more — every use left is a fill, a border or a dot
+_FILLCTX = ("background", "borderColor", "fill:", "STATUS_DOT", "CARBON_TONE", "Approved:", "confirmed:", "held:", "Pending:", "edited:", "ASSUMPTION:")
+def _text_uses(tok):
+    out = []
+    for m in _re.finditer(_re.escape(tok), _fe_wo):
+        win = _fe_wo[max(0, m.start() - 70):m.start()]
+        if not any(c in win for c in _FILLCTX):
+            out.append(_fe_wo[max(0, m.start() - 60):m.end() + 20].replace("\n", " "))
+    return out
+ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the markup — the 9 uses left are the progress bar's fill, a card's border (×3), the status dots (×3), the carbon-tone dot and the row-status icon",
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 9 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
+ok("...nor var(--gold): the 7 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot and the flag chip's triangle; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash)",
+   '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
+   and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
+   and 'const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";' in fe
+   and '["rgba(3,158,134,.12)", "var(--ok-text)"]' in fe and '["rgba(191,46,85,.12)", "var(--bad-text)"]' in fe
+   and 'style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>' in fe
+   and 'style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>' in fe and ': has ? ["routed", "var(--ok-text)"] : null;' in fe
+   and '.sim-ok{color:var(--ok-text);font-weight:700;}' in fe and '.sim-tl-ok{font-size:14px;fill:var(--ok-text);}' in fe
+   and '.sim-warn{color:var(--warn-text);}' in fe and ".sim-warn{color:var(--gold)" not in fe
+   and 'style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span>' in fe
+   and 'style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>' in fe
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 6 and _fe_wo.count("var(--warn-text)") == 2
+   and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
+   and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)
+ok("UI fix 4 (decision 1): 🔴 one rule maps text-slate-400 to --muted in the Ink and Light looks, written html:where(:not([data-theme=\"dark\"])) so it weighs as little as the utility and hover:text-slate-700 still wins; the dark look keeps its remap, whose value IS the dark --muted",
+   'html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}' in fe
+   and 'html[data-theme="dark"] .text-slate-400{color:#9AA1AB}' in _dark and _DARK["muted"] == "#9AA1AB"
+   and fe.count("/* CAPTIONS ") == 1 and "/* CAPTIONS-END */" in fe and fe.index("/* CAPTIONS ") > fe.index("/* ACCENTS-END */") and fe.index("/* CAPTIONS-END */") < fe.index("/* DARK-REMAP-START"))
+_mb = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        for where, bgc in [("a card", t["surface"]), ("the page", t["bg"]), ("the rail", t["rail-bg"]), ("a second surface", t["surface-2"]), ("a slate-50 head", t["surface-2"] if _l == "dark" else "#F8FAFC")]:
+            r = _cr(t["muted"], bgc)
+            if r < 4.5:
+                _mb.append(f"{_a}/{_l}: --muted on {where} {t['muted']} on {bgc} = {r:.2f}")
+ok("...--muted reads 4.5:1 or better on a card, the page, the rail, a second surface and a slate-50 head in all 12 looks × accents: ink #64748B on white 4.76, on the rail #FAFAF9 4.56, on a slate-50 head 4.55; dark #9AA1AB on #1F2024 6.25 — where slate-400 (#94A3B8) read 2.56 on white and slate-300 (#CBD5E1) 1.48",
+   not _mb and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#64748B", "#FAFAF9"), 2) == 4.56 and round(_cr("#64748B", "#F8FAFC"), 2) == 4.55
+   and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25 and round(_cr("#94A3B8", "#FFFFFF"), 2) == 2.56 and round(_cr("#CBD5E1", "#FFFFFF"), 2) == 1.48, "; ".join(_mb[:4]))
+ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-50 #EFF6FF; 4.38 on Orange shades' #FFF4E6), 4.28 on the Horizon's commit-week wash (navy-soft over white, #EEF3FD) and 4.43 on the Account's short-row wash (5 % rose, #FCF5F6) — so the second rule steps the greys there to slate-600 #475569 (6.96, 6.98, 6.81, 7.05), matching the inline washes by [style*=], again with :where() so a hover utility still wins",
+   round(_cr("#64748B", "#EFF6FF"), 2) == 4.37 and round(_cr("#64748B", "#FFF4E6"), 2) == 4.38
+   and round(_cr("#64748B", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 4.28 and round(_cr("#64748B", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 4.43
+   and round(_cr("#475569", "#EFF6FF"), 2) == 6.96 and round(_cr("#475569", "#FFF4E6"), 2) == 6.98
+   and round(_cr("#475569", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 6.81 and round(_cr("#475569", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 7.05
+   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}' in fe
+   and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2
+   and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
+ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
+   ".rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
+   and round(_cr(_over("rgba(100,116,139,.85)", "#FAFAF9"), "#FAFAF9"), 2) == 3.45
+   and "9aa1ac" not in fe.lower() and round(_cr("#9AA1AC", "#FFFFFF"), 2) == 2.60
+   and '"#94a3b8"' not in fe and 'style={{ color: tone || "var(--muted)" }}>{title}</div>' in fe
+   and "text-slate-300" not in _fe_wo and ".text-slate-300{" not in _dark and ".text-emerald-600{" not in _dark
+   and _fe_wo.count('<span className="text-slate-500">rate not set</span>') == 3 and 'className="text-slate-500">not recorded</span>' in fe)
+ok("UI fix 4 (decision 3): the Submit strip's six values read in the strip's own text colour — the amber on the strip was 1.62:1 (1.4:1 in Dark) and the label already says Peak",
+   '<div className="text-lg font-bold tabular-nums">{value}</div>' in fe and ".map(([label, value]) => (" in fe and '"peak"]' not in fe
+   and '["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],' in fe
+   and round(_cr(_ROOT["gold"], _ROOT["navy"]), 2) == 1.62 and round(_cr(_DARK["gold"], _DARK["navy"]), 1) == 1.4)
 # Every selector in the DARK-REMAP block must match something in the markup — the reverse of the coverage check above.
 # (The selector this fix replaced, .bg-[color:var(--navy)].text-white, had matched nothing since 7 Oct and nobody noticed.)
 _UTIL = set(_PAL.findall(_fe_wo))

@@ -749,10 +749,15 @@ _tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^
 ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
    [l for _, l in _tgr] == ["Where each screen reads from", "", "Old words, new words", "The community considerations layer: sources", ""]
    and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count("tabindex=") == 3, str(_tgr))
+# RE-PINNED 17 Oct 2026 (D114 fix): the opening sentence now also names the fallback (no approved line in the window ->
+# the months that have them), and the big-screen sentence says "the months the page opened on" instead of "this month ± 6"
 ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",
-   "the page opens on this month and six months either side, and <strong>Whole programme</strong> beside them shows every month"
+   "the page opens on this month and six months either side, or on the months that have approved lines when none of them "
+   "falls in that window, and <strong>Whole programme</strong> beside them shows every month"
    in src and "<strong>This month ± 6</strong> brings the default back" in src
-   and "(it keeps the months you had: this month ± 6 unless you picked others first)" in src)
+   and "(it keeps the months you had: the months the page opened on unless you picked others first)" in src)
+ok("\U0001f534 D114 fix (17 Oct 2026): the big-screen sentence no longer promises this month ± 6 (the fallback can open elsewhere)",
+   "(it keeps the months you had: this month ± 6 unless you picked others first)" not in src)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

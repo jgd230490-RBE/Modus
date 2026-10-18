@@ -1087,7 +1087,7 @@ _audit = read("backend/tests/ui_audit.js")
 ok("ui_audit.js says it is not in the default suite, what it measures (sideways scroll, axe WCAG AA, 24 px targets, "
    "a visible focus) and what it does not prove",
    "NOT PART OF THE DEFAULT SUITE" in _audit and "WHAT IT DOES NOT PROVE" in _audit
-   and all(s in _audit for s in ("no-sideways-scroll", "axe-wcag", "targets-24px", "focus-visible", "wcag22aa", "2.5.8", "2.4.7"))
+   and all(s in _audit for s in ("no-sideways-scroll", "axe-wcag", "targets-24px", "targets-44px", "focus-visible", "wcag22aa", "2.5.8", "2.4.7"))
    and 'exclude: [[".mapboxgl-ctrl-attrib"]]' in _audit and "passed, ${FAIL.length} failed" in _audit)
 # 17 Oct 2026 (the capture fixes, claude/ui-audit-capture): a stop must picture what it claims. The error and offline
 # stops go back to the app before they are taken and assert the app's title and header (they had been pictures of the
@@ -1108,6 +1108,28 @@ ok("ui_audit.js captures what its stops claim: the app comes back before the err
 ok("ui_audit.js drives the installed Google Chrome (the user, 17 Oct 2026), the bundled Chromium only when asked or when Chrome "
    "is missing, and the report says which ran",
    'channel: "chrome"' in _audit and 'browser: "chrome" }' in _audit and "--browser" in _audit and "REPORT.browser = {" in _audit)
+# 17 Oct 2026 (decisions 14 and 15 of notes/ui-audit-findings-1016.md §D, claude/ui-audit-rules): the quick run also measures
+# the Dark look with the Blue accent at the desk width (the pair where white figures on --navy #5B8FF0 fail; the extra
+# accents run in Ink only) — as part of the run's RECORDED shape, so --compare latest pairs like with like and a run from
+# before it does not pair; and the 44 px rule on a phone fails (the check targets-44px) a control that is neither inline nor
+# set apart — behind --strict-44, OFF by default until the phone branch (decisions 8, 9, 10) has merged, the header saying
+# so; the set-apart rows (spaced: true) stay a warning in either mode; the flag is a grading, not a shape. The guides stay
+# exempt from h1-many (decision 7), now recorded in the header.
+ok("ui_audit.js runs the Dark + Blue pass at the desk width as part of the recorded shape (decision 15)",
+   all(s in _audit for s in ('{ look: "dark", accent: "blue", widths: [DESK_W] }', "extraPasses: EXTRA_PASSES",
+                             "await walkPortal(browser, server.base, p.look, p.accent, false, p.widths)", "o.extraPasses || []")))
+ok("ui_audit.js grades the 44 px rule behind --strict-44, off by default, says when it turns on by default, keeps the "
+   "set-apart rows as warnings and the strict flag out of the shape (decision 14)",
+   all(s in _audit for s in ('else if (a === "--strict-44") o.strict44 = true', "strict44: false", "strict44: OPT.strict44",
+                             'checks.push({ id: "targets-44px", ok: strict44.length === 0, detail: strict44 })',
+                             "small44.filter(r => !r.spaced)", "small44.filter(r => r.spaced)",
+                             "--strict-44 is OFF by default; it turns on by default once the phone branch has merged",
+                             "decisions 8, 9 and 10", "a grading, not a shape", "crowded(a, 22) ? row : { ...row, spaced: true }",
+                             'el.closest(".mapboxgl-ctrl-attrib, .mapboxgl-ctrl-logo")'))
+   and "o.strict44" not in _audit.split("function sameShape")[1].split("\n")[0])
+ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and still exempts them",
+   "exempt from h1-many" in _audit and "decision 7" in _audit
+   and 'else if (dom.h1 > 1 && !/^help/.test(meta.name)) warnings.push({ id: "h1-many", detail: dom.h1 });' in _audit)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

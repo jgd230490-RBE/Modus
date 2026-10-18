@@ -810,6 +810,57 @@ async function gateArrivalsDom(){
   }
   d1.done();
 
+  // 17 Oct 2026 (D114 fix): the LIVE path. Mounted with initialData (above) the Dashboard never reads its own lines, so the
+  // D114 checks passed while live opened on every month: its first read of /api/costing/lines widened From / To to the
+  // lines' own months. Here nothing is handed in, the page reads its lines itself, and the lines' months are built from
+  // today's month so the check cannot age.
+  {
+    const N = dMeta.months.count, lo = Math.max(1, thisMonth - 6), hi = Math.min(N, thisMonth + 6);
+    const shift = (ms, status) => ({ ...CL, lines: CL.lines.map((l, i) => ({ ...l, month_index: ms[i % ms.length], ...(status ? { status } : {}) })) });
+    // live's shape: approved lines in EVERY month of the horizon (the four-year demo has lines in all 60)
+    const everyMonth = { ...CL, lines: Array.from({ length: N }, (_, k) => ({ ...CL.lines[k % CL.lines.length], status: "Approved", month_index: k + 1 })) };
+    const inside = [Math.max(lo, thisMonth - 1), thisMonth, Math.min(hi, thisMonth + 1)];   // inside the window, narrower than it
+    const baseFetch = w.fetch;
+    const openLive = async (lines) => {
+      const reads = [];
+      w.fetch = (url, opt) => {
+        if (String(url).startsWith("/api/costing/lines")) { reads.push(String(url)); return reply(200, lines); }
+        return baseFetch(url, opt);
+      };
+      const m = mount(w.Dashboard, { meta: dMeta });
+      await settle(80);
+      const fs_ = m.el.querySelector('select[aria-label="From month"]'), ts_ = m.el.querySelector('select[aria-label="To month"]');
+      const out = { f: fs_ ? +fs_.value : null, t: ts_ ? +ts_.value : null, reads };
+      m.done(); w.fetch = baseFetch;
+      return out;
+    };
+    const e = await openLive(everyMonth);
+    ok("⭐ D114 LIVE PATH: mounted WITHOUT initialData, with approved lines in EVERY month (live's shape), the Dashboard reads "
+       + "its own lines and STILL opens on this month ± 6 — the old first read widened it to every month, what live showed",
+       e.reads.length === 1 && e.reads[0] === "/api/costing/lines?status=All" && e.f === lo && e.t === hi,
+       `${e.f}–${e.t} for ${lo}–${hi}; reads ${e.reads}`);
+    const a = await openLive(shift(inside));
+    ok("D114 LIVE PATH: ...and with every line inside the window it keeps the whole window (it does not narrow to the lines)",
+       a.reads.length === 1 && a.f === lo && a.t === hi, `${a.f}–${a.t} for ${lo}–${hi}`);
+    // the fallback, on whichever side(s) of the window the horizon leaves room for today (at least one always)
+    const sides = [];
+    if (lo > 2) sides.push({ name: "finished", ms: [1, 2] });
+    if (hi + 2 <= N) sides.push({ name: "not started yet", ms: [hi + 1, hi + 2] });
+    const fell = [];
+    for (const s of sides) { const r = await openLive(shift(s.ms, "Approved")); fell.push({ s, r }); }
+    ok("D114 LIVE PATH: ...and when not one approved line falls inside the window it opens on the months that have lines, "
+       + "never on a window with none (a programme finished / not started yet, each side the horizon allows today)",
+       sides.length >= 1 && fell.every(({ s, r }) => r.f === s.ms[0] && r.t === s.ms[1]),
+       fell.map(({ s, r }) => `${s.name}: ${r.f}–${r.t} for ${s.ms}`).join("; "));
+    // the page opens on Approved: Pending lines inside the window do not hold it there when every approved line is outside
+    const apOut = sides[0].ms;
+    const mixed = { ...CL, lines: CL.lines.map((l, i) => l.status === "Approved" ? { ...l, month_index: apOut[i % 2] } : { ...l, month_index: thisMonth }) };
+    const p = await openLive(mixed);
+    ok("D114 LIVE PATH: ...the lines counted are the Approved ones (the status the page opens on): Pending lines this month "
+       + "do not keep a window whose approved lines are all outside it",
+       CL.lines.some(l => l.status === "Pending") && p.f === apOut[0] && p.t === apOut[1], `${p.f}–${p.t} for ${apOut}`);
+  }
+
   // (2) the read lands
   srv.gates = () => reply(200, GA);
   calls.length = 0;
