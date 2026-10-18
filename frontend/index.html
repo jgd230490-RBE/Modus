@@ -10025,7 +10025,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
               shift less the break the UK drivers' hours rules require, with driving (out, back and gate to face) at most
               9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why);
               a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip. A planning figure: weekly
-              limits and the day's other duties are not modelled.{data.planning.shift_note ? " " + data.planning.shift_note : ""}
+              limits and the day's other duties are not modelled.{data.planning.shift_note ? " " + data.planning.shift_note : ""}{" "}
               t/month assumes {data.planning.working_days_per_month} working days.
               {data.rows.some(r => r.return_estimated) && " * return leg not routed — assumed to mirror the outbound."}
             </p>

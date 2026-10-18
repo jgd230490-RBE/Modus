@@ -1968,6 +1968,8 @@ async function routesDriversDom(){
   ok("⭐ ROUTES DOM: the footnote says a planning figure, explains the 0, and carries the 13 h note for a 15 h shift",
      foot.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip")
      && foot.includes("A planning figure: weekly limits and the day's other duties are not modelled.") && foot.includes(NOTE)
+     // found in the Chrome check (18 Oct): JSX dropped the space at the line break — "modelled.t/month"
+     && foot.includes(NOTE + " t/month assumes") && !/\.t\/month/.test(foot)
      && foot.includes("the 15 h shift less the break the UK drivers' hours rules require"), foot.slice(-700));
   act(() => { root.unmount(); }); host.remove();
 }
