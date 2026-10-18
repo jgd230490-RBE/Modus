@@ -21,6 +21,12 @@ try { ({ JSDOM } = require(G + "jsdom")); } catch (e) { console.log("dom_fronten
 let pass = 0; const fail = [];
 const ok = (label, cond, extra) => { if (cond) pass++; else fail.push(label + (extra ? "  " + extra : "")); };
 
+// 18 Oct 2026 (D104 for the JS harnesses): today is a fixed day, shifted not frozen (lib/harness_clock.js) — the
+// Dashboard's this month ± 6 follows the clock, and the fixture lines sit in Sep–Nov 2026. Both realms: here, and the
+// jsdom window the app runs in (below, before the app's script). HARNESS_TODAY=YYYY-MM-DD runs on another day.
+const CLOCK = require(path.join(__dirname, "lib", "harness_clock.js"));
+CLOCK.pinNode();
+
 const ROOT = path.resolve(__dirname, "..", "..");
 const html = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 const src = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^ReactDOM\.createRoot\([\s\S]*?\);\s*$/m, "");
@@ -41,13 +47,22 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;"
+w.eval(CLOCK.shiftSource());      // 18 Oct 2026: the app's realm reads the same shifted clock as the checks
+w.eval(js +"\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;"
   // 13 Oct 2026 (W6): the app's own formatters, so the nothing-lost check formats each fact exactly as the old cell did
   + "\nwindow.__F = { grp, dist, distRate, DU, CUR, TKM, teamText, teamName, iptKey, vehLabel, unitLbl, gaN1, gaMin, gaFlagWord, fmt, flagWord, LINE_FLAG_LABEL, dayName, dayNum, isWeekend };");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
    w.document.querySelector('meta[name="theme-color"]').getAttribute("content") === "#FFFFFF");
+// 18 Oct 2026: the shifted clock holds in both realms, and still ticks (a frozen clock would stall anything that waits on it)
+{
+  const appDay = w.eval("new Date().toISOString().slice(0, 10)"), hereDay = new Date().toISOString().slice(0, 10);
+  const skew = Math.abs(w.eval("Date.now()") - Date.now()), t0 = Date.now(); let spin = 0; while (Date.now() === t0 && spin < 5e7) spin++;
+  ok(`CLOCK: today is ${CLOCK.TODAY} in the checks AND in the app's realm (lib/harness_clock.js), and the clock still moves`,
+     appDay === CLOCK.TODAY && hereDay === CLOCK.TODAY && skew < 5000 && Date.now() > t0 && w.eval("Date.__harnessShifted") === true,
+     `app ${appDay}, here ${hereDay}, skew ${skew} ms`);
+}
 
 // ---- 2. the picker in the header ------------------------------------------------------
 act(() => { w.ReactDOM.createRoot(w.document.getElementById("root")).render(
@@ -537,6 +552,231 @@ async function clpDom(){
   act(() => { r.unmount(); }); el.remove();
 }
 
+// ---- 16 Oct 2026 (S7): the Simulation section in a real DOM ----------------------------------------------------------
+// What the static harnesses cannot see: the read on FIRST OPEN (with the routes' lines once), folding and opening again,
+// Play / Pause / Restart / Jump moving the clock, a scenario change reading the day again (no lines, the scenario as
+// query parameters, a GET), a scenario the server refuses (its words shown, the inputs put back), one the screen
+// refuses itself, Back to the scheme's figures, and the phone (the table only). fetch is a stub answering the fixture
+// test_sim.py writes (the example's day with the pour). jsdom draws no map (no Mapbox here); two points a leg stand in
+// for each route's line so the drawing's counts can run.
+async function simDom(){
+  const SIM = FIX("sim_day.json");
+  const withLines = (d) => ({ ...d, legs: Object.fromEntries(Object.entries(d.legs).map(([k, v]) => [k, { ...v, coords: [[-1, 52], [-0.9, 52.1]],
+    cum: [0, 13000], len_m: 13000, parts: [[0, 13000, 13000 / (v.minutes || 30), null, 0, v.minutes || 30]], plan_minutes: v.minutes || 30 }])) });
+  const calls = [];
+  const srv = { day: (url) => reply(200, url.includes("legs=1") ? withLines(SIM) : SIM) };
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (String(url).startsWith("/api/sim/day")) return srv.day(String(url));
+    return new Promise(() => {});
+  };
+  const simCalls = () => calls.filter(c => c.url.startsWith("/api/sim/day"));
+  const _d = new Date(), thisMonth = Math.max(1, Math.min(metaMin.months.count, (_d.getFullYear() - metaMin.months.start_year) * 12 + _d.getMonth() + 1));
+  const mount = (props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    act(() => { r.render(w.React.createElement(w.SimulationPanel, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+  const toggle = (det, on) => act(async () => { det.open = on; det.dispatchEvent(new w.Event("toggle")); await sleep(40); });
+
+  const m = mount({ meta: metaMin, months: metaMin.months });
+  await settle(30);
+  const det = m.el.querySelector("details[data-sim]");
+  ok("⭐ SIM DOM: a folded Simulation reads NOTHING", simCalls().length === 0 && !!det && !det.open);
+  await toggle(det, true);
+  await settle(40);
+  ok("⭐ SIM DOM: opening it reads this month's day once, as a GET, with the routes' lines (legs=1)",
+     simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}&legs=1` && simCalls()[0].method === "GET", JSON.stringify(calls));
+  const lead = (m.el.querySelector("[data-sim-lead]") || {}).textContent || "";
+  ok("⭐ SIM DOM: the day is drawn from the reply: the lead line, eleven gate rows, the three checks all ticked",
+     m.el.querySelector('[data-sim-state="set"]') && lead.startsWith("Sep 2026: an average working day, 312 loads (646 lorry arrivals at the gates, 22 of them mixers)")
+     && m.el.querySelectorAll("[data-sim-table] tr[data-sim-gate]").length === 11
+     && [...m.el.querySelectorAll("[data-sim-checks] .sim-ok")].length === 3 && !m.el.querySelector("[data-sim-checks] .sim-bad"), lead);
+  const hb = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G007"]');
+  ok("SIM DOM: Harborough's row carries the server's figures: 101 arrivals, 84 % used, 12 waiting at 12:38, 1776 minutes lost, longest wait 56",
+     !!hb && hb.textContent.includes("101") && hb.textContent.includes("84 % used") && hb.textContent.includes("at 12:38")
+     && hb.textContent.includes("1776") && hb.textContent.includes("longest wait 56 min") && hb.textContent.includes("first wait 10:00"), hb && hb.textContent);
+  ok("SIM DOM: the timeline marks Harborough's bottleneck in words", (m.el.querySelector('[data-sim-tl-gate="G007"]') || {}).textContent && m.el.querySelector('[data-sim-tl-gate="G007"]').textContent.includes("bottleneck from"));
+  await toggle(det, false); await toggle(det, true);
+  ok("SIM DOM: folding and opening again reads nothing more", simCalls().length === 1, JSON.stringify(simCalls()));
+
+  // the clock. The test drives the animation frames itself (jsdom's own frames race React's act and made this flaky):
+  // a frame every 100 ms of page time; 05:30–17:30 plays in 60 s at 1×, so one second of frames is 12 minutes of the day
+  const clock = () => m.el.querySelector("[data-sim-clock]").textContent;
+  const play = () => m.el.querySelector("[data-sim-play]");
+  const realRaf = w.requestAnimationFrame, realCaf = w.cancelAnimationFrame, queued = new Map();
+  let rafId = 0, pageMs = 1000;
+  w.requestAnimationFrame = (cb) => { queued.set(++rafId, cb); return rafId; };
+  w.cancelAnimationFrame = (id) => { queued.delete(id); };
+  const frames = (n) => act(() => { for (let i = 0; i < n; i++){ const due = [...queued.values()]; queued.clear(); pageMs += 100; due.forEach(cb => cb(pageMs)); } });
+  ok("SIM DOM: the clock starts at the first lorry setting off (05:30) and the button says Play", clock() === "05:30" && play().textContent === "Play");
+  await act(async () => { play().click(); });
+  frames(11);
+  const ran = clock();
+  ok("⭐ SIM DOM: Play moves the clock — one second of frames is 12 minutes of the day (05:30 → 05:42) — and the button says Pause",
+     ran === "05:42" && play().textContent === "Pause", ran);
+  await act(async () => { play().click(); });
+  const held = clock();
+  frames(10);
+  ok("SIM DOM: Pause holds the clock (no frame is asked for while paused)", clock() === held && held === "05:42" && play().textContent === "Play" && queued.size === 0, held + " " + clock());
+  const twoX = m.el.querySelector('select[aria-label="Playback speed"]');
+  await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(twoX, "2"); twoX.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  await act(async () => { play().click(); });
+  frames(11);
+  ok("SIM DOM: at 2× one second of frames is 24 minutes (05:42 → 06:06)", clock() === "06:06", clock());
+  await toggle(det, false);
+  frames(10);
+  ok("SIM DOM: folding the section while it plays pauses it (nothing plays unseen)", play().textContent === "Play" && clock() === "06:06" && queued.size === 0, clock());
+  await toggle(det, true);
+  w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
+  const restart = byText(m.el, "button", "Restart");
+  await act(async () => { restart.click(); await sleep(20); });
+  ok("SIM DOM: Restart puts the clock back to 05:30", clock() === "05:30");
+  const jump = m.el.querySelector('input[type=range][aria-label="Jump to a time of day"]');
+  await setVal(jump, String(12 * 60 + 40));
+  await settle(20);
+  const g7now = m.el.querySelector('[data-sim-now-gate="G007"]');
+  ok("⭐ SIM DOM: Jump to 12:40 — the clock reads 12:40 and Harborough has lorries waiting in Gates now",
+     clock() === "12:40" && !!g7now && g7now.className.includes("sim-q") && /\d+ waiting/.test(g7now.textContent), g7now && g7now.textContent);
+
+  // a scenario: the pour switched on reads the day again, without the lines, with the pour as query parameters
+  const pourBox = [...m.el.querySelectorAll("[data-sim-scenario] label.sim-check")].find(l => /Concrete pour/.test(l.textContent)).querySelector("input");
+  await act(async () => { pourBox.click(); await sleep(450); });
+  const c2 = simCalls()[simCalls().length - 1];
+  ok("⭐ SIM DOM: switching the pour on reads the day again after a pause: no lines, the pour's gate, start, m³ and rate, a GET",
+     simCalls().length === 2 && !c2.url.includes("legs=1") && c2.url.includes("pour_gate=G007") && c2.url.includes("pour_start=10%3A00")
+     && c2.url.includes("pour_m3=160") && c2.url.includes("pour_rate=60") && c2.method === "GET", JSON.stringify(simCalls()));
+  ok("SIM DOM fix: the pour's gate list is the server's working sites (four compounds) and the tick took the server's default",
+     [...m.el.querySelectorAll('select[aria-label="Pour gate"] option')].map(o => o.value).join(",") === SIM.pour_gates.map(x => x.gate_id).join(",")
+     && SIM.pour_default === "G007" && m.el.querySelector('select[aria-label="Pour gate"]').value === "G007");
+  // the server refuses a pour past midnight: its words, the start put back, the last good day kept
+  srv.day = () => reply(400, { detail: "That pour would run past midnight (last mixer at 25:38); the simulation shows one day." });
+  const start = m.el.querySelector('input[aria-label="Pour starts at"]');
+  await setVal(start, "23:00");
+  await settle(450);
+  const msg = m.el.querySelector(".sim-msg");
+  ok("⭐ SIM DOM: a refused scenario shows the server's words and puts the input back; the day on screen stays",
+     !!msg && msg.textContent === "That pour would run past midnight (last mixer at 25:38); the simulation shows one day."
+     && m.el.querySelector('input[aria-label="Pour starts at"]').value === "10:00" && m.el.querySelectorAll("[data-sim-table] tr[data-sim-gate]").length === 11,
+     msg && msg.textContent);
+  srv.day = (url) => reply(200, url.includes("legs=1") ? withLines(SIM) : SIM);
+  const nBefore = simCalls().length;
+  await settle(400);
+  ok("SIM DOM: the scenario put back is the one on screen: nothing read again", simCalls().length === nBefore, JSON.stringify(simCalls().slice(nBefore)));
+  // a window past midnight typed in the table: refused on the screen, nothing read
+  const closes = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G001"] input[aria-label$="closes at"]');
+  await setVal(closes, "06:00");
+  await settle(400);
+  ok("⭐ SIM DOM: a gate closing before it opens is refused on the screen in words (D93), and nothing is read",
+     simCalls().length === nBefore && (m.el.querySelector(".sim-msg") || {}).textContent === "Kilby Ridge Quarry: the gate must close after it opens; a window past midnight is not simulated.",
+     (m.el.querySelector(".sim-msg") || {}).textContent);
+  const ci = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G012"] input[type=number]');
+  await setVal(ci, "20");
+  await settle(450);
+  const c3 = simCalls()[simCalls().length - 1];
+  ok("SIM DOM: a check-in typed in the table reads the day again with it (check_in=G012=20), the pour still on",
+     simCalls().length === nBefore + 1 && c3.url.includes("check_in=G012%3D20") && c3.url.includes("pour_gate=G007"), JSON.stringify(c3));
+  const back = byText(m.el, "button", "Back to the scheme's figures");
+  await act(async () => { back.click(); });
+  await settle(450);
+  const c4 = simCalls()[simCalls().length - 1];
+  ok("⭐ SIM DOM: Back to the scheme's figures reads the plain month again (no scenario, no lines); every call was a GET",
+     c4.url === `/api/sim/day?month=${thisMonth}` && calls.every(c => c.method === "GET"), JSON.stringify(c4));
+  m.done();
+
+  // the phone: the table only, no lines asked for, no player, nothing to type
+  calls.length = 0;
+  const p = mount({ meta: metaMin, months: metaMin.months, phone: true });
+  await settle(20);
+  await toggle(p.el.querySelector("details[data-sim]"), true);
+  await settle(40);
+  ok("⭐ SIM DOM: on a phone the day is read without the lines; one card a gate, read-only, with the desktop note",
+     simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}` && !!p.el.querySelector('[data-sim-phone="1"]')
+     && !p.el.querySelector("[data-sim-player]") && p.el.querySelectorAll("[data-sim-table] li[data-sim-gate]").length === 11
+     && (p.el.querySelector('li[data-sim-gate="G007"] [data-sim-busy]') || {}).textContent === "16 at 10:00"
+     && !p.el.querySelector("[data-sim-table] input") && !p.el.querySelector("[data-sim-scenario]"));
+  p.done();
+}
+
+// ---- 17 Oct 2026: the Simulation on the BIG SCREEN (SimWall, the sixth section) in a real DOM --------------------------
+// What the static harnesses cannot see: no read while the section is hidden; the plain month (no pour) read once with the
+// lines; the day played ONCE a pass in Rotate (then its last picture held), started again at the first lorry each pass,
+// looped in One section after the hold; paused while hidden; read again on the 5-minute refresh without restarting; a new
+// month read and started at its first lorry; no scenario control and no table on the TV. The month rule (simWallMonth):
+// the display's choice, else this month, else the next month with approved lines, else the last one before. Frames are
+// driven by the test (a frame every 100 ms of page time; a day = 60 s at 1×, so one second of frames is 12 minutes).
+async function simWallDom(){
+  const SIM = FIX("sim_day.json");
+  const withLines = (d) => ({ ...d, legs: Object.fromEntries(Object.entries(d.legs).map(([k, v]) => [k, { ...v, coords: [[-1, 52], [-0.9, 52.1]],
+    cum: [0, 13000], len_m: 13000, parts: [[0, 13000, 13000 / (v.minutes || 30), null, 0, v.minutes || 30]], plan_minutes: v.minutes || 30 }])) });
+  const calls = [];
+  w.fetch = (url, opt) => {
+    calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+    if (String(url).startsWith("/api/sim/day")) { const m = +((/month=(\d+)/.exec(String(url)) || [])[1]); return reply(200, { ...withLines(SIM), month: m, label: m === 9 ? "Sep 2026" : "Oct 2026" }); }
+    return new Promise(() => {});
+  };
+  const swm = w.eval("simWallMonth"), months = metaMin.months;
+  const _d = new Date(), thisMonth = Math.max(1, Math.min(months.count, (_d.getFullYear() - months.start_year) * 12 + _d.getMonth() + 1));
+  ok("⭐ SIM WALL DOM: the month rule — the display's choice; else this month; else the next month with approved lines; else the last before",
+     swm("9", months, []) === 9 && swm("", months, [thisMonth, thisMonth + 2]) === thisMonth && swm("", months, [thisMonth - 3, thisMonth + 2, thisMonth + 5]) === thisMonth + 2
+     && swm("", months, [thisMonth - 3, thisMonth - 1]) === thisMonth - 1 && swm("", months, []) === thisMonth && swm("99", months, [thisMonth]) === thisMonth);
+  const realRaf = w.requestAnimationFrame, realCaf = w.cancelAnimationFrame, queued = new Map();
+  let rafId = 0, pageMs = 1000;
+  w.requestAnimationFrame = (cb) => { queued.set(++rafId, cb); return rafId; };
+  w.cancelAnimationFrame = (id) => { queued.delete(id); };
+  const frames = (n) => act(() => { for (let i = 0; i < n; i++){ const due = [...queued.values()]; queued.clear(); pageMs += 100; due.forEach(cb => cb(pageMs)); } });
+  const el = w.document.createElement("div"); w.document.body.appendChild(el);
+  const root = w.ReactDOM.createRoot(el);
+  const draw = (props) => act(() => { root.render(w.React.createElement(w.SimWall, { meta: metaMin, month: 9, show: false, pass: 0, loop: false, fill: true, tick: 0, ...props })); });
+  const clock = () => (el.querySelector("[data-sim-wall-clock]") || {}).textContent;
+  draw({});
+  await settle(30);
+  ok("⭐ SIM WALL DOM: a hidden section reads nothing", calls.length === 0 && !el.querySelector('[data-sim-wall="1"]'));
+  draw({ show: true });
+  await settle(40);
+  ok("⭐ SIM WALL DOM: shown, it reads the plain month once with the lines — no pour, no scenario — as a GET",
+     calls.length === 1 && calls[0].url === "/api/sim/day?month=9&legs=1" && calls[0].method === "GET", JSON.stringify(calls));
+  const sub = (el.querySelector("[data-sim-wall-sub]") || {}).textContent || "";
+  ok("⭐ SIM WALL DOM: the TV shows the map, the clock at the first lorry, Gates now and the timeline; it says no pour and the stood-in hours",
+     !!el.querySelector('[data-sim-wall="1"] .sim-map') && clock() === "05:30" && !!el.querySelector("[data-sim-timeline]") && el.querySelectorAll("[data-sim-now-gate]").length === 8
+     && sub.includes("Sep 2026, an average working day: 312 loads · no pour · gates open 07:00–17:00 (stood in: no open hours typed)")
+     && el.textContent.includes("Staff only · never on the public map") && el.textContent.includes("Planning view, not a record of what happened"), sub);
+  ok("🔴 SIM WALL DOM: no scenario control and no table on the TV (nobody touches it): no input, select, scenario card or busiest-hour table",
+     el.querySelectorAll("input,select,textarea,button").length === 0 && !el.querySelector("[data-sim-scenario]") && !el.querySelector("[data-sim-table]"));
+  frames(11);
+  ok("SIM WALL DOM: it plays at 1×: one second of frames is 12 minutes (05:30 → 05:42)", clock() === "05:42", clock());
+  frames(700);
+  ok("⭐ SIM WALL DOM: in Rotate the day plays ONCE and holds its last picture: 17:30, and no frame asked for after it",
+     clock() === "17:30" && queued.size === 0, clock() + " " + queued.size);
+  draw({ show: true, pass: 1 });
+  await settle(10);
+  ok("⭐ SIM WALL DOM: the next pass starts the day again at the first lorry (05:30) and plays", clock() === "05:30" && queued.size === 1, clock());
+  frames(11);
+  draw({ show: false, pass: 1 });
+  frames(20);
+  const hiddenAt = clock();
+  ok("SIM WALL DOM: hidden, it stops playing (no frame asked for) and reads nothing", queued.size === 0 && hiddenAt === "05:42" && calls.length === 1, hiddenAt);
+  draw({ show: true, pass: 1, loop: true });
+  await settle(10);
+  frames(11);
+  ok("SIM WALL DOM: shown again on the same month and refresh it reads nothing more and carries on", calls.length === 1 && clock() === "05:54", clock());
+  // from 05:54 the day's end (17:30) is 696 minutes = 58 s = 580 frames away; then the last picture holds 5 s (50 frames)
+  frames(600);
+  const atEnd = clock();
+  frames(40);
+  ok("⭐ SIM WALL DOM: in One section it loops: the day's last picture is held 5 s, then the day starts again at the first lorry",
+     atEnd === "17:30" && /^05:[34]\d$/.test(clock()), atEnd + " → " + clock());
+  const beforeRefresh = clock();
+  draw({ show: true, pass: 1, loop: true, tick: 1 });
+  await settle(30);
+  ok("SIM WALL DOM: the 5-minute refresh reads the day again without restarting the clock",
+     calls.length === 2 && calls[1].url === "/api/sim/day?month=9&legs=1" && clock() === beforeRefresh, JSON.stringify(calls.slice(1)) + " " + beforeRefresh + " " + clock());
+  frames(30);
+  draw({ show: true, pass: 1, loop: true, tick: 1, month: 10 });
+  await settle(30);
+  ok("SIM WALL DOM: a new month on this display is read and starts at its first lorry",
+     calls.length === 3 && calls[2].url === "/api/sim/day?month=10&legs=1" && clock() === "05:30" && (el.querySelector("[data-sim-wall-sub]") || {}).textContent.startsWith("Oct 2026"));
+  act(() => { root.unmount(); }); el.remove();
+  w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
+}
+
 async function gateArrivalsDom(){
   const GA = FIX("gate_arrivals.json"), CTX = FIX("carbon_target.json"), CL = FIX("cost_lines.json");
   const calls = [];
@@ -565,7 +805,76 @@ async function gateArrivalsDom(){
      && !!d1.el.querySelector('[data-carbon-target="set"]') && !d1.el.querySelector("[data-ga-gate]"));
   ok("GATE DOM: ...it asked for this month, once, as a GET",
      gaCalls().length === 1 && gaCalls()[0].url === `/api/gates/arrivals?month=${thisMonth}` && gaCalls()[0].method === "GET");
+  // 17 Oct 2026 (D114): the Dashboard opens on THIS month ± 6, clamped to the horizon — not on every month
+  {
+    const fromSel = d1.el.querySelector('select[aria-label="From month"]'), toSel = d1.el.querySelector('select[aria-label="To month"]');
+    const lo = Math.max(1, thisMonth - 6), hi = Math.min(dMeta.months.count, thisMonth + 6);
+    const rbtn = () => d1.el.querySelector("button.dash-range-btn");
+    ok("⭐ D114 DOM: the Dashboard opens on this month ± 6 (From and To), clamped to the horizon — was every month",
+       !!fromSel && !!toSel && +fromSel.value === lo && +toSel.value === hi && !(lo === 1 && hi === dMeta.months.count),
+       `${fromSel && fromSel.value}–${toSel && toSel.value} for ${lo}–${hi}`);
+    ok("D114 DOM: ...a 'Whole programme' button beside the range", !!rbtn() && rbtn().textContent === "Whole programme");
+    click(rbtn());
+    ok("⭐ D114 DOM: 'Whole programme' sets every month of the horizon, and the button turns into 'This month ± 6'",
+       +d1.el.querySelector('select[aria-label="From month"]').value === 1
+       && +d1.el.querySelector('select[aria-label="To month"]').value === dMeta.months.count && rbtn().textContent === "This month ± 6");
+    click(rbtn());
+    ok("D114 DOM: ...and 'This month ± 6' brings the default back",
+       +d1.el.querySelector('select[aria-label="From month"]').value === lo && +d1.el.querySelector('select[aria-label="To month"]').value === hi
+       && rbtn().textContent === "Whole programme");
+  }
   d1.done();
+
+  // 17 Oct 2026 (D114 fix): the LIVE path. Mounted with initialData (above) the Dashboard never reads its own lines, so the
+  // D114 checks passed while live opened on every month: its first read of /api/costing/lines widened From / To to the
+  // lines' own months. Here nothing is handed in, the page reads its lines itself, and the lines' months are built from
+  // today's month so the check cannot age.
+  {
+    const N = dMeta.months.count, lo = Math.max(1, thisMonth - 6), hi = Math.min(N, thisMonth + 6);
+    const shift = (ms, status) => ({ ...CL, lines: CL.lines.map((l, i) => ({ ...l, month_index: ms[i % ms.length], ...(status ? { status } : {}) })) });
+    // live's shape: approved lines in EVERY month of the horizon (the four-year demo has lines in all 60)
+    const everyMonth = { ...CL, lines: Array.from({ length: N }, (_, k) => ({ ...CL.lines[k % CL.lines.length], status: "Approved", month_index: k + 1 })) };
+    const inside = [Math.max(lo, thisMonth - 1), thisMonth, Math.min(hi, thisMonth + 1)];   // inside the window, narrower than it
+    const baseFetch = w.fetch;
+    const openLive = async (lines) => {
+      const reads = [];
+      w.fetch = (url, opt) => {
+        if (String(url).startsWith("/api/costing/lines")) { reads.push(String(url)); return reply(200, lines); }
+        return baseFetch(url, opt);
+      };
+      const m = mount(w.Dashboard, { meta: dMeta });
+      await settle(80);
+      const fs_ = m.el.querySelector('select[aria-label="From month"]'), ts_ = m.el.querySelector('select[aria-label="To month"]');
+      const out = { f: fs_ ? +fs_.value : null, t: ts_ ? +ts_.value : null, reads };
+      m.done(); w.fetch = baseFetch;
+      return out;
+    };
+    const e = await openLive(everyMonth);
+    ok("⭐ D114 LIVE PATH: mounted WITHOUT initialData, with approved lines in EVERY month (live's shape), the Dashboard reads "
+       + "its own lines and STILL opens on this month ± 6 — the old first read widened it to every month, what live showed",
+       e.reads.length === 1 && e.reads[0] === "/api/costing/lines?status=All" && e.f === lo && e.t === hi,
+       `${e.f}–${e.t} for ${lo}–${hi}; reads ${e.reads}`);
+    const a = await openLive(shift(inside));
+    ok("D114 LIVE PATH: ...and with every line inside the window it keeps the whole window (it does not narrow to the lines)",
+       a.reads.length === 1 && a.f === lo && a.t === hi, `${a.f}–${a.t} for ${lo}–${hi}`);
+    // the fallback, on whichever side(s) of the window the horizon leaves room for today (at least one always)
+    const sides = [];
+    if (lo > 2) sides.push({ name: "finished", ms: [1, 2] });
+    if (hi + 2 <= N) sides.push({ name: "not started yet", ms: [hi + 1, hi + 2] });
+    const fell = [];
+    for (const s of sides) { const r = await openLive(shift(s.ms, "Approved")); fell.push({ s, r }); }
+    ok("D114 LIVE PATH: ...and when not one approved line falls inside the window it opens on the months that have lines, "
+       + "never on a window with none (a programme finished / not started yet, each side the horizon allows today)",
+       sides.length >= 1 && fell.every(({ s, r }) => r.f === s.ms[0] && r.t === s.ms[1]),
+       fell.map(({ s, r }) => `${s.name}: ${r.f}–${r.t} for ${s.ms}`).join("; "));
+    // the page opens on Approved: Pending lines inside the window do not hold it there when every approved line is outside
+    const apOut = sides[0].ms;
+    const mixed = { ...CL, lines: CL.lines.map((l, i) => l.status === "Approved" ? { ...l, month_index: apOut[i % 2] } : { ...l, month_index: thisMonth }) };
+    const p = await openLive(mixed);
+    ok("D114 LIVE PATH: ...the lines counted are the Approved ones (the status the page opens on): Pending lines this month "
+       + "do not keep a window whose approved lines are all outside it",
+       CL.lines.some(l => l.status === "Pending") && p.f === apOut[0] && p.t === apOut[1], `${p.f}–${p.t} for ${apOut}`);
+  }
 
   // (2) the read lands
   srv.gates = () => reply(200, GA);
@@ -1641,7 +1950,48 @@ async function g3LoginsDom(){
 
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
+// ---- 17 Oct 2026 (the user: UK drivers' hours; the review): the Routes page's Trips/day cell, mounted ---------------
+// The § marks only a route the rules hold below the shift alone (trips < trips_without_rules), the cell's title is the
+// server's words, a 0 shows as a 0 with its words, and the footnote carries the 13 h note. fetch answers the analysis
+// read only; the gates / haul roads / restrictions reads never answer. Not covered: the real server's rows (http_smoke).
+async function routesDriversDom(){
+  const ROW = (profile, trips, lim, plain, words) => ({ profile, alt_index: 0, loaded_km: 12, return_km: 12, return_estimated: false,
+    load_minutes: 15, unload_minutes: 9, turnaround_hr: 0.4, turnaround_parts: {}, cycle_hr: 1.5, haul_speed_applied: false,
+    trips_per_day: trips, tonnes_per_day: 100, tonnes_per_month: 2200, co2_kg_per_trip: 30,
+    lorry_day: { limited_by: lim, trips_without_rules: plain, words, break_minutes: 45 } });
+  const NOTE = "The 15 h shift is read as 13 h for a lorry's trips: one driver's day (the 11-hour daily rest).";
+  const DATA = { rows: [
+      ROW("Tipper", 5, "breaks", 6, "5 a day: 1 fewer than the shift alone would hold: the required break takes the time (45 min break)"),
+      ROW("Flatbed", 8, "shift", 8, "8 a day: as many round trips as fit in the shift (45 min break)"),
+      ROW("Mixer", 0, "none", 0, "One round trip does not fit in a driver's day: counted as one lorry a trip")],
+    planning: { shift_hours_per_day: 15, working_days_per_month: 22, shift_note: NOTE } };
+  w.fetch = (url) => /\/api\/routes\/R1\/analysis$/.test(String(url)) ? reply(200, DATA) : new Promise(() => {});
+  const host = w.document.createElement("div"); w.document.body.appendChild(host);
+  const root = w.ReactDOM.createRoot(host);
+  const E = w.React.createElement;
+  act(() => { root.render(E("table", null, E("tbody", null, E(w.RouteAnalysis, { routeId: "R1", colSpan: 9, token: "t" })))); });
+  await settle(150);
+  const cells = [...host.querySelectorAll("td[data-trips-limit]")];
+  ok("⭐ ROUTES DOM: one Trips/day cell a row, each carrying its limit", cells.length === 3
+     && cells.map(c => c.getAttribute("data-trips-limit")).join() === "breaks,shift,none", String(cells.length));
+  ok("⭐ ROUTES DOM: § only where the rules took trips off (5 of 6), not on a shift-limited 8 nor on a 0 the shift alone also gives",
+     cells.length === 3 && cells[0].textContent === "5§" && cells[1].textContent === "8" && cells[2].textContent === "0",
+     cells.map(c => c.textContent).join("|"));
+  ok("ROUTES DOM: the cell's title is the server's words (why, and the 0 counted as one lorry a trip)",
+     cells.length === 3 && cells[0].title === DATA.rows[0].lorry_day.words && cells[2].title === DATA.rows[2].lorry_day.words);
+  const foot = host.textContent.replace(/\s+/g, " ");
+  ok("⭐ ROUTES DOM: the footnote says a planning figure, explains the 0, and carries the 13 h note for a 15 h shift",
+     foot.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip")
+     && foot.includes("A planning figure: weekly limits and the day's other duties are not modelled.") && foot.includes(NOTE)
+     // found in the Chrome check (18 Oct): JSX dropped the space at the line break — "modelled.t/month"
+     && foot.includes(NOTE + " t/month assumes") && !/\.t\/month/.test(foot)
+     && foot.includes("the 15 h shift less the break the UK drivers' hours rules require"), foot.slice(-700));
+  act(() => { root.unmount(); }); host.remove();
+}
+
 (async () => {
+  try { await routesDriversDom(); ok("ROUTES DOM: the section ran to the end", true); }
+  catch (e) { ok("ROUTES DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await demoBar(); ok("DEMO BAR: the section ran to the end", true); }
   catch (e) { ok("DEMO BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await lateBar(); ok("MAP UNDER THE BAR: the section ran to the end", true); }
@@ -1655,6 +2005,10 @@ async function g3LoginsDom(){
   try { await carbonTargetDom(); } catch (e) { ok("CARBON DOM: the section ran to the end", false, e && e.stack); }
   try { await gateArrivalsDom(); ok("GATE DOM: the section ran to the end", true); }
   catch (e) { ok("GATE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await simDom(); ok("SIM DOM: the section ran to the end", true); }
+  catch (e) { ok("SIM DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  try { await simWallDom(); ok("SIM WALL DOM: the section ran to the end", true); }
+  catch (e) { ok("SIM WALL DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await clpDom(); ok("CLP DOM: the section ran to the end", true); }
   catch (e) { ok("CLP DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await infoTipDom(); ok("INFO BOX: the section ran to the end", true); }

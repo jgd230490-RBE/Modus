@@ -407,7 +407,7 @@ def route_with_haul(o_lat, o_lon, d_lat, d_lon, profile, steps, factors=None,
 
     With no steps this is a plain here_routing.routes() call and nothing changes.
 
-    ⚠️ Only ONE option is returned whenever any haul road applies, whatever
+    ⚠️ Only ONE option is returned whenever a haul road applies MID-LEG, whatever
     `alternatives` asks for. In 'via' mode that is HERE's own behaviour (believed, not
     verified — see the module docstring). In 'splice' mode it is this code's decision:
     alternatives across a spliced route would be the cross product of the alternatives on
@@ -415,11 +415,20 @@ def route_with_haul(o_lat, o_lon, d_lat, d_lon, profile, steps, factors=None,
     are partly HERE's and partly assigned. Returning the best of each sub-call and saying
     'one option' is the honest version. The consequence is real and visible: routes with
     a haul road have nothing for promote_alternative() to promote, and the UI says so.
+
+    17 Oct 2026 (D109, notes/demo-redesign-1016.md §4.3 item 5): the ONE exception is a leg whose only drawn roads are
+    the gate ACCESS ROADS at its two ends (the 35 m bellmouths, gate_access_step). There is then exactly one HERE call
+    between them, so there is no cross product: HERE's own alternatives on that middle call are spliced between the
+    same two access roads (_route_access_alternatives), ranked as HERE ranks them. Without this, every route lost its
+    alternatives the day every gate got an access road (16 Oct), and the collision evidence its side-by-side columns.
     """
     if not steps:
         return here_routing.routes(o_lat, o_lon, d_lat, d_lon, profile, factors,
                                    avoid_areas=avoid_areas, alternatives=alternatives,
                                    laden=laden)
+    if alternatives and alternatives > 1 and access_roads_only(steps):
+        return _route_access_alternatives(o_lat, o_lon, d_lat, d_lon, profile, steps,
+                                          factors, avoid_areas, laden, alternatives)
 
     via_steps = [s for s in steps if s["mode"] == "via"]
     splice_steps = [s for s in steps if s["mode"] != "via"]
@@ -509,6 +518,103 @@ def _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
         "haul_detail": detail,
         "sections": [],
     }]
+
+
+def access_roads_only(steps):
+    """
+    17 Oct 2026 (D109). True when a leg's drawn roads are nothing but gate access roads at its ENDS: the access road
+    of the gate it leaves by first and / or the access road of the gate it arrives by last (leg_steps' order), and no
+    haul road between them. Only then is there a single HERE call to take alternatives from.
+    """
+    if not steps or len(steps) > 2 or any(s.get("gate_role") not in ("exit", "entry") for s in steps):
+        return False
+    if len(steps) == 2:
+        return steps[0]["gate_role"] == "exit" and steps[1]["gate_role"] == "entry"
+    return True
+
+
+def _route_access_alternatives(o_lat, o_lon, d_lat, d_lon, profile, steps,
+                               factors, avoid_areas, laden, alternatives):
+    """
+    17 Oct 2026 (D109). [access road out] + HERE's options from its road end to the next access road's road end +
+    [access road in]: one option per HERE alternative on that one middle call, each spliced between the same two drawn
+    access roads, in HERE's order. The fixed pieces (a HERE call to reach an access road when the leg does not start or
+    end at its gate, which a resolved gate never needs) ask for one option, as _route_all_splice does. Every option
+    carries the same provenance (haul_km, haul_zones, haul_calls, haul_detail) as the one-option splice.
+    """
+    dep = steps[0] if steps[0]["gate_role"] == "exit" else None
+    arr = steps[-1] if steps[-1]["gate_role"] == "entry" else None
+    calls = 0
+
+    def _here_one(a_lat, a_lon, b_lat, b_lon):
+        nonlocal calls
+        calls += 1
+        return here_routing.routes(a_lat, a_lon, b_lat, b_lon, profile, factors,
+                                   avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
+
+    def _road(s, acc):
+        hr = _speed_hr(s["length_km"], s["speed_kph"])
+        acc["coords"] = _join(acc["coords"], s["line"])
+        acc["dist"] += s["length_km"]
+        acc["haul_km"] += s["length_km"]
+        acc["adjusted"] += (hr or 0.0)
+        acc["detail"].append({"zone_id": s["zone_id"], "name": s["name"], "mode": "splice",
+                              "length_km": s["length_km"], "speed_kph": s["speed_kph"],
+                              "here_duration_hr": None,
+                              "applied_duration_hr": (round(hr, 3) if hr is not None else None),
+                              "reversed": s["reversed"],
+                              "note": (None if hr is not None else
+                                       "no speed assigned — this stretch contributes 0 h to the "
+                                       "cycle. Set a speed on the haul road.")})
+
+    def _here(r, acc):
+        acc["coords"] = _join(acc["coords"], r["geometry"])
+        acc["dist"] += r["distance_km"]
+        acc["here"] += r["duration_hr"]
+        acc["adjusted"] += r["duration_hr"]
+
+    head = {"coords": [], "dist": 0.0, "here": 0.0, "adjusted": 0.0, "haul_km": 0.0, "detail": []}
+    cur_lat, cur_lon = o_lat, o_lon
+    if dep:
+        e_lat, e_lon = dep["entry"]
+        if _metres(cur_lat, cur_lon, e_lat, e_lon) > SAME_POINT_M:
+            _here(_here_one(cur_lat, cur_lon, e_lat, e_lon), head)
+        _road(dep, head)
+        cur_lat, cur_lon = dep["exit"]
+    end_lat, end_lon = arr["entry"] if arr else (d_lat, d_lon)
+    if _metres(cur_lat, cur_lon, end_lat, end_lon) > SAME_POINT_M:
+        middles = here_routing.routes(cur_lat, cur_lon, end_lat, end_lon, profile, factors,
+                                      avoid_areas=avoid_areas, alternatives=alternatives, laden=laden)
+        calls += 1
+    else:
+        middles = [None]
+    tail = {"coords": [], "dist": 0.0, "here": 0.0, "adjusted": 0.0, "haul_km": 0.0, "detail": []}
+    if arr:
+        _road(arr, tail)
+        x_lat, x_lon = arr["exit"]
+        if _metres(x_lat, x_lon, d_lat, d_lon) > SAME_POINT_M:
+            _here(_here_one(x_lat, x_lon, d_lat, d_lon), tail)
+
+    out = []
+    for m in middles:
+        acc = {"coords": list(head["coords"]), "dist": head["dist"], "here": head["here"],
+               "adjusted": head["adjusted"], "haul_km": head["haul_km"], "detail": list(head["detail"])}
+        if m is not None:
+            _here(m, acc)
+        acc["coords"] = _join(acc["coords"], tail["coords"])
+        out.append({
+            "geometry": acc["coords"],
+            "distance_km": round(acc["dist"] + tail["dist"], 2),
+            "duration_hr": round(acc["adjusted"] + tail["adjusted"], 3),
+            "duration_hr_here": round(acc["here"] + tail["here"], 3),
+            "haul_km": round(acc["haul_km"] + tail["haul_km"], 3),
+            "haul_zones": [s["zone_id"] for s in steps],
+            "haul_mode": "splice",
+            "haul_calls": calls,
+            "haul_detail": acc["detail"] + tail["detail"],
+            "sections": [],
+        })
+    return out
 
 
 def _route_all_via(o_lat, o_lon, d_lat, d_lon, profile, steps,

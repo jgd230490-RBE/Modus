@@ -605,6 +605,28 @@ ok("cycle_hr = out + back + turnaround, from the same total",
    row["cycle_hr"] == round(row["loaded_hr"] + row["return_hr"] + row["turnaround_hr"], 3))
 ok("with no haul road on the geometry, the flat figure applies",
    row["turnaround_parts"]["internal_travel_source"] == "flat")
+# 17 Oct 2026 (the user: UK drivers' hours): the cycle splits into DRIVING (both legs + the flat gate-to-face minutes) and
+# OTHER WORK (loading, unloading, the gate check-in), and trips a day are drivers_hours.lorry_day on that split
+import drivers_hours  # noqa: E402
+_an5 = network.route_analysis("R1")
+ok("⭐ drivers' hours: gate-to-face minutes are DRIVING, the check-in and loading OTHER WORK, on the row as minutes",
+   row["turnaround_parts"]["internal_travel_minutes"] > 0
+   and abs(row["drive_min"] - ((row["loaded_hr"] + row["return_hr"]) * 60 + row["turnaround_parts"]["internal_travel_minutes"])) < 0.5
+   and abs(row["other_work_min"] - (row["turnaround_parts"]["unloading_minutes"] + row["turnaround_parts"]["safety_minutes"])) < 0.01,
+   str((row.get("drive_min"), row.get("other_work_min"), row["turnaround_parts"])))
+ok("...trips a day are drivers_hours.lorry_day on that split, with the limit and the words on the row; the planning echo "
+   "names the rule", row["trips_per_day"] == drivers_hours.lorry_day(_an5["planning"]["shift_hours_per_day"], row["drive_min"],
+                                                                    row["other_work_min"])["trips"]
+   and row["lorry_day"]["limited_by"] in ("shift", "breaks", "driving", "driver_day", "none") and row["lorry_day"]["words"]
+   and _an5["planning"]["drivers_hours"] == drivers_hours.RULE_WORDS and _an5["planning"]["shift_capped"] is False
+   and _an5["planning"]["shift_note"] is None and _an5["planning"]["not_modelled"] == drivers_hours.NOT_MODELLED_WORDS,
+   str(row.get("lorry_day")))
+# 17 Oct 2026 (the review): the public map's route figures are the SAME trips and cycle (the drawer reads them)
+_pm5 = [f["properties"] for f in network.public_map_data(profile=row["profile"])["features"]
+        if f["properties"].get("route_id") == "R1" and f["properties"].get("leg")]
+ok("⭐ the review: the public map carries route_analysis's own trips a day and cycle on both legs of the route",
+   len(_pm5) == 2 and all(p["trips_per_day"] == row["trips_per_day"] and abs(p["cycle_hr"] - row["cycle_hr"]) < 0.006
+                          for p in _pm5), str([(p.get("trips_per_day"), p.get("cycle_hr")) for p in _pm5] + [row["trips_per_day"], row["cycle_hr"]]))
 
 db.execute("DELETE FROM route_geometry WHERE tenant_id = ?", (db.current_tenant(),))
 add_geom("R1", leg="loaded", profile=prof, haul_tag="Z001")

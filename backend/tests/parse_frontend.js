@@ -597,8 +597,25 @@ ok("...creates ONE map and keeps it (the guard), and never draws an unbaked rout
 ok("...colours lines by IPT from palette C, and is not rendered under the render harness",
   _cmBody.includes("IPT_PALETTE_C[iptKey(") && _laBody.includes("!initialPage && <CommitMap"));
 // 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
+// NARROWED 17 Oct 2026 (UI fix 2, claude/ui-fix-dark, finding 2): the wash is var(--navy-soft) INLINE — the .tbl th rule
+// out-ranks a bg-blue-50 class — so the dark look paints today's column in its own tint (the figures were 1.14:1 on #eff6ff)
 ok("today's column carries the wash and the '· today' suffix",
-  _laBody.includes('", today"') && _laBody.includes('#eff6ff'));
+  _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft)" } : {}}'));
+ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ahead; seven inline var(--navy-soft) washes (today's th and td, the summary row, the Horizon's commit th and two td); the week pill reads var(--muted) when off",
+  !/#eff6ff|#64748b|#B45309/i.test(_laBody)
+  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 7
+  && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
+ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
+  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
+  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}'));
+// 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
+ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
+  _laBody.includes('style={view === id ? { background: "var(--navy)", color: "var(--control-fg)", borderColor: "var(--navy)" }') && !/color: "white"/.test(_laBody));
+ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
+  (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
+  && (code.match(/var\(--ok-btn\)/g) || []).length === 2 && (code.match(/var\(--ok-btn-fg\)/g) || []).length === 2
+  && _laBody.includes('font-semibold rounded-lg" style={{ background: "var(--ok-btn)", color: "var(--ok-btn-fg)" }}>Confirm week</button>')
+  && !/text-white[^<]{0,400}var\(--green\)/.test(code));
 // NARROWED (H1): the unit word is DU() — km, or mi for a tenant that reads miles
 // 13 Oct 2026 (W6, narrowed): the ▶ row's string became the details row, one fact a line, labels in the tenant's unit
 ok("the expanded row prints km/trip, km/week, t·km, cycle and € or 'rate not set' — in the tenant's unit",
@@ -624,7 +641,8 @@ ok("⭐ export downloads through fetch + blob, never a bare <a href> (the access
   /fetch\(`\$\{API\}\/forecast-weeks\/export\?format=\$\{format\}&bucket=\$\{bucket\}`\)/.test(_laBody)
   && _laBody.includes("URL.createObjectURL(blob)") && !/href=\{`\$\{API\}\/forecast-weeks\/export/.test(code));
 ok("...the mock's bar: Export XLSX beside the green Confirm week, PDF as a smaller second button",
-  _laBody.includes(">Export XLSX<") && _laBody.includes('download("pdf")') && _laBody.includes('background: "var(--green)" }}>{anyConfirmed'));
+  // NARROWED 17 Oct 2026 (UI fix 2, finding 6): the button reads its own pair, --ok-btn / --ok-btn-fg
+  _laBody.includes(">Export XLSX<") && _laBody.includes('download("pdf")') && _laBody.includes('background: "var(--ok-btn)", color: "var(--ok-btn-fg)" }}>{anyConfirmed'));
 ok("no email and no upload in the page", !/mailto:|sendEmail|<input type="file"/.test(_laBody));
 // slice 5 — rates and the confirmed cost
 ok("⭐ the confirmed cost is sent ONLY when its box was touched — an absent field leaves it alone",
@@ -692,7 +710,7 @@ ok("...and the balance is read from /stockpiles", code.includes("/stockpiles?fro
 // ⭐ no capacity recorded is NOT zero capacity
 ok("⭐ an unset capacity renders '—' / 'not recorded', never 0",
   _dsBody.includes("· max —") && !_dsBody.includes("capacity_qty || 0")
-  && /s\.capacity_qty == null \? <span className="text-slate-300">not recorded<\/span>/.test(_laBody));
+  && /s\.capacity_qty == null \? <span className="text-slate-500">not recorded<\/span>/.test(_laBody));   // 17 Oct 2026 (UI fix 4): slate-500, readable
 ok("over capacity uses the existing red, not a reserved route colour",
   _dsBody.includes('b.over ? "#DC2626"') && !_dsBody.includes('over ? "#059669"'));
 ok("the panel says inbound comes from typed actuals only",
@@ -790,7 +808,10 @@ ok("a zone still needs three corners and a haul road two",
 ok("saving re-bakes what it invalidated", code.includes("rebakeAfterZone"));
 ok("the re-bake drives the existing batch endpoint rather than a new one",
   code.includes("`${API}/admin/bake-routes?${q}`"));
-ok("the re-bake loop has a guard against spinning forever", code.includes("guard++ < 200"));
+// NARROWED 17 Oct 2026 (Route all 502s): the guard is no longer a cap of 200 calls (short, time-boxed batches could
+// reach it on a big network) but "stop when `remaining` stops falling"; test_route_all.py asserts both loops
+ok("the re-bake loop has a guard against spinning forever",
+  /const rebakeAfterZone = async[\s\S]*?if\(left >= last\) throw new Error\(`\$\{left\} leg\(s\) left and not falling`\);/.test(code));
 ok("only the affected vehicle profiles are re-baked",
   code.includes("legs.map(l => l.vehicle_profile)"));
 ok("the invalidated leg count is surfaced to the user", code.includes("inv.leg_count"));
@@ -1124,6 +1145,9 @@ ok("there is a shared empty state", code.includes("function EmptyState("));
 
 // ---- 4f. 10 Sep evening — the fuel widget, target rate and Quote + BAF ---------------
 const _fwBody = code.slice(code.indexOf("function FuelWidget("), code.indexOf("function LookAhead("));
+// 17 Oct 2026 (UI fix 2, finding 2): the BAF figure's "no share" grey is the token (identical in Ink; 3.42:1 -> 6.25:1 in Dark)
+ok("UI fix 2 (#2): the fuel card's BAF figure reads var(--navy) or var(--muted), never the light-look grey literal",
+  _fwBody.includes('style={{ color: sum.baf_pct != null ? "var(--navy)" : "var(--muted)" }} title={baseTxt}>{bafTxt}</span>') && !/#64748b/i.test(_fwBody));
 const _ctBody = code.slice(code.indexOf("function CostingTab("), code.indexOf("function ConfigPage("));
 ok("⭐ ONE FuelWidget component, mounted THREE times: Commit (compact), Account (strip), Config (config)",
   (code.match(/function FuelWidget\(/g) || []).length === 1 && (code.match(/<FuelWidget\b/g) || []).length === 3
@@ -1293,10 +1317,11 @@ ok("0915: four sections, named, in the page's own order",
    && ["today", "kpis", "charts", "stock"].every(k => new RegExp(`key: "${k}"`).test(src))
    && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4
    // 14 Oct 2026 (narrowed): a FIFTH, More charts, added LAST so #dashboard/1 … /4 keep their screens
-   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n\];/.test(src));
-ok("0915: every one of the five (14 Oct: was four) is wrapped, and each wraps a DIFFERENT index",
-   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
-   && [0, 1, 2, 3, 4].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
+   // 17 Oct 2026 (narrowed): a SIXTH, Simulation, added LAST after it, so #dashboard/1 … /5 keep their screens
+   && /\{ key: "stock",  title: "Stockpiles" \},\n  \{ key: "more",   title: "More charts" \},\n  \/\/ 17 Oct 2026 \(the user\): the Simulation, added LAST[^\n]*\n  \{ key: "sim",    title: "Simulation" \},\n\];/.test(src));
+ok("0915: every one of the six (14 Oct: five; 17 Oct: six) is wrapped, and each wraps a DIFFERENT index",
+   (src.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6
+   && [0, 1, 2, 3, 4, 5].every(i => new RegExp(`sectionShown\\(${i}\\)`).test(src)));
 ok("0915: 🔴 a hidden section is HIDDEN, not unmounted — the Mapbox instance survives",
    // the wrapper renders its children unconditionally and toggles `hidden`
    // (13 Oct 2026, W5: narrowed — the wrapper no longer needs a ref, it fires nothing)
@@ -1314,10 +1339,13 @@ ok("0915: ...and a section coming back into view is re-measured (13 Oct: each bo
    && /function CommitMap[\s\S]{0,9000}new ResizeObserver\(\(\) => \{ try \{ if\(mapDiv\.current && mapDiv\.current\.clientWidth > 0\) m\.resize\(\);/.test(src));
 ok("0915: the WORKING view always shows all four, whatever the big screen remembered",
    /const sectionShown = \(i\) => !wall \|\| wallLayout === "all" \|\| wallSection === i;/.test(src));
+// NARROWED 17 Oct 2026: a timeout per section instead of one interval, so each section has its own time on screen — the
+// Simulation its whole day (SIM_WALL_SECONDS), the others the rotate setting
 ok("0915: the rotate timer runs only on the big screen, and is cleared",
    /if\(!wall \|\| wallLayout !== "rotate"\) return;/.test(src)
-   && /setInterval\(\(\) => setWallSection\(s => \(s \+ 1\) % DASH_SECTIONS\.length\), rotateSecs \* 1000\)/.test(src)
-   && /return \(\) => clearInterval\(id\);/.test(src));
+   && /setTimeout\(\(\) => setWallSection\(s => \(s \+ 1\) % DASH_SECTIONS\.length\), dwellNow \* 1000\)/.test(src)
+   && /return \(\) => clearTimeout\(id\);\n  \}, \[wall, wallLayout, rotateSecs, wallSection\]\);/.test(src)
+   && src.includes('const dwellNow = (DASH_SECTIONS[wallSection] || {}).key === "sim" ? SIM_WALL_SECONDS : rotateSecs;'));
 ok("0915: a screen can be pinned by URL, 1-based, and a bad number is ignored not clamped",
    /function screenFromHash\(max\)/.test(src)
    && /return \(n >= 1 && n <= max\) \? n : null;/.test(src)
@@ -1529,8 +1557,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && cb.includes("Every return leg is counted empty: back-loads are not modelled") && !cb.includes("Laden share of km"));
   // NARROWED 11 Oct 2026 (the process layout: the "By material" table became step 2's one row per category, with the NH
   // category on the name's hover; three tables remain, each inside a closed details)
+  // NARROWED 17 Oct 2026 (UI audit #15, claude/ui-fix-keyboard): the two step-5 reference tables wrap their cells (tbl-wrap)
   ok("the tables use the app's .tbl style with a caption, and the NH category takes NH's own name for waste",
-     (cb.match(/<table className="tbl">/g) || []).length === 3 && (cb.match(/<table\b/g) || []).length === 3 && (cb.match(/<caption><b>/g) || []).length === 3
+     (cb.match(/<table className="tbl(?: tbl-wrap)?">/g) || []).length === 3 && (cb.match(/<table className="tbl tbl-wrap">/g) || []).length === 2
+     && (cb.match(/<table\b/g) || []).length === 3 && (cb.match(/<caption><b>/g) || []).length === 3
      && cb.includes('"Waste": "Waste + Waste Transport"')
      && cb.includes('title={`National Highways Carbon Tool category: ${bc ? (CARBON_NH_CATEGORY[bc.sheet] || bc.sheet || "no category") : "no category"}`}'));
   // after the show (11 Oct 2026, notes/carbon-ui-1011 items 8, 9, 11–15): every figure from the server
@@ -1746,7 +1776,16 @@ ok("...and it collapses with the rail like every other item (label behind railSh
       && gf.includes("const [stripBottom, setStripBottom] = useState(16);") && gf.includes("document.querySelector('[data-sticky-foot]')")
       && gf.includes("Math.round(window.innerHeight - fr.top) + 8 : 16;") && gf.indexOf("useState(16)") < gf.indexOf("if(!step) return hintsEl;")
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
-      && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
+      // NARROWED 18 Oct 2026 (decision 17): ...and none on a phone
+      && gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }"));
+    // 18 Oct 2026 (UI audit decision 17, the user): the app's own dots are retired on the phone like the map's (decision 8) —
+    // the effect draws none there, the strip stays (its "Take the tour" carries the tips), the ≤ 767 px rule hides a dot left
+    // by a wider window until the next pass; a desk keeps its dots, named "Tip: <the step's title>"
+    ok("🔴 decision 17: the app draws no guide dot on a phone (the dots effect bails on `phone`, which is in its deps), keeps the strip there, and the phone rule hides .guide-dot; a desk keeps its dots",
+      gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }") && gf.includes("}, [hints, key, steps.length, phone]);")
+      && gf.includes("{strip && (") && gf.includes('className="guide-dot" style={{ top: d.top, left: d.left }} aria-label={`Tip: ${d.title}`}')
+      && /@media \(max-width:767px\)\{\.guide-dot\{display:none\}\}/.test(html) && (html.match(/\.guide-dot\{display:none\}/g) || []).length === 1
+      && !/\.guide-dot\{display:none\}/.test(html.split("@media (max-width:767px){.guide-dot{display:none}}")[0]));
   }
   // REVERSED 11 Oct 2026 (the demo bar, the user: the map's strip "on every page"): the header badge and PR #20's
   // logic that hid it under the embedded map are gone — the bar under the header carries the notice on every view,
@@ -1950,7 +1989,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
     // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
-    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
+    // 17 Oct 2026 (narrowed): six WallSections — the sixth is the Simulation (SimWall), no chart in it
+    && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
     && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
   ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
     ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
@@ -2028,7 +2068,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && code.includes("<Dashboard meta={meta} phone={narrow} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature); 14 Oct 2026: + phone
     // NARROWED 14 Oct 2026 (bundle G, W7: the render harness's prop initialClp joins the signature too; merged with D9's phone)
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen, phone })")
+    // NARROWED 16 Oct 2026 (S7: the render harness's prop initialSim joins the signature)
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialSim, onWall, onOpen, phone })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2213,8 +2254,168 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
-    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 5
+    // 17 Oct 2026 (narrowed): six sections (the Simulation); the Gate arrivals panel is still not on it
+    !_dbWl.includes("<GateArrivalsPanel") && (_dbWl.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6
     && (src.match(/\{ key: "(?:today|kpis|charts|stock)",/g) || []).length === 4);
+}
+
+// ---- 16 Oct 2026 (S3): the busiest hour on the Gate arrivals panel ----------------------------------------------------
+// Source-level. What they prove: the "Gate by gate" table carries a sixth column, "Busiest hour", read from the server's
+// `busiest_hour` (sim.py's average working day) and formatted only; the details line says the hour and what the gate can
+// check in an hour; the server's note is printed under the table. Not covered here: the loaded rows (render_frontend.js).
+{
+  const b0 = src.indexOf("// ---- 11 Oct 2026: Gate arrivals on the Dashboard");
+  const b1 = src.indexOf("// ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast");
+  const gb = src.slice(b0, b1).split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  const gbW = gb.slice(gb.indexOf("const gaBusyCell"), gb.indexOf("function GateArrivalsPanel"));
+  ok("⭐ S3: the gate table has a sixth column, Busiest hour, with its phone label, and the details row spans six",
+    gb.includes('<th scope="col" className="num">Busiest hour</th><th scope="col">Status</th>')
+    && gb.includes("colSpan={6}") && !gb.includes("colSpan={5}")
+    && ["Arrivals a day", "Average gap", "Check-in a lorry", "Busiest hour", "Status"].every(l => gb.includes(`data-label="${l}"`)));
+  ok("S3: the cell and the details line format the server's busiest_hour (lorries, hour, hours, per_hour); nothing is worked out",
+    gbW.includes('const gaBusyCell = (b) => b && b.lorries ? `${b.lorries} at ${b.hour}` : "—";')
+    && gb.includes("{gaBusyCell(g.busiest_hour)}") && gb.includes('<RdItem t="Busiest hour" wide>{gaBusyWords(g.busiest_hour)}</RdItem>')
+    && gbW.includes("`The gate can check in ${gaN1(b.per_hour)} an hour.`") && gbW.includes("No check-in time typed, so nothing is compared.")
+    && gbW.length > 200 && !/Math\.(ceil|floor|round|max)\(|\/ *60|\* *60/.test(gbW));
+  ok("S3: the server's note on where the busiest hour comes from is printed under the notes",
+    gb.includes('{ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}')
+    && gb.indexOf("data-ga-busy-note") > gb.indexOf("(ga.notes || []).map("));
+  ok("S3: no banned word and no 'peak hour' in the new words",
+    !/\b(secure|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|trucks?|peak hour)\b/i.test(gbW));
+}
+
+// ---- 16 Oct 2026 (S7): the Simulation on the staff Dashboard ----------------------------------------------------------
+// Source-level. What they prove: the section sits under Gate arrivals on the desk Dashboard only (not the big screen),
+// folded and read on first open with one GET; it writes nothing and keeps nothing (no storage, no address: D86); the
+// figures are the server's (the browser draws positions and counts what it draws, nothing else); dots not icons (D81);
+// its own Mapbox instance, never removed; no new script; no hourly HERE switch (D92); the holding area greyed; the words.
+// Not covered here: the rendered section (render_frontend.js), the reads and the clock (dom_frontend.js), a browser.
+{
+  const s0 = src.indexOf("// ---- 16 Oct 2026 (S7): the Simulation on the staff Dashboard ----");
+  const s1 = src.indexOf("function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){");
+  const simSrc = s0 > 0 && s1 > s0 ? src.slice(s0, s1) : "";
+  const simc = simSrc.split("\n").map(l => l.replace(/^\s*\/\/.*$/, "")).join("\n");
+  const fn = (name, next) => simSrc.slice(simSrc.indexOf(`function ${name}(`), next ? simSrc.indexOf(next) : undefined);
+  // 17 Oct 2026: the panel ends where the big screen's SimWall begins (same block)
+  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPanel", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN");
+  const _dbS = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
+  const _dbSW = _dbS.slice(_dbS.indexOf("{!wall ? ("), _dbS.indexOf("      ) : (\n        <>\n")), _dbSWl = _dbS.slice(_dbS.indexOf("      ) : (\n        <>\n"));
+  ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
+    simSrc.length > 20000 && ["function SimulationPanel({ meta, months, phone, initial })", "function SimPlayer({ meta, D, store, scenario, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
+      "function SimMap({ meta, D, store, frame })", "function SimTimeline({ D, t, onSeek })", "const SimScenario = React.memo(function SimScenario(",
+      "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f)));
+  ok("⭐ S7: under Gate arrivals on the desk Dashboard, before the folded sections; never on the big screen",
+    _dbSW.includes("<SimulationPanel meta={meta} months={months} phone={phone} initial={initialSim} />")
+    && _dbSW.indexOf("<SimulationPanel") > _dbSW.indexOf("<GateArrivalsPanel") && _dbSW.indexOf("<SimulationPanel") < _dbSW.indexOf('<details className="dash-more"')
+    && !_dbSWl.includes("<SimulationPanel") && (code.match(/<SimulationPanel /g) || []).length === 1);
+  ok("⭐ S7: folded, read on FIRST OPEN with one GET of /api/sim/day (the lines once a month), keyed on open, the month and the scenario",
+    panelSrc.includes('<details className="dash-more" data-sim="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>')
+    && panelSrc.includes("if(!open) return;") && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [open, month, scKey]);")
+    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 1
+    // NARROWED 17 Oct 2026: the block holds the big screen's SimWall too, with its own one read (the plain month, with the lines)
+    && (simc.match(/fetch\(/g) || []).length === 2 && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
+  ok("🔴 S7 (D86): nothing written, nothing kept, nothing in the address — no method, no storage, no history, no location in the block",
+    !/method:|localStorage|sessionStorage|history\.|location\.|postJSON|navigator\.clipboard/.test(simc));
+  ok("⭐ S7: the scenario reaches the server only as the query its parser reads (hours, check_in, bands, pour_*, legs=1)",
+    ["`hours=${encodeURIComponent(\"all=\" + sc.all[0] + \"-\" + sc.all[1])}`", "`check_in=${encodeURIComponent(g + \"=\" + sc.check_in[g])}`",
+     "`bands=${sc.bands ? \"on\" : \"off\"}`", "`pour_gate=${encodeURIComponent(p.gate)}`", "`pour_m3_per_load=${encodeURIComponent(p.mpl)}`", 'q.push("legs=1")'].every(t => simSrc.includes(t)));
+  ok("🔴 S7: the browser works out no figure: the table and the cards print the server's fields; no capacity, share, wait or rounding of a day here",
+    ["g.busiest", "g.pct", "g.capacity", "g.minutes_lost", "g.bottleneck_at", "g.most_waiting", "g.longest_wait", "g.late", "g.per_hour", "g.panel_per_day", "D.checks.table_equals_arrivals", "D.checks.largest_panel_difference"].every(f => simSrc.includes(f))
+    // NARROWED 17 Oct 2026: "* 100" no longer matches "* 1000" (the big screen's hold in milliseconds); a percentage still does
+    && !/60 \/ |\* 100(?!0)|\/ g\.check_in|open_minutes \//.test(simc)
+    // the one ceil is the timeline's first hour tick (drawing)
+    && (simc.match(/Math\.ceil/g) || []).length === 1 && simc.includes("for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++)"));
+  ok("⭐ S7 (D85): the timeline's red mark is the server's bottleneck (the first wait longer than the check-in), said in words",
+    simSrc.includes("{g.bottleneck_at != null") && simSrc.includes("bottleneck from {simHM(g.bottleneck_at)} · up to {g.most_waiting} waiting")
+    && simSrc.includes("none longer than the {+g.check_in} min check-in"));
+  ok("⭐ S7 (D81): lorries are dots (one circle layer, laden filled, empty hollow, mixers orange, waiting red); no icons",
+    mapSrc.includes('m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries"') && !/icon-image|loadImage|addImage/.test(mapSrc)
+    && mapSrc.includes('"laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"')
+    && /:root\{--sim-lorry:#2563EB;--sim-mixer:#E8590C;\}/.test(html) && /html\[data-theme="dark"\]\{--sim-lorry:#5B8FF0;--sim-mixer:#E8681E;\}/.test(html));
+  ok("🔴 S7: its own Mapbox instance (CommitMap's pattern), never removed; the only .remove() is a waiting badge's marker; no new script",
+    (mapSrc.match(/new window\.mapboxgl\.Map\(/g) || []).length === 1 && (mapSrc.match(/\.remove\(\)/g) || []).length === 1 && mapSrc.includes("try { x.m.remove(); } catch(e){}")
+    // no new third-party script: the page loads the same six scripts it loaded on main ba295a4
+    && !/<script|createElement\("script"\)/.test(simSrc) && (html.match(/<script[^>]*src=/g) || []).length === 6);
+  ok("⭐ S7: the drawing reads the server's plan: each lorry along its own leg at the parts' speeds, waiting lorries 25 m apart in the gate's one lane",
+    simSrc.includes("for(const p of parts){ if(el <= p[5]) return p[0] + (el - p[4]) * p[2]; }") && simSrc.includes("const SIM_QUEUE_M = 25;")
+    && simSrc.includes("Object.keys(lanes).forEach(g => lanes[g].sort((x, y) => x.start - y.start));") && simSrc.includes("leg.len_m - Math.max(0, q) * SIM_QUEUE_M"));
+  ok("⭐ S7 (D83): about 60 s a day at 1×, ½× to 4×, Play / Pause / Restart, a jump slider; the timeline click jumps too",
+    simSrc.includes("const SIM_PLAY_SECONDS = 60;") && simSrc.includes('const SIM_SPEEDS = [["0.5", "½×"], ["1", "1×"], ["2", "2×"], ["4", "4×"]];')
+    && simSrc.includes('playing ? "Pause" : (t >= s1 ? "Play again" : "Play")') && simSrc.includes(">Restart</button>")
+    && simSrc.includes('aria-label="Jump to a time of day"') && simSrc.includes("onClick={click}"));
+  ok("⭐ S7: the words — staff only, a planning view, congestion not modelled; the holding area greyed for V1; no hourly HERE switch (D92)",
+    simSrc.includes(">Staff only · never on the public map<") && simSrc.includes(">Planning view, not a record of what happened<")
+    && simSrc.includes(">Congestion on the public road is not modelled<") && simSrc.includes('<input type="checkbox" disabled /><span>Holding area: lorries wait off the highway</span>')
+    && simSrc.includes("Comes with holding areas (V1).") && !/\bHERE\b/.test(simc) && !/hour of day|hourly drive/i.test(simc));
+  ok("🔴 S7: no banned word and no word-rule word on screen; lorries never trucks; teams through teamText; the tenant's distance unit and speed",
+    // GeoJSON's own key (geometry) and Mapbox's token setting are code, not words on a screen
+    !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure|booking)\b/i.test(simc.replace(/accessToken|mapbox_token|geometry: \{|\.geometry\b/g, ""))
+    && simSrc.includes("teamText(x)") && simSrc.includes("${Math.round(speed(h.speed_kph))} ${SPD()}") && simSrc.includes("${fmtDist(h.length_km, 1)} ${DU()}")
+    && simSrc.includes("D.mixer.vehicle_label") && !/IPT ?[1-6]/.test(simSrc));
+  ok("S7: below 768 px one card a gate, read-only, and the desktop note; the scenario controls are not there",
+    panelSrc.includes("? <><div className=\"ct-note\" data-sim-phone=\"1\">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>")
+    && !fn("SimPhoneList", "function SimulationPanel(").includes("<input"));
+  // 17 Oct 2026 (found on live): the pour's gates and default are the server's (working sites only); the gate access roads
+  // are not listed with the haul roads, and the screen says so in one line
+  const scnSrc = fn("SimScenario", "const gateBandWords");
+  ok("⭐ S7 fix: the pour's gate list and default are the server's (D.pour_gates, D.pour_default); no site to pour at says so; no list worked out here",
+    scnSrc.includes("const sites = D.pour_gates || [];") && scnSrc.includes("gate: p.gate || D.pour_default || \"\"")
+    && !scnSrc.includes("origin_share_note") && !scnSrc.includes("(sites[0] || {}).gate_id")
+    && scnSrc.includes('data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).<'));
+  ok("S7 fix: one quiet line under the haul roads when gate access roads were left out (the server's count)",
+    panelSrc.includes('{D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}'));
+  // 17 Oct 2026: the big screen's sixth section (SimWall) and the one-screen layout of this section
+  const wallSrc = fn("SimWall", "function CommitMap(");
+  const wallTop = simSrc.slice(simSrc.indexOf("// ---- 17 Oct 2026: the Simulation on the BIG SCREEN"), simSrc.indexOf("function SimWall("));
+  ok("⭐ SIM BIG SCREEN: the sixth section is last (key sim), wrapped like the others, and plays SimWall with this display's month, the pass, the loop and the refresh",
+    _dbS.includes('<WallSection show={sectionShown(5)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[5].title}>')
+    && _dbS.includes('<SimWall meta={meta} month={simMonth} show={wall && sectionShown(5)} pass={simPass} loop={wallLayout !== "rotate"} fill={fill} tick={tick} />')
+    && _dbSWl.indexOf("<SimWall ") > _dbSWl.indexOf("<ChartCanvas config={splitCfg} />") && !_dbSW.includes("<SimWall "));
+  ok("⭐ SIM BIG SCREEN: in Rotate the Simulation stays its whole day (a day at 1× + a 5 s hold), whatever the rotate setting; the others keep theirs",
+    wallTop.includes("const SIM_WALL_HOLD_S = 5;") && wallTop.includes("const SIM_WALL_SECONDS = SIM_PLAY_SECONDS + SIM_WALL_HOLD_S;")
+    && _dbS.includes('const dwellNow = (DASH_SECTIONS[wallSection] || {}).key === "sim" ? SIM_WALL_SECONDS : rotateSecs;'));
+  ok("⭐ SIM BIG SCREEN: each pass starts the day again (simPass counts the section coming round); the play loop restarts on it",
+    _dbS.includes("useEffect(() => { if(wall && sectionShown(simIdx)) setSimPass(p => p + 1); }, [wall, wallLayout, wallSection]);")
+    && wallSrc.includes("useEffect(() => { if(dRef.current){ tRef.current = dRef.current.window.start; setT(dRef.current.window.start); } }, [pass]);")
+    && wallSrc.includes("}, [show, D, loop, pass]);") && wallSrc.includes("if(!loop){ tRef.current = n; setT(n); raf = null; return; }"));
+  ok("🔴 SIM BIG SCREEN (D86): the month is a per-display setting in localStorage, said in a comment to be NOT a saved or shared scenario; nothing goes in the address",
+    wallTop.includes('const SIM_WALL_MONTH_KEY = "modus_dash_sim_month";') && /NOT a saved or shared scenario: D86 stands/.test(wallTop)
+    && _dbS.includes("localStorage.setItem(SIM_WALL_MONTH_KEY, v)")
+    && /A display setting in this browser's localStorage, like the rotate time — NOT a saved or shared\n\s*\/\/ scenario \(D86 stands/.test(src)
+    && _dbS.includes('aria-label="Simulation month on this display"') && _dbS.includes('<option value="">this month</option>')
+    && !/localStorage|sessionStorage|history\.|location\./.test(wallSrc));
+  ok("SIM BIG SCREEN: the bar keeps one line — the month choice only while the Simulation is on screen (or in All sections), and no costing range beside it",
+    (_dbS.match(/\(wallLayout === "all" \|\| wallSection === simIdx\) && </g) || []).length === 2
+    && _dbS.includes("{fill && wallSection !== simIdx && <span className=\"dash-wallbar-note\" title="));
+  // 17 Oct 2026 (the user: "entry gate and empty lorry icons look too similar")
+  ok("⭐ SIM: an entry gate never reads as a lorry — a bullseye (radius 7, thick ink rim, ink centre) against the empty lorry's small blue ring (radius 4); the key draws the same",
+    mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });')
+    && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });')
+    && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")]')
+    && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
+    && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
+  ok("SIM: the map's key is a named group (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
+    mapSrc.includes('<div className="sim-legend" role="group" aria-label="Map key">') && !mapSrc.includes('<div className="sim-legend" aria-label='));
+  ok("SIM: the map's key names the concrete mixer only on a day with a pour",
+    mapSrc.includes('{D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>'));
+  ok("🔴 SIM BIG SCREEN: no scenario controls and no table on the TV; it reads the plain month (no pour) only while shown",
+    !/<input|<select|<button|SimScenario|SimTable|pour_gate|onHours|onCheckIn/.test(wallSrc)
+    && wallSrc.includes("if(!show) return;") && wallSrc.includes("fetch(`${API}/sim/day?month=${month}&legs=1`)") && wallSrc.includes("no pour"));
+  ok("SIM BIG SCREEN: it fills the TV in Rotate / One section (.dash-fill) with the map large, the clock and Gates now beside it, the timeline under the map",
+    /\.sim-wall\{display:grid;[^}]*grid-template-areas:"map side" "tl side";\}/.test(html) && /\.dash-wall\.dash-fill \.sim-wall-fill\{height:100%;grid-template-rows:minmax\(0,1fr\) auto;\}/.test(html)
+    && /\.sim-wall-fill \.sim-map\{height:100%;\}/.test(html) && /\.sim-wall-clock\{font-size:clamp\(/.test(html)
+    && wallSrc.includes('<div className={"sim-wall" + (fill ? " sim-wall-fill" : "")} data-sim-wall="1">'));
+  ok("⭐ SIM ONE SCREEN: from 1024 px the map and its timeline sit left, the clock / Gates now / scenario beside them; the table and the haul roads fold away (closed)",
+    fn("SimPlayer", "const SimScenario").includes('<div className="sim-main">\n          <SimMap meta={meta} D={D} store={store} frame={f} />')
+    && /<div className="sim-main">[\s\S]{0,700}<SimTimeline D=\{D\} t=\{t\}/.test(fn("SimPlayer", "const SimScenario"))
+    && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:clamp\(260px,calc\(100vh - 420px\),680px\);\}\}/.test(html)
+    // found in Chrome: in the flex column the map's box shrank to nothing (align-self:start); it stretches across its column
+    && /\.sim-main>\.sim-map-wrap\{align-self:stretch;\}/.test(html)
+    && panelSrc.includes('<details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>')
+    && panelSrc.includes('<details className="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>') && !/data-sim-fold="[a-z]+" open/.test(panelSrc));
+  ok("S7: the info box entry (≤ 40 words) and the controls are named for a screen reader",
+    /"dash\.sim": \{ title: "Simulation", text: "[^"]+", *\n? *how: "[^"]+", tech: "t1-gates" \}/.test(src)
+    && ["Simulation month", "Playback speed", "Every gate opens at", "Every gate closes at", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));
 }
 
 // ---- 11 Oct 2026 — the guide update: the tour text that was wrong or stale ------------------------
@@ -2342,9 +2543,12 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("🔴 W1: no map opens on the old [24.7, 58.5] default, and the location form's placeholders are not 58.5 / 24.7",
      !/24\.7,\s*58\.5/.test(html) && !/placeholder="(?:58\.5|24\.7)"/.test(html)
      && /placeholder="52\.6"/.test(html) && /placeholder="-1\.5"/.test(html));
-  ok("W1: both maps the app creates open on UK_VIEW (the Look-ahead map and the Routes / Zones map)",
-     (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 2
-     && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 2);
+  // NARROWED 16 Oct 2026 (S7): a third map, the Dashboard's Simulation (SimMap, its own instance like CommitMap), opens
+  // on UK_VIEW too, then frames the day's routes
+  ok("W1: every map the app creates opens on UK_VIEW (the Look-ahead map, the Routes / Zones map, the Simulation map)",
+     (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 3
+     && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 3
+     && /function SimMap\(\{ meta, D, store, frame \}\)\{[\s\S]{0,700}new window\.mapboxgl\.Map\(\{ container: div\.current, style: "mapbox:\/\/styles\/mapbox\/light-v11", center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html));
   const locFetch = (html.match(/fetch\(`\$\{API\}\/locations\/geojson`\)\.then\(r => r\.json\(\)\)\.then\(gj => \{([\s\S]*?)\n    \}\)\.catch/) || ["", ""])[1];
   ok("⭐ W1: the Routes / Zones map frames the scheme's locations the FIRST time they load, once (a ref), finite points only, inside a try",
      /const framedRef = useRef\(false\);/.test(html) && /if\(!framedRef\.current\)\{/.test(locFetch)
@@ -2366,6 +2570,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes('const rdKey = (table) => "modus_rows_" + table;') && /window\.sessionStorage\.setItem\(rdKey\(table\)/.test(src)
      && src.includes('window.localStorage.getItem("modus_units_" + page)') && src.includes('return UNIT_CHOICES.some(c => c[0] === v) ? v : "tonnes";')
      && src.includes('const UNIT_CHOICES = [["loads", "Loads"], ["tonnes", "Tonnes"], ["lorries", "Lorries"]];'));
+  // 17 Oct 2026 (UI fix 2, finding 1): the pressed word reads the control's text colour (white on the dark look's orange was 2.33:1)
+  ok("UI fix 2 (#1): the pressed Loads / Tonnes / Lorries word is var(--control-fg) on var(--navy), no #fff literal",
+     html.includes('.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}') && !/\.unit-sw-seg[^\n]*#fff/.test(html));
   ok("W6: the switch is a labelled group of three aria-pressed buttons with its info box, on the Look-ahead, the Dashboard and Forecasts (not Gate arrivals: all lorries)",
      src.includes('<span className="unit-sw-seg" role="group" aria-label="Show the figures as">') && src.includes('aria-pressed={value === k ? "true" : "false"}')
      && src.includes('<InfoTip id="units" />') && ["lookahead", "dashboard", "forecasts"].every(p => src.includes(`useUnits("${p}")`))
@@ -2585,8 +2792,11 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && ["c-demand", "c-top", "c-progress", "c-cost"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
      && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="pt-3 dash-more-charts">')
      && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
-  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone)",
-     (src.match(/new ResizeObserver\(/g) || []).length === 3 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src));
+  // NARROWED 16 Oct 2026 (S7): two more observers, the Simulation's map (it opens folded at 0 × 0, like the Today map)
+  // and its timeline (it redraws to its own width)
+  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone); so do the Simulation's map and timeline",
+     (src.match(/new ResizeObserver\(/g) || []).length === 5 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src)
+     && (src.slice(src.indexOf("function SimMap("), src.indexOf("function SimPlayer(")).match(/new ResizeObserver\(/g) || []).length === 2);
   // REVERSED 14 Oct 2026 (D9, the mobile shell): below 768 px there is NO rail (not even icons); the bottom tab bar
   // (PhoneTabs) takes its place. The same one breakpoint; the over-the-page "peek" and its CSS are gone.
   ok("W5 → D9 (14 Oct): below 768 px the rail is not drawn at all; the peek state, its class and its CSS are gone",
@@ -2672,7 +2882,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
   ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
      !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
-     && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)/g) || []).length);
+     // NARROWED 16 Oct 2026 (S7): the Simulation's lorry dots read their token --sim-lorry, with #2563EB as the fallback
+     // (map data: a lorry, in every accent; the token block holds the value)
+     && (src.match(/#2563EB/g) || []).length === (src.match(/const ROUTE_COLOR = "#2563EB";|"Port": "#2563EB"|"circle-stroke-color": "#2563EB"|toggleCat\("supplies", cat\)\} style=\{\{ accentColor: "#2563EB" \}\}|dot: "#2563EB"|s1: "#2563EB"|s2: "#2563EB"|btn: "#2563EB"|C2 = tok\("--chart-2", "#2563EB"\)|tok\("--sim-lorry", "#2563EB"\)/g) || []).length);
 }
 
 // ---- 14 Oct 2026: the big screen fills the screen in EVERY section (the user: "the screen still don't fill up on
@@ -2711,7 +2923,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /@media \(min-width:1024px\)\{\.wall-charts\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);\}\}/.test(html)
      && _db.includes('[["all", "All sections"], ["rotate", "Rotate"], ["single", "One section"]]') && !_db.includes('"All four"'));
   ok("BIG SCREEN: the rotation shows a line that fills over the section's time and names the next one; no motion when reduced motion is asked for",
-     _db.includes('<i key={wallSection + "-" + rotateSecs} style={{ animationDuration: rotateSecs + "s" }}></i>')
+     // NARROWED 17 Oct 2026: the line fills over THIS section's time (dwellNow: the Simulation's whole day, else the setting)
+     _db.includes('<i key={wallSection + "-" + dwellNow} style={{ animationDuration: dwellNow + "s" }}></i>')
      && _db.includes("next: {DASH_SECTIONS[(wallSection + 1) % DASH_SECTIONS.length].title}")
      && /@media \(prefers-reduced-motion:reduce\)\{\.dash-rot>i\{animation:none;/.test(html));
   ok("BIG SCREEN: the page header folds into the bar (range, updated, a clock, Exit); no tour and no menu over the TV",
@@ -3031,6 +3244,237 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("...placed after App, outside the Dashboard's read-only stock slice (that pin scans DashboardStockChart → App)",
      code.indexOf("function RouteMapExportMenu(") > code.indexOf("function App(") && code.indexOf("function RouteMapExportMenu(") < code.indexOf("function Header("));
 }
+
+// ---- 16 Oct 2026 (the UI audit, finding #14): names for the staff map's header selects and the Config JSON textarea ----
+// axe-core select-name and label (WCAG 4.1.2, Level A): on Locations, Routes and Zones the header announced "Light,
+// combo box" and "Artic Tipper (44t), combo box" with no word for what changes, and two selects were named only by a
+// title. The visible word beside a select is in its name (WCAG 2.5.3): "Basemap" → Basemap, "Show" → Show vehicle.
+{
+  const _h0 = src.indexOf('<span className="text-xs text-slate-400">Basemap</span>');
+  const _hd = _h0 < 0 ? "" : src.slice(_h0, src.indexOf('placeholder="Admin token"', _h0));
+  ok("names #14: the header of Locations / Routes / Zones is one block with four selects (Basemap, Show, direction, route option)",
+     _h0 > 0 && _hd.length > 200 && _hd.length < 2500 && (_hd.match(/<select\b/g) || []).length === 4, String(_hd.length));
+  ok("🔴 names #14: the Basemap select is named Basemap, the word shown beside it",
+     _hd.includes('<span className="text-xs text-slate-400">Basemap</span>\n          <select value={basemap} onChange={e => changeStyle(e.target.value)} className={sel} aria-label="Basemap">'));
+  ok("🔴 names #14: the vehicle select is named 'Show vehicle' — the visible word 'Show' first in the name (2.5.3)",
+     _hd.includes('<span className="text-xs text-slate-400 ml-1">Show</span>\n          <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel} aria-label="Show vehicle">'));
+  ok("🔴 names #14: the two selects that had only a title carry names — Direction drawn, Route option drawn — and keep their titles",
+     _hd.includes('<select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw" aria-label="Direction drawn">')
+     && _hd.includes('<select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which HERE option to draw" aria-label="Route option drawn">'));
+  const _names = [..._hd.matchAll(/<select [^\n]*aria-label="([^"]*)"/g)].map(m => m[1]);
+  ok("names #14: all four are named, in words that pass the word rule (no bake, server, endpoint, token, cached, geometry) and say lorry never truck",
+     _names.length === 4 && _names.every(n => n.length > 3 && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(n)), JSON.stringify(_names));
+  const _rw = src.slice(src.indexOf('{tab === "raw" && ('), src.indexOf('<div className="savebar" data-cfg-savebar="1">'));
+  ok('🔴 names #14: the Config "Everything (JSON)" textarea is named exactly "Everything (JSON)" — the tab\'s own words, the one JSON wording the word rule exempts',
+     (_rw.match(/<textarea\b/g) || []).length === 1
+     && _rw.includes('<textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)"'));
+  ok("names #14: no other aria-label on a staff screen says JSON (the exemption covers the tab's own words only)",
+     [...src.matchAll(/aria-label="([^"]*)"/g)].map(m => m[1]).filter(n => /\bJSON\b/.test(n)).every(n => n === "Everything (JSON)"));
+}
+
+// ---- 17 Oct 2026 (the UI audit's keyboard findings #15 and #16, claude/ui-fix-keyboard) -----------------------------
+// #16: the rail's "Find a page" box was the one control with no focus ring (its input has outline:0); the ring now goes on
+// the label that frames it, via :focus-within, the same ring as .auth-input:focus. #15: the Locations table scrolls in a
+// 40 vh box whose rows are mouse-only, so a keyboard user could reach none of it: the box is a named region with tabindex 0
+// and a ring. The Carbon planner's two step-5 reference tables wrap their cells instead of scrolling the Reference column
+// 1,200 px off a 772 px box. The big screen's Today list (open question 6) and the rows themselves (open question 16) wait.
+{
+  ok("🔴 #16: the Find a page box shows a ring when its input has the focus — the same ring as the sign-in fields",
+     html.includes(".rail-search:focus-within{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}")
+     && html.includes(".auth-input:focus{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}")
+     && html.includes('<label className="rail-search" title="Find a page (Ctrl K)">')
+     && /\.rail-search input\{[^}]*outline:0;/.test(html));
+  ok("🔴 #15: the Locations table's scroll box is a named region a keyboard user can Tab to (tabindex 0, role region, 'Locations table'), with a ring",
+     src.includes('<div className="overflow-auto kb-scroll" style={{ maxHeight: "40vh" }} tabIndex={0} role="region" aria-label="Locations table">')
+     && html.includes(".kb-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}"));
+  const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
+  ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
+     _regions.length === 3 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+       && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
+  ok("#15: the Locations rows are still mouse-only (open question 16 — pinned as found, not fixed here)",
+     src.includes('<tr key={l.id} onClick={() => locateNode(l.id)}\n') && !/<tr key=\{l\.id\} onClick=\{\(\) => locateNode\(l\.id\)\}[^\n]*tabIndex/.test(src));
+  ok("🔴 #15: the Carbon planner's two step-5 reference tables wrap their cells (tbl-wrap; the figures stay on one line), so the Reference column no longer scrolls off",
+     html.includes(".tbl.tbl-wrap td{white-space:normal;} .tbl.tbl-wrap td.num{white-space:nowrap;}")
+     && src.includes('<table className="tbl tbl-wrap">\n                  <caption><b>How the plan compares</b>')
+     && src.includes('<table className="tbl tbl-wrap">\n                  <caption><b>Transport only</b>')
+     && (src.match(/className="tbl tbl-wrap"/g) || []).length === 2);
+}
+
+// ---- 17 Oct 2026 (D114): the Dashboard's default range is this month ± 6 -----------------------------------------------
+{
+  ok("⭐ D114: the Dashboard's From / To start from dashRangeDefault (this month ± DASH_RANGE_EITHER_SIDE), not month 1 and the last month",
+     src.includes("const [fromM, setFromM] = useState(() => dashRangeDefault(months)[0]);")
+     && src.includes("const [toM, setToM] = useState(() => dashRangeDefault(months)[1]);")
+     && !src.includes("const [fromM, setFromM] = useState(1);") && !src.includes("const [toM, setToM] = useState(months.count);"));
+  ok("D114: six months either side, clamped to the horizon, from the same 'this month' the Gate arrivals panel uses",
+     src.includes("const DASH_RANGE_EITHER_SIDE = 6;")
+     && src.includes("return [Math.max(1, c - DASH_RANGE_EITHER_SIDE), Math.min(n, c + DASH_RANGE_EITHER_SIDE)];")
+     && /const dashRangeDefault = \(months\) => \{\s*const n = \(months && months\.count\) \|\| 60, c = gaMonthToday\(months\);/.test(src));
+  ok("D114: one button between the default and the whole programme ('Whole programme' / 'This month ± 6'), not shown on the big screen",
+     src.includes(">Whole programme</button>") && src.includes(">This month ± 6</button>")
+     && src.indexOf(">Whole programme</button>") > src.indexOf('aria-label="To month"')
+     && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
+  ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
+     src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
+  // 17 Oct 2026 (D114 fix): seen on live — the Dashboard opened on Jan 26 – Dec 30 because its first read of the lines
+  // widened From / To to every month with lines, after the ± 6 default had been set
+  ok("🔴 D114 fix: the Dashboard's first read no longer widens From / To to every month with lines; it keeps this month ± 6 "
+     + "and falls back to the lines' own months only when none falls inside it",
+     src.includes("if(idx.length && !idx.some(m => m >= lo && m <= hi)){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }")
+     && src.includes("const [lo, hi] = dashRangeDefault(months);")
+     && src.includes('const all = j.lines || [], ap = all.filter(x => x.status === "Approved");')
+     && src.includes("const idx = (ap.length ? ap : all).map(x => x.month_index);")
+     && !src.includes("if(idx.length){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }"));
+}
+
+// ---- 17 Oct 2026 (UI fix 4, claude/ui-fix-captions): captions, status words, chips and small captions (findings 3, 19, 20; decisions 1–3) ----
+{
+  const _fw = code.slice(code.indexOf("function FuelWidget("), code.indexOf("\n}\n", code.indexOf("function FuelWidget(")));
+  const _ipt = code.slice(code.indexOf("function IptPill("), code.indexOf("function LaKpi("));
+  const _cat = code.slice(code.indexOf("function CatChips("), code.indexOf("\n}\n", code.indexOf("function CatChips(")));
+  ok("🔴 captions #3 (decision 1): ONE rule maps text-slate-400 to --muted outside the dark look, weighed with :where() so hover:text-slate-700 still wins; the dark remap keeps its line; a second rule steps the greys on a selected row (.bg-blue-50) to slate-600",
+     html.includes('html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}')
+     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}')
+     && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9AA1AB}')
+     && code.includes("text-slate-400 hover:text-slate-700") && (code.match(/\btext-slate-400\b/g) || []).length >= 120);
+  ok("captions #3: the rail's group headings have no opacity, the big screen's labels read --muted (no #9aa1ac), the Dashboard group title defaults to --muted (no #94a3b8), and no text-slate-300 is left in the markup — every placeholder reads slate-500 (the dark remap line went with it)",
+     /\.rail-group\{[^}]*color:var\(--muted\);\}/.test(html) && !/\.rail-group\{[^}]*opacity/.test(html)
+     && !/9aa1ac/i.test(html) && /\.dash-wallbar-lbl\{[^}]*color:var\(--muted\);\}/.test(html) && /\.dash-divider\{[^}]*color:var\(--muted\);/.test(html)
+     && !code.includes('"#94a3b8"') && code.includes('style={{ color: tone || "var(--muted)" }}>{title}</div>')
+     && !/\btext-slate-300\b/.test(code) && !html.includes(".text-slate-300{") && !html.includes(".text-emerald-600{")
+     && (code.match(/<span className="text-slate-500">rate not set<\/span>/g) || []).length === 3);
+  ok("decision 3: the Submit strip's peak values carry no colour of their own (the label says Peak)",
+     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums">{value}</div>') && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
+  ok("decision 2: the green status WORDS read --ok-text, never --green — In force, Delivered %, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, the simulation's checks; the red chip words read --bad-text; the stale chip --warn-text",
+     code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
+     && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
+     && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
+     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#f1f5f9", "#475569"]')
+     && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>')
+     && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
+     && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
+     && code.includes('style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>') && _fw.includes('color: "var(--warn-text)", background: "rgba(217,119,6,.10)"'));
+  ok("🔴 chips #19: the 9–10 px chips take the house 12 px (text-xs) — target / quote, stale, winter / thaw, the team and workstream pills, the Routes vehicle chips, the material categories, the gate direction (now the house navy-on-tint pair), set, gate blocked and haul — no 'text-[10px] … rounded-full' chip is left; the one text-[9px] left is the horizon's role word (finding 11, its own branch)",
+     code.includes('const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>')
+     && code.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span>')
+     && _fw.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "var(--warn-text)"')
+     && code.includes('className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route')
+     && code.includes('<span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>')
+     && code.includes('<span className="ml-1 text-xs text-amber-700" title="Spring load restrictions')
+     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"')
+     && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"\n    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>')
+     && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
+     && _cat.includes('<span key={c} className="text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"')
+     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
+     && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
+     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
+     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 2
+     && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
+     && (code.match(/text-\[9px\]/g) || []).length === 1 && /text-\[9px\] uppercase tracking-wide text-slate-400">\{roleLbl\[role\]/.test(code));
+  ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
+     !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
+     && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')
+     && _fw.includes('<div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
+     && !_fw.includes("text-slate-500 mt-0.5 truncate") && !_fw.includes('mt-0.5 truncate" title={bafTxt}'));
+  ok("🔴 captions #20: the Config fuel widget has no 9, 10 or 11 px text (text-xs text-slate-500 captions, the DESNZ attribution among them) and its three admin buttons are btn-sec btn-sm; the Dashboard's figure labels and sub-lines, the Today card's captions and the group titles are 12 px; the never-rendered Kpi component is gone",
+     !/text-\[(9|10|11)px\]/.test(_fw) && _fw.includes('const attribution = <span className="text-xs text-slate-500"') && (_fw.match(/className="btn-sec btn-sm disabled:opacity-40"/g) || []).length === 3
+     && !_fw.includes("hover:bg-slate-50 disabled:opacity-40") && _fw.includes('<span className="text-xs uppercase tracking-wide text-slate-500">Diesel {country}</span>') && _fw.includes('<span className="w-full text-xs text-slate-500">The base is locked')
+     && (code.match(/className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
+     && (code.match(/className="text-xs text-slate-500 fig-sub"/g) || []).length === 2 && !code.includes("text-slate-400 fig-sub")
+     && (code.match(/className="text-xs font-semibold uppercase tracking-wide(?: mb-2)? fig-group"/g) || []).length === 2 && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
+     && code.includes('<div className="text-xs text-slate-500">{cw.from ? `week ') && code.includes('<div className="text-xs text-slate-500 mt-1">{bigNum(T.wkPlanT)}') && code.includes('<div className="text-xs text-slate-500 mt-1">{acct && acct.week ? `${acct.reported}')
+     && !code.includes("function Kpi(") && !/\bKpi\b/.test(code));
+}
+
+// ---- 18 Oct 2026 — the UI audit's phone branch (claude/ui-fix-phone): decisions 9 and 12, findings #13, #24, #29 and the
+// 44 px leftovers (the password eyes, the sign-in links) ---------------------------------------------------------------
+// Decision 9: the demo bar's 21 px Guide pill taps at 44 px through a ::after halo; the bar does not grow (it keeps its 26 px
+// and its overflow:hidden, which clips the halo to the bar — a tap outside the bar never reaches the pill). Decision 12 / #13:
+// Config → Materials' vehicles cell is two columns of 24 px rows, a long name wrapping; the Seasonal restrictions' vehicle
+// rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (they were 16 px at a 20
+// px pitch). #24: inside a sortable column header the InfoTip's touch halo is 36 px, clear of the sort arrow. #29: the
+// Routes table's Route button is 24 px tall. The 44 px rule: the password eyes (38 px drawn) tap at 44; on a touch screen
+// the sign-in's two text links are 44 px rows. The strip's × taps at 44 like the map's.
+{
+  ok("🔴 decision 9: the demo bar's Guide pill has a ::after halo (inset -12 px / -8 px: 45 × 76 on the 21 × 60 pill) and the bar itself keeps its 26 px, its absolute pill and its overflow:hidden",
+     /\.demo-bar-guide::after\{content:"";position:absolute;inset:-12px -8px;\}/.test(html)
+     && /\.demo-bar\{position:relative;flex:none;height:26px;[^}]*overflow:hidden;\}/.test(html)
+     && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;/.test(html));
+  ok("🔴 #24: on a touch screen the InfoTip inside a column header has a 36 px halo (inset -9 px), the 44 px halo elsewhere; the desk's 24 px halo is untouched",
+     /@media \(pointer:coarse\)\{th \.ibtn::after\{inset:-9px;\}\}/.test(html) && /@media \(pointer:coarse\)\{\.ibtn::after\{inset:-13px;\}\}/.test(html)
+     && /\.ibtn::after\{content:"";position:absolute;inset:-3px;\}/.test(html)
+     && html.indexOf("th .ibtn::after{inset:-9px;}") > html.indexOf(".ibtn::after{inset:-13px;}"));
+  ok("🔴 the 44 px rule: the show / hide eye keeps its 38 px drawing and taps at 44 (one ::after halo, inset -3 px, on .pw-eye, which is positioned)",
+     /\.pw-eye\{position:absolute;right:4px;top:50%;transform:translateY\(-50%\);width:38px;height:38px;/.test(html)
+     && (html.match(/\.pw-eye::after\{content:"";position:absolute;inset:-3px;\}/g) || []).length === 1);
+  ok("🔴 the 44 px rule: on a touch screen the two text links under Sign in are 44 px rows (padding 12 px 0 on their 20 px line); a mouse keeps the tight row (padding 0)",
+     /@media \(pointer:coarse\)\{\.auth-links button\{padding:12px 0;\}\}/.test(html) && /\.auth-links button\{background:none;border:0;padding:0;font:inherit;/.test(html)
+     && code.includes('<button type="button" onClick={() => go(forgot ? "email" : "forgot")}>{forgot ? "Back to sign in" : "Forgot your password?"}</button>'));
+  // RE-PINNED 18 Oct 2026 (decision 18, the user): the halos are for a coarse pointer only, and "Take the tour" has one too
+  ok("🔴 decision 18: on a coarse pointer the app strip's × (23 × 20) taps at 44 × 44 and 'Take the tour' (93 × 24) at 44 tall through ::after halos, both positioned; the × reaches 9 px into the strip's 10 px gap, so the halos never overlap; a mouse keeps the drawn boxes",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-strip-go\{position:relative;font:inherit;/.test(html)
+     // the × draws 22.6 px wide in Inter, so 9 + 13 px round it up to 45: the audit listed 44 × 44 as under 44
+     && /@media \(pointer:coarse\)\{\.guide-strip \.guide-strip-go::after\{content:"";position:absolute;inset:-10px 0\}\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -13px -12px -9px\}\}/.test(html)
+     && (html.match(/\.guide-x::after/g) || []).length === 1 && (html.match(/\.guide-strip-go::after/g) || []).length === 1
+     && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html)
+     && code.includes('<button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>'));
+  // decision 12 / #13: the tick rows
+  const mat = code.slice(code.indexOf('{tab === "materials" && ('), code.indexOf('{tab === "planning" && ('));
+  ok("🔴 decision 12: Config → Materials' vehicles cell is a two-column grid of 24 px rows (min-h-6), the names free to wrap inside their column (no whitespace-nowrap), the cell at least 332 px (two 154 px columns: a 'Rigid 8-wheeler (32t)' sits on one line); the one-column flex-wrap of 16 px rows is gone",
+     mat.includes('<td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>')
+     && mat.includes('<div className="grid grid-cols-2 gap-x-2">')
+     && mat.includes('<label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">')
+     && mat.includes('<input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)}')
+     && !mat.includes("flex flex-wrap gap-x-3 gap-y-1") && !mat.includes("text-slate-600 whitespace-nowrap"));
+  ok("decision 12: ...and the table FITS the 800 px card at 1366 (measured 799 px in Chrome): three short headings wrap to two lines at their least width (Density, Tonnes only at width 1; Volume ↔ weight at 92 px), a long material name wraps at 136 px; the six headings read as before",
+     mat.includes('style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>')
+     && mat.includes('["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h =>')
+     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>'));
+  ok("🔴 #13: the Seasonal restrictions' vehicle rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (min-h-6) — four lists, no 16 px tick row left among them",
+     code.includes('<label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">')
+     && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 2
+     && code.includes('<label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">')
+     && !code.includes('className="flex items-center gap-2 text-xs text-slate-700">') && !code.includes('className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">'));
+  ok("#29: the Routes table's Route button (the one that spends HERE calls) is a 24 px inline-flex box; Edit and Delete beside it unchanged",
+     code.includes('className="inline-flex items-center min-h-6 text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">')
+     && code.includes('className="text-[color:var(--navy)] hover:underline text-xs font-semibold mr-3">Edit</button>'));
+  ok("no visible word changed in the app for this branch: the pill still says Guide, the eye Show / Hide password, the links their two sentences",
+     code.includes('<button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>')
+     && (code.match(/aria-label=\{show \? "Hide password" : "Show password"\}/g) || []).length === 2
+     && code.includes('<button type="button" onClick={() => go("code")}>Sign in with a team code instead</button>'));
+}
+// ---- 17 Oct 2026 (the user: UK drivers' hours): the words that state how trips a lorry a day are worked out ----------
+// NARROWED 17 Oct 2026 (the review): a lorry's day, worked on one driver's 13 h (a longer shift is accepted, not
+// refused); one break with the second 15 past 12 h; the planning-figure caveat
+ok("⭐ Config → Planning: 'Shift hours a day' is a driver's working day, at most 13 h, the trips what fit after the "
+   + "required breaks with driving at most 9 h; the old 'shift ÷ cycle time' is gone",
+   src.includes("A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; 15 min more once work passes 12), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled.")
+   && !src.includes("Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time.")
+   && !src.includes("A driver's working day, at most 13 hours (the 11-hour daily rest)."));
+ok("⭐ the Routes table: Trips/day is what fits in a driver's day (driving = out, back and gate to face), § marks a route the "
+   + "rules hold below the shift alone, the cell's title gives the server's words",
+   src.includes("Trips/day is what fits in a driver's day: the {data.planning.shift_hours_per_day} h")
+   && src.includes("9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why);")
+   && src.includes('title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}')
+   && !src.includes("Trips/day assumes a {data.planning.shift_hours_per_day} h"));
+// 17 Oct 2026 (the review): § only where the rules took trips off (not on a 0 the shift alone would also give), the 0
+// explained, the caveat and the 13 h note on the footnote
+ok("⭐ the review: the Routes table's § marks only a route with fewer trips than the shift alone; the footnote explains a 0 "
+   + "(one lorry a trip), says it is a planning figure and shows the 13 h note",
+   src.includes('{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}')
+   && !src.includes('r.lorry_day.limited_by !== "shift" ? <span className="text-slate-500">§</span>')
+   && src.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip. A planning figure: weekly")
+   && src.includes('{data.planning.shift_note ? " " + data.planning.shift_note : ""}'));
+ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon page puts charging on top of the break",
+   src.includes("the trips one vehicle can do in a driver's day on its route") && src.includes("what one vehicle does in a driver's day on that route")
+   && !src.includes("the trips one vehicle can do in a shift on its route") && !src.includes("what one vehicle does in a shift on that route")
+   && src.includes('c.lorry_day.limited_by === "driving" ? "the 9 h driving limit"')
+   && src.includes('c.lorry_day.limited_by === "driver_day" ? "one driver\'s 13 h day"')
+   // NARROWED 17 Oct 2026 (the review): charging is attended, so working time — on top of the break AND counted toward it
+   && src.includes("charging time comes out of the shift. The driver attends it, so it counts as working time: it comes on top of the required break and counts toward it")
+   && !src.includes("the required breaks, at most 9 hours"));
+ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'compliant' or 'legal'",
+   !/drivers'? hours[^"`]{0,200}\b(compliant|compliance|legal)\b/i.test(src));
 
 // ---- report ------------------------------------------------------------------
 console.log();

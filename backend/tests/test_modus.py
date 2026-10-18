@@ -210,7 +210,8 @@ PROJECT_TERMS = [r"\bRBE\b", r"Rail\s?Baltic", r"\bAlliance\s?1\b", r"OnEST", r"
 SHIPPED_EXT = (".py", ".html", ".js", ".json", ".yaml", ".yml", ".md", ".txt", ".example")
 hits = {}
 for dirpath, dirs, files in os.walk(ROOT):
-    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules")]
+    # ui-audit/ (16 Oct 2026): the UI audit's runs, ignored in git; their reports quote the pages' own markup
+    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules", "ui-audit")]
     for fn in files:
         if not fn.endswith(SHIPPED_EXT):
             continue
@@ -422,30 +423,43 @@ dc = tenant_package.counts(demo)
 # NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
 # 10 m³ lines (3 of them in October, two on one route)
 # NARROWED 16 Oct 2026 (an access road to every gate, the user): + 17 zones, one haul road per gate (Z006-Z022)
-ok("demo: 14 locations, 22 routes, 3 teams, 8 sections, 88 forecasts (86 approved + 1 pending + 1 rejected), 17 gates, 22 zones "
-   "(5 + 17 gate access roads), 6 haul links",
-   dc["locations"] == 14 and dc["routes"] == 22 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 88
-   and dc["location_gates"] == 17 and dc["zones"] == 22 and dc["route_haul_roads"] == 6, str(dc))
+# RE-PINNED 17 Oct 2026 (demo redesign R2, notes/demo-redesign-1016.md §3a): the four-year programme — + the asphalt plant
+# and Welland Ready-Mix (2 locations, 2 gates, 2 access roads), routes R023–R043, 905 approved line-months, 7 advisory
+# zones after the access roads, the Langton haul road on all nine routes into Langton Compound. Teams 3 and sections 8 stay.
+ok("demo: 16 locations, 43 routes, 3 teams, 8 sections, 907 forecasts (905 approved + 1 pending + 1 rejected), 19 gates, 31 zones "
+   "(5 + 19 gate access roads + 7 advisory), 11 haul links",
+   dc["locations"] == 16 and dc["routes"] == 43 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 907
+   and dc["location_gates"] == 19 and dc["zones"] == 31 and dc["route_haul_roads"] == 11, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}
-ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries four approved "
-   "months of surplus cut; R020 to a fictional Soil recycling hub has a route and no forecast",
+# RE-PINNED 17 Oct 2026 (R2, §3a): R019 carries the Langton cutting's surplus Apr 2027 – Sep 2028 (months 16–33) and the
+# compound platform stone lifted Jan–May 2030 (49–53), read once from the regenerated package
+ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries the surplus cut "
+   "(Apr 2027 – Sep 2028) and the lifted platform stone (Jan–May 2030); R020 to a fictional Soil recycling hub has a route and no forecast",
    _locs[_rts["R019"]["dest_id"]]["loc_type"] == "Landfill" and _locs[_rts["R020"]["dest_id"]]["loc_type"] == "Soil recycling"
    and _rts["R019"]["origin_id"] == _rts["R020"]["origin_id"] and "fictional" in _locs[_rts["R019"]["dest_id"]]["name"]
    and "fictional" in _locs[_rts["R020"]["dest_id"]]["name"]
-   and sorted(f["month_index"] for f in demo["tables"]["forecasts"] if f["route_id"] == "R019" and f["status"] == "Approved") == [9, 10, 11, 12]
+   and sorted(f["month_index"] for f in demo["tables"]["forecasts"] if f["route_id"] == "R019" and f["status"] == "Approved")
+   == list(range(16, 34)) + list(range(49, 54))
    and not [f for f in demo["tables"]["forecasts"] if f["route_id"] == "R020"])
 _dfac = json.loads([r for r in demo["tables"]["config"] if r["key"] == "factors"][0]["value"])
-ok("⭐ demo (carbon): the package carries the carbon block, carbon_material on every category and the three scenario-only electric profiles",
-   "carbon" in _dfac and all(c.get("carbon_material") for k, c in _dfac["material_categories"].items() if not k.startswith("_"))
+# NARROWED 17 Oct 2026 (R2; D112, not in §3a): every category carries a carbon_material EXCEPT the asphalt plant's feed,
+# whose class is null ON PURPOSE (the asphalt's own factor already covers its aggregate) — present and null, never absent
+ok("⭐ demo (carbon): the package carries the carbon block, carbon_material on every category but the asphalt plant's feed "
+   "(null on purpose, D112) and the three scenario-only electric profiles",
+   "carbon" in _dfac and all(c.get("carbon_material") for k, c in _dfac["material_categories"].items()
+                             if not k.startswith("_") and k != "Aggregate for the asphalt plant")
+   and "carbon_material" in _dfac["material_categories"]["Aggregate for the asphalt plant"]
+   and _dfac["material_categories"]["Aggregate for the asphalt plant"]["carbon_material"] is None
    and sorted(k for k, v in _dfac["vehicles"].items() if isinstance(v, dict) and v.get("fuel") == "electric")
    == ["Artic Flatbed (44t) — electric", "Artic Tipper (44t) — electric", "Rigid 8-wheeler (32t) — electric"]
    and all(v.get("scenario_only") for v in _dfac["vehicles"].values() if isinstance(v, dict) and v.get("fuel") == "electric"))
 _st = {s_: sum(1 for r in demo["tables"]["forecasts"] if r["status"] == s_) for s_ in ("Approved", "Pending", "Rejected")}
 # NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
 # 10 m³ lines (3 of them in October, two on one route)
-ok("demo: 86 Approved (72 + the four muck-away months, 11 Oct + the ten concrete-pour line-months, 14 Oct), exactly one Pending and one Rejected (with a reason)",
-   _st == {"Approved": 86, "Pending": 1, "Rejected": 1}
+# RE-PINNED 17 Oct 2026 (R2, §3a): the programme's 905 approved line-months; Pending 1 and Rejected 1 kept
+ok("demo: 905 Approved (the four-year programme, 17 Oct), exactly one Pending and one Rejected (with a reason)",
+   _st == {"Approved": 905, "Pending": 1, "Rejected": 1}
    and all(r["reject_reason"] for r in demo["tables"]["forecasts"] if r["status"] == "Rejected"), str(_st))
 ok("demo: weeks are materialised and some actuals typed",
    dc["forecast_weeks"] > 0 and any(r.get("actual_qty") for r in demo["tables"]["forecast_weeks"]))
@@ -565,8 +579,8 @@ ok("demo: /api/meta reads the tenant back — £, Team, GB",
 ok("demo: the pickers see three teams and eight sections",
    len(m3["ipts"]) == 3 and len(m3["work_sections"]) == 8)
 ok("demo: the routes reach /api/meta with no distance (unbaked)",
-   # NARROWED 14 Oct 2026: 22 routes (the two concrete-pour routes)
-   len(m3["routes"]) == 22 and all(not r.get("distance_km") for r in m3["routes"]))
+   # NARROWED 14 Oct 2026: 22 routes (the two concrete-pour routes). RE-PINNED 17 Oct 2026 (R2): 43 (R001–R043)
+   len(m3["routes"]) == 43 and all(not r.get("distance_km") for r in m3["routes"]))
 
 # --- 5a-bis. Postgres booleans (29 Sep 2026: the first demo import on Render) ---------
 # `psycopg2.errors.DatatypeMismatch: column "in_scope" is of type boolean but expression
@@ -890,7 +904,8 @@ for rel in ("backend/export.py",):
 # keys are lower-case identifiers, kept on purpose, and do not match \bModus\b.
 _modus_hits = {}
 for dirpath, dirs, files in os.walk(ROOT):
-    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules")]
+    # ui-audit/ (16 Oct 2026): the UI audit's runs, ignored in git; their reports quote the pages' own markup
+    dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "tests", "node_modules", "ui-audit")]
     for fn in files:
         if not fn.endswith(SHIPPED_EXT + (".css", ".webmanifest", ".svg")):
             continue
@@ -1054,6 +1069,105 @@ ok("restrictions: the User-Agent is Wayscope", '"User-Agent": "Wayscope/1.0"' in
 ok("the seed's tenant name and config.TENANT_DEFAULTS are Wayscope",
    json.load(open(os.path.join(ROOT, "backend", "factors.json"), encoding="utf-8"))["tenant"]["name"] == "Wayscope"
    and config.TENANT_DEFAULTS["name"] == "Wayscope")
+
+# 16 Oct 2026 (the UI audit, backend/tests/ui_audit.js): a harness that drives a REAL browser is never in the default
+# suite — CI has no browser, and run_suite.py fails a harness that prints no count. So every backend/tests/*.js that
+# requires Playwright must be named in run_suite.BROWSER_ONLY, the audit's runs (hundreds of screenshots) must be
+# ignored in git, and the audit must say what it measures and what it does not prove, like every other harness.
+import glob as _glob
+_suite = read("backend/tests/run_suite.py")
+_browser_only = set(re.findall(r'"([a-z_]+\.js)"', _suite.split("BROWSER_ONLY = {", 1)[1].split("}", 1)[0]))
+_needs_browser = {os.path.basename(f) for f in _glob.glob(os.path.join(ROOT, "backend", "tests", "*.js"))
+                  if 'playwright")' in open(f, encoding="utf-8").read()}
+ok("every JS harness that requires Playwright is in run_suite.BROWSER_ONLY, so CI never runs it",
+   _needs_browser and _needs_browser <= _browser_only, str(_needs_browser - _browser_only))
+ok("ui_audit.js is one of them, and its output folder ui-audit/ is ignored in git",
+   "ui_audit.js" in _browser_only and "ui_audit.js" in _needs_browser and "\nui-audit/\n" in read(".gitignore"))
+_audit = read("backend/tests/ui_audit.js")
+ok("ui_audit.js says it is not in the default suite, what it measures (sideways scroll, axe WCAG AA, 24 px targets, "
+   "a visible focus) and what it does not prove",
+   "NOT PART OF THE DEFAULT SUITE" in _audit and "WHAT IT DOES NOT PROVE" in _audit
+   and all(s in _audit for s in ("no-sideways-scroll", "axe-wcag", "targets-24px", "targets-44px", "focus-visible", "wcag22aa", "2.5.8", "2.4.7"))
+   and 'exclude: [[".mapboxgl-ctrl-attrib"]]' in _audit and "passed, ${FAIL.length} failed" in _audit)
+# 17 Oct 2026 (the capture fixes, claude/ui-audit-capture): a stop must picture what it claims. The error and offline
+# stops go back to the app before they are taken and assert the app's title and header (they had been pictures of the
+# landing page's error page); a grown phone shot counts the tab bar under the scroller (every phone shot had lost its
+# last ~57 px); a grown viewport is measured again and grown again (the chart boxes are sized in vh, so the content
+# grows with the viewport — so what is sized in vh is pinned at its fold height first); the dead link is loaded afresh
+# after the public view's map has settled (a goto that changes only the hash is no load, and the app reads an email link
+# once, as the page loads); and a stop whose premise is a request the harness cut does not fail on the browser's own
+# "Failed to load resource" line for it.
+ok("ui_audit.js captures what its stops claim: the app comes back before the error stops, the tab bar is in a grown "
+   "phone shot, vh-sized elements are pinned and a grown viewport is measured again, the dead link is a fresh load, "
+   "a request the harness cut is not a defect",
+   all(s in _audit for s in ("function contentHeight()", "innerHeight - r.bottom", "page.evaluate(contentHeight)",
+                             "function pinViewportUnits()", "page.evaluate(pinViewportUnits)", "unpinViewportUnits",
+                             "the stop is the app's ${want} page", "shows the failure it is named for",
+                             'page.goto("about:blank")', "embeddedMap(page)", "const cut = meta.cut || null",
+                             "cut: /./", "const gone = meta.expectGone || null")))
+ok("ui_audit.js drives the installed Google Chrome (the user, 17 Oct 2026), the bundled Chromium only when asked or when Chrome "
+   "is missing, and the report says which ran",
+   'channel: "chrome"' in _audit and 'browser: "chrome" }' in _audit and "--browser" in _audit and "REPORT.browser = {" in _audit)
+# 17 Oct 2026 (decisions 14 and 15 of notes/ui-audit-findings-1016.md §D, claude/ui-audit-rules): the quick run also measures
+# the Dark look with the Blue accent at the desk width (the pair where white figures on --navy #5B8FF0 fail; the extra
+# accents run in Ink only) — as part of the run's RECORDED shape, so --compare latest pairs like with like and a run from
+# before it does not pair; and the 44 px rule on a phone fails (the check targets-44px) a control that is neither inline nor
+# set apart — behind --strict-44, OFF by default until the phone branch (decisions 8, 9, 10) merged, the header saying
+# so; the set-apart rows (spaced: true) stay a warning in either mode; the flag is a grading, not a shape. The guides stay
+# exempt from h1-many (decision 7), now recorded in the header.
+# RE-PINNED 18 Oct 2026 (claude/ui-fix-phone, decisions 8, 9, 10 built): the 44 px rule FAILS by default now; --no-strict-44
+# is the old grading. The header says since when, and why.
+ok("ui_audit.js runs the Dark + Blue pass at the desk width as part of the recorded shape (decision 15)",
+   all(s in _audit for s in ('{ look: "dark", accent: "blue", widths: [DESK_W] }', "extraPasses: EXTRA_PASSES",
+                             "await walkPortal(browser, server.base, p.look, p.accent, false, p.widths)", "o.extraPasses || []")))
+ok("ui_audit.js grades the 44 px rule as a failure BY DEFAULT since the phone branch (decision 14), keeps --strict-44 and adds "
+   "--no-strict-44 for the old grading, says since when in its header, keeps the set-apart rows as warnings and the flag out of the shape",
+   all(s in _audit for s in ('else if (a === "--strict-44") o.strict44 = true', 'else if (a === "--no-strict-44") o.strict44 = false',
+                             "strict44: true, browser:", "strict44: OPT.strict44",
+                             'checks.push({ id: "targets-44px", ok: strict44.length === 0, detail: strict44 })',
+                             "small44.filter(r => !r.spaced)", "small44.filter(r => r.spaced)",
+                             "--strict-44 was OFF by default until the phone branch merged (claude/ui-fix-phone, 18 Oct",
+                             "since then it is ON by default", "decisions 8, 9 and 10", "a grading, not a shape",
+                             "crowded(a, 22) ? row : { ...row, spaced: true }", 'el.closest(".mapboxgl-ctrl-attrib, .mapboxgl-ctrl-logo")',
+                             "FAIL without --no-strict-44"))
+   and "strict44: false" not in _audit and "OFF by default; it turns on by default" not in _audit
+   and "o.strict44" not in _audit.split("function sameShape")[1].split("\n")[0])
+# 18 Oct 2026 (the 44 px rule, claude/ui-fix-phone): the map's password page's 38 px eye taps at 44 through a halo, like the app's
+ok("the map password page's show / hide eye keeps its 38 px drawing and taps at 44 px (a ::after halo, inset -3 px)",
+   "width:38px; height:38px;" in main._MAP_PASSWORD_PAGE
+   and '.pw-eye::after { content:""; position:absolute; inset:-3px; }' in main._MAP_PASSWORD_PAGE)
+ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and still exempts them",
+   "exempt from h1-many" in _audit and "decision 7" in _audit
+   and 'else if (dom.h1 > 1 && !/^help/.test(meta.name)) warnings.push({ id: "h1-many", detail: dom.h1 });' in _audit)
+# 17 Oct 2026 (findings #32–#34 of notes/ui-audit-findings-1016.md §I, claude/ui-audit-guide-stop): the audit measures the
+# map's tour dots and the demo bar's Guide pill, so --strict-44 can verify decisions 8 and 9 once the phone branch has built
+# them. The first-visitor context of map-page+guide carries the signed-in context's cookies (it had none, so the stop was the
+# map's PASSWORD page in every run) and the stop asserts the tour strip and at least one dot; dashboard+guide, on the phone in
+# the first look, asserts the pill; both put the counts on the record (guideDots, guideStrip, guidePill). The hit-area test
+# credits the control itself or its label, never an ancestor (the pill, 21 px in a 45 px bar, had passed 44 × 44 on the bar's
+# area and was never a row). The harness's server origin is stripped from the compare keys (the port is picked per run).
+ok("ui_audit.js measures the guide hints: the first-visitor context carries the signed-in cookies, the two guide stops assert "
+   "what they are for (guide-shown) and put the counts on the record",
+   # NARROWED 18 Oct 2026 (claude/ui-fix-phone, decision 8): the wait is for a dot OR the strip — the map draws no dot on a phone
+   all(s in _audit for s in ("async function guideContext(browser, ctx, base, look, accent, w)", "g.addCookies(await ctx.cookies(base))",
+                             'waitForSelector(".guide-dot, .guide-strip"', 'id: "guide-shown"', 'guide: "map"', 'guide: "portal"',
+                             '"map-page+guide"', '"dashboard+guide"', "stop.guideDots = dom.guide.dots",
+                             'stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null',
+                             'document.querySelectorAll(".guide-dot")', 'document.querySelectorAll("button.demo-bar-guide")')))
+# 18 Oct 2026 (claude/ui-fix-phone, decision 8 built): the map's guide stop wants the strip and, below 768 px, NO dot — a dot on
+# the phone is the failure now; at a desk width it still wants at least one. The portal's stop is unchanged (the pill).
+ok("ui_audit.js's guide-shown wants the map's strip with no dot on a phone and with its dots at a desk (decision 8), the pill on the portal",
+   "const mapGuideOk = dom.guide.strip > 0 && (meta.width < 768 ? dom.guide.dots === 0 : dom.guide.dots > 0);" in _audit
+   and 'ok: meta.guide === "map" ? mapGuideOk : dom.guide.pill > 0' in _audit
+   and "dom.guide.strip > 0 && dom.guide.dots > 0 :" not in _audit)
+ok("ui_audit.js credits a control's hit area to the control itself or its label, never to an ancestor (finding #33: the demo "
+   "bar's 21 px pill had passed 44 × 44 on the bar's area)",
+   "const lands = (h) => !!h && (h === el || el.contains(h) || (!!labEl && (h === labEl || labEl.contains(h))))" in _audit
+   and "const reach = (d) => lands(hit(cx - d, cy)) && lands(hit(cx + d, cy)) && lands(hit(cx, cy - d)) && lands(hit(cx, cy + d))" in _audit
+   and "owns(el, hit(cx" not in _audit)
+ok("ui_audit.js strips the harness's server origin from the compare keys (finding #34: the port is picked per run)",
+   'const noOrigin = (s) => String(s).replace(/^https?:\\/\\/(127\\.0\\.0\\.1|localhost|\\[::1\\])(:\\d+)?/, "")' in _audit
+   and "(x.url ? noOrigin(x.url) : null)" in _audit and "noOrigin(x).slice(0, 80)" in _audit)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

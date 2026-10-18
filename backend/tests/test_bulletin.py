@@ -226,6 +226,11 @@ for _rid, _o, _d, _ipt, _cap in (("R1", "L1", "L2", "IPT 1", 60), ("R2", "L3", "
 tenant_package.import_rows("ipts", [
     {"id": "IPT1", "label": "North Team", "manager": None, "active": True, "merged_into": None},
     {"id": "IPT2", "label": "Central Team", "manager": None, "active": True, "merged_into": None}])
+# 17 Oct 2026: the disciplines carry LABELS unlike their ids (as the demo's "superstructure" reads "Pavement"), so a table
+# that prints the id is caught. "structures" has no row: an id the tenant does not define falls back to itself.
+tenant_package.import_rows("disciplines", [
+    {"id": "earthworks", "label": "Bulk earthworks", "sort_order": 10, "in_scope": True, "scope_note": None, "active": True},
+    {"id": "substructure", "label": "Foundations", "sort_order": 20, "in_scope": False, "scope_note": None, "active": True}])
 
 
 def _geom(rid, prof, leg, km, hr):
@@ -822,6 +827,7 @@ PAGES11 = [" ".join(p.split()) for p in pdf_text(PDF11).split("") if p.strip()]
 T10R = " ".join(pdf_text(PDF10, raw=True).split())
 PAGESR = [" ".join(p.split()) for p in pdf_text(PDF10, raw=True).split("\f") if p.strip()]
 HTML_TEXT = " ".join(re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", " ", HTML10, flags=re.S)).split())
+S10_ROLLUP_DISC = bulletin.month_page(10, PLANNER)["rollup"]["breakdown"]["discipline"]
 import html as _hm  # noqa: E402
 HTML_TEXT = _hm.unescape(HTML_TEXT)
 
@@ -891,11 +897,35 @@ ok("⭐ page 2: every route with its bar, what is being moved, the road works an
                                "What changed since last month"))
    and all(h in PAGES[-1] for h in ("Terms", "Caveats", "Sources"))
    and "Two-way movements a day by route" not in T10J and "Terms explained" not in T10J)
+# 17 Oct 2026: "What is being moved" printed the discipline IDS under a "Material" heading (R3's browser check on the
+# four-year demo: "superstructure", "substructure"). It names each row by the tenant's discipline label, under "Discipline".
+_MV = [m["name"] for m in S10["moved"]]
+ok("🔴 What is being moved: each row is the tenant's discipline label (Bulk earthworks, Foundations), never the id",
+   "Bulk earthworks" in _MV and "Foundations" in _MV and "earthworks" not in _MV and "substructure" not in _MV
+   and "Structures" not in _MV and "structures" in _MV, str(_MV))
+ok("…out of scope counts too (a line may still carry one): substructure is out of scope here and still reads Foundations",
+   bulletin.discipline_names().get("substructure") == "Foundations")
+_mv_html = HTML10[HTML10.index('data-bulletin="moved"'):HTML10.index("</table>", HTML10.index('data-bulletin="moved"'))]
+ok("🔴 …the page's table: headed Discipline, the labels in its rows, no id",
+   "<th>Discipline</th>" in _mv_html and "<th>Material</th>" not in HTML10 and "Bulk earthworks" in _mv_html
+   and "Foundations" in _mv_html and ">earthworks<" not in _mv_html and ">substructure<" not in _mv_html, _mv_html[:400])
+_p2 = PAGES[1][PAGES[1].index("What is being moved"):PAGES[1].index("Road works and limits")]
+ok("🔴 …the PDF's table (page 2): headed Discipline, the labels, no id",
+   "Discipline" in _p2 and "Material" not in _p2 and "Bulk earthworks" in _p2 and "Foundations" in _p2
+   and not re.search(r"(?<![A-Za-z])(earthworks|substructure)\b", _p2.replace("Bulk earthworks", "")), _p2)
+ok("…the roll-up keeps the id as the KEY (the filters and the sort read it); the pure roll-up with no names keeps name = key",
+   {r["key"] for r in S10_ROLLUP_DISC} >= {"earthworks", "substructure"}
+   and all(r["name"] == r["key"] for r in R["breakdown"]["discipline"]))
+ok("…and month_rollup names them the same way (the bar's window roll-up)",
+   {r["key"]: r["name"] for r in bulletin.month_rollup(10, PLANNER)["breakdown"]["discipline"]}.get("earthworks") == "Bulk earthworks")
 ok("…the table's note names the bar colours and the dashed planning flag; the chart's caption and its 'flag 60' label are gone",
    "Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark (1 of 2 routes have one)." in T10J
    and "Dashed red mark: the planning flag typed on the route" not in T10J and "flag 60" not in T10J)
+# NARROWED 17 Oct 2026 (no ids in text): the rows are the bar's panel's rows in its order, each named by the tenant's
+# discipline label (BD is the pure roll-up, which has no names to hand: its name is the id)
 ok("…what is being moved is the bar's discipline panel, with an All routes row equal to the headline",
-   [m["name"] for m in S10["moved"]] == [d["name"] for d in BD["discipline"]] and S10["moved_total"]["a_day"] == _fig["two_way"]
+   [m["name"] for m in S10["moved"]] == [bulletin.discipline_names().get(d["key"], d["name"]) for d in BD["discipline"]]
+   and S10["moved_total"]["a_day"] == _fig["two_way"]
    and S10["moved_total"]["vehicles"] == f"{FLEET:,}")
 ok("⭐ works affecting the roads: the stored A6 closure in October with its dates and provider; the ENDED closure is not there",
    "A6 Resurfacing" in T10J and "16 Oct 2026 to 17 Oct 2026" in T10J and "A46 Barrier repairs" not in T10J
@@ -1024,11 +1054,13 @@ ok("…every route in one table, each bar in its map colour, the flag a dashed r
 ok("…no chart wrapper; offline the map is the inline schematic: no basemap image and no Mapbox credit",
    "chartwrap" not in HTML10 and "mapbox" not in HTML10.lower() and "<image " not in HTML10
    and "Schematic, not to scale." in HTML_TEXT)
+# NARROWED 17 Oct 2026 (UI audit #5, claude/ui-fix-keyboard): the wrapper is a named region a keyboard user can Tab to
 ok("🔴 the 14 px floor on a phone: the bar column never squeezes (a min width; the table scrolls in its wrapper)",
-   "td.bar{min-width:200px;white-space:nowrap}" in HTML10 and '<div class="tw"><table data-bulletin="routes">' in HTML10)
+   "td.bar{min-width:200px;white-space:nowrap}" in HTML10
+   and '<div class="tw" tabindex="0" role="region" aria-label="Every route this month"><table data-bulletin="routes">' in HTML10)
 # 12 Oct 2026 (Track C review): the schematic map is 720 units wide with 14 px pin letters; at width:100% on a 375 px
 # phone they drew at about 6.7 px. It now sits in a scrolling wrapper and never draws narrower than its viewBox.
-_mv = re.search(r'<div class="mapwrap" data-bulletin="map"><svg viewBox="0 0 (\d+) \d+" role="img"', HTML10)
+_mv = re.search(r'<div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="[^"]+"><svg viewBox="0 0 (\d+) \d+" role="img"', HTML10)   # NARROWED 17 Oct 2026 (UI audit #5)
 _mm = re.search(r"\.mapwrap svg\{min-width:(\d+)px\}", HTML10)
 ok("🔴 the 14 px floor on a phone: the schematic map never draws narrower than its viewBox (it scrolls instead)",
    bool(_mv and _mm) and int(_mm.group(1)) >= int(_mv.group(1)) and ".mapwrap{overflow-x:auto" in HTML10,
@@ -1197,7 +1229,8 @@ ok("🔴 council PDF: the only requests are basemaps (no route or polygon in any
 ok("⭐ council PDF: 'fictional demo scheme' still on every page, which now number at least three",
    len([p for p in T10A.split("\f") if p.strip()]) >= 3 and all("fictional demo scheme" in p.lower() for p in T10A.split("\f") if p.strip()))
 ok("⭐ council page: an inline SVG of the districts (even-odd fill, white 2.5 px borders), each label with name and figure; offline no basemap",
-   '<div class="mapwrap" data-bulletin="council-map"><svg viewBox="0 0 720 560"' in HTML10A
+   # NARROWED 17 Oct 2026 (UI audit #5): the map wrapper is a named region with tabindex 0
+   '<div class="mapwrap" data-bulletin="council-map" tabindex="0" role="region" aria-label="Carbon by council in October 2026 (map)"><svg viewBox="0 0 720 560"' in HTML10A
    and HTML10A.count('fill-rule="evenodd" stroke="#FFFFFF" stroke-width="2.5"') == 3
    and f'<tspan class="cn">Eastshire</tspan>' in HTML10A and f'dy="17">{_tt(0.5 * _CT)}</tspan>' in HTML10A
    and "mapbox" not in HTML10A.lower() and "<polyline" not in HTML10A.split('data-bulletin="council-map"')[1].split("</svg>")[0])
@@ -1361,7 +1394,7 @@ ok("⭐ W11 (hand): R1 (~65 a day) is #0B55CB, R2 (~23 a day) #5A96F6; no width 
    _MR["R1"]["color"] == "#0B55CB" and _MR["R2"]["color"] == "#5A96F6" and near(_MR["R1"]["a_day"], _r1, 1e-3)
    and all("weight" not in r for r in S10["map_routes"]), str(S10["map_routes"]))
 ok("W11: drawn quietest first, so the busiest route is on top", [r["route_id"] for r in S10["map_routes"]] == ["R2", "R1"])
-_svgm = HTML10.split('data-bulletin="map">')[1].split("</svg>")[0]
+_svgm = HTML10.split('data-bulletin="map"')[1].split("</svg>")[0]   # 17 Oct 2026: the wrapper carries tabindex / role / aria-label after the marker
 ok("⭐ W11 page: every route at ONE width (5) in its Volume colour over a 7.5 casing in the map's ink; never the plan blue",
    _svgm.count('stroke-width="5"') == 2 and _svgm.count('stroke="#1F2024" stroke-width="7.5"') == 2
    and 'stroke="#0B55CB" stroke-width="5"' in _svgm and 'stroke="#5A96F6" stroke-width="5"' in _svgm
@@ -1378,10 +1411,12 @@ ok("⭐ W11 PDF: page 1 carries the legend (title and the five ranges); 'thicker
    and "Volume colour for its two-way movements a day, one width" not in PAGES[0] and "thicker" not in T10J)
 ok("🔴 W11 source: no line width is worked out from a volume in the bulletin's drawing code or the view model any more",
    all(x not in _EXB + read("backend/bulletin_doc.py") for x in ('r["weight"]', "r['weight']", '"weight":', "1.5 + 5 *", "0.8 + 3.2 *")))
+# NARROWED 16 Oct 2026 (D115, the public map's flow lanes): the map's heat-map ribbon is 6 / 8.5 px now, so its two
+# flow lanes fit inside it; the bulletin's map draws no lanes and keeps 5 / 7.5 — still one fixed width, never by volume
 ok("🔴 W11 source: the schematic and the page draw the casing then the colour, at fixed widths",
    'c.setLineWidth(3.4)' in _EXB and 'c.setLineWidth(2.2)' in _EXB and "_hex_rgb(r[\"color\"])" in _EXB
    and "ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5" in read("backend/bulletin_doc.py")
-   and "const CARBON_LINE_WIDTH = 5, CARBON_CASING_WIDTH = 7.5;" in MAP)
+   and "const CARBON_LINE_WIDTH = 6, CARBON_CASING_WIDTH = 8.5;" in MAP)
 
 # W11 — the shared road sections, each by its routes summed (the map's Volume heat map: routes by their own figure,
 # shared sections summed on top). R1 and R2 run the same road in the fixture, so after the index is built it is ONE shared
@@ -1414,7 +1449,7 @@ ok("⭐ W11 (hand): ONE shared section (R1 and R2's common road) at BOTH routes'
    and S10S["map_sections"][0]["color"] == "#0B55CB" and S10S["map_sections"][0]["routes"] == 2
    and near(S10S["map_sections"][0]["a_day"], _RL10["runs"][0]["movements_per_day"], 1e-9)
    and {r["route_id"]: r["color"] for r in S10S["map_routes"]}["R2"] == "#5A96F6", str((_rb, S10S["map_sections"][:1] and S10S["map_sections"][0]["a_day"])))
-_svgs = HTML10S.split('data-bulletin="map">')[1].split("</svg>")[0]
+_svgs = HTML10S.split('data-bulletin="map"')[1].split("</svg>")[0]
 ok("⭐ W11 page: the shared section is drawn ON TOP of the routes (after them), with its own casing, in its summed colour",
    _svgs.count('class="sec"') == 2 and _svgs.rindex('stroke="#5A96F6"') < _svgs.index('class="sec"')
    and 'stroke="#0B55CB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by 2 routes: 98 two-way movements a day</title>' in _svgs
@@ -2031,6 +2066,31 @@ ok("🔴 the leaflet page: the 14 px floor, a viewport, the demo notice, the map
    _pxL and min(_pxL) >= 14 and '<meta name="viewport" content="width=device-width,initial-scale=1">' in LH10B
    and f'<div class="notice">{NOTICE}</div>' in LH10B and ".mapwrap svg{min-width:720px}" in LH10B, str(sorted(set(_pxL))))
 ok("🔴 the leaflet page: word ban and UK words", not _BANNED.search(re.sub(r"<[^>]+>", " ", LH10B)) and not _trucks(re.sub(r"<[^>]+>", " ", LH10B)))
+
+# 17 Oct 2026 (UI audit #5, claude/ui-fix-keyboard): on a phone the two maps and five of the seven tables scroll sideways
+# (the 720 px map floor and the nowrap figure columns are deliberate). Each such wrapper is now a named region a keyboard
+# user can Tab to and scroll (tabindex 0; the role is required — a bare aria-label on a div is ignored), with a visible
+# ring; the two tables whose every column wraps (works, glance) are not tab stops. The sideways scroll itself stays
+# (open question 5: a phone-fit render).
+_REG = re.compile(r'<div class="(mapwrap|tw)"( data-bulletin="[a-z-]+")? tabindex="0" role="region" aria-label="([^"]*)">')
+_regB = [(m.group(1), m.group(3)) for m in _REG.finditer(HTML10B)]
+ok("🔴 #5 the seven scrolling wrappers of the full bulletin are named regions with tabindex 0 — two maps, five tables, in page order, named by their headings",
+   [c for c, _ in _regB] == ["mapwrap", "tw", "tw", "tw", "tw", "mapwrap", "tw"]
+   and [l for _, l in _regB] == ["Planned lorry routes, October 2026", "Every route this month", "What is being moved",
+                                 "What changed since last month", "Movements by council in October 2026",
+                                 "Carbon by council in October 2026 (map)", "Carbon by council in October 2026 (table)"], str(_regB))
+ok("#5 …the works and glance tables, whose columns wrap, stay plain wrappers (no needless tab stop); no other tabindex on the page; the names pass the word ban",
+   '<div class="tw"><table data-bulletin="works">' in HTML10B and '<div class="tw"><table data-bulletin="glance">' in HTML10B
+   and HTML10B.count('tabindex="0"') == len(_regB) == 7 and all(l.strip() for _, l in _regB)
+   and not _BANNED.search(" ".join(l for _, l in _regB)) and not _trucks(" ".join(l for _, l in _regB)))
+ok("#5 …a visible ring on a focused region in the page and in the leaflet (the link blue), and the leaflet's map is the same named region",
+   ".mapwrap:focus-visible,.tw:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}" in HTML10B
+   and ".mapwrap:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}" in LH10B
+   and '<div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="Planned lorry routes, October 2026"><svg' in LH10B
+   and LH10B.count('tabindex="0"') == 1)
+ok("#5 …the sideways scroll itself is unchanged (open question 5): the map's 720 px floor and the wrappers' overflow-x stay",
+   ".mapwrap{overflow-x:auto;border:1px solid var(--line)} .mapwrap svg{min-width:720px}" in HTML10B and ".tw{overflow-x:auto}" in HTML10B
+   and "tabindex" not in T10AJ)
 _MS = read("backend/main.py")
 # the leaflet endpoints, staff only like the bulletin (D10)
 ok("🔴 the gate calls /bulletin/leaflet/ 'bulletin' (staff only); both endpoints check staff before reading anything",
@@ -2227,6 +2287,22 @@ ok("🔴 the publishing check's words: no '[a typed field this scheme has not se
    "a typed field this scheme has not set yet" not in T10BJ + HTML_TEXT_B and "laden legs" not in T10BJ + HTML_TEXT_B
    and not re.search(r"\bR\d+\b", " ".join(o["text"] for o in S10B["others"]) + " ".join(w["routes_text"] for w in S10B["works"]))
    and "Terms explained" not in T10BJ + HTML_TEXT_B and "by route" not in T10BJ)
+
+# =========================================================================== #
+#  17 Oct 2026 (the user: UK drivers' hours; the review): the bulletin's words for lorries needed                       #
+# =========================================================================== #
+_bsrc, _bdsrc = read("backend/bulletin.py"), read("backend/bulletin_doc.py")
+ok("⭐ drivers' hours: the vehicles rule names a driver's day under the UK drivers' hours, ONE required break, the 9 h "
+   "cap, and says it is a planning figure (weekly limits and drivers' own hours not checked)",
+   "day under the UK drivers' hours: the shift less the required break, at most 9 h driving; a planning " in _bsrc
+   and "figure, weekly limits and drivers' own hours not checked), rounded up per line" in _bsrc
+   and "the required breaks" not in _bsrc)
+ok("...the newsletter's 'Lorries needed' term says the same in its own words (and the page count holds: four pages, "
+   "http_smoke D43)",
+   "driver's day under the UK drivers' hours (break taken, at most 9 h driving; a planning figure)." in _bdsrc
+   and "(breaks taken, at most 9 hours of driving)" not in _bdsrc)
+ok("🔴 no compliance claim in the bulletin's drivers' hours words: never 'compliant', 'compliance' or 'legal'",
+   not re.search(r"drivers' hours[^\"]{0,200}\b(compliant|compliance|legal)\b", _bsrc + _bdsrc, re.I))
 
 # =========================================================================== #
 print()

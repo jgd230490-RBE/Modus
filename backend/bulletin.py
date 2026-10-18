@@ -21,7 +21,9 @@ the same payload the browser gets and assert equality)
      doubled, never rounded per line.
   3. Vehicles needed = Σ per LINE ceil((loads ÷ working days) ÷ what one vehicle can do a
      day on THAT route). Ceil per line, never once over the total: a vehicle on one route
-     cannot also be working another.
+     cannot also be working another. 17 Oct 2026: "a day" is a driver's day under the UK
+     drivers' hours (drivers_hours.lorry_day: the shift less the required break, driving at
+     most 9 h), read from route_analysis's trips_per_day like every other surface.
   4. A line whose route is not baked for ITS vehicle has no cycle: it is counted in the
      movements and the tonnes, left out of the fleet, and the fleet says "excludes N
      lines with no stored road route for the vehicle" — named, not zeroed. (The map bar
@@ -169,7 +171,7 @@ def _r(v, dp=3):
 
 
 def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None,
-                    team_word=None, section_names=None):
+                    team_word=None, section_names=None, discipline_names=None):
     """
     The eleven rules over one or more month payloads (each the dict
     `/api/public/month-kpis` returns), `routes` = drawn_routes(), `wd` = working_days().
@@ -181,6 +183,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
     labels = taxonomy.team_labels() if labels is None else labels
     word = team_word or taxonomy._team_word()
     section_names = section_names or {}
+    discipline_names = discipline_names or {}
     fb_name = (payloads[0] or {}).get("payload_fallback_vehicle") if payloads else None
     # 14 Oct 2026: the NAME a reader sees (the key may say "Truck mixer"; conversions.vehicle_label)
     fb_name = conversions.vehicle_label(conversions.load_factors(), fb_name) if fb_name else None
@@ -326,6 +329,10 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
                    "tonnes_a_day": _r(g["t"] / gm / wd), "months_with_volume": len(g["months"])}
             if by == "section" and key in section_names:
                 row["name"] = section_names[key]
+            # 17 Oct 2026: the discipline row is NAMED by the tenant's label ("Pavement"), the key stays the id
+            # ("superstructure"). Until then the bulletin's "What is being moved" table printed the ids.
+            if by == "discipline" and key in discipline_names:
+                row["name"] = discipline_names[key]
             rows.append(row)
         rows.sort(key=lambda r: (-(r["tonnes_a_day"] or 0), r["key"]))
         breakdown[by] = rows
@@ -350,8 +357,10 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             "excludes_unbaked_lines": unbaked_lines,
             "label": "Vehicles needed" + (f" ({unb_label})" if unb_label else ""),
             "not_baked": bool(unbaked_lines and not fleet_peak),
-            "rule": ("Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle), "
-                     "rounded up per line" + (", busiest month" if n > 1 else "") + "."),
+            "rule": ("Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle, in a driver's "
+                     "day under the UK drivers' hours: the shift less the required break, at most 9 h driving; a planning "
+                     "figure, weekly limits and drivers' own hours not checked), rounded up per line"
+                     + (", busiest month" if n > 1 else "") + "."),
         },
         "material": {
             "shown": unit != "vehicles",                         # rule 8
@@ -441,9 +450,18 @@ def month_rollup(month_index, acc=None, unit="vehicles", months=None):
         names = {r["section_id"]: (r.get("name") or r["section_id"]) for r in taxonomy.list_work_sections()}
     except Exception:
         names = {}
-    out = rollup_payloads(payloads, routes, wd, acc=acc, unit=unit, section_names=names)
+    out = rollup_payloads(payloads, routes, wd, acc=acc, unit=unit, section_names=names,
+                          discipline_names=discipline_names())
     out["months"] = idx
     return out
+
+
+def discipline_names():
+    """id -> the tenant's label, every discipline (out of scope too: a line may still carry one). {} on a failed read."""
+    try:
+        return {r["id"]: (r.get("label") or r["id"]) for r in taxonomy.list_disciplines(include_out_of_scope=True)}
+    except Exception:
+        return {}
 
 
 def _stamp_caps(routes):
@@ -637,7 +655,8 @@ def month_page(month_index, acc):
     except Exception:
         names = {}
     # D37 (12 Oct 2026): the whole scheme for every code, team rows included (acc=None: no per-team limit)
-    rollup = rollup_payloads([payload], routes, wd, acc=None, section_names=names)
+    rollup = rollup_payloads([payload], routes, wd, acc=None, section_names=names,
+                             discipline_names=discipline_names())
     rollup["months"] = [mi]
     span_from, span_to = weeks.month_span(mi)
     try:

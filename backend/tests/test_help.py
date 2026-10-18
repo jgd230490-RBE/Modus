@@ -13,6 +13,7 @@ browser.
 """
 import os
 import re
+import struct
 import sys
 from html.parser import HTMLParser
 
@@ -626,6 +627,28 @@ _moved = {   # inventory §1 row → its key phrase in the technical guide
 _lost = [k for k, v in _moved.items() if v not in tg]
 ok3("⭐ W4 nothing lost: every passage W3 took off a screen is in the technical guide (%d phrases)" % len(_moved),
    not _lost, ", ".join(_lost))
+# 17 Oct 2026 (the user: UK drivers' hours): both guides state the rule with its sources and its limits; the old formula is gone
+ok("⭐ the user guide: trips a lorry a day are what fit in a driver's day — the break rule, 9 h driving, 13 h, what counts as "
+   "driving, the sources, what is not modelled; 'a 10-hour shift ÷ the cycle time' is gone",
+   # NARROWED 17 Oct 2026 (the review): one driver's day at most 13 (a longer shift is accepted), the second break past
+   # 12 h, the day's other duties not modelled, a 0 counted as one lorry a trip
+   "the most round trips that fit in a driver&#39;s day: the shift (10 hours by default; one driver&#39;s day at most 13) less the break the UK drivers&#39; hours rules require" in src
+   and "15 minutes more once work passes 12 — with driving" in src
+   and "Regulation (EC) 561/2006 as it applies in the UK (Articles 6–8) and the Road Transport (Working Time) Regulations 2005" in src
+   and "Weekly limits, night work, the occasional 10-hour driving day and the day&#39;s other duties are not modelled" in src
+   and "counted as one lorry a trip" in src
+   and "a 10-hour shift ÷ the cycle time, rounded down" not in src and "trips per day  = floor(shift hours / cycle)" not in src
+   and "(shift ÷ cycle, rounded down)" not in src)
+ok("⭐ the technical guide: drivers_hours.lorry_day, the thresholds, the split, the 13 h cap, charging on top of the break, "
+   "the gate keeping the full shift; floor(shift hours ÷ cycle) gone",
+   "drivers_hours.lorry_day(shift, driving, other work)" in tg and "<code>backend/drivers_hours.py</code>" in tg
+   # NARROWED 17 Oct 2026 (the review): reg 7 (not reg 5), the Art 7 and reg 7 breaks never added, one driver's day
+   # read as at most 13 h (Config accepts more), charging as working time
+   and "breaks are one break, never added" in tg
+   and "One driver&#39;s day is read as at most 13 h" in tg.replace("\r\n", "\n").replace("\n", " ")
+   and "Regulations 2005 reg 7" in tg.replace("\n", " ") and "reg 5" not in tg
+   and "attended, so it is working time" in tg.replace("\n", " ")
+   and "The gate figures keep the full shift" in tg and "floor(shift hours ÷ cycle)" not in tg.replace("the old floor(shift ÷ cycle)", ""))
 ok("...it maps the old screen words to the new ones, and says the exports keep the old words (decision A)",
    "baked / not baked / unbaked</td><td>routed / not routed yet" in tg and "line-month</td><td>forecast month" in tg
    and "UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED" in tg and "The XLSX and PDF exports and the clash text made on the server still say" in tg)
@@ -703,6 +726,78 @@ ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its
    "its green and amber run side by side; they close onto the road as you zoom right in." in src)
 ok("17 Oct: ...and no longer says that nothing shows direction",
    "Nothing shows direction — the colours do." not in src)
+# 17 Oct 2026 (UI audit #17, claude/ui-fix-keyboard): the 27 lazy figure images had no size, so a figure grew from 2 px to
+# its height as it loaded and pushed the focused "open it in the app" link (and anything a nav link scrolled to) off the
+# screen. Each <img> now carries its file's own pixel size (the box is reserved before the picture arrives), and the CSS
+# keeps height:auto so a narrowed figure keeps its shape.
+def _png_size(path):
+    with open(path, "rb") as f:
+        head = f.read(24)
+    return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else None
+_itags = re.findall(r"<img [^>]*>", src)
+_iattrs = [dict(re.findall(r'([a-z-]+)="([^"]*)"', t)) for t in _itags]
+_isizes = {a["src"]: _png_size(os.path.join(ROOT, "frontend", "help", a["src"])) for a in _iattrs}
+ok3("\U0001f534 #17 every figure image (%d) carries width and height equal to its file's own pixels, and keeps loading=\"lazy\"" % len(_itags),
+   len(_itags) == 27 and all(a.get("loading") == "lazy" and _isizes[a["src"]]
+                             and (int(a.get("width", 0)), int(a.get("height", 0))) == _isizes[a["src"]] for a in _iattrs),
+   str([(a["src"], a.get("width"), a.get("height"), _isizes[a["src"]]) for a in _iattrs
+        if (int(a.get("width", 0)), int(a.get("height", 0))) != _isizes[a["src"]]]))
+ok("#17 ...the figure CSS keeps height:auto beside max-width:100%, so a narrowed image keeps its shape (the size reserves the box, it never stretches it)",
+   "figure img{max-width:100%;height:auto;border:1px solid var(--line);" in src)
+
+# 17 Oct 2026 (UI audit #15): the technical guide's formula blocks were cut mid-line on a phone, and the CLP block at a desk
+# width, with no keyboard way to scroll them: <pre> now wraps at every width. Three of its five tables still scroll sideways
+# on a phone (nowrap first columns, long paths): each is a named region with tabindex 0 and a ring; the two whose columns wrap are plain.
+_tg2 = open(TECH, encoding="utf-8").read()
+ok("\U0001f534 #15 the technical guide's <pre> blocks wrap (pre-wrap, overflow-wrap anywhere) at every width, so none scrolls sideways",
+   "pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;"
+   "overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}" in _tg2)
+_tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
+ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
+   [l for _, l in _tgr] == ["Where each screen reads from", "", "Old words, new words", "The community considerations layer: sources", ""]
+   # NARROWED 18 Oct 2026 (decision 10): the fourth tabindex is main's -1, the "Skip to the text" link's target
+   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 3
+   and _tg2.count("tabindex=") == 4, str(_tgr))
+# RE-PINNED 17 Oct 2026 (D114 fix): the opening sentence now also names the fallback (no approved line in the window ->
+# the months that have them), and the big-screen sentence says "the months the page opened on" instead of "this month ± 6"
+ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",
+   "the page opens on this month and six months either side, or on the months that have approved lines when none of them "
+   "falls in that window, and <strong>Whole programme</strong> beside them shows every month"
+   in src and "<strong>This month ± 6</strong> brings the default back" in src
+   and "(it keeps the months you had: the months the page opened on unless you picked others first)" in src)
+ok("\U0001f534 D114 fix (17 Oct 2026): the big-screen sentence no longer promises this month ± 6 (the fallback can open elsewhere)",
+   "(it keeps the months you had: this month ± 6 unless you picked others first)" not in src)
+
+# 18 Oct 2026 (UI audit decision 10, finding #22, claude/ui-fix-phone): on a phone the guides' contents sit above the text —
+# 59 chapter rows in the user guide, 19 in the technical guide — as 30 px links. Now: a "Skip to the text" link heads the list
+# (the first row of the list on a phone; at a desk hidden until it has the focus, like any skip link), the rows are 44 px tall
+# there (min-height 44 and 12 px of padding on a 20 px line), the role buttons, the troubleshooting questions and "↑ top" are 44
+# px, and there is NO nested scroller (the user's choice over a 40 vh box). The target is <main id="guide-text" tabindex="-1">,
+# so the jump lands the focus on the text in every browser.
+for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", _tg2, False)):
+    ok3("\U0001f534 decision 10 (%s): 'Skip to the text' is the first thing in the contents and its target is the text (<main id=\"guide-text\" tabindex=\"-1\">)" % _nm,
+        '<nav id="nav"><a class="skip" href="#guide-text">Skip to the text</a><div class="brand"' in _pg
+        and _pg.count('<main id="guide-text" tabindex="-1">') == 1 and _pg.count("<main") == 1 and _pg.count("Skip to the text") == 1)
+    _m9 = re.search(r'@media \(max-width:900px\)\{\.skip\{([^}]*)\}#nav li a\{([^}]*)\}(.*?)\}\n', _pg)
+    ok3("\U0001f534 decision 10 (%s): below 900 px the skip link is a static 44 px row and every chapter row is 44 px (min-height 44, padding 12 px 8 px); no max-height or overflow on the list there" % _nm,
+        _m9 is not None and "position:static" in _m9.group(1) and "min-height:44px" in _m9.group(1) and "display:flex" in _m9.group(1)
+        and _m9.group(2) == "min-height:44px;padding:12px 8px" and "max-height" not in _pg.split("@media (max-width:900px)")[-1].split("}\n")[0]
+        and "#nav{position:static;width:auto}" in _pg and "#nav{max-height" not in _pg and "#nav{overflow" not in _pg, str(_m9 and _m9.group(0)[:160]))
+    ok3("decision 10 (%s): at a desk the skip link is off the top of the column until it has the focus (transform, then an outline), and the focused text draws no ring of its own" % _nm,
+        ".skip{position:absolute;left:8px;top:8px;z-index:9;" in _pg and "transform:translateY(-200%)}" in _pg
+        and ".skip:focus{transform:none;outline:2px solid #FF8C14;outline-offset:2px}" in _pg and "main:focus{outline:0}" in _pg)
+    ok3("decision 10 (%s): '↑ top' is a 44 px box on a phone (inline-flex, min 44 × 44), unchanged at a desk" % _nm,
+        "#top{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}" in _pg.split("@media (max-width:900px){.skip")[1].split("\n")[0]
+        and "#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:20px;font-size:12px}" in _pg)
+    if _roles:
+        ok3("decision 10 (%s): the role buttons and the troubleshooting questions are 44 px on a phone" % _nm,
+            "#roles button{min-height:44px}" in _pg.split("@media (max-width:900px){.skip")[1].split("\n")[0]
+            and ".ts-q button{min-height:44px;padding:12px 13px}" in _pg.split("@media (max-width:900px){.skip")[1].split("\n")[0])
+    # the desk rule the phone rule builds on is as it was: 5 px rows in a fixed 280 px column
+    ok3("decision 10 (%s): the desk contents are untouched — a fixed 280 px column, 5 px 8 px rows" % _nm,
+        "#nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;" in _pg and "#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}" in _pg)
+ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19)",
+   len(re.findall(r'<li class="l[12]"', src)) == 59 and len(re.findall(r'<li class="l[12]"', _tg2)) == 19)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

@@ -1,19 +1,34 @@
 """
 tools/make_demo_tenant.py — the synthetic UK demo tenant, as a package. Wayscope (G2, 16 Sep 2026).
 
-    python3 backend/tools/make_demo_tenant.py            # writes demo/uk-corridor.package.json
+    python3 backend/tools/make_demo_tenant.py --with-areas   # writes demo/uk-corridor.package.json (the shipped file)
     python3 backend/tools/make_demo_tenant.py --with-areas --out demo/with-areas.package.json
+    python3 backend/tools/make_demo_tenant.py --with-areas --as-of 2027-02-25 --out ../demo-refresh/live.package.json
+            --live-export ../demo-refresh/live-export.json      # one command: a live refresh (§1.9), outside the checkout
 
 OPTION --with-areas (12 Oct 2026, public map review §2.2b, D27). Also loads the council
 boundaries in backend/data/areas_demo.geojson (the eight ONS local authority districts round
 the corridor, May 2026, and Leicestershire, Dec 2025 — OGL v3, with the two licence lines)
 into the package's `areas` table, through areas.import_collection, the app's own path. OFF
-by default: the shipped demo package carries no areas, and a deployment loads them with
-POST /api/admin/areas/import?token= (the same file as the body). --out writes elsewhere,
-so the shipped package is not rewritten by trying the option. The clip (route_area_km)
+by default; since 16 Oct 2026 (D102) the SHIPPED package is built WITH it, so the By council
+view works straight after an import with no admin step. A deployment can still reload them
+with POST /api/admin/areas/import?token= (the same file as the body). --out writes elsewhere,
+so the shipped package is not rewritten by trying an option. The clip (route_area_km)
 needs baked geometry, so it is empty here and fills on the first bake after import.
 The seed file is 25,878 bytes (one line of JSON, 1,044 vertices), fetched 12 Oct 2026 from
 the ONS ArcGIS FeatureServer's BSC layers named in its `sources`; areas.py says more.
+
+OPTION --as-of (16 Oct 2026, D96, notes/demo-redesign-1016.md §1.9). The programme is fixed in time; what a viewer
+reads as "now" depends on the real date (the commit week is the week holding today's Thursday). So the history —
+typed actuals, the account week's shortages, the day actuals, the confirmations, the stockpile draw, the Pending and
+Rejected lines — is typed up to an as-of date. Its default is SHIPPED_AS_OF, so a plain regeneration reproduces the
+shipped history whichever session runs it. Any other date is accepted ONLY with --out to a path outside the checkout
+(test_modus.py scans every .json in the repository for team-slot ids and allows only the shipped package).
+OPTION --live-export (the same note, §1.9): with --as-of, copies the live demo's baked and fetched tables
+(route_geometry, route_sections, route_area_km, areas, community_*, collision_*) and its carbon_target row from a
+live export file (GET /api/admin/tenant/export) into the output, so a refresh needs no re-bake and no Fetch now.
+It refuses when the live routes, gates or zones differ from the ones written here. Outside the checkout only: the
+file holds HERE routes and OpenStreetMap-derived data.
 
 WHAT IT MAKES
 -------------
@@ -22,21 +37,26 @@ running north from Market Harborough towards Melton Mowbray (H2, 5 Oct 2026: re-
 from the v1 rail corridor for Highways UK) — with three quarries placed in the county's
 real crushed-rock heartland under invented names, one rail freight terminal, four
 compounds, three stockpiles, three delivery teams, six mainline work sections and two
-point assets, eighteen routes, four months of approved forecasts (Sep–Dec 2026) plus one
-Pending and one Rejected line, typed actuals into October, a confirmed commit week, a
-stockpile near capacity, contract rates on some routes, a target rate, a fuel share,
-GBP, miles, a UK country code, an alignment overlay with chainage, package bands and
-boundaries — and, from v2: a gate or two on every site (entry and exit on different
-roads where that is how the site works), two temporary haul roads ATTACHED to the routes
-that use them, three geofences (a works-zone closure that re-routes three routes, an
-advisory 7.5 t village limit, an advisory works area), daily vehicle caps on the village
-routes, and the tenant's demo notice on every screen and export. Since 14 Oct 2026 (civils
-materials, D13): a fictional ready-mix batching plant and a concrete pour — two mixer routes
-to Tilton and Melton Compounds, three lines in m³ on the two concrete mixers. Since 16 Oct 2026: every gate
-35 m in from a public road (OpenStreetMap), with its access road drawn as a haul road (a bellmouth for two lorries).
+point assets. Since 16 Oct 2026 (the demo redesign, notes/demo-redesign-1016.md, D95–D114) it is a FOUR-YEAR
+PROGRAMME, north to south: main works from January 2026 (month 1), the northern half open December 2028, the whole
+road October 2029, finishing works to December 2030 (month 60, the product's last). 905 approved line-months on 42
+routes (R001–R043; R020 is the Carbon planner's alternative and carries none), plus one Pending and one Rejected
+line on their own keys. Each section runs clearance → earthworks → drainage and capping → Type 1 → asphalt →
+barrier and signs; the seasons bend it (earthworks April–October, thin surface course April–September, a two-week
+Christmas stop). Earthworks appear only where they reach a public road (D98): the cut-to-fill haul on site is
+moved by dumpers and is not shown. Sixteen sites: the fourteen of v2 plus a temporary on-site asphalt plant beside
+Tilton Compound fed from the two quarries (D99; its feed on its own category with no material carbon, D112) and a
+southern ready-mix plant (D100). The site settings of §1.8 (gate hours, check-ins, school-run bands, CLP caps,
+Euro VI, stockpile sizes, the Burrough caps, zones, route-sheet words, site rules), contract rates and a target
+rate, a fuel share, a carbon target (D105), GBP, miles, a UK country code, an alignment overlay with chainage,
+package bands and boundaries, a gate or two on every site 35 m in from a public road with its access road drawn
+as a haul road, two temporary haul roads ATTACHED to the routes that use them, closures and works areas dated
+across the programme, and the tenant's demo notice on every screen and export. The concrete mixers carry the
+ready-mixed concrete in m³ from the two batching plants.
 
-NOTHING IN IT IS ANYONE'S DATA. Every name is invented; the quantities are made up to
-look plausible; the coordinates are chosen so HERE's truck routing finds sensible roads.
+NOTHING IN IT IS ANYONE'S DATA. Every name is invented; the quantities are sanity-checked against sourced UK rates
+(the note's §1.6) and are otherwise ASSUMPTIONS; the coordinates are chosen so HERE's truck routing finds sensible
+roads.
 
 HOW IT MAKES IT
 ---------------
@@ -45,15 +65,17 @@ calls the same functions the app calls — create_location, create_route, the fo
 insert, weeks.materialise_window, set_actual, confirm_week, stockpiles.set_capacity,
 tenant_package.set_overlay — then EXPORTS the tenant with tenant_package.export_tenant.
 So every row in the package is one the product itself would have written, and the
-package format is exercised end to end every time this runs.
+package format is exercised end to end every time this runs. The programme itself is DATA (PROGRAMME below,
+ported from the design tooling in notes/demo-redesign-1016/, which is not product code): one row per activity
+with its month-by-month quantities; the line-months are those rows summed per (route, month, discipline, section,
+vehicle), and the asphalt plant's feed is worked out from the asphalt it makes.
 
 WHAT IT CANNOT MAKE
 -------------------
 Route geometry. Baking needs HERE, which is never called from a build sandbox. After
 importing the package on a deployment, bake the network (Routes page → Bake all, or
-POST /api/admin/bake-routes) — 18 routes × the planning vehicles × 2 legs is a few
-hundred HERE calls, inside the free tier. Until then every Look-ahead line reads
-UNBAKED, by the product's own rule.
+POST /api/admin/bake-routes) for every vehicle the lines use. Until then every Look-ahead
+line reads UNBAKED, by the product's own rule. A live refresh (--live-export) carries live's baked routes instead.
 """
 import datetime
 import json
@@ -90,22 +112,25 @@ import config                # noqa: E402
 import taxonomy              # noqa: E402
 import network               # noqa: E402
 import weeks                 # noqa: E402
+import days                  # noqa: E402
 import stockpiles            # noqa: E402
 import costing               # noqa: E402
 import zones                 # noqa: E402
 import gates                 # noqa: E402
 import haul                  # noqa: E402
+import carbon_target         # noqa: E402
+import clashes               # noqa: E402
 import tenant_package        # noqa: E402
-
-random.seed(20260916)
 
 OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
 AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
 TENANT_NAME = "Wolds Link dualling — demo scheme"
 DEMO_NOTICE = "Fictional scheme"   # 15 Oct 2026 (the user): the bar reads DEMO · FICTIONAL SCHEME (its badge says DEMO)
 START_YEAR = 2026
-MONTHS = [9, 10, 11, 12]          # Sep–Dec 2026, month_index == month for 2026
-
+N_MONTHS = 60                     # Jan 2026 – Dec 2030: month_index = (year − 2026) × 12 + month
+SHIPPED_AS_OF = "2026-11-26"      # D96: Thursday, November week 4 — the shipped history; --as-of moves it (outside the checkout)
+AS_OF = SHIPPED_AS_OF             # set by --as-of
+LIVE_EXPORT = None                # set by --live-export
 
 # ------------------------------------------------------------------------------------
 #  Geometry helpers
@@ -199,8 +224,221 @@ assert [s for s in SECTIONS if s[0] == PROVISIONAL_WS][0][4] == PROVISIONAL_AT
 BAND_COLOURS = {"IPT1": "#4C1D95", "IPT2": "#155E75", "IPT3": "#57534E"}
 
 
+# ------------------------------------------------------------------------------------
+#  The programme — DATA, ported from notes/demo-redesign-1016/ (16 Oct 2026; D95–D114)
+# ------------------------------------------------------------------------------------
+BALLAST, SMALL, EARTH = "Large aggregate / ballast", "Small aggregate", "Earthworks / soil"
+PRECAST, STEEL, GENERAL = "Precast / concrete", "Steel / rail", "General / imported"
+READY, ASPHALT = "Ready-mixed concrete", "Asphalt"
+FEED = "Aggregate for the asphalt plant"   # D112: the plant's feed, on its own category with NO material carbon
+TIP, FLAT = "Artic Tipper (44t)", "Artic Flatbed (44t)"
+MIX8, MIX6 = "Truck mixer 8 m³ (32t)", "Truck mixer 6 m³ (26t)"   # the stored KEYS; every screen shows "Concrete mixer …"
+
+# Every route, in id order: (origin, destination, material). R001–R022 keep their ends and materials (D101; Type 1
+# rides "Large aggregate / ballast" and 6F2 "Small aggregate", as before); R023–R043 are appended. R020 (Langton
+# Compound → the recycling hub) carries no forecast: it is the Carbon planner's disposal alternative.
+ROUTES = [
+    ("Q1", "C1", BALLAST), ("Q2", "C1", SMALL), ("RH", "C1", PRECAST),           # R001–R003
+    ("Q1", "C2", BALLAST), ("Q2", "C2", SMALL), ("RH", "C2", GENERAL),           # R004–R006
+    ("Q1", "C3", BALLAST), ("Q2", "C3", SMALL), ("RH", "C3", PRECAST),           # R007–R009
+    ("Q1", "C4", BALLAST), ("Q2", "C4", SMALL), ("RH", "C4", GENERAL),           # R010–R012
+    ("Q3", "C1", EARTH), ("Q3", "C2", EARTH), ("Q3", "S1", EARTH), ("Q3", "S3", EARTH),   # R013–R016
+    ("Q1", "S2", BALLAST), ("Q2", "S3", SMALL),                                   # R017–R018
+    ("C2", "TIP", EARTH), ("C2", "HUB", EARTH),                                   # R019–R020
+    ("BP", "C3", READY), ("BP", "C4", READY),                                     # R021–R022
+    ("Q3", "S2", EARTH), ("Q3", "C4", EARTH),                                     # R023–R024 imported fill, north
+    ("C3", "TIP", EARTH), ("C1", "TIP", EARTH),                                   # R025–R026 exports to tip
+    ("Q2", "AP", FEED), ("Q1", "AP", FEED),                                       # R027–R028 crushed rock into the asphalt plant
+    ("AP", "C4", ASPHALT), ("AP", "C3", ASPHALT), ("AP", "C2", ASPHALT), ("AP", "C1", ASPHALT),   # R029–R032
+    ("BP", "C2", READY), ("BP", "C1", READY),                                     # R033–R034 the long concrete hauls
+    ("WR", "C2", READY), ("WR", "C1", READY),                                     # R035–R036 the southern ready-mix plant
+    ("RH", "C3", GENERAL), ("RH", "C1", GENERAL), ("RH", "C2", PRECAST), ("RH", "C4", PRECAST),   # R037–R040
+    ("Q2", "S1", SMALL), ("Q2", "S2", SMALL),                                     # R041–R042 capping stockpiled
+    ("Q2", "C2", ASPHALT),                                                        # R043 a quarry coating plant (2030)
+]
+assert len(ROUTES) == 43 and len(set(ROUTES)) == 43
+ROUTE_ID = {r: f"R{i + 1:03d}" for i, r in enumerate(ROUTES)}
+
+# Every activity: (section, discipline, material, origin, destination, vehicle, unit, first month, the quantity in
+# each month from the first (t, or m³ for concrete; 0 = nothing that month), description). The months were spread by
+# the design tooling (programme.py: a trapezoid × the sourced seasons × Christmas, rounded to 100 t / 10 m³) and are
+# typed here as figures. A forecast line-month is every activity on the same (route, month, discipline, section,
+# vehicle) summed, its descriptions joined with " + ". Order matters only for that join.
+PROGRAMME = [
+    ("WS6", "substructure", BALLAST, "Q1", "C4", TIP, "t", 1, [4500, 5500], "Compound platform and haul road stone (Type 1)"),
+    ("WS6", "substructure", GENERAL, "RH", "C4", FLAT, "t", 1, [100, 200], "Site cabins, welfare units and fencing"),
+    ("WS4", "substructure", BALLAST, "Q1", "C3", TIP, "t", 2, [3200, 4300, 4300, 3200], "Tilton Compound platform, piling mat and plant hardstanding stone (Type 1)"),
+    ("WS4", "substructure", GENERAL, "RH", "C3", FLAT, "t", 2, [200, 100], "Site cabins, welfare units and fencing"),
+    ("WS6", "earthworks", EARTH, "Q3", "C4", TIP, "t", 6, [1300, 1800, 2200, 2400, 1700, 600, 200, 300, 400, 1100, 1700, 1300], "Imported granular fill (Class 6N) — structure backfill"),
+    ("WS6", "substructure", SMALL, "Q2", "C4", TIP, "t", 6, [2400, 3400, 4200, 4200, 4200, 3400, 1500, 1800, 1400], "Pipe bedding and filter drain stone"),
+    ("WS6", "substructure", PRECAST, "RH", "C4", FLAT, "t", 6, [200, 300, 400, 400, 400, 300, 200, 200], "Drainage pipes, chambers and culvert units"),
+    ("WS6", "substructure", SMALL, "Q2", "C4", TIP, "t", 9, [5400, 6500, 4500, 2100, 3100, 3500, 7900, 9900, 9900, 9000, 7200, 5400], "6F2 capping"),
+    ("WS6", "superstructure", BALLAST, "Q1", "C4", TIP, "t", 22, [16700, 18500, 7400, 11900, 13200, 15000], "Type 1 sub-base"),
+    ("WS6", "superstructure", ASPHALT, "AP", "C4", TIP, "t", 27, [9700, 19000, 19000, 19000, 19000, 12100], "Asphalt base and binder course"),
+    ("WS6", "superstructure", ASPHALT, "AP", "C4", TIP, "t", 31, [4200, 5900, 5800], "Asphalt surface course"),
+    ("WS6", "substructure", GENERAL, "RH", "C4", FLAT, "t", 29, [100, 100, 100, 100, 100, 100], "Safety barrier, signs, lighting and fencing"),
+    ("WS6", "structures", READY, "BP", "C4", MIX8, "m3", 4, [310, 410, 500, 580, 580, 580, 580, 580, 320, 410, 430, 410, 310], "C32/40 concrete — WS6 culverts and overbridge"),
+    ("WS6", "substructure", READY, "BP", "C4", MIX6, "m3", 12, [50, 80, 110, 150, 170, 180, 190, 190, 190, 190, 190, 190, 110, 140, 160, 190, 190, 180, 170, 150, 130, 110, 90], "C20/25 concrete — kerb bedding, drainage surrounds, barrier footings"),
+    ("WS6", "structures", GENERAL, "RH", "C4", FLAT, "t", 6, [100, 100, 100, 100, 100, 100, 0, 100], "Reinforcement — WS6 structures"),
+    ("WS8", "structures", READY, "BP", "C4", MIX8, "m3", 3, [320, 390, 460, 540, 610, 610, 610, 610, 610, 350, 440, 520, 610, 610, 540, 460, 390, 320], "C32/40 concrete — Melton junction bridges"),
+    ("WS8", "structures", GENERAL, "RH", "C4", FLAT, "t", 6, [100, 100, 100, 100, 100, 100, 0, 100, 100, 100, 100, 100], "Reinforcement — Melton junction bridges"),
+    ("WS5", "earthworks", EARTH, "Q3", "S3", TIP, "t", 10, [1000, 500, 200, 400, 400, 1300, 2600, 2600, 2500, 2000, 1500], "Imported granular fill (Class 6N) — structure backfill"),
+    ("WS5", "substructure", SMALL, "Q2", "S3", TIP, "t", 10, [1600, 1700, 900, 1500, 1700, 2600, 2900, 2900, 2900, 2600, 2100, 1600], "Pipe bedding and filter drain stone"),
+    ("WS5", "substructure", SMALL, "Q2", "S3", TIP, "t", 11, [2300, 1500, 3000, 3900, 4300, 4300, 4300, 4300, 4300, 4300, 4300, 3700, 3000, 1100], "6F2 capping (stockpiled at Stockpile North)"),
+    ("WS5", "superstructure", BALLAST, "Q1", "C4", TIP, "t", 24, [3700, 9000, 10000, 17900, 13400], "Type 1 sub-base"),
+    ("WS5", "superstructure", ASPHALT, "AP", "C4", TIP, "t", 28, [7700, 12200, 12100, 12100, 12100, 7700], "Asphalt base and binder course"),
+    ("WS5", "superstructure", ASPHALT, "AP", "C4", TIP, "t", 31, [2800, 3800, 3800], "Asphalt surface course"),
+    ("WS5", "substructure", GENERAL, "RH", "C4", FLAT, "t", 29, [100, 100, 100, 100, 100, 100], "Safety barrier, signs, lighting and fencing"),
+    ("WS5", "structures", READY, "BP", "C4", MIX8, "m3", 8, [520, 670, 810, 960, 560, 720, 840, 990, 990, 990, 990, 960, 810, 670, 520], "C32/40 concrete — Burrough Road overbridge and accommodation bridges"),
+    ("WS5", "substructure", READY, "BP", "C4", MIX6, "m3", 20, [150, 190, 240, 280, 160, 210, 250, 290, 290, 290, 290, 280, 240, 190, 150], "C20/25 concrete — kerb bedding, drainage surrounds, barrier footings"),
+    ("WS5", "structures", GENERAL, "RH", "C4", FLAT, "t", 8, [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — WS5 structures"),
+    ("WS5", "structures", PRECAST, "RH", "C4", FLAT, "t", 10, [100, 200, 200, 200, 300, 300, 200, 200, 200, 200, 100], "Precast culvert units and parapets"),
+    ("WS4", "earthworks", EARTH, "Q3", "S2", TIP, "t", 7, [1400, 1700, 2100, 1700, 700, 200, 400, 400, 1300, 2600, 2600, 2600, 2500, 2100, 1700, 1000], "Imported granular fill to the viaduct approaches"),
+    ("WS4", "earthworks", EARTH, "C3", "TIP", TIP, "t", 5, [800, 1000, 1200, 1400, 1600, 1600, 1600, 900, 1100, 1300, 1600, 1500, 1400, 1200, 1000, 800], "Piling arisings and unsuitable material to tip"),
+    ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 5, [840, 1070, 1290, 1510, 1630, 1630, 1620, 910, 1170, 1380, 1620, 1620, 1510, 1290, 1070, 840], "C32/40 concrete — Tilton viaduct piles, pile caps, piers and abutments"),
+    ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 23, [580, 500, 690, 810, 960, 880, 580], "C32/40 concrete — Tilton viaduct deck slab, edge beams and approach slabs"),
+    ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 10, [260, 340, 230, 350, 430, 500, 500, 500, 500, 500, 500, 490, 410, 340, 150], "C32/40 concrete — A47 junction overbridge"),
+    ("WS4", "structures", GENERAL, "RH", "C3", FLAT, "t", 5, [100, 100, 100, 100, 100, 200, 200, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — Tilton viaduct and A47 junction"),
+    ("WS4", "substructure", SMALL, "Q2", "C3", TIP, "t", 12, [400, 800, 1100, 1900, 2200, 2200, 2100, 2100, 2100, 2100, 2100, 1700, 600, 800, 700], "Pipe bedding and filter drain stone"),
+    ("WS4", "substructure", PRECAST, "RH", "C3", FLAT, "t", 12, [100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100], "Drainage pipes, chambers and culvert units"),
+    ("WS4", "substructure", SMALL, "Q2", "S2", TIP, "t", 18, [4000, 5600, 7200, 7200, 7200, 7200, 3500, 5900, 5100, 4000], "6F2 capping (stockpiled at Stockpile Tilton)"),
+    ("WS4", "superstructure", BALLAST, "Q1", "S2", TIP, "t", 23, [7300, 5400, 9700, 10700, 11900, 11000, 7200], "Type 1 sub-base (from Stockpile Tilton)"),
+    ("WS4", "superstructure", ASPHALT, "AP", "C3", TIP, "t", 28, [9800, 15500, 15500, 15500, 15500, 9800], "Asphalt base and binder course"),
+    ("WS4", "superstructure", ASPHALT, "AP", "C3", TIP, "t", 32, [6000, 7300], "Asphalt surface course"),
+    ("WS4", "substructure", GENERAL, "RH", "C3", FLAT, "t", 30, [100, 100, 100, 100, 100, 100], "Safety barrier, signs, lighting and fencing"),
+    ("WS4", "substructure", READY, "BP", "C3", MIX6, "m3", 22, [180, 240, 160, 240, 280, 340, 340, 340, 340, 330, 290, 240, 180], "C20/25 concrete — kerb bedding, drainage surrounds, barrier footings"),
+    ("WS3", "substructure", BALLAST, "Q1", "C2", TIP, "t", 11, [2700, 2500, 3200, 4000, 2600], "Haul road and working platform stone (Type 1)"),
+    ("WS3", "substructure", GENERAL, "RH", "C2", FLAT, "t", 11, [200, 100], "Site cabins, welfare units and fencing"),
+    ("WS3", "earthworks", EARTH, "Q3", "C2", TIP, "t", 16, [1800, 2200, 2700, 3100, 3500, 3500, 2500, 900, 200, 500, 500, 1800, 3500, 3500, 3100, 2700, 2200, 1800], "Imported granular drainage blanket and culvert backfill"),
+    ("WS3", "structures", PRECAST, "RH", "C2", FLAT, "t", 15, [200, 200, 300, 200, 200, 200, 200], "Precast box culverts (three watercourse crossings)"),
+    ("WS3", "substructure", SMALL, "Q2", "C2", TIP, "t", 22, [1300, 1400, 700, 1300, 1500, 2300, 2500, 2500, 2500, 2500, 2500, 2500, 2100, 1400, 500], "Pipe bedding and filter drain stone"),
+    ("WS3", "substructure", SMALL, "Q2", "C2", TIP, "t", 29, [5000, 7100, 8700, 8700, 8700, 7800, 4400, 1500, 1600], "6F2 capping"),
+    ("WS3", "superstructure", BALLAST, "Q1", "C2", TIP, "t", 35, [8200, 5200, 8300, 9300, 16700, 11700], "Type 1 sub-base"),
+    ("WS3", "superstructure", ASPHALT, "AP", "C2", TIP, "t", 38, [3900, 9300, 12600, 12600, 12600, 11600, 7700], "Asphalt base and binder course"),
+    ("WS3", "superstructure", ASPHALT, "AP", "C2", TIP, "t", 43, [3600, 4300, 3500], "Asphalt surface course"),
+    ("WS3", "substructure", GENERAL, "RH", "C2", FLAT, "t", 41, [100, 200, 100, 100, 100, 100], "Safety barrier, signs, lighting and fencing"),
+    ("WS3", "structures", READY, "BP", "C2", MIX8, "m3", 14, [170, 240, 190], "C32/40 concrete — culvert bases and headwalls (before the southern plant)"),
+    ("WS3", "structures", READY, "BP", "C3", MIX8, "m3", 13, [50, 80, 100, 70], "C32/40 concrete — WS3 north culvert, delivered via Tilton Compound"),
+    ("WS3", "structures", READY, "WR", "C2", MIX8, "m3", 17, [570, 800, 1020, 1020, 1020, 1020, 1020, 570, 570, 490], "C32/40 concrete — culverts and Noseley underpass"),
+    ("WS7", "structures", READY, "WR", "C2", MIX8, "m3", 34, [120, 140, 100, 150, 190, 230, 230, 230, 230, 220, 220, 220, 220, 200, 100, 100, 100], "C25/30 concrete — Noseley depot slabs and salt barn"),
+    ("WS7", "structures", GENERAL, "RH", "C2", FLAT, "t", 38, [100, 100, 100, 100], "Reinforcement — Noseley depot"),
+    ("WS2", "earthworks", EARTH, "C2", "TIP", TIP, "t", 16, [5400, 6700, 8000, 9300, 10600, 10600, 7400, 2600, 700, 1400, 1600, 5300, 10500, 10500, 9300, 8000, 6700, 5400], "Surplus and unsuitable cut to tip (Langton cutting)"),
+    ("WS2", "structures", READY, "WR", "C2", MIX8, "m3", 17, [520, 670, 810, 960, 990, 990, 990, 560, 720, 840, 990, 960, 810, 670, 520], "C32/40 concrete — Langton Road overbridge and accommodation bridges"),
+    ("WS2", "structures", GENERAL, "RH", "C2", FLAT, "t", 15, [100, 100, 100, 200, 200, 200, 200, 200, 200, 100, 200, 200, 200, 100, 100, 100], "Reinforcement — WS2 and WS3 structures"),
+    ("WS2", "substructure", SMALL, "Q2", "C2", TIP, "t", 22, [1300, 1300, 700, 1200, 1400, 2200, 2400, 2400, 2400, 2400, 2400, 2400, 2200, 1500, 600, 700], "Pipe bedding and filter drain stone"),
+    ("WS2", "substructure", PRECAST, "RH", "C2", FLAT, "t", 22, [100, 200, 100, 200, 300, 300, 200, 200, 200, 200, 200, 200, 100], "Drainage pipes and chambers"),
+    ("WS2", "substructure", SMALL, "Q2", "C2", TIP, "t", 30, [6000, 8800, 10300, 10300, 9200, 5100, 1900, 1900], "6F2 capping"),
+    ("WS2", "superstructure", BALLAST, "Q1", "C2", TIP, "t", 35, [8200, 5200, 8300, 9300, 16700, 11700], "Type 1 sub-base"),
+    ("WS2", "superstructure", ASPHALT, "AP", "C2", TIP, "t", 38, [3900, 9300, 12600, 12600, 12600, 11600, 7700], "Asphalt base and binder course"),
+    ("WS2", "superstructure", ASPHALT, "AP", "C2", TIP, "t", 43, [3600, 4300, 3500], "Asphalt surface course"),
+    ("WS2", "substructure", GENERAL, "RH", "C2", FLAT, "t", 41, [100, 200, 100, 100, 100, 100], "Safety barrier, signs, lighting and fencing"),
+    ("WS2", "substructure", READY, "WR", "C2", MIX6, "m3", 34, [400, 530, 370, 530, 620, 740, 740, 740, 730, 670, 530, 400], "C20/25 concrete — kerb bedding, drainage surrounds, barrier footings"),
+    ("WS1", "substructure", BALLAST, "Q1", "C1", TIP, "t", 10, [2800, 3400, 1800], "Compound platform stone (Type 1)"),
+    ("WS1", "substructure", GENERAL, "RH", "C1", FLAT, "t", 10, [100, 100, 100], "Site fencing, cabins and welfare units"),
+    ("WS1", "structures", EARTH, "Q3", "C1", TIP, "t", 20, [900, 1300, 1200, 400, 100, 200, 300, 700, 900], "Class 6N backfill to the Welham Lane underpass"),
+    ("WS1", "earthworks", EARTH, "Q3", "S1", TIP, "t", 16, [1300, 1700, 2100, 2400, 2600, 2600, 1800, 700, 200, 400, 400, 1300, 2400, 2100, 1700, 1300], "Imported granular fill (Class 1A) — low embankments"),
+    ("WS1", "earthworks", EARTH, "C1", "TIP", TIP, "t", 16, [1100, 1400, 1700, 1900, 2100, 2100, 1500, 500, 100, 300, 300, 1000, 1900, 1600, 1400, 1100], "Unsuitable material to tip"),
+    ("WS1", "structures", READY, "BP", "C1", MIX8, "m3", 16, [300], "C32/40 concrete — Welham Lane underpass base (before the southern plant)"),
+    ("WS1", "structures", READY, "WR", "C1", MIX8, "m3", 17, [460, 590, 730, 860, 860, 860, 860, 480, 620, 740, 860, 730, 590, 460], "C32/40 concrete — Welham Lane underpass, culverts, accommodation bridge"),
+    ("WS1", "structures", GENERAL, "RH", "C1", FLAT, "t", 17, [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — WS1 structures"),
+    ("WS1", "substructure", SMALL, "Q2", "C1", TIP, "t", 23, [1100, 600, 1100, 1500, 2300, 2600, 2600, 2600, 2600, 2500, 2500, 2500, 1700, 600, 700], "Pipe bedding and filter drain stone"),
+    ("WS1", "substructure", PRECAST, "RH", "C1", FLAT, "t", 23, [100, 100, 200, 300, 300, 300, 300, 200, 200, 200, 200, 100], "Drainage pipes, chambers and culvert units"),
+    ("WS1", "substructure", SMALL, "Q2", "S1", TIP, "t", 30, [6900, 10100, 11700, 11700, 11700, 11700, 4900, 5500], "6F2 capping (stockpiled at Stockpile South)"),
+    ("WS1", "superstructure", BALLAST, "Q1", "C1", TIP, "t", 35, [11400, 7200, 11600, 12900, 23100, 16300], "Type 1 sub-base"),
+    ("WS1", "superstructure", ASPHALT, "AP", "C1", TIP, "t", 38, [5300, 12900, 17500, 17500, 17500, 16200, 10700], "Asphalt base and binder course"),
+    ("WS1", "superstructure", ASPHALT, "AP", "C1", TIP, "t", 43, [4900, 6100, 4900], "Asphalt surface course"),
+    ("WS1", "substructure", GENERAL, "RH", "C1", FLAT, "t", 41, [100, 200, 100, 100, 100, 100], "Safety barrier, signs, lighting and fencing"),
+    ("WS1", "substructure", READY, "WR", "C1", MIX6, "m3", 34, [200, 270, 190, 260, 310, 370, 370, 370, 370, 330, 260, 200], "C20/25 concrete — kerb bedding, drainage surrounds, barrier footings"),
+    ("WS1", "superstructure", ASPHALT, "AP", "C1", TIP, "t", 45, [4000], "Tie-in surfacing at the Harborough end and the A47 junction (night works)"),
+    ("WS2", "substructure", GENERAL, "RH", "C2", FLAT, "t", 45, [200, 200, 200], "Signs, road-marking materials and the last safety barrier"),
+    ("WS3", "superstructure", BALLAST, "Q1", "C2", TIP, "t", 51, [1100, 1900, 1900, 1900, 1200], "Side-road and accommodation-track reconstruction (Type 1)"),
+    ("WS3", "superstructure", ASPHALT, "Q2", "C2", TIP, "t", 52, [3700, 4600, 3700], "Old road resurfaced as it is handed back (de-trunking) and side roads, from a quarry coating plant"),
+    ("WS1", "earthworks", EARTH, "C1", "TIP", TIP, "t", 48, [200, 700, 800, 2700, 3600], "Compound platform stone lifted and taken to the inert landfill"),
+    ("WS2", "earthworks", EARTH, "C2", "TIP", TIP, "t", 49, [600, 900, 3100, 6200, 4200], "Compound platform stone lifted and taken to the inert landfill"),
+    ("WS4", "earthworks", EARTH, "C3", "TIP", TIP, "t", 47, [8000, 2700, 4300], "Asphalt plant and Tilton Compound platform stone lifted and taken to the inert landfill"),
+    ("WS1", "earthworks", GENERAL, "RH", "C1", FLAT, "t", 46, [100, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100], "Fencing, planting and environmental mitigation"),
+    ("WS3", "earthworks", GENERAL, "RH", "C2", FLAT, "t", 46, [100, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100], "Fencing, planting and environmental mitigation"),
+    ("WS6", "earthworks", GENERAL, "RH", "C4", FLAT, "t", 46, [100, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100], "Fencing, planting and environmental mitigation"),
+    ("WS7", "structures", PRECAST, "RH", "C2", FLAT, "t", 42, [100, 200, 200, 200, 200, 200, 100, 200, 100], "Noseley depot: precast salt barn panels and drainage"),
+]
+# The asphalt plant's feed (D112): crushed rock at PLANT_FEED_SHARE of each tonne of asphalt it makes, split between
+# the two quarries, booked to the section (and so the team) whose asphalt it makes, rounded to 100 t per quarry.
+PLANT_FEED_SHARE = 0.95          # Heidelberg Materials: asphalt is "approx. 95 %" aggregate (by weight: ASSUMPTION)
+PLANT_FEED_Q2 = 0.6              # 60 % Northfield, 40 % Kilby Ridge (ASSUMPTION)
+FEED_DESC = "Crushed rock for the asphalt plant (coarse and fine aggregate)"
+
+# The approval step (§1.9): one Pending and one Rejected line, each on its own line key (approval acts on every month
+# of a line). (route, discipline, section, t, material description, reason)
+PENDING = ("R013", "earthworks", "WS1", 6400.0, "Imported Class 1A for the Harborough South roundabout embankment")
+REJECTED = ("R005", "earthworks", "WS2", 24000.0, "Granular fill (6F2) for the Langton cutting embankments",
+            "24,000 t in one month is more than Langton can place before the capping starts: resubmit spread over "
+            "the earthworks season.")
+EARTHWORKS_SEASON = range(4, 11)  # April–October (§1.3)
+
+# The stockpiles' draw (§1.9, ASSUMPTION): a pile gives out what its sections lay. Out of season the formation is not
+# left exposed and frozen material is unacceptable (SHW Series 600), so little is laid: the share of the week's
+# deliveries laid straight away by calendar month, and in season a quarter of the stock held is laid each week too.
+LAY_SHARE = {1: 0.0, 2: 0.0, 3: 0.2, 4: 1.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 1.0, 9: 1.0, 10: 1.0, 11: 0.1, 12: 0.0}
+LAY_BACKLOG = {m: (0.25 if 4 <= m <= 10 else 0.0) for m in range(1, 13)}
+RAIN_NOTE = "Rain: formation covered, capping stood down Tue–Wed"
+
+
+def programme_lines():
+    """{(origin, dest, material, discipline, section, vehicle, unit, month): [quantity, [descriptions]]} — the
+    PROGRAMME summed per line-month, plus the asphalt plant's feed. Pure: no database."""
+    lines, made = {}, {}
+    for sec, disc, mat, o, d, veh, unit, m0, qs, desc in PROGRAMME:
+        assert (o, d, mat) in ROUTE_ID, (o, d, mat)
+        for i, q in enumerate(qs):
+            if not q:
+                continue
+            m = m0 + i
+            assert 1 <= m <= N_MONTHS, (sec, desc, m)
+            e = lines.setdefault((o, d, mat, disc, sec, veh, unit, m), [0.0, []])
+            e[0] += q
+            if desc not in e[1]:
+                e[1].append(desc)
+            if o == "AP":
+                made[(m, sec)] = made.get((m, sec), 0.0) + q
+    for (m, sec), t in sorted(made.items()):
+        agg = t * PLANT_FEED_SHARE
+        for o, share in (("Q2", PLANT_FEED_Q2), ("Q1", 1 - PLANT_FEED_Q2)):
+            q = round(agg * share / 100.0) * 100
+            if q > 0:
+                e = lines.setdefault((o, "AP", FEED, "superstructure", sec, TIP, "t", m), [0.0, []])
+                e[0] += q
+                e[1] = [FEED_DESC]
+    return lines
+
+
+def month_index_of(year, month):
+    return (year - START_YEAR) * 12 + month
+
+
+def _date(s):
+    return datetime.date.fromisoformat(s) if isinstance(s, str) else s
+
+
+def pending_month(as_of_month):
+    """The first earthworks-season month at least two months after the as-of month (Apr 2027 for 26 Nov 2026)."""
+    m = as_of_month + 2
+    while (m - 1) % 12 + 1 not in EARTHWORKS_SEASON:
+        m += 1
+    return min(m, N_MONTHS)
+
+
+def _outside_checkout(path):
+    p = os.path.normcase(os.path.realpath(os.path.abspath(path)))
+    r = os.path.normcase(os.path.realpath(ROOT))
+    try:
+        return os.path.commonpath([p, r]) != r
+    except ValueError:          # another drive on Windows
+        return True
+
+
 def build(with_areas=False, out=None):
     out = out or OUT
+    as_of = _date(AS_OF)
     # --- schema, seeds -----------------------------------------------------------
     db.init_db(); db.init_network_db(); db.init_taxonomy_db(); db.init_zones_db()
     db.init_gates_db(); db.init_weeks_db(); db.init_lookahead_db(); db.init_config_db()
@@ -214,7 +452,7 @@ def build(with_areas=False, out=None):
             ("superstructure", "Pavement", "Sub-base, base, binder and surface courses.", True),
             ("substructure", "Substructure", "Capping, drainage, kerbs, foundations below the pavement.", True),
             ("structures", "Structures", "Bridges, culverts, retaining walls, noise barriers.", True),
-            ("earthworks", "Earthworks", "Cut, fill, spoil to tip, landscaping.", True),
+            ("earthworks", "Earthworks", "Imported fill and exports to tip on public roads; cut to fill is moved on site by dumpers.", True),
             ("stations", "Stations", "Not part of a road scheme.", False)):
         db.execute("UPDATE disciplines SET label = ?, scope_note = ?, in_scope = ? WHERE tenant_id = ? AND id = ?",
                    (label, note, in_scope, db.current_tenant(), did))
@@ -223,11 +461,18 @@ def build(with_areas=False, out=None):
     doc = json.loads(json.dumps(config.load(conversions, use_cache=False)))
     # H1 (29 Sep 2026): GB, GBP, and the tenant READS MILES (HU5, per tenant; km is stored)
     # 13 Oct 2026 (W12): the council carbon bands, 20 / 50 / 100 t in the month, chosen from the LIVE demo's district
-    # figures for Sep-Dec 2026 (1.5-191 t; on the default 50 / 100 / 200 five of eight districts shared the first colour;
-    # these give 2 / 3 / 2 / 1 in each month). The movement bands keep the default (they already spread).
+    # figures for Sep-Dec 2026. 16 Oct 2026 (the redesign §4.1): held until the first live bake of the four-year
+    # programme, when they are re-chosen from its district figures (R3b) and written here.
+    # 18 Oct 2026 (R3b): re-chosen from the LIVE four-year demo's district figures over all 60 months, after its first
+    # live bake (U8a): 349 district-months with traffic (the county left out: the map draws it as an outline). Carbon
+    # 10 / 25 / 50 t in the month and movements 25 / 50 / 100 a day put about 57 / 23 / 13 / 7 % and 55 / 19 / 19 / 7 % of
+    # them in the four steps; the old 20 / 50 / 100 and the product's 50 / 100 / 200 left three quarters in the palest.
+    # The user saved them on live the same day.
     doc["tenant"] = {"name": TENANT_NAME, "team_label": "Team", "currency": "GBP", "country": "GB",
                      "distance_unit": "mi", "demo_notice": DEMO_NOTICE,
-                     "council_breaks": {"carbon": [20, 50, 100]}}
+                     "council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}}
+    # D106: NO seasonal windows — the product's are scheme-wide by calendar month and meant for statutory
+    # restrictions; Market Harborough's Christmas trading goes in as an advisory zone each December instead.
     doc["seasonal_restrictions"] = []
     # H1: a GB coefficient set with its sources, in GBP. The three ASSUMPTIONS are labelled
     # as such, exactly as the EE seed's are; the rest carry a public source.
@@ -249,6 +494,21 @@ def build(with_areas=False, out=None):
     doc["_fair_price_by_country_note"] = ("A coefficient set per country, used for a tenant whose country has one: this "
                                           "demo tenant is GB, and its fair_price above is the GB set. Config -> Costing · "
                                           "fuel offers the country's set as one click.")
+    # D112: the asphalt plant's feed on its own category. carbon_material null = excluded ON PURPOSE (carbon.py's
+    # carbon_material_of): the rock's production carbon is already inside the asphalt's own factor, so counting it
+    # again on delivery would count it twice (~4,200 tCO2e here). Its haulage is still counted, like any line's.
+    doc["material_categories"][FEED] = {
+        "density_t_per_m3": 1.6, "default_unit": "t", "volume_convertible": False, "units": ["t"],
+        "vehicles": [TIP], "carbon_material": None,
+        "_note": ("16 Oct 2026 (demo, D112): crushed rock delivered INTO the on-site asphalt plant. No material carbon: "
+                  "the asphalt it makes is priced with the asphalt factor, which already covers its aggregate. Haulage "
+                  "is counted. Density as Small aggregate, stored, not used (planned in tonnes only).")}
+    # §1.8: Euro VI on every vehicle the lines use (the CLP section's chart 5 has no "Not typed")
+    for v in (TIP, FLAT, MIX8, MIX6):
+        doc["vehicles"][v]["euro_class"] = "Euro VI"
+    # §1.8: the school-run no-delivery bands (a fictional CLP condition; real CLPs restrict deliveries near schools in
+    # term). Scheme-wide: the product takes them off every gate with hours typed.
+    doc["planning"]["peak_bands"] = [{"from": "08:00", "to": "09:00"}, {"from": "15:00", "to": "16:00"}]
     res = config.save(doc, by="tools/make_demo_tenant.py", network=network)
     assert res["ok"], res
     config.invalidate()
@@ -260,12 +520,15 @@ def build(with_areas=False, out=None):
         {"id": "DS1", "label": "Design Section 1 — south", "km_from": 0.0, "km_to": DS_SPLIT_M / 1000.0, "scope_note": "Harborough to Noseley."},
         {"id": "DS2", "label": "Design Section 2 — north", "km_from": DS_SPLIT_M / 1000.0, "km_to": round(LENGTH_M / 1000, 1), "scope_note": "Tilton to Melton."},
     ])
+    ws_note = {"WS2": " The Langton cutting's cut to the Noseley embankment is moved on site by dumpers and is not shown.",
+               "WS3": " Filled from the Langton cutting along the trace, moved on site by dumpers (not shown)."}
     ws_rows = []
     for sid, name, team, ds, a, b in SECTIONS:
         ws_rows.append({"section_id": sid, "parent_section_id": None, "design_section_id": ds, "ipt_id": team,
                         "name": name, "primary_discipline": None, "in_scope": True, "active": True,
                         "km_from": a / 1000.0, "km_to": (b if b is not None else LENGTH_M) / 1000.0,
-                        "scope_note": "Mainline band. Chainage is the scheme's single global datum, 0+000 at the Harborough end.",
+                        "scope_note": "Mainline band. Chainage is the scheme's single global datum, 0+000 at the Harborough end."
+                                      + ws_note.get(sid, ""),
                         "receives_override": None})
     for sid, name, team, ds, parent in POINT_SECTIONS:
         ws_rows.append({"section_id": sid, "parent_section_id": parent, "design_section_id": ds, "ipt_id": team,
@@ -273,10 +536,11 @@ def build(with_areas=False, out=None):
                         "km_from": None, "km_to": None, "scope_note": "A point asset inside its parent band, not a band of its own.",
                         "receives_override": None})
     tenant_package.import_rows("work_sections", ws_rows)
+    team_of_section = {s[0]: s[2] for s in SECTIONS}
+    team_of_section.update({s[0]: s[2] for s in POINT_SECTIONS})
+    team_name = dict(TEAMS)
 
-    # --- locations ------------------------------------------------------------------
-    BALLAST, SMALL, EARTH = "Large aggregate / ballast", "Small aggregate", "Earthworks / soil"
-    PRECAST, STEEL, GENERAL = "Precast / concrete", "Steel / rail", "General / imported"
+    # --- locations (L001–L016, in this order) ---------------------------------------------
     loc = {}
 
     def add(key, name, role, loc_type, lon, lat, supplies=None, receives=None, vendor=None, detail=None):
@@ -286,12 +550,12 @@ def build(with_areas=False, out=None):
         return r["id"]
 
     # Quarries in the county's real crushed-rock heartland, invented names, positions near main roads.
-    add("Q1", "Kilby Ridge Quarry", "origin", "Quarry", -1.2380, 52.5610, supplies=[BALLAST, SMALL],
-        vendor="Kilby Ridge Aggregates Ltd (fictional)", detail="Granite. Weighbridge in, separate exit onto the main road. Road despatch 06:00–18:00.")
-    add("Q2", "Northfield Quarry", "origin", "Quarry", -1.1340, 52.7270, supplies=[BALLAST, SMALL],
-        vendor="Northfield Stone Co. (fictional)", detail="Granodiorite. Weighbridge queue peaks 07:00–09:00.")
+    add("Q1", "Kilby Ridge Quarry", "origin", "Quarry", -1.2380, 52.5610, supplies=[BALLAST, SMALL, FEED],
+        vendor="Kilby Ridge Aggregates Ltd (fictional)", detail="Granite. Weighbridge in, separate exit onto the main road. Road despatch 06:00–18:00 Monday to Saturday.")
+    add("Q2", "Northfield Quarry", "origin", "Quarry", -1.1340, 52.7270, supplies=[BALLAST, SMALL, FEED, ASPHALT],
+        vendor="Northfield Stone Co. (fictional)", detail="Granodiorite, with a coating plant (asphalt for the 2030 side roads). Weighbridge queue peaks 07:00–09:00.")
     add("Q3", "Brook Pit", "origin", "Quarry", -0.7520, 52.6940, supplies=[EARTH, SMALL],
-        vendor="Brook Pit Sand & Gravel (fictional)", detail="Sand and gravel; earthworks fill.")
+        vendor="Brook Pit Sand & Gravel (fictional)", detail="Sand and gravel; imported granular fill.")
     add("RH", "Harborough Rail Freight Terminal", "origin", "Railhead", -0.9180, 52.4785, supplies=[PRECAST, GENERAL, SMALL],
         detail="Rail-delivered precast units, structural steel and aggregate transhipped to road. Fictional.")
 
@@ -301,92 +565,136 @@ def build(with_areas=False, out=None):
     for key, m in comp_chain.items():
         p = offset(point_at(ALIGN_PTS, ALIGN_CHAIN, m), east_m=420, north_m=-120)
         add(key, comp_names[key], "destination", "Compound", p[0], p[1],
-            receives=[BALLAST, SMALL, EARTH, PRECAST, STEEL, GENERAL],
-            detail=f"Site compound at chainage {chain_text(m)}.")
+            receives=[BALLAST, SMALL, EARTH, PRECAST, STEEL, GENERAL, READY, ASPHALT],
+            detail=f"Site compound at chainage {chain_text(m)}. It stands for all of its section's site accesses: "
+                   "the plan delivers to sites, not to work faces.")
     stock_chain = {"S1": 4500, "S2": 17500, "S3": 25000}
     stock_names = {"S1": "Stockpile South", "S2": "Stockpile Tilton", "S3": "Stockpile North"}
     for key, m in stock_chain.items():
         p = offset(point_at(ALIGN_PTS, ALIGN_CHAIN, m), east_m=-380, north_m=150)
         add(key, stock_names[key], "destination", "Stockpile", p[0], p[1],
             receives=[BALLAST, SMALL, EARTH], detail=f"Bulk stockpile at chainage {chain_text(m)}.")
-    stockpiles.set_capacity(loc["S1"], capacity_qty=60000, capacity_unit="t", opening_qty=12000)
-    stockpiles.set_capacity(loc["S2"], capacity_qty=40000, capacity_unit="t", opening_qty=31000)   # near capacity
-    stockpiles.set_capacity(loc["S3"], capacity_qty=80000, capacity_unit="t", opening_qty=5000)
+    # §1.8: sizes as the design; every opening 0 on 1 Jan 2026 (the scheme starts with empty piles)
+    for key, cap in (("S1", 60000), ("S2", 40000), ("S3", 25000)):
+        stockpiles.set_capacity(loc[key], capacity_qty=cap, capacity_unit="t", opening_qty=0)
 
-    # --- routes ---------------------------------------------------------------------
-    # (origin, dest, material, team, discipline, section, t/month range, rates)
-    section_of = {"C1": "WS1", "C2": "WS2", "C3": "WS4", "C4": "WS6", "S1": "WS1", "S2": "WS4", "S3": "WS5"}
-    team_of = {"C1": "IPT3", "C2": "IPT2", "C3": "IPT1", "C4": "IPT1", "S1": "IPT3", "S2": "IPT1", "S3": "IPT1"}
-    plan = []
-    for d in ("C1", "C2", "C3", "C4"):
-        plan.append(("Q1", d, BALLAST, "superstructure", (9000, 18000)))
-        plan.append(("Q2", d, SMALL, "substructure", (5000, 14000)))
-        plan.append(("RH", d, GENERAL if d in ("C2", "C4") else PRECAST, "superstructure" if d in ("C2", "C4") else "structures", (700, 2200)))
-    plan.append(("Q3", "C1", EARTH, "earthworks", (12000, 28000)))
-    plan.append(("Q3", "C2", EARTH, "earthworks", (12000, 28000)))
-    plan.append(("Q3", "S1", EARTH, "earthworks", (8000, 20000)))
-    plan.append(("Q3", "S3", EARTH, "earthworks", (8000, 20000)))
-    plan.append(("Q1", "S2", BALLAST, "superstructure", (6000, 12000)))
-    plan.append(("Q2", "S3", SMALL, "substructure", (5000, 11000)))
-    assert len(plan) == 18, len(plan)
+    # Carbon planner (10 Oct 2026): Langton Compound's surplus cut leaves site to a (fictional) inert landfill — the
+    # baseline — and a (fictional) soil-recycling hub sits closer, with a route but no forecast: the alternative the
+    # Carbon page's disposal control offers. The destinations' TYPES (Landfill / Soil recycling) are what mark the
+    # lines as disposal (carbon.disposal_loc_types).
+    c2 = point_at(ALIGN_PTS, ALIGN_CHAIN, comp_chain["C2"])
+    tp, hb = offset(c2, east_m=7200, north_m=-3800), offset(c2, east_m=2100, north_m=1600)
+    add("TIP", "Wolds Link Inert Landfill (fictional)", "destination", "Landfill", tp[0], tp[1], receives=[EARTH],
+        detail="Inert landfill taking surplus cut, unsuitable material and lifted platform stone. Fictional: no such site.")
+    add("HUB", "Wolds Link Soil Recycling Hub (fictional)", "destination", "Soil recycling", hb[0], hb[1], receives=[EARTH],
+        detail="Soil treatment and reuse; takes surplus cut for reuse on other schemes. Fictional: no such site.")
+    # civils materials (14 Oct 2026, D13): open ground on an unclassified road off the A606 south-east of Melton (OSM,
+    # 14 Oct 2026: New Road, no premises)
+    add("BP", "Wolds Link Batching Plant (fictional)", "origin", "Batching plant", -0.8620, 52.7440, supplies=[READY],
+        vendor="Wolds Ready-Mix Ltd (fictional)",
+        detail="Ready-mixed concrete for the structures; loading under the plant, a mixer an 8–10 minute turnaround. Fictional: no such plant.")
+    # 16 Oct 2026 (D99): a temporary transferable asphalt plant ON SITE, on open ground beside Tilton Compound off Hyde
+    # Lodge Road (OSM, 16 Oct 2026: farmland, no premises), as the A14 had at Godmanchester. A location type of its own,
+    # "Asphalt plant", so the map can say what it is and no batching-plant count includes it.
+    add("AP", "Wolds Link Asphalt Plant (fictional)", "both", "Asphalt plant", -0.8670, 52.6505,
+        supplies=[ASPHALT], receives=[FEED], vendor="Wolds Link joint venture (fictional)",
+        detail="A temporary transferable asphalt batch plant, 340 t an hour, beside Tilton Compound: base, binder and "
+               "surface courses for both surfacing summers (Mar–Sep 2028, Feb–Sep 2029), fed with crushed rock from "
+               "Northfield and Kilby Ridge. Its hardstanding comes with Tilton Compound's platform in 2026. Fictional: no such plant.")
+    # 16 Oct 2026 (D100): a dedicated ready-mix plant for the south, on open ground off Welham Road north of Market
+    # Harborough (OSM, 16 Oct 2026: farmland between Grange Farm and Wild Meadow Farm, no premises).
+    add("WR", "Welland Ready-Mix (fictional)", "origin", "Batching plant", -0.8920, 52.5232, supplies=[READY],
+        vendor="Welland Ready-Mix Ltd (fictional)",
+        detail="Ready-mixed concrete for the southern structures (Langton and Harborough Compounds), commissioned May "
+               "2027. Fictional: no such plant.")
+    assert [loc[k] for k in ("Q1", "BP", "AP", "WR")] == ["L001", "L014", "L015", "L016"], loc
 
-    routes = []
-    for o, d, mat, disc, rng in plan:
-        team = team_of[d]
-        # routes.ipt is free text; the demo writes the slot id, which every display
-        # turns into the team's name (taxonomy.team_text / teamText)
-        r = network.create_route(loc[o], loc[d], material_category=mat, ipt=team)
+    # --- routes (R001–R043, in ROUTES order) -------------------------------------------
+    team_of = {"C1": "IPT3", "C2": "IPT2", "C3": "IPT1", "C4": "IPT1", "S1": "IPT3", "S2": "IPT1", "S3": "IPT1",
+               "AP": "IPT1"}
+    routes = {}
+    for o, d, mat in ROUTES:
+        # routes.ipt is free text; the demo writes the slot id, which every display turns into the team's name
+        # (taxonomy.team_text / teamText). A route takes its site end's team; one to a tip, its compound's.
+        r = network.create_route(loc[o], loc[d], material_category=mat, ipt=team_of.get(d) or team_of[o])
         assert "error" not in r, r
-        rid = r["id"] if isinstance(r, dict) and "id" in r else r.get("route", {}).get("id")
-        routes.append((rid, o, d, mat, disc, section_of[d], team, rng))
-    # contract rates on the granite routes (a base charge per load plus £/km each way —
-    # the commonest quote shape), a typed target rate for everything else
-    for rid, o, d, mat, disc, sec, team, rng in routes:
+        assert r["id"] == ROUTE_ID[(o, d, mat)], (r["id"], o, d, mat)
+        routes[r["id"]] = (o, d, mat)
+    by_od = {}
+    for rid, (o, d, mat) in routes.items():
+        by_od.setdefault((o, d), rid)
+    # contract rates (§1.8): a base charge per load plus £/km each way on the granite routes (the commonest quote
+    # shape), £180 a load from the terminal, and a per-tonne rate on the asphalt plant's output. A target rate for
+    # everything else.
+    for rid, (o, d, mat) in routes.items():
         if o == "Q1":
-            network.set_route_planning(rid, ("rate_eur_per_load", "rate_eur_per_km", "km_basis"),
-                                       rate_eur_per_load=95.0, rate_eur_per_km=1.85, km_basis="round_trip")
+            res = network.set_route_planning(rid, ("rate_eur_per_load", "rate_eur_per_km", "km_basis"),
+                                             rate_eur_per_load=95.0, rate_eur_per_km=1.85, km_basis="round_trip")
         elif o == "RH":
-            network.set_route_planning(rid, ("rate_eur_per_load", "km_basis"), rate_eur_per_load=180.0, km_basis="round_trip")
-    costing.set_target({"eur_per_load": 0.0, "eur_per_t": 6.20, "eur_per_km": 0.0}, by="demo")
-    costing.set_fuel({"country": "GB", "share_pct": 30.0}, by="demo")
+            res = network.set_route_planning(rid, ("rate_eur_per_load", "km_basis"), rate_eur_per_load=180.0, km_basis="round_trip")
+        elif o == "AP":
+            res = network.set_route_planning(rid, ("rate_eur_per_t",), rate_eur_per_t=4.80)
+        else:
+            continue
+        assert "error" not in res, res
+    # 16 Oct 2026 (§4.3 item 4): the target rate was never saved — set_target was called with eur_per_* keys while
+    # costing.TARGET_FIELDS are rate_eur_per_*, and the answer was not checked. Both fixed.
+    res = costing.set_target({"rate_eur_per_load": 0.0, "rate_eur_per_t": 6.20, "rate_eur_per_km": 0.0}, by="demo")
+    assert res["ok"] and res["target"]["rate_eur_per_t"] == 6.20, res
+    res = costing.set_fuel({"country": "GB", "share_pct": 30.0}, by="demo")
+    assert res["ok"], res
+    # §1.8: the Burrough lane — 8 a day on each of the two village routes, a community agreement. The product compares
+    # each route with its own cap (the lane's total is not checked); a planning flag on the public pages, never a block.
+    # D113: no Look-ahead cap moment (the field is read as lorries there and as movements on the public pages).
+    for key, cap in ((("Q3", "S3"), 8), (("Q2", "S3"), 8)):
+        res = network.set_route_planning(by_od[key], ("max_vehicles_per_day",), max_vehicles_per_day=cap)
+        assert "error" not in res, res
+    # §1.8: the route sheets' words on the routes the stand shows. Every text says it is fictional.
+    burrough = ("Burrough Road is the only lorry access to Stockpile North. A community agreement allows 8 lorries a "
+                "day on this route, none before 07:30 (fictional).",
+                "None through Burrough village. If Burrough Road is closed, hold at the quarry and call the North Team "
+                "logistics desk (fictional).")
+    hot = ("Hot load: the shortest time from the plant to the paver keeps the asphalt at laying temperature (fictional).",
+           "Hot load, no stops: sheeted all the way, no waiting on the road. If the route is blocked, call the plant "
+           "before diverting (fictional).")
+    mix = ("Ready-mixed concrete: the shortest time from the plant, so the mix arrives well inside its workable life "
+           "(fictional).",
+           "Only a signed diversion. Tell the pour supervisor before the trip runs over 60 minutes (fictional).")
+    a47 = ("While the A47 at the new Tilton junction is closed to HGVs (5 Oct 2026 – 17 Dec 2027), follow the signed "
+           "HGV diversion and no other road (fictional).")
+    for rid, (o, d, mat) in routes.items():
+        words = burrough if d == "S3" else hot if o == "AP" else mix if mat == READY else (None, None)
+        reason, dev = words
+        if d in ("C3", "S2") or o == "C3":       # the A47 diversion is the one permitted deviation into Tilton
+            dev = a47 + (" Hot load: no stops on the diversion either." if o == "AP" else "")
+        if reason or dev:
+            res = network.set_route_sheet_text(rid, ("route_reason", "permitted_deviations"),
+                                               route_reason=reason, permitted_deviations=dev)
+            assert "error" not in res, res
+    # §1.8: the site rules on the compounds and plants (printed on every route sheet that loads or delivers there)
+    rules = {
+        "C1": "Site speed 10 mph. In by the A6 entrance, out by Mill Lane: one way on site. No deliveries 08:00–09:00 "
+              "or 15:00–16:00 (school run). Wheel wash before leaving. Hi-vis, hard hat, boots, gloves (fictional).",
+        "C2": "Site speed 10 mph. Langton haul road at 20 km/h; give way to dumpers. Wheel wash before leaving. Hi-vis, "
+              "hard hat, boots, gloves (fictional).",
+        "C3": "Site speed 10 mph. Wait in the bellmouth, never on Hyde Lodge Road. Wheel wash before leaving. Hi-vis, "
+              "hard hat, boots, gloves (fictional).",
+        "C4": "Site speed 10 mph. Call ahead when within 10 minutes; wait in the bellmouth, never on the A606. Wheel "
+              "wash before leaving. Hi-vis, hard hat, boots, gloves (fictional).",
+        "BP": "One-way loop under the plant. Wash out only in the wash-out bay. Ticket at the gate (fictional).",
+        "WR": "One-way loop under the plant. Wash out only in the wash-out bay. Ticket at the gate (fictional).",
+        "AP": "Weighbridge in and out. Sheet every asphalt load before it leaves. No stopping on the site roads. "
+              "Hi-vis, hard hat, boots, gloves (fictional).",
+    }
+    for key, text in rules.items():
+        res = network.set_site_rules(loc[key], text)
+        assert "error" not in res, res
+    # §1.8: the sites' CLP caps, in lorry visits a day (network.CLP_CAP_WORDS)
+    for key, cap in (("C1", 50), ("C4", 60), ("AP", 140)):
+        res = network.set_clp_cap(loc[key], cap)
+        assert "error" not in res, res
 
-    # --- forecasts: four approved months per route ------------------------------------
-    mi_of = {m: m for m in MONTHS}    # month_index == month for START_YEAR
-    n = 0
-    for rid, o, d, mat, disc, sec, team, (lo, hi) in routes:
-        base = random.uniform(lo, hi)
-        for m in MONTHS:
-            qty = round(base * random.uniform(0.85, 1.15) / 100.0) * 100
-            n += 1
-            db.execute(
-                "INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, "
-                "quantity, unit, material_type, material_description, vehicle_type, submitted_by, "
-                "status, reject_reason, ipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (db.current_tenant(), f"F{n:04d}", rid, mi_of[m], disc, sec, float(qty), "t", mat,
-                 {BALLAST: "Type 1 sub-base", SMALL: "6F2 capping", EARTH: "Class 1A general fill",
-                  STEEL: "Structural steel", PRECAST: "Precast units (culverts, parapets)", GENERAL: "Structural and reinforcement steel"}[mat],
-                 "Artic Tipper (44t)" if mat in (BALLAST, SMALL, EARTH) else "Artic Flatbed (44t)",
-                 f"{team} planner", "Approved", None, team))
-
-    # --- weeks: materialise, type two weeks of actuals, confirm the commit week -------
-    weeks.materialise_window(9, 12)
-    sept_lines = db.query("SELECT route_id, discipline, section_id FROM forecasts WHERE tenant_id = ? AND month_index = 9",
-                          (db.current_tenant(),))
-    for line in sept_lines:
-        for wk in (1, 2):
-            w = weeks.get_week(line["route_id"], 9, line["discipline"], line["section_id"], wk)
-            if not w:
-                continue
-            planned = float(w.get("planned_qty") or 0)
-            actual = round(planned * random.uniform(0.82, 1.06) / 10.0) * 10
-            weeks.set_actual(line["route_id"], 9, line["discipline"], line["section_id"], wk,
-                             actual_qty=actual, actual_note=None, by="site clerk")
-    for line in sept_lines:
-        weeks.confirm_week(line["route_id"], 9, line["discipline"], line["section_id"], 3, by="Central Team planner")
-    # a stockpile drawdown typed for week 2
-    stockpiles.consume(loc["S1"], 9, 2, consumed_qty=4200, unit="t", note="Fill placed at 4+200", by="site clerk")
-
-    # --- a temporary haul road (a zone) ------------------------------------------------
+    # --- two temporary haul roads (zones Z001, Z002) ---------------------------------------
     p1 = point_at(ALIGN_PTS, ALIGN_CHAIN, 7800)
     p2 = point_at(ALIGN_PTS, ALIGN_CHAIN, 9200)
     # v2: mode 'splice' — HERE does not know a road built across a field last month, and
@@ -394,225 +702,284 @@ def build(with_areas=False, out=None):
     # say so (haul.py). Spliced, the drawn line IS the geometry, at 20 km/h.
     zr = zones.create_zone("Langton haul road", {"type": "LineString", "coordinates": [offset(p1, 300, -60), offset(p2, 380, 40)]},
                            kind=zones.HAUL_KIND, affects_routing=True, note="Temporary haul road behind Langton Compound (fictional).",
-                           speed_kph=20, haul_mode="splice", starts_on="2026-09-01", ends_on="2026-12-31")
+                           speed_kph=20, haul_mode="splice", starts_on="2026-11-01", ends_on="2029-09-30")
     assert "error" not in zr, zr
     # a second haul road: the last 1.2 km into Stockpile North, off the public road
     p3 = point_at(ALIGN_PTS, ALIGN_CHAIN, 24200)
     zr2 = zones.create_zone("Stockpile North haul road", {"type": "LineString", "coordinates": [offset(p3, -900, -300), offset(p3, -420, 120)]},
                             kind=zones.HAUL_KIND, affects_routing=True, note="Temporary haul road from the lane into Stockpile North (fictional).",
-                            speed_kph=25, haul_mode="splice", starts_on="2026-09-15", ends_on="2026-12-31")
+                            speed_kph=25, haul_mode="splice", starts_on="2026-04-01", ends_on="2027-12-31")
     assert "error" not in zr2, zr2
-    # --- v2: ATTACH the haul roads to the routes that use them (v1 drew one and used it nowhere)
-    by_od = {(o, d): rid for rid, o, d, mat, disc, sec, team, rng in routes}
-    for key in (("Q1", "C2"), ("Q2", "C2"), ("RH", "C2"), ("Q3", "C2")):
-        res = haul.attach(by_od[key], zr["id"])
-        assert "error" not in res, res
+    # ATTACHED to the routes that use them: every route into Langton Compound, and the two village routes
+    for rid, (o, d, mat) in routes.items():
+        if d == "C2":
+            res = haul.attach(rid, zr["id"])
+            assert "error" not in res, res
     for key in (("Q3", "S3"), ("Q2", "S3")):
         res = haul.attach(by_od[key], zr2["id"])
         assert "error" not in res, res
 
-    # --- v2: GATES — a site is entered and left where its roads are, not at its centre ----
-    # Quarries: weighbridge in, a separate exit onto the main road. Compounds: one gate on the
-    # access road. Harborough Compound (the town end): in from one street, out by another.
+    # --- three geofences (Z003–Z005) ----------------------------------------------------
+    def box(lon, lat, w_m, h_m):
+        a = offset([lon, lat], -w_m / 2, -h_m / 2); b = offset([lon, lat], w_m / 2, h_m / 2)
+        return {"type": "Polygon", "coordinates": [[[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]], [a[0], a[1]]]]}
+    # (a) the A47 at the new Tilton junction, closed to HGVs while the junction is built — AFFECTS ROUTING: the routes
+    #     into Tilton Compound and Stockpile Tilton bake round it. A zone only steers HERE while it is in force on the
+    #     day of the bake (zones.applies_on), and the box has to sit on the line HERE drew: the 5 Oct 2026 bake ran the
+    #     A47 along 52.620–52.622 N here, turning north at Tilton (-0.922); the box straddles it 1.8 km west of that
+    #     turn. Same box and start date as before (D106), so the 5 Oct check stands; dated to the junction's build.
+    z_a = zones.create_zone("A47 at the new Tilton junction: HGV diversion while the junction is built",
+                            box(-0.9490, 52.6208, 360, 240), kind="closure", affects_routing=True,
+                            starts_on="2026-10-05", ends_on="2027-12-17",
+                            note="A47 closed to through HGVs at the new junction while it is built; signed HGV diversion (fictional).")
+    assert "error" not in z_a, z_a
+    # (b) a village 7.5 t limit on the lane to Stockpile North — ADVISORY (the router is not told): the routes keep
+    #     using it and the flag says so; paired with the daily caps above. For the whole programme.
+    z_b = zones.create_zone("Burrough village 7.5 t limit", box(-0.8879, 52.6993, 420, 360), kind="weight_limit",
+                            affects_routing=False, starts_on="2026-01-01", ends_on="2030-12-31",
+                            note="Community liaison agreement: 7.5 t except for access, 8 vehicles a day on each route, no deliveries before 07:30 (fictional).")
+    assert "error" not in z_b, z_b
+    # (c) an advisory works area at the Melton end — drawn grey, changes nothing (the junction, Mar 2026 – Sep 2027)
+    z_c = zones.create_zone("Melton junction works area", box(-0.8695, 52.7482, 380, 300), kind="works",
+                            affects_routing=False, starts_on="2026-03-01", ends_on="2027-09-30",
+                            note="Earthworks compound and crane standing for the junction structures (fictional).")
+    assert "error" not in z_c, z_c
+
+    # --- gates (G001–G019): a site is entered and left where its roads are, not at its centre ------------------
+    # Quarries: weighbridge in, a separate exit onto the main road. Compounds: one gate on the access road. Harborough
+    # Compound (the town end): in from the A6, out by Mill Lane. §1.8: open hours, check-in minutes (weighbridges 4,
+    # Harborough Compound 5, every other gate with a check-in 3; the stockpile gates gain one), ONE default gate per
+    # site (gates.py's documented rule): the gate that serves the site's own role.
+    COMPOUND_HOURS = ("07:30", "18:00", "1111100")       # DCO core hours, Monday to Friday (§1.3)
+    PLANT_HOURS = ("06:00", "18:00", "1111110")          # quarries, the Melton plant, the asphalt plant: Mon–Sat
+    hours = {"Q1": PLANT_HOURS, "Q2": PLANT_HOURS, "Q3": PLANT_HOURS, "BP": PLANT_HOURS, "AP": PLANT_HOURS,
+             "RH": ("07:00", "19:00", "1111100"), "WR": ("06:30", "17:00", "1111100")}
+
     def gate(key, name, east, north, direction, default=False, safety=None, internal=None, note=None):
         row = db.query("SELECT lat, lon FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), loc[key]))[0]
         pt = offset([row["lon"], row["lat"]], east, north)
+        of, ot, od = hours.get(key, COMPOUND_HOURS)
         g = gates.create_gate(loc[key], name, pt[1], pt[0], direction=direction, safety_minutes=safety,
-                              internal_travel_minutes=internal, is_default=default, note=note)
+                              internal_travel_minutes=internal, is_default=default, note=note,
+                              open_from=of, open_to=ot, open_days=od)
         assert "error" not in g, g
         return g["id"]
     G = {}
-    G["Q1_in"]  = gate("Q1", "Weighbridge (in)", -260, 90, "access", default=True, safety=4, internal=6, note="Check in at the weighbridge; 10 mph site limit.")
+    G["Q1_in"]  = gate("Q1", "Weighbridge (in)", -260, 90, "access", safety=4, internal=6, note="Check in at the weighbridge; 10 mph site limit.")
     G["Q1_out"] = gate("Q1", "Main road exit", 310, -140, "egress", default=True, internal=4)
-    G["Q2_in"]  = gate("Q2", "Weighbridge (in)", -240, -120, "access", default=True, safety=4, internal=5, note="Queue peaks 07:00–09:00.")
-    G["Q2_out"] = gate("Q2", "A46 exit", 280, 160, "egress", default=True, internal=3)
+    G["Q2_in"]  = gate("Q2", "Weighbridge (in)", -240, -120, "access", safety=4, internal=5, note="Queue peaks 07:00–09:00.")
+    # §4.3 item 7: renamed — the exit is on the A6 (it said "A46 exit")
+    G["Q2_out"] = gate("Q2", "A6 exit", 280, 160, "egress", default=True, internal=3)
     G["Q3"]     = gate("Q3", "Pit entrance", 180, -60, "both", default=True, safety=3, internal=4)
-    G["RH"]     = gate("RH", "Terminal gate", -150, 200, "both", default=True, safety=5, internal=5, note="Booking slot required at the terminal (fictional).")
-    G["C1_in"]  = gate("C1", "Station Road entrance (in)", -210, 150, "access", default=True, safety=5, internal=3, note="Town compound: in by Station Road, out by Mill Lane — one-way on site.")
-    G["C1_out"] = gate("C1", "Mill Lane exit", 230, -170, "egress", default=True, internal=3)
+    G["RH"]     = gate("RH", "Terminal gate", -150, 200, "both", default=True, safety=3, internal=5, note="Booking slot required at the terminal (fictional).")
+    # §4.3 item 7: renamed — the entrance is on the A6 (it said "Station Road entrance")
+    G["C1_in"]  = gate("C1", "A6 entrance (in)", -210, 150, "access", default=True, safety=5, internal=3, note="Town compound: in from the A6, out by Mill Lane — one-way on site.")
+    G["C1_out"] = gate("C1", "Mill Lane exit", 230, -170, "egress", internal=3)
     G["C2"]     = gate("C2", "Compound gate", 190, 60, "both", default=True, safety=3)
     G["C3"]     = gate("C3", "Compound gate", -200, 80, "both", default=True, safety=3)
     G["C4"]     = gate("C4", "Compound gate", 210, -90, "both", default=True, safety=3)
-    G["S1"]     = gate("S1", "Stockpile gate", 160, 100, "both", default=True)
-    G["S2"]     = gate("S2", "Stockpile gate", -170, -90, "both", default=True)
-    G["S3"]     = gate("S3", "Stockpile gate", 150, -120, "both", default=True)
+    G["S1"]     = gate("S1", "Stockpile gate", 160, 100, "both", default=True, safety=3)
+    G["S2"]     = gate("S2", "Stockpile gate", -170, -90, "both", default=True, safety=3)
+    G["S3"]     = gate("S3", "Stockpile gate", 150, -120, "both", default=True, safety=3)
+    G["TIP"]    = gate("TIP", "Weighbridge", -150, 80, "both", default=True, safety=4, internal=3,
+                       note="Inert waste acceptance; a weighbridge ticket per load (fictional).")
+    G["HUB"]    = gate("HUB", "Site gate", 120, -60, "both", default=True, safety=3, internal=2)
+    G["BP"]     = gate("BP", "Plant gate", 140, -90, "both", default=True, safety=3, internal=3,
+                       note="One-way loop under the batching plant; wash-out bay before the exit (fictional).")
+    G["AP"]     = gate("AP", "Weighbridge", -180, 0, "both", default=True, safety=4, internal=4,
+                       note="Weighbridge in and out; sheeting bay before the exit (fictional).")
+    G["WR"]     = gate("WR", "Plant gate", 0, 130, "both", default=True, safety=3, internal=3,
+                       note="One-way loop under the batching plant; wash-out bay before the exit (fictional).")
+    assert G["WR"] == "G019", G
     # the routes name their gates explicitly (the resolver would pick the defaults anyway;
     # an explicit choice is what a planner does on the route form)
-    origin_gate = {"Q1": G["Q1_out"], "Q2": G["Q2_out"], "Q3": G["Q3"], "RH": G["RH"]}
-    dest_gate = {"C1": G["C1_in"], "C2": G["C2"], "C3": G["C3"], "C4": G["C4"], "S1": G["S1"], "S2": G["S2"], "S3": G["S3"]}
-    for rid, o, d, mat, disc, sec, team, rng in routes:
+    origin_gate = {"Q1": G["Q1_out"], "Q2": G["Q2_out"], "Q3": G["Q3"], "RH": G["RH"], "C1": G["C1_out"], "C2": G["C2"],
+                   "C3": G["C3"], "BP": G["BP"], "AP": G["AP"], "WR": G["WR"]}
+    dest_gate = {"C1": G["C1_in"], "C2": G["C2"], "C3": G["C3"], "C4": G["C4"], "S1": G["S1"], "S2": G["S2"], "S3": G["S3"],
+                 "TIP": G["TIP"], "HUB": G["HUB"], "AP": G["AP"]}
+    for rid, (o, d, mat) in routes.items():
         res = gates.set_route_gates(rid, origin_gate_id=origin_gate[o], dest_gate_id=dest_gate[d],
                                     origin_given=True, dest_given=True)
         assert "error" not in res, res
 
-    # --- v2: GEOFENCES ------------------------------------------------------------------
-    def box(lon, lat, w_m, h_m):
-        a = offset([lon, lat], -w_m / 2, -h_m / 2); b = offset([lon, lat], w_m / 2, h_m / 2)
-        return {"type": "Polygon", "coordinates": [[[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]], [a[0], a[1]]]]}
-    # (a) a realignment works closure on the A47 west of Tilton, IN FORCE NOW and for the
-    #     show, AFFECTS ROUTING: the routes into Tilton Compound and Stockpile Tilton re-bake
-    #     around it (longer, dearer, more CO2 — the before/after on the Dashboard).
-    #     Two lessons from the first live bake (5 Oct): a zone only steers HERE while it is in
-    #     force on the day of the bake (zones.applies_on — one geometry per route, not per
-    #     date), so a closure dated from the show week moved nothing; and the box has to sit on
-    #     the line HERE actually drew. The baked A47 runs along 52.620–52.622 N here and the
-    #     routes turn north at Tilton (-0.922); the box straddles it 1.8 km west of that turn.
-    z_a = zones.create_zone("A47 Tilton realignment works", box(-0.9490, 52.6208, 360, 240), kind="closure",
-                            affects_routing=True, starts_on="2026-10-05", ends_on="2026-11-20",
-                            note="Carriageway realignment at the new junction tie-in: A47 closed to through traffic, signed diversion (fictional).")
-    assert "error" not in z_a, z_a
-    # (b) a village 7.5 t limit on the lane to Stockpile North — ADVISORY (the router is not
-    #     told): the routes keep using it and the flag says so; paired with the daily caps below
-    #     (centred on the lane the two routes were baked along — 5 Oct check)
-    z_b = zones.create_zone("Burrough village 7.5 t limit", box(-0.8879, 52.6993, 420, 360), kind="weight_limit",
-                            affects_routing=False, starts_on="2026-09-01", ends_on="2026-12-31",
-                            note="Community liaison agreement: 7.5 t except for access, 20 vehicles a day, no deliveries before 07:30 (fictional).")
-    assert "error" not in z_b, z_b
-    # (c) an advisory works area at the Melton end — drawn grey, changes nothing
-    #     (straddles the baked Melton approach so grey-over-a-route is what is on screen)
-    z_c = zones.create_zone("Melton junction works area", box(-0.8695, 52.7482, 380, 300), kind="works",
-                            affects_routing=False, starts_on="2026-10-01", ends_on="2026-12-18",
-                            note="Earthworks compound and crane standing for the junction structure (fictional).")
-    assert "error" not in z_c, z_c
+    # --- the forecasts: the programme's 905 approved line-months, plus Pending and Rejected -------------------
+    aw_m, aw_w = weeks.week_of_date(as_of)                 # the as-of week (the Thursday rule)
+    pw_m, pw_w = weeks.prev_week(aw_m, aw_w)               # the account week
+    assert 1 <= aw_m <= N_MONTHS, (AS_OF, aw_m)
+    plines = programme_lines()
+    rows = sorted(((ROUTE_ID[(o, d, mat)], m, disc, sec, veh, unit, mat, q, descs)
+                   for (o, d, mat, disc, sec, veh, unit, m), (q, descs) in plines.items()),
+                  key=lambda r: (r[1], r[0], r[2], r[3]))
+    hrng = random.Random(f"wolds-link-history:{as_of.isoformat()}")
+    # §2 PARENT_CHANGED: one Central Team line in the as-of week was raised after its week was set. Typed below as
+    # it happened: written lower, its as-of week set, then raised to the programme's figure.
+    central = [r for r in rows if r[1] == aw_m and team_of_section[r[3]] == "IPT2"]
+    raised = max(central, key=lambda r: (r[7], r[0])) if central else None
+    raise_by = (max(100.0, round(raised[7] * 0.1 / 100.0) * 100) if raised else 0.0)
 
-    # --- v2: daily vehicle caps on the two village routes (ROUTE_CAP fires in the show week) --
-    for key, cap in ((("Q3", "S3"), 20), (("Q2", "S3"), 30)):
-        res = network.set_route_planning(by_od[key], ("max_vehicles_per_day",), max_vehicles_per_day=cap)
-        assert "error" not in res, res
-
-    # --- v2: a Pending and a Rejected line in October, so the approval step is on screen ----
-    n_extra = db.query("SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
-    for status, reason, key, disc in (("Pending", None, ("Q3", "C1"), "structures"),
-                                      ("Rejected", "Quantity is double the September rate — confirm with the earthworks lead before resubmitting.", ("Q2", "C2"), "earthworks")):
-        n_extra += 1
-        rid = by_od[key]
+    def insert(n, rid, m, disc, sec, q, unit, mat, desc, veh, status, reason=None):
+        team = team_of_section[sec]
         db.execute(
             "INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, "
             "quantity, unit, material_type, material_description, vehicle_type, submitted_by, "
             "status, reject_reason, ipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (db.current_tenant(), f"F{n_extra:04d}", rid, 10, disc, section_of[key[1]], 6400.0 if status == "Pending" else 24000.0, "t",
-             EARTH if key[0] == "Q3" else SMALL, "Class 1A general fill" if key[0] == "Q3" else "6F2 capping",
-             "Artic Tipper (44t)", f"{team_of[key[1]]} planner", status, reason, team_of[key[1]]))
+            (db.current_tenant(), f"F{n:04d}", rid, m, disc, sec, float(q), unit, mat, desc, veh,
+             f"{team} planner", status, reason, team))
+    n = 0
+    for rid, m, disc, sec, veh, unit, mat, q, descs in rows:
+        n += 1
+        low = raised is not None and (rid, m, disc, sec) == raised[:4]
+        insert(n, rid, m, disc, sec, q - raise_by if low else q, unit, mat, " + ".join(descs), veh, "Approved")
+    insert(n + 1, PENDING[0], pending_month(aw_m), PENDING[1], PENDING[2], PENDING[3], "t", EARTH, PENDING[4], TIP, "Pending")
+    if aw_m < N_MONTHS:
+        insert(n + 2, REJECTED[0], aw_m + 1, REJECTED[1], REJECTED[2], REJECTED[3], "t", SMALL, REJECTED[4], TIP,
+               "Rejected", REJECTED[5])
 
-    # --- v2: typed actuals into October, so "last week delivered" is not 0 of 18 on the stand --
-    oct_lines = db.query("SELECT route_id, discipline, section_id FROM forecasts WHERE tenant_id = ? AND month_index = 10 AND status = 'Approved'",
-                         (db.current_tenant(),))
-    for line in oct_lines:
-        for wk in (1, 2):
-            w = weeks.get_week(line["route_id"], 10, line["discipline"], line["section_id"], wk)
-            if not w:
-                continue
-            planned = float(w.get("planned_qty") or 0)
-            actual = round(planned * random.uniform(0.86, 1.04) / 10.0) * 10
-            weeks.set_actual(line["route_id"], 10, line["discipline"], line["section_id"], wk,
-                             actual_qty=actual, actual_note=None, by="site clerk")
-
-    # --- carbon planner (10 Oct 2026): a landfill-vs-reuse choice for the surplus cut -------
-    # Langton Compound's surplus cut leaves site to a (fictional) inert landfill — the baseline,
-    # four approved months — and a (fictional) soil-recycling hub sits closer, with a route but
-    # no forecast: the alternative the Carbon page's disposal control offers. The destinations'
-    # TYPES (Landfill / Soil recycling) are what mark the lines as disposal (carbon.disposal_loc_types).
-    # A SEPARATE generator, seeded, so every random draw above — and so every row above — is
-    # byte-for-byte what it was before this block existed. The electric profiles, the recycled
-    # options and the factor block come from backend/factors.json (the seed this tenant starts from).
-    crng = random.Random(20261010)
-    c2 = point_at(ALIGN_PTS, ALIGN_CHAIN, comp_chain["C2"])
-    tp, hb = offset(c2, east_m=7200, north_m=-3800), offset(c2, east_m=2100, north_m=1600)
-    add("TIP", "Wolds Link Inert Landfill (fictional)", "destination", "Landfill", tp[0], tp[1], receives=[EARTH],
-        detail="Inert landfill taking surplus cut. Fictional: no such site.")
-    add("HUB", "Wolds Link Soil Recycling Hub (fictional)", "destination", "Soil recycling", hb[0], hb[1], receives=[EARTH],
-        detail="Soil treatment and reuse; takes surplus cut for reuse on other schemes. Fictional: no such site.")
-    spoil = []
-    for dest in ("TIP", "HUB"):
-        r = network.create_route(loc["C2"], loc[dest], material_category=EARTH, ipt=team_of["C2"])
-        assert "error" not in r, r
-        spoil.append(r["id"] if isinstance(r, dict) and "id" in r else r.get("route", {}).get("id"))
-    n_sp = db.query("SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
-    sp_base = crng.uniform(6000, 9000)
-    for m in MONTHS:
-        n_sp += 1
-        db.execute(
-            "INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, "
-            "quantity, unit, material_type, material_description, vehicle_type, submitted_by, "
-            "status, reject_reason, ipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (db.current_tenant(), f"F{n_sp:04d}", spoil[0], mi_of[m], "earthworks", section_of["C2"],
-             float(round(sp_base * crng.uniform(0.85, 1.15) / 100.0) * 100), "t", EARTH, "Surplus cut to tip (spoil)",
-             "Artic Tipper (44t)", f"{team_of['C2']} planner", "Approved", None, team_of["C2"]))
-        weeks.materialise_line(spoil[0], "earthworks", section_of["C2"], month_index=mi_of[m])
-    # held to the same standard as every other site and line: a gate each, routes that name
-    # their gates, September and October weeks 1–2 typed, September week 3 confirmed
-    G["TIP"] = gate("TIP", "Weighbridge", -150, 80, "both", default=True, safety=4, internal=3,
-                    note="Inert waste acceptance; a weighbridge ticket per load (fictional).")
-    G["HUB"] = gate("HUB", "Site gate", 120, -60, "both", default=True, safety=3, internal=2)
-    for rid, dest in zip(spoil, ("TIP", "HUB")):
-        res = gates.set_route_gates(rid, origin_gate_id=G["C2"], dest_gate_id=G[dest], origin_given=True, dest_given=True)
+    # --- the history up to the as-of date (§1.9) -------------------------------------------------------------
+    # Only weeks that carry history ship: every approved month up to the as-of month is materialised; later weeks
+    # materialise on read, as on any deployment.
+    weeks.materialise_window(1, aw_m)
+    if raised is not None:
+        r_rid, r_m, r_disc, r_sec = raised[:4]
+        w = weeks.get_week(r_rid, r_m, r_disc, r_sec, aw_w)
+        res = weeks.set_week(r_rid, r_m, r_disc, r_sec, aw_w, planned_qty=float(w["planned_qty"]), by=f"{team_name['IPT2']} planner")
         assert "error" not in res, res
-    for m, wks in ((9, (1, 2)), (10, (1, 2))):
-        for wk in wks:
-            w = weeks.get_week(spoil[0], m, "earthworks", section_of["C2"], wk)
-            if not w:
-                continue
-            actual = round(float(w.get("planned_qty") or 0) * crng.uniform(0.86, 1.04) / 10.0) * 10
-            weeks.set_actual(spoil[0], m, "earthworks", section_of["C2"], wk, actual_qty=actual, actual_note=None, by="site clerk")
-    weeks.confirm_week(spoil[0], 9, "earthworks", section_of["C2"], 3, by="Central Team planner")
+        db.execute("UPDATE forecasts SET quantity = ? WHERE tenant_id = ? AND route_id = ? AND month_index = ? "
+                   "AND discipline = ? AND section_id = ?", (float(raised[7]), db.current_tenant(), r_rid, r_m, r_disc, r_sec))
+        weeks.materialise_line(r_rid, r_disc, r_sec, month_index=r_m)
+    hist = [w for w in weeks.list_weeks(1, aw_m)
+            if w.get("parent_status") == "Approved" and (int(w["month_index"]), int(w["week_index"])) < (aw_m, aw_w)]
+    parents = {(f["route_id"], f["month_index"], f["discipline"], f["section_id"]): f for f in db.query(
+        "SELECT route_id, month_index, discipline, section_id, material_type, material_description, vehicle_type, "
+        "unit, ipt FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),))}
+    rmeta = {r["id"]: r for r in db.query("SELECT * FROM routes WHERE tenant_id = ?", (db.current_tenant(),))}
+    lmeta = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
+    factors = conversions.load_factors()
 
-    # --- civils materials (14 Oct 2026, D13): a concrete pour --------------------------------------
-    # A (fictional) ready-mix batching plant on the Melton side feeds the two big structures — Tilton
-    # viaduct (Tilton Compound) and the Melton junction bridge (Melton Compound) — in m³, on the two
-    # concrete mixers. Its OWN seeded generator, so every draw above, and so every row above, is what
-    # it was before this block existed (the carbon block's rule). The compounds' `receives` gain the
-    # category through update_location, so their creation rows above are untouched too.
-    READY = "Ready-mixed concrete"
-    MIX8, MIX6 = "Truck mixer 8 m³ (32t)", "Truck mixer 6 m³ (26t)"   # the stored KEYS; every screen shows "Concrete mixer …"
-    rrng = random.Random(20261014)
-    # open ground on an unclassified road off the A606 south-east of Melton (OSM, 14 Oct 2026: New Road, no premises)
-    add("BP", "Wolds Link Batching Plant (fictional)", "origin", "Batching plant", -0.8620, 52.7440, supplies=[READY],
-        vendor="Wolds Ready-Mix Ltd (fictional)",
-        detail="Ready-mixed concrete for the structures; loading under the plant, a mixer an 8–10 minute turnaround. Fictional: no such plant.")
-    for key in ("C3", "C4"):
-        row = db.query("SELECT receives FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), loc[key]))[0]
-        have = json.loads(row["receives"]) if row.get("receives") else []
-        res = network.update_location(loc[key], receives=have + [READY])
-        assert "error" not in (res or {}), res
-    G["BP"] = gate("BP", "Plant gate", 140, -90, "both", default=True, safety=3, internal=3,
-                   note="One-way loop under the batching plant; wash-out bay before the exit (fictional).")
-    pour = {}
-    for dest in ("C3", "C4"):
-        r = network.create_route(loc["BP"], loc[dest], material_category=READY, ipt=team_of[dest])
-        assert "error" not in r, r
-        pour[dest] = r["id"] if isinstance(r, dict) and "id" in r else r.get("route", {}).get("id")
-        res = gates.set_route_gates(pour[dest], origin_gate_id=G["BP"], dest_gate_id=dest_gate[dest], origin_given=True, dest_given=True)
+    def tonnes(qty, unit, mat, veh):
+        return float(qty) if unit == "t" else conversions.convert(float(qty), unit, "t", mat, veh, factors)
+
+    def km_one_way(rid):
+        # ASSUMPTION for a typed actual cost only: 1.3 × the straight line between the two sites (no geometry here)
+        a, b = lmeta[rmeta[rid]["origin_id"]], lmeta[rmeta[rid]["dest_id"]]
+        return 1.3 * zones.haversine_km([a["lon"], a["lat"]], [b["lon"], b["lat"]])
+
+    def actual_cost(rid, t, veh):
+        r = rmeta[rid]
+        if r.get("rate_eur_per_load") is None and r.get("rate_eur_per_t") is None:
+            return None
+        loads = math.ceil(t / float(factors["vehicles"][veh]["payload_t"]) - 1e-9)
+        km = km_one_way(rid) * (2 if (r.get("km_basis") or "round_trip") == "round_trip" else 1)
+        return round(loads * float(r.get("rate_eur_per_load") or 0) + t * float(r.get("rate_eur_per_t") or 0)
+                     + loads * km * float(r.get("rate_eur_per_km") or 0))
+
+    # the account week (the week before the as-of week): 2–3 chosen lines short, every other line held, so exactly
+    # those show SHORTAGE in the as-of week (clashes.HOLD_BAND: under 98 % of plan and not carried)
+    acct = [w for w in hist if (int(w["month_index"]), int(w["week_index"])) == (pw_m, pw_w)]
+    in_aw = {(r[0], r[2], r[3]) for r in rows if r[1] == aw_m}
+    short_pool = [w for w in acct if (w["route_id"], w["discipline"], w["section_id"]) in in_aw
+                  and w["discipline"] in ("earthworks", "substructure") and float(w["planned_qty"] or 0) >= 200]
+    prefer = [("R011", "substructure", "WS6"), ("R018", "substructure", "WS5"), ("R024", "earthworks", "WS6")]
+    short_pool.sort(key=lambda w: (0 if (w["route_id"], w["discipline"], w["section_id"]) in prefer else 1,
+                                   prefer.index((w["route_id"], w["discipline"], w["section_id"]))
+                                   if (w["route_id"], w["discipline"], w["section_id"]) in prefer else 0,
+                                   -float(w["planned_qty"] or 0), w["route_id"]))
+    shortages = {(w["route_id"], w["discipline"], w["section_id"]) for w in short_pool[:3]}
+    xmas = {datetime.date(y, 12, 25) for y in range(START_YEAR, START_YEAR + 6)} | \
+           {datetime.date(y, 1, 1) for y in range(START_YEAR, START_YEAR + 6)}
+    inbound = {}        # (location_id, month, week) -> tonnes delivered (typed actuals)
+    for w in hist:
+        rid, m, wk, disc, sec = w["route_id"], int(w["month_index"]), int(w["week_index"]), w["discipline"], w["section_id"]
+        p = parents[(rid, m, disc, sec)]
+        planned = float(w["planned_qty"] or 0)
+        mon, sun = weeks.week_span(m, wk)
+        cal_m = (m - 1) % 12 + 1
+        note = None
+        key = (rid, disc, sec)
+        if (m, wk) == (pw_m, pw_w):
+            f = hrng.uniform(0.80, 0.95) if key in shortages else hrng.uniform(0.98, 1.05)
+            if key in shortages and disc in ("earthworks", "substructure"):
+                note = RAIN_NOTE
+        elif any(mon <= x <= sun for x in xmas):
+            f, note = hrng.uniform(0.35, 0.60), "Christmas stop"
+        elif cal_m in (11, 12, 1, 2) and (disc == "earthworks" or "capping" in (p["material_description"] or "")) \
+                and hrng.random() < 0.35:
+            f = hrng.uniform(0.70, 0.90)
+            note = RAIN_NOTE if hrng.random() < 0.4 else None
+        else:
+            f = hrng.uniform(0.90, 1.05)
+        step = 1.0 if (w["unit"] == "m3" or planned < 200) else 10.0
+        actual = round(planned * f / step) * step
+        if (m, wk) == (pw_m, pw_w) and key not in shortages:
+            actual = max(actual, math.ceil(planned * clashes.HOLD_BAND - 1e-9))
+        t = tonnes(actual, w["unit"], p["material_type"], p["vehicle_type"])
+        cost = actual_cost(rid, t, p["vehicle_type"])
+        res = weeks.set_actual(rid, m, disc, sec, wk, actual_qty=actual, actual_note=note, by="site clerk",
+                               actual_cost_eur=cost, cost_given=cost is not None)
         assert "error" not in res, res
-    # (dest, discipline, section, m³ a month range, mixer, description, months)
-    POUR_LINES = [
-        ("C3", "structures", "WS4", (900, 1500), MIX8, "C32/40 concrete — Tilton viaduct piers and deck", MONTHS),
-        ("C4", "structures", "WS8", (500, 900), MIX8, "C32/40 concrete — Melton junction bridge", [10, 11, 12]),
-        ("C4", "substructure", "WS6", (200, 400), MIX6, "C20/25 concrete — kerb bedding and drainage surrounds", [10, 11, 12]),
-    ]
-    n_pour = db.query("SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"]
-    for dest, disc, sec, (lo, hi), veh, desc, months in POUR_LINES:
-        base = rrng.uniform(lo, hi)
-        for m in months:
-            n_pour += 1
-            db.execute(
-                "INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, "
-                "quantity, unit, material_type, material_description, vehicle_type, submitted_by, "
-                "status, reject_reason, ipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (db.current_tenant(), f"F{n_pour:04d}", pour[dest], mi_of[m], disc, sec,
-                 float(round(base * rrng.uniform(0.85, 1.15) / 10.0) * 10), "m3", READY, desc,
-                 veh, f"{team_of[dest]} planner", "Approved", None, team_of[dest]))
-            weeks.materialise_line(pour[dest], disc, sec, month_index=mi_of[m])
-        # actuals typed for weeks 1–2 of each month up to October, as on every other line
-        for m in (9, 10):
-            if m not in months:
-                continue
-            for wk in (1, 2):
-                w = weeks.get_week(pour[dest], m, disc, sec, wk)
-                if not w:
+        res = weeks.confirm_week(rid, m, disc, sec, wk, by=f"{team_name[p['ipt']]} planner")
+        assert "error" not in res, res
+        dest = rmeta[rid]["dest_id"]
+        inbound[(dest, m, wk)] = inbound.get((dest, m, wk), 0.0) + t
+    # consumption, typed every week before the as-of week (§1.9): the compounds use what arrives; the stockpiles give
+    # out what their sections lay (LAY_SHARE, LAY_BACKLOG). Nothing is typed for the as-of week itself, so a pile near
+    # capacity forecasts over in the commit week (STOCKPILE_OVER).
+    held = {loc[k]: 0.0 for k in ("S1", "S2", "S3")}
+    for m in range(1, aw_m + 1):
+        for wk in range(1, weeks.weeks_in_month(m) + 1):
+            if (m, wk) >= (aw_m, aw_w):
+                break
+            cal_m = (m - 1) % 12 + 1
+            for key in ("C1", "C2", "C3", "C4"):
+                t = inbound.get((loc[key], m, wk), 0.0)
+                if t > 0:
+                    res = stockpiles.consume(loc[key], m, wk, consumed_qty=round(t, 1), unit="t",
+                                             note="Used on the works as delivered", by="site clerk")
+                    assert "error" not in res, res
+            for key in ("S1", "S2", "S3"):
+                lid = loc[key]
+                t = inbound.get((lid, m, wk), 0.0)
+                if t <= 0 and held[lid] <= 0:
                     continue
-                actual = round(float(w.get("planned_qty") or 0) * rrng.uniform(0.86, 1.04))
-                weeks.set_actual(pour[dest], m, disc, sec, wk, actual_qty=actual, actual_note=None, by="site clerk")
-    weeks.confirm_week(pour["C3"], 9, "structures", "WS4", 3, by="North Team planner")
+                draw = min(held[lid] + t, t * LAY_SHARE[cal_m] + held[lid] * LAY_BACKLOG[cal_m])
+                held[lid] = held[lid] + t - draw
+                res = stockpiles.consume(lid, m, wk, consumed_qty=round(draw, 1), unit="t",
+                                         note=("Laid on the section" if draw > 0 else "Stock held: formation not laid in winter"),
+                                         by="site clerk")
+                assert "error" not in res, res
+    # the as-of week: days for every line, day actuals for the days before the as-of date (Monday to Wednesday for a
+    # Thursday), one South Team line's day split typed 10 t short of its week (DAYS_NE_WEEK), and the North Team's
+    # week confirmed — so the Confirm button is still live for the Central and South Teams.
+    days.materialise_commit_week(today=as_of)
+    aw_lines = [w for w in weeks.list_weeks(aw_m, aw_m)
+                if int(w["week_index"]) == aw_w and w.get("parent_status") == "Approved"]
+    south = [w for w in aw_lines if parents[(w["route_id"], aw_m, w["discipline"], w["section_id"])]["ipt"] == "IPT3"
+             and float(w["planned_qty"] or 0) >= 100]
+    if south:
+        s = max(south, key=lambda w: (float(w["planned_qty"] or 0), w["route_id"]))
+        mon = weeks.week_span(aw_m, aw_w)[0]
+        fri = mon + datetime.timedelta(days=4)
+        share = float(s["planned_qty"]) / 5.0
+        res = days.set_day(s["route_id"], aw_m, s["discipline"], s["section_id"], fri.isoformat(), share - 10.0,
+                           by=f"{team_name['IPT3']} planner", today=as_of)
+        assert "error" not in res, res
+    mon = weeks.week_span(aw_m, aw_w)[0]
+    for w in aw_lines:
+        p = parents[(w["route_id"], aw_m, w["discipline"], w["section_id"])]
+        for i in range(5):
+            d = mon + datetime.timedelta(days=i)
+            if d >= as_of:
+                break
+            share = float(w["planned_qty"] or 0) / 5.0
+            step = 1.0 if (w["unit"] == "m3" or share < 200) else 10.0
+            res = days.set_day_actual(w["route_id"], aw_m, w["discipline"], w["section_id"], d.isoformat(),
+                                      actual_qty=round(share * hrng.uniform(0.90, 1.05) / step) * step,
+                                      by="site clerk", today=as_of)
+            assert "error" not in res, res
+        if p["ipt"] == "IPT1":
+            res = days.confirm_week(w["route_id"], aw_m, w["discipline"], w["section_id"], aw_w,
+                                    by=f"{team_name['IPT1']} planner", today=as_of)
+            assert "error" not in res, res
 
     # --- the overlay ------------------------------------------------------------------
     # Chainage markers at EXACT 100 m chainages, positioned along the line — the shape a
@@ -665,24 +1032,24 @@ def build(with_areas=False, out=None):
 
     # --- 16 Oct 2026: EVERY GATE BY THE PUBLIC ROAD, WITH ITS ACCESS ROAD DRAWN --------------------------------
     # The user, 16 Oct 2026: "gates are usually right by the public road with a suitable bellmouth, maybe enough to fit
-    # one or two vehicles before the gate. Please ensure there is a haul road drawn to every gate." Until now a gate sat
-    # 150–310 m from its site's centre with no road near it, and the routes stopped 84–685 m short of it (measured on a
-    # local bake). Now each gate is moved to BELLMOUTH_M in from the nearest lorry road, and that stretch is drawn as the
-    # gate's access road (a haul road, spliced, at 10 km/h): every route arriving by the gate ends along it and every
-    # route leaving starts along it (haul.leg_steps). Done last, after every gate exists, so the zone ids above
-    # (Z001–Z005) and every other row are unchanged; the access roads take the next ids in gate order.
+    # one or two vehicles before the gate. Please ensure there is a haul road drawn to every gate." Each gate is moved to
+    # BELLMOUTH_M in from the nearest lorry road, and that stretch is drawn as the gate's access road (a haul road,
+    # spliced, at 10 km/h): every route arriving by the gate ends along it and every route leaving starts along it
+    # (haul.leg_steps). Done after every gate exists and after the five zones above, so those keep Z001–Z005 and the
+    # access roads take Z006–Z024 in gate order; the advisory zones below come after them (Z025 on).
     # The road points: the nearest OpenStreetMap way of class trunk / primary / secondary / tertiary / unclassified
     # (residential streets left out on purpose: no quarry gate on a housing close) to each gate's v2 position, one
-    # Overpass query, 16 Oct 2026. OSM data © OpenStreetMap contributors (ODbL); a point on a road, nothing else kept.
+    # Overpass query, 16 Oct 2026 (the two new plants' gates: one more query, 16 Oct 2026 night). OSM data ©
+    # OpenStreetMap contributors (ODbL); a point on a road, nothing else kept.
     BELLMOUTH_M = 35.0          # two 16.5 m artics off the carriageway before the gate
     ROAD_AT = {   # (site, gate): ([lon, lat] on the road, the road's name in OSM)
         ("Kilby Ridge Quarry", "Weighbridge (in)"): ([-1.237463, 52.559127], "Marion's Way"),
         ("Kilby Ridge Quarry", "Main road exit"): ([-1.235117, 52.55825], "Marion's Way"),
         ("Northfield Quarry", "Weighbridge (in)"): ([-1.136478, 52.72641], "Leicester Road"),
-        ("Northfield Quarry", "A46 exit"): ([-1.130968, 52.72813], "A6"),
+        ("Northfield Quarry", "A6 exit"): ([-1.130968, 52.72813], "A6"),
         ("Brook Pit", "Pit entrance"): ([-0.749217, 52.693492], "Ashwell Road"),
         ("Harborough Rail Freight Terminal", "Terminal gate"): ([-0.920385, 52.480157], "Doddridge Road"),
-        ("Harborough Compound", "Station Road entrance (in)"): ([-0.904551, 52.5023], "A6"),
+        ("Harborough Compound", "A6 entrance (in)"): ([-0.904551, 52.5023], "A6"),
         ("Harborough Compound", "Mill Lane exit"): ([-0.892606, 52.502515], "Welham Lane"),
         ("Langton Compound", "Compound gate"): ([-0.894045, 52.554637], "Harborough Road"),
         ("Tilton Compound", "Compound gate"): ([-0.873635, 52.646823], "Hyde Lodge Road"),
@@ -693,6 +1060,8 @@ def build(with_areas=False, out=None):
         ("Wolds Link Inert Landfill (fictional)", "Weighbridge"): ([-0.800099, 52.519765], "Medbourne Road"),
         ("Wolds Link Soil Recycling Hub (fictional)", "Site gate"): ([-0.865023, 52.566747], "Goadby Road"),
         ("Wolds Link Batching Plant (fictional)", "Plant gate"): ([-0.861343, 52.744406], "New Road"),
+        ("Wolds Link Asphalt Plant (fictional)", "Weighbridge"): ([-0.870439, 52.650658], "Hyde Lodge Road"),
+        ("Welland Ready-Mix (fictional)", "Plant gate"): ([-0.892004, 52.525043], "Welham Road"),
     }
     names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
     for g in gates.list_gates():
@@ -709,8 +1078,50 @@ def build(with_areas=False, out=None):
         assert "error" not in z, z
         res = gates.update_gate(g["id"], lat=at[1], lon=at[0], access_zone_id=z["id"])
         assert "error" not in res, res
+    assert z["id"] == "Z024", z
 
-    # --- council areas, only when asked (--with-areas; §2.2b) -------------------------
+    # --- §1.8: the ADVISORY zones of the programme (Z025 on), created after the access roads ----------------------
+    # Advisory: drawn on the map by month and listed in the bulletin's local controls; the router is not told.
+    def at_chain(m, east=0.0, north=0.0):
+        return offset(point_at(ALIGN_PTS, ALIGN_CHAIN, m), east, north)
+    ADVISORY = [
+        ("Tilton viaduct works area", box(*at_chain(18500), 700, 400), "works", "2026-05-01", "2028-05-31",
+         "Piling, piers and deck of the Tilton viaduct; crane standings and the beam lifts (fictional)."),
+        ("Langton cutting works area", box(*at_chain(8000), 900, 500), "works", "2027-04-01", "2028-09-30",
+         "The deep cutting; its cut goes to the Noseley embankment by dumpers on site (fictional)."),
+        ("A606 night closures for the Melton junction beam lift", box(-0.8650, 52.7462, 400, 250), "closure",
+         "2027-04-01", "2027-04-30",
+         "A606 closed overnight 22:00–06:00 on the beam-lift nights; signed diversion (fictional)."),
+        ("A47 tie-in weekend closures at Tilton", box(-0.9490, 52.6208, 400, 260), "closure", "2028-03-01", "2028-06-30",
+         "A47 closed at weekends while the new junction is tied in; signed diversion (fictional)."),
+        ("Harborough A6 tie-in", box(*at_chain(0), 400, 300), "works", "2029-06-01", "2029-10-31",
+         "The new road tied in to the A6 at the Harborough South roundabout; lane closures, nights mostly (fictional)."),
+        ("Market Harborough town centre: Christmas trading 2027", box(-0.9205, 52.4775, 700, 500), "closure",
+         "2027-12-01", "2027-12-31",
+         "No scheme lorries through the town centre during Christmas trading, by agreement with the council (fictional)."),
+        ("Market Harborough town centre: Christmas trading 2028", box(-0.9205, 52.4775, 700, 500), "closure",
+         "2028-12-01", "2028-12-31",
+         "No scheme lorries through the town centre during Christmas trading, by agreement with the council (fictional)."),
+    ]
+    for name, geom, kind, s_on, e_on, note in ADVISORY:
+        z = zones.create_zone(name, geom, kind=kind, affects_routing=False, starts_on=s_on, ends_on=e_on, note=note)
+        assert "error" not in z, z
+
+    # --- D105: the carbon target, shipped -----------------------------------------------------------------------
+    # A % target agreed at programme start from two decisions: Langton's surplus cut to the soil recycling hub (R019 →
+    # R020) instead of the inert landfill, and recycled aggregate in "Large aggregate / ballast" (30 %: ASSUMPTION).
+    # Both work on unbaked routes: a disposal figure and a material figure are tonnes × factor, with no distance. After
+    # the bake the swap's haulage saving adds on top; re-set the % once on live only if it must match exactly.
+    levers = [{"driver": "disposal", "scope": {"route_id": ROUTE_ID[("C2", "TIP", EARTH)]},
+               "to_route": ROUTE_ID[("C2", "HUB", EARTH)]},
+              {"driver": "recycled", "scope": {"category": BALLAST}, "pct": 30}]
+    ui = {"recycled": {BALLAST: 30}, "epd": {}, "reused": {}, "vehicle": {}, "electric": False, "distance": {},
+          "supplier": {}, "alt": {}, "disposal": {ROUTE_ID[("C2", "TIP", EARTH)]: {"to_route": ROUTE_ID[("C2", "HUB", EARTH)]}}}
+    ct = carbon_target.set_from_levers({"role": "planner", "ipt": None}, "pct", levers, ui_state=ui,
+                                       by="tools/make_demo_tenant.py")
+    assert ct and ct["mode"] == "pct" and ct["pct_below"] > 0, ct
+
+    # --- council areas (--with-areas; §2.2b; the shipped package since D102) -------------------
     if with_areas:
         import areas
         with open(AREAS_SEED, encoding="utf-8") as f:
@@ -719,41 +1130,92 @@ def build(with_areas=False, out=None):
 
     # --- export -----------------------------------------------------------------------
     pkg = tenant_package.export_tenant(app_version="modus-g2")
-    pkg["_readme"] = ("Synthetic demo tenant v2 — the Wolds Link, a fictional ~32 km A-road dualling scheme in the East "
-                      "Midlands. Nothing in it is anyone's data. Import into an EMPTY tenant "
-                      "(POST /api/admin/tenant/import; replace=1 over the v1 demo), then bake the network (HERE) for EVERY "
-                      "planning vehicle the lines use (Artic Tipper, Artic Flatbed, Rigid 8-wheeler, and since 14 Oct 2026 "
-                      "the two concrete mixers on the batching plant's routes) — routes read "
-                      "UNBAKED until then, and the works-zone geofence only re-routes what is baked. Diesel index: fetched "
+    pkg["_readme"] = ("Synthetic demo tenant v3 — the Wolds Link, a fictional ~32 km A-road dualling scheme in the East "
+                      "Midlands, as a four-year programme (Jan 2026 – Dec 2030; the north opens Dec 2028, the whole road "
+                      "Oct 2029). Nothing in it is anyone's data. Import into an EMPTY tenant "
+                      "(POST /api/admin/tenant/import; replace=1 over an older demo), then bake the network (HERE) for EVERY "
+                      "planning vehicle the lines use (Artic Tipper, Artic Flatbed, and the two concrete mixers on the "
+                      "batching plants' routes) — routes read UNBAKED until then, and the A47 closure only re-routes what "
+                      "is baked while it is in force. History (actuals, the account week, day actuals, confirmations, "
+                      f"stockpile draw) is typed up to {as_of.isoformat()} (the generator's --as-of). Diesel index: fetched "
                       "automatically from DESNZ weekly road fuel prices (H1); fuel_index below is a typed placeholder applied "
                       "on import if the GB row is empty. Distances read in miles (tenant.distance_unit); km is what is stored. "
-                      "tenant.demo_notice puts 'DEMO · Fictional scheme' on every screen and export. Carbon planner "
-                      "(10 Oct 2026): Langton Compound's surplus cut goes to a fictional inert landfill (four approved "
-                      "months); a fictional soil-recycling hub nearer by has a route and no forecast — the disposal "
-                      "alternative. The two electric lorry profiles are scenario-only: they read the diesel twin's "
-                      "baked distances and are never offered on a forecast.")
+                      "tenant.demo_notice puts 'DEMO · Fictional scheme' on every screen and export. The council areas "
+                      "ship in the package (D102) and the carbon target too (D105). Carbon planner: Langton Compound's "
+                      "surplus cut goes to a fictional inert landfill; a fictional soil-recycling hub nearer by has a route "
+                      "and no forecast — the disposal alternative. The asphalt plant's crushed rock rides its own category "
+                      "with no material carbon (D112). The two electric lorry profiles are scenario-only: they read the "
+                      "diesel twin's baked distances and are never offered on a forecast.")
     # H1: a typed placeholder at the research's second-hand reading of the DESNZ series (≈195.5 p/L,
     # w/c 21 Sep 2026, pump price incl. VAT). The DESNZ fetch replaces it on the first refresh.
     pkg["fuel_index"] = [{"country": "GB", "eur_per_l": 1.955, "bulletin_date": "2026-09-21",
                           "note": "typed placeholder from a second-hand reading of the DESNZ weekly road fuel "
                                   "prices (ULSD pump price incl. VAT); the automatic DESNZ fetch replaces it"}]
+    if LIVE_EXPORT:
+        copy_live_tables(pkg, LIVE_EXPORT)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         json.dump(pkg, f, ensure_ascii=False, indent=1)
     return pkg
 
 
+# The tables a live refresh carries over from the live demo unchanged (§1.9): baked and fetched, never generated here.
+LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas",
+               "community_features", "community_meta", "collision_records", "collision_meta")
+
+
+def copy_live_tables(pkg, path):
+    """Copy LIVE_TABLES and the live carbon_target row from a live export into `pkg`. Refuses (SystemExit) when the
+    live routes, gates or zones are not the ones written here: their baked geometry would then describe other roads."""
+    with open(path, encoding="utf-8") as f:
+        live = json.load(f)
+    lt, nt = live.get("tables") or {}, pkg["tables"]
+
+    def sig(rows, cols):
+        return sorted(tuple((round(r.get(c), 6) if isinstance(r.get(c), float) else r.get(c)) for c in cols)
+                      for r in rows or [])
+    problems = []
+    for t, cols in (("routes", ("id", "origin_id", "dest_id", "material_category")),
+                    ("location_gates", ("id", "location_id", "lat", "lon", "access_zone_id")),
+                    ("zones", ("id", "kind", "affects_routing", "geometry", "starts_on", "ends_on")),
+                    ("route_haul_roads", ("route_id", "zone_id"))):
+        if sig(lt.get(t), cols) != sig(nt.get(t), cols):
+            problems.append(f"{t} differ between the live export and this build")
+    if problems:
+        raise SystemExit("--live-export refused: " + "; ".join(problems) + ". Re-bake on live instead (§4.2).")
+    for t in LIVE_TABLES:
+        nt[t] = list(lt.get(t) or [])
+    row = [r for r in lt.get("config") or [] if r.get("key") == "carbon_target"]
+    nt["config"] = [r for r in nt["config"] if r.get("key") != "carbon_target"] + row
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="Write the synthetic UK demo tenant package.")
     ap.add_argument("--with-areas", action="store_true",
-                    help="also load backend/data/areas_demo.geojson into the package's areas table (off by default)")
+                    help="also load backend/data/areas_demo.geojson into the package's areas table (off by default; "
+                         "the shipped package is built with it)")
     ap.add_argument("--out", default=None, help="where to write the package (default demo/uk-corridor.package.json)")
+    ap.add_argument("--as-of", default=SHIPPED_AS_OF,
+                    help=f"type the history up to this date, YYYY-MM-DD (default {SHIPPED_AS_OF}, the shipped package); "
+                         "another date needs --out outside the checkout")
+    ap.add_argument("--live-export", default=None,
+                    help="a live export (GET /api/admin/tenant/export) whose baked and fetched tables are copied across; "
+                         "needs --out outside the checkout")
     args = ap.parse_args()
+    try:
+        datetime.date.fromisoformat(args.as_of)
+    except ValueError:
+        ap.error("--as-of must be a date, YYYY-MM-DD")
+    if args.as_of != SHIPPED_AS_OF or args.live_export:
+        if not args.out or not _outside_checkout(args.out):
+            ap.error("--as-of (other than the shipped date) and --live-export need --out to a path OUTSIDE the "
+                     "checkout: test_modus.py allows only the shipped package in the repository")
+    AS_OF, LIVE_EXPORT = args.as_of, args.live_export
     OUT = args.out or OUT
     pkg = build(with_areas=args.with_areas, out=OUT)
     c = tenant_package.counts(pkg)
     print(f"wrote {OUT}")
-    print("corridor length %.1f km" % (LENGTH_M / 1000))
+    print("corridor length %.1f km; history to %s" % (LENGTH_M / 1000, AS_OF))
     for t in tenant_package.ORDER:
         print(f"  {t:22s} {c.get(t, 0)}")

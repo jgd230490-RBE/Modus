@@ -982,8 +982,11 @@ ok("🔴 the CASING is dashed too, or the dots sit on a solid white line",
   ok("🔴 no expression uses a bare array as an output — it must be ['literal', …]",
     !bareArrayOutput.test(code.replace(/\s+/g, ' ')));
 }
+// NARROWED 16 Oct 2026 (D115): this is the ROUTE layers' rule. The flow's dasharray IS an expression — a step on the
+// lane's figure with every output ['literal', …]-wrapped, drawn on GL JS 2.14.1 in the browser on 16 Oct — built by
+// flowDashExpr() and set through a function, never written inline in a layer definition (pinned in the D115 block)
 ok("line-dasharray is a plain constant, not an expression — cross-faded properties "
-   + "have patchy expression support and two map deploys went out broken",
+   + "have patchy expression support and two map deploys went out broken (the route layers; the flow's is built by flowDashExpr)",
   !/'line-dasharray':\s*\['(step|interpolate|case|match)'/.test(code)
   && !/DASH_(CORE|CASING)\s*=\s*\['/.test(code));
 ok("...and the reason is written where someone would 'improve' it back",
@@ -1241,9 +1244,11 @@ ok("⭐ ...and does nothing when they are already last, in order",
 ok("⭐ every lazy layer adder re-raises the marks afterwards",
   /raiseMarks\(\);\n    \}/.test(code)
   && (code.match(/raiseMarks\(\);/g) || []).length >= 8);
+// NARROWED 16 Oct 2026 (D115): the flow layer's adder is ensureFlowLayer() on its own source; it re-raises after
+// putting the flow back under the labels (placeFlowLayer)
 ok("⭐ ...including the three forecast layers, which are the ones that actually covered them",
   /'text-halo-width':2\}\}\);\s*\n\s*raiseMarks\(\);/.test(code)
-  && /'line-dasharray':\[0,4,3\]\}\}\);\s*\n\s*raiseMarks\(\);/.test(code));
+  && /function ensureFlowLayer\(\)\{[\s\S]{0,1200}drawFlow\(\);\s*placeFlowLayer\(\);\s*raiseMarks\(\);\s*\}/.test(code));
 ok("⭐ ...and applyFilters, which runs after every user action",
   /markRouteEnds\(\);\s*\n\s*raiseMarks\(\);/.test(code));
 
@@ -1441,8 +1446,11 @@ ok("⭐ the overlay ticks only on Play, with the checkbox on, in a month that US
 ok("...pause / scrub / close hides it again",
   /function stopFlowAnimation\(\)\{[\s\S]{0,320}applyRailFlow\(\);/.test(code)
   && /if\(!TL\.playing\)\{[\s\S]{0,160}applyRailFlow\(\); return; \}/.test(code));
+// NARROWED 16 Oct 2026 (D115): ONE count, FLOW_CYCLE long (a whole number of the rail's seven steps and of every
+// band's steps); the hauls read it as their march step, the rail modulo its seven
 ok("⭐ the rail steps on the SAME dash index as the hauls, not a second cycle",
-  /_dashIx=\(_dashIx\+1\)%DASH_SEQ\.length;[\s\S]{0,400}setRailFlowDash\(DASH_SEQ\[_dashIx\]\)/.test(code));
+  /_dashIx=\(_dashIx\+1\)%FLOW_CYCLE;\s*if\(map\.getLayer\('forecast-flow'\)\) setFlowDash\(_dashIx\);[\s\S]{0,600}setRailFlowDash\(DASH_SEQ\[_dashIx%DASH_SEQ\.length\]\)/.test(code)
+  && /return FLOW_PERIODS\.map\(p => Math\.round\(p \/ FLOW_STEP\)\)\.concat\(\[DASH_SEQ\.length\]\)\.reduce\(\(a, b\) => a \* b \/ g\(a, b\), 1\);/.test(code));
 // the pinned trio is the CHECKBOX toggle. The flow layer must not join it, or the
 // checkbox alone would switch it to 'visible' and it would march on a paused map.
 ok("⭐ the flow layer is toggled separately from the corridor pair",
@@ -2107,8 +2115,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // (5) prefers-reduced-motion
   ok("reduced motion: one helper reads the media query, in a try/catch",
      /function reducedMotion\(\)\{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\); \} catch\(e\)\{ return false; \}/.test(code));
-  ok("reduced motion: the dash march stays DASH_SOLID while playing when it matches",
-     /function startFlowAnimation\(\)\{\s*applyRailFlow\(\);\s*if\(reducedMotion\(\)\)\{ setFlowDash\(DASH_SOLID\); setRailFlowDash\(DASH_SOLID\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
+  // NARROWED 16 Oct 2026 (D115): the hauls' dashes STAND STILL under reduced motion (setFlowDash(null): round caps, the
+  // bands' spacing) rather than going solid — still no march; the rail's overlay stays DASH_SOLID
+  ok("reduced motion: no dash march while playing when it matches — the hauls' dashes stand still, the rail stays DASH_SOLID",
+     /function startFlowAnimation\(\)\{\s*applyRailFlow\(\);\s*if\(reducedMotion\(\)\)\{ setFlowDash\(null\); setRailFlowDash\(DASH_SOLID\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
   ok("reduced motion: Show on map jumps instead of flying when it matches",
      /if \(reducedMotion\(\)\) map\.jumpTo\(cam\); else map\.flyTo\(\{ \.\.\.cam, duration: 700 \}\);/.test(code)
      && !/map\.flyTo\(\{ center: f\.geometry\.coordinates/.test(code));
@@ -2192,6 +2202,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     const f = new Function("document", "window", "localStorage", "setInterval", "clearInterval", "setTimeout", "CONFIG", "map",
       "perWorkingDay", "monthLabel", "ensureForecastLayers", "ensureFlowLayer", "applyZoneMonth", "applyFilters", "renderTimelineWarnings",
       "startFlowAnimation", "stopFlowAnimation", "WARN", "KPI", "kpiFetchMonth", "fetch", "FORECAST_WORKING_DAYS",
+      "perWorkingDayExact",   // 16 Oct 2026 (D115): the frame stamps the unrounded rate (f_day) for the flow too
       src.slice(tStart, tEnd) + "\nreturn { TL, tickTimeline, tlLoopBounds, setTimelineFull, tlStartMonth, monthHasVolume, renderMonthFrame, startTimeline, stopTimeline, setTimelineMonth, toggleTimeline, stepTimeline, tlPrefetchOrder, ensureTimelineMatrix };");
     // 12 Oct fix pass: the fetch is a delegate (it still throws unless a pin installs one) so the matrix dedupe can be run
     let fakeFetch = () => { throw new Error("fetch must not be called"); };
@@ -2199,7 +2210,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     try {
       api = f(document, { matchMedia: null }, { getItem: () => null, setItem() {} }, () => { calls.setInterval++; return 7; }, () => { calls.clearInterval++; }, () => {},
               CONFIG, map, v => Math.round(v / 22), monthLabel, () => {}, () => {}, () => {}, () => {}, m => { calls.warnings.push(m); },
-              () => {}, () => {}, WARN, KPI, () => Promise.resolve({}), (...a) => fakeFetch(...a), 22);
+              () => {}, () => {}, WARN, KPI, () => Promise.resolve({}), (...a) => fakeFetch(...a), 22, v => v / 22);
     } catch (e) { err = e.message; }
     ok("⭐ the timeline block runs against a fake DOM", !!api, err);
     if (api) {
@@ -2486,7 +2497,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes("&& f.properties.route_id && routePassesFilters(f.properties)) rids.push(f.properties.route_id);")
      && code.includes("['in', ['get', 'type'], ['literal', legs]],")
      && code.includes("['in', ['get', 'route_id'], ['literal', rids]]];")
-     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','forecast-flow'];")
+     // NARROWED 16 Oct 2026 (D115): three layers now — forecast-flow is drawn from its own lanes (flow-source), whose
+     // features carry no type / route_id, so drawFlow() applies the same leg toggles and routePassesFilters instead
+     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels'];")
+     && code.includes("if (map.getLayer('forecast-flow')) drawFlow();")
+     && /function flowLegFigures\(\)\{[\s\S]{0,500}const legOn = \{ 'Inbound Highway': !inCb \|\| inCb\.checked, 'Outbound Highway': !outCb \|\| outCb\.checked \};[\s\S]{0,200}const passing = modeRoutesPassing\(\);[\s\S]{0,200}\(p\.is_forecast && legOn\[p\.type\] && passing\[p\.route_id\]\)/.test(code)
      && !/filter:\['==','is_forecast',true\]/.test(code));
   ok("row 3: applyFilters() re-applies it, and so do both overlay adders",
      code.includes("if (typeof applyForecastFilter === 'function') applyForecastFilter();")
@@ -2640,8 +2655,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // width by volume
   // REVERSED 12 Oct 2026 (the user, evening: "line width by volume leave out and change to heat map like the carbon"):
   // the forecast line is ONE width again; volume is a colour (the Volume heat map), never a width
-  ok("⭐ width by volume is GONE: the forecast line and its casing are one width (3.5 / 6 px), no f_avg width stops",
-     code.includes("const FORECAST_LINE_WIDTH = 3.5;") && code.includes("const FORECAST_CASING_WIDTH = 6;")
+  // NARROWED 16 Oct 2026 (D115): still ONE width, now 6 / 8.5 px (was 3.5 / 6) so the flow's two lanes fit inside it
+  ok("⭐ width by volume is GONE: the forecast line and its casing are one width (6 / 8.5 px), no f_avg width stops",
+     code.includes("const FORECAST_LINE_WIDTH = 6;") && code.includes("const FORECAST_CASING_WIDTH = 8.5;")
      && !code.includes("FORECAST_VOL_STOPS") && !code.includes("forecastWidth(")
      && !/\['interpolate', \['linear'\], \['to-number', \['get', '(f_avg|rl_mv)'\]/.test(code)
      && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 2
@@ -3188,9 +3204,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ C1: a road-load SOURCE and a line layer of ONE width, coloured by two-way movements a day on FIXED, ascending stops",
      blkCode.includes("map.addSource('road-load-source', { type: 'geojson'")
      // REVERSED 12 Oct 2026 (evening): one width (5 / 7.5 px), never by volume; volume is the colour on FIXED stops
+     // NARROWED 16 Oct 2026 (D115): still one width, now 6 / 8.5 px (the forecast line's), so the flow's lanes fit
      && !blkCode.includes("ROAD_LOAD_STOPS") && !blkCode.includes("roadLoadWidth")
      && blkCode.includes("const VOLUME_STOPS = [10, 25, 50, 100];")
-     && blkCode.includes("const ROAD_LOAD_LINE_WIDTH = 5;") && blkCode.includes("const ROAD_LOAD_CASING_WIDTH = 7.5;")
+     && blkCode.includes("const ROAD_LOAD_LINE_WIDTH = 6;") && blkCode.includes("const ROAD_LOAD_CASING_WIDTH = 8.5;")
      && /id: 'road-load-line', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_LINE_WIDTH/.test(blkCode)
      && /id: 'road-load-casing', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': ROAD_LOAD_CASING_WIDTH/.test(blkCode));
   ok("⭐ C1: routes stay blue — the road-load line is the plan blue (CONFIG.COLORS.brand) under an ink casing",
@@ -3226,7 +3243,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && (code.match(/'line-cap': 'butt'/g) || []).length === 5
      && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 4);
   ok("C1: both lazy adders re-raise the marks (raiseMarks count is additive)",
-     /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*raiseMarks\(\);/.test(blkCode)
+     // NARROWED 16 Oct 2026 (D115): the flow is put back over the sections between the two
+     /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*if \(typeof placeFlowLayer === 'function'\) placeFlowLayer\(\);\s*raiseMarks\(\);/.test(blkCode)
      // NARROWED 12 Oct 2026 (night): the carbon label layer's definition is longer (point placement), so a wider window
      && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,700}raiseMarks\(\);/.test(blkCode)
      && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
@@ -3544,7 +3562,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
           ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], one width",
              JSON.stringify(fl0["line-color"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], "#94BBF9", 10, "#5A96F6", 25, "#2071F3", 50, "#0B55CB", 100, "#073888"])
              && JSON.stringify(rl0["line-color"]) === JSON.stringify(B.volumeColor("rl_mv", [10, 25, 50, 100]))
-             && fl0["line-width"] === 5 && rl0["line-width"] === 5 && fmap.layers["forecast-casing"].paint["line-width"] === 7.5
+             // NARROWED 16 Oct 2026 (D115): one width, 6 / 8.5 px (were 5 / 7.5), so the flow's lanes fit
+             && fl0["line-width"] === 6 && rl0["line-width"] === 6 && fmap.layers["forecast-casing"].paint["line-width"] === 8.5
              && !fmap.layers["carbon-route-labels"] && B.heatMode() === "volume", JSON.stringify(fl0));
         }
         B.refreshMapModes(); await flush(); B.refreshMapModes(); await flush();
@@ -3571,7 +3590,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("⭐ C1: picking Carbon takes the shared sections away and paints the ROUTES by f_co2 on the blue ramp, one width",
            !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"]
            && fmap.layers["forecast-layer"].paint["line-color"][0] === "case" && fmap.layers["forecast-layer"].paint["line-color"][2][1][1][1] === "f_co2"
-           && fmap.layers["forecast-layer"].paint["line-width"] === 5 && !!fmap.layers["carbon-route-labels"]
+           && fmap.layers["forecast-layer"].paint["line-width"] === 6 && !!fmap.layers["carbon-route-labels"]   // NARROWED 16 Oct (D115): 6, was 5
            && el("road-load-legend").hidden === true);
         // NARROWED 12 Oct 2026 (evening): per route (carbon never paints the shared sections now)
         ok("⭐ C1: the carbon legend: per route, the five ranges from the fixed stops, 'excludes 3 lines with no stored road route'",
@@ -3595,8 +3614,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
         const fl = fmap.layers["forecast-layer"].paint;
         ok("⭐ C1: Road load off, Carbon on: the road-load source and layers go, the FORECAST routes are painted by f_co2 at a fixed width",
-           !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && fl["line-color"][2][1][1][1] === "f_co2" && fl["line-width"] === 5
-           && fmap.layers["forecast-casing"].paint["line-width"] === 7.5);
+           !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && fl["line-color"][2][1][1][1] === "f_co2" && fl["line-width"] === 6
+           && fmap.layers["forecast-casing"].paint["line-width"] === 8.5);   // NARROWED 16 Oct (D115): 6 / 8.5, were 5 / 7.5
         ok("browser check 12 Oct: Road load off removes the label-point source too", !fmap.sources["road-load-label-source"] && !fmap.layers["road-load-labels"]);
         ok("⭐ C1: ...the route label switches to t CO₂e (its own layer on the loaded leg) and the per-route figure label stays hidden",
            !!fmap.layers["carbon-route-labels"] && JSON.stringify(fmap.layers["carbon-route-labels"].filter) === JSON.stringify(["all", ["all"], ["==", ["get", "type"], "Inbound Highway"]])
@@ -5250,6 +5269,89 @@ function qrRead(mod) {
      !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bAI\b|IPT\d/i.test(v3));
 }
 
+// 16 Oct 2026: pressing the basemap ALREADY showing (☀️ on first load) blanked the map (90 -> 54 layers, no
+// routes): GL 2.14.1 setStyle(sameUrl) diffs the style against itself, deletes our layers and fires no
+// style.load. Both controls go through changeBasemap, which holds what is shown and skips a same pick.
+{
+  const src = html;
+  const i0 = src.indexOf("const BASEMAP = {");
+  const i1 = src.indexOf("function maaametOrthoStyle()");
+  const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
+  ok("🔴 basemap: the held basemap starts on the map's own first style (light-v11) and becomes 'shown' only on a style.load",
+     bm.includes("const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null,")
+     && src.includes("style: 'mapbox://styles/mapbox/light-v11', center:")
+     && bm.includes("map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } });"));
+  ok("🔴 basemap: a pick equal to the one showing (or on its way) returns before setStyle",
+     /if \(styleUrl === \(BASEMAP\.pending \|\| BASEMAP\.shown\)\) return;[\s\S]*map\.setStyle\(/.test(bm));
+  ok("basemap: the page's own styles are a full rebuild (diff: false: style.load always fires, the last pick wins); any other keeps GL's validate-first diff",
+     bm.includes("if (BASEMAP.rebuild.has(styleUrl)) map.setStyle(style, { diff: false }); else map.setStyle(style);")
+     && ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].every(k => bm.includes(`'mapbox://styles/mapbox/${k}'`))
+     && bm.includes("'maaamet-ortho']) };") && !bm.includes("mapbox://styles/mapbox/standard"));
+  ok("basemap: Maa-amet is still a style object, chosen by its key",
+     bm.includes("const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;"));
+  const ct = (src.match(/window\.changeTheme = function\(btn, styleUrl\) \{([^}]*)\};/) || [])[1] || "";
+  ok("🔴 basemap: the widget's changeTheme calls changeBasemap and nothing else (no second setStyle path)",
+     ct.trim() === "changeBasemap(styleUrl);");
+  ok("🔴 basemap: exactly two setStyle calls in the page, both inside changeBasemap",
+     (src.match(/\.setStyle\(/g) || []).length === 2 && (bm.match(/map\.setStyle\(/g) || []).length === 2);
+  ok("basemap: each widget button names its style (data-basemap), the select and widget are synced, also when the widget arrives",
+     ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].every(k =>
+       src.includes(`data-basemap="mapbox://styles/mapbox/${k}" onclick="changeTheme(this, 'mapbox://styles/mapbox/${k}')"`))
+     && src.includes("syncBasemapControls(BASEMAP.pending || BASEMAP.shown);   // a pick made in the select")
+     && bm.includes("b.classList.toggle('active', b.dataset.basemap === styleUrl)"));
+
+  // run the real block against a fake map: record setStyle, fire style.load by hand
+  const calls = [], handlers = [];
+  const fakeMap = { on: (e, f) => { if (e === 'style.load') handlers.push(f); }, setStyle: (st, o) => calls.push([st, o]) };
+  const opts = ["mapbox://styles/mapbox/light-v11", "mapbox://styles/mapbox/dark-v11",
+                "mapbox://styles/mapbox/satellite-streets-v12", "maaamet-ortho"].map(v => ({ value: v, hidden: v === "maaamet-ortho" }));
+  const sel = { options: opts, value: opts[0].value, selectedIndex: 0 };
+  Object.defineProperty(sel, "value", { get() { return this.selectedIndex >= 0 ? opts[this.selectedIndex].value : ""; },
+                                        set(v) { this.selectedIndex = opts.findIndex(o => o.value === v); } });
+  const btns = ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].map(k => {
+    const cls = new Set(k === "light-v11" ? ["active"] : []);
+    return { dataset: { basemap: "mapbox://styles/mapbox/" + k }, classList: { toggle: (c, on) => on ? cls.add(c) : cls.delete(c), has: c => cls.has(c) } };
+  });
+  const fakeDoc = { getElementById: id => id === "basemap-select" ? sel : null, querySelectorAll: () => btns };
+  let api = null;
+  try {
+    api = new Function("map", "document", "maaametOrthoStyle",
+      bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }));
+  } catch (e) { ok("basemap sandbox: the block runs", false, String(e)); }
+  if (api) {
+    const L = "mapbox://styles/mapbox/light-v11", D = "mapbox://styles/mapbox/dark-v11", S = "mapbox://styles/mapbox/streets-v12";
+    const lit = () => btns.filter(b => b.classList.has("active")).map(b => b.dataset.basemap);
+    const load = () => handlers.forEach(f => f());
+    api.changeBasemap(L);
+    ok("⭐ sandbox: pressing Light while Light shows calls setStyle NOT AT ALL (the 90 -> 54 layer blank)", calls.length === 0);
+    api.changeBasemap(D);
+    ok("sandbox: Dark is one setStyle, a full rebuild (diff: false), and the widget and select follow",
+       calls.length === 1 && calls[0][0] === D && calls[0][1] && calls[0][1].diff === false && sel.value === D && lit().join() === D);
+    api.changeBasemap(D);
+    ok("sandbox: Dark again while Dark is still loading: no second setStyle", calls.length === 1);
+    load();
+    ok("sandbox: style.load makes Dark the shown basemap", api.BASEMAP.shown === D && api.BASEMAP.pending === null);
+    api.changeBasemap(D);
+    ok("⭐ sandbox: Dark pressed while Dark shows: still no second setStyle", calls.length === 1);
+    api.changeBasemap(S);
+    ok("sandbox: Streets (widget only) leaves the select blank, so any pick there fires a change; only 🛣️ lit",
+       calls.length === 2 && calls[1][1].diff === false && sel.selectedIndex === -1 && lit().join() === S);
+    api.changeBasemap(D);
+    ok("⭐ sandbox: back to the shown Dark before Streets loaded: a full rebuild (diff: false), so style.load re-adds the layers",
+       calls.length === 3 && calls[2][0] === D && calls[2][1] && calls[2][1].diff === false && api.BASEMAP.pending === D);
+    load();
+    api.changeBasemap("mapbox://styles/mapbox/standard");    // a style GL 2.14 rejects: no style.load ever comes
+    ok("sandbox: a style the page does not list keeps GL's default diff (validated first; a rejection keeps the basemap)",
+       calls.length === 4 && calls[3][1] === undefined);
+    api.changeBasemap(D);
+    ok("⭐ sandbox: after a rejected style, picking the basemap still showing rebuilds it (diff: false) instead of diffing it blank",
+       calls.length === 5 && calls[4][0] === D && calls[4][1] && calls[4][1].diff === false && api.BASEMAP.shown === D);
+    api.changeBasemap("maaamet-ortho");
+    ok("sandbox: Maa-amet is set as a style object, never as the string key, as a full rebuild",
+       calls.length === 6 && typeof calls[5][0] === "object" && calls[5][0].version === 8 && calls[5][1].diff === false);
+  }
+}
+
 // ===== 16 Oct 2026: the basemap menu offers only styles the loaded GL JS can draw =====
 // "Standard (3D)" (mapbox://styles/mapbox/standard) needs GL JS v3. On 2.14.1, checked in Chromium with real
 // Mapbox: setStyle logged 695 validation errors ("measure-light", "config", "batched-model", "vertical-range")
@@ -5281,6 +5383,422 @@ function qrRead(mod) {
   ok("basemap 16 Oct: the in-app guide lists the basemaps the menu offers, without Standard (3D)",
      guide.includes("Light (default), Dark and Satellite (Mapbox; called Aerial for a British organisation)")
      && !/Standard \(3D\)/.test(guide));
+}
+
+// ===== 16 Oct 2026 (the UI audit, finding #4): the public map's language and the names of its selects =====
+// axe-core html-has-lang and select-name (WCAG 3.1.1 and 4.1.2, both Level A): the one public page was read in the
+// synthesiser's default language, and a screen-reader or voice-control user met "All origins, combo box" four times
+// with no word for which filter was which. The team select's name is the tenant's team word, set in
+// applyTenantVocabulary like the rest of its vocabulary, behind a null check (a document without the panel).
+{
+  ok("🔴 names #4: the page declares its language, British English, on its one <html> tag",
+     (html.match(/<html\b/g) || []).length === 1 && /^<!DOCTYPE html>\n<html lang="en-GB">\n<head>/.test(html));
+  const tagOf = (id) => (html.match(new RegExp('<select id="' + id + '"[^>]*>')) || [""])[0];
+  const nameOf = (id) => (tagOf(id).match(/aria-label="([^"]*)"/) || [])[1] || null;
+  ok("🔴 names #4: the four filter selects are named Origin, Destination, Discipline and Team in the markup (before any script runs)",
+     nameOf("filter-origin") === "Origin" && nameOf("filter-dest") === "Destination"
+     && nameOf("filter-discipline") === "Discipline" && nameOf("filter-ipt") === "Team",
+     JSON.stringify(["filter-origin", "filter-dest", "filter-discipline", "filter-ipt"].map(nameOf)));
+  ok("🔴 names #4: the basemap select is named Basemap, its handler as it was",
+     nameOf("basemap-select") === "Basemap" && tagOf("basemap-select").includes('onchange="changeBasemap(this.value)"'));
+  ok("names #4: the filters' handlers are as they were (a name was added, nothing else changed)",
+     ["filter-origin", "filter-dest", "filter-discipline", "filter-ipt"].every(id => tagOf(id).includes('onchange="applyFilters()"')));
+  // every select in the static markup has a name: an aria-label, or a <label for> (the export card's four)
+  const unnamed = [...html.matchAll(/<select id="([^"]+)"[^>]*>/g)]
+    .filter(m => !/aria-label="[^"]+"/.test(m[0]) && !new RegExp('<label [^>]*for="' + m[1] + '"').test(html)).map(m => m[1]);
+  ok("names #4: every <select> in the markup is named — an aria-label, or a <label for> (the export card's four)",
+     unnamed.length === 0 && (html.match(/<select id="/g) || []).length >= 10, JSON.stringify(unnamed));
+  // the team word at run time
+  const atv = src.slice(src.indexOf("    function applyTenantVocabulary() {"), src.indexOf("    function barAbove(){"));
+  ok("names #4: applyTenantVocabulary names the team select after TEAM, behind a null check, beside the 'All …s' option text",
+     atv.length > 200 && atv.includes("if (ipt) ipt.textContent = 'All ' + TEAM.toLowerCase() + 's';\n")
+     && atv.includes("const iptSel = document.getElementById('filter-ipt');\n        if (iptSel) iptSel.setAttribute('aria-label', TEAM);"));
+  const runVocab = (withSelect, team) => {
+    const attrs = {};
+    const el = { textContent: "", hidden: false, setAttribute(k, v) { attrs[k] = String(v); }, closest() { return null; }, remove() {} };
+    const cls = new Set();
+    const document = { getElementById: (id) => (withSelect && id === "filter-ipt") ? el : null, querySelector: () => null, createElement: () => el,
+                       body: { classList: { toggle(c, on) { if (on) cls.add(c); else cls.delete(c); }, contains: (c) => cls.has(c) }, appendChild() {} } };
+    const f = new Function("document", "window", "TENANT", "TEAM", "EMBED", "barAbove", "setupGuide", atv + "\nreturn applyTenantVocabulary;");
+    f(document, { evr_rail_data: null, OVERLAY_VERSION: null }, { country: "GB" }, team, true, () => true, () => {})();
+    return attrs;
+  };
+  ok("⭐ names #4: run with the select on the page, its name is the tenant's team word (a tenant whose teams are crews reads Crew)",
+     runVocab(true, "Crew")["aria-label"] === "Crew" && runVocab(true, "Team")["aria-label"] === "Team");
+  let vocabThrew = null; try { runVocab(false, "Crew"); } catch (e) { vocabThrew = e; }
+  ok("names #4: run on a document without the select (the guide sandbox above, a page whose panel is not built), nothing throws",
+     vocabThrew === null, vocabThrew && String(vocabThrew));
+}
+// ===== 16 Oct 2026 (D115, S17): the public map's flow — each direction its own lane, spacing by movements a day =====
+// The user: flow dashes only on the public map (no lorries, no simulation: D36 / D86); each direction side by side,
+// left of its direction of travel; bigger, round-capped dashes with clear gaps; spacing by movements a day on FIXED
+// bands with a legend; where routes share a road, ONE set of dashes showing the sum. Every pin below fails on main
+// 4afc73c (the flow there was a 2 px white [0,4,3] dash on routes-source, both legs on top of each other).
+{
+  const fA = src.indexOf("    // ===== 16 Oct 2026 (D115, S17) — THE FLOW");
+  const fB = src.indexOf("    // ===== end of the flow =====");
+  const rlEnd = src.indexOf("    // ===== end of road load and carbon =====");
+  ok("D115: the flow block is one contiguous slice, after the road-load block (its bands are that block's stops)",
+     fA > 0 && fB > fA && rlEnd > 0 && fA > rlEnd);
+  const fblk = fA > 0 && fB > fA ? src.slice(fA, fB) : "";
+  const fcode = fblk.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
+  const addFlow = (fcode.match(/map\.addLayer\(\{ id: 'forecast-flow'[\s\S]*?\}\s*\}\);/) || [""])[0];
+
+  // ---- the layer: its own source, the lanes' offset, round caps ----
+  ok("⭐ D115: forecast-flow draws the LANES from its own source (flow-source), never routes-source, and carries no filter",
+     fcode.includes("const FLOW_SOURCE = 'flow-source';") && /id: 'forecast-flow', type: 'line', source: FLOW_SOURCE,/.test(addFlow)
+     && !/filter:/.test(addFlow) && !/id:\s?'forecast-flow',\s?type:\s?'line',\s?source:\s?'routes-source'/.test(code));
+  ok("⭐ D115: the lanes are offset LEFT of the direction of travel — one NEGATIVE constant (Mapbox: negative = left), on the flow only",
+     /const FLOW_OFFSET = -1\.75;/.test(fcode) && /'line-offset': FLOW_OFFSET/.test(addFlow)
+     && (code.match(/'line-offset': FLOW_OFFSET/g) || []).length === 1);
+  ok("⭐ D115: the dashes are ROUND-capped as added (standing still), 2.5 px wide, white, on round joins",
+     /layout: \{ 'line-cap': 'round', 'line-join': 'round',/.test(addFlow) && fcode.includes("const FLOW_WIDTH = 2.5;")
+     && /'line-color': '#ffffff', 'line-width': FLOW_WIDTH,/.test(addFlow) && /'line-dasharray': flowStillDash\(\)/.test(addFlow));
+  ok("🔴 D115: the march's butt cap is set at run time (setFlowDash), never in a layer definition — the five butt-capped route/rail layers are still five",
+     !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 5
+     && /const cap = ix == null \? 'round' : 'butt';/.test(fcode));
+  ok("⭐ D115: the blue under the lanes is the road, NOT offset, one width in every mode (6 / 8.5 px: forecast, Volume, Carbon, shared sections)",
+     code.includes("const FORECAST_LINE_WIDTH = 6;") && code.includes("const FORECAST_CASING_WIDTH = 8.5;")
+     && code.includes("const CARBON_LINE_WIDTH = 6, CARBON_CASING_WIDTH = 8.5;")
+     && code.includes("const ROAD_LOAD_LINE_WIDTH = 6;") && code.includes("const ROAD_LOAD_CASING_WIDTH = 8.5;")
+     && !/id:'forecast-(layer|casing)'[^\n]*line-offset/.test(code));
+  ok("D115: two lanes fit inside the blue with a gap between them (|offset| - width/2 > 0, |offset| + width/2 <= half the line)",
+     1.75 - 2.5 / 2 > 0 && 1.75 + 2.5 / 2 <= 6 / 2);
+  ok("⭐ D115: the flow sits over the blue (or the Volume sections) and UNDER the labels: placed after each adder and after the sections come and go",
+     /function placeFlowLayer\(\)\{[\s\S]{0,400}const anchor = \['road-load-line', 'forecast-layer'\]\.find/.test(fcode)
+     && /drawFlow\(\);\s*placeFlowLayer\(\);\s*raiseMarks\(\);/.test(fcode)
+     && /if \(had && typeof placeFlowLayer === 'function'\) placeFlowLayer\(\);/.test(code));
+  ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both legs) is gone; DASH_SEQ stays for the rail only",
+     !/'line-dasharray':\[0,4,3\]\}\}\)/.test(code) && /if\(map\.getLayer\('evr-rail-flow'\)\) setRailFlowDash\(DASH_SEQ\[_dashIx%DASH_SEQ\.length\]\);/.test(code)
+     && !/setFlowDash\(DASH_SEQ/.test(code) && !/setFlowDash\(DASH_SOLID\)/.test(code));
+  // ---- the bands ----
+  ok("⭐ D115: the bands are FIXED — the Volume heat map's own stops (FLOW_STOPS = ROUTE_VOLUME_STOPS), never cut from the month's figures",
+     fcode.includes("const FLOW_STOPS = ROUTE_VOLUME_STOPS;") && !/Math\.max\(/.test(fcode) && !/\.sort\(\(a, b\) => b/.test(fcode));
+  ok("⭐ D115: the band expression wraps every array output in ['literal', …] (a bare one dropped every route on 1 Sep)",
+     /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], \['literal', arrays\[0\]\]\];/.test(fcode)
+     && /e\.push\(s, \['literal', arrays\[i \+ 1\]\]\);/.test(fcode));
+  ok("⭐ D115: ONE march step for every band, and every period a whole number of steps (same speed, an exact repeat)",
+     /const FLOW_STEP = 0\.8;/.test(fcode) && (fcode.match(/FLOW_STEP\b/g) || []).length >= 3
+     && /flowR\(\(ix % Math\.round\(p \/ FLOW_STEP\)\) \* FLOW_STEP\)/.test(fcode));
+  ok("⭐ D115: both feeds stamp the unrounded daily rate (f_day) beside the label's rounded f_avg, through the ONE divisor helper",
+     /f\.properties\.f_day=perWorkingDayExact\(vol\);/.test(code)
+     && /f\.properties\.f_day = \(m\.per_day != null\) \? m\.per_day : perWorkingDayExact\(m\.avg\);/.test(code)
+     && /function perWorkingDay\(monthTotal\)\{\s*return Math\.round\(perWorkingDayExact\(monthTotal\)\);/.test(code)
+     && (code.match(/monthTotal \/ wd/g) || []).length === 1 && /Number\(p\.f_day != null \? p\.f_day : p\.f_avg\)/.test(fcode));
+  ok("D115: the march ticks on the old clock (65 ms) and the stop still drops to standing dashes, not a solid line",
+     fcode.includes("const FLOW_TICK_MS = 65;") && /if\(map\.getLayer && \(ts-_dashT>FLOW_TICK_MS\)\)\{/.test(code)
+     && /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*setFlowDash\(null\);/.test(code)
+     && /if\(!TL\.playing\)\{ _flowRAF=null; setFlowDash\(null\);/.test(code));
+  // ---- the legend's markup ----
+  ok("D115: a flow legend under the heat map, hidden in the markup (shown while the lanes are on the map)",
+     html.includes('<div class="mode-legend" id="flow-legend" hidden></div>')
+     && html.indexOf('id="flow-legend"') > html.indexOf('id="carbon-legend"') && html.indexOf('id="flow-legend"') < html.indexOf('id="btn-detail"'));
+  {
+    const strings = (fcode.match(/'[^'\n]*'/g) || []).join(" ");
+    ok("D115: nothing a person reads in the flow block says truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
+       !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(strings) && !/\bAI\b/.test(strings));
+    ok("D115: no lorry, dot or time on the public map's flow (D36): the block draws lines only, no symbol or circle layer, no clock",
+       !/type: '(symbol|circle)'/.test(fcode) && !/Date\(|toLocaleTimeString|getHours/.test(fcode));
+  }
+
+  {
+    const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
+    ok("D115: the in-app guide (§8.3) describes the lanes, the fixed bands, the shared-road total and the dashes standing still when paused",
+       guide.includes("each direction has its own lane, on the left as driven") && guide.includes("<strong>Closer dashes mean more movements a day</strong> each way, on five fixed bands (under 10, 10 to 25, 25 to 50, 50 to 100, 100 and over)")
+       && guide.includes("Where routes share a road, its dashes show their total") && guide.includes("paused, or with reduced motion set on your device, they stand still")
+       && !guide.includes("white dashes run along the blue routes from origin to destination"));
+  }
+
+  // ---- the block, run against a fake map and DOM ----
+  const mk = () => {
+    const layers = {}, sources = {}, order = [], log = [];
+    return { layers, sources, order, log,
+      getLayer: id => layers[id], getSource: id => sources[id],
+      addSource(id, spec) { sources[id] = { spec, _data: spec.data, setData(d) { this._data = d; log.push("setData:" + id); } }; },
+      addLayer(spec) { layers[spec.id] = { spec, paint: Object.assign({}, spec.paint), layout: Object.assign({}, spec.layout) }; order.push(spec.id); log.push("add:" + spec.id); },
+      removeLayer(id) { delete layers[id]; order.splice(order.indexOf(id), 1); },
+      setPaintProperty(id, k, v) { layers[id].paint[k] = v; log.push("paint:" + id + ":" + k); },
+      setLayoutProperty(id, k, v) { layers[id].layout[k] = v; log.push("layout:" + id + ":" + k + "=" + v); },
+      getLayoutProperty: (id, k) => layers[id].layout[k],
+      getStyle: () => ({ layers: order.map(id => ({ id })) }),
+      moveLayer(id, before) { order.splice(order.indexOf(id), 1); if (before) order.splice(order.indexOf(before), 0, id); else order.push(id); log.push("move:" + id + ">" + (before || "top")); } };
+  };
+  const fmap = mk();
+  const els = {};
+  const el = id => els[id] || (els[id] = { id, checked: true, hidden: true, innerHTML: "" });
+  const document = { getElementById: el };
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel = i => names[(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12));
+  const stepRanges = (s, unit) => ['under ' + s[0] + unit, s[0] + ' to ' + s[1] + unit, s[1] + ' to ' + s[2] + unit, s[2] + ' to ' + s[3] + unit, s[3] + unit + ' and over'];
+  const rlEsc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const CONFIG = { FORECAST_UNIT: "vehicles", COLORS: { forecast: "#3B82F6", forecastCasing: "#1F2024" } };
+  const VS = [10, 25, 50, 100];
+  // a road A-B-C-D along y = 0. R1 laden A->D and back D->A empty on the same road; R2 laden from B (a vertex 4e-6
+  // degrees off, which the snap must join) through C, then away north; R3's EMPTY leg runs B->C the same way as the
+  // laden lorries, then away south; R4 is not on the forecast this month.
+  const leg = (rid, type, coords, f_avg, on) => ({ type: "Feature", geometry: { type: "LineString", coordinates: coords },
+                                                   properties: { route_id: rid, type, is_forecast: on !== false, f_avg } });
+  const a1_data = { features: [
+    leg("R1", "Inbound Highway", [[0, 0], [1, 0], [2, 0], [3, 0]], 12),
+    leg("R1", "Outbound Highway", [[3, 0], [2, 0], [1, 0], [0, 0]], 12),
+    leg("R2", "Inbound Highway", [[1.000004, 0], [2, 0], [2, 1]], 20),
+    leg("R3", "Outbound Highway", [[1, 0], [2, 0], [2, -1]], 7),
+    leg("R4", "Inbound Highway", [[0, 0], [1, 0]], 30, false),
+    { type: "Feature", geometry: { type: "Point", coordinates: [0, 0] }, properties: { type: "Node" } } ] };
+  let passing = { R1: true, R2: true, R3: true, R4: true };
+  let focus = false, month = 10;
+  let api = null, err = "";
+  try {
+    api = new Function("map", "document", "a1_data", "modeRoutesPassing", "councilFocus", "mapModeMonth", "forecastWindow", "rlEsc", "monthLabel",
+      "stepRanges", "VOLUME_STOPS", "ROUTE_VOLUME_STOPS", "CONFIG", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "raiseMarks",
+      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_PERIODS, FLOW_DASH, FLOW_STEP, FLOW_WIDTH, FLOW_OFFSET, FLOW_CYCLE, DASH_SEQ, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowStillDash, flowMarchDash, flowMarchArray, setFlowDash, renderFlowLegend, flowSample };")(
+      fmap, document, a1_data, () => passing, () => focus, () => month, () => [9, 12], rlEsc, monthLabel, stepRanges, VS, VS, CONFIG, 6, 8.5, () => {});
+  } catch (e) { err = e.message; }
+  ok("⭐ D115 sandbox: the flow block runs against a fake map and DOM", !!api, err);
+  if (api) {
+    const F = api;
+    fmap.addSource("routes-source", { type: "geojson", data: a1_data });
+    ["forecast-casing", "forecast-layer", "forecast-labels", "forecast-cap-badge"].forEach(id => fmap.addLayer({ id, paint: {}, layout: {} }));
+    F.ensureFlowLayer();
+    const feats = () => fmap.sources["flow-source"]._data.features;
+    const near = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
+    // every directed segment of the drawn lanes, with the lane's figure
+    const segs = () => { const out = {}; feats().forEach(f => { const c = f.geometry.coordinates; for (let i = 1; i < c.length; i++) {
+      const k = c[i - 1].map(v => Math.round(v)).join(",") + ">" + c[i].map(v => Math.round(v)).join(",");
+      (out[k] = out[k] || []).push(f.properties.fl_mv); } }); return out; };
+    let S = segs();
+    ok("⭐ D115 sandbox: where three legs drive B->C the same way (R1 laden 12, R2 laden 20, R3 EMPTY 7) there is ONE lane, at their sum 39",
+       JSON.stringify(S["1,0>2,0"]) === "[39]", JSON.stringify(S));
+    ok("⭐ D115 sandbox: the other way, C->B, is its OWN lane (R1's empties alone, 12): two directions, two lanes, never one figure for both",
+       JSON.stringify(S["2,0>1,0"]) === "[12]" && JSON.stringify(S["0,0>1,0"]) === "[12]" && JSON.stringify(S["1,0>0,0"]) === "[12]");
+    ok("⭐ D115 sandbox: no directed segment is drawn twice — no two lanes' dashes stacked in one direction anywhere",
+       Object.values(S).every(v => v.length === 1), JSON.stringify(S));
+    ok("D115 sandbox: each lane runs the way it is driven (R2 turns north at C, R3's empties south) with its own figure",
+       JSON.stringify(S["2,0>2,1"]) === "[20]" && JSON.stringify(S["2,0>2,-1"]) === "[7]" && JSON.stringify(S["2,0>3,0"]) === "[12]" && JSON.stringify(S["3,0>2,0"]) === "[12]");
+    ok("D115 sandbox: a vertex 4e-6 degrees off is the same vertex (the 1e-5 snap, road_sections' rule), so R2 joins the shared lane",
+       !feats().some(f => f.geometry.coordinates.some(c => near(c, [1.000004, 0]))));
+    ok("D115 sandbox: a route not on the forecast this month (R4) adds nothing; points and other types are not legs",
+       F.FLOW.legs.length === 5 && JSON.stringify(S["0,0>1,0"]) === "[12]");
+    ok("D115 sandbox: each lane says how many legs it sums (fl_legs)", feats().find(f => f.properties.fl_mv === 39).properties.fl_legs === 3);
+    // the leg boxes and the filters
+    el("layer-outbound").checked = false; F.drawFlow(); S = segs();
+    ok("⭐ D115 sandbox: the empty-back box off: the empties' legs drop out of every lane (B->C is 32; C->B is not drawn)",
+       JSON.stringify(S["1,0>2,0"]) === "[32]" && !S["2,0>1,0"] && !S["2,0>2,-1"], JSON.stringify(S));
+    el("layer-outbound").checked = true; passing = { R1: true, R3: true }; F.drawFlow(); S = segs();
+    ok("⭐ D115 sandbox: a sidebar filter that lets R2 out re-sums the shared lane over the routes let through (19)",
+       JSON.stringify(S["1,0>2,0"]) === "[19]" && !S["2,0>2,1"], JSON.stringify(S));
+    passing = { R1: true, R2: true, R3: true, R4: true };
+    const n0 = fmap.log.filter(x => x === "setData:flow-source").length;
+    F.drawFlow(); F.drawFlow();
+    ok("D115 sandbox: the lanes are re-sent only when a figure changed (one setData for the change, none for the repeat)",
+       fmap.log.filter(x => x === "setData:flow-source").length === n0 + 1);
+    a1_data.features[2].properties.f_avg = 26; F.drawFlow();
+    ok("D115 sandbox: the next month's figures (f_avg re-stamped on the same legs) re-sum the same lanes without rebuilding them",
+       JSON.stringify(segs()["1,0>2,0"]) === "[45]" && F.FLOW.lanes === F.flowLanes());
+    a1_data.features[2].properties.f_avg = 20; F.drawFlow();
+    a1_data.features[0].properties.f_day = 11.6; a1_data.features[2].properties.f_day = 19.7; a1_data.features[3].properties.f_day = 6.9; F.drawFlow();
+    ok("⭐ D115 sandbox: a lane sums the UNROUNDED rates (f_day) where the feed stamped them, so it is the Volume figure, not a sum of roundings",
+       JSON.stringify(segs()["1,0>2,0"]) === "[38.2]", JSON.stringify(segs()["1,0>2,0"]));
+    [0, 2, 3].forEach(i => { delete a1_data.features[i].properties.f_day; }); F.drawFlow();
+    // the layer and its order
+    ok("⭐ D115 sandbox: the flow is added right over forecast-layer and under the labels and badges",
+       fmap.order.join(",") === "forecast-casing,forecast-layer,forecast-flow,forecast-labels,forecast-cap-badge", fmap.order.join(","));
+    fmap.addLayer({ id: "road-load-casing", paint: {}, layout: {} }); fmap.addLayer({ id: "road-load-line", paint: {}, layout: {} }); fmap.addLayer({ id: "road-load-labels", paint: {}, layout: {} });
+    F.placeFlowLayer();
+    ok("D115 sandbox: with the Volume heat map's shared sections on, the flow moves over them (and under their labels)",
+       fmap.order.indexOf("forecast-flow") === fmap.order.indexOf("road-load-line") + 1 && fmap.order.indexOf("forecast-flow") < fmap.order.indexOf("road-load-labels"), fmap.order.join(","));
+    ["road-load-labels", "road-load-line", "road-load-casing"].forEach(id => fmap.removeLayer(id)); F.placeFlowLayer();
+    ok("D115 sandbox: and back under the route labels when they go", fmap.order.indexOf("forecast-flow") === fmap.order.indexOf("forecast-layer") + 1);
+    const fl = fmap.layers["forecast-flow"];
+    ok("⭐ D115 sandbox: the layer as added — offset left (negative), round caps, the still pattern", fl.paint["line-offset"] < 0 && fl.layout["line-cap"] === "round"
+       && JSON.stringify(fl.paint["line-dasharray"]) === JSON.stringify(F.flowStillDash()));
+    // the dash patterns
+    const still = F.flowStillDash();
+    const outs = e => e.filter((x, i) => i >= 2 && i % 2 === 0);
+    ok("⭐ D115 sandbox: the still pattern is a step on fl_mv at the five bands' stops [10, 25, 50, 100], every output ['literal', array]",
+       still[0] === "step" && JSON.stringify(still[1]) === JSON.stringify(["to-number", ["get", "fl_mv"], 0])
+       && JSON.stringify(still.filter((x, i) => i >= 3 && i % 2 === 1)) === "[10,25,50,100]"
+       && outs(still).length === 5 && outs(still).every(o => Array.isArray(o) && o[0] === "literal" && Array.isArray(o[1])), JSON.stringify(still));
+    ok("⭐ D115 sandbox: closer dashes = more movements — the periods shrink band by band, and every band has a clear gap",
+       F.FLOW_PERIODS.every((p, i) => i === 0 || p < F.FLOW_PERIODS[i - 1]) && F.FLOW_PERIODS.every(p => p - F.FLOW_DASH >= 1));
+    ok("🔴 D115 sandbox: standing still (round caps) no array holds a zero-length piece — under round caps one draws a dot (tested on 2.14.1)",
+       outs(still).every(o => o[1].length === 2 && o[1].every(v => v > 0)));
+    ok("D115 sandbox: standing still, each dash piece is one width short of the dash on screen (the round caps add a half width at each end)",
+       outs(still).every((o, i) => o[1][0] === F.FLOW_DASH - 1 && Math.abs(o[1][0] + o[1][1] - F.FLOW_PERIODS[i]) < 1e-9));
+    // where the march's dash lies along one period of a band, from its butt-capped array
+    const dashCover = arr => { let x = 0; const on = []; arr.forEach((v, i) => { if (i % 2 === 0 && v > 0) on.push([x, x + v]); x += v; }); return { on, len: x }; };
+    let marchOk = true, why = "";
+    for (let b = 0; b < 5 && marchOk; b++) {
+      const p = F.FLOW_PERIODS[b], steps = Math.round(p / F.FLOW_STEP);
+      if (Math.abs(steps * F.FLOW_STEP - p) > 1e-9) { marchOk = false; why = "band " + b + " is not a whole number of steps"; break; }
+      for (let k = 0; k < steps; k++) {
+        const arr = outs(F.flowMarchDash(k))[b][1], c = dashCover(arr);
+        const dash = c.on.reduce((a, r) => a + r[1] - r[0], 0);
+        const phi = Math.round(k * F.FLOW_STEP * 1000) / 1000;
+        const starts = c.on.map(r => r[0]);
+        const startOk = (phi + F.FLOW_DASH <= p) ? starts.some(s => Math.abs(s - phi) < 1e-6) : (starts[0] === 0 && starts.some(s => Math.abs(s - phi) < 1e-6));
+        if (Math.abs(c.len - p) > 1e-6 || Math.abs(dash - F.FLOW_DASH) > 1e-6 || !startOk || arr.length % 2) { marchOk = false; why = "band " + b + " tick " + k + " " + JSON.stringify(arr); break; }
+      }
+    }
+    ok("⭐ D115 sandbox: SAME SPEED — at every tick every band's dash starts FLOW_STEP further on, is FLOW_DASH long and its pattern is one period",
+       marchOk, why);
+    ok("D115 sandbox: the march repeats exactly: FLOW_CYCLE is a whole number of every band's steps and of the rail's seven",
+       F.FLOW_CYCLE > 0 && F.FLOW_PERIODS.every(p => F.FLOW_CYCLE % Math.round(p / F.FLOW_STEP) === 0) && F.FLOW_CYCLE % F.DASH_SEQ.length === 0
+       && JSON.stringify(F.flowMarchDash(F.FLOW_CYCLE)) === JSON.stringify(F.flowMarchDash(0)), String(F.FLOW_CYCLE));
+    ok("D115 sandbox: on screen the bands are 30, 20, 16, 12 and 8 px apart and the dashes 5 px long, moving 2 px a tick (the rail's 2 px)",
+       JSON.stringify(F.FLOW_PERIODS.map(p => Math.round(p * F.FLOW_WIDTH * 100) / 100)) === "[30,20,16,12,8]"
+       && F.FLOW_DASH * F.FLOW_WIDTH === 5 && Math.abs(F.FLOW_STEP * F.FLOW_WIDTH - 2) < 1e-9);
+    F.setFlowDash(5);
+    ok("⭐ D115 sandbox: marching, the caps go butt (so no dot) and the pattern is the tick's", fl.layout["line-cap"] === "butt"
+       && JSON.stringify(fl.paint["line-dasharray"]) === JSON.stringify(F.flowMarchDash(5)));
+    F.setFlowDash(null);
+    ok("⭐ D115 sandbox: standing still again (pause, stop, reduced motion), round caps and the bands' own spacing", fl.layout["line-cap"] === "round"
+       && JSON.stringify(fl.paint["line-dasharray"]) === JSON.stringify(still));
+    // the legend
+    const lg = el("flow-legend");
+    ok("⭐ D115 sandbox: the legend says 'Closer dashes = more movements a day', each way, the month, and the five band figures",
+       lg.hidden === false && lg.innerHTML.includes("<b>Closer dashes = more movements a day</b>") && lg.innerHTML.includes("Each way, in Oct 2026")
+       && ["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].every(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
+    ok("D115 sandbox: ...that each direction is its own lane on the left, the dashes move while the timeline plays, shared roads show the total, the bands are fixed",
+       lg.innerHTML.includes("Each direction has its own lane, on the left as driven") && lg.innerHTML.includes("while the timeline plays")
+       && lg.innerHTML.includes("Where routes share a road, the dashes show their total") && lg.innerHTML.includes("a spacing means the same number in every month"));
+    ok("D115 sandbox: each band's sample is drawn as the map draws it (a 2.5 px round-capped dash, one width short, on the 6 px blue)",
+       (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 5 && lg.innerHTML.includes('stroke-dasharray="2.5 27.5"')
+       && lg.innerHTML.includes('stroke-dasharray="2.5 5.5"') && lg.innerHTML.includes('stroke-width="6"') && lg.innerHTML.includes('aria-hidden="true"'));
+    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /lorries/.test(lg.innerHTML));
+    month = null; F.renderFlowLegend();
+    ok("D115 sandbox: with no single month (Show forecast over the span) the legend says it is a daily average over the months",
+       lg.innerHTML.includes("Each way, a daily average, Sep 2026 to Dec 2026"), lg.innerHTML.slice(0, 200));
+    month = 10;
+    focus = true; F.renderFlowLegend();
+    ok("D115 sandbox: the council view (no flow drawn there) hides the legend", lg.hidden === true);
+    focus = false; a1_data.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); F.drawFlow();
+    ok("D115 sandbox: a month with nothing approved draws no lane and shows no legend", feats().length === 0 && lg.hidden === true);
+    // a re-add while playing marches on at once (the basemap switch)
+    a1_data.features.forEach(f => { if (f.properties && f.properties.route_id !== "R4") f.properties.is_forecast = true; });
+  }
+}
+
+// ---- 18 Oct 2026 — the UI audit's phone branch (claude/ui-fix-phone): decision 8, findings #26 and #30 ------------------
+// Decision 8: the map's tour dots are retired on a phone (767 px and below) — placeGuideHints() draws none there and the
+// phone block hides any left from a wider window; the strip's "Take the tour" carries the four tips; a desk keeps its dots,
+// each named by the tip's own title. #26: each team row of the legend is the box's <label>, 24 px (48 on the phone, the
+// sheet's row). #30: the conditions panel's × buttons and the route drawer's close tap at 28 px or more through a halo; the
+// share and export cards' close buttons were 44 px already and stay so. The strip's own × taps at 44 px the same way.
+{
+  const phone = (html.match(/@media \(max-width:767px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  ok("🔴 decision 8: placeGuideHints() draws no dot on a phone — the anchor is looked up only off the phone shell, so a dot of a wider window is removed on the next pass",
+     code.includes("const el = (on && !guideOnPhone()) ? guideAnchor(st) : null;") && !code.includes("const el = on ? guideAnchor(st) : null;"));
+  ok("decision 8: the phone block hides .guide-dot (belt and braces for the second between a resize and the next pass); the desk CSS of the dot is untouched",
+     /\.guide-dot\{ display:none; \}/.test(phone) && (html.match(/\.guide-dot\{ display:none; \}/g) || []).length === 1
+     && /\.guide-dot\{position:fixed;z-index:9002;width:10px;height:10px;/.test(html));
+  ok("decision 8: at a desk a dot is named by the tip's own title (guideTitle), never the raw step title",
+     code.includes("dot.setAttribute('aria-label', 'Tip: ' + guideTitle(st));") && !code.includes("'Tip: ' + st.title"));
+  // the guide block, run on a phone and at a desk: the same fake DOM as the 11 Oct sandbox, with isPhoneShell() handed in
+  const a = src.indexOf("    function applyTenantVocabulary() {");
+  const bEnd = "window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });";
+  const b = src.indexOf(bEnd);
+  const runShell = (phoneShell) => {
+    const byId = {};
+    const mk = (tag) => ({ tagName: String(tag || "div").toUpperCase(), id: "", style: {}, dataset: {}, attrs: {}, hidden: false, className: "",
+      textContent: "", innerHTML: "", offsetWidth: 600, offsetHeight: 72, onclick: null,
+      setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
+      remove() { if (byId[this.id] === this) delete byId[this.id]; },
+      getBoundingClientRect() { return { top: 0, left: 300, right: 1280, bottom: 72, width: 980, height: 72 }; },
+      scrollIntoView() {}, closest() { return null; }, querySelector() { return mk("span"); } });
+    // the desk anchors AND the phone anchors are all on the page, so without decision 8 a phone would get its four dots too
+    for (const id of ["kpi-hud", "tl-play", "kpi-conditions", "kpi-moving", "m-peek", "m-play", "m-handle", "m-layers-btn"]) { const e = mk(); e.id = id; byId[id] = e; }
+    const cls = new Set();
+    const document = { body: { classList: { toggle(c, on) { if (on) cls.add(c); else cls.delete(c); }, contains: (c) => cls.has(c) },
+                               appendChild(el) { byId[el.id] = el; return el; } },
+                       getElementById: (id) => byId[id] || null, createElement: (t) => mk(t), querySelector: () => null };
+    const store = {};
+    const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+    const window = { innerWidth: phoneShell ? 390 : 1280, innerHeight: 800, addEventListener() {}, parent: { document: { querySelector: () => null }, postMessage() {} } };
+    const f = new Function("document", "window", "localStorage", "location", "setInterval", "TENANT", "TEAM", "EMBED", "isPhoneShell",
+      src.slice(a, b + bEnd.length) + "\nreturn { applyTenantVocabulary, setupGuide };");
+    const api = f(document, window, localStorage, { origin: "https://app.wayscope.test", search: "" }, () => {}, { name: "Wolds Link", team_label: "Team", demo_notice: "Fictional scheme" }, "Team", false, () => phoneShell);
+    api.applyTenantVocabulary();
+    const dots = Object.keys(byId).filter(k => /^guide-dot-/.test(k));
+    return { dots: dots.length, labels: dots.map(k => byId[k].attrs["aria-label"]), strip: !!byId["guide-strip"] };
+  };
+  let desk = null, ph = null, err = "";
+  try { desk = runShell(false); ph = runShell(true); } catch (e) { err = e.message; }
+  ok("⭐ decision 8 sandbox: the guide block runs with isPhoneShell() handed in, phone and desk", !!desk && !!ph, err);
+  if (desk && ph) {
+    ok("⭐ decision 8 sandbox: on a phone the strip is placed and NO dot is drawn, though every anchor is on the page", ph.strip === true && ph.dots === 0, JSON.stringify(ph));
+    ok("⭐ decision 8 sandbox: at a desk the strip and the four dots are drawn as before, each named 'Tip: <the step's title>'",
+       desk.strip === true && desk.dots === 4 && JSON.stringify(desk.labels) === JSON.stringify(["Tip: The bar along the top", "Tip: Press Play", "Tip: Conditions", "Tip: The side panel"]), JSON.stringify(desk));
+  }
+  // #26: the legend rows
+  ok("🔴 #26: each team row of the legend is a <label> round its box (24 px by a stylesheet rule — not inline, so the phone block's 48 px wins — and a pointer cursor), so the whole row ticks it and a screen reader names the box by the team; no bare div row is left in renderIptLegend",
+     code.includes('return `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.7;cursor:pointer;${r.muted ? \'opacity:.7;\' : \'\'}" title="${r.labels.join(\' · \').replace(/"/g, \'&quot;\')}">`')
+     && /#ipt-legend label\{ min-height:24px; \}/.test(html) && !/<label style="[^"]*min-height/.test(code)
+     && code.includes("+ `<span style=\"color:#8a9099;\">${label}</span></label>`;")
+     && !/return `<div style="display:flex;align-items:center;gap:6px;font-size:12\.5px/.test(code)
+     && /type="checkbox" id="\$\{iptCheckboxId\(r\.ipt\)\}" checked/.test(code));
+  ok("#26: on a phone the legend rows are the Layers sheet's 48 px rows with 20 px boxes, like every other row there",
+     /#ipt-legend label\{ min-height:48px; \}/.test(phone) && /#ipt-legend input\[type=checkbox\]\{ width:20px; height:20px; \}/.test(phone));
+  // #30: the close buttons
+  ok("🔴 #30: the conditions panel's two × buttons (the head's, each row's dismiss) and the route drawer's close tap at 28 px or more through one ::after halo (inset -8 px), each positioned so the halo is its own",
+     /\.tl-head \.x::after, \.tl-warn \.x::after, \.drawer-close::after\{ content:""; position:absolute; inset:-8px; \}/.test(html)
+     && /\.tl-head \.x\{ position:relative; border:none;/.test(html) && /\.tl-warn \.x\{ position:relative; border:none;/.test(html)
+     && /\.drawer-close\{ position:relative; margin-left:auto;/.test(html));
+  ok("#30: the share and export cards' close buttons were 44 px at every width already and stay so; on the phone the sheet's row × is 44 px as before",
+     /\.mt-close, \.share-close\{ width:44px; height:44px;/.test(html) && /\.m-body \.tl-warn \.show, \.m-body \.tl-warn \.x\{ min-height:44px; min-width:44px;/.test(phone));
+  // RE-PINNED 18 Oct 2026 (decision 18, the user): the halos are for a coarse pointer only, and "Take the tour" has one too
+  ok("🔴 decision 18: on a coarse pointer the strip's × (23 × 20) taps at 44 × 44 and 'Take the tour' (93 × 24) at 44 tall through ::after halos, both buttons positioned; the × reaches 9 px into the strip's 10 px gap, so the two halos never overlap; a mouse keeps the drawn boxes (no halo outside the media rule)",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-strip-go\{position:relative;font:inherit;/.test(html)
+     // the × draws 22.6 px wide in Inter, so 9 + 13 px round it up to 45: the audit listed 44 × 44 as under 44
+     && /@media \(pointer:coarse\)\{\.guide-strip \.guide-strip-go::after\{content:"";position:absolute;inset:-10px 0\}\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -13px -12px -9px\}\}/.test(html)
+     && (html.match(/\.guide-x::after/g) || []).length === 1 && (html.match(/\.guide-strip-go::after/g) || []).length === 1
+     && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html));
+  ok("no visible word changed on the map for this branch: the strip still says 'Take the tour' and 'Hide the tips', the dots' tips still come from the steps",
+     code.includes("onclick=\"guideStart()\">Take the tour</button>") && code.includes('aria-label="Hide the tips" title="Hide the tips and the dots"')
+     && code.includes("tip.querySelector('b').textContent = guideTitle(st); tip.querySelector('span').textContent = guideBody(st);"));
+}
+
+// ---- 17 Oct 2026 (the user: UK drivers' hours): the route drawer's trips a lorry a day ------------------------------
+// lorryDayTrips is the server's drivers_hours.lorry_day in the page (the drawer's rough estimate at the average speed).
+// The table is test_drivers_hours.py's CASES, row for row: the two languages are held to one answer.
+{
+  const grabLD = code.match(/function lorryDayTrips\(shiftH, driveMin, otherMin\)\{[\s\S]*?\n    \}/);
+  ok("⭐ the drawer has lorryDayTrips (the drivers' hours rule) and no longer divides the shift by the cycle",
+     !!grabLD && !code.includes("P.shift_hours_per_day/cycleH") && code.includes("lorryDayTrips(P.shift_hours_per_day, (round/P.avg_haul_speed_kmh)*60, P.load_minutes+P.unload_minutes)"));
+  if (grabLD) {
+    const lorryDayTrips = new Function(grabLD[0] + "; return lorryDayTrips;")();
+    const CASES = [[10, 60, 0, 9], [10, 69, 24, 5], [10, 45, 24, 8], [10, 84, 20, 5], [10, 174, 24, 2], [10, 600, 0, 0],
+                   [5, 54, 0, 5], [5, 54.01, 0, 4], [13, 60, 30, 8], [8, 30, 30, 7], [13, 60, 0, 9], [11, 20, 50, 8],
+                   [6, 30, 30, 6], [9.5, 30, 30, 9], [13, 60, 21, 8], [10, 15, 5, 27]];
+    const got = CASES.map(([sh, d, o]) => lorryDayTrips(sh, d, o));
+    ok("⭐ lorryDayTrips gives the server's answer on every one of test_drivers_hours.py's cases",
+       CASES.every(([sh, d, o, n], i) => got[i] === n), JSON.stringify(got));
+    ok("...a shift over 13 h is read as 13 (the daily rest), and nothing typed as 10",
+       lorryDayTrips(15, 60, 30) === lorryDayTrips(13, 60, 30) && lorryDayTrips(0, 60, 0) === lorryDayTrips(10, 60, 0));
+  }
+  // NARROWED 17 Oct 2026 (the review): the card reads the server's figure on the routed cycle when the route carries it
+  // (the rough estimate only without), and a 0 says why in words
+  ok("the drawer's card names the day: the shift less breaks, at most 9 h driving; whole trips, the literal kept",
+     code.includes("card(String(tripsPerDay),'Trips / day / lorry', tripsPerDay>0")
+     && code.includes("'@ '+Math.min(13, P.shift_hours_per_day)+' h shift less breaks, at most 9 h driving, '")
+     && code.includes("'routed cycle, '+Math.min(13, P.shift_hours_per_day)+' h shift less the required break, at most 9 h driving'")
+     && code.includes(": 'one round trip does not fit a driver\\'s day')"));
+  ok("⭐ the review: the drawer prefers the server's trips a day and cycle (feature properties), and 0 trips counts one lorry a trip",
+     code.includes("const tripsPerDay = fromServer ? info.trips_per_day")
+     && code.includes("if(cur.trips_per_day==null && typeof f.properties.trips_per_day==='number')")
+     && code.includes("card(info.cycle_hr.toFixed(2)+' h','Haul cycle','Routed drive, both legs, + gate and handling')")
+     && code.includes("Math.ceil(peakLoads/(Math.max(1, tripsPerDay)*P.working_days_per_month))")
+     && !code.includes("(tripsPerDay>0)?Math.ceil(peakLoads/"));
+  if (grabLD) {
+    const lorryDayTrips = new Function(grabLD[0] + "; return lorryDayTrips;")();
+    ok("⭐ the review: the twin knows the second break past 12 h of work (13 h, 60 + 21 a cycle: 9 would need 789 min)",
+       lorryDayTrips(13, 60, 21) === 8 && lorryDayTrips(13, 60, 30) === 8);
+  }
+  // NARROWED 17 Oct 2026 (the review): one break ("the required break") and the planning-figure caveat
+  ok("the bar's note and the month table's note say the vehicles are worked out in a driver's day",
+     code.includes("(the cycle time of its stored road route) in a driver's day under the UK drivers' hours (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers' own hours not checked)")
+     && code.includes("what one vehicle can do in a driver\\'s day on that route (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers\\' own hours not checked)")
+     && !code.includes("the shift less the required breaks"));
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

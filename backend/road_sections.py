@@ -53,7 +53,7 @@ in the totals and on no section, and `routes_off_index` names it. Movements a da
 the sum, over the routes that own it, of their Approved lines' loads in the month (tonnes
 ÷ payload, as typed, fractional — the bar's rule, never rounded per line) ÷ the working
 days. Vehicles = Σ per line ceil((loads ÷ working days) ÷ what one vehicle can do a day
-on that route), the bar's rule; the Dashboard's rounded-up `trips` rides beside it,
+on that route — a driver's day under the UK drivers' hours since 17 Oct 2026), the bar's rule; the Dashboard's rounded-up `trips` rides beside it,
 named. CO2e for the month is apportioned by length: a route's co2_t (costlines' figure,
 both legs) × run length ÷ the route's TWO-WAY length (loaded + baked return) — the carbon
 emitted ON the run, both lengths haversine over the stored vertices. (Until 12 Oct the

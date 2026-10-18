@@ -93,3 +93,80 @@ def fixture_today(today=None):
     """
     d = today or datetime.date.today()
     return d - datetime.timedelta(days=d.weekday() - 4) if d.weekday() > 4 else d
+
+
+DEMO_AS_OF = datetime.date(2026, 11, 26)   # the shipped demo's as-of date (make_demo_tenant.SHIPPED_AS_OF, D96)
+
+
+def pin_today(day=DEMO_AS_OF, extra=()):
+    """
+    17 Oct 2026 (demo redesign D104): make every `date.today()` (and `datetime.now()` / `.today()`) the backend reads
+    return `day`, so a harness that reads the REAL commit week reads the same week whatever the calendar says. Without it
+    http_smoke and test_h1_uk failed whenever the real week fell outside the demo's plan (4 Jan 2027 on the old demo) and
+    pinned figures moved every week.
+
+    Replaces, in every backend module already imported (call it after `import main`) and in the date-reading modules
+    named here, and in sys.modules (so a function's own `import datetime` reads the pin too): an attribute holding the
+    `datetime` MODULE with a copy whose `date` / `datetime` are subclasses with a
+    pinned today() / now(); an attribute holding `datetime.date` or `datetime.datetime` itself (`from datetime import
+    date`) likewise. isinstance() keeps accepting real dates and datetimes. utcnow() and time.time() are NOT pinned:
+    stamps (created_at, an audit row) keep the real clock, and so does restrictions' "current" filter, which reads
+    time.time() — a fixture closure must therefore span both the real and the pinned date. Returns the pinned date.
+    """
+    import importlib
+    import sys
+    import types
+    real_date, real_dt = datetime.date, datetime.datetime
+
+    class _DateMeta(type):
+        def __instancecheck__(cls, obj):
+            return isinstance(obj, real_date)
+
+    class _DtMeta(type):
+        def __instancecheck__(cls, obj):
+            return isinstance(obj, real_dt)
+
+    class PinnedDate(real_date, metaclass=_DateMeta):
+        def __new__(cls, *a, **k):          # every date built through the pin is a REAL date (sqlite, json, arithmetic)
+            return real_date(*a, **k)
+
+        @classmethod
+        def today(cls):
+            return real_date(day.year, day.month, day.day)
+
+    class PinnedDateTime(real_dt, metaclass=_DtMeta):
+        def __new__(cls, *a, **k):
+            return real_dt(*a, **k)
+
+        @classmethod
+        def now(cls, tz=None):
+            t = real_dt.now(tz)
+            return t.replace(year=day.year, month=day.month, day=day.day)
+
+        @classmethod
+        def today(cls):
+            return cls.now()
+
+    proxy = types.ModuleType("datetime")
+    proxy.__dict__.update({k: v for k, v in vars(datetime).items() if not k.startswith("__")})
+    proxy.date, proxy.datetime = PinnedDate, PinnedDateTime
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for name in ("weeks", "days", "lookahead", "network", "stockpiles", "fuel", "zones", "export", "route_sheet",
+                 "route_map_export", "collisions", "community", "clp", "bulletin", "gate_arrivals", "clashes") + tuple(extra):
+        try:
+            importlib.import_module(name)
+        except Exception:
+            pass
+    for mod in list(sys.modules.values()):
+        f = getattr(mod, "__file__", None) or ""
+        if not f or os.path.dirname(os.path.abspath(f)) != backend:
+            continue
+        for k, v in list(vars(mod).items()):
+            if v is datetime:
+                setattr(mod, k, proxy)
+            elif v is real_date:
+                setattr(mod, k, PinnedDate)
+            elif v is real_dt:
+                setattr(mod, k, PinnedDateTime)
+    sys.modules["datetime"] = proxy      # modules imported BEFORE this keep their own reference (the stdlib, the libraries)
+    return real_date(day.year, day.month, day.day)

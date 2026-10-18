@@ -296,7 +296,10 @@ db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L
 db.execute("INSERT INTO locations (id, name, lat, lon) VALUES (?, ?, ?, ?)", ("L2", "Site", 58.6, 24.4))
 db.execute("INSERT INTO routes (id, origin_id, dest_id) VALUES (?, ?, ?)", ("R1", "L1", "L2"))
 db.execute("INSERT INTO routes (id, origin_id, dest_id) VALUES (?, ?, ?)", ("R2", "L1", "L2"))
-MONTHS = tuple(range(1, 25))                 # two years, so today is always covered
+# NARROWED 16 Oct: was a fixed range(1, 25), which ran out on 20 Dec 2027 (the early-warning
+# week fell in month 25, unseeded). Now at least two years and always two months past the
+# commit month, so the commit / make-ready / early-warning weeks are seeded whatever the date.
+MONTHS = tuple(range(1, max(24, days.commit_bucket()[0] + 2) + 1))
 seed_line(route_id="R1", disc="earthworks", sect="WS1", months=MONTHS, qty=4000.0)
 seed_line(route_id="R2", disc="earthworks", sect="WS9", months=MONTHS, qty=800.0)   # stays Pending
 
@@ -305,7 +308,7 @@ DATES = days.bucket_dates(MI, WI)
 ISO = [d.isoformat() for d in DATES]
 NWD = len(days.weekdays_in(DATES))
 ok("the commit bucket is inside the seeded horizon (a month owns 4 or 5 weeks: the Thursday rule)",
-   1 <= MI <= 24 and 1 <= WI <= weeks.weeks_in_month(MI))
+   1 <= MI <= max(MONTHS) - 2 and 1 <= WI <= weeks.weeks_in_month(MI))
 
 r = days.materialise_commit_week()
 ok("nothing materialises while no line is Approved", r["created"] == 0 and _line_days() == [])
@@ -401,7 +404,7 @@ ok("Sat/Sun are typeable — 0 is a default, not a rule",
 #  4. Actuals — rule 6, the freeze trap, and no calibration                    #
 # =========================================================================== #
 before_next = weeks.get_week("R1", *weeks.next_week(MI, WI)[:1], "earthworks", "WS1", weeks.next_week(MI, WI)[1]) \
-    if weeks.next_week(MI, WI)[0] <= 24 else None
+    if weeks.next_week(MI, WI)[0] <= max(MONTHS) else None   # was <= 24: skipped from 27 Dec 2027
 r = main.set_forecast_day_actual(main.DayActual(route_id="R1", month_index=MI, discipline="earthworks",
                                                 section_id="WS1", day_date=first_wd, actual_qty=10.0))
 w = weeks.get_week("R1", MI, "earthworks", "WS1", WI)
@@ -467,7 +470,10 @@ ok("...and the chosen week is outside BOTH day buckets (commit and next)", (om, 
 #  6. Calibrate — next week only, and the opt-in spread                       #
 # =========================================================================== #
 # calibrating INTO a confirmed commit week still 400s, spread or not
-pm, pw = (MI, WI - 1) if WI > 1 else (MI - 1, 4)
+# NARROWED 16 Oct: the week before the commit week comes from weeks.prev_week. The old
+# `(MI - 1, 4)` assumed every month ends at week 4; after a five-week month (Oct 2026)
+# it picked a week whose next week is NOT the commit week, and the test crashed.
+pm, pw = weeks.prev_week(MI, WI)
 weeks.set_actual("R1", pm, "earthworks", "WS1", pw, actual_qty=1.0)
 r = days.calibrate("R1", pm, "earthworks", "WS1", pw, spread=True)
 ok("🔴 calibrate into a confirmed commit week is refused, spread or not", r.get("blocked_by") == "confirmed")
@@ -687,8 +693,16 @@ ok("a baked line: baked, return_baked, both distances, km_trip = loaded + return
    and c1.get("return_km") == 30.0 and c1.get("km_trip") == 60.0 and c1.get("cycle_mark") is None
    and c1.get("cycle_source") == "here")
 ok("cycle_min is route_analysis' cycle in minutes (104.0 = 1.7333 h)", c1.get("cycle_min") == 104.0)
-ok("⭐ cycles_per_vehicle_day IS route_analysis().trips_per_day — floor(600 / 104) = 5",
+# label NARROWED 17 Oct 2026 (UK drivers' hours): 5 is now the rule's answer (5 × 104 = 520 + the 45-min break ≤ 600),
+# the same 5 the old floor(600 / 104) gave
+ok("⭐ cycles_per_vehicle_day IS route_analysis().trips_per_day — 5 in a driver's day (520 min + the break ≤ 600)",
    c1.get("cycles_per_vehicle_day") == 5 and c1.get("shift_hours") == 10.0)
+_ra1 = next((r for r in network.route_analysis("R1")["rows"] if r.get("alt_index") == 0 and r.get("profile") == V8), {})
+ok("17 Oct 2026 (the review): the line's context carries the row's driving / other-work split and the lorry's day "
+   "(the Look-ahead's details name the limit from it)",
+   c1.get("drive_min") == _ra1.get("drive_min") and c1.get("other_work_min") == _ra1.get("other_work_min")
+   and c1.get("lorry_day") == _ra1.get("lorry_day") and (c1.get("lorry_day") or {}).get("limited_by") == "shift",
+   str((c1.get("drive_min"), c1.get("other_work_min"), c1.get("lorry_day"))))
 ab = main.routes_analysis_batch(route_ids="R1")
 ok("⭐ ...and it equals what /api/routes/analysis-batch reports for the same (route, vehicle)",
    (ab.get("analysis", {}).get("R1", {}).get(V8) or {}).get("trips_per_day") == c1.get("cycles_per_vehicle_day")
@@ -974,6 +988,33 @@ ok("🔴 IPT_SHARE: IPT1 + IPT2 on the same route_id the same day — and on the
    and all(f["ipts"] == ["IPT1", "IPT2"] for f in flags if f["code"] == "IPT_SHARE"))
 ok("...R3 (IPT3 alone, a different origin) raises no share flag",
    not any(f["route_id"] == "R3" for f in flags if f["code"] == "IPT_SHARE"))
+# 17 Oct 2026: the share text names the PLACES, never the location or haul-road ids (R3's browser check on the
+# four-year demo read "IPT1 + IPT2 on the same haul L014→L007"). The route keeps its id: R1 is the reference a
+# person reads on the Routes page, the row details and ROUTE_CAP's own text.
+_sh_txt = {f["share"]: f["text"] for f in flags if f["code"] == "IPT_SHARE"}
+ok("🔴 IPT_SHARE (same origin + destination) names the places: \"on the same haul Pit → Site\", no location id",
+   "on the same haul Pit → Site on " in _sh_txt.get("od", "")
+   and not any(re.search(r"\bL\d+\b", f["text"]) for f in flags if f["code"] == "IPT_SHARE"), str(_sh_txt))
+ok("…the route kind keeps the route's reference, said as a route: \"IPT1 + IPT2 on route R1 on …\"",
+   _sh_txt.get("route", "").startswith("IPT1 + IPT2 on route R1 on "), str(_sh_txt))
+ok("…share_id keeps the ids (a machine field, never printed): L1→L2 for the od kind",
+   {f["share_id"] for f in flags if f["code"] == "IPT_SHARE" and f["share"] == "od"} == {"L1→L2"})
+# a haul road on R1: the text names the haul road (its zone name), never its zone id
+db.execute("INSERT INTO zones (tenant_id, id, name, kind) VALUES (?, ?, ?, ?)",
+           (db.current_tenant(), "Z77", "Pit haul road", "haul_road"))
+db.execute("INSERT INTO route_haul_roads (tenant_id, route_id, zone_id, seq) VALUES (?, ?, ?, ?)",
+           (db.current_tenant(), "R1", "Z77", 0))
+_pg_haul = lookahead.page(bucket="commit")
+_hl = [f for f in _pg_haul["clashes"]["flags"] if f["code"] == "IPT_SHARE" and f["share"] == "haul"]
+ok("🔴 IPT_SHARE on a haul road names it: \"IPT1 + IPT2 on Pit haul road on …\", never Z77",
+   len(_hl) >= 2 and all(f["text"].startswith("IPT1 + IPT2 on Pit haul road on ") and "Z77" not in f["text"]
+                         and f["share_id"] == "Z77" for f in _hl), str(_hl[:1]))
+db.execute("UPDATE zones SET name = '' WHERE tenant_id = ? AND id = 'Z77'", (db.current_tenant(),))
+_hl0 = [f for f in lookahead.page(bucket="commit")["clashes"]["flags"] if f["code"] == "IPT_SHARE" and f["share"] == "haul"]
+ok("…a haul road with no name reads \"on the same haul road\" — the id never stands in",
+   _hl0 and all("on the same haul road on " in f["text"] and "Z77" not in f["text"] for f in _hl0), str(_hl0[:1]))
+db.execute("DELETE FROM route_haul_roads WHERE tenant_id = ? AND zone_id = 'Z77'", (db.current_tenant(),))
+db.execute("DELETE FROM zones WHERE tenant_id = ? AND id = 'Z77'", (db.current_tenant(),))
 # a cap EQUAL to the day's vehicles is not exceeded: R3 runs 1 veh/day; cap it at 1
 network.set_route_planning("R3", {"max_vehicles_per_day"}, max_vehicles_per_day=1)
 _pg_cap = lookahead.page(bucket="commit")
@@ -1275,6 +1316,10 @@ ok("...a priced row carries €",
 _sh = lambda n: wb[n] if n in wb.sheetnames else None
 ok("...the Clashes sheet has every flag the rail has",
    _sh("Clashes") is not None and _sh("Clashes").max_row - 1 == pg["clashes"]["count"])
+# 17 Oct 2026: the exports print the flag text — the places by name, no location id
+_clash_cells = [str(c.value or "") for row in _sh("Clashes").iter_rows() for c in row] if _sh("Clashes") is not None else []
+ok("🔴 ...the Clashes sheet names the shared haul's places (Pit → Site) and prints no location id",
+   any("on the same haul Pit → Site" in v for v in _clash_cells) and not any("L1→L2" in v for v in _clash_cells))
 ok("...the About sheet says Mon–Fri only",
    _sh("About") is not None and any("Mon–Fri only" in str(_sh("About").cell(row=i, column=2).value or "") for i in range(1, _sh("About").max_row + 1)))
 from portable import pdf_text, offline   # tests/pdf_text.py: portable pdftotext, no live Mapbox
@@ -1284,6 +1329,19 @@ ok("the PDF builds", isinstance(pb, bytes) and pb[:5] == b"%PDF-")
 ptxt = pb.decode("latin-1")
 ok("🔴 the PDF is LANDSCAPE A4 (10 Sep, the human)", re.search(r"/MediaBox \[ 0 0 841\.\d+ 595\.\d+ \]", ptxt) is not None, ptxt[ptxt.find("/MediaBox"):ptxt.find("/MediaBox") + 40])
 _txt = pdf_text(pb, ptxt)
+# the sheets list the most serious flags first (ROUTE_CAP outranks SHARE here), so the share text is read from a page
+# whose rail holds only the od share flags — the same builders, the same text
+_pg_od = dict(pg, clashes=dict(pg["clashes"], flags=[f for f in pg["clashes"]["flags"]
+                                                     if f["code"] == "IPT_SHARE" and f["share"] == "od"]))
+# the sheets set the arrow as "to" (the day sheet read "L1toL2" before the fix), so any join counts
+_ID_PAIR = re.compile(r"\bL\d+\s*(?:→|->|to)\s*L\d+\b")
+_od_pdf = " ".join(pdf_text(export.build_pdf(_pg_od)).split())
+ok("🔴 ...the PDF prints the share flag with the places by name, no location id (17 Oct 2026)",
+   "same haul Pit" in _od_pdf and not _ID_PAIR.search(_od_pdf), _od_pdf[-500:])
+_ds_day = next(d["day_date"] for d in pg["commit"]["lines"][0]["days"] if datetime.date.fromisoformat(d["day_date"]).weekday() <= 4)
+_ds_txt = " ".join(pdf_text(export.build_day_sheet_pdf(_pg_od, _ds_day)).split())
+ok("🔴 ...the day sheet does the same (17 Oct 2026)",
+   "same haul Pit" in _ds_txt and not _ID_PAIR.search(_ds_txt), _ds_txt[-500:])
 ok("...and carries the disclaimer, the flags heading, the footer lines and a page number",
    # G2: the road-user-charge line is country-neutral now ("Road-user charges are not on this sheet")
    "not a delivery note" in _txt and "not a stop" in _txt and "Road-user charges are not on this sheet" in _txt

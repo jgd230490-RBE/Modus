@@ -251,7 +251,7 @@ The demo is a fictional highways scheme, and nothing in it is a real project, so
 
 Three things to try:
 1. Dashboard: the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.
-2. Look-ahead: this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.
+2. Look-ahead: this week committed by route and by day, with National Highways road closures and lorry limits flagged; switch to next week to plan ahead.
 3. Public map: press Play to watch a month of haul unfold.
 
 Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the red "DEMO · Fictional scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.
@@ -275,7 +275,7 @@ def email_html(name, c):
 <p>Three things to try:</p>
 <ol>
 <li><b>Dashboard:</b> the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.</li>
-<li><b>Look-ahead:</b> this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.</li>
+<li><b>Look-ahead:</b> this week committed by route and by day, with National Highways road closures and lorry limits flagged; switch to next week to plan ahead.</li>
 <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
 </ol>
 <p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the red "DEMO · Fictional scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>
@@ -492,7 +492,7 @@ def access_page(name, c):
   <p>Three things to try:</p>
   <ol>
     <li><b>Dashboard:</b> the plan at a glance; today's tonnes, trips and vehicles are one click down, under This week and today.</li>
-    <li><b>Look-ahead:</b> this week committed by route and by day, with closures and route caps flagged; switch to next week to plan ahead.</li>
+    <li><b>Look-ahead:</b> this week committed by route and by day, with National Highways road closures and lorry limits flagged; switch to next week to plan ahead.</li>
     <li><b>Public map:</b> press Play to watch a month of haul unfold.</li>
   </ol>
   <p>Nothing pops up by itself. Each page offers a short tour in a small "New here?" box; "Guide", at the right of the red "DEMO · Fictional scheme" bar, starts the tour for the page you are on. Orange dots mark the main features: point at one for its tip.</p>

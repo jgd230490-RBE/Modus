@@ -63,6 +63,7 @@ import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one 
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
+import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -188,6 +189,7 @@ _GATE_CSS = """
   .pw-eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:38px; height:38px;
             margin:0; padding:0; display:grid; place-items:center; color:#78716C; background:none; border-radius:6px; }
   .pw-eye:hover { background:#F5F5F4; color:#1F2024; }
+  .pw-eye::after { content:""; position:absolute; inset:-3px; }   /* 18 Oct 2026 (UI audit, the 44 px rule): the 38 px eye taps at 44 */
   .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
   .foot { margin-top:18px; font-size:13px; color:#78716C; }
   a { color:#2563EB; }
@@ -2405,7 +2407,9 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
                 res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None)
                 for row in res.get("rows", []):
                     if row.get("alt_index") == 0 and (not vehicle or row.get("profile") == vehicle):
-                        tpv = row.get("trips_per_day")
+                        # 17 Oct 2026 (drivers' hours): a routed line where not one round trip fits a driver's day counts
+                        # one lorry a trip (the floor every reader uses), never "not routed"
+                        tpv = max(1, int(row.get("trips_per_day") or 0))
                         break
             except Exception:
                 tpv = None
@@ -3258,10 +3262,14 @@ def bake_routes(profile: str = network.DEFAULT_PROFILE,
 
     'limit' counts legs rather than routes — each leg is one HERE call. Pass
     legs='loaded' to skip the unladen return and halve the call count.
+
+    17 Oct 2026: each call also stops starting legs after network.BAKE_BUDGET_S seconds,
+    so it answers well inside Render's request limit (Route all used to 502 on most batches).
     """
     _check_admin(token)
     want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else network.LEGS
-    return network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS)
+    return network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS,
+                              budget_s=network.BAKE_BUDGET_S)
 
 
 @app.post("/api/admin/clear-geometry")
@@ -3468,7 +3476,46 @@ def gate_arrivals_month(month: Optional[int] = None):
     if not (1 <= int(month) <= MONTH_COUNT):
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
     factors = conversions.load_factors()
-    return gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=_working_days(factors))
+    wd = _working_days(factors)
+    out = gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=wd)
+    # 16 Oct 2026 (S3): the busiest clock hour at each gate, from the simulation's average day (sim.py, the one engine;
+    # no pour, the gates as typed). Never fails the panel: a day that cannot be simulated adds nothing.
+    b = sim.busiest(int(month), acc, factors, wd, out)
+    for g in out.get("gates") or []:
+        g["busiest_hour"] = (b.get("gates") or {}).get(g["gate_id"])
+    out["busiest_note"] = b.get("note")
+    return out
+
+
+@app.get("/api/sim/day")
+def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None),
+            check_in: Optional[List[str]] = Query(None), bands: Optional[str] = None,
+            pour_gate: Optional[str] = None, pour_start: Optional[str] = None, pour_m3: Optional[str] = None,
+            pour_m3_per_load: Optional[str] = None, pour_rate: Optional[str] = None, legs: Optional[str] = None):
+    """
+    16 Oct 2026 (S3) — the haulage simulation: an average working day of one month at every gate, lorry by lorry
+    (sim.py; the example the user approved on 16 Oct is its spec). Whole loads per line, each gate's arrivals spread
+    evenly over its open hours less the no-delivery bands (D59), an optional concrete pour as a burst, one lane at each
+    gate, the busiest hour, the bottleneck (D85), the minutes lost, late check-ins (D89). The scenario is these query
+    parameters and nothing else: no write, nothing saved, no link (D86). Any signed-in code, like the Gate arrivals
+    panel; a team code sees other teams' lines by route only. `legs=1` adds each route's line for the drawing.
+    400 in words for a scenario that cannot be simulated (a window past midnight, D93; a pour past midnight).
+    """
+    acc = _require_access()
+    if month is None:
+        import datetime as _dt
+        month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
+    if not (1 <= int(month) <= MONTH_COUNT):
+        raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    factors = conversions.load_factors()
+    try:
+        sc = sim.scenario_from_query(hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
+                                     pour_start=pour_start, pour_m3=pour_m3, pour_m3_per_load=pour_m3_per_load,
+                                     pour_rate=pour_rate)
+        return sim.day(int(month), acc, factors=factors, working_days=_working_days(factors), scenario=sc,
+                       send_lines=str(legs or "").lower() in ("1", "true", "yes"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/clp/monitoring")

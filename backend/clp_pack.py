@@ -20,6 +20,8 @@ the status red and gold, the "none" grey and ink — the colour system's roles (
 """
 import datetime
 import io
+import math
+import re
 
 import brand_pdf
 import export
@@ -122,6 +124,100 @@ def table_of(c, M):
 
 
 # --------------------------------------------------------------------------- #
+#  The tables on paper: the same figures, laid out to fit A4                   #
+# --------------------------------------------------------------------------- #
+PAD = 6          # reportlab's default left and right cell padding, points
+FIGURE = re.compile(r"^[\d .,%—-]+$")
+
+
+def _units(c, M):
+    """(key, units, n_rows) for a chart's table on paper. key = the first column (header, cells); a unit = (header over it or
+    None, [(column header, cells)]) and is never split across two tables. The vehicle and Euro class tables run one row a
+    month (the XLSX keeps one column a month): 24 months across would be 49 columns, more than A4 holds."""
+    k = c["key"]
+    if k in ("vehicle_types", "euro_class"):
+        months = [m["label"] for m in c.get("months") or []]
+        units = [(s["label"], [("Loads", [_n(x, 0) for x in s["loads"]]),
+                               ("Share", [(f"{x:g} %" if x is not None else "—") for x in s["pct"]])])
+                 for s in c.get("series") or []]
+        units.append((None, [("All loads", [_n(x, 0) for x in c.get("totals") or []])]))
+        return ("Month", months), units, len(months)
+    head, rows = table_of(c, M)
+    if not head:
+        return None, [], 0
+    return ((head[0], [r[0] for r in rows]), [(None, [(h, [r[j] for r in rows])]) for j, h in enumerate(head[1:], 1)], len(rows))
+
+
+def pdf_tables(c, M, usable, F):
+    """A chart's table as one or more tables that each fit `usable` points: a list of dicts with 'header' (one or two rows),
+    'rows', 'widths' (None = reportlab shares the width out, the layout of a table that fits) and 'spans'. A table too wide
+    for the page is split into column groups, each repeating the first column; no figure is dropped or shortened."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    fb = F["fallback"]
+
+    def word_w(s, bold=True):
+        return max([stringWidth(w, F["bold"] if bold else F["regular"], 7) for w in _txt(s, fb).split()] + [0])
+
+    def cell_w(x):                # a figure never wraps (its thousands gap is a space); words wrap at their spaces
+        s = _txt(x, fb)
+        return stringWidth(s, F["regular"], 7) if FIGURE.match(s) else word_w(s, bold=False)
+
+    def col_w(h, cells):
+        return max([word_w(h)] + [cell_w(x) for x in cells]) + 2 * PAD
+
+    key, units, n = _units(c, M)
+    if key is None or not n:
+        return []
+    two = any(top is not None for top, _ in units)
+    kw = max(col_w(key[0], key[1]),
+             min(max([stringWidth(_txt(x, fb), F["regular"], 7) for x in key[1]] + [0]) + 2 * PAD, usable * 0.22))
+    uw = []
+    for top, cols in units:
+        ws = [col_w(h, cells) for h, cells in cols]
+        if top is not None and word_w(top) + 2 * PAD > sum(ws):
+            extra = (word_w(top) + 2 * PAD - sum(ws)) / len(ws)
+            ws = [w + extra for w in ws]
+        uw.append(ws)
+    groups, cur, cur_w = [], [], kw
+    for i, ws in enumerate(uw):
+        if cur and cur_w + sum(ws) > usable:
+            groups.append(cur)
+            cur, cur_w = [], kw
+        cur.append(i)
+        cur_w += sum(ws)
+    groups.append(cur)
+    out = []
+    for g in groups:
+        cols = [cc for i in g for cc in units[i][1]]
+        natural = [kw] + [w for i in g for w in uw[i]]
+        if len(groups) == 1 and not two:
+            widths = None
+        else:
+            widths = [w * usable / sum(natural) for w in natural] if sum(natural) < usable else natural
+        spans, header = [], []
+        if two:
+            top_row, sub_row, x = [key[0]], [""], 1
+            for i in g:
+                top, ucols = units[i]
+                if top is None:                       # a lone column: its header fills both header rows
+                    top_row.append(ucols[0][0]); sub_row.append("")
+                    spans.append(((x, 0), (x, 1)))
+                else:
+                    top_row += [top] + [""] * (len(ucols) - 1)
+                    sub_row += [h for h, _ in ucols]
+                    if len(ucols) > 1:
+                        spans.append(((x, 0), (x + len(ucols) - 1, 0)))
+                x += len(ucols)
+            spans.append(((0, 0), (0, 1)))
+            header = [top_row, sub_row]
+        else:
+            header = [[key[0]] + [h for h, _ in cols]]
+        rows = [[key[1][r]] + [cells[r] for _, cells in cols] for r in range(n)]
+        out.append({"header": header, "rows": rows, "widths": widths, "spans": spans})
+    return out
+
+
+# --------------------------------------------------------------------------- #
 #  PDF                                                                         #
 # --------------------------------------------------------------------------- #
 def _chart_flowable(c, width, F):
@@ -148,6 +244,16 @@ def _chart_flowable(c, width, F):
 
         def _stroke(self, cv, hx, w=0.6):
             cv.setStrokeColorRGB(*_rgb(hx)); cv.setLineWidth(w)
+
+        # --- the month under each bar or point; with many months (a 24-month window) every k-th, so none overlap
+        def _months(self, cv, xs, labels, y):
+            gap = (xs[1] - xs[0]) if len(xs) > 1 else self.width
+            wid = max([cv.stringWidth(_txt(s, fb), F["regular"], 7) for s in labels] + [1]) + 2 * mm
+            every = max(1, math.ceil(wid / gap))
+            self._fill(cv, INK); self._font(cv, size=7)
+            for i, lab in enumerate(labels):
+                if i % every == 0:
+                    cv.drawCentredString(xs[i], y, _txt(lab, fb))
 
         def draw(self):
             cv = self.canv
@@ -177,7 +283,7 @@ def _chart_flowable(c, width, F):
         def _share(self, cv):
             months = [m["label"] for m in c.get("months") or []]
             series = c.get("series") or []
-            left, bottom, legend_h = 10 * mm, 12 * mm, 6 * mm
+            left, bottom, legend_h = 10 * mm, 12 * mm + 6 * mm * (len(legend_lines) - 1), 6 * mm
             ph = self.height - bottom - legend_h
             pw = self.width - left
             n = max(1, len(months))
@@ -187,12 +293,7 @@ def _chart_flowable(c, width, F):
                 y = bottom + ph * p / 100
                 cv.line(left, y, self.width, y)
                 self._fill(cv, "#64748B"); self._font(cv, size=6.5); cv.drawRightString(left - 1.5 * mm, y - 1, f"{p} %")
-            colours, slot = [], 0
-            for s in series:
-                if s["group"] == NOT_TYPED:
-                    colours.append(NONE)
-                else:
-                    colours.append(SLOTS[slot % len(SLOTS)]); slot += 1
+            colours = share_colours
             for i, m in enumerate(months):
                 x = left + pw * (i + 0.5) / n - bw / 2
                 y = bottom
@@ -203,14 +304,14 @@ def _chart_flowable(c, width, F):
                         self._fill(cv, col); cv.rect(x, y, bw, h, fill=1, stroke=0)
                         self._stroke(cv, "#FFFFFF", 0.8); cv.line(x, y + h, x + bw, y + h)
                     y += h
-                self._fill(cv, INK); self._font(cv, size=7); cv.drawCentredString(x + bw / 2, bottom - 4 * mm, m)
-            lx = left
-            for s, col in zip(series, colours):
-                self._fill(cv, col); cv.rect(lx, 1 * mm, 3 * mm, 3 * mm, fill=1, stroke=0)
-                self._fill(cv, INK); self._font(cv, size=7)
-                t = _txt(s["label"], fb)[:30]
-                cv.drawString(lx + 4 * mm, 1.4 * mm, t)
-                lx += 4 * mm + cv.stringWidth(t, F["regular"], 7) + 5 * mm
+            self._months(cv, [left + pw * (i + 0.5) / n for i in range(len(months))], months, bottom - 4 * mm)
+            for li, line in enumerate(legend_lines):          # the key wraps onto more lines, never off the page
+                lx, ly = left, 1 * mm + (len(legend_lines) - 1 - li) * 6 * mm
+                for t, col in line:
+                    self._fill(cv, col); cv.rect(lx, ly, 3 * mm, 3 * mm, fill=1, stroke=0)
+                    self._fill(cv, INK); self._font(cv, size=7)
+                    cv.drawString(lx + 4 * mm, ly + 0.4 * mm, t)
+                    lx += 4 * mm + _sw(t) + 5 * mm
 
         # --- councils: laden and empty distance, stacked, with movements a day in words
         def _councils(self, cv):
@@ -254,8 +355,7 @@ def _chart_flowable(c, width, F):
                 self._fill(cv, "#64748B"); self._font(cv, size=6.5); cv.drawRightString(left - 1.5 * mm, y - 1, _tick(v, step))
             n = max(1, len(labels))
             xs = [left + pw * (i + 0.5) / n for i in range(n)]
-            for i, lab in enumerate(labels):
-                self._fill(cv, INK); self._font(cv, size=7); cv.drawCentredString(xs[i], bottom - 4 * mm, lab)
+            self._months(cv, xs, labels, bottom - 4 * mm)
             for name, vals, col, dash in series:
                 self._stroke(cv, col, 1.6)
                 cv.setDash(*dash) if dash else cv.setDash()
@@ -285,20 +385,32 @@ def _chart_flowable(c, width, F):
                 y = bottom + ph * p / 4
                 cv.line(left, y, left + pw, y)
                 self._fill(cv, "#64748B"); self._font(cv, size=6.5); cv.drawRightString(left - 1.5 * mm, y - 1, _tick(step * p, step))
+            xs = [left + pw * (i + 0.5) / n for i in range(n)]
+            gap = (xs[1] - xs[0]) if n > 1 else pw
+            # the trips avoided over each pair: "31 avoided" where every month's fits, else the figure alone where every
+            # month's fits (the key then says what it is), else none over the bars (the key points to the table); never
+            # some months and not others. The table below carries every month either way.
+            fit = lambda fmt: all(cv.stringWidth(fmt(m), F["bold"], 7) + 1 * mm <= gap for m in ms if m["avoided"])
+            words = (lambda m: f"{_n(m['avoided'], 0)} avoided")
+            figure = (lambda m: _n(m["avoided"], 0))
+            say = words if fit(words) else (figure if fit(figure) else None)
             for i, m in enumerate(ms):
-                cx = left + pw * (i + 0.5) / n
+                cx = xs[i]
                 h1, h2 = ph * m["loads_planned"] / top, ph * m["loads_with_decisions"] / top
                 self._fill(cv, "#F8C9AE"); self._stroke(cv, SLOTS[0], 0.6); cv.rect(cx - bw - 0.5 * mm, bottom, bw, h1, fill=1, stroke=1)
                 self._fill(cv, SLOTS[0]); cv.rect(cx + 0.5 * mm, bottom, bw, h2, fill=1, stroke=0)
-                self._fill(cv, INK); self._font(cv, size=7); cv.drawCentredString(cx, bottom - 4 * mm, m["label"])
-                if m["avoided"]:
-                    self._font(cv, bold=True, size=7)
-                    cv.drawCentredString(cx, bottom + max(h1, h2) + 1.5 * mm, f"{_n(m['avoided'], 0)} avoided")
+                if m["avoided"] and say:
+                    self._fill(cv, INK); self._font(cv, bold=True, size=7)
+                    cv.drawCentredString(cx, bottom + max(h1, h2) + 1.5 * mm, say(m))
+            self._months(cv, xs, [m["label"] for m in ms], bottom - 4 * mm)
             lx = left
             for name, col in (("Loads as planned", "#F8C9AE"), ("With the agreed decisions", SLOTS[0])):
                 self._fill(cv, col); cv.rect(lx, 1 * mm, 3 * mm, 3 * mm, fill=1, stroke=0)
                 self._fill(cv, INK); self._font(cv, size=7); cv.drawString(lx + 4 * mm, 1.4 * mm, name)
                 lx += 4 * mm + cv.stringWidth(name, F["regular"], 7) + 5 * mm
+            if any(m["avoided"] for m in ms) and say is not words:
+                self._fill(cv, INK); self._font(cv, bold=True, size=7)
+                cv.drawString(lx, 1.4 * mm, "Figure over a pair: trips avoided" if say else "Trips avoided each month: the table below")
 
     rows_b = []
     if k in ("route_caps", "site_caps"):
@@ -315,7 +427,25 @@ def _chart_flowable(c, width, F):
         return Chart(len(rows_b) * 8 * mm + 4 * mm)
     if k in ("vehicle_types", "euro_class"):
         kind = "share"
-        return Chart(62 * mm)
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        _sw = lambda t: stringWidth(t, F["regular"], 7)
+        share_colours, slot = [], 0
+        for s in c.get("series") or []:
+            if s["group"] == NOT_TYPED:
+                share_colours.append(NONE)
+            else:
+                share_colours.append(SLOTS[slot % len(SLOTS)]); slot += 1
+        legend_lines, line, lx = [], [], 10 * mm
+        for s, col in zip(c.get("series") or [], share_colours):
+            t = _txt(s["label"], fb)
+            w = 4 * mm + _sw(t) + 5 * mm
+            if line and lx + w - 5 * mm > width:
+                legend_lines.append(line)
+                line, lx = [], 10 * mm
+            line.append((t, col))
+            lx += w
+        legend_lines.append(line)
+        return Chart(56 * mm + 6 * mm * len(legend_lines))
     if k == "councils":
         kind = "councils"
         return Chart((len(c.get("rows") or []) + 1) * 7 * mm + 4 * mm)
@@ -378,14 +508,15 @@ def build_pdf(M, generated=None):
         fl = _chart_flowable(c, usable, F)
         if fl is not None:
             block += [Spacer(1, 2 * mm), fl]
-        head, rows = table_of(c, M)
-        if rows:
-            data = [[P_(E(h), st_th) for h in head]] + [[P_(E(x), st_td) for x in r] for r in rows]
-            t = LongTable(data, repeatRows=1, hAlign="LEFT")
-            t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.Color(*_rgb(INK))),
+        for tb in pdf_tables(c, M, usable, F):
+            nh = len(tb["header"])
+            data = [[P_(E(h), st_th) for h in hr] for hr in tb["header"]] + [[P_(E(x), st_td) for x in r] for r in tb["rows"]]
+            t = LongTable(data, colWidths=tb["widths"], repeatRows=nh, hAlign="LEFT")
+            t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, nh - 1), colors.Color(*_rgb(INK))),
                                    ("GRID", (0, 0), (-1, -1), 0.3, colors.Color(*_rgb("#CBD5E1"))),
                                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                                   ("TOPPADDING", (0, 0), (-1, -1), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5)]))
+                                   ("TOPPADDING", (0, 0), (-1, -1), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5)]
+                                  + [("SPAN", a, b) for a, b in tb["spans"]]))
             block += [Spacer(1, 2 * mm), t]
         for note_key in ("target_note", "invalid", "double_count"):
             if c.get(note_key):

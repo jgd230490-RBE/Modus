@@ -153,6 +153,11 @@ import here_routing  # noqa: E402
 import main  # noqa: E402
 import access  # noqa: E402
 access.set_current("planner123")
+# 17 Oct 2026 (demo redesign R2, D104): the harness pins its own date — the shipped demo's as-of date, Thu 26 Nov 2026
+# (Nov W4), the week the package's history is typed up to — so the commit week, its lines and the figures below never
+# move with the calendar (the old demo had no plan after the week of 28 Dec 2026)
+from portable import pin_today, DEMO_AS_OF  # noqa: E402
+_PINNED = pin_today(DEMO_AS_OF)
 
 PASS = 0
 FAIL = []
@@ -275,9 +280,23 @@ _CSV = ("Date,ULSP:  Pump price in pence/litre,ULSD:  Pump price in pence/litre,
         "14/09/2026,135.20,194.80,20,20\n21/09/2026,135.60,195.50,20,20\n")
 fuel.fetch_desnz = lambda timeout=None: {"csv": _CSV, "csv_url": "https://assets.publishing.service.gov.uk/x.csv", "csv_title": "Weekly road fuel prices (CSV)"}
 import time as _t
-_now_ms = int(_t.time() * 1000)
+# NARROWED 17 Oct 2026 (R2, D104): restrictions' "current" filter reads the REAL clock (time.time()) while the look-ahead
+# reads the pinned week, so the fixture closures are dated round BOTH: the live one from 2 days before the earlier of the
+# two to 400 days after the later, the finished one ending 10 days before the earlier
+import calendar as _cal
+_real_ms = int(_t.time() * 1000)
+_pin_ms = _cal.timegm(_PINNED.timetuple()) * 1000
+_now_ms = min(_real_ms, _pin_ms)
+_late_ms = max(_real_ms, _pin_ms)
 _day = 86400000
-_r1 = db.query("SELECT id FROM routes WHERE tenant_id = ? ORDER BY id", (db.current_tenant(),))[0]["id"]
+# NARROWED 17 Oct 2026 (R2, D104, §3a): was the FIRST route by id, which had a line in every week of the 4-month demo; now
+# the first route that HAS an approved line in the pinned commit week's month (R001, the Harborough platform stone)
+import weeks as _wk  # noqa: E402
+_CM = _wk.editable_week()[0]
+_cw_routes = sorted({r["route_id"] for r in db.query(
+    "SELECT route_id FROM forecasts WHERE tenant_id = ? AND month_index = ? AND status = 'Approved'", (db.current_tenant(), _CM))})
+ok("D104: the pinned commit week (Nov W4 2026) has at least 2 routes with approved lines", len(_cw_routes) >= 2, str(_cw_routes))
+_r1 = _cw_routes[0]
 # bake the first route for every vehicle its forecast lines use, along the closure fixture below
 _veh = [r["vehicle_type"] for r in db.query("SELECT DISTINCT vehicle_type FROM forecasts WHERE tenant_id = ? AND route_id = ?",
                                             (db.current_tenant(), _r1))] or ["Rigid 8-wheeler (32t)"]
@@ -293,7 +312,7 @@ def _fake_nh_page(offset, count=restrictions.NH_PAGE, timeout=None):
         {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.9, 52.5], [-0.89, 52.51]]},
          "properties": {"OBJECTID": 2, "description": "Lane closure for barrier works", "road_number": "A46",
                         "eventtype": "Lane closure", "natureofworks": "Barrier works", "formattedeventnumber": "NH-0002",
-                        "scheduledplannedstartdate": _now_ms - 2 * _day, "scheduledplannedenddate": _now_ms + 400 * _day}},
+                        "scheduledplannedstartdate": _now_ms - 2 * _day, "scheduledplannedenddate": _late_ms + 400 * _day}},
         # 12 Oct 2026 (map review §2.2c (c)): a closure on the same route that ENDED ten days ago. Dropped by every
         # default read (the stored check, the look-ahead, /api/restrictions), kept only when a caller asks for the
         # past with include_expired — a past month on the public map's timeline.
@@ -312,7 +331,8 @@ ok("H2: the scheme is a road — tenant name, overlay note, discipline words; no
    and [d["in_scope"] for d in _T["disciplines"] if d["id"] == "stations"] == [0])
 ok("H2: every site has a gate at its own coordinates; the quarries and the town compound enter and leave by different gates",
    # NARROWED 14 Oct 2026 (civils materials): 17 gates — the batching plant's
-   len(_T["location_gates"]) == 17 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
+   # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): 19 — the asphalt plant's and Welland Ready-Mix's; == one per site at least
+   len(_T["location_gates"]) == 19 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
    and all(g["lat"] and g["lon"] for g in _T["location_gates"])
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L001") == ["access", "egress"]
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
@@ -324,13 +344,29 @@ _access = {g["access_zone_id"] for g in _T["location_gates"]}
 ok("H2: two haul roads, spliced (HERE does not know them), attached to the routes that use them",
    [(z["id"], z["haul_mode"]) for z in _T["zones"] if z["kind"] == "haul_road" and z["id"] not in _access]
    == [("Z001", "splice"), ("Z002", "splice")]
-   and sorted((l["route_id"], l["zone_id"]) for l in _T["route_haul_roads"]) == [("R004", "Z001"), ("R005", "Z001"), ("R006", "Z001"), ("R014", "Z001"), ("R016", "Z002"), ("R018", "Z002")])
+   # RE-PINNED 17 Oct 2026 (R2, §3a): the Langton haul road is attached to EVERY route into Langton Compound (nine since the
+   # four-year programme: + the asphalt, the two concrete plants, the precast and the 2030 coating-plant routes)
+   and sorted((l["route_id"], l["zone_id"]) for l in _T["route_haul_roads"])
+   == sorted([(r, "Z001") for r in ("R004", "R005", "R006", "R014", "R031", "R033", "R035", "R039", "R043")]
+             + [("R016", "Z002"), ("R018", "Z002")])
+   and {r["id"] for r in _T["routes"] if r["dest_id"] == "L006"} == {l["route_id"] for l in _T["route_haul_roads"] if l["zone_id"] == "Z001"})
 ok("16 Oct 2026: and one access road per gate, all spliced haul roads, none attached to a route",
-   len(_access) == 17 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
+   len(_access) == 19 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
    and not ({l["zone_id"] for l in _T["route_haul_roads"]} & _access))
-ok("H2: three geofences — a closure that re-routes (Tilton, in force before the show), an advisory 7.5 t village limit, an advisory works area",
-   [(z["kind"], z["affects_routing"], z["starts_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
-   == [("closure", 1, "2026-10-05"), ("weight_limit", 0, "2026-09-01"), ("works", 0, "2026-10-01")])
+# RE-PINNED 17 Oct 2026 (R2, §3a, §1.8): the three geofences re-dated to the four-year programme (Z003 keeps its box and
+# start date, ends with the junction build 17 Dec 2027; the Burrough limit runs the whole programme; the Melton works area
+# Mar 2026 – Sep 2027), then the seven ADVISORY zones created after the access roads (Z025–Z031): nothing new steers routing
+ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t village limit, an advisory works area — then seven advisory zones",
+   [(z["id"], z["kind"], z["affects_routing"], z["starts_on"], z["ends_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
+   == [("Z003", "closure", 1, "2026-10-05", "2027-12-17"), ("Z004", "weight_limit", 0, "2026-01-01", "2030-12-31"),
+       ("Z005", "works", 0, "2026-03-01", "2027-09-30"),
+       ("Z025", "works", 0, "2026-05-01", "2028-05-31"), ("Z026", "works", 0, "2027-04-01", "2028-09-30"),
+       ("Z027", "closure", 0, "2027-04-01", "2027-04-30"), ("Z028", "closure", 0, "2028-03-01", "2028-06-30"),
+       ("Z029", "works", 0, "2029-06-01", "2029-10-31"), ("Z030", "closure", 0, "2027-12-01", "2027-12-31"),
+       ("Z031", "closure", 0, "2028-12-01", "2028-12-31")]
+   and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] != "haul_road")
+   and "8 vehicles a day" in [z for z in _T["zones"] if z["id"] == "Z004"][0]["note"]
+   and [z for z in _T["zones"] if z["id"] == "Z003"][0]["name"] == "A47 at the new Tilton junction: HGV diversion while the junction is built")
 def _bbox(g):
     xs = [c[0] for c in g["coordinates"][0]]; ys = [c[1] for c in g["coordinates"][0]]
     return min(xs), min(ys), max(xs), max(ys)
@@ -342,13 +378,30 @@ ok("H2: the Tilton closure box straddles the A47 as HERE baked it (52.620–52.6
 ok("H2: the Burrough 7.5 t box straddles the lane the Stockpile North routes were baked along (-0.8879, 52.6993)",
    _Z["Z004"][0] < -0.8879 < _Z["Z004"][2] and _Z["Z004"][1] < 52.6993 < _Z["Z004"][3])
 ok("H2: daily vehicle caps on the two village routes, so ROUTE_CAP has something to fire on",
-   {r["id"]: r["max_vehicles_per_day"] for r in _T["routes"] if r["max_vehicles_per_day"]} == {"R016": 20, "R018": 30})
-ok("H2: the show week (12–18 Oct = Oct W3) and the week after are populated for every approved line, and October W1/W2 carry typed actuals",
-   # NARROWED (11 Oct 2026): 19 approved October lines — the muck-away line joined the 18
-   # NARROWED 14 Oct 2026 (civils materials): 22 — the three October concrete-pour lines joined, actuals typed on them too
-   sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 3)) == 22
-   and sum(1 for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (10, 4)) == 22
-   and sum(1 for w in _T["forecast_weeks"] if w["month_index"] == 10 and w["week_index"] in (1, 2) and w.get("actual_qty") is not None) == 44)
+   # RE-PINNED 17 Oct 2026 (R2, §3a, §1.8): the Burrough lane community agreement, 8 a day on each route (was 20 and 30)
+   {r["id"]: r["max_vehicles_per_day"] for r in _T["routes"] if r["max_vehicles_per_day"]} == {"R016": 8, "R018": 8})
+# NARROWED 17 Oct 2026 (demo redesign R2, §3a, §1.9): was "Oct W3 and W4 carry 22 lines, Oct W1/W2 44 actuals" — the
+# 4-month demo's show week. Now the INVARIANT of the history typed to the as-of date (Thu 26 Nov 2026 = Nov W4): every
+# approved line-month up to the as-of month has all of its weeks, nothing later is materialised, every approved
+# line-week before the as-of week carries a typed actual and is confirmed, and the as-of week is confirmed for the
+# North Team only (so Confirm is live for the other two)
+_AWM, _AWW = 11, 4
+_wk_by = {}
+for _w in _T["forecast_weeks"]:
+    _wk_by.setdefault((_w["route_id"], _w["month_index"], _w["discipline"], _w["section_id"]), {})[_w["week_index"]] = _w
+_appr = [f for f in _T["forecasts"] if f["status"] == "Approved" and f["month_index"] <= _AWM]
+_ipt_of = {(f["route_id"], f["month_index"], f["discipline"], f["section_id"]): f["ipt"] for f in _T["forecasts"]}
+ok("H2: the history to the as-of week — every approved line-month to Nov 2026 has all its weeks, none later; every earlier "
+   "line-week has an actual and is confirmed; the as-of week confirmed for the North Team only",
+   _appr and all(sorted(_wk_by.get((f["route_id"], f["month_index"], f["discipline"], f["section_id"]), {}))
+                 == list(range(1, _wk.weeks_in_month(f["month_index"]) + 1)) for f in _appr)
+   and max(w["month_index"] for w in _T["forecast_weeks"]) == _AWM
+   and all(w["actual_qty"] is not None and w["status"] == "confirmed" for w in _T["forecast_weeks"]
+           if (w["month_index"], w["week_index"]) < (_AWM, _AWW))
+   and {(_ipt_of[(w["route_id"], w["month_index"], w["discipline"], w["section_id"])], w["status"] == "confirmed")
+        for w in _T["forecast_weeks"] if (w["month_index"], w["week_index"]) == (_AWM, _AWW)}
+   == {("IPT1", True), ("IPT2", False), ("IPT3", False)},
+   str(len(_appr)))
 # NARROWED 14 Oct 2026 (the user took the recommendation): "the scheme and its plan are invented", was "nothing here is
 # real" (the bulletin quotes real government figures); still "Fictional demo scheme" first, still under 121 characters
 ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validates as short text or null",
@@ -629,7 +682,9 @@ import re as _re2
 _fits = [m.start() for m in _re2.finditer(r"\.fitBounds\(", fe)]
 ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the Look-ahead map white-screened the whole app)",
    # NARROWED 13 Oct 2026 (W1): four, the Routes / Zones map now frames the scheme's locations on first load
-   len(_fits) == 4 and all("try {" in fe[max(0, i - 60):i] for i in _fits), str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
+   # NARROWED 16 Oct 2026 (S7): five, the Dashboard's Simulation map frames the day's routes once a month
+   len(_fits) == 5 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
 _SKIP = re.compile(r'^(?:\w+:)?(?:text-white|bg-white/\d+|border-white/\d+|text-white/\d+|bg-black/\d+|\w+-transparent|\w+-current|(?:bg|text|border|ring)-\[color:var|ring-\[)')
@@ -946,6 +1001,193 @@ ok("W16: the brief's 'Orange primary' button #FF8C14 would fail on white (2.33:1
 ok("W16: Blue shades' navy header is the Ink look's only (white on it 10.36:1); the Light look keeps its white header",
    _eff("blue-shades", "ink")["hdr-bg"] == "#1E3A8A" and round(_cr("#FFFFFF", "#1E3A8A"), 2) == 10.36
    and _eff("blue-shades", "light")["hdr-bg"] == "#FFFFFF" and _eff("blue", "ink")["hdr-bg"] == "#1F2024")
+
+# --- 17 Oct 2026: UI fix 2 (claude/ui-fix-dark) — the dark look's contrast failures that needed no decision -------------
+# (notes/ui-audit-findings-1016.md, findings 1, 2 and 6's button). Ratios by the WCAG relative-luminance formula above.
+# Finding 6: the Confirm week button has its own pair in every look. The status WORDS keep --green (open question 2).
+_bad6 = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        for name, a, b, need in [("the Confirm week button's text on the button", t["ok-btn-fg"], t["ok-btn"], 4.5),
+                                  ("the Confirm week button's edge on the page", t["ok-btn"], t["bg"], 3.0)]:
+            r = _cr(a, b)
+            if r < need:
+                _bad6.append(f"{_a}/{_l}: {name} {a} on {b} = {r:.2f} < {need}")
+ok("UI fix 2 (#6): the Confirm week pair --ok-btn / --ok-btn-fg reads 4.5:1 in all 12 looks × accents and 3:1 against the page — ink #047857 / white 5.48:1, dark #34D399 / #1F2024 8.47:1",
+   not _bad6 and _ROOT["ok-btn"] == "#047857" and _ROOT["ok-btn-fg"] == "#FFFFFF" and _DARK["ok-btn"] == "#34D399" and _DARK["ok-btn-fg"] == "#1F2024"
+   and round(_cr("#FFFFFF", "#047857"), 2) == 5.48 and round(_cr("#1F2024", "#34D399"), 2) == 8.47, "; ".join(_bad6[:4]))
+ok("...only :root and the dark block define the pair (no accent touches it), and white on --green — the old button — fails 4.5:1 in every look (3.77 ink, 1.92 dark), which is why the words stay an open question",
+   _css.count("--ok-btn:") == 2 and _css.count("--ok-btn-fg:") == 2
+   and all(_cr("#FFFFFF", _eff(a, l)["green"]) < 4.5 for a in _ACC for l in ("ink", "light", "dark"))
+   and round(_cr("#FFFFFF", _eff("orange", "ink")["green"]), 2) == 3.77 and round(_cr("#FFFFFF", _eff("orange", "dark")["green"]), 2) == 1.92)
+# Finding 1: a filled control is `text-white` beside an INLINE background (no bg-[color:var(--navy)] utility since 7 Oct, so
+# the old remap selector matched nothing and every primary button in Dark was white on orange, 2.33:1). The rule at the end
+# of the DARK-REMAP block matches the inline form; here every text-white in the markup is classified by the fill it sits on.
+_TW = re.compile(r"text-white(?!/)")
+_FILLS = [("navy", 'var(--navy)'), ("blue", 'var(--blue)'), ("slate-800", "bg-slate-800"), ("team palette", "IPT_PALETTE_C"),
+          ("zone colour", "ZONE_HAUL"), ("zone colour", "ZONE_ROUTING"), ("red", 'var(--red)'), ("green", 'var(--green)'), ("ok-btn", 'var(--ok-btn)')]
+_sites = {}
+for _m in _TW.finditer(_fe_wo):
+    _start = _fe_wo.rfind("<", 0, _m.start())
+    _win = _fe_wo[_start:_start + 600]
+    _found = sorted((_win.find(mark), kind) for kind, mark in _FILLS if mark in _win)
+    _sites.setdefault(_found[0][1] if _found else "unknown", []).append(_win)
+ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 14 on an inline var(--navy) and 1 on var(--blue) (the dark rule maps them to --control-fg), 2 on bg-slate-800 (remapped), the team pill, 4 zone buttons (finding 7, open) — none on var(--green) or the Confirm pair, none unknown",
+   len(_sites.get("navy", [])) == 14 and len(_sites.get("blue", [])) == 1 and len(_sites.get("slate-800", [])) == 2
+   and len(_sites.get("team palette", [])) == 1 and len(_sites.get("zone colour", [])) == 4
+   and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
+ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
+   len(_sites.get("red", [])) == 1 and ">Delete</button>" in _sites.get("red", [""])[0])
+ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / `\"var(--blue)\"` (the form React writes as `background: var(--navy);`, which the rule's [style*=] matches), and the rule reads --control-fg",
+   'html[data-theme="dark"] .text-white[style*="var(--navy)"],html[data-theme="dark"] .text-white[style*="var(--blue)"]{color:var(--control-fg)}' in _dark
+   and ".bg-\\[color\\:var\\(--navy\\)\\]" not in fe
+   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') >= 14 and _fe_wo.count('background: "var(--blue)"') >= 1
+   and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
+_bad1 = []
+for _a in _ACC:
+    t = _eff(_a, "dark")
+    for name, a, b in [("text on a --navy fill", t["control-fg"], t["navy"]), ("text on a --blue fill", t["control-fg"], t["blue"])]:
+        r = _cr(a, b)
+        if r < 4.5:
+            _bad1.append(f"{_a}/dark: {name} {a} on {b} = {r:.2f}")
+ok("...in the dark look --control-fg reads 4.5:1 on both fills in every accent (#1F2024 on #FF8C14 6.99:1, on #FFA10A 8.02:1; #141518 on #5B8FF0 5.77:1, on #8FB3F5 8.64:1) — the Ink/Light --blue fill stays white (3.68:1 on #3B82F6, the gate-place toggle; not this fix)",
+   not _bad1 and round(_cr("#1F2024", "#FF8C14"), 2) == 6.99 and round(_cr("#FFFFFF", "#FF8C14"), 2) == 2.33, "; ".join(_bad1))
+ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values went with UI fix 4 (decision 3, 17 Oct)",
+   '<div className="text-[10px] uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
+   and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' not in fe
+   and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}' in fe)
+
+# --- 17 Oct 2026: UI fix 4 (claude/ui-fix-captions) — the captions (finding 3, decision 1), the status WORDS (finding 6's words,
+# finding 19, decision 2), the Submit strip's peak values (decision 3) and the small chips / captions (findings 19, 20). Ratios by the
+# WCAG relative-luminance formula above; a token's effective value per look × accent from _eff; a tint laid over its surface by _over.
+_TXT = {"ok-text": "#047857", "warn-text": "#B45309", "bad-text": "#B91C1C"}
+_TXT_DARK = {"ok-text": "#34D399", "warn-text": "#FBBF24", "bad-text": "#F87171"}
+ok("UI fix 4 (decision 2): three text-grade status colours, defined once in :root and once in the dark block and nowhere else — ok-text #047857, warn-text #B45309, bad-text #B91C1C; dark #34D399 / #FBBF24 / #F87171, which ARE the dark look's status colours, so Dark reads as before",
+   all(_ROOT[k] == v for k, v in _TXT.items()) and all(_DARK[k] == v for k, v in _TXT_DARK.items())
+   and all(_css.count(f"--{k}:") == 2 for k in _TXT)
+   and _DARK["ok-text"] == _DARK["green"] and _DARK["warn-text"] == _DARK["gold"] and _DARK["bad-text"] == _DARK["red"])
+_bad4 = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        _surfs = [("a card", t["surface"]), ("the page", t["bg"]), ("the rail", t["rail-bg"]), ("a second surface", t["surface-2"]),
+                  ("a slate-50 table head", t["surface-2"] if _l == "dark" else "#F8FAFC"), ("a selected row", "#FFF4E6" if _a == "orange-shades" and _l != "dark" else "#EFF6FF" if _l != "dark" else _over(t["navy-soft"], t["surface"]))]
+        for name in _TXT:
+            for where, bgc in _surfs:
+                r = _cr(t[name], bgc)
+                if r < 4.5:
+                    _bad4.append(f"{_a}/{_l}: {name} on {where} {t[name]} on {bgc} = {r:.2f}")
+        for name, tint in [("ok-text", "rgba(3,158,134,.12)"), ("ok-text", "rgba(3,158,134,.10)"), ("ok-text", "rgba(3,158,134,.06)"),
+                           ("bad-text", "rgba(197,48,48,.12)"), ("bad-text", "rgba(191,46,85,.12)"), ("warn-text", "rgba(217,119,6,.10)")]:
+            r = _cr(t[name], _over(tint, t["surface"]))
+            if r < 4.5:
+                _bad4.append(f"{_a}/{_l}: {name} on its chip tint {tint} = {r:.2f}")
+ok("UI fix 4 (decision 2): 🔴 in all 12 looks × accents the three read 4.5:1 or better on a card, the page, the rail, a second surface, a slate-50 head and a selected row, and on their chip tints (ok-text on the 12 %, 10 % and 6 % green tints, bad-text on the two 12 % red tints, warn-text on the 10 % amber tint)",
+   not _bad4, "; ".join(_bad4[:6]))
+ok("...the headline figures: ok-text 5.48:1 on white and 4.77:1 on the 12 % green tint; warn-text 5.02:1 on white and 4.50:1 on a 10 % amber tint (4.33:1 on the 14 % tint the stale chip had, which is why its tint came down); bad-text 6.47:1 on white and 5.38:1 on the red tint; dark 8.47 / 9.75 / 5.88 on the surface",
+   round(_cr("#047857", "#FFFFFF"), 2) == 5.48 and round(_cr("#047857", _over("rgba(3,158,134,.12)", "#FFFFFF")), 2) == 4.77
+   and round(_cr("#B45309", "#FFFFFF"), 2) == 5.02 and round(_cr("#B45309", _over("rgba(217,119,6,.10)", "#FFFFFF")), 2) == 4.50
+   and round(_cr("#B45309", _over("rgba(217,119,6,.14)", "#FFFFFF")), 2) == 4.33
+   and round(_cr("#B91C1C", "#FFFFFF"), 2) == 6.47 and round(_cr("#B91C1C", _over("rgba(197,48,48,.12)", "#FFFFFF")), 2) == 5.38
+   and round(_cr("#34D399", "#1F2024"), 2) == 8.47 and round(_cr("#FBBF24", "#1F2024"), 2) == 9.75 and round(_cr("#F87171", "#1F2024"), 2) == 5.88)
+ok("...and why the words moved: the green status colour reads 3.77:1 on white and the amber 3.19:1 — under 4.5:1 for text, fine for a fill or a dot (3:1)",
+   round(_cr(_ROOT["green"], "#FFFFFF"), 2) == 3.77 and round(_cr(_ROOT["gold"], "#FFFFFF"), 2) == 3.19
+   and _cr(_ROOT["green"], "#FFFFFF") >= 3 and _cr(_ROOT["gold"], "#FFFFFF") >= 3)
+# at source level: the green and the amber are never a TEXT colour any more — every use left is a fill, a border or a dot
+_FILLCTX = ("background", "borderColor", "fill:", "STATUS_DOT", "CARBON_TONE", "Approved:", "confirmed:", "held:", "Pending:", "edited:", "ASSUMPTION:")
+def _text_uses(tok):
+    out = []
+    for m in _re.finditer(_re.escape(tok), _fe_wo):
+        win = _fe_wo[max(0, m.start() - 70):m.start()]
+        if not any(c in win for c in _FILLCTX):
+            out.append(_fe_wo[max(0, m.start() - 60):m.end() + 20].replace("\n", " "))
+    return out
+ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the markup — the 9 uses left are the progress bar's fill, a card's border (×3), the status dots (×3), the carbon-tone dot and the row-status icon",
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 9 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
+ok("...nor var(--gold): the 7 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot and the flag chip's triangle; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash)",
+   '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
+   and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
+   and 'const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";' in fe
+   and '["rgba(3,158,134,.12)", "var(--ok-text)"]' in fe and '["rgba(191,46,85,.12)", "var(--bad-text)"]' in fe
+   and 'style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>' in fe
+   and 'style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>' in fe and ': has ? ["routed", "var(--ok-text)"] : null;' in fe
+   and '.sim-ok{color:var(--ok-text);font-weight:700;}' in fe and '.sim-tl-ok{font-size:14px;fill:var(--ok-text);}' in fe
+   and '.sim-warn{color:var(--warn-text);}' in fe and ".sim-warn{color:var(--gold)" not in fe
+   and 'style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span>' in fe
+   and 'style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>' in fe
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 6 and _fe_wo.count("var(--warn-text)") == 2
+   and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
+   and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)
+ok("UI fix 4 (decision 1): 🔴 one rule maps text-slate-400 to --muted in the Ink and Light looks, written html:where(:not([data-theme=\"dark\"])) so it weighs as little as the utility and hover:text-slate-700 still wins; the dark look keeps its remap, whose value IS the dark --muted",
+   'html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}' in fe
+   and 'html[data-theme="dark"] .text-slate-400{color:#9AA1AB}' in _dark and _DARK["muted"] == "#9AA1AB"
+   and fe.count("/* CAPTIONS ") == 1 and "/* CAPTIONS-END */" in fe and fe.index("/* CAPTIONS ") > fe.index("/* ACCENTS-END */") and fe.index("/* CAPTIONS-END */") < fe.index("/* DARK-REMAP-START"))
+_mb = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        for where, bgc in [("a card", t["surface"]), ("the page", t["bg"]), ("the rail", t["rail-bg"]), ("a second surface", t["surface-2"]), ("a slate-50 head", t["surface-2"] if _l == "dark" else "#F8FAFC")]:
+            r = _cr(t["muted"], bgc)
+            if r < 4.5:
+                _mb.append(f"{_a}/{_l}: --muted on {where} {t['muted']} on {bgc} = {r:.2f}")
+ok("...--muted reads 4.5:1 or better on a card, the page, the rail, a second surface and a slate-50 head in all 12 looks × accents: ink #64748B on white 4.76, on the rail #FAFAF9 4.56, on a slate-50 head 4.55; dark #9AA1AB on #1F2024 6.25 — where slate-400 (#94A3B8) read 2.56 on white and slate-300 (#CBD5E1) 1.48",
+   not _mb and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#64748B", "#FAFAF9"), 2) == 4.56 and round(_cr("#64748B", "#F8FAFC"), 2) == 4.55
+   and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25 and round(_cr("#94A3B8", "#FFFFFF"), 2) == 2.56 and round(_cr("#CBD5E1", "#FFFFFF"), 2) == 1.48, "; ".join(_mb[:4]))
+ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-50 #EFF6FF; 4.38 on Orange shades' #FFF4E6), 4.28 on the Horizon's commit-week wash (navy-soft over white, #EEF3FD) and 4.43 on the Account's short-row wash (5 % rose, #FCF5F6) — so the second rule steps the greys there to slate-600 #475569 (6.96, 6.98, 6.81, 7.05), matching the inline washes by [style*=], again with :where() so a hover utility still wins",
+   round(_cr("#64748B", "#EFF6FF"), 2) == 4.37 and round(_cr("#64748B", "#FFF4E6"), 2) == 4.38
+   and round(_cr("#64748B", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 4.28 and round(_cr("#64748B", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 4.43
+   and round(_cr("#475569", "#EFF6FF"), 2) == 6.96 and round(_cr("#475569", "#FFF4E6"), 2) == 6.98
+   and round(_cr("#475569", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 6.81 and round(_cr("#475569", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 7.05
+   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}' in fe
+   and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2
+   and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
+ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
+   ".rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
+   and round(_cr(_over("rgba(100,116,139,.85)", "#FAFAF9"), "#FAFAF9"), 2) == 3.45
+   and "9aa1ac" not in fe.lower() and round(_cr("#9AA1AC", "#FFFFFF"), 2) == 2.60
+   and '"#94a3b8"' not in fe and 'style={{ color: tone || "var(--muted)" }}>{title}</div>' in fe
+   and "text-slate-300" not in _fe_wo and ".text-slate-300{" not in _dark and ".text-emerald-600{" not in _dark
+   and _fe_wo.count('<span className="text-slate-500">rate not set</span>') == 3 and 'className="text-slate-500">not recorded</span>' in fe)
+ok("UI fix 4 (decision 3): the Submit strip's six values read in the strip's own text colour — the amber on the strip was 1.62:1 (1.4:1 in Dark) and the label already says Peak",
+   '<div className="text-lg font-bold tabular-nums">{value}</div>' in fe and ".map(([label, value]) => (" in fe and '"peak"]' not in fe
+   and '["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],' in fe
+   and round(_cr(_ROOT["gold"], _ROOT["navy"]), 2) == 1.62 and round(_cr(_DARK["gold"], _DARK["navy"]), 1) == 1.4)
+# Every selector in the DARK-REMAP block must match something in the markup — the reverse of the coverage check above.
+# (The selector this fix replaced, .bg-[color:var(--navy)].text-white, had matched nothing since 7 Oct and nobody noticed.)
+_UTIL = set(_PAL.findall(_fe_wo))
+_dead = []
+for _line in _dark.splitlines():
+    _line = _line.strip()
+    if not _line.startswith('html[data-theme="dark"]'):
+        continue
+    for _sel in _re.split(r"(?<!\\),", _line[:_line.index("{")]):     # a comma between selectors, not an escaped one inside a class
+        _rest = _sel.strip()[len('html[data-theme="dark"]'):].strip()
+        if _rest.startswith(".mapboxgl-"):          # a class Mapbox GL adds at run time; never in the markup
+            continue
+        if not _rest.startswith("."):
+            _tag = _re.match(r"[a-z]+", _rest).group(0)
+            if f"<{_tag}" not in _fe_wo:
+                _dead.append(_sel.strip())
+            continue
+        _i, _cls = 1, ""
+        while _i < len(_rest):
+            if _rest[_i] == "\\":
+                _cls += _rest[_i + 1]; _i += 2; continue
+            if _rest[_i] in ":[ ":
+                break
+            _cls += _rest[_i]; _i += 1
+        _attr = _re.search(r'\[style\*="([^"]+)"\]', _rest[_i:])
+        _used = (_cls in _UTIL) if _PAL.fullmatch(_cls) else (_cls in _fe_wo)
+        if _attr and _attr.group(1) not in _fe_wo:
+            _used = False
+        if not _used:
+            _dead.append(_sel.strip())
+ok("UI fix 2: every selector in the DARK-REMAP block has a use in the markup — the four stale remaps found this way on 17 Oct (bg-[rgba(37,99,235,.06)], bg-slate-200, hover:text-slate-800 / -900: utilities no longer in the file) are gone",
+   not _dead and _dark.count('html[data-theme="dark"]') >= 48 and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
