@@ -21,6 +21,12 @@ try { ({ JSDOM } = require(G + "jsdom")); } catch (e) { console.log("dom_fronten
 let pass = 0; const fail = [];
 const ok = (label, cond, extra) => { if (cond) pass++; else fail.push(label + (extra ? "  " + extra : "")); };
 
+// 18 Oct 2026 (D104 for the JS harnesses): today is a fixed day, shifted not frozen (lib/harness_clock.js) — the
+// Dashboard's this month ± 6 follows the clock, and the fixture lines sit in Sep–Nov 2026. Both realms: here, and the
+// jsdom window the app runs in (below, before the app's script). HARNESS_TODAY=YYYY-MM-DD runs on another day.
+const CLOCK = require(path.join(__dirname, "lib", "harness_clock.js"));
+CLOCK.pinNode();
+
 const ROOT = path.resolve(__dirname, "..", "..");
 const html = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 const src = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^ReactDOM\.createRoot\([\s\S]*?\);\s*$/m, "");
@@ -41,13 +47,22 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;"
+w.eval(CLOCK.shiftSource());      // 18 Oct 2026: the app's realm reads the same shifted clock as the checks
+w.eval(js +"\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;"
   // 13 Oct 2026 (W6): the app's own formatters, so the nothing-lost check formats each fact exactly as the old cell did
   + "\nwindow.__F = { grp, dist, distRate, DU, CUR, TKM, teamText, teamName, iptKey, vehLabel, unitLbl, gaN1, gaMin, gaFlagWord, fmt, flagWord, LINE_FLAG_LABEL, dayName, dayNum, isWeekend };");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
    w.document.querySelector('meta[name="theme-color"]').getAttribute("content") === "#FFFFFF");
+// 18 Oct 2026: the shifted clock holds in both realms, and still ticks (a frozen clock would stall anything that waits on it)
+{
+  const appDay = w.eval("new Date().toISOString().slice(0, 10)"), hereDay = new Date().toISOString().slice(0, 10);
+  const skew = Math.abs(w.eval("Date.now()") - Date.now()), t0 = Date.now(); let spin = 0; while (Date.now() === t0 && spin < 5e7) spin++;
+  ok(`CLOCK: today is ${CLOCK.TODAY} in the checks AND in the app's realm (lib/harness_clock.js), and the clock still moves`,
+     appDay === CLOCK.TODAY && hereDay === CLOCK.TODAY && skew < 5000 && Date.now() > t0 && w.eval("Date.__harnessShifted") === true,
+     `app ${appDay}, here ${hereDay}, skew ${skew} ms`);
+}
 
 // ---- 2. the picker in the header ------------------------------------------------------
 act(() => { w.ReactDOM.createRoot(w.document.getElementById("root")).render(
