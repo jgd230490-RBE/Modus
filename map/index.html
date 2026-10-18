@@ -738,8 +738,9 @@
   .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
   .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
   .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
-  /* 18 Oct 2026 (UI audit, the phone branch): the strip's × draws 23 × 20 but taps at 44 — a halo, so the strip keeps its height */
-  .guide-strip .guide-x::after{content:"";position:absolute;inset:-12px -8px}
+  /* 18 Oct 2026 (UI audit, the phone branch): the strip's × draws 23 × 20 but taps at 45 × 44 — a halo (10 px to the left, the
+     strip's gap, so it stops short of "Take the tour"; 12 px to the right, past the strip's 6 px padding), so the strip keeps its height */
+  .guide-strip .guide-x::after{content:"";position:absolute;inset:-12px -12px -12px -10px}
   .guide-dot{position:fixed;z-index:9002;width:10px;height:10px;border-radius:50%;background:#C2410C;border:0;padding:0;cursor:pointer;animation:guide-pulse 2s infinite}
   @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(194,65,12,.45)}70%{box-shadow:0 0 0 8px rgba(194,65,12,0)}100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}}
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}

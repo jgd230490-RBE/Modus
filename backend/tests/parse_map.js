@@ -5716,8 +5716,9 @@ function qrRead(mod) {
      && /\.drawer-close\{ position:relative; margin-left:auto;/.test(html));
   ok("#30: the share and export cards' close buttons were 44 px at every width already and stay so; on the phone the sheet's row × is 44 px as before",
      /\.mt-close, \.share-close\{ width:44px; height:44px;/.test(html) && /\.m-body \.tl-warn \.show, \.m-body \.tl-warn \.x\{ min-height:44px; min-width:44px;/.test(phone));
-  ok("the strip's × (Hide the tips) taps at 44 px through a halo and the strip keeps its height — the only strip control under 44 that was not set apart",
-     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -8px\}/.test(html));
+  ok("the strip's × (Hide the tips, 23 × 20) taps at 45 × 44 through a halo — 10 px to the left (the strip's 10 px gap, so it stops short of 'Take the tour'), 12 px the other ways — and the strip keeps its height; the only strip control under 44 that was not set apart (the audit measured 39 × 44 with an 8 px side halo)",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -12px -12px -10px\}/.test(html)
+     && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html));
   ok("no visible word changed on the map for this branch: the strip still says 'Take the tour' and 'Hide the tips', the dots' tips still come from the steps",
      code.includes("onclick=\"guideStart()\">Take the tour</button>") && code.includes('aria-label="Hide the tips" title="Hide the tips and the dots"')
      && code.includes("tip.querySelector('b').textContent = guideTitle(st); tip.querySelector('span').textContent = guideBody(st);"));

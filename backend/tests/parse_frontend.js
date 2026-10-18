@@ -3401,8 +3401,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("🔴 the 44 px rule: on a touch screen the two text links under Sign in are 44 px rows (padding 12 px 0 on their 20 px line); a mouse keeps the tight row (padding 0)",
      /@media \(pointer:coarse\)\{\.auth-links button\{padding:12px 0;\}\}/.test(html) && /\.auth-links button\{background:none;border:0;padding:0;font:inherit;/.test(html)
      && code.includes('<button type="button" onClick={() => go(forgot ? "email" : "forgot")}>{forgot ? "Back to sign in" : "Forgot your password?"}</button>'));
-  ok("the app's guide strip × (Hide the tips) taps at 44 px through a halo and the strip keeps its height",
-     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -8px\}/.test(html)
+  ok("the app's guide strip × (Hide the tips, 23 × 20) taps at 45 × 44 through a halo (10 px to the left = the strip's gap, short of 'Take the tour'; 12 px the other ways) and the strip keeps its height",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -12px -12px -10px\}/.test(html)
+     && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html)
      && code.includes('<button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>'));
   // decision 12 / #13: the tick rows
   const mat = code.slice(code.indexOf('{tab === "materials" && ('), code.indexOf('{tab === "planning" && ('));
