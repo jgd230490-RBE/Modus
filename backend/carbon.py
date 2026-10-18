@@ -445,16 +445,18 @@ def electric_kg_per_km(factors, v, basis="ttw"):
     return conversions.electric_kg_per_km(factors, v, basis)
 
 
-def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw, drive_min=None):
+def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw, drive_min=None, other_min=None):
     """
     Cycles one electric lorry can run in a shift once charging is counted, simulated trip by
     trip: the battery starts the shift full; a trip's energy must fit the usable battery; before
     a trip that does not fit, the lorry charges — only what the rest of the shift needs, up to a
     full battery — at charge_kw (minutes = kWh ÷ kW × 60). Returns {cycles, charges,
     charge_minutes, minutes_per_charge, kwh_per_trip, kwh_day, range_per_charge_km, feasible}.
-    17 Oct 2026: the driver keeps the UK drivers' hours (drivers_hours): driving at most 9 h and the required break,
-    CHARGING ON TOP OF THE BREAK (the cautious reading). `drive_min` = the driving minutes of one cycle; None counts the
-    whole cycle as driving (the cautious stand-in).
+    17 Oct 2026: the driver keeps the UK drivers' hours (drivers_hours): driving at most 9 h and the required breaks;
+    charging is attended, so it is WORKING TIME — on top of the break and counted when the break is chosen. `drive_min` /
+    `other_min` = one cycle's driving and other work (route_analysis's split); with no split the whole cycle counts as
+    driving (the cautious stand-in). A battery that holds the trip but a day that holds no trip is FEASIBLE with 0 cycles
+    (`day_fits` False): the lorry count's floor (one a trip) applies, never the battery flag.
     """
     cyc, km, kwh, bat, kw = (_num(cycle_min), _num(km_trip), _num(kwh_per_km), _num(battery_kwh), _num(charge_kw))
     shift_h = drivers_hours.shift_hours({"planning": {"shift_hours_per_day": shift_hours}})[0]
@@ -466,10 +468,11 @@ def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw, 
     e_trip = km * kwh
     out["kwh_per_trip"] = e_trip
     drv = min(cyc, _num(drive_min)) if _num(drive_min) is not None else cyc
-    oth = max(0.0, cyc - drv)
+    oth = _num(other_min) if _num(other_min) is not None else max(0.0, cyc - drv)
+    out["day_fits"] = True
     if not bat or bat <= 0 or not kw or kw <= 0:
         n = drivers_hours.lorry_day(shift_h, drv, oth)["trips"]   # no battery figures: the diesel day, stated
-        return dict(out, cycles=n, kwh_day=n * e_trip)
+        return dict(out, cycles=n, kwh_day=n * e_trip, day_fits=n > 0)
     out["range_per_charge_km"] = bat / kwh
     if e_trip > bat + 1e-9:
         return dict(out, feasible=False)
@@ -491,16 +494,18 @@ def ev_day(cycle_min, km_trip, shift_hours, kwh_per_km, battery_kwh, charge_kw, 
         stops, minutes = charging(n)
         return dict(out, cycles=n, charges=stops, charge_minutes=minutes,
                     minutes_per_charge=(minutes / stops if stops else None), kwh_day=n * e_trip)
-    return dict(out, cycles=0, feasible=False)
+    # the battery holds a trip (checked above), so not one fitting is the driver's day, not the battery
+    return dict(out, cycles=0, day_fits=False)
 
 
 def lorries_for(trips, cycles_per_day, working_days):
-    """costlines' fleet rule: ceil(trips ÷ (cycles a day × working days)); None with no cycle."""
+    """costlines' fleet rule: ceil(trips ÷ (cycles a day × working days)); None with no cycle (not routed). 17 Oct 2026:
+    0 cycles (not one round trip fits a driver's day) counts one lorry a trip, the floor every reader uses."""
     if not trips:
         return 0
-    if not cycles_per_day:
+    if cycles_per_day is None:
         return None
-    return int(math.ceil(round(float(trips) / (float(cycles_per_day) * float(working_days)), 9)))
+    return int(math.ceil(round(float(trips) / (max(1.0, float(cycles_per_day)) * float(working_days)), 9)))
 
 
 # =========================================================================== #
@@ -796,7 +801,7 @@ def _eval(line, s, ctx):
 
     # ---- distance and cycle ---------------------------------------------------------
     one_way = ret = km_trip = cycle_min = None
-    cycles = line_drive = None
+    cycles = line_drive = line_other = None
     if base_baked and unchanged_geo:
         one_way = _num(line.get("distance_km"))
         ret = _num(line.get("return_km"))                     # None when the return is not baked
@@ -804,6 +809,7 @@ def _eval(line, s, ctx):
         cycle_min = _num(line.get("cycle_min"))
         cycles = line.get("cycles_per_vehicle_day")
         line_drive = _num(line.get("drive_min"))
+        line_other = _num(line.get("other_work_min"))
         if ret is None:
             flags.append(FLAG_RETURN_ESTIMATED)
     elif base_baked:
@@ -831,12 +837,22 @@ def _eval(line, s, ctx):
             km_trip = one_way + (ret or 0.0)
             travel_hr = (float(row.get("loaded_hr") or 0) + float(row.get("return_hr") or 0)) * scale
             cycle_min = round((travel_hr + float(row.get("turnaround_hr") or 0)) * 60.0, 1)
-            # 17 Oct 2026: route_analysis's own rule on the swapped route (drivers_hours.lorry_day), never a third formula:
-            # driving = both legs (scaled) + gate-to-face; other work = loading, unloading, check-in
-            drive_min, other_min = drivers_hours.split_cycle(travel_hr, 0.0, row.get("turnaround_parts"))
-            line_drive = drive_min
-            cycles = (drivers_hours.lorry_day(plan["shift_h"], drive_min, other_min)["trips"]
-                      if cycle_min and cycle_min > 0 else 0)
+            # 17 Oct 2026: route_analysis's own figures for the swapped route, never a third formula. At the route's own
+            # distance its row's trips_per_day and split ARE the answer (no recomputing from rounded hours — the review);
+            # scaled, the legs scale and the gate minutes do not: drivers_hours.lorry_day on the scaled split
+            internal = float((row.get("turnaround_parts") or {}).get("internal_travel_minutes") or 0.0)
+            if scale == 1.0 and row.get("drive_min") is not None:
+                line_drive, line_other = float(row["drive_min"]), float(row.get("other_work_min") or 0.0)
+                cycles = int(row.get("trips_per_day") or 0)
+            else:
+                if row.get("drive_min") is not None:
+                    line_drive = (float(row["drive_min"]) - internal) * scale + internal
+                    line_other = float(row.get("other_work_min") or 0.0)
+                else:
+                    line_drive, line_other = drivers_hours.split_cycle(travel_hr, 0.0, row.get("turnaround_parts"))
+                cycles = (drivers_hours.lorry_day(plan["shift_h"], line_drive, line_other,
+                                                  typed_shift_h=plan.get("shift_typed_h"))["trips"]
+                          if cycle_min and cycle_min > 0 else 0)
         else:
             base_baked = False
     if not base_baked:
@@ -848,7 +864,7 @@ def _eval(line, s, ctx):
     if electric and base_baked and cycle_min:
         ev_km = (one_way or 0.0) + (ret if ret is not None else (one_way or 0.0))   # the lorry drives home either way
         ev = ev_day(cycle_min, ev_km, plan["shift_h"], v.get("kwh_per_km"), v.get("battery_kwh_usable"), v.get("charge_kw"),
-                    drive_min=line_drive)
+                    drive_min=line_drive, other_min=line_other)
         if not ev["feasible"] and twin:
             r = _eval(line, dict(s, vehicle=twin), ctx)
             r["flags"] = r["flags"] + [FLAG_EV_INFEASIBLE]
@@ -1094,6 +1110,7 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
     ctx = {"cp": cp, "doc": doc, "vs": vs, "geo": _Geo(), "locs": locs, "routes": routes, "cm": cm_of,
            # 17 Oct 2026: the shift as the drivers' hours rule reads it (at most 13 h)
            "plan": {"shift_h": drivers_hours.shift_hours({"planning": plan})[0],
+                    "shift_typed_h": drivers_hours.typed_shift_hours({"planning": plan}),
                     "work_days": float(plan.get("working_days_per_month") or 22)}}
     _check_allocation(allocation)
     _check_levers(baseline_levers, vs, routes)

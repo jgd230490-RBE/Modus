@@ -617,9 +617,16 @@ ok("⭐ drivers' hours: gate-to-face minutes are DRIVING, the check-in and loadi
 ok("...trips a day are drivers_hours.lorry_day on that split, with the limit and the words on the row; the planning echo "
    "names the rule", row["trips_per_day"] == drivers_hours.lorry_day(_an5["planning"]["shift_hours_per_day"], row["drive_min"],
                                                                     row["other_work_min"])["trips"]
-   and row["lorry_day"]["limited_by"] in ("shift", "breaks", "driving", "none") and row["lorry_day"]["words"]
-   and _an5["planning"]["drivers_hours"] == drivers_hours.RULE_WORDS and _an5["planning"]["shift_capped"] is False,
+   and row["lorry_day"]["limited_by"] in ("shift", "breaks", "driving", "driver_day", "none") and row["lorry_day"]["words"]
+   and _an5["planning"]["drivers_hours"] == drivers_hours.RULE_WORDS and _an5["planning"]["shift_capped"] is False
+   and _an5["planning"]["shift_note"] is None and _an5["planning"]["not_modelled"] == drivers_hours.NOT_MODELLED_WORDS,
    str(row.get("lorry_day")))
+# 17 Oct 2026 (the review): the public map's route figures are the SAME trips and cycle (the drawer reads them)
+_pm5 = [f["properties"] for f in network.public_map_data(profile=row["profile"])["features"]
+        if f["properties"].get("route_id") == "R1" and f["properties"].get("leg")]
+ok("⭐ the review: the public map carries route_analysis's own trips a day and cycle on both legs of the route",
+   len(_pm5) == 2 and all(p["trips_per_day"] == row["trips_per_day"] and abs(p["cycle_hr"] - row["cycle_hr"]) < 0.006
+                          for p in _pm5), str([(p.get("trips_per_day"), p.get("cycle_hr")) for p in _pm5] + [row["trips_per_day"], row["cycle_hr"]]))
 
 db.execute("DELETE FROM route_geometry WHERE tenant_id = ?", (db.current_tenant(),))
 add_geom("R1", leg="loaded", profile=prof, haul_tag="Z001")

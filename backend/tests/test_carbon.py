@@ -478,6 +478,17 @@ ok("...and with no battery figures the electric day is the diesel day under the 
 ok("🔴 a trip longer than the battery is flagged infeasible, not sized", not carbon.ev_day(600, 450, 10, 1.25, 500, 350)["feasible"])
 ok("fleet = ceil(trips ÷ (cycles a day × working days)): 545 ÷ (7 × 22) → 4; no cycle → None; no trips → 0",
    carbon.lorries_for(545, 7, 22) == 4 and carbon.lorries_for(10, None, 22) is None and carbon.lorries_for(0, None, 22) == 0)
+# 17 Oct 2026 (drivers' hours, the review): the electric day with the cycle's split given; a day too short for one trip
+ok("⭐ the review: with driving AND other work given, the electric day is the diesel day's rule (13 h, 60 + 30: 8 — "
+   "drivers_hours.lorry_day), and charging counts as working time (30 + 30 a cycle, 125 kWh trips: fewer than 9)",
+   carbon.ev_day(90, 40, 13, 1.25, None, None, drive_min=60, other_min=30)["cycles"] == 8
+   and carbon.ev_day(60, 100, 10, 1.25, 500, 350, drive_min=30, other_min=30)["cycles"]
+   < carbon.ev_day(60, 100, 10, 1.25, None, None, drive_min=30, other_min=30)["cycles"])
+_d0 = carbon.ev_day(800, 50, 10, 1.25, 500, 350)
+ok("⭐ the review: a battery that holds the trip but a day that holds none is FEASIBLE with 0 cycles, day_fits False "
+   "(never the 'trip exceeds battery' flag); the fleet then counts one lorry a trip",
+   _d0["cycles"] == 0 and _d0["feasible"] and _d0["day_fits"] is False
+   and carbon.ev_day(60, 40, 10, 1.25, 500, 350)["day_fits"] is True and carbon.lorries_for(44, 0, 22) == 2, str(_d0))
 ok("miles ↔ km 1.609344: 10 mi = 16.09344 km and back; km stays km",
    near(carbon.km_from(10, "mi"), 16.09344) and near(carbon.km_to(16.09344, "mi"), 10.0) and carbon.km_from(7, "km") == 7.0
    and carbon.KM_PER_MILE == config.KM_PER_MILE)
@@ -796,6 +807,37 @@ ok("🔴 review: charging is simulated trip by trip — 200 kWh trips on 500 kWh
    and near(carbon.ev_day(60, 160, 10, 1.25, 500, 350)["minutes_per_charge"], 700 / 350 * 60 / 2, 1e-6))
 ok("...and the range is named for what it is: the range on ONE charge", "range_per_charge_km" in carbon.ev_day(60, 40, 10, 1.25, 500, 350)
    and "daily_range_km" not in carbon.ev_day(60, 40, 10, 1.25, 500, 350))
+# 17 Oct 2026 (drivers' hours, the review): the swapped route: at the route's own distance the row's trips a day ARE the answer; scaled, lorry_day on the scaled split
+_seen = []
+_eval0 = carbon._eval
+carbon._eval = lambda line, s, ctx: (_seen.append(_eval0(line, s, ctx)) or _seen[-1])
+try:
+    _rows = {r["profile"]: r for r in network.route_analysis("R1").get("rows", []) if r.get("alt_index") == 0}
+    _base_veh = {x["vehicle"] for x in carbon.scenario()["lines"] if x["route_id"] == "R1"}
+    _other = next((k for k in sorted(_rows) if k not in _base_veh and "electric" not in k), None)
+    _seen.clear()
+    _alt([{"driver": "vehicle", "scope": {"route_id": "R1"}, "vehicle": _other}])
+    _sw = [e for e in _seen if e["route_id"] == "R1" and e["vehicle"] == _other and e["baked"]]
+    _rw = _rows.get(_other)
+    ok("⭐ the review: a vehicle swap at the route's own distance reads route_analysis's trips a day for that vehicle "
+       "(no recomputing from rounded hours)",
+       bool(_sw) and _rw is not None and all(e["cycles_per_day"] == _rw["trips_per_day"] for e in _sw),
+       str((_other, sorted(_rows), [(e["cycles_per_day"], (_rw or {}).get("trips_per_day")) for e in _sw[:2]])))
+    _seen.clear()
+    _alt([{"driver": "source", "scope": {"route_id": "R1"}, "distance_pct": 50}])
+    _sc = [e for e in _seen if e["route_id"] == "R1" and e["baked"] and e["cycles_per_day"] is not None
+           and e["vehicle"] in _rows and abs((e["one_way_km"] or 0) - float(_rows[e["vehicle"]]["loaded_km"]) * 0.5) < 1e-6]
+    import drivers_hours  # noqa: E402
+    _int = lambda r: float((r.get("turnaround_parts") or {}).get("internal_travel_minutes") or 0.0)  # noqa: E731
+    _want = lambda r: drivers_hours.lorry_day(  # noqa: E731
+        drivers_hours.shift_hours(config.load(conversions))[0], (r["drive_min"] - _int(r)) * 0.5 + _int(r), r["other_work_min"],
+        typed_shift_h=drivers_hours.typed_shift_hours(config.load(conversions)))["trips"]
+    ok("...and at half the distance: drivers_hours.lorry_day on the halved legs, the gate minutes and other work kept",
+       bool(_sc) and all(e["cycles_per_day"] == _want(_rows[e["vehicle"]]) for e in _sc)
+       and any(e["cycles_per_day"] > _rows[e["vehicle"]]["trips_per_day"] for e in _sc),
+       str([(e["vehicle"], e["cycles_per_day"], _want(_rows[e["vehicle"]])) for e in _sc[:3]]))
+finally:
+    carbon._eval = _eval0
 a = _alt([{"driver": "material", "reused": True}])
 # R1 2,900 × (2.21 − 7.80307) = −16.2199; R5 1,000 × (2.21 − 7.80307) = −5.5931; soils: no re-used row → unchanged
 ok("🔴 review: an unscoped 're-used' applies where a re-used row is published and notes the rest (−21.813 t), never fails",

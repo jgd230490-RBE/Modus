@@ -17,7 +17,7 @@ THE RULES THAT MATTER
    /api/public/month-kpis already read, so the Look-ahead, the dashboard and the public
    map cannot disagree about how many movements one vehicle makes in a day. That row's
    `trips_per_day` is READ, never recomputed here: since 17 Oct 2026 it is the UK drivers'
-   hours rule (drivers_hours.lorry_day — the shift less the required breaks, driving at most
+   hours rule (drivers_hours.lorry_day — the shift less the required break, driving at most
    9 h; it was the brief's floor(shift_min / cycle_min)).
 
 2. **The formulas are the brief's §4, verbatim**, per day:
@@ -310,6 +310,7 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
         "cycles_per_vehicle_day": (int(row.get("trips_per_day") or 0) if baked else None),
         # 17 Oct 2026: the driving minutes of one cycle and the lorry's day in words, for the details and the Carbon page
         "drive_min": (row.get("drive_min") if baked else None),
+        "other_work_min": (row.get("other_work_min") if baked else None),
         "lorry_day": (row.get("lorry_day") if baked else None),
         # slices 3-5: the route's planning cap and contract rates, as typed (never seeded)
         "max_vehicles_per_day": rt.get("max_vehicles_per_day"),

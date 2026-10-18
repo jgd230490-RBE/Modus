@@ -693,8 +693,16 @@ ok("a baked line: baked, return_baked, both distances, km_trip = loaded + return
    and c1.get("return_km") == 30.0 and c1.get("km_trip") == 60.0 and c1.get("cycle_mark") is None
    and c1.get("cycle_source") == "here")
 ok("cycle_min is route_analysis' cycle in minutes (104.0 = 1.7333 h)", c1.get("cycle_min") == 104.0)
-ok("⭐ cycles_per_vehicle_day IS route_analysis().trips_per_day — floor(600 / 104) = 5",
+# label NARROWED 17 Oct 2026 (UK drivers' hours): 5 is now the rule's answer (5 × 104 = 520 + the 45-min break ≤ 600),
+# the same 5 the old floor(600 / 104) gave
+ok("⭐ cycles_per_vehicle_day IS route_analysis().trips_per_day — 5 in a driver's day (520 min + the break ≤ 600)",
    c1.get("cycles_per_vehicle_day") == 5 and c1.get("shift_hours") == 10.0)
+_ra1 = next((r for r in network.route_analysis("R1")["rows"] if r.get("alt_index") == 0 and r.get("profile") == V8), {})
+ok("17 Oct 2026 (the review): the line's context carries the row's driving / other-work split and the lorry's day "
+   "(the Look-ahead's details name the limit from it)",
+   c1.get("drive_min") == _ra1.get("drive_min") and c1.get("other_work_min") == _ra1.get("other_work_min")
+   and c1.get("lorry_day") == _ra1.get("lorry_day") and (c1.get("lorry_day") or {}).get("limited_by") == "shift",
+   str((c1.get("drive_min"), c1.get("other_work_min"), c1.get("lorry_day"))))
 ab = main.routes_analysis_batch(route_ids="R1")
 ok("⭐ ...and it equals what /api/routes/analysis-batch reports for the same (route, vehicle)",
    (ab.get("analysis", {}).get("R1", {}).get(V8) or {}).get("trips_per_day") == c1.get("cycles_per_vehicle_day")

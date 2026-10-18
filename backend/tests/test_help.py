@@ -630,15 +630,24 @@ ok3("⭐ W4 nothing lost: every passage W3 took off a screen is in the technical
 # 17 Oct 2026 (the user: UK drivers' hours): both guides state the rule with its sources and its limits; the old formula is gone
 ok("⭐ the user guide: trips a lorry a day are what fit in a driver's day — the break rule, 9 h driving, 13 h, what counts as "
    "driving, the sources, what is not modelled; 'a 10-hour shift ÷ the cycle time' is gone",
-   "the most round trips that fit in a driver&#39;s day: the shift (10 hours by default, at most 13) less the break the UK drivers&#39; hours rules require" in src
+   # NARROWED 17 Oct 2026 (the review): one driver's day at most 13 (a longer shift is accepted), the second break past
+   # 12 h, the day's other duties not modelled, a 0 counted as one lorry a trip
+   "the most round trips that fit in a driver&#39;s day: the shift (10 hours by default; one driver&#39;s day at most 13) less the break the UK drivers&#39; hours rules require" in src
+   and "15 minutes more once work passes 12 — with driving" in src
    and "Regulation (EC) 561/2006 as it applies in the UK (Articles 6–8) and the Road Transport (Working Time) Regulations 2005" in src
-   and "Weekly limits, night work and the occasional 10-hour driving day are not modelled" in src
+   and "Weekly limits, night work, the occasional 10-hour driving day and the day&#39;s other duties are not modelled" in src
+   and "counted as one lorry a trip" in src
    and "a 10-hour shift ÷ the cycle time, rounded down" not in src and "trips per day  = floor(shift hours / cycle)" not in src
    and "(shift ÷ cycle, rounded down)" not in src)
 ok("⭐ the technical guide: drivers_hours.lorry_day, the thresholds, the split, the 13 h cap, charging on top of the break, "
    "the gate keeping the full shift; floor(shift hours ÷ cycle) gone",
    "drivers_hours.lorry_day(shift, driving, other work)" in tg and "<code>backend/drivers_hours.py</code>" in tg
-   and "never the two added" in tg and "The shift is at most 13 h" in tg.replace("\r\n", "\n").replace("\n", " ")
+   # NARROWED 17 Oct 2026 (the review): reg 7 (not reg 5), the Art 7 and reg 7 breaks never added, one driver's day
+   # read as at most 13 h (Config accepts more), charging as working time
+   and "breaks are one break, never added" in tg
+   and "One driver&#39;s day is read as at most 13 h" in tg.replace("\r\n", "\n").replace("\n", " ")
+   and "Regulations 2005 reg 7" in tg.replace("\n", " ") and "reg 5" not in tg
+   and "attended, so it is working time" in tg.replace("\n", " ")
    and "The gate figures keep the full shift" in tg and "floor(shift hours ÷ cycle)" not in tg.replace("the old floor(shift ÷ cycle)", ""))
 ok("...it maps the old screen words to the new ones, and says the exports keep the old words (decision A)",
    "baked / not baked / unbaked</td><td>routed / not routed yet" in tg and "line-month</td><td>forecast month" in tg

@@ -1019,7 +1019,7 @@ const INFO = {
   "dash.deliveries": { title: "Deliveries a day", text: "Loaded trips in the months in view, divided by the working days in those months. Each delivery is a two-way movement: there loaded, back empty.",
     how: "Trips are worked out for each month of each line: tonnes ÷ the vehicle's payload, rounded up. The working days in a month are set on Config → Planning.", guide: "3-1-filters-and-the-six-cards", tech: "t1-trips" },
   "dash.vehicles": { title: "Vehicles needed", text: "The most vehicles any one month needs, adding up every line in view. A line whose route is not worked out yet has no figure, so it is left out, never guessed.",
-    how: "For each line: its trips a day ÷ the trips one vehicle can do in a driver's day on its route (there, back and the time to load and unload): the shift less the breaks the UK drivers' hours rules require, with at most 9 hours of driving.", guide: "3-1-filters-and-the-six-cards", tech: "t1-vehicles" },
+    how: "For each line: its trips a day ÷ the trips one vehicle can do in a driver's day on its route (there, back and the time to load and unload): the shift less the break the UK drivers' hours rules require, with at most 9 hours of driving.", guide: "3-1-filters-and-the-six-cards", tech: "t1-vehicles" },
   "dash.week": { title: "Planned this week", text: "The tonnes and loads planned for the commit week on the Look-ahead, and how many lines held their plan last week. It is the Look-ahead's own figure.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered, as a share of the tonnes planned in view. A month nobody has reported counts as not yet delivered: nothing is assumed.",
     how: "Actuals are typed each week on Look-ahead → Account. A day's actual rolls into its week.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
@@ -1069,7 +1069,7 @@ const INFO = {
   "dash.today": { title: "Today", text: "What the Look-ahead plans for today. Each line says reported (an actual is typed), confirmed, edited (not yet confirmed) or planned (follows the week, not yet confirmed).", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_t": { title: "Tonnes today", text: "Each line's planned quantity for today, in tonnes, from the Look-ahead's commit week.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_trips": { title: "Trips today", text: "Loaded trips today: tonnes ÷ payload, rounded up for each line, and the lorry distance on lines with a route.", tech: "t1-trips" },
-  "dash.today_veh": { title: "Vehicles today", text: "For each line, today's trips ÷ what one vehicle does in a driver's day on that route (the shift less the required breaks, at most 9 hours driving), added up. A line with no route yet needs an unknown number.", tech: "t1-vehicles" },
+  "dash.today_veh": { title: "Vehicles today", text: "For each line, today's trips ÷ what one vehicle does in a driver's day on that route (the shift less the required break, at most 9 hours driving), added up. A line with no route yet needs an unknown number.", tech: "t1-vehicles" },
   "dash.today_reported": { title: "Reported today", text: "Lines with a day actual typed for today on the Look-ahead.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.week_to_date": { title: "This week to date", text: "The week's planned tonnes up to today. The bar fills as day actuals are typed.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.last_week": { title: "Last week", text: "Last week's account: tonnes reported against tonnes planned on the reported lines, and how many lines held their plan.", guide: "6-4-account-view-what-actually-happened-last-week" },
@@ -6231,7 +6231,7 @@ function ConfigPage({ meta, who, access }){
           {tab === "planning" && (
             <div className="px-6 pb-6 max-w-xl">
               {[["working_days_per_month", "Working days a month", "Loads a day and vehicle counts divide by this. Every export prints it."],
-                ["shift_hours_per_day", "Shift hours a day", "A driver's working day, at most 13 hours (the 11-hour daily rest). The trips one lorry makes on a route are what fit in it after the breaks the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9; 30 min once work passes 6), with driving at most 9 hours. Weekly limits are not checked."],
+                ["shift_hours_per_day", "Shift hours a day", "A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; 15 min more once work passes 12), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled."],
                 ["avg_haul_speed_kmh", "Average haul speed, km/h", "Used only where HERE has no timing for a route. A stand-in until the route is routed."],
                 ["load_minutes", "Loading time, minutes (default)", "Used when a vehicle has no figure of its own."],
                 ["unload_minutes", "Unloading time, minutes (default)", "Likewise."]].map(([k, l, help]) => (
@@ -6819,7 +6819,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
                       <div key={p.vehicle}>{vehLabel(p.vehicle)}: payload {p.payload_t} t (diesel {p.twin_payload_t} t) · {p.kwh_per_km} kWh per km · battery {p.battery_kwh_usable} kWh usable · charger {p.charge_kw} kW <Chip s={p.status} /></div>
                     ))}
                     <div>Range on one charge {fc.range_per_charge_km_min == null ? "no data" : `${fmtDist(fc.range_per_charge_km_min, 0)} ${DU()}`} · {fc.charges_per_lorry_day_max ? `up to ${fc.charges_per_lorry_day_max} charge${fc.charges_per_lorry_day_max === 1 ? "" : "s"} a lorry-day${fc.minutes_per_charge_max ? `, ${fc.minutes_per_charge_max} min each` : ""}` : "no charge needed inside a shift"}{fc.infeasible_lines ? ` · ${fc.infeasible_lines} plan line${fc.infeasible_lines === 1 ? "" : "s"} left out of both columns: a trip needs more than one battery` : ""}</div>
-                    <div className={hint}>The battery starts each shift full; charging time comes out of the shift, on top of the driver's required break (the UK drivers' hours: at most 9 hours of driving).</div>
+                    <div className={hint}>The battery starts each shift full; charging time comes out of the shift. The driver attends it, so it counts as working time: it comes on top of the required break and counts toward it (the UK drivers' hours; driving at most 9 hours).</div>
                   </div>
                 </>
               )}
@@ -7813,7 +7813,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <RdItem t={`${DU()} this week`}>{grp(dist(wd.km))}</RdItem>
                             <RdItem t={TKM()}>{`${grp(dist(wd.tonne_km))}, ${c.km_basis === "loaded" ? "loaded leg" : "round trip"}`}</RdItem>
                             <RdItem t="Cycle">{`${grp(c.cycle_min)} min, ${c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"}`}</RdItem>
-                            <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) + (c.lorry_day && c.lorry_day.limited_by !== "shift" ? ` (${c.lorry_day.limited_by === "driving" ? "the 9 h driving limit" : c.lorry_day.limited_by === "breaks" ? "the required break takes one" : "one round trip does not fit a driver's day"})` : "") : null}</RdItem>
+                            <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) + (c.lorry_day && c.lorry_day.limited_by !== "shift" ? ` (${c.lorry_day.limited_by === "driving" ? "the 9 h driving limit" : c.lorry_day.limited_by === "breaks" ? "the required break" : c.lorry_day.limited_by === "driver_day" ? "one driver's 13 h day" : "one round trip does not fit a driver's day: one lorry a trip"})` : "") : null}</RdItem>
                           </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${vehLabel(c.payload_fallback)} fallback)` : ""}.`}</RdItem>}
                           <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
                           <RdItem t={c.rate_source === "target" ? "Target, per unit" : "Quote, per unit"}>{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null ? unitList(wd.eur_units) : null}</RdItem>
@@ -9981,7 +9981,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                         : undefined}>
                       {r.cycle_hr} h{r.haul_speed_applied ? <span style={{ color: ZONE_HAUL }}>†</span> : null}
                     </td>
-                    <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{r.trips_per_day || <span className="text-slate-300">0</span>}{r.lorry_day && r.lorry_day.limited_by !== "shift" ? <span className="text-slate-500">§</span> : null}</td>
+                    <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{r.trips_per_day || <span className="text-slate-300">0</span>}{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}</td>
                     <td className={cell}>{r.tonnes_per_day}</td>
                     <td className={cell}>{r.tonnes_per_month}</td>
                     <td className={cell}>{r.co2_kg_per_trip}</td>
@@ -10005,8 +10005,10 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
               Cycle = out + back + turnaround. Turnaround is the vehicle's own load and unload
               time from Config → Vehicles, plus — where gates record them — induction at each gate
               and gate-to-face travel (‡). Trips/day is what fits in a driver's day: the {data.planning.shift_hours_per_day} h
-              shift less the breaks the UK drivers' hours rules require, with driving (out, back and gate to face) at most
-              9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why).
+              shift less the break the UK drivers' hours rules require, with driving (out, back and gate to face) at most
+              9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why);
+              a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip. A planning figure: weekly
+              limits and the day's other duties are not modelled.{data.planning.shift_note ? " " + data.planning.shift_note : ""}
               t/month assumes {data.planning.working_days_per_month} working days.
               {data.rows.some(r => r.return_estimated) && " * return leg not routed — assumed to mirror the outbound."}
             </p>

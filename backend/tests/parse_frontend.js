@@ -3310,21 +3310,35 @@ ok("...and it collapses with the rail like every other item (label behind railSh
 }
 
 // ---- 17 Oct 2026 (the user: UK drivers' hours): the words that state how trips a lorry a day are worked out ----------
+// NARROWED 17 Oct 2026 (the review): a lorry's day, worked on one driver's 13 h (a longer shift is accepted, not
+// refused); one break with the second 15 past 12 h; the planning-figure caveat
 ok("⭐ Config → Planning: 'Shift hours a day' is a driver's working day, at most 13 h, the trips what fit after the "
    + "required breaks with driving at most 9 h; the old 'shift ÷ cycle time' is gone",
-   src.includes("A driver's working day, at most 13 hours (the 11-hour daily rest). The trips one lorry makes on a route are what fit in it after the breaks the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9; 30 min once work passes 6), with driving at most 9 hours. Weekly limits are not checked.")
-   && !src.includes("Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time."));
+   src.includes("A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; 15 min more once work passes 12), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled.")
+   && !src.includes("Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time.")
+   && !src.includes("A driver's working day, at most 13 hours (the 11-hour daily rest)."));
 ok("⭐ the Routes table: Trips/day is what fits in a driver's day (driving = out, back and gate to face), § marks a route the "
    + "rules hold below the shift alone, the cell's title gives the server's words",
    src.includes("Trips/day is what fits in a driver's day: the {data.planning.shift_hours_per_day} h")
-   && src.includes("9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why).")
+   && src.includes("9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why);")
    && src.includes('title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}')
    && !src.includes("Trips/day assumes a {data.planning.shift_hours_per_day} h"));
+// 17 Oct 2026 (the review): § only where the rules took trips off (not on a 0 the shift alone would also give), the 0
+// explained, the caveat and the 13 h note on the footnote
+ok("⭐ the review: the Routes table's § marks only a route with fewer trips than the shift alone; the footnote explains a 0 "
+   + "(one lorry a trip), says it is a planning figure and shows the 13 h note",
+   src.includes('{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}')
+   && !src.includes('r.lorry_day.limited_by !== "shift" ? <span className="text-slate-500">§</span>')
+   && src.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip. A planning figure: weekly")
+   && src.includes('{data.planning.shift_note ? " " + data.planning.shift_note : ""}'));
 ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon page puts charging on top of the break",
    src.includes("the trips one vehicle can do in a driver's day on its route") && src.includes("what one vehicle does in a driver's day on that route")
    && !src.includes("the trips one vehicle can do in a shift on its route") && !src.includes("what one vehicle does in a shift on that route")
    && src.includes('c.lorry_day.limited_by === "driving" ? "the 9 h driving limit"')
-   && src.includes("charging time comes out of the shift, on top of the driver's required break"));
+   && src.includes('c.lorry_day.limited_by === "driver_day" ? "one driver\'s 13 h day"')
+   // NARROWED 17 Oct 2026 (the review): charging is attended, so working time — on top of the break AND counted toward it
+   && src.includes("charging time comes out of the shift. The driver attends it, so it counts as working time: it comes on top of the required break and counts toward it")
+   && !src.includes("the required breaks, at most 9 hours"));
 ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'compliant' or 'legal'",
    !/drivers'? hours[^"`]{0,200}\b(compliant|compliance|legal)\b/i.test(src));
 

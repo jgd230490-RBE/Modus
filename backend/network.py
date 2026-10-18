@@ -2538,6 +2538,7 @@ def route_analysis(route_id, profiles=None, pre=None):
     # 17 Oct 2026 (the user: "please use uk rules"): the lorry's day is the shift (at most 13 h) less the breaks the UK
     # drivers' hours rules require, driving at most 9 h — drivers_hours.lorry_day, the one rule every surface reads
     shift_hr, shift_capped = drivers_hours.shift_hours(factors)
+    typed_shift_hr = drivers_hours.typed_shift_hours(factors)
     work_days = float(plan.get("working_days_per_month") or 22)
     veh = factors.get("vehicles", {}) or {}
     default_veh = veh.get("_default", {}) or {}
@@ -2613,7 +2614,7 @@ def route_analysis(route_id, profiles=None, pre=None):
             cycle_hr = l_hr + r_hr + turnaround_hr
             # driving = both legs + gate-to-face travel; other work = loading, unloading, the gate check-in
             drive_min, other_min = drivers_hours.split_cycle(l_hr, r_hr, parts)
-            day = drivers_hours.lorry_day(shift_hr, drive_min, other_min)
+            day = drivers_hours.lorry_day(shift_hr, drive_min, other_min, typed_shift_h=typed_shift_hr)
             trips = day["trips"]
             total_km = round(l_km + r_km, 2)
             out.append({
@@ -2676,6 +2677,7 @@ def route_analysis(route_id, profiles=None, pre=None):
         "planning": {"shift_hours_per_day": shift_hr,
                      "working_days_per_month": work_days,
                      # 17 Oct 2026: the rule the trips a day rest on, in words, and whether the typed shift was capped
-                     "drivers_hours": drivers_hours.RULE_WORDS, "shift_capped": shift_capped},
+                     "drivers_hours": drivers_hours.RULE_WORDS, "shift_capped": shift_capped,
+                     "shift_note": drivers_hours.shift_note(factors), "not_modelled": drivers_hours.NOT_MODELLED_WORDS},
         "rows": out,
     }
