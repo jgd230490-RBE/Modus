@@ -31,10 +31,16 @@ th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight
 .callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:var(--blue)}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:var(--red)}
 #top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:20px;font-size:12px}
 @media (max-width:900px){#nav{position:static;width:auto}main{margin-left:0;padding:18px 16px 60px}}
+/* 18 Oct 2026 (UI audit decision 10, #22): a skip link heads the contents — hidden at a desk until it has the focus, the
+   first row of the list on a phone, where the chapter rows sit above the text; those rows and "↑ top" are 44 px tall there */
+.skip{position:absolute;left:8px;top:8px;z-index:9;padding:10px 14px;border-radius:8px;background:#fff;color:var(--navy);font-weight:600;text-decoration:none;transform:translateY(-200%)}
+.skip:focus{transform:none;outline:2px solid #FF8C14;outline-offset:2px}
+main:focus{outline:0}
+@media (max-width:900px){.skip{position:static;display:flex;align-items:center;min-height:44px;margin:0 0 8px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.1);color:#fff;transform:none}#nav li a{min-height:44px;padding:12px 8px}#top{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}}
 @media print{#nav,#top{display:none}main{margin:0;padding:0;max-width:none}}
 </style></head>
 <body>
-<nav id="nav"><div class="brand">Wayscope<span>Technical guide · staff only</span></div><ol>
+<nav id="nav"><a class="skip" href="#guide-text">Skip to the text</a><div class="brand">Wayscope<span>Technical guide · staff only</span></div><ol>
 <li class="l1"><a href="#t0-about">About this guide</a></li>
 <li class="l1"><a href="#t1-figures">T1 How each figure is made</a></li>
 <li class="l2"><a href="#t1-volume">Tonnes and conversions</a></li>
@@ -55,7 +61,7 @@ th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight
 <li class="l1"><a href="#t6-words">T6 Old words, new words</a></li>
 <li class="l1"><a href="#t7-reference">T7 Sourced and assumed figures</a></li>
 </ol></nav>
-<main>
+<main id="guide-text" tabindex="-1">
 
 <h1 id="t0-about">Technical guide</h1>
 <p>For the people who run Wayscope and answer &ldquo;where does that number come from?&rdquo;. The

@@ -14,7 +14,7 @@
  *     node backend/tests/ui_audit.js                 # quick: 390 and 1366 px, Ink and Dark, + Dark with the Blue accent at 1366, ~15 min
  *     node backend/tests/ui_audit.js --full          # 320 360 390 768 1024 1366 1920 × Ink Light Dark, + the other accents and Dark / Blue at 1920
  *     node backend/tests/ui_audit.js --compare latest    # ...and say what changed since the previous run of the same shape
- *     node backend/tests/ui_audit.js --strict-44         # the 44 px rule on a phone graded as a failure (decision 14; OFF by default, see below)
+ *     node backend/tests/ui_audit.js --no-strict-44      # the 44 px rule on a phone back to a warning (decision 14; a failure by default since 18 Oct 2026, see below)
  *     node backend/tests/ui_audit.js --base http://127.0.0.1:8834 --code <planner code> --map-password <pw>
  *     node backend/tests/ui_audit.js --base https://… --email you@… --password …     # a server whose codes are gone (D49)
  *
@@ -34,10 +34,11 @@
  *       below 768 px, a hit area under 44 × 44 (the platform guides; one under 24 × 24 and crowded is the 24 px failure
  *       above, not listed twice): set apart — its 44 px circle touches no other control, nor the 44 px circle of another
  *       control under 44 (the 24 px rule's spacing test at this rule's size; `spaced: true` on the row) — or inline     (warn)
- *       neither set apart nor inline: a warning today, a FAILURE (the check targets-44px) with --strict-44.
- *       Decision 14, 17 Oct 2026: --strict-44 is OFF by default; it turns on by default once the phone branch has merged
- *       (claude/ui-fix-phone — decisions 8, 9 and 10: the map's tour dots retired on the phone, the demo bar's pill with
- *       its 44 px halo, the help TOC rows padded to 44 px). The flag is a grading, not part of the run's shape, so a
+ *       neither set apart nor inline: a FAILURE (the check targets-44px); --no-strict-44 makes it a warning as before.
+ *       Decision 14, 17 Oct 2026: --strict-44 was OFF by default until the phone branch merged (claude/ui-fix-phone, 18 Oct
+ *       2026 — decisions 8, 9 and 10: the map's tour dots retired on the phone, the demo bar's pill with its 44 px halo,
+ *       the help TOC rows padded to 44 px; with them the password eyes, the sign-in links, the help "top" link and the privacy
+ *       Back link); since then it is ON by default. The flag is a grading, not part of the run's shape, so a
  *       strict run pairs with a plain one in --compare.
  *     - the look and accent asked for are the ones on <html>, and the page is the one named (its header)           (fail)
  *       the passes: every look at every width with the Orange accent; the other accents at the widest width in the first
@@ -97,7 +98,7 @@ const BACKEND = path.join(ROOT, "backend");
 function parseArgs(argv) {
   const o = { full: false, headed: false, blockMapbox: false, keepServer: false, guide: false, deep: true, out: path.join(ROOT, "ui-audit"),
               db: path.join(BACKEND, "forecasts_local.db"), python: null, base: null, code: "ui-planner", teamCode: "ui-team-1",
-              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500, strict44: false, browser: "chrome" };
+              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500, strict44: true, browser: "chrome" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => argv[++i];
     if (a === "--full") o.full = true;
@@ -107,7 +108,8 @@ function parseArgs(argv) {
     else if (a === "--keep-server") o.keepServer = true;
     else if (a === "--no-deep") o.deep = false;
     else if (a === "--guide") o.guide = true;
-    else if (a === "--strict-44") o.strict44 = true;   // decision 14: the 44 px rule on a phone fails; OFF by default until the phone branch has merged
+    else if (a === "--strict-44") o.strict44 = true;   // decision 14: the 44 px rule on a phone fails; ON by default since the phone branch (18 Oct 2026)
+    else if (a === "--no-strict-44") o.strict44 = false;   // ...the old grading: every 44 px row a warning
     else if (a === "--out") o.out = path.resolve(v());
     else if (a === "--db") o.db = path.resolve(v());
     else if (a === "--python") o.python = v();
@@ -1243,7 +1245,7 @@ function writeSummaryMd(t) {
   for (const [k, v] of Object.entries(t.byCheck)) lines.push(`| ${k} | ${v.pass} | ${v.fail} | ${Object.entries(v.widths).map(([w, n]) => w + " (" + n + ")").join(", ")} |`);
   lines.push("", "## Warnings (not counted as failures)", "", "| Warning | Items across all stops |", "|---|---:|");
   for (const [k, v] of Object.entries(t.warnBy)) lines.push(`| ${k} | ${v} |`);
-  if (t.strict44Would) lines.push("", `targets-44px: ${t.strict44Would} of the rows above are neither inline nor set apart and FAIL with --strict-44 (decision 14; off by default until the phone branch has merged).`);
+  if (t.strict44Would) lines.push("", `targets-44px: ${t.strict44Would} of the rows above are neither inline nor set apart and FAIL without --no-strict-44 (decision 14; the default since the phone branch, 18 Oct 2026).`);
   lines.push("", "## axe rules hit", "", "| Rule | Impact | Stops | Nodes | Screens |", "|---|---|---:|---:|---|");
   for (const [k, v] of Object.entries(t.axeBy).sort((a, b) => b[1].stops - a[1].stops)) lines.push(`| ${k} | ${v.impact} | ${v.stops} | ${v.nodes} | ${v.where.slice(0, 8).join(", ")}${v.where.length > 8 ? " …" : ""} |`);
   if (t.colourPairs.length) { lines.push("", "## Colour pairs failing contrast (one token value fixes every node that shares it), worst first", "", "| Ratio | Foreground on background | Size | Nodes | Looks | Screens | Sample |", "|---:|---|---|---:|---|---|---|");
@@ -1375,7 +1377,7 @@ draw();
   console.log("\n" + "=".repeat(64));
   for (const [k, v] of Object.entries(t.byCheck)) console.log(`${k.padEnd(22)} ${String(v.pass).padStart(5)} pass ${String(v.fail).padStart(5)} fail`);
   console.log(`warnings: ${Object.entries(t.warnBy).map(([k, v]) => k + " " + v).join(" · ") || "none"}`);
-  if (t.strict44Would) console.log(`targets-44px: ${t.strict44Would} row(s) would FAIL with --strict-44 (not inline, not set apart)`);
+  if (t.strict44Would) console.log(`targets-44px: ${t.strict44Would} row(s) would FAIL without --no-strict-44 (not inline, not set apart)`);
   console.log(`report: ${path.join(RUN_DIR, "report.html")}  (${REPORT.secs} s; a full run is ~70 MB of screenshots — delete the runs you no longer compare against)`);
   if (FAIL.length) { console.log("\nFailures:"); for (const f of FAIL) console.log("  ✗ " + f); }
   console.log(`\n${PASS} passed, ${FAIL.length} failed`);

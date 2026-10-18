@@ -239,8 +239,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .guide-strip b{color:#1F2024;font-weight:600}
   .guide-strip .guide-strip-go{font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
   .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
-  .guide-strip .guide-x{font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
+  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
   .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
+  .guide-strip .guide-x::after{content:"";position:absolute;inset:-12px -8px}   /* 18 Oct 2026 (UI audit, the phone branch): the × taps at 44 px; the strip keeps its height */
   .guide-dot{position:fixed;z-index:9002;width:10px;height:10px;border-radius:50%;background:#C2410C;border:0;padding:0;cursor:pointer;animation:guide-pulse 2s infinite}
   @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(194,65,12,.45)}70%{box-shadow:0 0 0 8px rgba(194,65,12,0)}100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}}
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
@@ -261,6 +262,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .demo-bar-guide{position:absolute;right:8px;top:2px;height:21px;padding:0 10px;border:0;border-radius:999px;background:var(--demo-btn-bg);box-shadow:inset 0 0 0 1px var(--demo-btn-ring);color:var(--demo-btn-fg);font:600 14px/21px Inter,system-ui,sans-serif;letter-spacing:0;cursor:pointer;}
   .demo-bar-guide:hover{background:var(--demo-btn-hover);}
   .demo-bar-guide:focus-visible{outline:2px solid var(--demo-fg);outline-offset:0;}
+  /* 18 Oct 2026 (UI audit decision 9): the 21 px pill taps at 44 px through a halo; the bar keeps its height (it clips
+     the halo to its own box, so a tap outside the bar never reaches the pill) */
+  .demo-bar-guide::after{content:"";position:absolute;inset:-12px -8px;}
   @media (max-width:639px){ .demo-bar{letter-spacing:.03em;height:auto;min-height:26px;padding:4px 12px;line-height:1.3;} .demo-bar.has-guide{padding:4px 76px 4px 12px;} .demo-bar-text{white-space:normal;text-overflow:clip;text-align:center;} .demo-bar-guide{top:50%;transform:translateY(-50%);} }
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
@@ -348,6 +352,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:38px;display:grid;place-items:center;border:0;border-radius:6px;background:none;color:var(--muted);cursor:pointer;}
   .pw-eye:hover{background:var(--surface-2);color:var(--ink);}
   .pw-eye:focus-visible{outline:2px solid var(--action);outline-offset:1px;}
+  .pw-eye::after{content:"";position:absolute;inset:-3px;}   /* 18 Oct 2026 (UI audit, the 44 px rule): the 38 px eye taps at 44 */
   .auth-go{display:block;width:100%;margin-top:6px;padding:11px 14px;font-size:15px;text-align:center;}
   .auth-go:disabled{opacity:.5;cursor:default;}
   .auth-back{display:block;width:100%;margin-top:8px;padding:8px;font:inherit;font-size:14px;color:var(--muted);background:none;border:0;cursor:pointer;}
@@ -358,6 +363,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .auth-links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;margin-top:10px;font-size:13px;}
   .auth-links button{background:none;border:0;padding:0;font:inherit;color:var(--muted);text-decoration:underline;cursor:pointer;white-space:nowrap;}
   .auth-links button:hover{color:var(--ink);}
+  /* 18 Oct 2026 (UI audit #10, the 44 px rule): on a touch screen the two text links under Sign in are 44 px rows (they were
+     20 px, with Sign in 10 px above); a mouse keeps the tight row */
+  @media (pointer:coarse){.auth-links button{padding:12px 0;}}
   .auth-msg{font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--action) 8%,transparent);border:1px solid color-mix(in srgb,var(--action) 30%,transparent);border-radius:6px;padding:9px 11px;margin-bottom:12px;color:var(--ink);}
   .acct-btn{max-width:220px;display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);font:inherit;font-size:13px;cursor:pointer;}
   .acct-btn:hover,.acct-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
@@ -386,6 +394,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ibtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin:0 0 0 5px;padding:0;border:1.5px solid currentColor;border-radius:999px;background:transparent;color:var(--muted);font:600 11px/1 Georgia,"Times New Roman",serif;font-style:italic;cursor:pointer;vertical-align:-3px;flex:none;}
   .ibtn::after{content:"";position:absolute;inset:-3px;}
   @media (pointer:coarse){.ibtn::after{inset:-13px;}}
+  /* 18 Oct 2026 (UI audit #24): inside a sortable column header the 44 px halo covered the sort arrow, so a tap near the
+     (i) opened the info box instead of sorting — 36 px there on a touch screen, still past the 24 px rule */
+  @media (pointer:coarse){th .ibtn::after{inset:-9px;}}
   .ibtn:hover{color:var(--ink);}
   .ibtn[aria-expanded="true"]{color:var(--navy);}
   .ibtn:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
@@ -6208,12 +6219,15 @@ function ConfigPage({ meta, who, access }){
             <div className="overflow-auto">
               <table className="tbl">
                 <thead>
-                  <tr>{["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h => <th key={h} scope="col" className={h === "Density t/m³" ? "num" : ""}>{h}</th>)}</tr>
+                  {/* 18 Oct 2026 (decision 12): three short headings wrap to two lines and take their own width (width 1 = the
+                      column's least width), so the six columns fit the 800 px card with the vehicles cell two columns wide */}
+                  <tr>{["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h => <th key={h} scope="col" className={h === "Density t/m³" ? "num" : ""}
+                    style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {materials.map(k => { const c = doc.material_categories[k]; return (
                     <tr key={k} className="align-top">
-                      <td className="font-medium text-slate-800">{k}</td>
+                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>   {/* 18 Oct 2026 (decision 12): a long name wraps */}
                       <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
                       <td className="w-32">
                         <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
@@ -6225,11 +6239,16 @@ function ConfigPage({ meta, who, access }){
                       <td className="text-center"><input type="checkbox" checked={isTonnesOnly(c)} aria-label={`${k} is planned in tonnes only`} data-cfg-tonnes-only={k}
                         onChange={e => upd(d => { const m = d.material_categories[k]; if(e.target.checked){ m.units = ["t"]; m.default_unit = "t"; } else delete m.units; })} /></td>
                       <td className="text-center"><input type="checkbox" checked={c.volume_convertible !== false} aria-label={`${k} converts volume to weight`} onChange={e => upd(d => { d.material_categories[k].volume_convertible = e.target.checked; })} /></td>
-                      <td style={{ whiteSpace: "normal", height: "auto", padding: "8px 12px" }}>
-                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {/* 18 Oct 2026 (UI audit decision 12, finding #13): two columns of 24 px rows, a long name wrapping inside its
+                          column — it was one column of 16 px rows at a 20 px pitch (a tablet ticks the wrong vehicle, and it goes live on
+                          Save), each name on one line and cut at the card's edge ("Concrete mixer 8 m³ (3…"). The cell is at least 332 px
+                          (two 154 px columns: a "Rigid 8-wheeler (32t)" on one line; the mixers and the electric names wrap) and, with the
+                          headings above and the material name wrapping, the table fits the card at 1366 px instead of scrolling inside it */}
+                      <td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>
+                        <div className="grid grid-cols-2 gap-x-2">
                           {vehicles.map(v => (
-                            <label key={v} className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">
-                              <input type="checkbox" checked={(c.vehicles || []).includes(v)} onChange={e => upd(d => {
+                            <label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">
+                              <input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)} onChange={e => upd(d => {
                                 const cur = d.material_categories[k].vehicles || [];
                                 d.material_categories[k].vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
                               })} /> {vehLabel(v)}
@@ -6333,7 +6352,7 @@ function ConfigPage({ meta, who, access }){
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
                       <span className="text-[13px] text-slate-500 w-full">Restricted vehicles (none = applies to every vehicle)</span>
                       {vehicles.map(v => (
-                        <label key={v} className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">
+                        <label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">   {/* 18 Oct 2026 (UI audit #13): 24 px rows */}
                           <input type="checkbox" checked={(w.restricted_vehicles || []).includes(v)} onChange={e => upd(d => {
                             const cur = d.seasonal_restrictions[i].restricted_vehicles || [];
                             d.seasonal_restrictions[i].restricted_vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
@@ -11697,7 +11716,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="block text-sm font-medium text-slate-700 mb-1">Supplies · materials it provides</span>
                     <div className="mt-1 space-y-1">
                       {materials.map(cat => (
-                        <label key={cat} className="flex items-center gap-2 text-xs text-slate-700">
+                        <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">   {/* 18 Oct 2026 (UI audit #13): 24 px rows */}
                           <input type="checkbox" checked={(form.supplies || []).includes(cat)} onChange={() => toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />
                           {cat}
                         </label>
@@ -11710,7 +11729,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="block text-sm font-medium text-slate-700 mb-1">Receives · materials it accepts</span>
                     <div className="mt-1 space-y-1">
                       {materials.map(cat => (
-                        <label key={cat} className="flex items-center gap-2 text-xs text-slate-700">
+                        <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
                           <input type="checkbox" checked={(form.receives || []).includes(cat)} onChange={() => toggleCat("receives", cat)} style={{ accentColor: "#059669" }} />
                           {cat}
                         </label>
@@ -12349,7 +12368,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       : (!on && has) ? ["will be removed", "var(--red)"]
                       : has ? ["routed", "var(--ok-text)"] : null;
                     return (
-                      <label key={v} className="flex items-center gap-2 text-xs text-slate-700">
+                      <label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">   {/* 18 Oct 2026 (UI audit #13): 24 px rows */}
                         <input type="checkbox" checked={on}
                           onChange={() => (editingRoute ? toggleEVehicle(v) : toggleRVehicle(v))}
                           style={{ accentColor: "var(--navy)" }} />
@@ -12595,7 +12614,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         title={Object.keys(r.profiles || {}).length
                           ? `Re-route via HERE for ${Object.keys(r.profiles).map(vehShort).join(", ")}`
                           : `Not routed yet — will route for ${vehShort(showProfile)}`}
-                        className="text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">
+                        className="inline-flex items-center min-h-6 text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">   {/* 18 Oct 2026 (UI audit #29): the one button that spends HERE calls was 16 px tall */}
                         {bakeBusy === r.id ? "Routing…" : "Route"}
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); startEditRoute(r); }}

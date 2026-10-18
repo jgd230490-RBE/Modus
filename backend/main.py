@@ -189,6 +189,7 @@ _GATE_CSS = """
   .pw-eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:38px; height:38px;
             margin:0; padding:0; display:grid; place-items:center; color:#78716C; background:none; border-radius:6px; }
   .pw-eye:hover { background:#F5F5F4; color:#1F2024; }
+  .pw-eye::after { content:""; position:absolute; inset:-3px; }   /* 18 Oct 2026 (UI audit, the 44 px rule): the 38 px eye taps at 44 */
   .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
   .foot { margin-top:18px; font-size:13px; color:#78716C; }
   a { color:#2563EB; }
