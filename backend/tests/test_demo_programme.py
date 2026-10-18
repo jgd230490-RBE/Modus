@@ -264,6 +264,13 @@ ok("...and it refuses another as-of date (or a live export) unless --out is outs
    'ap.add_argument("--as-of"' in _gen and 'ap.add_argument("--live-export"' in _gen
    and "need --out to a path OUTSIDE the" in _gen and "def _outside_checkout(path):" in _gen)
 ok("...and the package's readme names the as-of date it was built for", "2026-11-26" in PKG.get("_readme", ""))
+# 18 Oct 2026 (R3b): the council colour bands re-chosen from the live four-year demo's district figures (60 months,
+# after the first live bake) ship in the package for BOTH measures, and the generator says where they came from
+ok("⭐ R3b: the package's council bands are the ones chosen from the live four-year figures — movements 25 / 50 / 100 a "
+   "day, carbon 10 / 25 / 50 t in the month — and the generator records why",
+   FAC.get("tenant", {}).get("council_breaks") == {"movements": [25, 50, 100], "carbon": [10, 25, 50]}
+   and '"council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}' in _gen
+   and "18 Oct 2026 (R3b)" in _gen, str(FAC.get("tenant", {}).get("council_breaks")))
 
 print()
 for f_ in FAIL:

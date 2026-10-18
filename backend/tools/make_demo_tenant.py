@@ -463,9 +463,14 @@ def build(with_areas=False, out=None):
     # 13 Oct 2026 (W12): the council carbon bands, 20 / 50 / 100 t in the month, chosen from the LIVE demo's district
     # figures for Sep-Dec 2026. 16 Oct 2026 (the redesign §4.1): held until the first live bake of the four-year
     # programme, when they are re-chosen from its district figures (R3b) and written here.
+    # 18 Oct 2026 (R3b): re-chosen from the LIVE four-year demo's district figures over all 60 months, after its first
+    # live bake (U8a): 349 district-months with traffic (the county left out: the map draws it as an outline). Carbon
+    # 10 / 25 / 50 t in the month and movements 25 / 50 / 100 a day put about 57 / 23 / 13 / 7 % and 55 / 19 / 19 / 7 % of
+    # them in the four steps; the old 20 / 50 / 100 and the product's 50 / 100 / 200 left three quarters in the palest.
+    # The user saved them on live the same day.
     doc["tenant"] = {"name": TENANT_NAME, "team_label": "Team", "currency": "GBP", "country": "GB",
                      "distance_unit": "mi", "demo_notice": DEMO_NOTICE,
-                     "council_breaks": {"carbon": [20, 50, 100]}}
+                     "council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}}
     # D106: NO seasonal windows — the product's are scheme-wide by calendar month and meant for statutory
     # restrictions; Market Harborough's Christmas trading goes in as an advisory zone each December instead.
     doc["seasonal_restrictions"] = []
