@@ -498,6 +498,14 @@ ok("...it is charcoal with demo-background.jpg (a JPEG under 200 KB) behind a sh
 ok("...and orange stays on the band's eyebrow and its button", ".demo .eyebrow{color:var(--orange)}" in src
    and '<button class="btn btn-orange" type="submit">' in src)
 
+# 18 Oct 2026 (the UI audit's 44 px rule on a phone, claude/ui-fix-phone): the privacy notice's "← Back to Wayscope" link was a
+# 151 × 26 px tap; on a touch screen it is a 44 px row now (inline-flex, min-height 44), the words and the desk unchanged
+_priv_raw = open(os.path.join(ROOT, "landing", "privacy.html"), encoding="utf-8").read()
+ok("the privacy notice's Back link is a 44 px tap on a touch screen, and still inline-block at a desk",
+   "@media (pointer:coarse){.back{display:inline-flex;align-items:center;min-height:44px}}" in _priv_raw
+   and ".back{display:inline-block;margin-top:32px;font-weight:500;text-decoration:none}" in _priv_raw
+   and '<a class="back" href="./">← Back to Wayscope</a>' in _priv_raw)
+
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
 print("placeholders still on the page:", ", ".join(placeholders) or "none")

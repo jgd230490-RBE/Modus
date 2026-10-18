@@ -66,6 +66,7 @@
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
         .control-item input[type=checkbox]{ accent-color:var(--navy); width:14px; height:14px; }
+        #ipt-legend label{ min-height:24px; }   /* 18 Oct 2026 (UI audit #26): a team row is its box's label, 24 px (the phone block makes it 48) */
         .color-dot { width:11px; height:11px; border-radius:50%; display:inline-block; margin-left:auto; box-sizing:border-box; }
         /* D24: a zone kind with nothing in force in the month on screen reads as dimmed, not gone */
         #zone-kinds .control-item { padding:4px 2px; font-size:14px; }   /* 12 Oct fix pass: the 14 px floor on new text (was 12.5) */
@@ -222,7 +223,10 @@
                       border-radius:12px; padding:14px 18px 6px; flex-direction:column; pointer-events:auto; }
         .tl-head{ display:flex; align-items:baseline; justify-content:space-between; padding-bottom:10px; }
         .tl-head b{ font-size:14px; font-weight:600; color:var(--navy-deep); }
-        .tl-head .x{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; padding:2px 4px; }
+        .tl-head .x{ position:relative; border:none; background:none; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; padding:2px 4px; }
+        /* 18 Oct 2026 (UI audit #30): the panel's two × buttons draw 13-26 px but tap at 28 px or more — a ::after halo,
+           as the app's .ibtn has, so the row's layout does not move (the phone's sheet gives them 44 px below) */
+        .tl-head .x::after, .tl-warn .x::after, .drawer-close::after{ content:""; position:absolute; inset:-8px; }
         .tl-warn{ display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-top:1px solid var(--line); font-size:13px; line-height:1.45; }
         .tl-warn .cond-dot{ flex:0 0 9px; margin-top:5px; }
         .tl-warn .body{ flex:1; min-width:0; }
@@ -230,7 +234,7 @@
         .tl-warn .what{ color:var(--muted); font-size:14px; }   /* 12 Oct: the row's sentence is new text, 14 px floor */
         .tl-warn .show{ display:inline-block; margin-top:4px; font-size:13px; font-weight:500; color:var(--navy-deep); background:none; border:none; padding:0; cursor:pointer; font-family:inherit; }
         .tl-warn .show:hover{ text-decoration:underline; }
-        .tl-warn .x{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
+        .tl-warn .x{ position:relative; border:none; background:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
         /* kept as level classes so the sort and the dots agree: clash red, warn amber, caution slate */
         .tl-warn.clash .cond-dot{ background:#C2321C; } .tl-warn.warn .cond-dot{ background:#D98A17; } .tl-warn.caution .cond-dot{ background:#8A94A3; }
         /* on a phone the note is the first thing to go, then the panel shrinks to the
@@ -349,7 +353,7 @@
         .drawer-head{ display:flex; align-items:center; gap:4px; padding:10px 16px; border-bottom:1px solid var(--line); }
         .drawer-tab{ border:none; background:none; font-size:12.5px; font-weight:600; color:var(--muted); padding:6px 10px; cursor:pointer; border-radius:6px; }
         .drawer-tab.active{ color:var(--navy); background:#eef3fb; }
-        .drawer-close{ margin-left:auto; border:none; background:none; font-size:20px; line-height:1; color:var(--muted); cursor:pointer; padding:2px 8px; }
+        .drawer-close{ position:relative; margin-left:auto; border:none; background:none; font-size:20px; line-height:1; color:var(--muted); cursor:pointer; padding:2px 8px; }
         .drawer-body{ overflow:auto; padding:16px; }
         .an-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; }
         .an-card{ border:1px solid var(--line); border-radius:9px; padding:11px 13px; }
@@ -687,6 +691,14 @@
             body.month-text-open #guide-btn{ display:none; }
             #route-hover-card{ display:none !important; }
             body .guide-strip{ max-width:calc(100vw - 100px); }   /* clear of the 44 px zoom buttons on the right */
+            /* 18 Oct 2026 (UI audit decision 8): no tour dots on a phone — 10 px dots on the corners of Play, Layers and the
+               sheet's handle were the smallest targets on the page, and a tap on one fired the control under it. The
+               strip's "Take the tour" carries the four tips here; placeGuideHints() draws no dot on a phone, and this rule
+               hides any left from a wider window until its next pass. A desk keeps its dots. */
+            .guide-dot{ display:none; }
+            /* ...and the teams' tick rows in the Layers sheet are the sheet's 48 px rows, their boxes 20 px like every other */
+            #ipt-legend label{ min-height:48px; }
+            #ipt-legend input[type=checkbox]{ width:20px; height:20px; }
         }
         /* 16 Oct 2026 (CLOCS v5 C2): the route's typed words on the phone's route card AND the desktop's route analysis,
            so outside the phone block */
@@ -722,10 +734,14 @@
   #guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
   .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44403C;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 Inter,system-ui,sans-serif}
   .guide-strip b{color:#1F2024;font-weight:600}
-  .guide-strip .guide-strip-go{font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
+  .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
   .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
-  .guide-strip .guide-x{font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
+  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
   .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
+  /* 18 Oct 2026 (UI audit decision 18): on a touch screen the strip's two buttons tap at 44 px through halos, the glyphs and the
+     strip's height unchanged — "Take the tour" (93 × 24) 44 tall; the × (23 × 20) 44 × 44, reaching 9 px into the strip's 10 px
+     gap, so the two halos never overlap. A mouse keeps the drawn boxes. */
+  @media (pointer:coarse){.guide-strip .guide-strip-go::after{content:"";position:absolute;inset:-10px 0}.guide-strip .guide-x::after{content:"";position:absolute;inset:-12px -13px -12px -9px}}
   .guide-dot{position:fixed;z-index:9002;width:10px;height:10px;border-radius:50%;background:#C2410C;border:0;padding:0;cursor:pointer;animation:guide-pulse 2s infinite}
   @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(194,65,12,.45)}70%{box-shadow:0 0 0 8px rgba(194,65,12,0)}100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}}
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
@@ -1384,12 +1400,14 @@
             strip.style.top = (Math.round(k.bottom) + 10) + 'px'; strip.style.left = (Math.round(k.left) + 12) + 'px';
         } else if (strip) strip.remove();
         MAP_GUIDE_STEPS.forEach((st, n) => {
-            const el = on ? guideAnchor(st) : null;
+            // 18 Oct 2026 (UI audit decision 8): no dots on a phone (767 px and below) — the strip's "Take the tour" carries
+            // the four tips there; a dot left by a wider window is removed on the next pass
+            const el = (on && !guideOnPhone()) ? guideAnchor(st) : null;
             let dot = document.getElementById('guide-dot-' + n);
             if (!el) { if (dot) dot.remove(); return; }
             if (!dot) {
                 dot = guideEl('guide-dot-' + n, 'button'); dot.type = 'button'; dot.className = 'guide-dot';
-                dot.setAttribute('aria-label', 'Tip: ' + st.title);
+                dot.setAttribute('aria-label', 'Tip: ' + guideTitle(st));
                 const show = () => guideTip(n, true), hide = () => guideTip(n, false);
                 dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;
                 dot.onclick = () => guideTip(n, !document.getElementById('guide-tip'));
@@ -1600,10 +1618,12 @@
                 ? `<b style="color:#5b6270;">${r.ipt}</b> · ${(window.IPT_UNDERLAY || {}).label || 'corridor underlay'}`
                 : `<b style="color:#5b6270;">${r.ipt}</b>${r.ws.length ? ' · ' + r.ws.join(', ') : ''}`;
             const handler = under ? 'toggleUnderlay(this.checked)' : 'applyIptFilter()';
-            return `<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.7;${r.muted ? 'opacity:.7;' : ''}" title="${r.labels.join(' · ').replace(/"/g, '&quot;')}">`
+            // 18 Oct 2026 (UI audit #26): each row is the box's <label> — the whole 24 px row ticks it, and a screen reader
+            // names the box by the team, not by its id (it was a bare 13 px box beside a span)
+            return `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.7;cursor:pointer;${r.muted ? 'opacity:.7;' : ''}" title="${r.labels.join(' · ').replace(/"/g, '&quot;')}">`
                 + `<input type="checkbox" id="${iptCheckboxId(r.ipt)}" checked onchange="${handler}" style="margin:0;">`
                 + `<span style="flex:0 0 14px;height:${under ? 4 : 3}px;background:${colour};border-radius:0;"></span>`
-                + `<span style="color:#8a9099;">${label}</span></div>`;
+                + `<span style="color:#8a9099;">${label}</span></label>`;
         }).join('');
         paintAlignmentSwatch();
     }

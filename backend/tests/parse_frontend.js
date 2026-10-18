@@ -1776,7 +1776,16 @@ ok("...and it collapses with the rail like every other item (label behind railSh
       && gf.includes("const [stripBottom, setStripBottom] = useState(16);") && gf.includes("document.querySelector('[data-sticky-foot]')")
       && gf.includes("Math.round(window.innerHeight - fr.top) + 8 : 16;") && gf.indexOf("useState(16)") < gf.indexOf("if(!step) return hintsEl;")
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
-      && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
+      // NARROWED 18 Oct 2026 (decision 17): ...and none on a phone
+      && gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }"));
+    // 18 Oct 2026 (UI audit decision 17, the user): the app's own dots are retired on the phone like the map's (decision 8) —
+    // the effect draws none there, the strip stays (its "Take the tour" carries the tips), the ≤ 767 px rule hides a dot left
+    // by a wider window until the next pass; a desk keeps its dots, named "Tip: <the step's title>"
+    ok("🔴 decision 17: the app draws no guide dot on a phone (the dots effect bails on `phone`, which is in its deps), keeps the strip there, and the phone rule hides .guide-dot; a desk keeps its dots",
+      gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }") && gf.includes("}, [hints, key, steps.length, phone]);")
+      && gf.includes("{strip && (") && gf.includes('className="guide-dot" style={{ top: d.top, left: d.left }} aria-label={`Tip: ${d.title}`}')
+      && /@media \(max-width:767px\)\{\.guide-dot\{display:none\}\}/.test(html) && (html.match(/\.guide-dot\{display:none\}/g) || []).length === 1
+      && !/\.guide-dot\{display:none\}/.test(html.split("@media (max-width:767px){.guide-dot{display:none}}")[0]));
   }
   // REVERSED 11 Oct 2026 (the demo bar, the user: the map's strip "on every page"): the header badge and PR #20's
   // logic that hid it under the embedded map are gone — the bar under the header carries the notice on every view,
@@ -3377,6 +3386,63 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && !code.includes("function Kpi(") && !/\bKpi\b/.test(code));
 }
 
+// ---- 18 Oct 2026 — the UI audit's phone branch (claude/ui-fix-phone): decisions 9 and 12, findings #13, #24, #29 and the
+// 44 px leftovers (the password eyes, the sign-in links) ---------------------------------------------------------------
+// Decision 9: the demo bar's 21 px Guide pill taps at 44 px through a ::after halo; the bar does not grow (it keeps its 26 px
+// and its overflow:hidden, which clips the halo to the bar — a tap outside the bar never reaches the pill). Decision 12 / #13:
+// Config → Materials' vehicles cell is two columns of 24 px rows, a long name wrapping; the Seasonal restrictions' vehicle
+// rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (they were 16 px at a 20
+// px pitch). #24: inside a sortable column header the InfoTip's touch halo is 36 px, clear of the sort arrow. #29: the
+// Routes table's Route button is 24 px tall. The 44 px rule: the password eyes (38 px drawn) tap at 44; on a touch screen
+// the sign-in's two text links are 44 px rows. The strip's × taps at 44 like the map's.
+{
+  ok("🔴 decision 9: the demo bar's Guide pill has a ::after halo (inset -12 px / -8 px: 45 × 76 on the 21 × 60 pill) and the bar itself keeps its 26 px, its absolute pill and its overflow:hidden",
+     /\.demo-bar-guide::after\{content:"";position:absolute;inset:-12px -8px;\}/.test(html)
+     && /\.demo-bar\{position:relative;flex:none;height:26px;[^}]*overflow:hidden;\}/.test(html)
+     && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;/.test(html));
+  ok("🔴 #24: on a touch screen the InfoTip inside a column header has a 36 px halo (inset -9 px), the 44 px halo elsewhere; the desk's 24 px halo is untouched",
+     /@media \(pointer:coarse\)\{th \.ibtn::after\{inset:-9px;\}\}/.test(html) && /@media \(pointer:coarse\)\{\.ibtn::after\{inset:-13px;\}\}/.test(html)
+     && /\.ibtn::after\{content:"";position:absolute;inset:-3px;\}/.test(html)
+     && html.indexOf("th .ibtn::after{inset:-9px;}") > html.indexOf(".ibtn::after{inset:-13px;}"));
+  ok("🔴 the 44 px rule: the show / hide eye keeps its 38 px drawing and taps at 44 (one ::after halo, inset -3 px, on .pw-eye, which is positioned)",
+     /\.pw-eye\{position:absolute;right:4px;top:50%;transform:translateY\(-50%\);width:38px;height:38px;/.test(html)
+     && (html.match(/\.pw-eye::after\{content:"";position:absolute;inset:-3px;\}/g) || []).length === 1);
+  ok("🔴 the 44 px rule: on a touch screen the two text links under Sign in are 44 px rows (padding 12 px 0 on their 20 px line); a mouse keeps the tight row (padding 0)",
+     /@media \(pointer:coarse\)\{\.auth-links button\{padding:12px 0;\}\}/.test(html) && /\.auth-links button\{background:none;border:0;padding:0;font:inherit;/.test(html)
+     && code.includes('<button type="button" onClick={() => go(forgot ? "email" : "forgot")}>{forgot ? "Back to sign in" : "Forgot your password?"}</button>'));
+  // RE-PINNED 18 Oct 2026 (decision 18, the user): the halos are for a coarse pointer only, and "Take the tour" has one too
+  ok("🔴 decision 18: on a coarse pointer the app strip's × (23 × 20) taps at 44 × 44 and 'Take the tour' (93 × 24) at 44 tall through ::after halos, both positioned; the × reaches 9 px into the strip's 10 px gap, so the halos never overlap; a mouse keeps the drawn boxes",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-strip-go\{position:relative;font:inherit;/.test(html)
+     // the × draws 22.6 px wide in Inter, so 9 + 13 px round it up to 45: the audit listed 44 × 44 as under 44
+     && /@media \(pointer:coarse\)\{\.guide-strip \.guide-strip-go::after\{content:"";position:absolute;inset:-10px 0\}\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -13px -12px -9px\}\}/.test(html)
+     && (html.match(/\.guide-x::after/g) || []).length === 1 && (html.match(/\.guide-strip-go::after/g) || []).length === 1
+     && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html)
+     && code.includes('<button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>'));
+  // decision 12 / #13: the tick rows
+  const mat = code.slice(code.indexOf('{tab === "materials" && ('), code.indexOf('{tab === "planning" && ('));
+  ok("🔴 decision 12: Config → Materials' vehicles cell is a two-column grid of 24 px rows (min-h-6), the names free to wrap inside their column (no whitespace-nowrap), the cell at least 332 px (two 154 px columns: a 'Rigid 8-wheeler (32t)' sits on one line); the one-column flex-wrap of 16 px rows is gone",
+     mat.includes('<td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>')
+     && mat.includes('<div className="grid grid-cols-2 gap-x-2">')
+     && mat.includes('<label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">')
+     && mat.includes('<input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)}')
+     && !mat.includes("flex flex-wrap gap-x-3 gap-y-1") && !mat.includes("text-slate-600 whitespace-nowrap"));
+  ok("decision 12: ...and the table FITS the 800 px card at 1366 (measured 799 px in Chrome): three short headings wrap to two lines at their least width (Density, Tonnes only at width 1; Volume ↔ weight at 92 px), a long material name wraps at 136 px; the six headings read as before",
+     mat.includes('style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>')
+     && mat.includes('["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h =>')
+     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>'));
+  ok("🔴 #13: the Seasonal restrictions' vehicle rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (min-h-6) — four lists, no 16 px tick row left among them",
+     code.includes('<label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">')
+     && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 2
+     && code.includes('<label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">')
+     && !code.includes('className="flex items-center gap-2 text-xs text-slate-700">') && !code.includes('className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">'));
+  ok("#29: the Routes table's Route button (the one that spends HERE calls) is a 24 px inline-flex box; Edit and Delete beside it unchanged",
+     code.includes('className="inline-flex items-center min-h-6 text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">')
+     && code.includes('className="text-[color:var(--navy)] hover:underline text-xs font-semibold mr-3">Edit</button>'));
+  ok("no visible word changed in the app for this branch: the pill still says Guide, the eye Show / Hide password, the links their two sentences",
+     code.includes('<button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>')
+     && (code.match(/aria-label=\{show \? "Hide password" : "Show password"\}/g) || []).length === 2
+     && code.includes('<button type="button" onClick={() => go("code")}>Sign in with a team code instead</button>'));
+}
 // ---- 17 Oct 2026 (the user: UK drivers' hours): the words that state how trips a lorry a day are worked out ----------
 // NARROWED 17 Oct 2026 (the review): a lorry's day, worked on one driver's 13 h (a longer shift is accepted, not
 // refused); one break with the second 15 past 12 h; the planning-figure caveat
