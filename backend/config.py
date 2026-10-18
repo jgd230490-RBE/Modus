@@ -392,6 +392,9 @@ def validate(doc, network=None):
             x = plan.get(f)
             if not num(x) or x <= 0:
                 p.append(f"planning.{f} must be a positive number")
+        # 17 Oct 2026 (the user: UK drivers' hours; the review): a shift longer than one driver's 13 h is NOT refused — a
+        # lorry can be double-shifted and the field is also a gate's stand-in open window; drivers_hours reads one
+        # driver's day as at most 13 h for the trips a lorry makes, and the Routes page says so (drivers_hours.shift_note)
         # 14 Oct 2026 (bundle G, W8 + the user's Q1): the CLP's no-delivery windows, taken off each gate's open hours
         import gate_hours
         pb = gate_hours.peak_bands_problem(plan.get("peak_bands"))

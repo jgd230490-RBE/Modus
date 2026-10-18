@@ -150,7 +150,9 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
         cycles = int(ctx.get("cycles_per_vehicle_day") or 0)
         # the fleet this month needs: trips spread over the working days, at what one
         # vehicle can do in a shift on this route — None when unbaked (no cycle)
-        vehicles = (int(-(-f["trips"] // max(1, cycles * work_days))) if (baked and cycles > 0 and f["trips"] > 0)
+        # 17 Oct 2026 (drivers' hours, the review): a routed line where not one round trip fits a driver's day (cycles 0)
+        # counts one lorry a trip, as derived.day_figures does — every reader the same floor, never 0 lorries
+        vehicles = (int(-(-f["trips"] // (max(1, cycles) * work_days))) if (baked and f["trips"] > 0)
                     else (0 if baked else None))
         planned = unit_prices(f.get("eur"), f["tonnes"], f["trips"], basis_km_total)
         planned["source"] = ctx.get("rate_source")
@@ -178,6 +180,8 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
             "distance_km": ctx.get("distance_km"), "return_km": ctx.get("return_km"),
             "payload_t": ctx.get("payload_t"), "dest_id": ctx.get("dest_id"), "origin_id": ctx.get("origin_id"),
             "cycle_min": ctx.get("cycle_min"), "cycles_per_vehicle_day": (cycles if baked else None),
+            # 17 Oct 2026: the driving minutes of one cycle (the Carbon planner's electric day reads it)
+            "drive_min": ctx.get("drive_min"), "other_work_min": ctx.get("other_work_min"),
             "km": km, "tonne_km": f.get("tonne_km"), "co2_t": co2_t,
             "planned": planned, "fair": fair,
             "actual_qty": act["qty"], "actual_tonnes": actual_t, "actual_eur": act["eur"],

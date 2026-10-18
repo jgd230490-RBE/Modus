@@ -21,7 +21,9 @@ the same payload the browser gets and assert equality)
      doubled, never rounded per line.
   3. Vehicles needed = Σ per LINE ceil((loads ÷ working days) ÷ what one vehicle can do a
      day on THAT route). Ceil per line, never once over the total: a vehicle on one route
-     cannot also be working another.
+     cannot also be working another. 17 Oct 2026: "a day" is a driver's day under the UK
+     drivers' hours (drivers_hours.lorry_day: the shift less the required break, driving at
+     most 9 h), read from route_analysis's trips_per_day like every other surface.
   4. A line whose route is not baked for ITS vehicle has no cycle: it is counted in the
      movements and the tonnes, left out of the fleet, and the fleet says "excludes N
      lines with no stored road route for the vehicle" — named, not zeroed. (The map bar
@@ -355,8 +357,10 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             "excludes_unbaked_lines": unbaked_lines,
             "label": "Vehicles needed" + (f" ({unb_label})" if unb_label else ""),
             "not_baked": bool(unbaked_lines and not fleet_peak),
-            "rule": ("Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle), "
-                     "rounded up per line" + (", busiest month" if n > 1 else "") + "."),
+            "rule": ("Vehicles = movements ÷ what one vehicle can do per day on that route (baked cycle, in a driver's "
+                     "day under the UK drivers' hours: the shift less the required break, at most 9 h driving; a planning "
+                     "figure, weekly limits and drivers' own hours not checked), rounded up per line"
+                     + (", busiest month" if n > 1 else "") + "."),
         },
         "material": {
             "shown": unit != "vehicles",                         # rule 8

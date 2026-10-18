@@ -1950,7 +1950,48 @@ async function g3LoginsDom(){
 
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
+// ---- 17 Oct 2026 (the user: UK drivers' hours; the review): the Routes page's Trips/day cell, mounted ---------------
+// The § marks only a route the rules hold below the shift alone (trips < trips_without_rules), the cell's title is the
+// server's words, a 0 shows as a 0 with its words, and the footnote carries the 13 h note. fetch answers the analysis
+// read only; the gates / haul roads / restrictions reads never answer. Not covered: the real server's rows (http_smoke).
+async function routesDriversDom(){
+  const ROW = (profile, trips, lim, plain, words) => ({ profile, alt_index: 0, loaded_km: 12, return_km: 12, return_estimated: false,
+    load_minutes: 15, unload_minutes: 9, turnaround_hr: 0.4, turnaround_parts: {}, cycle_hr: 1.5, haul_speed_applied: false,
+    trips_per_day: trips, tonnes_per_day: 100, tonnes_per_month: 2200, co2_kg_per_trip: 30,
+    lorry_day: { limited_by: lim, trips_without_rules: plain, words, break_minutes: 45 } });
+  const NOTE = "The 15 h shift is read as 13 h for a lorry's trips: one driver's day (the 11-hour daily rest).";
+  const DATA = { rows: [
+      ROW("Tipper", 5, "breaks", 6, "5 a day: 1 fewer than the shift alone would hold: the required break takes the time (45 min break)"),
+      ROW("Flatbed", 8, "shift", 8, "8 a day: as many round trips as fit in the shift (45 min break)"),
+      ROW("Mixer", 0, "none", 0, "One round trip does not fit in a driver's day: counted as one lorry a trip")],
+    planning: { shift_hours_per_day: 15, working_days_per_month: 22, shift_note: NOTE } };
+  w.fetch = (url) => /\/api\/routes\/R1\/analysis$/.test(String(url)) ? reply(200, DATA) : new Promise(() => {});
+  const host = w.document.createElement("div"); w.document.body.appendChild(host);
+  const root = w.ReactDOM.createRoot(host);
+  const E = w.React.createElement;
+  act(() => { root.render(E("table", null, E("tbody", null, E(w.RouteAnalysis, { routeId: "R1", colSpan: 9, token: "t" })))); });
+  await settle(150);
+  const cells = [...host.querySelectorAll("td[data-trips-limit]")];
+  ok("⭐ ROUTES DOM: one Trips/day cell a row, each carrying its limit", cells.length === 3
+     && cells.map(c => c.getAttribute("data-trips-limit")).join() === "breaks,shift,none", String(cells.length));
+  ok("⭐ ROUTES DOM: § only where the rules took trips off (5 of 6), not on a shift-limited 8 nor on a 0 the shift alone also gives",
+     cells.length === 3 && cells[0].textContent === "5§" && cells[1].textContent === "8" && cells[2].textContent === "0",
+     cells.map(c => c.textContent).join("|"));
+  ok("ROUTES DOM: the cell's title is the server's words (why, and the 0 counted as one lorry a trip)",
+     cells.length === 3 && cells[0].title === DATA.rows[0].lorry_day.words && cells[2].title === DATA.rows[2].lorry_day.words);
+  const foot = host.textContent.replace(/\s+/g, " ");
+  ok("⭐ ROUTES DOM: the footnote says a planning figure, explains the 0, and carries the 13 h note for a 15 h shift",
+     foot.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip")
+     && foot.includes("A planning figure: weekly limits and the day's other duties are not modelled.") && foot.includes(NOTE)
+     // found in the Chrome check (18 Oct): JSX dropped the space at the line break — "modelled.t/month"
+     && foot.includes(NOTE + " t/month assumes") && !/\.t\/month/.test(foot)
+     && foot.includes("the 15 h shift less the break the UK drivers' hours rules require"), foot.slice(-700));
+  act(() => { root.unmount(); }); host.remove();
+}
+
 (async () => {
+  try { await routesDriversDom(); ok("ROUTES DOM: the section ran to the end", true); }
+  catch (e) { ok("ROUTES DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await demoBar(); ok("DEMO BAR: the section ran to the end", true); }
   catch (e) { ok("DEMO BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await lateBar(); ok("MAP UNDER THE BAR: the section ran to the end", true); }
