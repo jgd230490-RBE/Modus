@@ -1112,21 +1112,30 @@ ok("ui_audit.js drives the installed Google Chrome (the user, 17 Oct 2026), the 
 # the Dark look with the Blue accent at the desk width (the pair where white figures on --navy #5B8FF0 fail; the extra
 # accents run in Ink only) — as part of the run's RECORDED shape, so --compare latest pairs like with like and a run from
 # before it does not pair; and the 44 px rule on a phone fails (the check targets-44px) a control that is neither inline nor
-# set apart — behind --strict-44, OFF by default until the phone branch (decisions 8, 9, 10) has merged, the header saying
+# set apart — behind --strict-44, OFF by default until the phone branch (decisions 8, 9, 10) merged, the header saying
 # so; the set-apart rows (spaced: true) stay a warning in either mode; the flag is a grading, not a shape. The guides stay
 # exempt from h1-many (decision 7), now recorded in the header.
+# RE-PINNED 18 Oct 2026 (claude/ui-fix-phone, decisions 8, 9, 10 built): the 44 px rule FAILS by default now; --no-strict-44
+# is the old grading. The header says since when, and why.
 ok("ui_audit.js runs the Dark + Blue pass at the desk width as part of the recorded shape (decision 15)",
    all(s in _audit for s in ('{ look: "dark", accent: "blue", widths: [DESK_W] }', "extraPasses: EXTRA_PASSES",
                              "await walkPortal(browser, server.base, p.look, p.accent, false, p.widths)", "o.extraPasses || []")))
-ok("ui_audit.js grades the 44 px rule behind --strict-44, off by default, says when it turns on by default, keeps the "
-   "set-apart rows as warnings and the strict flag out of the shape (decision 14)",
-   all(s in _audit for s in ('else if (a === "--strict-44") o.strict44 = true', "strict44: false", "strict44: OPT.strict44",
+ok("ui_audit.js grades the 44 px rule as a failure BY DEFAULT since the phone branch (decision 14), keeps --strict-44 and adds "
+   "--no-strict-44 for the old grading, says since when in its header, keeps the set-apart rows as warnings and the flag out of the shape",
+   all(s in _audit for s in ('else if (a === "--strict-44") o.strict44 = true', 'else if (a === "--no-strict-44") o.strict44 = false',
+                             "strict44: true, browser:", "strict44: OPT.strict44",
                              'checks.push({ id: "targets-44px", ok: strict44.length === 0, detail: strict44 })',
                              "small44.filter(r => !r.spaced)", "small44.filter(r => r.spaced)",
-                             "--strict-44 is OFF by default; it turns on by default once the phone branch has merged",
-                             "decisions 8, 9 and 10", "a grading, not a shape", "crowded(a, 22) ? row : { ...row, spaced: true }",
-                             'el.closest(".mapboxgl-ctrl-attrib, .mapboxgl-ctrl-logo")'))
+                             "--strict-44 was OFF by default until the phone branch merged (claude/ui-fix-phone, 18 Oct",
+                             "since then it is ON by default", "decisions 8, 9 and 10", "a grading, not a shape",
+                             "crowded(a, 22) ? row : { ...row, spaced: true }", 'el.closest(".mapboxgl-ctrl-attrib, .mapboxgl-ctrl-logo")',
+                             "FAIL without --no-strict-44"))
+   and "strict44: false" not in _audit and "OFF by default; it turns on by default" not in _audit
    and "o.strict44" not in _audit.split("function sameShape")[1].split("\n")[0])
+# 18 Oct 2026 (the 44 px rule, claude/ui-fix-phone): the map's password page's 38 px eye taps at 44 through a halo, like the app's
+ok("the map password page's show / hide eye keeps its 38 px drawing and taps at 44 px (a ::after halo, inset -3 px)",
+   "width:38px; height:38px;" in main._MAP_PASSWORD_PAGE
+   and '.pw-eye::after { content:""; position:absolute; inset:-3px; }' in main._MAP_PASSWORD_PAGE)
 ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and still exempts them",
    "exempt from h1-many" in _audit and "decision 7" in _audit
    and 'else if (dom.h1 > 1 && !/^help/.test(meta.name)) warnings.push({ id: "h1-many", detail: dom.h1 });' in _audit)
@@ -1139,11 +1148,18 @@ ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and
 # area and was never a row). The harness's server origin is stripped from the compare keys (the port is picked per run).
 ok("ui_audit.js measures the guide hints: the first-visitor context carries the signed-in cookies, the two guide stops assert "
    "what they are for (guide-shown) and put the counts on the record",
+   # NARROWED 18 Oct 2026 (claude/ui-fix-phone, decision 8): the wait is for a dot OR the strip — the map draws no dot on a phone
    all(s in _audit for s in ("async function guideContext(browser, ctx, base, look, accent, w)", "g.addCookies(await ctx.cookies(base))",
-                             'waitForSelector(".guide-dot"', 'id: "guide-shown"', 'guide: "map"', 'guide: "portal"',
+                             'waitForSelector(".guide-dot, .guide-strip"', 'id: "guide-shown"', 'guide: "map"', 'guide: "portal"',
                              '"map-page+guide"', '"dashboard+guide"', "stop.guideDots = dom.guide.dots",
                              'stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null',
                              'document.querySelectorAll(".guide-dot")', 'document.querySelectorAll("button.demo-bar-guide")')))
+# 18 Oct 2026 (claude/ui-fix-phone, decision 8 built): the map's guide stop wants the strip and, below 768 px, NO dot — a dot on
+# the phone is the failure now; at a desk width it still wants at least one. The portal's stop is unchanged (the pill).
+ok("ui_audit.js's guide-shown wants the map's strip with no dot on a phone and with its dots at a desk (decision 8), the pill on the portal",
+   "const mapGuideOk = dom.guide.strip > 0 && (meta.width < 768 ? dom.guide.dots === 0 : dom.guide.dots > 0);" in _audit
+   and 'ok: meta.guide === "map" ? mapGuideOk : dom.guide.pill > 0' in _audit
+   and "dom.guide.strip > 0 && dom.guide.dots > 0 :" not in _audit)
 ok("ui_audit.js credits a control's hit area to the control itself or its label, never to an ancestor (finding #33: the demo "
    "bar's 21 px pill had passed 44 × 44 on the bar's area)",
    "const lands = (h) => !!h && (h === el || el.contains(h) || (!!labEl && (h === labEl || labEl.contains(h))))" in _audit

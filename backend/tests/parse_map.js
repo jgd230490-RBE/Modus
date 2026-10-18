@@ -5649,6 +5649,85 @@ function qrRead(mod) {
   }
 }
 
+// ---- 18 Oct 2026 — the UI audit's phone branch (claude/ui-fix-phone): decision 8, findings #26 and #30 ------------------
+// Decision 8: the map's tour dots are retired on a phone (767 px and below) — placeGuideHints() draws none there and the
+// phone block hides any left from a wider window; the strip's "Take the tour" carries the four tips; a desk keeps its dots,
+// each named by the tip's own title. #26: each team row of the legend is the box's <label>, 24 px (48 on the phone, the
+// sheet's row). #30: the conditions panel's × buttons and the route drawer's close tap at 28 px or more through a halo; the
+// share and export cards' close buttons were 44 px already and stay so. The strip's own × taps at 44 px the same way.
+{
+  const phone = (html.match(/@media \(max-width:767px\)\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  ok("🔴 decision 8: placeGuideHints() draws no dot on a phone — the anchor is looked up only off the phone shell, so a dot of a wider window is removed on the next pass",
+     code.includes("const el = (on && !guideOnPhone()) ? guideAnchor(st) : null;") && !code.includes("const el = on ? guideAnchor(st) : null;"));
+  ok("decision 8: the phone block hides .guide-dot (belt and braces for the second between a resize and the next pass); the desk CSS of the dot is untouched",
+     /\.guide-dot\{ display:none; \}/.test(phone) && (html.match(/\.guide-dot\{ display:none; \}/g) || []).length === 1
+     && /\.guide-dot\{position:fixed;z-index:9002;width:10px;height:10px;/.test(html));
+  ok("decision 8: at a desk a dot is named by the tip's own title (guideTitle), never the raw step title",
+     code.includes("dot.setAttribute('aria-label', 'Tip: ' + guideTitle(st));") && !code.includes("'Tip: ' + st.title"));
+  // the guide block, run on a phone and at a desk: the same fake DOM as the 11 Oct sandbox, with isPhoneShell() handed in
+  const a = src.indexOf("    function applyTenantVocabulary() {");
+  const bEnd = "window.addEventListener('resize', () => { if (guideIndex >= 0) guideRender(); });";
+  const b = src.indexOf(bEnd);
+  const runShell = (phoneShell) => {
+    const byId = {};
+    const mk = (tag) => ({ tagName: String(tag || "div").toUpperCase(), id: "", style: {}, dataset: {}, attrs: {}, hidden: false, className: "",
+      textContent: "", innerHTML: "", offsetWidth: 600, offsetHeight: 72, onclick: null,
+      setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
+      remove() { if (byId[this.id] === this) delete byId[this.id]; },
+      getBoundingClientRect() { return { top: 0, left: 300, right: 1280, bottom: 72, width: 980, height: 72 }; },
+      scrollIntoView() {}, closest() { return null; }, querySelector() { return mk("span"); } });
+    // the desk anchors AND the phone anchors are all on the page, so without decision 8 a phone would get its four dots too
+    for (const id of ["kpi-hud", "tl-play", "kpi-conditions", "kpi-moving", "m-peek", "m-play", "m-handle", "m-layers-btn"]) { const e = mk(); e.id = id; byId[id] = e; }
+    const cls = new Set();
+    const document = { body: { classList: { toggle(c, on) { if (on) cls.add(c); else cls.delete(c); }, contains: (c) => cls.has(c) },
+                               appendChild(el) { byId[el.id] = el; return el; } },
+                       getElementById: (id) => byId[id] || null, createElement: (t) => mk(t), querySelector: () => null };
+    const store = {};
+    const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+    const window = { innerWidth: phoneShell ? 390 : 1280, innerHeight: 800, addEventListener() {}, parent: { document: { querySelector: () => null }, postMessage() {} } };
+    const f = new Function("document", "window", "localStorage", "location", "setInterval", "TENANT", "TEAM", "EMBED", "isPhoneShell",
+      src.slice(a, b + bEnd.length) + "\nreturn { applyTenantVocabulary, setupGuide };");
+    const api = f(document, window, localStorage, { origin: "https://app.wayscope.test", search: "" }, () => {}, { name: "Wolds Link", team_label: "Team", demo_notice: "Fictional scheme" }, "Team", false, () => phoneShell);
+    api.applyTenantVocabulary();
+    const dots = Object.keys(byId).filter(k => /^guide-dot-/.test(k));
+    return { dots: dots.length, labels: dots.map(k => byId[k].attrs["aria-label"]), strip: !!byId["guide-strip"] };
+  };
+  let desk = null, ph = null, err = "";
+  try { desk = runShell(false); ph = runShell(true); } catch (e) { err = e.message; }
+  ok("⭐ decision 8 sandbox: the guide block runs with isPhoneShell() handed in, phone and desk", !!desk && !!ph, err);
+  if (desk && ph) {
+    ok("⭐ decision 8 sandbox: on a phone the strip is placed and NO dot is drawn, though every anchor is on the page", ph.strip === true && ph.dots === 0, JSON.stringify(ph));
+    ok("⭐ decision 8 sandbox: at a desk the strip and the four dots are drawn as before, each named 'Tip: <the step's title>'",
+       desk.strip === true && desk.dots === 4 && JSON.stringify(desk.labels) === JSON.stringify(["Tip: The bar along the top", "Tip: Press Play", "Tip: Conditions", "Tip: The side panel"]), JSON.stringify(desk));
+  }
+  // #26: the legend rows
+  ok("🔴 #26: each team row of the legend is a <label> round its box (24 px by a stylesheet rule — not inline, so the phone block's 48 px wins — and a pointer cursor), so the whole row ticks it and a screen reader names the box by the team; no bare div row is left in renderIptLegend",
+     code.includes('return `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.7;cursor:pointer;${r.muted ? \'opacity:.7;\' : \'\'}" title="${r.labels.join(\' · \').replace(/"/g, \'&quot;\')}">`')
+     && /#ipt-legend label\{ min-height:24px; \}/.test(html) && !/<label style="[^"]*min-height/.test(code)
+     && code.includes("+ `<span style=\"color:#8a9099;\">${label}</span></label>`;")
+     && !/return `<div style="display:flex;align-items:center;gap:6px;font-size:12\.5px/.test(code)
+     && /type="checkbox" id="\$\{iptCheckboxId\(r\.ipt\)\}" checked/.test(code));
+  ok("#26: on a phone the legend rows are the Layers sheet's 48 px rows with 20 px boxes, like every other row there",
+     /#ipt-legend label\{ min-height:48px; \}/.test(phone) && /#ipt-legend input\[type=checkbox\]\{ width:20px; height:20px; \}/.test(phone));
+  // #30: the close buttons
+  ok("🔴 #30: the conditions panel's two × buttons (the head's, each row's dismiss) and the route drawer's close tap at 28 px or more through one ::after halo (inset -8 px), each positioned so the halo is its own",
+     /\.tl-head \.x::after, \.tl-warn \.x::after, \.drawer-close::after\{ content:""; position:absolute; inset:-8px; \}/.test(html)
+     && /\.tl-head \.x\{ position:relative; border:none;/.test(html) && /\.tl-warn \.x\{ position:relative; border:none;/.test(html)
+     && /\.drawer-close\{ position:relative; margin-left:auto;/.test(html));
+  ok("#30: the share and export cards' close buttons were 44 px at every width already and stay so; on the phone the sheet's row × is 44 px as before",
+     /\.mt-close, \.share-close\{ width:44px; height:44px;/.test(html) && /\.m-body \.tl-warn \.show, \.m-body \.tl-warn \.x\{ min-height:44px; min-width:44px;/.test(phone));
+  // RE-PINNED 18 Oct 2026 (decision 18, the user): the halos are for a coarse pointer only, and "Take the tour" has one too
+  ok("🔴 decision 18: on a coarse pointer the strip's × (23 × 20) taps at 44 × 44 and 'Take the tour' (93 × 24) at 44 tall through ::after halos, both buttons positioned; the × reaches 9 px into the strip's 10 px gap, so the two halos never overlap; a mouse keeps the drawn boxes (no halo outside the media rule)",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-strip-go\{position:relative;font:inherit;/.test(html)
+     // the × draws 22.6 px wide in Inter, so 9 + 13 px round it up to 45: the audit listed 44 × 44 as under 44
+     && /@media \(pointer:coarse\)\{\.guide-strip \.guide-strip-go::after\{content:"";position:absolute;inset:-10px 0\}\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -13px -12px -9px\}\}/.test(html)
+     && (html.match(/\.guide-x::after/g) || []).length === 1 && (html.match(/\.guide-strip-go::after/g) || []).length === 1
+     && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html));
+  ok("no visible word changed on the map for this branch: the strip still says 'Take the tour' and 'Hide the tips', the dots' tips still come from the steps",
+     code.includes("onclick=\"guideStart()\">Take the tour</button>") && code.includes('aria-label="Hide the tips" title="Hide the tips and the dots"')
+     && code.includes("tip.querySelector('b').textContent = guideTitle(st); tip.querySelector('span').textContent = guideBody(st);"));
+}
+
 // ---- 17 Oct 2026 (the user: UK drivers' hours): the route drawer's trips a lorry a day ------------------------------
 // lorryDayTrips is the server's drivers_hours.lorry_day in the page (the drawer's rough estimate at the average speed).
 // The table is test_drivers_hours.py's CASES, row for row: the two languages are held to one answer.
