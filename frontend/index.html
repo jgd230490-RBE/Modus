@@ -8230,6 +8230,19 @@ const phWeekdays = (lines, cw) => {
   return out;
 };
 const PH_FIRST = 6;    // lines shown before "Show N more"
+// 17 Oct 2026: the clash rail's flags of ONE day, by line. A flag dated to a day (`day_date`: a gate over or near
+// capacity, a route cap, a share) belongs on that day's card only; it was joined by line key alone, so Wednesday's gate
+// showed on Monday's card. A flag with no date (a road limit, a restriction, not routed…) is the line's all week and
+// stays on every day. The Day sheet PDF keeps the same rule (export.day_sheet_rows). The desk grid's row is the whole
+// week, so it keeps every flag of the week (LookAhead's own flagsByLine).
+const phFlagsByLine = (flags, day) => {
+  const g = {};
+  (flags || []).forEach(f => {
+    if(f.day_date && f.day_date !== day) return;
+    const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f);
+  });
+  return g;
+};
 function PhoneLookAhead({ meta, initialPage }){
   const [bucket, setBucket] = useState("commit");
   const [page, setPage] = useState(initialPage || null);
@@ -8256,11 +8269,7 @@ function PhoneLookAhead({ meta, initialPage }){
   const dates = phWeekdays(lines, cw);
   const shown = (day && dates.includes(day)) ? day : (dates.includes(today) ? today : dates[0]);
   const rail = (page && page.clashes) || { flags: [] };
-  const flagsByLine = useMemo(() => {
-    const g = {};
-    (rail.flags || []).forEach(f => { const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f); });
-    return g;
-  }, [rail]);
+  const flagsByLine = useMemo(() => phFlagsByLine(rail.flags, shown), [rail, shown]);
   const rows = lines.map(line => {
     const d = (line.days || []).find(x => x.day_date === shown);
     if(!d) return null;

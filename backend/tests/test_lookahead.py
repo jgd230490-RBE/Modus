@@ -1487,7 +1487,11 @@ ok("DAY SHEET: heaviest first; places, never only an id; the team's NAME, never 
    str([(r["route_id"], r["team"], r["origin"]) for r in _drows]))
 _rank = export.DAY_FLAG_RANK
 _byk = {}
+# NARROWED 17 Oct 2026: a flag dated to one day (day_date: a gate, a route cap, a share) is that day's only — the
+# expectation joined every flag by line key, the same bug the sheet had (gate flags: test_gate_arrivals.py §8c)
 for _f in _pgd["clashes"]["flags"]:
+    if _f.get("day_date") and _f["day_date"] != _dday:
+        continue
     _byk.setdefault(export._line_key(_f), []).append(_f)
 _firsts = [(r, sorted(_byk.get(r["key"], []), key=lambda x: _rank.index(x["code"]) if x["code"] in _rank else 99)) for r in _drows]
 ok("DAY SHEET: each row's flag is its line's most serious (the Look-ahead's order: a road limit first), +N other kinds",

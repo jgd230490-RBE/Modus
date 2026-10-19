@@ -843,6 +843,95 @@ ok("⭐ W17 PDF: the flags list names GATE OVER CAPACITY and the gate, and print
    and "Gate capacity: planned arrivals spread evenly over the gate's open hours, less its shut times and the no-delivery bands; no hourly peak is known." in _flat
    and _export.GATE_LIMIT == "Gate capacity: p" + gate_hours.LIMIT_WORDS[1:], _flat[:300])
 
+# ---- 17 Oct 2026: the Look-ahead's Day sheet (export.day_sheet_rows / build_day_sheet_pdf) and the gate flags ----
+# Two bugs on main since W17: the sheet printed the raw code "GATE_OVER" (no word, no rank: it sorted after NOT ROUTED,
+# so a gate over capacity hid behind SHARE), and it joined flags to a line by key only, so a gate flag dated Wednesday
+# printed on Monday's sheet too. A flag that carries day_date belongs on that day's sheet only.
+import copy as _cp  # noqa: E402
+_fe = open(os.path.join(ROOT, "frontend", "index.html"), encoding="utf-8").read()
+_lfl = dict(re.findall(r'(\w+): "([^"]*)"', re.search(r"const LINE_FLAG_LABEL = \{([^}]*)\}", _fe).group(1)))
+_lfr = [c for c, v in sorted(re.findall(r"(\w+): ([\d.]+)", re.search(r"const LA_FLAG_RANK = \{([^}]*)\}", _fe).group(1)),
+                             key=lambda cv: float(cv[1]))]
+ok("⭐ DAY SHEET: the gate flags read GATE OVER / GATE NEAR, the grid's and the phone day card's words (LINE_FLAG_LABEL); "
+   "every clash code has a word, so no code prints raw",
+   _export.DAY_FLAG_WORD.get("GATE_OVER") == "GATE OVER" == _lfl.get("GATE_OVER")
+   and _export.DAY_FLAG_WORD.get("GATE_NEAR") == "GATE NEAR" == _lfl.get("GATE_NEAR")
+   and set(_export.DAY_FLAG_WORD) == set(_lfl) == set(_clashes.CODES)
+   # the one word that differs: Helvetica on the PDF has no ≠
+   and all(_export.DAY_FLAG_WORD[c] == _lfl[c] for c in _lfl if c != "DAYS_NE_WEEK")
+   and _export.DAY_FLAG_WORD["DAYS_NE_WEEK"] == "DAYS NOT = WEEK" and _lfl["DAYS_NE_WEEK"] == "DAYS ≠ WEEK",
+   str((_export.DAY_FLAG_WORD, _lfl)))
+ok("⭐ DAY SHEET: the flags rank as the grid's LA_FLAG_RANK — GATE OVER after CAP, before STOCKPILE OVER; GATE NEAR after "
+   "MONTH CHANGED, before NOT ROUTED",
+   list(_export.DAY_FLAG_RANK) == _lfr and set(_export.DAY_FLAG_RANK) == set(_clashes.CODES)
+   and _export.DAY_FLAG_RANK.index("GATE_OVER") == _export.DAY_FLAG_RANK.index("ROUTE_CAP") + 1
+   and _export.DAY_FLAG_RANK.index("GATE_NEAR") == _export.DAY_FLAG_RANK.index("UNBAKED") - 1, str((_export.DAY_FLAG_RANK, _lfr)))
+# the week as the page reads it: every weekday's rows carry only that day's dated flags (and every undated one)
+_dsw = {}
+for _x in _gw["dates"]:
+    _dsw[_x] = _export.day_sheet_rows(_pg, _x)
+_want = {}
+for _x in _gw["dates"]:
+    for _r in _dsw[_x]:
+        _own = sorted((f for f in _pg["clashes"]["flags"] if _export._line_key(f) == _r["key"] and f.get("day_date") in (None, "", _x)),
+                      key=lambda f: _export.DAY_FLAG_RANK.index(f["code"]) if f["code"] in _export.DAY_FLAG_RANK else 99)
+        _want[(_x, _r["key"])] = [f["code"] for f in _own]
+_dw = {d["date"]: d["day"] for d in _gwg["G003"]["days"]}
+ok("⭐ DAY SHEET: each day's rows carry that day's gate / share flags only (were all five days'), every undated flag still",
+   _want and all(_r.get("codes", []) == _want[(_x, _r["key"])] for _x in _gw["dates"] for _r in _dsw[_x])
+   and any("GATE_OVER" in _r.get("codes", []) for _x in _red_days for _r in _dsw[_x])
+   # the gate sentences name the sheet's own day, never another
+   and all(t.startswith("GATE OVER: East compound, Compound gate on " + _dw[_x] + ":")
+           for _x in _gw["dates"] for _r in _dsw[_x] for t in _r["flag_texts"] if "Compound gate" in t)
+   and all((" on " + _dw[_x] + ":") in t for _x in _gw["dates"] for _r in _dsw[_x] for t in _r["flag_texts"] if t.startswith("GATE ")),
+   str([(_x, _r["route_id"], _r.get("codes", [])) for _x in _gw["dates"][:2] for _r in _dsw[_x]])[:400])
+ok("DAY SHEET: on a red day a line with a gate over capacity and a share shows GATE OVER first (it was SHARE), +N other kinds",
+   any({"GATE_OVER", "IPT_SHARE"} <= set(_r.get("codes", [])) for _x in _red_days for _r in _dsw[_x])
+   and all(_r["flag"] == "GATE OVER" and _r["more"] == len(set(_r.get("codes", []))) - 1
+           for _x in _red_days for _r in _dsw[_x] if {"GATE_OVER", "IPT_SHARE"} <= set(_r.get("codes", []))),
+   str([(_r["route_id"], _r["flag"], _r.get("codes", [])) for _r in _dsw[_red_days[0]]]) if _red_days else "no red day")
+# the bug as reported: a line with a gate flag dated ONE day (X); another day Y of the same line has loads and no gate flag
+_X = _red_days[0] if _red_days else None
+_L = next((r for r in _dsw.get(_X, []) if "GATE_OVER" in r.get("codes", [])), None)
+_Y = next((y for y in _gw["dates"] if y != _X and any(r["key"] == (_L or {}).get("key") for r in _dsw[y])), None)
+_pg1 = _cp.deepcopy(_pg)
+_pg1["clashes"]["flags"] = [f for f in _pg1["clashes"]["flags"] if f["code"] not in ("GATE_OVER", "GATE_NEAR") or f.get("day_date") == _X]
+_ry = {r["key"]: r for r in _export.day_sheet_rows(_pg1, _Y)} if _Y else {}
+_rx = {r["key"]: r for r in _export.day_sheet_rows(_pg1, _X)} if _X else {}
+_ty = " ".join(_pdf_text(_export.build_day_sheet_pdf(_pg1, _Y)).split()) if _Y else ""
+_tx = " ".join(_pdf_text(_export.build_day_sheet_pdf(_pg1, _X)).split()) if _X else ""
+ok("⭐ DAY SHEET: a gate flag dated one day is on THAT day's sheet only — none on another day of the same line, no limit line there",
+   _L and _Y and "GATE_OVER" in _rx[_L["key"]].get("codes", []) and _rx[_L["key"]]["flag"] == "GATE OVER"
+   and not any(c in ("GATE_OVER", "GATE_NEAR") for r in _ry.values() for c in r.get("codes", []))
+   and "GATE OVER" not in _ty and "Compound gate" not in _ty and _export.GATE_LIMIT not in _ty
+   # an undated flag stays on both days (NOT ROUTED is the line's all week)
+   and ("UNBAKED" in _rx[_L["key"]].get("codes", [])) == ("UNBAKED" in _ry[_L["key"]].get("codes", [])),
+   f"X {_X} Y {_Y} line {(_L or {}).get('route_id')}: {_ty[:300]}")
+ok("⭐ DAY SHEET PDF: the gate day reads GATE OVER in words — counted per kind, the sentence with the gate and the day — "
+   "and prints the gate limit under the flags; no raw code anywhere",
+   _X and re.search(r"GATE OVER on \d+ lines?", _tx) is not None
+   and ("GATE OVER: East compound, Compound gate on " + _dw[_X] + ":") in _tx and _export.GATE_LIMIT in _tx
+   and not re.search(r"GATE_(OVER|NEAR)", _tx) and not re.search(r"GATE_(OVER|NEAR)", _ty), _tx[:400])
+# GATE NEAR, the warning: after SHARE, before NOT ROUTED; on its own it heads the row and prints the limit too
+_ln = _cp.deepcopy(next(l for l in _pg["commit"]["lines"] if _export._line_key(l) == _L["key"])) if _L else {}
+_mk = lambda code, **kw: dict(code=code, route_id=_ln.get("route_id"), month_index=_ln.get("month_index"),
+                              discipline=_ln.get("discipline") or "", section_id=_ln.get("section_id") or "",
+                              ipt=_ln.get("ipt"), text="words of the test", **kw)
+_pgn = {"today": _pg.get("today"), "commit": {"lines": [_ln]},
+        "clashes": {"flags": [_mk("UNBAKED"), _mk("GATE_NEAR", day_date=_X), _mk("IPT_SHARE", day_date=_X)]}}
+_pgo = {"today": _pg.get("today"), "commit": {"lines": [_ln]},
+        "clashes": {"flags": [_mk("STOCKPILE_OVER"), _mk("GATE_OVER", day_date=_X), _mk("ROUTE_CAP", day_date=_X)]}}
+_rn = _export.day_sheet_rows(_pgn, _X) if _X else []
+_ro = _export.day_sheet_rows(_pgo, _X) if _X else []
+_tn = " ".join(_pdf_text(_export.build_day_sheet_pdf({**_pgn, "clashes": {"flags": [_mk("GATE_NEAR", day_date=_X)]}}, _X)).split()) if _X else ""
+ok("DAY SHEET: the ranks in use — SHARE > GATE NEAR > NOT ROUTED; CAP > GATE OVER > STOCKPILE OVER; a GATE NEAR alone heads "
+   "its row and prints the gate limit",
+   len(_rn) == 1 and _rn[0].get("codes", []) == ["IPT_SHARE", "GATE_NEAR", "UNBAKED"] and _rn[0]["flag"] == "SHARE" and _rn[0]["more"] == 2
+   and len(_ro) == 1 and _ro[0].get("codes", []) == ["ROUTE_CAP", "GATE_OVER", "STOCKPILE_OVER"] and _ro[0]["flag"] == "CAP"
+   and "GATE NEAR: words of the test" in _tn and _export.GATE_LIMIT in _tn and re.search(r"GATE NEAR on 1 line\b", _tn) is not None
+   and not re.search(r"GATE_(OVER|NEAR)", _tn),
+   str((_rn, _ro))[:400] + " | " + _tn[:300])
+
 # a closed day, and the near step: East compound closed on Wednesdays; West pit's hours cut to make it near
 gates.update_gate("G003", open_from="07:00", open_to="17:00", open_days="1101111")
 gates.update_gate("G001", open_from="07:00", open_to="16:00")          # 540 min ÷ 2 = 270 a day
