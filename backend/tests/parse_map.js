@@ -388,8 +388,38 @@ ok("and each casing still sits under its own core line",
 ok("the reason is written down where the order is easy to reverse by accident",
   /LAYER ADD ORDER IS Z-ORDER/.test(src));
 
+// NARROWED 17 Oct 2026: OFFSET_OUT is no longer its own ramp, it IS OFFSET_IN (both legs left of
+// their own travel, below), so it collapses at zoom 17 because OFFSET_IN does.
 ok("the direction offset collapses at high zoom instead of holding 4px",
-  /OFFSET_IN\s*=[^;]*17,\s*0\]/.test(code) && /OFFSET_OUT\s*=[^;]*17,\s*0\]/.test(code));
+  /OFFSET_IN\s*=[^;]*17,\s*0\]/.test(code) && /OFFSET_OUT\s*=\s*OFFSET_IN\s*;/.test(code));
+// 🔴 17 Oct 2026 — the two legs' offsets have the SAME sign. line-offset is measured from each
+// line's own direction (negative = left), and every stored leg runs the way its lorry drives:
+// laden origin -> destination, the return destination -> origin (test_phase5a pins the bake and
+// the feed). The old mirror (OFFSET_OUT +4 at zoom 12) was right of the return's own travel =
+// the laden leg's side, so a route coming back the way it went drew its amber dots under its
+// green ones on one edge of the road (seen on a demo copy at zoom 11-14).
+{
+  const ramp = (name) => { const m = code.match(new RegExp(name + "\\s*=\\s*(\\[[^;]*\\]);")); return m ? m[1] : null; };
+  const inRamp = ramp("OFFSET_IN");
+  const stops = inRamp ? (inRamp.match(/(-?\d+(?:\.\d+)?)/g) || []).map(Number) : [];
+  // ['interpolate', ['linear'], ['zoom'], z, v, z, v, ...] -> the values are every second number
+  const vals = stops.filter((_, i) => i % 2 === 1);
+  ok("🔴 17 Oct: both legs are offset to the SAME side of their own travel (OFFSET_OUT = OFFSET_IN)",
+    /const OFFSET_OUT\s*=\s*OFFSET_IN\s*;/.test(code));
+  ok("🔴 17 Oct: ...and that side is LEFT (every OFFSET_IN stop <= 0, at least one < 0): the UK drives on the left",
+    vals.length >= 4 && vals.every(v => v <= 0) && vals.some(v => v < 0), JSON.stringify(vals));
+  ok("🔴 17 Oct: the mirror ramp (+1 at 7, +4 at 12) is gone from the map",
+    !/OFFSET_OUT\s*=\s*\['interpolate'[^;]*7,\s*1,\s*12,\s*4/.test(code));
+  ok("17 Oct: the empty leg's core AND casing use OFFSET_OUT, the laden leg's both OFFSET_IN",
+    /'id': 'outbound-lines-casing'[\s\S]{0,400}'line-offset': OFFSET_OUT/.test(code)
+    && /'id': 'outbound-lines',[\s\S]{0,400}'line-offset': OFFSET_OUT/.test(code)
+    && /'id': 'inbound-lines-casing'[\s\S]{0,400}'line-offset': OFFSET_IN/.test(code)
+    && /'id': 'inbound-lines',[\s\S]{0,400}'line-offset': OFFSET_IN/.test(code));
+  ok("17 Oct: the reason is written where someone would 'restore' the mirror",
+    /BOTH LEGS GO LEFT OF THEIR OWN TRAVEL/.test(src) && /Do not "restore" the mirror/.test(src));
+  ok("17 Oct: the k = 1.25 casing note is redone for same-sign offsets (zoom 14 binds, not 12)",
+    /that paragraph ASSUMED opposite signs/.test(src) && /zoom 14 is,\s*\/\/\s+where the halos already overlap/.test(src));
+}
 ok("line width keeps scaling with zoom", /WIDTH_CORE\s*=[^;]*16,\s*6\.8\]/.test(code));
 ok("no hard-coded offset ramp survives inside a layer definition",
   !/'line-offset': \['interpolate'/.test(code));
