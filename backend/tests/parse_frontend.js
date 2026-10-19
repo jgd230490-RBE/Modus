@@ -3137,6 +3137,23 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _pl.includes("<RowStatus word={r.st.word} tone={r.st.tone} more={r.st.more} />") && _pl.includes("st: laStatus(lf, line.week || {})")
      && _pl.includes('aria-expanded={isOpen ? "true" : "false"} aria-controls={did}') && _pl.includes('<dl className="rd-dl" id={did} hidden={!isOpen}>')
      && _pl.includes("laFlagGroups(r.lf).map(g =>"));
+  // 17 Oct 2026: the card is ONE day, so a flag dated to a day (a gate, a route cap, a share: clashes._flag(day_date=…))
+  // belongs on that day's card only, and a flag with no date on every day — the Day sheet PDF's rule
+  // (export.day_sheet_rows). It was joined by line key alone: Wednesday's gate showed on Monday's card.
+  {
+    const _la = (src.match(/function LookAhead\([\s\S]*?\n\}\n/) || [""])[0];
+    ok("⭐ PHONE LOOK-AHEAD (17 Oct): the day card joins the rail's flags by line AND day — a flag dated another day is skipped, one with no date kept",
+       src.includes("const phFlagsByLine = (flags, day) => {")
+       && src.includes("    if(f.day_date && f.day_date !== day) return;\n    const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f);")
+       && _pl.includes("const flagsByLine = useMemo(() => phFlagsByLine(rail.flags, shown), [rail, shown]);")
+       && !/lineKeyOf\(f\)/.test(_pl));
+    ok("PHONE LOOK-AHEAD (17 Oct): the status, the details and the 'N lines flagged' count all read that day's flags",
+       _pl.includes("const lf = flagsByLine[lk] || [];") && _pl.includes("st: laStatus(lf, line.week || {})")
+       && _pl.includes("laFlagGroups(r.lf).map(g =>") && _pl.includes("const flagged = rows.filter(r => r.lf.length).length;"));
+    ok("DESK GRID (17 Oct, unchanged): the desk Look-ahead's row is the whole week, so it keeps joining by line alone, every flag of the week",
+       _la.length > 3000 && _la.includes("(rail.flags || []).forEach(f => { const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f); });")
+       && !_la.includes("phFlagsByLine") && !/day_date !== day/.test(_la));
+  }
   ok("PHONE LOOK-AHEAD: the Day sheet downloads as day-sheet-<day>.pdf, and the page says where typing happens",
      _pl.includes("a.download = `day-sheet-${shown}.pdf`;") && _pl.includes("To type a day's plan, confirm the week or record what moved, open the Look-ahead on a desktop."));
   ok("PHONE GUIDE: the Look-ahead has its own phone steps, the Dashboard's big-screen step is marked desk-only, and the welcome names the tabs",

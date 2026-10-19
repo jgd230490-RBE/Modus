@@ -1737,6 +1737,81 @@ async function phoneShellDom(){
   w.matchMedia = mm;
 }
 
+// ---- 17 Oct 2026: the phone day card shows that DAY's flags --------------------------------------------------------
+// PhoneLookAhead mounted with `initialPage` (no fetch): three lines of the backend fixture planned on every weekday, the
+// clash rail swapped for four flags — a gate over capacity dated the next weekday on line A, a gate near capacity dated
+// today on line B, a route cap dated the next weekday on line B, a road restriction with no date on line C. A dated flag
+// belongs on its own day's card only, an undated one on every day (the Day sheet PDF's rule, export.day_sheet_rows; the
+// fixture's own dated flags fall on every weekday, so they cannot show the difference). Checked on three days: each
+// line's status, its details and the "N lines flagged" count; then the desk grid with the same page, whose row is the
+// whole week and so keeps every flag.
+async function phoneDayFlagsDom(){
+  const LA = FIX("lookahead_page.json");
+  w.fetch = () => new Promise(() => {});
+  const meta = { ...metaMin, months: { start_year: 2026, count: 60 } };
+  const lk = (r) => `${r.route_id}|${r.discipline || ""}|${r.section_id || ""}|${r.month_index}`;
+  const planned = (l, iso) => { const d = (l.days || []).find(x => x.day_date === iso); return !!d && ((+d.planned_qty || 0) > 0 || ((d.derived || {}).trips || 0) > 0); };
+  const today = LA.today;
+  const weekdays = LA.commit.lines[0].days.map(d => d.day_date).filter(iso => !w.__F.isWeekend(iso));
+  const [next, third] = weekdays.filter(iso => iso > today);
+  const lines = LA.commit.lines.filter(l => weekdays.every(iso => planned(l, iso))).slice(0, 3);
+  ok("PHONE DAY FLAGS: the test page — three fixture lines planned on every weekday, today and two later weekdays",
+     lines.length === 3 && new Set(lines.map(lk)).size === 3 && weekdays.includes(today) && !!next && !!third, `${lines.length} ${today} ${next} ${third}`);
+  const [A, B, C] = lines;
+  const fl = (l, code, text, day) => ({ code, route_id: l.route_id, month_index: l.month_index, discipline: l.discipline || "",
+    section_id: l.section_id || "", ipt: l.ipt, text, ...(day ? { day_date: day } : {}) });
+  const page = { ...LA, commit: { ...LA.commit, lines }, clashes: { ...LA.clashes, flags: [
+    fl(A, "GATE_OVER", `Gate A on ${next}: 9 lorries against the 6 it can check in (150 %)`, next),
+    fl(B, "GATE_NEAR", `Gate B on ${today}: 5 lorries against the 6 it can check in (83 %), near capacity`, today),
+    fl(B, "ROUTE_CAP", `${B.route_id} ${next}: 12 veh against a cap of 10`, next),
+    fl(C, "RESTRICTION", "Road closed all week"),
+  ] } };
+  const el = w.document.createElement("div"); w.document.body.appendChild(el);
+  const r = w.ReactDOM.createRoot(el);
+  await act(async () => { r.render(w.React.createElement(w.PhoneLookAhead, { meta, initialPage: page })); });
+  const card = () => el.querySelector("[data-ph-day]");
+  const line = (l) => el.querySelector(`[data-ph-line="${lk(l)}"]`);
+  // the status word alone (the row-st span holds an icon <i>, the word, and +N for more kinds of flag)
+  const word = (l) => { const s = line(l).querySelector(".row-st"); return [...s.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim(); };
+  const more = (l) => (line(l).querySelector(".row-st .rs-more") || {}).textContent || "";
+  const facts = (l) => line(l).querySelector("dl").textContent;
+  const note = () => card().querySelector(".ph-note").textContent;
+  const pick = async (iso) => { await act(async () => { [...el.querySelectorAll(".ph-days > button")].find(b => b.textContent === w.__F.dayName(iso) + w.__F.dayNum(iso)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
+
+  ok("PHONE DAY FLAGS: the card opens on today with all three lines", card().getAttribute("data-ph-day") === today && !!line(A) && !!line(B) && !!line(C));
+  ok("⭐ PHONE DAY FLAGS (today): a gate over capacity dated another day is NOT on the card — not in the line's status, not in its details",
+     word(A) !== "GATE OVER" && !/GATE OVER/.test(facts(A)) && !facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
+  ok("⭐ PHONE DAY FLAGS (today): a flag dated today IS on the card; the same line's route cap dated another day is not",
+     word(B) === "GATE NEAR" && more(B) === "" && facts(B).includes(`Gate B on ${today}`) && !/\bCAP\b/.test(facts(B)), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
+  ok("⭐ PHONE DAY FLAGS (today): a flag with no date (a road restriction) is on the card", word(C) === "RESTRICTION" && facts(C).includes("Road closed all week"), word(C));
+  ok("PHONE DAY FLAGS (today): the count names the two lines flagged today, not three", /· 2 lines flagged/.test(note()), note());
+
+  await pick(next);
+  ok("⭐ PHONE DAY FLAGS (next weekday): its own gate over capacity shows on that day's card, status and details",
+     card().getAttribute("data-ph-day") === next && word(A) === "GATE OVER" && facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
+  ok("PHONE DAY FLAGS (next weekday): line B carries its route cap, and today's gate near capacity has left the card",
+     word(B) === "CAP" && more(B) === "" && !/GATE NEAR/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
+  ok("⭐ PHONE DAY FLAGS (next weekday): the undated restriction is still on the card (every day)", word(C) === "RESTRICTION");
+  ok("PHONE DAY FLAGS (next weekday): three lines flagged", /· 3 lines flagged/.test(note()), note());
+
+  await pick(third);
+  ok("⭐ PHONE DAY FLAGS (a day no dated flag names): only the undated restriction — one line flagged, A and B in the week's own state",
+     card().getAttribute("data-ph-day") === third && word(C) === "RESTRICTION" && !/GATE|CAP/.test(word(A) + word(B))
+     && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && /· 1 line flagged/.test(note()), `${word(A)} | ${word(B)} | ${note()}`);
+  await act(async () => { r.unmount(); }); el.remove();
+
+  // the desk grid: its row is the whole week, so every flag of the week stays on it (unchanged by the phone's rule)
+  const del = w.document.createElement("div"); w.document.body.appendChild(del);
+  const dr = w.ReactDOM.createRoot(del);
+  await act(async () => { dr.render(w.React.createElement(w.LookAhead, { meta, who: "t", initialPage: page, initialView: "commit" })); });
+  const deskWord = (l) => { const s = del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st`); return s ? [...s.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim() : "(no row)"; };
+  const deskMore = (l) => (del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st .rs-more`) || {}).textContent || "";
+  ok("⭐ DESK GRID (unchanged): the week's row keeps every flag of the week — A's gate over capacity, B's route cap ahead of its gate near capacity (+1), C's restriction",
+     deskWord(A) === "GATE OVER" && deskWord(B) === "CAP" && deskMore(B) === "+1" && deskWord(C) === "RESTRICTION",
+     `${deskWord(A)} | ${deskWord(B)} ${deskMore(B)} | ${deskWord(C)}`);
+  await act(async () => { dr.unmount(); }); del.remove();
+}
+
 // ---- 14 Oct 2026 (G3): per-person logins, mounted -------------------------------------------------------------
 // The whole App with a stubbed fetch that records every call: email sign-in, the account menu, the Users page (teams by
 // NAME, never an id), the hint that resumes a session on reload, a session ending while the app is open, a demo login
@@ -2021,6 +2096,8 @@ async function routesDriversDom(){
   catch (e) { ok("ROW DETAILS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await phoneShellDom(); ok("PHONE: the section ran to the end", true); }
   catch (e) { ok("PHONE: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  try { await phoneDayFlagsDom(); ok("PHONE DAY FLAGS: the section ran to the end", true); }
+  catch (e) { ok("PHONE DAY FLAGS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);
