@@ -5920,12 +5920,12 @@
     // 17 Oct 2026 (the user: UK drivers' hours): the trips one lorry makes in a day — the server's rule
     // (backend/drivers_hours.py lorry_day), here only for the drawer's rough estimate at the average haul speed when the
     // route carries no server figure. The largest n whose driving is at most 9 h and whose work + the required break
-    // (45 min once driving passes 4.5 h or work passes 9 h, else 30 min once work passes 6 h; 15 min more once work passes
-    // 12 h) fit one driver's day (the shift, at most 13 h). parse_map checks it against the server's cases.
+    // (45 min once driving passes 4.5 h or work passes 9 h, else 30 min once work passes 6 h; nothing more past 12 h: the
+    // 45 may be taken as 15 + 30) fit one driver's day (the shift, at most 13 h). parse_map checks it against the server's cases.
     function lorryDayTrips(shiftH, driveMin, otherMin){
         const EPS = 1e-6, sh = Math.min(13, shiftH > 0 ? shiftH : 10) * 60, d = Math.max(0, driveMin || 0), o = Math.max(0, otherMin || 0);
         const cyc = d + o; if (!(cyc > 0)) return 0;
-        const brk = (dr, wk) => ((dr > 270 + EPS || wk > 540 + EPS) ? 45 : (wk > 360 + EPS ? 30 : 0)) + (wk > 720 + EPS ? 15 : 0);
+        const brk = (dr, wk) => (dr > 270 + EPS || wk > 540 + EPS) ? 45 : (wk > 360 + EPS ? 30 : 0);
         for (let n = Math.floor((sh + EPS) / cyc); n > 0; n--) {
             const dr = n * d, wk = n * cyc;
             if (dr <= 540 + EPS && wk + brk(dr, wk) <= sh + EPS) return n;

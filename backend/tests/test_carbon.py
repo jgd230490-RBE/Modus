@@ -480,7 +480,9 @@ ok("fleet = ceil(trips ÷ (cycles a day × working days)): 545 ÷ (7 × 22) → 
    carbon.lorries_for(545, 7, 22) == 4 and carbon.lorries_for(10, None, 22) is None and carbon.lorries_for(0, None, 22) == 0)
 # 17 Oct 2026 (drivers' hours, the review): the electric day with the cycle's split given; a day too short for one trip
 ok("⭐ the review: with driving AND other work given, the electric day is the diesel day's rule (13 h, 60 + 30: 8 — "
-   "drivers_hours.lorry_day), and charging counts as working time (30 + 30 a cycle, 125 kWh trips: fewer than 9)",
+   # label NARROWED 18 Oct 2026 (the user): charging is counted as working time as the cautious reading, not as a rule
+   "drivers_hours.lorry_day), and charging is counted as working time, the cautious reading (30 + 30 a cycle, 125 kWh "
+   "trips: fewer than 9)",
    carbon.ev_day(90, 40, 13, 1.25, None, None, drive_min=60, other_min=30)["cycles"] == 8
    and carbon.ev_day(60, 100, 10, 1.25, 500, 350, drive_min=30, other_min=30)["cycles"]
    < carbon.ev_day(60, 100, 10, 1.25, None, None, drive_min=30, other_min=30)["cycles"])

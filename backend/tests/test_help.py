@@ -632,8 +632,12 @@ ok("⭐ the user guide: trips a lorry a day are what fit in a driver's day — t
    "driving, the sources, what is not modelled; 'a 10-hour shift ÷ the cycle time' is gone",
    # NARROWED 17 Oct 2026 (the review): one driver's day at most 13 (a longer shift is accepted), the second break past
    # 12 h, the day's other duties not modelled, a 0 counted as one lorry a trip
+   # REVERSED 18 Oct 2026 (the user): no second break past 12 h — the 45 may be taken as 15 + 30; charging softened
    "the most round trips that fit in a driver&#39;s day: the shift (10 hours by default; one driver&#39;s day at most 13) less the break the UK drivers&#39; hours rules require" in src
-   and "15 minutes more once work passes 12 — with driving" in src
+   and "else 30 minutes once work passes 6 hours (the 45 may be taken as 15 + 30) — with driving" in src
+   and "15 minutes more once work passes 12" not in src and "15 min more once work passes 12" not in src
+   and "so no further break is needed past 12 hours of work" in src
+   and "the cautious reading, as no rule yet says whether attended charging is work or a break" in src
    and "Regulation (EC) 561/2006 as it applies in the UK (Articles 6–8) and the Road Transport (Working Time) Regulations 2005" in src
    and "Weekly limits, night work, the occasional 10-hour driving day and the day&#39;s other duties are not modelled" in src
    and "counted as one lorry a trip" in src
@@ -647,7 +651,10 @@ ok("⭐ the technical guide: drivers_hours.lorry_day, the thresholds, the split,
    and "breaks are one break, never added" in tg
    and "One driver&#39;s day is read as at most 13 h" in tg.replace("\r\n", "\n").replace("\n", " ")
    and "Regulations 2005 reg 7" in tg.replace("\n", " ") and "reg 5" not in tg
-   and "attended, so it is working time" in tg.replace("\n", " ")
+   # NARROWED 18 Oct 2026 (the user): charging "counted as working time" as the cautious reading; no break past 720 min
+   and "counted as working time (the cautious reading: no rule says yet" in tg.replace("\n", " ")
+   and "No further break past 720 min of work: the 45 may be taken as 15 + 30" in tg.replace("\n", " ")
+   and "plus 15 min once work passes 720" not in tg.replace("\n", " ")
    and "The gate figures keep the full shift" in tg and "floor(shift hours ÷ cycle)" not in tg.replace("the old floor(shift ÷ cycle)", ""))
 ok("...it maps the old screen words to the new ones, and says the exports keep the old words (decision A)",
    "baked / not baked / unbaked</td><td>routed / not routed yet" in tg and "line-month</td><td>forecast month" in tg

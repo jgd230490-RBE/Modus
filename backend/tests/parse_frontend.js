@@ -3446,9 +3446,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
 // ---- 17 Oct 2026 (the user: UK drivers' hours): the words that state how trips a lorry a day are worked out ----------
 // NARROWED 17 Oct 2026 (the review): a lorry's day, worked on one driver's 13 h (a longer shift is accepted, not
 // refused); one break with the second 15 past 12 h; the planning-figure caveat
+// REVERSED 18 Oct 2026 (the user): no second break past 12 h — the hint says the 45 may be taken as 15 + 30
 ok("⭐ Config → Planning: 'Shift hours a day' is a driver's working day, at most 13 h, the trips what fit after the "
    + "required breaks with driving at most 9 h; the old 'shift ÷ cycle time' is gone",
-   src.includes("A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; 15 min more once work passes 12), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled.")
+   src.includes("A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; the 45 may be taken as 15 + 30), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled.")
    && !src.includes("Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time.")
    && !src.includes("A driver's working day, at most 13 hours (the 11-hour daily rest)."));
 ok("⭐ the Routes table: Trips/day is what fits in a driver's day (driving = out, back and gate to face), § marks a route the "
@@ -3471,7 +3472,9 @@ ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon p
    && src.includes('c.lorry_day.limited_by === "driving" ? "the 9 h driving limit"')
    && src.includes('c.lorry_day.limited_by === "driver_day" ? "one driver\'s 13 h day"')
    // NARROWED 17 Oct 2026 (the review): charging is attended, so working time — on top of the break AND counted toward it
-   && src.includes("charging time comes out of the shift. The driver attends it, so it counts as working time: it comes on top of the required break and counts toward it")
+   // NARROWED 18 Oct 2026 (the user: soften it): counted as working time, said to be the cautious reading — no rule says yet
+   && src.includes("charging time comes out of the shift. Wayscope counts it as the driver's working time under the UK drivers' hours (driving at most 9 hours): on top of the required break, and toward the hours that decide how long that break is — the cautious reading, as no rule yet says whether attended charging is work or a break.")
+   && !src.includes("The driver attends it, so it counts as working time") && !src.includes("15 min more once work passes 12")
    && !src.includes("the required breaks, at most 9 hours"));
 ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'compliant' or 'legal'",
    !/drivers'? hours[^"`]{0,200}\b(compliant|compliance|legal)\b/i.test(src));
