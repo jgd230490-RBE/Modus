@@ -5962,6 +5962,12 @@ function qrRead(mod) {
        r1 === true && r2 === false && /<button class="btn btn-ghost" id="filter-reset" hidden onclick="resetFilters\(\)">Reset filters<\/button>/.test(html)
        && /function applyFilters\(\) \{[\s\S]{0,400}syncFilterReset\(\);/.test(code));
   }
+  ok("19 Oct (seen in Chrome): the pressed heat-map segment's rule outranks the segments' white (was white text on white)",
+     html.includes(".heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }")
+     && !html.includes(".heat-seg label:has(input:checked)"));
+  ok("19 Oct (seen in Chrome): the 2×2 filters and the share row are 13 px, so 'All destinations' is whole and the buttons sit two to a row",
+     html.includes(".filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; }")
+     && html.includes(".share-group .share-row .btn{ font-size:13px; padding:8px 10px; }"));
   ok("19 Oct: the four filters sit two by two (the names on the selects kept)",
      /<div class="filter-grid">\s*<select id="filter-origin"[^>]*aria-label="Origin">/.test(sb) && html.includes(".filter-grid{ display:grid; grid-template-columns:1fr 1fr; column-gap:6px; }"));
   // ---- the month picker ----

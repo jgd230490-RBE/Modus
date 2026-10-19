@@ -375,10 +375,11 @@
                                       border-radius:0; background:#fff; }
         .heat-seg .fc-toggle.fc-mode:last-child{ border-right:0; }
         .heat-seg input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
-        .heat-seg label:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }
+        .heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }   /* beats the white above (19 Oct, seen in Chrome: white on white) */
         .heat-seg label:focus-within{ outline:2px solid var(--navy); outline-offset:-3px; }
         .filter-grid{ display:grid; grid-template-columns:1fr 1fr; column-gap:6px; }
-        .filter-grid select{ min-width:0; }
+        .filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; }      /* "All destinations" whole in a 129 px column (seen in Chrome, 19 Oct) */
+        .share-group .share-row .btn{ font-size:13px; padding:8px 10px; }      /* two to a row at 300 px (were one each at 14 px) */
         .layers-box > summary small{ margin-left:6px; font-size:13px; font-weight:500; color:var(--muted); }
         /* the number badges' key (the badges on the map are drawn by pillBadgeImage) */
         .mv-pill, .co-pill{ flex:none; display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 7px; border-radius:10px; background:#fff;
