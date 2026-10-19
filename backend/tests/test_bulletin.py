@@ -1426,7 +1426,9 @@ ok("W11: with no shared-section index the map draws the routes only, and the not
    S10["map_sections"] == [] and S10["map_note"] == "Each route is coloured by its own two-way movements a day.")
 # REVERSED 14 Oct 2026 (the user took the recommendation): the map's Volume legend foot is shortened to match — it OPENS with the
 # bulletin's note word for word, and the long "Each route is painted by its own figure; … summed, and labelled" is gone
-_mapfoot = re.search(r"'<div class=\"ml-foot\">Where routes share a road, its colour shows their total \(' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+ '\)\. ' \+", MAP)
+# NARROWED 19 Oct 2026 (the user: "remove too much wording and put it into an info box"): the foot moved behind the heat
+# map's "i" (`more`, written to #heat-info-more); it still OPENS with the bulletin's note word for word
+_mapfoot = re.search(r"more = 'Where routes share a road, its colour shows their total \(' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+ '\)\. ' \+", MAP)
 # NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the bulletin's note says the rule in one sentence
 ok("⭐ W11: the note says the map's rule in one sentence (shared roads show the routes' total), and the map's foot opens with it",
    bool(_mapfoot) and bulletin_doc.map_note(3) == "Where routes share a road, its colour shows their total."

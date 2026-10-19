@@ -2064,7 +2064,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
      /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
      && /return span \? span\[0\] : 1;/.test(code)
-     && /ensureTimelineMatrix\(\)\.then\(\(\)=>\{\s*if\(!monthHasVolume\(TL\.month\)\) TL\.month = tlStartMonth\(\);\s*setTimelineMonth\(TL\.month\);/.test(code)
+     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the start month is used unless a month was ASKED for (TL.chosen: a month
+     // button, a link, a month already shown) — on live the council views opened on Jan 2026 because month 1, the default,
+     // carries volume on the four-year demo
+     && /ensureTimelineMatrix\(\)\.then\(\(\)=>\{[\s\S]{0,300}?if\(!TL\.chosen\) TL\.month = tlStartMonth\(\);\s*setTimelineMonth\(TL\.month\);/.test(code)
+     && /const TL = \{ on:false, playing:false, month:1, chosen:false,/.test(code)
+     && /function setTimelineMonth\(m\)\{\s*TL\.month=m; TL\.chosen=true;/.test(code)
+     && /if \(v\.month\) \{ TL\.month = v\.month; TL\.chosen = true; \}\s*setSel\('filter-origin'/.test(code)
      && /return \(d\.getFullYear\(\) - CONFIG\.START_YEAR\) \* 12 \+ d\.getMonth\(\) \+ 1;/.test(code));
   ok("D22: the loop runs within the span with volume; the old 1..MONTH_COUNT wrap is gone from tickTimeline",
      /function tickTimeline\(\)\{\s*const \[lo, hi\] = tlLoopBounds\(\);\s*const wrap = TL\.month >= hi \|\| TL\.month < lo;/.test(code)
@@ -2924,9 +2930,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   const layersEnd = html.indexOf("</details>", html.indexOf('<details class="layers-box" id="layers-box">'));
   const zonesBox = html.indexOf('id="layer-zones"'), zoneKinds = html.indexOf('<div id="zone-kinds"');
   const group = gStart >= 0 ? html.slice(gStart, html.indexOf("</div>\n\n", gStart)) : "";
-  ok("⭐ §2.2b: a 'By council' group of its own, AFTER the layers box closes — not inside 'Disruption zones' or its kinds",
-     gStart > layersEnd && layersEnd > zonesBox && zonesBox > 0 && zoneKinds > 0 && gStart > zoneKinds
-     && /<h3>By council<\/h3>/.test(group), String(gStart) + " " + String(layersEnd));
+  // REVERSED 19 Oct 2026 (the user: "check the control panel is in a logical order"): By council is a fold of its own
+  // ABOVE "More layers" (the old layers box, now at the foot of the panel) — still outside "Disruption zones" and its kinds
+  const layersStart = html.indexOf('<details class="layers-box" id="layers-box">');
+  ok("⭐ §2.2b: a 'By council' group of its own, a fold ABOVE the More layers box — not inside 'Disruption zones' or its kinds",
+     gStart > 0 && gStart < layersStart && layersEnd > zonesBox && zonesBox > layersStart && zoneKinds > 0 && !(gStart > layersStart && gStart < layersEnd)
+     && /<details class="layers-box" id="council-fold">\s*<summary>By council <small id="council-fold-sum"><\/small><\/summary>/.test(group)
+     && !/<h3>By council<\/h3>/.test(html), String(gStart) + " " + String(layersEnd));
   ok("⭐ §2.2b: its own checkboxes, districts and county, each with its own handler — and both OFF by default",
      /<input type="checkbox" id="layer-areas-district" onchange="toggleAreaTier\('district', this\.checked\)">/.test(group)
      && /<input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier\('county', this\.checked\)">/.test(group)
@@ -2989,8 +2999,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /filter: \['==', \['get', 'tier'\], 'county'\]/.test(blk) && /'line-dasharray': \[3, 2\]/.test(blk));
   // NARROWED 16 Oct 2026 (V3, the user: the label improvements on the council view): the label is a card now - white,
   // edged in the colouring's hue, so no halo - and 14 px is still the floor at every zoom; the figure is larger
-  ok("§2.2b: the label is 14 px (the floor) on a white card",
-     /'text-size': \['interpolate', \['linear'\], \['zoom'\], 9, 14, 12, 16\]/.test(blk)
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels) ("labels too big, reduce by ~35 %"): 13 px (the floor since decision 4,
+  // 17 Oct) at every zoom, the figure 1.08 times that (14 px); were 14-16 px and 1.35 times
+  ok("§2.2b: the label is 13 px (the floor) on a white card, the figure 1.08 times that",
+     /const AREA_LABEL_SIZE = 13, AREA_FIG_SCALE = 1\.08;/.test(blk) && /'text-size': AREA_LABEL_SIZE, 'text-max-width': 20,/.test(blk)
+     && !/'text-size': \['interpolate', \['linear'\], \['zoom'\], 9, 14, 12, 16\]/.test(blk) && /'icon-text-fit-padding': \[1, 5, 1, 5\]/.test(blk)
      && /const AREA_LABEL_PAINT = \{ 'text-color': AREA_INK, 'text-halo-width': 0 \};/.test(blk)
      && /'icon-text-fit': 'both'/.test(blk) && !/'font-scale': 0\.\d/.test(blk));
   ok("§2.2b: the colour-by switch has two modes, movements first (D27: movements first, carbon second)",
@@ -3174,8 +3187,12 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ C1: a 'Heat map' radio group — Off (checked), Volume, Carbon — sits in the forecast box; Volume and Carbon OFF by default",
      code.includes('<div class="heat-group" role="radiogroup" aria-labelledby="heat-label">')
      && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>')
-     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume <span class="mode-sub">two-way movements a day</span></label>')
-     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month, per route</span></label>')
+     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): one segmented control (.heat-seg); the sub-lines moved behind the "i"
+     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon</label>')
+     && /<div class="heat-seg">\s*<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off"/.test(code)
+     && code.includes('<p><b>Volume</b>: two-way movements a day. Each route by its own figure; a stretch of road two or more routes share by the routes using it, summed.</p><p><b>Carbon</b>: t CO₂e in the month, per route.</p>')
+     && !code.includes('<span class="mode-sub">')
      && !/type="checkbox" id="toggle-(road-load|carbon)"/.test(code) && !code.includes("> Road load</label>")
      && !/id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code)
      && code.indexOf('id="toggle-road-load"') > code.indexOf('id="toggle-forecast"') && code.indexOf('id="toggle-carbon"') > code.indexOf('id="toggle-road-load"'));
@@ -3213,11 +3230,15 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ C1: routes stay blue — the road-load line is the plan blue (CONFIG.COLORS.brand) under an ink casing",
      /id: 'road-load-line'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.brand,/.test(blkCode)
      && /id: 'road-load-casing'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.forecastCasing,/.test(blkCode));
-  ok("⭐ C1: ONE label per run with its OWN text expression ('N two-way / day · R routes'), never the per-route f_avg concat",
-     blkCode.includes("const ROAD_LOAD_LABEL = ['concat', ['get', 'rl_mv_text'], ' two-way / day · ', ['get', 'rl_routes_text']];")
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels) ("labels too wordy and noisy — a small icon label with a legend"): the run's
+  // label is its NUMBER on a badge with a two-way arrow (mv-badge), what it counts in the key; none under 1 a day
+  ok("⭐ C1: ONE label per run with its OWN text expression (the number, on the arrow badge), never the per-route f_avg concat",
+     blkCode.includes("const ROAD_LOAD_LABEL = ['get', 'rl_mv_text'];") && blkCode.includes("const ROAD_LOAD_BADGE_MIN = 1;")
+     && !blkCode.includes("' two-way / day · '")
      // NARROWED 12 Oct 2026 (browser check): the label sits on its own point source, placed as a level point label;
      // the line-placed version ('line-center' on road-load-source) never rendered on bent roads
-     && /id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,[\s\S]{0,120}'symbol-placement': 'point', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14,/.test(blkCode)
+     && /id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,\s*filter: \['>=', \['get', 'rl_mv'\], ROAD_LOAD_BADGE_MIN\],\s*layout: badgeLayout\(ROAD_LOAD_LABEL, 'mv-badge'\),/.test(blkCode)
+     && blkCode.includes("return { 'symbol-placement': 'point', 'text-field': field, 'text-size': BADGE_TEXT_SIZE,")
      && !/\['get', 'f_avg'\]/.test(blkCode));
   ok("⭐ browser check 12 Oct: the run label is NOT placed along the line (Mapbox drops a line-placed label wherever the road bends past the text's angle)",
      !/id: 'road-load-labels'[\s\S]{0,200}'symbol-placement': 'line/.test(blkCode)
@@ -3228,14 +3249,21 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // 12 Oct 2026 (night, live in the user's Chrome: 1 of 18 carbon labels drawn on real HERE routes)
   ok("⭐ live check 12 Oct: the carbon route label is a LEVEL point label at the route's middle, on its own source — never placed along the line",
      blkCode.includes("const CARBON_LABEL_SOURCE = 'carbon-label-source';")
-     && /id: CARBON_LABEL_LAYER, type: 'symbol', source: CARBON_LABEL_SOURCE, filter: carbonLabelFilter\(\),\s*layout: \{ 'symbol-placement': 'point', 'text-field': CARBON_ROUTE_LABEL, 'text-size': 14,/.test(blkCode)
-     && !/id: CARBON_LABEL_LAYER[\s\S]{0,300}'symbol-placement': 'line/.test(blkCode)
+     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the badge layout (point placement inside badgeLayout)
+     && /id: CARBON_LABEL_LAYER, type: 'symbol', source: CARBON_LABEL_SOURCE, filter: carbonLabelFilter\(\),\s*layout: badgeLayout\(CARBON_ROUTE_LABEL, 'co2-badge'\),/.test(blkCode)
+     && !/id: CARBON_LABEL_LAYER[\s\S]{0,300}'symbol-placement': 'line/.test(blkCode) && !/function badgeLayout[\s\S]{0,300}'symbol-placement': 'line/.test(blkCode)
      && blkCode.includes("const pt = runMidpoint(coords);")
      && blkCode.includes("if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }")
      && blkCode.includes("if (map.getSource(CARBON_LABEL_SOURCE)) map.removeSource(CARBON_LABEL_SOURCE);"));
-  ok("browser check 12 Oct: the run label keeps to one line (text-max-width 30 ems) and is never forced over other labels",
-     /id: 'road-load-labels'[\s\S]{0,300}'text-max-width': 30,/.test(blkCode)
-     && !/id: 'road-load-labels'[\s\S]{0,400}'text-allow-overlap': true/.test(blkCode));
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): a badge is a number, one line by nature (no text-max-width); still never forced over other labels
+  ok("browser check 12 Oct: the run label keeps to one line and is never forced over other labels",
+     /function badgeLayout\(field, image\) \{/.test(blkCode)
+     && !/function badgeLayout[\s\S]{0,500}'text-allow-overlap': true/.test(blkCode) && !/id: 'road-load-labels'[\s\S]{0,400}'text-allow-overlap': true/.test(blkCode));
+  ok("⭐ badges (19 Oct): the two pill images are drawn once, re-added after a basemap switch, stretch in the middle only (round ends, the arrow keep their shape)",
+     blkCode.includes("function pillBadgeImage(edge, arrow) {") && blkCode.includes("function addPillBadges(m) {")
+     && blkCode.includes("[['mv-badge', BADGE_STYLE.mv.edge, true], ['co2-badge', BADGE_STYLE.co2.edge, false]]")
+     && blkCode.includes("opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[8 * R, 12 * R]], content: [L, 3 * R, L + MID, H - 3 * R] }")
+     && (blkCode.match(/try \{ addPillBadges\(map\); \} catch \(e\) \{\}/g) || []).length === 2);
   // the four count pins of review §2.2d, honoured (asserted above unchanged; these say WHY they still hold)
   ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
      (blkCode.match(/layout: \{ 'line-cap': 'round', 'line-join': 'round' \}/g) || []).length === 2
@@ -3341,17 +3369,20 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && !blkCode.includes("carbonColor('rl_co2'") && !blkCode.includes("paintRuns")
      // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
      && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
-  ok("⭐ C1: the route label switches to 't CO₂e' in carbon mode (its own layer, on the loaded leg: one label per route)",
-     // REVERSED 12 Oct 2026 (wording review): the fallback reads 'no carbon figure' (was 'no stored road route')
-     blkCode.includes("['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];")
-     && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway']];")
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the carbon badge reads "CO₂ 24" (one decimal under 10), the unit in the
+  // key; a route with no figure gets NO badge (the filter), its grey line and the key say "no figure"
+  ok("⭐ C1: the route label switches to the 'CO₂' badge in carbon mode (its own layer, on the loaded leg: one label per route)",
+     blkCode.includes("['concat', 'CO₂ ', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]]], ''];")
+     && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway'], ['==', ['typeof', ['get', 'f_co2']], 'number']];")
      // NARROWED 12 Oct 2026 (evening): the sections are drawn in Volume only, so their label is always the volume one
      && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);") && !code.includes("ROAD_LOAD_CARBON_LABEL"));
   ok("⭐ C1: the carbon legend is a stepped gradient with the note 'Approved plan only, average-laden factor on both legs, excludes N …'",
      blkCode.includes("'<div class=\"ml-steps\">' + CARBON_RAMP.map(c => '<i style=\"background:' + c + '\"></i>').join('') + '</div>'")
      // NARROWED 12 Oct 2026 (browser check): the excluded-line clause is written only when a line is excluded; the demo
      // read "excludes 0 lines with no stored road route"
-     && blkCode.includes("'<div class=\"ml-foot\">Approved plan only, average-laden factor on both legs' +")
+     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note moved behind the heat map's "i" (#heat-info-more), word for word
+     && blkCode.includes("more = 'Approved plan only, average-laden factor on both legs' +")
+     && blkCode.includes("if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;")
      && blkCode.includes("(miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +")
      && !blkCode.includes("on both legs, excludes ' + miss")
      // NARROWED 12 Oct 2026 (Track C review): the legend names the maximum used, route-month or section-month
@@ -3409,7 +3440,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     ok("C1: nothing a person reads in the block says truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
        !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(strings) && !/\bAI\b/.test(strings));
   }
-  ok("C1: every new symbol layer is 14 px", (blkCode.match(/'text-size': (\d+)/g) || []).length === 2 && !/'text-size': (1[0-3]|[0-9])\b/.test(blkCode));
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the two label layers share badgeLayout at BADGE_TEXT_SIZE, 13 px (the floor
+  // since decision 4, 17 Oct; was 14); no literal size under 13 anywhere in the block
+  ok("C1: every new symbol layer is 13 px or more (the badges' one size)",
+     (blkCode.match(/'text-size': BADGE_TEXT_SIZE/g) || []).length === 1 && blkCode.includes("const BADGE_TEXT_SIZE = 13,")
+     && !/'text-size': (1[0-2]|[0-9])\b/.test(blkCode));
 
   // ---- the block, run against a fake map and DOM ----
   const tA = src.indexOf("    const TEAM_LABELS = {};"), tB = src.indexOf("    // ===== The overlay package");
@@ -3556,7 +3591,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            el("road-load-legend").hidden === false && el("road-load-legend").innerHTML.includes("Volume · two-way movements a day in Oct 2026")
            && el("road-load-legend").innerHTML.includes("under 10") && el("road-load-legend").innerHTML.includes("100 and over")
            && el("road-load-legend").innerHTML.includes("ml-steps") && !el("road-load-legend").innerHTML.includes("ml-w")
-           && el("road-load-legend").innerHTML.includes("the loaded leg is counted once"));
+           // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the counting rule is behind the heat map's "i" (#heat-info-more); the legend
+           // carries the badge's key instead
+           && el("heat-info-more").innerHTML.includes("the loaded leg is counted once")
+           && el("road-load-legend").innerHTML.includes("two-way lorry movements a day on that stretch</div>")
+           && el("road-load-legend").innerHTML.includes('<span class="mv-pill">') && !el("road-load-legend").innerHTML.includes("ml-foot"));
         {
           const fl0 = fmap.layers["forecast-layer"].paint, rl0 = fmap.layers["road-load-line"].paint;
           ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], one width",
@@ -3571,7 +3610,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         TL.month = 11; B.refreshMapModes(); await flush(); await flush();
         ok("⭐ C1: the next month on the playhead re-fetches (road-load?month=11) and the server's note reaches the legend",
            fetches[1] === "/api/public/road-load?month=11" && fmap.sources["road-load-source"]._data.features.length === 0
-           && el("road-load-legend").innerHTML.includes("Approved volume this month runs on no shared road section."));
+           // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the server's note is behind the heat map's "i"
+           && el("heat-info-more").innerHTML.includes("Approved volume this month runs on no shared road section."));
         TL.month = 10; B.refreshMapModes(); await flush();
         ok("C1: back to October: from the cache, the runs drawn again", fetches.length === 2 && fmap.sources["road-load-source"]._data.features.length === 2);
         // filters
@@ -3596,19 +3636,23 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("⭐ C1: the carbon legend: per route, the five ranges from the fixed stops, 'excludes 3 lines with no stored road route'",
            el("carbon-legend").hidden === false && el("carbon-legend").innerHTML.includes("Carbon · t CO₂e in Oct 2026, per route")
            && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
-           && el("carbon-legend").innerHTML.includes("Approved plan only, average-laden factor on both legs, excludes 3 lines with no stored road route.")
-           && el("carbon-legend").innerHTML.includes("(55.5 t)"), el("carbon-legend").innerHTML.slice(0, 400));
+           // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note is behind the heat map's "i"; the legend keeps the exclusion in
+           // one line and the CO2 badge's key
+           && el("heat-info-more").innerHTML.includes("Approved plan only, average-laden factor on both legs, excludes 3 lines with no stored road route.")
+           && el("heat-info-more").innerHTML.includes("(55.5 t)") && el("carbon-legend").innerHTML.includes("Excludes 3 lines with no stored road route.")
+           && el("carbon-legend").innerHTML.includes('<span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month'), el("carbon-legend").innerHTML.slice(0, 400));
         // REVERSED 12 Oct 2026 (evening): carbon paints the routes only, so a section-month figure from the server never
         // sets the stops; the route-month maximum always does
         TL.matrix.sectionCo2Max = 9.1; B.refreshMapModes(); await flush();
         const rlc = fmap.layers["forecast-layer"].paint["line-color"][2];
         ok("⭐ heat map: Carbon's stops come from the largest ROUTE-month (55.5 t) even when the server sends a section-month (9.1 t)",
            JSON.stringify([rlc[3], rlc[5], rlc[7], rlc[9]]) === JSON.stringify(B.carbonStops(55.5))
-           && el("carbon-legend").innerHTML.includes("largest route-month (55.5 t)") && !el("carbon-legend").innerHTML.includes("section-month"),
+           // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the stops' note is behind the heat map's "i"
+           && el("heat-info-more").innerHTML.includes("largest route-month (55.5 t)") && !el("heat-info-more").innerHTML.includes("section-month"),
            JSON.stringify(rlc) + " " + el("carbon-legend").innerHTML.slice(0, 200));
         delete TL.matrix.sectionCo2Max; B.refreshMapModes(); await flush();
         ok("Track C review: ...and with no section figure from the server, the route-month maximum, named as such",
-           el("carbon-legend").innerHTML.includes("largest route-month (55.5 t)")
+           el("heat-info-more").innerHTML.includes("largest route-month (55.5 t)")   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): behind the "i"
            && JSON.stringify(fmap.layers["forecast-layer"].paint["line-color"][2].filter((x, i) => i >= 3 && i % 2 === 1)) === JSON.stringify(B.carbonStops(55.5)));
         // road load off: the forecast routes carry the carbon
         el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
@@ -3618,7 +3662,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            && fmap.layers["forecast-casing"].paint["line-width"] === 8.5);   // NARROWED 16 Oct (D115): 6 / 8.5, were 5 / 7.5
         ok("browser check 12 Oct: Road load off removes the label-point source too", !fmap.sources["road-load-label-source"] && !fmap.layers["road-load-labels"]);
         ok("⭐ C1: ...the route label switches to t CO₂e (its own layer on the loaded leg) and the per-route figure label stays hidden",
-           !!fmap.layers["carbon-route-labels"] && JSON.stringify(fmap.layers["carbon-route-labels"].filter) === JSON.stringify(["all", ["all"], ["==", ["get", "type"], "Inbound Highway"]])
+           // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): a route with no carbon figure gets no badge
+           !!fmap.layers["carbon-route-labels"] && JSON.stringify(fmap.layers["carbon-route-labels"].filter) === JSON.stringify(["all", ["all"], ["==", ["get", "type"], "Inbound Highway"], ["==", ["typeof", ["get", "f_co2"]], "number"]])
            && fmap.layers["forecast-labels"].layout.visibility === "none");
         const fco2 = a1_data.features.map(f => f.properties.route_id + "/" + f.properties.type.split(" ")[0] + "=" + f.properties.f_co2).join(",");
         ok("⭐ C1: f_co2 is the route's month figure on BOTH legs (rounded to 0.1 t); a route with no figure is null, never 0",
@@ -3640,8 +3685,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            !el("carbon-legend").innerHTML.includes("Carbon Tool"));
         TL.matrix.carbonStamp = "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"; B.refreshMapModes(); await flush();
         ok("⭐ wording: the carbon legend ends with the Carbon page's stamp from forecast-matrix (carbon_stamp), word for word",
-           el("carbon-legend").innerHTML.includes(" Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures.</div>"),
-           el("carbon-legend").innerHTML.slice(-200));
+           // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the stamp ends the note behind the heat map's "i"
+           el("heat-info-more").innerHTML.endsWith(" Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures."),
+           el("heat-info-more").innerHTML.slice(-200));
         B.RL.cache[10].carbon = { stamp: "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" };
         ok("⭐ wording: the shared-section card prints the road-load feed's carbon stamp while Carbon is on",
            B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null).includes("Approved plan only. Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures.</div>"));
@@ -3799,9 +3845,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // ---- (3) D14: the month chips replace From / To at every width ---------------------------------------------------
   ok("C3 (D14): the From / To selects and the function that filled them are gone from the page — markup and code",
      !/forecast-from|forecast-to|populateForecastMonths/.test(html));
-  ok("C3 (D14): the forecast box carries the month chips (desktop) and the sheet the same chips (phone); both are .month-chips groups",
-     html.includes('<div><label id="fc-chips-label">Month</label><div class="month-chips" id="fc-chips" role="group" aria-labelledby="fc-chips-label"></div></div>')
-     && /document\.querySelectorAll\('\.month-chips'\)\.forEach\(box =>/.test(code));
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels) ("too many month tabs"): the forecast box carries the YEAR-AND-MONTH picker
+  // (#fc-months: the horizon's years, the shown year's 12 months), not a chip per month (60 on the four-year demo); the
+  // phone sheet keeps its chips (.month-chips)
+  ok("C3 (D14): the forecast box carries the month picker (desktop) and the sheet the month chips (phone)",
+     html.includes('<div class="month-picker" id="fc-months" role="group" aria-labelledby="fc-month-label"></div>')
+     && !html.includes('id="fc-chips"') && /document\.querySelectorAll\('\.month-chips'\)\.forEach\(box =>/.test(code)
+     && /box\.querySelectorAll\('\.month-chip'\)\.forEach\(b => b\.setAttribute\('aria-pressed', String\(Number\(b\.dataset\.month\) === cur\)\)\);\s*\}\);\s*renderMonthPicker\(\);/.test(code));
   ok("C3 (D14): Show forecast routes, the route analysis and the detail table read the span with volume (forecastWindow), after the matrix",
      // NARROWED 12 Oct 2026 (Track C review): `|| []` (the window may be null); REVERSED: no matrix is NO window, never
      // the whole horizon (which made the bar ask for up to 60 months)
@@ -3836,8 +3886,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("C3 link: read on load — initNetwork calls onNetworkReady once the network and the filters are in, which applies the link",
      /populateFilters\(\);\s*buildNodeMarkers\(\);\s*buildRouteInfo\(\);\s*applyFilters\(\);\s*if \(typeof onNetworkReady === 'function'\) onNetworkReady\(\);/.test(code)
      && /function onNetworkReady\(\) \{[\s\S]{0,300}applyViewFromUrl\(\);/.test(code));
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the "Link and QR code" button is in the panel's share row (static markup now)
   ok("C3 share: 'Copy link' and the share card (a dialog with the QR, the link and a polite status); the card says the link still asks for the map password",
-     /onclick="openSharePanel\(\)">Link and QR code<\/button>/.test(code) && /onclick="copyViewLink\(\)">Copy link to this view<\/button>/.test(html)
+     /onclick="openSharePanel\(\)">Link and QR code<\/button>/.test(html) && /onclick="copyViewLink\(\)">Copy link to this view<\/button>/.test(html)
      && html.includes('<div id="share-panel" role="dialog" aria-labelledby="share-title" hidden>') && html.includes('<div id="share-status" role="status" aria-live="polite"></div>')
      && html.includes("It still asks for the map password."));
   ok("C3 (D29): no PNG export — no preserveDrawingBuffer, no map canvas toDataURL, no toBlob, no download (the legend's swatch canvas is not the map)",
@@ -4218,9 +4269,11 @@ function qrRead(mod) {
 {
   ok("⭐ wording: no text on the page names the removed From / To selects as something to set",
      !/From and To/.test(code) && !/set From/.test(code));
-  ok("⭐ the 14 px floor: the Road load and Carbon checkbox labels (.fc-toggle is 13.5 px) and the chips' Month label (.fc-row label is 12.5 px) are 14 px",
-     /\.fc-toggle\.fc-mode\{ font-size:14px; \}/.test(html) && /#fc-chips-label\{ font-size:14px; \}/.test(html)
-     && html.includes('<label id="fc-chips-label">Month</label>'));
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the Month label is the picker's h3 (13 px, as every panel heading); the
+  // month and year buttons 13 px (the floor since decision 4)
+  ok("⭐ the 14 px floor: the Volume and Carbon labels (.fc-toggle is 13.5 px) are 14 px; the Month heading is the picker's h3 and its buttons 13 px",
+     /\.fc-toggle\.fc-mode\{ font-size:14px; \}/.test(html) && html.includes('<h3 id="fc-month-label">Month</h3>')
+     && html.includes("font:500 13px Inter,system-ui,sans-serif; cursor:pointer; }") && !html.includes('<label id="fc-chips-label">Month</label>'));
   // the phone sheet and the map's foot: Mapbox's logo and attribution carry the ONS / OS lines of a council layer
   const phoneCss = (() => { const i = html.indexOf("@media (max-width:767px){\n            #kpi-hud, #menu-toggle"); return i > 0 ? html.slice(i, html.indexOf("\n        }\n", i)) : ""; })();
   ok("⭐ licences (phone): the bottom controls (Mapbox logo, attribution with the ONS / OS lines) ride above the sheet, never under it",
@@ -4307,9 +4360,14 @@ function qrRead(mod) {
   const ab = (() => { const i = code.indexOf("    const AREAS = { cache: {}"); return i > 0 ? code.slice(i, code.indexOf("// ===== Phase 2.5a", i) > 0 ? code.indexOf("// ===== Phase 2.5a", i) : i + 40000) : ""; })();
   ok("⭐ Track C review areas: the polygons are read ONCE (/public/areas/shapes, no month roll-up); each month's figures without them (&geometry=0)",
      ab.includes("fetch(CONFIG.API_BASE + '/public/areas/shapes')") && ab.includes("'/public/areas?month=' + m + '&geometry=0'")
+     // 19 Oct 2026 (the user: "the council heat map doesn't seem to work"): EVERY month's figures in one read, the month's
+     // own read only when that one fails; refreshAreas goes through loadAreaMonth
+     && ab.includes("fetch(CONFIG.API_BASE + '/public/areas/months')") && ab.includes("return fetchAreasAll().then(() => AREAS.cache[m] || fetchAreas(m), () => fetchAreas(m));")
+     && ab.includes("loadAreaMonth(m).then(j => {") && !/\n\s*fetchAreas\(m\)\.then\(j => \{/.test(ab)
      && /if \(!AREAS\.shapes\) \{[\s\S]{0,200}fetchAreaShapes\(\)/.test(ab));
   {
-    const fj = /function areaJoin\(shapes, figs\) \{[\s\S]*?\n    \}/.exec(ab), ft = /function areaFigureText\(a, mode, when\) \{[\s\S]*?\n    \}/.exec(ab);
+    // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): areaJoin takes a third argument, `loading`
+    const fj = /function areaJoin\(shapes, figs(, loading)?\) \{[\s\S]*?\n    \}/.exec(ab), ft = /function areaFigureText\(a, mode, when\) \{[\s\S]*?\n    \}/.exec(ab);
     const ff = /function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/.exec(ab), fcard = /function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/.exec(ab);
     let J = null, T = null, F = null, C = null;
     try {
@@ -4412,7 +4470,8 @@ function qrRead(mod) {
      && /function stopPausingOnClash\(\)\{ setPauseOnClash\(false\); startTimeline\(\); \}/.test(code));
   ok("⭐ M3: moving the month by hand (the slider, the step buttons, a month chip, the rail) re-arms the once-per-loop pause",
      /function onTimelineScrub\(v\)\{ stopTimeline\(\); TL\.clashPaused = false; setTimelineMonth/.test(code) && /function stepTimeline\(delta\)\{\s*stopTimeline\(\); TL\.clashPaused = false;/.test(code)
-     && /TL\.month = m; TL\.clashPaused = false;\s*if \(!TL\.on\) openTimeline\(\); else setTimelineMonth\(m\);/.test(code)
+     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): and marks the month as asked for (TL.chosen)
+     && /TL\.month = m; TL\.chosen = true; TL\.clashPaused = false;\s*(\/\/[^\n]*\n\s*)?if \(!TL\.on\) openTimeline\(\); else setTimelineMonth\(m\);/.test(code)
      && code.includes("RAIL.drag = true; stopTimeline(); TL.clashPaused = false;"));
   ok("M3: Esc on the bar closes it (the keys row says so); wall mode has its own Esc",
      code.includes("else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); closeTimeline(); }")
@@ -4872,9 +4931,14 @@ function qrRead(mod) {
 // ---- 13 Oct 2026 (the user): PRESET VIEWS at the top of the panel ------------------------------------------------------
 {
   const nb = newBlockSrc(), nbc = newBlockCode();
-  ok("⭐ presets: a 'Views' group is the FIRST group of the panel (above Route filtering), its buttons built by renderPresets()",
-     html.includes('<div class="control-group" id="preset-group">\n        <h3>Views</h3>\n        <div class="preset-views" id="preset-views" role="group" aria-label="Preset views"></div>')
-     && html.indexOf('id="preset-group"') < html.indexOf('<h3>Route filtering</h3>') && html.indexOf('id="preset-group"') > html.indexOf('id="main-sidebar"'));
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels) ("logical order"): the forecast box (Month, Heat map) is inserted ABOVE Views
+  // (`top.insertAdjacentHTML('beforebegin', ...)`); Views is the first STATIC group, above Filter routes; its note behind an "i"
+  ok("⭐ presets: a 'Views' group is the first static group of the panel (above Filter routes, under Month and Heat map), its buttons built by renderPresets()",
+     /<div class="control-group" id="preset-group">\n        <div class="ctl-head"><h3>Views<\/h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-views"/.test(html)
+     && html.includes('<div class="preset-views" id="preset-views" role="group" aria-label="Preset views"></div>')
+     && html.indexOf('id="preset-group"') < html.indexOf('<h3>Filter routes</h3>') && html.indexOf('id="preset-group"') > html.indexOf('id="main-sidebar"')
+     && code.includes("const top = document.getElementById('preset-group');")
+     && code.includes("if (top) top.insertAdjacentHTML('beforebegin', pluginUI); else sidebar.insertAdjacentHTML('beforeend', pluginUI);"));
   ok("⭐ presets: the six views, in the user's order and words",
      nbc.includes("{ key: 'councils-movements', label: 'Councils: movements', council: 'movements' },\n        { key: 'councils-carbon', label: 'Councils: carbon', council: 'carbon' },\n        { key: 'busiest-roads', label: 'Busiest roads', heat: 'volume' },\n        { key: 'route-carbon', label: 'Route carbon', heat: 'carbon' },\n        { key: 'closures', label: 'Closures and restrictions', closures: true },\n        { key: 'everything', label: 'Everything' },"));
   ok("⭐ presets: a view outside the council view LEAVES it first (its restore would fight the boxes), sets the boxes, then the heat map",
@@ -5081,8 +5145,11 @@ function qrRead(mod) {
 {
   const fnSrc = (name) => { let i = src.indexOf("    function " + name + "("); if (i < 0) i = src.indexOf("    async function " + name + "("); if (i < 0) return ""; const j = src.indexOf("\n    }\n", i); return src.slice(i, j + 6); };
   // NARROWED 14 Oct 2026, evening (the CLP plans): the button says "plan" — it exports just the map, as a PDF or a PNG
-  ok("⭐ ROUTE MAP EXPORT: the button is under Route filtering and HIDDEN in the markup (shown for staff only)",
-     /<button class="btn btn-ghost" onclick="resetFilters\(\)">Reset filters<\/button>\n[\s\S]{0,400}<button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport\(\)">Export route map \(plan\)<\/button>/.test(html)
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the button is in the share row at the foot of the panel (with Month as text,
+  // Link and QR code and the detail table), still hidden in the markup
+  ok("⭐ ROUTE MAP EXPORT: the button is in the panel's share row and HIDDEN in the markup (shown for staff only)",
+     /<div class="control-group share-group" id="share-group">[\s\S]{0,1200}<button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport\(\)">Export route map \(plan\)<\/button>/.test(html)
+     && (html.match(/id="rme-open"/g) || []).length === 1
      && !html.includes("Export route map (PDF)"));
   const chk = fnSrc("checkRouteExportStaff");
   ok("⭐ ...it is shown only when /api/public/whoami says level 'staff' (the map password's 'map' keeps it hidden)",
@@ -5231,7 +5298,9 @@ function qrRead(mod) {
   if (P) {
     const m = P.areaLabelParts({ name: 'Harborough', movements_per_day: 238.4, routes_count: 15 }, 'movements');
     ok("⭐ V3 movements: the NAME, the figure with 'a day' (bold, large), then the routes — the legend carries 'two-way movements a day'",
-       m.lb_name === 'HARBOROUGH' && m.lb_fig === '238 a day' && m.lb_sub === '15 routes' && m.lb_badge === 'area-badge-movements', JSON.stringify(m));
+       // NARROWED 19 Oct 2026 (the user: map controls, council view and labels) ("labels too big"): the name in normal case and NO routes line (the card a
+       // click opens carries the count)
+       m.lb_name === 'Harborough' && m.lb_fig === '238 a day' && m.lb_sub === '' && m.lb_badge === 'area-badge-movements', JSON.stringify(m));
     const c = P.areaLabelParts({ name: 'Hinckley and Bosworth', co2_t: 1.44 }, 'carbon');
     ok("⭐ V3 carbon: the figure with its unit and nothing under it — no month name repeated on every district",
        c.lb_fig === '1.4 t CO₂e' && c.lb_sub === '' && c.lb_badge === 'area-badge-carbon' && !/2026|Oct/.test(JSON.stringify(c)), JSON.stringify(c));
@@ -5245,12 +5314,18 @@ function qrRead(mod) {
        && P.areaLabelParts({ name: 'A', co2_t: 0, unclipped: 2 }, 'carbon').lb_sub === 'no figure yet'
        && P.areaLabelParts({ name: 'A', movements_per_day: 0, unclipped: 1 }, 'movements').lb_sub === 'no figure yet'
        && P.areaLabelParts({ name: 'A', movements_per_day: 0, return_only_routes: ['R1'] }, 'movements').lb_sub === 'empties only'
-       && P.areaLabelParts({ name: 'A', movements_per_day: 0 }, 'movements').lb_sub === 'no approved route'
+       // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): "no approved route" reads "none" on the two-line card (the click card says
+       // it in full); a district with a figure has no second line; a month on its way reads "reading…"
+       && P.areaLabelParts({ name: 'A', movements_per_day: 0 }, 'movements').lb_sub === 'none'
+       && P.areaLabelParts({ name: 'A', co2_t: 0 }, 'carbon').lb_sub === 'none'
        && P.areaLabelParts({ name: 'A', movements_per_day: 0 }, 'movements').lb_fig === ''
-       && P.areaLabelParts({ name: 'A', movements_per_day: 3, routes_count: 1 }, 'movements').lb_sub === '1 route');
+       && P.areaLabelParts({ name: 'A', movements_per_day: 3, routes_count: 1 }, 'movements').lb_sub === ''
+       && P.areaLabelParts({ name: 'A', nofig: true, loading: true }, 'movements').lb_sub === 'reading…'
+       && P.areaLabelParts({ name: 'A', nofig: true, loading: true }, 'movements').lb_fig === '');
   }
-  ok("V3: the field is ONE format expression — name, the figure in the bold fontstack at 1.35, what it counts; an empty part draws no line",
-     /return \['format',/.test(v3) && v3.includes("{ 'font-scale': 1.35, 'text-font': ['literal', AREA_LABEL_BOLD] }")
+  // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the figure at AREA_FIG_SCALE (1.08: 14 px on the 13 px name; was 1.35)
+  ok("V3: the field is ONE format expression — name, the figure in the bold fontstack at AREA_FIG_SCALE, what it counts; an empty part draws no line",
+     /return \['format',/.test(v3) && v3.includes("{ 'font-scale': AREA_FIG_SCALE, 'text-font': ['literal', AREA_LABEL_BOLD] }")
      && v3.includes("const br = k => ['case', ['==', ['coalesce', ['get', k], ''], ''], '', '\\n'];")
      && v3.includes("['coalesce', ['get', 'lb_name'], ['get', 'label']], {},"));
   ok("⭐ V3: the busiest district's label wins a collision (symbol-sort-key: a larger figure is placed first)",
@@ -5492,7 +5567,10 @@ function qrRead(mod) {
   // ---- the legend's markup ----
   ok("D115: a flow legend under the heat map, hidden in the markup (shown while the lanes are on the map)",
      html.includes('<div class="mode-legend" id="flow-legend" hidden></div>')
-     && html.indexOf('id="flow-legend"') > html.indexOf('id="carbon-legend"') && html.indexOf('id="flow-legend"') < html.indexOf('id="btn-detail"'));
+     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the detail table's button moved to the share row (static markup, earlier in
+     // the file), so the legend's place is pinned against the forecast box's own end instead
+     && html.indexOf('id="flow-legend"') > html.indexOf('id="carbon-legend"')
+     && /<div class="mode-legend" id="flow-legend" hidden><\/div>\n\s*<\/div>`;/.test(html));
   {
     const strings = (fcode.match(/'[^'\n]*'/g) || []).join(" ");
     ok("D115: nothing a person reads in the flow block says truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
@@ -5801,6 +5879,170 @@ function qrRead(mod) {
      code.includes("(the cycle time of its stored road route) in a driver's day under the UK drivers' hours (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers' own hours not checked)")
      && code.includes("what one vehicle can do in a driver\\'s day on that route (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers\\' own hours not checked)")
      && !code.includes("the shift less the required breaks"));
+}
+
+// ---- 19 Oct 2026 (the user: "check the control panel is in a logical order, remove too much wording and put it into an
+// info box, too many month tabs; the council heat map doesn't seem to work, its labels ~35 % smaller; the movement labels
+// too wordy — a small icon label with a legend") ---------------------------------------------------------------------------
+{
+  const sb = (() => { const i = html.indexOf('<div class="sidebar" id="main-sidebar">'); return i > 0 ? html.slice(i, html.indexOf('<div class="m-done">', i)) : ""; })();
+  const at = k => sb.indexOf(k);
+  // ---- the order ----
+  ok("⭐ 19 Oct order: Views, Filter routes, By council, What's moving, More layers, the share row — in that order, then Show map",
+     sb.length > 0 && at('id="preset-group"') > 0 && at('id="preset-group"') < at('id="filter-group"') && at('id="filter-group"') < at('id="council-group"')
+     && at('id="council-group"') < at('id="kpi-moving"') && at('id="kpi-moving"') < at('id="layers-box"') && at('id="layers-box"') < at('id="share-group"'));
+  ok("⭐ 19 Oct order: Month and Heat map (the forecast box) are inserted ABOVE Views, so they are the panel's first group",
+     /const top = document\.getElementById\('preset-group'\);\s*if \(top\) top\.insertAdjacentHTML\('beforebegin', pluginUI\);/.test(code)
+     && !/\n\s*sidebar\.insertAdjacentHTML\('beforeend', pluginUI\);/.test(code)
+     && html.indexOf('<h3 id="fc-month-label">Month</h3>') < html.indexOf('<div class="heat-label" id="heat-label">Heat map</div>'));
+  const lb = (() => { const i = sb.indexOf('<details class="layers-box" id="layers-box">'); return i > 0 ? sb.slice(i, sb.indexOf("</details>\n\n    <!-- 19 Oct 2026 (the user): the share row", i)) : ""; })();
+  ok("⭐ 19 Oct: 'More layers' folds the basemap, overlays, haul routes, community, collisions, road closures and lorry limits",
+     lb.includes("<summary>More layers <small>basemap, closures, limits…</small></summary>")
+     && ['<h3>Basemap</h3>', '<h3>Overlays</h3>', '<h3>Haul routes</h3>', 'id="community-group"', 'id="collision-group"', 'id="restrictions-group"', 'id="limits-group"']
+        .every(k => lb.includes(k)) && !sb.includes("<summary>Layers and basemap</summary>"));
+  ok("19 Oct: By council and What's moving are folds (closed by default); switching the council view on opens its fold",
+     /<details class="layers-box" id="council-fold">/.test(sb) && /<details class="layers-box" id="moving-fold">\s*<summary><span id="kpi-moving-title">What's moving<\/span><\/summary>/.test(sb)
+     && !/<details[^>]*id="(council|moving)-fold"[^>]*\sopen/.test(sb)
+     && /function toggleAreaTier\(tier, on\) \{\s*(\/\/[^\n]*\n\s*)?if \(on\) \{ const fold = document\.getElementById\('council-fold'\); if \(fold && !fold\.open\) fold\.open = true; \}/.test(code));
+  ok("19 Oct: the share row carries Month as text, Link and QR code, the detail table and (staff) the plan export; 'Report a concern' is in the share card",
+     /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>Forecast detail table<\/button>/.test(sb)
+     && /<div class="concern-slot"><\/div>\s*<\/div>\s*\n\s*<!-- 14 Oct 2026 \(backlog item 2\): the route map export/.test(html)
+     && (html.match(/id="btn-detail"/g) || []).length === 1);
+  // ---- the wording ----
+  const pops = (sb + html.slice(html.indexOf('<div class="control-group fc-box" id="fc-box">'), html.indexOf("</div>`;", html.indexOf('id="fc-box"'))));
+  ok("⭐ 19 Oct wording: each explanation sits behind an 'i' — Month, Heat map, Views, the council figures — word for word",
+     pops.includes('<div class="info-pop" id="info-views" hidden>Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>')
+     && pops.includes('<div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day. Each route by its own figure;')
+     && pops.includes('<div class="info-pop" id="info-month" hidden><p>Approved forecasts only, never actuals.</p>')
+     && /<div class="info-pop" id="info-council" hidden>\s*<div class="area-note" id="area-unitary-note"><\/div>\s*<div class="area-note" id="area-focus-note" hidden>/.test(sb)
+     && ['info-month', 'info-heat', 'info-views', 'info-council'].every(id => (html.match(new RegExp('aria-controls="' + id + '"', "g")) || []).length === 1));
+  ok("19 Oct wording: the old visible notes are gone from the panel (preset note, the Volume note, the mode sub-lines, 'Approved forecasts only.' as a status)",
+     !html.includes('class="preset-note"') && !html.includes('id="road-load-note"') && !html.includes('class="mode-sub"')
+     && html.includes('<div id="forecast-status"></div>') && !code.includes('status.innerHTML = "Approved forecasts only.";'));
+  ok("19 Oct wording: a failed or partial council read stays IN SIGHT (#area-notes is outside the info box)",
+     sb.indexOf('id="area-notes"') > 0 && sb.indexOf('id="area-notes"') < sb.indexOf('id="info-council"'));
+  ok("19 Oct: the 'i' is a named button (aria-expanded, aria-controls), 18 px with a 44 px hit area (::after inset -13 px)",
+     /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
+     && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
+     // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
+     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 4
+     && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
+  ok("19 Oct (UI audit): on a phone the folds' summary rows are 44 px tall (By council, What's moving, More layers)",
+     /@media \(max-width:767px\)[\s\S]*?\.layers-box > summary\{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; \}/.test(html));
+  // the "i" in a sandbox: one open at a time, the button says so, Esc closes and gives focus back
+  {
+    const tSrc = (() => { const i = code.indexOf("    function infoPopOf(btn)"); return i > 0 ? code.slice(i, code.indexOf("    document.addEventListener('keydown', e => {", i)) : ""; })();
+    let api = null;
+    const mk = id => ({ id, hidden: true, attrs: {}, setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; }, contains: () => false });
+    const pops2 = { a: mk("a"), b: mk("b") };
+    const btnA = mk("ba"), btnB = mk("bb");
+    btnA.attrs = { "aria-controls": "a", "aria-expanded": "false" }; btnB.attrs = { "aria-controls": "b", "aria-expanded": "false" };
+    const document = { getElementById: id => pops2[id] || null,
+                       querySelectorAll: () => [btnA, btnB].filter(b => b.attrs["aria-expanded"] === "true") };
+    try { api = new Function("document", tSrc + "\nreturn { toggleInfo, closeInfos };")(document); } catch (e) { api = null; }
+    ok("19 Oct: the info-box functions run", !!api && tSrc.length > 0);
+    if (api) {
+      api.toggleInfo(btnA);
+      const oneOpen = pops2.a.hidden === false && btnA.attrs["aria-expanded"] === "true";
+      api.toggleInfo(btnB);
+      const swapped = pops2.a.hidden === true && btnA.attrs["aria-expanded"] === "false" && pops2.b.hidden === false && btnB.attrs["aria-expanded"] === "true";
+      api.toggleInfo(btnB);
+      const closed = pops2.b.hidden === true && btnB.attrs["aria-expanded"] === "false";
+      ok("⭐ 19 Oct: an 'i' opens its box; opening another closes the first; pressing it again closes it", oneOpen && swapped && closed);
+    }
+    ok("19 Oct: Esc closes an open box and returns focus to its button; a click outside closes it",
+       /document\.addEventListener\('keydown', e => \{\s*if \(e\.key !== 'Escape'\) return;\s*const b = document\.querySelector\('\.info-i\[aria-expanded="true"\]'\);\s*if \(!b\) return;\s*e\.stopPropagation\(\);\s*closeInfos\(\); try \{ b\.focus\(\); \} catch \(err\) \{\}\s*\}, true\);/.test(code)
+       && /document\.addEventListener\('mousedown', e => \{[\s\S]{0,300}closeInfos\(\);\s*\}\);/.test(code));
+  }
+  // ---- Reset filters ----
+  {
+    const fr = /function syncFilterReset\(\) \{[\s\S]*?\n    \}/.exec(code);
+    const els = { 'filter-reset': { hidden: false }, 'filter-origin': { value: 'ALL' }, 'filter-dest': { value: 'ALL' }, 'filter-discipline': { value: 'ALL' }, 'filter-ipt': { value: 'ALL' } };
+    let f = null;
+    try { f = new Function("document", fr[0] + "\nreturn syncFilterReset;")({ getElementById: id => els[id] || null }); } catch (e) {}
+    let r1 = null, r2 = null;
+    if (f) { f(); r1 = els['filter-reset'].hidden; els['filter-ipt'].value = 'IPT3'; f(); r2 = els['filter-reset'].hidden; }
+    ok("⭐ 19 Oct: 'Reset filters' is hidden with no filter set and shown once one is; applyFilters keeps it in step",
+       r1 === true && r2 === false && /<button class="btn btn-ghost" id="filter-reset" hidden onclick="resetFilters\(\)">Reset filters<\/button>/.test(html)
+       && /function applyFilters\(\) \{[\s\S]{0,400}syncFilterReset\(\);/.test(code));
+  }
+  ok("19 Oct (seen in Chrome): the pressed heat-map segment's rule outranks the segments' white (was white text on white)",
+     html.includes(".heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }")
+     && !html.includes(".heat-seg label:has(input:checked)"));
+  ok("19 Oct (seen in Chrome): the 2×2 filters and the share row are 13 px, so 'All destinations' is whole and the buttons sit two to a row",
+     html.includes(".filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; }")
+     && html.includes(".share-group .share-row .btn{ font-size:13px; padding:8px 10px; }"));
+  ok("19 Oct: the four filters sit two by two (the names on the selects kept)",
+     /<div class="filter-grid">\s*<select id="filter-origin"[^>]*aria-label="Origin">/.test(sb) && html.includes(".filter-grid{ display:grid; grid-template-columns:1fr 1fr; column-gap:6px; }"));
+  // ---- the month picker ----
+  {
+    const pSrc = (() => { const i = code.indexOf("    const MPICK = { year: null, forMonth: null };"); return i > 0 ? code.slice(i, code.indexOf("    function pickMonth(m)", i)) : ""; })();
+    const box = { dataset: {}, innerHTML: "", btns: [], querySelectorAll() { return this.btns; } };
+    let P = null;
+    const env = { CONFIG: { START_YEAR: 2026, MONTH_COUNT: 60 }, TL: { on: true, month: 22, matrix: {} }, CHIPS: { failed: false } };
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthLabel = i => names[(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12));
+    try {
+      P = new Function("CONFIG", "TL", "CHIPS", "document", "chipMonths", "monthLabel", "escHtml", "tlStartMonth", "currentMonthIndex",
+                       pSrc + "\nreturn { renderMonthPicker, pickYear, MPICK };")(
+        env.CONFIG, env.TL, env.CHIPS, { getElementById: id => id === 'fc-months' ? box : null },
+        () => [1, 2, 3, 10, 22, 23, 40], monthLabel, s => String(s), () => 10, () => 10);
+    } catch (e) { P = null; }
+    ok("19 Oct: the month picker runs in a sandbox", !!P && pSrc.length > 0);
+    if (P) {
+      P.renderMonthPicker();
+      const h = box.innerHTML;
+      const years = (h.match(/class="mp-year( none)?" data-year=/g) || []).length, months = (h.match(/data-month="\d+"/g) || []).length;
+      ok("⭐ 19 Oct month picker: five year buttons (2026-2030) and twelve month buttons — 17 in all, not one chip per month",
+         years === 5 && months === 12 && h.includes('aria-label="Year"'), h.slice(0, 200));
+      ok("⭐ 19 Oct month picker: it shows the year of the month on screen (Oct 2027 = month 22), that year pressed, its months 13..24",
+         /data-year="2027" aria-pressed="true"/.test(h) && h.includes('data-month="13"') && h.includes('data-month="24"') && !h.includes('data-month="12"')
+         && h.includes('aria-label="Months of 2027"'));
+      ok("19 Oct month picker: a month with nothing approved is grey and says so to a screen reader; it can still be picked",
+         /class="month-chip mp-month none" data-month="13"[^>]*aria-label="Jan 2027, nothing approved" onclick="pickMonth\(13\)"/.test(h)
+         && /class="month-chip mp-month" data-month="22"[^>]*aria-label="Oct 2027" onclick="pickMonth\(22\)">Oct<\/button>/.test(h));
+      ok("19 Oct month picker: a year with nothing approved is grey (2028, 2030 here); a year with volume is not (2029 has month 40)",
+         /class="mp-year none" data-year="2028"/.test(h) && /class="mp-year none" data-year="2030"/.test(h) && /class="mp-year" data-year="2026"/.test(h)
+         && /class="mp-year" data-year="2029"/.test(h));
+      P.pickYear(2026);
+      const h2 = box.innerHTML;
+      ok("19 Oct month picker: a year button shows that year's months without moving the month on screen",
+         /data-year="2026" aria-pressed="true"/.test(h2) && h2.includes('data-month="1"') && env.TL.month === 22);
+      env.TL.month = 40; P.renderMonthPicker();
+      ok("19 Oct month picker: when the month moves (Play, a step), the picker follows it to its year again",
+         /data-year="2029" aria-pressed="true"/.test(box.innerHTML));
+    }
+    ok("19 Oct month picker: 32 px buttons on a desk, 44 px on a phone (the phone rule); pressed = the accent",
+       html.includes(".month-picker button{ height:32px;") && /@media \(max-width:767px\)[\s\S]*?\.month-picker button\{ min-height:44px; \}/.test(html)
+       && html.includes('.month-picker button[aria-pressed="true"]{ background:var(--navy);'));
+  }
+  // ---- the council read: every month at once, unpacked exactly ----
+  {
+    const uSrc = /function areaUnpack\(packed, m\) \{[\s\S]*?\n    \}/.exec(code);
+    let U = null;
+    try { U = new Function(uSrc[0] + "\nreturn areaUnpack;")(); } catch (e) {}
+    const packed = { common: { working_days: 22, stops: { movements: [25, 50, 100] }, attribution: ["ONS"] },
+                     area_fixed: { E1: { name: "Blaby", tier: "district", sites: ["S1"], sites_count: 1 } },
+                     months: { "10": { month: 10, notes: ["n"], totals: { movements_per_day: 4.4 }, areas: [{ area_id: "E1", movements_per_day: 4.39, co2_t: 0.5 }] } } };
+    const one = U && U(packed, 10);
+    ok("⭐ 19 Oct council read: the map unpacks one month exactly — what all months share, the area's fixed fields, the month's own",
+       !!one && one.working_days === 22 && one.month === 10 && one.notes[0] === "n" && one.attribution[0] === "ONS"
+       && one.areas[0].name === "Blaby" && one.areas[0].sites_count === 1 && one.areas[0].movements_per_day === 4.39 && !("months" in one)
+       && U(packed, 11) === null, JSON.stringify(one));
+    ok("19 Oct council read: while the first month's figures are on their way the cards say 'reading…' (AREAS.loading, part of the drawn key)",
+       code.includes("if (!AREAS.cache[m] && AREAS.month === null) { AREAS.loading = true; AREAS.data = areaJoin(AREAS.shapes, null, true); renderAreas(); }")
+       && code.includes("const key = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(','), AREAS.loading ? 'loading' : ''].join('|');"));
+    ok("19 Oct council read: a failed all-months read falls back to the month's own read, once (allFailed), and says so in the console",
+       code.includes("if (AREAS.allFailed) return Promise.reject(new Error('council months unavailable'));")
+       && code.includes(".catch(e => { AREAS.allFailed = true; console.warn('council areas: every month in one read failed; reading month by month', e); throw e; })"));
+    ok("19 Oct: the council fold's summary counts the districts", code.includes("fs.textContent = nd ? nd + ' council' + (nd === 1 ? '' : 's') : '';"));
+  }
+  // ---- nothing public says a banned word in the new words ----
+  {
+    const words = [html.slice(html.indexOf('id="info-month"'), html.indexOf('id="info-month"') + 600), sb].join(" ").replace(/<[^>]+>/g, " ");
+    ok("19 Oct: the new panel words say no truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
+       !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(words) && !/\bAI\b/.test(words));
+  }
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before

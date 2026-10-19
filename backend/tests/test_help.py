@@ -166,8 +166,11 @@ ok("...and it explains the map password and that it does not open the guide",
 # "Route filtering, Basemap, Overlays" no longer exists. The description must still name every group, in order.
 _cp_at = src.find("The <strong>Control Panel</strong> on the left holds, top to bottom:")
 _cp = src[_cp_at:src.find("</ul>", _cp_at)] if _cp_at >= 0 else ""
-_cp_groups = ("Route filtering", "Layers and basemap", "Basemap, Overlays and Haul routes", "What's moving",
-              "Road closures", "Road restrictions", "Forecast traffic volume")
+# NARROWED 19 Oct 2026 (the user: "check the control panel is in a logical order"): the panel now reads Month, Heat map,
+# Views, Filter routes, By council, What's moving, More layers (Basemap, Overlays, Haul routes, ... Road closures or Road
+# restrictions), then the row of buttons — the description still names every group, in that order
+_cp_groups = ("Month", "Heat map", "Views", "Filter routes", "By council", "What's moving", "More layers",
+              "Basemap, Overlays, Haul routes", "Road closures", "Road restrictions", "Month as text")
 ok("\U0001f534 ...and correcting that sentence did NOT take the Control Panel description "
    "with it", "Control Panel" in src and all(g in _cp for g in _cp_groups)
    and [_cp.index(g) for g in _cp_groups] == sorted(_cp.index(g) for g in _cp_groups)
@@ -352,16 +355,26 @@ ok("...the first confirm locks the fuel-surcharge base, and a team code confirms
    "locks the base for the fuel surcharge (BAF)" in text and "Confirm week confirms your team's lines only" in text)
 
 # the public map after PRs #20-#29
-ok("⭐ the map: Layers and basemap, What's moving, Busiest routes, the figures bar's names, Conditions",
-   all(s in src for s in ("<strong>Layers and basemap</strong>", "<strong>What's moving</strong>", "<strong>Busiest routes</strong>",
+# NARROWED 19 Oct 2026: "Layers and basemap" is "More layers" on the panel and in the guide
+ok("⭐ the map: More layers, What's moving, Busiest routes, the figures bar's names, Conditions",
+   "<strong>Layers and basemap</strong>" not in src and "Route filtering" not in src
+   and all(s in src for s in ("<strong>More layers</strong>", "<strong>What's moving</strong>", "<strong>Busiest routes</strong>",
                            "<strong>Two-way movements a day</strong>", "<strong>CO₂e a day</strong>", "<strong>CO₂e to date</strong>",
                            "<strong>Conditions in [month]</strong>", "<strong>Show on map</strong>")))
 ok("🔴 ...the retired map parts are gone: the KPI panel, the callouts, the warning stack's levels, the Street View button, the legend message",
    "KPI panel" not in text and "callouts" not in text and "<strong>Clash</strong>" not in src and "<strong>Caution</strong>" not in src
    and "press <strong>Street View</strong>" not in src and "no alignment in this tenant" not in text
    and "Use this option" not in text)
-ok("...Play: the timeline runs every month whatever the From and To months; Conditions only while it is open",
-   "whatever the From and To months say" in text and "While the timeline is open (playing or paused)" in text)
+# NARROWED 19 Oct 2026: the From and To months went in D14 (12 Oct); the sentence no longer names them
+ok("...Play: the timeline runs through the months of the programme; Conditions only while it is open",
+   "The timeline runs through the months of the programme." in text and "From and To" not in text
+   and "While the timeline is open (playing or paused)" in text)
+ok("19 Oct: the guide describes the month picker, the info buttons, the badges and the council labels as built",
+   "press a year, then a month, to show that month on the map" in text
+   and "A small <strong>i</strong> beside a heading opens a short explanation" in src
+   and "a small white badge with a two-way arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text
+   and "a green <strong>CO₂</strong> badge on each route" in src and 'the labels say "reading…"' in text
+   and "Reset filters</strong> appears once a filter is set" in src)
 ok("🔴 ...and it is honest that a planned closure is listed in every month its route carries volume, whatever its dates",
    "whatever the closure's own dates" in text and "the Look-ahead counts it only in the weeks it overlaps" in text)
 ok("...the map's route analysis panel is a rough cycle at the average haul speed, not the routed drive time",

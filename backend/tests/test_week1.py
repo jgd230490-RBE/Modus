@@ -1364,7 +1364,10 @@ ok("B2: the costlines read is restored and the happy path has no co2_error again
    costlines.lines is _real_lines and "co2_error" not in main.public_forecast_matrix(from_=9, to=9, unit="t"))
 _main_src_b2 = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
 ok("B2: both public feeds read ONE helper for carbon (_approved_co2) and main.py has no bare `except Exception:` left around the costlines read",
-   _main_src_b2.count("= _approved_co2(factors") == 2 and _main_src_b2.count("def _approved_co2(") == 1
+   # NARROWED 19 Oct 2026: a third reader, approved_lines_by_month() (the council figures for every month in one read),
+   # goes through the same helper
+   _main_src_b2.count("= _approved_co2(factors") == 3 and _main_src_b2.count("def _approved_co2(") == 1
+   and "table, co2_error = _approved_co2(factors, 1, MONTH_COUNT)" in _main_src_b2
    and "co2_by_key, to_date = {}, {}" not in _main_src_b2)
 ok("§9: ...matching route_analysis exactly, so the dashboard, the form and the map agree",
    [r for r in network.route_analysis("R1", profiles=["Rigid 8-wheeler (32t)"])["rows"]
