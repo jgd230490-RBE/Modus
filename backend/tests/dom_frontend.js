@@ -734,9 +734,12 @@ async function simWallDom(){
   ok("⭐ SIM WALL DOM: shown, it reads the plain month once with the lines — no pour, no scenario — as a GET",
      calls.length === 1 && calls[0].url === "/api/sim/day?month=9&legs=1" && calls[0].method === "GET", JSON.stringify(calls));
   const sub = (el.querySelector("[data-sim-wall-sub]") || {}).textContent || "";
-  ok("⭐ SIM WALL DOM: the TV shows the map, the clock at the first lorry, Gates now and the timeline; it says no pour and the stood-in hours",
+  // RELABELLED 17 Oct 2026 (the review): it says the default gate hours now, never 'stood in'
+  ok("⭐ SIM WALL DOM: the TV shows the map, the clock at the first lorry, Gates now and the timeline; it says no pour and the default gate hours",
      !!el.querySelector('[data-sim-wall="1"] .sim-map') && clock() === "05:30" && !!el.querySelector("[data-sim-timeline]") && el.querySelectorAll("[data-sim-now-gate]").length === 8
-     && sub.includes("Sep 2026, an average working day: 312 loads · no pour · gates open 07:00–17:00 (stood in: no open hours typed)")
+     // NARROWED 17 Oct 2026: the example's 07:00–17:00 is the scheme's default gate hours in test_sim's fixture, said so
+     && sub.includes("Sep 2026, an average working day: 312 loads · no pour · gates open 07:00–17:00 (the default: no open hours typed)")
+     && !sub.includes("stood in")
      && el.textContent.includes("Staff only · never on the public map") && el.textContent.includes("Planning view, not a record of what happened"), sub);
   ok("🔴 SIM WALL DOM: no scenario control and no table on the TV (nobody touches it): no input, select, scenario card or busiest-hour table",
      el.querySelectorAll("input,select,textarea,button").length === 0 && !el.querySelector("[data-sim-scenario]") && !el.querySelector("[data-sim-table]"));

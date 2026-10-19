@@ -2246,10 +2246,12 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   // 13 Oct 2026 (W3, narrowed): the footnote's gate sentence moved: the read and the rule to the technical guide (T1, T3),
   // the rule in plain words to the panel's info box
   ok("the gate arrivals read and how the figure is made: the technical guide and the panel's info box",
-    _tg.includes("<code>GET /api/gates/arrivals?month=N</code>") && _tg.includes("The gap is the shift's minutes ÷ arrivals, an average with no hourly")
+    // NARROWED 17 Oct 2026: the gap is the gate's open minutes (its hours or the default gate hours, less shut times and bands)
+    _tg.includes("<code>GET /api/gates/arrivals?month=N</code>") && _tg.includes("The gap is the gate's open minutes ÷ arrivals, an average with no hourly")
     // NARROWED 14 Oct 2026 (bundle G, W17): the info box's how-to now names the gate's open minutes and the peak bands
     && _tg.includes("all teams summed at the gate a lorry arrives by")
-    && src.includes("Capacity = the gate's open minutes (its hours less any no-delivery peak bands, else the shift) ÷ its check-in minutes a lorry. Averages, no peak hour.")
+    && src.includes("Capacity = the gate's open minutes (its hours, or the default gate hours where none are typed, less its shut times and any no-delivery peak bands) ÷ its check-in minutes a lorry. Averages, no peak hour.")
+    && !src.includes("peak bands, else the shift)")
     && _tg.includes("<code>backend/gate_hours.py</code>") && _tg.includes("<strong>Queue likely</strong> (amber)")
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
@@ -2991,7 +2993,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the open hours ÷ the check-in time a lorry")
      && _ga.includes('<i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely')
      && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
-     && _ga.includes("`the ${ga.shift_hours} h shift`} ÷ ${+r.g.gate_minutes} min a lorry)`") && _ga.includes("`open ${r.g.open_hours}"));
+     // REVERSED 17 Oct 2026: no gate rests on the lorry shift; the tooltip names the hours (the default said so) and the shut minutes
+     && !_ga.includes("h shift") && !_ga.includes("ga.shift_hours")
+     && _ga.includes('a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? " by default" : ""}')
+     && _ga.includes('${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`'));
 }
 
 // ---- 14 Oct 2026 (bundle G, W7 + W8): CLP monitoring and the CLP data fields, source level ---------------
@@ -3068,6 +3073,53 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes('"Unload min", "Euro class", "Planning"]') && src.includes('data-cfg-euro={k}') && src.includes("else delete d.vehicles[k].euro_class;")
      && src.includes('data-cfg="peak-bands"') && src.includes("No-delivery peak bands (from the CLP)") && src.includes("((doc.planning || {}).peak_bands || []).length < PEAK_BANDS_MAX")
      && src.includes("Wayscope holds no arrival times, so it cannot check that lorries keep out of them."));
+
+  // ---- 17 Oct 2026 (the user: gate times and "planned close times throughout the day"; default 08:00-17:00) ----------
+  ok("⭐ the shut-time cap and example and the default gate hours are held equal to the backend (gate_hours.py)",
+     /MAX_SHUT_WINDOWS = 4\b/.test(_ghPy) && src.includes("const GATE_SHUT_MAX = 4;")
+     && /SHUT_PLACEHOLDER = \[\{"from": "08:30", "to": "09:15"\}, \{"from": "15:00", "to": "15:45"\}\]/.test(_ghPy)
+     && src.includes('const GATE_SHUT_PLACEHOLDER = [{ from: "08:30", to: "09:15" }, { from: "15:00", to: "15:45" }];')
+     && /DEFAULT_GATE_HOURS = \{"from": "08:00", "to": "17:00"\}/.test(_ghPy) && src.includes('const GATE_DEFAULT_HOURS = { from: "08:00", to: "17:00" };'));
+  ok("⭐ the gate form: 'Shut during the day (optional)', a from and a to a row with names, Add a shut time up to the cap, Remove",
+     src.includes('data-gate-shut-form="1"') && src.includes("Shut during the day (optional)")
+     && src.includes("aria-label={`Shut time ${i + 1} from`}") && src.includes("aria-label={`Shut time ${i + 1} to`}")
+     && src.includes("(gateForm.shut_windows || []).length < GATE_SHUT_MAX") && src.includes(">Add a shut time</button>")
+     && src.includes("shut_windows: g.shut_windows.filter((_, j) => j !== i)"));
+  ok("⭐ the gate's shut times are loaded on edit, start empty on a new gate, and sent with a blank row dropped ([] clears them)",
+     src.includes('access_zone_id: "", shut_windows: [] });')
+     && src.includes("shut_windows: (g.shut_windows || []).map(w => ({ from: w.from, to: w.to })) });")
+     && src.includes("shut_windows: (gateForm.shut_windows || []).filter(w => w.from || w.to),"));
+  ok("the gate list names a gate's shut times beside its hours", src.includes("data-gate-shut={g.id}") && src.includes("shut {gateBandWords(g.shut_windows)}</span>"));
+  ok("⭐ Config → Planning: 'Default gate hours', two named time boxes showing 08:00–17:00 until changed; back to the default deletes the key",
+     src.includes('data-cfg="default-gate-hours"') && src.includes("<label>Default gate hours</label>")
+     && src.includes("aria-label={`Default gate hours ${k}`}")
+     && src.includes("value={((doc.planning || {}).default_gate_hours || GATE_DEFAULT_HOURS)[k] || \"\"}")
+     // NARROWED 17 Oct 2026 (the review): clearing ONE box keeps the other half; only both blank or the default deletes it
+     && src.includes("if((!v.from && !v.to) || (v.from === GATE_DEFAULT_HOURS.from && v.to === GATE_DEFAULT_HOURS.to)) delete d.planning.default_gate_hours;")
+     && !src.includes("if(!e.target.value || (v.from === GATE_DEFAULT_HOURS.from"));
+  ok("🔴 the lorry shift no longer stands in for a gate anywhere on a screen: no 'stood in', no stand_in, no 'h shift stands in'",
+     !src.includes('open_basis === "stood_in"') && !src.includes("D.stand_in") && !src.includes("stands in at")
+     && !src.includes("(stood in") && !src.includes("Blank hours use the scheme's shift") && !src.includes("open_basis === \"shift\""));
+  const _h1 = '<div className="hint">The hours a gate is open when none of its own are typed on Data → Locations';
+  const _gNew = [src.slice(src.indexOf(_h1), src.indexOf("</div>", src.indexOf(_h1))),
+                 src.slice(src.indexOf("Blank hours use the default gate hours set on Config"), src.indexOf("never blocked.", src.indexOf("Blank hours use the default gate hours set on Config")))];
+  ok("🔴 the new words pass the word rule (no server, endpoint, token, geometry, bake, JSON) and say lorry, never truck",
+     _gNew.every(t => t.length > 100 && !/\b(servers?|endpoints?|tokens?|geometry|bak\w*|JSON|trucks?)\b/i.test(t)), JSON.stringify(_gNew.map(t => t.length)));
+  ok("the Simulation and the big screen say the default gate hours and the shut times, from the reply",
+     src.includes("open {D.default_hours.from}–{D.default_hours.to}, the default gate hours.")
+     && src.includes("(the default: no open hours typed)`") && src.includes('", their shut times taken off"')
+     // NARROWED 17 Oct 2026 (the review): the noun, the check-in condition and a typed pour
+     && src.includes("data-sim-shut={g.gate_id}") && src.includes("No lorry is placed before its gate opens: each sets off its route's drive time earlier, so the first lorries set off before the opening.")
+     && src.includes("a pour you type can bring mixers then, and the notes say how many"));
+  ok("🔴 the review: each shut time's Remove is named for its row and has a 24 px hit area; the rows are one named group",
+     src.includes("aria-label={`Remove shut time ${i + 1}`}") && src.includes('className="text-xs text-slate-500 underline px-2 py-1"')
+     && src.includes('<div role="group" aria-labelledby="gate-shut-h">') && src.includes('id="gate-shut-h">Shut during the day (optional)</div>'));
+  ok("⭐ the review: a gate left no open time says so on the chart's tooltip and the week's card, never 'no check-in time typed'",
+     src.includes('r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null')
+     && src.includes(`g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."`));
+  ok("the Config hint is a sentence and says a change that strands a gate is refused, naming it",
+     src.includes(_h1 + "; {GATE_DEFAULT_HOURS.from} to {GATE_DEFAULT_HOURS.to} unless you change them here.")
+     && src.includes("A change that would leave a gate's shut times outside its hours, or the gate no open time, is refused and names the gate."));
 }
 
 // ---- 14 Oct 2026 (D9 + D14, the mobile shell; notes/session-1014-mobile-shell.md) ----------------------------------------

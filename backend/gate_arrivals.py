@@ -6,14 +6,18 @@ THE DECISION (the user, 11 Oct 2026, late night)
 A staff-only "Gate arrivals" panel on the Dashboard. For each gate and month: the laden
 arrivals a day at the DESTINATION's entry gate PLUS the empty arrivals (lorries coming to
 load) at the ORIGIN's entry gate, summed across ALL teams. Average gap in minutes = the
-tenant's shift hours × 60 ÷ arrivals a day. The gate's minutes per lorry is its existing
+gate's open minutes ÷ arrivals a day (17 Oct 2026: its hours, else the default gate hours, less
+the no-delivery bands and its shut windows — gate_hours.open_minutes; it was the scheme's shift
+hours × 60 until then). The gate's minutes per lorry is its existing
 typed check-in (`location_gates.safety_minutes`); no new field, no data change, no
 re-import. Red ONLY when the average gap is shorter than that check-in — a queue even with
 perfect spacing. No amber. A gate with no check-in typed is never compared. Approved lines
 make the figure; pending lines are a note, never in the figure.
 
 14 Oct 2026 (bundle G, W17, the user's D42 follow-up): the gate's OWN open hours when typed (less the
-scheme's peak bands, the no-delivery windows) replace the shift for that gate, and an AMBER step joins
+scheme's peak bands, the no-delivery windows) replace the shift for that gate (17 Oct 2026: a gate with
+none typed takes the default gate hours, 08:00–17:00 unless the scheme sets its own, and its shut
+windows come off too; the lorry shift no longer sets any gate's day), and an AMBER step joins
 the red: "Queue likely" at 85 % of capacity or more (gate_hours.NEAR_PCT). The red rule is unchanged
 (gap < check-in, the displayed gap); its word on screen is now "Over gate capacity". gate_hours.py
 holds the rules; this module only applies them to the month.
@@ -39,8 +43,9 @@ THE RULES, EACH FROM THE MODULE THAT ALREADY OWNS IT
 * the red rule compares the DISPLAYED gap (one decimal place) with the typed check-in,
   so the screen never shows "3.0 min" flagged red against a 3 min check-in. A raw gap of
   2.96 min reads 3.0 and does not flag; 2.94 reads 2.9 and does (asserted at the edge).
-* working days and shift hours: the planning block's figures, the costlines.py and
-  derived.py rules (22 and 10 when untyped). main passes its own _working_days in.
+* working days: the planning block's figure, the costlines.py rule (22 when untyped); main passes its
+  own _working_days in. The reply still carries the lorry shift (`shift_hours`, derived.py's 10 h when
+  untyped) for the record; no gate figure reads it since 17 Oct 2026.
 * cross-team sums on the UNFILTERED rows, per_team masked for a team code — clashes.py's
   rule: a team code may see the total and WHICH teams share the gate (by name), never
   another team's figure. Planner, admin and the demo submitter see every team's row.
@@ -66,6 +71,10 @@ import weeks
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 SPREAD = "if arrivals are spread evenly"
+#: 17 Oct 2026 (review): a gate whose no-delivery bands and shut times cover all its hours — one meaning everywhere:
+#: shut all day, so any arrival is over what it can check in (red), with these words, never "no check-in typed"
+NO_OPEN_TIME = ("No open time: the no-delivery bands and this gate's shut times cover all its hours, so every arrival "
+                "is more than it can check in.")
 
 
 def r1(x):
@@ -90,7 +99,7 @@ def _positive(value, default):
 
 
 def shift_hours(factors):
-    """The derived.py rule: the planning block's shift, 10 h when untyped."""
+    """The derived.py rule: the planning block's LORRY shift, 10 h when untyped (not a gate's day since 17 Oct 2026)."""
     plan = (factors or {}).get("planning", {}) or {}
     return _positive(plan.get("shift_hours_per_day"), 10)
 
@@ -177,7 +186,9 @@ def arrivals(month_index, acc, factors=None, working_days=None):
     factors = factors or conversions.load_factors()
     wd = _positive(working_days, _working_days(factors))
     sh = shift_hours(factors)
-    open_m = sh * 60.0
+    # 17 Oct 2026: the default gate day — what a gate with no hours typed is open (before bands and shut windows)
+    dw = gate_hours.default_words(factors)
+    open_m = float(sum(b - a for a, b in gate_hours._intervals(*gate_hours.effective_window({}, factors)[0])))
     label = month_label(month_index)
     scope = "team" if (acc or {}).get("ipt") else "scheme"
     my_team = (acc or {}).get("ipt")
@@ -263,8 +274,9 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         total = g["laden"] + g["empty"]
         arr_raw = total / wd
         arr = r1(arr_raw)
-        # 14 Oct 2026 (W17): the gate's OWN open minutes when its hours are typed (less the scheme's peak bands, the
-        # no-delivery windows), else the scheme's shift — gate_hours.open_minutes, the one rule
+        # 14 Oct 2026 (W17): the gate's OWN open minutes when its hours are typed, else (17 Oct 2026) the default gate
+        # hours; less the scheme's peak bands (the no-delivery windows) and the gate's shut windows, an overlap counted
+        # once — gate_hours.open_minutes, the one rule
         om = gate_hours.open_minutes(grow, factors)
         open_g = om["minutes"]
         gm = grow.get("safety_minutes")
@@ -277,6 +289,10 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         jd = judge(arr_raw, open_g, gm)
         gap, red, cap_raw, cap_pct, amber, flag = jd["gap"], jd["red"], jd["cap_raw"], jd["cap_pct"], jd["amber"], jd["flag"]
         cap = r1(cap_raw) if cap_raw is not None else None
+        shut_all_day = open_g <= 0
+        if shut_all_day:
+            # 17 Oct 2026 (review): no open minute left — red whenever lorries come, check-in typed or not, capacity 0
+            red, amber, flag, cap, cap_pct = total > 0, False, ("red" if total > 0 else None), 0.0, None
         roles = g["roles"] or g["pending_roles"]
         role = "both" if len(roles) == 2 else (next(iter(roles)) if roles else "destination")
         teams = sorted(((team_name(k), k) for k in g["team_trips"]),
@@ -306,15 +322,20 @@ def arrivals(month_index, acc, factors=None, working_days=None):
             "capacity_per_day": cap,
             "capacity_pct": cap_pct,
             # 14 Oct 2026 (W17): the "Queue likely" step in lorries a day (85 % of capacity), for the chart's guide tick
-            "near_per_day": (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None),
+            "near_per_day": (0.0 if shut_all_day else (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None)),
             "flag": flag,
             "status_word": gate_hours.STATUS_WORDS.get(flag),
             "open_minutes": open_g,
             "open_basis": om["basis"],
             "open_hours": om["hours"],
             "peak_minutes": om["peak_minutes"],
+            # 17 Oct 2026: the gate's shut windows, the minutes they take off (beyond the bands) and their words
+            "shut_windows": om["shut"],
+            "shut_minutes": om["shut_minutes"],
+            "shut_words": om["shut_words"],
+            "no_open_time": shut_all_day,
             "closed_days": gate_hours.closed_days_words(grow),
-            "reason": _reason(arr if total > 0 else None, gap, gm, cap_pct, amber),
+            "reason": (NO_OPEN_TIME if (shut_all_day and total > 0) else _reason(arr if total > 0 else None, gap, gm, cap_pct, amber)),
             "pending_lines": g["pending_lines"],
             "pending_per_day": r1(g["pending_trips"] / wd),
             "teams": [t[0] for t in teams],
@@ -349,22 +370,23 @@ def arrivals(month_index, acc, factors=None, working_days=None):
     for lid in sorted(no_gate_locs):
         name = no_gate_locs[lid].get("name") or lid
         notes.append(f"{name} has no entry gate recorded, so arrivals there are not shown.")
-    if any(g["open_basis"] == "gate" for g in out_gates):
-        notes.append(f"Averages only, {SPREAD} across each gate's open hours (the {sh:g} h shift where a gate has "
-                     f"none typed). No hourly peak is typed.")
-    else:
-        notes.append(f"Averages only, {SPREAD} across the {sh:g} h shift. No hourly peak is typed.")
+    # 17 Oct 2026: every gate has clock hours now (typed, or the default), so the bands come off every gate and the note
+    # that they could not (the shift had no clock times) is gone; one note says what the averages rest on
     bands = gate_hours.peak_bands(factors)
-    if bands and any(g["open_basis"] == "shift" for g in out_gates):
-        notes.append(f"The peak bands ({gate_hours.peak_words(bands)}, no deliveries) are taken off only the gates "
-                     f"with open hours typed: the scheme's shift has no clock times.")
+    off = [w for w, on in (("its shut times", any(g["shut_windows"] for g in out_gates)),
+                           ("the no-delivery bands", bool(bands))) if on]
+    notes.append(f"Averages only, {SPREAD} across each gate's open hours"
+                 + (f" ({dw} where none are typed)" if any(g["open_basis"] == "default" for g in out_gates) else "")
+                 + (", less " + " and ".join(off) if off else "") + ". No hourly peak is typed.")
 
     return {
         "month": int(month_index),
         "label": label,
         "working_days": wd,
         "shift_hours": sh,
+        # 17 Oct 2026: the default gate day (was the shift's minutes) and its hours, for the screen's words
         "open_minutes": open_m,
+        "default_hours": dw,
         "scope": scope,
         "gates": out_gates,
         "notes": notes,
@@ -477,7 +499,8 @@ def week_by_day(lines, factors=None, dates=None):
         days_out, worst, peak_pct = [], None, None
         for iso in shown:
             arr = int(byday.get(iso, 0))
-            open_today = gate_hours.is_open_on(grow, datetime.date.fromisoformat(iso))
+            # 17 Oct 2026: a gate whose bands and shut windows leave it no open minute is shut all day, like a closed day
+            open_today = gate_hours.is_open_on(grow, datetime.date.fromisoformat(iso)) and om["minutes"] > 0
             flag = gate_hours.status(arr, cap_raw, open_today)
             cap_day = (r1(cap_raw) if cap_raw is not None else None) if open_today else 0.0
             pct = round(arr * 100.0 / cap_raw) if (cap_raw and arr and open_today) else None
@@ -488,20 +511,24 @@ def week_by_day(lines, factors=None, dates=None):
             days_out.append({"date": iso, "day": day_words(iso), "arrivals": arr, "capacity": cap_day, "pct": pct,
                              "open": open_today, "flag": flag, "status_word": gate_hours.STATUS_WORDS.get(flag),
                              "_lines": keys.get((gid, iso), [])})
+        no_open = om["minutes"] <= 0
         out.append({"gate_id": gid, "gate_name": grow.get("name"), "location_id": grow.get("location_id"),
                     "location_name": loc.get("name") or grow.get("location_id") or "",
                     "check_in_minutes": gm, "open_minutes": om["minutes"], "open_basis": om["basis"],
                     "open_hours": om["hours"], "peak_minutes": om["peak_minutes"],
+                    "shut_windows": om["shut"], "shut_minutes": om["shut_minutes"], "shut_words": om["shut_words"],
+                    # 17 Oct 2026 (review): the bands and shut times leave no open minute — every day is shut
+                    "no_open_time": no_open,
                     "closed_days": gate_hours.closed_days_words(grow),
-                    "capacity_per_day": (r1(cap_raw) if cap_raw is not None else None),
-                    "near_per_day": (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None),
+                    "capacity_per_day": (0.0 if no_open else (r1(cap_raw) if cap_raw is not None else None)),
+                    "near_per_day": (0.0 if no_open else (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None)),
                     "peak_pct": peak_pct, "flag": worst, "status_word": gate_hours.STATUS_WORDS.get(worst),
                     "days": days_out})
     order = {"red": 0, "amber": 1, None: 2}
     out.sort(key=lambda x: (order.get(x["flag"], 2), -(x["peak_pct"] or -1), -max([d["arrivals"] for d in x["days"]] or [0]),
                             x["gate_id"]))
     return {"dates": shown, "days": [day_words(i) for i in shown], "gates": out, "near_pct": gate_hours.NEAR_PCT,
-            "limit": gate_hours.LIMIT_WORDS,
+            "limit": gate_hours.LIMIT_WORDS, "default_hours": gate_hours.default_words(factors),
             "peak_bands": gate_hours.peak_bands(factors)}
 
 

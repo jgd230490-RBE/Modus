@@ -481,8 +481,9 @@ def monitoring(month_index, acc=None, factors=None, working_days=None):
         "charts": charts,
         "with_data": [k for k in ORDER if charts[k]["state"] == "set"],
         "peak_bands": bands,
+        # 17 Oct 2026: every gate has clock hours now (typed, or the default gate hours), so the bands come off every gate
         "peak_words": (f"No deliveries {gate_hours.peak_words(bands)} (the CLP's peak bands, taken off each gate's "
-                       f"open hours where they are typed)." if bands else None),
+                       f"open hours: {gate_hours.default_words(factors)} where none are typed)." if bands else None),
         "scope": "team" if team else "scheme",
         "scope_line": (("Your team's lines for the vehicle, carbon and trip charts; the whole scheme for the caps and "
                         "councils, as the public map shows them.") if team else

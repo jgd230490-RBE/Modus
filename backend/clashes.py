@@ -178,7 +178,11 @@ def gate_capacity(lines, gw):
             if d["flag"] not in ("red", "amber"):
                 continue
             code = "GATE_OVER" if d["flag"] == "red" else "GATE_NEAR"
-            if not d["open"]:
+            if not d["open"] and g.get("no_open_time"):
+                # 17 Oct 2026 (review): not a closed day — the bands and the gate's shut times cover all its hours
+                text = (f"{where} on {d['day']}: {d['arrivals']} lorries planned, but the no-delivery bands and the "
+                        f"gate's shut times leave it no open time")
+            elif not d["open"]:
                 text = (f"{where} on {d['day']}: {d['arrivals']} lorries planned, but the gate is "
                         f"{g['closed_days'] or 'closed that day'}")
             else:

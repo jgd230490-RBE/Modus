@@ -129,10 +129,13 @@ def _row(g):
         "is_default": _truthy(g.get("is_default")),
         "active": _truthy(g.get("active")),
         "note": g.get("note"),
-        # 14 Oct 2026 (bundle G, W17): when the gate is open; None = the scheme's shift, every day
+        # 14 Oct 2026 (bundle G, W17): when the gate is open; None = the default gate hours (17 Oct 2026: 08:00–17:00
+        # unless the scheme sets its own on Config), every day
         "open_from": g.get("open_from"),
         "open_to": g.get("open_to"),
         "open_days": gate_hours.clean_days(g.get("open_days")),
+        # 17 Oct 2026 (the user: "planned close times throughout the day"): the gate's shut windows, [{from, to}]
+        "shut_windows": gate_hours.shut_windows(g),
         # 16 Oct 2026: the haul road drawn from the public road to this gate; None = none drawn
         "access_zone_id": g.get("access_zone_id") or None,
         "created_at": g.get("created_at"),
@@ -284,19 +287,29 @@ def bake_blockers(route, origin, dest, gates_by_loc=None):
 # --------------------------------------------------------------------------- #
 #  Writes                                                                      #
 # --------------------------------------------------------------------------- #
-def _hours_problem(open_from, open_to, open_days):
-    """14 Oct 2026 (W17): both times or neither, each a 24-hour HH:MM, not the same; the days seven flags."""
+def _hours_problem(open_from, open_to, open_days, shut_windows=None):
+    """14 Oct 2026 (W17): both times or neither, each a 24-hour HH:MM, not the same; the days seven flags.
+    17 Oct 2026: the shut windows (gate_hours.shut_problem), and that they fit the hours — typed, or the default."""
     f = None if open_from in (None, "") else open_from
     t = None if open_to in (None, "") else open_to
     if (f is None) != (t is None):
-        return "type both open hours (from and to), or clear both to use the scheme's shift"
+        return "type both open hours (from and to), or clear both to use the default gate hours"
     if f is not None:
         for k, v in (("open from", f), ("open to", t)):
             if gate_hours.hhmm_problem(v):
                 return f"{k} {gate_hours.hhmm_problem(v)}"
         if gate_hours.minutes_of(f) == gate_hours.minutes_of(t):
             return "open from and open to are the same time"
-    return gate_hours.days_problem(open_days)
+    dp = gate_hours.days_problem(open_days)
+    if dp:
+        return dp
+    sp = gate_hours.shut_problem(shut_windows)
+    if sp:
+        return sp
+    # 17 Oct 2026 (review): the shut times must fit the hours, and the hours less the shut times AND the scheme's
+    # no-delivery bands must leave some open time — checked against the live Config (gate_hours.fit_problem)
+    import conversions
+    return gate_hours.fit_problem({"open_from": f, "open_to": t, "shut_windows": shut_windows}, conversions.load_factors())
 
 
 def _clean_hhmm(v):
@@ -319,8 +332,8 @@ def access_problem(zone_id):
 def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=None,
                 internal_travel_minutes=None, is_default=False, active=True,
                 note=None, gate_id=None, open_from=None, open_to=None, open_days=None,
-                access_zone_id=None):
-    hp = _hours_problem(open_from, open_to, open_days) or access_problem(access_zone_id)
+                access_zone_id=None, shut_windows=None):
+    hp = _hours_problem(open_from, open_to, open_days, shut_windows) or access_problem(access_zone_id)
     if hp:
         return {"error": hp}
     if not (location_id or "").strip():
@@ -341,13 +354,13 @@ def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=No
     db.execute(
         "INSERT INTO location_gates (tenant_id, id, location_id, name, direction, "
         "lat, lon, safety_minutes, internal_travel_minutes, is_default, active, note, "
-        "created_at, updated_at, open_from, open_to, open_days, access_zone_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "created_at, updated_at, open_from, open_to, open_days, access_zone_id, shut_windows) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (db.current_tenant(), gid, location_id, name.strip(),
          _clean_direction(direction), la, lo, _clean_minutes(safety_minutes),
          _clean_minutes(internal_travel_minutes), bool(is_default), bool(active),
          (note or None), now, now, _clean_hhmm(open_from), _clean_hhmm(open_to),
-         gate_hours.clean_days(open_days), (access_zone_id or None)),
+         gate_hours.clean_days(open_days), (access_zone_id or None), gate_hours.clean_shut(shut_windows)),
     )
     if is_default:
         _clear_other_defaults(location_id, gid)
@@ -391,12 +404,14 @@ def update_gate(gate_id, **fields):
             sets.append(f"{key} = ?"); params.append(_clean_minutes(fields[key]))
     if "note" in fields:
         sets.append("note = ?"); params.append(fields["note"] or None)
-    # 14 Oct 2026 (W17): the open hours, checked as a pair against what is stored
-    if {"open_from", "open_to", "open_days"} & set(fields):
+    # 14 Oct 2026 (W17): the open hours, checked as a pair against what is stored. 17 Oct 2026: with the shut windows,
+    # so new hours are checked against the stored shut times and new shut times against the stored hours.
+    if {"open_from", "open_to", "open_days", "shut_windows"} & set(fields):
         nf = fields.get("open_from", cur.get("open_from"))
         nt = fields.get("open_to", cur.get("open_to"))
         nd = fields.get("open_days", cur.get("open_days"))
-        hp = _hours_problem(nf, nt, nd)
+        ns = fields.get("shut_windows", cur.get("shut_windows"))
+        hp = _hours_problem(nf, nt, nd, ns)
         if hp:
             return {"error": hp}
         for key in ("open_from", "open_to"):
@@ -404,6 +419,8 @@ def update_gate(gate_id, **fields):
                 sets.append(f"{key} = ?"); params.append(_clean_hhmm(fields[key]))
         if "open_days" in fields:
             sets.append("open_days = ?"); params.append(gate_hours.clean_days(fields["open_days"]))
+        if "shut_windows" in fields:            # None, '' or [] clears them
+            sets.append("shut_windows = ?"); params.append(gate_hours.clean_shut(fields["shut_windows"]))
     if "access_zone_id" in fields:              # 16 Oct 2026: the gate's access road; blank clears
         ap = access_problem(fields["access_zone_id"])
         if ap:
