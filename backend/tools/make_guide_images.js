@@ -70,7 +70,7 @@ function figNumbers() {
     ["Tonnes", "m³ × density of the<br>material category<br><span class=muted>(Config › Materials)</span>", ""],
     ["Trips", "tonnes ÷ payload of<br>the vehicle<br><span class=muted>(Config › Vehicles)</span>", ""],
     ["Trips per day", "÷ working days (22 per month), or week ÷ 5 on the Look-ahead", ""],
-    ["Vehicles", "trips per day ÷ what one lorry can do in a 10 h shift on that route's routed cycle", "accent"],
+    ["Vehicles", "trips per day ÷ what one lorry can do in a driver's day on that route's routed cycle (UK drivers' hours)", "accent"],
     ["km · t·km · CO₂e · cost", "trips × routed km; tonnes × km basis; km × kg CO₂e/km; typed route rates", "ok"],
   ];
   const boxes = steps.map(([h, p, cls], i) =>
@@ -140,7 +140,7 @@ function figHaulCycle() {
      <div class="card" style="margin-top:24px;background:#fff;border-color:${T.ink}">
        <h3>Formulas</h3>
        <p class="mono">cycle_hr &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= laden drive + return drive + turnaround</p>
-       <p class="mono">trips_per_day = floor(shift hours ÷ cycle_hr) &nbsp;&nbsp;<span class="muted">shift = 10 h (Config › Planning)</span></p>
+       <p class="mono">trips_per_day = the most cycles with n × cycle + break ≤ shift and n × driving ≤ 9 h &nbsp;&nbsp;<span class="muted">shift = 10 h (Config › Planning); break 30 / 45 min (UK drivers' hours)</span></p>
        <p class="mono">trips &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= ceil(tonnes ÷ payload) &nbsp;&nbsp;&nbsp; vehicles = ceil(trips per day ÷ trips_per_day)</p>
        <p class="mono">km &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= trips × routed km &nbsp;&nbsp;&nbsp; t·km = tonnes × basis km &nbsp;&nbsp;&nbsp; CO₂e = km × kg CO₂e/km</p>
      </div>`,

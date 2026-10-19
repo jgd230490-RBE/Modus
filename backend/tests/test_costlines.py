@@ -517,7 +517,7 @@ _fc = _fe[_fe.index("function Forecasts("):_fe.index("function CostingTab(")]
 ok("the Forecasts page reads /costing/lines (its own fetch, so a failure never hides the list) and joins per line",
    # 13 Oct 2026 (W6, narrowed): the join is per row (const c), each cost cell says "—" when the line has none
    "fetch(`${API}/costing/lines?status=All`)" in _fc and "const c = costByLine[g.key];" in _fc
-   and '!c ? <span className="text-slate-300">—</span>' in _fc)
+   and '!c ? <span className="text-slate-500">—</span>' in _fc)   # 17 Oct 2026 (UI fix 4): slate-500, readable
 ok("...with a Cost column (planned + fair, €/t beside fair) and nine cost columns in the CSV",
    'data-cost-cell="1"' in _fc and '`Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/${DU()}`' in _fc   # NARROWED H1
    and '"Fair € (model)"' not in _fc)

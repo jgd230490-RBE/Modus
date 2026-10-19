@@ -27,6 +27,11 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+// 18 Oct 2026 (D104 for the JS harnesses): today is a fixed day, shifted not frozen (lib/harness_clock.js) — the
+// Dashboard's this month ± 6 follows the clock, and the fixture lines sit in Sep–Nov 2026. Both realms: here, and the
+// sandbox the app runs in (below, before the app's script). HARNESS_TODAY=YYYY-MM-DD runs on another day.
+const CLOCK = require(path.join(__dirname, "lib", "harness_clock.js"));
+CLOCK.pinNode();
 // 29 Sep 2026: resolve the global packages through NODE_PATH or a node_modules on the
 // path first (CI, Codespace, any sandbox); the old sandbox's fixed folder is the fallback.
 const G = (() => { try { require.resolve("typescript"); return ""; } catch (e) { return "/home/claude/.npm-global/lib/node_modules/"; } })();
@@ -79,11 +84,17 @@ sandbox.document = { getElementById: () => el(), createElement: () => el(), body
                      addEventListener(){}, removeEventListener(){} };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
+vm.runInContext(CLOCK.shiftSource(), sandbox);   // 18 Oct 2026: the app's realm reads the same shifted clock as the checks
 
 let loaded = true;
 try {
   vm.runInContext(js, sandbox, { filename: "index.tsx" });
   ok("the whole script block evaluates", true);
+  // 18 Oct 2026: the shifted clock holds in both realms (lib/harness_clock.js)
+  const _appDay = vm.runInContext("new Date().toISOString().slice(0, 10)", sandbox), _hereDay = new Date().toISOString().slice(0, 10);
+  ok(`CLOCK: today is ${CLOCK.TODAY} in the checks AND in the app's sandbox, and the clock still moves`,
+     _appDay === CLOCK.TODAY && _hereDay === CLOCK.TODAY && Math.abs(vm.runInContext("Date.now()", sandbox) - Date.now()) < 5000
+     && vm.runInContext("Date.__harnessShifted", sandbox) === true, `app ${_appDay}, here ${_hereDay}`);
 } catch (e) {
   loaded = false;
   ok("the whole script block evaluates", false, e.message);

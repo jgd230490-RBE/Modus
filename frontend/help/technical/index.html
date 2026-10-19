@@ -31,10 +31,16 @@ th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight
 .callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:var(--blue)}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:var(--red)}
 #top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:20px;font-size:12px}
 @media (max-width:900px){#nav{position:static;width:auto}main{margin-left:0;padding:18px 16px 60px}}
+/* 18 Oct 2026 (UI audit decision 10, #22): a skip link heads the contents — hidden at a desk until it has the focus, the
+   first row of the list on a phone, where the chapter rows sit above the text; those rows and "↑ top" are 44 px tall there */
+.skip{position:absolute;left:8px;top:8px;z-index:9;padding:10px 14px;border-radius:8px;background:#fff;color:var(--navy);font-weight:600;text-decoration:none;transform:translateY(-200%)}
+.skip:focus{transform:none;outline:2px solid #FF8C14;outline-offset:2px}
+main:focus{outline:0}
+@media (max-width:900px){.skip{position:static;display:flex;align-items:center;min-height:44px;margin:0 0 8px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.1);color:#fff;transform:none}#nav li a{min-height:44px;padding:12px 8px}#top{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}}
 @media print{#nav,#top{display:none}main{margin:0;padding:0;max-width:none}}
 </style></head>
 <body>
-<nav id="nav"><div class="brand">Wayscope<span>Technical guide · staff only</span></div><ol>
+<nav id="nav"><a class="skip" href="#guide-text">Skip to the text</a><div class="brand">Wayscope<span>Technical guide · staff only</span></div><ol>
 <li class="l1"><a href="#t0-about">About this guide</a></li>
 <li class="l1"><a href="#t1-figures">T1 How each figure is made</a></li>
 <li class="l2"><a href="#t1-volume">Tonnes and conversions</a></li>
@@ -55,7 +61,7 @@ th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight
 <li class="l1"><a href="#t6-words">T6 Old words, new words</a></li>
 <li class="l1"><a href="#t7-reference">T7 Sourced and assumed figures</a></li>
 </ol></nav>
-<main>
+<main id="guide-text" tabindex="-1">
 
 <h1 id="t0-about">Technical guide</h1>
 <p>For the people who run Wayscope and answer &ldquo;where does that number come from?&rdquo;. The
@@ -94,10 +100,30 @@ which say how many lines they exclude. It is excluded, never estimated. The load
 own (Config → Vehicles, seeded from <code>backend/factors.json</code>); blank minutes use the planning defaults.</p>
 
 <h2 id="t1-vehicles">Vehicles and peak fleet</h2>
-<pre>trips per vehicle-day = floor(shift hours ÷ cycle)
+<pre>trips per vehicle-day = drivers_hours.lorry_day(shift, driving, other work)["trips"]   — 17 Oct 2026
 vehicles (per line)   = trips per day ÷ trips per vehicle-day      — the server's `vehicles`
 peak fleet            = the largest same-month sum of vehicles needed across the lines in view</pre>
-<p>That is trips ÷ (working days × what one vehicle does in a shift). An unbaked line has no cycle, so it needs an
+<p>Since 17 Oct 2026 the trips one vehicle makes in a day follow the UK drivers&#39; hours (<code>backend/drivers_hours.py</code>,
+called by <code>network.route_analysis</code>, the public map&#39;s route figures and the Carbon planner — never a second
+formula): the largest n with n × driving ≤ 540 min (Reg 561/2006 Art 6) and n × cycle + the break ≤ the shift, the break
+45 min once driving passes 270 min (Art 7) or work passes 540, else 30 min once work passes 360 (Road Transport (Working
+Time) Regulations 2005 reg 7) — the Art 7 and reg 7 breaks are one break, never added. No further break past 720 min of
+work: the 45 may be taken as 15 + 30 (Art 7; reg 7(4)), which lets every stretch of work be kept to 6 h (reg 7(1)) in a
+13 h day — the 15 before the 30, placed to suit; where they fall is not modelled (18 Oct 2026; the first build's extra
+15 min was stricter than the law). Driving = both legs as routed (haul roads and gate access roads are
+inside them) + gate-to-face minutes; other work = load + unload + the gate check-in (<code>safety_minutes</code>). One
+driver&#39;s day is read as at most 13 h (the 11 h daily rest); Config accepts a longer shift (a double-shifted lorry, a
+gate&#39;s stand-in window) and <code>planning.shift_note</code> says the trips use 13. An electric lorry&#39;s charging is
+counted as working time (the cautious reading: no rule says yet; DfT's 2024–25 zero-emission vans consultation asked
+operators, and its November 2025 response did not settle it): on top of
+the break and counted when the break is chosen (<code>carbon.ev_day</code>,
+<code>drivers_hours.ev_trips</code>); a day that holds no trip is <code>day_fits</code> False, not a battery failure. Each row carries <code>drive_min</code>,
+<code>other_work_min</code> and <code>lorry_day</code> (<code>limited_by</code> shift / breaks / driving / driver_day / none, the break,
+<code>trips_without_rules</code> = the old floor(typed shift ÷ cycle)). 0 trips = not one round trip fits a driver&#39;s day:
+every reader counts one lorry a trip (<code>derived.day_figures</code>, <code>costlines</code>,
+<code>carbon.lorries_for</code>, the CLP figures). Not modelled: weekly limits, night work, the twice-a-week 10 h driving
+day, the reduced daily rest, where the break falls, a second driver, the day&#39;s other duties, GB domestic rules. The gate figures keep the full shift (a gate stays open while drivers take breaks).</p>
+<p>That is trips ÷ (working days × what one vehicle does in a driver&#39;s day). An unbaked line has no cycle, so it needs an
 unknown number of vehicles and is left out of the sum. Trips are not vehicles: a fleet worked out as tonnes ÷ payload
 alone is a trip count.</p>
 

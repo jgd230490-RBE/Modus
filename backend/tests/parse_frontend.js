@@ -710,7 +710,7 @@ ok("...and the balance is read from /stockpiles", code.includes("/stockpiles?fro
 // ⭐ no capacity recorded is NOT zero capacity
 ok("⭐ an unset capacity renders '—' / 'not recorded', never 0",
   _dsBody.includes("· max —") && !_dsBody.includes("capacity_qty || 0")
-  && /s\.capacity_qty == null \? <span className="text-slate-300">not recorded<\/span>/.test(_laBody));
+  && /s\.capacity_qty == null \? <span className="text-slate-500">not recorded<\/span>/.test(_laBody));   // 17 Oct 2026 (UI fix 4): slate-500, readable
 ok("over capacity uses the existing red, not a reserved route colour",
   _dsBody.includes('b.over ? "#DC2626"') && !_dsBody.includes('over ? "#059669"'));
 ok("the panel says inbound comes from typed actuals only",
@@ -1776,7 +1776,16 @@ ok("...and it collapses with the rail like every other item (label behind railSh
       && gf.includes("const [stripBottom, setStripBottom] = useState(16);") && gf.includes("document.querySelector('[data-sticky-foot]')")
       && gf.includes("Math.round(window.innerHeight - fr.top) + 8 : 16;") && gf.indexOf("useState(16)") < gf.indexOf("if(!step) return hintsEl;")
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
-      && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
+      // NARROWED 18 Oct 2026 (decision 17): ...and none on a phone
+      && gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }"));
+    // 18 Oct 2026 (UI audit decision 17, the user): the app's own dots are retired on the phone like the map's (decision 8) —
+    // the effect draws none there, the strip stays (its "Take the tour" carries the tips), the ≤ 767 px rule hides a dot left
+    // by a wider window until the next pass; a desk keeps its dots, named "Tip: <the step's title>"
+    ok("🔴 decision 17: the app draws no guide dot on a phone (the dots effect bails on `phone`, which is in its deps), keeps the strip there, and the phone rule hides .guide-dot; a desk keeps its dots",
+      gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }") && gf.includes("}, [hints, key, steps.length, phone]);")
+      && gf.includes("{strip && (") && gf.includes('className="guide-dot" style={{ top: d.top, left: d.left }} aria-label={`Tip: ${d.title}`}')
+      && /@media \(max-width:767px\)\{\.guide-dot\{display:none\}\}/.test(html) && (html.match(/\.guide-dot\{display:none\}/g) || []).length === 1
+      && !/\.guide-dot\{display:none\}/.test(html.split("@media (max-width:767px){.guide-dot{display:none}}")[0]));
   }
   // REVERSED 11 Oct 2026 (the demo bar, the user: the map's strip "on every page"): the header badge and PR #20's
   // logic that hid it under the embedded map are gone — the bar under the header carries the notice on every view,
@@ -3359,7 +3368,168 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
   ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
      src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
+  // 17 Oct 2026 (D114 fix): seen on live — the Dashboard opened on Jan 26 – Dec 30 because its first read of the lines
+  // widened From / To to every month with lines, after the ± 6 default had been set
+  ok("🔴 D114 fix: the Dashboard's first read no longer widens From / To to every month with lines; it keeps this month ± 6 "
+     + "and falls back to the lines' own months only when none falls inside it",
+     src.includes("if(idx.length && !idx.some(m => m >= lo && m <= hi)){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }")
+     && src.includes("const [lo, hi] = dashRangeDefault(months);")
+     && src.includes('const all = j.lines || [], ap = all.filter(x => x.status === "Approved");')
+     && src.includes("const idx = (ap.length ? ap : all).map(x => x.month_index);")
+     && !src.includes("if(idx.length){ setFromM(Math.min(...idx)); setToM(Math.max(...idx)); }"));
 }
+
+// ---- 17 Oct 2026 (UI fix 4, claude/ui-fix-captions): captions, status words, chips and small captions (findings 3, 19, 20; decisions 1–3) ----
+{
+  const _fw = code.slice(code.indexOf("function FuelWidget("), code.indexOf("\n}\n", code.indexOf("function FuelWidget(")));
+  const _ipt = code.slice(code.indexOf("function IptPill("), code.indexOf("function LaKpi("));
+  const _cat = code.slice(code.indexOf("function CatChips("), code.indexOf("\n}\n", code.indexOf("function CatChips(")));
+  ok("🔴 captions #3 (decision 1): ONE rule maps text-slate-400 to --muted outside the dark look, weighed with :where() so hover:text-slate-700 still wins; the dark remap keeps its line; a second rule steps the greys on a selected row (.bg-blue-50) to slate-600",
+     html.includes('html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}')
+     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}')
+     && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9AA1AB}')
+     && code.includes("text-slate-400 hover:text-slate-700") && (code.match(/\btext-slate-400\b/g) || []).length >= 120);
+  ok("captions #3: the rail's group headings have no opacity, the big screen's labels read --muted (no #9aa1ac), the Dashboard group title defaults to --muted (no #94a3b8), and no text-slate-300 is left in the markup — every placeholder reads slate-500 (the dark remap line went with it)",
+     /\.rail-group\{[^}]*color:var\(--muted\);\}/.test(html) && !/\.rail-group\{[^}]*opacity/.test(html)
+     && !/9aa1ac/i.test(html) && /\.dash-wallbar-lbl\{[^}]*color:var\(--muted\);\}/.test(html) && /\.dash-divider\{[^}]*color:var\(--muted\);/.test(html)
+     && !code.includes('"#94a3b8"') && code.includes('style={{ color: tone || "var(--muted)" }}>{title}</div>')
+     && !/\btext-slate-300\b/.test(code) && !html.includes(".text-slate-300{") && !html.includes(".text-emerald-600{")
+     && (code.match(/<span className="text-slate-500">rate not set<\/span>/g) || []).length === 3);
+  ok("decision 3: the Submit strip's peak values carry no colour of their own (the label says Peak)",
+     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums">{value}</div>') && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
+  ok("decision 2: the green status WORDS read --ok-text, never --green — In force, Delivered %, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, the simulation's checks; the red chip words read --bad-text; the stale chip --warn-text",
+     code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
+     && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
+     && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
+     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#f1f5f9", "#475569"]')
+     && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>')
+     && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
+     && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
+     && code.includes('style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>') && _fw.includes('color: "var(--warn-text)", background: "rgba(217,119,6,.10)"'));
+  ok("🔴 chips #19: the 9–10 px chips take the house 12 px (text-xs) — target / quote, stale, winter / thaw, the team and workstream pills, the Routes vehicle chips, the material categories, the gate direction (now the house navy-on-tint pair), set, gate blocked and haul — no 'text-[10px] … rounded-full' chip is left; the one text-[9px] left is the horizon's role word (finding 11, its own branch)",
+     code.includes('const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>')
+     && code.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span>')
+     && _fw.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "var(--warn-text)"')
+     && code.includes('className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route')
+     && code.includes('<span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>')
+     && code.includes('<span className="ml-1 text-xs text-amber-700" title="Spring load restrictions')
+     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"')
+     && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"\n    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>')
+     && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
+     && _cat.includes('<span key={c} className="text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"')
+     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
+     && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
+     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
+     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 2
+     && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
+     && (code.match(/text-\[9px\]/g) || []).length === 1 && /text-\[9px\] uppercase tracking-wide text-slate-400">\{roleLbl\[role\]/.test(code));
+  ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
+     !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
+     && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')
+     && _fw.includes('<div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
+     && !_fw.includes("text-slate-500 mt-0.5 truncate") && !_fw.includes('mt-0.5 truncate" title={bafTxt}'));
+  ok("🔴 captions #20: the Config fuel widget has no 9, 10 or 11 px text (text-xs text-slate-500 captions, the DESNZ attribution among them) and its three admin buttons are btn-sec btn-sm; the Dashboard's figure labels and sub-lines, the Today card's captions and the group titles are 12 px; the never-rendered Kpi component is gone",
+     !/text-\[(9|10|11)px\]/.test(_fw) && _fw.includes('const attribution = <span className="text-xs text-slate-500"') && (_fw.match(/className="btn-sec btn-sm disabled:opacity-40"/g) || []).length === 3
+     && !_fw.includes("hover:bg-slate-50 disabled:opacity-40") && _fw.includes('<span className="text-xs uppercase tracking-wide text-slate-500">Diesel {country}</span>') && _fw.includes('<span className="w-full text-xs text-slate-500">The base is locked')
+     && (code.match(/className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
+     && (code.match(/className="text-xs text-slate-500 fig-sub"/g) || []).length === 2 && !code.includes("text-slate-400 fig-sub")
+     && (code.match(/className="text-xs font-semibold uppercase tracking-wide(?: mb-2)? fig-group"/g) || []).length === 2 && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
+     && code.includes('<div className="text-xs text-slate-500">{cw.from ? `week ') && code.includes('<div className="text-xs text-slate-500 mt-1">{bigNum(T.wkPlanT)}') && code.includes('<div className="text-xs text-slate-500 mt-1">{acct && acct.week ? `${acct.reported}')
+     && !code.includes("function Kpi(") && !/\bKpi\b/.test(code));
+}
+
+// ---- 18 Oct 2026 — the UI audit's phone branch (claude/ui-fix-phone): decisions 9 and 12, findings #13, #24, #29 and the
+// 44 px leftovers (the password eyes, the sign-in links) ---------------------------------------------------------------
+// Decision 9: the demo bar's 21 px Guide pill taps at 44 px through a ::after halo; the bar does not grow (it keeps its 26 px
+// and its overflow:hidden, which clips the halo to the bar — a tap outside the bar never reaches the pill). Decision 12 / #13:
+// Config → Materials' vehicles cell is two columns of 24 px rows, a long name wrapping; the Seasonal restrictions' vehicle
+// rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (they were 16 px at a 20
+// px pitch). #24: inside a sortable column header the InfoTip's touch halo is 36 px, clear of the sort arrow. #29: the
+// Routes table's Route button is 24 px tall. The 44 px rule: the password eyes (38 px drawn) tap at 44; on a touch screen
+// the sign-in's two text links are 44 px rows. The strip's × taps at 44 like the map's.
+{
+  ok("🔴 decision 9: the demo bar's Guide pill has a ::after halo (inset -12 px / -8 px: 45 × 76 on the 21 × 60 pill) and the bar itself keeps its 26 px, its absolute pill and its overflow:hidden",
+     /\.demo-bar-guide::after\{content:"";position:absolute;inset:-12px -8px;\}/.test(html)
+     && /\.demo-bar\{position:relative;flex:none;height:26px;[^}]*overflow:hidden;\}/.test(html)
+     && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;/.test(html));
+  ok("🔴 #24: on a touch screen the InfoTip inside a column header has a 36 px halo (inset -9 px), the 44 px halo elsewhere; the desk's 24 px halo is untouched",
+     /@media \(pointer:coarse\)\{th \.ibtn::after\{inset:-9px;\}\}/.test(html) && /@media \(pointer:coarse\)\{\.ibtn::after\{inset:-13px;\}\}/.test(html)
+     && /\.ibtn::after\{content:"";position:absolute;inset:-3px;\}/.test(html)
+     && html.indexOf("th .ibtn::after{inset:-9px;}") > html.indexOf(".ibtn::after{inset:-13px;}"));
+  ok("🔴 the 44 px rule: the show / hide eye keeps its 38 px drawing and taps at 44 (one ::after halo, inset -3 px, on .pw-eye, which is positioned)",
+     /\.pw-eye\{position:absolute;right:4px;top:50%;transform:translateY\(-50%\);width:38px;height:38px;/.test(html)
+     && (html.match(/\.pw-eye::after\{content:"";position:absolute;inset:-3px;\}/g) || []).length === 1);
+  ok("🔴 the 44 px rule: on a touch screen the two text links under Sign in are 44 px rows (padding 12 px 0 on their 20 px line); a mouse keeps the tight row (padding 0)",
+     /@media \(pointer:coarse\)\{\.auth-links button\{padding:12px 0;\}\}/.test(html) && /\.auth-links button\{background:none;border:0;padding:0;font:inherit;/.test(html)
+     && code.includes('<button type="button" onClick={() => go(forgot ? "email" : "forgot")}>{forgot ? "Back to sign in" : "Forgot your password?"}</button>'));
+  // RE-PINNED 18 Oct 2026 (decision 18, the user): the halos are for a coarse pointer only, and "Take the tour" has one too
+  ok("🔴 decision 18: on a coarse pointer the app strip's × (23 × 20) taps at 44 × 44 and 'Take the tour' (93 × 24) at 44 tall through ::after halos, both positioned; the × reaches 9 px into the strip's 10 px gap, so the halos never overlap; a mouse keeps the drawn boxes",
+     /\.guide-strip \.guide-x\{position:relative;font:inherit;/.test(html) && /\.guide-strip \.guide-strip-go\{position:relative;font:inherit;/.test(html)
+     // the × draws 22.6 px wide in Inter, so 9 + 13 px round it up to 45: the audit listed 44 × 44 as under 44
+     && /@media \(pointer:coarse\)\{\.guide-strip \.guide-strip-go::after\{content:"";position:absolute;inset:-10px 0\}\.guide-strip \.guide-x::after\{content:"";position:absolute;inset:-12px -13px -12px -9px\}\}/.test(html)
+     && (html.match(/\.guide-x::after/g) || []).length === 1 && (html.match(/\.guide-strip-go::after/g) || []).length === 1
+     && /\.guide-strip\{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;/.test(html)
+     && code.includes('<button type="button" className="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onClick={off}>×</button>'));
+  // decision 12 / #13: the tick rows
+  const mat = code.slice(code.indexOf('{tab === "materials" && ('), code.indexOf('{tab === "planning" && ('));
+  ok("🔴 decision 12: Config → Materials' vehicles cell is a two-column grid of 24 px rows (min-h-6), the names free to wrap inside their column (no whitespace-nowrap), the cell at least 332 px (two 154 px columns: a 'Rigid 8-wheeler (32t)' sits on one line); the one-column flex-wrap of 16 px rows is gone",
+     mat.includes('<td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>')
+     && mat.includes('<div className="grid grid-cols-2 gap-x-2">')
+     && mat.includes('<label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">')
+     && mat.includes('<input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)}')
+     && !mat.includes("flex flex-wrap gap-x-3 gap-y-1") && !mat.includes("text-slate-600 whitespace-nowrap"));
+  ok("decision 12: ...and the table FITS the 800 px card at 1366 (measured 799 px in Chrome): three short headings wrap to two lines at their least width (Density, Tonnes only at width 1; Volume ↔ weight at 92 px), a long material name wraps at 136 px; the six headings read as before",
+     mat.includes('style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>')
+     && mat.includes('["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h =>')
+     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>'));
+  ok("🔴 #13: the Seasonal restrictions' vehicle rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (min-h-6) — four lists, no 16 px tick row left among them",
+     code.includes('<label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">')
+     && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 2
+     && code.includes('<label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">')
+     && !code.includes('className="flex items-center gap-2 text-xs text-slate-700">') && !code.includes('className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">'));
+  ok("#29: the Routes table's Route button (the one that spends HERE calls) is a 24 px inline-flex box; Edit and Delete beside it unchanged",
+     code.includes('className="inline-flex items-center min-h-6 text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">')
+     && code.includes('className="text-[color:var(--navy)] hover:underline text-xs font-semibold mr-3">Edit</button>'));
+  ok("no visible word changed in the app for this branch: the pill still says Guide, the eye Show / Hide password, the links their two sentences",
+     code.includes('<button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>')
+     && (code.match(/aria-label=\{show \? "Hide password" : "Show password"\}/g) || []).length === 2
+     && code.includes('<button type="button" onClick={() => go("code")}>Sign in with a team code instead</button>'));
+}
+// ---- 17 Oct 2026 (the user: UK drivers' hours): the words that state how trips a lorry a day are worked out ----------
+// NARROWED 17 Oct 2026 (the review): a lorry's day, worked on one driver's 13 h (a longer shift is accepted, not
+// refused); one break with the second 15 past 12 h; the planning-figure caveat
+// REVERSED 18 Oct 2026 (the user): no second break past 12 h — the hint says the 45 may be taken as 15 + 30
+ok("⭐ Config → Planning: 'Shift hours a day' is a driver's working day, at most 13 h, the trips what fit after the "
+   + "required breaks with driving at most 9 h; the old 'shift ÷ cycle time' is gone",
+   src.includes("A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; the 45 may be taken as 15 + 30), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled.")
+   && !src.includes("Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time.")
+   && !src.includes("A driver's working day, at most 13 hours (the 11-hour daily rest)."));
+ok("⭐ the Routes table: Trips/day is what fits in a driver's day (driving = out, back and gate to face), § marks a route the "
+   + "rules hold below the shift alone, the cell's title gives the server's words",
+   src.includes("Trips/day is what fits in a driver's day: the {data.planning.shift_hours_per_day} h")
+   && src.includes("9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why);")
+   && src.includes('title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}')
+   && !src.includes("Trips/day assumes a {data.planning.shift_hours_per_day} h"));
+// 17 Oct 2026 (the review): § only where the rules took trips off (not on a 0 the shift alone would also give), the 0
+// explained, the caveat and the 13 h note on the footnote
+ok("⭐ the review: the Routes table's § marks only a route with fewer trips than the shift alone; the footnote explains a 0 "
+   + "(one lorry a trip), says it is a planning figure and shows the 13 h note",
+   src.includes('{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}')
+   && !src.includes('r.lorry_day.limited_by !== "shift" ? <span className="text-slate-500">§</span>')
+   && src.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip. A planning figure: weekly")
+   && src.includes('{data.planning.shift_note ? " " + data.planning.shift_note : ""}'));
+ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon page puts charging on top of the break",
+   src.includes("the trips one vehicle can do in a driver's day on its route") && src.includes("what one vehicle does in a driver's day on that route")
+   && !src.includes("the trips one vehicle can do in a shift on its route") && !src.includes("what one vehicle does in a shift on that route")
+   && src.includes('c.lorry_day.limited_by === "driving" ? "the 9 h driving limit"')
+   && src.includes('c.lorry_day.limited_by === "driver_day" ? "one driver\'s 13 h day"')
+   // NARROWED 17 Oct 2026 (the review): charging is attended, so working time — on top of the break AND counted toward it
+   // NARROWED 18 Oct 2026 (the user: soften it): counted as working time, said to be the cautious reading — no rule says yet
+   && src.includes("charging time comes out of the shift. Wayscope counts it as the driver's working time under the UK drivers' hours (driving at most 9 hours): on top of the required break, and toward the hours that decide how long that break is — the cautious reading, as no rule yet says whether attended charging is work or a break.")
+   && !src.includes("The driver attends it, so it counts as working time") && !src.includes("15 min more once work passes 12")
+   && !src.includes("the required breaks, at most 9 hours"));
+ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'compliant' or 'legal'",
+   !/drivers'? hours[^"`]{0,200}\b(compliant|compliance|legal)\b/i.test(src));
 
 // ---- report ------------------------------------------------------------------
 console.log();

@@ -15,13 +15,14 @@ THE RULES THAT MATTER
 1. **One source for the haul cycle: network.route_analysis(), alt 0, THIS line's
    vehicle profile.** That is the path /api/routes/analysis-batch and
    /api/public/month-kpis already read, so the Look-ahead, the dashboard and the public
-   map cannot disagree about how many movements one vehicle makes in a day. The
-   brief's `cycles_per_veh = floor(shift_min / cycle_min)` is exactly that row's
-   `trips_per_day`, and it is READ from the row, not recomputed here.
+   map cannot disagree about how many movements one vehicle makes in a day. That row's
+   `trips_per_day` is READ, never recomputed here: since 17 Oct 2026 it is the UK drivers'
+   hours rule (drivers_hours.lorry_day — the shift less the required break, driving at most
+   9 h; it was the brief's floor(shift_min / cycle_min)).
 
 2. **The formulas are the brief's §4, verbatim**, per day:
         trips          = ceil(qty / payload)           -- or qty itself if unit is vehicles
-        cycles_per_veh = floor(shift_min / cycle_min)  -- route_analysis().trips_per_day
+        cycles_per_veh = route_analysis().trips_per_day  -- drivers_hours.lorry_day (17 Oct 2026)
         vehicles_need  = ceil(trips / max(cycles_per_veh, 1))
         km_trip        = distance_km + (return_km if return_baked else 0)
         km_day         = trips * km_trip
@@ -76,6 +77,7 @@ Horizon view. No UI — slice 6.
 import math
 
 import conversions
+import drivers_hours
 import costing
 import db
 import fairprice
@@ -245,8 +247,8 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
     """
     routes = routes if routes is not None else _routes_and_names()
     cost = cost if cost is not None else costing_context()
-    plan = factors.get("planning", {}) or {}
-    shift_hr = float(plan.get("shift_hours_per_day") or 10)
+    # 17 Oct 2026: the shift as the drivers' hours rule reads it (at most 13 h) — drivers_hours.shift_hours
+    shift_hr = drivers_hours.shift_hours(factors)[0]
     rid, veh = line.get("route_id"), line.get("vehicle_type")
     payload, fb = payload_for(veh, factors)
     rt = routes.get(rid) or {}
@@ -303,9 +305,13 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
                          else ("here" if return_baked else "here_return_estimated")),
         "cycle_mark": ("‡" if (baked and not return_baked) else None),
         "shift_hours": shift_hr,
-        # brief: cycles_per_veh = floor(shift_min / cycle_min). route_analysis() already
-        # holds exactly that as trips_per_day; reading it is what keeps every surface equal
+        # route_analysis() holds the trips a lorry a day as trips_per_day (17 Oct 2026: the UK drivers' hours rule,
+        # drivers_hours.lorry_day); reading it is what keeps every surface equal
         "cycles_per_vehicle_day": (int(row.get("trips_per_day") or 0) if baked else None),
+        # 17 Oct 2026: the driving minutes of one cycle and the lorry's day in words, for the details and the Carbon page
+        "drive_min": (row.get("drive_min") if baked else None),
+        "other_work_min": (row.get("other_work_min") if baked else None),
+        "lorry_day": (row.get("lorry_day") if baked else None),
         # slices 3-5: the route's planning cap and contract rates, as typed (never seeded)
         "max_vehicles_per_day": rt.get("max_vehicles_per_day"),
         "rates": rates, "rate_set": rate_set,

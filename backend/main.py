@@ -189,6 +189,7 @@ _GATE_CSS = """
   .pw-eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:38px; height:38px;
             margin:0; padding:0; display:grid; place-items:center; color:#78716C; background:none; border-radius:6px; }
   .pw-eye:hover { background:#F5F5F4; color:#1F2024; }
+  .pw-eye::after { content:""; position:absolute; inset:-3px; }   /* 18 Oct 2026 (UI audit, the 44 px rule): the 38 px eye taps at 44 */
   .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
   .foot { margin-top:18px; font-size:13px; color:#78716C; }
   a { color:#2563EB; }
@@ -2406,7 +2407,9 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
                 res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None)
                 for row in res.get("rows", []):
                     if row.get("alt_index") == 0 and (not vehicle or row.get("profile") == vehicle):
-                        tpv = row.get("trips_per_day")
+                        # 17 Oct 2026 (drivers' hours): a routed line where not one round trip fits a driver's day counts
+                        # one lorry a trip (the floor every reader uses), never "not routed"
+                        tpv = max(1, int(row.get("trips_per_day") or 0))
                         break
             except Exception:
                 tpv = None

@@ -454,19 +454,43 @@ _fp_src = read("backend/fairprice.py")
 ok("B2: fairprice.py's unused 2.68 kg/L diesel constant is deleted; the diesel factor lives in factors.json only",
    not hasattr(fairprice, "KG_CO2E_PER_L_DIESEL") and "2.68" not in _fp_src and "2.58354" in _fp_src)
 d = carbon.ev_day(75, 80, 10, 1.25, 500, 350)
-# 100 kWh a trip; 8 cycles need 300 kWh more = 51.4 min → 651 > 600; 7 need 200 kWh = 34.3 min → 559 ≤ 600
-ok("⭐ electric shift: 75-min cycle, 80 km a trip, 500 kWh, 350 kW → 7 cycles (not 8), one charge of 34.3 min",
-   d["cycles"] == 7 and d["charges"] == 1 and near(d["charge_minutes"], 200 / 350 * 60) and d["feasible"]
-   and near(d["range_per_charge_km"], 400.0) and near(d["kwh_per_trip"], 100.0), str(d))
+# REVERSED 17 Oct 2026 (the user: UK drivers' hours; the cycle counted all as driving when its split is not given): 100 kWh
+# a trip; 7 cycles = 525 min + 34.3 min charging + the 45-min break (charging ON TOP of the break) = 604.3 > 600; 6 cycles
+# need 100 kWh = 17.1 min → 450 + 17.1 + 45 = 512 ≤ 600 (it was 7, one charge of 34.3, on the shift alone)
+ok("⭐ electric shift: 75-min cycle, 80 km a trip, 500 kWh, 350 kW → 6 cycles under the drivers' hours (7 on the shift "
+   "alone), one charge of 17.1 min", d["cycles"] == 6 and d["charges"] == 1 and near(d["charge_minutes"], 100 / 350 * 60)
+   and d["feasible"] and near(d["range_per_charge_km"], 400.0) and near(d["kwh_per_trip"], 100.0), str(d))
 d = carbon.ev_day(60, 40, 10, 1.25, 500, 350)
-ok("...10 cycles of 50 kWh fit one 500 kWh battery: no charge, the diesel day", d["cycles"] == 10 and d["charges"] == 0)
+# REVERSED 17 Oct 2026: a 60-min cycle all driving hits the 9 h driving cap at 9 (it was 10 on the shift alone)
+ok("...9 cycles of 50 kWh fit one 500 kWh battery: no charge, the diesel day — the 9 h driving cap (10 on the shift alone)",
+   d["cycles"] == 9 and d["charges"] == 0)
 d = carbon.ev_day(30, 100, 10, 1.25, 500, 350)
-# 30n + (125n − 500) / 350 × 60 ≤ 600 → n ≤ 13.3: 13 cycles, 1,125 kWh topped up in 3 stops, 192.9 min
-ok("...a short heavy cycle: 13 cycles, 3 charges, 192.9 min charging (64.3 a stop)",
-   d["cycles"] == 13 and d["charges"] == 3 and near(d["charge_minutes"], 1125 / 350 * 60) and near(d["minutes_per_charge"], 1125 / 350 * 60 / 3), str(d))
+# REVERSED 17 Oct 2026: 13 cycles = 390 + 192.9 charging + 45 = 627.9 > 600; 12 cycles = 360 + 171.4 (1,000 kWh in 2
+# stops) + 45 = 576.4 (it was 13 cycles, 3 charges, 192.9 min on the shift alone)
+ok("...a short heavy cycle: 12 cycles, 2 charges, 171.4 min charging (85.7 a stop) under the drivers' hours",
+   d["cycles"] == 12 and d["charges"] == 2 and near(d["charge_minutes"], 1000 / 350 * 60) and near(d["minutes_per_charge"], 1000 / 350 * 60 / 2), str(d))
+# 17 Oct 2026: with its split given (75 min, 45 of them driving), the same lorry is not driving-capped; still 6, the break
+d = carbon.ev_day(75, 80, 10, 1.25, 500, 350, drive_min=45)
+ok("...with the cycle's driving given (45 of 75 min), the charging and the 45-min break both come out of the shift: 6 cycles",
+   d["cycles"] == 6 and d["charges"] == 1, str(d))
+ok("...and with no battery figures the electric day is the diesel day under the same rule (drivers_hours.lorry_day)",
+   carbon.ev_day(60, 40, 10, 1.25, None, None)["cycles"] == 9 and carbon.ev_day(60, 40, 10, 1.25, None, None, drive_min=30)["cycles"] == 9)
 ok("🔴 a trip longer than the battery is flagged infeasible, not sized", not carbon.ev_day(600, 450, 10, 1.25, 500, 350)["feasible"])
 ok("fleet = ceil(trips ÷ (cycles a day × working days)): 545 ÷ (7 × 22) → 4; no cycle → None; no trips → 0",
    carbon.lorries_for(545, 7, 22) == 4 and carbon.lorries_for(10, None, 22) is None and carbon.lorries_for(0, None, 22) == 0)
+# 17 Oct 2026 (drivers' hours, the review): the electric day with the cycle's split given; a day too short for one trip
+ok("⭐ the review: with driving AND other work given, the electric day is the diesel day's rule (13 h, 60 + 30: 8 — "
+   # label NARROWED 18 Oct 2026 (the user): charging is counted as working time as the cautious reading, not as a rule
+   "drivers_hours.lorry_day), and charging is counted as working time, the cautious reading (30 + 30 a cycle, 125 kWh "
+   "trips: fewer than 9)",
+   carbon.ev_day(90, 40, 13, 1.25, None, None, drive_min=60, other_min=30)["cycles"] == 8
+   and carbon.ev_day(60, 100, 10, 1.25, 500, 350, drive_min=30, other_min=30)["cycles"]
+   < carbon.ev_day(60, 100, 10, 1.25, None, None, drive_min=30, other_min=30)["cycles"])
+_d0 = carbon.ev_day(800, 50, 10, 1.25, 500, 350)
+ok("⭐ the review: a battery that holds the trip but a day that holds none is FEASIBLE with 0 cycles, day_fits False "
+   "(never the 'trip exceeds battery' flag); the fleet then counts one lorry a trip",
+   _d0["cycles"] == 0 and _d0["feasible"] and _d0["day_fits"] is False
+   and carbon.ev_day(60, 40, 10, 1.25, 500, 350)["day_fits"] is True and carbon.lorries_for(44, 0, 22) == 2, str(_d0))
 ok("miles ↔ km 1.609344: 10 mi = 16.09344 km and back; km stays km",
    near(carbon.km_from(10, "mi"), 16.09344) and near(carbon.km_to(16.09344, "mi"), 10.0) and carbon.km_from(7, "km") == 7.0
    and carbon.KM_PER_MILE == config.KM_PER_MILE)
@@ -777,11 +801,45 @@ ok("...and it is left out of BOTH sides of the diesel/electric comparison (1 lin
 config.reset_to_file(conversions, by="harness")
 config.invalidate()
 
-ok("🔴 review: charging is simulated trip by trip — 200 kWh trips on 500 kWh: 7 cycles, 3 stops of 51.4 min (not 2 of 77)",
-   carbon.ev_day(60, 160, 10, 1.25, 500, 350)["cycles"] == 7 and carbon.ev_day(60, 160, 10, 1.25, 500, 350)["charges"] == 3
-   and near(carbon.ev_day(60, 160, 10, 1.25, 500, 350)["minutes_per_charge"], 900 / 350 * 60 / 3, 1e-6))
+# REVERSED 17 Oct 2026 (UK drivers' hours): 7 cycles = 420 + 154.3 + 45 = 619.3 > 600; 6 cycles: 1,200 kWh from a full
+# 500 = 700 kWh in 2 stops (400 then 300, each topped up only to what the rest of the day needs), 120 min, 60 a stop —
+# still simulated trip by trip (not 1 of 120); it was 7 cycles, 3 stops of 51.4 on the shift alone
+ok("🔴 review: charging is simulated trip by trip — 200 kWh trips on 500 kWh: 6 cycles, 2 stops of 60.0 min (not 1 of 120)",
+   carbon.ev_day(60, 160, 10, 1.25, 500, 350)["cycles"] == 6 and carbon.ev_day(60, 160, 10, 1.25, 500, 350)["charges"] == 2
+   and near(carbon.ev_day(60, 160, 10, 1.25, 500, 350)["minutes_per_charge"], 700 / 350 * 60 / 2, 1e-6))
 ok("...and the range is named for what it is: the range on ONE charge", "range_per_charge_km" in carbon.ev_day(60, 40, 10, 1.25, 500, 350)
    and "daily_range_km" not in carbon.ev_day(60, 40, 10, 1.25, 500, 350))
+# 17 Oct 2026 (drivers' hours, the review): the swapped route: at the route's own distance the row's trips a day ARE the answer; scaled, lorry_day on the scaled split
+_seen = []
+_eval0 = carbon._eval
+carbon._eval = lambda line, s, ctx: (_seen.append(_eval0(line, s, ctx)) or _seen[-1])
+try:
+    _rows = {r["profile"]: r for r in network.route_analysis("R1").get("rows", []) if r.get("alt_index") == 0}
+    _base_veh = {x["vehicle"] for x in carbon.scenario()["lines"] if x["route_id"] == "R1"}
+    _other = next((k for k in sorted(_rows) if k not in _base_veh and "electric" not in k), None)
+    _seen.clear()
+    _alt([{"driver": "vehicle", "scope": {"route_id": "R1"}, "vehicle": _other}])
+    _sw = [e for e in _seen if e["route_id"] == "R1" and e["vehicle"] == _other and e["baked"]]
+    _rw = _rows.get(_other)
+    ok("⭐ the review: a vehicle swap at the route's own distance reads route_analysis's trips a day for that vehicle "
+       "(no recomputing from rounded hours)",
+       bool(_sw) and _rw is not None and all(e["cycles_per_day"] == _rw["trips_per_day"] for e in _sw),
+       str((_other, sorted(_rows), [(e["cycles_per_day"], (_rw or {}).get("trips_per_day")) for e in _sw[:2]])))
+    _seen.clear()
+    _alt([{"driver": "source", "scope": {"route_id": "R1"}, "distance_pct": 50}])
+    _sc = [e for e in _seen if e["route_id"] == "R1" and e["baked"] and e["cycles_per_day"] is not None
+           and e["vehicle"] in _rows and abs((e["one_way_km"] or 0) - float(_rows[e["vehicle"]]["loaded_km"]) * 0.5) < 1e-6]
+    import drivers_hours  # noqa: E402
+    _int = lambda r: float((r.get("turnaround_parts") or {}).get("internal_travel_minutes") or 0.0)  # noqa: E731
+    _want = lambda r: drivers_hours.lorry_day(  # noqa: E731
+        drivers_hours.shift_hours(config.load(conversions))[0], (r["drive_min"] - _int(r)) * 0.5 + _int(r), r["other_work_min"],
+        typed_shift_h=drivers_hours.typed_shift_hours(config.load(conversions)))["trips"]
+    ok("...and at half the distance: drivers_hours.lorry_day on the halved legs, the gate minutes and other work kept",
+       bool(_sc) and all(e["cycles_per_day"] == _want(_rows[e["vehicle"]]) for e in _sc)
+       and any(e["cycles_per_day"] > _rows[e["vehicle"]]["trips_per_day"] for e in _sc),
+       str([(e["vehicle"], e["cycles_per_day"], _want(_rows[e["vehicle"]])) for e in _sc[:3]]))
+finally:
+    carbon._eval = _eval0
 a = _alt([{"driver": "material", "reused": True}])
 # R1 2,900 × (2.21 − 7.80307) = −16.2199; R5 1,000 × (2.21 − 7.80307) = −5.5931; soils: no re-used row → unchanged
 ok("🔴 review: an unscoped 're-used' applies where a re-used row is published and notes the rest (−21.813 t), never fails",
@@ -1050,7 +1108,9 @@ _src = read("backend/carbon.py")
 _code = _src.split('"""', 2)[2]
 ok("carbon.py reads the forecast through costlines.lines (one distance, one trip count)", "costlines.lines(" in _code)
 ok("...and the cycle through network.route_analysis — never a third cycle formula", "network.route_analysis(" in _code
-   and "avg_haul_speed" not in _code)
+   and "avg_haul_speed" not in _code
+   # NARROWED 17 Oct 2026: a swapped route's trips a lorry a day are drivers_hours.lorry_day's, never a shift ÷ cycle
+   and "// cycle_min" not in _code and "drivers_hours.lorry_day(" in _code and "drivers_hours.ev_trips(" in _code)
 ok("...every SQL it runs carries the tenant", _code.count("WHERE tenant_id = ?") == 2 and "INSERT" not in _code
    and "UPDATE " not in _code and "DELETE" not in _code)
 ok("🔴 no ICE and no invented factor in the code: every kg figure comes from the factor document",

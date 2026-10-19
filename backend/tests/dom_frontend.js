@@ -21,6 +21,12 @@ try { ({ JSDOM } = require(G + "jsdom")); } catch (e) { console.log("dom_fronten
 let pass = 0; const fail = [];
 const ok = (label, cond, extra) => { if (cond) pass++; else fail.push(label + (extra ? "  " + extra : "")); };
 
+// 18 Oct 2026 (D104 for the JS harnesses): today is a fixed day, shifted not frozen (lib/harness_clock.js) — the
+// Dashboard's this month ± 6 follows the clock, and the fixture lines sit in Sep–Nov 2026. Both realms: here, and the
+// jsdom window the app runs in (below, before the app's script). HARNESS_TODAY=YYYY-MM-DD runs on another day.
+const CLOCK = require(path.join(__dirname, "lib", "harness_clock.js"));
+CLOCK.pinNode();
+
 const ROOT = path.resolve(__dirname, "..", "..");
 const html = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 const src = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^ReactDOM\.createRoot\([\s\S]*?\);\s*$/m, "");
@@ -41,13 +47,22 @@ const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { b
 
 // ---- 1. a remembered choice is applied before anything mounts -------------------------
 w.localStorage.setItem("modus_theme", "light");
-w.eval(js + "\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;"
+w.eval(CLOCK.shiftSource());      // 18 Oct 2026: the app's realm reads the same shifted clock as the checks
+w.eval(js +"\nwindow.__T = THEME; window.__ACC = ACCENT; window.__CHARTFIT = { chartLegendPos }; window.__TENANT = TENANT; window.__ACCESS = ACCESS; window.__VEH = VEH;"
   // 13 Oct 2026 (W6): the app's own formatters, so the nothing-lost check formats each fact exactly as the old cell did
   + "\nwindow.__F = { grp, dist, distRate, DU, CUR, TKM, teamText, teamName, iptKey, vehLabel, unitLbl, gaN1, gaMin, gaFlagWord, fmt, flagWord, LINE_FLAG_LABEL, dayName, dayNum, isWeekend };");   // VEH: the vehicle-name languages (§3b, 11 Oct)   // ACCESS: the stored code (11 Oct, reload resume)   // consts in the script scope; THEME for §3, TENANT for §4
 ok("APPEARANCE: a remembered look (localStorage modus_theme) is on <html> before React mounts",
    w.document.documentElement.getAttribute("data-theme") === "light");
 ok("APPEARANCE: theme-color follows the header colour (white for the light look)",
    w.document.querySelector('meta[name="theme-color"]').getAttribute("content") === "#FFFFFF");
+// 18 Oct 2026: the shifted clock holds in both realms, and still ticks (a frozen clock would stall anything that waits on it)
+{
+  const appDay = w.eval("new Date().toISOString().slice(0, 10)"), hereDay = new Date().toISOString().slice(0, 10);
+  const skew = Math.abs(w.eval("Date.now()") - Date.now()), t0 = Date.now(); let spin = 0; while (Date.now() === t0 && spin < 5e7) spin++;
+  ok(`CLOCK: today is ${CLOCK.TODAY} in the checks AND in the app's realm (lib/harness_clock.js), and the clock still moves`,
+     appDay === CLOCK.TODAY && hereDay === CLOCK.TODAY && skew < 5000 && Date.now() > t0 && w.eval("Date.__harnessShifted") === true,
+     `app ${appDay}, here ${hereDay}, skew ${skew} ms`);
+}
 
 // ---- 2. the picker in the header ------------------------------------------------------
 act(() => { w.ReactDOM.createRoot(w.document.getElementById("root")).render(
@@ -812,6 +827,57 @@ async function gateArrivalsDom(){
        && rbtn().textContent === "Whole programme");
   }
   d1.done();
+
+  // 17 Oct 2026 (D114 fix): the LIVE path. Mounted with initialData (above) the Dashboard never reads its own lines, so the
+  // D114 checks passed while live opened on every month: its first read of /api/costing/lines widened From / To to the
+  // lines' own months. Here nothing is handed in, the page reads its lines itself, and the lines' months are built from
+  // today's month so the check cannot age.
+  {
+    const N = dMeta.months.count, lo = Math.max(1, thisMonth - 6), hi = Math.min(N, thisMonth + 6);
+    const shift = (ms, status) => ({ ...CL, lines: CL.lines.map((l, i) => ({ ...l, month_index: ms[i % ms.length], ...(status ? { status } : {}) })) });
+    // live's shape: approved lines in EVERY month of the horizon (the four-year demo has lines in all 60)
+    const everyMonth = { ...CL, lines: Array.from({ length: N }, (_, k) => ({ ...CL.lines[k % CL.lines.length], status: "Approved", month_index: k + 1 })) };
+    const inside = [Math.max(lo, thisMonth - 1), thisMonth, Math.min(hi, thisMonth + 1)];   // inside the window, narrower than it
+    const baseFetch = w.fetch;
+    const openLive = async (lines) => {
+      const reads = [];
+      w.fetch = (url, opt) => {
+        if (String(url).startsWith("/api/costing/lines")) { reads.push(String(url)); return reply(200, lines); }
+        return baseFetch(url, opt);
+      };
+      const m = mount(w.Dashboard, { meta: dMeta });
+      await settle(80);
+      const fs_ = m.el.querySelector('select[aria-label="From month"]'), ts_ = m.el.querySelector('select[aria-label="To month"]');
+      const out = { f: fs_ ? +fs_.value : null, t: ts_ ? +ts_.value : null, reads };
+      m.done(); w.fetch = baseFetch;
+      return out;
+    };
+    const e = await openLive(everyMonth);
+    ok("⭐ D114 LIVE PATH: mounted WITHOUT initialData, with approved lines in EVERY month (live's shape), the Dashboard reads "
+       + "its own lines and STILL opens on this month ± 6 — the old first read widened it to every month, what live showed",
+       e.reads.length === 1 && e.reads[0] === "/api/costing/lines?status=All" && e.f === lo && e.t === hi,
+       `${e.f}–${e.t} for ${lo}–${hi}; reads ${e.reads}`);
+    const a = await openLive(shift(inside));
+    ok("D114 LIVE PATH: ...and with every line inside the window it keeps the whole window (it does not narrow to the lines)",
+       a.reads.length === 1 && a.f === lo && a.t === hi, `${a.f}–${a.t} for ${lo}–${hi}`);
+    // the fallback, on whichever side(s) of the window the horizon leaves room for today (at least one always)
+    const sides = [];
+    if (lo > 2) sides.push({ name: "finished", ms: [1, 2] });
+    if (hi + 2 <= N) sides.push({ name: "not started yet", ms: [hi + 1, hi + 2] });
+    const fell = [];
+    for (const s of sides) { const r = await openLive(shift(s.ms, "Approved")); fell.push({ s, r }); }
+    ok("D114 LIVE PATH: ...and when not one approved line falls inside the window it opens on the months that have lines, "
+       + "never on a window with none (a programme finished / not started yet, each side the horizon allows today)",
+       sides.length >= 1 && fell.every(({ s, r }) => r.f === s.ms[0] && r.t === s.ms[1]),
+       fell.map(({ s, r }) => `${s.name}: ${r.f}–${r.t} for ${s.ms}`).join("; "));
+    // the page opens on Approved: Pending lines inside the window do not hold it there when every approved line is outside
+    const apOut = sides[0].ms;
+    const mixed = { ...CL, lines: CL.lines.map((l, i) => l.status === "Approved" ? { ...l, month_index: apOut[i % 2] } : { ...l, month_index: thisMonth }) };
+    const p = await openLive(mixed);
+    ok("D114 LIVE PATH: ...the lines counted are the Approved ones (the status the page opens on): Pending lines this month "
+       + "do not keep a window whose approved lines are all outside it",
+       CL.lines.some(l => l.status === "Pending") && p.f === apOut[0] && p.t === apOut[1], `${p.f}–${p.t} for ${apOut}`);
+  }
 
   // (2) the read lands
   srv.gates = () => reply(200, GA);
@@ -1887,7 +1953,48 @@ async function g3LoginsDom(){
 
 // one runner for the async sections (merged 11 Oct 2026: claude/carbon-process + claude/demo-bar): the bar's first,
 // on a fresh window, then the carbon target's (it mounts its pages directly, without the App shell)
+// ---- 17 Oct 2026 (the user: UK drivers' hours; the review): the Routes page's Trips/day cell, mounted ---------------
+// The § marks only a route the rules hold below the shift alone (trips < trips_without_rules), the cell's title is the
+// server's words, a 0 shows as a 0 with its words, and the footnote carries the 13 h note. fetch answers the analysis
+// read only; the gates / haul roads / restrictions reads never answer. Not covered: the real server's rows (http_smoke).
+async function routesDriversDom(){
+  const ROW = (profile, trips, lim, plain, words) => ({ profile, alt_index: 0, loaded_km: 12, return_km: 12, return_estimated: false,
+    load_minutes: 15, unload_minutes: 9, turnaround_hr: 0.4, turnaround_parts: {}, cycle_hr: 1.5, haul_speed_applied: false,
+    trips_per_day: trips, tonnes_per_day: 100, tonnes_per_month: 2200, co2_kg_per_trip: 30,
+    lorry_day: { limited_by: lim, trips_without_rules: plain, words, break_minutes: 45 } });
+  const NOTE = "The 15 h shift is read as 13 h for a lorry's trips: one driver's day (the 11-hour daily rest).";
+  const DATA = { rows: [
+      ROW("Tipper", 5, "breaks", 6, "5 a day: 1 fewer than the shift alone would hold: the required break takes the time (45 min break)"),
+      ROW("Flatbed", 8, "shift", 8, "8 a day: as many round trips as fit in the shift (45 min break)"),
+      ROW("Mixer", 0, "none", 0, "One round trip does not fit in a driver's day: counted as one lorry a trip")],
+    planning: { shift_hours_per_day: 15, working_days_per_month: 22, shift_note: NOTE } };
+  w.fetch = (url) => /\/api\/routes\/R1\/analysis$/.test(String(url)) ? reply(200, DATA) : new Promise(() => {});
+  const host = w.document.createElement("div"); w.document.body.appendChild(host);
+  const root = w.ReactDOM.createRoot(host);
+  const E = w.React.createElement;
+  act(() => { root.render(E("table", null, E("tbody", null, E(w.RouteAnalysis, { routeId: "R1", colSpan: 9, token: "t" })))); });
+  await settle(150);
+  const cells = [...host.querySelectorAll("td[data-trips-limit]")];
+  ok("⭐ ROUTES DOM: one Trips/day cell a row, each carrying its limit", cells.length === 3
+     && cells.map(c => c.getAttribute("data-trips-limit")).join() === "breaks,shift,none", String(cells.length));
+  ok("⭐ ROUTES DOM: § only where the rules took trips off (5 of 6), not on a shift-limited 8 nor on a 0 the shift alone also gives",
+     cells.length === 3 && cells[0].textContent === "5§" && cells[1].textContent === "8" && cells[2].textContent === "0",
+     cells.map(c => c.textContent).join("|"));
+  ok("ROUTES DOM: the cell's title is the server's words (why, and the 0 counted as one lorry a trip)",
+     cells.length === 3 && cells[0].title === DATA.rows[0].lorry_day.words && cells[2].title === DATA.rows[2].lorry_day.words);
+  const foot = host.textContent.replace(/\s+/g, " ");
+  ok("⭐ ROUTES DOM: the footnote says a planning figure, explains the 0, and carries the 13 h note for a 15 h shift",
+     foot.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip")
+     && foot.includes("A planning figure: weekly limits and the day's other duties are not modelled.") && foot.includes(NOTE)
+     // found in the Chrome check (18 Oct): JSX dropped the space at the line break — "modelled.t/month"
+     && foot.includes(NOTE + " t/month assumes") && !/\.t\/month/.test(foot)
+     && foot.includes("the 15 h shift less the break the UK drivers' hours rules require"), foot.slice(-700));
+  act(() => { root.unmount(); }); host.remove();
+}
+
 (async () => {
+  try { await routesDriversDom(); ok("ROUTES DOM: the section ran to the end", true); }
+  catch (e) { ok("ROUTES DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await demoBar(); ok("DEMO BAR: the section ran to the end", true); }
   catch (e) { ok("DEMO BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await lateBar(); ok("MAP UNDER THE BAR: the section ran to the end", true); }
