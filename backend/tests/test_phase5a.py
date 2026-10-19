@@ -786,6 +786,34 @@ ok("a deactivated gate is still drawn, flagged rather than dropped",
 
 
 # =========================================================================== #
+#  11b. 🔴 The public map gets each leg in its direction of travel (17 Oct)    #
+# =========================================================================== #
+#
+# map/index.html offsets BOTH legs left of their own line's direction (OFFSET_OUT =
+# OFFSET_IN). That only puts a route's two legs either side of a road if the return
+# arrives as it was baked, destination -> origin (the bake test above). If the feed ever
+# reversed or "normalised" the return to origin -> destination, both legs would sit on one
+# side again, the amber under the green, and nothing else would notice.
+reset_db()
+seed_two_locations()
+_LOADED = [[24.0, 58.5], [24.5, 58.6], [25.0, 58.5]]     # O (west) -> D (east)
+_RETURN = [[25.0, 58.5], [24.5, 58.4], [24.0, 58.5]]     # D -> O, by another road
+for _leg, _line in (("loaded", _LOADED), ("return", _RETURN)):
+    db.execute("INSERT INTO route_geometry (route_id, vehicle_profile, leg, alt_index, geometry, "
+               "distance_km, duration_hr, zones_applied, haul_zones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+               ("R1", "P", _leg, 0, json.dumps(_line), 70.0, 1.0, "", None))
+_legs = {f["properties"]["leg"]: f for f in network.public_map_data(profile="P")["features"]
+         if f["properties"].get("route_id") == "R1"}
+ok("17 Oct: 🔴 the return leg reaches the public map in its stored order, destination first",
+   _legs["return"]["geometry"]["coordinates"] == _RETURN
+   and _legs["return"]["properties"]["type"] == "Outbound Highway",
+   str(_legs.get("return", {}).get("geometry")))
+ok("17 Oct: ...and the laden leg origin first, so 'left of each line' is left of each lorry",
+   _legs["loaded"]["geometry"]["coordinates"] == _LOADED
+   and _legs["loaded"]["properties"]["type"] == "Inbound Highway")
+
+
+# =========================================================================== #
 #  12. Route alternatives — a SEPARATE collection, on purpose                  #
 # =========================================================================== #
 reset_db()

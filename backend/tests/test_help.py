@@ -726,6 +726,13 @@ ok("⭐ W10: the guide offers the CLP pack beside the month and says what it hol
    and "the charts that cannot be drawn yet are listed with what they need" in src
    and "<code>GET /api/clp/pack.pdf?month=N</code>" in open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read())
 
+# 17 Oct 2026: both route legs are drawn left of their own travel (map OFFSET_OUT = OFFSET_IN), so a route
+# that comes back the same road shows its green and amber side by side; the guide's legend row says so.
+ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its lorries drive, green and amber side by side",
+   "Each line sits just to the left of the way its lorries drive, so where a route comes back along the same road "
+   "its green and amber run side by side; they close onto the road as you zoom right in." in src)
+ok("17 Oct: ...and no longer says that nothing shows direction",
+   "Nothing shows direction — the colours do." not in src)
 # 17 Oct 2026 (UI audit #17, claude/ui-fix-keyboard): the 27 lazy figure images had no size, so a figure grew from 2 px to
 # its height as it loaded and pushed the focused "open it in the app" link (and anything a nav link scrolled to) off the
 # screen. Each <img> now carries its file's own pixel size (the box is reserved before the picture arrives), and the CSS
