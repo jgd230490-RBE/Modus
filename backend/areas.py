@@ -653,11 +653,29 @@ def area_load(month, working_days=None, drawn=None, geometry=True):
     wd = float(working_days or payload.get("working_days") or 0) or None
     if not wd:
         raise ValueError("working days per month is not set")
-    co2_failed = bool(payload.get("co2_error"))
+    ctx = _month_context(drawn)
+    return _area_month(month, payload.get("lines", []) or [], payload.get("co2_error"), wd, ctx, geometry)
+
+
+def _month_context(drawn=None):
+    """19 Oct 2026: what area_load reads that does not change with the month — the routes the map draws, the clip
+    table, the stored areas (prepared for point-in-polygon), the sites inside each — read once for every month by
+    area_load_all()."""
     drawn = _drawn() if drawn is None else dict(drawn)
+    areas = stored_areas()
+    prepared = [Area(a["area_id"], a["geometry"]) for a in areas]
+    sites, sites_placed = _sites_in(prepared)
+    return {"drawn": drawn, "clips": clip_table(), "areas": areas, "sites": sites, "sites_placed": sites_placed,
+            "stops": _stops()}
+
+
+def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
+    """One month's area payload (area_load's), from that month's approved lines and the month context."""
+    co2_failed = bool(co2_error)
+    drawn = ctx["drawn"]
 
     per_route, not_drawn = {}, {}
-    for l in payload.get("lines", []) or []:
+    for l in lines:
         rid = l["route_id"]
         if rid not in drawn:
             not_drawn[rid] = not_drawn.get(rid, 0) + 1
@@ -678,10 +696,8 @@ def area_load(month, working_days=None, drawn=None, geometry=True):
             return 0.0
         return pr["co2_t"] if pr["co2_lines"] else None
 
-    clips = clip_table()
-    areas = stored_areas()
-    prepared = [Area(a["area_id"], a["geometry"]) for a in areas]
-    sites, sites_placed = _sites_in(prepared)
+    clips, areas = ctx["clips"], ctx["areas"]
+    sites, sites_placed = ctx["sites"], ctx["sites_placed"]
     with_volume = sorted(r for r, pr in per_route.items() if pr["loads"] > 0)
 
     # each route on the profile the map draws it with
@@ -799,7 +815,7 @@ def area_load(month, working_days=None, drawn=None, geometry=True):
         "routes_not_clipped": not_clipped,
         "routes_not_drawn": sorted(not_drawn),
         # 13 Oct 2026 (W12): the scheme's colour bands, so the map paints with the figures the bulletin prints by
-        "stops": _stops(),
+        "stops": ctx["stops"],
         "notes": notes,
         "attribution": attribution,
         "carbon": {"stamp": road_sections._carbon_stamp(),
@@ -807,6 +823,58 @@ def area_load(month, working_days=None, drawn=None, geometry=True):
                            "that route's month CO₂e × its km inside ÷ its two-way length."},
     }
     if co2_failed:
-        out["co2_error"] = payload["co2_error"]
+        out["co2_error"] = co2_error
         notes.append("The carbon figures could not be read, so no CO2e figure is given here — see co2_error.")
+    return out
+
+
+# --------------------------------------------------------------------------- #
+#  19 Oct 2026 — every month in one read                                       #
+# --------------------------------------------------------------------------- #
+#: the payload keys that are the same in every month: sent once, under "common"
+ALL_COMMON_KEYS = ("working_days", "enter_km", "basis", "co2_basis", "stops", "attribution", "carbon")
+#: an area's keys that do not change with the month: sent once per area, under "area_fixed"
+ALL_AREA_FIXED_KEYS = ("name", "tier", "tier_words", "highway_authority", "source", "sites", "sites_count")
+
+
+def area_load_all(working_days, months):
+    """
+    19 Oct 2026 (the user: "the council heat map doesn't seem to work"). area_load(m, geometry=False) for every month
+    1..`months` in ONE read: the month context once, every month's approved lines from one pass
+    (main.approved_lines_by_month), then each month by the same _area_month. On Render each month's read took 3.7-7.4 s
+    (19 Oct, timed in the user's Chrome), so the councils showed no colour while Play ran at 0.75 s a month.
+
+    Packed so the horizon stays small: what every month shares once under "common", what an area keeps all horizon once
+    under "area_fixed", and per month only what changes. unpack_month(packed, m) (and the map's areaUnpack) rebuild
+    exactly area_load(m, geometry=False); test_areas.py holds the two equal for every month.
+    """
+    import main
+    wd = float(working_days or 0) or None
+    if not wd:
+        raise ValueError("working days per month is not set")
+    by_month, co2_error = main.approved_lines_by_month()
+    ctx = _month_context()
+    common, fixed, out = None, {}, {}
+    for m in range(1, int(months) + 1):
+        pay = _area_month(m, by_month.get(m, []), co2_error, wd, ctx, geometry=False)
+        if common is None:
+            common = {k: pay[k] for k in ALL_COMMON_KEYS}
+        entry = {k: v for k, v in pay.items() if k not in ALL_COMMON_KEYS and k != "areas"}
+        entry["areas"] = []
+        for a in pay["areas"]:
+            fixed.setdefault(a["area_id"], {k: a[k] for k in ALL_AREA_FIXED_KEYS})
+            entry["areas"].append({k: v for k, v in a.items() if k not in ALL_AREA_FIXED_KEYS})
+        out[str(m)] = entry
+    return {"months_count": int(months), "common": common or {}, "area_fixed": fixed, "months": out}
+
+
+def unpack_month(packed, month):
+    """One month of area_load_all()'s pack as area_load(month, geometry=False) returns it (the map's areaUnpack)."""
+    entry = (packed.get("months") or {}).get(str(int(month)))
+    if entry is None:
+        return None
+    out = dict(packed.get("common") or {})
+    out.update({k: v for k, v in entry.items() if k != "areas"})
+    fixed = packed.get("area_fixed") or {}
+    out["areas"] = [dict(fixed.get(a["area_id"]) or {}, **a) for a in entry.get("areas") or []]
     return out

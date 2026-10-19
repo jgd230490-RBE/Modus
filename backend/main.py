@@ -2418,23 +2418,10 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
 
     lines = []
     for r in rows:
-        v = r.get("vehicle_type")
-        known = bool(v and vs.get(v) and (vs.get(v) or {}).get("payload_t"))
-        payload = float(vs[v]["payload_t"]) if known else fb_payload
-        t = conversions.to_tonnes(r["quantity"], r["unit"], r.get("material_type"), v, factors)
-        lines.append({
-            "route_id": r["route_id"], "discipline": r.get("discipline") or "",
-            "section_id": r.get("section_id") or "", "ipt": r.get("ipt"),
-            "material_type": r.get("material_type") or "",
-            # 14 Oct 2026: vehicle_name is what the map prints; vehicle_type stays the stored key
-            "vehicle_type": v, "vehicle_name": conversions.vehicle_label(factors, v), "unit": r["unit"],
-            "qty_unit": conversions.round_for_unit(conversions.convert_row(r, unit, factors), unit),
-            "qty_t": round(t, 3),
-            "vehicle_loads": round(t / payload, 3) if payload else 0.0,
-            "payload_t": payload, "payload_fallback": (None if known else fb_name),
-            # movements one vehicle can make per day on THIS route, or None if unbaked
-            "trips_per_vehicle_day": trips_per_vehicle_day(r["route_id"], v),
-        })
+        line = _month_kpi_line(r, unit, factors, vs, fb_payload, fb_name)
+        # movements one vehicle can make per day on THIS route, or None if unbaked
+        line["trips_per_vehicle_day"] = trips_per_vehicle_day(r["route_id"], r.get("vehicle_type"))
+        lines.append(line)
     # 6 Oct 2026 (map redesign) — CO2e, the same figure the costlines read gives the
     # Dashboard: km x the vehicle's kg CO2e/km from factors.json, per line, for the month.
     # `co2_t` rides on each line (None where the route is not baked for that vehicle: no
@@ -2467,6 +2454,53 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
     if co2_error:
         out["co2_error"] = co2_error
     return out
+
+
+def _month_kpi_line(r, unit, factors, vs, fb_payload, fb_name):
+    """One APPROVED forecast row as /api/public/month-kpis carries it, less `trips_per_vehicle_day` (which needs a
+    route_analysis per route and vehicle) and `co2_t` (the month's carbon table). 19 Oct 2026: shared by the month read
+    and approved_lines_by_month(), so the council read for every month counts loads by the same rule."""
+    v = r.get("vehicle_type")
+    known = bool(v and vs.get(v) and (vs.get(v) or {}).get("payload_t"))
+    payload = float(vs[v]["payload_t"]) if known else fb_payload
+    t = conversions.to_tonnes(r["quantity"], r["unit"], r.get("material_type"), v, factors)
+    return {
+        "route_id": r["route_id"], "discipline": r.get("discipline") or "",
+        "section_id": r.get("section_id") or "", "ipt": r.get("ipt"),
+        "material_type": r.get("material_type") or "",
+        # 14 Oct 2026: vehicle_name is what the map prints; vehicle_type stays the stored key
+        "vehicle_type": v, "vehicle_name": conversions.vehicle_label(factors, v), "unit": r["unit"],
+        "qty_unit": conversions.round_for_unit(conversions.convert_row(r, unit, factors), unit),
+        "qty_t": round(t, 3),
+        "vehicle_loads": round(t / payload, 3) if payload else 0.0,
+        "payload_t": payload, "payload_fallback": (None if known else fb_name),
+    }
+
+
+def approved_lines_by_month():
+    """
+    19 Oct 2026 (the user: "the council heat map doesn't seem to work" — each month's council read took 4-7 s on
+    Render, so the councils never coloured while Play ran). Every month's approved lines in ONE pass: one forecast
+    query and one carbon table for the whole horizon, where /api/public/month-kpis makes one of each per month plus a
+    route_analysis per route and vehicle for `trips_per_vehicle_day`, which the council figures do not read.
+    Returns ({month_index: [line, ...]}, co2_error); each line as _month_kpi_line() builds it with `co2_t` from the
+    same costlines read (_approved_co2), so the council figures equal the month read's (test_areas.py holds them equal).
+    """
+    factors = conversions.load_factors()
+    vs = factors.get("vehicles", {}) or {}
+    fb_payload, fb_name = derived.payload_for(None, factors)
+    rows = db.query(
+        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+        "ORDER BY month_index, route_id, discipline, section_id",
+        (db.current_tenant(),))
+    table, co2_error = _approved_co2(factors, 1, MONTH_COUNT)
+    out = {}
+    for r in rows:
+        mi = int(r["month_index"])
+        line = _month_kpi_line(r, "vehicles", factors, vs, fb_payload, fb_name)
+        line["co2_t"] = table.get((line["route_id"], line["discipline"], line["section_id"], mi))
+        out.setdefault(mi, []).append(line)
+    return out, co2_error
 
 
 def _approved_co2(factors, from_month, to_month):
@@ -3075,6 +3109,18 @@ def public_areas(month: int = Query(..., ge=1, le=MONTH_COUNT), geometry: int = 
     """
     factors = conversions.load_factors()
     return areas.area_load(int(month), working_days=_working_days(factors), geometry=bool(geometry))
+
+
+@app.get("/api/public/areas/months")
+def public_areas_months():
+    """
+    19 Oct 2026 (the user: "the council heat map doesn't seem to work"). Every month's council figures in one read,
+    packed (areas.area_load_all): the map reads it once and Play / the month buttons recolour the councils at once.
+    On Render one month of /api/public/areas took 3.7-7.4 s, longer than Play's 0.75 s a month. Behind the map gate.
+    /api/public/areas?month= stays: the map falls back to it when this read fails.
+    """
+    factors = conversions.load_factors()
+    return areas.area_load_all(_working_days(factors), MONTH_COUNT)
 
 
 @app.post("/api/admin/areas/import")

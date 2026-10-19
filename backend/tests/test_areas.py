@@ -708,6 +708,50 @@ ok("5. area_load(geometry=False): the same figures without the polygons or label
    == [(a["area_id"], a["movements_per_day"], a["co2_t"]) for a in areas.area_load(M, working_days=WD)["areas"]])
 
 # =========================================================================== #
+#  5b. 19 Oct 2026 — every month in one read (the user: "the council heat map  #
+#      doesn't seem to work": 3.7-7.4 s a month on Render, longer than Play)   #
+# =========================================================================== #
+_all = areas.area_load_all(WD, main.MONTH_COUNT)
+_diff = [m for m in range(1, main.MONTH_COUNT + 1)
+         if json.dumps(areas.unpack_month(_all, m), sort_keys=True)
+         != json.dumps(areas.area_load(m, working_days=WD, geometry=False), sort_keys=True)]
+ok("5b. ⭐ area_load_all(): EVERY month unpacks to exactly area_load(m, geometry=False) — all " + str(main.MONTH_COUNT) + " months",
+   _diff == [] and len(_all["months"]) == main.MONTH_COUNT, str(_diff[:10]))
+ok("5b. ...and the month with routes in this file carries figures (not a vacuous pass)",
+   any(a["movements_per_day"] > 0 for a in areas.unpack_month(_all, M)["areas"]))
+ok("5b. the pack sends what every month shares ONCE (basis, stops, attribution, carbon, working days) and each area's fixed fields once",
+   set(_all["common"]) == set(areas.ALL_COMMON_KEYS)
+   and all(not (set(e) & set(areas.ALL_COMMON_KEYS)) for e in _all["months"].values())
+   and all(not (set(a) & set(areas.ALL_AREA_FIXED_KEYS)) for e in _all["months"].values() for a in e["areas"])
+   and set(_all["area_fixed"]) == {a["area_id"] for a in areas.area_load(M, working_days=WD, geometry=False)["areas"]})
+ok("5b. unpack_month() of a month outside the pack is None, never an empty month dressed as a figure",
+   areas.unpack_month(_all, main.MONTH_COUNT + 1) is None)
+_kpl = {}
+_by, _err = main.approved_lines_by_month()
+for _m in range(1, main.MONTH_COUNT + 1):
+    _one = main.public_month_kpis(month=_m, unit="vehicles")
+    _kpl[_m] = [{k: v for k, v in l.items() if k != "trips_per_vehicle_day"} for l in _one["lines"]]
+ok("5b. ⭐ approved_lines_by_month(): every month's lines equal the month read's (/api/public/month-kpis) less trips a vehicle-day",
+   all(_kpl[_m] == _by.get(_m, []) for _m in _kpl) and sum(len(v) for v in _by.values()) > 0 and _err is None)
+ok("5b. the month read and the every-month read build a line with ONE function (_month_kpi_line)",
+   read("backend/main.py").count("= _month_kpi_line(r, ") == 2 and "def _month_kpi_line(r, unit, factors, vs, fb_payload, fb_name):" in read("backend/main.py"))
+ok("5b. the every-month read makes ONE forecast query and ONE carbon read for the horizon (no route_analysis)",
+   "_approved_co2(factors, 1, MONTH_COUNT)" in read("backend/main.py")
+   and "network.route_analysis(" not in read("backend/main.py").split("def approved_lines_by_month():", 1)[1].split("\ndef ", 1)[0]
+   and read("backend/main.py").split("def approved_lines_by_month():", 1)[1].split("\ndef ", 1)[0].count("db.query(") == 1)
+# a carbon read that fails: every month says so, as the month read does
+_real_co2 = main._approved_co2
+try:
+    main._approved_co2 = lambda f, a, b: ({}, "The carbon figures could not be read (Boom).")
+    _allf = areas.area_load_all(WD, main.MONTH_COUNT)
+    _mf = areas.unpack_month(_allf, M)
+    ok("5b. a failed carbon read: every month carries co2_error and no CO2e figure (never a zero)",
+       all(e.get("co2_error") == "The carbon figures could not be read (Boom)." for e in _allf["months"].values())
+       and all(a["co2_t"] is None for a in _mf["areas"]))
+finally:
+    main._approved_co2 = _real_co2
+
+# =========================================================================== #
 #  6. The endpoints (bodies) and the gate scope                                #
 # =========================================================================== #
 ok("6. ⭐ /api/public/areas is behind the map scope", gate.scope_for("/api/public/areas?month=10") == "map"
@@ -715,6 +759,10 @@ ok("6. ⭐ /api/public/areas is behind the map scope", gate.scope_for("/api/publ
 ok("6. ⭐ /api/public/areas/shapes is behind the map scope too, and its body is shapes()",
    gate.scope_for("/api/public/areas/shapes") == "map" and main.public_area_shapes() == areas.shapes()
    and '@app.get("/api/public/areas/shapes")' in read("backend/main.py"))
+ok("6. ⭐ /api/public/areas/months (19 Oct) is behind the map scope, and its body is area_load_all() for the whole horizon",
+   gate.scope_for("/api/public/areas/months") == "map"
+   and json.dumps(main.public_areas_months(), sort_keys=True) == json.dumps(areas.area_load_all(WD, main.MONTH_COUNT), sort_keys=True)
+   and '@app.get("/api/public/areas/months")' in read("backend/main.py"))
 ok("6. the admin paths are not the map's (they are token-protected)",
    gate.scope_for("/api/admin/areas/import?token=x") is None and gate.scope_for("/api/admin/areas") is None)
 body = main.public_areas(month=M)

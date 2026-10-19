@@ -340,6 +340,52 @@
         #flow-legend{ margin-top:12px; }
         .mode-legend .ml-sub{ color:var(--muted); margin:-2px 0 4px; }
         .mode-legend .fl-sw{ flex:0 0 64px; display:block; }
+        /* 19 Oct 2026 (the user: "check the control panel is in a logical order, remove too much wording and put it into
+           an info box; too many month tabs"): the panel reads Month, Heat map, Views, Filter routes, then three folds and
+           the share row. An "i" button opens its section's explanation in place (one at a time; Esc or a click elsewhere
+           closes it); the 18 px circle has a 44 px hit area (::after), the phone rule. */
+        .ctl-head{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
+        .ctl-head h3, .ctl-head .heat-label, .ctl-head .area-legend-title{ margin:0; }
+        .info-i{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px; padding:0; border-radius:50%;
+                 border:1.5px solid #94A3B8; background:#fff; color:#475569; font:700 11px/1 Inter,system-ui,sans-serif; cursor:pointer; }
+        .info-i::after{ content:""; position:absolute; inset:-13px; }
+        .info-i[aria-expanded="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
+        .info-i:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+        .info-pop{ margin:0 0 10px; padding:10px 12px; background:#fff; border:1px solid #CBD5E1; border-radius:8px;
+                   box-shadow:0 6px 18px rgba(16,24,40,.10); font-size:13px; line-height:1.5; color:var(--ink); }
+        .info-pop[hidden]{ display:none; }
+        .info-pop p{ margin:0 0 6px; }
+        .info-pop p:last-child{ margin:0; }
+        .info-pop .area-note{ margin:0 0 6px; }
+        /* the month picker: a year row and that year's twelve months (was one chip per month: 60 on the four-year demo) */
+        .month-picker .mp-years{ display:flex; gap:4px; margin:0 0 6px; }
+        .month-picker .mp-months{ display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; }
+        .month-picker button{ height:32px; padding:0; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink);
+                              font:500 13px Inter,system-ui,sans-serif; cursor:pointer; }
+        .month-picker .mp-years button{ flex:1; font-weight:600; }
+        .month-picker button.none{ color:var(--muted); background:var(--surface-2); }
+        .month-picker button[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; font-weight:700; }
+        .month-picker .chips-none{ font-size:14px; color:var(--note); }
+        .fc-box #tl-open{ margin-top:8px; }
+        .fc-box .fc-toggle{ margin-top:8px; }
+        #forecast-status:empty{ display:none; }
+        /* the heat map as one segmented control (the three radio buttons keep their ids, names and handlers) */
+        .heat-seg{ display:flex; border:1px solid #D6D3D1; border-radius:8px; overflow:hidden; }
+        .heat-seg .fc-toggle.fc-mode{ flex:1; justify-content:center; margin:0; padding:8px 4px; border:0; border-right:1px solid #D6D3D1;
+                                      border-radius:0; background:#fff; }
+        .heat-seg .fc-toggle.fc-mode:last-child{ border-right:0; }
+        .heat-seg input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
+        .heat-seg label:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }
+        .heat-seg label:focus-within{ outline:2px solid var(--navy); outline-offset:-3px; }
+        .filter-grid{ display:grid; grid-template-columns:1fr 1fr; column-gap:6px; }
+        .filter-grid select{ min-width:0; }
+        .layers-box > summary small{ margin-left:6px; font-size:13px; font-weight:500; color:var(--muted); }
+        /* the number badges' key (the badges on the map are drawn by pillBadgeImage) */
+        .mv-pill, .co-pill{ flex:none; display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 7px; border-radius:10px; background:#fff;
+                            font:700 13px/20px Inter,system-ui,sans-serif; white-space:nowrap; }
+        .mv-pill{ color:#1D4ED8; box-shadow:inset 0 0 0 1.5px #2563EB; }
+        .co-pill{ color:#065F46; box-shadow:inset 0 0 0 1.5px #059669; }
+        .mode-legend .ml-key{ margin-top:6px; }
         #btn-detail{ margin-top:8px; display:none; }
 
         .mapboxgl-popup-content { border-radius:10px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:'Inter',sans-serif !important; }
@@ -656,6 +702,7 @@
             .preset-chip{ min-height:48px; padding:0 14px; }
             .m-done{ display:flex; order:99; position:sticky; bottom:-24px; margin:auto -18px -24px; padding:10px 18px 14px; background:#fff; border-top:1px solid var(--line); }
             .m-done .btn{ min-height:48px; }
+            .month-picker button{ min-height:44px; }
             #m-sheet{ display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; z-index:26; background:#fff;
                       border-top:1px solid var(--line); border-radius:16px 16px 0 0; box-shadow:0 -8px 28px rgba(16,24,40,.14);
                       max-height:calc(100% - var(--notice-h, 0px) - 72px); font-size:14px; color:var(--ink); padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -763,14 +810,17 @@
 
     <!-- 13 Oct 2026 (the user): preset views at the top of the panel, one click each. The buttons are built by
          renderPresets() in the last script block; on a phone this panel IS the Layers sheet, so they reach it too. -->
+    <!-- 19 Oct 2026 (the user): Month and Heat map (the forecast box, inserted ABOVE this group by the second script) come
+         first, then Views, Filter routes, the three folds (By council, What's moving, More layers) and the share row. -->
     <div class="control-group" id="preset-group">
-        <h3>Views</h3>
+        <div class="ctl-head"><h3>Views</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-views" onclick="toggleInfo(this)" title="About the views"><span aria-hidden="true">i</span><span class="sr-only">About the views</span></button></div>
+        <div class="info-pop" id="info-views" hidden>Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>
         <div class="preset-views" id="preset-views" role="group" aria-label="Preset views"></div>
-        <div class="preset-note">Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>
     </div>
 
-    <div class="control-group">
-        <h3>Route filtering</h3>
+    <div class="control-group" id="filter-group">
+        <h3>Filter routes</h3>
+        <div class="filter-grid">
         <select id="filter-origin" onchange="applyFilters()" aria-label="Origin"><option value="ALL">All origins</option></select>
         <select id="filter-dest" onchange="applyFilters()" aria-label="Destination"><option value="ALL">All destinations</option></select>
         <!-- was the legacy 'leg' filter (Primary/Direct, Hub Distribution). The routing
@@ -779,16 +829,61 @@
              so it stays disabled until some exist. -->
         <select id="filter-discipline" onchange="applyFilters()" aria-label="Discipline"><option value="ALL">All disciplines</option></select>
         <select id="filter-ipt" onchange="applyFilters()" aria-label="Team"><option value="ALL">All teams</option></select>
-        <button class="btn btn-ghost" onclick="resetFilters()">Reset filters</button>
-        <!-- 14 Oct 2026 (backlog item 2): the route map export, STAFF ONLY (the user, 14 Oct). Hidden until
-             /api/public/whoami says staff; the endpoint refuses anyone else (401) whatever the page shows. -->
-        <button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport()">Export route map (plan)</button>
+        </div>
+        <!-- 19 Oct 2026: shown only while a filter is set (syncFilterReset) -->
+        <button class="btn btn-ghost" id="filter-reset" hidden onclick="resetFilters()">Reset filters</button>
+    </div>
+    <!-- §2.2b / D27 (12 Oct 2026): movements and carbon per council. Its OWN group and boxes, outside
+         "Disruption zones"; off by default; hidden when the tenant has loaded no council areas. The fill is
+         one hue (the plan blue) on fixed stops; the figures come from /api/public/areas. -->
+    <div class="control-group" id="council-group" hidden>
+        <details class="layers-box" id="council-fold">
+        <summary>By council <small id="council-fold-sum"></small></summary>
+        <div class="control-item"><label><input type="checkbox" id="layer-areas-district" onchange="toggleAreaTier('district', this.checked)"> Local authority districts</label><span class="color-dot" style="background:#6A8BD2; border-radius:3px;"></span></div>
+        <div class="area-legend-title area-sub" id="area-mode-title">Colour the districts by</div>
+        <div class="kpi-switch area-mode" id="area-mode"></div>
+        <div id="area-district-rows" hidden></div>
+        <div id="area-legend" hidden></div>
+        <div class="area-legend-title area-sub">Highway authority</div>
+        <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:2px;"></span></div>
+        <div class="area-county-fig" id="area-county-fig"></div>
+        <div class="area-note" id="area-notes"></div>
+        <div class="ctl-head" style="margin-top:8px"><span class="area-legend-title">About these figures</span><button type="button" class="info-i" aria-expanded="false" aria-controls="info-council" onclick="toggleInfo(this)" title="About the council figures"><span aria-hidden="true">i</span><span class="sr-only">About the council figures</span></button></div>
+        <div class="info-pop" id="info-council" hidden>
+        <div class="area-note" id="area-unitary-note"></div>
+        <div class="area-note" id="area-focus-note" hidden>While By council is on, every other layer is switched off and the heat map is off, so the councils read by themselves. Tick any layer to add it back (routes show thin and grey); unticking By council brings back the layers you had on.</div>
+        <div class="area-note" id="area-when"></div>
+        <div class="area-note" id="area-attribution"></div>
+        </div>
+        </details>
+    </div>
+
+    <!-- Phase 2.5a — road-restriction layers from the tenant country's road authority
+         (Estonia's Tark Tee; since H1 also National Highways' planned closures for
+         Great Britain), proxied and reprojected by the backend. See
+         backend/restrictions.py: that source declares WKID 4326 and returns L-EST97
+         metres, so nothing here may draw a raw coordinate. Hidden unless the API names
+         a provider for the tenant's country.
+         Toggles are built from /api/restrictions/layers so the catalogue lives in one
+         place rather than being copied into this file. -->
+    <!-- 2026-10-06 — "what is moving": the breakdown moved here from the KPI card over the
+         map. Shown only while a month is on screen. -->
+    <div class="control-group" id="kpi-moving">
+        <details class="layers-box" id="moving-fold">
+        <summary><span id="kpi-moving-title">What's moving</span></summary>
+        <div class="kpi-switch" id="kpi-switch"></div>
+        <div class="kpi-chips" id="kpi-breakdown"></div>
+        <h3 style="margin-top:16px">Busiest routes</h3>
+        <div id="kpi-busiest"></div>
+        </details>
     </div>
 
     <!-- 11 Oct 2026 — the map leads (ui-review-1009, mockup 7): the layer controls fold away. Closed by
-         default; every control inside keeps its id and handler, so nothing that reads them changes. -->
+         default; every control inside keeps its id and handler, so nothing that reads them changes.
+         19 Oct 2026 (the user): "More layers", below the council and What's moving folds, and the community,
+         collision, road-closure and lorry-limit groups inside it (each still hidden until it has something to show). -->
     <details class="layers-box" id="layers-box">
-    <summary>Layers and basemap</summary>
+    <summary>More layers <small>basemap, closures, limits…</small></summary>
     <div class="control-group">
         <h3>Basemap</h3>
         <!-- 16 Oct 2026: "Standard (3D)" (mapbox://styles/mapbox/standard) is gone. That style needs
@@ -884,28 +979,6 @@
         <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes</label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
         <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:12px;color:var(--note);">loading…</span></div>
     </div>
-    </details>
-
-    <!-- §2.2b / D27 (12 Oct 2026): movements and carbon per council. Its OWN group and boxes, outside
-         "Disruption zones"; off by default; hidden when the tenant has loaded no council areas. The fill is
-         one hue (the plan blue) on fixed stops; the figures come from /api/public/areas. -->
-    <div class="control-group" id="council-group" hidden>
-        <h3>By council</h3>
-        <div class="control-item"><label><input type="checkbox" id="layer-areas-district" onchange="toggleAreaTier('district', this.checked)"> Local authority districts</label><span class="color-dot" style="background:#6A8BD2; border-radius:3px;"></span></div>
-        <div class="area-legend-title area-sub" id="area-mode-title">Colour the districts by</div>
-        <div class="kpi-switch area-mode" id="area-mode"></div>
-        <div id="area-district-rows" hidden></div>
-        <div id="area-legend" hidden></div>
-        <div class="area-legend-title area-sub">Highway authority</div>
-        <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:2px;"></span></div>
-        <div class="area-county-fig" id="area-county-fig"></div>
-        <div class="area-note" id="area-unitary-note"></div>
-        <div class="area-note" id="area-focus-note" hidden>While By council is on, every other layer is switched off and the heat map is off, so the councils read by themselves. Tick any layer to add it back (routes show thin and grey); unticking By council brings back the layers you had on.</div>
-        <div class="area-note" id="area-when"></div>
-        <div class="area-note" id="area-notes"></div>
-        <div class="area-note" id="area-attribution"></div>
-    </div>
-
     <!-- 14 Oct 2026: the community considerations layer (the CLOCS CLP template's "community considerations").
          STAFF ONLY: hidden in the markup and shown only when /api/public/whoami answers level "staff" (as the
          route map export is); the map password's view never sees it and /api/community refuses its cookie. Off by
@@ -934,24 +1007,6 @@
         <div class="area-note" id="collision-attribution"></div>
     </div>
 
-    <!-- Phase 2.5a — road-restriction layers from the tenant country's road authority
-         (Estonia's Tark Tee; since H1 also National Highways' planned closures for
-         Great Britain), proxied and reprojected by the backend. See
-         backend/restrictions.py: that source declares WKID 4326 and returns L-EST97
-         metres, so nothing here may draw a raw coordinate. Hidden unless the API names
-         a provider for the tenant's country.
-         Toggles are built from /api/restrictions/layers so the catalogue lives in one
-         place rather than being copied into this file. -->
-    <!-- 2026-10-06 — "what is moving": the breakdown moved here from the KPI card over the
-         map. Shown only while a month is on screen. -->
-    <div class="control-group" id="kpi-moving">
-        <h3 id="kpi-moving-title">What's moving</h3>
-        <div class="kpi-switch" id="kpi-switch"></div>
-        <div class="kpi-chips" id="kpi-breakdown"></div>
-        <h3 style="margin-top:16px">Busiest routes</h3>
-        <div id="kpi-busiest"></div>
-    </div>
-
     <div class="control-group" id="restrictions-group" hidden>
         <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
@@ -975,6 +1030,20 @@
         <div class="control-item" id="limit-empty" hidden><span style="font-size:14px;color:var(--note);">No lorry limits loaded for this area yet</span></div>
         <div class="control-item" style="padding-left:2px;margin-top:-2px;">
             <span id="limit-source" style="font-size:14px;color:var(--note);">OpenStreetMap contributors and HERE · coverage is incomplete. Advisory: check the signed limit on site.</span>
+        </div>
+    </div>
+
+    </details>
+
+    <!-- 19 Oct 2026 (the user): the share row at the foot of the panel; "Report a concern" is in the Link and QR card -->
+    <div class="control-group share-group" id="share-group">
+        <div class="share-row">
+            <button type="button" class="btn btn-ghost" id="btn-month-text" onclick="openMonthText()">Month as text</button>
+            <button type="button" class="btn btn-ghost" id="btn-share" onclick="openSharePanel()">Link and QR code</button>
+            <button type="button" class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
+            <!-- 14 Oct 2026 (backlog item 2): the route map export, STAFF ONLY (the user, 14 Oct). Hidden until
+                 /api/public/whoami says staff; the endpoint refuses anyone else (401) whatever the page shows. -->
+            <button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport()">Export route map (plan)</button>
         </div>
     </div>
 
@@ -1148,6 +1217,7 @@
   <div class="share-row"><button type="button" class="btn" onclick="copyViewLink()">Copy link</button></div>
   <div id="share-status" role="status" aria-live="polite"></div>
   <p class="mt-note" id="share-note">The link opens the map on this month with these layers and filters. It still asks for the map password.</p>
+  <div class="concern-slot"></div>
 </div>
 
 <!-- 14 Oct 2026 (backlog item 2): the route map export — the routes the filters show, one month, two options. Staff only. -->
@@ -2861,9 +2931,15 @@
         });
     }
 
+    // 19 Oct 2026: "Reset filters" shows only while one of the four is set
+    function syncFilterReset() {
+        const b = document.getElementById('filter-reset');
+        if (b) b.hidden = ['filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt'].every(id => { const el = document.getElementById(id); return !el || el.value === 'ALL'; });
+    }
     function applyFilters() {
         const o = document.getElementById('filter-origin').value; const d = document.getElementById('filter-dest').value;
         const disc = document.getElementById('filter-discipline').value; const i = document.getElementById('filter-ipt').value;
+        syncFilterReset();
         const inVis = document.getElementById('layer-inbound').checked; const outVis = document.getElementById('layer-outbound').checked;
 
         calculateKPIs(o, d, disc, i);
@@ -4200,7 +4276,7 @@
     // Track C review: `shapes` (the polygons, read ONCE from /api/public/areas/shapes) and the month's figures
     // (/api/public/areas?geometry=0, cached per month) are joined on area_id, so Play does not re-send every polygon
     const AREAS = { cache: {}, pending: {}, month: null, mode: 'movements', data: null, off: new Set(), probed: false, drawn: '',
-                    shapes: null, shapesPending: null, error: null };
+                    shapes: null, shapesPending: null, error: null, all: null, allPending: null, allFailed: false, loading: false };
     const AREA_RAMP = ['#89A3DC', '#6A8BD2', '#4A72C9', '#2D4E95'];     // the plan blue #4A72C9, one hue, light to dark; the light end 2.5:1 on white
     // 12 Oct 2026 (night, the user: "movements in blue hue and carbon in orange hue"): the carbon colouring of the councils
     // is ONE orange hue, light to dark, the light end 2.4:1 on white (rule: an ordinal ramp starts no lighter than 2:1).
@@ -4253,23 +4329,25 @@
     const AREA_BADGE_EDGE = { movements: '#2D4E95', carbon: '#B8470A' };      // the darkest step of each ramp
     const AREA_LABEL_BOLD = ['Open Sans Bold', 'Arial Unicode MS Bold'];      // the bold of the style's default fontstack
     function areaNum(n) { return (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toLocaleString('en-GB'); }
+    // 19 Oct 2026 (the user: "labels too big, reduce by approx 35 %"): TWO lines, the name in normal case (was capitals)
+    // and the figure; the route count moved to the card a click opens. "no approved route" is "none" (the card says it in
+    // full). Type stays at the 13 px floor (decision 4, 17 Oct); the cards shrink ~35-40 % each way.
     function areaLabelParts(a, mode) {
-        const out = { lb_name: String(a.name || '').toUpperCase(), lb_fig: '', lb_sub: '',
+        const out = { lb_name: String(a.name || ''), lb_fig: '', lb_sub: '',
                       lb_badge: mode === 'carbon' ? 'area-badge-carbon' : 'area-badge-movements' };
+        if (a.loading) { out.lb_sub = 'reading…'; return out; }     // the month's figures are on their way
         if (a.nofig) return out;                        // no month on screen: the name alone (the group says to pick one)
         if (mode === 'carbon') {
             if (a.co2_t === null || a.co2_t === undefined) out.lb_sub = 'no carbon figure';
             else if (!(a.co2_t > 0) && a.unclipped) out.lb_sub = 'no figure yet';
-            else if (!(a.co2_t > 0)) out.lb_sub = 'no approved route';
+            else if (!(a.co2_t > 0)) out.lb_sub = 'none';
             else out.lb_fig = areaNum(a.co2_t) + ' t CO₂e';     // the month is the bar's and the legend's
             return out;
         }
         if (!(a.movements_per_day > 0) && a.unclipped) { out.lb_sub = 'no figure yet'; return out; }
-        if (!(a.movements_per_day > 0)) { out.lb_sub = (a.return_only_routes || []).length ? 'empties only' : 'no approved route'; return out; }
-        const n = a.routes_count || 0;
+        if (!(a.movements_per_day > 0)) { out.lb_sub = (a.return_only_routes || []).length ? 'empties only' : 'none'; return out; }
         // "two-way movements a day" is the legend's title and the bar's; on the card it would wrap and hide neighbours
         out.lb_fig = areaNum(a.movements_per_day) + ' a day';
-        out.lb_sub = n + (n === 1 ? ' route' : ' routes');
         return out;
     }
     // name, then (a line break and) the figure in bold, then what it counts; an empty part draws no line
@@ -4278,7 +4356,7 @@
         return ['format',
                 ['coalesce', ['get', 'lb_name'], ['get', 'label']], {},
                 br('lb_fig'), {},
-                ['coalesce', ['get', 'lb_fig'], ''], { 'font-scale': 1.35, 'text-font': ['literal', AREA_LABEL_BOLD] },
+                ['coalesce', ['get', 'lb_fig'], ''], { 'font-scale': AREA_FIG_SCALE, 'text-font': ['literal', AREA_LABEL_BOLD] },
                 br('lb_sub'), {},
                 ['coalesce', ['get', 'lb_sub'], ''], {}];
     }
@@ -4301,14 +4379,15 @@
         });
     }
     // the layout both label layers share (the district's and the county's)
+    // 19 Oct 2026: 13 px name (the floor), the figure 14 px bold (13 x 1.08); were 14-16 px and 1.35 times that
+    const AREA_LABEL_SIZE = 13, AREA_FIG_SCALE = 1.08;
     function areaLabelLayout(visibility) {
         return { visibility: visibility, 'text-field': areaLabelField(),
-                 // 14 px is the floor (the name and the line under the figure); the figure is 1.35 times that
-                 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 14, 12, 16], 'text-max-width': 20,
-                 'text-line-height': 1.15, 'symbol-placement': 'point', 'text-padding': 4,
+                 'text-size': AREA_LABEL_SIZE, 'text-max-width': 20,
+                 'text-line-height': 1.15, 'symbol-placement': 'point', 'text-padding': 3,
                  'symbol-sort-key': ['-', 0, ['get', 'v']],
                  'icon-image': ['coalesce', ['get', 'lb_badge'], 'area-badge-movements'],
-                 'icon-text-fit': 'both', 'icon-text-fit-padding': [2, 6, 2, 6] };
+                 'icon-text-fit': 'both', 'icon-text-fit-padding': [1, 5, 1, 5] };
     }
     const AREA_LABEL_PAINT = { 'text-color': AREA_INK, 'text-halo-width': 0 };
     // a district row's figure breaks only at its ' · ' ("257 a day ·" over "16 routes"), never inside a figure
@@ -4396,16 +4475,49 @@
     }
     // the shapes with one month's figures joined on area_id (figs null: no month on screen, every area "no figure");
     // `unclipped` = the routes with volume the server could not place yet (named, and never read as a zero)
-    function areaJoin(shapes, figs) {
+    function areaJoin(shapes, figs, loading) {
         const byId = {};
         ((figs && figs.areas) || []).forEach(a => { byId[a.area_id] = a; });
         const nc = ((figs && figs.routes_not_clipped) || []).length;
         const out = Object.assign({}, figs || {});
+        // 19 Oct 2026: `loading` = the month's figures are on their way: every card says "reading…" (no fill yet)
         out.areas = ((shapes && shapes.areas) || []).map(s => Object.assign({}, byId[s.area_id] || { nofig: true }, s,
-            figs && nc ? { unclipped: nc } : {}, figs ? {} : { nofig: true }));
+            figs && nc ? { unclipped: nc } : {}, figs ? {} : { nofig: true }, (!figs && loading) ? { loading: true } : {}));
         out.attribution = (shapes && shapes.attribution) || (figs && figs.attribution) || [];
         out.stops = (figs && figs.stops) || (shapes && shapes.stops) || null;     // W12: the scheme's bands
         return out;
+    }
+    // 19 Oct 2026 (the user: "the council heat map doesn't seem to work"): on Render one month of /public/areas took 3.7-7.4 s,
+    // so the councils showed bare outlines while it loaded and never coloured while Play ran (0.75 s a month). Now EVERY
+    // month comes in one read (/public/areas/months, packed: what all months share once), unpacked into AREAS.cache, so
+    // Play and the month buttons recolour at once. /public/areas?month= stays as the fallback when that read fails.
+    function areaUnpack(packed, m) {
+        const entry = packed && packed.months ? packed.months[String(m)] : null;
+        if (!entry) return null;
+        const out = Object.assign({}, packed.common || {});
+        Object.keys(entry).forEach(k => { if (k !== 'areas') out[k] = entry[k]; });
+        const fixed = packed.area_fixed || {};
+        out.areas = (entry.areas || []).map(a => Object.assign({}, fixed[a.area_id] || {}, a));
+        return out;
+    }
+    function fetchAreasAll() {
+        if (AREAS.all) return Promise.resolve(AREAS.all);
+        if (AREAS.allFailed) return Promise.reject(new Error('council months unavailable'));
+        if (!AREAS.allPending) AREAS.allPending = fetch(CONFIG.API_BASE + '/public/areas/months')
+            .then(r => r.ok ? r.json() : Promise.reject(r.status))
+            .then(j => {
+                AREAS.all = j;
+                Object.keys(j.months || {}).forEach(k => { const one = areaUnpack(j, k); if (one) AREAS.cache[Number(k)] = one; });
+                return j;
+            })
+            .catch(e => { AREAS.allFailed = true; console.warn('council areas: every month in one read failed; reading month by month', e); throw e; })
+            .finally(() => { AREAS.allPending = null; });
+        return AREAS.allPending;
+    }
+    // one month's figures: the cache (filled by the one read), else that read, else the month's own read
+    function loadAreaMonth(m) {
+        if (AREAS.cache[m]) return Promise.resolve(AREAS.cache[m]);
+        return fetchAreasAll().then(() => AREAS.cache[m] || fetchAreas(m), () => fetchAreas(m));
     }
     async function fetchAreas(m) {
         if (AREAS.cache[m]) return AREAS.cache[m];
@@ -4426,19 +4538,22 @@
         if (!AREAS.data) { AREAS.data = areaJoin(AREAS.shapes, null); AREAS.month = null; renderAreas(); }   // the group shows
         if (AREAS.probed && !areaTierOn('district') && !areaTierOn('county')) return;   // off: nothing to fetch
         if (!m) {                                      // no single month on screen: the polygons, no figure, a note
-            AREAS.error = null;
+            AREAS.error = null; AREAS.loading = false;
             if (AREAS.month !== null || !AREAS.data.areas.every(a => a.nofig)) { AREAS.data = areaJoin(AREAS.shapes, null); AREAS.month = null; }
             renderAreas();
             return;
         }
-        fetchAreas(m).then(j => {
+        // 19 Oct 2026: nothing coloured yet and the figures not here: say so on the cards (a month already on screen
+        // keeps its colours until the next one arrives)
+        if (!AREAS.cache[m] && AREAS.month === null) { AREAS.loading = true; AREAS.data = areaJoin(AREAS.shapes, null, true); renderAreas(); }
+        loadAreaMonth(m).then(j => {
             if (m !== areasMonth()) return;            // the playhead has moved on: paint only the month on screen
-            AREAS.data = areaJoin(AREAS.shapes, j); AREAS.month = m; AREAS.error = null;
+            AREAS.data = areaJoin(AREAS.shapes, j); AREAS.month = m; AREAS.error = null; AREAS.loading = false;
             renderAreas();
         }).catch(e => {
             console.warn('council areas: the month could not be read', e);
             if (m !== areasMonth()) return;
-            AREAS.data = areaJoin(AREAS.shapes, null); AREAS.month = null;
+            AREAS.data = areaJoin(AREAS.shapes, null); AREAS.month = null; AREAS.loading = false;
             AREAS.error = 'The council figures could not be read for ' + ((typeof monthLabel === 'function') ? monthLabel(m) : 'this month') + '.';
             renderAreas();
         });
@@ -4451,7 +4566,7 @@
         if (typeof schedulePresetRender === 'function') schedulePresetRender();   // 13 Oct: the council views show with the group
         if (!has) return;
         const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
-        const key = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(',')].join('|');
+        const key = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(','), AREAS.loading ? 'loading' : ''].join('|');
         const noMonth = !AREAS.month;                  // Track C review: no single month on screen, no figure, no fill
         ensureAreaLayers();
         if (key !== AREAS.drawn && map.getSource('areas-source')) {
@@ -4460,6 +4575,9 @@
             if (map.getLayer('area-fill')) map.setPaintProperty('area-fill', 'fill-opacity', noMonth ? 0 : AREA_FILL_OPACITY);
             AREAS.drawn = key;
         }
+        // 19 Oct 2026: the fold's summary counts the districts
+        const fs = document.getElementById('council-fold-sum');
+        if (fs) { const nd = j.areas.filter(a => a.tier === 'district').length; fs.textContent = nd ? nd + ' council' + (nd === 1 ? '' : 's') : ''; }
         // the group: the colour-by switch, one row per district with its own box and figure, the legend, the lines
         const sw = document.getElementById('area-mode');
         if (sw) sw.innerHTML = [['movements', 'Two-way movements a day'], ['carbon', 't CO₂e this month']].map(([k, l]) =>
@@ -4596,6 +4714,8 @@
         }
     }
     function toggleAreaTier(tier, on) {
+        // 19 Oct 2026: the council group is a fold; switching the view on opens it, so its legend and rows show
+        if (on) { const fold = document.getElementById('council-fold'); if (fold && !fold.open) fold.open = true; }
         // Track C review: a tick with no single month on screen opens the timeline (its month), as Road load and Carbon do
         if (on && !areasMonth() && typeof TL !== 'undefined' && !TL.on && typeof openTimeline === 'function') openTimeline();
         const vis = areaVisibility();
@@ -5536,36 +5656,34 @@
             let sidebar = document.querySelector('.sidebar');
             if(sidebar) {
                 let pluginUI = `
-                <div class="control-group fc-box">
-                    <h3>Forecast traffic volume</h3>
-                    <!-- 12 Oct 2026 (D14): one chip per month that carries volume replaces the 60-entry From / To selects -->
-                    <div class="fc-row">
-                        <div><label id="fc-chips-label">Month</label><div class="month-chips" id="fc-chips" role="group" aria-labelledby="fc-chips-label"></div></div>
-                    </div>
+                <div class="control-group fc-box" id="fc-box">
+                    <!-- 19 Oct 2026 (the user: "too many month tabs"): a year row and its twelve months (renderMonthPicker)
+                         replace the 12 Oct (D14) chip per month — 60 chips on the four-year demo. The phone sheet keeps its chips. -->
+                    <div class="ctl-head"><h3 id="fc-month-label">Month</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-month" onclick="toggleInfo(this)" title="About the month"><span aria-hidden="true">i</span><span class="sr-only">About the month</span></button></div>
+                    <div class="info-pop" id="info-month" hidden><p>Approved forecasts only, never actuals.</p><p>A grey month has nothing approved; you can still pick it. Play steps through the months; the bar at the foot of the map shows the whole horizon. Show forecast routes draws the routes over a range of months instead of one.</p></div>
+                    <div class="month-picker" id="fc-months" role="group" aria-labelledby="fc-month-label"></div>
+                    <button type="button" class="btn" id="tl-open" onclick="startTimeline()">▶ Play forecast timeline</button>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
-                    <!-- 12 Oct 2026 (the user, evening): ONE heat map, volume OR carbon, never both (radio buttons) -->
+                    <div id="forecast-status"></div>
+                    <!-- 12 Oct 2026 (the user, evening): ONE heat map, volume OR carbon, never both (radio buttons);
+                         19 Oct 2026: drawn as one segmented control, the explanations behind its "i" -->
                     <div class="heat-group" role="radiogroup" aria-labelledby="heat-label">
-                    <div class="heat-label" id="heat-label">Heat map</div>
+                    <div class="ctl-head"><div class="heat-label" id="heat-label">Heat map</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-heat" onclick="toggleInfo(this)" title="About the heat map"><span aria-hidden="true">i</span><span class="sr-only">About the heat map</span></button></div>
+                    <div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day. Each route by its own figure; a stretch of road two or more routes share by the routes using it, summed.</p><p><b>Carbon</b>: t CO₂e in the month, per route.</p><p id="heat-info-more"></p></div>
+                    <div class="heat-seg">
                     <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>
-                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume <span class="mode-sub">two-way movements a day</span></label>
-                    <div class="mode-note" id="road-load-note">Each route by its own figure; a stretch of road two or more routes share by the routes using it, summed.</div>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon</label>
+                    </div>
                     <div class="mode-legend" id="road-load-legend" hidden></div>
-                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon <span class="mode-sub">t CO₂e in the month, per route</span></label>
                     <div class="mode-legend" id="carbon-legend" hidden></div>
                     </div>
                     <!-- 16 Oct 2026 (D115): the flow's legend, shown while the lanes are on the map (renderFlowLegend) -->
                     <div class="mode-legend" id="flow-legend" hidden></div>
-                    <button class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
-                    <button class="btn btn-ghost" id="tl-open" onclick="startTimeline()" style="margin-top:6px;">▶ Play forecast timeline</button>
-                    <div id="forecast-status">Approved forecasts only.</div>
-                    <!-- 12 Oct 2026 (review 2.1, 2.3): the month as text, a link to this view and its QR, and "Report a concern" -->
-                    <div class="share-row">
-                        <button type="button" class="btn btn-ghost" id="btn-month-text" onclick="openMonthText()">Month as text</button>
-                        <button type="button" class="btn btn-ghost" id="btn-share" onclick="openSharePanel()">Link and QR code</button>
-                    </div>
-                    <div class="concern-slot"></div>
                 </div>`;
-                sidebar.insertAdjacentHTML('beforeend', pluginUI);
+                // 19 Oct 2026: at the TOP of the panel, above Views (it was the last group, 3,000 px down)
+                const top = document.getElementById('preset-group');
+                if (top) top.insertAdjacentHTML('beforebegin', pluginUI); else sidebar.insertAdjacentHTML('beforeend', pluginUI);
                 if (typeof renderMonthChips === 'function') renderMonthChips();
                 if (typeof renderConcernLinks === 'function') renderConcernLinks();
             }
@@ -5704,7 +5822,7 @@
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyRailHighlight();      // §6b: forecast off -> dim, unless a railhead origin is selected
                 applyFilters();            // §9: and the cards drop back to the network count
-                status.innerHTML = "Approved forecasts only.";
+                status.innerHTML = "";
                 status.style.color = "#6b7280";
                 const bd = document.getElementById('btn-detail'); if(bd) bd.style.display = 'none';
                 if (typeof closeDrawer === 'function' && drawerTab === 'detail') closeDrawer();
@@ -6183,11 +6301,51 @@
     // 16 Oct 2026 (D115): 6 / 8.5 (were 5 / 7.5), the forecast line's width, so the flow's lanes fit every mode
     const ROAD_LOAD_LINE_WIDTH = 6;        // one width (the heat map's), never by volume
     const ROAD_LOAD_CASING_WIDTH = 8.5;    // 2.5 px wider than the line it sits under
-    //: the run's label: "118 two-way / day · 7 routes" (its OWN expression, not the per-route f_avg one)
-    const ROAD_LOAD_LABEL = ['concat', ['get', 'rl_mv_text'], ' two-way / day · ', ['get', 'rl_routes_text']];
-    //: the route label in carbon mode: the route's t CO2e in the month, from the server
+    //: 19 Oct 2026 (the user: "labels too wordy and noisy, perhaps a small icon label with a legend explaining what the
+    //: number is"): the run's label is its NUMBER on a badge with a two-way arrow ("118"; was "118 two-way / day · 7
+    //: routes"), what it counts said once in the heat map's key; the route count is in the section's card on click. A
+    //: stretch under 1 a day gets no badge (ROAD_LOAD_BADGE_MIN), still clickable.
+    const ROAD_LOAD_LABEL = ['get', 'rl_mv_text'];
+    const ROAD_LOAD_BADGE_MIN = 1;
+    //: the route badge in carbon mode: "CO₂ 24", the route's t CO2e in the month from the server (one decimal under 10);
+    //: a route with no figure gets no badge (its grey line and the key say "no figure")
     const CARBON_ROUTE_LABEL = ['case', ['==', ['typeof', ['get', 'f_co2']], 'number'],
-                                ['concat', ['to-string', ['get', 'f_co2']], ' t CO₂e'], 'no carbon figure'];
+                                ['concat', 'CO₂ ', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]]], ''];
+    //: the badges' ink and edge (the key in the panel uses the same pair: .mv-pill / .co-pill)
+    const BADGE_STYLE = { mv: { edge: '#2563EB', ink: '#1D4ED8' }, co2: { edge: '#059669', ink: '#065F46' } };
+    //: a white pill with a coloured edge, drawn at twice the size (pixelRatio 2); `arrow` adds the two-way arrow on its left.
+    //: Stretchable in the middle only, so the round ends and the arrow keep their shape whatever the number's width.
+    function pillBadgeImage(edge, arrow) {
+        const R = 2, H = 20 * R, L = (arrow ? 19 : 7) * R, MID = 8 * R, RT = 7 * R, W = L + MID + RT;
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const g = c.getContext('2d'), rr = H / 2 - R;
+        g.fillStyle = '#ffffff'; g.strokeStyle = edge; g.lineWidth = 1.5 * R;
+        g.beginPath(); g.moveTo(R + rr, R); g.lineTo(W - R - rr, R); g.arc(W - R - rr, H / 2, rr, -Math.PI / 2, Math.PI / 2);
+        g.lineTo(R + rr, H - R); g.arc(R + rr, H / 2, rr, Math.PI / 2, Math.PI * 1.5); g.closePath(); g.fill(); g.stroke();
+        if (arrow) {                                    // ⇄: out laden along the top, back empty along the bottom
+            g.lineWidth = 1.4 * R; g.lineCap = 'round'; g.lineJoin = 'round';
+            const x0 = 6 * R, x1 = 16 * R, y0 = 7.5 * R, y1 = 12.5 * R, hd = 2.6 * R;
+            g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y0); g.moveTo(x1 - hd, y0 - hd); g.lineTo(x1, y0); g.lineTo(x1 - hd, y0 + hd);
+            g.moveTo(x1, y1); g.lineTo(x0, y1); g.moveTo(x0 + hd, y1 - hd); g.lineTo(x0, y1); g.lineTo(x0 + hd, y1 + hd); g.stroke();
+        }
+        return { img: { width: W, height: H, data: g.getImageData(0, 0, W, H).data },
+                 opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[8 * R, 12 * R]], content: [L, 3 * R, L + MID, H - 3 * R] } };
+    }
+    // re-added after a basemap switch (which drops images), like the council badges
+    function addPillBadges(m) {
+        [['mv-badge', BADGE_STYLE.mv.edge, true], ['co2-badge', BADGE_STYLE.co2.edge, false]].forEach(([id, edge, arrow]) => {
+            if (m.hasImage && !m.hasImage(id)) { const b = pillBadgeImage(edge, arrow); m.addImage(id, b.img, b.opts); }
+        });
+    }
+    //: the badge layers' shared layout: a 13 px bold number (the 13 px floor, decision 4), the pill fitted round it, above
+    //: the line; the bold of the style's default fontstack (the council cards' AREA_LABEL_BOLD, named here so this block
+    //: stands alone)
+    const BADGE_TEXT_SIZE = 13, BADGE_FONT = ['Open Sans Bold', 'Arial Unicode MS Bold'];
+    function badgeLayout(field, image) {
+        return { 'symbol-placement': 'point', 'text-field': field, 'text-size': BADGE_TEXT_SIZE, 'text-font': ['literal', BADGE_FONT],
+                 'text-anchor': 'bottom', 'text-offset': [0, -0.9], 'text-padding': 3,
+                 'icon-image': image, 'icon-text-fit': 'both', 'icon-text-fit-padding': [2, 2, 2, 2] };
+    }
     //: a blue at five lightness steps (HSL hue 217, mockup 5's #2071F3 family), light to dark; the light end may recede
     //: (rule 5). Track C review: this is NOT the plan blue #4A72C9 (hue 221) that the council fill (AREA_RAMP) is built
     //: on, and the two carry different stops; the council legend says so. One ramp for both is a D26 follow-up.
@@ -6343,10 +6501,11 @@
         map.addLayer({ id: 'road-load-line', type: 'line', source: 'road-load-source',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: { 'line-color': CONFIG.COLORS.brand, 'line-width': ROAD_LOAD_LINE_WIDTH, 'line-opacity': 0.95 } });
+        try { addPillBadges(map); } catch (e) {}
         map.addLayer({ id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,
-            layout: { 'symbol-placement': 'point', 'text-field': ROAD_LOAD_LABEL, 'text-size': 14, 'text-anchor': 'bottom', 'text-offset': [0, -0.8],
-                      'text-max-width': 30, 'text-padding': 4 },
-            paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
+            filter: ['>=', ['get', 'rl_mv'], ROAD_LOAD_BADGE_MIN],
+            layout: badgeLayout(ROAD_LOAD_LABEL, 'mv-badge'),
+            paint: { 'text-color': BADGE_STYLE.mv.ink } });
         wireRoadLoadPopup();
         if (typeof placeFlowLayer === 'function') placeFlowLayer();     // 16 Oct (D115): the flow's dashes over the sections
         raiseMarks();
@@ -6370,10 +6529,10 @@
         if (!map.getSource('routes-source')) return;
         if (!map.getSource(CARBON_LABEL_SOURCE)) map.addSource(CARBON_LABEL_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         if (map.getLayer(CARBON_LABEL_LAYER)) return;
+        try { addPillBadges(map); } catch (e) {}
         map.addLayer({ id: CARBON_LABEL_LAYER, type: 'symbol', source: CARBON_LABEL_SOURCE, filter: carbonLabelFilter(),
-            layout: { 'symbol-placement': 'point', 'text-field': CARBON_ROUTE_LABEL, 'text-size': 14, 'text-anchor': 'bottom', 'text-offset': [0, -0.8],
-                      'text-max-width': 30, 'text-padding': 4 },
-            paint: { 'text-color': '#1F2024', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
+            layout: badgeLayout(CARBON_ROUTE_LABEL, 'co2-badge'),
+            paint: { 'text-color': BADGE_STYLE.co2.ink } });
         raiseMarks();
     }
     // one point per route on the overlay, at the middle of its LOADED leg by length (the longest part of a multi-part
@@ -6401,7 +6560,8 @@
     }
     // the overlay's own filter, on the LOADED leg only: one carbon label per route, never one per carriageway
     function carbonLabelFilter(){
-        return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway']];
+        // 19 Oct 2026: a route with no carbon figure gets no badge
+        return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway'], ['==', ['typeof', ['get', 'f_co2']], 'number']];
     }
     // f_co2 on BOTH legs of each route (both colour), from the timeline matrix: the route's t CO2e in month m (the sum
     // of its lines' server co2_t), null when no line carries a figure or the carbon read failed
@@ -6475,6 +6635,7 @@
         const rlBox = document.getElementById('road-load-legend'), coBox = document.getElementById('carbon-legend');
         const mode = heatMode(), rl = mode === 'volume', co2 = mode === 'carbon';
         const needMonth = 'Shows one month: press Play or pick a month.';
+        let more = '';      // 19 Oct 2026: the legend's explanation, shown behind the heat map's "i" (#heat-info-more)
         if (rlBox) {
             rlBox.hidden = !rl;
             if (rl) {
@@ -6488,13 +6649,15 @@
                     rlBox.innerHTML = '<b>Volume · two-way movements a day in ' + rlEsc(monthLabel(m)) + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
                         stepRanges(VOLUME_STOPS, '').map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
-                        // 14 Oct 2026 (the user took the recommendation): shortened to match the bulletin's map note — its first
-                        // sentence is bulletin_doc.map_note() word for word; the rest keeps only the facts a reader needs
-                        '<div class="ml-foot">Where routes share a road, its colour shows their total (' + n + ' shared section' + (n === 1 ? '' : 's') + '). ' +
+                        // 19 Oct 2026: the badges' key — what the number on the road is
+                        '<div class="ml-row ml-key">' + MV_PILL_HTML + 'two-way lorry movements a day on that stretch</div>';
+                    // 14 Oct 2026 (the user took the recommendation): shortened to match the bulletin's map note — its first
+                    // sentence is bulletin_doc.map_note() word for word; the rest keeps only the facts a reader needs
+                    more = 'Where routes share a road, its colour shows their total (' + n + ' shared section' + (n === 1 ? '' : 's') + '). ' +
                         'One load = one two-way movement; the loaded leg is counted once. Fixed stops: a colour means the same volume every month. ' +
-                        'Hover or click a route for its own figure.' +
+                        'A stretch under 1 a day carries no number. Hover or click a route for its own figure, a stretch for the routes on it.' +
                         (other ? ' Routes are painted in ' + rlEsc(CONFIG.FORECAST_UNIT) + ' a day on stops twenty times these.' : '') +
-                        ((data.notes || []).length ? ' ' + data.notes.map(rlEsc).join(' ') : '') + '</div>';
+                        ((data.notes || []).length ? ' ' + data.notes.map(rlEsc).join(' ') : '');
                 }
             }
         }
@@ -6513,14 +6676,21 @@
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
                         ranges.map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
                         '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>No stored road route · no figure</div>' +
-                        '<div class="ml-foot">Approved plan only, average-laden factor on both legs' +
+                        // 19 Oct 2026: the badges' key
+                        '<div class="ml-row ml-key"><span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month</div>' +
+                        (miss ? '<div class="ml-foot">Excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route.</div>' : '');
+                    more = 'Approved plan only, average-laden factor on both legs' +
                         (miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +
                         '. Stops are fixed from the programme\'s largest ' + sc.what + ' (' + fmtTonnes(sc.max || 0) + '), so a colour means the same tonnes in every month.' +
-                        (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '') + '</div>';
+                        (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '');
                 }
             }
         }
+        const moreEl = document.getElementById('heat-info-more');
+        if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;
     }
+    // the badge in the key: the same arrow and number the map draws
+    const MV_PILL_HTML = '<span class="mv-pill"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 4h9M7 1l3 3-3 3M11 8H2M5 5L2 8l3 3" fill="none" stroke="#2563EB" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>19</span>';
     // the one entry point: every month change, every toggle, the style.load re-add and the overlay switching off
     function refreshMapModes(){
         if (typeof map === 'undefined' || !map || !map.getLayer) return;
@@ -6960,7 +7130,10 @@
     // reached by a tick (only those can pause — never the month Play was pressed on).
     // 12 Oct fix pass: `startedOn` = the month Play was pressed on, until the loop first wraps (F3); `matrixPending` = the
     // matrix fetch in flight, so a double press does not fetch it twice.
-    const TL = { on:false, playing:false, month:1, timer:null, matrix:null, matrixPending:null, speed:1, full:false, clashPaused:false, ticked:null, startedOn:null, expanded:false };
+    // 19 Oct 2026: `chosen` = TL.month was asked for (a month button, a shared link, or a month already shown); until then the
+    // timeline opens on tlStartMonth() — the current month — and never on month 1 just because 1 is the default (seen on live:
+    // the council views opened on Jan 2026 because Jan 2026 carries volume)
+    const TL = { on:false, playing:false, month:1, chosen:false, timer:null, matrix:null, matrixPending:null, speed:1, full:false, clashPaused:false, ticked:null, startedOn:null, expanded:false };
     try { const sp = parseFloat(localStorage.getItem('modus_tl_speed')); if(sp > 0){ TL.speed = sp; } } catch(e){}
     // 12 Oct 2026 (evening, M3): `pauseOnClash` = the bar's "Pause on clash" switch (on unless the visitor turned it off,
     // remembered in this browser); `wall` = wall mode is on (it dwells on a red month instead of pausing)
@@ -7163,8 +7336,9 @@
         const lbl=document.getElementById('tl-label'); if(lbl) lbl.textContent='Loading\u2026';
         if(typeof renderTlRail === 'function') renderTlRail();
         ensureTimelineMatrix().then(()=>{
-            // D22: never open on an empty January \u2014 the current month if it carries volume, else the first that does
-            if(!monthHasVolume(TL.month)) TL.month = tlStartMonth();
+            // D22: never open on an empty January \u2014 the current month if it carries volume, else the first that does.
+            // 19 Oct 2026: unless a month was asked for (TL.chosen): that month, even one with nothing approved
+            if(!TL.chosen) TL.month = tlStartMonth();
             setTimelineMonth(TL.month);
             if(TL.playing && TL.ticked === null) TL.startedOn = TL.month;   // F3: Play opened the bar; this is the month it started on
             if(typeof renderTlRail === 'function') renderTlRail();     // M3: the shaded months need the matrix
@@ -7210,7 +7384,7 @@
         if(was) announceTimeline(typeof reason === 'string' ? reason : 'Paused at ' + monthLabel(TL.month));   // a screen reader hears where playback stopped
     }
     function setTimelineMonth(m){
-        TL.month=m; const r=document.getElementById('tl-range'); if(r){ r.value=m; r.setAttribute('aria-valuetext', monthLabel(m)); }
+        TL.month=m; TL.chosen=true; const r=document.getElementById('tl-range'); if(r){ r.value=m; r.setAttribute('aria-valuetext', monthLabel(m)); }
         if(typeof syncTlRail === 'function') syncTlRail(m);
         if(typeof TOAST !== 'undefined' && TOAST.month !== m) hideClashToast();
         renderMonthFrame(m);
@@ -7884,6 +8058,49 @@
             // the month on screen is the pressed chip; updated in place, so a focused chip keeps its focus during Play
             box.querySelectorAll('.month-chip').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.month) === cur)));
         });
+        renderMonthPicker();       // 19 Oct 2026: the panel's year-and-month picker follows the same month
+    }
+    // ---------------------------------------------------------------- the month picker (19 Oct 2026, the user: "too many
+    // month tabs"): a row of the horizon's years and the shown year's twelve months, in place of one chip per month in the
+    // panel (60 on the four-year demo). A month with nothing approved is grey and can still be picked; a year with nothing
+    // approved is grey. The shown year follows the month on screen until a year button is pressed. Rebuilt only when the
+    // year or the months with volume change, so a focused button keeps its focus during Play (as the chips did).
+    const MPICK = { year: null, forMonth: null };
+    function pickerYearOf(m) { return CONFIG.START_YEAR + Math.floor((m - 1) / 12); }
+    function pickerYears() {
+        const n = Math.ceil((CONFIG.MONTH_COUNT || 60) / 12), out = [];
+        for (let k = 0; k < n; k++) out.push(CONFIG.START_YEAR + k);
+        return out;
+    }
+    function pickYear(y) { MPICK.year = y; MPICK.forMonth = TL.on ? TL.month : null; renderMonthPicker(); }
+    function renderMonthPicker() {
+        const box = document.getElementById('fc-months');
+        if (!box) return;
+        const vol = new Set(chipMonths());
+        const cur = TL.on ? TL.month : null;
+        if (MPICK.forMonth !== cur) { MPICK.year = null; MPICK.forMonth = cur; }      // the month moved: show its year
+        const start = cur || (TL.matrix ? tlStartMonth() : currentMonthIndex());
+        const years = pickerYears();
+        let year = MPICK.year || pickerYearOf(Math.min(Math.max(start, 1), CONFIG.MONTH_COUNT || 60));
+        if (years.indexOf(year) < 0) year = years[0];
+        const sig = (TL.matrix ? 'm' : (CHIPS.failed ? 'f' : 'l')) + year + ':' + [...vol].sort((a, b) => a - b).join(',');
+        if (box.dataset.sig !== sig) {
+            box.dataset.sig = sig;
+            if (!TL.matrix) box.innerHTML = '<span class="chips-none">' + (CHIPS.failed ? 'The months could not be loaded' : 'Loading the months…') + '</span>';
+            else {
+                const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const y0 = (year - CONFIG.START_YEAR) * 12;
+                const yHas = y => { for (let k = 1; k <= 12; k++) if (vol.has((y - CONFIG.START_YEAR) * 12 + k)) return true; return false; };
+                box.innerHTML = '<div class="mp-years" role="group" aria-label="Year">' + years.map(y => '<button type="button" class="mp-year'
+                        + (yHas(y) ? '' : ' none') + '" data-year="' + y + '" aria-pressed="' + (y === year) + '" onclick="pickYear(' + y + ')">' + y + '</button>').join('') + '</div>'
+                    + '<div class="mp-months" role="group" aria-label="Months of ' + year + '">' + names.map((nm, k) => {
+                        const m = y0 + k + 1, has = vol.has(m);
+                        return '<button type="button" class="month-chip mp-month' + (has ? '' : ' none') + '" data-month="' + m + '" aria-pressed="false" aria-label="'
+                            + escHtml(monthLabel(m)) + (has ? '' : ', nothing approved') + '" onclick="pickMonth(' + m + ')">' + nm + '</button>';
+                    }).join('') + '</div>';
+            }
+        }
+        box.querySelectorAll('.mp-month').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.month) === cur)));
     }
     // a chip shows ONE month: it stops playback and opens the timeline on that month (the bar, the map and the
     // conditions all follow it, exactly as a scrub does)
@@ -7891,7 +8108,7 @@
         m = parseInt(m, 10);
         if (!(m >= 1 && m <= (CONFIG.MONTH_COUNT || 60))) return;
         if (TL.playing) stopTimeline();
-        TL.month = m; TL.clashPaused = false;     // M3: a month picked by hand starts a new loop
+        TL.month = m; TL.chosen = true; TL.clashPaused = false;     // M3: a month picked by hand starts a new loop
         if (!TL.on) openTimeline(); else setTimelineMonth(m);
     }
 
@@ -8082,6 +8299,9 @@
             const o = [...el.options].find(op => op.value === want || (byText && op.textContent === want));
             if (o) el.value = o.value;
         };
+        // 19 Oct 2026: the link's month BEFORE its boxes, so a box that opens the timeline (By council) opens on it (it
+        // opened on the first month, then switched once the months had loaded: ~30 s on live)
+        if (v.month) { TL.month = v.month; TL.chosen = true; }
         setSel('filter-origin', v.filters.origin); setSel('filter-dest', v.filters.dest);
         setSel('filter-discipline', v.filters.discipline); setSel('filter-ipt', v.filters.team, true);
         // 13 Oct 2026: the colouring before the boxes, so the districts' first paint is the shared one
@@ -8212,6 +8432,40 @@
         // a phone: the view is picked in the Layers sheet, so the sheet goes down and the map shows
         if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof closeLayersSheet === 'function') closeLayersSheet();
     }
+
+    // ---------------------------------------------------------------- the panel's "i" buttons (19 Oct 2026, the user:
+    // "remove too much wording and put it into an info box"). A button opens its section's explanation in place, under the
+    // heading; one at a time; Esc, a click elsewhere or the button again closes it (Esc gives the button its focus back).
+    function infoPopOf(btn) { return btn ? document.getElementById(btn.getAttribute('aria-controls')) : null; }
+    function closeInfos(except) {
+        document.querySelectorAll('.info-i[aria-expanded="true"]').forEach(b => {
+            if (b === except) return;
+            b.setAttribute('aria-expanded', 'false');
+            const p = infoPopOf(b); if (p) p.hidden = true;
+        });
+    }
+    function toggleInfo(btn) {
+        const pop = infoPopOf(btn);
+        if (!pop) return;
+        const open = pop.hidden;
+        closeInfos(btn);
+        pop.hidden = !open;
+        btn.setAttribute('aria-expanded', String(open));
+    }
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        const b = document.querySelector('.info-i[aria-expanded="true"]');
+        if (!b) return;
+        e.stopPropagation();
+        closeInfos(); try { b.focus(); } catch (err) {}
+    }, true);
+    document.addEventListener('mousedown', e => {
+        const b = document.querySelector('.info-i[aria-expanded="true"]');
+        if (!b) return;
+        const p = infoPopOf(b);
+        if (b.contains(e.target) || (p && p.contains(e.target))) return;
+        closeInfos();
+    });
 
     // ---------------------------------------------------------------- "Copy link" and the share card with its QR
     const SHARE = { opener: null };
