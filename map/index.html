@@ -704,6 +704,7 @@
             .m-done{ display:flex; order:99; position:sticky; bottom:-24px; margin:auto -18px -24px; padding:10px 18px 14px; background:#fff; border-top:1px solid var(--line); }
             .m-done .btn{ min-height:48px; }
             .month-picker button{ min-height:44px; }
+            .layers-box > summary{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; }   /* the folds: 44 px rows (UI audit, 19 Oct) */
             #m-sheet{ display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; z-index:26; background:#fff;
                       border-top:1px solid var(--line); border-radius:16px 16px 0 0; box-shadow:0 -8px 28px rgba(16,24,40,.14);
                       max-height:calc(100% - var(--notice-h, 0px) - 72px); font-size:14px; color:var(--ink); padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -814,7 +815,7 @@
     <!-- 19 Oct 2026 (the user): Month and Heat map (the forecast box, inserted ABOVE this group by the second script) come
          first, then Views, Filter routes, the three folds (By council, What's moving, More layers) and the share row. -->
     <div class="control-group" id="preset-group">
-        <div class="ctl-head"><h3>Views</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-views" onclick="toggleInfo(this)" title="About the views"><span aria-hidden="true">i</span><span class="sr-only">About the views</span></button></div>
+        <div class="ctl-head"><h3>Views</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-views" onclick="toggleInfo(this)" title="About the views" aria-label="About the views"><span aria-hidden="true">i</span></button></div>
         <div class="info-pop" id="info-views" hidden>Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>
         <div class="preset-views" id="preset-views" role="group" aria-label="Preset views"></div>
     </div>
@@ -849,7 +850,7 @@
         <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:2px;"></span></div>
         <div class="area-county-fig" id="area-county-fig"></div>
         <div class="area-note" id="area-notes"></div>
-        <div class="ctl-head" style="margin-top:8px"><span class="area-legend-title">About these figures</span><button type="button" class="info-i" aria-expanded="false" aria-controls="info-council" onclick="toggleInfo(this)" title="About the council figures"><span aria-hidden="true">i</span><span class="sr-only">About the council figures</span></button></div>
+        <div class="ctl-head" style="margin-top:8px"><span class="area-legend-title">About these figures</span><button type="button" class="info-i" aria-expanded="false" aria-controls="info-council" onclick="toggleInfo(this)" title="About the council figures" aria-label="About the council figures"><span aria-hidden="true">i</span></button></div>
         <div class="info-pop" id="info-council" hidden>
         <div class="area-note" id="area-unitary-note"></div>
         <div class="area-note" id="area-focus-note" hidden>While By council is on, every other layer is switched off and the heat map is off, so the councils read by themselves. Tick any layer to add it back (routes show thin and grey); unticking By council brings back the layers you had on.</div>
@@ -5660,7 +5661,7 @@
                 <div class="control-group fc-box" id="fc-box">
                     <!-- 19 Oct 2026 (the user: "too many month tabs"): a year row and its twelve months (renderMonthPicker)
                          replace the 12 Oct (D14) chip per month — 60 chips on the four-year demo. The phone sheet keeps its chips. -->
-                    <div class="ctl-head"><h3 id="fc-month-label">Month</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-month" onclick="toggleInfo(this)" title="About the month"><span aria-hidden="true">i</span><span class="sr-only">About the month</span></button></div>
+                    <div class="ctl-head"><h3 id="fc-month-label">Month</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-month" onclick="toggleInfo(this)" title="About the month" aria-label="About the month"><span aria-hidden="true">i</span></button></div>
                     <div class="info-pop" id="info-month" hidden><p>Approved forecasts only, never actuals.</p><p>A grey month has nothing approved; you can still pick it. Play steps through the months; the bar at the foot of the map shows the whole horizon. Show forecast routes draws the routes over a range of months instead of one.</p></div>
                     <div class="month-picker" id="fc-months" role="group" aria-labelledby="fc-month-label"></div>
                     <button type="button" class="btn" id="tl-open" onclick="startTimeline()">▶ Play forecast timeline</button>
@@ -5669,7 +5670,7 @@
                     <!-- 12 Oct 2026 (the user, evening): ONE heat map, volume OR carbon, never both (radio buttons);
                          19 Oct 2026: drawn as one segmented control, the explanations behind its "i" -->
                     <div class="heat-group" role="radiogroup" aria-labelledby="heat-label">
-                    <div class="ctl-head"><div class="heat-label" id="heat-label">Heat map</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-heat" onclick="toggleInfo(this)" title="About the heat map"><span aria-hidden="true">i</span><span class="sr-only">About the heat map</span></button></div>
+                    <div class="ctl-head"><div class="heat-label" id="heat-label">Heat map</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-heat" onclick="toggleInfo(this)" title="About the heat map" aria-label="About the heat map"><span aria-hidden="true">i</span></button></div>
                     <div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day. Each route by its own figure; a stretch of road two or more routes share by the routes using it, summed.</p><p><b>Carbon</b>: t CO₂e in the month, per route.</p><p id="heat-info-more"></p></div>
                     <div class="heat-seg">
                     <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>

@@ -5924,7 +5924,11 @@ function qrRead(mod) {
   ok("19 Oct: the 'i' is a named button (aria-expanded, aria-controls), 18 px with a 44 px hit area (::after inset -13 px)",
      /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
      && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
-     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z]+" onclick="toggleInfo\(this\)" title="[^"]+"><span aria-hidden="true">i<\/span><span class="sr-only">[^<]+<\/span><\/button>/g) || []).length === 4);
+     // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
+     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 4
+     && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
+  ok("19 Oct (UI audit): on a phone the folds' summary rows are 44 px tall (By council, What's moving, More layers)",
+     /@media \(max-width:767px\)[\s\S]*?\.layers-box > summary\{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; \}/.test(html));
   // the "i" in a sandbox: one open at a time, the button says so, Esc closes and gives focus back
   {
     const tSrc = (() => { const i = code.indexOf("    function infoPopOf(btn)"); return i > 0 ? code.slice(i, code.indexOf("    document.addEventListener('keydown', e => {", i)) : ""; })();
