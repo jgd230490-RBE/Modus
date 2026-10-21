@@ -2504,6 +2504,20 @@ def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
 
 
 
+#: 21 Oct 2026 (live OOM kills, notes live-502-1021.md): route_analysis() reads every column of route_geometry but the
+#: polyline. It only tested the polyline for emptiness, and `SELECT *` brought the whole HERE geometry text of every leg
+#: and alternative of the route into Python (hundreds of kB a route on live) once per call, which month-kpis made per
+#: (route, vehicle) per month. `geometry` is now 1 where the stored polyline is non-empty and NULL where it is NULL or
+#: '' — the same truth value the code tested — so every figure is unchanged (test_month_kpis_bulk.py holds them equal
+#: to a SELECT * read). drawn_road_on() reads haul_zones only. The comparison with '' needs no detoast on Postgres
+#: (texteq compares the lengths first).
+ANALYSIS_GEOMETRY_SQL = (
+    "SELECT tenant_id, route_id, vehicle_profile, leg, alt_index, "
+    "CASE WHEN geometry IS NULL OR geometry = '' THEN NULL ELSE 1 END AS geometry, "
+    "distance_km, duration_hr, computed_at, error, zones_applied, haul_zones, haul_km, duration_hr_here "
+    "FROM route_geometry WHERE tenant_id = ? AND route_id = ?")
+
+
 def route_analysis(route_id, profiles=None, pre=None):
     """
     Haul-cycle figures for one route, per vehicle profile x alternative.
@@ -2571,8 +2585,7 @@ def route_analysis(route_id, profiles=None, pre=None):
     rows_by = {}
     geo_by = pre.setdefault("geom", {}) if pre is not None else {}
     if route_id not in geo_by:
-        geo_by[route_id] = db.query("SELECT * FROM route_geometry WHERE tenant_id = ? AND route_id = ?",
-                                    (db.current_tenant(), route_id))
+        geo_by[route_id] = db.query(ANALYSIS_GEOMETRY_SQL, (db.current_tenant(), route_id))
     for g in geo_by[route_id]:
         if profiles and g["vehicle_profile"] not in profiles:
             continue

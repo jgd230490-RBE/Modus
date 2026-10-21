@@ -2690,8 +2690,30 @@
         const span = (typeof TL !== 'undefined' && TL.matrix && TL.matrix.span) || null;
         return span ? [span[0], span[1]] : null;
     }
+    // 21 Oct 2026 (live ran out of memory twice, notes live-502-1021.md): every month's figures in ONE read
+    // (/public/month-kpis/months, each entry exactly the month read's answer), into KPI.cache. The page used to read the
+    // months one at a time, sixty reads on every page load, again on every reload. The month read below stays as the
+    // fallback when this one fails; while this one is on its way a month waits for it rather than reading beside it.
+    function kpiFetchAll() {
+        if (KPI.allDone) return Promise.resolve(KPI.cache);
+        if (KPI.allFailed) return Promise.reject(new Error('month figures unavailable in one read'));
+        if (!KPI.allPending) {
+            const unit = CONFIG.FORECAST_UNIT || 'vehicles';
+            KPI.allPending = fetch(`${CONFIG.API_BASE}/public/month-kpis/months?unit=${unit}`)
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(j => {
+                    Object.keys(j.months || {}).forEach(k => { if (!KPI.cache[Number(k)]) KPI.cache[Number(k)] = j.months[k]; });
+                    KPI.allDone = true;
+                    return KPI.cache;
+                })
+                .catch(e => { KPI.allFailed = true; console.warn('month figures: every month in one read failed; reading month by month', e); throw e; })
+                .finally(() => { KPI.allPending = null; });
+        }
+        return KPI.allPending;
+    }
     async function kpiFetchMonth(m) {
         if (KPI.cache[m]) return KPI.cache[m];
+        if (KPI.allPending) { try { await KPI.allPending; } catch (e) {} if (KPI.cache[m]) return KPI.cache[m]; }
         if (!KPI.pending[m]) {
             const unit = CONFIG.FORECAST_UNIT || 'vehicles';
             KPI.pending[m] = fetch(`${CONFIG.API_BASE}/public/month-kpis?month=${m}&unit=${unit}`)
@@ -7259,10 +7281,10 @@
         return TL.matrix;
     }
     // 12 Oct 2026 (review §2.4): Play used to fire one month-kpis GET on each month's first tick. Once the
-    // matrix is here the months in the loop are warmed sequentially through the existing cache
-    // (kpiFetchMonth dedupes against an in-flight fetch), after the first paint has been scheduled.
-    // 12 Oct fix pass (F1): the month on screen first, then the rest of the span in the order Play will reach them;
-    // only the span with volume (a tenant with nothing approved used to fire 60 GETs, and Full horizon as many).
+    // matrix is here the months in the loop are warmed through the existing cache, after the first paint has been
+    // scheduled. 12 Oct fix pass (F1): only when there is a span with volume (a tenant with nothing approved used to
+    // fire 60 GETs). 21 Oct 2026: ONE read for every month (kpiFetchAll), no longer the span month by month; the order
+    // below is what that sweep followed and is kept for the fallback's sake (a month read, on demand).
     function tlPrefetchOrder(){
         const span = TL.matrix && TL.matrix.span;
         if(!span) return [];
@@ -7273,11 +7295,9 @@
         return out;
     }
     function prefetchSpanKpis(){
-        setTimeout(async ()=>{
-            for(const m of tlPrefetchOrder()){
-                if(KPI.cache[m]) continue;
-                try { await kpiFetchMonth(m); } catch(e){}
-            }
+        setTimeout(()=>{
+            if(!tlPrefetchOrder().length) return;
+            kpiFetchAll().catch(()=>{});      // one read; on failure each month is read when it is shown
         }, 0);
     }
     function renderMonthFrame(m){

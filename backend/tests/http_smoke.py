@@ -566,6 +566,21 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("B2: /api/public/month-kpis for R001's first month: co2_t present on its line, co2_error absent",
            r.status_code == 200 and "co2_error" not in mk
            and any(l["route_id"] == "R001" and l["co2_t"] is not None for l in mk.get("lines") or []), f"{r.status_code} {str(mk)[:160]}")
+        # 21 Oct 2026 (live OOM kills, branch claude/map-read-memory): every month in one read, through the real app
+        r_all = c.get("/api/public/month-kpis/months", params={"unit": "t"})
+        _all = r_all.json() if r_all.status_code == 200 else {}
+        ok("⭐ 21 Oct: /api/public/month-kpis/months answers 200 through the real app: all 60 months, R001's first month exactly "
+           "the month read's answer",
+           r_all.status_code == 200 and sorted(int(k) for k in _all.get("months", {})) == list(range(1, 61))
+           and json.dumps(_all["months"][str(_m001)]) == json.dumps(mk), f"{r_all.status_code} {r_all.text[:160]}")
+        ok("21 Oct: ...a unit it does not know is a 400",
+           c.get("/api/public/month-kpis/months", params={"unit": "furlongs"}).status_code == 400)
+        _anon = TestClient(main.app, base_url="https://testserver")
+        ok("21 Oct: ...and with no cookie and no code it is behind the gate like the month read (401)",
+           _anon.get("/api/public/month-kpis/months").status_code == 401
+           and _anon.get("/api/public/month-kpis", params={"month": 1}).status_code == 401)
+        ok("21 Oct: /api/health still answers 200 (now async: answered while the worker threads are busy)",
+           _anon.get("/api/health").status_code == 200)
         # RE-PINNED 17 Oct 2026 (R2): the Carbon Tool basis computed from R001's tonnes × the 18.4 km one-way leg × the tool's
         # 2.27669e-4 t per t per one-way km (laden + unladen, 2024 factors with well-to-tank)
         _nh001 = sum(_q001) * 18.4 * 0.00022766866666666666
