@@ -2129,11 +2129,63 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /if \(reducedMotion\(\)\) map\.jumpTo\(cam\); else map\.flyTo\(\{ \.\.\.cam, duration: 700 \}\);/.test(code)
      && !/map\.flyTo\(\{ center: f\.geometry\.coordinates/.test(code));
   // (6) KPI prefetch
-  ok("KPI prefetch: kicked off when the matrix lands, never awaited, through the existing cache, one month at a time",
+  // NARROWED 21 Oct 2026 (live OOM kills, notes live-502-1021.md): the prefetch is ONE read for every month
+  // (kpiFetchAll -> /public/month-kpis/months), no longer the span one month at a time; still kicked off when the matrix
+  // lands, never awaited, and only when there is a span with volume
+  ok("KPI prefetch: kicked off when the matrix lands, never awaited, ONE read for every month, only with a span with volume",
      /TL\.matrix = \{ byRoute:byR[^\n]*\};\s*prefetchSpanKpis\(\);\s*return TL\.matrix;/.test(code)
-     && /function prefetchSpanKpis\(\)\{\s*setTimeout\(async \(\)=>\{\s*for\(const m of tlPrefetchOrder\(\)\)\{\s*if\(KPI\.cache\[m\]\) continue;\s*try \{ await kpiFetchMonth\(m\); \} catch\(e\)\{\}/.test(code)   // 12 Oct fix pass (F1)
+     && /function prefetchSpanKpis\(\)\{\s*setTimeout\(\(\)=>\{\s*if\(!tlPrefetchOrder\(\)\.length\) return;\s*kpiFetchAll\(\)\.catch\(\(\)=>\{\}\);/.test(code)
      && /function tlPrefetchOrder\(\)\{\s*const span = TL\.matrix && TL\.matrix\.span;\s*if\(!span\) return \[\];/.test(code)
      && !/Promise\.all\([^)]*kpiFetchMonth/.test(code.slice(code.indexOf("function prefetchSpanKpis"), code.indexOf("function renderMonthFrame"))));
+  // 21 Oct 2026: the 60-read sweep is gone — no loop over the months calls kpiFetchMonth in the prefetch, and the bulk
+  // read is the one the page asks for
+  { const pf = code.slice(code.indexOf("function prefetchSpanKpis"), code.indexOf("function renderMonthFrame"));
+    ok("⭐ 21 Oct: the prefetch no longer reads the months one by one (no kpiFetchMonth, no for loop over tlPrefetchOrder)",
+       pf.length > 0 && !/kpiFetchMonth/.test(pf) && !/for\s*\(\s*const m of tlPrefetchOrder/.test(pf));
+    ok("⭐ 21 Oct: the page asks for every month's figures in one read, /public/month-kpis/months, with the map's unit",
+       /fetch\(`\$\{CONFIG\.API_BASE\}\/public\/month-kpis\/months\?unit=\$\{unit\}`\)/.test(code)
+       && (code.match(/\/public\/month-kpis\/months/g) || []).length === 1);
+    ok("21 Oct: the month read stays as the fallback (kpiFetchMonth still reads /public/month-kpis?month=)",
+       /KPI\.pending\[m\] = fetch\(`\$\{CONFIG\.API_BASE\}\/public\/month-kpis\?month=\$\{m\}&unit=\$\{unit\}`\)/.test(code)); }
+  // ...and run: one read fills every month, a month asked meanwhile waits for it, a failed bulk read falls back
+  { const a = src.indexOf("    function kpiFetchAll() {"), b = src.indexOf("    function routePropsById() {");
+    ok("21 Oct sandbox: kpiFetchAll and kpiFetchMonth are found", a > 0 && b > a);
+    if (a > 0 && b > a) {
+      const mk = (fetchImpl) => { const KPI = { cache: {}, pending: {} };
+        const api = new Function("KPI", "CONFIG", "fetch", "console", src.slice(a, b) + "\nreturn { kpiFetchAll, kpiFetchMonth };")(
+          KPI, { FORECAST_UNIT: "vehicles", API_BASE: "/api" }, fetchImpl, { warn() {} });
+        return { KPI, api }; };
+      ASYNC_PINS.push((async () => {
+        const urls = []; let release;
+        const gateP = new Promise(r => { release = r; });
+        const months = {}; for (let m = 1; m <= 60; m++) months[String(m)] = { month: m, lines: [] };
+        const { KPI, api } = mk(url => { urls.push(url);
+          if (/months\?unit=vehicles$/.test(url)) return gateP.then(() => ({ ok: true, json: () => Promise.resolve({ unit: "vehicles", months }) }));
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ month: Number(/month=(\d+)/.exec(url)[1]), lines: ["own read"] }) }); });
+        const all = api.kpiFetchAll(); const again = api.kpiFetchAll();
+        const m33 = api.kpiFetchMonth(33);           // asked while the one read is on its way
+        release(); await all; await again; const got33 = await m33;
+        ok("⭐ 21 Oct: one fetch fills all 60 months; a second call and a month asked meanwhile ride on it (no month read)",
+           urls.length === 1 && urls[0] === "/api/public/month-kpis/months?unit=vehicles" && Object.keys(KPI.cache).length === 60
+           && got33.month === 33 && got33.lines.length === 0 && KPI.allDone === true, JSON.stringify(urls));
+        await api.kpiFetchAll(); await api.kpiFetchMonth(60);
+        ok("21 Oct: once filled, the cache answers with no fetch at all", urls.length === 1);
+      })());
+      ASYNC_PINS.push((async () => {
+        const urls = [];
+        const { KPI, api } = mk(url => { urls.push(url);
+          if (/\/months\?/.test(url)) return Promise.resolve({ ok: false, status: 503 });
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ month: Number(/month=(\d+)/.exec(url)[1]), lines: [] }) }); });
+        const m7 = api.kpiFetchMonth(7); let failed = false;
+        try { await api.kpiFetchAll(); } catch (e) { failed = true; }
+        const got7 = await m7; const got9 = await api.kpiFetchMonth(9);
+        let again = false; try { await api.kpiFetchAll(); } catch (e) { again = true; }
+        ok("⭐ 21 Oct: a failed one read falls back to the month read for the months shown, and is not retried on every month",
+           failed && again && KPI.allFailed === true && got7.month === 7 && got9.month === 9
+           && urls.filter(u => /\/months\?/.test(u)).length === 1 && urls.filter(u => /month=\d+/.test(u)).length === 2, JSON.stringify(urls));
+      })());
+    }
+  }
   // (7) keyboard and ARIA
   // 12 Oct fix pass — NARROWED: on the map canvas the arrows are Mapbox's pan keys; they step the month on the bar only
   ok("keyboard: Space toggles Play on the bar or the map; the arrows step a month on the bar only; never inside an input or select",

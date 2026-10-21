@@ -64,6 +64,7 @@ import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" pa
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
+import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -1012,7 +1013,12 @@ def _vehicle_list(factors):
 
 # ------------------------------------------------------------------ meta
 @app.get("/api/health")
-def health():
+async def health():
+    """
+    21 Oct 2026 (notes live-502-1021.md): `async def`, answered on the event loop. As a plain `def` it waited in the
+    same worker-thread pool as the heavy reads; with every thread busy Render's 5 s health check timed out and Render
+    restarted the app (19 Oct 12:37 UTC). It does no I/O: db.IS_PG is a constant read at import.
+    """
     return {"ok": True, "backend": "postgres" if db.IS_PG else "sqlite"}
 
 
@@ -2284,6 +2290,16 @@ def bulletin_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), requ
 
 
 # ------------------------------------------------------------------ public feed (map)
+def _heavy_busy():
+    return HTTPException(503, "The map's figures are busy; try again in a minute.", headers={"Retry-After": "30"})
+
+
+def _heavy(name):
+    """21 Oct 2026 (live OOM kills): one of heavy_reads.SLOTS slots for a heavy public read, one memory line in the log.
+    The heavy reads: month-kpis, month-kpis/months, map-data, route-alternatives, forecast-matrix, areas/months."""
+    return heavy_reads.slot(name, busy=_heavy_busy)
+
+
 def _working_days(factors):
     """
     Working days in a planning month, from factors.json.
@@ -2386,25 +2402,67 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+    with _heavy("month-kpis"):
+        return _month_kpis_payloads([int(month)], unit)[int(month)]
+
+
+@app.get("/api/public/month-kpis/months")
+def public_month_kpis_months(unit: str = Query("vehicles")):
+    """
+    21 Oct 2026 (live OOM-killed twice, notes live-502-1021.md). EVERY month's /api/public/month-kpis answer in one read:
+    {"unit": unit, "months": {"1": <the month-kpis answer for month 1>, ..., "60": ...}}, each entry exactly what the
+    month read answers (test_month_kpis_bulk.py holds every month equal). The map read the months one by one, sixty
+    reads on every page load, each re-reading the cost lines for months 1..M for its carbon to date; this reads the
+    forecasts once, the cost lines once and each route's figures once. The map falls back to the month read when this
+    one fails. Approved only, never actuals; behind the map gate like the rest of /api/public/.
+    """
+    if unit not in conversions.UNITS:
+        raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+    with _heavy("month-kpis/months"):
+        pages = _month_kpis_payloads(range(1, MONTH_COUNT + 1), unit)
+        return {"unit": unit, "months": {str(m): pages[m] for m in sorted(pages)}}
+
+
+def _month_kpis_payloads(months, unit):
+    """
+    {month: the /api/public/month-kpis answer} for each month asked (21 Oct 2026: the month read's body, moved here so
+    one month and every month are the same code). Per request, not per month: one forecast query, one costlines read
+    for months 1..the last month asked (each month's carbon to date is summed from it exactly as the month read summed
+    its own 1..M read), and one route_analysis() per (route, vehicle) with a request-level `pre` (routes, locations,
+    gates and each route's geometry rows read once, as the Look-ahead has done since 13 Oct).
+    """
+    months = sorted({int(m) for m in months})
     factors = conversions.load_factors()
     wd = _working_days(factors)          # 15 Sep: shared with the two forecast feeds
     vs = factors.get("vehicles", {}) or {}
     # 11 Oct 2026: one rule for the fallback — the Look-ahead's (it was a copy of it here,
     # with its own literal 18 t, the payload of a vehicle the seed no longer carries)
     fb_payload, fb_name = derived.payload_for(None, factors)
-    rows = db.query(
-        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
-        "AND month_index = ? ORDER BY route_id, discipline, section_id",
-        (db.current_tenant(), int(month)))
-    # one route_analysis() per (route, vehicle) rather than per line
+    # 21 Oct 2026: `id` breaks a tie on (route, discipline, section) so one month and every month list a month's
+    # lines in the same order (the demo has no tie; the order of a tie was the database's choice before)
+    if len(months) == 1:
+        rows = db.query(
+            "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+            "AND month_index = ? ORDER BY route_id, discipline, section_id, id",
+            (db.current_tenant(), months[0]))
+    else:
+        rows = db.query(
+            "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+            "AND month_index BETWEEN ? AND ? ORDER BY month_index, route_id, discipline, section_id, id",
+            (db.current_tenant(), months[0], months[-1]))
+    rows_by_month = {}
+    for r in rows:
+        rows_by_month.setdefault(int(r["month_index"]), []).append(r)
+    # one route_analysis() per (route, vehicle) rather than per line, and per request rather than per month
     _tpv_cache = {}
+    _pre = {}
 
     def trips_per_vehicle_day(route_id, vehicle):
         key = (route_id, vehicle)
         if key not in _tpv_cache:
             tpv = None
             try:
-                res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None)
+                res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None, pre=_pre)
                 for row in res.get("rows", []):
                     if row.get("alt_index") == 0 and (not vehicle or row.get("profile") == vehicle):
                         # 17 Oct 2026 (drivers' hours): a routed line where not one round trip fits a driver's day counts
@@ -2416,12 +2474,6 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
             _tpv_cache[key] = tpv
         return _tpv_cache[key]
 
-    lines = []
-    for r in rows:
-        line = _month_kpi_line(r, unit, factors, vs, fb_payload, fb_name)
-        # movements one vehicle can make per day on THIS route, or None if unbaked
-        line["trips_per_vehicle_day"] = trips_per_vehicle_day(r["route_id"], r.get("vehicle_type"))
-        lines.append(line)
     # 6 Oct 2026 (map redesign) — CO2e, the same figure the costlines read gives the
     # Dashboard: km x the vehicle's kg CO2e/km from factors.json, per line, for the month.
     # `co2_t` rides on each line (None where the route is not baked for that vehicle: no
@@ -2433,27 +2485,42 @@ def public_month_kpis(month: int = Query(..., ge=1, le=MONTH_COUNT),
     # `co2_error` and every co2_t is None — until today the except blanked every carbon
     # figure silently (a null factor saved on Config was one trigger) and the map showed
     # the month with no carbon and no reason.
-    table, co2_error = _approved_co2(factors, 1, int(month))
-    co2_by_key, to_date, unbaked_to_date = {}, {}, 0
-    for (rid, disc, sec, mi), co2 in table.items():
-        if mi == int(month):
-            co2_by_key[(rid, disc, sec)] = co2
-        if co2 is None:
-            unbaked_to_date += 1
-            continue
-        to_date[(rid, disc, sec)] = to_date.get((rid, disc, sec), 0.0) + float(co2)
-    for l in lines:
-        l["co2_t"] = co2_by_key.get((l["route_id"], l["discipline"], l["section_id"]))
-    co2_to_date = [{"route_id": k[0], "discipline": k[1], "section_id": k[2], "co2_t": round(v, 3)}
-                   for k, v in sorted(to_date.items())]
-    out = {"month": int(month), "unit": unit, "working_days": wd,
-           "payload_fallback_vehicle": fb_name,
-           "payload_fallback_name": conversions.vehicle_label(factors, fb_name) if fb_name else None,
-           "lines": lines,
-           "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
-    if co2_error:
-        out["co2_error"] = co2_error
-    return out
+    # 21 Oct 2026: ONE read for months 1..the last month asked; each month's to-date sum walks that table's entries
+    # for months 1..month in the table's own order, which is the order the month's own 1..month read gave them, so
+    # every float is summed in the same order and the answer is byte for byte the month read's
+    table, co2_error = _approved_co2(factors, 1, months[-1])
+    items = list(table.items())
+    out_by_month = {}
+    for month in months:
+        lines = []
+        for r in rows_by_month.get(month, []):
+            line = _month_kpi_line(r, unit, factors, vs, fb_payload, fb_name)
+            # movements one vehicle can make per day on THIS route, or None if unbaked
+            line["trips_per_vehicle_day"] = trips_per_vehicle_day(r["route_id"], r.get("vehicle_type"))
+            lines.append(line)
+        co2_by_key, to_date, unbaked_to_date = {}, {}, 0
+        for (rid, disc, sec, mi), co2 in items:
+            if mi > month:
+                continue
+            if mi == month:
+                co2_by_key[(rid, disc, sec)] = co2
+            if co2 is None:
+                unbaked_to_date += 1
+                continue
+            to_date[(rid, disc, sec)] = to_date.get((rid, disc, sec), 0.0) + float(co2)
+        for l in lines:
+            l["co2_t"] = co2_by_key.get((l["route_id"], l["discipline"], l["section_id"]))
+        co2_to_date = [{"route_id": k[0], "discipline": k[1], "section_id": k[2], "co2_t": round(v, 3)}
+                       for k, v in sorted(to_date.items())]
+        out = {"month": int(month), "unit": unit, "working_days": wd,
+               "payload_fallback_vehicle": fb_name,
+               "payload_fallback_name": conversions.vehicle_label(factors, fb_name) if fb_name else None,
+               "lines": lines,
+               "co2_to_date": co2_to_date, "co2_to_date_unbaked_lines": unbaked_to_date}
+        if co2_error:
+            out["co2_error"] = co2_error
+        out_by_month[month] = out
+    return out_by_month
 
 
 def _month_kpi_line(r, unit, factors, vs, fb_payload, fb_name):
@@ -2576,9 +2643,17 @@ def public_forecast_matrix(
     Approved forecasts as a month-by-month grid (for the map's detail table).
     Returns a list, one entry per route, each with a {month_index: quantity} map
     in the requested unit, plus the route's material and vehicle.
+
+    21 Oct 2026: a heavy read (_heavy, one of heavy_reads.SLOTS at once); the body is _forecast_matrix().
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
+    with _heavy("forecast-matrix"):
+        return _forecast_matrix(from_, to, unit, sections)
+
+
+def _forecast_matrix(from_, to, unit, sections):
+    """The body of /api/public/forecast-matrix (21 Oct 2026: moved here unchanged, so the endpoint can hold a slot)."""
     lo, hi = min(from_, to), max(from_, to)
     rows = db.query(
         "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
@@ -2885,7 +2960,8 @@ def public_route_alternatives(profile: Optional[str] = None):
     A SEPARATE endpoint from /api/public/map-data on purpose — see the docstring
     on network.route_alternatives_geojson() for the five things that walk that
     FeatureCollection and would be corrupted by alternatives appearing in it."""
-    return network.route_alternatives_geojson(profile)
+    with _heavy("route-alternatives"):
+        return network.route_alternatives_geojson(profile)
 
 
 @app.get("/api/routes/geojson")
@@ -2972,7 +3048,8 @@ def public_map_data(profile: Optional[str] = None):
     dashed straight line usefully says 'HERE could not route this'; on a public map it
     would just look like a road that isn't there.
     """
-    return network.public_map_data(profile=profile)
+    with _heavy("map-data"):
+        return network.public_map_data(profile=profile)
 
 
 @app.get("/api/public/road-load")
@@ -3120,7 +3197,8 @@ def public_areas_months():
     /api/public/areas?month= stays: the map falls back to it when this read fails.
     """
     factors = conversions.load_factors()
-    return areas.area_load_all(_working_days(factors), MONTH_COUNT)
+    with _heavy("areas/months"):
+        return areas.area_load_all(_working_days(factors), MONTH_COUNT)
 
 
 @app.post("/api/admin/areas/import")
