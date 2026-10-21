@@ -132,6 +132,9 @@ function api(u) {
   if (p === "/public/map-data") return mapData();
   if (p === "/public/route-alternatives") return { type: "FeatureCollection", features: [] };
   if (p === "/public/month-kpis") return monthKpis(parseInt(q.get("month") || "1"));
+  // 21 Oct 2026: every month in one read, the page's prefetch (each entry the month read's answer)
+  if (p === "/public/month-kpis/months") return { unit: "vehicles",
+    months: Object.fromEntries(Array.from({ length: 60 }, (_, k) => [String(k + 1), monthKpis(k + 1)])) };
   if (p === "/public/forecast-matrix") return forecastMatrix();
   if (p === "/public/route-forecasts") return { routes: [] };
   // one of each level, so the stack is a real test and not an empty div:
