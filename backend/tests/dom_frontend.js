@@ -1818,8 +1818,8 @@ async function abnormalDom(){
      rowOf(p.el, "AL001").textContent.includes("8–12 Mar 2027") && rowOf(p.el, "AL001").textContent.includes("day · 3 movements")
      && rowOf(p.el, "AL001").textContent.includes("Low-loader · 4.6 × 3.9 × 16.5 m · 40 t · 6 axles · 9 t axle"));
   ok("⭐ AL DOM: a planner's actions follow the server's transitions: Approve and Withdraw on a pending movement, Mark notified / Mark moved / Withdraw / Reopen on an approved one, Delete on both",
-     [...rowOf(p.el, "AL002").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Approve|Withdraw|Delete"
-     && [...rowOf(p.el, "AL001").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Mark notified|Mark moved|Withdraw|Reopen|Delete");
+     [...rowOf(p.el, "AL002").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Draw the route|Approve|Withdraw|Delete"
+     && [...rowOf(p.el, "AL001").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Draw the route|Mark notified|Mark moved|Withdraw|Reopen|Delete");   // NARROWED 22 Oct 2026 (phase 2): + Draw the route, a planner's
   await act(async () => { rowOf(p.el, "AL002").querySelector("button.al-tri").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   const det = p.el.querySelector('[data-al-details="AL002"]');
   ok("⭐ AL DOM: the chevron opens the row: the server's advice lines word for word, the category words, the typed figures, the references, the advice footer",
@@ -1872,6 +1872,62 @@ async function abnormalDom(){
   await act(async () => { byText(t.el, "button", "Plan an abnormal load").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   ok("AL DOM: a team login's form has the team locked to its own", t.el.querySelector('select[aria-label="Team"]').disabled && t.el.querySelector('select[aria-label="Team"]').value === "IPT1");
   await t.done();
+  w.fetch = () => new Promise(() => {});
+}
+
+// ---- 22 Oct 2026: the abnormal loads on the other screens (phase 2) ---------------------------
+async function abnormalScreensDom(){
+  const meta = { ...metaMin, months: { start_year: 2026, count: 60 }, ipts: [{ id: "IPT1", label: "North Team" }] };
+  const calls = [];
+  const summary = { today: "2027-03-20", weeks_ahead: 4, planned: 3, ahead: 3, ahead_names: ["Units", "Beams", "Crane"], notices_due: 1, notices_late: 0, to_apply: 1, road_limit: 0,
+                    words: "Counted apart: none of these is in the cards, the charts or the carbon target (D70, D71)." };
+  w.fetch = (url, opt) => { calls.push({ url, method: (opt && opt.method) || "GET" }); if (url === "/api/abnormal/summary") return reply(200, summary); return reply(404, {}); };
+  const mount = async (C, props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    await act(async () => { r.render(w.React.createElement(C, props)); }); await settle(20); return { el, done: async () => { await act(async () => { r.unmount(); }); el.remove(); } }; };
+  const opened = [];
+  const s1 = await mount(w.AbnormalStrip, { onOpen: (p) => opened.push(p) });
+  const strip = s1.el.querySelector("[data-abnormal-strip]");
+  ok("⭐ AL2 DOM strip: ONE read, the three figures with the chips, the button opens the page through the switch, the words",
+     calls.filter(c => c.url === "/api/abnormal/summary").length === 1 && strip && strip.getAttribute("data-abnormal-strip") === "set"
+     && strip.textContent.includes("3 abnormal loads in the next 4 weeks") && strip.textContent.includes("1 notice due this week") && strip.textContent.includes("NOTICE DUE")
+     && strip.textContent.includes("1 Special Order or VR1 to apply for") && strip.textContent.includes("SO LEAD TIME") && strip.textContent.includes("Counted apart"));
+  await act(async () => { byText(s1.el, "button", "Open Abnormal loads").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  ok("AL2 DOM strip: the button hands 'abnormal' to the Portal", opened.join("|") === "abnormal");
+  await s1.done();
+  w.fetch = (url, opt) => reply(200, { ...summary, planned: 0 });
+  const s2 = await mount(w.AbnormalStrip, { onOpen(){} });
+  ok("AL2 DOM strip: with nothing planned one quiet line and the button", s2.el.querySelector('[data-abnormal-strip="none"]') && s2.el.textContent.includes("No abnormal loads planned."));
+  await s2.done();
+  const ab = { count: 2, from: "2027-04-12", to: "2027-04-18", words: "Abnormal loads are never in the week's tonnes, loads, lorries, gate counts or carbon (D70).",
+    movements: [
+      { id: "AL002", name: "32 m precast bridge beams", team_name: "North Team", origin_name: "Precast works", dest_name: "Melton Compound", dest_gate_name: "North gate",
+        date_from: "2027-04-12", date_to: "2027-04-14", time_band: "night", movements: 9, escort_planned: "private", status: "approved", status_word: "Approved",
+        summary: "Special Order · police 5 days · authorities 5 days · attendant · escort expected", permission: "special_order", category: "special_order",
+        notify_by: "2027-04-06", flags: [{ code: "NOTICE_DUE", text: "notify by 2027-04-06" }], routed: true, distance_km: 51.7, candidates: 21, limit_exceeds: 0 },
+      { id: "AL003", name: "Cranes in tandem", team_name: "North Team", origin_name: "Northfield Quarry", dest_name: "Melton Compound", dest_gate_name: null,
+        date_from: "2027-04-13", date_to: "2027-04-13", time_band: "day", movements: 4, escort_planned: "none", status: "notified", status_word: "Notified",
+        summary: "STGO Cat 2 · authorities 2 days", permission: "none", category: "cat2", notify_by: "2027-04-08", flags: [], routed: false, distance_km: null, candidates: 0, limit_exceeds: 0 }] };
+  const wk = await mount(w.AbnormalWeek, { ab });
+  const rows = [...wk.el.querySelectorAll("[data-abnormal-week-row]")];
+  ok("⭐ AL2 DOM week: the block with its count, a row a movement — the class chip, the window with band / movements / escort, the route or 'not drawn', the status and the flag, the notify-by, the words",
+     wk.el.querySelector("[data-abnormal-week]") && wk.el.textContent.includes("Abnormal loads this week · 2 · counted apart from the lorries") && rows.length === 2
+     && rows[0].querySelector(".al-chip.al-so").textContent === "Special Order" && rows[0].textContent.includes("12–14 Apr 2027") && rows[0].textContent.includes("night · 9 movements · private escort")
+     && rows[0].textContent.includes("21 to survey") && rows[0].textContent.includes("NOTICE DUE") && rows[0].textContent.includes("notify by 6 Apr 2027")
+     && rows[1].querySelector(".al-chip.al-stgo").textContent === "STGO Cat 2" && rows[1].textContent.includes("not drawn") && rows[1].textContent.includes("Notified")
+     && wk.el.textContent.includes("never in the week's tonnes"), rows.map(r => r.textContent.slice(0, 120)).join(" || "));
+  await wk.done();
+  const wk0 = await mount(w.AbnormalWeek, { ab: { count: 0, movements: [] } });
+  ok("AL2 DOM week: nothing drawn for an empty week", !wk0.el.querySelector("[data-abnormal-week]"));
+  await wk0.done();
+  // the gate marker: the panel's row carries it; the figures are the server's
+  const GAF = FIX("gate_arrivals.json");
+  const ga = { ...GAF, gates: (GAF.gates || []).map((g, i) => ({ ...g, abnormal: i === 0 ? [{ id: "AL002", name: "32 m precast bridge beams", date_from: "2027-04-12", date_to: "2027-04-14", leaving: false }] : [] })) };
+  const gp = await mount(w.GateArrivalsPanel, { ga, err: false, month: ga.month, months: meta.months, onMonth(){} });
+  const mark = gp.el.querySelector("[data-ga-abnormal]");
+  ok("⭐ AL2 DOM gates: the first gate's row carries the marker (count, window) and its hover names the load and says counted apart; the other rows none",
+     !!mark && mark.textContent.includes("+ 1 abnormal load · 12–14 Apr 2027") && mark.getAttribute("title").includes("32 m precast bridge beams: 12–14 Apr 2027")
+     && mark.getAttribute("title").includes("counted apart") && gp.el.querySelectorAll("[data-ga-abnormal]").length === 1);
+  await gp.done();
   w.fetch = () => new Promise(() => {});
 }
 
@@ -2230,6 +2286,8 @@ async function routesDriversDom(){
   catch (e) { ok("PHONE DAY FLAGS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await abnormalDom(); ok("AL DOM: the section ran to the end", true); }
   catch (e) { ok("AL DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  try { await abnormalScreensDom(); ok("AL2 DOM: the section ran to the end", true); }
+  catch (e) { ok("AL2 DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

@@ -1482,8 +1482,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      alStrings.length > 80 && !alStrings.some(alBanned), alStrings.filter(alBanned).join(" | "));
   ok("AL: the page's words — check with the haulier, counted apart, the flags' words and tones (NOTICE DUE amber, NOTICE LATE and SO LEAD TIME red), the status words",
      al.includes("check with the haulier; ESDAL, the police and the road and bridge authorities decide. Counted apart from the lorries, the CLP caps, the gate capacity and the carbon totals.")
-     && al.includes('const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME" };')
-     && al.includes('const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad" };')
+     && al.includes('const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
+     && al.includes('const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad", AIL_ROAD_LIMIT: "bad" };')
      && al.includes('const AL_NEXT_WORD = { approved: "Approve", pending: "Reopen", notified: "Mark notified", moved: "Mark moved", withdrawn: "Withdraw" };'));
   ok("AL: the guide has three steps for the page (the header, the Plan button, the list), each anchored to a mark the page carries",
      /\n  abnormal: \[\n    \{ anchor: "page-header", title: "Each abnormal load on its own\."/.test(code)
@@ -1495,6 +1495,59 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && html.includes("min-width:24px;min-height:24px;") && !al.includes('{isOpen ? "▼" : "▶"}'));
   ok("AL: the team's NAME on every row and in the form (teamName / the meta's labels), never a slot id as text",
      al.includes("{m.team_name || \"—\"}") && al.includes("{t.label || teamName(t.id)}") && !/\bIPT[1-6]\b/.test(al));
+}
+
+// ---- 22 Oct 2026: the abnormal loads on the other screens (phase 2) ------------------------
+// The route and its potential pinch points in the page's row; the Look-ahead's block; the Dashboard's strip; the gate
+// markers. Everything printed is the server's; nothing is a lorry figure (D70).
+{
+  const a0 = src.indexOf("// ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)");
+  const a1 = src.indexOf("// ================================================================= Public map\n");
+  const al = src.slice(a0, a1).split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
+  ok("⭐ AL2 page: a Route column after Notify by (length and time in the tenant's unit, 'N to survey', 'drawn at 30 m' when HERE capped the length, 'N limits over'); Draw the route is a planner's, after Edit, one HERE call",
+     al.includes('["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""]') && al.includes('data-al-route-cell={m.routed ? "drawn" : "none"}')
+     && al.includes("{dist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min") && al.includes('{(m.candidates || []).length} to survey')
+     && al.includes('/at most/.test(n)) ? " · drawn at 30 m" : ""') && al.includes("{canApprove && <>{\" \"}<button type=\"button\" className=\"link-btn\" disabled={busy} onClick={() => draw(m)}")
+     && al.includes("await call(`/abnormal/${encodeURIComponent(m.id)}/route`, \"POST\")") && al.includes('{m.routed ? "Draw the route again" : "Draw the route"}'));
+  ok("⭐ AL2 row: the route block first in the opened row — the facts (length, roads, HERE's notes in the warning colour, motorway yes / no, when drawn, via points), the candidates table " +
+     "(id, kind word, HERE's words and detail, the source, the grade), the signed limits at the load's size, the candidate words; a planner grades (one PUT), others read the grade",
+     al.includes('data-al-route={m.routed ? "drawn" : "none"}') && al.includes("<dt>Roads</dt><dd>{m.roads_words || \"—\"}</dd>")
+     && al.includes('<dd style={{ color: "var(--warn-text)" }}>{n}</dd>') && al.includes("none on the line (the escort rule's other-roads figures apply)")
+     && al.includes("data-al-pinch={m.id}") && al.includes("{AL_KIND_WORDS[c.kind] || c.kind}") && al.includes('aria-label={`Grade of ${c.id}`}')
+     && al.includes("onChange={e => grade(m, c.id, e.target.value)}") && al.includes("await call(`/abnormal/${encodeURIComponent(m.id)}/pinch`, \"PUT\", { pinch:")
+     && al.includes("Signed limits on the line, at the load's size") && al.includes("<p className=\"al-foot\">{AL_CANDIDATE_WORDS}</p>")
+     && al.includes('const AL_GRADES = [["grey", "Grey — to survey"], ["green", "Green — passable"], ["amber", "Amber — passable with care or measures"],'));
+  ok("AL2 row: the via points are typed one a line as latitude, longitude, saved with one PUT, and the line is said to need drawing again; a bad line is refused in words",
+     al.includes("await call(`/abnormal/${encodeURIComponent(m.id)}/via`, \"PUT\", { via: pts })") && al.includes('throw new Error("Each via point is one line: latitude, longitude.");')
+     && al.includes("Press Draw the route again to draw the line through them."));
+  ok("AL2 row: no line yet is said in words, with the reason stored when HERE refused; a not-planner is told a planner draws it",
+     al.includes("The line could not be drawn: {m.bake_error}") && al.includes("No line drawn yet.") && al.includes("A planner draws it."));
+  const wk0 = src.indexOf("function AbnormalWeek({ ab }){"), wk1 = src.indexOf("function GatesWeek({ gw }){");
+  const wk = src.slice(wk0, wk1);
+  ok("⭐ AL2 Look-ahead: an 'Abnormal loads this week' block under the gates' week (only when the server's block has movements), one row a brief — the load and its ends, " +
+     "the window, band, movements and escort, the class chip and summary, the route's length and 'N to survey' or 'not drawn', the status word and the flag chips, the notify-by — and the counted-apart words",
+     wk0 > 0 && wk1 > wk0 && wk.includes('data-abnormal-week="1"') && wk.includes("Abnormal loads this week · {ab.count} · counted apart from the lorries")
+     && wk.includes("data-abnormal-week-row={m.id}") && wk.includes("{esc(m.escort_planned)}") && wk.includes("<AlChip tone=\"grey\">{m.candidates} to survey</AlChip>")
+     && wk.includes("{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}") && wk.includes("notify by {alDay(m.notify_by)}") && wk.includes("{ab.words}")
+     && code.includes("{page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}"));
+  ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
+     src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
+     && src.includes('code === "NOTICE_DUE") ? "warn" : "bad";'));
+  const st0 = src.indexOf("function AbnormalStrip({ onOpen }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
+  const st = src.slice(st0, st1);
+  ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
+     "permissions to apply for with the chip, limits over, the button to the page through the Portal's switch, the counted-apart words; a failed read is one line",
+     st0 > 0 && st1 > st0 && (st.match(/fetch\(/g) || []).length === 1 && st.includes("fetch(`${API}/abnormal/summary`)")
+     && st.includes('data-abnormal-strip="set"') && st.includes("in the next {s.weeks_ahead} weeks") && st.includes('<AlChip tone="warn">NOTICE DUE</AlChip>')
+     && st.includes('<AlChip tone="bad">SO LEAD TIME</AlChip>') && st.includes('onOpen("abnormal")') && st.includes("{s.words}")
+     && st.includes("The abnormal loads did not load.") && code.includes("{!wall && !phone && <AbnormalStrip onOpen={onOpen} />}"));
+  const gac = src.slice(src.indexOf("function GateArrivalsPanel("), src.indexOf("function CarbonTargetStrip("));
+  ok("⭐ AL2 Gate arrivals: a marker on the gate's row for its abnormal loads (count and windows; the hover names each and says counted apart); the figures untouched",
+     gac.includes("{(g.abnormal || []).length > 0 && <span className=\"al-chip al-so al-mark\" data-ga-abnormal={g.abnormal.length}")
+     && gac.includes("counted apart: not in the arrivals, the gap or the capacity") && gac.includes("+ {g.abnormal.length} abnormal load{g.abnormal.length === 1 ? \"\" : \"s\"} · "));
+  const al2Strings = (al + wk + st).match(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g) || [];
+  ok("🔴 AL2: none of the banned words in anything new a person reads", al2Strings.length > 100
+     && !al2Strings.some(x => /\b(compliant|secure|NH-approved|real-time|predict\w*|optimi[sz]\w*|trucks?|approved by)\b/i.test(x) || /\bAI\b/.test(x)));
 }
 
 // ---- 10 Oct 2026: the Carbon planner page (phase 3) ------------------------------
@@ -3105,8 +3158,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && src.includes('stepped: "middle", order: 1 });') && src.includes("data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3]")
      && src.includes('<RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} />'));
   ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
-     src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY" };') && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR" };')
-     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR") ? "warn" : "bad";')
+     // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
+     src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
+     && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR" };')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE") ? "warn" : "bad";')
      && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields

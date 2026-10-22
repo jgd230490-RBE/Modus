@@ -891,6 +891,15 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .al-dl dt{color:var(--muted);} .al-dl dd{margin:0;}
   .al-bans td,.al-bans th{height:36px;padding:0 6px;font-size:13px;}
   .al-bans .ctl-sm{padding:3px 6px;font-size:13px;width:100%;}
+  .al-grey{background:#F1F5F9;color:#475569;border-color:#CBD5E1;} .al-okc{background:#ECFDF5;color:var(--ok-text);border-color:#A7F3D0;}
+  html[data-theme="dark"] .al-grey{background:#1E293B;color:#CBD5E1;border-color:#475569;} html[data-theme="dark"] .al-okc{background:#052E16;color:#86EFAC;border-color:#166534;}
+  .al-route{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px;}
+  .al-ptbl{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 8px;} .al-ptbl th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line);}
+  .al-ptbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top;} .al-ptbl .ctl-sm{padding:2px 6px;font-size:12px;}
+  .al-via{margin-top:8px;max-width:520px;} .al-via .ctl{font-family:ui-monospace,Consolas,monospace;font-size:12px;}
+  .al-mark{margin-left:6px;font-weight:600;}
+  .al-strip{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13px;background:var(--surface);margin-top:12px;}
+  .al-strip b{font-size:16px;font-variant-numeric:tabular-nums;} .al-strip-btn{padding:4px 9px;font-size:13px;} .al-strip-words{flex-basis:100%;color:var(--muted);font-size:12px;}
 </style>
 </head>
 <body>
@@ -1725,7 +1734,9 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
                 <RowDetails key={k} rowKey={"ga-" + k} isOpen={gaOpen(k)} onToggle={() => gaToggle(k)} colSpan={6}
                   label={`Details for ${g.location_name}, ${g.gate_name}`}
                   rowProps={{ "data-ga-gate": g.gate_id, "data-ga-flag": g.flag || "none" }}
-                  summary={<>{g.location_name}<div className="ga-gate">{g.gate_name}</div></>}
+                  summary={<>{g.location_name}<div className="ga-gate">{g.gate_name}{(g.abnormal || []).length > 0 && <span className="al-chip al-so al-mark" data-ga-abnormal={g.abnormal.length}
+                    title={g.abnormal.map(a => `${a.name}: ${alWindow(a.date_from, a.date_to)}${a.leaving ? " (leaving)" : ""}`).join("; ") + " — counted apart: not in the arrivals, the gap or the capacity"}>
+                    + {g.abnormal.length} abnormal load{g.abnormal.length === 1 ? "" : "s"} · {g.abnormal.map(a => alWindow(a.date_from, a.date_to)).join(", ")}</span>}</div></>}
                   chips={chips}
                   cells={<>
                     <td className="num" data-label="Arrivals a day">{gaN1(g.arrivals_per_day)}</td>
@@ -2399,6 +2410,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
           <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
+          {!wall && !phone && <AbnormalStrip onOpen={onOpen} />}
           {/* 16 Oct 2026 (S7): the simulation, folded, under Gate arrivals; read the first time it is opened (D86: staff only) */}
           <SimulationPanel meta={meta} months={months} phone={phone} initial={initialSim} />
           <details className="dash-more">
@@ -2668,6 +2680,34 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // today; Tark Tee off). Nothing is derived here: the days carry the server's tonnes,
 // trips and vehicles; the account carries its own totals. Cost stays off the map (the
 // map's hover shows quantity and trips only, as on the Look-ahead).
+// 22 Oct 2026 (abnormal loads, phase 2): one strip under Gate arrivals — loads in the next four weeks, notices due or late
+// this week, permissions still to apply for — and the way to the page. One read (GET /abnormal/summary). Counted apart:
+// nothing here is in the six cards, the charts or the carbon target (D70, D71). Not on the big screen, not on a phone.
+function AbnormalStrip({ onOpen }){
+  const [s, setS] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch(`${API}/abnormal/summary`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live){ setS(j); setErr(false); } }).catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, []);
+  if(err) return <div className="al-strip" data-abnormal-strip="error"><span className="text-slate-500">The abnormal loads did not load.</span></div>;
+  if(!s) return null;
+  const open = () => { if(onOpen) onOpen("abnormal"); };
+  if(!s.planned) return (
+    <div className="al-strip" data-abnormal-strip="none"><span className="text-slate-600">No abnormal loads planned.</span>
+      <button type="button" className="btn-sec al-strip-btn" onClick={open}>Open Abnormal loads</button></div>);
+  return (
+    <div className="al-strip" data-abnormal-strip="set" data-guide="dash-abnormal">
+      <span><b>{s.ahead}</b> abnormal load{s.ahead === 1 ? "" : "s"} in the next {s.weeks_ahead} weeks</span>
+      <span><b>{s.notices_due}</b> notice{s.notices_due === 1 ? "" : "s"} due this week{s.notices_late > 0 ? <> <AlChip tone="bad">NOTICE LATE</AlChip></> : (s.notices_due > 0 ? <> <AlChip tone="warn">NOTICE DUE</AlChip></> : null)}</span>
+      <span><b>{s.to_apply}</b> Special Order{s.to_apply === 1 ? "" : "s"} or VR1{s.to_apply === 1 ? "" : "s"} to apply for{s.to_apply > 0 ? <> <AlChip tone="bad">SO LEAD TIME</AlChip></> : null}</span>
+      {s.road_limit > 0 && <span><b>{s.road_limit}</b> over a signed limit <AlChip tone="bad">AIL ROAD LIMIT</AlChip></span>}
+      <button type="button" className="btn-sec al-strip-btn" onClick={open}>Open Abnormal loads</button>
+      <span className="al-strip-words">{s.words}</span>
+    </div>
+  );
+}
 function DashboardToday({ meta, week, err, wall, fill }){
   const [todayOpen, todayToggle] = useRowOpen("today");    // 13 Oct 2026 (W6): the rows' hover title moved into details
   const lines = (week && week.commit && week.commit.lines) || [];
@@ -4004,8 +4044,15 @@ function fmtWhen(iso){
 // login plans its own team's; a planner approves, reopens, deletes any, types the police time bans and fetches the
 // bank holidays. Desk only (D9): on a phone the Portal shows the desk-only card. Counted apart (D70, D71): nothing
 // on this page is a lorry count.
-const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME" };
-const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad" };
+const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };
+const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad", AIL_ROAD_LIMIT: "bad" };
+// phase 2: the kinds of potential pinch point the route module finds (its KIND_WORDS) and WSP's grades (its GRADE_WORDS)
+const AL_KIND_WORDS = { turn: "Turn", roundabout: "Roundabout", slip_road: "Slip road", bend: "Sharp bend", limit: "Signed limit", notice: "HERE notice",
+                        bridge: "Bridge", railway: "Railway crossed", level_crossing: "Level crossing", calming: "Traffic calming", overhead: "Overhead line",
+                        width: "Narrow road", junction: "Junction", furniture: "Street furniture", other: "Other" };
+const AL_GRADES = [["grey", "Grey — to survey"], ["green", "Green — passable"], ["amber", "Amber — passable with care or measures"],
+                   ["red", "Red — needs works or a permit"], ["black", "Black — impassable"]];
+const AL_CANDIDATE_WORDS = "Potential pinch points found by Wayscope from HERE's turn-by-turn, the line itself and the stored signed limits, each graded Grey (to survey). The route survey decides: no structure rating, no swept path, no overhead clearance is worked out here.";
 // the one-word class chip: the permission first, then the STGO weight category, then the regime
 function alClass(adv){
   if(!adv) return ["—", "cu"];
@@ -4081,6 +4128,7 @@ function AbnormalPage({ meta, access, who }){
   const [note, setNote] = useState(null);          // {ok, text}
   const [showSettings, setShowSettings] = useState(false);
   const [bans, setBans] = useState(null);          // the time bans being edited (planner)
+  const [viaText, setViaText] = useState({});      // phase 2: the via points being typed, per movement
   const call = async (path, method, body) => {
     const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
                                              body: body ? JSON.stringify(body) : undefined });
@@ -4128,6 +4176,26 @@ function AbnormalPage({ meta, access, who }){
     if(!window.confirm(`Delete "${m.name}"? This cannot be undone.`)) return;
     await call(`/abnormal/${encodeURIComponent(m.id)}`, "DELETE");
     setNote({ ok: true, text: `${m.name}: deleted.` });
+    await load();
+  });
+  // phase 2: the route at the typed size (a planner; one HERE call, two with an abnormal return leg), the grades, the via points
+  const draw = (m) => act(async () => {
+    const j = await call(`/abnormal/${encodeURIComponent(m.id)}/route`, "POST");
+    const notes = (j.notes || []).length ? ` ${j.notes.join(" ")}` : "";
+    setNote({ ok: true, text: `${m.name}: the line is drawn, ${dist(j.distance_km)} ${DU()}, ${j.candidates} potential pinch point${j.candidates === 1 ? "" : "s"} to survey${j.exceeds ? `, ${j.exceeds} signed limit${j.exceeds === 1 ? "" : "s"} the load is over` : ""}.${notes}` });
+    setOpen(m.id);
+    await load();
+  });
+  const grade = (m, cid, g) => act(async () => {
+    await call(`/abnormal/${encodeURIComponent(m.id)}/pinch`, "PUT", { pinch: (m.candidates || []).map(c => ({ id: c.id, grade: c.id === cid ? g : (c.grade || "grey"), note: c.note || null })).concat(m.typed_points || []) });
+    await load();
+  });
+  const saveVia = (m) => act(async () => {
+    const pts = (viaText[m.id] || "").split("\n").map(l => l.trim()).filter(Boolean).map(l => l.split(",").map(x => parseFloat(x.trim())));
+    if(pts.some(p => p.length !== 2 || p.some(x => isNaN(x)))) throw new Error("Each via point is one line: latitude, longitude.");
+    await call(`/abnormal/${encodeURIComponent(m.id)}/via`, "PUT", { via: pts });
+    setViaText(v => { const n = { ...v }; delete n[m.id]; return n; });
+    setNote({ ok: true, text: `${m.name}: ${pts.length} via point${pts.length === 1 ? "" : "s"} saved. Press Draw the route again to draw the line through them.` });
     await load();
   });
   const fetchHolidays = () => act(async () => {
@@ -4281,7 +4349,7 @@ function AbnormalPage({ meta, access, who }){
           </div>
         </div>
       )}
-      {!data && !err && <SkeletonTable cols={["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Status", ""]} rows={3} caption="Abnormal loads" />}
+      {!data && !err && <SkeletonTable cols={["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""]} rows={3} caption="Abnormal loads" />}
       {data && !movements.length && !form && (
         <EmptyState title="No abnormal loads planned yet" body="Plan the first one: what it is, where it goes, when, and its size and weight. The rules' advice appears as you type."
           action={<button type="button" className="btn-pri" onClick={startNew}>Plan an abnormal load</button>} />
@@ -4290,7 +4358,7 @@ function AbnormalPage({ meta, access, who }){
         <div className="card overflow-auto" data-guide="al-list">
           <table className="tbl al-tbl">
             <caption><b>Abnormal loads</b> · {movements.length} · oldest window first</caption>
-            <thead><tr>{["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Status", ""].map((h, i) => <th key={i} scope="col" className={i === 8 ? "text-right" : ""}>{h}</th>)}</tr></thead>
+            <thead><tr>{["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""].map((h, i) => <th key={i} scope="col" className={i === 9 ? "text-right" : ""}>{h}</th>)}</tr></thead>
             <tbody>
               {movements.map(m => {
                 const [cw, ct] = alClass(m.advice);
@@ -4305,16 +4373,64 @@ function AbnormalPage({ meta, access, who }){
                     <td><AlChip tone={ct}>{cw}</AlChip><div className="text-[13px] text-slate-500">{(m.advice && m.advice.summary || "").replace(/^(Special Order|VR1|STGO Cat [123]|C&U)( · )?/, "")}</div></td>
                     <td><div>{m.advice && m.advice.notify_by ? alDay(m.advice.notify_by) : "—"}{" "}{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}</div>
                       {m.advice && m.advice.apply_by && <div className="text-[13px] text-slate-500">apply by {alDay(m.advice.apply_by)}</div>}</td>
+                    <td data-al-route-cell={m.routed ? "drawn" : "none"}>{m.routed
+                      ? <><div>{dist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>
+                          <div className="text-[13px] text-slate-500">{(m.candidates || []).length} to survey{(m.route_notes || []).some(n => /at most/.test(n)) ? " · drawn at 30 m" : ""}{(m.limit_exceeds || []).length ? ` · ${m.limit_exceeds.length} limit${m.limit_exceeds.length === 1 ? "" : "s"} over` : ""}</div></>
+                      : <span className="text-[13px] text-slate-500">{m.bake_error ? "not drawn (see the row)" : "not drawn"}</span>}</td>
                     <td><StatusWord status={{ pending: "Pending", approved: "Approved", notified: "Approved", moved: "confirmed", withdrawn: "Rejected" }[m.status]} label={m.status_word} /></td>
                     <td className="text-right whitespace-nowrap">
                       <button type="button" className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>
+                      {canApprove && <>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => draw(m)}
+                        title={m.routed ? "Draw the line again with HERE at the load's size (one HERE call)" : "Draw the line with HERE at the load's size (one HERE call)"}>{m.routed ? "Draw the route again" : "Draw the route"}</button></>}
                       {nextOf(m).map(s => <React.Fragment key={s}>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => setStatus(m, s)}>{AL_NEXT_WORD[s] || s}</button></React.Fragment>)}
                       {canDelete(m) && <>{" "}<button type="button" className="link-btn" style={{ color: "var(--red)" }} disabled={busy} onClick={() => del(m)}>Delete</button></>}
                     </td>
                   </tr>
                   {isOpen && (
-                    <tr className="al-det-row" data-al-details={m.id}><td colSpan={9}>
+                    <tr className="al-det-row" data-al-details={m.id}><td colSpan={10}>
                       <div className="al-det">
+                        <div className="al-route" style={{ gridColumn: "1 / -1" }} data-al-route={m.routed ? "drawn" : "none"}>
+                          {!m.routed && <p className="text-sm text-slate-600">{m.bake_error ? <span style={{ color: "var(--bad-text)" }}>The line could not be drawn: {m.bake_error}</span>
+                            : <>No line drawn yet.{canApprove ? " Press Draw the route: HERE draws it for the load's size, and the potential pinch points are listed here." : " A planner draws it."}</>}</p>}
+                          {m.routed && <>
+                            <h4 className="al-h4">The route · indicative, drawn by HERE for the load's size</h4>
+                            <dl className="al-dl">
+                              <dt>Length, time</dt><dd>{dist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min (HERE's own){m.return_geometry ? " · the return leg drawn too" : ""}</dd>
+                              <dt>Roads</dt><dd>{m.roads_words || "—"}</dd>
+                              {(m.route_notes || []).map((n, i) => <React.Fragment key={i}><dt>Note</dt><dd style={{ color: "var(--warn-text)" }}>{n}</dd></React.Fragment>)}
+                              <dt>Motorway</dt><dd>{m.has_motorway ? "on the line: the escort rule's motorway figures apply there" : "none on the line (the escort rule's other-roads figures apply)"}</dd>
+                              <dt>Drawn</dt><dd>{m.baked_at ? alDay(m.baked_at.slice(0, 10)) : "—"}{(m.via || []).length ? ` · ${m.via.length} via point${m.via.length === 1 ? "" : "s"}` : ""}</dd>
+                            </dl>
+                            <h4 className="al-h4">Potential pinch points · {(m.candidates || []).length} found, graded Grey (to survey) · the route survey decides</h4>
+                            {(m.candidates || []).length === 0 && <p className="text-sm text-slate-500">None found on this line: no turn, roundabout, sharp bend or signed limit the load is over.</p>}
+                            {(m.candidates || []).length > 0 && <table className="al-ptbl" data-al-pinch={m.id}>
+                              <thead><tr><th></th><th>Kind</th><th>Where / what</th><th>From</th><th>Grade</th></tr></thead>
+                              <tbody>{m.candidates.map(c => (
+                                <tr key={c.id}>
+                                  <td className="font-semibold whitespace-nowrap">{c.id}</td>
+                                  <td>{AL_KIND_WORDS[c.kind] || c.kind}</td>
+                                  <td>{c.words}{c.detail ? <span className="text-slate-500"> · {c.detail}</span> : null}{c.note ? <div className="text-[13px]" style={{ color: "var(--warn-text)" }}>{c.note}</div> : null}</td>
+                                  <td className="text-slate-500 whitespace-nowrap">{{ here: "HERE", line: "the line", limits: "signed limit", osm: "OpenStreetMap" }[c.source] || c.source}</td>
+                                  <td>{canApprove
+                                    ? <select className="ctl ctl-sm" value={c.grade || "grey"} aria-label={`Grade of ${c.id}`} disabled={busy} onChange={e => grade(m, c.id, e.target.value)}>
+                                        {AL_GRADES.map(([k, w]) => <option key={k} value={k}>{w}</option>)}</select>
+                                    : <AlChip tone={c.grade === "grey" || !c.grade ? "grey" : c.grade === "green" ? "okc" : c.grade === "amber" ? "warn" : "bad"}>{(AL_GRADES.find(g => g[0] === (c.grade || "grey")) || ["", c.grade])[1]}</AlChip>}</td>
+                                </tr>))}</tbody>
+                            </table>}
+                            {(m.limits_hits || []).length > 0 && <>
+                              <h4 className="al-h4" style={{ marginTop: 10 }}>Signed limits on the line, at the load's size</h4>
+                              <ul className="al-lines">{m.limits_hits.map((h, i) => <li key={i} style={h.verdict === "exceeds" ? { color: "var(--bad-text)" } : undefined}>
+                                {h.headline}: the load's {h.vehicle_value != null ? `${h.vehicle_value} ${h.unit}` : "figure"} {h.verdict === "exceeds" ? "is over it" : h.verdict === "at_limit" ? "is exactly at it" : h.verdict === "within" ? "is within it" : "could not be compared"}{h.note ? ` — ${h.note}` : ""}</li>)}</ul>
+                            </>}
+                            <p className="al-foot">{AL_CANDIDATE_WORDS}</p>
+                          </>}
+                          {canApprove && <div className="al-via">
+                            <label className="al-fld">Via points, one a line as latitude, longitude (in travel order, up to 10; the line is drawn again on the next Draw)
+                              <textarea className="ctl ctl-sm" rows={2} value={viaText[m.id] !== undefined ? viaText[m.id] : (m.via || []).map(p => `${p[0]}, ${p[1]}`).join("\n")}
+                                aria-label="Via points" onChange={e => setViaText(v => ({ ...v, [m.id]: e.target.value }))} /></label>
+                            <button type="button" className="btn-sec btn-sm" disabled={busy || viaText[m.id] === undefined} onClick={() => saveVia(m)}>Save via points</button>
+                          </div>}
+                        </div>
                         <div>
                           <h4 className="al-h4">What the rules say{m.advice && m.advice.category_words ? ` · ${m.advice.category_words}` : ""}</h4>
                           <AlAdvice adv={m.advice} compact />
@@ -7662,6 +7778,33 @@ function gwCfg(g, labels){
       tooltip: { callbacks: { label: (it) => it.datasetIndex === 0 ? `${grp(g.days[it.dataIndex].arrivals)} lorries planned${g.days[it.dataIndex].pct != null ? ` · ${g.days[it.dataIndex].pct} %` : ""}` : `${it.dataset.label}: ${grp(it.parsed.y)}` } } },
       scales: { x: { grid: { display: false } }, y: { title: { display: true, text: "lorries a day" } } } } };
 }
+// 22 Oct 2026 (abnormal loads, phase 2): the movements whose window touches the committed week, under the gates' week.
+// Not a line in the grid and never in the week's figures (D70): the server's briefs, printed; the chips are the rail's words.
+function AbnormalWeek({ ab }){
+  if(!ab || !ab.count) return null;
+  const esc = (e) => ({ none: "no escort", attendant: "attendant", private: "private escort", police: "police escort" }[e] || e);
+  return (
+    <div className="card p-4 mt-4" data-abnormal-week="1">
+      <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Abnormal loads this week · {ab.count} · counted apart from the lorries</h3>
+      <div className="overflow-auto"><table className="tbl al-tbl">
+        <thead><tr>{["Load", "When", "What it needs", "Route", "Status"].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+        <tbody>{(ab.movements || []).map(m => {
+          const [cw, ct] = alClass({ permission: m.permission, category: m.category, abnormal: true });
+          return (
+            <tr key={m.id} data-abnormal-week-row={m.id}>
+              <td><div className="font-medium text-slate-800">{m.name}</div><div className="text-[13px] text-slate-500">{m.team_name} · {m.origin_name} → {m.dest_name}{m.dest_gate_name ? `, ${m.dest_gate_name}` : ""}</div></td>
+              <td><div>{alWindow(m.date_from, m.date_to)}</div><div className="text-[13px] text-slate-500">{m.time_band} · {m.movements} movement{m.movements === 1 ? "" : "s"} · {esc(m.escort_planned)}</div></td>
+              <td><AlChip tone={ct}>{cw}</AlChip><div className="text-[13px] text-slate-500">{(m.summary || "").replace(/^(Special Order|VR1|STGO Cat [123]|C&U)( · )?/, "")}</div></td>
+              <td>{m.routed ? <>{dist(m.distance_km)} {DU()} <AlChip tone="grey">{m.candidates} to survey</AlChip></> : <span className="text-slate-500">not drawn</span>}</td>
+              <td><span className={"sw"}>{m.status_word}</span> {(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}
+                {m.notify_by && <div className="text-[13px] text-slate-500">notify by {alDay(m.notify_by)}</div>}</td>
+            </tr>);
+        })}</tbody>
+      </table></div>
+      <p className="text-[12px] text-slate-500 mt-2">{ab.words}</p>
+    </div>
+  );
+}
 function GatesWeek({ gw }){
   if(!gw || !(gw.gates || []).length) return null;
   const gs = gw.gates;
@@ -7702,7 +7845,9 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
                      ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
                      LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED",
                      // 14 Oct 2026 (bundle G, W17)
-                     GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY" };
+                     GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",
+                     // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
+                     NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
@@ -7719,7 +7864,7 @@ const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOC
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
-const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR") ? "warn" : "bad";
+const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -8329,6 +8474,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 
           {/* 14 Oct 2026 (bundle G, W17): the committed week at each gate, against what it can check in */}
           {lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}
+          {page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}
           {/* 10 Sep: this week's movements on a map, in place of the stock card (now on
               the Dashboard). Drawn from the baked geometry of the lines on this page;
               its own small fetch, off the page read, so it cannot slow the grid. */}

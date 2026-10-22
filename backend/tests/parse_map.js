@@ -1943,7 +1943,7 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
 // prints; identifiers and comments are not copy. Vehicle NAMES come from the tenant's factors, not here.
 {
   const strings = (code.match(/'[^'\r\n]*'|"[^"\r\n]*"|`[^`]*`/g) || []).filter(s => !/^['"`]\s*$/.test(s));
-  const trucks = strings.filter(s => /trucks?/i.test(s) && !/Truck mixer/.test(s));
+  const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s));
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
   ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
   ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (average laden, both legs, tailpipe only, set on Config)",
@@ -6098,6 +6098,35 @@ function qrRead(mod) {
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
+// ---- 22 Oct 2026: the abnormal loads group on the staff map (phase 2, D67) ------------------
+{
+  const grp = html.slice(html.indexOf('<div class="control-group" id="abnormal-group" hidden>'), html.indexOf('<div class="control-group" id="restrictions-group" hidden>'));
+  ok("⭐ ABN: an 'Abnormal loads' control group after the collision history, HIDDEN in the markup, with the show tick, the dots and approved-only ticks folded, a legend and a when line",
+     grp.length > 300 && grp.includes("<h3>Abnormal loads</h3>") && grp.includes('<input type="checkbox" id="layer-abnormal" onchange="toggleAbnormal(this.checked)">')
+     && grp.includes('<div id="abnormal-filters" hidden>') && grp.includes('id="abn-dots" checked') && grp.includes('id="abn-approved"')
+     && grp.includes('id="abnormal-legend"') && grp.includes('id="abnormal-when"'));
+  ok("🔴 ABN: shown only when whoami says staff (abnormalStaff from checkRouteExportStaff, beside the community and collision groups); off by default; read only when ticked, from /api/abnormal/geojson",
+     src.includes("communityStaff(RME.staff); collisionStaff(RME.staff); abnormalStaff(RME.staff); })")
+     && src.includes("function abnormalStaff(staff) {") && src.includes("if (g) g.hidden = !ABN.staff;")
+     && src.includes("const ABN = { staff: false, on: false, data: null, loading: false, dots: true, approved: false };")
+     && src.includes("if (ABN.on && !ABN.data) loadAbnormal();") && src.includes("fetch('/api/abnormal/geojson', { credentials: 'same-origin' })")
+     && (src.match(/fetch\('\/api\/abnormal\/geojson'/g) || []).length === 1);
+  ok("⭐ ABN: the line is violet dashes (its own style: not the blue routes, the green / amber legs or the red breach), the dots one colour a kind with a white edge, the kind told by the dot; " +
+     "the layers come back after a basemap change like the collision layers",
+     src.includes("const ABN_LINE = '#7C3AED';") && src.includes("'line-dasharray': [2, 1.5]") && src.includes("'circle-stroke-color': '#ffffff'")
+     && src.includes("['match', ['get', 'kind'], 'turn', ABN_DOT.turn, 'roundabout', ABN_DOT.roundabout, 'slip_road', ABN_DOT.slip_road,")
+     && src.includes("const ABN_LAYERS = ['abnormal-lines', 'abnormal-points'];")
+     && (src.match(/if \(typeof ABN !== 'undefined' && ABN\.data\) ensureAbnormalLayers\(\);/g) || []).length === 2);
+  ok("ABN: the approved-only tick filters the lines on the server's status; the dots tick hides the points; the two filters never read anything new",
+     src.includes("['in', ['get', 'status'], ['literal', ['approved', 'notified', 'moved']]]") && src.includes("map.setLayoutProperty('abnormal-points', 'visibility', (ABN.on && ABN.dots) ? 'visible' : 'none');")
+     && src.includes("function abnormalFilterChanged() {") && !/function abnormalFilterChanged\(\) \{[^}]*fetch/.test(src));
+  const abnSrc = src.slice(src.indexOf("// ---------------------------------------------------------------- the abnormal loads (22 Oct 2026, phase 2, D67)"), src.indexOf("function abnormalFilterChanged() {"));
+  const abnStrings = abnSrc.match(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g) || [];
+  ok("🔴 ABN wording: the popups say indicative and to survey, the panel says counted apart and staff only; lorry never truck; none of the banned words",
+     abnSrc.includes("Grey — to survey") && abnSrc.includes("the route survey decides") && abnSrc.includes("Staff only.")
+     && abnStrings.length > 40 && !abnStrings.some(x => /\b(truck|real-time|live tracking|telematics|optimi[sz]e|predict|compliant|approved by)\b/i.test(x) || /\bsecure\b|\bAI\b/.test(x)));
+}
+
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
   for (const f of fail) console.log("  FAIL:", f);
