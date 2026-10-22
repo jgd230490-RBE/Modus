@@ -69,6 +69,7 @@ ORDER = [
     "disciplines", "discipline_materials",
     "ipts", "design_sections", "work_sections",
     "locations", "location_gates",
+    "abnormal_loads",       # 22 Oct 2026 (S16 / B5): names locations and gates, nothing later (the fetched layers stay last)
     "zones",
     "areas",                # 12 Oct 2026 (§2.2b): the council boundaries the tenant imported
     "routes", "route_haul_roads", "route_geometry",

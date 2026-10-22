@@ -288,7 +288,10 @@ ok("every material category names its Government class",
        "Precast / concrete": "concrete", "Steel / rail": "metals", "General / imported": "average_construction",
        # NARROWED 14 Oct 2026 (civils materials): the four categories added, each on its Government class
        "Ready-mixed concrete": "concrete", "Precast units": "concrete", "Structural steel / rebar": "metals",
-       "Asphalt": "asphalt"})
+       "Asphalt": "asphalt",
+       # NARROWED 22 Oct 2026 (abnormal loads, B2's bare category): null ON PURPOSE — an abnormal load is left out of the
+       # carbon totals (D71); the category exists for the holding-area exemption list (D63) and the picker
+       "Abnormal loads": None})
 ok("⭐ the file passes config.validate as it stands", config.validate(FILE) == [], str(config.validate(FILE)))
 
 # =========================================================================== #

@@ -1738,6 +1738,53 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 …a team code may read it but not fetch it: 403 (no fetch is started from this harness: it would go online)",
        c.get("/api/collisions", headers=NORTH).status_code == 200
        and c.post("/api/collisions/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)
+    # 22 Oct 2026 (S16 / B5): the abnormal loads — the real endpoints end to end on the demo package
+    ok("🔴 abnormal loads: the page, the rules preview and the settings need a sign-in (the map cookie gets 401)",
+       c.get("/api/abnormal").status_code == 401 and c.get("/api/abnormal/rules?width_m=5").status_code == 401
+       and c.get("/api/abnormal/settings").status_code == 401)
+    _ab = c.get("/api/abnormal", headers=PLAN)
+    _abj = _ab.json() if _ab.status_code == 200 else {}
+    ok("⭐ …a planner reads the page: 200, no movements on the demo yet, the shipped bank holidays, no time bans, the pickers",
+       _ab.status_code == 200 and _abj.get("movements") == [] and _abj.get("settings", {}).get("holidays", {}).get("source") == "seed"
+       and _abj.get("settings", {}).get("time_bans") == [] and len(_abj.get("choices", {}).get("locations") or []) == 16
+       and "check with the haulier" in (_abj.get("words", {}).get("advice") or "").lower(), _ab.text[:200])
+    _pv = c.get("/api/abnormal/rules", params={"width_m": 4.6, "height_m": 3.9, "length_m": 16.5, "gross_t": 40, "max_axle_t": 9,
+                                                "axle_count": 6, "indivisible": "true", "date_from": "2027-03-08"}, headers=NORTH)
+    _pvj = _pv.json() if _pv.status_code == 200 else {}
+    ok("⭐ …the preview for the 4.6 m modular units: STGO, police 2 clear working days by Wed 3 Mar 2027, attendant, escort expected "
+       "off motorways; nothing saved",
+       _pv.status_code == 200 and _pvj.get("regime") == "stgo" and _pvj.get("notices", {}).get("police_days") == 2
+       and _pvj.get("notify_by") == "2027-03-03" and _pvj.get("attendant") is True and _pvj.get("escort_expected") == "other_roads"
+       and c.get("/api/abnormal", headers=PLAN).json().get("count") == 0, _pv.text[:200])
+    _mk = c.post("/api/abnormal", json={"name": "Site office units", "origin_id": "L004", "dest_id": "L006", "dest_gate_id": "G009",
+                                        "date_from": "2027-03-08", "date_to": "2027-03-12", "movements": 3, "width_m": 4.6, "height_m": 3.9,
+                                        "length_m": 16.5, "gross_t": 40, "max_axle_t": 9, "axle_count": 6, "indivisible": True,
+                                        "vehicle_type": "low_loader"}, headers=dict(NORTH, **{"X-Wayscope": "1"}))
+    _mkj = _mk.json() if _mk.status_code == 200 else {}
+    ok("🔴 …a team code plans one: 200, AL001, pending, ITS team (the body named none), the team's name never the id, the advice on it",
+       _mk.status_code == 200 and _mkj.get("movement", {}).get("id") == "AL001" and _mkj["movement"]["status"] == "pending"
+       and _mkj["movement"]["ipt"] == "IPT1" and _mkj["movement"]["team_name"] == "North Team"
+       and _mkj["movement"]["advice"]["summary"].startswith("STGO Cat 1"), _mk.text[:300])
+    ok("🔴 …a bad body is a 400 in sentences (a slipped decimal, a missing figure)",
+       c.post("/api/abnormal", json={"name": "x", "origin_id": "L004", "dest_id": "L006", "width_m": 46, "height_m": 3.9,
+                                     "date_from": "2027-03-08"}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 400)
+    ok("🔴 …approving is a planner's: the team's code gets 403, the planner's 200; a wrong step a 400",
+       c.post("/api/abnormal/AL001/status", json={"status": "approved"}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL001/status", json={"status": "approved"}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.post("/api/abnormal/AL001/status", json={"status": "pending"}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL001/status", json={"status": "moved"}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.post("/api/abnormal/AL001/status", json={"status": "pending"}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400)
+    ok("…the time bans and the holidays fetch are a planner's: 403 to a team code; a bad ban list a 400; the fetch is NOT pressed here (it would go online)",
+       c.put("/api/abnormal/time-bans", json={"time_bans": []}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/bank-holidays/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.put("/api/abnormal/time-bans", json={"time_bans": [{"force": "", "from": "7", "to": "9"}]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
+       and c.put("/api/abnormal/time-bans", json={"time_bans": [{"force": "Leicestershire", "from": "07:00", "to": "09:30"}]},
+                 headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.get("/api/abnormal/settings", headers=NORTH).json().get("time_bans", [{}])[0].get("force") == "Leicestershire")
+    ok("🔴 …another team's code cannot see it (404, never 403) and a planner deletes it",
+       c.get("/api/abnormal/AL001", headers={"X-Access-Code": "central-code-xyz"}).status_code in (401, 404)
+       and c.delete("/api/abnormal/AL001", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.get("/api/abnormal", headers=PLAN).json().get("count") == 0)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",

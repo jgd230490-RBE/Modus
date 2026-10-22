@@ -121,6 +121,15 @@
       "carbon_material": "asphalt",
       "_density_basis": "ASSUMPTION, stated: 2.3 t/m3 compacted. No UK public source was found that gives one figure: it depends on the mix and its air voids (published EPDs for dense asphalt concrete mixes give 2.26-2.34 t/m3, environdec.com, read 14 Oct 2026). Stored, not used: asphalt is ordered and planned in tonnes, never converted from m3. Replace with the mix's registered density. Added 14 Oct 2026 (the user asked for it)."
     },
+    "Abnormal loads": {
+      "density_t_per_m3": 1.0,
+      "default_unit": "vehicles",
+      "units": ["vehicles"],
+      "volume_convertible": false,
+      "vehicles": [],
+      "carbon_material": null,
+      "_note": "22 Oct 2026 (S16 / B5, the B2 half): the BARE category. An abnormal load is planned on its own screen (Plan -> Abnormal loads) as its own movement with its typed size, its own route and its dates (D66a), never as a forecast line; this category exists so a site can say it supplies or receives abnormal loads, so the vehicle holding area's exemption list can name it (D63), and so a picker has the word. No haulage vehicle (an abnormal load has its own), counted in movements only, no material carbon (D71: left out of the carbon totals; the density is a placeholder the validator needs and nothing reads)."
+    },
     "_default": {
       "density_t_per_m3": 1.6,
       "default_unit": "t",

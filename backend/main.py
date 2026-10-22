@@ -65,6 +65,7 @@ import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" sectio
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
+import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
 import read_cache  # 22 Oct 2026 — whole reads kept until the next write (the first council view on live)
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
@@ -2920,6 +2921,163 @@ def collision_refresh(request: Request = None):
     if acc.get("role") not in ("planner", "admin"):
         raise HTTPException(403, "only a planner or an admin can fetch the collision history again")
     return collisions.start_refresh(by=acc.get("name") or acc.get("label") or acc.get("role"))
+
+
+# ------------------------------------------------------------------ abnormal loads (22 Oct 2026, S16 / B5)
+#
+# Each abnormal load is its own planned movement (D66a): typed size and weights, a window, a status. The read decorates
+# every movement with abnormal_rules.advice() — the class, the permission and its lead time, the notices and the
+# "notify by" date on the right calendar, attendant, markers, speeds, the escort the National Highways code expects,
+# the height warnings, the rail flags — all of it advice ("check with the haulier"), nothing stored. A signed-in code
+# or login reads and plans (a team login its own team's); a planner or an admin approves, reopens, deletes any, types
+# the police time bans and fetches the bank holidays. Every write below is audited by the middleware like any other.
+class AbnormalIn(BaseModel):
+    name: Optional[str] = None
+    ipt: Optional[str] = None
+    origin_id: Optional[str] = None
+    origin_gate_id: Optional[str] = None
+    dest_id: Optional[str] = None
+    dest_gate_id: Optional[str] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    time_band: Optional[str] = None
+    movements: Optional[int] = None
+    return_abnormal: Optional[bool] = None
+    width_m: Optional[float] = None
+    height_m: Optional[float] = None
+    length_m: Optional[float] = None
+    rigid_length_m: Optional[float] = None
+    proj_front_m: Optional[float] = None
+    proj_rear_m: Optional[float] = None
+    proj_side_m: Optional[float] = None
+    gross_t: Optional[float] = None
+    max_axle_t: Optional[float] = None
+    axle_driving: Optional[bool] = None
+    axle_count: Optional[int] = None
+    axle_spacings_m: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    cu_vehicle: Optional[bool] = None
+    indivisible: Optional[bool] = None
+    escort_planned: Optional[str] = None
+    esdal_ref: Optional[str] = None
+    vr1_ref: Optional[str] = None
+    so_ref: Optional[str] = None
+    applied_on: Optional[str] = None
+    notified_on: Optional[str] = None
+    note: Optional[str] = None
+
+
+class AbnormalStatusIn(BaseModel):
+    status: str
+
+
+class TimeBansIn(BaseModel):
+    time_bans: List[dict] = []
+
+
+def _abnormal_result(res):
+    """One answer shape for the store's results: problems are a 400 with the sentences, a miss a 404, a refusal a 403."""
+    if res.get("ok"):
+        return res
+    if res.get("problems"):
+        raise HTTPException(400, "; ".join(res["problems"]))
+    if res.get("forbidden"):
+        raise HTTPException(403, res.get("error") or "not allowed")
+    raise HTTPException(404 if "no such" in (res.get("error") or "") else 400, res.get("error") or "not done")
+
+
+@app.get("/api/abnormal")
+def abnormal_page():
+    """Every abnormal load the caller may see, each with the rules' advice, plus the settings and the pickers."""
+    acc = _require_access()
+    return abnormal.page(acc)
+
+
+@app.get("/api/abnormal/rules")
+def abnormal_rules_preview(width_m: Optional[float] = None, height_m: Optional[float] = None,
+                           length_m: Optional[float] = None, rigid_length_m: Optional[float] = None,
+                           proj_front_m: Optional[float] = None, proj_rear_m: Optional[float] = None,
+                           proj_side_m: Optional[float] = None, gross_t: Optional[float] = None,
+                           max_axle_t: Optional[float] = None, axle_driving: Optional[bool] = None,
+                           axle_count: Optional[int] = None, axle_spacings_m: Optional[str] = None,
+                           cu_vehicle: Optional[bool] = None, indivisible: Optional[bool] = None,
+                           date_from: Optional[str] = None, date_to: Optional[str] = None,
+                           time_band: Optional[str] = None, escort_planned: Optional[str] = None,
+                           applied_on: Optional[str] = None, status: Optional[str] = None):
+    """The advice for figures as they are typed, before anything is saved (the form's live panel). Nothing is written."""
+    _require_access()
+    f = {"width_m": width_m, "height_m": height_m, "length_m": length_m, "rigid_length_m": rigid_length_m,
+         "proj_front_m": proj_front_m, "proj_rear_m": proj_rear_m, "proj_side_m": proj_side_m, "gross_t": gross_t,
+         "max_axle_t": max_axle_t, "axle_driving": axle_driving, "axle_count": axle_count,
+         "axle_spacings_m": axle_spacings_m, "cu_vehicle": cu_vehicle, "indivisible": indivisible}
+    return abnormal.preview(f, date_from=date_from, date_to=date_to, time_band=time_band or "day",
+                            escort_planned=escort_planned, applied_on=applied_on, status=status or "pending")
+
+
+@app.get("/api/abnormal/settings")
+def abnormal_settings():
+    """The bank holidays (where from, how far), the typed police time bans and the nation."""
+    _require_access()
+    return abnormal.settings()
+
+
+@app.post("/api/abnormal/bank-holidays/refresh")
+def abnormal_holidays_refresh():
+    """Fetch the gov.uk bank holidays again and keep them for this scheme (D74). A planner or an admin."""
+    acc = _require_approver()
+    res = abnormal.refresh_holidays(by=acc.get("name") or acc.get("label") or acc.get("role"))
+    if not res.get("ok"):
+        raise HTTPException(502, res.get("error") or "gov.uk could not be read")
+    return res
+
+
+@app.put("/api/abnormal/time-bans")
+def abnormal_time_bans(body: TimeBansIn):
+    """The police time bans typed for this scheme (D72): force, days, hours, note. A planner or an admin."""
+    acc = _require_approver()
+    res = abnormal.set_time_bans(body.time_bans, by=acc.get("name") or acc.get("label") or acc.get("role"))
+    if not res.get("ok"):
+        raise HTTPException(400, "; ".join(res.get("problems") or ["not saved"]))
+    return res
+
+
+@app.post("/api/abnormal")
+def abnormal_create(body: AbnormalIn):
+    """Plan an abnormal load (status pending). A team login plans its own team's; a planner says whose."""
+    acc = _require_access()
+    sent = {k: getattr(body, k) for k in _fields_set(body)}
+    return _abnormal_result(abnormal.create(sent, acc, by=acc.get("name") or acc.get("label")))
+
+
+@app.get("/api/abnormal/{movement_id}")
+def abnormal_one(movement_id: str):
+    acc = _require_access()
+    row = abnormal.get(movement_id)
+    if not row or not abnormal._visible(row, acc):
+        raise HTTPException(404, "no such abnormal load")
+    return abnormal.decorate(row)
+
+
+@app.put("/api/abnormal/{movement_id}")
+def abnormal_update(movement_id: str, body: AbnormalIn):
+    """Change the fields sent. A team login changes its own team's movements only; their team stays."""
+    acc = _require_access()
+    sent = {k: getattr(body, k) for k in _fields_set(body)}
+    return _abnormal_result(abnormal.update(movement_id, sent, acc, by=acc.get("name") or acc.get("label")))
+
+
+@app.post("/api/abnormal/{movement_id}/status")
+def abnormal_status(movement_id: str, body: AbnormalStatusIn):
+    """pending → approved → notified → moved, or withdrawn. Approving and reopening are a planner's or an admin's."""
+    acc = _require_access()
+    return _abnormal_result(abnormal.set_status(movement_id, body.status, acc, by=acc.get("name") or acc.get("label")))
+
+
+@app.delete("/api/abnormal/{movement_id}")
+def abnormal_delete(movement_id: str):
+    """A planner deletes any; a team login its own while pending or withdrawn."""
+    acc = _require_access()
+    return _abnormal_result(abnormal.delete(movement_id, acc))
 
 
 def _collision_evidence(route_id, request):
