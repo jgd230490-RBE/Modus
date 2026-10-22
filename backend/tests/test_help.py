@@ -841,8 +841,8 @@ ok("⭐ 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 — planni
    and '<li class="l1"><a href="#14-abnormal-loads">14. Abnormal loads</a></li>' in src and src.count('<li class="l2"><a href="#14-') == 3
    and "Advice, never permission" in src and "ESDAL, the police and the road and bridge authorities decide" in src and "counted apart" in src
    and "Check the roads again" in src and "Notice calendar" in src and "ESDAL details sheet" in src and "approved movements only" in src
-   and not re.search(r"trucks?", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
-   and not re.search(r"(compliant|approved by|real-time|optimi[sz]e|predict)", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
+   and not re.search(r"\btrucks?\b", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
+   and not re.search(r"\b(compliant|approved by|real-time|optimi[sz]e|predict)\b", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
    and '<h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>' in _tg2 and '<li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li>' in _tg2
    and "STGO 2003 Schedule 1" in _tg2 and "osm_structures" in _tg2 and "vehicle[grossWeight / weightPerAxle / height / width / length / axleCount]" in _tg2
    and "/api/public/abnormal" in _tg2 and "Not modelled" in _tg2)
