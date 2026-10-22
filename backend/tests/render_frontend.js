@@ -415,8 +415,11 @@ if (loaded) {
         tvFill.includes('data-today-fit="1"') && (tvFill.match(/<tr class="rd-row /g) || []).length === todayRows.length && todayRows.length > 0
         && !tvFill.includes("today-cut") && !tvFill.includes("today-more")
         && tvFill.includes("This week to date") && tvFill.includes("Last week") && (tvFill.match(/h-2 rounded-full bg-slate-100/g) || []).length === 2);
-      ok("UI FIX 6 card 5: All sections (card 4, held) and the working Dashboard carry no fit marker and no count line, in their 260 / 190 px boxes as before",
-        !tvAll.includes("data-today-fit") && !tvAll.includes("today-more") && tvAll.includes("max-height:260px")
+      // REVERSED 22 Oct 2026 (card 4, the user's yes): All sections is marked to fit now, like Rotate / One section, in its 260 px
+      // box (no count line until measured); the working Dashboard is still unchanged
+      ok("UI FIX 6 card 4: All sections is marked to fit in its 260 px box (no count line until it is measured); the working Dashboard carries no fit marker and no count line, in its 190 px box as before",
+        tvAll.includes('data-today-fit="1"') && !tvAll.includes("today-more") && tvAll.includes("max-height:260px")
+        && tvAll.includes("This week to date") && tvAll.includes("Last week")
         && !tvDesk.includes("data-today-fit") && !tvDesk.includes("today-more") && tvDesk.includes("max-height:190px")
         && (tvAll.match(/<tr class="rd-row /g) || []).length === todayRows.length && (tvDesk.match(/<tr class="rd-row /g) || []).length === todayRows.length);
       // 2026-10-11: the weekend, rendered on purpose every day rather than only when the harness happens
