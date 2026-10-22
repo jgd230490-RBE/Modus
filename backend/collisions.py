@@ -597,6 +597,8 @@ ROWS = [
     ("vru_any", "A vulnerable road user hurt, any severity"),
     ("goods", "A goods vehicle over 3.5 t involved"),
     ("goods_ksi", "A goods vehicle over 3.5 t involved, KSI"),
+    # 22 Oct 2026 (evidence v2, the user's yes to the mockup): the case CLOCS is written for, as its own row
+    ("vru_goods", "A vulnerable road user hurt, a goods vehicle over 3.5 t involved"),
     ("junction", "At or within 20 m of a junction"),
 ]
 
@@ -619,6 +621,8 @@ def _count(recs, key):
             return c["goods"]
         if key == "goods_ksi":
             return c["goods"] and c["ksi"]
+        if key == "vru_goods":
+            return c["goods"] and bool(c["vru"])
         if key == "junction":
             return bool(c["junction"])
         return False
@@ -634,6 +638,11 @@ def counts_for(recs, key):
 
 def _chainage(index, line, p):
     """Metres along `line` (from its first vertex) to the point on it nearest `p`."""
+    return _project(index, line, p)[1]
+
+
+def _project(index, line, p):
+    """(metres from `line`, metres along it from its first vertex) for the point on `line` nearest `p`."""
     best, at, run = None, 0.0, 0.0
     P = index._xy(p)
     for a, b in zip(line, line[1:]):
@@ -645,7 +654,12 @@ def _chainage(index, line, p):
         if best is None or d < best:
             best, at = d, run + t * math.sqrt(L2)
         run += math.sqrt(L2)
-    return at
+    return (best if best is not None else float("inf")), at
+
+
+def line_length_m(index, line):
+    """The length of `line` in metres on the index's projection (the one _project measures along)."""
+    return sum(math.hypot(*(B - A for A, B in zip(index._xy(a), index._xy(b)))) for a, b in zip(line, line[1:]))
 
 
 def locations(recs, index, line):
@@ -691,12 +705,12 @@ def locations(recs, index, line):
     return out
 
 
-def nearby_community(lon, lat, index, limit=4, within_m=NEAR_ROUTE_M):
+def nearby_community(lon, lat, index, limit=4, within_m=NEAR_ROUTE_M, feats=None):
     """The community considerations within `within_m` of a point: the NEAREST of each kind (points only), nearest kind
-    first, at most `limit` kinds — 'Schools: Langham Primary 120 m'."""
+    first, at most `limit` kinds (None: every kind) — 'Schools: Langham Primary 120 m'."""
     import community
     best = {}
-    for f in community.features():
+    for f in (community.features() if feats is None else feats):
         g = f.get("geometry") or {}
         if g.get("type") != "Point":
             continue
@@ -709,6 +723,297 @@ def nearby_community(lon, lat, index, limit=4, within_m=NEAR_ROUTE_M):
         label = community.KIND_BY_KEY.get(kind, {}).get("label") or kind
         out.append({"kind": label, "name": name or label, "m": int(round(d))})
     return out
+
+
+# --------------------------------------------------------------------------- #
+#  22 Oct 2026 — evidence v2 (the user's yes to notes\collision-evidence-v2-   #
+#  mockup-1022): the route stretch by stretch, the plan's lorries beside it    #
+# --------------------------------------------------------------------------- #
+# The PDF's "Nearby" (the appendix): schools and health within 250 m, bus stops within 100 m (people at the kerb). Every
+# other kind, and every kind's nearest within 250 m, stays in the XLSX.
+PDF_NEARBY_M = {"schools": NEAR_ROUTE_M, "hospitals": NEAR_ROUTE_M, "health": NEAR_ROUTE_M, "bus_stops": 100}
+STRETCH_KINDS = {"schools": "schools", "hospitals": "health", "health": "health"}   # the stretch table's two counts
+STRETCH_MIN = 4                     # a road that fewer collisions than this name joins its neighbour
+STRETCH_SPLIT_M = 5 * 1609.344      # one road longer than 5 mi is split once where its speed limits change
+SPEED_LOW_MAX = 40                  # 20-40 mph is one band, 50-70 the other
+SPLIT_AGREE = 0.8                   # ...when at least 80 % of its collisions fall on the right side of the split
+OVERLAP_M = 50                      # a run of the scheme's lorries counts on a stretch it covers by more than this
+GAP_M = 250                         # ...and the route's own figure where no run covers more than this (a gate's last
+                                    # few metres, where two bakes drew the road apart, are not a stretch of their own)
+
+
+def pdf_nearby(community_list):
+    """The PDF's Nearby cell from a place's community list: schools and health within 250 m, bus stops within 100 m."""
+    import community
+    limit = {community.KIND_BY_KEY[k]["label"]: m for k, m in PDF_NEARBY_M.items() if k in community.KIND_BY_KEY}
+    return [x for x in community_list or [] if x["kind"] in limit and x["m"] <= limit[x["kind"]]]
+
+
+def _numbered(road):
+    """A road with a number ('A6', 'B4114', 'M1'), not 'C road', 'B road' or 'Unclassified road'."""
+    return bool(road) and not road.endswith(" road")
+
+
+def route_road(c):
+    """The road a collision on the route names for the route: its first road when numbered, else its second (a
+    collision at a side road's mouth is often recorded on the side road), else None."""
+    if _numbered(c.get("road")):
+        return c["road"]
+    if _numbered(c.get("road2")):
+        return c["road2"]
+    return None
+
+
+def _speed_words(limits):
+    lo, hi = min(limits), max(limits)
+    return f"{lo} mph" if lo == hi else f"{lo}–{hi} mph"
+
+
+def _split_by_speed(part):
+    """One stretch of one road ({"from_m", "to_m", "road", "on": [(m, c)]}) split once where its recorded speed limits
+    change between 20-40 and 50-70 mph — only when it is longer than STRETCH_SPLIT_M, both sides keep STRETCH_MIN
+    collisions and SPLIT_AGREE of them fall on their side. A list of one or two parts."""
+    if part["to_m"] - part["from_m"] <= STRETCH_SPLIT_M:
+        return [part]
+    pts = [(m, c["speed_limit"]) for m, c in part["on"] if c.get("speed_limit")]
+    n = len(pts)
+    best = None
+    for k in range(STRETCH_MIN, n - STRETCH_MIN + 1):
+        for left_low in (True, False):
+            good = sum(1 for _, s in pts[:k] if (s <= SPEED_LOW_MAX) == left_low) \
+                + sum(1 for _, s in pts[k:] if (s <= SPEED_LOW_MAX) != left_low)
+            if best is None or good > best[0]:
+                best = (good, k, left_low)
+    if not best or best[0] < SPLIT_AGREE * n:
+        return [part]
+    _, k, left_low = best
+    cut = (pts[k - 1][0] + pts[k][0]) / 2
+    out = []
+    for a, b, low in ((part["from_m"], cut, left_low), (cut, part["to_m"], not left_low)):
+        on = [(m, c) for m, c in part["on"] if a <= m < b or (b == part["to_m"] and m >= a)]
+        lims = [c["speed_limit"] for _, c in on if c.get("speed_limit") and (c["speed_limit"] <= SPEED_LOW_MAX) == low]
+        out.append({"from_m": a, "to_m": b, "road": part["road"], "on": on,
+                    "speed": _speed_words(lims) if lims else None})
+    return out
+
+
+def stretches(on, length_m):
+    """
+    The route cut into stretches from A, from the collisions ON it: `on` is [(metres from A, record)] sorted. Each
+    stretch is the road DfT records for its collisions (route_road); a road that fewer than STRETCH_MIN collisions
+    name joins the neighbour with more; one road longer than STRETCH_SPLIT_M is split once by speed limit. Boundaries
+    fall half way between the last collision of one road and the first of the next — they come from the collisions,
+    not from a road map (the stored road routes carry no road names). No numbered road at all: one stretch, the whole
+    route. Returns [{"no", "from_m", "to_m", "road", "speed", "name", "on"}], in order from A, covering 0..length_m.
+    """
+    runs = []
+    for m, c in on:
+        r = route_road(c)
+        if not r:
+            continue
+        if runs and runs[-1]["road"] == r:
+            runs[-1]["ch"].append(m)
+        else:
+            runs.append({"road": r, "ch": [m]})
+
+    def join():
+        k = 0
+        while k < len(runs) - 1:
+            if runs[k]["road"] == runs[k + 1]["road"]:
+                runs[k]["ch"] += runs.pop(k + 1)["ch"]
+            else:
+                k += 1
+    while len(runs) > 1:
+        i = min(range(len(runs)), key=lambda k: (len(runs[k]["ch"]), k))
+        if len(runs[i]["ch"]) >= STRETCH_MIN:
+            break
+        j = max((x for x in (i - 1, i + 1) if 0 <= x < len(runs)), key=lambda x: len(runs[x]["ch"]))
+        runs[j]["ch"] = sorted(runs[j]["ch"] + runs[i]["ch"])
+        del runs[i]
+        join()
+    if not runs:
+        parts = [{"from_m": 0.0, "to_m": length_m, "road": None, "on": list(on)}]
+    else:
+        cuts = [0.0] + [(runs[k]["ch"][-1] + runs[k + 1]["ch"][0]) / 2 for k in range(len(runs) - 1)] + [length_m]
+        parts = []
+        for k, r in enumerate(runs):
+            a, b = cuts[k], max(cuts[k + 1], cuts[k])
+            parts.append({"from_m": a, "to_m": b, "road": r["road"],
+                          "on": [(m, c) for m, c in on if a <= m < b or (k == len(runs) - 1 and m >= a)]})
+    out = []
+    for p in parts:
+        out.extend(_split_by_speed(p) if p["road"] else [p])
+    for i, s in enumerate(out, 1):
+        s["no"] = i
+        s.setdefault("speed", None)
+        s["name"] = (f"{s['road']}, {s['speed']}" if s["speed"] else s["road"]) if s["road"] else "The whole route"
+    return out
+
+
+def plan_loads(factors=None):
+    """
+    {route_id: {month_index: loads}} and {route_id: {month_index: [vehicle names]}} over the APPROVED forecast — the
+    public map bar's loads (main._month_kpi_line: tonnes ÷ payload, fractional), one query, no route analysis.
+    """
+    import main
+    import derived
+    import conversions
+    factors = factors or conversions.load_factors()
+    vs = factors.get("vehicles", {}) or {}
+    fb_payload, fb_name = derived.payload_for(None, factors)
+    loads, vehicles = {}, {}
+    for r in db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+                      "ORDER BY month_index, route_id, discipline, section_id, id", (db.current_tenant(),)):
+        line = main._month_kpi_line(r, "vehicles", factors, vs, fb_payload, fb_name)
+        mi = int(r["month_index"])
+        rl = loads.setdefault(r["route_id"], {})
+        rl[mi] = rl.get(mi, 0.0) + float(line.get("vehicle_loads") or 0.0)
+        vv = vehicles.setdefault(r["route_id"], {}).setdefault(mi, [])
+        if line.get("vehicle_name") and line["vehicle_name"] not in vv:
+            vv.append(line["vehicle_name"])
+    return loads, vehicles
+
+
+def plan_beside(route_id, index, line):
+    """
+    The plan's lorries for the evidence (CLOCS 4.1a: crash data beside "volume, frequency and type of vehicle
+    movements"): this route's BUSIEST month of Approved lines, its movements a day that month, and the stretches of
+    its loaded road route the scheme's other routes share (road_sections' stored runs) with every owner's movements a
+    day summed — road_load's rule (one movement = one load there and back, never doubled), read without a route
+    analysis. None when the route has no Approved line. Never divided into a collision count.
+    """
+    import main
+    import conversions
+    import road_sections
+    import gate_arrivals
+    factors = conversions.load_factors()
+    wd = main._working_days(factors)
+    loads, vehicles = plan_loads(factors)
+    own = loads.get(route_id) or {}
+    own = {m: v for m, v in own.items() if v > 0}
+    if not own:
+        return None
+    month = max(own, key=lambda m: (own[m], -m))
+    per_day = own[month] / wd
+    segs = []
+    if len(line) >= 2:
+        for run in road_sections.stored_runs("loaded"):
+            if route_id not in run["routes"] or len(run["geometry"]) < 2:
+                continue
+            g = run["geometry"]
+            probe = g[:: max(1, len(g) // 12)] + [g[-1]]
+            along = [_project(index, line, p)[1] for p in probe]
+            v = sum((loads.get(r) or {}).get(month, 0.0) for r in run["routes"]) / wd
+            segs.append((min(along), max(along), v))
+    return {"month": month, "month_words": gate_arrivals.month_label(month), "per_day": per_day,
+            "vehicles": (vehicles.get(route_id) or {}).get(month) or [], "segments": segs}
+
+
+def _whole(x):
+    return int(math.floor(x + 0.5))
+
+
+def stretch_lorries(plan, a, b):
+    """(lowest, highest) whole movements a day of the scheme's lorries along [a, b] metres from A: the shared runs that
+    cover it by more than OVERLAP_M, and this route's own figure where none covers more than GAP_M of it in all. None
+    without a plan."""
+    if not plan:
+        return None
+    vals, covered = [], []
+    for s0, s1, v in plan["segments"]:
+        lo, hi = max(a, s0), min(b, s1)
+        if hi - lo > OVERLAP_M:
+            vals.append(v)
+            covered.append((lo, hi))
+    covered.sort()
+    gap, at = 0.0, a
+    for lo, hi in covered:
+        if lo > at:
+            gap += lo - at
+        at = max(at, hi)
+    gap += max(0.0, b - at)
+    if gap > GAP_M or not vals:
+        vals.append(plan["per_day"])
+    return _whole(min(vals)), _whole(max(vals))
+
+
+def stretch_summary(parts, locs, plan, features, index, line, du_words):
+    """Each stretch's row: the counts on the route, the places in it (by number), the scheme's lorries a day, the
+    schools and health within 250 m of it. `du_words(metres)` gives a distance in the tenant's unit."""
+    near_kinds = []
+    for f in features or []:
+        g = f.get("geometry") or {}
+        k = STRETCH_KINDS.get((f.get("properties") or {}).get("kind"))
+        if g.get("type") != "Point" or not k or len(line) < 2:
+            continue
+        d, m = _project(index, line, g["coordinates"][:2])
+        if d <= NEAR_ROUTE_M:
+            near_kinds.append((m, k))
+    out = []
+    last = len(parts) - 1
+    for i, s in enumerate(parts):
+        a, b = s["from_m"], s["to_m"]
+        inside = (lambda m: a <= m < b or (i == last and m >= a))
+        recs = [c for _, c in s["on"]]
+        nos = [L["no"] for L in locs if L.get("along_m") is not None and inside(L["along_m"])]
+        for L in locs:
+            if L["no"] in nos:
+                L["stretch"] = s["no"]
+        out.append({"no": s["no"], "name": s["name"], "road": s["road"], "speed": s["speed"],
+                    "from_m": a, "to_m": b, "from_words": du_words(a), "to_words": du_words(b),
+                    "length_words": du_words(b - a),
+                    "n": len(recs), "fatal": sum(1 for c in recs if c["severity"] == 1),
+                    "ksi": sum(1 for c in recs if c["ksi"]), "vru_ksi": sum(1 for c in recs if c["vru_ksi"]),
+                    "goods": sum(1 for c in recs if c["goods"]), "places": len(nos),
+                    "place_nos": (nos[0], nos[-1]) if nos else None,
+                    "lorries": stretch_lorries(plan, a, b),
+                    "schools": sum(1 for m, k in near_kinds if k == "schools" and inside(m)),
+                    "health": sum(1 for m, k in near_kinds if k == "health" and inside(m))})
+    return out
+
+
+def point_at(index, line, metres):
+    """The (lon, lat) `metres` along `line` from its first vertex (on the index's projection)."""
+    run = 0.0
+    for a, b in zip(line, line[1:]):
+        A, B = index._xy(a), index._xy(b)
+        L = math.hypot(B[0] - A[0], B[1] - A[1])
+        if run + L >= metres and L > 0:
+            t = (metres - run) / L
+            return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]
+        run += L
+    return list(line[-1]) if line else None
+
+
+def line_between(index, line, a_m, b_m):
+    """The vertices of `line` between a_m and b_m metres from its start, with the two end points."""
+    out, run = [point_at(index, line, a_m)], 0.0
+    for a, b in zip(line, line[1:]):
+        A, B = index._xy(a), index._xy(b)
+        run += math.hypot(B[0] - A[0], B[1] - A[1])
+        if a_m < run < b_m:
+            out.append(list(b))
+    out.append(point_at(index, line, b_m))
+    return [p for p in out if p]
+
+
+def densest_window(on, width_m):
+    """(start, end) metres from A of the window `width_m` long holding the most collisions on the route (the first
+    such window from A), or None with fewer than 3 — the evidence map's inset frames it, chosen only for legibility."""
+    ms = sorted(m for m, _ in on)
+    best = None
+    j = 0
+    for i, m in enumerate(ms):
+        while ms[j] < m - width_m:
+            j += 1
+        n = i - j + 1
+        if best is None or n > best[0]:
+            best = (n, ms[j], m)
+    if not best or best[0] < 3:
+        return None
+    _, a, b = best
+    mid = (a + b) / 2
+    return max(0.0, mid - width_m / 2), mid + width_m / 2
 
 
 class EvidenceError(LookupError):
@@ -764,12 +1069,41 @@ def evidence(route_id, acc=None, now=None):
     for alt, key in keys:
         columns.append({"key": key, "alt": alt, "label": "This route" if not alt else f"Alternative {alt}",
                         "length": length_words(alt), **counts_for(recs, key)})
-    prim_recs = [c for c in recs if route_key(route_id) in c["routes"]]
+    key0 = route_key(route_id)
+    prim_recs = [c for c in recs if key0 in c["routes"]]
     locs_out = locations(prim_recs, index, loaded)
+    import community
+    feats = community.features()
+
+    def du_words(metres):
+        return f"{export._dist(metres / 1000):.1f}"
     for L in locs_out:
-        L["community"] = nearby_community(L["lon"], L["lat"], index)
+        # 22 Oct 2026 (v2): every kind's nearest within 250 m (the XLSX keeps them all); the PDF prints pdf_nearby()
+        L["community"] = nearby_community(L["lon"], L["lat"], index, limit=None, feats=feats)
+        L["nearby_pdf"] = pdf_nearby(L["community"])
         if L["along_m"] is not None:
-            L["along_words"] = f"{export._dist(L['along_m'] / 1000):.1f} {du} from A"
+            L["along_words"] = f"{du_words(L['along_m'])} {du} from A"
+            L["along_short"] = f"{du_words(L['along_m'])} {du}"
+    # 22 Oct 2026 (v2): each collision's distance from A along the loaded road route; the stretches from those on it
+    length_m = line_length_m(index, loaded) if len(loaded) >= 2 else 0.0
+    for c in prim_recs:
+        c["along_m"] = _chainage(index, loaded, (c["lon"], c["lat"])) if len(loaded) >= 2 else None
+    on = sorted(((c["along_m"], c) for c in prim_recs if c["routes"][key0] <= ON_ROUTE_M and c["along_m"] is not None),
+                key=lambda mc: (mc[0], mc[1]["collision_id"]))
+    parts = stretches(on, length_m) if len(loaded) >= 2 else []
+    try:
+        plan = plan_beside(route_id, index, loaded)
+        plan_error = None
+    except Exception as e:                      # the evidence never fails for want of the plan: it says so instead
+        plan, plan_error = None, f"the plan's lorry figures could not be read ({e.__class__.__name__})"
+    stretch_rows = stretch_summary(parts, locs_out, plan, feats, index, loaded, du_words)
+    for s in parts:
+        for _, c in s["on"]:
+            c["stretch"] = s["no"]
+    window = densest_window(on, 1609.344 if du == "mi" else 1000.0)
+    for s in stretch_rows:
+        s["mid"] = point_at(index, loaded, (s["from_m"] + s["to_m"]) / 2) if len(loaded) >= 2 else None
+    inset_line = line_between(index, loaded, *window) if window else []
     st = status()
     factors = conversions.load_factors()
     notice = export._demo_notice() or None
@@ -784,6 +1118,8 @@ def evidence(route_id, acc=None, now=None):
         "years": st["years"], "period": st["period"], "fetched_at": st["fetched_at"], "fetched": bool(st["fetched_at"]),
         "columns": columns, "rows": ROWS, "locations": locs_out,
         "records": [c for c in prim_recs],
+        "on": [c for _, c in on], "stretches": stretch_rows, "plan": plan, "plan_error": plan_error,
+        "length_m": length_m, "inset_window": window, "inset_line": inset_line, "unit": du,
         "on_route_m": ON_ROUTE_M, "near_route_m": NEAR_ROUTE_M, "cluster_m": CLUSTER_M,
         "caveat": CAVEAT, "not_a_verdict": NOT_A_VERDICT, "credit": credit_line(),
         "issued": f"{as_at:%d %b %Y}".lstrip("0"),

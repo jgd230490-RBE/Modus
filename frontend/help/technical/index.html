@@ -399,6 +399,21 @@ Junction from <code>junction_detail</code> (0 = not at or within 20 m of a junct
 <tr><td class="k">Severity</td><td>As the police reported it. DfT's adjusted figures (for forces not using injury-based reporting) are not used;
 the caveat on every output says severity recording changed after 2016.</td></tr>
 </tbody></table></div>
+<p><strong>The evidence sheet, v2 (22 Oct 2026).</strong> <code>collisions.evidence()</code> adds, for the primary loaded leg:
+each collision's distance from A (<code>along_m</code>, projected on the leg); the <em>stretches</em> (<code>stretches()</code>): runs of
+the numbered road (<code>route_road</code>: <code>first_road</code>, else <code>second_road</code>; C and unclassified roads name none) the
+collisions on the route record, a road named by fewer than 4 of them joined to its neighbour, boundaries half way between
+the last collision of one road and the first of the next, and one road longer than 5 mi split once where its recorded limits
+change between 20&ndash;40 and 50&ndash;70 mph (when at least 80 % fall on their side); the <em>plan</em> beside them
+(<code>plan_beside()</code>): the route's busiest month of Approved lines (loads as the map bar counts them) and, per stretch, the
+lowest and highest movements a day of every route on it from the stored shared runs (<code>route_sections</code>, road_load's rule:
+the owners' loads &divide; working days), the route's own figure where no run covers more than 250 m; schools and health within 250 m
+of each stretch; and the window of one mile (km) with the most collisions on the route, which the map's inset frames when it is at
+least twice the map's scale and a corner is free. The map draws the collisions on the route only and labels the stretches; a
+counts row 0 in every column is folded into a sentence on the PDF (the XLSX keeps every row); the appendix prints schools and
+health within 250 m and bus stops within 100 m (<code>PDF_NEARBY_M</code>), the XLSX every kind's nearest within 250 m. New counts row
+<code>vru_goods</code>: a vulnerable road user hurt in a collision with a goods vehicle over 3.5 t. Nothing divides a collision count by a
+lorry figure. The time of day is not shown: the stored rows keep the year and month only (R6).</p>
 <p>The rows live per organisation (<code>collision_records</code>, <code>collision_meta</code>) and travel in its package.
 The words on every output: &ldquo;police-reported injury collisions&rdquo;, the period beside every count, and &ldquo;evidence for a
 route risk assessment, not the assessment&rdquo;. No score, rate, ranking or colour status.</p>
