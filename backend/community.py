@@ -68,8 +68,16 @@ SOURCES = {
                "attribution": "Contains public sector information licensed under the Open Government Licence v3.0 "
                               "(DfT NaPTAN)",
                "url": "https://beta-naptan.dft.gov.uk/", "kinds": ["bus_stops", "stations"]},
+    # 22 Oct 2026 (abnormal loads, phase 3): the structures and limits along the roads, from the SAME county extract
+    # in a second pass. Not a community layer kind: abnormal_route reads them for a load's potential pinch points.
+    "osm_structures": {"name": "OpenStreetMap structures and limits along the roads", "licence": "ODbL 1.0",
+                       "attribution": "© OpenStreetMap contributors (ODbL)",
+                       "url": "https://www.openstreetmap.org/copyright",
+                       "via": "the same Geofabrik county extract, a second pass",
+                       "kinds": ["s_bridge", "s_rail", "s_level_crossing", "s_calming", "s_power", "s_limit"]},
 }
-SOURCE_ORDER = ("osm", "gias", "naptan")
+SOURCE_ORDER = ("osm", "osm_structures", "gias", "naptan")
+OSM_SOURCES = ("osm", "osm_structures")      # both credited as OpenStreetMap, never under the OGL
 META_ID = "current"
 STALE_RUN = timedelta(minutes=30)       # a 'running' row older than this is a dead run, not a live one
 _LOCK = threading.Lock()
@@ -223,6 +231,26 @@ def strip_from_db():
             continue
         seen.add(key)
         lines.append(thin)
+    # 22 Oct 2026 (abnormal loads, phase 3): each load's own drawn line (both legs), so a fetch after a Draw covers
+    # the roads an abnormal load takes and not only the lorries' routes
+    try:
+        for r in db.query("SELECT geometry_json, return_geometry_json FROM abnormal_loads WHERE tenant_id = ? "
+                          "AND status != 'withdrawn'", (tenant,)):
+            for col in ("geometry_json", "return_geometry_json"):
+                try:
+                    coords = json.loads(r[col]) if isinstance(r.get(col), str) else r.get(col)
+                except Exception:
+                    continue
+                if not coords or len(coords) < 2:
+                    continue
+                thin = _thin([[float(c[0]), float(c[1])] for c in coords])
+                key = tuple((round(c[0], 3), round(c[1], 3)) for c in thin[:: max(1, len(thin) // 20)])
+                if key in seen:
+                    continue
+                seen.add(key)
+                lines.append(thin)
+    except Exception:       # noqa: BLE001 — a database without the table (an old copy) keeps the lorries' strip
+        pass
     sites = [(float(l["lon"]), float(l["lat"])) for l in db.query(
         "SELECT lon, lat FROM locations WHERE tenant_id = ? AND lat IS NOT NULL AND lon IS NOT NULL", (tenant,))]
     return Strip(lines, sites)
@@ -350,9 +378,9 @@ def credit_line(source_keys=None):
     if not keys:
         return ""
     parts = []
-    if "osm" in keys:
+    if any(k in OSM_SOURCES for k in keys):
         parts.append("© OpenStreetMap contributors (ODbL)")
-    gov = [SOURCES[s]["name"] for s in keys if s != "osm"]
+    gov = [SOURCES[s]["name"] for s in keys if s not in OSM_SOURCES]
     if gov:
         parts.append("contains public sector information licensed under the Open Government Licence v3.0 ("
                      + ", ".join(gov) + ")")
@@ -369,10 +397,13 @@ def payload(kinds=None):
 # --------------------------------------------------------------------------- #
 #  Refresh                                                                     #
 # --------------------------------------------------------------------------- #
-def _fetch_osm(strip, workdir, fetch):
-    from community_sources import GEOFABRIK_INDEX, geofabrik_regions, extract_date, osm_extract
+def _osm_files(strip, workdir, fetch):
+    """The county extracts the strip touches, downloaded into workdir once per refresh (a file already there — the
+    second OSM pass of the same refresh — is not fetched again). Returns (paths, files, data_date)."""
+    from community_sources import GEOFABRIK_INDEX, geofabrik_regions, extract_date
     idx_path = os.path.join(workdir, "geofabrik-index.json")
-    fetch["download"](GEOFABRIK_INDEX, idx_path)
+    if not os.path.exists(idx_path):
+        fetch["download"](GEOFABRIK_INDEX, idx_path)
     with open(idx_path, encoding="utf-8") as f:
         index = json.load(f)
     regions = geofabrik_regions(index, strip.bbox, strip.probe)
@@ -383,13 +414,32 @@ def _fetch_osm(strip, workdir, fetch):
     paths, files, dates = [], [], []
     for rid, name, url in regions:
         p = os.path.join(workdir, rid.replace("/", "_") + ".osm.pbf")
-        final, n = fetch["download"](url, p)
+        meta = p + ".meta.json"
+        if os.path.exists(p) and os.path.exists(meta):
+            with open(meta, encoding="utf-8") as f:
+                final, n = json.load(f)
+        else:
+            final, n = fetch["download"](url, p)
+            with open(meta, "w", encoding="utf-8") as f:
+                json.dump([final, n], f)
         paths.append(p)
         files.append(f"{name} ({final.rsplit('/', 1)[-1]}, {round(n / 1e6, 1)} MB)")
         dates.append(extract_date(final))
-    feats = fetch["osm_extract"](paths, strip.keep)
     ds = sorted(d for d in dates if d)
-    return feats, files, (ds[0] if ds else None)
+    return paths, files, (ds[0] if ds else None)
+
+
+def _fetch_osm(strip, workdir, fetch):
+    paths, files, data_date = _osm_files(strip, workdir, fetch)
+    feats = fetch["osm_extract"](paths, strip.keep)
+    return feats, files, data_date
+
+
+def _fetch_osm_structures(strip, workdir, fetch):
+    """22 Oct 2026 (abnormal loads, phase 3): the second pass over the same files."""
+    paths, files, data_date = _osm_files(strip, workdir, fetch)
+    feats = fetch["osm_structures_extract"](paths, strip.keep)
+    return feats, files, data_date
 
 
 def _fetch_gias(strip, workdir, fetch, today):
@@ -419,7 +469,7 @@ def _fetch_naptan(strip, workdir, fetch):
 
 def default_fetchers():
     import community_sources as cs
-    return {"download": cs.download, "osm_extract": cs.osm_extract}
+    return {"download": cs.download, "osm_extract": cs.osm_extract, "osm_structures_extract": cs.osm_structures_extract}
 
 
 def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER):
@@ -446,6 +496,8 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
             try:
                 if s == "osm":
                     feats, files, data_date = _fetch_osm(strip, workdir, fetch)
+                elif s == "osm_structures":
+                    feats, files, data_date = _fetch_osm_structures(strip, workdir, fetch)
                 elif s == "gias":
                     feats, files, data_date = _fetch_gias(strip, workdir, fetch, today)
                 else:
@@ -502,6 +554,34 @@ def start_refresh(by=None, sync=False, **kw):
 # --------------------------------------------------------------------------- #
 #  The CLP plans                                                               #
 # --------------------------------------------------------------------------- #
+def structures(bbox=None, kinds=None):
+    """22 Oct 2026 (abnormal loads, phase 3): the stored structures and limits (source osm_structures), optionally
+    those touching a bbox — as plain dicts {kind, name, detail, geometry, dist_m, source_ref}, never GeoJSON for a
+    map: nothing of this is drawn on its own."""
+    tenant = db.current_tenant()
+    want = set(kinds or ("s_bridge", "s_rail", "s_level_crossing", "s_calming", "s_power", "s_limit"))
+    out = []
+    for r in db.query("SELECT kind, source_ref, name, detail, geometry_json, dist_m FROM community_features "
+                      "WHERE tenant_id = ? AND source = ? ORDER BY kind, feature_id", (tenant, "osm_structures")):
+        if r["kind"] not in want:
+            continue
+        try:
+            g = json.loads(r["geometry_json"])
+        except Exception:
+            continue
+        if bbox and not _geom_touches(g, bbox):
+            continue
+        out.append({"kind": r["kind"], "name": r["name"], "detail": r["detail"], "geometry": g, "dist_m": r["dist_m"],
+                    "source_ref": r["source_ref"]})
+    return out
+
+
+def structures_fetched_at():
+    """When the structures were last fetched (ISO) or None — the words on a load's candidates say so."""
+    d = (_detail(_meta_row()).get("sources") or {}).get("osm_structures") or {}
+    return d.get("fetched_at")
+
+
 def in_view(bbox):
     """For a plan: the stored features touching the plan's frame, and the kinds among them (legend order)."""
     feats = features(bbox=bbox)

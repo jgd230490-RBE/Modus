@@ -889,14 +889,105 @@ ok("⭐ PINCH: a found candidate takes the planner's grade and note and keeps it
 ok("PINCH: a bad grade, a bad kind or a typed row with nothing said is refused in sentences",
    any("grade" in p for p in AR.pinch_problems([{"id": _first, "grade": "purple"}])) and any("kind" in p for p in AR.pinch_problems([{"source": "typed", "kind": "volcano", "words": "x"}]))
    and any("say where" in p for p in AR.pinch_problems([{"source": "typed", "kind": "bridge"}])) and AR.GRADES == ("grey", "green", "amber", "red", "black"))
-ok("PINCH: a re-bake keeps the planner's grade on a found candidate that comes back? No — found candidates are drawn afresh (Grey) and the typed rows stay; the stale rule says so",
-   AR.bake(_b["id"], _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])["ok"] and A.decorate(A.get(_b["id"]))["candidates"][0]["grade"] == "grey"
+ok("PINCH: a re-bake KEEPS the planner's grade and note on a found candidate that comes back (REVERSED 22 Oct, phase 3: _carry_grades matches the source, the kind and the place), and the typed rows stay",
+   AR.bake(_b["id"], _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])["ok"] and A.decorate(A.get(_b["id"]))["candidates"][0]["grade"] == "amber"
+   and A.decorate(A.get(_b["id"]))["candidates"][0]["note"] == "checked on site: 3.9 m at the kerb"
    and A.decorate(A.get(_b["id"]))["typed_points"][0]["place"] == "Welland bridge")
+
+# ---- 22 Oct 2026 (phase 3): the structures and limits from OpenStreetMap along the drawn line ----------------------
+def _f(kind, geom, name=None, detail=None, ref="w1"):
+    return {"kind": kind, "name": name, "detail": detail, "geometry": geom, "dist_m": 1.0, "source_ref": ref}
+
+
+def _ls(*pts):
+    return {"type": "LineString", "coordinates": [list(p) for p in pts]}
+
+
+def _pt(lon, lat):
+    return {"type": "Point", "coordinates": [lon, lat]}
+
+
+_x3 = PTS[3][0]
+FEATS = [
+    _f("s_rail", _ls((_x3, 52.4800), (_x3, 52.4850)), "Midland Main Line (test)", "railway=rail;bridge=yes", "w108"),
+    _f("s_bridge", _ls(PTS[1], PTS[2]), "Welland Viaduct", "highway=primary;bridge=yes;bridge:structure=arch;maxweight=44", "w107"),
+    _f("s_level_crossing", _pt(PTS[5][0] + 0.00005, PTS[5][1]), "Mill Lane LC", "railway=level_crossing", "n5"),
+    _f("s_calming", _pt(PTS[6][0], PTS[6][1] + 0.00004), None, "traffic_calming=hump;name=Mill Lane", "n6"),
+    _f("s_power", _ls((PTS[6][0] + 0.0005, 52.4800), (PTS[6][0] + 0.0005, 52.4900)), None, "power=line;voltage=132000", "w109"),
+    _f("s_limit", _ls(PTS[2], PTS[3]), "Station Road", "highway=unclassified;name=Station Road;maxheight=4.0;maxweight=100", "w110"),
+    _f("s_limit", _pt(PTS[4][0], PTS[4][1]), None, "barrier=height_restrictor;maxheight=3.0", "n4"),
+    _f("s_rail", _ls((-0.80, 52.30), (-0.80, 52.31)), "Far line", "railway=rail", "w200"),
+    _f("s_calming", _pt(PTS[6][0] + 0.001, PTS[6][1] - 0.001), None, "traffic_calming=cushion", "n9"),
+]
+_sc = AR.structure_candidates(PTS, dict(BEAM), FEATS, fetched="2026-10-22T16:00:00Z")
+_by_kind = {}
+for _c in _sc:
+    _by_kind.setdefault(_c["kind"], []).append(_c)
+ok("⭐ STRUCTURES: along the beam's line — a railway crossed (on a bridge: a height question), a bridge carrying the road (its maxweight 44 t against 78 t), a level crossing and a hump within 20 m, a 132 kV line crossed, a maxheight 4.0 m road the 4.2 m beam is over (its maxweight 100 t not worth a word), a 3.0 m height restrictor — the far railway and the far cushion not; every one Grey, source osm, dated by the fetch",
+   [c["kind"] for c in _sc] == ["railway", "bridge", "level_crossing", "calming", "overhead", "limit", "limit"]
+   and _by_kind["railway"][0]["words"] == "Railway crossed: Midland Main Line (test)" and "carried over the road on a bridge" in _by_kind["railway"][0]["detail"]
+   and _by_kind["bridge"][0]["words"] == "Bridge carrying the road: Welland Viaduct (arch)" and "maxweight 44 t: the load's gross weight 78 t is over it" in _by_kind["bridge"][0]["detail"]
+   and _by_kind["level_crossing"][0]["words"] == "Level crossing: Mill Lane LC" and _by_kind["calming"][0]["words"] == "Traffic calming (hump) on Mill Lane"
+   and _by_kind["overhead"][0]["words"] == "Overhead line crossed (132 kV)"
+   and _by_kind["limit"][0]["words"] == "Signed limit on Station Road: maxheight 4 m: the load's height 4.2 m is over it"
+   and _by_kind["limit"][1]["words"] == "Height restrictor: maxheight 3 m: the load's height 4.2 m is over it"
+   and all(c["grade"] == "grey" and c["source"] == "osm" and "(OpenStreetMap as fetched 2026-10-22)" in c["detail"] and c["lon"] is not None and c["ref"] for c in _sc)
+   and abs(_by_kind["railway"][0]["lon"] - _x3) < 1e-6 and _by_kind["bridge"][0]["lon"] == PTS[1][0]
+   and AR.structure_candidates(PTS, dict(BEAM), []) == [] and AR.structure_candidates([], dict(BEAM), FEATS) == [],
+   str([(c["kind"], c["words"]) for c in _sc]))
+ok("STRUCTURES: OpenStreetMap's values read as numbers — 4.2, '4.2 m', 13'6\" (4.11 m), '7.5 t', '7,5', '3000 kg' (3 t), '11kV'; none / default / words are None; the voltage words; the limit words name over and within",
+   AR._num_tag("4.2") == 4.2 and AR._num_tag("4.2 m") == 4.2 and AR._num_tag("13'6\"") == 4.11 and AR._num_tag("7.5 t") == 7.5 and AR._num_tag("7,5") == 7.5
+   and AR._num_tag("3000 kg") == 3.0 and AR._num_tag("11kV") == 11000 and AR._num_tag("none") is None and AR._num_tag("default") is None and AR._num_tag("tall") is None
+   and AR._kv("132000") == "132 kV" and AR._kv("400000,275000") == "400 kV" and AR._kv("x") is None
+   and AR._limit_words({"maxheight": "4.4", "maxweight": "80"}, {"maxheight": 4.2, "maxweight": 78})
+   == "maxheight 4.4 m: the load's height 4.2 m is within 0.3 m of it; maxweight 80 t: the load's gross weight 78 t is within 8 t of it"
+   and AR._limit_words({"maxwidth": "3.5"}, {"maxwidth": 2.8}) == "" and AR._limit_words({"maxheight": "none"}, {"maxheight": 4.2}) == "")
+_r3 = AR.bake(_b["id"], _routes=_here_stub(PTS, ACTS, SPANS), _limits=[], _structures=FEATS, _fetched="2026-10-22T16:00:00Z")
+_d3 = A.decorate(A.get(_b["id"]))
+_srcs = [c["source"] for c in _d3["candidates"]]
+ok("⭐ STRUCTURES in the bake: the seven numbered after HERE's and the bends and before the signed limits; the answer counts and dates them; the planner's amber grade on the first candidate is still there",
+   _r3["ok"] and _r3["structures"] == 7 and _r3["structures_fetched"] == "2026-10-22T16:00:00Z" and _srcs.count("osm") == 7
+   and _srcs.index("osm") > max(i for i, s_ in enumerate(_srcs) if s_ in ("here", "line")) and "limits" not in _srcs[:_srcs.index("osm")]
+   and _d3["candidates"][0]["grade"] == "amber", str(_srcs))
+_osm_id = next(c["id"] for c in _d3["candidates"] if c["source"] == "osm" and c["kind"] == "bridge")
+AR.set_pinch(_b["id"], [{"id": _osm_id, "grade": "red", "note": "44 t posted"},
+                        {"source": "typed", "kind": "bridge", "place": "Welland bridge", "words": "Arch bridge, headroom 3.9 m at the kerb", "grade": "red",
+                         "owner": "Leicestershire CC", "measure": "run on the crown", "permit": "asked 20 Oct", "link": "https://example.test/drawing"}], by="Planner")   # the page sends every row
+_c0 = AR.check_structures(_b["id"], by="Planner", _structures=[], _fetched=None)
+_d35 = A.decorate(A.get(_b["id"]))
+ok("STRUCTURES: Check the roads again before any fetch: nothing to check against, so what was found (and the red grade on the bridge) stays, and the note says where Fetch now is",
+   _c0["ok"] and _c0["structures"] == 7 and "Fetch now" in _c0["note"] and [c["source"] for c in _d35["candidates"]] == _srcs
+   and next(c for c in _d35["candidates"] if c["source"] == "osm" and c["kind"] == "bridge")["grade"] == "red", str(_c0))
+_c2 = AR.check_structures(_b["id"], by="Planner", _structures=FEATS, _fetched="2026-10-23T09:00:00Z")
+_d5 = A.decorate(A.get(_b["id"]))
+_brg = next(c for c in _d5["candidates"] if c["source"] == "osm" and c["kind"] == "bridge")
+ok("STRUCTURES: ...after a fetch they are found afresh and come back in their place with the grade and note the planner set (matched on the OpenStreetMap object), dated by the new fetch",
+   _c2["ok"] and _c2["structures"] == 7 and _brg["grade"] == "red" and _brg["note"] == "44 t posted" and "2026-10-23" in _brg["detail"]
+   and [c["source"] for c in _d5["candidates"]] == _srcs and _c2["note"] is None, str(_brg))
+_c1 = AR.check_structures(_b["id"], by="Planner", _structures=[], _fetched="2026-10-23T09:00:00Z")
+_d4 = A.decorate(A.get(_b["id"]))
+ok("STRUCTURES: a fetch that finds nothing along the line takes the structure candidates off — no HERE call; HERE's, the bends, their grades and the typed rows stay",
+   _c1["ok"] and _c1["structures"] == 0 and "osm" not in [c["source"] for c in _d4["candidates"]] and len(_d4["candidates"]) == len(_d3["candidates"]) - 7
+   and _d4["candidates"][0]["grade"] == "amber" and _d4["typed_points"][0]["place"] == "Welland bridge" and _c1["note"] is None, str(_c1))
+_nr = A.create(dict(BEAM, name="Not routed yet"), PLANNER)["movement"]
+ok("STRUCTURES: an unrouted movement cannot be checked (draw first); with no fetch yet the note says where Fetch now is; the collection's words carry the structures' sentence for staff and not for the public",
+   "draw the route first" in AR.check_structures(_nr["id"], _structures=[])["error"]
+   and "Fetch now" in (AR.check_structures(_b["id"], _structures=[], _fetched=None)["note"] or "")
+   and AR.feature_collection([_d5])["words"]["structures"] == AR.STRUCTURES_WORDS and AR.feature_collection([_d5], public=True)["words"]["structures"] is None
+   and "OpenStreetMap" in AR.STRUCTURES_WORDS and "the survey decides" in AR.STRUCTURES_WORDS
+   and A.delete(_nr["id"], PLANNER)["ok"] and AR.check_structures("AL999", _structures=[])["error"] == "no such abnormal load")
+AR.check_structures(_b["id"], by="Planner", _structures=FEATS, _fetched="2026-10-23T09:00:00Z")
 _main3 = read("backend/main.py")
 ok("ENDPOINTS: GET /api/abnormal/summary (any sign-in) and PUT /api/abnormal/{id}/pinch (an approver), the summary before the {movement_id} read",
    re.search(r'@app\.get\("/api/abnormal/summary"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
    and re.search(r'@app\.put\("/api/abnormal/\{movement_id\}/pinch"\)\ndef \w+\(movement_id: str, body: PinchIn\):\n(?:\s+""".*?"""\n)?\s+acc = _require_approver\(\)', _main3, re.S)
    and _main3.index('"/api/abnormal/summary"') < _main3.index('@app.get("/api/abnormal/{movement_id}")'))
+ok("ENDPOINTS (phase 3): POST /api/abnormal/{id}/structures (an approver, no HERE call) and GET /api/public/abnormal — behind the map gate, the approved-or-later movements through the staff view, the public words only",
+   re.search(r'@app\.post\("/api/abnormal/\{movement_id\}/structures"\)\ndef \w+\(movement_id: str\):\n(?:\s+""".*?"""\n)?\s+acc = _require_approver\(\)', _main3, re.S)
+   and 'ms = [m for m in abnormal.page(abnormal.STAFF_VIEW)["movements"] if m.get("status") in abnormal.PUBLIC_STATUSES]' in _main3
+   and 'return abnormal_route.feature_collection(ms, public=True)' in _main3 and A.PUBLIC_STATUSES == ("approved", "notified", "moved")
+   and A.STAFF_VIEW == {"role": "planner", "ipt": None, "label": "Staff (map)"} and 'acc = abnormal.STAFF_VIEW' in _main3
+   and '"/api/public/",' in read("backend/gate.py"))
 
 try:
     remove_scratch_db(db, TMP)

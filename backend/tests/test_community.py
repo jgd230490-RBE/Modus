@@ -368,6 +368,17 @@ def _osm_xml():
     cyc = [n(mid - 0.003, LAT0 + 20 * DLAT), n(mid + 0.003, LAT0 + 20 * DLAT)]
     rd = [n(-0.948, LAT0 + 30 * DLAT), n(-0.946, LAT0 + 30 * DLAT)]
     farw = [n(-0.80, 52.30), n(-0.79, 52.30)]
+    # 22 Oct 2026 (abnormal loads, phase 3): the structures and limits along the road, read by the second pass
+    brg = [n(mid - 0.0005, LAT0 + 2 * DLAT), n(mid + 0.0005, LAT0 + 2 * DLAT)]
+    rwy = [n(mid + 0.001, LAT0 - 300 * DLAT), n(mid + 0.001, LAT0 + 300 * DLAT)]
+    n(mid + 0.0015, LAT0 + 1 * DLAT, {"railway": "level_crossing", "name": "Langton LC"})
+    n(mid - 0.001, LAT0, {"traffic_calming": "hump"})
+    n(mid - 0.0012, LAT0, {"barrier": "height_restrictor", "maxheight": "2.1"})
+    pwr = [n(mid + 0.002, LAT0 - 300 * DLAT), n(mid + 0.002, LAT0 + 300 * DLAT)]
+    mxh = [n(mid - 0.0025, LAT0 + 3 * DLAT), n(mid - 0.0015, LAT0 + 3 * DLAT)]
+    aband = [n(mid + 0.0025, LAT0 - 300 * DLAT), n(mid + 0.0025, LAT0 + 300 * DLAT)]
+    nobr = [n(mid - 0.004, LAT0 + 2 * DLAT), n(mid - 0.0035, LAT0 + 2 * DLAT)]
+    farb = [n(-0.80, 52.301), n(-0.79, 52.301)]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<osm version="0.6" generator="test">']
     for i, lon, lat, t in nodes:
         xml.append(f'<node id="{i}" version="1" lat="{lat:.7f}" lon="{lon:.7f}">{tagxml(t)}</node>')
@@ -381,6 +392,13 @@ def _osm_xml():
     way(104, cyc, {"highway": "cycleway"})
     way(105, rd, {"highway": "unclassified", "name": "Back Lane"})
     way(106, farw, {"highway": "cycleway"})
+    way(107, brg, {"highway": "primary", "bridge": "yes", "name": "Langton Bridge", "maxweight": "40", "layer": "1"})
+    way(108, rwy, {"railway": "rail", "name": "Midland Main Line (test)", "bridge": "yes", "electrified": "contact_line"})
+    way(109, pwr, {"power": "line", "voltage": "132000", "cables": "6"})
+    way(110, mxh, {"highway": "unclassified", "name": "Station Road", "maxheight": "4.2"})
+    way(111, aband, {"railway": "abandoned", "name": "Old line"})
+    way(112, nobr, {"highway": "primary", "bridge": "no", "name": "Not a bridge"})
+    way(113, farb, {"highway": "primary", "bridge": "yes", "name": "Far Bridge"})
     xml.append('<relation id="201" version="1"><member type="way" ref="105" role=""/>'
                '<tag k="type" v="route"/><tag k="route" v="bicycle"/><tag k="network" v="ncn"/><tag k="ref" v="64"/></relation>')
     xml.append("</osm>")
@@ -494,6 +512,34 @@ _st = community.status()
 ok("4: status before any refresh: 'never', the counts from what is stored", _st["state"] == "never" and _st["counts"]["schools"] == 2
    and _st["counts"]["bus_stops"] == 1 and _st["total"] == 3)
 
+# 22 Oct 2026 (abnormal loads, phase 3): the second pass over the same file — the structures and limits along the road
+EXPECT_STRUCT = {("s_bridge", "Langton Bridge"), ("s_rail", "Midland Main Line (test)"), ("s_level_crossing", "Langton LC"),
+                 ("s_calming", None), ("s_limit", None), ("s_power", None), ("s_limit", "Station Road")}
+if HAVE_OSMIUM:
+    _st = cs.osm_structures_extract([osm_path], strip.keep)
+    ok("⭐ 3b: the structures pass: a road on a bridge (with its maxweight), a railway crossing (on a bridge, electrified), a level "
+       "crossing, a hump, a height restrictor, a 132 kV line, a maxheight road — and NOT an abandoned railway, a road with bridge=no "
+       "or a bridge far away; every one with its distance, source osm_structures, the tags that matter as key=value",
+       {(x["kind"], x["name"]) for x in _st} == EXPECT_STRUCT and len(_st) == 7
+       and all(x["source"] == "osm_structures" and x["dist_m"] is not None and x["source_ref"][0] in "nw" for x in _st)
+       and any("maxweight=40" in (x["detail"] or "") and "layer=1" in x["detail"] for x in _st if x["kind"] == "s_bridge")
+       and any("voltage=132000" in (x["detail"] or "") and "cables=6" in x["detail"] for x in _st if x["kind"] == "s_power")
+       and any("bridge=yes" in (x["detail"] or "") and "electrified=contact_line" in x["detail"] for x in _st if x["kind"] == "s_rail")
+       and any("barrier=height_restrictor" in (x["detail"] or "") and "maxheight=2.1" in x["detail"] for x in _st if x["kind"] == "s_limit")
+       and {x["geometry"]["type"] for x in _st if x["kind"] in ("s_level_crossing", "s_calming")} == {"Point"}
+       and {x["geometry"]["type"] for x in _st if x["kind"] in ("s_bridge", "s_rail", "s_power")} == {"LineString"},
+       str(sorted((x["kind"], x["name"] or "", x["detail"] or "") for x in _st)))
+ok("3b: the kinds at source: a way is a power line, a railway (never disused / abandoned), a road on a bridge or a road with a limit tag; "
+   "a node a level crossing, traffic calming or a height restrictor; the detail keeps only the tags that matter, a ';' in a value becomes ','",
+   cs.structure_way_kind({"highway": "primary", "bridge": "yes"}) == "s_bridge" and cs.structure_way_kind({"railway": "rail"}) == "s_rail"
+   and cs.structure_way_kind({"railway": "disused"}) is None and cs.structure_way_kind({"highway": "residential", "maxheight": "4.2"}) == "s_limit"
+   and cs.structure_way_kind({"highway": "footway", "bridge": "yes"}) is None and cs.structure_way_kind({"power": "minor_line"}) == "s_power"
+   and cs.structure_node_kind({"railway": "level_crossing"}) == "s_level_crossing" and cs.structure_node_kind({"traffic_calming": "hump"}) == "s_calming"
+   and cs.structure_node_kind({"barrier": "height_restrictor", "maxheight": "2.1"}) == "s_limit" and cs.structure_node_kind({"railway": "station"}) is None
+   and cs.structure_detail({"name": "A6", "maxheight": "4.2;3", "highway": "primary", "colour": "x"}) == "name=A6;highway=primary;maxheight=4.2,3"
+   and cs.STRUCTURE_KINDS == ("s_bridge", "s_rail", "s_level_crossing", "s_calming", "s_power", "s_limit")
+   and community.SOURCES["osm_structures"]["kinds"] == list(cs.STRUCTURE_KINDS) and not set(cs.STRUCTURE_KINDS) & set(community.KIND_KEYS))
+
 # --------------------------------------------------------------------------- #
 #  5. refresh()                                                                #
 # --------------------------------------------------------------------------- #
@@ -503,6 +549,7 @@ open(_naptan_file, "w", encoding="utf-8").write(NAPTAN_CSV)
 _idx_file = os.path.join(FX, "index.json")
 json.dump(INDEX, open(_idx_file, "w"))
 FAILS = set()
+_downloads = {"pbf": 0}
 
 
 def fake_download(url, dest, **k):
@@ -512,6 +559,7 @@ def fake_download(url, dest, **k):
     if "index-v1" in url:
         shutil.copy(_idx_file, dest); return url, os.path.getsize(dest)
     if url.endswith(".osm.pbf"):
+        _downloads["pbf"] += 1
         shutil.copy(osm_path, dest); return url.replace("-latest", "-261013"), os.path.getsize(dest)
     if "edubase" in url:
         if "20261014" in url:
@@ -528,9 +576,16 @@ def fake_osm(paths, keep):
         {"kind": "hospitals", "source_ref": "n1", "name": "Langton Hospital", "detail": None, "geometry": P(mid, LAT0), "dist_m": 1.0}]
 
 
+def fake_structures(paths, keep):
+    return cs.osm_structures_extract([osm_path], keep) if HAVE_OSMIUM else [
+        {"kind": "s_bridge", "source": "osm_structures", "source_ref": "w107", "name": "Langton Bridge",
+         "detail": "name=Langton Bridge;highway=primary;bridge=yes;layer=1;maxweight=40",
+         "geometry": {"type": "LineString", "coordinates": [[mid - 0.0005, LAT0 + 2 * DLAT], [mid + 0.0005, LAT0 + 2 * DLAT]]}, "dist_m": 2.0}]
+
+
 import datetime as _dt  # noqa: E402
 TODAY = _dt.date(2026, 10, 14)
-FX_FETCH = {"download": fake_download, "osm_extract": fake_osm}
+FX_FETCH = {"download": fake_download, "osm_extract": fake_osm, "osm_structures_extract": fake_structures}
 st = community.refresh(by="Planner", fetchers=FX_FETCH, strip=strip, today=TODAY)
 src = {s["key"]: s for s in st["sources"]}
 ok("5: a refresh stores every source, with its data date (Geofabrik's file name; GIAS yesterday's file)",
@@ -541,6 +596,22 @@ ok("5: ...the counts per kind, and who fetched it", st["counts"]["schools"] >= 2
 ok("5: ...the files read are named (Leicestershire and Rutland extracts)",
    any("Leicestershire" in x for x in src["osm"]["files"] or []) and any("Rutland" in x for x in src["osm"]["files"] or []),
    str(src["osm"]))
+ok("⭐ 5b: the structures and limits are the FOURTH source (phase 3), read from the same two files in the same refresh — no second "
+   "download — dated like the first pass and counted on their own; never a community kind: not drawn, not in the kind counts, "
+   "OpenStreetMap credited once",
+   src["osm_structures"]["count"] == (7 if HAVE_OSMIUM else 1) and src["osm_structures"]["data_date"] == "2026-10-13"
+   and not src["osm_structures"]["error"] and src["osm_structures"]["files"] == src["osm"]["files"] and _downloads["pbf"] == 2
+   and all(f["properties"]["kind"] in community.KIND_KEYS for f in community.features()) and st["total"] == sum(st["counts"].values())
+   and st["credit"].count("OpenStreetMap") == 1 and [x["key"] for x in st["sources"]] == ["osm", "osm_structures", "gias", "naptan"],
+   json.dumps(src["osm_structures"])[:300] + f" downloads {_downloads}")
+_s = community.structures()
+ok("5b: community.structures() reads them back with kind, name, detail and geometry; a bbox away from them reads none; "
+   "structures_fetched_at() is the refresh's time",
+   ({(x["kind"], x["name"]) for x in _s} == EXPECT_STRUCT if HAVE_OSMIUM else len(_s) == 1)
+   and all(x["geometry"]["type"] in ("Point", "LineString") and x["source_ref"] for x in _s)
+   and community.structures(bbox=[-0.80, 52.29, -0.79, 52.31]) == []
+   and len(community.structures(bbox=[mid - 0.01, LAT0 - 0.01, mid + 0.01, LAT0 + 0.01])) == len(_s)
+   and community.structures_fetched_at() == st["fetched_at"], str([(x["kind"], x["name"]) for x in _s]))
 _before = {x["properties"]["name"] for x in community.features(["bus_stops", "stations"])}
 FAILS.add("naptan")
 st2 = community.refresh(by="Planner", fetchers=FX_FETCH, strip=strip, today=TODAY)
@@ -555,6 +626,14 @@ ok("5: every source failing changes nothing and says so", st3["state"] == "faile
 FAILS.clear()
 st4 = community.refresh(fetchers=FX_FETCH, strip=community.Strip([], []), today=TODAY)
 ok("5: no route and no site: said in words, nothing fetched", st4["state"] == "failed" and "no route is worked out" in st4["error"])
+_n0 = len(community.strip_from_db().lines)
+db.execute("INSERT INTO abnormal_loads (tenant_id, id, name, status, date_from, geometry_json) VALUES (?, ?, ?, ?, ?, ?)",
+           (db.current_tenant(), "AL900", "Strip test", "approved", "2027-01-01", json.dumps([[-0.95, 52.30], [-0.94, 52.31], [-0.93, 52.32]])))
+db.execute("INSERT INTO abnormal_loads (tenant_id, id, name, status, date_from, geometry_json) VALUES (?, ?, ?, ?, ?, ?)",
+           (db.current_tenant(), "AL901", "Withdrawn", "withdrawn", "2027-01-01", json.dumps([[-0.85, 52.20], [-0.84, 52.21]])))
+ok("5c: the strip takes in each abnormal load's own drawn line (phase 3: a fetch after a Draw covers its roads), never a withdrawn one's",
+   len(community.strip_from_db().lines) == _n0 + 1, str(_n0))
+db.execute("DELETE FROM abnormal_loads WHERE tenant_id = ? AND id IN (?, ?)", (db.current_tenant(), "AL900", "AL901"))
 community._write_meta("running", {}, started_at=community._now())
 r = community.start_refresh(by="x", sync=True, fetchers=FX_FETCH, strip=strip, today=TODAY)
 ok("5: start_refresh refuses while a refresh is running", r["started"] is False and "already running" in r["message"])

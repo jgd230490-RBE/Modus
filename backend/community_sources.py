@@ -519,3 +519,130 @@ def naptan_extract(text, keep, bbox=None):
         out.append({"kind": kind, "source": "naptan", "source_ref": (r.get("ATCOCode") or "").strip(),
                     "name": name or None, "detail": detail or None, "geometry": geom, "dist_m": d})
     return out
+
+
+# --------------------------------------------------------------------------- #
+#  22 Oct 2026 (abnormal loads, phase 3): the structures and limits along the roads, read from the SAME county
+#  extract in a second pass, kept in community_features under the source "osm_structures". Not a community
+#  layer kind (nothing of this is drawn on the community group): abnormal_route reads them to find a load's
+#  potential pinch points — a bridge the road is carried on, a railway or an overhead line the line crosses, a level
+#  crossing, traffic calming, a signed limit tagged on the road (maxheight, maxwidth, maxweight, maxaxleload,
+#  maxlength, a height restrictor). The strip is the community strip, which strip_from_db() now widens to the
+#  abnormal loads' own lines. OpenStreetMap is as complete as its mappers: a road may carry no tag at all.
+# --------------------------------------------------------------------------- #
+STRUCTURE_SOURCE = "osm_structures"
+STRUCTURE_KINDS = ("s_bridge", "s_rail", "s_level_crossing", "s_calming", "s_power", "s_limit")
+STRUCTURE_WORDS = {"s_bridge": "a bridge or viaduct carrying the road", "s_rail": "a railway",
+                   "s_level_crossing": "a level crossing", "s_calming": "traffic calming",
+                   "s_power": "an overhead power line", "s_limit": "a signed limit tagged on the road"}
+RAIL_TYPES = ("rail", "light_rail", "narrow_gauge", "tram", "monorail", "funicular")
+ROAD_TYPES = ("motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "service",
+              "living_street", "road", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link")
+LIMIT_TAGS = ("maxheight", "maxwidth", "maxweight", "maxaxleload", "maxlength")
+STRUCTURE_KEYS = ("bridge", "railway", "traffic_calming", "power", "barrier") + LIMIT_TAGS
+KEPT_TAGS = ("name", "ref", "highway", "bridge", "bridge:name", "bridge:structure", "layer", "railway", "electrified",
+             "tunnel", "service", "traffic_calming", "power", "voltage", "cables", "barrier", "operator") + LIMIT_TAGS
+STRUCTURE_DENSE_M = 120.0      # a long straight way is tested against the strip every 120 m, not only at its vertices
+
+
+def structure_way_kind(tags):
+    """The kind a tagged WAY is for the abnormal loads, or None: an overhead power line, a railway (never a disused or
+    abandoned one: those carry railway=disused / abandoned), a road on a bridge, a road with a signed limit tag."""
+    if tags.get("power") in ("line", "minor_line"):
+        return "s_power"
+    if tags.get("railway") in RAIL_TYPES:
+        return "s_rail"
+    if tags.get("highway") in ROAD_TYPES:
+        if tags.get("bridge") not in (None, "no"):
+            return "s_bridge"
+        if any(tags.get(k) for k in LIMIT_TAGS):
+            return "s_limit"
+    return None
+
+
+def structure_node_kind(tags):
+    """The kind a tagged NODE is: a level crossing, a traffic-calming feature, a height restrictor (a barrier with a
+    limit tag)."""
+    if tags.get("railway") in ("level_crossing", "crossing"):
+        return "s_level_crossing"
+    if tags.get("traffic_calming") not in (None, "no"):
+        return "s_calming"
+    if tags.get("barrier") == "height_restrictor" or (tags.get("barrier") and any(tags.get(k) for k in LIMIT_TAGS)):
+        return "s_limit"
+    return None
+
+
+def structure_name(tags):
+    return tags.get("name") or tags.get("bridge:name") or tags.get("ref") or None
+
+
+def structure_detail(tags):
+    """The tags that matter, as 'key=value;key=value' (a ';' in a value becomes ',') — read back by
+    abnormal_route._parse_detail."""
+    parts = []
+    for k in KEPT_TAGS:
+        v = tags.get(k)
+        if v:
+            parts.append(f"{k}={str(v).replace(';', ',').strip()}")
+    return ";".join(parts) or None
+
+
+def _dense(coords, step_m=STRUCTURE_DENSE_M):
+    """The way's vertices plus a point every step_m along a long straight (for the strip test only; the stored
+    geometry keeps the vertices as mapped)."""
+    out = [coords[0]]
+    for a, b in zip(coords, coords[1:]):
+        lat = math.radians((a[1] + b[1]) / 2.0)
+        dx, dy = (b[0] - a[0]) * 111320.0 * math.cos(lat), (b[1] - a[1]) * 110574.0
+        n = int(math.hypot(dx, dy) // step_m)
+        for i in range(1, n + 1):
+            t = i / (n + 1)
+            out.append([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+        out.append(b)
+    return out
+
+
+def osm_structures_extract(paths, keep):
+    """Read the same Geofabrik .osm.pbf files for the structures and limits along the roads (one pass over nodes and
+    ways, the tag filter in C++: any of STRUCTURE_KEYS). keep(kind, geometry) -> distance (kept) or None (outside the
+    strip). The same object read from two overlapping extracts is kept once. Returns features shaped like
+    osm_extract's, source 'osm_structures'."""
+    import osmium            # imported here: the app starts without it; refresh says so in words
+    feats, seen = [], set()
+    for path in paths:
+        fp = (osmium.FileProcessor(path, osmium.osm.NODE | osmium.osm.WAY).with_locations()
+              .with_filter(osmium.filter.KeyFilter(*STRUCTURE_KEYS)))
+        for o in fp:
+            tags = {t.k: t.v for t in o.tags}
+            if o.is_node():
+                kind = structure_node_kind(tags)
+                if not kind:
+                    continue
+                try:
+                    geom = {"type": "Point", "coordinates": [round(o.lon, 6), round(o.lat, 6)]}
+                except Exception:
+                    continue
+                ref, test_geom = "n" + str(o.id), geom
+            elif o.is_way():
+                kind = structure_way_kind(tags)
+                if not kind:
+                    continue
+                try:
+                    coords = [[round(n.lon, 6), round(n.lat, 6)] for n in o.nodes if n.location.valid()]
+                except Exception:
+                    continue
+                if len(coords) < 2:
+                    continue
+                geom = {"type": "LineString", "coordinates": coords}
+                ref, test_geom = "w" + str(o.id), {"type": "LineString", "coordinates": _dense(coords)}
+            else:
+                continue
+            if ref in seen:
+                continue
+            d = keep(kind, test_geom)
+            if d is None:
+                continue
+            seen.add(ref)
+            feats.append({"kind": kind, "source": STRUCTURE_SOURCE, "source_ref": ref, "name": structure_name(tags),
+                          "detail": structure_detail(tags), "geometry": geom, "dist_m": d})
+    return feats

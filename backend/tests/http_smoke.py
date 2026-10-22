@@ -1700,10 +1700,18 @@ with TestClient(main.app, base_url="https://testserver") as c:
 
     r = c.get("/map/")
     ok("after sign-out the map is closed again", r.status_code == 401, str(r.status_code))
+    ok("…and so are the public map's abnormal loads (phase 3, D68): 401 signed out", c.get("/api/public/abnormal").status_code == 401)
     ok("🔴 D18: ...and so is the network — the twelve reads answer 401 to the signed-out visitor",
        all(c.get(p).status_code == 401 for p in NETWORK_READS))
     r = c.post("/api/map-auth", json={"password": "map-pass-xyz"})
     ok("the map password opens the map…", r.status_code == 200 and c.get("/map/").status_code == 200)
+    _pub = c.get("/api/public/abnormal")
+    ok("…and (phase 3, D68) the map cookie reads the public abnormal loads: a collection of the approved-or-later movements only — none yet — "
+       "with no grades, no candidate words and no structures words (the staff map's), only the indicative line words",
+       _pub.status_code == 200 and _pub.json().get("type") == "FeatureCollection" and _pub.json().get("features") == []
+       and _pub.json().get("grades") is None and _pub.json().get("words", {}).get("candidates") is None
+       and _pub.json().get("words", {}).get("structures") is None and "Indicative" in (_pub.json().get("words", {}).get("indicative") or ""),
+       _pub.text[:200])
     ok("…but 🔴 not the guide", c.get("/help/").status_code == 401)
     ok("…and 🔴 not the monthly bulletin (staff only, D10)", c.get("/bulletin/?month=10").status_code == 401
        and c.get("/api/bulletin/month.pdf?month=10").status_code == 401)
@@ -1812,8 +1820,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and c.get("/api/abnormal", headers=PLAN).json().get("count") == 1
        and _ck.get("/api/abnormal").status_code == 401, str(_cm))
     ok("...the collection with the cookie carries every movement a planner sees once drawn: none drawn here (no HERE key), so count 0 both ways, and the cookie's read is byte-identical to the header's",
-       _ck.get("/api/abnormal/geojson").json() == c.get("/api/abnormal/geojson", headers=PLAN).json()
-       and c.delete(f"/api/abnormal/{_cm}", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200)
+       _ck.get("/api/abnormal/geojson").json() == c.get("/api/abnormal/geojson", headers=PLAN).json())
+    _chk = c.post(f"/api/abnormal/{_cm}/structures", headers=dict(PLAN, **{"X-Wayscope": "1"}))
+    ok("abnormal loads, phase 3: Check the roads again — a team code may not (403), a missing movement is a 404, an unrouted one a 400 in words (draw first), no HERE call needed",
+       c.post(f"/api/abnormal/{_cm}/structures", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL999/structures", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 404
+       and _chk.status_code == 400 and "draw the route first" in _chk.json().get("detail", "")
+       and c.delete(f"/api/abnormal/{_cm}", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200, _chk.text[:160])
     ok("abnormal loads, phase 2: the Dashboard's summary (any sign-in; 401 signed out) and the pinch rows (a planner's)",
        c.get("/api/abnormal/summary").status_code == 401 and c.get("/api/abnormal/summary", headers=NORTH).status_code == 200
        and c.get("/api/abnormal/summary", headers=NORTH).json().get("planned") == 0

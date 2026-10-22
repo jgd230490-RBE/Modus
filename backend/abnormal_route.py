@@ -337,6 +337,299 @@ def notice_candidates(notices, geometry):
                     "lon": geometry[0][0] if geometry else None, "lat": geometry[0][1] if geometry else None, "offset": 0})
     return out
 
+# --------------------------------------------------------------------------- #
+#  22 Oct 2026 (phase 3): the structures and limits along the road, from OpenStreetMap — the community layer's
+#  second pass (community_sources.osm_structures_extract, source "osm_structures"), read along the drawn line.
+#  A bridge the road is carried on, a railway or an overhead line the line crosses, a level crossing, traffic
+#  calming, a signed limit tagged on the road or a height restrictor. Every one is a Grey candidate: OpenStreetMap is
+#  as complete as its mappers, and the survey decides.
+# --------------------------------------------------------------------------- #
+STRUCT_NEAR_M = 20.0      # a crossing, a calming feature or a height restrictor this close to the line is on the road
+STRUCT_ALONG_M = 12.0     # a bridge or a tagged limit whose way has a vertex this close is the road the line follows
+STRUCT_PAD_M = 60.0       # the stored features are read for the line's bbox plus this
+LIMIT_WORDS = {"maxheight": ("height", "m"), "maxwidth": ("width", "m"), "maxweight": ("gross weight", "t"),
+               "maxaxleload": ("heaviest axle", "t"), "maxlength": ("length", "m")}
+LIMIT_NEAR = {"maxheight": 0.3, "maxwidth": 0.3, "maxweight": 0.10, "maxaxleload": 0.10, "maxlength": 1.0}   # m, m, share, share, m
+STRUCTURES_WORDS = ("Structures and limits from OpenStreetMap along the drawn line — the community layer's extract "
+                    "(Config → Map and bulletin → Fetch now): a bridge the road is carried on, a railway or an overhead line "
+                    "crossed, a level crossing, traffic calming, a limit tagged on the road. A road may be mapped without its "
+                    "tags: the survey decides.")
+_FT_IN = re.compile(r"""^\s*(\d+)\s*'\s*(\d+(?:\.\d+)?)?\s*"?\s*$""")
+
+
+def _parse_detail(detail):
+    """community_sources.structure_detail back into a dict."""
+    out = {}
+    for part in str(detail or "").split(";"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def _num_tag(v):
+    """An OpenStreetMap limit value as a number: '4.2', '4.2 m', '13'6"', '7.5 t', '7,5', '132000'; None for none /
+    default / words. Feet and inches, kilograms and pounds come back in metres and tonnes."""
+    if v is None:
+        return None
+    t = str(v).strip().lower()
+    if not t or t in ("none", "default", "unsigned", "no", "below_default", "yes"):
+        return None
+    m = _FT_IN.match(t)
+    if m:
+        return round(int(m.group(1)) * 0.3048 + float(m.group(2) or 0) * 0.0254, 2)
+    m = re.match(r"^(\d+(?:[.,]\d{1,2})?)\s*(m|t|tonnes?|tons?|lbs?|kg|ft|kv)?\b", t)
+    if not m:
+        return None
+    x = float(m.group(1).replace(",", "."))
+    unit = m.group(2) or ""
+    if unit == "ft":
+        return round(x * 0.3048, 2)
+    if unit == "kv":
+        return x * 1000.0
+    if unit == "kg":
+        return round(x / 1000.0, 2)
+    if unit in ("lb", "lbs"):
+        return round(x * 0.000453592, 2)
+    return x
+
+
+def _kv(v):
+    """'132000' → '132 kV'; '400000,275000' → '400 kV' (the highest); None when unreadable."""
+    best = None
+    for part in str(v or "").split(","):
+        n = _num_tag(part)
+        if n is not None and (best is None or n > best):
+            best = n
+    if best is None:
+        return None
+    return f"{best / 1000:g} kV" if best >= 1000 else f"{best:g} V"
+
+
+def _proj(geometry):
+    lat = (sum(c[1] for c in geometry) / len(geometry)) if geometry else 52.0
+    return 111320.0 * math.cos(math.radians(lat)), 110574.0
+
+
+def _xy(c, k):
+    return (c[0] * k[0], c[1] * k[1])
+
+
+def _pt_seg(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = dx * dx + dy * dy
+    t = 0.0 if L == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L))
+    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+
+
+def _seg_meet(p1, p2, q1, q2):
+    d = (p2[0] - p1[0]) * (q2[1] - q1[1]) - (p2[1] - p1[1]) * (q2[0] - q1[0])
+    if abs(d) < 1e-9:
+        return None
+    t = ((q1[0] - p1[0]) * (q2[1] - q1[1]) - (q1[1] - p1[1]) * (q2[0] - q1[0])) / d
+    u = ((q1[0] - p1[0]) * (p2[1] - p1[1]) - (q1[1] - p1[1]) * (p2[0] - p1[0])) / d
+    if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+        return (p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1]))
+    return None
+
+
+class _Line:
+    """The load's line in metres (a local equirectangular projection) with a cell grid of its segments, so a county's
+    features are tested quickly."""
+    CELL = 300.0
+
+    def __init__(self, geometry):
+        self.k = _proj(geometry)
+        self.xy = [_xy(c, self.k) for c in geometry]
+        self.grid = {}
+        for i, (a, b) in enumerate(zip(self.xy, self.xy[1:])):
+            for gx in range(int(min(a[0], b[0]) // self.CELL) - 1, int(max(a[0], b[0]) // self.CELL) + 2):
+                for gy in range(int(min(a[1], b[1]) // self.CELL) - 1, int(max(a[1], b[1]) // self.CELL) + 2):
+                    self.grid.setdefault((gx, gy), []).append(i)
+
+    def near_m(self, c):
+        """Metres from a point to the line (None when no segment is within a cell of it)."""
+        p = _xy(c, self.k)
+        best = None
+        for i in self.grid.get((int(p[0] // self.CELL), int(p[1] // self.CELL)), ()):
+            d = _pt_seg(p, self.xy[i], self.xy[i + 1])
+            best = d if best is None or d < best else best
+        return best
+
+    def cross(self, coords):
+        """Where a way first crosses the line, as (lon, lat); None when it does not."""
+        for q1, q2 in zip(coords, coords[1:]):
+            Q1, Q2 = _xy(q1, self.k), _xy(q2, self.k)
+            cells = set()
+            for gx in range(int(min(Q1[0], Q2[0]) // self.CELL), int(max(Q1[0], Q2[0]) // self.CELL) + 1):
+                for gy in range(int(min(Q1[1], Q2[1]) // self.CELL), int(max(Q1[1], Q2[1]) // self.CELL) + 1):
+                    cells.update(self.grid.get((gx, gy), ()))
+            for i in sorted(cells):
+                pt = _seg_meet(self.xy[i], self.xy[i + 1], Q1, Q2)
+                if pt:
+                    return (pt[0] / self.k[0], pt[1] / self.k[1])
+        return None
+
+    def along(self, coords):
+        """The first vertex of a way that lies on the line (within STRUCT_ALONG_M), as (lon, lat); None when the way
+        is not the road the line follows."""
+        for c in coords:
+            d = self.near_m(c)
+            if d is not None and d <= STRUCT_ALONG_M:
+                return (c[0], c[1])
+        return None
+
+
+def _limit_words(tags, dims):
+    """'maxheight 4.2 m: the load's height 4.3 m is over it' for each tagged limit the load is over or close to
+    (LIMIT_NEAR); '' when none applies."""
+    parts = []
+    for tag, (what, unit) in LIMIT_WORDS.items():
+        lim, have = _num_tag(tags.get(tag)), dims.get(tag)
+        if lim is None or have is None:
+            continue
+        near = LIMIT_NEAR[tag]
+        margin = lim * near if unit == "t" else near
+        if have > lim:
+            parts.append(f"{tag} {lim:g} {unit}: the load's {what} {have:g} {unit} is over it")
+        elif have > lim - margin:
+            parts.append(f"{tag} {lim:g} {unit}: the load's {what} {have:g} {unit} is within {margin:g} {unit} of it")
+    return "; ".join(parts)
+
+
+def _bbox(geometry, pad_m=STRUCT_PAD_M):
+    kx, ky = _proj(geometry)
+    return [min(c[0] for c in geometry) - pad_m / kx, min(c[1] for c in geometry) - pad_m / ky,
+            max(c[0] for c in geometry) + pad_m / kx, max(c[1] for c in geometry) + pad_m / ky]
+
+
+def _stored_structures(geometry):
+    try:
+        import community
+        return community.structures(bbox=_bbox(geometry))
+    except Exception:       # noqa: BLE001 — a copy without the table, or no fetch yet: no structure candidates
+        return []
+
+
+def _structures_fetched():
+    try:
+        import community
+        return community.structures_fetched_at()
+    except Exception:       # noqa: BLE001
+        return None
+
+
+def structure_candidates(geometry, m, feats, fetched=None):
+    """OpenStreetMap's structures and limits (community.structures) along the drawn line as candidates (source 'osm'),
+    each Grey: a bridge carrying the road (a vertex on the line), a railway or an overhead line crossed (a segment
+    meeting the line), a level crossing / traffic calming / height restrictor within STRUCT_NEAR_M, a tagged limit the
+    load is over or close to. `fetched` (ISO) dates the words."""
+    if not geometry or len(geometry) < 2 or not feats:
+        return []
+    L = _Line(geometry)
+    dims = {"maxheight": rules._num(m.get("height_m")), "maxwidth": rules._num(m.get("width_m")),
+            "maxweight": rules._num(m.get("gross_t")), "maxaxleload": rules._num(m.get("max_axle_t")),
+            "maxlength": rules._num(m.get("length_m"))}
+    when = f" (OpenStreetMap as fetched {str(fetched)[:10]})" if fetched else " (OpenStreetMap)"
+    out = []
+    for f in feats:
+        g = f.get("geometry") or {}
+        kind, tags, name = f.get("kind"), _parse_detail(f.get("detail")), f.get("name")
+        road = tags.get("name") or tags.get("ref")
+        if g.get("type") == "Point":
+            c = g.get("coordinates") or []
+            if len(c) < 2:
+                continue
+            d = L.near_m(c)
+            if d is None or d > STRUCT_NEAR_M:
+                continue
+            lon, lat = c[0], c[1]
+            if kind == "s_level_crossing":
+                k, words = "level_crossing", "Level crossing" + (f": {name}" if name else "")
+                detail = ("Network Rail's level crossing: a long or low load needs its say (grounding on the crossing, "
+                          "the time spent on it)" + when)
+            elif kind == "s_calming":
+                t = (tags.get("traffic_calming") or "").replace("_", " ")
+                k, words = "calming", f"Traffic calming ({t})" + (f" on {road}" if road else "")
+                detail = "a low loader can ground on a hump, cushion or table; an island or a chicane narrows the road" + when
+            elif kind == "s_limit":
+                over = _limit_words(tags, dims)
+                if not over:
+                    continue
+                k = "limit"
+                words = ("Height restrictor" if tags.get("barrier") == "height_restrictor" else "Signed limit") + (f" at {name}" if name else "") + ": " + over
+                detail = "tagged in OpenStreetMap on a barrier; the sign on the road is what counts" + when
+            else:
+                continue
+        elif g.get("type") == "LineString":
+            coords = g.get("coordinates") or []
+            if len(coords) < 2:
+                continue
+            if kind in ("s_rail", "s_power"):
+                pt = L.cross(coords)
+                if not pt:
+                    continue
+                lon, lat = pt
+                if kind == "s_rail":
+                    where = ("the railway is carried over the road on a bridge: a height question for the load"
+                             if tags.get("bridge") not in (None, "no") else
+                             "the railway passes under the road in a tunnel" if tags.get("tunnel") not in (None, "no") else
+                             "whether the railway passes over or under the road is the survey's question")
+                    k, words = "railway", "Railway crossed" + (f": {name}" if name else "")
+                    detail = "Network Rail: notice where a load goes over or under its structure (the aide memoire); " + where + when
+                else:
+                    volts = _kv(tags.get("voltage"))
+                    k, words = "overhead", "Overhead line crossed" + (f" ({volts})" if volts else "")
+                    detail = ("the line's owner (the distribution network operator, or National Grid at 275 / 400 kV) sets "
+                              "the clearance under it for the travelling height" + when)
+            elif kind in ("s_bridge", "s_limit"):
+                pt = L.along(coords)
+                if not pt:
+                    continue
+                lon, lat = pt
+                over = _limit_words(tags, dims)
+                if kind == "s_bridge":
+                    k, words = "bridge", "Bridge carrying the road" + (f": {name}" if name else "") + (f" ({tags['bridge:structure']})" if tags.get("bridge:structure") else "")
+                    detail = ("the structure's owner assesses it for the load's weight through ESDAL (the road and bridge "
+                              "authority's notice)" + (f"; signed {over}" if over else "") + when)
+                else:
+                    if not over:
+                        continue
+                    k, words = "limit", "Signed limit" + (f" on {road}" if road else "") + ": " + over
+                    detail = ("tagged in OpenStreetMap on the road; the sign on the road is what counts, and the stored signed "
+                              "limits are checked apart" + when)
+            else:
+                continue
+        else:
+            continue
+        out.append({"source": "osm", "kind": k, "place": name or road, "words": words, "detail": detail, "grade": "grey",
+                    "lon": round(lon, 6), "lat": round(lat, 6), "offset": None, "ref": f.get("source_ref")})
+    return out
+
+
+def _carry_grades(old, new):
+    """A grade (and a note) the planner set on a found candidate survives a re-bake or a structures check when the
+    same candidate is found again: the same source, kind and place (the OSM object, else the point and the words)."""
+    def key(c):
+        return (c.get("source"), c.get("kind"), c.get("ref") or (round(float(c.get("lon") or 0), 5), round(float(c.get("lat") or 0), 5), c.get("words")))
+    prev = {key(c): c for c in (old or []) if isinstance(c, dict) and c.get("source") != "typed"}
+    for c in new:
+        o = prev.get(key(c))
+        if o:
+            if o.get("grade") in GRADES:
+                c["grade"] = o["grade"]
+            if o.get("note"):
+                c["note"] = o["note"]
+    return new
+
+
+def _stored_candidates(m):
+    try:
+        cur = json.loads(m.get("pinch_json") or "[]")
+    except Exception:
+        cur = []
+    return [c for c in cur if isinstance(c, dict) and c.get("source") != "typed"]
+
 
 def _numbered(cands):
     for i, c in enumerate(cands):
@@ -384,7 +677,7 @@ def typed_rows(m):
     return rows
 
 
-def bake(movement_id, by=None, _routes=None, _limits=None):
+def bake(movement_id, by=None, _routes=None, _limits=None, _structures=None, _fetched=None):
     """
     Route one movement at its typed size and store the line, HERE's words and the candidates. `_routes` (tests)
     replaces here_routing.routes. Returns {ok, movement_id, distance_km, duration_hr, candidates, notes} or
@@ -426,7 +719,10 @@ def bake(movement_id, by=None, _routes=None, _limits=None):
     here_c = candidates_from_actions(actions, geometry, m, spans)
     bend_c = bends(geometry, m, spans, taken_points=[[c["lon"], c["lat"]] for c in here_c if c.get("lon") is not None])
     hits = limits.check_line(geometry, load_dims(m), label="the load", _limits=_limits)
-    cands = _numbered(notice_candidates(notices, geometry) + here_c + bend_c + limit_candidates(hits))
+    feats = _structures if _structures is not None else _stored_structures(geometry)
+    fetched = _fetched if _structures is not None else _structures_fetched()
+    struct_c = structure_candidates(geometry, m, feats, fetched=fetched)
+    cands = _carry_grades(_stored_candidates(m), _numbered(notice_candidates(notices, geometry) + here_c + bend_c + struct_c + limit_candidates(hits)))
     typed = typed_rows(m)
     for i, t in enumerate(typed):
         t["id"] = t.get("id") or f"T{i + 1}"
@@ -452,7 +748,46 @@ def bake(movement_id, by=None, _routes=None, _limits=None):
     })
     return {"ok": True, "movement_id": movement_id, "distance_km": best.get("distance_km"), "duration_hr": best.get("duration_hr"),
             "points": len(geometry), "candidates": len(cands), "limit_hits": len(hits), "exceeds": len([h for h in hits if h["verdict"] == "exceeds"]),
-            "notices": len(notices), "roads": roads_sentence(roads), "notes": notes + ret_notes, "return_drawn": bool(ret_geom)}
+            "notices": len(notices), "roads": roads_sentence(roads), "notes": notes + ret_notes, "return_drawn": bool(ret_geom),
+            "structures": len(struct_c), "structures_fetched": fetched}
+
+
+def check_structures(movement_id, by=None, _structures=None, _fetched=None):
+    """
+    22 Oct 2026 (phase 3): look again along the DRAWN line for OpenStreetMap's structures and limits — no HERE call —
+    after a Fetch now on Config → Map and bulletin. The HERE candidates, the bends and the signed-limit hits stay as
+    they are; the structure candidates are found afresh, numbered in their place (before the signed limits), and a
+    grade or note set on one found again is kept.
+    """
+    import abnormal
+    m = abnormal.get(movement_id)
+    if not m:
+        return {"ok": False, "error": "no such abnormal load"}
+    try:
+        geometry = json.loads(m.get("geometry_json") or "null")
+    except Exception:
+        geometry = None
+    if not geometry:
+        return {"ok": False, "error": "draw the route first: the structures are looked for along the drawn line"}
+    feats = _structures if _structures is not None else _stored_structures(geometry)
+    fetched = _fetched if _structures is not None else _structures_fetched()
+    found = _stored_candidates(m)
+    if not feats and not fetched:
+        # nothing has been fetched for the scheme yet: there is nothing to check against, so what was found before (and
+        # any grade on it) stays; the note says where Fetch now is
+        return {"ok": True, "movement_id": movement_id, "structures": sum(1 for c in found if c.get("source") == "osm"),
+                "candidates": len(found), "structures_fetched": None,
+                "note": ("no structures have been fetched for this scheme yet: Config → Map and bulletin → Fetch now (the "
+                         "community layer) brings them, then Check the roads again")}
+    keep = [c for c in found if c.get("source") != "osm"]
+    before = [c for c in keep if c.get("source") != "limits"]
+    after = [c for c in keep if c.get("source") == "limits"]
+    struct_c = structure_candidates(geometry, m, feats, fetched=fetched)
+    cands = _carry_grades(found, _numbered(before + struct_c + after))
+    _store(movement_id, {"pinch_json": json.dumps(cands + typed_rows(m)), "updated_by": by, "updated_at": _now()})
+    return {"ok": True, "movement_id": movement_id, "structures": len(struct_c), "candidates": len(cands), "structures_fetched": fetched,
+            "note": None if fetched else ("no structures have been fetched for this scheme yet: Config → Map and bulletin → "
+                                          "Fetch now (the community layer) brings them, then Check the roads again")}
 
 
 def set_via(movement_id, points, by=None):
@@ -605,6 +940,7 @@ def feature_collection(movements, public=False):
                                              "grade_word": GRADE_WORDS.get(c.get("grade") or "grey")}})
     return {"type": "FeatureCollection", "features": feats,
             "words": {"indicative": INDICATIVE_WORDS, "candidates": None if public else CANDIDATE_WORDS,
+                      "structures": None if public else STRUCTURES_WORDS,
                       "counted_apart": "Counted apart from the lorries: not in the movement counts, the heat map or the carbon figures."},
             "grades": [{"key": k, "word": GRADE_WORDS[k]} for k in GRADES] if not public else None,
             "count": len({f["properties"].get("id") for f in feats if f["geometry"]["type"] == "LineString"})}

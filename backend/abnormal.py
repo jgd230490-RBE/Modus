@@ -62,6 +62,10 @@ TYPED_FIELDS = ("name", "ipt", "origin_id", "origin_gate_id", "dest_id", "dest_g
                 "axle_spacings_m", "vehicle_type", "cu_vehicle", "indivisible", "escort_planned", "esdal_ref",
                 "vr1_ref", "so_ref", "applied_on", "notified_on", "note")
 REQUIRED_FIGURES = ("width_m", "height_m", "length_m", "gross_t")
+#: 22 Oct 2026: the scheme's staff view for a caller with no account to scope by — the map page's STAFF gate cookie
+#: (a code sign-in sends no header there) and the public map's endpoint, which picks the approved-or-later movements itself
+STAFF_VIEW = {"role": "planner", "ipt": None, "label": "Staff (map)"}
+PUBLIC_STATUSES = ("approved", "notified", "moved")       # D68: what the public map may show
 BOOL_FIELDS = ("return_abnormal", "axle_driving", "cu_vehicle", "indivisible")
 NUMBER_FIELDS = ("width_m", "height_m", "length_m", "rigid_length_m", "proj_front_m", "proj_rear_m", "proj_side_m",
                  "gross_t", "max_axle_t")

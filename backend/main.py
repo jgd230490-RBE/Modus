@@ -3089,8 +3089,21 @@ def abnormal_geojson(request: Request = None):
         # The STAFF gate cookie alone: the map page of a staff member signed in with a shared code (until the codes go,
         # 31 Oct) sends no header and holds no session, so there is no account to scope by — the scheme's staff view,
         # as the community and collision groups read (seen empty on a local copy, 22 Oct). A login's own scope applies.
-        acc = {"role": "planner", "ipt": None, "label": "Staff (map)"}
+        acc = abnormal.STAFF_VIEW
     return abnormal_route.feature_collection(abnormal.page(acc)["movements"], public=False)
+
+
+@app.get("/api/public/abnormal")
+def public_abnormal():
+    """
+    22 Oct 2026 (phase 3, D68): the PUBLIC map's abnormal loads — the approved, notified and moved movements only, each
+    as its drawn line with the words a visitor may read (the kind, the window and the band, 'escorted', the roads,
+    'Indicative route; the agreed route may differ.'): no dots, no team, no size, no references, no pending plan. Behind
+    the map gate like all of /api/public/ (gate.MAP_DATA_PREFIXES).
+    """
+    import abnormal_route
+    ms = [m for m in abnormal.page(abnormal.STAFF_VIEW)["movements"] if m.get("status") in abnormal.PUBLIC_STATUSES]
+    return abnormal_route.feature_collection(ms, public=True)
 
 
 class ViaIn(BaseModel):
@@ -3112,6 +3125,23 @@ def abnormal_route_bake(movement_id: str):
     res = abnormal_route.bake(movement_id, by=acc.get("name") or acc.get("label"))
     if not res.get("ok"):
         raise HTTPException(400, res.get("error") or "the line could not be drawn")
+    res["movement"] = abnormal.decorate(abnormal.get(movement_id))
+    return res
+
+
+@app.post("/api/abnormal/{movement_id}/structures")
+def abnormal_structures(movement_id: str):
+    """
+    22 Oct 2026 (phase 3): look again along the drawn line for OpenStreetMap's structures and limits (the community
+    layer's second pass) — no HERE call — after a Fetch now on Config → Map and bulletin. A planner or an admin, like
+    Draw; a team code may look, not check.
+    """
+    acc = _require_approver()
+    import abnormal_route
+    row = abnormal.get(movement_id)
+    if not row or not abnormal._visible(row, acc):
+        raise HTTPException(404, "no such abnormal load")
+    res = _abnormal_result(abnormal_route.check_structures(movement_id, by=acc.get("name") or acc.get("label")))
     res["movement"] = abnormal.decorate(abnormal.get(movement_id))
     return res
 
