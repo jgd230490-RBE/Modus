@@ -1102,7 +1102,7 @@ if (loaded) {
         h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {}, doc: { vehicles: {} }, upd: () => {}, fileDoc }));
       ok("...with the file's values in the inputs, the 'no block yet' note, and the three assumption labels",
         fCfg2.includes('data-fair-price-section="1"') && fCfg2.includes('value="20"') && fCfg2.includes('value="23.6"')
-        && fCfg2.includes("the live document has no fair_price block yet") && (fCfg2.match(/ASSUMPTION/g) || []).length === 3 && !/undefined|NaN/.test(fCfg2));
+        && fCfg2.includes("These are the starting values. Save once to keep them.") && !fCfg2.includes("fair_price block") /* NARROWED 22 Oct 2026 (words sweep): plain words */ && (fCfg2.match(/ASSUMPTION/g) || []).length === 3 && !/undefined|NaN/.test(fCfg2));
       const fCfg3 = render("...and from the DOCUMENT when it has one",
         h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {}, doc: { fair_price: { ...fileDoc.fair_price, driver_eur_per_h: 25 } }, upd: () => {}, fileDoc }));
       ok("...the document's value wins and the note is gone", fCfg3.includes('value="25"') && !fCfg3.includes("no fair_price block yet"));
@@ -1119,7 +1119,7 @@ if (loaded) {
       const fGbNone = cfgGb({ tenant: { country: "GB" } });
       ok("...with no block on the document the inputs show the GB set (31 rigid, 24 driver), not the EE one, and no offer",
         fGbNone.includes('value="24"') && fGbNone.includes('value="31"') && !fGbNone.includes('value="27"')
-        && !fGbNone.includes("data-fair-country-offer") && fGbNone.includes("the live document has no fair_price block yet"));
+        && !fGbNone.includes("data-fair-country-offer") && fGbNone.includes("These are the starting values. Save once to keep them."));   // NARROWED 22 Oct 2026 (words sweep): plain words
       const fGbSame = cfgGb({ tenant: { country: "gb" }, fair_price: { ...gbSet, _README: "edited words only", _driver_source: "x" } });
       ok("...the document already holding the GB numbers (sources reworded, country in lower case) gets no offer",
         !fGbSame.includes("data-fair-country-offer") && fGbSame.includes('value="24"'));

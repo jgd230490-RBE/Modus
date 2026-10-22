@@ -1067,7 +1067,7 @@ ok("10: map — a tick on an existing layer goes straight on (the filter is not 
 ok("10: map — the group's words count the alternatives' apart and say how to see them",
    "are along the alternative routes only: " in MAP and "tick Alternative routes to see them." in MAP)
 ok("10: app — the Config panel counts them apart too",
-   "are along the stored alternative routes only: on the Route map while Alternative routes is ticked" in APP)
+   " are near alternative routes only.`" in APP and "stored alternative routes" not in APP)   # NARROWED 22 Oct 2026 (words sweep; the user: few words on screens): shorter
 ok("10: map — re-added after a basemap switch", "if (typeof COLL !== 'undefined' && COLL.data) ensureCollisionLayers();" in MAP)
 ok("10: map — the export card's box adds collisions=1, off by default",
    "if (col && col.checked) q.set('collisions', '1');" in MAP and 'id="rme-collisions"' in MAP
@@ -1081,7 +1081,8 @@ ok("10: app — Config → Map and bulletin carries the panel; a planner or admi
    and 'access.role === "planner" || access.role === "admin"' in _cp and "setTimeout(read, 5000)" in _cp
    and APP.count("/collisions/status") == 1)
 ok("10: app — the panel says it is not the assessment, staff only, never the public map or bulletin, and when to fetch again",
-   "It is not the assessment." in _cp and "never on the public map or the bulletin" in _cp and "late-July release" in _cp)
+   "it is not the assessment." in _cp and "Staff only." in _cp and "Fetch again after changing routes, and each August." in _cp   # NARROWED 22 Oct 2026 (words sweep; the user: few words on screens): the panel is three short sentences; where it never shows is in the guide and T9
+   and "never on the public map or the bulletin" in read("frontend/help/index.html"))
 _cb = APP.split("function CollisionEvidenceButton(")[1].split("\nfunction ")[0]
 ok("10: app — the Routes page's buttons (PDF and XLSX) for the route picked in the list",
    "<CollisionEvidenceButton routeId={selected} />" in APP and 'go("pdf")' in _cb and 'go("xlsx")' in _cb
@@ -1103,22 +1104,23 @@ ok("10: the user guide says what it is, who sees it, where it comes from, what i
    and "police" in _g and "2016" in _g and "never the day or time" in _g and "Collision evidence (PDF)" in _g)
 ok("10: v2 (22 Oct 2026): the user guide describes the stretches, the strip, the lorries beside (never a rate), the fold "
    "and the appendix's Nearby rule; the technical guide the rules behind them",
-   "<em>stretch by stretch</em>" in _g and "never divided into a rate" in _g and "folded into one sentence" in _g
-   and "bus stops within 100 m" in _g and "Stretches sheet" in _g
+   "<em>stretch by stretch</em>" in _g and "never divided into a rate" in _g   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): the fold, the Nearby rule and the sheet are in T9
+   and "folded into a sentence" in TECH and "100 m" in TECH and "<em>Stretches sheet</em>" in TECH
    and "The evidence sheet, v2 (22 Oct 2026)." in TECH and "<code>vru_goods</code>" in TECH and "<code>PDF_NEARBY_M</code>" in TECH
    and "keep the year and month only (R6)" in TECH)
 ok("10: v3 (22 Oct 2026): the user guide describes the routes compared, the CLOCS box, the lorries, the cycle routes, the "
    "left turns and the assessor's page; the technical guide the fields and the measures",
-   "this route beside each stored alternative" in _g and "violet squares" in _g and "not a CLOCS form" in _g
-   and "next <em>Fetch now</em>" in _g and "The evidence sheet, v3 (22 Oct 2026)." in TECH and "<code>detail_json</code>" in TECH
+   "the route beside its alternatives" in _g and "not a CLOCS form" in _g   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): the squares and the next-fetch rule are in T9
+   and "violet squares" in TECH and "read from the next Fetch now" in TECH and "The evidence sheet, v3 (22 Oct 2026)." in TECH and "<code>detail_json</code>" in TECH
    and "<code>DETAIL_ROWS</code>" in TECH and "45&deg;" in TECH)
 ok("10: v3 part 2: the guides say how 'compared with roads like these' is worked out, that it is a range never a score, "
    "and its caveats",
-   "<em>Compared with roads like these</em>" in _g and "never a score" in _g and "city-centre roads" in _g
+   "<em>Compared with roads like these</em>" in _g and "never a score" in _g and "city-centre roads" in TECH   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): the caveat is in T9
    and "<code>traffic.py</code>" in TECH and "<code>traffic.RATES</code>" in TECH and "never a ratio" in TECH
    and "dft_aadf_local_authority_id_" in TECH)
 ok("10: the guides say the alternatives' collisions show with Alternative routes and the plans leave them out",
-   "those near a stored alternative route only appear while <em>Alternative routes</em>" in _g
+   "those near an alternative route only appear while <em>Alternative routes</em>" in _g   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): "stored" left; the plans rule is in T9
+   and "the route map plans leave them out" in TECH
    and "<code>alternatives_only</code>" in TECH)
 ok("10: the technical guide: the endpoints, the files, the years rule, the codes, the licence",
    'id="t9-collisions"' in TECH and "/api/collisions" in TECH and "data.dft.gov.uk" in TECH and "late July" in TECH

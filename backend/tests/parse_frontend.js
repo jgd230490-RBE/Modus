@@ -491,7 +491,7 @@ ok("...and a confirmed week can be re-opened, through its own endpoint, deleting
   _laBody.includes("/forecast-weeks/reopen") && _laBody.includes("Nothing is deleted"));
 ok("confirm offers exactly the four flag fields, all optional",
   /\["weather", "wetness", "traffic", "other"\]/.test(code)
-  && code.includes("optional and may be left blank"));
+  && code.includes("The notes are optional."));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter
 // ⭐ THE ONE THAT MATTERS. Saving an actual must not calibrate.
 ok("⭐ the actual is saved through /forecast-weeks/actual",
   code.includes("/forecast-weeks/actual"));
@@ -820,7 +820,8 @@ ok("the re-bake loop has a guard against spinning forever",
 ok("only the affected vehicle profiles are re-baked",
   code.includes("legs.map(l => l.vehicle_profile)"));
 ok("the invalidated leg count is surfaced to the user", code.includes("inv.leg_count"));
-ok("approximate matches are declared, not hidden", code.includes("inv.approximate"));
+// NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): REVERSED: the zone message no longer counts approximate matches (mockup card 3); the technical guide keeps the rule
+ok("approximate matches are declared, not hidden", !code.includes("matched approximately") && _tg.includes("matched") && _tg.includes("approximately"));
 
 ok("routing zones and advisory zones are drawn differently",
   code.includes("ZONE_ROUTING") && code.includes("ZONE_ADVISORY"));
@@ -1067,13 +1068,13 @@ ok("the Config page saves the whole document to the admin endpoint",
   code.includes("`${API}/admin/config/factors${qs}`") && code.includes('method: "PUT"'));
 ok("...and can put the file back", code.includes("admin/config/factors/reset"));
 ok("⭐ it says the file is only the seed once the row exists",
-  src.includes("Reset to file") && src.includes("differs from the file in the repo"));
+  src.includes("Reset to defaults…") && src.includes('label="changed from the defaults"') && !src.includes("differs from the file in the repo"));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): question 6
 ok("a raw JSON tab exists for what the forms do not cover",
   code.includes('["raw", "Everything (JSON)"]'));
 ok("bad JSON in the raw tab is refused before it is sent",
   code.includes('setRawErr("Not valid JSON: "'));
 ok("the vehicle id is not editable — baked geometry is keyed on it",
-  src.includes("it cannot be renamed here"));
+  !/<input[^>]*value=\{k\}/.test(src) && _tg.includes("so they cannot be renamed"));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the screen note left; the id is still never an input, and the technical guide says why
 
 // 8e. route editing in place
 ok("a route row can be edited", code.includes("startEditRoute") && code.includes("saveRouteEdit"));
@@ -1210,7 +1211,7 @@ ok("Config has a 'Costing · fuel' tab whose target rate saves to PUT /admin/cos
   && !_ctBody.includes("admin/config/factors") && _ctBody.includes("Save target rate"));
 ok("...three target inputs; a blank sends null (clears), and the copy says target is used ONLY where the route has no rate",
   (_ctBody.match(/rate_eur_per_(load|t|km)/g) || []).length >= 6 && _ctBody.includes('if(draft[k] === ""){ body[k] = null; return; }')
-  && _ctBody.includes("Used ONLY for routes with no rate typed on the route form"));
+  && _ctBody.includes("Used only for routes with no rate of their own, marked \"target\"."));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter
 ok("the route form says a typed rate is used alone and never mixed with the target",   // NARROWED 22 Oct 2026 (UI fix 7, fewer words): "added together", blank = the target
   code.includes('Rates are added together. Blank = the target rate from Config, marked "target".') && !code.includes("A typed rate here is used ALONE"));
 ok("LookAhead now receives the role (for the widget's typeable boxes)", /<LookAhead meta=\{meta\} who=\{who\} access=\{role\} \/>/.test(code));
@@ -1225,14 +1226,14 @@ ok("⭐ ONE FairPriceSection, mounted once inside the Costing tab, editing doc.f
   (code.match(/function FairPriceSection\(/g) || []).length === 1 && (code.match(/<FairPriceSection\b/g) || []).length === 1
   && _ctBody.includes("<FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc}") && _fpBody.includes("d.fair_price = JSON.parse(JSON.stringify(fileFp))"));
 ok("...it saves through the factors document (the page's Save + admin token), never its own endpoint",
-  !_fpBody.includes("fetch(") && _fpBody.includes("Saved with the page's Save button (admin token)"));
+  !_fpBody.includes("fetch(") && !_fpBody.includes("Saved with the page's Save button (admin token)") && _fpBody.includes("upd && upd(d =>"));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the "(admin token)" note left; it still writes through the page document
 ok("...the four money coefficients, the three consumption figures, the uplift and both month pickers are editable",
   ["driver_eur_per_h", "vehicle_standing_eur_per_h", "running_eur_per_km", "margin_pct"].every(k => _fpBody.includes(`"${k}"`))
   && _fpBody.includes("l_per_100km_per_tonne") && _fpBody.includes("f.consumption.rigid.l_per_100km_empty") && _fpBody.includes("f.consumption.artic.l_per_100km_empty")
   && _fpBody.includes("winter_consumption_uplift_pct") && _fpBody.includes('monthsBox("winter_months"') && _fpBody.includes('monthsBox("thaw_months"'));
 ok("...and says which three are assumptions", (_fpBody.match(/ASSUMPTION/g) || []).length === 3);
 ok("...a live document without the block shows the file's values and says so",
-  _fpBody.includes("const fp = (doc && doc.fair_price) || fileFp") && _fpBody.includes("the live document has no fair_price block yet"));
+  _fpBody.includes("const fp = (doc && doc.fair_price) || fileFp") && _fpBody.includes("These are the starting values. Save once to keep them."));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): plain words
 ok("the Look-ahead prints the fair figure as a THIRD figure, marked 'model': KPI caption, expanded row, Account column",
   // 13 Oct 2026 (W6, narrowed): the Commit row's fair figure is the details' "Fair cost (model)" line
   _laBody.includes("fair ${CUR()} ${grp(totals.fair_eur)} (model") && _laBody.includes('<RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()} ${grp(wd.fair_eur)}') && _laBody.includes("Fair {CUR()} <span")
@@ -1974,12 +1975,12 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("Config: a section list, a two-thirds form, labels above inputs, one Save bar, the token and Reset behind More",
     _cfBody.includes('<div className="cfg-grid">') && _cfBody.includes('<nav className="cfg-nav" aria-label="Configuration sections">')
     && _cfBody.includes('<div className="savebar" data-cfg-savebar="1">') && _cfBody.includes('<details className="row-menu" data-cfg-more="1">')
-    && _cfBody.includes(">Reset to file…</button>") && _cfBody.includes('<label htmlFor={"cfg-" + k}>{l}</label>') && _cfBody.includes('<div className="hint">{help}</div>')
+    && _cfBody.includes(">Reset to defaults…</button>") && _cfBody.includes('<label htmlFor={"cfg-" + k}>{l}</label>') && _cfBody.includes('<div className="hint">{help}</div>')
     && /\.cfg-grid\{display:grid;grid-template-columns:200px minmax\(0,800px\);/.test(html) && /\.savebar\{position:sticky;bottom:0;/.test(html));
   ok("...every form label in the file is 14 px above its input; the 11 px uppercase label is gone",
     (code.match(/<span className="block text-sm font-medium text-slate-700 mb-1">/g) || []).length >= 40
     && !code.includes('text-[11px] uppercase tracking-wide text-slate-400') && !/text-\[(9|10|11)px\]/.test(_cfBody));
-  ok("...one Discard beside Save, both in the bar; Reset keeps its confirm", _cfBody.includes(">Discard</button>") && _cfBody.includes('if(!confirm("Replace the live configuration with backend/factors.json?'));
+  ok("...one Discard beside Save, both in the bar; Reset keeps its confirm", _cfBody.includes(">Discard</button>") && _cfBody.includes('if(!confirm("Put every setting back to the starting values?'));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): question 6
   // 13 Oct 2026 (W12, bundle B): Config → Map and bulletin — the scheme's council colour bands
   ok("⭐ W12: Config has a 'Map and bulletin' section, before Everything (JSON), with three band fields per measure",
     _cfBody.includes('["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]')
@@ -2267,7 +2268,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
     _tg.includes("<code>GET /api/gates/arrivals?month=N</code>") && _tg.includes("The gap is the gate's open minutes ÷ arrivals, an average with no hourly")
     // NARROWED 14 Oct 2026 (bundle G, W17): the info box's how-to now names the gate's open minutes and the peak bands
     && _tg.includes("all teams summed at the gate a lorry arrives by")
-    && src.includes("Capacity = the gate's open minutes (its hours, or the default gate hours where none are typed, less its shut times and any no-delivery peak bands) ÷ its check-in minutes a lorry. Averages, no peak hour.")
+    && src.includes("Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter; the full rule is in t1-gates
     && !src.includes("peak bands, else the shift)")
     && _tg.includes("<code>backend/gate_hours.py</code>") && _tg.includes("<strong>Queue likely</strong> (amber)")
     && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
@@ -2455,7 +2456,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   // NARROWED 11 Oct 2026 (guide v2.1 review): the step titled "Six cards." named five; it names all six now, and says
   // which one is the Look-ahead's rather than "for the lines in view"
   ok("...the cards step names the six cards; the carbon step says transport only and points to the target strip; cost is in its chart",
-     dashU.includes('title: "Six cards."') && dashU.includes("Material in view, deliveries a day, vehicles needed, delivered against plan and transport carbon for the lines in view, and this week's plan from the Look-ahead.")
+     dashU.includes('title: "Six cards."') && dashU.includes("For the lines in view. Press a card's i to see how it is worked out.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter
      && dashU.includes('title: "Carbon."') && dashU.includes("Transport carbon counts transport only.") && dashU.includes("Cost is in the Cost over time chart."));
   ok("🔴 ...and the old dashboard promises are gone (today in the header, the seven-day number, cost on the cards)",
      !/title: "Today\."|seven-day|Cost and carbon\.|Planned cost, the modelled fair price/.test(dashU));
@@ -2705,6 +2706,17 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && EXEMPT_TEXT.every(x => pieces.some(p => p.t === x)));
   ok("...the internal codes and field names stay (only the words a person reads changed)",
      src.includes('UNBAKED: "NOT ROUTED"') && src.includes("r.baked") && src.includes("excludes_unbaked") && src.includes("D.baked"));
+  // 22 Oct 2026 (the words sweep; the user: "no info about api or backend stuff"): the same walk, for the words the sweep
+  // took off the screens — the routing provider by name, its calls and parameters, the file, the repository, stored routes
+  const WS_BAN = /(factors\.json|\bbbox\b|bounding box|\bparameters?\b|\bprobe\b|\bdatabase\b|stored (?:road )?route|\bthe repo\b|in the repository|\binvalidated\b|\bfeed:|feed is down|hosting service|Type-check|key space|steering the router)/i;   // "approved lines feed the map" is plain English: only the diesel box's "feed:" / "feed is down"
+  const wsOf = (t) => { const t2 = t.replace(/admin token/gi, ""); const m = t2.match(WS_BAN) || t2.match(/\bHERE\b/); return m ? m[0] : null; };
+  const wsHits = pieces.filter(p => wsOf(p.t) && !isCode(p) && !EXEMPT_TEXT.includes(p.t));
+  ok(`⭐ words sweep: no text a person reads on a staff screen names HERE, its calls, factors.json, bbox, parameters, probe, the database, a stored route, the repository or a feed (${pieces.length} pieces read)`,
+     pieces.length > 2000 && wsHits.length === 0,
+     wsHits.slice(0, 8).map(p => `line ${p.line} ${p.comp} [${wsOf(p.t)}] ${JSON.stringify(p.t.trim().slice(0, 80))}`).join(" | "));
+  ok("...and it would catch the old words (HERE calls, the stored route, the file in the repository, the feed)",
+     wsOf("Each costs HERE calls.") && wsOf("Its stored route goes too.") && wsOf("with the file in the repository") && wsOf("feed: timeout")
+     && wsOf("Overwrite the live configuration with backend/factors.json") && !wsOf("Here is the plan") && !wsOf("Admin token"));
 
   // the INFO dictionary
   const infoDecl = (() => { let d = null; (function f(n) { if (ts.isVariableDeclaration(n) && n.name.getText() === "INFO") d = n; ts.forEachChild(n, f); })(sfW); return d; })();
@@ -2770,12 +2782,12 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes('<th scope="col" className="num">Planned ({CUR()})<InfoTip id="fc.cost" /></th>') && !src.includes("Hover a figure for")
      && !src.includes('data-carbon-target="set" title='));
   ok("W3 §1: the passages that left the screen read in plain words (each one's old text is in the technical guide)",
-     src.includes("Needed to change routes, locations and zones. Remembered in this browser.") && !src.includes("ADMIN_TOKEN")
-     && src.includes("Routing is not set up on this deployment yet") && !src.includes("HERE_API_KEY")
+     src.includes("Needed to change routes, locations and zones.") && !src.includes("Remembered in this browser.") && !src.includes("ADMIN_TOKEN")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter
+     && src.includes("Routing is not set up yet, so no route can be worked out.") && !src.includes("HERE_API_KEY")
      // NARROWED 22 Oct 2026 (UI fix 7, fewer words): the admin-token line under the Locations form is gone; the cycle note is one line
      && !src.includes("The admin token is taken from the field at the top of this page.") && !src.includes("taken from the bake panel")
      && src.includes("Saved on its own: the page's Save button does not save the target rate") && src.includes("Cycle = out + back + turnaround (load, unload and gate time ‡).")
-     && src.includes("Codes are checked by Wayscope") && src.includes('confirm("Clear ALL routes? Locations are kept. This cannot be undone.")'));
+     && !src.includes("Codes are checked by Wayscope") && src.includes("Ask your planner if you do not have one.") && src.includes('confirm("Clear ALL routes? Locations are kept. This cannot be undone.")'));
 }
 
 // ---- 13 Oct 2026 (W5, bundle E): charts fill every screen ------------------------------------------------------
@@ -3094,7 +3106,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("W8: Config → Vehicles has a Euro class column ('not typed' deletes the key); Config → Planning the no-delivery peak bands, at most four",
      src.includes('"Unload min", "Euro class", "Planning"]') && src.includes('data-cfg-euro={k}') && src.includes("else delete d.vehicles[k].euro_class;")
      && src.includes('data-cfg="peak-bands"') && src.includes("No-delivery peak bands (from the CLP)") && src.includes("((doc.planning || {}).peak_bands || []).length < PEAK_BANDS_MAX")
-     && src.includes("Wayscope holds no arrival times, so it cannot check that lorries keep out of them."));
+     && src.includes("Each gate's daily capacity loses them. At most {PEAK_BANDS_MAX}.") && !src.includes("Wayscope holds no arrival times, so it cannot check"));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter
 
   // ---- 17 Oct 2026 (the user: gate times and "planned close times throughout the day"; default 08:00-17:00) ----------
   ok("⭐ the shut-time cap and example and the default gate hours are held equal to the backend (gate_hours.py)",
@@ -3122,7 +3134,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("🔴 the lorry shift no longer stands in for a gate anywhere on a screen: no 'stood in', no stand_in, no 'h shift stands in'",
      !src.includes('open_basis === "stood_in"') && !src.includes("D.stand_in") && !src.includes("stands in at")
      && !src.includes("(stood in") && !src.includes("Blank hours use the scheme's shift") && !src.includes("open_basis === \"shift\""));
-  const _h1 = '<div className="hint">The hours a gate is open when none of its own are typed on Data → Locations';
+  const _h1 = '<div className="hint">For gates with no hours of their own (Data → Locations)';   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the hint is one line
   const _gNew = [src.slice(src.indexOf(_h1), src.indexOf("</div>", src.indexOf(_h1))),
                  // NARROWED 22 Oct 2026 (UI fix 7, fewer words): the Locations gate-hours hint is two lines now
                  src.slice(src.indexOf("Blank hours = the default on Config"), src.indexOf("never blocked.", src.indexOf("Blank hours = the default on Config")))];
@@ -3132,8 +3144,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes("open {D.default_hours.from}–{D.default_hours.to}, the default gate hours.")
      && src.includes("(the default: no open hours typed)`") && src.includes('", their shut times taken off"')
      // NARROWED 17 Oct 2026 (the review): the noun, the check-in condition and a typed pour
-     && src.includes("data-sim-shut={g.gate_id}") && src.includes("No lorry is placed before its gate opens: each sets off its route's drive time earlier, so the first lorries set off before the opening.")
-     && src.includes("a pour you type can bring mixers then, and the notes say how many"));
+     && src.includes("data-sim-shut={g.gate_id}") && src.includes("No lorry arrives before its gate opens; one that arrives while it is shut waits.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the i box is four short sentences
+     && !src.includes("a pour you type can bring mixers then, and the notes say how many"));
   ok("🔴 the review: each shut time's Remove is named for its row and has a 24 px hit area; the rows are one named group",
      src.includes("aria-label={`Remove shut time ${i + 1}`}") && src.includes('className="text-xs text-slate-500 underline px-2 py-1"')
      && src.includes('<div role="group" aria-labelledby="gate-shut-h">') && src.includes('id="gate-shut-h">Shut during the day (optional)</div>'));
@@ -3141,8 +3153,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      src.includes('r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null')
      && src.includes(`g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."`));
   ok("the Config hint is a sentence and says a change that strands a gate is refused, naming it",
-     src.includes(_h1 + "; {GATE_DEFAULT_HOURS.from} to {GATE_DEFAULT_HOURS.to} unless you change them here.")
-     && src.includes("A change that would leave a gate's shut times outside its hours, or the gate no open time, is refused and names the gate."));
+     src.includes(_h1 + ". Take them from the noise consent or planning conditions.</div>")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the refusal names the gate on Save; the hint no longer says so
+     && !src.includes("A change that would leave a gate's shut times outside its hours, or the gate no open time, is refused and names the gate."));
 }
 
 // ---- 14 Oct 2026 (D9 + D14, the mobile shell; notes/session-1014-mobile-shell.md) ----------------------------------------
@@ -3352,7 +3364,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      _hd.includes('<span className="text-xs text-slate-400 ml-1">Show</span>\n          <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel} aria-label="Show vehicle">'));
   ok("🔴 names #14: the two selects that had only a title carry names — Direction drawn, Route option drawn — and keep their titles",
      _hd.includes('<select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw" aria-label="Direction drawn">')
-     && _hd.includes('<select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which HERE option to draw" aria-label="Route option drawn">'));
+     && _hd.includes('<select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which route option to draw" aria-label="Route option drawn">'));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): no HERE
   const _names = [..._hd.matchAll(/<select [^\n]*aria-label="([^"]*)"/g)].map(m => m[1]);
   ok("names #14: all four are named, in words that pass the word rule (no bake, server, endpoint, token, cached, geometry) and say lorry never truck",
      _names.length === 4 && _names.every(n => n.length > 3 && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(n)), JSON.stringify(_names));
@@ -3545,7 +3557,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
 // REVERSED 18 Oct 2026 (the user): no second break past 12 h — the hint says the 45 may be taken as 15 + 30
 ok("⭐ Config → Planning: 'Shift hours a day' is a driver's working day, at most 13 h, the trips what fit after the "
    + "required breaks with driving at most 9 h; the old 'shift ÷ cycle time' is gone",
-   src.includes("A lorry's working day. The trips it makes on a route are what fit in one driver's day of it, at most 13 hours (the 11-hour daily rest), after the break the UK drivers' hours rules require (45 min once driving passes 4½ hours or work passes 9, otherwise 30 min once work passes 6; the 45 may be taken as 15 + 30), with driving at most 9 hours. A longer shift is fine for a double-shifted lorry. A planning figure: weekly limits, night work and the day's other duties are not modelled.")
+   src.includes("A lorry's working day. Its trips fit one driver's day (at most 13 hours) less the required break, with at most 9 hours driving. A planning figure.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter; the break rule is in t1-vehicles
    && !src.includes("Caps the trips one vehicle can make on a route in a day: shift ÷ cycle time.")
    && !src.includes("A driver's working day, at most 13 hours (the 11-hour daily rest)."));
 ok("⭐ the Routes table: Trips/day is what fits in a driver's day (driving = out, back and gate to face), § marks a route the "
@@ -3570,7 +3582,7 @@ ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon p
    && src.includes('c.lorry_day.limited_by === "driver_day" ? "one driver\'s 13 h day"')
    // NARROWED 17 Oct 2026 (the review): charging is attended, so working time — on top of the break AND counted toward it
    // NARROWED 18 Oct 2026 (the user: soften it): counted as working time, said to be the cautious reading — no rule says yet
-   && src.includes("charging time comes out of the shift. Wayscope counts it as the driver's working time under the UK drivers' hours (driving at most 9 hours): on top of the required break, and toward the hours that decide how long that break is — the cautious reading, as no rule yet says whether attended charging is work or a break.")
+   && src.includes("The battery starts each shift full. Charging counts as the driver's working time: the cautious reading, as no rule says yet.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter; the full rule is in t1-vehicles
    && !src.includes("The driver attends it, so it counts as working time") && !src.includes("15 min more once work passes 12")
    && !src.includes("the required breaks, at most 9 hours"));
 ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'compliant' or 'legal'",

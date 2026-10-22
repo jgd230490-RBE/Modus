@@ -777,7 +777,7 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
     if not with_volume:
         notes.append("No approved volume in this month.")
     if not_clipped:
-        # 22 Oct 2026 (words sweep): plain words on the public map; the clip itself (it runs on the next routing
+        # The words sweep (Oct 2026): plain words on the public map; the clip itself (it runs on the next routing
         # or council-areas import) is in the technical guide, T10
         notes.append(f"{len(not_clipped)} route(s) with volume are not placed in a council yet. "
                      "They are in the scheme totals.")

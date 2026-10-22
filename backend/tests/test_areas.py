@@ -594,7 +594,7 @@ ok("5. the districts' movements add up to MORE than the scheme's — and the bas
 ok("5. ⭐ the unbaked line (R003) is in no area and in no figure — named in routes_not_drawn",
    all("R003" not in a["routes"] + a["return_only_routes"] for a in pay["areas"])
    and pay["routes_not_drawn"] == ["R003"] and pay["totals"]["loads"] == 170
-   and any("no stored road route" in n for n in pay["notes"]), str(pay["notes"]))
+   and any("not routed yet" in n for n in pay["notes"]), str(pay["notes"]))   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
 ok("5. the Pending line and the other month's line do not count", A_["E"]["loads"] == 100)
 ok("5. R004, outside every area, is in the scheme totals (170 = 100 + 50 + 20) and in no area",
    all("R004" not in a["routes"] for a in pay["areas"]) and pay["totals"]["routes_with_volume"] == 3)
@@ -644,7 +644,7 @@ ok("5. a month with no volume: every area 0 movements and 0.0 t (a true zero, no
 db.execute("DELETE FROM route_area_km WHERE tenant_id = ? AND route_id = ?", (db.current_tenant(), "R004"))
 nc = areas.area_load(M, working_days=WD)
 ok("5. a route with volume and no clip is named in routes_not_clipped with a sentence, never invented",
-   nc["routes_not_clipped"] == ["R004"] and any("no clipped road route yet" in n for n in nc["notes"]))
+   nc["routes_not_clipped"] == ["R004"] and any("not placed in a council yet" in n for n in nc["notes"]))   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "clip" on the map
 areas.rebuild()
 # no carbon on a route's lines (not stored for the lines' vehicle): None, never 0.0
 add_line("F7", r2, 5 * PAYLOAD, month=2, vehicle=RIGID)
@@ -660,7 +660,8 @@ try:
     ok("5. ⭐ when the carbon read fails: movements intact, every CO2e None (never 0), co2_error carried, a note",
        br["areas"][0]["movements_per_day"] > 0 and all(a["co2_t"] is None for a in br["areas"])
        and br["totals"]["co2_t"] is None and all(v is None for v in br["totals"]["co2_t_by_tier"].values())
-       and "RuntimeError" in str(br.get("co2_error", "")) and any("co2_error" in n for n in br["notes"]))
+       and "RuntimeError" in str(br.get("co2_error", ""))   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the note no longer points at a field name
+       and any("The carbon figures could not be read" in n for n in br["notes"]) and not any("co2_error" in n for n in br["notes"]))
 except Exception as e:  # pragma: no cover
     ok("5. ⭐ when the carbon read fails: movements intact, every CO2e None (never 0), co2_error carried, a note", False, repr(e))
 finally:

@@ -68,8 +68,10 @@ ok("G2: no map/data directory ships at all",
 ok("routes and nodes are fetched from the API", code.includes("/public/map-data"));
 ok("the fetch result is pushed into the map source", /getSource\(['"]routes-source['"]\)/.test(code));
 ok("init waits for the map to load", code.includes("map.once('load', initNetwork)"));
-ok("a failed fetch is surfaced, not swallowed", /Could not load the route network/.test(src));
-ok("an empty network tells the user to bake", /Bake the network/.test(src));
+// NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the failure says so in plain words, without the raw message
+ok("a failed fetch is surfaced, not swallowed", /Could not load the routes\./.test(src) && /console\.error\('map-data failed', e\)/.test(src));
+// NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): REVERSED in part: an empty network says nothing is worked out yet; "Bake the network" left the screen (T10 says run Route all)
+ok("an empty network tells the user to bake", /No routes are worked out yet\./.test(src) && !/Bake the network/.test(src));
 
 // ---- temp haul layer is BACK (Phase 4) ---------------------------------------
 // Phase 2 asserted this layer was gone and its toggle disabled, because the network held
@@ -152,7 +154,7 @@ ok("an open-ended end date sorts last rather than being special-cased",
   code.includes("99999999"));
 ok("only active zones are drawn", code.includes("z.active && z.geometry"));
 ok("clicking a zone explains whether routing is affected",
-  code.includes("Routing avoids this area") && code.includes("Advisory only"));
+  code.includes("Routes avoid this area") && code.includes("For information only: routes not changed"));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
 ok("a missing zones endpoint is not surfaced as a page error",
   code.includes("console.warn('zones unavailable'"));
 
@@ -246,7 +248,7 @@ ok("⭐ 2026-10-06: six numbers, the last two CO2e a day and to date",
 ok("⭐ CO2e sums per line AFTER the same filters, and lines with no stored road route are named, not zeroed",
   /if \(l\.co2_t != null\) co2 \+= l\.co2_t; else co2Unbaked\+\+;/.test(code)
   && /excl\. \$\{noRoute\(co2Unbaked\)\}/.test(code)
-  && code.includes("const noRoute = k => `${k} line${k === 1 ? '' : 's'} with no stored road route`;")
+  && code.includes("const noRoute = k => `${k} line${k === 1 ? '' : 's'} not routed yet`;")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
   && !/excl\. \$\{co2Unbaked\} unbaked/.test(code) && !/\$\{last\.co2_to_date_unbaked_lines\} unbaked/.test(code));
 // 12 Oct 2026 (the base merge; Track B's merge-time item): month-kpis' co2_error reaches the bar
 ok("⭐ the figures bar reads month-kpis' co2_error and prints 'carbon could not be read', with a dash, in both carbon cards",
@@ -271,9 +273,9 @@ ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix for EVERY line
 // printed under the cards, a failed carbon read says so (it used to blame a missing route), and the wording says
 // "no stored road route" instead of the team's word "baked"
 ok("B2: no stored route shows a dash and says so, never an estimate; a partly stored window names the months it excludes",
-  /card\('—','CO₂e \(est\.\)','no road route stored for this vehicle yet'\)/.test(code)
-  && /' · excl\. '\+unbakedM\+' month'\+\(unbakedM>1\?'s':''\)\+' with no stored road route'/.test(code)
-  && /Read from the server: the costlines figure the bar above and the Dashboard use, summed over every line on this route\./.test(code)
+  /card\('—','CO₂e \(est\.\)','not routed for this lorry yet'\)/.test(code)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"; the route card no longer says "read from the server"
+  && /' · excl\. '\+unbakedM\+' month'\+\(unbakedM>1\?'s':''\)\+' not routed yet'/.test(code)
+  && /The same figure as the bar above\.'/.test(code) && !/Read from the server/.test(code)
   && !/The same figure as the bar above and the Dashboard, read from the server\./.test(code)
   && !/route not baked for this vehicle/.test(code));
 ok("⭐ the drawer's CO2e card is labelled an estimate and carries the server's planning-estimate stamp (forecast-matrix carbon_stamp)",
@@ -317,12 +319,12 @@ ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per lin
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
 // NARROWED 12 Oct 2026 (the base merge): the words a person reads are "no stored route" / "with no stored road route"
 ok("§9: ⭐ a line with no stored road route is counted as unknown, never as zero vehicles",
-  /else unbakedLines\+\+;/.test(code) && code.includes("'no stored route'")
-  && code.includes("line${unbakedLines === 1 ? '' : 's'} with no stored road route)")
+  /else unbakedLines\+\+;/.test(code) && code.includes("'not routed yet'")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
+  && code.includes("line${unbakedLines === 1 ? '' : 's'} not routed yet)")
   && !code.includes("'not baked'") && !code.includes("'s'} unbaked)"));
 ok("the bar's method note and the alternatives note say 'stored road route', not 'baked'",
-  code.includes("Active routes = every route with a stored road route that matches the filters.")
-  && code.includes("(the cycle time of its stored road route)") && code.includes("'none stored — a route through a haul road has no alternatives'")
+  code.includes("Active routes = the routes on the map that match the filters.")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the method note is short; its detail is in T10
+  && code.includes("Vehicles = lorries needed in a driver's day (a planning figure)") && code.includes("'none: a route along a haul road has none'")
   && !code.includes("every baked route matching") && !code.includes("(baked cycle)") && !code.includes("'none baked"));
 ok("§9: the fleet figure is the busiest month's, not the average", /const fleet = Math\.max\(\.\.\.mFleet\)/.test(code));
 ok("§9: no card says trips equal vehicles", !code.includes("Trips = vehicle loads on every line"));
@@ -496,9 +498,9 @@ ok("and the builder still emits the is_bridge flag, so nothing downstream breaks
 // across ~60 km of missing survey, on a client-visible map. Two things carry the
 // caveat instead, and both are asserted so neither can quietly go.
 ok("🔴 the click popup declares an interpolated stretch",
-  /No surveyed alignment on this stretch/.test(code) && /p\.is_bridge/.test(code));
+  /No survey on this stretch\./.test(code) && /p\.is_bridge/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, no "alignment file"
 ok("...and says plainly that it is not measured geometry",
-  /not measured geometry/.test(code));
+  /The line is filled in, not measured\./.test(code) && !/measured geometry/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "geometry"
 ok("the sidebar legend no longer claims there are breaks in the line",
   !/Breaks in the line/.test(html) && /interpolated/.test(html));
 ok("⭐ the reason it was made solid is written next to the layer",
@@ -551,7 +553,7 @@ ok("and that popper is wired ONCE, like the alignment one",
   /WS_POPUP_WIRED/.test(code) &&
   /function setupWsBoundaryPopup\(\)\s*\{\s*if\s*\(WS_POPUP_WIRED\)\s*return;/.test(code));
 ok("⭐ it says when there is no surveyed alignment, and how far the nearest is",
-  code.includes("No surveyed alignment here.") && /track_gap_m/.test(code));
+  code.includes("No survey here.") && /The nearest surveyed track is \$\{p\.track_gap_m\} m away/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
 ok("and it names the two sections in full, not just their codes",
   /window\.WS_NAMES\[c\]/.test(code));
 
@@ -937,8 +939,9 @@ ok("there is a control for it", /id="layer-gates"/.test(html)
 ok("the toggle moves both the dots and the labels",
   code.includes("['site-gates', 'site-gates-label'].forEach"));
 ok("clicking a gate explains that it is an access point, not the site",
-  code.includes("access point, not the site itself"));
-ok("a deactivated gate's popup says why it matters", code.includes("will not bake"));
+  code.includes("Access point, not the site itself") && !code.includes("${p.gate_id} · "));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no internal gate id
+// NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "will not bake" left the screen
+ok("a deactivated gate's popup says why it matters", code.includes("gate cannot be worked out.") && !code.includes("will not bake"));
 ok("the gate popup is wired once, not on every style.load",
   !/style\.load[\s\S]{0,4000}map\.on\('click', 'site-gates'/.test(code));
 
@@ -1086,7 +1089,7 @@ ok("there is a control for it, OFF by default",
 ok("the fetch is off the critical path — a failure must not cost the map",
   /async function loadAlternatives/.test(code) && /catch\(e\)\{[\s\S]{0,200}alternatives unavailable/.test(code));
 ok("...and it says how many there are, or why there are none",
-  /no alternatives/.test(code));
+  /none: a route along a haul road has none/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
 
 
 // =============================================================================
@@ -1333,7 +1336,7 @@ const _railHtml = _railFn ? _railFn({
   source: "Natural Earth 10m railroads",
 }) : "";
 ok("⭐ the rendered popup SAYS the geometry is provisional",
-  _railHtml.includes("Provisional geometry"));
+  _railHtml.includes("Approximate line."));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "geometry"
 ok("⭐ ...and renders the feature's own accuracy note",
   _railHtml.includes("6.4 km"));
 ok("H1 (HU5): the rail popup prints the length in the tenant's unit (16.60 km here)",
@@ -1420,7 +1423,7 @@ ok("§4: no second imagery provider", !/mapillary|bing.*streetside|kartaview/i.t
 // The map's empty-network hint tells the user where to go and bake. It named the
 // "Data Management tab", which 2.5b split into Locations / Routes / Zones in the rail.
 ok("the empty-network hint names a page that still exists",
-  !src.includes("Data Management tab") && src.includes("Routes page"));
+  !src.includes("Data Management tab") && !src.includes("Bake the network"));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the hint names no page now (the technical guide does: T10)
 
 
 // =============================================================================
@@ -1947,7 +1950,7 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
   ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
   ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (average laden, both legs, tailpipe only, set on Config)",
-     /Carbon: DESNZ 2026 kg CO₂e per vehicle-km, average laden, applied to both legs, tailpipe only; set per vehicle on the Config page\./.test(code) && !/DEFRA/.test(code));
+     /Carbon: DESNZ 2026 factors, both legs, tailpipe only\. The same figure as the bar above\./.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
 }
 
 
@@ -2704,7 +2707,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("14 px: the zone-kind rows, the zone legend note and the Full horizon switch are 14 px (were 12.5, 12 and 11)",
      /#zone-kinds \.control-item \{ padding:4px 2px; font-size:14px; \}/.test(html)
      && /\.tl-seg button\{[^}]*font:500 14px/.test(html) && !/#timeline-bar \.tl-full\{/.test(html)
-     && /<span style="font-size:14px;color:var\(--note\);">amber = closure or works/.test(html)
+     && /<span style="font-size:14px;color:var\(--note\);">A dimmed row has none in force this month\./.test(html)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the swatches carry the colours
      && !/#zone-kinds \.control-item \{[^}]*font-size:12\.5px/.test(html));
   ok("14 px: the map's new badges (over planning flag, the boxed weight/height limit) are 14 px (were 10.5 and 11.5)",
      /id:'forecast-cap-badge'[\s\S]{0,400}'text-size':14,/.test(code)
@@ -2817,15 +2820,15 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
           p21.co2_to_date_unbaked_lines = 3; KPI.cache[21] = p21;
           TL.month = 21; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
           ok("⭐ base merge: a line with no stored road route is named in those words on the bar (vehicles, CO2e a day, CO2e to date), never 'unbaked'",
-             el("kpi-vehicles-label").innerText === "Vehicles needed (1 line with no stored road route)"
-             && el("kpi-co2-day-label").innerText === "CO\u2082e a day (excl. 1 line with no stored road route)"
-             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (excl. 3 lines with no stored road route)"
+             el("kpi-vehicles-label").innerText === "Vehicles needed (1 line not routed yet)"   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
+             && el("kpi-co2-day-label").innerText === "CO\u2082e a day (excl. 1 line not routed yet)"
+             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (excl. 3 lines not routed yet)"
              && el("kpi-co2-day").innerText !== "—" && !/baked/.test(el("kpi-note").innerText + el("kpi-vehicles-label").innerText),
              JSON.stringify([el("kpi-vehicles-label").innerText, el("kpi-co2-day-label").innerText, el("kpi-co2-total-label").innerText]));
           const p22 = pay(22, 400); p22.lines[0].trips_per_vehicle_day = 0; KPI.cache[22] = p22;
           TL.month = 22; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
           ok("...and a month whose every line lacks a stored road route reads 'no stored route' for vehicles, never 'not baked' or 0",
-             el("kpi-vehicles").innerText === "no stored route", el("kpi-vehicles").innerText); }
+             el("kpi-vehicles").innerText === "not routed yet", el("kpi-vehicles").innerText); }   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
         TL.month = 12; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
         ASYNC_PINS.push((async () => {
           deferred[11](pay(11, 200)); await flush(); await flush();
@@ -3369,7 +3372,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes("paint: { 'line-color': '#FFFFFF', 'line-width': 2.5, 'line-opacity': 1 } }, before);")
      && /id: 'area-county-outline'[\s\S]{0,200}'line-color': AREA_INK, 'line-width': 2, 'line-dasharray': \[3, 2\]/.test(code));
   ok("council view: the By council group says what happens to the routes and the heat map while it is on",
-     html.includes('<div class="area-note" id="area-focus-note" hidden>While By council is on, every other layer is switched off and the heat map is off, so the councils read by themselves. Tick any layer to add it back (routes show thin and grey); unticking By council brings back the layers you had on.</div>')
+     html.includes('<div class="area-note" id="area-focus-note" hidden>By council turns the other layers and the heat map off. Tick a layer to add it back. Untick By council to get your layers back.</div>')   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
      && code.includes("if (fn) fn.hidden = !(areaTierOn('district') || areaTierOn('county'));"));
   ok("⭐ C1: the section card lists the routes, their teams through teamText (never the raw id) and their shares; registered ONCE",
      blkCode.includes("rlEsc(teamText((sh.teams || []).join(', ')) || '—')")
@@ -3433,12 +3436,13 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      // NARROWED 12 Oct 2026 (browser check): the excluded-line clause is written only when a line is excluded; the demo
      // read "excludes 0 lines with no stored road route"
      // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note moved behind the heat map's "i" (#heat-info-more), word for word
-     && blkCode.includes("more = 'Approved plan only, average-laden factor on both legs' +")
+     && blkCode.includes("more = 'Approved plan only, both legs. A colour means the same tonnes every month.' +")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; the stops rule is in T10
      && blkCode.includes("if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;")
-     && blkCode.includes("(miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +")
+     && blkCode.includes("(miss ? '<div class=\"ml-foot\">Leaves out ' + miss + ' line' + (miss === 1 ? '' : 's') + ' not routed yet.</div>' : '')")
      && !blkCode.includes("on both legs, excludes ' + miss")
      // NARROWED 12 Oct 2026 (Track C review): the legend names the maximum used, route-month or section-month
-     && blkCode.includes("'. Stops are fixed from the programme\\'s largest ' + sc.what + ' ('"));
+     // NARROWED 22 Oct 2026 (words sweep): the note no longer names the maximum (T10 does); the exclusion stays in the legend foot
+     && !blkCode.includes("'. Stops are fixed from the programme\\'s largest ' + sc.what + ' ('"));
   ok("browser check 12 Oct: on the desktop bar the conditions pill wraps inside 300 px (at 1280 px it covered the last figure card by 91 px)",
      /@media \(min-width:1024px\)\{ #kpi-conditions\{ flex-wrap:wrap; max-width:300px; flex-shrink:0;/.test(html)
      && html.includes(".cond-part{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }")
@@ -3645,7 +3649,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            && el("road-load-legend").innerHTML.includes("ml-steps") && !el("road-load-legend").innerHTML.includes("ml-w")
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the counting rule is behind the heat map's "i" (#heat-info-more); the legend
            // carries the badge's key instead
-           && el("heat-info-more").innerHTML.includes("the loaded leg is counted once")
+           && !el("heat-info-more").innerHTML.includes("the loaded leg is counted once")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the counting rule is in T10
+           && el("heat-info-more").innerHTML.includes("Where routes share a road, its colour shows their total.")
            && el("road-load-legend").innerHTML.includes("two-way lorry movements a day on that stretch</div>")
            && el("road-load-legend").innerHTML.includes('<span class="mv-pill">') && !el("road-load-legend").innerHTML.includes("ml-foot"));
         {
@@ -3690,8 +3695,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note is behind the heat map's "i"; the legend keeps the exclusion in
            // one line and the CO2 badge's key
-           && el("heat-info-more").innerHTML.includes("Approved plan only, average-laden factor on both legs, excludes 3 lines with no stored road route.")
-           && el("heat-info-more").innerHTML.includes("(55.5 t)") && el("carbon-legend").innerHTML.includes("Excludes 3 lines with no stored road route.")
+           && el("heat-info-more").innerHTML.includes("Approved plan only, both legs. A colour means the same tonnes every month.")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, "not routed yet"
+           && !el("heat-info-more").innerHTML.includes("(55.5 t)") && el("carbon-legend").innerHTML.includes("Leaves out 3 lines not routed yet.")
            && el("carbon-legend").innerHTML.includes('<span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month'), el("carbon-legend").innerHTML.slice(0, 400));
         // REVERSED 12 Oct 2026 (evening): carbon paints the routes only, so a section-month figure from the server never
         // sets the stops; the route-month maximum always does
@@ -3700,11 +3705,11 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         ok("⭐ heat map: Carbon's stops come from the largest ROUTE-month (55.5 t) even when the server sends a section-month (9.1 t)",
            JSON.stringify([rlc[3], rlc[5], rlc[7], rlc[9]]) === JSON.stringify(B.carbonStops(55.5))
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the stops' note is behind the heat map's "i"
-           && el("heat-info-more").innerHTML.includes("largest route-month (55.5 t)") && !el("heat-info-more").innerHTML.includes("section-month"),
+           && !el("heat-info-more").innerHTML.includes("section-month"),   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the note no longer names the maximum; the stops still come from 55.5
            JSON.stringify(rlc) + " " + el("carbon-legend").innerHTML.slice(0, 200));
         delete TL.matrix.sectionCo2Max; B.refreshMapModes(); await flush();
         ok("Track C review: ...and with no section figure from the server, the route-month maximum, named as such",
-           el("heat-info-more").innerHTML.includes("largest route-month (55.5 t)")   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): behind the "i"
+           el("heat-info-more").innerHTML.includes("A colour means the same tonnes every month.")   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): behind the "i"; NARROWED 22 Oct 2026 (words sweep): the maximum is no longer named
            && JSON.stringify(fmap.layers["forecast-layer"].paint["line-color"][2].filter((x, i) => i >= 3 && i % 2 === 1)) === JSON.stringify(B.carbonStops(55.5)));
         // road load off: the forecast routes carry the carbon
         el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
@@ -4151,7 +4156,7 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        && /Date%3A%0ATime%3A%0APlace/.test(mt) && /Lorry%20registration/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt));
     api.renderConcernLinks();
     ok("⭐ C3 concern: the demo (no typed address) says so in every slot, as a placeholder — no link, no invented address",
-       concernSlots.every(s => s.innerHTML === '<span class="concern-unset">Report a concern: no contact address has been typed for this scheme (a placeholder on the fictional demo scheme).</span>'));
+       concernSlots.every(s => s.innerHTML === '<span class="concern-unset">Report a concern: no contact address yet (fictional demo).</span>'));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
     TENANT.concern_email = 'contact@scheme.example'; api.renderConcernLinks();
     ok("C3 concern: a typed address becomes a 'Report a concern by email' link", concernSlots.every(s => /^<a class="concern-link" href="mailto:contact@scheme\.example\?subject=/.test(s.innerHTML) && />Report a concern by email<\/a>$/.test(s.innerHTML)));
     TENANT.concern_email = null;
@@ -4388,7 +4393,7 @@ function qrRead(mod) {
   // the carbon ramps: the comment is true, the council legend names the difference
   ok("Track C review: the carbon ramp's comment no longer calls #2071F3's family 'the plan blue'; the council legend says its stops differ from the Carbon legend's",
      !/the plan blue at five lightness steps/.test(src) && /NOT the plan blue #4A72C9/.test(src)
-     && code.includes("These stops are fixed for districts (t in the month) and differ from the Carbon legend\\'s for routes and sections."));
+     && code.includes("District bands differ from the route carbon bands."));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
   // forecastWindow: no matrix, no window, no burst of month reads
   {
     const fw = /function forecastWindow\(\) \{[\s\S]*?\n    \}/.exec(code), km = /function kpiMonthsOnScreen\(\) \{[\s\S]*?\n    \}/.exec(code);
@@ -4447,7 +4452,7 @@ function qrRead(mod) {
     const cd = C && C(jd.areas[0], jd, "Oct 2026");
     ok("⭐ Track C review areas: the card names what a partial figure leaves out — 'excludes 1 route with no carbon figure', the edge route, the routes not clipped",
        !!cd && cd.includes("excludes 1 route with no carbon figure") && cd.includes("1 more only cross its edge (under 200 m inside)")
-       && cd.includes("2 routes with volume not clipped yet"), (cd || "").slice(0, 300));
+       && cd.includes("2 routes with volume not yet placed in a council"), (cd || "").slice(0, 300));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "clip"
     ok("Track C review areas: ...and with no month the card says to pick one, with no zero", C && /Shows one month: press Play or pick a month\./.test(C(jn.areas[0], jn, "")) && !/<b>0<\/b>/.test(C(jn.areas[0], jn, "")));
   }
   ok("⭐ Track C review areas: the server's notes are printed in the group (a gap reads as a gap); a failed read says so",
@@ -5308,7 +5313,7 @@ function qrRead(mod) {
      && fnSrc("syncRouteExport").includes("const noPlace = centred && !(RME.places || []).length;"));
   ok("...two downloads, the PDF and the PNG, and the note says what each is for (the scale bar once a picture is resized)",
      html.includes(`onclick="downloadRouteExport('pdf')">Download PDF</button>`) && html.includes(`onclick="downloadRouteExport('png')">Download PNG</button>`)
-     && html.includes("The PDF prints at the stated scale on A4 at 100 %. The PNG is for a Word document: once it is resized, use the scale bar."));
+     && html.includes("PDF: to scale on A4 at 100 %. PNG: for Word; after resizing, use the scale bar."));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
   const open = fnSrc("openRouteExport");
   ok("...the month list is the months with volume (the chips); the month on screen is picked, else the first",
      open.includes("const months = chipMonths();") && open.includes("const want = (TL.on && TL.month) ? TL.month : (months[0] || null);"));
@@ -5326,7 +5331,8 @@ function qrRead(mod) {
      && /#rme-panel \.rme-check\{[^}]*min-height:44px; font-size:14px;/.test(html)
      && /#rme-panel \.rme-note\{[^}]*font-size:14px; \}/.test(html) && /#rme-panel \.rme-plan-what\{[^}]*font-size:14px; \}/.test(html));
   ok("...a refusal says so in words (401: only staff; a plan it cannot draw: the server's sentence), never a raw code alone",
-     fnSrc("downloadRouteExport").includes("r.status === 401 ? 'only staff can export the route map: sign in to the app' : (d || 'the export failed (' + r.status + ')')"));
+     fnSrc("downloadRouteExport").includes("r.status === 401 ? 'only staff can export the route map: sign in to the app' : (d || 'try again')")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no status code
+     && !fnSrc("downloadRouteExport").includes("'the export failed (' + r.status"));
   // NARROWED 14 Oct 2026, evening: there IS a PNG now, but the server's (the PDF page rasterised), never the browser map's
   ok("🔴 no screenshot of the browser map: the PDF and the PNG are both the server's (D29 stands)",
      // (the one toDataURL in the page is buildLocLegend's 34 px swatch, not the map)
@@ -5579,7 +5585,7 @@ function qrRead(mod) {
      html.includes('<input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label>')
      && code.includes("id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',"));
   ok("basemap 16 Oct: the in-app guide lists the basemaps the menu offers, without Standard (3D)",
-     guide.includes("Light (default), Dark and Satellite (Mapbox; called Aerial for a British organisation)")
+     guide.includes("Light (default), Dark and Satellite (called Aerial for a British organisation)")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the basemap names no longer say Mapbox
      && !/Standard \(3D\)/.test(guide));
 }
 
@@ -5861,12 +5867,12 @@ function qrRead(mod) {
        lg.hidden === false && lg.innerHTML.includes("<b>Closer dashes = more movements a day</b>") && lg.innerHTML.includes("Each way, in Oct 2026")
        && ["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].every(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
     ok("D115 sandbox: ...that each direction is its own lane on the left, the dashes move while the timeline plays, shared roads show the total, the bands are fixed",
-       lg.innerHTML.includes("Each direction has its own lane, on the left as driven") && lg.innerHTML.includes("while the timeline plays")
-       && lg.innerHTML.includes("Where routes share a road, the dashes show their total") && lg.innerHTML.includes("a spacing means the same number in every month"));
+       lg.innerHTML.includes("Each direction has its own lane, on the left.") && !lg.innerHTML.includes("while the timeline plays")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the foot keeps two facts; the rest is in T10
+       && lg.innerHTML.includes("Where routes share a road, the dashes show their total") && !lg.innerHTML.includes("a spacing means the same number in every month"));
     ok("D115 sandbox: each band's sample is drawn as the map draws it (a 2.5 px round-capped dash, one width short, on the 6 px blue)",
        (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 5 && lg.innerHTML.includes('stroke-dasharray="2.5 27.5"')
        && lg.innerHTML.includes('stroke-dasharray="2.5 5.5"') && lg.innerHTML.includes('stroke-width="6"') && lg.innerHTML.includes('aria-hidden="true"'));
-    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /lorries/.test(lg.innerHTML));
+    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /movements a day/.test(lg.innerHTML));   // NARROWED 22 Oct 2026 (words sweep): the foot's "the way the lorries go" left with the motion sentence; the unit names movements
     month = null; F.renderFlowLegend();
     ok("D115 sandbox: with no single month (Show forecast over the span) the legend says it is a daily average over the months",
        lg.innerHTML.includes("Each way, a daily average, Sep 2026 to Dec 2026"), lg.innerHTML.slice(0, 200));
@@ -5982,12 +5988,12 @@ function qrRead(mod) {
   ok("the drawer's card names the day: the shift less breaks, at most 9 h driving; whole trips, the literal kept",
      code.includes("card(String(tripsPerDay),'Trips / day / lorry', tripsPerDay>0")
      && code.includes("'@ '+Math.min(13, P.shift_hours_per_day)+' h shift less breaks, at most 9 h driving, '")
-     && code.includes("'routed cycle, '+Math.min(13, P.shift_hours_per_day)+' h shift less the required break, at most 9 h driving'")
+     && code.includes("Math.min(13, P.shift_hours_per_day)+' h shift less the break, max 9 h driving'")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
      && code.includes(": 'one round trip does not fit a driver\\'s day')"));
   ok("⭐ the review: the drawer prefers the server's trips a day and cycle (feature properties), and 0 trips counts one lorry a trip",
      code.includes("const tripsPerDay = fromServer ? info.trips_per_day")
      && code.includes("if(cur.trips_per_day==null && typeof f.properties.trips_per_day==='number')")
-     && code.includes("card(info.cycle_hr.toFixed(2)+' h','Haul cycle','Routed drive, both legs, + gate and handling')")
+     && code.includes("card(info.cycle_hr.toFixed(2)+' h','Haul cycle','driving both ways, plus gate and handling')")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
      && code.includes("Math.ceil(peakLoads/(Math.max(1, tripsPerDay)*P.working_days_per_month))")
      && !code.includes("(tripsPerDay>0)?Math.ceil(peakLoads/"));
   if (grabLD) {
@@ -5999,8 +6005,8 @@ function qrRead(mod) {
   }
   // NARROWED 17 Oct 2026 (the review): one break ("the required break") and the planning-figure caveat
   ok("the bar's note and the month table's note say the vehicles are worked out in a driver's day",
-     code.includes("(the cycle time of its stored road route) in a driver's day under the UK drivers' hours (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers' own hours not checked)")
-     && code.includes("what one vehicle can do in a driver\\'s day on that route (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers\\' own hours not checked)")
+     code.includes("Vehicles = lorries needed in a driver's day (a planning figure)")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the two notes are short; the drivers' hours rule is in T1 / T10
+     && code.includes("Vehicles: a planning figure, rounded up per line.")
      && !code.includes("the shift less the required breaks"));
 }
 
@@ -6036,7 +6042,7 @@ function qrRead(mod) {
   ok("⭐ 19 Oct wording: each explanation sits behind an 'i' — Month, Heat map, Views, the council figures — word for word",
      pops.includes('<div class="info-pop" id="info-views" hidden>Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>')
      && pops.includes('<div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day. Each route by its own figure;')
-     && pops.includes('<div class="info-pop" id="info-month" hidden><p>Approved forecasts only, never actuals.</p>')
+     && pops.includes('<div class="info-pop" id="info-month" hidden><p>Approved forecasts only.</p>')   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
      && /<div class="info-pop" id="info-council" hidden>\s*<div class="area-note" id="area-unitary-note"><\/div>\s*<div class="area-note" id="area-focus-note" hidden>/.test(sb)
      && ['info-month', 'info-heat', 'info-views', 'info-council'].every(id => (html.match(new RegExp('aria-controls="' + id + '"', "g")) || []).length === 1));
   ok("19 Oct wording: the old visible notes are gone from the panel (preset note, the Volume note, the mode sub-lines, 'Approved forecasts only.' as a status)",
@@ -6166,6 +6172,39 @@ function qrRead(mod) {
     ok("19 Oct: the new panel words say no truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
        !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(words) && !/\bAI\b/.test(words));
   }
+}
+
+// ---- 22 Oct 2026 (the words sweep; the user: "no info about api or backend stuff") ----------------------------------
+// The public map's words a person reads — the panel, the route card, the legends, the popups, the status lines — say
+// nothing about stored routes, cached geometry, baking, the server, costlines, the router, HERE's calls or factors.json.
+// Read with the comments taken out (HTML comments, /* */ blocks, and // comments that start a line or follow a space,
+// so a URL's "https://" stays). The lorry limits' credit ("OpenStreetMap contributors and HERE") is the one HERE left.
+{
+  const noComments = html.replace(/<!--[\s\S]*?-->/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[ \t])\/\/[^\n]*/gm, "$1");
+  const MAP_BAN = [/stored road route/i, /no stored route/i, /no road route stored/i, /cached geometry/i, /Bake the network/,
+                   /Read from the server/, /the costlines figure/, /the router is not/, /HERE offered/, /not in factors\.json/,
+                   /Mapbox basemaps/, /Satellite \(Mapbox\)/, /Mapbox Satellite/, /Routed road geometry/, /road geometry\./,
+                   /Provisional geometry/i, /Reference geometry/, /measured geometry/, /alignment file/, /will not bake/,
+                   /until the clip runs/, /HERE will not accept/, /months with a stored route/, /Reading the shared sections/];
+  const mapHits = MAP_BAN.filter(r => r.test(noComments)).map(String);
+  ok("⭐ words sweep: the public map's words carry no stored route, cached geometry, bake, server, costlines, router, HERE call or factors.json",
+     mapHits.length === 0, mapHits.join(" | "));
+  const OLD = ["No routes have cached geometry yet. Bake the network on the", "Vehicles needed (2 lines with no stored road route)",
+               "Read from the server: the costlines figure the bar above", "Advisory — the router is not given this data."];
+  ok("...the rule is real: it catches the old sentences, and the new words are on the page",
+     OLD.every(x => MAP_BAN.some(r => r.test(x)))
+     && noComments.includes("not routed yet") && noComments.includes("No routes are worked out yet.")
+     && noComments.includes("For information only: routes do not avoid these.") && noComments.includes("The same figure as the bar above."));
+  const visibleHere = (noComments.match(/['"`>][^'"`<\n]*\bHERE\b[^'"`<\n]*/g) || []).filter(s => !/src\.has\('here'\)/.test(s));
+  ok("...HERE is named only in the lorry limits' credit (OpenStreetMap contributors and HERE)",
+     visibleHere.every(s => /OpenStreetMap contributors and HERE/.test(s) || s === "'HERE"), visibleHere.join(" | "));
+  // no status code or raw error message joined into what a person reads
+  const RAW = [/textContent = 'Could not load the route network: ' \+ e\.message/, /"\\u274c Failed: " \+ e\.message/,
+               /Couldn\\'t load forecast \('\+e\.message/, /Couldn\\'t load forecast detail \('\+e\.message/,
+               /rlEsc\(RL\.error\[m\]\)/, /rlEsc\(mtx\.co2Error\) \+ ' Every line/, /: 'error ' \+ r\.status/,
+               /the export failed \(' \+ r\.status/, /'Not read: ' \+ \(e && e\.message/, /' ' \+ D\.error \+ '\.'/];
+  const rawHits = RAW.filter(r => r.test(html)).map(String);
+  ok("⭐ words sweep: no map message joins a status code or a raw error into the words it shows (10 places)", rawHits.length === 0, rawHits.join(" | "));
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
