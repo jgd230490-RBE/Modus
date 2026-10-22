@@ -9005,10 +9005,24 @@
             ['abnormal-points', 'abnormal-lines'].forEach(l => { map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; }); map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; }); });
         }
     }
+    function abnWhen(from, to, band) {
+        // The window in words, as the app prints it: 8 Mar 2027 · 8–12 Mar 2027 · 28 Mar – 2 Apr 2027 · 30 Dec 2026 – 2 Jan 2027, then ', day' / ', night'
+        const d = s => { const x = new Date(String(s || '').slice(0, 10) + 'T12:00:00Z'); return isNaN(x) ? null : x; };
+        const a = d(from), b = d(to && to !== from ? to : null);
+        const f = (x, o) => x.toLocaleDateString('en-GB', Object.assign({ timeZone: 'UTC' }, o));
+        const DMY = { day: 'numeric', month: 'short', year: 'numeric' }, DM = { day: 'numeric', month: 'short' };
+        let w = '';
+        if (a && !b) w = f(a, DMY);
+        else if (a && b && a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth()) w = a.getUTCDate() + '–' + f(b, DMY);
+        else if (a && b && a.getUTCFullYear() === b.getUTCFullYear()) w = f(a, DM) + ' – ' + f(b, DMY);
+        else if (a && b) w = f(a, DMY) + ' – ' + f(b, DMY);
+        else w = String(from || '');
+        return w + (w && band ? ', ' + band : '');
+    }
     function abnormalLinePopup(e) {
         const f = e.features && e.features[0]; if (!f) return;
         const p = f.properties || {};
-        const when = (p.date_from || '') + (p.date_to && p.date_to !== p.date_from ? ' to ' + p.date_to : '') + (p.time_band ? ', ' + p.time_band : '');
+        const when = abnWhen(p.date_from, p.date_to, p.time_band);
         const html = `<div style="font:14px system-ui;max-width:300px"><b>Abnormal load · ${escHtml(p.name || '')}</b><br>` +
             `${escHtml(p.team_name || '')} · ${escHtml(when)} · ${p.movements || ''} movement${p.movements === 1 ? '' : 's'}${p.escorted === true || p.escorted === 'true' ? ' · escorted' : ''}<br>` +
             `${escHtml(p.class_word || '')}${p.leg === 'return' ? ' · the return leg' : ''}<br>` +

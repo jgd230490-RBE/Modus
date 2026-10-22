@@ -6117,6 +6117,16 @@ function qrRead(mod) {
      && src.includes("['match', ['get', 'kind'], 'turn', ABN_DOT.turn, 'roundabout', ABN_DOT.roundabout, 'slip_road', ABN_DOT.slip_road,")
      && src.includes("const ABN_LAYERS = ['abnormal-lines', 'abnormal-points'];")
      && (src.match(/if \(typeof ABN !== 'undefined' && ABN\.data\) ensureAbnormalLayers\(\);/g) || []).length === 2);
+  {
+    const fnSrc = src.slice(src.indexOf("function abnWhen(from, to, band) {"), src.indexOf("function abnormalLinePopup(e) {"));
+    const abnWhen = new Function(fnSrc + "; return abnWhen;")();
+    ok("ABN: the line popup prints the window in words like the app (8–12 Mar 2027 / 28 Mar – 2 Apr 2027 / 30 Dec 2026 – 2 Jan 2027, then the band), never ISO dates — seen as '2027-03-08 to 2027-03-12' on the local copy, 22 Oct",
+       src.includes("const when = abnWhen(p.date_from, p.date_to, p.time_band);") && !src.includes("const when = (p.date_from || '')")
+       && abnWhen("2027-03-08", "2027-03-12", "day") === "8–12 Mar 2027, day" && abnWhen("2027-04-05", "2027-04-05", null) === "5 Apr 2027"
+       && abnWhen("2027-03-28", "2027-04-02", "night") === "28 Mar – 2 Apr 2027, night" && abnWhen("2026-12-30", "2027-01-02", "") === "30 Dec 2026 – 2 Jan 2027"
+       && abnWhen("", "", "day") === "" && abnWhen("2027-04-05", null, "day") === "5 Apr 2027, day",
+       [abnWhen("2027-03-08", "2027-03-12", "day"), abnWhen("2027-03-28", "2027-04-02", "night")].join(" | "));
+  }
   ok("ABN: the approved-only tick filters the lines on the server's status; the dots tick hides the points; the two filters never read anything new",
      src.includes("['in', ['get', 'status'], ['literal', ['approved', 'notified', 'moved']]]") && src.includes("map.setLayoutProperty('abnormal-points', 'visibility', (ABN.on && ABN.dots) ? 'visible' : 'none');")
      && src.includes("function abnormalFilterChanged() {") && !/function abnormalFilterChanged\(\) \{[^}]*fetch/.test(src));

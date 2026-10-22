@@ -804,6 +804,11 @@ ok("⭐ MAP (staff): a LineString per drawn leg (the crane's two), a Point per c
    and all(f["properties"]["grade_word"] == "Grey — to survey" for f in _fs["features"] if f["geometry"]["type"] == "Point")
    and any(f["properties"]["kind_word"] == "Roundabout" and f["properties"]["movement"] == "Units" for f in _fs["features"] if f["geometry"]["type"] == "Point")
    and _fs["words"]["candidates"] == AR.CANDIDATE_WORDS and [g["key"] for g in _fs["grades"]] == ["grey", "green", "amber", "red", "black"])
+ok("MAP (staff): the line's size words carry the typed figures as typed — 40 t, never '40.0 t' (seen in the popup on the local copy, 22 Oct); a decimal keeps its decimal",
+   any(f["properties"].get("size") == "4.6 × 3.9 × 16.5 m · 40 t" for f in _fs["features"] if f["geometry"]["type"] == "LineString")
+   and not any(".0 t" in (f["properties"].get("size") or "") for f in _fs["features"] if f["geometry"]["type"] == "LineString")
+   and AR._nw(40.0) == "40" and AR._nw(4.6) == "4.6" and AR._nw("16.5") == "16.5" and AR._nw(None) == "—" and AR._nw(3.95) == "3.95",
+   str([f["properties"].get("size") for f in _fs["features"] if f["geometry"]["type"] == "LineString"]))
 ok("🔴 MAP (public, D68): approved-or-later only (the units), no Points, and only the words a visitor may read — the kind, the window and the band (never an hour), "
    "'escorted', the roads in words, 'Indicative route; the agreed route may differ.' — never the team, the size, the references, the candidates",
    _fp["count"] == 1 and all(f["geometry"]["type"] == "LineString" for f in _fp["features"]) and _fp["features"][0]["properties"]["id"] == _u["id"]

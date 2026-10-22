@@ -555,6 +555,14 @@ ROUTE_FIELDS = ("origin_id", "origin_gate_id", "dest_id", "dest_gate_id", "width
 # --------------------------------------------------------------------------- #
 #  The map's collections                                                        #
 # --------------------------------------------------------------------------- #
+def _nw(x):
+    """A typed figure in words: 40.0 -> 40, 4.6 -> 4.6, None -> — (the map popup read '40.0 t' on the local copy, 22 Oct)."""
+    v = rules._num(x)
+    if v is None:
+        return "—"
+    return str(int(v)) if float(v).is_integer() else f"{v:g}"
+
+
 def feature_collection(movements, public=False):
     """
     The abnormal loads as GeoJSON: one LineString per drawn leg, and (staff only) one Point per candidate. `movements`
@@ -579,7 +587,7 @@ def feature_collection(movements, public=False):
             base["kind"] = "Abnormal load"
             base["public_words"] = "Indicative route; the agreed route may differ."
         else:
-            base.update({"team_name": m.get("team_name"), "size": f"{m.get('width_m')} × {m.get('height_m')} × {m.get('length_m')} m · {m.get('gross_t')} t",
+            base.update({"team_name": m.get("team_name"), "size": f"{_nw(m.get('width_m'))} × {_nw(m.get('height_m'))} × {_nw(m.get('length_m'))} m · {_nw(m.get('gross_t'))} t",
                          "candidates": len([c for c in (m.get("pinch") or []) if c.get("source") != "typed"]),
                          "typed_points": len([c for c in (m.get("pinch") or []) if c.get("source") == "typed"]),
                          "flags": [f.get("code") for f in (m.get("flags") or [])], "baked_at": m.get("baked_at")})
