@@ -282,6 +282,7 @@ def import_tenant(pkg, replace=False):
             if gone:
                 dropped[t] = sorted(gone)
         conn.commit()
+        db.bump_data_version()   # 22 Oct 2026: its own connection, so db.note_write never saw it (read_cache)
     except Exception:
         try:
             conn.rollback()
@@ -350,6 +351,7 @@ def import_rows(table, rows):
             cur.execute(db._adapt(sql), [tenant] + _bind(r, cols, types))
             n += 1
         conn.commit()
+        db.bump_data_version()   # 22 Oct 2026: its own connection, so db.note_write never saw it (read_cache)
     finally:
         conn.close()
     return n

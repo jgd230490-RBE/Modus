@@ -146,6 +146,7 @@ import tenant_package  # noqa: E402
 import road_sections  # noqa: E402
 import areas  # noqa: E402
 import gate  # noqa: E402
+import limits  # noqa: E402
 import main  # noqa: E402
 
 PASS = 0
@@ -759,9 +760,10 @@ ok("6. ⭐ /api/public/areas is behind the map scope", gate.scope_for("/api/publ
 ok("6. ⭐ /api/public/areas/shapes is behind the map scope too, and its body is shapes()",
    gate.scope_for("/api/public/areas/shapes") == "map" and main.public_area_shapes() == areas.shapes()
    and '@app.get("/api/public/areas/shapes")' in read("backend/main.py"))
+# NARROWED 22 Oct 2026 (read_cache): the endpoint now answers the JSON bytes it keeps, so its body is parsed first
 ok("6. ⭐ /api/public/areas/months (19 Oct) is behind the map scope, and its body is area_load_all() for the whole horizon",
    gate.scope_for("/api/public/areas/months") == "map"
-   and json.dumps(main.public_areas_months(), sort_keys=True) == json.dumps(areas.area_load_all(WD, main.MONTH_COUNT), sort_keys=True)
+   and json.dumps(json.loads(main.public_areas_months().body), sort_keys=True) == json.dumps(areas.area_load_all(WD, main.MONTH_COUNT), sort_keys=True)
    and '@app.get("/api/public/areas/months")' in read("backend/main.py"))
 ok("6. the admin paths are not the map's (they are token-protected)",
    gate.scope_for("/api/admin/areas/import?token=x") is None and gate.scope_for("/api/admin/areas") is None)
@@ -805,6 +807,286 @@ ok("6. main.py registers the three routes", all(s in src_main for s in (
 # NARROWED 12 Oct 2026 (Track C review): the call may also pass geometry=bool(geometry) (the figures-only month read)
 ok("6. the public endpoint hands _working_days() in — one reader of the figure",
    re.search(r"areas\.area_load\(int\(month\), working_days=_working_days\(factors\)(, geometry=bool\(geometry\))?\)", src_main) is not None)
+
+# =========================================================================== #
+#  6b. 22 Oct 2026 — the read cache (read_cache.py): the first council view on #
+#      live waited 7-11 s; now built once per data version, never stale        #
+# =========================================================================== #
+import threading  # noqa: E402
+import read_cache  # noqa: E402
+
+
+def months_body():
+    """The endpoint's body as the browser gets it (bytes) and parsed."""
+    r = main.public_areas_months()
+    return r.body, json.loads(r.body.decode("utf-8"))
+
+
+def fresh():
+    """What the every-month read is RIGHT NOW, built from the database with no cache."""
+    return read_cache.json_bytes(areas.area_load_all(WD, main.MONTH_COUNT))
+
+
+def w_loads(body):
+    return {a["area_id"]: a["loads"] for a in json.loads(body)["months"][str(M)]["areas"]}
+
+
+read_cache.clear()
+_b0 = dict(read_cache.STATS)
+_body1, _js1 = months_body()
+_b1 = dict(read_cache.STATS)
+_n = [0]
+_real_run = db._run
+
+
+def _count_run(sql, params, fetch):
+    _n[0] += 1
+    return _real_run(sql, params, fetch)
+
+
+_heavy_calls = []
+_real_heavy = main._heavy
+db._run = _count_run
+main._heavy = lambda name: (_heavy_calls.append(name), _real_heavy(name))[1]
+try:
+    _body2, _js2 = months_body()
+finally:
+    db._run = _real_run
+    main._heavy = _real_heavy
+_b2 = dict(read_cache.STATS)
+ok("6b. ⭐ the first read builds once; a second read is a cache hit with the IDENTICAL bytes",
+   _b1["builds"] == _b0["builds"] + 1 and _b2["builds"] == _b1["builds"] and _b2["hits"] == _b1["hits"] + 1
+   and _body2 == _body1)
+ok("6b. ⭐ ...and those bytes are exactly the uncached read (area_load_all, as JSONResponse would encode it)",
+   _body1 == fresh() and _js1 == areas.area_load_all(WD, main.MONTH_COUNT))
+ok("6b. ...the cached body parses to every month and unpacks like the month read (not a vacuous pass)",
+   len(_js1["months"]) == main.MONTH_COUNT and w_loads(_body1).get("W") == 150
+   and json.dumps(areas.unpack_month(_js1, M), sort_keys=True)
+   == json.dumps(areas.area_load(M, working_days=WD, geometry=False), sort_keys=True))
+ok("6b. ⭐ a hit asks the database nothing beyond the config (0 or 1 query) and takes no heavy-read slot",
+   _n[0] <= 1 and _heavy_calls == [], f"{_n[0]} queries, slots {_heavy_calls}")
+ok("6b. the endpoint answers application/json bytes (FastAPI's own separators, UTF-8)",
+   main.public_areas_months().media_type == "application/json" and isinstance(_body1, bytes)
+   and b'": ' not in _body1[:2000] and _body1.startswith(b"{"))
+
+
+def after_write(label, write, undo=None, changes=True):
+    """Read (cached), write, read again: the second read must be rebuilt and equal the database now."""
+    before, _ = months_body()
+    months_body()                                    # a hit, so the next miss is the write's doing
+    v0, b0 = db.data_version(), read_cache.STATS["builds"]
+    write()
+    after, _ = months_body()
+    ok(f"6b. ⭐ {label}: the next read is rebuilt (data version moved, one build) and equals the database now",
+       db.data_version() > v0 and read_cache.STATS["builds"] == b0 + 1 and after == fresh())
+    if changes:
+        ok(f"6b. ...{label}: the figures DID change, so the old cached body would have been stale",
+           after != before)
+    if undo:
+        undo()
+        back, _ = months_body()
+        ok(f"6b. ...{label} undone: the read is back to the first figures", back == before and back == fresh())
+
+
+# a forecast: F2 (R002, 50 loads into Westshire) un-approved, as the approve / reject endpoints write it
+after_write("an approved line set back to Pending",
+            lambda: db.execute("UPDATE forecasts SET status = 'Pending' WHERE tenant_id = ? AND id = 'F2'", (db.current_tenant(),)),
+            lambda: db.execute("UPDATE forecasts SET status = 'Approved' WHERE tenant_id = ? AND id = 'F2'", (db.current_tenant(),)))
+db.execute("UPDATE forecasts SET status = 'Pending' WHERE tenant_id = ? AND id = 'F2'", (db.current_tenant(),))
+ok("6b. ⭐ Westshire reads 100 loads with F2 Pending — straight after the write, from the endpoint",
+   w_loads(months_body()[0]).get("W") == 100)
+db.execute("UPDATE forecasts SET status = 'Approved' WHERE tenant_id = ? AND id = 'F2'", (db.current_tenant(),))
+ok("6b. ...and 150 again once it is approved again", w_loads(months_body()[0]).get("W") == 150)
+# a new forecast line
+after_write("a new approved line",
+            lambda: add_line("F9", r1, 7 * PAYLOAD, section="WS7"),
+            lambda: db.execute("DELETE FROM forecasts WHERE tenant_id = ? AND id = 'F9'", (db.current_tenant(),)))
+# route geometry: R002's stored legs taken away (the map stops drawing it), then put back
+_geo = db.query("SELECT * FROM route_geometry WHERE tenant_id = ? AND route_id = ?", (db.current_tenant(), r2))
+
+
+def _geo_back():
+    for g in _geo:
+        cols_ = [c for c in g.keys()]
+        db.execute(f"INSERT INTO route_geometry ({', '.join(cols_)}) VALUES ({', '.join('?' for _ in cols_)})",
+                   tuple(g[c] for c in cols_))
+
+
+after_write("a route's stored geometry removed",
+            lambda: db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ?", (db.current_tenant(), r2)),
+            _geo_back)
+# the council areas, through the admin import endpoint's body
+os.environ["ADMIN_TOKEN"] = "adm-test"
+after_write("a council area renamed by the admin import",
+            lambda: main.areas_import(FC2, token="adm-test"),
+            lambda: main.areas_import(FC, replace=1, token="adm-test"))
+os.environ.pop("ADMIN_TOKEN", None)
+# a location: the first site inside an area moved far away, then back
+_site = next(l for l in db.query("SELECT id, name, lat, lon FROM locations WHERE tenant_id = ? ORDER BY id", (db.current_tenant(),))
+             if any(l["name"] in (a.get("sites") or []) for a in areas.area_load(M, working_days=WD)["areas"]))
+after_write("a site moved",
+            lambda: db.execute("UPDATE locations SET lat = ? WHERE tenant_id = ? AND id = ?", (_site["lat"] + 20, db.current_tenant(), _site["id"])),
+            lambda: db.execute("UPDATE locations SET lat = ? WHERE tenant_id = ? AND id = ?", (_site["lat"], db.current_tenant(), _site["id"])))
+# the config, through config.save (the Config page's Save): the council colour bands
+_cfg = json.loads(json.dumps(config.load(conversions, use_cache=False)))
+_cfg2 = json.loads(json.dumps(_cfg))
+_cfg2.setdefault("tenant", {})["council_breaks"] = {"movements": [3, 6, 9], "carbon": [4, 8, 12]}
+after_write("the council bands saved on Config",
+            lambda: ok("6b. (the config save itself worked)", config.save(_cfg2, by="test")["ok"]),
+            lambda: ok("6b. (the config put back)", config.save(_cfg, by="test")["ok"]))
+# working days: the key moves as well as the version
+_cfg3 = json.loads(json.dumps(_cfg)); _cfg3["planning"]["working_days_per_month"] = WD + 1
+before_wd, _ = months_body()
+config.save(_cfg3, by="test")
+_wd_body, _wd_js = months_body()
+ok("6b. ⭐ working days changed on Config: the read is rebuilt with the new divisor",
+   _wd_js["common"]["working_days"] == WD + 1 and _wd_body != before_wd)
+config.save(_cfg, by="test")
+ok("6b. ...and back", months_body()[0] == before_wd)
+# the writers that commit on their own connection
+_v = db.data_version()
+tenant_package.import_rows("forecasts", [])
+ok("6b. ⭐ tenant_package.import_rows (its own connection) bumps the data version even for no rows", db.data_version() > _v)
+_v = db.data_version()
+limits.init_db()
+ok("6b. limits.init_db (its own connection) bumps it", db.data_version() > _v)
+_v = db.data_version()
+limits.replace_rows("test", (0, 0, 0, 0), [])
+ok("6b. limits.replace_rows (its own connection) bumps it", db.data_version() > _v)
+
+# writes that are not figures do NOT throw the cache away (else a staff session's touch would empty it on every page)
+db.init_users_db()
+months_body()
+_v, _b = db.data_version(), read_cache.STATS["builds"]
+db.execute("UPDATE user_sessions SET last_seen_at = ? WHERE tenant_id = ? AND token_hash = ?", ("x", db.current_tenant(), "none"))
+db.execute_atomic([("DELETE FROM auth_attempts WHERE tenant_id = ? AND id = ?", (db.current_tenant(), "none"))])
+months_body()
+ok("6b. ⭐ a session touch and the sign-in throttle (NO_DATA_TABLES) leave the version and the cached read alone",
+   db.data_version() == _v and read_cache.STATS["builds"] == _b)
+ok("6b. the tables that do not bump are exactly the account / audit / lead tables",
+   db.NO_DATA_TABLES == {"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users", "demo_requests"})
+ok("6b. ⭐ written_table(): INSERT / INSERT OR REPLACE / REPLACE / UPDATE / DELETE name their table; anything else is None (and bumps)",
+   db.written_table("INSERT INTO forecasts (a) VALUES (?)") == "forecasts"
+   and db.written_table("  insert or replace into Audit_Log (a) values (?)") == "audit_log"
+   and db.written_table("REPLACE INTO users (a) VALUES (?)") == "users"
+   and db.written_table("UPDATE user_sessions SET x = 1") == "user_sessions"
+   and db.written_table("\nDELETE FROM route_geometry WHERE 1") == "route_geometry"
+   and db.written_table("ALTER TABLE locations ADD COLUMN x TEXT") is None
+   and db.written_table("WITH x AS (SELECT 1) INSERT INTO users SELECT * FROM x") is None
+   and db.written_table(None) is None)
+_v = db.data_version()
+db.note_write("CREATE TABLE IF NOT EXISTS t_new (a TEXT)")
+db.note_write("INSERT INTO some_new_table (a) VALUES (?)")
+ok("6b. ⭐ a statement it does not recognise, and a table nobody listed, BUMP (a new table can only cost a rebuild)",
+   db.data_version() == _v + 2)
+_v = db.data_version()
+db.execute_atomic([("UPDATE user_sessions SET last_seen_at = ? WHERE tenant_id = ? AND token_hash = ?", ("y", db.current_tenant(), "none")),
+                   ("UPDATE forecasts SET quantity = quantity WHERE tenant_id = ? AND id = ?", (db.current_tenant(), "F1"))])
+ok("6b. an atomic set that writes one figure table among account tables bumps", db.data_version() > _v)
+
+# a write that lands WHILE the read is being built: that build is served to its viewer but never kept
+_d0 = read_cache.STATS["discarded"]
+
+
+def _build_with_write():
+    db.execute("UPDATE forecasts SET quantity = quantity WHERE tenant_id = ? AND id = ?", (db.current_tenant(), "F1"))
+    return b"built-across-a-write"
+
+
+_got = read_cache.cached("t/midwrite", 1, _build_with_write)
+ok("6b. ⭐ a write mid-build: the viewer gets that build, nothing is kept, the next read builds again",
+   _got == b"built-across-a-write" and read_cache.STATS["discarded"] == _d0 + 1
+   and read_cache.peek("t/midwrite", 1) is None)
+ok("6b. ...the version is noted BEFORE the build and the entry kept only if it has not moved (source)",
+   read("backend/read_cache.py").index("version = db.data_version()") < read("backend/read_cache.py").index("value = build()")
+   and "if db.data_version() == version:" in read("backend/read_cache.py"))
+# a different key (other working days, another horizon) never answers from this entry
+read_cache.cached("t/key", ("a", 1), lambda: b"one")
+ok("6b. a different key is a miss, never the other key's value",
+   read_cache.cached("t/key", ("a", 2), lambda: b"two") == b"two" and read_cache.peek("t/key", ("a", 1)) is None)
+# per tenant
+months_body()
+_bt = read_cache.STATS["builds"]
+_tok = db.set_current_tenant("other-tenant")
+try:
+    _other = main.public_areas_months().body
+finally:
+    db.reset_current_tenant(_tok)
+ok("6b. ⭐ another tenant gets its own build (never this tenant's figures): no areas there",
+   read_cache.STATS["builds"] == _bt + 1 and json.loads(_other)["area_fixed"] == {} and _other != months_body()[0])
+ok("6b. ...and this tenant's entry is still there afterwards (one entry per tenant)", read_cache.STATS["builds"] == _bt + 1)
+
+# single-flight: four first viewers at once build it once
+_sf = [0]
+
+
+def _slow():
+    import time as _t
+    _sf[0] += 1
+    _t.sleep(0.3)
+    return b"slow"
+
+
+_res = []
+_ths = [threading.Thread(target=lambda: _res.append(read_cache.cached("t/sf", 1, _slow))) for _ in range(4)]
+for _t_ in _ths:
+    _t_.start()
+for _t_ in _ths:
+    _t_.join()
+ok("6b. ⭐ four viewers at once on a cold entry: ONE build, all four get it", _sf[0] == 1 and _res == [b"slow"] * 4)
+
+# the warmer builds exactly what a viewer would read
+read_cache.clear()
+_w = read_cache.warm(db.current_tenant())
+_bw = read_cache.STATS["builds"]
+_wb, _ = months_body()
+ok("6b. ⭐ warm(): builds the council read for the tenant, and the next viewer's read is a hit with the same bytes",
+   _w == {"areas/months": "ok"} and read_cache.STATS["builds"] == _bw and _wb == fresh())
+ok("6b. a warmer that fails says so and never raises",
+   (lambda: (read_cache.WARMERS.__setitem__("t/boom", lambda: 1 / 0), read_cache.warm(db.current_tenant()),
+             read_cache.WARMERS.pop("t/boom"))[1])().get("t/boom", "").startswith("ZeroDivisionError"))
+ok("6b. the warmer starts only from main's lifespan (never on import) and WAYSCOPE_WARM_CACHE=0 turns it off",
+   src_main.count("read_cache.start_warmer(") == 1
+   and src_main.index("read_cache.start_warmer(") < src_main.index("    yield\n")
+   and 'os.environ.get("WAYSCOPE_WARM_CACHE", "1").strip() != "0"' in src_main
+   and not re.search(r"^\s*(read_cache\.)?start_warmer\(", read("backend/read_cache.py") + read("backend/main.py").replace(
+       "        read_cache.start_warmer(db.current_tenant())", ""), re.M))
+
+# the wiring that the stubbed HTTP layer cannot run (http_smoke.py runs it for real)
+_mw = src_main[src_main.index("async def _access_middleware("):src_main.index("GUARD_HEADER = ")]
+ok("6b. ⭐ the middleware bumps the version after EVERY audited /api/ write, worked or not (in a finally round call_next)",
+   "try:\n                response = await call_next(request)\n            finally:" in _mw
+   and "if write and _audited(path):\n                    db.bump_data_version()" in _mw)
+ok("6b. ⭐ db._run bumps after the commit and execute_atomic after its commit (not before: a reader could re-cache old figures)",
+   "conn.commit()\n            note_write(sql)" in read("backend/db.py")
+   and "conn.commit()\n            if any(written_table(step[0]) not in NO_DATA_TABLES for step in steps):\n                bump_data_version()" in read("backend/db.py"))
+_own = {}
+for _f in sorted(os.listdir(os.path.join(ROOT, "backend"))):
+    if _f.endswith(".py") and _f != "db.py":
+        _lines = read("backend/" + _f).split("\n")
+        for _i, _l in enumerate(_lines):
+            if "conn.commit()" in _l:
+                _own.setdefault(_f, []).append("db.bump_data_version()" in _lines[_i + 1])
+ok("6b. ⭐ every module that commits on its own connection bumps the version on the next line",
+   _own and all(all(v) for v in _own.values()) and set(_own) == {"limits.py", "tenant_package.py"}, str(_own))
+_dbsrc = read("backend/db.py")
+_fn, _bad = None, []
+for _l in _dbsrc.split("\n"):
+    if _l.startswith("def "):
+        _fn = _l[4:].split("(")[0]
+    if "conn.commit()" in _l and not (_fn.startswith(("init_", "_migrate_")) or _fn in ("_run", "execute_atomic")):
+        _bad.append(_fn)
+ok("6b. db.py's other commits are start-up migrations only (init_* / _migrate_*), before anything is cached",
+   _bad == [], str(_bad))
+ok("6b. ⭐ Render runs ONE process: the start command has no --workers (the version is per process; see db.py)",
+   "--workers" not in read("render.yaml") and "WEB_CONCURRENCY" not in read("render.yaml")
+   and "uvicorn main:app" in read("render.yaml"))
+ok("6b. the endpoint serves from read_cache and builds inside the heavy-read slot",
+   "read_cache.cached(AREAS_MONTHS_CACHE, _areas_months_key(), _areas_months_build)" in src_main
+   and 'with _heavy("areas/months"):\n        return read_cache.json_bytes(areas.area_load_all(wd, months))' in src_main)
+ok("6b. read_cache.py says what it does not do, and names no team id", "WHAT THIS DOES NOT DO" in read("backend/read_cache.py")
+   and "IPT" not in read("backend/read_cache.py"))
+read_cache.clear()
 
 # =========================================================================== #
 #  7. The package round trip                                                   #

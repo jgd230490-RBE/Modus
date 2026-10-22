@@ -56,6 +56,8 @@ os.environ.update({
     "IPT1_CODE": "north-code-xyz",
     "MAP_PASSWORD": "map-pass-xyz",
     "GATE_SECRET": "gate-secret-for-tests-only",
+    # 22 Oct 2026 (read_cache): no background warm-up here — every build below is one this file asked for
+    "WAYSCOPE_WARM_CACHE": "0",
 })
 
 import db  # noqa: E402
@@ -1446,6 +1448,33 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # RE-PINNED 18 Oct 2026 (R3b): the demo's bands are movements 25 / 50 / 100 and carbon 10 / 25 / 50, both put back
     ok("W12: ...and the document put back reads the demo's bands again", r.status_code == 200
        and c.get("/api/public/areas/shapes").json().get("stops") == {"movements": [25, 50, 100], "carbon": [10, 25, 50]})
+    # 22 Oct 2026 (read_cache): the every-month council read is kept until the next write — here through the REAL
+    # middleware and endpoints, which test_areas.py's stubbed HTTP layer cannot run
+    import read_cache as _rc
+    _m1 = c.get("/api/public/areas/months")
+    _bm = _rc.STATS["builds"]
+    _m2 = c.get("/api/public/areas/months")
+    ok("⭐ read cache: a second /api/public/areas/months is a hit — the same bytes, no build, application/json",
+       _m1.status_code == _m2.status_code == 200 and _m2.content == _m1.content and _rc.STATS["builds"] == _bm
+       and _m2.headers.get("content-type", "").startswith("application/json")
+       and len(_m1.json()["months"]) == main.MONTH_COUNT and len(_m1.json()["area_fixed"]) == 9, str(_rc.STATS))
+    _v = db.data_version()
+    c.get("/api/public/areas/shapes"); c.get("/api/health"); c.get("/api/public/areas", params={"month": 10, "geometry": 0})
+    ok("read cache: reads (GET) never move the data version", db.data_version() == _v)
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _bad, "updated_by": "smoke"})
+    ok("⭐ read cache: a write that is REFUSED (400, nothing stored) still moves the version — the middleware's second net",
+       r.status_code == 400 and db.data_version() > _v, f"{r.status_code} {db.data_version()} {_v}")
+    _good = json.loads(json.dumps(_cfg)); _good.setdefault("tenant", {})["council_breaks"] = {"carbon": [11, 22, 33]}
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _good, "updated_by": "smoke"})
+    _bm = _rc.STATS["builds"]
+    _m3 = c.get("/api/public/areas/months")
+    ok("⭐ read cache: a Config save, then the very next read carries the new bands (rebuilt once, never the cached body)",
+       r.status_code == 200 and _m3.json()["common"]["stops"]["carbon"] == [11, 22, 33] and _rc.STATS["builds"] == _bm + 1
+       and _m3.content != _m1.content, str((r.status_code, _m3.json()["common"].get("stops"))))
+    r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _cfg, "updated_by": "smoke"})
+    _m4 = c.get("/api/public/areas/months")
+    ok("read cache: ...and the document put back, the read is the first one again, byte for byte",
+       r.status_code == 200 and _m4.content == _m1.content)
     # 14 Oct 2026 (HU7): the Config page reads the file's per-country fair-price sets from the same call
     _fj = c.get("/api/config/factors", headers=PLAN).json()
     _gbf = ((_fj.get("file") or {}).get("fair_price_by_country") or {}).get("GB") or {}
