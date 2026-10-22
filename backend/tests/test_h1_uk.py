@@ -350,20 +350,22 @@ ok("H2: two haul roads, spliced (HERE does not know them), attached to the route
    == sorted([(r, "Z001") for r in ("R004", "R005", "R006", "R014", "R031", "R033", "R035", "R039", "R043")]
              + [("R016", "Z002"), ("R018", "Z002")])
    and {r["id"] for r in _T["routes"] if r["dest_id"] == "L006"} == {l["route_id"] for l in _T["route_haul_roads"] if l["zone_id"] == "Z001"})
-ok("16 Oct 2026: and one access road per gate, all spliced haul roads, none attached to a route",
-   len(_access) == 19 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
+# NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): 21 gates, the precast works' and the crane depot's among them
+ok("16 Oct 2026: and one access road per gate (21 since 22 Oct), all spliced haul roads, none attached to a route",
+   len(_access) == 21 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
    and not ({l["zone_id"] for l in _T["route_haul_roads"]} & _access))
 # RE-PINNED 17 Oct 2026 (R2, §3a, §1.8): the three geofences re-dated to the four-year programme (Z003 keeps its box and
 # start date, ends with the junction build 17 Dec 2027; the Burrough limit runs the whole programme; the Melton works area
-# Mar 2026 – Sep 2027), then the seven ADVISORY zones created after the access roads (Z025–Z031): nothing new steers routing
+# Mar 2026 – Sep 2027), then the seven ADVISORY zones created after the access roads (Z025–Z031; Z027–Z033 since 22 Oct 2026,
+# the two abnormal-load sites' access roads before them): nothing new steers routing
 ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t village limit, an advisory works area — then seven advisory zones",
    [(z["id"], z["kind"], z["affects_routing"], z["starts_on"], z["ends_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
    == [("Z003", "closure", 1, "2026-10-05", "2027-12-17"), ("Z004", "weight_limit", 0, "2026-01-01", "2030-12-31"),
        ("Z005", "works", 0, "2026-03-01", "2027-09-30"),
-       ("Z025", "works", 0, "2026-05-01", "2028-05-31"), ("Z026", "works", 0, "2027-04-01", "2028-09-30"),
-       ("Z027", "closure", 0, "2027-04-01", "2027-04-30"), ("Z028", "closure", 0, "2028-03-01", "2028-06-30"),
-       ("Z029", "works", 0, "2029-06-01", "2029-10-31"), ("Z030", "closure", 0, "2027-12-01", "2027-12-31"),
-       ("Z031", "closure", 0, "2028-12-01", "2028-12-31")]
+       ("Z027", "works", 0, "2026-05-01", "2028-05-31"), ("Z028", "works", 0, "2027-04-01", "2028-09-30"),
+       ("Z029", "closure", 0, "2027-04-01", "2027-04-30"), ("Z030", "closure", 0, "2028-03-01", "2028-06-30"),
+       ("Z031", "works", 0, "2029-06-01", "2029-10-31"), ("Z032", "closure", 0, "2027-12-01", "2027-12-31"),
+       ("Z033", "closure", 0, "2028-12-01", "2028-12-31")]
    and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] != "haul_road")
    and "8 vehicles a day" in [z for z in _T["zones"] if z["id"] == "Z004"][0]["note"]
    and [z for z in _T["zones"] if z["id"] == "Z003"][0]["name"] == "A47 at the new Tilton junction: HGV diversion while the junction is built")

@@ -20,6 +20,11 @@ import abnormal_rules as rules
 FLAG_WORDS = {"NOTICE_DUE": "Notice due", "NOTICE_LATE": "Notice late", "SO_LEAD_TIME": "Special Order lead time",
               "AIL_ROAD_LIMIT": "Over a signed limit"}
 ESCORT_WORDS = {"none": "none planned", "attendant": "an attendant", "private": "a private escort", "police": "a police escort"}
+ESCORT_EXPECTED_WORDS = {"none": "none expected from the figures",
+                         "other_roads": "expected on roads other than motorways (National Highways' code of practice)",
+                         "motorways": "expected on motorways (National Highways' code of practice)",
+                         "all_roads": "expected on every road (National Highways' code of practice)"}
+CAL_SHORT = {"stgo": "STGO clear working days", "cu": "C&U working days", "calendar": "calendar days"}
 CALENDAR_HEAD = ["Load", "Team", "From → to", "Window", "Band", "Movements", "Size (W × H × L m · t)", "Class", "Permission",
                  "Apply by", "Applied on", "Police notice by", "Authorities notice by", "Notify by", "Notified on", "Status",
                  "Flags", "ESDAL ref", "VR1 ref", "Special Order ref", "Escort planned", "Route drawn", "Potential pinch points"]
@@ -100,6 +105,7 @@ def calendar(acc, today=None, generated=None):
             "police_days": nt.get("police_days"), "police_by": nt.get("police_by"),
             "rba_days": nt.get("rba_days"), "rba_by": nt.get("rba_by"), "rba_indemnity": bool(nt.get("rba_indemnity")),
             "notify_by": adv.get("notify_by"), "notified_on": m.get("notified_on"), "calendar": adv.get("calendar_words"),
+            "calendar_key": adv.get("calendar"),
             "escort": ESCORT_WORDS.get(m.get("escort_planned") or "none", m.get("escort_planned")),
             "escort_expected": adv.get("escort_expected"), "attendant": bool(adv.get("attendant")),
             "esdal_ref": m.get("esdal_ref"), "vr1_ref": m.get("vr1_ref"), "so_ref": m.get("so_ref"),
@@ -253,17 +259,19 @@ def _table(P, widths, head, rows, size=7.4, gap=2.2, head_size=7.6):
         x = P.m
         c.setFillColorRGB(*export.NAVY_RGB)
         c.setFont(B, head_size)
-        P.y -= head_size + 3
-        for w, h in zip(widths, head):
-            for i, ln in enumerate(export._wrap(h, B, head_size, w - 4)[:2]):
-                c.drawString(x + 2, P.y - i * (head_size + 1), ln)
+        wrapped = [export._wrap(h, B, head_size, w - 4)[:2] for w, h in zip(widths, head)]
+        nl = max(len(w_) for w_ in wrapped) or 1
+        top = P.y - 3
+        for w, lines in zip(widths, wrapped):
+            for i, ln in enumerate(lines):
+                c.drawString(x + 2, top - (i + 1) * (head_size + 1.5), ln)
             x += w
-        P.y -= head_size + 3
+        P.y = top - nl * (head_size + 1.5) - 4
         c.setStrokeColorRGB(*export.GREY)
         c.setLineWidth(0.5)
         c.line(P.m, P.y + 2, P.m + sum(widths), P.y + 2)
 
-    P.need(2 * (head_size + 3) + 20)
+    P.need(3 * (head_size + 1.5) + 24)
     draw_head()
     for row in rows:
         cells = [export._wrap(str(v if v is not None else ""), R, size, w - 4) for v, w in zip(row, widths)]
@@ -341,9 +349,10 @@ def build_calendar_pdf(C):
     P = _Page(c, W, H, m, _header_block("Abnormal loads — notice calendar", sub, C),
               _footer_block(C, C["words"]["advice"] + " " + (C["words"]["counted_apart"] or "")))
     mm_ = export.mm
-    widths = [w * mm_ for w in (44, 46, 30, 42, 22, 24, 26, 20, 23)]
-    head = ["Load", "From → to", "Window · band · movements", "Class · permission", "Apply by", "Police notice by",
+    widths = [w * mm_ for w in (40, 42, 30, 42, 22, 24, 26, 24, 23)]      # 273 mm: the page less the margins
+    head = ["Load", "From and to", "Window · band · movements", "Class · permission", "Apply by", "Police notice by",
             "Authorities notice by", "Notify by", "Status · flags"]
+    used_cals = []
     rows = []
     for r in C["rows"]:
         rows.append([f"{r['id']} · {r['name']}\n{r['size']} · {r['team'] or ''}", r["from_to"],
@@ -351,14 +360,20 @@ def build_calendar_pdf(C):
                      (r["class"] or "") + (f" · {r['permission']}" if r.get("permission_key") else ""),
                      _apply_words(r) + (f"\napplied {_day(r['applied_on'])}" if r.get("applied_on") else ""),
                      _police_words(r), _rba_words(r),
-                     (_day(r["notify_by"]) if r.get("notify_by") else "—") + (f"\n{r['calendar']}" if r.get("calendar") else "")
+                     (_day(r["notify_by"]) if r.get("notify_by") else "—") + (f" ({CAL_SHORT[r['calendar_key']]})" if r.get("calendar_key") in CAL_SHORT else "")
                      + (f"\nnotified {_day(r['notified_on'])}" if r.get("notified_on") else ""),
                      r["status"] + (f"\n{_flag_words(r)}" if r["flags"] else "")])
+    for r in C["rows"]:
+        if r.get("calendar_key") in CAL_SHORT and r["calendar_key"] not in used_cals:
+            used_cals.append(r["calendar_key"])
     if rows:
         _table(P, widths, head, [[str(v).replace("\n", " — ") for v in row] for row in rows])
     else:
         P.text("No abnormal load is planned.", export._BF("regular"), 9, export.GREY, W - 2 * m)
     P.y -= 8
+    if used_cals:
+        P.text("The calendars: " + " · ".join(rules.CALENDAR_WORDS[k] for k in used_cals) + ".", export._BF("regular"), 7.4, export.GREY, W - 2 * m)
+        P.y -= 4
     P.text(C["words"]["not_modelled"], export._BF("regular"), 7.4, export.GREY, W - 2 * m)
     P.finish()
     return buf.getvalue()
@@ -388,7 +403,7 @@ def esdal_sheet(movement_id, acc, today=None, generated=None):
         "movement": m, "id": m["id"], "name": m.get("name"), "team": m.get("team_name"), "status": m.get("status_word") or m.get("status"),
         "generated": _generated(generated), "tenant": export._tenant().get("name") or "", "demo_notice": export._demo_notice(),
         "vehicle": m.get("vehicle_word") or rules.VEHICLE_WORDS.get(m.get("vehicle_type") or "", m.get("vehicle_type") or "—"),
-        "fill_in": [("Haulier", ""), ("Contact", ""), ("Vehicle registration", ""), ("ESDAL movement reference", m.get("esdal_ref") or "")],
+        "fill_in": [("Haulier", ""), ("Contact", ""), ("Vehicle registration", ""), ("ESDAL reference", m.get("esdal_ref") or "")],
         "load": [("Load", m.get("name")), ("Indivisible", "declared" if m.get("indivisible") else "not declared — say so if it is"),
                  ("Movements", f"{m.get('movements')}{' (the return abnormal too)' if m.get('return_abnormal') else ''}"),
                  ("Window", _window(m)), ("Time band", (m.get("time_band") or "day") + " " + "–".join(rules.TIME_BANDS.get(m.get("time_band") or "day", ()))),
@@ -410,12 +425,13 @@ def esdal_sheet(movement_id, acc, today=None, generated=None):
                     ("Apply by", _apply_words({"apply_by": adv.get("apply_by"), "apply_by_be16": adv.get("apply_by_be16")}) if adv.get("apply_by") else "—"),
                     ("Police notice", _police_words({"police_by": nt.get("police_by"), "police_days": nt.get("police_days")})
                      + (f"; {', '.join(nt.get('police_triggers') or [])}" if nt.get("police_triggers") else "")),
-                    ("Road and bridge authorities", _rba_words({"rba_by": nt.get("rba_by"), "rba_days": nt.get("rba_days"), "rba_indemnity": nt.get("rba_indemnity")})),
+                    ("Authorities' notice", _rba_words({"rba_by": nt.get("rba_by"), "rba_days": nt.get("rba_days"), "rba_indemnity": nt.get("rba_indemnity")})),
                     ("Notify by", (_day(adv["notify_by"]) + (f" — {adv['calendar_words']}" if adv.get("calendar_words") else "")) if adv.get("notify_by") else "—"),
                     ("Attendant", "required" if adv.get("attendant") else "not required by the figures"),
-                    ("Escort", f"{adv.get('escort_expected') or 'none'} expected; planned: {ESCORT_WORDS.get(m.get('escort_planned') or 'none', m.get('escort_planned'))}"),
-                    ("Markers and speeds", ", ".join(adv.get("markers") or []) + (f"; {', '.join(str(x) for x in adv['speeds_mph'])} mph" if adv.get("speeds_mph") else "")),
-                    ("Height", adv.get("height") or "—")],
+                    ("Escort", f"{ESCORT_EXPECTED_WORDS.get(adv.get('escort_expected') or 'none', adv.get('escort_expected'))}; planned: {ESCORT_WORDS.get(m.get('escort_planned') or 'none', m.get('escort_planned'))}"),
+                    ("Markers", ", ".join(adv.get("markers") or []) or "none required by the figures"),
+                    ("Speeds", f"{', '.join(str(x) for x in adv['speeds_mph'])} mph (motorway, dual carriageway, other roads)" if adv.get("speeds_mph") else "—"),
+                    ("Height", "; ".join(adv.get("height") or []) or "—")],
         "refs": [("ESDAL", m.get("esdal_ref") or "—"), ("VR1", m.get("vr1_ref") or "—"), ("Special Order", m.get("so_ref") or "—"),
                  ("Applied on", _day(m["applied_on"]) if m.get("applied_on") else "—"), ("Notified on", _day(m["notified_on"]) if m.get("notified_on") else "—")],
         "lines": list(adv.get("lines") or []), "notes": list(adv.get("notes") or []),
@@ -470,7 +486,7 @@ def build_esdal_pdf(S):
         i = 0
         while i < len(pairs):
             group = pairs[i:i + cols]
-            cells = [(k, export._wrap(str(v if v is not None else "") or "____________________", R, 8.2, colw - 92)) for k, v in group]
+            cells = [(k, export._wrap(str(v if v is not None else "") or "____________________", R, 8.2, colw - 104)) for k, v in group]
             h = max(len(v) for _, v in cells) * 10.4 + 4
             P.need(h)
             x = m
@@ -481,7 +497,7 @@ def build_esdal_pdf(S):
                 c.setFillColorRGB(*export.NAVY_RGB)
                 c.setFont(R, 8.2)
                 for j, ln in enumerate(lines):
-                    c.drawString(x + 88, P.y - 9 - j * 10.4, ln)
+                    c.drawString(x + 100, P.y - 9 - j * 10.4, ln)
                 x += colw
             P.y -= h
             i += cols
