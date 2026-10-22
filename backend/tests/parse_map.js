@@ -5185,8 +5185,79 @@ function qrRead(mod) {
      /#demo-notice::before\{content:"DEMO";content:"DEMO" \/ "";display:inline-block;[^}]*background:#B91C1C;color:#FFFFFF;/.test(html)
      && /dn\.textContent = TENANT\.demo_notice;/.test(code));
   ok("D45: from 1024 px up the strip keeps 26 px with a 3 px red rule inside it (border-box, so nothing under it moves)",
-     /body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:4px 10px 3px; height:26px; \}/.test(html)
+     // NARROWED 22 Oct 2026 (UI fix 6, card 7): the same rule, with 3 / 2 px vertical padding (was 4 / 3) and 84 px each
+     // side (was 10) for the one-line 14 px words; still 26 px, the 3 px rule, border-box
+     /body\.has-demo-notice #demo-notice\{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:3px 84px 2px; font-size:14px; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; height:26px; \}/.test(html)
      && /\*\{ box-sizing:border-box; \}/.test(html) && !/#demo-notice\{[^}]*border-width:0 0 1px/.test(html));
+}
+
+// ---- 22 Oct 2026 (UI fix 6, cards 7, 8, 9; finding #12): the map's demo strip, its Guide and the road-closures group ----
+// The approved mockup notes\ui-fix-layout-mockup-1022 (cards 7-9). The desk strip took the base rule's 10.5 px (it set
+// no size); now 14 px on one line in the same 26 px band, like the app's bar. The Guide is 14 px in the app bar's 21 px
+// box. The road-closures source name was #8a9099 at ~10.8 px (3.22:1); now 13 px in --muted like the fold's captions.
+{
+  const desk = (html.match(/@media \(min-width:1024px\)\{\s*body\.has-demo-notice #demo-notice\{[\s\S]*?\n        \}/) || [""])[0];
+  const deskRule = (desk.match(/body\.has-demo-notice #demo-notice\{([^}]*)\}/) || ["", ""])[1];
+  const px = (rule, prop) => { const mm = rule.match(new RegExp("(?:^|[;\\s])" + prop + ":\\s*([0-9.]+)px")); return mm ? Number(mm[1]) : NaN; };
+  ok("⭐ UI fix 6, card 7: from 1024 px up the strip is 14 px, line-height 1, ONE line ending in an ellipsis, still 26 px tall",
+     desk.length > 0 && /font-size:14px; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; height:26px;/.test(deskRule), deskRule);
+  ok("card 7: no 10.5 px left on the desk strip (its own rule sets 14 px, overriding the base rule's 10.5 px font)",
+     px(deskRule, "font-size") === 14 && !/10\.5px/.test(deskRule)
+     // the base 10.5 px reaches no visible strip: the strip and body.has-demo-notice share ONE condition
+     && /document\.body\.classList\.toggle\('has-demo-notice', !!TENANT\.demo_notice && !barOn\);[^\n]*\n\s+if \(TENANT\.demo_notice && !barOn\) \{/.test(html));
+  ok("card 7: the strip's box adds up — 3 px + an 18 px line + 2 px + the 3 px rule = the 26 px every offset below assumes",
+     /padding:3px 84px 2px;/.test(deskRule) && /border-width:0 0 3px;/.test(deskRule) && 3 + 18 + 2 + 3 === px(deskRule, "height")
+     && /body\.has-demo-notice #kpi-hud\{ top:26px; \}/.test(desk) && /body\.has-demo-notice \.sidebar\{ top:26px; \}/.test(desk)
+     && /body\.has-demo-notice #month-text\{ top:26px; \}/.test(html));
+  ok("card 7: the DEMO tag sits on an 18 px line at a desk (the app bar's tag), set in the desk block, not on the base tag rule",
+     desk.includes("body.has-demo-notice #demo-notice::before{ line-height:18px; }")
+     && !/\n\s*#demo-notice::before\{content[^}]*line-height/.test(html));
+  ok("card 7: 84 px on the right is room for the Guide (right 10 px + its 10 px padding each side + 'Guide' at 14 px), so a long notice ends before it",
+     /padding:3px 84px 2px;/.test(deskRule) && /body\.has-demo-notice #guide-btn\{ left:auto !important; right:10px;/.test(desk));
+  ok("card 7: the wall screen's notice is unchanged (22 px, wrapping, line-height 1.4 as the base font, the tag on its line)",
+     html.includes("body.wall-mode.has-demo-notice #demo-notice{ font-size:22px; height:auto; padding:8px 22px; }")
+     && desk.includes("body.wall-mode.has-demo-notice #demo-notice{ line-height:1.4; white-space:normal; overflow:visible; }")
+     && desk.includes("body.wall-mode.has-demo-notice #demo-notice::before{ line-height:inherit; }")
+     && /\n\s*#demo-notice\{[^}]*font:700 10\.5px\/1\.4 system-ui,sans-serif;/.test(html));
+  const phoneBlock = (html.match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}\n        @media \(min-width:701px\)/) || ["", ""])[1];
+  ok("card 7: the phone band is unchanged (14 px, line-height 1.35, wrapping)",
+     phoneBlock.includes("body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; white-space:normal; text-align:center; font-size:14px; line-height:1.35; letter-spacing:.03em; padding:5px 12px; }")
+     && !/#demo-notice\{[^}]*nowrap/.test(phoneBlock));
+  const guideDesk = (desk.match(/body\.has-demo-notice #guide-btn\{([^}]*)\}/) || ["", ""])[1];
+  const guideBase = (html.match(/\n\s*#guide-btn\{(position:absolute;[^}]*)\}/) || ["", ""])[1];
+  ok("⭐ UI fix 6, card 8: at a desk the Guide is 14 px in a 21 px box (line-height 21 px, 0 10 px padding), the app bar's Guide",
+     guideDesk === " left:auto !important; right:10px; top:2px; height:21px; padding:0 10px; font-size:14px; line-height:21px; ", guideDesk);
+  ok("card 8: the Guide stays inside the band: its top + height end at or above the red rule (26 px strip less its 3 px rule)",
+     px(guideDesk, "top") + px(guideDesk, "height") <= px(deskRule, "height") - 3, `${px(guideDesk, "top")} + ${px(guideDesk, "height")}`);
+  ok("card 8: the base Guide rule is 14 px in the same 21 px box, an inset ring instead of the border (colours unchanged)",
+     /border:0;/.test(guideBase) && /height:21px;padding:0 10px;font:600 14px\/21px system-ui,sans-serif;/.test(guideBase)
+     && /box-shadow:inset 0 0 0 1px var\(--line\),0 2px 8px rgba\(16,24,40,\.12\);/.test(guideBase)
+     && /background:#fff;color:#1F2024;/.test(guideBase), guideBase);
+  ok("card 8: no 11 / 11.5 px left on any Guide button rule",
+     !/#guide-btn\{[^}]*font-size:11px/.test(html) && !/#guide-btn\{[^}]*11\.5px/.test(html));
+  // 22 Oct 2026 (UI fix 6, card 8, review): the 21 px pill is under the 24 px floor on a phone, so a touch screen gets a 44 px
+  // tap area through an invisible ::after (the app bar's Guide does the same, decision 9); the base rule keeps position:absolute for it
+  ok("card 8: on a touch screen the Guide keeps a 44 px tap area — an invisible ::after inset 12 px top and bottom (21 + 24 = 45 px)",
+     /@media \(pointer:coarse\)\{ #guide-btn::after\{content:"";position:absolute;inset:-12px -8px;\} \}/.test(html)
+     && /position:absolute;/.test(guideBase));
+  // card 9: the road-closures group in More layers
+  const prov = (html.match(/<small id="restriction-provider"[^>]*>/) || [""])[0];
+  ok("⭐ UI fix 6, card 9: the road-closures source name is 13 px in --muted, as the fold's captions (was #8a9099 at the small's ~10.8 px)",
+     prov === '<small id="restriction-provider" style="font-weight:500;font-size:13px;text-transform:none;letter-spacing:0;color:var(--muted);">'
+     && /\.layers-box > summary small\{ margin-left:6px; font-size:13px; font-weight:500; color:var\(--muted\); \}/.test(html), prov);
+  ok("card 9: no #8a9099 on the provider", prov.length > 0 && !/8a9099/i.test(prov));
+  // the ratio, computed (WCAG 2.x): --muted on the panel's white
+  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const lum = (h) => { const n = parseInt(h.replace("#", ""), 16); return 0.2126 * lin(n >> 16 & 255) + 0.7152 * lin(n >> 8 & 255) + 0.0722 * lin(n & 255); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const muted = (html.match(/--muted:(#[0-9A-Fa-f]{6});/) || ["", "#000000"])[1];
+  ok("card 9: the name reads at 4.76:1 or better (--muted #64748B on the panel's white; was 3.22:1)",
+     muted.toUpperCase() === "#64748B" && /\.sidebar \{ position:absolute;[^}]*background:#fff;/.test(html)
+     && ratio(muted, "#FFFFFF") >= 4.5 && Math.round(ratio(muted, "#FFFFFF") * 100) / 100 === 4.76 && ratio("#8A9099", "#FFFFFF") < 4.5,
+     ratio(muted, "#FFFFFF").toFixed(2));
+  ok("card 9: the group's heading is 14 px like its sibling groups in the fold (community, collisions, council, limits)",
+     html.includes("#restrictions-group h3{ font-size:14px; }")
+     && ["community", "collision", "council", "limits"].every(g => html.includes("#" + g + "-group h3, #" + g + "-group .control-item{ font-size:14px; }")));
 }
 
 

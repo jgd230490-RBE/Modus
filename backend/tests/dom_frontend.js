@@ -2067,6 +2067,127 @@ async function routesDriversDom(){
   act(() => { root.unmount(); }); host.remove();
 }
 
+// ---- 22 Oct 2026 (UI fix 6, card 5; decision 6): the big screen's Today list in Rotate / One section, mounted -------------
+// The list shows only the rows that fit WHOLE (busiest first), every row closed whatever the desk opened, and under it
+// "+ N more lines today · X t"; nothing changes in "All sections" (card 4 is held) or at the desk. jsdom has no layout and
+// no ResizeObserver, so the list box's height and the rows' boxes are stubbed (a 30 px header, 40 px rows) and the observer
+// is fired by hand. The counting rule itself, todayFit, is tested on its own first. Not covered here: real row heights,
+// fonts and the TV widths (the browser and the UI audit), and the count line's own height taking space from the list
+// (the observer re-measures when the box shrinks; with a stubbed box that size never changes).
+async function todayFitDom(){
+  const tf = w.todayFit;
+  ok("UI FIX 6 card 5: todayFit is a global helper", typeof tf === "function");
+  ok("⭐ UI FIX 6 card 5: todayFit counts the rows that fit WHOLE, in order — 3 × 40 px in 120 → 3, in 119 → 2; half a pixel is forgiven (119.6 → 3)",
+     tf([40, 40, 40], 120) === 3 && tf([40, 40, 40], 119) === 2 && tf([40, 40, 40], 119.6) === 3 && tf([40, 40, 40], 1000) === 3);
+  ok("⭐ UI FIX 6 card 5: todayFit never skips a row to pull a shorter one up (busiest first stays busiest first), and a first row taller than the box gives 0",
+     tf([40, 80, 10], 100) === 1 && tf([130, 10], 100) === 0);
+  ok("UI FIX 6 card 5: todayFit with no rows, no list, or a row with no height stops there",
+     tf([], 100) === 0 && tf(null, 100) === 0 && tf(undefined, 100) === 0 && tf([40, NaN, 40], 500) === 1 && tf([40, 40], 0) === 0);
+
+  const TODAY = CLOCK.TODAY;
+  const TONNES = [2400, 1800, 1200, 700, 650, 120.6];       // already busiest first; the last three sum to 1 470.6
+  const lines = TONNES.map((t, i) => ({ route_id: "R" + (i + 1), discipline: "D" + i, section_id: "", unit: "t", material_type: "Small aggregate",
+    context: { origin_name: "Quarry " + (i + 1), dest_name: "Compound " + (i + 1), vehicle_short: "Tipper", baked: true },
+    week_derived: { tonnes: t * 5, trips: 10 },
+    days: [{ day_date: TODAY, planned_qty: t, status: "planned", actual_qty: null, derived: { tonnes: t, trips: 2, vehicles: 1, km_day: 40 } }] }));
+  const week = { today: TODAY, commit: { lines }, commit_week: { week_index: 3, from: "2026-10-12", to: "2026-10-18" }, account: null };
+  const OPEN = { "R1|D0|": 1 };                             // the busiest row, opened at the desk earlier in this tab
+  w.sessionStorage.setItem("modus_rows_today", JSON.stringify(OPEN));
+  w.fetch = () => new Promise(() => {});
+  // the stubs: the list box (.today-lines) is AVAIL px high, its rows sit under a 30 px header, 40 px each
+  let AVAIL = 0; const HEAD = 30, ROWH = 40, TOP = 100;
+  const hadOwn = Object.getOwnPropertyDescriptor(w.HTMLElement.prototype, "clientHeight");
+  const realRect = w.Element.prototype.getBoundingClientRect;
+  Object.defineProperty(w.HTMLElement.prototype, "clientHeight", { configurable: true,
+    get(){ return this.classList && this.classList.contains("today-lines") ? AVAIL : 0; } });
+  w.Element.prototype.getBoundingClientRect = function(){
+    if (this.classList && this.classList.contains("today-lines")) return { top: TOP, bottom: TOP + AVAIL, height: AVAIL, left: 0, right: 500, width: 500, x: 0, y: TOP };
+    if (this.classList && this.classList.contains("rd-row") && this.parentNode) {
+      const i = [...this.parentNode.children].filter(x => x.classList.contains("rd-row")).indexOf(this);
+      // 22 Oct 2026 (UI fix 6, card 5, review): a scrolled list box lifts its rows, as a browser does
+      const lb = this.closest && this.closest(".today-lines");
+      const top = TOP + HEAD + i * ROWH - ((lb && lb.scrollTop) || 0);
+      return { top, bottom: top + ROWH, height: ROWH, left: 0, right: 500, width: 500, x: 0, y: top };
+    }
+    return realRect.call(this);
+  };
+  const ROs = [];
+  w.ResizeObserver = function(cb){ this.cb = cb; this.els = []; this.observe = (el) => { this.els.push(el); if (!ROs.includes(this)) ROs.push(this); }; this.disconnect = () => { this.els = []; }; };
+  const fire = () => act(() => { ROs.forEach(o => { if (o.els.length) o.cb([]); }); });
+  const mount = (props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    act(() => { r.render(w.React.createElement(w.DashboardToday, { meta: metaMin, week, ...props })); });
+    return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+  const norm = (t) => String(t || "").replace(/\s+/g, " ").trim();
+  try {
+    // 1. Rotate: the section is hidden (0 px) when the card mounts — nothing is measured, every row drawn, no count line
+    const tv = mount({ wall: true, fill: true });
+    const list = () => tv.el.querySelector(".today-lines");
+    const rows = () => [...tv.el.querySelectorAll("tr.rd-row")];
+    const cut = () => rows().filter(r => r.classList.contains("today-cut")).map(r => r.getAttribute("data-rd"));
+    const more = () => tv.el.querySelector("[data-today-more]");
+    ok("UI FIX 6 card 5: on the big screen in Rotate / One section the list is marked to fit, its box observed (the box and its table)",
+       !!list() && list().getAttribute("data-today-fit") === "1" && ROs.some(o => o.els.includes(list()) && o.els.includes(list().querySelector("table"))));
+    ok("UI FIX 6 card 5: while its section is hidden (0 px high) nothing is measured — all six rows drawn, no count line",
+       rows().length === 6 && cut().length === 0 && !more());
+    // 2. the section is shown: a 155 px box = the header + three whole rows + 5 px
+    AVAIL = HEAD + 3 * ROWH + 5; fire();
+    ok("⭐ UI FIX 6 card 5: the section shown (155 px): three whole rows, busiest first; the other three are not drawn (today-cut), none cut in half",
+       cut().join() === "today-R4|D3|,today-R5|D4|,today-R6|D5|" && rows().slice(0, 3).every(r => !r.classList.contains("today-cut")), cut().join());
+    ok("⭐ UI FIX 6 card 5: under the list, inside the card, '+ 3 more lines today · 1 471 t' (the hidden rows' tonnes, rounded and grouped like the card's figures), 12 px, flex:none (.today-more)",
+       !!more() && norm(more().textContent) === "+ 3 more lines today · 1 471 t" && more().getAttribute("data-today-more") === "3"
+       && more().className === "text-xs today-more" && list().nextElementSibling === more() && !!more().closest(".card") && !list().contains(more()),
+       more() ? norm(more().textContent) : "no count line");
+    ok("UI FIX 6 card 5: the rows shown plus the count add up to the card's tonnes figure (5 400 + 1 470.6 = 6 870.6, printed 6 871)",
+       norm(tv.el.textContent).includes("6 871") && TONNES.slice(0, 3).reduce((a, b) => a + b, 0) + 1470.6 === TONNES.reduce((a, b) => a + b, 0));
+    ok("⭐ UI FIX 6 card 5: every row is drawn CLOSED on the big screen although the desk opened the busiest one in this tab — and the desk's choice is kept for the desk",
+       [...tv.el.querySelectorAll("tr.rd-details")].every(d => d.hidden) && tv.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
+       && w.sessionStorage.getItem("modus_rows_today") === JSON.stringify(OPEN));
+    ok("UI FIX 6 card 5 (the user: keep the progress bars): the two bars and their headings are still there, above the list",
+       tv.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(tv.el.textContent).includes("This week to date") && norm(tv.el.textContent).includes("Last week")
+       && (tv.el.querySelector(".h-2.rounded-full.bg-slate-100").compareDocumentPosition(list()) & 4) === 4);
+    // 2b. 22 Oct 2026 (UI fix 6, card 5, review): a scroll left over from "All sections" (40 px down) is reset before
+    // measuring, so the count is the unscrolled one (without the reset the rows sit 40 px higher and four would "fit")
+    { let st = 40; const lbx = list();
+      Object.defineProperty(lbx, "scrollTop", { configurable: true, get(){ return st; }, set(v){ st = v; } });
+      fire();
+      ok("⭐ UI FIX 6 card 5 (review): a list box left scrolled (40 px) by All sections is put back to the top before measuring — the same three whole rows and '+ 3 more lines today · 1 471 t'",
+         st === 0 && cut().join() === "today-R4|D3|,today-R5|D4|,today-R6|D5|" && !!more() && norm(more().textContent) === "+ 3 more lines today · 1 471 t",
+         `scrollTop ${st}; cut ${cut().join()}`);
+      delete lbx.scrollTop; }
+    // 3. a bigger screen: everything fits — no cut, no count line
+    AVAIL = 1000; fire();
+    ok("⭐ UI FIX 6 card 5: when every row fits there is no count line and no row is left off",
+       cut().length === 0 && !more() && rows().length === 6);
+    // 4. room for five: one more line, singular
+    AVAIL = HEAD + 5 * ROWH + 2; fire();
+    ok("UI FIX 6 card 5: room for five whole rows: '+ 1 more line today · 121 t' (one line, singular; 120.6 t rounded)",
+       cut().join() === "today-R6|D5|" && !!more() && norm(more().textContent) === "+ 1 more line today · 121 t", more() ? norm(more().textContent) : cut().join());
+    // 5. Rotate moves to another section (0 px): the last count is kept, not reset to 'everything hidden'
+    AVAIL = 0; fire();
+    ok("UI FIX 6 card 5: while another section is on the screen (0 px) the last count is kept",
+       cut().join() === "today-R6|D5|" && !!more() && norm(more().textContent) === "+ 1 more line today · 121 t");
+    tv.done();
+    // 6. All sections (card 4, held) and the desk: exactly as before
+    AVAIL = HEAD + 3 * ROWH + 5;
+    for (const [name, props, maxH] of [["All sections (wall, not fill)", { wall: true, fill: false }, "260px"], ["the working Dashboard", { wall: false, fill: false }, "190px"]]) {
+      const m = mount(props);
+      fire();
+      const lb = m.el.querySelector(".today-lines");
+      ok(`UI FIX 6 card 5: ${name} is unchanged — no fit marker, no row left off, no count line, its ${maxH} box, and the row opened at the desk is open`,
+         !!lb && !lb.hasAttribute("data-today-fit") && lb.style.maxHeight === maxH && m.el.querySelectorAll("tr.rd-row").length === 6
+         && !m.el.querySelector(".today-cut") && !m.el.querySelector("[data-today-more]")
+         && m.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "true"
+         && !m.el.querySelector('tr[data-rd-details="today-R1|D0|"]').hidden);
+      m.done();
+    }
+  } finally {
+    w.Element.prototype.getBoundingClientRect = realRect;
+    if (hadOwn) Object.defineProperty(w.HTMLElement.prototype, "clientHeight", hadOwn); else delete w.HTMLElement.prototype.clientHeight;
+    delete w.ResizeObserver;
+    w.sessionStorage.removeItem("modus_rows_today");
+  }
+}
+
 (async () => {
   try { await routesDriversDom(); ok("ROUTES DOM: the section ran to the end", true); }
   catch (e) { ok("ROUTES DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
@@ -2101,6 +2222,9 @@ async function routesDriversDom(){
   catch (e) { ok("PHONE: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await phoneDayFlagsDom(); ok("PHONE DAY FLAGS: the section ran to the end", true); }
   catch (e) { ok("PHONE DAY FLAGS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 22 Oct 2026 (UI fix 6, card 5): the big screen's Today list fitted to its box
+  try { await todayFitDom(); ok("TODAY FIT: the section ran to the end", true); }
+  catch (e) { ok("TODAY FIT: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

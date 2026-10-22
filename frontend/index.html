@@ -56,6 +56,13 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
        tint). The green, amber and red status colours stay for fills, dots, bars, borders and the map. In the dark look
        the status colours read well as text (8.47:1 and better on the surface), so the pairs are the same values there. */
     --ok-text:#047857; --warn-text:#B45309; --bad-text:#B91C1C;
+    /* 22 Oct 2026 (UI fix 6, card 6; decision 13): the haul-road colour as TEXT and as a button FILL. The map line keeps
+       ZONE_HAUL #C2790B (picked so a haul road never reads as closed), but as words or a fill it failed in every look:
+       white on it 3.48:1, the chips 2.82 to 3.06:1. The haul text colour is the same brown, darker, #9A5F08: white on it
+       5.23:1 and 5.23:1 on white. The chips sit on a SOLID haul soft #FBF0DF, 4.64:1 on any row (the see-through tint
+       fell to 4.24:1 on a selected row). The dark look: #F0A838 with dark text on the fills (8.03:1) and #3A2E1C behind
+       the chips (6.53:1). */
+    --haul-text:#9A5F08; --haul-soft:#FBF0DF;
     /* 10 Oct 2026 — THE DATA PALETTE (notes/colour-system-1010.md). Colour on a chart does
        one job: slot 1 is always the PLAN (11 Oct: the brand orange, orange-led), slot 2 always
        DELIVERED (blue), slot 4 the fair-price MODEL (violet), slots 3 and 5 further
@@ -87,6 +94,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
     --rail-bg:#1B1D21; --rail-on:#F3F4F6; --action:#FF8C14; --action-fg:#1F2024;
     --ok-btn:#34D399; --ok-btn-fg:#1F2024;
     --ok-text:#34D399; --warn-text:#FBBF24; --bad-text:#F87171;
+    --haul-text:#F0A838; --haul-soft:#3A2E1C;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     --navy-soft:rgba(255,140,20,.14);
     color-scheme:dark;
@@ -191,9 +199,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 17 Oct 2026 (UI audit, finding 1): a filled control is `text-white` beside an INLINE background var(--navy) or
      var(--blue) (no utility class; the selector above this one since 7 Oct matched nothing). In the dark look that
      fill is orange (white on it 2.33:1), so the text reads the control's own text colour, as .btn-pri does. The
-     Confirm week button has its own pair (--ok-btn); the haul / routing zone buttons keep their fixed colours
-     (finding 7, open). */
+     Confirm week button has its own pair (--ok-btn). REWRITTEN 22 Oct 2026 (UI fix 6, card 6; decision 13): the haul-road
+     buttons have their own rule below; the routing zone's red "Stop placing" keeps its fixed colour (white on #DC2626
+     4.83:1 in every look). */
   html[data-theme="dark"] .text-white[style*="var(--navy)"],html[data-theme="dark"] .text-white[style*="var(--blue)"]{color:var(--control-fg)}
+  /* 22 Oct 2026 (UI fix 6, card 6; decision 13): the four haul-road buttons (+ Haul road twice, Attach, Stop placing while a
+     haul road is drawn) are text-white on an INLINE var(--haul-text). In the dark look that fill is the light brown #F0A838
+     (white on it 2.03:1), so their text reads the control's own text colour: 8.03:1, 9.01:1 in the blue accents. */
+  html[data-theme="dark"] .text-white[style*="var(--haul-text)"]{color:var(--control-fg)}
   html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background-color:var(--surface-3);color:var(--ink);border-color:var(--grey)}
   html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::placeholder{color:#6B7280}
   html[data-theme="dark"] .mapboxgl-ctrl-group{background:var(--surface-3)} html[data-theme="dark"] .mapboxgl-ctrl-group button span{filter:invert(1)}
@@ -484,6 +497,13 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wall.dash-fill .today-grid{grid-template-rows:minmax(0,1fr);}
   .dash-wall.dash-fill .today-grid>.card{min-height:0;overflow:hidden;}
   .dash-wall.dash-fill .today-lines{max-height:none !important;overflow:hidden;}
+  /* 22 Oct 2026 (UI fix 6, card 5; decision 6): the big screen's Today list (Rotate and One section) shows only the rows
+     that fit WHOLE, busiest first (DashboardToday measures them with todayFit). A row past the cut keeps its place in the
+     layout, so it can still be measured when the screen changes, but is not drawn; the count line under the list is
+     flex:none, so the card's overflow cannot clip it. The working Dashboard and "All sections" do not carry data-today-fit. */
+  .today-lines[data-today-fit]{overflow:hidden;}
+  .today-lines[data-today-fit] tr.today-cut{visibility:hidden;}
+  .today-more{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-weight:600;color:var(--muted);}
   .dash-wall.dash-fill .today-figs{column-gap:clamp(16px,2vw,64px);row-gap:clamp(10px,2vh,40px);}
   .dash-wall.dash-fill .today-figs .fig-val{font-size:clamp(2rem,min(7vh,3vw),8.5rem);}
   .dash-wall.dash-fill .today-map{display:flex;flex-direction:column;}
@@ -684,6 +704,21 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .tbl .la-stick{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
   .tbl th.la-stick{background:var(--surface-2);z-index:3;}
   .tbl tbody tr:hover td.la-stick{background:var(--surface-2);}
+  /* 22 Oct 2026 (UI fix 6, card 1; decision 11): the Look-ahead Account table needs its 1,220 px; at 1366 px with the side
+     menu open its card gives it 1,100, so the Action column ("spread on this week") sat past the right edge. The column is
+     pinned to the card's right edge, with the app's hairline (as .la-stick) and a soft shadow, and the figures scroll
+     under it. A sticky cell does not carry its row's background, so it paints its own: the surface, or on a short row the
+     same 5 % rose laid over the surface (no white stripe down the table, in every look). The scroller keeps 176 px of
+     scroll padding on the right (the column is about 165 px wide), so a Tab into the Note box, which the pin covers at the
+     starting scroll, brings it out from under the pin. */
+  .la-acct-scroll{scroll-padding-right:176px;}
+  .la-pin{position:sticky;right:0;z-index:2;background:var(--surface);box-shadow:-1px 0 0 var(--line),-8px 0 10px -8px rgba(15,23,42,.28);}
+  .la-pin.la-pin-short{background:linear-gradient(rgba(191,46,85,.05),rgba(191,46,85,.05)),var(--surface);}
+  /* 22 Oct 2026 (UI fix 6, card 2; finding #11): the Account table's headings take the .tbl th look, 13 px in ordinary
+     capitals, muted on the second surface (4.56:1; Dark 6.48:1), one line each, about 40 px tall (they were 10 px
+     capitals, the smallest headings in the app). The pinned Action heading paints the same surface. */
+  .la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap;height:40px;vertical-align:middle;border-bottom:1px solid var(--line);}
+  .la-acct-head th.la-pin{background:var(--surface-2);z-index:3;}
   .la-cell{font:inherit;font-size:14px;font-weight:600;color:var(--ink);background:none;border:0;border-bottom:1px dashed transparent;padding:0;cursor:text;font-variant-numeric:tabular-nums;line-height:1.2;}
   .la-cell:hover{border-bottom-color:var(--muted);}
   .tbl tr.la-total td{font-weight:600;background:var(--surface-2);border-top:1px solid var(--grey);}
@@ -2631,6 +2666,19 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // today; Tark Tee off). Nothing is derived here: the days carry the server's tonnes,
 // trips and vehicles; the account carries its own totals. Cost stays off the map (the
 // map's hover shows quantity and trips only, as on the Look-ahead).
+// 22 Oct 2026 (UI fix 6, card 5; decision 6): how many of the big screen's Today rows fit WHOLE in the space left to the
+// list. `heights` are the rows' heights in their order (busiest first, as DashboardToday sorts them), `available` the
+// list box's height below its header. Rows are taken in order and never skipped (a shorter row further down is not
+// pulled up past one that does not fit); half a pixel is forgiven for sub-pixel rounding. Pure, so dom_frontend can
+// test it without a layout.
+function todayFit(heights, available){
+  let used = 0, n = 0;
+  for(const h of (heights || [])){
+    if(!(h >= 0) || used + h > available + 0.5) break;
+    used += h; n += 1;
+  }
+  return n;
+}
 function DashboardToday({ meta, week, err, wall, fill }){
   const [todayOpen, todayToggle] = useRowOpen("today");    // 13 Oct 2026 (W6): the rows' hover title moved into details
   const lines = (week && week.commit && week.commit.lines) || [];
@@ -2662,6 +2710,40 @@ function DashboardToday({ meta, week, err, wall, fill }){
     out.rows.sort((a, b) => (b.tonnes || 0) - (a.tonnes || 0));
     return out;
   }, [lines, today]);
+  // 22 Oct 2026 (UI fix 6, card 5; decision 6): on the big screen in Rotate and One section the list shows only the rows
+  // that fit WHOLE (busiest first), every row drawn closed whatever was opened at the desk (the desk's open rows stay in
+  // sessionStorage for the desk), and a line under it says how many more there are and their tonnes. `tvList` is the one
+  // switch: "All sections" (card 4, held for the user's answer) would be `const tvList = wall;` and nothing else.
+  const tvList = fill;
+  const listBox = useRef(null);
+  const [fitN, setFitN] = useState(null);          // the rows that fit; null = not measured yet (every row drawn)
+  useEffect(() => {
+    if(!tvList){ setFitN(null); return; }
+    const box = listBox.current;
+    if(!box) return;
+    const measure = () => {
+      if(!(box.clientHeight > 0)) return;          // hidden (another section is on the screen): keep the last count
+      // 22 Oct 2026 (UI fix 6, card 5, review): a scroll left over from "All sections" (same card, its box scrolls there)
+      // would lift the rows above the box and count more as fitting than are seen; the fitted box cannot scroll, so reset it.
+      if(box.scrollTop) box.scrollTop = 0;
+      const rs = [...box.querySelectorAll("tbody > tr.rd-row")].map(tr => tr.getBoundingClientRect());
+      if(!rs.length){ setFitN(null); return; }
+      const top = box.getBoundingClientRect().top;
+      // each row's height to the next row's top (a closed row's details row takes no space), the last one its own
+      const hs = rs.map((r, i) => (i + 1 < rs.length ? rs[i + 1].top : r.bottom) - r.top);
+      setFitN(todayFit(hs, box.clientHeight - (rs[0].top - top)));
+    };
+    measure();
+    if(typeof ResizeObserver === "undefined") return;   // old browsers and the jsdom harness (it stubs one)
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);                                   // the space left to the list (the count line takes some of it)
+    const tb = box.querySelector("table");
+    if(tb) ro.observe(tb);                             // the rows' own heights (a late web font, a refreshed day)
+    return () => ro.disconnect();
+  }, [tvList, T.rows]);
+  const nShown = tvList && fitN != null ? Math.min(fitN, T.rows.length) : T.rows.length;
+  const nMore = T.rows.length - nShown;
+  const moreT = T.rows.slice(nShown).reduce((s, r) => s + (r.tonnes || 0), 0);
   const cw = (week && week.commit_week) || {};
   const dayName = (iso) => { const d = new Date(iso + "T00:00:00"); return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.getDay()]; };
   // 13 Oct 2026 (W3): an info box, not a hover tooltip (see Fig)
@@ -2714,16 +2796,16 @@ function DashboardToday({ meta, week, err, wall, fill }){
           </div>
           {/* 14 Oct 2026: on a filled big screen the list takes the rest of the card (busiest first; what does not fit
               is left off, never scrolled on a TV) */}
-          <div className="mt-3 flex-1 overflow-auto rd-scroll today-lines" style={{ maxHeight: wall ? 260 : 190 }}>
+          <div ref={listBox} className="mt-3 flex-1 overflow-auto rd-scroll today-lines" data-today-fit={tvList ? "1" : undefined} style={{ maxHeight: wall ? 260 : 190 }}>
             {T.rows.length === 0 ? <div className="text-xs text-slate-400 py-2">{lines.length ? "No deliveries planned for today." : "No confirmed lines in this week's Look-ahead."}</div> : (
             <table className="w-full text-xs rd-table rd-mini" data-rd-table="today">
               <thead className="text-slate-400"><tr><th className="text-left font-semibold py-1">Line</th><th className="text-right font-semibold py-1">t</th><th className="text-right font-semibold py-1">trips</th><th className="text-right font-semibold py-1">veh</th><th className="text-left font-semibold py-1 pl-2">Status</th></tr></thead>
               <tbody>
-                {T.rows.map(r => {
+                {T.rows.map((r, i) => {
                   const st = todayStatus(r.status, r.actual);
                   return (
-                  <RowDetails key={r.key} rowKey={"today-" + r.key} isOpen={todayOpen(r.key)} onToggle={() => todayToggle(r.key)} colSpan={5}
-                    label={`Details for ${r.route_id}`} rowProps={{ className: "border-t border-slate-100" }} firstClass="py-1 pr-2"
+                  <RowDetails key={r.key} rowKey={"today-" + r.key} isOpen={!tvList && todayOpen(r.key)} onToggle={() => todayToggle(r.key)} colSpan={5}
+                    label={`Details for ${r.route_id}`} rowProps={{ className: "border-t border-slate-100" + (i >= nShown ? " today-cut" : "") }} firstClass="py-1 pr-2"
                     summary={<>{r.origin || "—"} → {r.dest || "—"}</>}
                     chips={[r.material, r.discipline || null]}
                     cells={<>
@@ -2747,6 +2829,9 @@ function DashboardToday({ meta, week, err, wall, fill }){
               </tbody>
             </table>)}
           </div>
+          {/* 22 Oct 2026 (UI fix 6, card 5): what the big screen leaves off, in a line of its own under the list (flex:none,
+              inside the card); the rows shown plus this add up to the tonnes figure above */}
+          {tvList && nMore > 0 && <div className="text-xs today-more" data-today-more={nMore}>+ {nMore} more line{nMore === 1 ? "" : "s"} today · {bigNum(moreT)} t</div>}
         </>}
       </div>
       <div className="card p-0 overflow-hidden lg:col-span-3 today-map">
@@ -7941,9 +8026,12 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             <EmptyState title="No approved line in last week." body="The Account view types what actually moved against last week's plan. There is nothing to account for yet." />
           ) : (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <div className="overflow-auto">
+              {/* 22 Oct 2026 (UI fix 6, cards 1 and 2): the table keeps its 1,220 px; the Action column is pinned right (.la-pin),
+                  the scroller pads its right edge so Tab brings the Note box out from under the pin (.la-acct-scroll), and the
+                  headings take the .tbl th look (.la-acct-head). */}
+              <div className="overflow-auto la-acct-scroll">
                 <table className="text-sm w-full" style={{ minWidth: 1220 }}>
-                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">
+                  <thead className="la-acct-head">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold">Line</th>
                       <th className="px-2 py-2 text-right font-semibold">Planned</th>
@@ -7954,7 +8042,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       <th className="px-2 py-2 text-right font-semibold">Actual {CUR()}<InfoTip id="la.cost_actual" /></th>
                       <th className="px-2 py-2 text-right font-semibold">{CUR()} var</th>
                       <th className="px-2 py-2 text-left font-semibold">Note</th>
-                      <th className="px-2 py-2 text-right font-semibold">Action<InfoTip id="la.spread" /></th>
+                      <th className="px-2 py-2 text-right font-semibold la-pin">Action<InfoTip id="la.spread" /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -8011,15 +8099,15 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               onChange={e => setDraft(d => ({ ...d, [k + "|n"]: e.target.value }))}
                               onBlur={() => saveActual(r)} />
                           </td>
-                          <td className="px-2 py-2 text-right whitespace-nowrap">
+                          <td className={"px-2 py-2 text-right whitespace-nowrap la-pin" + (short ? " la-pin-short" : "")}>
                             {r.action === "held" && <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>}
                             {r.action === "waiting" && <span className="text-[11px] text-slate-400">waiting</span>}
                             {r.action === "applied" && <span className="text-[11px] font-semibold px-2 py-1 rounded-full text-slate-600 bg-slate-100" title={`${grp(r.carried, 1)} carried into this week`}>applied · {grp(r.carried, 1)}</span>}
                             {r.action === "spread" && (
+                              // 22 Oct 2026 (UI fix 6, card 2; finding #11): the app's standard small button (13 px on the accent), was an 11 px one-off on --navy
                               <button onClick={() => doSpread(r)} disabled={!!busy}
-                                className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white disabled:opacity-40"
-                                title={`Carry +${grp(r.remaining_short, 1)} into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.`}
-                                style={{ background: "var(--navy)" }}>spread on this week</button>
+                                className="btn-pri btn-sm disabled:opacity-40"
+                                title={`Carry +${grp(r.remaining_short, 1)} into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.`}>spread on this week</button>
                             )}
                           </td>
                         </tr>
@@ -8113,17 +8201,21 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                     <thead className="bg-slate-50 text-slate-500 text-xs">
                       <tr>
                         <th className="px-3 py-2 text-left font-semibold border-r border-slate-200 sticky left-0 bg-slate-50 z-10" style={{ minWidth: 240 }}>
-                          Line<InfoTip id="la.horizon" /><div className="text-[10px] font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)} · {monthLabelAbs(horizon.to_month, months.start_year)}</div>
+                          {/* 22 Oct 2026 (UI fix 6, card 3; finding #11): the month line, the role words and the outcomes are 12 px (were 9 and 10 px) */}
+                          Line<InfoTip id="la.horizon" /><div className="text-xs font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)} · {monthLabelAbs(horizon.to_month, months.start_year)}</div>
                         </th>
                         {cols.map(({ m, w }) => {
                           const role = roleOf(m, w);
                           return (
                             <th key={`${m}|${w}`} className="px-2 py-1.5 text-left border-r border-slate-100"
                               style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>
-                              <div className={"font-semibold " + (role === "commit" ? "" : "text-slate-600")} style={role === "commit" ? { color: "var(--navy)" } : {}}>
+                              {/* 22 Oct 2026 (UI fix 6, card 3; finding #37, the user's yes): on the commit week's shade the heading is the
+                                  accent's darker shade (text-blue-700, remapped per accent and look: 5.66:1 or better in all 12), was
+                                  var(--navy) at 4.44:1; and the role word is slate-600 there (6.40:1 or better; --muted would be 4.08:1) */}
+                              <div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>
                                 W{w} · {weekSpanLbl(horizon, m, w)}
                               </div>
-                              <div className="text-[9px] uppercase tracking-wide text-slate-400">{roleLbl[role] || " "}</div>
+                              <div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || " "}</div>
                             </th>
                           );
                         })}
@@ -8136,7 +8228,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{line.route_id}</div>
                             <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1"><IptPill ipt={line.ipt} /><WsPill ws={line.section_id} /><span>{line.material_type || "—"} · {vehShort(line.vehicle_type) || "—"}</span></div>
                             {line.reopened.length > 0 && (
-                              <div className="text-[10px] mt-0.5" style={{ color: "var(--red)" }}
+                              <div className="text-xs mt-0.5" style={{ color: "var(--red)" }}
                                 title="These weeks were created while the month was approved. Reopening it does not delete them.">
                                 month is now {(line.weeks[Object.keys(line.weeks).find(k => +k.split("|")[0] === line.reopened[0])] || {}).parent_status || "reopened"} ({line.reopened.map(m => monthLabelAbs(m, months.start_year)).join(", ")})
                               </div>
@@ -8155,7 +8247,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             return (
                               <td key={`${m}|${w}`} className="px-2 py-2 border-r border-slate-100 whitespace-nowrap" style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>
                                 <div className="font-semibold tabular-nums text-slate-800">{grp(r.planned_qty, 1)} {unitLbl(line.unit)}</div>
-                                <div className="text-[10px] tabular-nums">{status}{r.parent_changed && <span style={{ color: "var(--red)" }}> · month changed</span>}</div>
+                                <div className="text-xs tabular-nums">{status}{r.parent_changed && <span style={{ color: "var(--red)" }}> · month changed</span>}</div>
                               </td>
                             );
                           })}
@@ -9376,6 +9468,9 @@ const ZONE_ADVISORY = "#64748B";
 // Phase 4. A haul road is the one kind that is NOT an obstacle: every other kind with
 // "affects routing" on goes to HERE as an area to avoid, and a haul road is a road to
 // route through. It gets its own colour because red would read as "closed".
+// 22 Oct 2026 (UI fix 6, card 6; decision 13): ZONE_HAUL is the MAP PAINT only (the haul-road line on the Zones map). As
+// words and as a button fill it failed (white on it 3.48:1), so every heading, label, mark, chip and button reads
+// var(--haul-text), the same brown darker (#9A5F08; #F0A838 in the dark look), and a chip sits on var(--haul-soft).
 const ZONE_HAUL = "#C2790B";
 const HAUL_KIND = "haul_road";
 const ZONE_KINDS = [
@@ -9613,7 +9708,8 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-2.5 mb-3">
       <div className="flex items-center justify-between gap-2 mb-1.5">
-        <span className="text-[11px] uppercase tracking-wide" style={{ color: ZONE_HAUL }}>
+        {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road words read var(--haul-text), the map line keeps ZONE_HAUL */}
+        <span className="text-[11px] uppercase tracking-wide" style={{ color: "var(--haul-text)" }}>
           Temporary haul roads on this route
         </span>
         {plan && plan.here_calls_per_bake != null && !!attached.length && (
@@ -9702,9 +9798,10 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
             </option>
           ))}
         </select>
+        {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road fill reads var(--haul-text) (white on it 5.23:1; dark text in the dark look) */}
         <button onClick={attach} disabled={busy || !pick}
           className="text-[11px] font-semibold px-2 py-1 rounded-md text-white disabled:opacity-40"
-          style={{ background: ZONE_HAUL }}>Attach</button>
+          style={{ background: "var(--haul-text)" }}>Attach</button>
       </div>
 
       {!!attached.length && (
@@ -10061,11 +10158,12 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                       {(r.turnaround_parts && (r.turnaround_parts.safety_minutes
                         || r.turnaround_parts.internal_travel_minutes)) ? "‡" : ""}
                     </td>
+                    {/* 22 Oct 2026 (UI fix 6, card 6): the dagger reads var(--haul-text) */}
                     <td className={cell}
                       title={r.haul_speed_applied
                         ? `Includes an assigned haul speed over ${fmtDist(r.haul_km, 1)} ${DU()} (${(r.haul_zones || []).join(", ")}). On HERE's own timing this cycle would be ${r.cycle_hr_here} h.`
                         : undefined}>
-                      {r.cycle_hr} h{r.haul_speed_applied ? <span style={{ color: ZONE_HAUL }}>†</span> : null}
+                      {r.cycle_hr} h{r.haul_speed_applied ? <span style={{ color: "var(--haul-text)" }}>†</span> : null}
                     </td>
                     <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{r.trips_per_day || <span className="text-slate-500">0</span>}{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}</td>
                     <td className={cell}>{r.tonnes_per_day}</td>
@@ -10099,7 +10197,8 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
               {data.rows.some(r => r.return_estimated) && " * return leg not routed — assumed to mirror the outbound."}
             </p>
             {data.rows.some(r => r.haul_speed_applied) && (
-              <p className="text-[11px] mt-1" style={{ color: ZONE_HAUL }}>
+              // 22 Oct 2026 (UI fix 6, card 6): the note reads var(--haul-text) (5.05:1 on the expanded row)
+              <p className="text-[11px] mt-1" style={{ color: "var(--haul-text)" }}>
                 † part of this cycle runs on a temporary haul road at an <strong>assigned</strong> speed,
                 not a speed HERE measured. HERE will not accept a custom speed, so the haul stretch is
                 timed at <em>drawn length ÷ assigned speed</em> and substituted in. Hover the cycle for
@@ -12182,9 +12281,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <span className="flex items-center gap-2">
                   <button onClick={startNewZone} disabled={zoneBusy}
                     className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>+ Draw zone</button>
+                  {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road fill reads var(--haul-text) */}
                   <button onClick={startNewHaul} disabled={zoneBusy}
                     title="A temporary haul road: an open line with an assigned speed, attached to routes on the Routes tab"
-                    className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: ZONE_HAUL }}>+ Haul road</button>
+                    className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--haul-text)" }}>+ Haul road</button>
                 </span>
               )}
             </div>
@@ -12203,7 +12303,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   that matters — the panel shows the box each zone actually sends.
                 </p>
                 <p className="text-[11px] text-slate-600 border border-slate-200 rounded p-2">
-                  <strong style={{ color: ZONE_HAUL }}>Temporary haul roads</strong> are the one kind that
+                  {/* 22 Oct 2026 (UI fix 6, card 6): the words read var(--haul-text) */}
+                  <strong style={{ color: "var(--haul-text)" }}>Temporary haul roads</strong> are the one kind that
                   works the other way round: drawn as an open <em>line</em> with a speed, and routes are sent
                   <em> through</em> them rather than around. A haul road is never put in HERE&rsquo;s avoid
                   list — that would steer the router away from the road it is meant to use. It does nothing
@@ -12241,7 +12342,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 {isHaul(zoneForm) && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5 space-y-2.5">
-                    <div className="text-[11px] uppercase tracking-wide" style={{ color: ZONE_HAUL }}>Haul road</div>
+                    {/* 22 Oct 2026 (UI fix 6, card 6): the label reads var(--haul-text) (5.13:1 on the amber wash) */}
+                    <div className="text-[11px] uppercase tracking-wide" style={{ color: "var(--haul-text)" }}>Haul road</div>
                     <label className="block">
                       <span className="block text-sm font-medium text-slate-700 mb-1">Assigned speed (km/h)</span>
                       <input type="number" min="1" step="1" value={zoneForm.speed_kph}
@@ -12314,9 +12416,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {isHaul(zoneForm) ? `Line · ${drawPts.length} point(s)` : `Shape · ${drawPts.length} corner(s)`}
                     </span>
                     <span className="flex items-center gap-2">
+                      {/* 22 Oct 2026 (UI fix 6, card 6): "Stop placing" on a haul road reads var(--haul-text); a routing zone keeps ZONE_ROUTING */}
                       <button onClick={() => setZoneDraw(d => !d)}
                         className={"text-xs font-semibold px-2 py-0.5 rounded-md " + (zoneDraw ? "text-white" : "border border-slate-200 text-slate-600")}
-                        style={zoneDraw ? { background: isHaul(zoneForm) ? ZONE_HAUL : ZONE_ROUTING } : undefined}>
+                        style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>
                         {zoneDraw ? "Stop placing"
                                   : (drawPts.length ? (isHaul(zoneForm) ? "Add points" : "Add corners")
                                                     : (isHaul(zoneForm) ? "Place points" : "Place corners"))}
@@ -12684,9 +12787,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         </span>
                       )}
                       {!!(r.haul_roads || []).length && (
+                        // 22 Oct 2026 (UI fix 6, card 6): the chip sits on a SOLID var(--haul-soft) (4.64:1 on any row; the tint fell to 4.24:1 on a selected row)
                         <span title={`Routed through ${(r.haul_roads || []).length} temporary haul road(s): ${(r.haul_roads || []).join(", ")}. Expand the row to edit.`}
                           className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                          style={{ background: "rgba(194,121,11,.12)", color: ZONE_HAUL }}>
+                          style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}>
                           haul ×{(r.haul_roads || []).length}
                         </span>
                       )}
@@ -12739,8 +12843,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>
               + Draw zone
             </button>
+            {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road fill reads var(--haul-text) */}
             <button onClick={startNewHaul} disabled={zoneBusy}
-              className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: ZONE_HAUL }}>
+              className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--haul-text)" }}>
               + Haul road
             </button>
           </span>
@@ -12764,16 +12869,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2 font-medium">{z.name}</td>
                     <td className="px-3 py-2 text-slate-500">{(ZONE_KINDS.find(k => k[0] === z.kind) || [null, z.kind])[1]}</td>
                     <td className="px-3 py-2">
+                      {/* 22 Oct 2026 (UI fix 6, card 6): "Routed through" on a solid var(--haul-soft) in var(--haul-text); the user's extra: "Avoided" is
+                          #B91C1C on its pink (5.53:1, was #DC2626 at 4.13:1), a fixed pair in every look */}
                       {z.kind === HAUL_KIND
                         ? (z.affects_routing
                            ? <span className="text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
-                               style={{ background: "rgba(194,121,11,.12)", color: ZONE_HAUL }}
+                               style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}
                                title="Routes attached to this road are sent through it — it is never in HERE's avoid list">
                                Routed through{z.speed_kph ? ` @ ${z.speed_kph}` : ""}
                              </span>
                            : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600" title="Drawn but not open to traffic">Not open</span>)
                         : z.affects_routing
-                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: ZONE_ROUTING }}>Avoided</span>
+                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
                         : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
                     </td>
                     <td className="px-3 py-2 text-slate-500">{z.starts_on || "—"}</td>
@@ -12784,10 +12891,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         : <span className="text-slate-400">Out of window</span>}
                     </td>
                     <td className="px-3 py-2 text-xs">
+                      {/* 22 Oct 2026 (UI fix 6, card 6): "no routes" reads var(--haul-text) */}
                       {z.kind !== HAUL_KIND ? <span className="text-slate-500">—</span>
                         : haulUse[z.id]
                         ? <span className="text-slate-600">{haulUse[z.id]} route(s)</span>
-                        : <span style={{ color: ZONE_HAUL }}
+                        : <span style={{ color: "var(--haul-text)" }}
                             title="Drawn, but on no route — so it changes nothing. Attach it by expanding a route on the Routes tab.">
                             no routes
                           </span>}

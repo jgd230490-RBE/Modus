@@ -62,6 +62,7 @@
         .control-group[hidden] { display:none; }
         #community-group h3, #community-group .control-item{ font-size:14px; }
         #collision-group h3, #collision-group .control-item{ font-size:14px; }
+        #restrictions-group h3{ font-size:14px; }   /* 22 Oct 2026 (UI fix 6, card 9): the road-closures heading at 14 px like its sibling groups in More layers (was the shared 13 px) */
         .control-item { display:flex; align-items:center; justify-content:space-between; font-size:13.5px; padding:7px 2px; }
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
@@ -135,14 +136,23 @@
            On a demo tenant the notice is now a 26 px strip across the top at every width (the phone layout
            already did this), the bar, the panel and the map controls move down by 26 px, and the Guide
            button sits at the right end of the strip. */
+        /* 22 Oct 2026 (UI fix 6, card 7): the desk strip is 14 px on ONE line (it took the base rule's 10.5 px), line-height 1
+           as the app's bar, still 26 px tall (every offset below is 26 px); 3 + 18 + 2 px + the 3 px rule fill it, and 84 px each
+           side keep the words centred and end a long notice in an ellipsis before the Guide instead of running under it.
+           22 Oct 2026 (UI fix 6, card 8): the Guide is 14 px in the app bar's 21 px box (top 2 px: inside the band, above the rule). */
         @media (min-width:1024px){
-            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:4px 10px 3px; height:26px; }
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:3px 84px 2px; font-size:14px; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; height:26px; }
             body.has-demo-notice #kpi-hud{ top:26px; }
             body.has-demo-notice .sidebar{ top:26px; }
             body.has-demo-notice #menu-toggle{ top:40px; }
             body.has-demo-notice .mapboxgl-ctrl-top-right{ top:98px; }
             body.has-demo-notice #tl-warnings{ top:110px; }
-            body.has-demo-notice #guide-btn{ left:auto !important; right:10px; top:2px; padding:1px 10px; font-size:11px; }
+            body.has-demo-notice #guide-btn{ left:auto !important; right:10px; top:2px; height:21px; padding:0 10px; font-size:14px; line-height:21px; }
+            /* 22 Oct 2026 (UI fix 6, card 7): the DEMO tag on an 18 px line, the app bar's tag. The wall screen keeps its own
+               22 px notice exactly as before: wrapping, line-height 1.4, the tag on the notice's own line */
+            body.has-demo-notice #demo-notice::before{ line-height:18px; }
+            body.wall-mode.has-demo-notice #demo-notice{ line-height:1.4; white-space:normal; overflow:visible; }
+            body.wall-mode.has-demo-notice #demo-notice::before{ line-height:inherit; }
         }
         .kpi-title{ font-size:16px; font-weight:600; color:var(--navy-deep); line-height:1.2;
                     letter-spacing:-.01em; min-width:120px; white-space:nowrap; }
@@ -764,8 +774,12 @@
             #m-sheet[data-state="half"]{ height:calc(100% - var(--notice-h, 0px) - 24px); }
         }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
-            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
+            /* 22 Oct 2026 (UI fix 6, card 8): 14 px in a 21 px box like the app bar's Guide, an inset ring for the border (was 11.5 px, 4 px 12 px padding) */
+            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:0;border-radius:999px;height:21px;padding:0 10px;font:600 14px/21px system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line),0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
+            /* 22 Oct 2026 (UI fix 6, card 8, review): on a touch screen the 21 px Guide keeps a 44 px tap area through an
+               invisible ::after, like the app bar's Guide (decision 9); the visible pill is unchanged */
+            @media (pointer:coarse){ #guide-btn::after{content:"";position:absolute;inset:-12px -8px;} }
   /* 11 Oct 2026 — the guide, options 4 + 1 + 2 (the user): Google-style bubbles, slightly transparent; a light
      one-line strip that offers the tour; small pulsing dots on the features. Nothing pops up uninvited. */
   #guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:8px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
@@ -1010,7 +1024,8 @@
     </div>
 
     <div class="control-group" id="restrictions-group" hidden>
-        <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
+        <!-- 22 Oct 2026 (UI fix 6, card 9): the source's name at 13 px in the muted grey (4.76:1), as the fold's other captions (was #8a9099 at the small's ~10.8 px, 3.22:1) -->
+        <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;font-size:13px;text-transform:none;letter-spacing:0;color:var(--muted);"></small></h3>
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
         <div class="control-item" style="padding-left:2px;margin-top:-2px;">
             <span id="restriction-source" style="font-size:12px;color:var(--note);">Advisory — the router is not given this data.</span>
