@@ -414,6 +414,20 @@ counts row 0 in every column is folded into a sentence on the PDF (the XLSX keep
 health within 250 m and bus stops within 100 m (<code>PDF_NEARBY_M</code>), the XLSX every kind's nearest within 250 m. New counts row
 <code>vru_goods</code>: a vulnerable road user hurt in a collision with a goods vehicle over 3.5 t. Nothing divides a collision count by a
 lorry figure. The time of day is not shown: the stored rows keep the year and month only (R6).</p>
+<p><strong>The evidence sheet, v3 (22 Oct 2026).</strong> <code>read_vehicles</code> also records, per collision, in
+<code>detail_json</code> (one column, migrated on boot, NULL until the next fetch): the goods vehicles' weight classes
+(<code>vehicle_type</code> 21, 20, 98), articulated (<code>towing_and_articulation</code> 1), a goods vehicle and any vehicle
+turning or waiting to turn left (<code>vehicle_manoeuvre</code> 7 or 8, the <code>_historic</code> field for the years before
+2024), a goods vehicle on a journey for work (<code>journey_purpose_of_driver</code> 1), and <code>urban_or_rural_area</code>.
+<code>collision_meta</code> says <code>vehicle_details</code> once a fetch has read them; the counts rows that need them
+(<code>DETAIL_ROWS</code>) print only when every counted collision carries them. Cycle routes are the community layer's
+<code>cycle</code> lines: a route runs beside one within 20 m (sampled every 10 m) and one meets it within 8 m (one place per
+run, runs 60 m apart joined). The route's own left turns: the heading over the next 25 m turned 45&deg; or more anticlockwise
+from the last 25 m, one per 40 m at the sharpest, &ldquo;near a cycle route&rdquo; within 30 m. The headline compares the route
+and each stored alternative; the map draws the alternatives and the cycle routes, the inset tries three sizes and any clear
+spot so it never covers a route; goods-vehicle collisions are squares in <code>CE_LORRY</code>. The last page's ten questions
+(<code>ASSESSOR_QUESTIONS</code>) and the clause box (<code>CLOCS_MAP</code>) cite CLOCS Standard v5 clause numbers in neutral
+words. The footer carries the community layer's credit.</p>
 <p>The rows live per organisation (<code>collision_records</code>, <code>collision_meta</code>) and travel in its package.
 The words on every output: &ldquo;police-reported injury collisions&rdquo;, the period beside every count, and &ldquo;evidence for a
 route risk assessment, not the assessment&rdquo;. No score, rate, ranking or colour status.</p>
