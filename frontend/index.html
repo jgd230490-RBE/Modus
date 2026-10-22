@@ -3857,7 +3857,7 @@ function CommunityPanel({ access }){
           <p className="text-[13px] text-slate-500 mb-3">{st.kinds.map(k => `${k.label} ${grp(k.count, 0)}`).join(" · ")}</p>
           {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
           {canFetch
-            ? <button type="button" className="btn btn-secondary" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
+            ? <button type="button" className="btn-sec" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
             : <p className="text-[13px] text-slate-500">A planner or an admin fetches it.</p>}
           {msg ? <span className="text-[13px] text-slate-600 ml-3" role="status">{msg}</span> : null}
         </>
@@ -3904,7 +3904,7 @@ function CollisionPanel({ access }){
           {(st.notes || []).map((n, i) => <p key={i} className="text-[13px] text-slate-500 mb-2">{n}</p>)}
           {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
           {canFetch
-            ? <button type="button" className="btn btn-secondary" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
+            ? <button type="button" className="btn-sec" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
             : <p className="text-[13px] text-slate-500">A planner or an admin fetches it.</p>}
           {msg ? <span className="text-[13px] text-slate-600 ml-3" role="status">{msg}</span> : null}
         </>

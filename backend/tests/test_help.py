@@ -887,5 +887,38 @@ ok("⭐ 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 — planni
    and "STGO 2003 Schedule 1" in _tg2 and "osm_structures" in _tg2 and "vehicle[grossWeight / weightPerAxle / height / width / length / axleCount]" in _tg2
    and "/api/public/abnormal" in _tg2 and "Not modelled" in _tg2)
 
+# ⭐ 22 Oct 2026 (UI fix 8, claude/ui-fix-callouts; mockup notes\ui-fix-callouts-mockup-1022\ approved, Q1 yes): the callout
+# titles and the user guide's h3 headings were the light blue / red tokens on the boxes' pale backgrounds (note 3.32:1,
+# warn 4.41:1, h3 on white 3.67:1, ok 3.33:1 — under WCAG AA's 4.5:1 for 15–16 px text). Each now has its own text-grade
+# colour, worked out here against its box. The guides have no Dark look (always light), so there is no dark pair to check.
+def _lum(h):
+    h = h.lstrip("#"); c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+def _ratio(a, b):
+    a, b = _lum(a), _lum(b); return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+ok("UI fix 8: the contrast helper agrees with the audit's figures for the old colours (note 3.32, warn 4.41, h3 3.67)",
+   round(_ratio("#3B82F6", "#EEF4FB"), 2) == 3.32 and round(_ratio("#DC2626", "#FDF2F5"), 2) == 4.41 and round(_ratio("#3B82F6", "#FFFFFF"), 2) == 3.68)
+for _nm, _pg in (("user guide", src), ("technical guide", _tg2)):
+    _css = _pg[:_pg.index("</style>")]
+    for _kind in ("note", "warn", "ok", "tip"):
+        _bg = re.search(r"\.callout\.%s\{background:(#[0-9A-Fa-f]{6})" % _kind, _css)
+        _fg = re.search(r"\.callout\.%s \.ct\{color:([^}]+)\}" % _kind, _css)
+        if not (_bg and _fg):
+            continue
+        ok("🔴 UI fix 8 (%s): the %s box's title is a hex colour (not a light token) at 4.5:1 or more on its box" % (_nm, _kind),
+           _fg.group(1).startswith("#") and _ratio(_fg.group(1), _bg.group(1)) >= 4.5)
+    ok("⭐ UI fix 8 (%s): the note title #1D4ED8 (6.05:1) and the warn title #B91C1C (5.91:1); the borders keep the tokens" % _nm,
+       ".callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:#1D4ED8}" in _css
+       and ".callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:#B91C1C}" in _css)
+    ok("🔴 UI fix 8 (%s): no callout title or h3 is drawn in var(--blue) / var(--red) / var(--green) any more" % _nm,
+       not re.search(r"\.ct\{color:var\(--(blue|red|green)\)\}|h3\{color:var\(--blue\)", _css))
+    ok("⭐ UI fix 8 (%s, card 4): h3 headings #1D4ED8 on white, 6.70:1" % _nm,
+       "h3{color:#1D4ED8;font-size:16px;margin:22px 0 6px}" in _css and round(_ratio("#1D4ED8", "#FFFFFF"), 2) == 6.70)
+    ok("UI fix 8 (%s): the guide still has no Dark look, so the light pairs are the only pairs" % _nm,
+       "prefers-color-scheme" not in _pg and 'data-theme' not in _pg)
+ok("UI fix 8: the user guide's green box title (unused today) is #047857, 4.85:1 on its box",
+   ".callout.ok{background:#E6F4F1;border-color:var(--green)}.callout.ok .ct{color:#047857}" in src)
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

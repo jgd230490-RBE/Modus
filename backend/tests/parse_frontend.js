@@ -4002,6 +4002,21 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   }
 }
 
+// ---- 22 Oct 2026 (UI fix 8, claude/ui-fix-callouts; mockup notes\ui-fix-callouts-mockup-1022\ approved) ----------------
+// Config -> Map and bulletin: the two Fetch now / Fetch again buttons asked for "btn btn-secondary", classes the app never
+// defined, so they drew as plain text. They take the app's secondary button, btn-sec, like the rest of Config.
+{
+  const _panel = (name) => { const i = src.indexOf(`function ${name}(`); return i < 0 ? "" : src.slice(i, src.indexOf("\nfunction ", i + 10)); };
+  const _cp = _panel("CommunityPanel"), _hp = _panel("CollisionPanel");
+  ok("🔴 UI fix 8: no 'btn-secondary' (a class the app never defines) anywhere in the app", !/btn-secondary/.test(html));
+  ok("🔴 UI fix 8: the app defines no '.btn{' / '.btn-secondary' rule either (btn-sec is the secondary button)", !/\.btn\{|\.btn-secondary\b/.test(html) && /\.btn-sec\{display:inline-block;/.test(html));
+  for (const [nm, body] of [["CommunityPanel", _cp], ["CollisionPanel", _hp]]) {
+    ok(`⭐ UI fix 8: ${nm}'s Fetch now / Fetch again is a btn-sec button, disabled while a fetch runs`,
+       body.includes('<button type="button" className="btn-sec" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>'));
+    ok(`UI fix 8: ${nm} has no bare 'btn' class left`, body.length > 0 && !/className="btn[ "]/.test(body));
+  }
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
