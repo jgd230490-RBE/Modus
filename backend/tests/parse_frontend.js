@@ -1498,6 +1498,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
 }
 
 // ---- 22 Oct 2026: the abnormal loads on the other screens (phase 2) ------------------------
+ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and the time-ban table's remove are 24 px tall boxes — the audit's targets-24px and axe target-size failed on the 18 px link buttons (run 2026-10-22_162849, 8 new failures on the abnormal stops)",
+   html.includes(".al-tbl .link-btn, .al-set .link-btn{display:inline-block;min-height:24px;line-height:24px;padding:0 2px;}"));
+
 // The route and its potential pinch points in the page's row; the Look-ahead's block; the Dashboard's strip; the gate
 // markers. Everything printed is the server's; nothing is a lorry figure (D70).
 {
