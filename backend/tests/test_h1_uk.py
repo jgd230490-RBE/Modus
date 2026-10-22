@@ -332,7 +332,8 @@ ok("H2: the scheme is a road — tenant name, overlay note, discipline words; no
 ok("H2: every site has a gate at its own coordinates; the quarries and the town compound enter and leave by different gates",
    # NARROWED 14 Oct 2026 (civils materials): 17 gates — the batching plant's
    # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): 19 — the asphalt plant's and Welland Ready-Mix's; == one per site at least
-   len(_T["location_gates"]) == 19 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
+   # RE-PINNED 22 Oct 2026 (abnormal loads, phase 3, D75): 21 — the precast works' and the crane depot's
+   len(_T["location_gates"]) == 21 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
    and all(g["lat"] and g["lon"] for g in _T["location_gates"])
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L001") == ["access", "egress"]
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
@@ -350,20 +351,22 @@ ok("H2: two haul roads, spliced (HERE does not know them), attached to the route
    == sorted([(r, "Z001") for r in ("R004", "R005", "R006", "R014", "R031", "R033", "R035", "R039", "R043")]
              + [("R016", "Z002"), ("R018", "Z002")])
    and {r["id"] for r in _T["routes"] if r["dest_id"] == "L006"} == {l["route_id"] for l in _T["route_haul_roads"] if l["zone_id"] == "Z001"})
-ok("16 Oct 2026: and one access road per gate, all spliced haul roads, none attached to a route",
-   len(_access) == 19 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
+# NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): 21 gates, the precast works' and the crane depot's among them
+ok("16 Oct 2026: and one access road per gate (21 since 22 Oct), all spliced haul roads, none attached to a route",
+   len(_access) == 21 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
    and not ({l["zone_id"] for l in _T["route_haul_roads"]} & _access))
 # RE-PINNED 17 Oct 2026 (R2, §3a, §1.8): the three geofences re-dated to the four-year programme (Z003 keeps its box and
 # start date, ends with the junction build 17 Dec 2027; the Burrough limit runs the whole programme; the Melton works area
-# Mar 2026 – Sep 2027), then the seven ADVISORY zones created after the access roads (Z025–Z031): nothing new steers routing
+# Mar 2026 – Sep 2027), then the seven ADVISORY zones created after the access roads (Z025–Z031; Z027–Z033 since 22 Oct 2026,
+# the two abnormal-load sites' access roads before them): nothing new steers routing
 ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t village limit, an advisory works area — then seven advisory zones",
    [(z["id"], z["kind"], z["affects_routing"], z["starts_on"], z["ends_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
    == [("Z003", "closure", 1, "2026-10-05", "2027-12-17"), ("Z004", "weight_limit", 0, "2026-01-01", "2030-12-31"),
        ("Z005", "works", 0, "2026-03-01", "2027-09-30"),
-       ("Z025", "works", 0, "2026-05-01", "2028-05-31"), ("Z026", "works", 0, "2027-04-01", "2028-09-30"),
-       ("Z027", "closure", 0, "2027-04-01", "2027-04-30"), ("Z028", "closure", 0, "2028-03-01", "2028-06-30"),
-       ("Z029", "works", 0, "2029-06-01", "2029-10-31"), ("Z030", "closure", 0, "2027-12-01", "2027-12-31"),
-       ("Z031", "closure", 0, "2028-12-01", "2028-12-31")]
+       ("Z027", "works", 0, "2026-05-01", "2028-05-31"), ("Z028", "works", 0, "2027-04-01", "2028-09-30"),
+       ("Z029", "closure", 0, "2027-04-01", "2027-04-30"), ("Z030", "closure", 0, "2028-03-01", "2028-06-30"),
+       ("Z031", "works", 0, "2029-06-01", "2029-10-31"), ("Z032", "closure", 0, "2027-12-01", "2027-12-31"),
+       ("Z033", "closure", 0, "2028-12-01", "2028-12-31")]
    and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] != "haul_road")
    and "8 vehicles a day" in [z for z in _T["zones"] if z["id"] == "Z004"][0]["note"]
    and [z for z in _T["zones"] if z["id"] == "Z003"][0]["name"] == "A47 at the new Tilton junction: HGV diversion while the junction is built")
@@ -1111,12 +1114,12 @@ def _text_uses(tok):
         if not any(c in win for c in _FILLCTX):
             out.append(_fe_wo[max(0, m.start() - 60):m.end() + 20].replace("\n", " "))
     return out
-ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the markup — the 9 uses left are the progress bar's fill, a card's border (×3), the status dots (×3), the carbon-tone dot and the row-status icon",
-   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 9 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the markup — the 10 uses left are the progress bar's fill, a card's border (×4: the abnormal loads' note card since 22 Oct), the status dots (×3), the carbon-tone dot and the row-status icon",
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 10 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 ok("...nor var(--gold): the 7 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot and the flag chip's triangle; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
    not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
-ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash)",
+ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
    and 'const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";' in fe
@@ -1127,8 +1130,9 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    and '.sim-warn{color:var(--warn-text);}' in fe and ".sim-warn{color:var(--gold)" not in fe
    and 'style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span>' in fe
    and 'style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>' in fe
-   # NARROWED 22 Oct 2026 (finding #40): bad-text 6 -> 8, the Horizon commit column's short and month-changed words
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 8 and _fe_wo.count("var(--warn-text)") == 2
+   # NARROWED 22 Oct 2026 (finding #40): bad-text 6 -> 8, the Horizon commit column's short and month-changed words;
+   # and (abnormal loads, the same day) bad-text 8 -> 11, warn-text 2 -> 6: the .al-bad / .al-warn chips, the route-error line, the limits over, .al-notes, the route and candidate notes
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 11 and _fe_wo.count("var(--warn-text)") == 6
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)

@@ -760,8 +760,12 @@ ok("the reason is on the raw rows the submitter's view reads",
 # every material category must name at least one vehicle, or the restricted dropdown
 # would leave a submitter unable to pick anything at all
 _cats = conversions.load_factors()["material_categories"]
-_bad = [k for k, v in _cats.items() if not k.startswith("_") and not (v.get("vehicles") or [])]
-ok("every material category lists usable vehicles", not _bad, str(_bad))
+# NARROWED 22 Oct 2026 (abnormal loads, B2's bare category): "Abnormal loads" lists no haulage vehicle on purpose (an
+# abnormal load has its own); the Submit form falls back to every vehicle for a category that names none
+# (frontend suggestedVehicles), so nobody is left unable to pick
+_bad = [k for k, v in _cats.items() if not k.startswith("_") and k != "Abnormal loads" and not (v.get("vehicles") or [])]
+ok("every material category lists usable vehicles (Abnormal loads, counted in movements, lists none on purpose)",
+   not _bad and _cats["Abnormal loads"].get("vehicles") == [], str(_bad))
 _vnames = set(conversions.vehicle_names(conversions.load_factors()))
 _unknown = {v for k, c in _cats.items() if not k.startswith("_")
             for v in (c.get("vehicles") or []) if v not in _vnames}

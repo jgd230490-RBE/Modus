@@ -11,6 +11,7 @@ in use. SQL is written with '?' placeholders and translated to '%s' for Postgres
 """
 import contextvars
 import os
+import re
 import sqlite3
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
@@ -74,6 +75,9 @@ TENANTED_TABLES = {
     # 16 Oct 2026 (CLOCS v5 C1, collisions.py): the police-reported injury collisions (DfT STATS19) along ITS
     # routes, and the one row saying which years and when. One tenant's data, carried in its package.
     "collision_records", "collision_meta",
+    # 22 Oct 2026 (S16 / B5, abnormal loads): each abnormal load a tenant plans — its typed dimensions and weights, its
+    # window, its status and references, and (from phase 2) its own routed line. One tenant's data, carried in its package.
+    "abnormal_loads",
     # 22 Oct 2026 (evidence v3, traffic.py): DfT's traffic counts (AADF) at the count points along ITS routes, for the
     # evidence sheet's "expected for roads like these". One tenant's data, carried in its package.
     "traffic_counts",
@@ -520,6 +524,22 @@ def init_network_db():
         # 16 Oct 2026: the collision history (CLOCS v5 C1). Born with tenant_id in the key.
         _create_tenanted(cur, "collision_records")
         _create_tenanted(cur, "collision_meta")
+        # 22 Oct 2026: the abnormal loads (S16 / B5). Born with tenant_id in the key. A column the DDL gained after a
+        # database first made the table (phase 2's actions_json / roads_json on a copy booted at phase 1) is ADDed here,
+        # plain ADD COLUMN on both backends — the table's columns are all nullable TEXT / REAL / BOOLEAN with defaults.
+        _create_tenanted(cur, "abnormal_loads")
+        conn.commit()
+        try:
+            have = set(_columns_of(cur, "abnormal_loads"))
+            for col in _ddl_columns(_TENANT_DDL["abnormal_loads"]):
+                if col in have:
+                    continue
+                typ = _ddl_column_type(_TENANT_DDL["abnormal_loads"], col)
+                cur.execute(f"ALTER TABLE abnormal_loads ADD COLUMN {col} {typ}")
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print("⚠️  abnormal_loads: a missing column could not be added:", e)
         _create_tenanted(cur, "traffic_counts")     # 22 Oct 2026 (evidence v3). Born with tenant_id in the key.
         conn.commit()
         # 22 Oct 2026 (evidence v3): the vehicle details, NULL until the next fetch
@@ -1387,6 +1407,70 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, meta_id)
         )
     """,
+    # 22 Oct 2026 (S16 / B5, abnormal_rules.py + abnormal.py): one row per ABNORMAL LOAD a tenant plans — its own planned
+    # movement, never a forecast line (D66a). The typed figures are metres and tonnes; the window is two ISO dates; the
+    # status runs pending → approved → notified → moved, or withdrawn (D68: only approved-or-later reaches the public map).
+    # What the rules say (the class, the notices, "notify by") is worked out on read from these figures and never stored.
+    # The route columns (geometry_json … limits_checked_at) are written by the phase-2 bake at the load's own size; the
+    # pinch points (pinch_json) by phase 3. Both travel in the package like any other column.
+    "abnormal_loads": """
+        CREATE TABLE abnormal_loads (
+            tenant_id          TEXT NOT NULL DEFAULT 'default',
+            id                 TEXT NOT NULL,
+            name               TEXT NOT NULL,
+            ipt                TEXT,
+            origin_id          TEXT,
+            origin_gate_id     TEXT,
+            dest_id            TEXT,
+            dest_gate_id       TEXT,
+            date_from          TEXT,
+            date_to            TEXT,
+            time_band          TEXT NOT NULL DEFAULT 'day',
+            movements          INTEGER NOT NULL DEFAULT 1,
+            return_abnormal    BOOLEAN NOT NULL DEFAULT FALSE,
+            width_m            REAL,
+            height_m           REAL,
+            length_m           REAL,
+            rigid_length_m     REAL,
+            proj_front_m       REAL,
+            proj_rear_m        REAL,
+            proj_side_m        REAL,
+            gross_t            REAL,
+            max_axle_t         REAL,
+            axle_driving       BOOLEAN NOT NULL DEFAULT FALSE,
+            axle_count         INTEGER,
+            axle_spacings_m    TEXT,
+            vehicle_type       TEXT,
+            cu_vehicle         BOOLEAN NOT NULL DEFAULT FALSE,
+            indivisible        BOOLEAN NOT NULL DEFAULT FALSE,
+            escort_planned     TEXT,
+            esdal_ref          TEXT,
+            vr1_ref            TEXT,
+            so_ref             TEXT,
+            applied_on         TEXT,
+            notified_on        TEXT,
+            status             TEXT NOT NULL DEFAULT 'pending',
+            note               TEXT,
+            via_json           TEXT,
+            geometry_json      TEXT,
+            return_geometry_json TEXT,
+            distance_km        REAL,
+            duration_hr        REAL,
+            baked_at           TEXT,
+            bake_error         TEXT,
+            here_notices_json  TEXT,
+            actions_json       TEXT,
+            roads_json         TEXT,
+            limits_hits_json   TEXT,
+            limits_checked_at  TEXT,
+            pinch_json         TEXT,
+            created_by         TEXT,
+            created_at         TEXT,
+            updated_by         TEXT,
+            updated_at         TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # 12 Oct 2026 (§2.2b). Km of each route's PRIMARY polyline (per vehicle profile and leg)
     # inside each area, and one row per leg with area_id '*' carrying the leg's whole length.
     # Derived by areas.rebuild() and rewritten whole — never typed.
@@ -1727,6 +1811,7 @@ _TENANT_PK = {
     "community_meta": "(tenant_id, meta_id)",
     "collision_records": "(tenant_id, collision_id)",
     "collision_meta": "(tenant_id, meta_id)",
+    "abnormal_loads": "(tenant_id, id)",
     "traffic_counts": "(tenant_id, count_point_id, year)",
 }
 
@@ -1776,6 +1861,17 @@ def _column_types_of(cur, table):
         return {r[1]: (r[2] or "").upper() for r in cur.fetchall()}
     except Exception:
         return {}
+
+
+def _ddl_column_type(ddl, col):
+    """
+    The declaration a column carries in one of the _TENANT_DDL blocks ("TEXT", "REAL", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    for an ADD COLUMN on a database that made the table before the column existed. The `--` comments go first, as in
+    _ddl_columns(), and for the same reason. Falls back to TEXT when the column is not found.
+    """
+    body = "\n".join(line.split("--", 1)[0] for line in ddl.splitlines())
+    m = re.search(r"(?:^|,|\()\s*" + re.escape(col) + r"\s+([A-Za-z]+(?:\s+NOT NULL)?(?:\s+DEFAULT\s+[^,\)]+)?)", body)
+    return m.group(1).strip() if m else "TEXT"
 
 
 def _ddl_columns(ddl):

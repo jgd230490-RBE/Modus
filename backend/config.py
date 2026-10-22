@@ -405,6 +405,11 @@ def validate(doc, network=None):
         if dg:
             # worded for the field a person sees (Config → Planning → Default gate hours), not the setting's path
             p.append(dg)
+        # 22 Oct 2026 (abnormal loads, D74): which nation's bank holidays the C&U notice calendar leaves out (the STGO
+        # calendar leaves out every GB public holiday whatever this says). Absent = England and Wales.
+        an = plan.get("abnormal_nation")
+        if an not in (None, "", "england-and-wales", "scotland"):
+            p.append("planning.abnormal_nation must be england-and-wales or scotland (or left out)")
     # 10 Oct 2026: the carbon block, when present. Every shape the carbon planner reads is
     # checked, so a Config save can never leave a document that makes every scenario fail:
     # the sub-blocks are objects, every factor a number >= 0 (null switches a figure off), a

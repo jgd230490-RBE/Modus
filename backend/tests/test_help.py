@@ -873,9 +873,19 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
     ok3("decision 10 (%s): the desk contents are untouched — a fixed 280 px column, 5 px 8 px rows" % _nm,
         "#nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;" in _pg and "#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}" in _pg)
 # NARROWED 22 Oct 2026 (UI fix 7): the technical guide gains one row, T2 "What the screens leave out"
-ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19, + 1 since UI fix 7)",
-   len(re.findall(r'<li class="l[12]"', src)) == 58 and len(re.findall(r'<li class="l[12]"', _tg2)) == 28   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19, + 1 since UI fix 7; 58 + 4 and 28 + 1 since the abnormal loads' chapter 14 and its T1 entry, 22 Oct)",
+   len(re.findall(r'<li class="l[12]"', src)) == 62 and len(re.findall(r'<li class="l[12]"', _tg2)) == 29   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
+ok("⭐ 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 — planning one, the route and the potential pinch points, where they show and the documents — says advice never permission, lorry never truck, counted apart; its three rows in the contents; the technical guide's T1 entry names the sources, the calendars, HERE's parameters, the structures pass and what is not modelled",
+   '<h1 id="14-abnormal-loads">14. Abnormal loads</h1>' in src and src.count('<h2 id="14-') == 3
+   and '<li class="l1"><a href="#14-abnormal-loads">14. Abnormal loads</a></li>' in src and src.count('<li class="l2"><a href="#14-') == 3
+   and "Advice, never permission" in src and "ESDAL, the police and the road and bridge authorities decide" in src and "counted apart" in src
+   and "Check the roads again" in src and "Notice calendar" in src and "ESDAL details sheet" in src and "approved movements only" in src
+   and not re.search(r"\btrucks?\b", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
+   and not re.search(r"\b(compliant|approved by|real-time|optimi[sz]e|predict)\b", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
+   and '<h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>' in _tg2 and '<li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li>' in _tg2
+   and "STGO 2003 Schedule 1" in _tg2 and "osm_structures" in _tg2 and "vehicle[grossWeight / weightPerAxle / height / width / length / axleCount]" in _tg2
+   and "/api/public/abnormal" in _tg2 and "Not modelled" in _tg2)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

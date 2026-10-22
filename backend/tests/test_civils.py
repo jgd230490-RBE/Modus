@@ -567,8 +567,10 @@ F9 = conversions.load_factors_file()
 ok("9: both steel categories are tonnes only in the seed, with the reason",
    all(F9["material_categories"][k].get("units") == ["t"] and F9["material_categories"][k].get("default_unit") == "t"
        and "tonnes only" in F9["material_categories"][k].get("_units_note", "") for k in STEEL))
-ok("9: no other category is restricted (they keep every unit)",
-   all("units" not in c for k, c in F9["material_categories"].items() if k not in STEEL and isinstance(c, dict)))
+# NARROWED 22 Oct 2026 (abnormal loads, B2's bare category): "Abnormal loads" is movements only (units ["vehicles"])
+ok("9: no other category is restricted (they keep every unit) — except Abnormal loads, counted in movements only",
+   all("units" not in c for k, c in F9["material_categories"].items() if k not in STEEL + ("Abnormal loads",) and isinstance(c, dict))
+   and F9["material_categories"]["Abnormal loads"].get("units") == ["vehicles"])
 ok("9: allowed_units: steel → tonnes only; another material, or one the document lacks → all three",
    conversions.allowed_units(F9, "Steel / rail") == ["t"] and conversions.allowed_units(F9, "Structural steel / rebar") == ["t"]
    and conversions.allowed_units(F9, "Small aggregate") == ["m3", "t", "vehicles"]

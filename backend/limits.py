@@ -991,6 +991,84 @@ def check_route(route_id, _limits=None):
             "exceeds": len([h for h in hits if h["verdict"] == "exceeds"])}
 
 
+def _matches(line, lims):
+    """
+    The stored limits one polyline runs along, as (limit, point?, along_m) — the matching rule of check_route()
+    (MATCH_M, ALONG_MIN_M / ALONG_SHARE for a line limit, POINT_M for a node), the geometry only, no verdict.
+    22 Oct 2026 (abnormal loads): pulled out so a movement's own line can be checked at the LOAD's size.
+    """
+    out = []
+    if not line or len(line) < 2:
+        return out
+    lb = _bbox(line)
+    pad = MATCH_M / 111000.0 * 2
+    idx = None
+    for L in lims:
+        coords = L["geometry"]
+        if L["geom_type"] == "Point":
+            if not _bbox_near((coords[0], coords[1], coords[0], coords[1]), lb, pad):
+                continue
+            idx = idx or _LineIndex(line, max(MATCH_M, POINT_M))
+            if not idx.near(coords, POINT_M):
+                continue
+            out.append((L, True, None))
+        else:
+            fb = _bbox(coords)
+            if not fb or not _bbox_near(fb, lb, pad):
+                continue
+            idx = idx or _LineIndex(line, max(MATCH_M, POINT_M))
+            along = _along(coords, lambda c: idx.near(c, MATCH_M))
+            need = min(ALONG_MIN_M, ALONG_SHARE * (L.get("length_m") or _line_len_m(coords)))
+            if along <= 0 or along < need:
+                continue
+            out.append((L, False, along))
+    return out
+
+
+def assess_dims(limit, dims):
+    """assess() for a set of typed figures: dims = {mass_t, height_m, width_m, axle_t} (an abnormal load's own)."""
+    kind = limit["kind"]
+    dim = KINDS[kind]["dimension"] or ("axle_t" if kind == "axle" else None)
+    have = (dims or {}).get(dim) if dim else None
+    if have is None:
+        return {"verdict": "unknown", "vehicle": None, "margin": None, "note": f"no {kind} figure is typed for this load, so no comparison is made"}
+    lim = float(limit["value"])
+    if abs(float(have) - lim) < 0.005:
+        return {"verdict": "at_limit", "vehicle": float(have), "margin": 0.0,
+                "note": "exactly at the signed limit: legal, but check the load's real figure and the sign"}
+    return {"verdict": "exceeds" if float(have) > lim else "within", "vehicle": float(have), "margin": round(lim - float(have), 2), "note": None}
+
+
+def check_line(line, dims, leg="loaded", label="the load", _limits=None):
+    """
+    22 Oct 2026 (abnormal loads, D67): the stored limits one polyline runs along, each judged against the LOAD's
+    typed figures (gross, height, width, heaviest axle) rather than a factors.json profile. Reports, never blocks.
+    Same shape as check_route()'s hits (vehicle_profile = the label).
+    """
+    lims = _limits if _limits is not None else stored()
+    hits = []
+    for L, point, along in _matches(line, lims):
+        a = assess_dims(L, dims)
+        note = a["note"]
+        if point:
+            note = ("a point limit on or beside the route: check whether the route passes it or "
+                    "crosses over or under it") + (f"; {note}" if note else "")
+        if L.get("exceptions"):
+            note = (f"{L['exceptions']}: a lorry may use it to reach premises on it — check whether "
+                    "this site is one") + (f"; {note}" if note else "")
+        hits.append({
+            "vehicle_profile": label, "vehicle_label": label, "leg": leg, "source": L["source"], "ext_id": L["ext_id"],
+            "kind": L["kind"], "limit": L["value"], "unit": L["unit"], "signed": L.get("signed"), "headline": headline(L),
+            "name": L.get("name"), "ref": L.get("ref"), "exceptions": L.get("exceptions"), "point": point,
+            "along_m": round(along, 1) if along is not None else None,
+            "verdict": a["verdict"], "vehicle_value": a["vehicle"], "margin": a["margin"], "note": note,
+            "anchor": [L["anchor_lon"], L["anchor_lat"]],
+        })
+    order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "within": 3}
+    hits.sort(key=lambda h: (order.get(h["verdict"], 3), bool(h["point"]), h["kind"]))
+    return hits
+
+
 def store_checks(route_ids=None):
     """Check every route (or the given ones) against the stored limits and store the hits on
     the route (routes.limits_hits). Synchronous."""

@@ -240,9 +240,18 @@ ok("⭐ the carbon read gives the feed NO material carbon (counted once, in the 
 # =========================================================================== #
 _kept = {"Kilby Ridge Quarry", "Northfield Quarry", "Brook Pit", "Harborough Rail Freight Terminal", "Harborough Compound",
          "Langton Compound", "Tilton Compound", "Melton Compound", "Stockpile South", "Stockpile Tilton", "Stockpile North"}
-ok("⭐ sixteen sites: the eleven named after places, and every other one says \"(fictional)\" in its name",
-   len(T["locations"]) == 16 and {l["name"] for l in T["locations"]} >= _kept
+# NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): eighteen — the precast works and the crane depot the three abnormal loads start from
+ok("⭐ eighteen sites: the eleven named after places, and every other one says \"(fictional)\" in its name",
+   len(T["locations"]) == 18 and {l["name"] for l in T["locations"]} >= _kept
    and all("(fictional)" in l["name"] for l in T["locations"] if l["name"] not in _kept))
+ok("⭐ D75 (phase 3): the three fictional abnormal loads ship in the package — the 4.6 m units (approved) from the rail terminal to Langton Compound, the 72 t crane (pending, in and out) from the crane depot and the 32 m beams (pending, a Special Order) from the precast works to Melton Compound; the two new sites with a gate each; nothing routed in the file (a planner draws on live)",
+   [(m["id"], m["status"], m["origin_id"], m["dest_id"], bool(m.get("return_abnormal")), m.get("geometry_json")) for m in T["abnormal_loads"]]
+   == [("AL001", "approved", "L004", "L006", False, None), ("AL002", "pending", "L018", "L008", True, None), ("AL003", "pending", "L017", "L008", False, None)]
+   and {(l["id"], l["name"], l["loc_type"]) for l in T["locations"] if l["id"] in ("L017", "L018")}
+   == {("L017", "Earl Shilton Precast Works (fictional)", "Precast works"), ("L018", "Soar Valley Crane Hire (fictional)", "Depot")}
+   and {g["name"] for g in T["location_gates"] if g["location_id"] in ("L017", "L018")} == {"Works gate", "Depot gate"}
+   and [m["gross_t"] for m in T["abnormal_loads"]] == [40.0, 72.0, 78.0] and all("fictional" in (m.get("note") or "") for m in T["abnormal_loads"]),
+   str([(m["id"], m["status"], m["origin_id"], m["dest_id"]) for m in T.get("abnormal_loads", [])]))
 ok("...the two new ones as designed: the asphalt plant (its own type) and Welland Ready-Mix (a batching plant)",
    {(l["id"], l["name"], l["loc_type"]) for l in T["locations"] if l["id"] in ("L015", "L016")}
    == {("L015", "Wolds Link Asphalt Plant (fictional)", "Asphalt plant"), ("L016", "Welland Ready-Mix (fictional)", "Batching plant")})

@@ -429,17 +429,19 @@ ok("⭐ planner: per_team carries every team with its figure (G001: Team 1 161.4
 # 14 Oct 2026 (narrowed): + capacity_per_day and capacity_pct, for the Dashboard's gate chart
 # 14 Oct 2026, later (narrowed again, bundle G W17): + status_word, the gate's own open minutes, basis, hours, peak
 # minutes and closed days; the response + near_pct, peak_bands, limit
+# NARROWED 22 Oct 2026 (abnormal loads, phase 2, D70): + abnormal, the markers on the gate's row (never in the figures)
 ok("the response carries every key of the contract on every gate",
    all(set(g) == {"gate_id", "gate_name", "location_id", "location_name", "loc_type", "role", "laden_per_day", "empty_per_day",
                   "arrivals_per_day", "gap_minutes", "gate_minutes", "capacity_per_day", "capacity_pct", "flag", "reason", "pending_lines", "pending_per_day",
-                  "teams", "per_team", "origin_share_note", "fallthrough_routes",
+                  "teams", "per_team", "origin_share_note", "fallthrough_routes", "abnormal",
                   "status_word", "open_minutes", "open_basis", "open_hours", "peak_minutes", "closed_days", "near_per_day",
                   # 17 Oct 2026 (narrowed): the gate's shut windows, the minutes they take off and their words
                   "shut_windows", "shut_minutes", "shut_words",
                   # 17 Oct 2026 (narrowed, the review): a gate whose bands and shut times leave no open minute says so
                   "no_open_time"} for g in gl)
+   # NARROWED 22 Oct 2026 (abnormal loads, phase 2): + abnormal_total, how many abnormal loads the month's markers name
    and set(res) == {"month", "label", "working_days", "shift_hours", "open_minutes", "scope", "gates", "notes",
-                    "near_pct", "peak_bands", "limit", "default_hours"})
+                    "near_pct", "peak_bands", "limit", "default_hours", "abnormal_total"})
 
 # =========================================================================== #
 #  5. A team code: totals and names, never the other team's figure              #

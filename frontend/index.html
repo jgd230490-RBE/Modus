@@ -890,6 +890,57 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   input[type=number]{-moz-appearance:textfield;}
   ::-webkit-scrollbar{height:9px;width:9px;} ::-webkit-scrollbar-thumb{background:var(--grey);border-radius:6px;}
+  /* 22 Oct 2026 (S16 / B5): the Abnormal loads page */
+  .al-stats{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px;}
+  .al-stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:120px;}
+  .al-stat b{display:block;font-size:20px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;}
+  .al-stat span{font-size:12px;color:var(--muted);}
+  .al-holidays{margin-left:auto;font-size:12px;color:var(--muted);max-width:420px;}
+  .al-cap{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:14px;border-radius:10px 10px 0 0;}
+  .al-form{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:18px;padding:14px;}
+  .al-set{display:grid;grid-template-columns:1fr 1.4fr;gap:18px;padding:14px;}
+  .al-tbl .link-btn, .al-set .link-btn{display:inline-block;min-height:24px;line-height:24px;padding:0 2px;} /* 22 Oct: the row's text actions are 24 px tall (WCAG 2.2 target size; the audit's targets-24px / axe target-size failed on them) */
+  .al-det{display:grid;grid-template-columns:3fr 2fr;gap:18px;padding:4px 8px 8px 30px;font-size:13px;white-space:normal;}
+  @media (max-width:1100px){.al-form,.al-set,.al-det{grid-template-columns:1fr;}}
+  .al-h4{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  .al-fld{display:block;font-size:13px;color:var(--ink);margin:0 0 8px;}
+  .al-fld .ctl{display:block;width:100%;margin-top:2px;}
+  .al-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;} .al-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .al-tick{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink);margin:6px 0;}
+  .al-tick input{margin-top:3px;flex:none;}
+  .al-advice{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:13px;}
+  .al-lines{margin:0;padding-left:16px;} .al-lines li{margin:4px 0;}
+  .al-notes{margin:8px 0 0;padding-left:16px;color:var(--warn-text);} .al-notes li{margin:3px 0;}
+  .al-foot{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:8px;margin:10px 0 0;}
+  .al-chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid transparent;white-space:nowrap;margin-right:4px;}
+  .al-so{background:#F5F3FF;color:#5B21B6;border-color:#DDD6FE;} .al-vr1{background:#ECFEFF;color:#0E7490;border-color:#A5F3FC;}
+  .al-stgo{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;} .al-cu{background:var(--surface-3);color:var(--ink);border-color:var(--line);}
+  .al-warn{background:#FFFBEB;color:var(--warn-text);border-color:#FDE68A;} .al-bad{background:#FEF2F2;color:var(--bad-text);border-color:#FECACA;}
+  html[data-theme="dark"] .al-so{background:#2E1065;color:#DDD6FE;border-color:#5B21B6;} html[data-theme="dark"] .al-vr1{background:#083344;color:#A5F3FC;border-color:#0E7490;}
+  html[data-theme="dark"] .al-stgo{background:#172554;color:#BFDBFE;border-color:#1D4ED8;}
+  html[data-theme="dark"] .al-warn{background:#3A2E1C;color:#FCD34D;border-color:#92400E;} html[data-theme="dark"] .al-bad{background:#3F1D1D;color:#FCA5A5;border-color:#991B1B;}
+  .al-tri{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;min-width:24px;min-height:24px;transition:transform .12s;}
+  .al-tri.is-open{transform:rotate(90deg);}
+  .al-tbl td{white-space:normal;height:auto;padding-top:8px;padding-bottom:8px;vertical-align:top;}
+  .al-tbl td:nth-child(9){white-space:nowrap;}
+  .al-det-row > td{padding:0 0 10px;background:var(--surface-2);}
+  .al-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;margin:0 0 10px;font-variant-numeric:tabular-nums;}
+  .al-dl dt{color:var(--muted);} .al-dl dd{margin:0;}
+  .al-bans td,.al-bans th{height:36px;padding:0 6px;font-size:13px;}
+  .al-bans .ctl-sm{padding:3px 6px;font-size:13px;width:100%;}
+  .al-grey{background:#F1F5F9;color:#475569;border-color:#CBD5E1;} .al-okc{background:#ECFDF5;color:var(--ok-text);border-color:#A7F3D0;}
+  html[data-theme="dark"] .al-grey{background:#1E293B;color:#CBD5E1;border-color:#475569;} html[data-theme="dark"] .al-okc{background:#052E16;color:#86EFAC;border-color:#166534;}
+  .al-route{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px;}
+  .al-ptbl{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 8px;} .al-ptbl th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line);}
+  .al-ptbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top;} .al-ptbl .ctl-sm{padding:2px 6px;font-size:12px;}
+  /* 22 Oct 2026 (phase 3): the pinch-point heading with Check the roads again beside it; the planner's own rows */
+  .al-h4row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;} .al-h4row .al-h4{margin:0;}
+  .al-typed{margin:6px 0 8px;} .al-typed-more{display:flex;flex-wrap:wrap;gap:4px;} .al-typed-more .ctl-sm{width:118px;}
+  .al-typed-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;}
+  .al-via{margin-top:8px;max-width:520px;} .al-via .ctl{font-family:ui-monospace,Consolas,monospace;font-size:12px;}
+  .al-mark{margin-left:6px;font-weight:600;}
+  .al-strip{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13px;background:var(--surface);margin-top:12px;}
+  .al-strip b{font-size:16px;font-variant-numeric:tabular-nums;} .al-strip-btn{padding:4px 9px;font-size:13px;} .al-strip-words{flex-basis:100%;color:var(--muted);font-size:12px;}
 </style>
 </head>
 <body>
@@ -1810,7 +1861,9 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
                 <RowDetails key={k} rowKey={"ga-" + k} isOpen={gaOpen(k)} onToggle={() => gaToggle(k)} colSpan={6}
                   label={`Details for ${g.location_name}, ${g.gate_name}`}
                   rowProps={{ "data-ga-gate": g.gate_id, "data-ga-flag": g.flag || "none" }}
-                  summary={<>{g.location_name}<div className="ga-gate">{g.gate_name}</div></>}
+                  summary={<>{g.location_name}<div className="ga-gate">{g.gate_name}{(g.abnormal || []).length > 0 && <span className="al-chip al-so al-mark" data-ga-abnormal={g.abnormal.length}
+                    title={g.abnormal.map(a => `${a.name}: ${alWindow(a.date_from, a.date_to)}${a.leaving ? " (leaving)" : ""}`).join("; ") + " — counted apart: not in the arrivals, the gap or the capacity"}>
+                    + {g.abnormal.length} abnormal load{g.abnormal.length === 1 ? "" : "s"} · {g.abnormal.map(a => alWindow(a.date_from, a.date_to)).join(", ")}</span>}</div></>}
                   chips={chips}
                   cells={<>
                     <td className="num" data-label="Arrivals a day">{gaN1(g.arrivals_per_day)}</td>
@@ -2484,6 +2537,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
           <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
+          {!wall && !phone && <AbnormalStrip onOpen={onOpen} />}
           {/* 16 Oct 2026 (S7): the simulation, folded, under Gate arrivals; read the first time it is opened (D86: staff only) */}
           <SimulationPanel meta={meta} months={months} phone={phone} initial={initialSim} />
           <details className="dash-more">
@@ -2753,6 +2807,34 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // today; Tark Tee off). Nothing is derived here: the days carry the server's tonnes,
 // trips and vehicles; the account carries its own totals. Cost stays off the map (the
 // map's hover shows quantity and trips only, as on the Look-ahead).
+// 22 Oct 2026 (abnormal loads, phase 2): one strip under Gate arrivals — loads in the next four weeks, notices due or late
+// this week, permissions still to apply for — and the way to the page. One read (GET /abnormal/summary). Counted apart:
+// nothing here is in the six cards, the charts or the carbon target (D70, D71). Not on the big screen, not on a phone.
+function AbnormalStrip({ onOpen }){
+  const [s, setS] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch(`${API}/abnormal/summary`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live){ setS(j); setErr(false); } }).catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, []);
+  if(err) return <div className="al-strip" data-abnormal-strip="error"><span className="text-slate-500">The abnormal loads did not load.</span></div>;
+  if(!s) return null;
+  const open = () => { if(onOpen) onOpen("abnormal"); };
+  if(!s.planned) return (
+    <div className="al-strip" data-abnormal-strip="none"><span className="text-slate-600">No abnormal loads planned.</span>
+      <button type="button" className="btn-sec al-strip-btn" onClick={open}>Open Abnormal loads</button></div>);
+  return (
+    <div className="al-strip" data-abnormal-strip="set" data-guide="dash-abnormal">
+      <span><b>{s.ahead}</b> abnormal load{s.ahead === 1 ? "" : "s"} in the next {s.weeks_ahead} weeks</span>
+      <span><b>{s.notices_due}</b> notice{s.notices_due === 1 ? "" : "s"} due this week{s.notices_late > 0 ? <> <AlChip tone="bad">NOTICE LATE</AlChip></> : (s.notices_due > 0 ? <> <AlChip tone="warn">NOTICE DUE</AlChip></> : null)}</span>
+      <span><b>{s.to_apply}</b> Special Order{s.to_apply === 1 ? "" : "s"} or VR1{s.to_apply === 1 ? "" : "s"} to apply for{s.to_apply > 0 ? <> <AlChip tone="bad">SO LEAD TIME</AlChip></> : null}</span>
+      {s.road_limit > 0 && <span><b>{s.road_limit}</b> over a signed limit <AlChip tone="bad">AIL ROAD LIMIT</AlChip></span>}
+      <button type="button" className="btn-sec al-strip-btn" onClick={open}>Open Abnormal loads</button>
+      <span className="al-strip-words">{s.words}</span>
+    </div>
+  );
+}
 // 22 Oct 2026 (UI fix 6, card 5; decision 6): how many of the big screen's Today rows fit WHOLE in the space left to the
 // list. `heights` are the rows' heights in their order (busiest first, as DashboardToday sorts them), `available` the
 // list box's height below its header. Rows are taken in order and never skipped (a shorter row further down is not
@@ -3388,6 +3470,12 @@ const GUIDE_STEPS = {
     { anchor: "carbon-drivers", title: "5. Result.", body: "The new total, and which decisions change carbon most." },
     { anchor: "carbon-target", title: "6. Carbon target.", body: "The planner sets the agreed decisions as the scheme's target." },
   ],
+  // 22 Oct 2026 (S16 / B5): the abnormal loads (desk only; the phone shows the desk-only card)
+  abnormal: [
+    { anchor: "page-header", title: "Each abnormal load on its own.", body: "What it is, where it goes, when, and its size and weight. What the rules say is advice from the typed figures: check with the haulier; ESDAL, the police and the road and bridge authorities decide." },
+    { anchor: "al-plan", title: "Plan one.", body: "Type the figures; the panel beside them says the class, the notices, the notify-by date, the attendant, the markers and the escort expected, as you type. Nothing is saved until you press Save." },
+    { anchor: "al-list", title: "The list.", body: "One row a load: what it needs, notify by with a flag when a notice is due or late, the status. A planner approves; the team marks it notified and moved." },
+  ],
   // 14 Oct 2026 (D9): the Look-ahead on a phone (PhoneLookAhead) reads; it has no Confirm week or Account
   lookahead_phone: [
     { anchor: "ph-days", title: "One day at a time.", body: "Pick a day of this week or next; today opens first. The card shows the day's tonnes, loads and lorries, and every line with its flag." },
@@ -3752,7 +3840,7 @@ function CommunityPanel({ access }){
   return (
     <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="community">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Community considerations</h3>
-      <p className="text-[14px] text-slate-600 mb-3">Schools, hospitals, stations, bus stops, homes and more within {st ? st.strip.route_m : 250} m of a route and {st ? st.strip.site_m : 500} m of a site. Staff only. Fetch again after changing routes.</p>
+      <p className="text-[14px] text-slate-600 mb-3">Schools, hospitals, stations, bus stops, homes and more within {st ? st.strip.route_m : 250} m of a route and {st ? st.strip.site_m : 500} m of a site. Staff only. Fetch again after changing routes. The same fetch keeps the bridges, railways, level crossings, traffic calming, overhead lines and tagged limits along the roads for the abnormal loads' potential pinch points, and the strip takes in each abnormal load's own drawn line, so fetch again after drawing one.</p>
       {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
         <>
           <p className="text-[14px] text-slate-700 mb-2" data-community-state={st.state}>
@@ -4114,6 +4202,514 @@ function fmtWhen(iso){
   try { const d = new Date(iso); if(isNaN(d)) return iso || "";
     return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) + ", "
       + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); } catch(e){ return iso || ""; }
+}
+
+// ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)
+//
+// Each abnormal load is its own planned movement (D66a): what it is, the team, from and to (gate), a window and a
+// day / night band, how many movements, its size and weights. The page reads ONE call (GET /abnormal: the movements
+// with the rules' advice already on them, the settings, the pickers) and writes through the movement calls; the
+// form's live panel reads the rules preview as the figures are typed (nothing saved until Save). Every line of
+// advice is the server's own words, labelled "check with the haulier" (D69); nothing here works a rule out. A team
+// login plans its own team's; a planner approves, reopens, deletes any, types the police time bans and fetches the
+// bank holidays. Desk only (D9): on a phone the Portal shows the desk-only card. Counted apart (D70, D71): nothing
+// on this page is a lorry count.
+const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };
+const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad", AIL_ROAD_LIMIT: "bad" };
+// phase 2: the kinds of potential pinch point the route module finds (its KIND_WORDS) and WSP's grades (its GRADE_WORDS)
+const AL_KIND_WORDS = { turn: "Turn", roundabout: "Roundabout", slip_road: "Slip road", bend: "Sharp bend", limit: "Signed limit", notice: "Routing notice",
+                        bridge: "Bridge", railway: "Railway crossed", level_crossing: "Level crossing", calming: "Traffic calming", overhead: "Overhead line",
+                        width: "Narrow road", junction: "Junction", furniture: "Street furniture", other: "Other" };
+const AL_GRADES = [["grey", "Grey — to survey"], ["green", "Green — passable"], ["amber", "Amber — passable with care or measures"],
+                   ["red", "Red — needs works or a permit"], ["black", "Black — impassable"]];
+// phase 3: the planner's own rows (the survey's list) — the kinds a person types, and a blank row
+const AL_TYPED_KINDS = ["bridge", "junction", "furniture", "level_crossing", "overhead", "railway", "calming", "width", "other"];
+const AL_TYPED_BLANK = { kind: "other", place: "", words: "", grade: "grey", note: "", owner: "", measure: "", permit: "", works: "", link: "" };
+const AL_CANDIDATE_WORDS = "Potential pinch points found by Wayscope from the route's turn-by-turn directions, the line itself and the stored signed limits, each graded Grey (to survey). The route survey decides: no structure rating, no swept path, no overhead clearance is worked out here.";
+// the one-word class chip: the permission first, then the STGO weight category, then the regime
+function alClass(adv){
+  if(!adv) return ["—", "cu"];
+  if(adv.permission === "special_order") return ["Special Order", "so"];
+  if(adv.permission === "vr1") return ["VR1", "vr1"];
+  if(adv.category === "cat1") return ["STGO Cat 1", "stgo"];
+  if(adv.category === "cat2") return ["STGO Cat 2", "stgo"];
+  if(adv.category === "cat3") return ["STGO Cat 3", "stgo"];
+  if(adv.regime === "cu") return ["C&U", "cu"];
+  return adv.abnormal ? ["Abnormal", "stgo"] : ["Within limits", "cu"];
+}
+const AL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function alDay(iso){ if(!iso) return ""; const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : `${d.getDate()} ${AL_MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
+function alWindow(a, b){
+  if(!a) return "—";
+  if(!b || b === a) return alDay(a);
+  const da = new Date(a + "T00:00:00"), db = new Date(b + "T00:00:00");
+  if(isNaN(da) || isNaN(db)) return `${a} – ${b}`;
+  if(da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth()) return `${da.getDate()}–${db.getDate()} ${AL_MONTHS[da.getMonth()]} ${da.getFullYear()}`;
+  return `${alDay(a)} – ${alDay(b)}`;
+}
+const alN = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
+const alFmt = (v, unit) => alN(v) === null ? "—" : `${alN(v)} ${unit}`;
+function alSize(m){
+  const q = (v) => alN(v) === null ? "?" : String(alN(v));
+  const bits = [`${q(m.width_m)} × ${q(m.height_m)} × ${q(m.length_m)} m`, alFmt(m.gross_t, "t")];
+  if(alN(m.axle_count) !== null) bits.push(`${m.axle_count} axles`);
+  if(alN(m.max_axle_t) !== null) bits.push(`${m.max_axle_t} t axle`);
+  return bits.join(" · ");
+}
+const AL_FIGURE_KEYS = ["width_m", "height_m", "length_m", "rigid_length_m", "proj_front_m", "proj_rear_m", "proj_side_m", "gross_t", "max_axle_t",
+                        "axle_driving", "axle_count", "axle_spacings_m", "cu_vehicle", "indivisible", "date_from", "date_to", "time_band",
+                        "escort_planned", "applied_on"];
+const AL_BLANK = { name: "", ipt: "", vehicle_type: "", origin_id: "", origin_gate_id: "", dest_id: "", dest_gate_id: "", date_from: "", date_to: "",
+                   time_band: "day", movements: 1, return_abnormal: false, escort_planned: "none", indivisible: false, cu_vehicle: false,
+                   esdal_ref: "", vr1_ref: "", so_ref: "", applied_on: "", notified_on: "", note: "",
+                   width_m: "", height_m: "", length_m: "", rigid_length_m: "", proj_front_m: "", proj_rear_m: "", proj_side_m: "",
+                   gross_t: "", max_axle_t: "", axle_driving: false, axle_count: "", axle_spacings_m: "" };
+const AL_NEXT_WORD = { approved: "Approve", pending: "Reopen", notified: "Mark notified", moved: "Mark moved", withdrawn: "Withdraw" };
+const AL_DAY_PRESETS = [["1111100", "Weekdays"], ["1111110", "Mon–Sat"], ["1111111", "Every day"], ["0000011", "Weekends"]];
+
+function AlChip({ tone, children, title }){
+  return <span className={"al-chip al-" + (tone || "cu")} title={title}>{children}</span>;
+}
+function AlFlag({ f }){
+  return <span className={"al-chip al-" + (AL_FLAG_TONE[f.code] || "warn")} title={f.text}>{AL_FLAG_WORD[f.code] || f.code}</span>;
+}
+// the advice panel: the summary, the lines, the notes, the footer — the server's words, nothing worked out here
+function AlAdvice({ adv, compact }){
+  if(!adv) return <p className="text-sm text-slate-500">Type the width, height, length and gross weight to see what the rules say.</p>;
+  const [word, tone] = alClass(adv);
+  return (
+    <div className="al-advice" data-al-advice="1">
+      <p className="font-semibold text-slate-800 mb-1"><AlChip tone={tone}>{word}</AlChip>{" "}{adv.summary}</p>
+      {adv.category_words && <p className="text-[13px] text-slate-500 mb-1">{adv.category_words}{adv.lead_words ? ` · ${adv.lead_words}` : ""}</p>}
+      {!adv.abnormal && adv.not_abnormal_words && <p className="text-sm text-slate-600">{adv.not_abnormal_words}</p>}
+      <ul className="al-lines">{(adv.lines || []).map((l, i) => <li key={i}>{l}</li>)}</ul>
+      {(adv.notes || []).length > 0 && <ul className="al-notes">{adv.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+      {!compact && <p className="al-foot">{adv.advice_words}</p>}
+    </div>
+  );
+}
+
+function AbnormalPage({ meta, access, who }){
+  const canApprove = !!(access && access.can_approve);
+  const teamLocked = !!(access && access.ipt);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [open, setOpen] = useState(null);          // the row opened
+  const [form, setForm] = useState(null);          // null = closed; {…AL_BLANK} = new; with id = editing
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(null);          // {ok, text}
+  const [showSettings, setShowSettings] = useState(false);
+  const [bans, setBans] = useState(null);          // the time bans being edited (planner)
+  const [viaText, setViaText] = useState({});      // phase 2: the via points being typed, per movement
+  const [typedDraft, setTypedDraft] = useState({}); // phase 3: the planner's own pinch-point rows being edited, per movement
+  const call = async (path, method, body) => {
+    const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
+                                             body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : `Not done (${r.status}).`);
+    return j;
+  };
+  const load = () => call("/abnormal").then(j => { setData(j); setErr(""); setBans(null); }).catch(e => { setErr(e.message); });
+  useEffect(() => { load(); }, []);
+  // the live panel: the rules for the figures as typed, a moment after the last keystroke
+  const figKey = form ? JSON.stringify(AL_FIGURE_KEYS.map(k => form[k])) : "";
+  useEffect(() => {
+    if(!form) return;
+    const q = new URLSearchParams();
+    AL_FIGURE_KEYS.forEach(k => { const v = form[k]; if(v !== "" && v !== null && v !== undefined && v !== false) q.set(k, String(v)); });
+    if(form.id && form.status) q.set("status", form.status);
+    if(!q.has("width_m") || !q.has("height_m") || !q.has("length_m") || !q.has("gross_t")){ setPreview(null); return; }
+    const t = setTimeout(() => { call(`/abnormal/rules?${q.toString()}`).then(setPreview).catch(() => {}); }, 350);
+    return () => clearTimeout(t);
+  }, [figKey]);
+  const act = async (fn) => { setBusy(true); setNote(null); try { await fn(); } catch(e){ setNote({ ok: false, text: e.message }); } setBusy(false); };
+  const startNew = () => { setForm({ ...AL_BLANK, ipt: teamLocked ? access.ipt : "" }); setPreview(null); setNote(null); };
+  const startEdit = (m) => {
+    const f = { ...AL_BLANK };
+    Object.keys(AL_BLANK).forEach(k => { f[k] = (m[k] === null || m[k] === undefined) ? AL_BLANK[k] : m[k]; });
+    f.id = m.id; f.status = m.status;
+    setForm(f); setPreview(m.advice || null); setNote(null);
+  };
+  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const save = () => act(async () => {
+    const body = {};
+    Object.keys(AL_BLANK).forEach(k => { const v = form[k]; body[k] = (v === "" ? null : v); });
+    if(teamLocked) delete body.ipt;
+    const j = form.id ? await call(`/abnormal/${encodeURIComponent(form.id)}`, "PUT", body) : await call("/abnormal", "POST", body);
+    setForm(null); setPreview(null);
+    setNote({ ok: true, text: form.id ? `${j.movement.name}: saved.` : `${j.movement.name}: planned, pending approval.` });
+    await load();
+  });
+  const setStatus = (m, s) => act(async () => {
+    const j = await call(`/abnormal/${encodeURIComponent(m.id)}/status`, "POST", { status: s });
+    setNote({ ok: true, text: `${m.name}: ${(j.movement.status_word || s).toLowerCase()}.` });
+    await load();
+  });
+  const del = (m) => act(async () => {
+    if(!window.confirm(`Delete "${m.name}"? This cannot be undone.`)) return;
+    await call(`/abnormal/${encodeURIComponent(m.id)}`, "DELETE");
+    setNote({ ok: true, text: `${m.name}: deleted.` });
+    await load();
+  });
+  // phase 2: the route at the typed size (a planner; one HERE call, two with an abnormal return leg), the grades, the via points
+  const draw = (m) => act(async () => {
+    const j = await call(`/abnormal/${encodeURIComponent(m.id)}/route`, "POST");
+    const notes = (j.notes || []).length ? ` ${j.notes.join(" ")}` : "";
+    setNote({ ok: true, text: `${m.name}: the line is drawn, ${fmtDist(j.distance_km)} ${DU()}, ${j.candidates} potential pinch point${j.candidates === 1 ? "" : "s"} to survey${j.exceeds ? `, ${j.exceeds} signed limit${j.exceeds === 1 ? "" : "s"} the load is over` : ""}.${notes}` });
+    setOpen(m.id);
+    await load();
+  });
+  const grade = (m, cid, g) => act(async () => {
+    await call(`/abnormal/${encodeURIComponent(m.id)}/pinch`, "PUT", { pinch: (m.candidates || []).map(c => ({ id: c.id, grade: c.id === cid ? g : (c.grade || "grey"), note: c.note || null })).concat(m.typed_points || []) });
+    await load();
+  });
+  const saveVia = (m) => act(async () => {
+    const pts = (viaText[m.id] || "").split("\n").map(l => l.trim()).filter(Boolean).map(l => l.split(",").map(x => parseFloat(x.trim())));
+    if(pts.some(p => p.length !== 2 || p.some(x => isNaN(x)))) throw new Error("Each via point is one line: latitude, longitude.");
+    await call(`/abnormal/${encodeURIComponent(m.id)}/via`, "PUT", { via: pts });
+    setViaText(v => { const n = { ...v }; delete n[m.id]; return n; });
+    setNote({ ok: true, text: `${m.name}: ${pts.length} via point${pts.length === 1 ? "" : "s"} saved. Press Draw the route again to draw the line through them.` });
+    await load();
+  });
+  // phase 3 (D73): the documents come through the app's fetch (the sign-in's headers), never a bare link
+  const dl = (path, fallback) => act(async () => {
+    const r = await fetch(`${API}${path}`);
+    if(!r.ok){ let d = ""; try { d = (await r.json()).detail || ""; } catch(e){ d = ""; } throw new Error(d || `error ${r.status}`); }
+    const blob = await r.blob();
+    const cd = (r.headers && r.headers.get && r.headers.get("Content-Disposition")) || "";
+    const mm = cd.match(/filename="([^"]+)"/);
+    const a = document.createElement("a");
+    a.href = (window.URL && URL.createObjectURL) ? URL.createObjectURL(blob) : "#";
+    a.download = mm ? mm[1] : fallback;
+    document.body.appendChild(a); a.click(); a.remove();
+    if(a.href !== "#") setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+  // phase 3: look again along the drawn line for OpenStreetMap's structures and limits — no HERE call
+  const checkRoads = (m) => act(async () => {
+    const j = await call(`/abnormal/${encodeURIComponent(m.id)}/structures`, "POST");
+    const n = j.structures || 0;
+    setNote({ ok: true, text: `${m.name}: ${n} structure${n === 1 ? "" : "s"} or tagged limit${n === 1 ? "" : "s"} from OpenStreetMap along the line${j.structures_fetched ? ` (fetched ${alDay(String(j.structures_fetched).slice(0, 10))})` : ""}.${j.note ? " " + j.note : ""}` });
+    await load();
+  });
+  // phase 3: the planner's own pinch-point rows — edited in a draft, saved in one press with the found candidates' grades
+  const typedRows = (m) => typedDraft[m.id] !== undefined ? typedDraft[m.id] : (m.typed_points || []);
+  const editTyped = (m, i, k, v) => setTypedDraft(d => { const rows = typedRows(m).map(r => ({ ...r })); rows[i] = { ...rows[i], [k]: v }; return { ...d, [m.id]: rows }; });
+  const addTyped = (m) => setTypedDraft(d => ({ ...d, [m.id]: typedRows(m).concat([{ ...AL_TYPED_BLANK }]) }));
+  const removeTyped = (m, i) => setTypedDraft(d => ({ ...d, [m.id]: typedRows(m).filter((_, j) => j !== i) }));
+  const saveTyped = (m) => act(async () => {
+    const rows = (typedDraft[m.id] || []).map(r => ({ ...r, source: "typed" }));
+    const j = await call(`/abnormal/${encodeURIComponent(m.id)}/pinch`, "PUT", { pinch: (m.candidates || []).map(c => ({ id: c.id, grade: c.grade || "grey", note: c.note || null })).concat(rows) });
+    setTypedDraft(d => { const n = { ...d }; delete n[m.id]; return n; });
+    const n = (j.pinch || []).filter(r => r.source === "typed").length;
+    setNote({ ok: true, text: `${m.name}: ${n} of your own pinch point${n === 1 ? "" : "s"} saved.` });
+    await load();
+  });
+  const fetchHolidays = () => act(async () => {
+    const j = await call("/abnormal/bank-holidays/refresh", "POST");
+    setNote({ ok: true, text: `Bank holidays fetched: ${(j.status && j.status.words) || "done"}.` });
+    await load();
+  });
+  const saveBans = () => act(async () => {
+    const j = await call("/abnormal/time-bans", "PUT", { time_bans: bans });
+    setNote({ ok: true, text: `${j.time_bans.length} police time ban${j.time_bans.length === 1 ? "" : "s"} saved.` });
+    await load();
+  });
+  const movements = (data && data.movements) || [];
+  const choices = (data && data.choices) || {};
+  const settings = (data && data.settings) || {};
+  const words = (data && data.words) || {};
+  const teams = (meta && meta.ipts) || [];
+  const locName = (id) => ((choices.locations || []).find(l => l.id === id) || {}).name || id || "";
+  const gatesOf = (locId) => (choices.gates || []).filter(g => g.location_id === locId && g.active !== false);
+  const by = data ? data.by_status || {} : {};
+  const toApply = movements.filter(m => m.advice && m.advice.permission !== "none" && !m.applied_on && ["pending", "approved"].includes(m.status)).length;
+  const due = movements.filter(m => (m.flags || []).some(f => f.code === "NOTICE_DUE" || f.code === "NOTICE_LATE")).length;
+  const transitions = choices.transitions || {};
+  const plannerOnly = new Set(choices.planner_only || ["approved", "pending"]);
+  const nextOf = (m) => (transitions[m.status] || []).filter(s => canApprove || !plannerOnly.has(s));
+  const canDelete = (m) => canApprove || ["pending", "withdrawn"].includes(m.status);
+  const banRows = bans || settings.time_bans || [];
+  const field = (label, k, props) => (
+    <label className="al-fld">{label}<input className="ctl ctl-sm" value={form[k] ?? ""} onChange={e => upd(k, e.target.value)} aria-label={label} {...(props || {})} /></label>
+  );
+  const num = (label, k, required) => field(label + (required ? " *" : ""), k, { type: "number", step: "0.01", min: "0", inputMode: "decimal" });
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2" data-page="abnormal">
+      <PageHeader title="Abnormal loads" kicker="Plan"
+        subtitle="Each abnormal load is planned on its own: its size and weight typed, its own route, its own dates. What the rules say is advice from the typed figures — check with the haulier; ESDAL, the police and the road and bridge authorities decide. Counted apart from the lorries, the CLP caps, the gate capacity and the carbon totals."
+        actions={<>
+          <button type="button" className="btn-pri" onClick={startNew} disabled={!data || !!form} data-guide="al-plan">Plan an abnormal load</button>
+          <button type="button" className="btn-sec" onClick={() => setShowSettings(s => !s)} aria-expanded={showSettings}>Settings · bank holidays and time bans</button>
+          <button type="button" className="btn-sec" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.xlsx", "abnormal-loads-notice-calendar.xlsx")} data-al-doc="calendar-xlsx"
+            title="Every load you may see with its apply-by, police, authorities and notify-by dates, as a spreadsheet (nothing is sent anywhere)">Notice calendar · XLSX</button>
+          <button type="button" className="btn-sec" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.pdf", "abnormal-loads-notice-calendar.pdf")} data-al-doc="calendar-pdf"
+            title="The same calendar as an A4 landscape PDF">Notice calendar · PDF</button>
+        </>} />
+      {err && <EmptyState kind="error" title="Couldn't open the abnormal loads" body={err} action={<button type="button" className="btn-sec" onClick={load}>Try again</button>} />}
+      {note && <div className="card p-3 mb-4 text-sm" role="status" style={{ borderColor: note.ok ? "var(--green)" : "var(--red)" }}>{note.text}</div>}
+      {data && (
+        <div className="al-stats" data-guide="al-stats">
+          <div className="al-stat"><b>{movements.length}</b><span>planned</span></div>
+          <div className="al-stat"><b>{(by.approved || 0) + (by.notified || 0) + (by.moved || 0)}</b><span>approved or later</span></div>
+          <div className="al-stat"><b>{due}</b><span>notices due or late</span></div>
+          <div className="al-stat"><b>{toApply}</b><span>Special Orders or VR1s to apply for</span></div>
+          <span className="al-holidays">{settings.holidays ? `Bank holidays: ${settings.holidays.words}` : ""}</span>
+        </div>
+      )}
+      {showSettings && data && (
+        <div className="card mb-4" data-al-settings="1">
+          <div className="al-cap"><b>Settings</b><span className="text-slate-500"> · what the advice is worked out with</span></div>
+          <div className="al-set">
+            <div>
+              <h4 className="al-h4">Bank holidays</h4>
+              <p className="text-sm">{settings.holidays && settings.holidays.words}{settings.holidays && settings.holidays.count ? ` England and Wales ${settings.holidays.count["england-and-wales"] || 0} days, Scotland ${settings.holidays.count.scotland || 0}, Northern Ireland ${settings.holidays.count["northern-ireland"] || 0}.` : ""}</p>
+              {canApprove && <button type="button" className="btn-sec" disabled={busy} onClick={fetchHolidays}>Fetch now from gov.uk</button>}
+              <p className="text-[13px] text-slate-500 mt-2">The STGO calendar leaves out every public holiday in Great Britain. The C&amp;U calendar leaves out the bank holidays of <b>{settings.nation === "scotland" ? "Scotland" : "England and Wales"}</b> (Config → Planning, admins).</p>
+            </div>
+            <div>
+              <h4 className="al-h4">Police time bans typed for this scheme</h4>
+              <table className="tbl al-bans">
+                <thead><tr>{["Force", "Days", "From", "To", "Note", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                <tbody>
+                  {banRows.map((b, i) => (
+                    <tr key={i}>
+                      {canApprove ? <>
+                        <td><input className="ctl ctl-sm" value={b.force || ""} aria-label="Police force" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, force: e.target.value } : x))} /></td>
+                        <td><select className="ctl ctl-sm" value={b.days || "1111100"} aria-label="Days" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, days: e.target.value } : x))}>
+                          {AL_DAY_PRESETS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></td>
+                        <td><input className="ctl ctl-sm" type="time" value={b.from || ""} aria-label="From" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, from: e.target.value } : x))} /></td>
+                        <td><input className="ctl ctl-sm" type="time" value={b.to || ""} aria-label="To" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, to: e.target.value } : x))} /></td>
+                        <td><input className="ctl ctl-sm" value={b.note || ""} aria-label="Note" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, note: e.target.value } : x))} /></td>
+                        <td className="text-right"><button type="button" className="link-btn" style={{ color: "var(--red)" }} onClick={() => setBans(rows => (rows || settings.time_bans).filter((_, j) => j !== i))}>Remove</button></td>
+                      </> : <>
+                        <td>{b.force}</td><td>{(AL_DAY_PRESETS.find(p => p[0] === b.days) || [null, b.days])[1]}</td><td>{b.from}</td><td>{b.to}</td><td>{b.note || ""}</td><td></td>
+                      </>}
+                    </tr>
+                  ))}
+                  {!banRows.length && <tr><td colSpan={6} className="text-sm text-slate-500">None typed. Forces differ; a ban is used only once a planner types it here.</td></tr>}
+                </tbody>
+              </table>
+              {canApprove && <div className="flex gap-2 mt-2">
+                <button type="button" className="btn-sec" disabled={busy || banRows.length >= (settings.max_time_bans || 12)} onClick={() => setBans([...(bans || settings.time_bans || []), { force: "", days: "1111100", from: "07:00", to: "09:30", note: "" }])}>+ Add a force</button>
+                <button type="button" className="btn-pri" disabled={busy || !bans} onClick={saveBans}>Save the time bans</button>
+              </div>}
+              <p className="text-[13px] text-slate-500 mt-2">A ban that touches a movement's band (day 06:00–20:00, night 20:00–06:00) is said on the movement. Which forces the route crosses is not worked out.</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {form && data && (
+        <div className="card mb-4" data-al-form="1">
+          <div className="al-cap"><b>{form.id ? `Edit ${form.name || form.id}` : "Plan an abnormal load"}</b><span className="text-slate-500"> · the figures are the haulier's; the advice is Wayscope's reading of the rules</span>
+            <span className="ml-auto flex gap-2"><button type="button" className="btn-sec" disabled={busy} onClick={() => { setForm(null); setPreview(null); }}>Cancel</button>
+              <button type="button" className="btn-pri" disabled={busy} onClick={save}>{form.id ? "Save" : "Save as pending"}</button></span></div>
+          <div className="al-form">
+            <div>
+              <h4 className="al-h4">The load</h4>
+              {field("What it is", "name")}
+              <div className="al-row2">
+                <label className="al-fld">{TEAM()}<select className="ctl ctl-sm" value={form.ipt || ""} disabled={teamLocked} aria-label={TEAM()} onChange={e => upd("ipt", e.target.value)}>
+                  <option value="">Choose…</option>{teams.map(t => <option key={t.id} value={t.id}>{t.label || teamName(t.id)}</option>)}</select></label>
+                <label className="al-fld">Vehicle<select className="ctl ctl-sm" value={form.vehicle_type || ""} aria-label="Vehicle" onChange={e => upd("vehicle_type", e.target.value)}>
+                  <option value="">Not said</option>{(choices.vehicle_types || []).map(v => <option key={v.key} value={v.key}>{v.word}</option>)}</select></label>
+              </div>
+              <div className="al-row2">
+                <label className="al-fld">From<select className="ctl ctl-sm" value={form.origin_id || ""} aria-label="From" onChange={e => { upd("origin_id", e.target.value); upd("origin_gate_id", ""); }}>
+                  <option value="">Choose…</option>{(choices.locations || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+                <label className="al-fld">Gate<select className="ctl ctl-sm" value={form.origin_gate_id || ""} aria-label="From gate" onChange={e => upd("origin_gate_id", e.target.value)}>
+                  <option value="">Its default</option>{gatesOf(form.origin_id).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+              </div>
+              <div className="al-row2">
+                <label className="al-fld">To<select className="ctl ctl-sm" value={form.dest_id || ""} aria-label="To" onChange={e => { upd("dest_id", e.target.value); upd("dest_gate_id", ""); }}>
+                  <option value="">Choose…</option>{(choices.locations || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+                <label className="al-fld">Gate<select className="ctl ctl-sm" value={form.dest_gate_id || ""} aria-label="To gate" onChange={e => upd("dest_gate_id", e.target.value)}>
+                  <option value="">Its default</option>{gatesOf(form.dest_id).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+              </div>
+              <div className="al-row3">
+                {field("Earliest *", "date_from", { type: "date" })}
+                {field("Latest", "date_to", { type: "date" })}
+                <label className="al-fld">Band<select className="ctl ctl-sm" value={form.time_band || "day"} aria-label="Band" onChange={e => upd("time_band", e.target.value)}>
+                  <option value="day">Day</option><option value="night">Night</option></select></label>
+              </div>
+              <div className="al-row2">
+                {field("Movements", "movements", { type: "number", min: "1", step: "1" })}
+                <label className="al-fld">Escort planned<select className="ctl ctl-sm" value={form.escort_planned || "none"} aria-label="Escort planned" onChange={e => upd("escort_planned", e.target.value)}>
+                  <option value="none">None</option><option value="attendant">Attendant</option><option value="private">Private</option><option value="police">Police</option></select></label>
+              </div>
+              <label className="al-tick"><input type="checkbox" checked={!!form.indivisible} onChange={e => upd("indivisible", e.target.checked)} /> One indivisible item (the planner's declaration, STGO Sch 1 para 2)</label>
+              <label className="al-tick"><input type="checkbox" checked={!!form.return_abnormal} onChange={e => upd("return_abnormal", e.target.checked)} /> The return leg is abnormal too (a crane: drawn and counted both ways)</label>
+              <label className="al-tick"><input type="checkbox" checked={!!form.cu_vehicle} onChange={e => upd("cu_vehicle", e.target.checked)} /> Vehicle within the C&amp;U limits (the notice regime is C&amp;U, not STGO)</label>
+              <div className="al-row3">{field("ESDAL ref", "esdal_ref")}{field("VR1 ref", "vr1_ref")}{field("Special Order ref", "so_ref")}</div>
+              <div className="al-row2">{field("Applied for on", "applied_on", { type: "date" })}{field("Notified on", "notified_on", { type: "date" })}</div>
+              <label className="al-fld">Note<textarea className="ctl ctl-sm" rows={2} value={form.note || ""} aria-label="Note" onChange={e => upd("note", e.target.value)} /></label>
+            </div>
+            <div>
+              <h4 className="al-h4">Size and weight (metres, tonnes)</h4>
+              <div className="al-row3">{num("Overall width", "width_m", true)}{num("Travelling height", "height_m", true)}{num("Overall length", "length_m", true)}</div>
+              <div className="al-row3">{num("Rigid length", "rigid_length_m")}{num("Front projection", "proj_front_m")}{num("Rear projection", "proj_rear_m")}</div>
+              <div className="al-row3">{num("Side projection", "proj_side_m")}{num("Gross weight", "gross_t", true)}{num("Heaviest axle", "max_axle_t")}</div>
+              <label className="al-tick"><input type="checkbox" checked={!!form.axle_driving} onChange={e => upd("axle_driving", e.target.checked)} /> The heaviest axle is a driving axle (the normal limit is then 11.5 t, not 10 t)</label>
+              <div className="al-row2">{field("Axles", "axle_count", { type: "number", min: "1", step: "1" })}{field("Axle spacings (m, between adjacent axles)", "axle_spacings_m", { placeholder: "1.36, 1.36, 1.8" })}</div>
+              <p className="text-[13px] text-slate-500 mt-1">* required. A blank is never guessed: the panel says what it leaves untested. Figures far outside a lorry's (a slipped decimal point) are refused in words.</p>
+            </div>
+            <div>
+              <h4 className="al-h4">What the rules say</h4>
+              <AlAdvice adv={preview} />
+            </div>
+          </div>
+        </div>
+      )}
+      {!data && !err && <SkeletonTable cols={["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""]} rows={3} caption="Abnormal loads" />}
+      {data && !movements.length && !form && (
+        <EmptyState title="No abnormal loads planned yet" body="Plan the first one: what it is, where it goes, when, and its size and weight. The rules' advice appears as you type."
+          action={<button type="button" className="btn-pri" onClick={startNew}>Plan an abnormal load</button>} />
+      )}
+      {data && movements.length > 0 && (
+        <div className="card overflow-auto" data-guide="al-list">
+          <table className="tbl al-tbl">
+            <caption><b>Abnormal loads</b> · {movements.length} · oldest window first</caption>
+            <thead><tr>{["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""].map((h, i) => <th key={i} scope="col" className={i === 9 ? "text-right" : ""}>{h}</th>)}</tr></thead>
+            <tbody>
+              {movements.map(m => {
+                const [cw, ct] = alClass(m.advice);
+                const isOpen = open === m.id;
+                return (<React.Fragment key={m.id}>
+                  <tr data-al-row={m.id} className={isOpen ? "al-open" : ""}>
+                    <td><button type="button" className={"al-tri" + (isOpen ? " is-open" : "")} aria-expanded={isOpen} aria-label={`${isOpen ? "Close" : "Open"} ${m.name}`} onClick={() => setOpen(isOpen ? null : m.id)}>›</button></td>
+                    <td><div className="font-medium text-slate-800">{m.name}</div><div className="text-[13px] text-slate-500">{[m.vehicle_word, alSize(m)].filter(Boolean).join(" · ")}</div></td>
+                    <td>{m.team_name || "—"}</td>
+                    <td><div>{m.origin_name} → {m.dest_name}</div>{(m.dest_gate_name || m.origin_gate_name) && <div className="text-[13px] text-slate-500">{[m.origin_gate_name, m.dest_gate_name].filter(Boolean).join(" → ")}</div>}</td>
+                    <td><div>{alWindow(m.date_from, m.date_to)}</div><div className="text-[13px] text-slate-500">{m.time_band} · {m.movements} movement{m.movements === 1 ? "" : "s"}{m.return_abnormal ? " (in and out)" : ""}</div></td>
+                    <td><AlChip tone={ct}>{cw}</AlChip><div className="text-[13px] text-slate-500">{(m.advice && m.advice.summary || "").replace(/^(Special Order|VR1|STGO Cat [123]|C&U)( · )?/, "")}</div></td>
+                    <td><div>{m.advice && m.advice.notify_by ? alDay(m.advice.notify_by) : "—"}{" "}{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}</div>
+                      {m.advice && m.advice.apply_by && <div className="text-[13px] text-slate-500">apply by {alDay(m.advice.apply_by)}</div>}</td>
+                    <td data-al-route-cell={m.routed ? "drawn" : "none"}>{m.routed
+                      ? <><div className="whitespace-nowrap">{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>
+                          <div className="text-[13px] text-slate-500">{(m.candidates || []).length} to survey{(m.route_notes || []).some(n => /at most/.test(n)) ? " · drawn at 30 m" : ""}{(m.limit_exceeds || []).length ? ` · ${m.limit_exceeds.length} limit${m.limit_exceeds.length === 1 ? "" : "s"} over` : ""}</div></>
+                      : <span className="text-[13px] text-slate-500">{m.bake_error ? "not drawn (see the row)" : "not drawn"}</span>}</td>
+                    <td><StatusWord status={{ pending: "Pending", approved: "Approved", notified: "Approved", moved: "confirmed", withdrawn: "Rejected" }[m.status]} label={m.status_word} /></td>
+                    <td className="text-right whitespace-nowrap">
+                      <button type="button" className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>
+                      {canApprove && <>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => draw(m)}
+                        title={m.routed ? "Draw the line again for the load's size" : "Draw the line for the load's size"}>{m.routed ? "Draw the route again" : "Draw the route"}</button></>}
+                      {" "}<button type="button" className="link-btn" disabled={busy} onClick={() => dl(`/abnormal/${encodeURIComponent(m.id)}/esdal.pdf`, `esdal-details-${m.id}.pdf`)}
+                        title="The fields ESDAL asks for, as typed and as advised, for the haulier to copy across — a PDF; nothing is sent">ESDAL sheet</button>
+                      {nextOf(m).map(s => <React.Fragment key={s}>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => setStatus(m, s)}>{AL_NEXT_WORD[s] || s}</button></React.Fragment>)}
+                      {canDelete(m) && <>{" "}<button type="button" className="link-btn" style={{ color: "var(--red)" }} disabled={busy} onClick={() => del(m)}>Delete</button></>}
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="al-det-row" data-al-details={m.id}><td colSpan={10}>
+                      <div className="al-det">
+                        <div className="al-route" style={{ gridColumn: "1 / -1" }} data-al-route={m.routed ? "drawn" : "none"}>
+                          {!m.routed && <p className="text-sm text-slate-600">{m.bake_error ? <span style={{ color: "var(--bad-text)" }}>The line could not be drawn: {m.bake_error}</span>
+                            : <>No line drawn yet.{canApprove ? " Press Draw the route: the line is drawn for the load's size, and the potential pinch points are listed here." : " A planner draws it."}</>}</p>}
+                          {m.routed && <>
+                            <h4 className="al-h4">The route · indicative, drawn for the load's size</h4>
+                            <dl className="al-dl">
+                              <dt>Length, time</dt><dd>{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min (as routed){m.return_geometry ? " · the return leg drawn too" : ""}</dd>
+                              <dt>Roads</dt><dd>{m.roads_words || "—"}</dd>
+                              {(m.route_notes || []).map((n, i) => <React.Fragment key={i}><dt>Note</dt><dd style={{ color: "var(--warn-text)" }}>{n}</dd></React.Fragment>)}
+                              <dt>Motorway</dt><dd>{m.has_motorway ? "on the line: the escort rule's motorway figures apply there" : "none on the line (the escort rule's other-roads figures apply)"}</dd>
+                              <dt>Drawn</dt><dd>{m.baked_at ? alDay(m.baked_at.slice(0, 10)) : "—"}{(m.via || []).length ? ` · ${m.via.length} via point${m.via.length === 1 ? "" : "s"}` : ""}</dd>
+                            </dl>
+                            <div className="al-h4row"><h4 className="al-h4">Potential pinch points · {(m.candidates || []).length} found, graded Grey (to survey) · the route survey decides</h4>
+                              {canApprove && <button type="button" className="btn-sec btn-sm" disabled={busy} onClick={() => checkRoads(m)} data-al-check={m.id}
+                                title="Look again along the drawn line for OpenStreetMap's structures and limits (after Fetch now on Config → Map and bulletin); the line is not drawn again">Check the roads again</button>}</div>
+                            {(m.candidates || []).length === 0 && <p className="text-sm text-slate-500">None found on this line: no turn, roundabout, sharp bend, structure, crossing or signed limit the load is over.</p>}
+                            {(m.candidates || []).length > 0 && <table className="al-ptbl" data-al-pinch={m.id}>
+                              <thead><tr><th></th><th>Kind</th><th>Where / what</th><th>From</th><th>Grade</th></tr></thead>
+                              <tbody>{m.candidates.map(c => (
+                                <tr key={c.id}>
+                                  <td className="font-semibold whitespace-nowrap">{c.id}</td>
+                                  <td>{AL_KIND_WORDS[c.kind] || c.kind}</td>
+                                  <td>{c.words}{c.detail ? <span className="text-slate-500"> · {c.detail}</span> : null}{c.note ? <div className="text-[13px]" style={{ color: "var(--warn-text)" }}>{c.note}</div> : null}</td>
+                                  <td className="text-slate-500 whitespace-nowrap">{{ here: "the route's directions", line: "the line", limits: "signed limit", osm: "OpenStreetMap" }[c.source] || c.source}</td>
+                                  <td>{canApprove
+                                    ? <select className="ctl ctl-sm" value={c.grade || "grey"} aria-label={`Grade of ${c.id}`} disabled={busy} onChange={e => grade(m, c.id, e.target.value)}>
+                                        {AL_GRADES.map(([k, w]) => <option key={k} value={k}>{w}</option>)}</select>
+                                    : <AlChip tone={c.grade === "grey" || !c.grade ? "grey" : c.grade === "green" ? "okc" : c.grade === "amber" ? "warn" : "bad"}>{(AL_GRADES.find(g => g[0] === (c.grade || "grey")) || ["", c.grade])[1]}</AlChip>}</td>
+                                </tr>))}</tbody>
+                            </table>}
+                            {(m.limits_hits || []).length > 0 && <>
+                              <h4 className="al-h4" style={{ marginTop: 10 }}>Signed limits on the line, at the load's size</h4>
+                              <ul className="al-lines">{m.limits_hits.map((h, i) => <li key={i} style={h.verdict === "exceeds" ? { color: "var(--bad-text)" } : undefined}>
+                                {h.headline}: the load's {h.vehicle_value != null ? `${h.vehicle_value} ${h.unit}` : "figure"} {h.verdict === "exceeds" ? "is over it" : h.verdict === "at_limit" ? "is exactly at it" : h.verdict === "within" ? "is within it" : "could not be compared"}{h.note ? ` — ${h.note}` : ""}</li>)}</ul>
+                            </>}
+                            <p className="al-foot">{AL_CANDIDATE_WORDS}</p>
+                            {words.structures && <p className="al-foot">{words.structures}</p>}
+                          </>}
+                          {(typedRows(m).length > 0 || canApprove) && <div className="al-typed" data-al-typed={m.id}>
+                            <h4 className="al-h4">Your own pinch points · {typedRows(m).length} · the survey's list</h4>
+                            {typedRows(m).length > 0 && <table className="al-ptbl"><thead><tr><th></th><th>Kind</th><th>Where</th><th>What</th><th>Grade</th><th>Owner · measure · permit · works · link · note</th>{canApprove && <th></th>}</tr></thead>
+                              <tbody>{typedRows(m).map((t, i) => canApprove ? (
+                                <tr key={i} className="al-typed-row">
+                                  <td className="font-semibold whitespace-nowrap">{t.id || `T${i + 1}`}</td>
+                                  <td><select className="ctl ctl-sm" value={t.kind || "other"} aria-label={`Kind of ${t.id || "the new row"}`} onChange={e => editTyped(m, i, "kind", e.target.value)}>
+                                    {AL_TYPED_KINDS.map(k => <option key={k} value={k}>{AL_KIND_WORDS[k]}</option>)}</select></td>
+                                  <td><input className="ctl ctl-sm" value={t.place || ""} aria-label="Where" placeholder="Welland bridge" onChange={e => editTyped(m, i, "place", e.target.value)} /></td>
+                                  <td><input className="ctl ctl-sm" value={t.words || ""} aria-label="What" placeholder="Arch bridge, headroom 3.9 m at the kerb" onChange={e => editTyped(m, i, "words", e.target.value)} /></td>
+                                  <td><select className="ctl ctl-sm" value={t.grade || "grey"} aria-label={`Grade of ${t.id || "the new row"}`} onChange={e => editTyped(m, i, "grade", e.target.value)}>
+                                    {AL_GRADES.map(([k, w]) => <option key={k} value={k}>{w}</option>)}</select></td>
+                                  <td className="al-typed-more">{[["owner", "Owner"], ["measure", "Measure"], ["permit", "Permit"], ["works", "Works"], ["link", "Link"], ["note", "Note"]].map(([k, l]) =>
+                                    <input key={k} className="ctl ctl-sm" value={t[k] || ""} aria-label={l} placeholder={l} onChange={e => editTyped(m, i, k, e.target.value)} />)}</td>
+                                  <td className="text-right whitespace-nowrap"><button type="button" className="link-btn" style={{ color: "var(--red)" }} disabled={busy} onClick={() => removeTyped(m, i)}>Remove</button></td>
+                                </tr>) : (
+                                <tr key={i} className="al-typed-row">
+                                  <td className="font-semibold whitespace-nowrap">{t.id}</td><td>{AL_KIND_WORDS[t.kind] || t.kind}</td><td>{t.place}</td><td>{t.words}</td>
+                                  <td><AlChip tone={t.grade === "grey" || !t.grade ? "grey" : t.grade === "green" ? "okc" : t.grade === "amber" ? "warn" : "bad"}>{(AL_GRADES.find(g => g[0] === (t.grade || "grey")) || ["", t.grade])[1]}</AlChip></td>
+                                  <td className="text-slate-500">{[t.owner, t.measure, t.permit, t.works, t.link, t.note].filter(Boolean).join(" · ")}</td>
+                                </tr>))}</tbody></table>}
+                            {canApprove && <div className="al-typed-actions">
+                              <button type="button" className="btn-sec btn-sm" disabled={busy} onClick={() => addTyped(m)}>+ Add your own pinch point</button>
+                              {typedDraft[m.id] !== undefined && <button type="button" className="btn-pri btn-sm" disabled={busy} onClick={() => saveTyped(m)}>Save your own rows</button>}
+                              <span className="text-[13px] text-slate-500">What the data cannot know, with its owner, the measure needed, the permit, the works dates and a link to the drawing. A found pinch point's grade saves as you change it.</span></div>}
+                          </div>}
+                          {canApprove && <div className="al-via">
+                            <label className="al-fld">Via points, one a line as latitude, longitude (in travel order, up to 10; the line is drawn again on the next Draw)
+                              <textarea className="ctl ctl-sm" rows={2} value={viaText[m.id] !== undefined ? viaText[m.id] : (m.via || []).map(p => `${p[0]}, ${p[1]}`).join("\n")}
+                                aria-label="Via points" onChange={e => setViaText(v => ({ ...v, [m.id]: e.target.value }))} /></label>
+                            <button type="button" className="btn-sec btn-sm" disabled={busy || viaText[m.id] === undefined} onClick={() => saveVia(m)}>Save via points</button>
+                          </div>}
+                        </div>
+                        <div>
+                          <h4 className="al-h4">What the rules say{m.advice && m.advice.category_words ? ` · ${m.advice.category_words}` : ""}</h4>
+                          <AlAdvice adv={m.advice} compact />
+                        </div>
+                        <div>
+                          <h4 className="al-h4">The load</h4>
+                          <dl className="al-dl">
+                            <dt>Overall width</dt><dd>{alFmt(m.width_m, "m")}</dd><dt>Travelling height</dt><dd>{alFmt(m.height_m, "m")}</dd><dt>Overall length</dt><dd>{alFmt(m.length_m, "m")}</dd>
+                            {alN(m.rigid_length_m) !== null && <><dt>Rigid length</dt><dd>{alFmt(m.rigid_length_m, "m")}</dd></>}
+                            {(alN(m.proj_front_m) || alN(m.proj_rear_m) || alN(m.proj_side_m)) ? <><dt>Projections</dt><dd>front {alFmt(m.proj_front_m, "m")}, rear {alFmt(m.proj_rear_m, "m")}, side {alFmt(m.proj_side_m, "m")}</dd></> : null}
+                            <dt>Gross weight</dt><dd>{alFmt(m.gross_t, "t")}</dd><dt>Heaviest axle</dt><dd>{alFmt(m.max_axle_t, "t")}{m.axle_driving ? " (driving)" : ""}</dd>
+                            <dt>Axles</dt><dd>{alN(m.axle_count) !== null ? m.axle_count : "—"}{m.axle_spacings_m ? ` (spacings ${m.axle_spacings_m})` : " (spacings not typed)"}</dd>
+                            <dt>Vehicle</dt><dd>{m.vehicle_word || "—"}</dd><dt>Indivisible</dt><dd>{m.indivisible ? "declared" : "not declared"}</dd>
+                            <dt>Escort planned</dt><dd>{m.escort_planned || "none"}</dd><dt>Return leg</dt><dd>{m.return_abnormal ? "abnormal too (drawn and counted both ways)" : "empty, within the normal limits"}</dd>
+                            {m.note && <><dt>Note</dt><dd>{m.note}</dd></>}
+                          </dl>
+                          <h4 className="al-h4">References</h4>
+                          <dl className="al-dl">
+                            <dt>ESDAL</dt><dd>{m.esdal_ref || "—"}</dd>
+                            {m.advice && m.advice.permission === "vr1" && <><dt>VR1</dt><dd>{m.vr1_ref || "—"}{m.applied_on ? ` (applied for on ${alDay(m.applied_on)})` : ""}</dd></>}
+                            {m.advice && m.advice.permission === "special_order" && <><dt>Special Order</dt><dd>{m.so_ref || "—"}{m.applied_on ? ` (applied for on ${alDay(m.applied_on)})` : " (not applied for)"}</dd></>}
+                            <dt>Notified on</dt><dd>{m.notified_on ? alDay(m.notified_on) : "—"}</dd>
+                          </dl>
+                        </div>
+                        <p className="al-foot" style={{ gridColumn: "1 / -1" }}>{words.advice}{m.created_by ? ` Planned by ${m.created_by}${m.created_at ? ", " + alDay(m.created_at.slice(0, 10)) : ""}.` : ""}</p>
+                      </div>
+                    </td></tr>
+                  )}
+                </React.Fragment>);
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {data && <p className="text-[12px] text-slate-500 mt-3" data-al-words="1">{words.advice} {words.not_modelled} {words.counted_apart}</p>}
+    </div>
+  );
 }
 
 // ================================================================= Public map
@@ -4608,6 +5204,8 @@ const NAV = [
     { id: "submit", label: "Submit forecast", glyph: "✎" },
     { id: "forecasts", label: "Forecasts", glyph: "☰" },
     { id: "carbon", label: "Carbon planner", glyph: "◐" },
+    // 22 Oct 2026 (S16 / B5): each abnormal load planned on its own; a team code plans its own, a planner approves
+    { id: "abnormal", label: "Abnormal loads", glyph: "⬌" },
   ]},
   { group: "Track", items: [
     { id: "lookahead", label: "Look-ahead", glyph: "◔" },
@@ -4638,6 +5236,7 @@ const NAV_ICON = {
   zones: "M12 3l8 4.5v9L12 21l-8-4.5v-9z",
   config: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h2M3 12h2M12 3v2M12 19v2M17 7l1.4-1.4M5.6 18.4L7 17M17 17l1.4 1.4M5.6 5.6L7 7",
   map: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
+  abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
 };
 function NavIcon({ id }){
   return <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={NAV_ICON[id] || NAV_ICON.forecasts} /></svg>;
@@ -4972,6 +5571,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {page === "submit" && !narrow && <Matrix meta={meta} who={who} editTarget={editTarget} vehLang={vehLang} access={role} />}
         {page === "forecasts" && !narrow && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
         {page === "carbon" && !narrow && <CarbonPage meta={meta} access={role} who={who} />}
+        {page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}
         {page === "lookahead" && !narrow && <LookAhead meta={meta} who={who} access={role} />}
         {page === "lookahead" && narrow && <PhoneLookAhead meta={meta} />}
         {/* one mounted instance across the three data pages — see the note at the top */}
@@ -7416,6 +8016,33 @@ function gwCfg(g, labels){
       tooltip: { callbacks: { label: (it) => it.datasetIndex === 0 ? `${grp(g.days[it.dataIndex].arrivals)} lorries planned${g.days[it.dataIndex].pct != null ? ` · ${g.days[it.dataIndex].pct} %` : ""}` : `${it.dataset.label}: ${grp(it.parsed.y)}` } } },
       scales: { x: { grid: { display: false } }, y: { title: { display: true, text: "lorries a day" } } } } };
 }
+// 22 Oct 2026 (abnormal loads, phase 2): the movements whose window touches the committed week, under the gates' week.
+// Not a line in the grid and never in the week's figures (D70): the server's briefs, printed; the chips are the rail's words.
+function AbnormalWeek({ ab }){
+  if(!ab || !ab.count) return null;
+  const esc = (e) => ({ none: "no escort", attendant: "attendant", private: "private escort", police: "police escort" }[e] || e);
+  return (
+    <div className="card p-4 mt-4" data-abnormal-week="1">
+      <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Abnormal loads this week · {ab.count} · counted apart from the lorries</h3>
+      <div className="overflow-auto"><table className="tbl al-tbl">
+        <thead><tr>{["Load", "When", "What it needs", "Route", "Status"].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+        <tbody>{(ab.movements || []).map(m => {
+          const [cw, ct] = alClass({ permission: m.permission, category: m.category, abnormal: true });
+          return (
+            <tr key={m.id} data-abnormal-week-row={m.id}>
+              <td><div className="font-medium text-slate-800">{m.name}</div><div className="text-[13px] text-slate-500">{m.team_name} · {m.origin_name} → {m.dest_name}{m.dest_gate_name ? `, ${m.dest_gate_name}` : ""}</div></td>
+              <td><div>{alWindow(m.date_from, m.date_to)}</div><div className="text-[13px] text-slate-500">{m.time_band} · {m.movements} movement{m.movements === 1 ? "" : "s"} · {esc(m.escort_planned)}</div></td>
+              <td><AlChip tone={ct}>{cw}</AlChip><div className="text-[13px] text-slate-500">{(m.summary || "").replace(/^(Special Order|VR1|STGO Cat [123]|C&U)( · )?/, "")}</div></td>
+              <td>{m.routed ? <>{fmtDist(m.distance_km)} {DU()} <AlChip tone="grey">{m.candidates} to survey</AlChip></> : <span className="text-slate-500">not drawn</span>}</td>
+              <td><span className={"sw"}>{m.status_word}</span> {(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}
+                {m.notify_by && <div className="text-[13px] text-slate-500">notify by {alDay(m.notify_by)}</div>}</td>
+            </tr>);
+        })}</tbody>
+      </table></div>
+      <p className="text-[12px] text-slate-500 mt-2">{ab.words}</p>
+    </div>
+  );
+}
 function GatesWeek({ gw }){
   if(!gw || !(gw.gates || []).length) return null;
   const gs = gw.gates;
@@ -7456,7 +8083,9 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
                      ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
                      LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED",
                      // 14 Oct 2026 (bundle G, W17)
-                     GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY" };
+                     GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",
+                     // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
+                     NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
@@ -7473,7 +8102,7 @@ const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOC
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
-const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR") ? "warn" : "bad";
+const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -8083,6 +8712,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 
           {/* 14 Oct 2026 (bundle G, W17): the committed week at each gate, against what it can check in */}
           {lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}
+          {page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}
           {/* 10 Sep: this week's movements on a map, in place of the stock card (now on
               the Dashboard). Drawn from the baked geometry of the lines on this page;
               its own small fetch, off the page read, so it cannot slow the grid. */}

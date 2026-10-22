@@ -1946,7 +1946,7 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
 // prints; identifiers and comments are not copy. Vehicle NAMES come from the tenant's factors, not here.
 {
   const strings = (code.match(/'[^'\r\n]*'|"[^"\r\n]*"|`[^`]*`/g) || []).filter(s => !/^['"`]\s*$/.test(s));
-  const trucks = strings.filter(s => /trucks?/i.test(s) && !/Truck mixer/.test(s));
+  const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s));
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
   ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
   ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (average laden, both legs, tailpipe only, set on Config)",
@@ -6208,6 +6208,70 @@ function qrRead(mod) {
 }
 
 // 12 Oct 2026 (fix pass): wait for the sandboxes' promises, then print the summary as before
+// ---- 22 Oct 2026: the abnormal loads group on the staff map (phase 2, D67) ------------------
+{
+  const grp = html.slice(html.indexOf('<div class="control-group" id="abnormal-group" hidden>'), html.indexOf('<div class="control-group" id="restrictions-group" hidden>'));
+  ok("⭐ ABN: an 'Abnormal loads' control group after the collision history, HIDDEN in the markup, with the show tick, the dots and approved-only ticks folded, a legend and a when line",
+     grp.length > 300 && grp.includes("<h3>Abnormal loads</h3>") && grp.includes('<input type="checkbox" id="layer-abnormal" onchange="toggleAbnormal(this.checked)">')
+     && grp.includes('<div id="abnormal-filters" hidden>') && grp.includes('id="abn-dots" checked') && grp.includes('id="abn-approved"')
+     && grp.includes('id="abnormal-legend"') && grp.includes('id="abnormal-when"'));
+  ok("🔴 ABN: shown only when whoami says staff (abnormalStaff from checkRouteExportStaff, beside the community and collision groups); off by default; read only when ticked, from /api/abnormal/geojson",
+     src.includes("communityStaff(RME.staff); collisionStaff(RME.staff); abnormalStaff(RME.staff); })")
+     && src.includes("function abnormalStaff(staff) {") && src.includes("if (g) g.hidden = !ABN.staff;")
+     && src.includes("const ABN = { staff: false, on: false, data: null, loading: false, dots: true, approved: false };")
+     && src.includes("if (ABN.on && !ABN.data) loadAbnormal();") && src.includes("fetch('/api/abnormal/geojson', { credentials: 'same-origin' })")
+     && (src.match(/fetch\('\/api\/abnormal\/geojson'/g) || []).length === 1);
+  ok("⭐ ABN: the line is violet dashes (its own style: not the blue routes, the green / amber legs or the red breach), the dots one colour a kind with a white edge, the kind told by the dot; " +
+     "the layers come back after a basemap change like the collision layers",
+     src.includes("const ABN_LINE = '#7C3AED';") && src.includes("'line-dasharray': [2, 1.5]") && src.includes("'circle-stroke-color': '#ffffff'")
+     && src.includes("['match', ['get', 'kind'], 'turn', ABN_DOT.turn, 'roundabout', ABN_DOT.roundabout, 'slip_road', ABN_DOT.slip_road,")
+     && src.includes("const ABN_LAYERS = ['abnormal-lines', 'abnormal-points'];")
+     && (src.match(/if \(typeof ABN !== 'undefined' && ABN\.data\) ensureAbnormalLayers\(\);/g) || []).length === 2);
+  {
+    const fnSrc = src.slice(src.indexOf("function abnWhen(from, to, band) {"), src.indexOf("function abnormalLinePopup(e) {"));
+    const abnWhen = new Function(fnSrc + "; return abnWhen;")();
+    ok("ABN: the line popup prints the window in words like the app (8–12 Mar 2027 / 28 Mar – 2 Apr 2027 / 30 Dec 2026 – 2 Jan 2027, then the band), never ISO dates — seen as '2027-03-08 to 2027-03-12' on the local copy, 22 Oct",
+       src.includes("const when = abnWhen(p.date_from, p.date_to, p.time_band);") && !src.includes("const when = (p.date_from || '')")
+       && abnWhen("2027-03-08", "2027-03-12", "day") === "8–12 Mar 2027, day" && abnWhen("2027-04-05", "2027-04-05", null) === "5 Apr 2027"
+       && abnWhen("2027-03-28", "2027-04-02", "night") === "28 Mar – 2 Apr 2027, night" && abnWhen("2026-12-30", "2027-01-02", "") === "30 Dec 2026 – 2 Jan 2027"
+       && abnWhen("", "", "day") === "" && abnWhen("2027-04-05", null, "day") === "5 Apr 2027, day",
+       [abnWhen("2027-03-08", "2027-03-12", "day"), abnWhen("2027-03-28", "2027-04-02", "night")].join(" | "));
+  }
+  ok("ABN: the approved-only tick filters the lines on the server's status; the dots tick hides the points; the two filters never read anything new",
+     src.includes("['in', ['get', 'status'], ['literal', ['approved', 'notified', 'moved']]]") && src.includes("map.setLayoutProperty('abnormal-points', 'visibility', (ABN.on && ABN.dots) ? 'visible' : 'none');")
+     && src.includes("function abnormalFilterChanged() {") && !/function abnormalFilterChanged\(\) \{[^}]*fetch/.test(src));
+  const abnSrc = src.slice(src.indexOf("// ---------------------------------------------------------------- the abnormal loads (22 Oct 2026, phase 2, D67)"), src.indexOf("function abnormalFilterChanged() {"));
+  const abnStrings = abnSrc.match(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g) || [];
+  ok("🔴 ABN wording: the popups say indicative and to survey, the panel says counted apart and staff only; lorry never truck; none of the banned words",
+     abnSrc.includes("Grey — to survey") && abnSrc.includes("the route survey decides") && abnSrc.includes("Staff only.")
+     && abnStrings.length > 40 && !abnStrings.some(x => /\b(truck|real-time|live tracking|telematics|optimi[sz]e|predict|compliant|approved by)\b/i.test(x) || /\bsecure\b|\bAI\b/.test(x)));
+}
+
+// ---- 22 Oct 2026: the abnormal loads, phase 3 — the public map's approved layer (D68), the structures' dots ------------
+{
+  const grp = html.slice(html.indexOf('<div class="control-group" id="abnormal-public-group">'), html.indexOf('<div class="control-group" id="restrictions-group" hidden>'));
+  ok("⭐ ABP: the public map's abnormal loads — an 'Abnormal loads (approved)' box for every visitor, a layer-* box (in a shared link as abnormal-public), off by default, with the indicative words; hidden for staff, whose own group shows everything",
+     grp.length > 200 && grp.includes('<input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)"> Abnormal loads (approved)')
+     && !grp.includes(" checked") && grp.includes('id="abnormal-public-when"') && grp.includes("Indicative: the agreed route may differ.")
+     && src.includes("const pg = document.getElementById('abnormal-public-group');") && src.includes("if (pg) pg.hidden = ABN.staff;"));
+  ok("🔴 ABP: read ONCE from /api/public/abnormal when ticked (behind the map password), drawn as the same violet dashes on its own layer, back after a basemap change like the staff layers; the popup prints the window, the movements, 'escorted', the roads and the indicative words — never the size, the team, the references or a dot",
+     (src.match(/fetch\('\/api\/public\/abnormal'/g) || []).length === 1 && src.includes("const ABP = { on: false, data: null, loading: false };")
+     && src.includes("map.addLayer({ id: 'abnormal-public-lines', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],")
+     && src.includes("paint: { 'line-color': ABN_LINE, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.5, 13, 5], 'line-dasharray': [2, 1.5], 'line-opacity': 0.9 } });\n        map.on('click', 'abnormal-public-lines', e => abnormalPublicPopup(e));")
+     && (src.match(/if \(typeof ABP !== 'undefined' && ABP\.data\) ensureAbnormalPublicLayers\(\);/g) || []).length === 2
+     && (() => { const pop = src.slice(src.indexOf("function abnormalPublicPopup(e) {"), src.indexOf("function renderAbnormalPublicPanel() {"));
+                 return pop.includes("p.public_words || 'Indicative route; the agreed route may differ.'") && pop.includes("abnWhen(p.date_from, p.date_to, p.time_band)")
+                     && !pop.includes("p.size") && !pop.includes("p.team_name") && !pop.includes("p.name") && !pop.includes("p.candidates") && !pop.includes("esdal"); })());
+  ok("ABP: the panel line counts the approved loads drawn and lists their windows; nothing drawn says so; the words never promise the route",
+     src.includes("when.textContent = n ? `${n} approved: ${lines.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`")
+     && src.includes("'No approved abnormal load has a line drawn yet.'"));
+  ok("ABN (phase 3): the structure kinds have their own dot colours in the community layer's palette (bridge, railway, level crossing, calming, overhead line), in the match and the legend; a dot found in OpenStreetMap says so in its popup",
+     src.includes("bridge: '#1F2024', railway: '#4338CA', level_crossing: '#DB2777', calming: '#A16207', overhead: '#0891B2' };")
+     && src.includes("'bridge', ABN_DOT.bridge, 'railway', ABN_DOT.railway, 'level_crossing', ABN_DOT.level_crossing,")
+     && src.includes("['bridge', 'bridge'], ['railway', 'railway'], ['level_crossing', 'level crossing'], ['calming', 'traffic calming'], ['overhead', 'overhead line']]")
+     && src.includes("p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'the route’s directions'") && src.includes("The structures are OpenStreetMap’s, as fetched."));
+}
+
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
   for (const f of fail) console.log("  FAIL:", f);

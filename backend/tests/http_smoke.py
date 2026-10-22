@@ -1407,10 +1407,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
                for a in ar["areas"]), r.text[:200])
     # NARROWED 14 Oct 2026 (civils materials): the batching plant is a fourteenth site, in Melton
     # RE-PINNED 17 Oct 2026 (R2, §3a): the asphalt plant and Welland Ready-Mix are both in Harborough (10 of 16)
-    ok("...the demo's sites where the package coordinates put them (Harborough 10, Melton 3, Blaby, Charnwood, Rutland 1)",
-       [_by.get(n, {}).get("sites_count") for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland")] == [10, 3, 1, 1, 1])
-    ok("...of the 16 the totals carry (the card's '10 of 16'), and one label point per area for the map's one label",
-       ar.get("totals", {}).get("sites") == 16
+    # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): the crane depot in Charnwood, the precast works in Hinckley and Bosworth (18)
+    ok("...the demo's sites where the package coordinates put them (Harborough 10, Melton 3, Blaby 1, Charnwood 2, Rutland 1, Hinckley and Bosworth 1)",
+       [_by.get(n, {}).get("sites_count") for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland", "Hinckley and Bosworth")] == [10, 3, 1, 2, 1, 1])
+    ok("...of the 18 the totals carry (the card's '10 of 18'), and one label point per area for the map's one label",
+       ar.get("totals", {}).get("sites") == 18
        and all(isinstance(a.get("label_point"), list) and len(a["label_point"]) == 2 for a in ar.get("areas", [])), r.text[:200])
     ok("...and the October lines are named as undrawn, never counted in an area",
        len(ar.get("routes_not_drawn", [])) == 13 and ar.get("totals", {}).get("loads") == 0)   # NARROWED 14 Oct: 21 routes; RE-PINNED 17 Oct: 13
@@ -1613,7 +1614,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and len(pkg["tables"]["routes"]) == len(DEMO["tables"]["routes"]) == 43
        and len(pkg["tables"]["forecasts"]) == len(DEMO["tables"]["forecasts"]) == 907
        and len(pkg["tables"]["forecast_weeks"]) >= len(DEMO["tables"]["forecast_weeks"])
-       and len(pkg["tables"]["location_gates"]) == len(DEMO["tables"]["location_gates"]) == 19)
+       and len(pkg["tables"]["location_gates"]) == len(DEMO["tables"]["location_gates"]) == 21      # NARROWED 22 Oct 2026: the two abnormal-load sites
+       and len(pkg["tables"]["abnormal_loads"]) == len(DEMO["tables"]["abnormal_loads"]) == 3)
     ok("...and it carries the route_sections table (empty: nothing is baked here)",
        "route_sections" in pkg.get("tables", {}) and pkg["tables"]["route_sections"] == [])
     ok("...and the nine council areas imported above, with an empty clip table (§2.2b)",
@@ -1703,10 +1705,18 @@ with TestClient(main.app, base_url="https://testserver") as c:
 
     r = c.get("/map/")
     ok("after sign-out the map is closed again", r.status_code == 401, str(r.status_code))
+    ok("…and so are the public map's abnormal loads (phase 3, D68): 401 signed out", c.get("/api/public/abnormal").status_code == 401)
     ok("🔴 D18: ...and so is the network — the twelve reads answer 401 to the signed-out visitor",
        all(c.get(p).status_code == 401 for p in NETWORK_READS))
     r = c.post("/api/map-auth", json={"password": "map-pass-xyz"})
     ok("the map password opens the map…", r.status_code == 200 and c.get("/map/").status_code == 200)
+    _pub = c.get("/api/public/abnormal")
+    ok("…and (phase 3, D68) the map cookie reads the public abnormal loads: a collection of the approved-or-later movements only — none yet — "
+       "with no grades, no candidate words and no structures words (the staff map's), only the indicative line words",
+       _pub.status_code == 200 and _pub.json().get("type") == "FeatureCollection" and _pub.json().get("features") == []
+       and _pub.json().get("grades") is None and _pub.json().get("words", {}).get("candidates") is None
+       and _pub.json().get("words", {}).get("structures") is None and "Indicative" in (_pub.json().get("words", {}).get("indicative") or ""),
+       _pub.text[:200])
     ok("…but 🔴 not the guide", c.get("/help/").status_code == 401)
     ok("…and 🔴 not the monthly bulletin (staff only, D10)", c.get("/bulletin/?month=10").status_code == 401
        and c.get("/api/bulletin/month.pdf?month=10").status_code == 401)
@@ -1741,6 +1751,103 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 …a team code may read it but not fetch it: 403 (no fetch is started from this harness: it would go online)",
        c.get("/api/collisions", headers=NORTH).status_code == 200
        and c.post("/api/collisions/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)
+    # 22 Oct 2026 (S16 / B5): the abnormal loads — the real endpoints end to end on the demo package
+    ok("🔴 abnormal loads: the page, the rules preview and the settings need a sign-in (the map cookie gets 401)",
+       c.get("/api/abnormal").status_code == 401 and c.get("/api/abnormal/rules?width_m=5").status_code == 401
+       and c.get("/api/abnormal/settings").status_code == 401)
+    _ab = c.get("/api/abnormal", headers=PLAN)
+    _abj = _ab.json() if _ab.status_code == 200 else {}
+    # NARROWED 22 Oct 2026 (phase 3, D75): the demo ships three loads — the units approved, the crane and the beams pending — and 18 sites
+    ok("⭐ …a planner reads the page: 200, the demo's three loads (D75: AL001 the units approved, AL002 the crane and AL003 the beams pending), the shipped bank holidays, no time bans, the pickers",
+       _ab.status_code == 200 and [m["id"] for m in _abj.get("movements") or []] == ["AL001", "AL002", "AL003"]
+       and [m["status"] for m in _abj["movements"]] == ["approved", "pending", "pending"] and all(m.get("geometry") is None for m in _abj["movements"])
+       and _abj.get("settings", {}).get("holidays", {}).get("source") == "seed"
+       and _abj.get("settings", {}).get("time_bans") == [] and len(_abj.get("choices", {}).get("locations") or []) == 18
+       and "check with the haulier" in (_abj.get("words", {}).get("advice") or "").lower(), _ab.text[:200])
+    _pv = c.get("/api/abnormal/rules", params={"width_m": 4.6, "height_m": 3.9, "length_m": 16.5, "gross_t": 40, "max_axle_t": 9,
+                                                "axle_count": 6, "indivisible": "true", "date_from": "2027-03-08"}, headers=NORTH)
+    _pvj = _pv.json() if _pv.status_code == 200 else {}
+    ok("⭐ …the preview for the 4.6 m modular units: STGO, police 2 clear working days by Wed 3 Mar 2027, attendant, escort expected "
+       "off motorways; nothing saved",
+       _pv.status_code == 200 and _pvj.get("regime") == "stgo" and _pvj.get("notices", {}).get("police_days") == 2
+       and _pvj.get("notify_by") == "2027-03-03" and _pvj.get("attendant") is True and _pvj.get("escort_expected") == "other_roads"
+       and c.get("/api/abnormal", headers=PLAN).json().get("count") == 3, _pv.text[:200])
+    _mk = c.post("/api/abnormal", json={"name": "Site office units", "origin_id": "L004", "dest_id": "L006", "dest_gate_id": "G009",
+                                        "date_from": "2027-03-08", "date_to": "2027-03-12", "movements": 3, "width_m": 4.6, "height_m": 3.9,
+                                        "length_m": 16.5, "gross_t": 40, "max_axle_t": 9, "axle_count": 6, "indivisible": True,
+                                        "vehicle_type": "low_loader"}, headers=dict(NORTH, **{"X-Wayscope": "1"}))
+    _mkj = _mk.json() if _mk.status_code == 200 else {}
+    ok("🔴 …a team code plans one: 200, AL004 (after the demo's three), pending, ITS team (the body named none), the team's name never the id, the advice on it",
+       _mk.status_code == 200 and _mkj.get("movement", {}).get("id") == "AL004" and _mkj["movement"]["status"] == "pending"
+       and _mkj["movement"]["ipt"] == "IPT1" and _mkj["movement"]["team_name"] == "North Team"
+       and _mkj["movement"]["advice"]["summary"].startswith("STGO Cat 1"), _mk.text[:300])
+    ok("🔴 …a bad body is a 400 in sentences (a slipped decimal, a missing figure)",
+       c.post("/api/abnormal", json={"name": "x", "origin_id": "L004", "dest_id": "L006", "width_m": 46, "height_m": 3.9,
+                                     "date_from": "2027-03-08"}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 400)
+    ok("🔴 …approving is a planner's: the team's code gets 403, the planner's 200; a wrong step a 400",
+       c.post("/api/abnormal/AL004/status", json={"status": "approved"}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL004/status", json={"status": "approved"}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.post("/api/abnormal/AL004/status", json={"status": "pending"}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL004/status", json={"status": "moved"}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.post("/api/abnormal/AL004/status", json={"status": "pending"}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400)
+    ok("…the time bans and the holidays fetch are a planner's: 403 to a team code; a bad ban list a 400; the fetch is NOT pressed here (it would go online)",
+       c.put("/api/abnormal/time-bans", json={"time_bans": []}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/bank-holidays/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.put("/api/abnormal/time-bans", json={"time_bans": [{"force": "", "from": "7", "to": "9"}]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
+       and c.put("/api/abnormal/time-bans", json={"time_bans": [{"force": "Leicestershire", "from": "07:00", "to": "09:30"}]},
+                 headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.get("/api/abnormal/settings", headers=NORTH).json().get("time_bans", [{}])[0].get("force") == "Leicestershire")
+    ok("🔴 …another team's code cannot see it (404, never 403) and a planner deletes it; the demo's three stay",
+       c.get("/api/abnormal/AL004", headers={"X-Access-Code": "central-code-xyz"}).status_code in (401, 404)
+       and c.delete("/api/abnormal/AL004", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.get("/api/abnormal", headers=PLAN).json().get("count") == 3)
+    # 22 Oct 2026 (phase 2): the route at the typed size — no HERE key on this harness, so the bake says so; via points; the staff map's collection
+    ok("🔴 abnormal loads, the route: the map cookie gets 401 on the staff collection; a team code may not route (403); a planner's bake with no HERE key is a 400 in words",
+       c.get("/api/abnormal/geojson").status_code == 401 and c.get("/api/abnormal/geojson", headers=NORTH).status_code == 200
+       and c.post("/api/abnormal", json={"name": "Beams", "ipt": "IPT1", "origin_id": "L002", "dest_id": "L008", "date_from": "2027-04-12", "width_m": 2.8,
+                                         "height_m": 4.2, "length_m": 36, "gross_t": 78, "max_axle_t": 11, "axle_count": 8}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.post("/api/abnormal/AL001/route", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL001/route", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
+       and "no routing key" in c.post("/api/abnormal/AL001/route", headers=dict(PLAN, **{"X-Wayscope": "1"})).json().get("detail", "")
+       and c.put("/api/abnormal/AL001/via", json={"via": [[52.6, -0.9]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.put("/api/abnormal/AL001/via", json={"via": [[95, 0]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
+       and c.get("/api/abnormal/geojson", headers=PLAN).json().get("count") == 0
+       and c.delete("/api/abnormal/AL001", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200)
+    # 22 Oct 2026 (seen on a local copy): the map page sends the STAFF gate cookie and no header, so access.current() is None
+    # and the staff collection came back EMPTY for a code sign-in. Now the cookie alone reads the scheme's staff view.
+    _ck = TestClient(main.app, base_url="https://testserver")
+    _ck.post("/api/auth", json={"code": "plan-code-xyz"})
+    _cm = c.post("/api/abnormal", json={"name": "Cookie check", "ipt": "IPT1", "origin_id": "L002", "dest_id": "L008", "date_from": "2027-04-12",
+                                        "width_m": 3.2, "height_m": 4.2, "length_m": 18, "gross_t": 48, "max_axle_t": 10, "axle_count": 6},
+                 headers=dict(PLAN, **{"X-Wayscope": "1"})).json().get("movement", {}).get("id")
+    ok("🔴 abnormal loads, the staff map's collection: the STAFF gate cookie alone (the map page of a code sign-in, no header) reads the same "
+       "collection a planner's header does — the words, the grades and the movement's candidates — not an empty one; the map cookie still gets 401",
+       gate.COOKIE in _ck.cookies and _ck.get("/api/abnormal/geojson").status_code == 200
+       and _ck.get("/api/abnormal/geojson").json().get("grades") == c.get("/api/abnormal/geojson", headers=PLAN).json().get("grades")
+       and _ck.get("/api/abnormal/geojson").json().get("words", {}).get("candidates")
+       and c.get("/api/abnormal", headers=PLAN).json().get("count") == 4      # AL002, AL003, the Beams, the Cookie check
+       and _ck.get("/api/abnormal").status_code == 401, str(_cm))
+    ok("...the collection with the cookie carries every movement a planner sees once drawn: none drawn here (no HERE key), so count 0 both ways, and the cookie's read is byte-identical to the header's",
+       _ck.get("/api/abnormal/geojson").json() == c.get("/api/abnormal/geojson", headers=PLAN).json())
+    _cal = c.get("/api/abnormal/calendar.xlsx", headers=PLAN)
+    _calp = c.get("/api/abnormal/calendar.pdf", headers=PLAN)
+    _es = c.get(f"/api/abnormal/{_cm}/esdal.pdf", headers=PLAN)
+    ok("abnormal loads, phase 3 (D73): the notice calendar as XLSX and PDF and a movement's ESDAL details sheet — any sign-in (401 signed out), the right media types and file names, a missing movement a 404",
+       c.get("/api/abnormal/calendar.xlsx").status_code == 401 and c.get(f"/api/abnormal/{_cm}/esdal.pdf").status_code == 401
+       and _cal.status_code == 200 and "spreadsheetml" in _cal.headers.get("content-type", "") and "notice-calendar" in _cal.headers.get("content-disposition", "")
+       and _calp.status_code == 200 and _calp.headers.get("content-type") == "application/pdf" and _calp.content[:4] == b"%PDF"
+       and _es.status_code == 200 and _es.content[:4] == b"%PDF" and f"esdal-details-{_cm}" in _es.headers.get("content-disposition", "")
+       and c.get("/api/abnormal/AL999/esdal.pdf", headers=PLAN).status_code == 404, f"{_cal.status_code} {_calp.status_code} {_es.status_code}")
+    _chk = c.post(f"/api/abnormal/{_cm}/structures", headers=dict(PLAN, **{"X-Wayscope": "1"}))
+    ok("abnormal loads, phase 3: Check the roads again — a team code may not (403), a missing movement is a 404, an unrouted one a 400 in words (draw first), no HERE call needed",
+       c.post(f"/api/abnormal/{_cm}/structures", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL999/structures", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 404
+       and _chk.status_code == 400 and "draw the route first" in _chk.json().get("detail", "")
+       and c.delete(f"/api/abnormal/{_cm}", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200, _chk.text[:160])
+    ok("abnormal loads, phase 2: the Dashboard's summary (any sign-in; 401 signed out) and the pinch rows (a planner's)",
+       c.get("/api/abnormal/summary").status_code == 401 and c.get("/api/abnormal/summary", headers=NORTH).status_code == 200
+       and c.get("/api/abnormal/summary", headers=NORTH).json().get("planned") == 3      # the demo's crane and beams, the Beams (all North Team)
+       and c.put("/api/abnormal/AL001/pinch", json={"pinch": []}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",

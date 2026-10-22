@@ -254,10 +254,10 @@ reset_db()
 # NARROWED again 12 Oct 2026: nineteen with areas and route_area_km (public map review §2.2b, D27).
 # NARROWED 14 Oct 2026 (night): and without community_features / community_meta (the community considerations layer)
 # NARROWED 16 Oct 2026: and without collision_records / collision_meta (the collision history, CLOCS v5 C1)
-# NARROWED 22 Oct 2026: and without traffic_counts (DfT's traffic counts, evidence v3)
-# (twenty-three with the two collision tables; twenty-four with traffic_counts, 22 Oct 2026)
-ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 24
-   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts"}) == 16,
+# (twenty-three with the two collision tables)
+# NARROWED 22 Oct 2026: and without abnormal_loads (the abnormal loads, S16 / B5) — twenty-four; twenty-five with traffic_counts (evidence v3, the same day)
+ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 25
+   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts"}) == 16,
    f"got {len(db.TENANTED_TABLES)}")
 
 for t in sorted(db.TENANTED_TABLES):

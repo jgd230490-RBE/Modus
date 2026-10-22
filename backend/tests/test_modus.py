@@ -426,10 +426,12 @@ dc = tenant_package.counts(demo)
 # RE-PINNED 17 Oct 2026 (demo redesign R2, notes/demo-redesign-1016.md §3a): the four-year programme — + the asphalt plant
 # and Welland Ready-Mix (2 locations, 2 gates, 2 access roads), routes R023–R043, 905 approved line-months, 7 advisory
 # zones after the access roads, the Langton haul road on all nine routes into Langton Compound. Teams 3 and sections 8 stay.
-ok("demo: 16 locations, 43 routes, 3 teams, 8 sections, 907 forecasts (905 approved + 1 pending + 1 rejected), 19 gates, 31 zones "
-   "(5 + 19 gate access roads + 7 advisory), 11 haul links",
-   dc["locations"] == 16 and dc["routes"] == 43 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 907
-   and dc["location_gates"] == 19 and dc["zones"] == 31 and dc["route_haul_roads"] == 11, str(dc))
+# NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): + the precast works and the crane depot (2 locations, 2 gates, 2 access
+# roads) and the three abnormal loads, which are rows of their own, never forecasts
+ok("demo: 18 locations, 43 routes, 3 teams, 8 sections, 907 forecasts (905 approved + 1 pending + 1 rejected), 21 gates, 33 zones "
+   "(5 + 21 gate access roads + 7 advisory), 11 haul links, 3 abnormal loads",
+   dc["locations"] == 18 and dc["routes"] == 43 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 907
+   and dc["location_gates"] == 21 and dc["zones"] == 33 and dc["route_haul_roads"] == 11 and dc["abnormal_loads"] == 3, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}
 # RE-PINNED 17 Oct 2026 (R2, §3a): R019 carries the Langton cutting's surplus Apr 2027 – Sep 2028 (months 16–33) and the
@@ -448,7 +450,8 @@ _dfac = json.loads([r for r in demo["tables"]["config"] if r["key"] == "factors"
 ok("⭐ demo (carbon): the package carries the carbon block, carbon_material on every category but the asphalt plant's feed "
    "(null on purpose, D112) and the three scenario-only electric profiles",
    "carbon" in _dfac and all(c.get("carbon_material") for k, c in _dfac["material_categories"].items()
-                             if not k.startswith("_") and k != "Aggregate for the asphalt plant")
+                             if not k.startswith("_") and k not in ("Aggregate for the asphalt plant", "Abnormal loads"))
+   and _dfac["material_categories"]["Abnormal loads"]["carbon_material"] is None      # NARROWED 22 Oct 2026: D71, counted apart
    and "carbon_material" in _dfac["material_categories"]["Aggregate for the asphalt plant"]
    and _dfac["material_categories"]["Aggregate for the asphalt plant"]["carbon_material"] is None
    and sorted(k for k, v in _dfac["vehicles"].items() if isinstance(v, dict) and v.get("fuel") == "electric")

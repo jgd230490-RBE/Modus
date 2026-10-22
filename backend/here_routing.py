@@ -135,7 +135,7 @@ def _query(params, via_values):
 
 def routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,
            alternatives=1, laden=True, via=None, pass_through=False,
-           departure_time=None):
+           departure_time=None, vehicle=None, extras=None):
     """
     Route origin -> destination for a vehicle profile, returning up to `alternatives`
     options ranked best-first.
@@ -182,7 +182,13 @@ def routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,
     want = max(1, int(alternatives or 1))
     if want > 1:
         params["alternatives"] = want - 1
-    params.update(_truck_params(profile, factors, laden=laden))
+    # 22 Oct 2026 (abnormal loads, D67): `vehicle` = the truck parameters as a dict ({"transportMode": "truck",
+    # "vehicle[grossWeight]": …}) built from a movement's TYPED figures, in place of a factors.json profile; `extras` =
+    # further query parameters (the probe of 22 Oct: return=…,actions,instructions and spans=…, which left the line and
+    # the figures unchanged — notes/abnormal-loads-1022-probe). Both None keep today's call exactly.
+    params.update(vehicle if vehicle else _truck_params(profile, factors, laden=laden))
+    if extras:
+        params.update(extras)
     if avoid_areas:  # list of "bbox:west,south,east,north" strings
         params["avoid[areas]"] = "|".join(avoid_areas)
     if departure_time:
@@ -215,11 +221,17 @@ def routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,
             summ = sec.get("summary") or {}
             dist_m += summ.get("length", 0)
             dur_s += summ.get("duration", 0)
-            parts.append({
+            part = {
                 "geometry": pts,
                 "distance_km": round(summ.get("length", 0) / 1000.0, 2),
                 "duration_hr": round(summ.get("duration", 0) / 3600.0, 3),
-            })
+            }
+            # 22 Oct 2026: what `extras` asked for travels with the section, exactly as HERE sent it (the
+            # abnormal-loads bake reads actions, spans and notices; nothing else looks at them)
+            for k in ("actions", "spans", "notices"):
+                if sec.get(k):
+                    part[k] = sec[k]
+            parts.append(part)
         out.append({
             "geometry": coords,
             "distance_km": round(dist_m / 1000.0, 2),
