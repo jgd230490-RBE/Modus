@@ -463,6 +463,9 @@ fe = read("frontend/index.html")
 i = fe.index("  const ROUTE_RETRY_S = [30, 60, 90];")
 j = fe.index("  // Bulk bake.", i)
 helper = fe[i:j]
+# 22 Oct 2026 (claude/error-words): the loop now says its failures through the page's error helper (errFrom / errLog),
+# so the node run below gets that helper too, sliced the same way (const ERR_WORDS … function errSay)
+_eh = fe[fe.index("const ERR_WORDS = {"):fe.index("\n", fe.index("function errSay("))]
 bulk = fe[fe.index("const bulkBake = async"):fe.index("const clearRoutes")]
 zone = fe[fe.index("const rebakeAfterZone = async"):fe.index("const saveZone = async")]
 ok("6. Route all and the re-route after a zone write both go through postRouteBatch",
@@ -480,7 +483,7 @@ ok("6. the retry words follow the word rule (no server, no bake)",
 node = shutil.which("node")
 ok("6. node is on the PATH (the suite's JS harnesses need it too)", bool(node))
 if node:
-    js = helper + r"""
+    js = _eh + "\n" + helper + r"""
     ;(async () => {
       const out = {};
       const run = async (name, seq) => {
@@ -518,21 +521,23 @@ if node:
         ok("6. ⭐ two 502s then an answer: tried again after 30 s and 60 s, the answer returned",
            a["ok"] and a["calls"] == 3 and a["waits"] == [30, 60] and a["j"]["method"] == "POST"
            and a["j"]["url"].startswith("/api/admin/bake-routes?profile=P&limit=30"), str(a))
+        # NARROWED 22 Oct 2026 (claude/error-words): no status number in the words; the why is errWords' sentence
         ok("6. ...and it said so each time, in plain words",
-           a["says"] == ["Wayscope did not answer (502). Trying again in 30 s (1 of 3)…",
-                         "Wayscope did not answer (502). Trying again in 60 s (2 of 3)…"], str(a["says"]))
+           a["says"] == ["Wayscope did not answer. Trying again in 30 s (1 of 3)…",
+                         "Wayscope did not answer. Trying again in 60 s (2 of 3)…"], str(a["says"]))
         ok("6. a 504 and a 503 are tried again too", R["504"]["ok"] and R["504"]["calls"] == 2 and R["503"]["ok"] and R["503"]["calls"] == 2)
         ok("6. no answer at all (a restart during a deploy) is tried again", R["net"]["ok"] and R["net"]["calls"] == 2
-           and "no answer" in R["net"]["says"][0])
+           and "did not answer" in R["net"]["says"][0])   # NARROWED 22 Oct 2026 (error-words): was "(no answer)" in brackets
         d = R["down"]
         ok("6. ⭐ after three tries (30, 60, 90 s) it stops and says why; the loop's own message says what is kept",
-           not d["ok"] and d["calls"] == 4 and d["waits"] == [30, 60, 90] and d["err"] == "503 — tried 4 times", str(d))
-        ok("6. 🔴 a 403 is never retried: 'admin token rejected' at once",
-           not R["403"]["ok"] and R["403"]["calls"] == 1 and R["403"]["err"] == "admin token rejected" and R["403"]["waits"] == [])
-        ok("6. 🔴 a 500 (a real fault) is never retried", not R["500"]["ok"] and R["500"]["calls"] == 1
-           and R["500"]["err"].startswith("500 body 500"))
+           not d["ok"] and d["calls"] == 4 and d["waits"] == [30, 60, 90] and d["err"] == "No answer after 4 tries.", str(d))   # NARROWED 22 Oct 2026 (error-words): was "503 — tried 4 times"
+        ok("6. 🔴 a 403 is never retried: the admin sentence at once",   # NARROWED 22 Oct 2026 (error-words): was 'admin token rejected'
+           not R["403"]["ok"] and R["403"]["calls"] == 1
+           and R["403"]["err"] == "Not allowed: sign in as an admin, or type the admin token." and R["403"]["waits"] == [])
+        ok("6. 🔴 a 500 (a real fault) is never retried", not R["500"]["ok"] and R["500"]["calls"] == 1   # NARROWED 22 Oct 2026 (error-words): was "500 body 500"
+           and R["500"]["err"] == "Wayscope could not do this just now. Try again in a minute.")
 ok("6. the loop's stop message still says finished routes are kept and Route all can run again",
-   "routes already worked out are kept, so you can run it again" in bulk)
+   "Routes already worked out are kept, so you can run it again" in bulk)   # NARROWED 22 Oct 2026 (error-words): a sentence of its own now
 
 remove_scratch_db(db, TMP)
 print(f"test_route_all.py: {PASS} passed, {len(FAIL)} failed")

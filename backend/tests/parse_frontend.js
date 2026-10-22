@@ -1708,8 +1708,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      cb.includes(": err ? `Not updated: ${err}`") && cb.includes("Not updated: {err}{A ? \" The figures below are from your previous choices.\" : \"\"}")
      && cb.includes("{(A || err) && (") && cb.includes('<span role="alert" style={{ color: "var(--red)" }}>Not updated: {err}</span>')
      && cb.includes("err ? null : <p className=\"text-sm text-slate-600 mt-2\">Make a choice in steps 2 to 4 to see the result."));
+  // NARROWED 22 Oct 2026 (claude/error-words): the prefix ends in a full stop and the why is errSay's sentence
   ok("...the summary's failure sits under its own button (pdfErr), never in the scenario's error; its hook is with the others",
-     cb.includes("} catch(e){ setPdfErr(\"The summary could not be made: \" + (e.message || e)); }") && !cb.includes("setErr(\"The summary could not be made")
+     cb.includes("} catch(e){ setPdfErr(errSay(\"The summary could not be made.\", e)); }") && !cb.includes("setErr(\"The summary could not be made")
      && cb.includes("{pdfErr && <p") && _cp.indexOf("const [pdfErr, setPdfErr] = useState(null);") > 0
      && _cp.indexOf("const [pdfErr, setPdfErr] = useState(null);") < _cp.indexOf("if(!data && err) return"));
   ok("...an EPD says what it needs beside its fields, and an EPD in use is said beside the controls it switches off",
@@ -2517,8 +2518,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("BULLETIN: the month defaults to this calendar month, clamped to the programme; every month is offered by its label",
     bmc.includes("const cur = Math.min(months.count, Math.max(1, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));")
     && bmc.includes("const [m, setM] = useState(cur);") && bmc.includes("monthLabelAbs(i, months.start_year)"));
+  // NARROWED 22 Oct 2026 (claude/error-words): the prefix ends in a full stop and the why is errSay's sentence
   ok("BULLETIN: a failed PDF says so under the button in the server's words, never silently",
-    bmc.includes('setErr("The bulletin could not be made: " + (e.message || e));') && bmc.includes('<div className="bm-err" role="alert">{err}</div>')
+    bmc.includes('setErr(errSay("The bulletin could not be made.", e));') && bmc.includes('<div className="bm-err" role="alert">{err}</div>')
     && bmc.includes('{busy ? "Making the bulletin…" : "Download the PDF"}'));
   ok("🔴 BULLETIN: nothing is computed in the browser — no working-day divisor, no movements arithmetic, no team id",
     !/working_days|\/ 22|vehicle_loads|two_way|IPT/.test(bmc));
@@ -3053,9 +3055,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      // NARROWED 14 Oct 2026 (W10, the same session): a second fetch, the CLP pack, on a button press only
      && clpc.includes('onToggle={e => setOpen(e.currentTarget.open)}') && (clpc.match(/fetch\(/g) || []).length === 2
      && clpc.includes("const r = await fetch(`${API}/clp/pack.${ext}?month=${month}`);"));
+  // NARROWED 22 Oct 2026 (claude/error-words): the prefix ends in a full stop and the why is errSay's sentence
   ok("⭐ W10: the section offers the CLP pack for its month, PDF and XLSX; the file name is the reply's own; a failure is said in words",
      clpc.includes('onClick={() => pack("pdf")}') && clpc.includes('onClick={() => pack("xlsx")}')
-     && clpc.includes('const m = cd.match(/filename="([^"]+)"/);') && clpc.includes('setPackErr("The CLP pack could not be made: " + (e.message || e));')
+     && clpc.includes('const m = cd.match(/filename="([^"]+)"/);') && clpc.includes('setPackErr(errSay("The CLP pack could not be made.", e));')
      && clpc.includes('{packErr && <div className="ct-line" role="alert" data-clp-pack-error="1">{packErr}</div>}'));
   ok("⭐ CLP: the Dashboard mounts it once, folded, after More charts and before Stockpile capacity",
      (src.match(/<ClpMonitoring months=\{months\} initial=\{initialClp\} \/>/g) || []).length === 1
@@ -3352,7 +3355,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("...team NAMES in its list (teamText), never an id",
      _rm.includes("{(ipts || []).map(i => <option key={i.id} value={i.id}>{teamText(i.id)}</option>)}"));
   ok("...it says what it is (approved lines, not an approved CLP), and a refusal in words",
-     _rm.includes("Approved lines only. A planning document, not an approved CLP.") && _rm.includes('setErr("The route map could not be made: " + (e.message || e));'));
+     _rm.includes("Approved lines only. A planning document, not an approved CLP.") && _rm.includes('setErr(errSay("The route map could not be made.", e));'));   // NARROWED 22 Oct 2026 (claude/error-words): the prefix ends in a full stop and the why is errSay's sentence
   ok("...placed after App, outside the Dashboard's read-only stock slice (that pin scans DashboardStockChart → App)",
      code.indexOf("function RouteMapExportMenu(") > code.indexOf("function App(") && code.indexOf("function RouteMapExportMenu(") < code.indexOf("function Header("));
 }
@@ -3762,6 +3765,96 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("UI FIX 7: the technical guide no longer places Diagnostics on Data → Routes or an admin-token note under the Locations form",
      !_tg.includes("<strong>Diagnostics</strong> (Data → Routes) shows") && !_tg.includes("The Data → Locations note now points at the field")
      && !_tg.includes("tab and the Diagnostics panel)") && _tg.includes("<strong>Diagnostics</strong> left Data → Routes on 22 Oct 2026"));
+}
+
+// ---- 22 Oct 2026 (claude/error-words): a failed reply in words, never a status number or the raw reply ----------------
+// The approved mockup notes\ui-fix-errors-mockup-1022\ (Q1–Q4 as recommended): about 50 failure paths printed "403",
+// "(500)", "error 502", a half-stripped {"detail":…} body or the first 140 characters of an HTML page. Now every one says
+// "what did not happen." + ONE sentence from errWords, and the raw reply goes to console.warn. The guard below fails on any
+// way a status or a raw reply could reach a visible string again; the second half runs the helper on each rule of the table.
+{
+  const ERR_RAW = [
+    [/\$\{(?:r|res|cr|dr|br|e)\.status\b/, "a status number in a template string"],
+    [/\(\$\{e\}\)/, "a caught value printed as '(${e})'"],
+    [/`error \$\{/, "'error ${…}'"],
+    [/String\((?:r|res|cr|dr)\.status\)/, "a status number as a message"],
+    [/\.text\(\)\)\.slice\(|\bt\.slice\(0, ?\d+\)|\btxt\.(?:slice|replace)\(/, "a slice of the raw reply"],
+    [/\^\\\{"detail":"/, "a half-stripped {\"detail\":…} body"],
+    [/j\.error \|\| res\.status/, "a bare status when the reply had a sentence"],
+    [/admin token rejected/, "the old 'admin token rejected'"],
+    [/e\.status \|\| "no answer"/, "'(no answer)' / a status in brackets"],
+    [/"[^"\n]*: " \+ \(?e\.message\b/, "a prefix joined to e.message (bypassing errSay)"],
+    [/`[^`\n]*\$\{e\.message\}/, "e.message in a template (bypassing errMsg)"],
+  ];
+  // the one kept: the Config JSON editor's own parse error is about the text the person typed, not a reply
+  const _errSrc = src.replace('setRawErr("Not valid JSON: " + e.message)', "");
+  for (const [re, what] of ERR_RAW) {
+    const hit = _errSrc.match(re);
+    ok(`⭐ ERROR WORDS: no failure message carries ${what}`, !hit, hit ? hit[0] : "");
+  }
+  ok("ERROR WORDS: the Config JSON editor keeps its own parse error (the person's text, not a reply)", src.includes('setRawErr("Not valid JSON: " + e.message)'));
+  for (const f of ["const ERR_WORDS = {", "function errSentence(", "function errWords(", "function errLog(", "function errOf(",
+                   "async function errFrom(", "async function okJSON(", "function errMsg(", "function errSay("])
+    ok(`ERROR WORDS: the helper ${f.replace(/[({ =]+$/, "")} is defined once`, src.split(f).length === 2);
+  ok("ERROR WORDS: the raw reply goes to the console, the first 2,000 characters",
+     src.includes('console.warn("Wayscope:", where || "", status, typeof body === "string" ? body.slice(0, 2000) : body)'));
+  const _uses = (src.match(/\berrSay\(/g) || []).length, _okj = (src.match(/\bokJSON\b/g) || []).length, _ef = (src.match(/\berrFrom\(/g) || []).length;
+  ok("ERROR WORDS: the paths go through the helper (errSay ≥ 45, okJSON ≥ 15, errFrom ≥ 25)", _uses >= 45 && _okj >= 15 && _ef >= 25, `errSay ${_uses} · okJSON ${_okj} · errFrom ${_ef}`);
+  ok("ERROR WORDS: Route all's retry says 'did not answer' with no status, and its last try a sentence",
+     src.includes("say(`Wayscope did not answer. Trying again in ${wait} s (${attempt + 1} of ${ROUTE_RETRY_S.length})…`);")
+     && src.includes("throw new Error(`No answer after ${attempt + 1} tries.`);")
+     && src.includes("setRouteMsg(`Routing the whole network stopped. ${errMsg(e)} Routes already worked out are kept, so you can run it again.`);"));
+  ok("ERROR WORDS: the code sign-in still tells a wrong code from a failure (e.status, as okJSON throws)",
+     src.includes(`.catch(e => setErr(e && e.status === 401 ? "That access code isn't recognised." : errSay("Couldn't sign in.", e)))`));
+
+  // ---- the helper itself, run in a sandbox on each row of the mockup's rule table ----
+  const a = src.indexOf("const ERR_WORDS = {"), bEnd = src.indexOf("\n", src.indexOf("function errSay("));
+  const vm = require("vm");
+  const logs = [];
+  const box = { console: { warn: (...x) => logs.push(x) } };
+  let H = null;
+  try {
+    vm.createContext(box);
+    vm.runInContext(src.slice(a, bEnd) + "\n;this.H = { ERR_WORDS, errWords, errMsg, errOf, errSay, errSentence };", box);
+    H = box.H;
+  } catch (e) { ok("ERROR WORDS: the helper runs on its own", false, e.message); }
+  if (H) {
+    const W = H.ERR_WORDS;
+    const html502 = '<!DOCTYPE html><html lang="en"><head><title>502 Bad Gateway</title></head><body><h1>Bad Gateway</h1></body></html>';
+    const rows = [
+      ["403 'bad or missing admin token' → the admin sentence (Q1)", H.errWords(403, '{"detail":"bad or missing admin token"}'), W.admin],
+      ["403 'admin access is not configured — set ADMIN_TOKEN' → the admin sentence", H.errWords(403, '{"detail":"admin access is not configured — set ADMIN_TOKEN"}'), W.admin],
+      ["403 with no sentence → the admin sentence", H.errWords(403, ""), W.admin],
+      ["403 from a planner-only check keeps its own sentence (Q1)", H.errWords(403, '{"detail":"Team 1 cannot approve or reject"}'), "Team 1 cannot approve or reject."],
+      ["400 'zone not found' → capitalised, full stop", H.errWords(404, '{"detail":"zone not found"}'), "Zone not found."],
+      ["a sentence that ends itself is left alone", H.errWords(400, '{"detail":"Your current password isn\'t right."}'), "Your current password isn't right."],
+      ["a 200 with {error} (the Data writes) → its sentence", H.errWords(200, { error: "route id 'R041' already exists" }), "Route id 'R041' already exists."],
+      ["422, a list of field problems → the form sentence", H.errWords(422, '{"detail":[{"type":"missing","loc":["body","doc"],"msg":"Field required"}]}'), W.invalid],
+      ["a detail that is an object of sentences → its first sentence", H.errWords(400, { detail: { staff: "That address already has a staff login." } }), "That address already has a staff login."],
+      ["404 with no sentence", H.errWords(404, ""), W.notFound],
+      ["429 with no sentence", H.errWords(429, ""), W.tooMany],
+      ["401 with no sentence", H.errWords(401, ""), W.signedOut],
+      ["500 'Internal Server Error' (plain text) → the failure sentence (Q2)", H.errWords(500, "Internal Server Error"), W.failed],
+      ["502, Render's HTML page → the failure sentence", H.errWords(502, html502), W.failed],
+      ["no answer (status 0)", H.errWords(0, ""), W.noAnswer],
+      ["errMsg: fetch's own TypeError → no answer", H.errMsg(new TypeError("Failed to fetch")), W.noAnswer],
+      ["errMsg: a TypeError from a fault in the page → the failure sentence, not 'no answer'", H.errMsg(new TypeError("x is undefined")), W.failed],
+      ["errMsg: a reply that is not JSON (SyntaxError) → the failure sentence", H.errMsg(new SyntaxError("Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON")), W.failed],
+      ["errMsg: postJSON's {status: 0} → no answer", H.errMsg({ status: 0, detail: "" }), W.noAnswer],
+      ["errMsg: postJSON's {status, detail} → the sentence", H.errMsg({ status: 400, detail: "Your current password isn't right." }), "Your current password isn't right."],
+      ["errMsg: a bare status (an old Promise.reject) → words", H.errMsg(500), W.failed],
+      ["errMsg: a sentence this page threw → as a sentence", H.errMsg(new Error("3 leg(s) left and not falling")), "3 leg(s) left and not falling."],
+      ["errMsg: an Error errOf made passes unchanged", H.errMsg(H.errOf(403, { detail: "bad or missing admin token" })), W.admin],
+      ["errOf with a tail keeps one full stop at the end", H.errOf(400, { error: "gate is used by routes" }, " (R001, R004)").message, "Gate is used by routes (R001, R004)."],
+      ["errSay: what did not happen + why (card 1)", H.errSay("Not deleted.", H.errOf(403, { detail: "bad or missing admin token" })), "Not deleted. Not allowed: sign in as an admin, or type the admin token."],
+      ["errSay: card 3 (the export's 500)", H.errSay("Export failed.", H.errOf(500, "Internal Server Error")), "Export failed. Wayscope could not do this just now. Try again in a minute."],
+    ];
+    for (const [label, got, want] of rows) ok(`⭐ ERROR WORDS (helper): ${label}`, got === want, JSON.stringify(got));
+    const all = rows.map(r => r[1]).join(" | ");
+    ok("🔴 ERROR WORDS (helper): no answer shows a status number, JSON or HTML", !/\b[45]\d\d\b|[{}<>]|"detail"/.test(all), all);
+    ok("ERROR WORDS (helper): the raw reply was written to the console (errOf logs what it was given)",
+       logs.some(l => l[0] === "Wayscope:" && l[2] === 403) && logs.some(l => l[0] === "Wayscope:" && l[2] === 500 && l[3] === "Internal Server Error"));
+  }
 }
 
 // ---- report ------------------------------------------------------------------
