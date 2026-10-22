@@ -414,8 +414,21 @@ ok("the footer links the privacy notice", src.rfind('href="./privacy.html"') > s
 ok("contact email is JDavis@wayscope.co.uk, as a mailto link and as visible text",
    "mailto:JDavis@wayscope.co.uk" in p.hrefs and "JDavis@wayscope.co.uk" in body)
 ok("no [EMAIL] or [COMPANY NAME AND NUMBER] placeholder left", "[EMAIL]" not in body and "[COMPANY NAME" not in body)
-ok("company line is plain Wayscope: no company number, no Ltd / Limited",
-   re.search(r"[Cc]ompany (No|no|number)", body) is None and " Ltd" not in body and "Limited" not in body)
+# REVERSED 22 Oct 2026: WAYSCOPE LTD was incorporated on 20 Oct (company no. 17531597), so the footer names it
+# (Companies Act website disclosure); the earlier "plain Wayscope, no number" rule is retired.
+_foot = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", src[src.find("<footer"):src.find("</footer>")]))
+ok("⭐ the footer names WAYSCOPE LTD, England and Wales, company no. 17531597 and the registered office",
+   "WAYSCOPE LTD. Registered in England and Wales, company no. 17531597." in _foot
+   and "Registered office: 128 City Road, London EC1V 2NX." in _foot)
+ok("...and still carries the plain 'Wayscope' line and the contact email", " Wayscope " in _foot and "JDavis@wayscope.co.uk" in _foot)
+_priv_who = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", open(os.path.join(ROOT, "landing", "privacy.html"), encoding="utf-8").read()))
+_priv_who = _priv_who[_priv_who.find("Who we are"):_priv_who.find("What we collect from the demo form")]
+ok("⭐ the privacy notice's Who we are names WAYSCOPE LTD as the controller, with number, place of registration, registered office and email",
+   "controller" in _priv_who and "WAYSCOPE LTD" in _priv_who and "17531597" in _priv_who
+   and "registered in England and Wales" in _priv_who and "128 City Road, London EC1V 2NX" in _priv_who
+   and "JDavis@wayscope.co.uk" in _priv_who)
+ok("thanks.html and error.html carry no company footer, so they need no company line",
+   all("<footer" not in open(os.path.join(ROOT, "landing", f), encoding="utf-8").read() for f in ("thanks.html", "error.html")))
 # NARROWED 8 Oct: the planner code is not on the page at all (the 7 Oct "Not published" tile went
 # with the rest of the code tiles); the code names are asserted absent above.
 ok("the planner code is NOT published", "[PLANNER CODE]" not in body and "PLANNER_CODE" not in body)
