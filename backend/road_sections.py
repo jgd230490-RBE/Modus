@@ -793,22 +793,18 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
         notes.append("No approved volume in this month.")
     elif not per_route:
         n_nd = sum(not_drawn.values())
-        notes.append(f"No approved volume on a route the map draws in this month: {n_nd} "
-                     f"line{'' if n_nd == 1 else 's'} on routes with no stored road route, "
-                     "listed in routes_not_drawn and not counted.")
+        notes.append(f"No approved volume on a route on the map this month: {n_nd} "
+                     f"line{'' if n_nd == 1 else 's'} not routed yet, not counted.")
     elif not runs_out:
         if not stored_runs(leg):
-            notes.append("No shared road sections are indexed: no road routes are stored, "
-                         "or the index has not been rebuilt.")
+            notes.append("No shared roads to show yet.")
         else:
             notes.append("Approved volume this month runs on no shared road section.")
     if unbaked_lines:
-        notes.append(f"{unbaked_lines} line(s) on a route with no stored road route for the "
-                     f"line's vehicle: counted in the movements, left out of the vehicles.")
+        notes.append(f"{unbaked_lines} line(s) not routed yet: in the movements, not in the vehicles.")
     if off_index:
-        notes.append(f"The sections are worked out on the {conversions.vehicle_label(conversions.load_factors(), profile)} road routes; "
-                     f"{len(off_index)} route(s) with volume have none stored for it and are "
-                     "on no section (they are in the totals).")
+        notes.append(f"{len(off_index)} route(s) have no {conversions.vehicle_label(conversions.load_factors(), profile)} route, "
+                     "so are on no shared road (they are in the totals).")
     if leg == "return":
         notes.append("Return leg: the same loads running back empty. These are not "
                      "additional movements and are never added to the loaded figure.")
@@ -829,9 +825,8 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
         "totals": totals,
         "routes_not_drawn": {
             "lines": sum(not_drawn.values()), "routes": sorted(not_drawn),
-            "note": ("Lines on routes the map does not draw (no stored road route for any "
-                     "vehicle) are not in these figures. They are listed here, not counted "
-                     "as zero.") if not_drawn else None,
+            "note": ("Lines not routed yet are not in these figures. They are listed here, "
+                     "not counted as zero.") if not_drawn else None,
         },
         "routes_off_index": off_index,
         "notes": notes,
@@ -847,8 +842,7 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
     }
     if co2_failed:
         out["co2_error"] = payload["co2_error"]
-        notes.append("The carbon figures could not be read, so no CO2e figure is given here "
-                     "(each reads null) — see co2_error.")
+        notes.append("The carbon figures could not be read, so no CO2e figure is given.")
     return out
 
 

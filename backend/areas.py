@@ -777,14 +777,15 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
     if not with_volume:
         notes.append("No approved volume in this month.")
     if not_clipped:
-        notes.append(f"{len(not_clipped)} route(s) with volume have no clipped road route yet: "
-                     "in the scheme totals, in no area. The clip runs on the next bake or areas import.")
+        # 22 Oct 2026 (words sweep): plain words on the public map; the clip itself (it runs on the next routing
+        # or council-areas import) is in the technical guide, T10
+        notes.append(f"{len(not_clipped)} route(s) with volume are not placed in a council yet. "
+                     "They are in the scheme totals.")
     if co2_unb and not co2_failed:
-        notes.append(f"{co2_unb} line(s) with volume carry no CO2e (no stored road route for the line's "
-                     "vehicle): left out of the carbon, never counted as zero.")
+        notes.append(f"{co2_unb} line(s) not routed yet: left out of the carbon, not counted as zero.")
     if not_drawn:
         n = sum(not_drawn.values())
-        notes.append(f"{n} line(s) on routes with no stored road route are in no figure here.")
+        notes.append(f"{n} line(s) not routed yet are not in these figures.")
     attribution = []
     for a in areas:
         for line in a["attribution"]:
@@ -824,7 +825,7 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
     }
     if co2_failed:
         out["co2_error"] = co2_error
-        notes.append("The carbon figures could not be read, so no CO2e figure is given here — see co2_error.")
+        notes.append("The carbon figures could not be read, so no CO2e figure is given.")
     return out
 
 
