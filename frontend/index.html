@@ -4375,7 +4375,7 @@ function AbnormalPage({ meta, access, who }){
                     <td><div>{m.advice && m.advice.notify_by ? alDay(m.advice.notify_by) : "—"}{" "}{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}</div>
                       {m.advice && m.advice.apply_by && <div className="text-[13px] text-slate-500">apply by {alDay(m.advice.apply_by)}</div>}</td>
                     <td data-al-route-cell={m.routed ? "drawn" : "none"}>{m.routed
-                      ? <><div>{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>
+                      ? <><div className="whitespace-nowrap">{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>
                           <div className="text-[13px] text-slate-500">{(m.candidates || []).length} to survey{(m.route_notes || []).some(n => /at most/.test(n)) ? " · drawn at 30 m" : ""}{(m.limit_exceeds || []).length ? ` · ${m.limit_exceeds.length} limit${m.limit_exceeds.length === 1 ? "" : "s"} over` : ""}</div></>
                       : <span className="text-[13px] text-slate-500">{m.bake_error ? "not drawn (see the row)" : "not drawn"}</span>}</td>
                     <td><StatusWord status={{ pending: "Pending", approved: "Approved", notified: "Approved", moved: "confirmed", withdrawn: "Rejected" }[m.status]} label={m.status_word} /></td>
