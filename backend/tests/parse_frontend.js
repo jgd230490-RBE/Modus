@@ -3593,8 +3593,22 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      _hz.includes('Line<InfoTip id="la.horizon" /><div className="text-xs font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)}')
      && _hz.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role]')
      && _hz.includes('<div className="text-xs mt-0.5" style={{ color: "var(--red)" }}')
-     && _hz.includes('<div className="text-xs tabular-nums">{status}{r.parent_changed && <span style={{ color: "var(--red)" }}> · month changed</span>}</div>')
+     // NARROWED 22 Oct 2026 (finding #40): the commit column's ' · month changed' is --bad-text on the shade, --red elsewhere
+     && _hz.includes('<div className="text-xs tabular-nums">{status}{r.parent_changed && <span style={{ color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed</span>}</div>')
      && !/text-\[(9|10)px\]/.test(_hz) && _hz.length > 2000);
+  // 22 Oct 2026 (finding #40, the user's yes): on the commit column's shade (#E7EEFB-#FAF0EC by accent) the red words fell to
+  // 4.27-4.33:1 and the amber 4.44-4.50:1; there they take the text-grade red and amber-800. Ratios computed with the WCAG formula.
+  const _lum = (h) => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const _cr = (a, b) => { const x = _lum(a), y = _lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  ok("⭐ FINDING #40: in the Horizon's commit column the short / month-changed words are --bad-text and 'edited · open days' is amber-800; the other columns keep --red / amber-700",
+     _hz.includes('? <span style={{ color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)") : "var(--ok-text)" }}>actual')
+     && _hz.includes('<span className={role === "commit" ? "text-amber-800" : "text-amber-700"}>edited{role === "commit" ? " · open days" : ""}</span>')
+     && _hz.includes('color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed'));
+  ok("FINDING #40: on the three commit-column shades (#EEF3FD Orange/Blue, #EDF1FC Blue shades, #FAF0EC Orange shades) #B91C1C and #92400E pass 4.5:1, and the old #DC2626 / #B45309 did not",
+     ["#EEF3FD", "#EDF1FC", "#FAF0EC"].every(bg => _cr("#B91C1C", bg) >= 4.5 && _cr("#92400E", bg) >= 4.5 && _cr("#DC2626", bg) < 4.5)
+     // the old amber fails on the unrounded Orange/Blue wash (4.497) but reads 4.51 on its rounded hex, so it is checked on the other two
+     && _cr("#B45309", "#EDF1FC") < 4.5 && _cr("#B45309", "#FAF0EC") < 4.5
+     && /--bad-text:#B91C1C/.test(html) && /html\[data-theme="dark"\] \.text-amber-800\{color:#FCD34D\}/.test(html));
   ok("⭐ UI FIX 6 card 3 (finding #37): the commit week's heading is text-blue-700 (the accent's darker shade, remapped per accent and look) instead of var(--navy) at 4.44:1; the commit column keeps its inline wash",
      _hz.includes('<div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>')
      && !_hz.includes('style={role === "commit" ? { color: "var(--navy)" } : {}}')
@@ -3608,7 +3622,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      _fit.includes("function todayFit(heights, available){") && _fit.includes("if(!(h >= 0) || used + h > available + 0.5) break;")
      && !/document|window|getBoundingClientRect|clientHeight/.test(_fit.replace(/\/\/.*$/gm, "")));
   ok("⭐ UI FIX 6 card 5: one switch, tvList = fill (Rotate / One section) — the list is measured by a ResizeObserver on its box and its table, every row is drawn closed on the TV, and the rows past the cut are not drawn",
-     _tdF.includes("const tvList = fill;") && _tdF.includes("todayFit(hs, box.clientHeight - (rs[0].top - top))")
+     // NARROWED 22 Oct 2026 (card 4, the user's yes): the switch is now `wall` — every big-screen layout, All sections too
+     _tdF.includes("const tvList = wall;") && _tdF.includes("todayFit(hs, box.clientHeight - (rs[0].top - top))")
      && _tdF.includes("ro.observe(box);") && _tdF.includes("if(tb) ro.observe(tb);") && _tdF.includes("}, [tvList, T.rows]);")
      && _tdF.includes("isOpen={!tvList && todayOpen(r.key)}") && _tdF.includes('rowProps={{ className: "border-t border-slate-100" + (i >= nShown ? " today-cut" : "") }}')
      && _tdF.includes('<div ref={listBox} className="mt-3 flex-1 overflow-auto rd-scroll today-lines" data-today-fit={tvList ? "1" : undefined} style={{ maxHeight: wall ? 260 : 190 }}>')
@@ -3624,8 +3639,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _tdF.includes('<span className="font-semibold text-slate-700">Last week{acct && acct.week ?')
      && (_tdF.match(/<Big value=/g) || []).length === 4 && _tdF.indexOf("This week to date") < _tdF.indexOf("today-lines")
      && _tdF.includes('<div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>'));
-  ok("UI FIX 6 card 5: 'All sections' (card 4, held) and the working Dashboard are unchanged — no fit, rows open as at the desk, the 260 / 190 px boxes scroll as before; the fill switch is the Dashboard's",
-     _dbBody.includes('const fill = wall && wallLayout !== "all";') && !/const tvList = wall/.test(code)
+  // REVERSED 22 Oct 2026 (card 4, the user: "yes, build card 4 ... keeping the progress bars"): All sections now fits whole rows
+  // like the filled layouts; the working Dashboard is still unchanged (wall false). The fill switch stays the Dashboard's.
+  ok("UI FIX 6 card 4: 'All sections' fits whole rows too (tvList = wall, not fill); the working Dashboard keeps its scrolling list; the fill switch is the Dashboard's",
+     _dbBody.includes('const fill = wall && wallLayout !== "all";') && /const tvList = wall;/.test(code) && !/const tvList = fill/.test(code)
      && /\n  \.dash-wall\.dash-fill \.today-lines\{max-height:none !important;overflow:hidden;\}\n/.test(html));
   // card 6 (decision 13) + the user's extra (the Avoided chip)
   ok("⭐ UI FIX 6 card 6: ZONE_HAUL is the map paint only — it appears in its definition and the Zones map's line colour, nowhere else",

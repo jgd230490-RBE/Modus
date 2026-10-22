@@ -2069,7 +2069,7 @@ async function routesDriversDom(){
 
 // ---- 22 Oct 2026 (UI fix 6, card 5; decision 6): the big screen's Today list in Rotate / One section, mounted -------------
 // The list shows only the rows that fit WHOLE (busiest first), every row closed whatever the desk opened, and under it
-// "+ N more lines today · X t"; nothing changes in "All sections" (card 4 is held) or at the desk. jsdom has no layout and
+// "+ N more lines today · X t"; since card 4 (22 Oct) "All sections" does the same; the desk is unchanged. jsdom has no layout and
 // no ResizeObserver, so the list box's height and the rows' boxes are stubbed (a 30 px header, 40 px rows) and the observer
 // is fired by hand. The counting rule itself, todayFit, is tested on its own first. Not covered here: real row heights,
 // fonts and the TV widths (the browser and the UI audit), and the count line's own height taking space from the list
@@ -2167,14 +2167,30 @@ async function todayFitDom(){
     ok("UI FIX 6 card 5: while another section is on the screen (0 px) the last count is kept",
        cut().join() === "today-R6|D5|" && !!more() && norm(more().textContent) === "+ 1 more line today · 121 t");
     tv.done();
-    // 6. All sections (card 4, held) and the desk: exactly as before
+    // 6. REVERSED 22 Oct 2026 (UI fix 6, card 4; the user: "yes, build card 4 ... keeping the progress bars"): All sections
+    //    (wall, not fill) now fits whole rows like Rotate / One section, in its 260 px box; the working Dashboard is unchanged.
     AVAIL = HEAD + 3 * ROWH + 5;
-    for (const [name, props, maxH] of [["All sections (wall, not fill)", { wall: true, fill: false }, "260px"], ["the working Dashboard", { wall: false, fill: false }, "190px"]]) {
-      const m = mount(props);
+    {
+      const m = mount({ wall: true, fill: false });
       fire();
       const lb = m.el.querySelector(".today-lines");
-      ok(`UI FIX 6 card 5: ${name} is unchanged — no fit marker, no row left off, no count line, its ${maxH} box, and the row opened at the desk is open`,
-         !!lb && !lb.hasAttribute("data-today-fit") && lb.style.maxHeight === maxH && m.el.querySelectorAll("tr.rd-row").length === 6
+      const mm = m.el.querySelector("[data-today-more]");
+      ok("⭐ UI FIX 6 card 4: All sections fits too — the 260 px box is marked to fit, three whole rows shown, three not drawn, '+ 3 more lines today · 1 471 t' under it",
+         !!lb && lb.getAttribute("data-today-fit") === "1" && lb.style.maxHeight === "260px"
+         && m.el.querySelectorAll("tr.today-cut").length === 3 && !!mm && norm(mm.textContent) === "+ 3 more lines today · 1 471 t",
+         mm ? norm(mm.textContent) : "no count line");
+      ok("UI FIX 6 card 4: in All sections every row is drawn closed (the desk opened the busiest), and both progress bars stay above the list",
+         [...m.el.querySelectorAll("tr.rd-details")].every(d => d.hidden)
+         && m.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
+         && m.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(m.el.textContent).includes("This week to date"));
+      m.done();
+    }
+    {
+      const m = mount({ wall: false, fill: false });
+      fire();
+      const lb = m.el.querySelector(".today-lines");
+      ok("UI FIX 6 card 4: the working Dashboard is unchanged — no fit marker, no row left off, no count line, its 190px box, and the row opened at the desk is open",
+         !!lb && !lb.hasAttribute("data-today-fit") && lb.style.maxHeight === "190px" && m.el.querySelectorAll("tr.rd-row").length === 6
          && !m.el.querySelector(".today-cut") && !m.el.querySelector("[data-today-more]")
          && m.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "true"
          && !m.el.querySelector('tr[data-rd-details="today-R1|D0|"]').hidden);

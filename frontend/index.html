@@ -500,7 +500,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 22 Oct 2026 (UI fix 6, card 5; decision 6): the big screen's Today list (Rotate and One section) shows only the rows
      that fit WHOLE, busiest first (DashboardToday measures them with todayFit). A row past the cut keeps its place in the
      layout, so it can still be measured when the screen changes, but is not drawn; the count line under the list is
-     flex:none, so the card's overflow cannot clip it. The working Dashboard and "All sections" do not carry data-today-fit. */
+     flex:none, so the card's overflow cannot clip it. 22 Oct 2026 (card 4): "All sections" carries it too (its 260 px box
+     no longer scrolls); only the working Dashboard does not. */
   .today-lines[data-today-fit]{overflow:hidden;}
   .today-lines[data-today-fit] tr.today-cut{visibility:hidden;}
   .today-more{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-weight:600;color:var(--muted);}
@@ -2713,8 +2714,10 @@ function DashboardToday({ meta, week, err, wall, fill }){
   // 22 Oct 2026 (UI fix 6, card 5; decision 6): on the big screen in Rotate and One section the list shows only the rows
   // that fit WHOLE (busiest first), every row drawn closed whatever was opened at the desk (the desk's open rows stay in
   // sessionStorage for the desk), and a line under it says how many more there are and their tonnes. `tvList` is the one
-  // switch: "All sections" (card 4, held for the user's answer) would be `const tvList = wall;` and nothing else.
-  const tvList = fill;
+  // switch. 22 Oct 2026 (UI fix 6, card 4; the user: "yes, build card 4 ... keeping the progress bars"): "All sections" too,
+  // so every big-screen layout fits whole rows (was `fill`, Rotate and One section only). The figures and both bars above
+  // the list are not touched; the working Dashboard (wall false) keeps its scrolling 190 px list.
+  const tvList = wall;
   const listBox = useRef(null);
   const [fitN, setFitN] = useState(null);          // the rows that fit; null = not measured yet (every row drawn)
   useEffect(() => {
@@ -8239,15 +8242,18 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             const role = roleOf(m, w);
                             if(!r) return <td key={`${m}|${w}`} className="px-2 py-2 text-slate-500 border-r border-slate-100" style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>—</td>;
                             const short = r.actual_qty != null && r.variance > 0 && !(r.actual_qty >= 0.98 * (r.planned_qty || 0));
+                            // 22 Oct 2026 (finding #40, the user's yes): on the commit column's shade the red and amber words fell under
+                            // 4.5:1 (#DC2626 4.27-4.33, #B45309 4.44-4.50); there they take --bad-text #B91C1C (5.73-5.82) and amber-800
+                            // #92400E (6.28-6.37). The other columns are on white and keep their colours. Dark already passed.
                             const status = r.actual_qty != null
-                              ? <span style={{ color: short ? "var(--red)" : "var(--ok-text)" }}>actual {grp(r.actual_qty, 1)} · {short ? `+${grp(r.variance, 1)} short${r.calibrated_at ? " · carried" : ""}` : "held"}</span>
+                              ? <span style={{ color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)") : "var(--ok-text)" }}>actual {grp(r.actual_qty, 1)} · {short ? `+${grp(r.variance, 1)} short${r.calibrated_at ? " · carried" : ""}` : "held"}</span>
                               : r.status === "confirmed" ? <span style={{ color: "var(--ok-text)" }}>confirmed</span>
-                              : r.status === "edited" ? <span className="text-amber-700">edited{role === "commit" ? " · open days" : ""}</span>
+                              : r.status === "edited" ? <span className={role === "commit" ? "text-amber-800" : "text-amber-700"}>edited{role === "commit" ? " · open days" : ""}</span>
                               : <span className="text-slate-400">derived ÷{weekNosOf(horizon, m).length}</span>;
                             return (
                               <td key={`${m}|${w}`} className="px-2 py-2 border-r border-slate-100 whitespace-nowrap" style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>
                                 <div className="font-semibold tabular-nums text-slate-800">{grp(r.planned_qty, 1)} {unitLbl(line.unit)}</div>
-                                <div className="text-xs tabular-nums">{status}{r.parent_changed && <span style={{ color: "var(--red)" }}> · month changed</span>}</div>
+                                <div className="text-xs tabular-nums">{status}{r.parent_changed && <span style={{ color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed</span>}</div>
                               </td>
                             );
                           })}
