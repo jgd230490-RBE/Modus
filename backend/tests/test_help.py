@@ -830,10 +830,10 @@ ok("\U0001f534 #15 the technical guide's <pre> blocks wrap (pre-wrap, overflow-w
    "overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}" in _tg2)
 _tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
 ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
-   [l for _, l in _tgr] == ["Where each screen reads from", "", "Old words, new words", "", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): T7's sourcing table (from Appendix D) is a plain one
+   [l for _, l in _tgr] == ["Where each screen reads from", "Errors and what they mean", "Old words, new words", "Sourced and assumed figures", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep): T5 (longer now) and T7's sourcing table (from Appendix D) scroll on a phone too, so they are named regions (the UI audit's axe found them)
    # NARROWED 18 Oct 2026 (decision 10): the fourth tabindex is main's -1, the "Skip to the text" link's target
-   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 3
-   and _tg2.count("tabindex=") == 4, str(_tgr))
+   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 5
+   and _tg2.count("tabindex=") == 6, str(_tgr))
 # RE-PINNED 17 Oct 2026 (D114 fix): the opening sentence now also names the fallback (no approved line in the window ->
 # the months that have them), and the big-screen sentence says "the months the page opened on" instead of "this month ± 6"
 ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",

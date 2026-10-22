@@ -382,7 +382,7 @@ CSV keeps the path. The carbon target's write carries the decisions, never a fig
 </ul>
 
 <h1 id="t5-errors">T5 Errors and what they mean</h1>
-<div class="tbl"><table><thead><tr><th>The screen says</th><th>What happened</th></tr></thead><tbody>
+<div class="tbl" tabindex="0" role="region" aria-label="Errors and what they mean"><table><thead><tr><th>The screen says</th><th>What happened</th></tr></thead><tbody>
 <tr><td class="k">Wayscope did not answer in time</td><td>The request to the server timed out or failed. Nothing typed is lost; try again.</td></tr>
 <tr><td class="k">Wayscope may still be starting up</td><td>The Render service was starting or redeploying, so the first read failed. Refresh the page.</td></tr>
 <tr><td class="k">admin token rejected</td><td>The server answered 403: the token typed does not match <code>ADMIN_TOKEN</code>.</td></tr>
@@ -429,7 +429,7 @@ vehicle makes several a day. A fleet figure worked out as tonnes ÷ payload alon
 whatever that multiple is — typically three to six times.</p></div>
 
 <h2 id="t7-sourced">Which figures are sourced, and which are assumed</h2>
-<div class="tbl"><table><thead><tr><th>Figure</th><th>Standing</th></tr></thead><tbody>
+<div class="tbl" tabindex="0" role="region" aria-label="Sourced and assumed figures"><table><thead><tr><th>Figure</th><th>Standing</th></tr></thead><tbody>
 <tr><td class="k">Route distance and duration</td><td><strong>Measured</strong> — returned by the routing
 service for a lorry profile with that vehicle's weight and dimensions. Nothing in the platform invents a road.</td></tr>
 <tr><td class="k">Payloads</td><td><strong>Planning assumption.</strong> A typical carrying limit, not a
@@ -647,9 +647,8 @@ popup says which stretches are measured and how far the nearest surveyed track i
 Data &rarr; Routes.</li>
 <li><strong>Errors.</strong> When a read fails the map shows a fixed sentence (&ldquo;Could not load the routes.&rdquo;,
 &ldquo;Could not load this layer.&rdquo; …); the status code and the server's text go to the browser console (and, for the
-carbon legend, the hover title). The reads: <code>map-data</code>, <code>route-forecasts</code>,
-<code>forecast-matrix</code>, <code>road-load</code>, <code>areas/months</code>, <code>limits</code>,
-<code>community</code>, <code>collisions</code>, <code>map-export</code> (401 = not staff).</li>
+carbon legend, the hover title). The reads: map-data, route-forecasts, forecast-matrix, road-load, areas/months, limits, community, collisions and
+map-export (401 = not staff), all under <code>/api/</code>.</li>
 </ul>
 
 </main>
