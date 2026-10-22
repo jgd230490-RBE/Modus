@@ -332,7 +332,8 @@ ok("H2: the scheme is a road — tenant name, overlay note, discipline words; no
 ok("H2: every site has a gate at its own coordinates; the quarries and the town compound enter and leave by different gates",
    # NARROWED 14 Oct 2026 (civils materials): 17 gates — the batching plant's
    # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): 19 — the asphalt plant's and Welland Ready-Mix's; == one per site at least
-   len(_T["location_gates"]) == 19 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
+   # RE-PINNED 22 Oct 2026 (abnormal loads, phase 3, D75): 21 — the precast works' and the crane depot's
+   len(_T["location_gates"]) == 21 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
    and all(g["lat"] and g["lon"] for g in _T["location_gates"])
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L001") == ["access", "egress"]
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
