@@ -518,6 +518,15 @@ def init_network_db():
         _create_tenanted(cur, "collision_records")
         _create_tenanted(cur, "collision_meta")
         conn.commit()
+        # 22 Oct 2026 (evidence v3): the vehicle details, NULL until the next fetch
+        try:
+            if IS_PG:
+                cur.execute("ALTER TABLE collision_records ADD COLUMN IF NOT EXISTS detail_json TEXT")
+            else:
+                cur.execute("ALTER TABLE collision_records ADD COLUMN detail_json TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()  # column already present — fine
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
         # list of zone ids ('' = baked with no zones in force). Nullable, and NULL means
@@ -1332,6 +1341,10 @@ _TENANT_DDL = {
             routes_json    TEXT,
             sites_json     TEXT,
             fetched_at     TEXT,
+            -- 22 Oct 2026 (evidence v3): the vehicle details the sheet reads (goods vehicle weight classes, articulated, a
+            -- goods vehicle / any vehicle turning or waiting to turn left, a goods vehicle on a work journey) and DfT's
+            -- urban / rural flag, as JSON. Listed here AND ALTERed in init_db(); NULL until the next fetch.
+            detail_json    TEXT,
             PRIMARY KEY (tenant_id, collision_id)
         )
     """,

@@ -81,6 +81,10 @@ VRU = [
 VRU_KEYS = [v["key"] for v in VRU]
 VRU_LABEL = {v["key"]: v["label"] for v in VRU}
 GOODS_TYPES = {"20", "21", "98"}       # goods over 3.5 t (under 7.5 t, 7.5 t and over, weight not known)
+# 22 Oct 2026 (evidence v3): the words for each goods class on the sheet; "98" is DfT's goods vehicle whose weight the
+# police did not record, counted as over 3.5 t as DfT counts it
+GOODS_WORDS = {"21": "7.5 t and over", "20": "3.5–7.5 t", "98": "weight not recorded"}
+LEFT_MANOEUVRES = {"7", "8"}            # turning left, waiting to turn left (the same codes in the 2024 and older fields)
 
 ROAD_CLASS = {"1": "M", "2": "A(M)", "3": "A", "4": "B", "5": "C", "6": "Unclassified road"}
 JUNCTION = {"0": None, "13": "T or staggered junction", "16": "Crossroads", "17": "Junction with more than four arms",
@@ -274,18 +278,44 @@ def read_collisions(path, index, year=None):
             "n_casualties": int(r["number_of_casualties"]) if str(r.get("number_of_casualties") or "").isdigit() else None,
             "n_vehicles": int(r["number_of_vehicles"]) if str(r.get("number_of_vehicles") or "").isdigit() else None,
             "vru": [], "vru_ksi": [], "goods": False,
+            # 22 Oct 2026 (v3): DfT's urban (1) / rural (2) flag, and the vehicle details read_vehicles adds
+            "detail": {"urban": int(r["urban_or_rural_area"]) if str(r.get("urban_or_rural_area") or "").strip() in ("1", "2") else None},
             "dist_m": min(list(routes.values()) + list(sites.values())),
             "routes": routes, "sites": sites,
         }
     return out
 
 
+def _code(r, field):
+    """A vehicle field from the 2024 specification, else its _historic twin (the years before 2024 fill only that)."""
+    v = str(r.get(field) or "").strip()
+    if v in ("", "-1"):
+        v = str(r.get(field + "_historic") or "").strip()
+    return v
+
+
 def read_vehicles(path, keep):
-    """Marks the kept collisions that involved a goods vehicle over 3.5 t."""
+    """Marks the kept collisions that involved a goods vehicle over 3.5 t and (22 Oct 2026, v3) records the details the
+    sheet reads: the goods vehicles' weight classes, articulated, a goods vehicle turning or waiting to turn left, a goods
+    vehicle on a journey for work, and any vehicle turning or waiting to turn left."""
     for r in _rows(path):
         c = keep.get(r.get("collision_index"))
-        if c is not None and str(r.get("vehicle_type") or "").strip() in GOODS_TYPES:
+        if c is None:
+            continue
+        d = c.setdefault("detail", {})
+        for k, v in (("goods_types", []), ("goods_artic", False), ("goods_left", False), ("goods_work", False),
+                     ("left_turn", False)):
+            d.setdefault(k, v)
+        vt = str(r.get("vehicle_type") or "").strip()
+        left = _code(r, "vehicle_manoeuvre") in LEFT_MANOEUVRES
+        d["left_turn"] = d["left_turn"] or left
+        if vt in GOODS_TYPES:
             c["goods"] = True
+            if vt not in d["goods_types"]:
+                d["goods_types"] = sorted(d["goods_types"] + [vt], key=lambda x: ("21", "20", "98").index(x))
+            d["goods_artic"] = d["goods_artic"] or str(r.get("towing_and_articulation") or "").strip() == "1"
+            d["goods_left"] = d["goods_left"] or left
+            d["goods_work"] = d["goods_work"] or _code(r, "journey_purpose_of_driver") == "1"
 
 
 def read_casualties(path, keep):
@@ -315,7 +345,7 @@ def read_casualties(path, keep):
 # --------------------------------------------------------------------------- #
 _COLS = ("collision_id", "year", "month", "lon", "lat", "severity", "road", "road2", "junction", "road_type",
          "speed_limit", "light", "authority", "n_casualties", "n_vehicles", "vru_json", "vru_ksi_json", "goods",
-         "dist_m", "routes_json", "sites_json", "fetched_at")
+         "dist_m", "routes_json", "sites_json", "fetched_at", "detail_json")
 
 
 def _meta_row():
@@ -352,7 +382,8 @@ def replace_all(records, fetched_at):
                      c["road2"], c["junction"], c["road_type"], c["speed_limit"], c["light"], c["authority"],
                      c["n_casualties"], c["n_vehicles"], json.dumps(c["vru"]), json.dumps(c["vru_ksi"]),
                      1 if c["goods"] else 0, c["dist_m"], json.dumps(c["routes"], separators=(",", ":")),
-                     json.dumps(c["sites"], separators=(",", ":")), fetched_at))
+                     json.dumps(c["sites"], separators=(",", ":")), fetched_at,
+                     json.dumps(c.get("detail") or {}, separators=(",", ":"))))
     db.execute_atomic([
         ("DELETE FROM collision_records WHERE tenant_id = ?", (tenant,)),
         ("INSERT INTO collision_records (tenant_id, " + ", ".join(_COLS) + ") VALUES (" +
@@ -371,7 +402,7 @@ def along(c):
 
 def _load(r):
     c = dict(r)
-    for k, dflt in (("vru_json", []), ("vru_ksi_json", []), ("routes_json", {}), ("sites_json", {})):
+    for k, dflt in (("vru_json", []), ("vru_ksi_json", []), ("routes_json", {}), ("sites_json", {}), ("detail_json", {})):
         try:
             c[k[:-5]] = json.loads(c.pop(k) or "null") or dflt
         except (TypeError, ValueError):
@@ -429,6 +460,7 @@ def status():
             "years": years, "period": period_words(years), "files": det.get("files") or [],
             "strip": {"route_m": NEAR_ROUTE_M, "site_m": NEAR_SITE_M, "on_route_m": ON_ROUTE_M},
             "counts": n, "alternatives_only": alt, "source": SOURCE,
+            "vehicle_details": bool(det.get("vehicle_details")),
             "credit": credit_line() if n["all"] or alt["all"] or years else "",
             "name": LAYER_NAME, "what": WHAT}
 
@@ -551,6 +583,7 @@ def refresh(by=None, fetchers=None, index=None, today=None):
     det.update({"years": years, "files": files, "error": None})
     if back:
         det["notes"].append(f"The {last} data is not published yet; the latest five final years are {period_words(years)}.")
+    det["vehicle_details"] = True     # 22 Oct 2026 (v3): rows fetched from here on carry detail_json
     _write_meta("done", det, fetched_at=now)
     return status()
 
@@ -599,7 +632,16 @@ ROWS = [
     ("goods_ksi", "A goods vehicle over 3.5 t involved, KSI"),
     # 22 Oct 2026 (evidence v2, the user's yes to the mockup): the case CLOCS is written for, as its own row
     ("vru_goods", "A vulnerable road user hurt, a goods vehicle over 3.5 t involved"),
+    ("cyclist_any", "A cyclist hurt, any severity"),
     ("junction", "At or within 20 m of a junction"),
+]
+# 22 Oct 2026 (evidence v3): rows that need the vehicle details (read from the fetch after v3 shipped); the sheet shows
+# them only when every collision it counts carries them, never a zero that only means "not read yet"
+DETAIL_ROWS = [
+    ("goods_75", "A goods vehicle of 7.5 t and over involved"),
+    ("goods_artic", "An articulated goods vehicle involved"),
+    ("goods_left", "A goods vehicle over 3.5 t turning or waiting to turn left"),
+    ("cyclist_left", "A cyclist hurt while a vehicle was turning or waiting to turn left"),
 ]
 
 
@@ -623,17 +665,34 @@ def _count(recs, key):
             return c["goods"] and c["ksi"]
         if key == "vru_goods":
             return c["goods"] and bool(c["vru"])
+        if key == "cyclist_any":
+            return "cyclist" in c["vru"]
+        d = c.get("detail") or {}
+        if key == "goods_75":
+            return "21" in (d.get("goods_types") or [])
+        if key == "goods_artic":
+            return bool(d.get("goods_artic"))
+        if key == "goods_left":
+            return bool(d.get("goods_left"))
+        if key == "cyclist_left":
+            return "cyclist" in c["vru"] and bool(d.get("left_turn"))
         if key == "junction":
             return bool(c["junction"])
         return False
     return sum(1 for c in recs if hit(c))
 
 
-def counts_for(recs, key):
+def counts_for(recs, key, rows=None):
     """The table's two columns for one route key: on the route (within ON_ROUTE_M) and within NEAR_ROUTE_M."""
+    rows = ROWS if rows is None else rows
     near = [c for c in recs if key in c["routes"]]
     on = [c for c in near if c["routes"][key] <= ON_ROUTE_M]
-    return {"on": {k: _count(on, k) for k, _ in ROWS}, "near": {k: _count(near, k) for k, _ in ROWS}}
+    return {"on": {k: _count(on, k) for k, _ in rows}, "near": {k: _count(near, k) for k, _ in rows}}
+
+
+def has_details(recs):
+    """True when every record carries the v3 vehicle details (fetched after 22 Oct 2026)."""
+    return all("goods_types" in (c.get("detail") or {}) for c in recs)
 
 
 def _chainage(index, line, p):
@@ -997,6 +1056,125 @@ def line_between(index, line, a_m, b_m):
     return [p for p in out if p]
 
 
+# --------------------------------------------------------------------------- #
+#  22 Oct 2026 - evidence v3: cycle routes beside / meeting the route, the     #
+#  route's own left turns, the routes compared                                 #
+# --------------------------------------------------------------------------- #
+CYCLE_BESIDE_M = 20       # a stretch of route runs "beside" a cycle route when one is within this
+CYCLE_MEETS_M = 8         # a cycle route "meets" the route where it comes within this (crossing or joining)
+CYCLE_MEET_GAP_M = 60     # ...one place per run, runs closer than this along the route joined
+TURN_WINDOW_M = 25        # a left turn: the heading over the next 25 m turned 45 degrees or more anticlockwise
+TURN_MIN_DEG = 45         #   from the heading over the last 25 m (x east, y north; UK traffic turns left across
+TURN_JOIN_M = 40          #   the nearside, where a cyclist rides); turns closer than 40 m are one, at the sharpest
+TURN_CYCLE_M = 30         # a left turn "where the route meets a cycle route": one within this of the turn
+
+
+def _resample(index, line, step):
+    """Points every `step` metres along `line` on the index's projection, with their distance from its start."""
+    P = [index._xy(p) for p in line]
+    out, carry, run = [(P[0], 0.0)], 0.0, 0.0
+    for a, b in zip(P, P[1:]):
+        seg = math.hypot(b[0] - a[0], b[1] - a[1])
+        t = step - carry
+        while t <= seg and seg > 0:
+            out.append(((a[0] + (b[0] - a[0]) * t / seg, a[1] + (b[1] - a[1]) * t / seg), run + t))
+            t += step
+        carry = (carry + seg) % step
+        run += seg
+    return out
+
+
+class _SegGrid:
+    """The cycle routes' segments in 100 m cells, for 'how far is the nearest cycle route' along a route."""
+    CELL = 100.0
+
+    def __init__(self, index, lines):
+        self.g = {}
+        for name, line in lines:
+            P = [index._xy(p) for p in line]
+            for a, b in zip(P, P[1:] or P):
+                for gx in range(int(min(a[0], b[0]) // self.CELL) - 1, int(max(a[0], b[0]) // self.CELL) + 2):
+                    for gy in range(int(min(a[1], b[1]) // self.CELL) - 1, int(max(a[1], b[1]) // self.CELL) + 2):
+                        self.g.setdefault((gx, gy), []).append((a, b, name))
+
+    def nearest(self, p):
+        best, name = None, None
+        for a, b, n in self.g.get((int(p[0] // self.CELL), int(p[1] // self.CELL)), ()):
+            d = RouteIndex._seg(p, a, b)
+            if best is None or d < best:
+                best, name = d, n
+        return (best, name) if best is not None else (float("inf"), None)
+
+
+def cycle_lines():
+    """The community layer's cycle routes (National Cycle Network and cycle paths, OpenStreetMap) as (name, line) pairs."""
+    import community
+    out = []
+    for f in community.features(kinds=["cycle"]):
+        g = f.get("geometry") or {}
+        name = (f.get("properties") or {}).get("name") or "Cycle route"
+        if g.get("type") == "LineString":
+            out.append((name, g["coordinates"]))
+        elif g.get("type") == "MultiLineString":
+            out.extend((name, l) for l in g["coordinates"])
+    return out
+
+
+def cycle_along(index, line, grid):
+    """{'beside_m': [metres from A, sampled every 10 m, beside a cycle route], 'meets': [(metres from A, name)]} for
+    one route: within CYCLE_BESIDE_M is beside; within CYCLE_MEETS_M is a meeting, one per run."""
+    beside, touch = [], []
+    if grid is None or len(line) < 2:
+        return {"beside_m": [], "meets": []}
+    for p, m in _resample(index, line, 10.0):
+        d, n = grid.nearest(p)
+        if d <= CYCLE_BESIDE_M:
+            beside.append(m)
+        if d <= CYCLE_MEETS_M:
+            touch.append((m, n))
+    meets = []
+    for m, n in touch:
+        if meets and m - meets[-1][1] <= CYCLE_MEET_GAP_M:
+            meets[-1][1] = m
+        else:
+            meets.append([m, m, n])
+    return {"beside_m": beside, "meets": [((a + b) / 2, n) for a, b, n in meets]}
+
+
+def left_turns(index, line, grid=None):
+    """The route's own left turns: [{'m', 'deg', 'cycle', 'cycle_m'}] where the heading over the next TURN_WINDOW_M
+    turns TURN_MIN_DEG or more anticlockwise from the last, one per TURN_JOIN_M at its sharpest, with the nearest cycle
+    route within TURN_CYCLE_M (if any). Worked out from the stored road route, so a roundabout's gentle entry may not
+    count: the sheet says how it is measured."""
+    if len(line) < 2:
+        return []
+    pts = _resample(index, line, 5.0)
+    k = int(TURN_WINDOW_M / 5)
+
+    def hd(a, b):
+        return math.atan2(b[1] - a[1], b[0] - a[0])
+    cand = []
+    for i in range(k, len(pts) - k):
+        d = math.degrees(hd(pts[i][0], pts[i + k][0]) - hd(pts[i - k][0], pts[i][0]))
+        d = (d + 180) % 360 - 180
+        if d >= TURN_MIN_DEG:
+            cand.append((i, d))
+    turns = []
+    for i, d in cand:
+        if turns and i - turns[-1][0] <= int(TURN_JOIN_M / 5):
+            if d > turns[-1][1]:
+                turns[-1] = (i, d)
+        else:
+            turns.append((i, d))
+    out = []
+    for i, d in turns:
+        p, m = pts[i]
+        cd, cn = grid.nearest(p) if grid is not None else (float("inf"), None)
+        out.append({"m": m, "deg": int(round(d)), "cycle": cn if cd <= TURN_CYCLE_M else None,
+                    "cycle_m": int(round(cd)) if cd <= TURN_CYCLE_M else None})
+    return out
+
+
 def densest_window(on, width_m):
     """(start, end) metres from A of the window `width_m` long holding the most collisions on the route (the first
     such window from A), or None with fewer than 3 — the evidence map's inset frames it, chosen only for legibility."""
@@ -1065,10 +1243,13 @@ def evidence(route_id, acc=None, now=None):
     keys = [(0, route_key(route_id))] + [(a, route_key(route_id, a)) for a in sorted(geo) if a]
     recs = records([k for _, k in keys])
     index = index_from_db()
+    # 22 Oct 2026 (v3): the rows that need the vehicle details only once every counted collision carries them
+    details = bool(recs) and has_details(recs)
+    rows = ROWS + (DETAIL_ROWS if details else [])
     columns = []
     for alt, key in keys:
         columns.append({"key": key, "alt": alt, "label": "This route" if not alt else f"Alternative {alt}",
-                        "length": length_words(alt), **counts_for(recs, key)})
+                        "length": length_words(alt), **counts_for(recs, key, rows)})
     key0 = route_key(route_id)
     prim_recs = [c for c in recs if key0 in c["routes"]]
     locs_out = locations(prim_recs, index, loaded)
@@ -1104,6 +1285,58 @@ def evidence(route_id, acc=None, now=None):
     for s in stretch_rows:
         s["mid"] = point_at(index, loaded, (s["from_m"] + s["to_m"]) / 2) if len(loaded) >= 2 else None
     inset_line = line_between(index, loaded, *window) if window else []
+    # 22 Oct 2026 (v3): cycle routes and the route's own left turns, for the route and each alternative; the routes
+    # compared side by side on page 1; the lorry-involved collisions on the route, listed
+    cl_lines = cycle_lines()
+    grid = _SegGrid(index, cl_lines) if cl_lines else None
+    mu = 1609.344 if du == "mi" else 1000.0
+
+    def leg_of(alt):
+        g = ((geo.get(alt) or {}).get(used) or {}).get("loaded")
+        if not g:
+            g = next((v.get("loaded") for v in (geo.get(alt) or {}).values() if v.get("loaded")), None)
+        return _coords(g["geometry"]) if g else []
+    headline, alt_lines = [], []
+    cyc0, turns0 = {"beside_m": [], "meets": []}, []
+    for col in columns:
+        line = loaded if not col["alt"] else leg_of(col["alt"])
+        if col["alt"] and line:
+            alt_lines.append((col["label"], line))
+        cyc = cycle_along(index, line, grid)
+        turns = left_turns(index, line, grid)
+        if not col["alt"]:
+            cyc0, turns0 = cyc, turns
+        on_c = [c for c in recs if c["routes"].get(col["key"], 1e9) <= ON_ROUTE_M]
+        headline.append({
+            "label": col["label"], "length": col.get("length"), "on": len(on_c),
+            "ksi": sum(1 for c in on_c if c["ksi"]), "fatal": sum(1 for c in on_c if c["severity"] == 1),
+            "vru_ksi": sum(1 for c in on_c if c["vru_ksi"]), "cyclist": sum(1 for c in on_c if "cyclist" in c["vru"]),
+            "cyclist_ksi": sum(1 for c in on_c if "cyclist" in c["vru_ksi"]), "goods": sum(1 for c in on_c if c["goods"]),
+            "beside": f"{export._dist(len(cyc['beside_m']) * 10 / 1000):.1f}" if grid is not None else None,
+            "meets": len(cyc["meets"]) if grid is not None else None, "turns": len(turns),
+            "turns_cycle": sum(1 for x in turns if x["cycle"]) if grid is not None else None,
+            "lorries": (plan["per_day"] if plan else None) if not col["alt"] else None,
+        })
+    for x in turns0:
+        x["words"] = f"{du_words(x['m'])} {du}"
+    for s in stretch_rows:
+        a, b, last = s["from_m"], s["to_m"], s["no"] == len(stretch_rows)
+        inside = (lambda m: a <= m < b or (last and m >= a))
+        recs_s = [c for c in prim_recs if c.get("stretch") == s["no"]]
+        s["cyclist"] = sum(1 for c in recs_s if "cyclist" in c["vru"])
+        s["cyclist_ksi"] = sum(1 for c in recs_s if "cyclist" in c["vru_ksi"])
+        s["beside"] = f"{export._dist(sum(1 for m in cyc0['beside_m'] if inside(m)) * 10 / 1000):.1f}" if grid is not None else None
+        s["meets"] = sum(1 for m, _ in cyc0["meets"] if inside(m)) if grid is not None else None
+    lorry_list = []
+    for c in sorted((c for c in prim_recs if c["goods"] and c["routes"][key0] <= ON_ROUTE_M),
+                    key=lambda c: (c.get("along_m") or 0, c["collision_id"])):
+        d = c.get("detail") or {}
+        lorry_list.append({"mi": c.get("along_m"), "words": f"{du_words(c['along_m'])} {du}" if c.get("along_m") is not None else "",
+                           "road": " / ".join(r for r in (c["road"], c["road2"]) if r) or "Road not recorded",
+                           "junction": c["junction"], "severity": SEVERITY[c["severity"]], "year": c["year"],
+                           "goods_words": ", ".join(GOODS_WORDS[g] for g in d.get("goods_types") or []) if details else None,
+                           "artic": bool(d.get("goods_artic")), "left": bool(d.get("goods_left")), "work": bool(d.get("goods_work")),
+                           "vru_words": [VRU_LABEL[k] for k in c["vru"]], "collision_id": c["collision_id"]})
     st = status()
     factors = conversions.load_factors()
     notice = export._demo_notice() or None
@@ -1116,14 +1349,19 @@ def evidence(route_id, acc=None, now=None):
         "vehicle_text": conversions.vehicle_label(factors, used) if used else None,
         "loaded": loaded, "return": ret, "drawn": bool(loaded),
         "years": st["years"], "period": st["period"], "fetched_at": st["fetched_at"], "fetched": bool(st["fetched_at"]),
-        "columns": columns, "rows": ROWS, "locations": locs_out,
+        "columns": columns, "rows": rows, "details": details, "locations": locs_out,
+        "headline": headline, "alt_lines": alt_lines, "cycle_lines": cl_lines, "cycle_shown": grid is not None,
+        "turns": turns0, "cycle": {"beside": headline[0]["beside"] if headline else None,
+                                   "meets": [{"m": m, "words": f"{du_words(m)} {du}", "name": n} for m, n in cyc0["meets"]]},
+        "lorry_list": lorry_list,
         "records": [c for c in prim_recs],
         "on": [c for _, c in on], "stretches": stretch_rows, "plan": plan, "plan_error": plan_error,
         "length_m": length_m, "inset_window": window, "inset_line": inset_line, "unit": du,
         "on_route_m": ON_ROUTE_M, "near_route_m": NEAR_ROUTE_M, "cluster_m": CLUSTER_M,
         "caveat": CAVEAT, "not_a_verdict": NOT_A_VERDICT, "credit": credit_line(),
         "issued": f"{as_at:%d %b %Y}".lstrip("0"),
-        "community_credit": None,
+        # 22 Oct 2026 (v3): the schools, health, bus stops and cycle routes on the sheet come from the community layer
+        "community_credit": (community.credit_line() if (feats or cl_lines) else None),
     }
 
 
