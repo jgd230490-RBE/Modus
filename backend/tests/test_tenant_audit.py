@@ -97,6 +97,9 @@ TENANTED = {
     # 16 Oct 2026 (the collision history, CLOCS v5 C1). The police-reported collisions fetched along one tenant's
     # routes and the row saying which years and when. Registered in the same edit as the tables — ten and eleven.
     "collision_records", "collision_meta",
+    # 22 Oct 2026 (evidence v3, traffic.py): DfT's traffic counts at the count points along one tenant's routes.
+    # Registered in the same edit as the table — twelve.
+    "traffic_counts",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

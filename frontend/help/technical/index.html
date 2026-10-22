@@ -428,6 +428,20 @@ and each stored alternative; the map draws the alternatives and the cycle routes
 spot so it never covers a route; goods-vehicle collisions are squares in <code>CE_LORRY</code>. The last page's ten questions
 (<code>ASSESSOR_QUESTIONS</code>) and the clause box (<code>CLOCS_MAP</code>) cite CLOCS Standard v5 clause numbers in neutral
 words. The footer carries the community layer's credit.</p>
+<p><strong>Compared with roads like these (v3 part 2, 22 Oct 2026; <code>traffic.py</code>).</strong> The collision fetch also
+reads DfT's road traffic statistics: the authority list
+(<code>storage.googleapis.com/dft-statistics/road-traffic/downloads/data-gov-uk/local_authority_traffic.csv</code>, ONS code to
+DfT id) and one AADF file per authority the collisions name
+(<code>.../aadf/local_authority_id/dft_aadf_local_authority_id_&lt;id&gt;.csv</code>), keeping the major-road count points within
+250 m of a route for the collision years in <code>traffic_counts</code> (tenanted, in the package). An authority whose file fails is
+named on the Config page and skipped. Per stretch: the count points within 150 m of its road route (400 m past its ends) on the
+same road; each year their AADF plus pedal cycles weighted by link length × 365 × the stretch's miles × the RAS0302 rate for the
+road type that year (<code>traffic.RATES</code>: motorway, urban / rural A, urban / rural other; reported injury collisions and
+fatal-or-serious adjusted, per billion vehicle miles, 2021–2025 typed in from the 2025 edition — add each new year); urban or
+rural from DfT's flag on the stretch's collisions; the 95 % Poisson range; the observed fatal-or-serious figure on DfT's adjusted
+basis (<code>collision_adjusted_severity_serious</code>) when every collision carries it. Shown as a count and a range with
+"below / within / above the range", never a ratio. Licence: Open Government Licence v3.0 (data.gov.uk); roadtraffic.dft.gov.uk
+answered 503 on the day it was built.</p>
 <p>The rows live per organisation (<code>collision_records</code>, <code>collision_meta</code>) and travel in its package.
 The words on every output: &ldquo;police-reported injury collisions&rdquo;, the period beside every count, and &ldquo;evidence for a
 route risk assessment, not the assessment&rdquo;. No score, rate, ranking or colour status.</p>

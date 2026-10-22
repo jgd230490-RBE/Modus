@@ -279,7 +279,10 @@ def read_collisions(path, index, year=None):
             "n_vehicles": int(r["number_of_vehicles"]) if str(r.get("number_of_vehicles") or "").isdigit() else None,
             "vru": [], "vru_ksi": [], "goods": False,
             # 22 Oct 2026 (v3): DfT's urban (1) / rural (2) flag, and the vehicle details read_vehicles adds
-            "detail": {"urban": int(r["urban_or_rural_area"]) if str(r.get("urban_or_rural_area") or "").strip() in ("1", "2") else None},
+            "detail": {"urban": int(r["urban_or_rural_area"]) if str(r.get("urban_or_rural_area") or "").strip() in ("1", "2") else None,
+                       # DfT's probability that a collision is serious once severity recording is adjusted (fatal = 1):
+                       # the observed figure beside DfT's adjusted fatal-or-serious rates
+                       "adj_serious": _adj(r.get("collision_adjusted_severity_serious"))},
             "dist_m": min(list(routes.values()) + list(sites.values())),
             "routes": routes, "sites": sites,
         }
@@ -292,6 +295,13 @@ def _code(r, field):
     if v in ("", "-1"):
         v = str(r.get(field + "_historic") or "").strip()
     return v
+
+
+def _adj(v):
+    try:
+        return round(float(v), 4)
+    except (TypeError, ValueError):
+        return None
 
 
 def read_vehicles(path, keep):
@@ -576,10 +586,30 @@ def refresh(by=None, fetchers=None, index=None, today=None):
                 det["error"] = f"{e}; nothing was changed"
                 _write_meta("failed", det)
                 return status()
+        # 22 Oct 2026 (evidence v3): DfT's traffic counts along the routes, for "expected for roads like these" — from
+        # the authorities the collisions name; a failure here keeps the collisions and the counts already stored
+        traffic_rows, traffic_note = None, None
+        if index.lines:
+            try:
+                import traffic
+                traffic_rows, tfiles, tmissing = traffic.fetch(index, years, {c["authority"] for c in recs if c.get("authority")},
+                                                               workdir, fetch["download"])
+                files = files + tfiles
+                if tmissing:
+                    traffic_note = ("The traffic counts for " + ", ".join(tmissing) + " could not be read; the other "
+                                    "authorities' were.")
+            except Exception as e:          # noqa: BLE001 — said on the page, never fatal to the collisions
+                traffic_note = f"The traffic counts could not be read ({str(e)[:140]}); the ones already stored were kept."
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
     now = _now()
     replace_all(recs, now)
+    if traffic_rows is not None:
+        import traffic
+        traffic.replace_all(traffic_rows, now)
+        det["traffic_points"] = len({r["count_point_id"] for r in traffic_rows})
+    if traffic_note:
+        det["notes"].append(traffic_note)
     det.update({"years": years, "files": files, "error": None})
     if back:
         det["notes"].append(f"The {last} data is not published yet; the latest five final years are {period_words(years)}.")
@@ -1327,6 +1357,36 @@ def evidence(route_id, acc=None, now=None):
         s["cyclist_ksi"] = sum(1 for c in recs_s if "cyclist" in c["vru_ksi"])
         s["beside"] = f"{export._dist(sum(1 for m in cyc0['beside_m'] if inside(m)) * 10 / 1000):.1f}" if grid is not None else None
         s["meets"] = sum(1 for m, _ in cyc0["meets"] if inside(m)) if grid is not None else None
+    # 22 Oct 2026 (v3): expected for roads like these — DfT's traffic counts on the stretch × DfT's national rate for its
+    # road type (traffic.py); the observed fatal-or-serious figure on DfT's adjusted basis where every collision has it
+    import traffic
+    trows = traffic.stored()
+    years_held = status()["years"]
+    for s in stretch_rows:
+        recs_s = [c for c in prim_recs if c.get("stretch") == s["no"]]
+        if not trows:
+            s["expected"] = {"why": "traffic counts not fetched yet"}
+            continue
+        e = traffic.expected_for(index, loaded, s["from_m"], s["to_m"], s.get("road"), traffic.urban_of(recs_s),
+                                 years_held, trows)
+        if "expected" in e:
+            adj = [(c.get("detail") or {}).get("adj_serious") for c in recs_s if c["severity"] != 1]
+            if all(a is not None for a in adj):
+                e["obs_fsc"], e["fsc_basis"] = sum(1 for c in recs_s if c["severity"] == 1) + sum(adj), "adjusted"
+            else:
+                e["obs_fsc"], e["fsc_basis"] = sum(1 for c in recs_s if c["ksi"]), "reported"
+            e["reading"] = traffic.reading(s["n"], e["range"])
+            e["reading_fsc"] = traffic.reading(int(round(e["obs_fsc"])), e["range_fsc"])
+        s["expected"] = e
+    with_exp = [s for s in stretch_rows if "expected" in s["expected"]]
+    if headline:
+        if with_exp and len(with_exp) == len(stretch_rows):
+            tot = sum(s["expected"]["expected"] for s in with_exp)
+            headline[0]["expected"] = {"expected": tot, "range": traffic.poisson_range(tot), "covers": "all"}
+        elif with_exp:
+            headline[0]["expected"] = {"covers": f"{len(with_exp)} of {len(stretch_rows)} stretches"}
+        else:
+            headline[0]["expected"] = None
     lorry_list = []
     for c in sorted((c for c in prim_recs if c["goods"] and c["routes"][key0] <= ON_ROUTE_M),
                     key=lambda c: (c.get("along_m") or 0, c["collision_id"])):
@@ -1353,7 +1413,7 @@ def evidence(route_id, acc=None, now=None):
         "headline": headline, "alt_lines": alt_lines, "cycle_lines": cl_lines, "cycle_shown": grid is not None,
         "turns": turns0, "cycle": {"beside": headline[0]["beside"] if headline else None,
                                    "meets": [{"m": m, "words": f"{du_words(m)} {du}", "name": n} for m, n in cyc0["meets"]]},
-        "lorry_list": lorry_list,
+        "lorry_list": lorry_list, "traffic_shown": bool(with_exp), "traffic_credit": traffic.SOURCE["attribution"] + "." if with_exp else None,
         "records": [c for c in prim_recs],
         "on": [c for _, c in on], "stretches": stretch_rows, "plan": plan, "plan_error": plan_error,
         "length_m": length_m, "inset_window": window, "inset_line": inset_line, "unit": du,
