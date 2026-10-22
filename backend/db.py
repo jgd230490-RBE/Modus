@@ -239,6 +239,7 @@ def _run(sql, params, fetch):
             if fetch:
                 return [dict(r) for r in cur.fetchall()]
             conn.commit()
+            note_write(sql)
             return None
         except Exception as e:
             if attempt == 0 and _is_conn_error(e) and isinstance(conn, _PooledConn):
@@ -247,6 +248,57 @@ def _run(sql, params, fetch):
             raise
         finally:
             conn.close()
+
+
+# --------------------------------------------------------------------------- #
+#  22 Oct 2026 — the data version (read_cache.py's invalidation)               #
+# --------------------------------------------------------------------------- #
+# A counter that goes up after every committed write that could change what a reader sees.
+# read_cache.py keeps a whole read (the map's council figures) only while this counter is
+# unchanged, so a cached answer never outlives a write. Bumped AFTER the commit: a reader that
+# notes the version before it starts can never store figures older than the version it noted.
+#
+# The tables below are the only ones whose writes do NOT bump it: who signed in, sessions,
+# sign-in links, the audit trail, the throttle and the lead form. Those are written on plain
+# reads (a session's last_seen_at, a page open in the audit trail), and none of them is a
+# figure. Every other table — and any statement this does not recognise — bumps: a new table
+# invalidates by default, which can only cost a rebuild, never a stale figure.
+#
+# ⚠️ Per PROCESS. Render runs one uvicorn process (render.yaml's startCommand has no
+#    --workers; test_areas.py holds that). A second worker or instance would not see this
+#    process's writes, and the version must then move into the database.
+NO_DATA_TABLES = frozenset({"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users",
+                            "demo_requests"})
+_DATA_VERSION = [0]
+_WRITE_TABLE_RE = None
+
+
+def data_version():
+    """The current data version (see above)."""
+    return _DATA_VERSION[0]
+
+
+def bump_data_version():
+    """Every cached read is out of date from now on. Writers that commit on their own
+    connection (tenant_package, limits) call this after the commit."""
+    _DATA_VERSION[0] += 1
+
+
+def written_table(sql):
+    """The table an INSERT / UPDATE / DELETE / REPLACE writes, lower case; None for anything else."""
+    global _WRITE_TABLE_RE
+    if _WRITE_TABLE_RE is None:
+        import re
+        _WRITE_TABLE_RE = re.compile(
+            r"^\s*(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|REPLACE\s+INTO|UPDATE|DELETE\s+FROM)\s+\"?(\w+)", re.I)
+    m = _WRITE_TABLE_RE.match(sql or "")
+    return m.group(1).lower() if m else None
+
+
+def note_write(sql):
+    """After a committed statement: bump the data version unless it wrote only a NO_DATA_TABLES table."""
+    if written_table(sql) not in NO_DATA_TABLES:
+        bump_data_version()
 
 
 def query(sql, params=()):
@@ -289,6 +341,8 @@ def execute_atomic(steps):
                 else:
                     cur.execute(_adapt(sql), params)
             conn.commit()
+            if any(written_table(step[0]) not in NO_DATA_TABLES for step in steps):
+                bump_data_version()
             return None
         except Exception as e:
             try:

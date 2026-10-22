@@ -140,6 +140,7 @@ def init_db():
         cur.execute(DDL)
         cur.execute("CREATE INDEX IF NOT EXISTS ix_road_limits_anchor ON road_limits (anchor_lon, anchor_lat)")
         conn.commit()
+        db.bump_data_version()   # 22 Oct 2026: its own connection, so db.note_write never saw it (read_cache)
     finally:
         conn.close()
 
@@ -680,6 +681,7 @@ def replace_rows(source, box, rows):
                  r.get("length_m"), r.get("name"), r.get("ref"), r.get("exceptions"),
                  json.dumps(r.get("tags") or {}, ensure_ascii=False), r["fetched_at"]))
         conn.commit()
+        db.bump_data_version()   # 22 Oct 2026: its own connection, so db.note_write never saw it (read_cache)
         return len(seen)
     except Exception:
         try:

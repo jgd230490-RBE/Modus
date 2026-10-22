@@ -65,6 +65,7 @@ import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" sectio
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
+import read_cache  # 22 Oct 2026 — whole reads kept until the next write (the first council view on live)
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -142,6 +143,12 @@ async def lifespan(app: FastAPI):
                   f"{back.get('left', 0)} left NULL (shared or unknown route IPT).")
     except Exception as e:
         print("Network seed skipped:", e)
+    # 22 Oct 2026: the start-up migrations above commit on their own connections; nothing is cached yet, but say so.
+    db.bump_data_version()
+    # ... and build the map's council figures in the background, so the first viewer after a deploy does not wait
+    # (read_cache.start_warmer; again after writes go quiet). WAYSCOPE_WARM_CACHE=0 turns it off (http_smoke does).
+    if os.environ.get("WAYSCOPE_WARM_CACHE", "1").strip() != "0":
+        read_cache.start_warmer(db.current_tenant())
     yield
 
 
@@ -391,7 +398,14 @@ if _Request is not None and hasattr(app, "middleware"):
                 except Exception:
                     body = None
 
-            response = await call_next(request)
+            try:
+                response = await call_next(request)
+            finally:
+                # 22 Oct 2026 (read_cache): every write that reached an endpoint, worked or not, ends every cached
+                # read. db.note_write already bumps on each committed statement; this is the second net for a path
+                # that writes some other way. The skipped paths (sign-in, page opens, previews) change no figure.
+                if write and _audited(path):
+                    db.bump_data_version()
 
             # G3 (D55): every write that worked, with who did it and what was sent (secrets removed).
             # One place, so a new endpoint cannot forget it.
@@ -3196,9 +3210,28 @@ def public_areas_months():
     On Render one month of /api/public/areas took 3.7-7.4 s, longer than Play's 0.75 s a month. Behind the map gate.
     /api/public/areas?month= stays: the map falls back to it when this read fails.
     """
-    factors = conversions.load_factors()
+    body = read_cache.cached(AREAS_MONTHS_CACHE, _areas_months_key(), _areas_months_build)
+    return Response(content=body, media_type="application/json")
+
+
+#: 22 Oct 2026: /api/public/areas/months is kept in memory (read_cache) until the next write — 7.4 s on Render cold
+AREAS_MONTHS_CACHE = "areas/months"
+
+
+def _areas_months_key():
+    """What the every-month council read depends on besides the data: the working days and the horizon."""
+    return (_working_days(conversions.load_factors()), MONTH_COUNT)
+
+
+def _areas_months_build():
+    """The every-month council read as the body JSONResponse would send (built once per data version)."""
+    wd, months = _areas_months_key()
     with _heavy("areas/months"):
-        return areas.area_load_all(_working_days(factors), MONTH_COUNT)
+        return read_cache.json_bytes(areas.area_load_all(wd, months))
+
+
+read_cache.WARMERS[AREAS_MONTHS_CACHE] = lambda: read_cache.cached(AREAS_MONTHS_CACHE, _areas_months_key(),
+                                                                   _areas_months_build)
 
 
 @app.post("/api/admin/areas/import")
