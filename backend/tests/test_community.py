@@ -706,7 +706,8 @@ ok("8: app — no page reads the layer on load except the panel's status", APP.c
 ok("8: the tables are tenanted, in the package (after the work tables) and in the audit's registry",
    {"community_features", "community_meta"} <= set(db.TENANTED_TABLES)
    # NARROWED 16 Oct 2026: the collision history's two tables (CLOCS v5 C1) come after them, so the last four
-   and tenant_package.ORDER[-4:-2] == ["community_features", "community_meta"]
+   # NARROWED 22 Oct 2026: and DfT's traffic counts (evidence v3) after those, so the last five
+   and tenant_package.ORDER[-5:-3] == ["community_features", "community_meta"]
    and '"community_features", "community_meta",' in read("backend/tests/test_tenant_audit.py"))
 _sql = read("backend/community.py")
 import ast  # noqa: E402

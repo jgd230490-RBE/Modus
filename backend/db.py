@@ -74,6 +74,9 @@ TENANTED_TABLES = {
     # 16 Oct 2026 (CLOCS v5 C1, collisions.py): the police-reported injury collisions (DfT STATS19) along ITS
     # routes, and the one row saying which years and when. One tenant's data, carried in its package.
     "collision_records", "collision_meta",
+    # 22 Oct 2026 (evidence v3, traffic.py): DfT's traffic counts (AADF) at the count points along ITS routes, for the
+    # evidence sheet's "expected for roads like these". One tenant's data, carried in its package.
+    "traffic_counts",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -517,6 +520,7 @@ def init_network_db():
         # 16 Oct 2026: the collision history (CLOCS v5 C1). Born with tenant_id in the key.
         _create_tenanted(cur, "collision_records")
         _create_tenanted(cur, "collision_meta")
+        _create_tenanted(cur, "traffic_counts")     # 22 Oct 2026 (evidence v3). Born with tenant_id in the key.
         conn.commit()
         # 22 Oct 2026 (evidence v3): the vehicle details, NULL until the next fetch
         try:
@@ -1348,6 +1352,28 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, collision_id)
         )
     """,
+    # 22 Oct 2026 (evidence v3, traffic.py): DfT road traffic statistics, the annual average daily flow at each count
+    # point within the strip of a route, one row per point and year: the road, where, its link length, all motor
+    # vehicles, pedal cycles and HGVs a day, and whether that year was counted or estimated. Fetched with the collisions.
+    "traffic_counts": """
+        CREATE TABLE traffic_counts (
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            count_point_id  TEXT NOT NULL,
+            year            INTEGER NOT NULL,
+            road_name       TEXT,
+            road_type       TEXT,
+            lon             REAL,
+            lat             REAL,
+            link_km         REAL,
+            aadf_all        REAL,
+            aadf_cycles     REAL,
+            aadf_hgvs       REAL,
+            method          TEXT,
+            authority       TEXT,
+            fetched_at      TEXT,
+            PRIMARY KEY (tenant_id, count_point_id, year)
+        )
+    """,
     # 16 Oct 2026: which years the collision history holds, the files read, when, by whom, and the state of a fetch.
     "collision_meta": """
         CREATE TABLE collision_meta (
@@ -1701,6 +1727,7 @@ _TENANT_PK = {
     "community_meta": "(tenant_id, meta_id)",
     "collision_records": "(tenant_id, collision_id)",
     "collision_meta": "(tenant_id, meta_id)",
+    "traffic_counts": "(tenant_id, count_point_id, year)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

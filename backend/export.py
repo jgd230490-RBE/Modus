@@ -3121,6 +3121,34 @@ def collision_stretch_cells(S):
     return rows
 
 
+def _exp_cell(h):
+    """The headline's 'expected for roads like these' cell (22 Oct 2026, v3 part 2): a count and a range, or why not."""
+    e = h.get("expected")
+    if not e:
+        return "—"
+    if "expected" not in e:
+        return f"for {e['covers']}"
+    return f"{e['expected']:.0f} ({e['range'][0]}–{e['range'][1]})"
+
+
+def collision_expected_rows(S):
+    """22 Oct 2026 (v3 part 2): per stretch, the collisions beside what a typical road of its type would see with its
+    traffic, as rows of strings; a stretch it cannot be worked out for says why."""
+    rows = []
+    for st in S.get("stretches") or []:
+        e = st.get("expected") or {}
+        if "expected" not in e:
+            rows.append([str(st["no"]), st["name"], "—", "—", str(st["n"]), e.get("why", "—"), "", "", "", ""])
+            continue
+        aadf = e.get("aadf")
+        traffic_w = (f"{aadf[0]:,.0f}" if aadf and aadf[0] == aadf[1] else (f"{aadf[0]:,.0f}–{aadf[1]:,.0f}" if aadf else "—"))
+        rows.append([str(st["no"]), st["name"], traffic_w, e["class_words"], str(st["n"]),
+                     f"{e['expected']:.0f} ({e['range'][0]}–{e['range'][1]})", e["reading"],
+                     (f"{e['obs_fsc']:.0f}" if e["fsc_basis"] == "adjusted" else f"{e['obs_fsc']}"),
+                     f"{e['expected_fsc']:.0f} ({e['range_fsc'][0]}–{e['range_fsc'][1]})", e["reading_fsc"]])
+    return rows
+
+
 def collision_headline_rows(S):
     """22 Oct 2026 (v3): this route beside each alternative, as rows of strings [label, route, alt 1, ...]."""
     du = S.get("unit") or "km"
@@ -3135,6 +3163,7 @@ def collision_headline_rows(S):
         ["…a vulnerable road user KSI"] + cells(lambda h: str(h["vru_ksi"])),
         ["…a cyclist hurt (KSI)"] + cells(lambda h: f"{h['cyclist']} ({h['cyclist_ksi']})"),
         ["…a goods vehicle over 3.5 t involved"] + cells(lambda h: str(h["goods"])),
+        ["Expected for roads like these (typical range)"] + cells(_exp_cell),
         [f"Beside a cycle route ({du})"] + cells(lambda h: h["beside"] if h.get("beside") is not None else "—"),
         ["Places where a cycle route meets it"] + cells(lambda h: str(h["meets"]) if h.get("meets") is not None else "—"),
         ["Left turns · near a cycle route"] + cells(lambda h: f"{h['turns']} · {h['turns_cycle']}" if h.get("turns_cycle") is not None else str(h["turns"])),
@@ -3221,7 +3250,7 @@ def build_collision_evidence_pdf(S):
     c = rl_canvas.Canvas(buf, pagesize=A4)
     c.setTitle(_pdf_safe(f"{S['tenant']} · {S['title']} · {S['route_id']}"))
     c.setAuthor("Wayscope")
-    footer_h = 56
+    footer_h = 64
     page = [1]
     S["pages"] = 1
     du = S.get("unit") or "km"
@@ -3230,11 +3259,13 @@ def build_collision_evidence_pdf(S):
         foot = [S["caveat"], S["not_a_verdict"], S["credit"]]
         if S.get("community_credit"):        # 22 Oct 2026 (v3): schools, health, bus stops and cycle routes are credited
             foot.append(S["community_credit"])
+        if S.get("traffic_credit"):          # ...and the traffic counts and the national rates
+            foot.append(S["traffic_credit"])
         if S.get("basemap"):
             foot.append("Map © Mapbox © OpenStreetMap.")
         fy = m + footer_h - 8
         c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.5); c.line(m, m + footer_h - 2, W - m, m + footer_h - 2)
-        for ln in _wrap(" ".join(foot), R, 6.6, cw - 40)[:6]:
+        for ln in _wrap(" ".join(foot), R, 6.6, cw - 40)[:7]:
             c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawString(m, fy, ln)
             fy -= 8.2
         c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawRightString(W - m, m + footer_h - 10, f"Page {page[0]}")
@@ -3250,6 +3281,8 @@ def build_collision_evidence_pdf(S):
 
     def para(text, y, size=7.2, colour=None, width=None):
         for ln in _wrap(text, R, size, width or cw):
+            if y - size - 2 < m + footer_h:       # 22 Oct 2026 (v3): a note never runs into the footer
+                y = new_page()
             c.setFillColorRGB(*(colour or GREY)); c.setFont(R, size); c.drawString(m, y - size, ln)
             y -= size + 1.8
         return y
@@ -3612,6 +3645,71 @@ def build_collision_evidence_pdf(S):
              "are the lowest and the highest along the stretch. A cycle route is beside the route within "
              f"{cl.CYCLE_BESIDE_M} m and meets it within {cl.CYCLE_MEETS_M} m.", y - 2, 6.8) - 8
 
+    # compared with roads like these — 22 Oct 2026 (v3 part 2; the user: "nothing to compare it to"; R5 reversed for this
+    # one comparison, at the user's word): a count and the range a typical road would show, never a ratio or a verdict
+    erows = collision_expected_rows(S) if S.get("traffic_shown") else []
+    if S.get("stretches") and not erows:
+        why = {(st.get("expected") or {}).get("why") for st in S["stretches"]} - {None}
+        y = para("Compared with roads like these: " + ("DfT's traffic counts have not been fetched yet (Config, Map and bulletin, "
+                 "Fetch now)." if why == {"traffic counts not fetched yet"} else "no stretch of this route has a DfT traffic count "
+                 "and a road type to compare with.") , y, 7.2, NAVY_RGB) - 6
+    if erows:
+        if y - 90 < m + footer_h:
+            y = new_page()
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "Compared with roads like these")
+        y -= 14
+        y = para(f"The collisions on each stretch, {S['period']}, beside what a typical road of the same type in Great Britain "
+                 "would see with the same traffic, and the range its count would fall in 95 times in 100.", y, 7.4, NAVY_RGB) - 3
+        eh = ["", "Stretch", "Traffic, vehicles a day (latest year)", "Compared with", "Collisions on the route",
+              "Expected (typical range)", "", "Fatal or serious", "Expected (typical range)", ""]
+        ew = [5, 24, 22, 24, 14, 20, 18, 12, 20, 0]
+        ew[-1] = cw / mm - sum(ew)
+        ew = [w_ * mm for w_ in ew]
+        enum_ = {2, 4, 5, 7, 8}
+        hw_ = [_wrap(h_, B, 6.6, w_ - 4) or [""] for h_, w_ in zip(eh, ew)]
+        hh_ = max(len(x_) for x_ in hw_) * 7.6 + 4
+        c.setFillColorRGB(*BAND); c.rect(m, y - hh_, cw, hh_, stroke=0, fill=1)
+        x = m
+        for i_, (lines_, w_) in enumerate(zip(hw_, ew)):
+            for j_, ln in enumerate(lines_):
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.6)
+                yy = y - hh_ + 3 + (len(lines_) - 1 - j_) * 7.6
+                if i_ in enum_:
+                    c.drawRightString(x + w_ - 3, yy, ln)
+                else:
+                    c.drawString(x + 2, yy, ln)
+            x += w_
+        y -= hh_ + 1
+        for row in erows:
+            wr = [_wrap(t_, R, 7.0, w_ - 4) or [""] for t_, w_ in zip(row, ew)]
+            hgt = max(len(w_) for w_ in wr) * 8.2 + 3
+            if y - hgt < m + footer_h:
+                y = new_page()
+            x = m
+            for j_, (lines_, w_) in enumerate(zip(wr, ew)):
+                yy = y - 7.6
+                for ln in lines_:
+                    c.setFillColorRGB(*NAVY_RGB); c.setFont(B if j_ in (1, 4) else R, 7.0)
+                    if j_ in enum_:
+                        c.drawRightString(x + w_ - 3, yy, ln)
+                    else:
+                        c.drawString(x + 2, yy, ln)
+                    yy -= 8.2
+                x += w_
+            c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.4); c.line(m, y - hgt, W - m, y - hgt)
+            y -= hgt + 1
+        notes_ = ["Expected = DfT's traffic counts at the count points on the stretch (annual average daily flow, weighted by "
+                  "link length, most of them estimated from a count every few years) × the stretch's length × DfT's national "
+                  "collision rate for that type of road that year (Reported road casualties GB, table RAS0302), over the years "
+                  "shown. Urban or rural is DfT's own flag on the stretch's collisions. Fatal or serious uses DfT's adjusted "
+                  "severity, as the rates do."]
+        if any((st.get("expected") or {}).get("class", "").startswith("urban") for st in S.get("stretches") or []):
+            notes_.append("The national urban figures include city-centre roads, so a ring road or a dual carriageway will "
+                          "often sit below the range: that says as much about the yardstick as about the road.")
+        notes_.append("Small numbers: over five years only a large difference falls outside the range. This is evidence for the "
+                      "assessor, not a verdict on the road.")
+        y = para(" ".join(notes_), y - 2, 6.6) - 8
+
     # cycle routes and the route's own left turns — 22 Oct 2026 (v3; the user asked for cycle routes and the turns where
     # a lorry could cut across a cyclist: said as a fact, never as a verdict on the turn)
     if y - 70 < m + footer_h:
@@ -3897,6 +3995,26 @@ def build_collision_evidence_xlsx(S):
                 ("yes" if L_["work"] else "") if known else None, ", ".join(L_["vru_words"]), L_["year"], L_["collision_id"]]
         for j, v in enumerate(vals, 1):
             wl.cell(row=i, column=j, value=v)
+    # 22 Oct 2026 (v3 part 2): compared with roads like these, per stretch, as numbers
+    we_ = wb.create_sheet("Compared with roads like these")
+    header(we_, ["No", "Stretch", "Road type compared with", "Traffic, vehicles a day (latest year, lowest)",
+                 "Traffic, vehicles a day (latest year, highest)", "Years counted (not estimated)", "DfT count points",
+                 "Collisions on the route", "Expected", "Typical range, lowest", "Typical range, highest", "Where it sits",
+                 "Fatal or serious (observed)", "Severity basis", "Fatal or serious, expected", "Typical range, lowest",
+                 "Typical range, highest", "Where it sits", "Why not worked out"])
+    for i, st in enumerate(S.get("stretches") or [], 2):
+        e = st.get("expected") or {}
+        has = "expected" in e
+        vals = [st["no"], st["name"], e.get("class_words"), (e.get("aadf") or (None, None))[0] if has else None,
+                (e.get("aadf") or (None, None))[1] if has else None, ", ".join(str(y) for y in e.get("counted") or []) if has else None,
+                ", ".join(e.get("points") or []) if has else None, st["n"],
+                round(e["expected"], 1) if has else None, e["range"][0] if has else None, e["range"][1] if has else None,
+                e.get("reading"), round(e["obs_fsc"], 1) if has else None, e.get("fsc_basis"),
+                round(e["expected_fsc"], 1) if has else None, e["range_fsc"][0] if has else None,
+                e["range_fsc"][1] if has else None, e.get("reading_fsc"), None if has else e.get("why")]
+        for j, v in enumerate(vals, 1):
+            we_.cell(row=i, column=j, value=v)
+
     wt2 = wb.create_sheet("Cycle and left turns")
     header(wt2, ["What", f"Distance from A ({du})", "Detail"])
     r_ = 2
