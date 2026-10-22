@@ -481,6 +481,14 @@ db.execute("INSERT INTO community_features (tenant_id, feature_id, kind, source,
            "dist_m, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
            (T, "gias:2", "schools", "gias", "2", "Further School", None,
             json.dumps({"type": "Point", "coordinates": list(P(10, 180))}), 170.0, "2026-10-16"))
+# 22 Oct 2026 (evidence v2): the plan beside the counts — R1's Approved lines (month 11 its busiest) and R2's, and one
+# stored run R1 and R2 share over the route's first 1.7 km (runs are built from stored road routes; set by hand here)
+for fid, rid, mi, q in (("F1", "R1", 10, 2900.0), ("F2", "R1", 11, 5800.0), ("F3", "R2", 11, 2900.0)):
+    db.execute("INSERT INTO forecasts (tenant_id, id, route_id, month_index, discipline, section_id, quantity, unit, "
+               "material_type, vehicle_type, status, ipt) VALUES (?, ?, ?, ?, '', '', ?, 't', ?, ?, 'Approved', 'IPT1')",
+               (T, fid, rid, mi, q, "General / imported", PROF))
+db.execute("INSERT INTO route_sections (tenant_id, section_id, leg, routes_json, geometry_json, length_km, built_at) "
+           "VALUES (?, ?, ?, ?, ?, ?, ?)", (T, "Stest", "loaded", json.dumps(["R1", "R2"]), json.dumps(ROUTE[:2]), 1.69, "x"))
 E = cl.evidence("R1", now=date(2026, 10, 16))
 ok("6: the route and its stored alternative, in adjacent columns", [c["label"] for c in E["columns"]] == ["This route", "Alternative 1"]
    and [c["key"] for c in E["columns"]] == ["R1", "R1@1"])
@@ -532,8 +540,10 @@ ok("7: the title, the route, the period and DfT's words",
 ok("7: the counts table, both columns, the route and the alternative",
    not _t or ("On the route (25 m)" in _t and "Within 250 m" in _t and "This route" in _t and "Alternative 1" in _t
               and "A pedestrian killed or seriously injured" in _t), _t[:900])
+# NARROWED 22 Oct 2026 (evidence v2): the places are the appendix, each row "1.7 km: A6 …" under its stretch's heading
 ok("7: the place, along the route, with the school near it",
-   not _t or ("Places with more than one collision" in _t and "from A: A6" in _t and "Schools: Test Primary" in _t), _t[-1400:])
+   not _t or ("Appendix: places with more than one collision" in _t and "km: A6" in _t and "from A: A6" not in _t
+              and "Stretch 1 · A6" in _t and "Schools: Test Primary" in _t), _t[-1400:])
 ok("7: every page says it is evidence, not the assessment, with DfT's caveats and the credit",
    not _t or (_t.count("It is not the assessment") == E["pages"] and "no legal duty" in _t
               and "Open Government Licence v3.0 (DfT road safety data)" in _t), _t[-900:])
@@ -541,7 +551,9 @@ ok("7: no verdict word on the sheet", not _t or not VERDICT.search(_t), str(VERD
 _x = export.build_collision_evidence_xlsx(E)
 import openpyxl  # noqa: E402
 wb = openpyxl.load_workbook(io.BytesIO(_x))
-ok("7: the XLSX: Summary, Places, Collisions, About", wb.sheetnames == ["Summary", "Places", "Collisions", "About"])
+# NARROWED 22 Oct 2026 (evidence v2): the Stretches sheet after the Summary
+ok("7: the XLSX: Summary, Stretches, Places, Collisions, About",
+   wb.sheetnames == ["Summary", "Stretches", "Places", "Collisions", "About"], str(wb.sheetnames))
 wc = wb["Collisions"]
 _hdr = [c.value for c in wc[1]]
 ok("7: one row per collision near the route, with the month and never the day", wc.max_row - 1 == 4 and "Month" in _hdr
@@ -558,10 +570,145 @@ ok("7: the About sheet carries the caveat, 'not the assessment' and the source",
    and cl.SOURCE["url"] in wb["About"].cell(row=4, column=1).value)
 _ex = read("backend/export.py")
 _b = _ex.split("def build_collision_evidence_pdf(")[1].split("\ndef ")[0]
-ok("7: on the map the slight ones are drawn first, so the KSI sit on top; the places are numbered",
-   "for sev in (3, 2, 1):" in _b and "_ce_tag(c, *P(L[\"lon\"], L[\"lat\"]), L[\"no\"])" in _b)
+# REVERSED 22 Oct 2026 (evidence v2, the user's yes): the 40 numbered place tags piled up in town; the map labels the
+# stretches instead and the places are numbered in the appendix only
+ok("7: on the map the slight ones are drawn first, so the KSI sit on top; the STRETCHES are labelled, the places are not",
+   "for sev in (3, 2, 1):" in _b and "_ce_tag(c, *P(L[\"lon\"], L[\"lat\"]), L[\"no\"])" not in _b
+   and 'S["stretch_labels"].append(t)' in _b and E.get("stretch_labels") == ["1  A6"], str(E.get("stretch_labels")))
 ok("7: the demo's map carries its tag", '_map_tag(c, S.get("map_demo_tag"), cw, h1)' in _b
    and 'bulletin_doc.DEMO_MAP_TAG if notice else None' in read("backend/collisions.py"))
+
+# --------------------------------------------------------------------------- #
+#  7b. Evidence v2 (22 Oct 2026, the user's yes to notes\collision-evidence-   #
+#      v2-mockup-1022): stretches, the plan beside, the strip, the fold        #
+# --------------------------------------------------------------------------- #
+ok("7b: the new counts row: a vulnerable road user hurt, a goods vehicle over 3.5 t involved (C1: pedestrian + type 21)",
+   ("vru_goods", "A vulnerable road user hurt, a goods vehicle over 3.5 t involved") in cl.ROWS
+   and E["columns"][0]["on"]["vru_goods"] == 1 and E["columns"][0]["near"]["vru_goods"] == 1
+   and E["columns"][1]["near"]["vru_goods"] == 0)
+ok("7b: route_road: a numbered first road; else a numbered second road; else none",
+   cl.route_road({"road": "A6", "road2": "B582"}) == "A6" and cl.route_road({"road": "Unclassified road", "road2": "B4114"}) == "B4114"
+   and cl.route_road({"road": "C road", "road2": None}) is None and cl.route_road({"road": "B road", "road2": "Unclassified road"}) is None)
+MI = 1609.344
+
+
+def _c(i, road, sl=30, sev=3, road2=None):
+    return {"collision_id": f"S{i}", "road": road, "road2": road2, "speed_limit": sl, "severity": sev, "ksi": sev < 3,
+            "vru": [], "vru_ksi": [], "goods": False}
+
+
+_on = [(0.2 * MI, _c(1, "B4114")), (0.5 * MI, _c(2, "B4114")), (0.9 * MI, _c(3, "Unclassified road", road2="B4114")),
+       (1.1 * MI, _c(4, "B4114")), (1.3 * MI, _c(5, "B582")), (1.6 * MI, _c(6, "B4114")),
+       (2.0 * MI, _c(7, "A563")), (2.2 * MI, _c(8, "A563")), (2.6 * MI, _c(9, "A563")), (3.0 * MI, _c(10, "A563"))]
+_st = cl.stretches(_on, 4.0 * MI)
+ok("7b: stretches: cut where the recorded road changes; a road named by fewer than 4 collisions (B582 once) joins its "
+   "neighbour; a side-road record counts for its numbered second road",
+   [s["name"] for s in _st] == ["B4114", "A563"] and len(_st[0]["on"]) == 6 and len(_st[1]["on"]) == 4,
+   str([(s["name"], len(s["on"])) for s in _st]))
+ok("7b: ...the boundary half way between the last of one road and the first of the next; from A to B, no gap",
+   _st[0]["from_m"] == 0 and abs(_st[0]["to_m"] - 1.8 * MI) < 1 and _st[1]["from_m"] == _st[0]["to_m"]
+   and _st[1]["to_m"] == 4.0 * MI and [s["no"] for s in _st] == [1, 2])
+_long = [(i * 0.5 * MI, _c(i, "A6", 30 if i < 6 else 60)) for i in range(1, 13)]
+_sl = cl.stretches(_long, 7.0 * MI)
+ok("7b: one road longer than 5 mi is split once where its speed limits change (30 → 60 mph), each part named by its limits",
+   [s["name"] for s in _sl] == ["A6, 30 mph", "A6, 60 mph"] and abs(_sl[0]["to_m"] - 2.75 * MI) < 1
+   and _sl[-1]["to_m"] == 7.0 * MI, str([(s["name"], s["from_m"] / MI, s["to_m"] / MI) for s in _sl]))
+ok("7b: ...not when it is 5 mi or shorter", [s["name"] for s in cl.stretches(_long, 5.0 * MI)] == ["A6"])
+_mixed = [(i * 0.5 * MI, _c(i, "A6", (30, 60)[i % 2])) for i in range(1, 13)]
+ok("7b: ...nor when the limits do not change in one place (fewer than 80 % on their side)",
+   [s["name"] for s in cl.stretches(_mixed, 7.0 * MI)] == ["A6"])
+_none = cl.stretches([(100.0, _c(1, "Unclassified road")), (900.0, _c(2, "C road"))], 2000.0)
+ok("7b: no numbered road at all: one stretch, the whole route", [(s["name"], s["from_m"], s["to_m"]) for s in _none]
+   == [("The whole route", 0.0, 2000.0)] and len(_none[0]["on"]) == 2)
+ok("7b: no collision on the route: one stretch, the whole route", [s["name"] for s in cl.stretches([], 1000.0)] == ["The whole route"])
+ok("7b: the fixture route is one stretch, A6 (C1, C8 name it; C2 on an unclassified road joins it)",
+   [(s["name"], s["n"], s["ksi"], s["places"], s["place_nos"]) for s in E["stretches"]] == [("A6", 3, 2, 1, (1, 1))],
+   str([(s["name"], s["n"], s["ksi"], s["places"], s["place_nos"]) for s in E["stretches"]]))
+_fac = conversions.load_factors()
+_vs = _fac.get("vehicles", {}) or {}
+import derived  # noqa: E402
+_fbp, _fbn = derived.payload_for(None, _fac)
+
+
+def _loads(q):
+    return main._month_kpi_line({"route_id": "R1", "quantity": q, "unit": "t", "material_type": "General / imported",
+                                 "vehicle_type": PROF}, "vehicles", _fac, _vs, _fbp, _fbn)["vehicle_loads"]
+
+
+_wd = main._working_days(_fac)
+PLAN = E["plan"] or {}
+ok("7b: the plan: R1's busiest month of Approved lines (month 11, not 10), its movements a day that month, the vehicle",
+   PLAN.get("month") == 11 and PLAN.get("month_words") == "Nov 2026" and abs(PLAN.get("per_day", 0) - _loads(5800) / _wd) < 1e-9
+   and PLAN.get("vehicles") == [conversions.vehicle_label(_fac, PROF)], str(PLAN))
+ok("7b: ...the shared run: R1 + R2 that month, over its first 1.7 km (road_load's rule: Σ owners' loads ÷ working days)",
+   len(PLAN.get("segments") or []) == 1 and PLAN["segments"][0][0] < 5 and abs(PLAN["segments"][0][1] - 1690) < 40
+   and abs(PLAN["segments"][0][2] - (_loads(5800) + _loads(2900)) / _wd) < 1e-9, str(PLAN.get("segments")))
+_lo, _hi = E["stretches"][0]["lorries"]
+ok("7b: the stretch's lorries: the lowest and highest whole movements a day along it — R1's own past the run, the run's",
+   (_lo, _hi) == (int(_loads(5800) / _wd + 0.5), int((_loads(5800) + _loads(2900)) / _wd + 0.5)), str((_lo, _hi)))
+_pl = {"per_day": 3.4, "segments": [(0.0, 1000.0, 9.6)]}
+ok("7b: stretch_lorries: covered → the run's figure; a stretch past it → the route's own; partly → both; no plan → None",
+   cl.stretch_lorries(_pl, 0, 1000) == (10, 10) and cl.stretch_lorries(_pl, 1000, 2000) == (3, 3)
+   and cl.stretch_lorries(_pl, 500, 2000) == (3, 10) and cl.stretch_lorries(None, 0, 10) is None
+   and cl.stretch_lorries(_pl, 0, 1030) == (10, 10) and cl.stretch_lorries(_pl, 0, 1240) == (10, 10)
+   and cl.stretch_lorries(_pl, 0, 1260) == (3, 10))   # GAP_M: a gap under 250 m (a gate's last metres) is not a stretch
+ok("7b: the uncovered gap that brings in the route's own figure is GAP_M = 250 m", cl.GAP_M == 250 and cl.OVERLAP_M == 50)
+ok("7b: a route with no Approved line has no plan (and the sheet says so)",
+   cl.plan_beside("R404", DIX, ROUTE) is None and "plan_error" in E)
+ok("7b: the plan never becomes a rate: nothing divides a collision count by a lorry figure",
+   not re.search(r"\[\"n\"\]\s*/|ksi\"\]\s*/|/\s*plan|/\s*st\[\"lorries", read("backend/collisions.py") + _ex))
+ok("7b: densest_window: the 1-unit window with the most collisions on the route, None with fewer than 3",
+   cl.densest_window([(m, None) for m in (100, 2000, 2100, 2300, 2400, 5000)], 1000) == (1700.0, 2700.0)
+   and cl.densest_window([(1.0, None), (2.0, None)], 1000) is None,
+   str(cl.densest_window([(m, None) for m in (100, 2000, 2100, 2300, 2400, 5000)], 1000)))
+ok("7b: pdf_nearby: schools and health within 250 m, bus stops within 100 m; nothing else (the XLSX keeps them all)",
+   cl.pdf_nearby([{"kind": "Schools", "name": "S", "m": 240}, {"kind": "Bus stops", "name": "B", "m": 101},
+                  {"kind": "Bus stops", "name": "B2", "m": 99}, {"kind": "Sports facilities", "name": "X", "m": 20},
+                  {"kind": "Health centres", "name": "H", "m": 250}, {"kind": "Hospitals", "name": "Y", "m": 251}])
+   == [{"kind": "Schools", "name": "S", "m": 240}, {"kind": "Bus stops", "name": "B2", "m": 99},
+       {"kind": "Health centres", "name": "H", "m": 250}])
+ok("7b: each place keeps every kind's nearest (no limit of four) for the XLSX, and its stretch",
+   "nearby_community(L[\"lon\"], L[\"lat\"], index, limit=None, feats=feats)" in read("backend/collisions.py")
+   and L1.get("stretch") == 1 and L1.get("nearby_pdf") == L1.get("community"))
+ok("7b: the map draws the collisions ON the route only (C1, C2, C8; not C3, 200 m off it)",
+   E["drawn_count"] == 3 and sorted(r["collision_id"][4:] for r in E["on"]) == ["C1", "C2", "C8"])
+ok("7b: the PDF: the strip, the stretch table with the plan beside it, the ring and square explained",
+   not _t or ("Along the route, A to B" in _t and "Along the route, stretch by stretch" in _t
+              and "ring: a vulnerable road user hurt" in _t and "square: a goods vehicle over 3.5 t involved" in _t
+              and f"R1 plans {int(_loads(5800) / _wd + 0.5)} lorry movements a day in its busiest month (Nov 2026" in _t
+              and f"{_lo}–{_hi}" in _t and "neither is divided by the other" in _t and "The whole route" in _t), _t[:2400])
+ok("7b: the PDF says what is drawn and what is only counted",
+   not _t or ("Drawn: the 3 collisions on this route's road route (within 25 m)" in _t
+              and "1 more within 250 m, on side and parallel roads, are counted in the table, not drawn" in _t), _t[:1500])
+ok("7b: a counts row 0 in every column is folded into one sentence (horse rider, mobility scooter, …); the rest print",
+   not _t or ("A horse rider killed or seriously injured" not in _t and "A mobility scooter user killed" not in _t
+              and "No cyclist, horse rider or mobility scooter user was killed or seriously injured on either route or "
+                  "within 250 m, 2021–2025." in _t
+              and "A pedestrian killed or seriously injured" in _t
+              and "A vulnerable road user hurt, a goods vehicle over 3.5 t involved" in _t), _t[:2600])
+ok("7b: ...the XLSX Summary keeps every row, the zero ones too",
+   [ws.cell(row=i, column=1).value for i in range(6, 6 + len(cl.ROWS))] == [l for _, l in cl.ROWS])
+ok("7b: the appendix follows the counts table and names its Nearby rule",
+   not _t or ("Appendix: places with more than one collision" in _t and "bus stops (100 m)" in _t))
+ok("7b: no rate, score or ranking words on the sheet",
+   not _t or not re.search(r"\bper (mile|km|lorry|movement)\b|\brate\b|\bworst\b|\branked?\b|\bscore\b", _t, re.I),
+   str(re.findall(r"\bper (?:mile|km|lorry|movement)\b|\brate\b|\bworst\b|\branked?\b|\bscore\b", _t, re.I)))
+_wt = wb["Stretches"]
+_sh = [c.value for c in _wt[3]]
+ok("7b: the XLSX Stretches sheet: one row a stretch, the counts and the lorries as numbers",
+   _sh[:3] == ["No", "Stretch", "Road"] and _wt.cell(row=4, column=2).value == "A6" and _wt.cell(row=4, column=8).value == 3
+   and _wt.cell(row=4, column=15).value == _lo and _wt.cell(row=4, column=16).value == _hi and _wt.max_row == 4, str(_sh))
+ok("7b: the XLSX Collisions sheet adds the distance from A and the stretch (blank off the route)",
+   _hdr[-2:] == ["Distance from A (km)", "Stretch"]
+   and sorted(wc.cell(row=i, column=len(_hdr)).value or 0 for i in range(2, 6)) == [0, 1, 1, 1])
+ok("7b: the inset is drawn only at twice the map's scale or more, in a free corner, and says its window and scale",
+   "if mag >= 2:" in _b and (E["inset"] is None or (E["inset"]["mag"] >= 2 and "× the scale of the map" in E["inset"]["words"])))
+_lay = export.collision_strip_layout(E, 500)
+ok("7b: the strip: one mark per collision on the route, stacked by distance from A, bins at least 6.5 pt wide",
+   sum(len(v) for v in _lay["bins"].values()) == 3 and _lay["top"] >= 1
+   and (_lay["pw"] * _lay["bin"] * _lay["unit_m"] / _lay["length_m"]) >= 6.5)
+ok("7b: no verdict word in the new words", not VERDICT.search(" ".join(cl.PDF_NEARBY_M) + _b + " ".join(
+   s["name"] for s in E["stretches"])))
 # not fetched yet
 db.execute("DELETE FROM collision_records WHERE tenant_id = ?", (T,))
 db.execute("DELETE FROM collision_meta WHERE tenant_id = ?", (T,))
@@ -733,6 +880,12 @@ _g = GUIDE.split("<li><strong>Collision history</strong>")[1].split("</li>")[0] 
 ok("10: the user guide says what it is, who sees it, where it comes from, what it cannot tell you, and that it is not the assessment",
    _g and "staff only" in _g and "STATS19" in _g and "250 m" in _g and "not the assessment" in _g
    and "police" in _g and "2016" in _g and "never the day or time" in _g and "Collision evidence (PDF)" in _g)
+ok("10: v2 (22 Oct 2026): the user guide describes the stretches, the strip, the lorries beside (never a rate), the fold "
+   "and the appendix's Nearby rule; the technical guide the rules behind them",
+   "<em>stretch by stretch</em>" in _g and "never divided into a rate" in _g and "folded into one sentence" in _g
+   and "bus stops within 100 m" in _g and "Stretches sheet" in _g
+   and "The evidence sheet, v2 (22 Oct 2026)." in TECH and "<code>vru_goods</code>" in TECH and "<code>PDF_NEARBY_M</code>" in TECH
+   and "keep the year and month only (R6)" in TECH)
 ok("10: the guides say the alternatives' collisions show with Alternative routes and the plans leave them out",
    "those near a stored alternative route only appear while <em>Alternative routes</em>" in _g
    and "<code>alternatives_only</code>" in TECH)
