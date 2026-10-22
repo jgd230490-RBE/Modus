@@ -2714,6 +2714,14 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok(`⭐ words sweep: no text a person reads on a staff screen names HERE, its calls, factors.json, bbox, parameters, probe, the database, a stored route, the repository or a feed (${pieces.length} pieces read)`,
      pieces.length > 2000 && wsHits.length === 0,
      wsHits.slice(0, 8).map(p => `line ${p.line} ${p.comp} [${wsOf(p.t)}] ${JSON.stringify(p.t.trim().slice(0, 80))}`).join(" | "));
+  // question 1: the admin token box shows only where it does something — the server lets an admin LOGIN through without it
+  ok("⭐ words sweep (question 1): the admin token box is hidden for an admin login, on Config, the diesel box and the Data pages; Users keeps its own rule",
+     src.includes('const tokenNeeded = (a) => !(a && a.via === "login" && a.role === "admin");')
+     && src.includes('{tokenNeeded(access) && <label className="row-menu-field"><span>Admin token</span>')
+     && src.includes('{tokenNeeded(access) && <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" className="border border-slate-200 rounded px-2 py-0.5 text-xs w-32" />}')
+     && src.includes('{tokenNeeded(ACCESS.info) && <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token"')
+     && (src.match(/placeholder="Admin token"/g) || []).length === 4 && src.includes("{!viaLogin && (")
+     && !src.includes("needed to save unless you signed in as an admin") && !src.includes("needed here while you are signed in with a shared code"));
   ok("...and it would catch the old words (HERE calls, the stored route, the file in the repository, the feed)",
      wsOf("Each costs HERE calls.") && wsOf("Its stored route goes too.") && wsOf("with the file in the repository") && wsOf("feed: timeout")
      && wsOf("Overwrite the live configuration with backend/factors.json") && !wsOf("Here is the plan") && !wsOf("Admin token"));
