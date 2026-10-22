@@ -2796,8 +2796,10 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
   // NARROWED 16 Oct 2026 (S7): two more observers, the Simulation's map (it opens folded at 0 × 0, like the Today map)
   // and its timeline (it redraws to its own width)
-  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone); so do the Simulation's map and timeline",
-     (src.match(/new ResizeObserver\(/g) || []).length === 5 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src)
+  // NARROWED 22 Oct 2026 (UI fix 6, card 5): one more, the big screen's Today list (it counts the rows that fit whole)
+  ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone); so do the Simulation's map and timeline, and the big screen's Today list",
+     (src.match(/new ResizeObserver\(/g) || []).length === 6
+     && (src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart(")).match(/new ResizeObserver\(/g) || []).length === 1 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src)
      && (src.slice(src.indexOf("function SimMap("), src.indexOf("function SimPlayer(")).match(/new ResizeObserver\(/g) || []).length === 2);
   // REVERSED 14 Oct 2026 (D9, the mobile shell): below 768 px there is NO rail (not even icons); the bottom tab bar
   // (PhoneTabs) takes its place. The same one breakpoint; the over-the-page "peek" and its CSS are gone.
@@ -3423,7 +3425,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
      && code.includes('style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>') && _fw.includes('color: "var(--warn-text)", background: "rgba(217,119,6,.10)"'));
-  ok("🔴 chips #19: the 9–10 px chips take the house 12 px (text-xs) — target / quote, stale, winter / thaw, the team and workstream pills, the Routes vehicle chips, the material categories, the gate direction (now the house navy-on-tint pair), set, gate blocked and haul — no 'text-[10px] … rounded-full' chip is left; the one text-[9px] left is the horizon's role word (finding 11, its own branch)",
+  // NARROWED 22 Oct 2026 (UI fix 6, card 3; finding #11): the one text-[9px] that was left, the Horizon's role word, is 12 px
+  // too (text-xs), slate-600 on the commit week's shade — so no text-[9px] is left anywhere
+  ok("🔴 chips #19: the 9–10 px chips take the house 12 px (text-xs) — target / quote, stale, winter / thaw, the team and workstream pills, the Routes vehicle chips, the material categories, the gate direction (now the house navy-on-tint pair), set, gate blocked and haul — no 'text-[10px] … rounded-full' chip is left; no text-[9px] is left (22 Oct: the horizon's role word is 12 px, UI fix 6)",
      code.includes('const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>')
      && code.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span>')
      && _fw.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "var(--warn-text)"')
@@ -3439,7 +3443,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 2
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
-     && (code.match(/text-\[9px\]/g) || []).length === 1 && /text-\[9px\] uppercase tracking-wide text-slate-400">\{roleLbl\[role\]/.test(code));
+     && (code.match(/text-\[9px\]/g) || []).length === 0
+     && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
   ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
      !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
      && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')
@@ -3547,6 +3552,100 @@ ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon p
    && !src.includes("the required breaks, at most 9 hours"));
 ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'compliant' or 'legal'",
    !/drivers'? hours[^"`]{0,200}\b(compliant|compliance|legal)\b/i.test(src));
+
+// ---- 22 Oct 2026 — UI fix 6, the layout branch (claude/ui-fix-layout): cards 1, 2, 3, 5 and 6 of the approved mockup
+// (notes/ui-fix-layout-mockup-1022/; the user: "i agree to all apart from 4 . i would like to keep the progress bars").
+// Card 4 ("All sections" on the big screen) is NOT built. The contrast ratios are in test_h1_uk.py; the row fitting and the
+// count line are mounted in dom_frontend.js; the Account and Horizon markup is rendered in render_frontend.js.
+{
+  const _acct = _laBody.slice(_laBody.indexOf(') : view === "account" ? ('), _laBody.indexOf("Stockpiles · "));
+  const _hz = _laBody.slice(_laBody.indexOf("const roleLbl"), _laBody.indexOf("{confirming &&"));
+  // card 1 (decision 11): the Action column pinned right; the table keeps its 1,220 px
+  ok("UI FIX 6 card 1: the Account table keeps its 1,220 px inside a scroller that pads its right edge 176 px (Tab brings the Note box out from under the pin)",
+     _acct.includes('<div className="overflow-auto la-acct-scroll">\n                <table className="text-sm w-full" style={{ minWidth: 1220 }}>')
+     && /\n  \.la-acct-scroll\{scroll-padding-right:176px;\}\n/.test(html) && (_laBody.match(/minWidth: 1220/g) || []).length === 1);
+  ok("⭐ UI FIX 6 card 1: the Action heading and cell are pinned to the right (sticky, opaque, above the cells), with the app's hairline and a soft shadow",
+     /\n  \.la-pin\{position:sticky;right:0;z-index:2;background:var\(--surface\);box-shadow:-1px 0 0 var\(--line\),-8px 0 10px -8px rgba\(15,23,42,\.28\);\}\n/.test(html)
+     && /\n  \.la-acct-head th\.la-pin\{background:var\(--surface-2\);z-index:3;\}\n/.test(html)
+     && _acct.includes('<th className="px-2 py-2 text-right font-semibold la-pin">Action<InfoTip id="la.spread" /></th>')
+     && _acct.includes('<td className={"px-2 py-2 text-right whitespace-nowrap la-pin" + (short ? " la-pin-short" : "")}>')
+     && (_laBody.match(/la-pin/g) || []).length === 3);
+  ok("⭐ UI FIX 6 card 1: a short row's pinned cell paints the row's 5 % rose over the surface (no white stripe), and the row's own inline wash is unchanged (the captions rule matches it by [style*=])",
+     /\n  \.la-pin\.la-pin-short\{background:linear-gradient\(rgba\(191,46,85,\.05\),rgba\(191,46,85,\.05\)\),var\(--surface\);\}\n/.test(html)
+     && _acct.includes('<tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(191,46,85,.05)" } : {}}>')
+     && _acct.includes('const short = r.action === "spread";'));
+  // card 2 (finding #11): the headings and the button in the app's standard styles
+  ok("UI FIX 6 card 2: the Account headings take the .tbl th look — 13 px, ordinary capitals, muted on the second surface, one line, 40 px — and the 10 px capitals are gone from the Account (the Stockpiles table keeps them: the type branch)",
+     _acct.includes('<thead className="la-acct-head">') && !_acct.includes("text-[10px] uppercase tracking-wide")
+     // NARROWED 22 Oct 2026 (UI fix 6, card 2, review): the rule also draws the .tbl th line under the headings (border-bottom var(--line))
+     && /\n  \.la-acct-head th\{background:var\(--surface-2\);color:var\(--muted\);font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap;height:40px;vertical-align:middle;border-bottom:1px solid var\(--line\);\}\n/.test(html)
+     && (_laBody.match(/<thead className="bg-slate-50 text-slate-500 text-\[10px\] uppercase tracking-wide">/g) || []).length === 1
+     && _laBody.indexOf('<thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">') > _laBody.indexOf("Stockpiles · "));
+  ok("UI FIX 6 card 2: the headings keep their '(model)' word and their five info boxes",
+     _acct.includes('Fair {CUR()} <span className="normal-case tracking-normal text-slate-400">(model)</span><InfoTip id="la.cost_fair" />')
+     && ["la.variance", "la.cost_quote", "la.cost_fair", "la.cost_actual", "la.spread"].every(id => _acct.includes(`<InfoTip id="${id}"`)));
+  ok("⭐ UI FIX 6 card 2: 'spread on this week' is the app's standard small button (btn-pri btn-sm: 13 px on the accent), same words, same click, same title, same disabled rule; the 11 px white-on-navy one-off is gone",
+     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-pri btn-sm disabled:opacity-40"\n                                title={`Carry +${grp(r.remaining_short, 1)} into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.`}>spread on this week</button>')
+     && !_laBody.includes("text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white") && !/background: "var\(--navy\)" \}\}>spread on this week/.test(_laBody)
+     && /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));
+  // card 3 (finding #11 + the user's yes to finding #37)
+  ok("⭐ UI FIX 6 card 3: the Horizon's month line, role words, 'month is now …' note and outcome lines are 12 px (text-xs); no 9 or 10 px text is left in the Horizon",
+     _hz.includes('Line<InfoTip id="la.horizon" /><div className="text-xs font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)}')
+     && _hz.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role]')
+     && _hz.includes('<div className="text-xs mt-0.5" style={{ color: "var(--red)" }}')
+     && _hz.includes('<div className="text-xs tabular-nums">{status}{r.parent_changed && <span style={{ color: "var(--red)" }}> · month changed</span>}</div>')
+     && !/text-\[(9|10)px\]/.test(_hz) && _hz.length > 2000);
+  ok("⭐ UI FIX 6 card 3 (finding #37): the commit week's heading is text-blue-700 (the accent's darker shade, remapped per accent and look) instead of var(--navy) at 4.44:1; the commit column keeps its inline wash",
+     _hz.includes('<div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>')
+     && !_hz.includes('style={role === "commit" ? { color: "var(--navy)" } : {}}')
+     && _hz.includes('style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>')
+     && html.includes(':root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700{color:#9A3412}')
+     && html.includes('html[data-theme="dark"] .text-blue-700{color:#FFB454}') && html.includes('html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}'));
+  // card 5 (decision 6): Rotate and One section only
+  const _tdF = src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart("));
+  const _fit = src.slice(src.indexOf("function todayFit("), src.indexOf("function DashboardToday("));
+  ok("⭐ UI FIX 6 card 5: the counting rule is one small pure helper, todayFit(heights, available) — rows in order, never skipped, half a pixel forgiven — with no DOM in it",
+     _fit.includes("function todayFit(heights, available){") && _fit.includes("if(!(h >= 0) || used + h > available + 0.5) break;")
+     && !/document|window|getBoundingClientRect|clientHeight/.test(_fit.replace(/\/\/.*$/gm, "")));
+  ok("⭐ UI FIX 6 card 5: one switch, tvList = fill (Rotate / One section) — the list is measured by a ResizeObserver on its box and its table, every row is drawn closed on the TV, and the rows past the cut are not drawn",
+     _tdF.includes("const tvList = fill;") && _tdF.includes("todayFit(hs, box.clientHeight - (rs[0].top - top))")
+     && _tdF.includes("ro.observe(box);") && _tdF.includes("if(tb) ro.observe(tb);") && _tdF.includes("}, [tvList, T.rows]);")
+     && _tdF.includes("isOpen={!tvList && todayOpen(r.key)}") && _tdF.includes('rowProps={{ className: "border-t border-slate-100" + (i >= nShown ? " today-cut" : "") }}')
+     && _tdF.includes('<div ref={listBox} className="mt-3 flex-1 overflow-auto rd-scroll today-lines" data-today-fit={tvList ? "1" : undefined} style={{ maxHeight: wall ? 260 : 190 }}>')
+     && /\n  \.today-lines\[data-today-fit\]\{overflow:hidden;\}\n  \.today-lines\[data-today-fit\] tr\.today-cut\{visibility:hidden;\}\n/.test(html));
+  ok("⭐ UI FIX 6 card 5: under the list, inside the card, '+ N more lines today · X t' (the hidden rows' tonnes, grouped like the card's figures; 'line' for one) — drawn only when N > 0, 12 px, weight 600, muted, flex:none",
+     _tdF.includes('{tvList && nMore > 0 && <div className="text-xs today-more" data-today-more={nMore}>+ {nMore} more line{nMore === 1 ? "" : "s"} today · {bigNum(moreT)} t</div>}')
+     && _tdF.includes("const moreT = T.rows.slice(nShown).reduce((s, r) => s + (r.tonnes || 0), 0);")
+     && /\n  \.today-more\{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var\(--line\);font-weight:600;color:var\(--muted\);\}\n/.test(html)
+     && _tdF.indexOf("today-more") > _tdF.indexOf("</table>)}"));
+  ok("⭐ UI FIX 6 card 5 (the user: keep the progress bars): the four figures and BOTH bars, 'This week to date' and 'Last week', are where they were and as they were",
+     _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />')
+     && _tdF.includes('<span className="font-semibold text-slate-700">This week to date<InfoTip id="dash.week_to_date"')
+     && _tdF.includes('<span className="font-semibold text-slate-700">Last week{acct && acct.week ?')
+     && (_tdF.match(/<Big value=/g) || []).length === 4 && _tdF.indexOf("This week to date") < _tdF.indexOf("today-lines")
+     && _tdF.includes('<div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>'));
+  ok("UI FIX 6 card 5: 'All sections' (card 4, held) and the working Dashboard are unchanged — no fit, rows open as at the desk, the 260 / 190 px boxes scroll as before; the fill switch is the Dashboard's",
+     _dbBody.includes('const fill = wall && wallLayout !== "all";') && !/const tvList = wall/.test(code)
+     && /\n  \.dash-wall\.dash-fill \.today-lines\{max-height:none !important;overflow:hidden;\}\n/.test(html));
+  // card 6 (decision 13) + the user's extra (the Avoided chip)
+  ok("⭐ UI FIX 6 card 6: ZONE_HAUL is the map paint only — it appears in its definition and the Zones map's line colour, nowhere else",
+     (code.match(/ZONE_HAUL/g) || []).length === 2 && code.includes('const ZONE_HAUL = "#C2790B";')
+     && code.includes('paint: { "line-color": ["case", ["get", "is_haul"], ZONE_HAUL,'));
+  ok("⭐ UI FIX 6 card 6: the 12 haul-road words and fills read var(--haul-text) — four buttons, eight words — and the two chips sit on a solid var(--haul-soft); the see-through tint is gone",
+     (code.match(/var\(--haul-text\)/g) || []).length === 12 && (code.match(/background: "var\(--haul-text\)"/g) || []).length === 3
+     && code.includes('style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>')
+     && (code.match(/style=\{\{ background: "var\(--haul-soft\)", color: "var\(--haul-text\)" \}\}/g) || []).length === 2
+     && !code.includes("rgba(194,121,11") && (code.match(/var\(--haul-soft\)/g) || []).length === 2);
+  ok("UI FIX 6 card 6: the tokens — haul-text #9A5F08 and haul-soft #FBF0DF in :root, #F0A838 and #3A2E1C in the dark block — and the dark rule that gives the four fills the control's own text colour (the navy / blue rule kept as it was)",
+     /--ok-text:#047857; --warn-text:#B45309; --bad-text:#B91C1C;\n[\s\S]{0,900}?--haul-text:#9A5F08; --haul-soft:#FBF0DF;/.test(html)
+     && html.includes("--ok-text:#34D399; --warn-text:#FBBF24; --bad-text:#F87171;\n    --haul-text:#F0A838; --haul-soft:#3A2E1C;")
+     && html.includes('html[data-theme="dark"] .text-white[style*="var(--haul-text)"]{color:var(--control-fg)}')
+     && html.includes('html[data-theme="dark"] .text-white[style*="var(--navy)"],html[data-theme="dark"] .text-white[style*="var(--blue)"]{color:var(--control-fg)}')
+     && !html.includes("(finding 7, open)"));
+  ok("⭐ UI FIX 6 card 6 (the user's extra): the 'Avoided' chip is #B91C1C on its pink #FDE8EE (5.53:1, was #DC2626 at 4.13:1) — a fixed pair, not var(--bad-text) (#F87171 in the dark look would fail on the pink)",
+     code.includes('<span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>')
+     && !code.includes('color: ZONE_ROUTING }}>Avoided') && !/var\(--bad-text\)[^\n]{0,40}Avoided/.test(code));
+}
 
 // ---- report ------------------------------------------------------------------
 console.log();
