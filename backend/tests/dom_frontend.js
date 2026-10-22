@@ -2059,11 +2059,12 @@ async function routesDriversDom(){
      cells.length === 3 && cells[0].title === DATA.rows[0].lorry_day.words && cells[2].title === DATA.rows[2].lorry_day.words);
   const foot = host.textContent.replace(/\s+/g, " ");
   ok("⭐ ROUTES DOM: the footnote says a planning figure, explains the 0, and carries the 13 h note for a 15 h shift",
-     foot.includes("a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip")
-     && foot.includes("A planning figure: weekly limits and the day's other duties are not modelled.") && foot.includes(NOTE)
+     // NARROWED 22 Oct 2026 (UI fix 7, the user: fewer words): the footnote is one short paragraph, the rule the same.
+     // The build's own first run found "fit a15 h" here (JSX drops the space at a line break before {…}): asserted below.
+     foot.includes("0 = one lorry a trip)") && foot.includes("A planning figure.") && foot.includes(NOTE)
      // found in the Chrome check (18 Oct): JSX dropped the space at the line break — "modelled.t/month"
-     && foot.includes(NOTE + " t/month assumes") && !/\.t\/month/.test(foot)
-     && foot.includes("the 15 h shift less the break the UK drivers' hours rules require"), foot.slice(-700));
+     && foot.includes(NOTE + " t/month at 22 working days") && !/\.t\/month/.test(foot)
+     && foot.includes("round trips that fit a 15 h shift with the legal break and at most 9 h driving") && !/fit a15/.test(foot), foot.slice(-700));
   act(() => { root.unmount(); }); host.remove();
 }
 

@@ -55,6 +55,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li>
 <li class="l2"><a href="#t1-clp">CLP monitoring</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
+<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
 <li class="l1"><a href="#t4-settings">T4 Settings and deployment</a></li>
 <li class="l1"><a href="#t5-errors">T5 Errors and what they mean</a></li>
@@ -253,6 +254,32 @@ and each is spliced between the same two access roads.</li>
 check reports what lies within its distance of the baked line, not that it is on your carriageway. The Look-ahead says
 which providers were not checked since baking.</li>
 <li><strong>Cost.</strong> Each bake spends HERE calls; the confirm dialogs say how many before anything runs.</li>
+</ul>
+
+<h2 id="t2-left-out">What the screens leave out</h2>
+<p>Since 22 Oct 2026 the Data pages carry short planner words only (the user: no API or back-end detail on screens or in
+the user guide). What they used to say, where it is still worth knowing:</p>
+<ul>
+<li><strong>Zones are rectangles.</strong> HERE's avoid-areas parameter takes bounding boxes, not polygons: a zone is sent
+as the rectangle around what was drawn (<code>bbox:west,south,east,north</code>), so a long diagonal or L-shaped closure
+blocks more ground than it looks. Draw several small zones where that matters.</li>
+<li><strong>Splice or Via.</strong> The choice is a fact about HERE's map, not a preference. Via on a road HERE does not
+know is wrong without warning; Splice is always right and costs two calls a leg. Before choosing Via, ask HERE about the
+route: <code>GET /api/admin/diagnostics/compare/{route_id}?probe=true&amp;token=…</code>.</li>
+<li><strong>Haul road speed.</strong> The haul stretch is timed at drawn length ÷ the assigned speed and substituted into
+the cycle. Blank means not set, not zero: on a spliced road the stretch then adds distance but no time; on a Via road
+HERE's own timing stands. Hovering a cycle marked † shows the figure on HERE's timing.</li>
+<li><strong>The cost of routing again.</strong> A route with haul roads attached costs <code>here_calls_per_bake</code>
+calls to route again (two a leg for a spliced road). Saving a zone or a haul road clears and re-routes the legs it
+touches; the counts are in the confirm dialogs.</li>
+<li><strong>Road restrictions and closures.</strong> The router is never given this data. Records outside their date
+window are left out of the check (the count is in the API answer, <code>expired_or_future_excluded</code>).</li>
+<li><strong>Diagnostics (admin).</strong> The card that sat on the Data pages is gone; the two checks are the same
+addresses, with the admin token: <code>GET /api/admin/diagnostics/factors?token=…</code> (every vehicle profile resolved
+against <code>factors.json</code>: payload, CO2e a km, laden and tare weight, load/unload minutes, and whether its name is
+in the file or falls back to <code>_default</code>) and the compare address above (each vehicle's gross weight, the km
+HERE returns, how many options and whether the truck parameters were sent). Use them when vehicles look interchangeable:
+identical distances, cycle times or CO2e.</li>
 </ul>
 
 <h1 id="t3-sources">T3 Where each screen reads from</h1>

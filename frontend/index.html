@@ -225,7 +225,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .appearance-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
   .appearance-btn:hover,.appearance-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
   .appearance-menu{position:absolute;right:0;top:40px;min-width:200px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-size:12.5px;line-height:1.4;z-index:60;}
-  .appearance-menu h6{margin:0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--popover-muted);padding:6px 10px 4px;font-weight:600;}
+  .appearance-menu h6{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--popover-muted);padding:6px 10px 4px;font-weight:600;}
   .appearance-item,.accent-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
   .appearance-item:hover,.accent-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on,.accent-item.is-on{background:rgba(255,140,20,.12);}
   .appearance-item .tick,.accent-item .tick{opacity:0;color:var(--brand-orange);} .appearance-item.is-on .tick,.accent-item.is-on .tick{opacity:1;}
@@ -288,19 +288,19 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
   .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
   /* 14 Oct 2026 (D9): the W5 "peek" (the rail opened over the page below 768 px) is gone: no rail is drawn there now */
-  .rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}
+  .rail-group{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}
   /* 11 Oct 2026 — the fresher shell (fresh-directions.html: A, Clean, with B's orange button and kicker) */
   .rail-item{color:var(--muted);border-radius:6px;margin:1px 8px;width:calc(100% - 16px) !important;padding-left:10px !important;}
   .rail-item:hover{background:var(--surface);color:var(--ink);}
   .rail-item.is-on{background:var(--surface);color:var(--rail-on);font-weight:600;box-shadow:0 0 0 1px var(--line);}
   .rail-search{display:flex;align-items:center;gap:6px;margin:0 8px 12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
   .rail-search input{border:0;outline:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);width:100%;min-width:0;}
-  .rail-search kbd{font:11px ui-monospace,Consolas,monospace;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
+  .rail-search kbd{font:12px ui-monospace,Consolas,monospace;white-space:nowrap;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
   .rail-search:focus-within{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}   /* 17 Oct 2026 (UI audit #16): the input has outline:0, so the ring goes on the label that frames it — the same ring as .auth-input:focus */
   .nav-ic{width:18px;height:18px;flex:none;}
   .kicker{font:600 12px ui-monospace,'SF Mono',Consolas,'Liberation Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--action);margin-bottom:4px;}
   .kicker::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--action);margin-right:8px;vertical-align:1px;}
-  .rail-count{font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .rail-count{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
   /* 10 Oct 2026 — the UI pass (ui-review-1009, mockups 2, 4 and 5): tables at 14 px in 40 px
      rows with a caption, a sticky header and the sort shown once; the filter row and its
      applied-filter chips; buttons; status as a word with a dot; the empty-state family;
@@ -874,7 +874,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      is forced here. */
   [hidden]{display:none !important;}
   .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;}
-  .dash-wallbar-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+  .dash-wallbar-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
   .dash-wallbar-btn{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:var(--surface-3);border:1px solid transparent;border-radius:8px;padding:5px 11px;cursor:pointer;}
   .dash-wallbar-btn:hover{background:var(--grey);}
   .dash-wallbar-btn.is-on{background:var(--navy);color:var(--control-fg);}
@@ -882,7 +882,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wallbar-sep{width:1px;height:20px;background:var(--line);margin:0 3px;}
   .dash-clock{margin-left:auto;font:700 clamp(15px,2.2vh,40px)/1 Inter,system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums;}
   .dash-wallbar-note{font-size:12px;color:var(--muted);}
-  .dash-wallbar-note code{background:var(--surface-3);border-radius:4px;padding:1px 5px;font-size:11.5px;}
+  .dash-wallbar-note code{background:var(--surface-3);border-radius:4px;padding:1px 5px;font-size:12px;}
   .dash-divider{font:700 12px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
                 border-top:2px solid var(--line);padding-top:9px;margin-bottom:10px;}
   .dash-wall .dash-divider{font-size:14px;}
@@ -2315,7 +2315,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> forecast months have a route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} leave out the {D.lines - D.baked} not routed yet ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}): route them on Data → Routes</span> : null}<InfoTip id="dash.coverage" /></span>
           <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
-          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
+          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
       </PageHeader>}
       {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} forecast month${D.lines === 1 ? "" : "s"} in view`} />}
@@ -2926,7 +2926,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
       <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
         <div className="text-sm font-semibold text-slate-700 chart-title">Stockpile capacity <span className="text-slate-400 font-normal">· how full each stockpile is at the end of {c ? `${MONTHS[(c.m - 1) % 12]} week ${c.w}` : "the week"}</span><InfoTip id="dash.stock" /></div>
         <div className="flex flex-wrap gap-1">
-          {cols.map(x => <button key={x.k} type="button" onClick={() => setWk(x.k)} className={"rounded-full px-2 py-0.5 text-[11px] font-semibold " + (x.k === selKey ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")} style={x.k === selKey ? { background: "var(--navy)" } : undefined} title={x.k === nowKey ? "this week" : undefined}>{x.w === 1 ? MONTHS[(x.m - 1) % 12] + " " : ""}W{x.w}{x.k === nowKey ? " · now" : ""}</button>)}
+          {cols.map(x => <button key={x.k} type="button" onClick={() => setWk(x.k)} className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (x.k === selKey ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")} style={x.k === selKey ? { background: "var(--navy)" } : undefined} title={x.k === nowKey ? "this week" : undefined}>{x.w === 1 ? MONTHS[(x.m - 1) % 12] + " " : ""}W{x.w}{x.k === nowKey ? " · now" : ""}</button>)}
         </div>
       </div>
       {err && <div className="text-xs mb-2" style={{ color: "var(--red)" }}>{err}</div>}
@@ -2948,7 +2948,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
               <div key={sp.location_id} className="py-1 border-t border-slate-100" title={`${sp.loc_type} · ${sp.location_id} · in ${fmt(cell.inbound || 0, sp.capacity_unit)} · out ${fmt(cell.consumed || 0, sp.capacity_unit)}`}>
                 <span className="font-medium text-slate-800">{sp.name}</span> <span className="tabular-nums">{fmt(cell.balance_end || 0, sp.capacity_unit)} {unitOf(sp)}</span> <span className="text-slate-400">· max —</span>
               </div>); })}
-            <div className="text-[10px] text-slate-400 mt-1">Give these a capacity on the Locations page and they join the chart.</div>
+            <div className="text-[13px] text-slate-400 mt-1">Give these a capacity on the Locations page and they join the chart.</div>
           </div>}
         </div>
       )}
@@ -3871,7 +3871,7 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
                   only when there is a CHOICE — the seed's vehicles carry English alone, so a new organisation and
                   the GB demo get no buttons (until then the GB demo showed a lone "English" button). */}
               {VEH_LANGS.filter(([k]) => vehLangShown(k)).length > 1 && (
-              <span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg text-[11px] mr-2"
+              <span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg text-xs mr-2"
                 title="How vehicle names are shown. Changes the label only; nothing stored changes.">
                 {VEH_LANGS.filter(([k]) => vehLangShown(k)).map(([k, l]) => (
                   <button key={k} onClick={() => setVehLang(k)}
@@ -4882,7 +4882,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
             {railShown ? "‹ Collapse" : "›"}
           </button>
           {railShown && role && (
-            <div className="px-2 pb-1 text-[11px] text-slate-500 truncate" title={who}>
+            <div className="px-2 pb-1 text-xs text-slate-500 truncate" title={who}>
               <span className="font-medium text-slate-700">{teamText(who) || "—"}</span> · {role.ipt ? teamName(role.ipt) : role.label}
             </div>
           )}
@@ -5454,10 +5454,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
           </Field>
         </div>
 
-        <p className="text-[11px] text-slate-400 -mt-1">
-          One vehicle per line. If a haul genuinely splits across two vehicle types, save
-          it as two lines — that keeps each one's real cycle time, which a blended payload
-          used to hide (an Artic Flatbed turns round in 45 minutes, a Tipper in 24).
+        <p className="text-[13px] text-slate-400 -mt-1">
+          One vehicle per line: save a haul that uses two vehicle types as two lines.
         </p>
 
         {/* From year / To year. One save covers the whole range — see the save()
@@ -5475,7 +5473,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
               {yearsAvail.filter(y => y >= fromYear).map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </Field>
-          <div className="col-span-2 md:col-span-3 self-end text-[11px] text-slate-400 pb-2">
+          <div className="col-span-2 md:col-span-3 self-end text-[13px] text-slate-400 pb-2">
             {yearsInRange.length} year{yearsInRange.length === 1 ? "" : "s"} ·{" "}
             {mHi - mLo + 1} months in one save. Months left blank are cleared.
           </div>
@@ -5504,7 +5502,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
                           className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                         {/* the model's fair € for this cell, from the preview read — never computed here */}
                         {costCell[mi] && costCell[mi].fair && costCell[mi].fair.eur != null && (
-                          <span className="block mt-0.5 text-[10px] tabular-nums" style={{ color: "var(--navy)" }} data-cell-fair="1"
+                          <span className="block mt-0.5 text-xs tabular-nums" style={{ color: "var(--navy)" }} data-cell-fair="1"
                                 title={`fair ${CUR()} (model): ${unitTriple(costCell[mi].fair)} · ${grp(costCell[mi].trips)} trips${(costCell[mi].fair.flags || []).includes("WINTER") ? " · winter" : ""}${(costCell[mi].fair.flags || []).includes("THAW") ? " · thaw restrictions may apply" : ""}${costCell[mi].planned && costCell[mi].planned.eur != null ? ` · ${costCell[mi].planned.source === "target" ? "target" : "quote"} ${CUR()} ${grp(costCell[mi].planned.eur)}` : ""}`}>
                             fair {CUR()} {grp(costCell[mi].fair.eur)}{(costCell[mi].fair.flags || []).includes("WINTER") ? <span className="text-slate-400"> · w</span> : null}
                           </span>)}
@@ -5555,8 +5553,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
               [`Avg ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`,  fmt(perDay.avgQty, unit)],
               [`Peak ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`, fmt(perDay.peakQty, unit)],
             ].map(([label, value]) => (
-              <div key={label} className="px-3 py-2.5">
-                <div className="text-[10px] uppercase tracking-wide">{label}</div>
+              <div key={label} className="px-3 py-2.5 flex flex-col justify-between">
+                <div className="text-xs uppercase tracking-wide">{label}</div>
                 {/* 17 Oct 2026 (UI audit, decision 3): the peak values read in the strip's own text colour — the amber on the
                     strip was 1.62:1 (1.39:1 in the dark look) and the label already says Peak */}
                 <div className="text-lg font-bold tabular-nums">{value}</div>
@@ -5599,7 +5597,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             {ct && <div className="w-full ct-line" data-carbon-target={ctOk(ct) ? "set" : "none"}>{ctCellsTarget(ct)}</div>}
             {ct && ctOk(ct) && ct.status.invalid && <div className="w-full ct-note">{ct.status.invalid}</div>}
           </div>
-          <div className="px-3 py-1.5 text-[10.5px] text-slate-400 bg-white">
+          <div className="px-3 py-1.5 text-[13px] text-slate-400 bg-white">
             Movements = loads per working day ({perDay.wd}/month). Vehicles needed = movements ÷{" "}
             {tripsPerVehicleDay > 0
               ? <>the <strong>{tripsPerVehicleDay}</strong> movements one {vehLabel(vehicle)} can make per day on this route (routed cycle), rounded up.</>
@@ -6101,7 +6099,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
       <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
       <div className="flex flex-wrap gap-1 mt-1">
         {MONTHS.map((m, mi) => (
-          <label key={m} className={"text-[11px] px-1.5 py-0.5 rounded border cursor-pointer " + ((season[k] || []).includes(mi + 1) ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-600")}>
+          <label key={m} className={"text-xs px-1.5 py-0.5 rounded border cursor-pointer " + ((season[k] || []).includes(mi + 1) ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-600")}>
             <input type="checkbox" className="hidden" checked={(season[k] || []).includes(mi + 1)} onChange={e => set(f => {
               f.season = f.season || {}; const cur = f.season[k] || [];
               f.season[k] = e.target.checked ? [...cur, mi + 1].sort((a, b) => a - b) : cur.filter(x => x !== mi + 1);
@@ -6156,7 +6154,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         {monthsBox("winter_months", "Winter months (uplift applies)")}
         {monthsBox("thaw_months", "Thaw months (flag: 8 t road limits may apply)")}
       </div>
-      {summary && <p className="text-[11px] text-slate-400 mt-2">In use now (saved): driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "missing — no fair price until the bulletin is fetched" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
+      {summary && <p className="text-[13px] text-slate-400 mt-2">In use now (saved): driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "missing — no fair price until the bulletin is fetched" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
     </div>
   );
 }
@@ -8054,14 +8052,14 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       const short = r.action === "spread";
                       return (
                         <tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(191,46,85,.05)" } : {}}>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2 min-w-[220px]">
                             <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{r.route_id}</div>
-                            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1">
+                            <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">
                               <IptPill ipt={r.ipt} /><WsPill ws={r.section_id} />
                               <span>{r.material_type || "—"} · <span title={vehLabel(r.vehicle_type)}>{vehShort(r.vehicle_type) || "—"}</span> · {r.status}</span>
                             </div>
                           </td>
-                          <td className="px-2 py-2 text-right tabular-nums font-semibold">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>
+                          <td className="px-2 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>
                           <td className="px-2 py-2 text-right">
                             <input className={fld + " max-w-[110px] ml-auto"} inputMode="decimal" placeholder="—"
                               style={short ? { borderColor: "var(--red)" } : {}}
@@ -8076,14 +8074,14 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           <td className="px-2 py-2 text-right tabular-nums text-slate-600">
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
                               <div>{CUR()} {grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
-                              {r.planned_units && r.planned_units.per_t != null && <div className="text-[10px] text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
-                              {r.planned_eur_adj != null && <div className="text-[10px] text-slate-500" title="Quote × (1 + BAF). The quote above is unchanged.">+ BAF {CUR()} {grp(r.planned_eur_adj)}</div>}
+                              {r.planned_units && r.planned_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
+                              {r.planned_eur_adj != null && <div className="text-xs text-slate-500" title="Quote × (1 + BAF). The quote above is unchanged.">+ BAF {CUR()} {grp(r.planned_eur_adj)}</div>}
                             </>}
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums" style={{ color: "var(--navy)" }}>
                             {r.planned_fair_eur == null ? <span className="text-slate-500" title="No fair price: the route is not routed yet for this vehicle, or the diesel index is missing">—</span>
                               : <>{CUR()} {grp(r.planned_fair_eur)}{(r.fair_flags || []).includes("WINTER") && <span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>}{(r.fair_flags || []).includes("THAW") && <span className="ml-1 text-xs text-amber-700" title="Spring load restrictions (8 t) may apply on gravel and municipal roads — permits are free">thaw</span>}
-                                  {r.fair_units && r.fair_units.per_t != null && <div className="text-[10px] text-slate-400 whitespace-nowrap">{unitTriple(r.fair_units)}</div>}</>}
+                                  {r.fair_units && r.fair_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.fair_units)}</div>}</>}
                           </td>
                           <td className="px-2 py-2 text-right">
                             <input className={fld + " max-w-[110px] ml-auto"} inputMode="decimal" placeholder={`${CUR()} —`}
@@ -8103,9 +8101,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               onBlur={() => saveActual(r)} />
                           </td>
                           <td className={"px-2 py-2 text-right whitespace-nowrap la-pin" + (short ? " la-pin-short" : "")}>
-                            {r.action === "held" && <span className="text-[11px] font-semibold px-2 py-1 rounded-full" style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>}
-                            {r.action === "waiting" && <span className="text-[11px] text-slate-400">waiting</span>}
-                            {r.action === "applied" && <span className="text-[11px] font-semibold px-2 py-1 rounded-full text-slate-600 bg-slate-100" title={`${grp(r.carried, 1)} carried into this week`}>applied · {grp(r.carried, 1)}</span>}
+                            {r.action === "held" && <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>}
+                            {r.action === "waiting" && <span className="text-[13px] text-slate-400">waiting</span>}
+                            {r.action === "applied" && <span className="text-xs font-semibold px-2 py-1 rounded-full text-slate-600 bg-slate-100" title={`${grp(r.carried, 1)} carried into this week`}>applied · {grp(r.carried, 1)}</span>}
                             {r.action === "spread" && (
                               // 22 Oct 2026 (UI fix 6, card 2; finding #11): the app's standard small button (13 px on the accent), was an 11 px one-off on --navy
                               <button onClick={() => doSpread(r)} disabled={!!busy}
@@ -8120,7 +8118,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                 </table>
               </div>
               {/* 13 Oct 2026 (W3): the three notes moved to the column headers' info boxes (la.variance, la.spread, la.cost_quote, la.cost_fair) */}
-              <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 space-y-0.5">
+              <div className="px-3 py-2 text-[13px] text-slate-400 border-t border-slate-100 space-y-0.5">
                 {busy && <span className="text-slate-500">saving…</span>}
               </div>
             </div>
@@ -8133,7 +8131,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               <div className="text-sm font-semibold text-slate-700 mb-2">Stockpiles · {spanLabel(account.week.from, account.week.to)}<InfoTip id="la.stock" /></div>
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <table className="text-sm w-full" style={{ minWidth: 760 }}>
-                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">
+                  <thead className="la-acct-head">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold">Stockpile</th>
                       <th className="px-2 py-2 text-right font-semibold">Opening</th>
@@ -8151,7 +8149,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                         <tr key={s.location_id} className="border-t border-slate-100" style={s.over ? { background: "rgba(191,46,85,.05)" } : {}}>
                           <td className="px-3 py-2">
                             <div className="font-semibold text-[color:var(--navy-deep)]">{s.name}</div>
-                            <div className="text-[11px] text-slate-500">{s.loc_type} · {s.location_id}{s.unconvertible_movements ? <span className="text-amber-700"> · {s.unconvertible_movements} movement(s) not convertible to {s.unit}</span> : null}</div>
+                            <div className="text-[13px] text-slate-500">{s.loc_type} · {s.location_id}{s.unconvertible_movements ? <span className="text-amber-700"> · {s.unconvertible_movements} movement(s) not convertible to {s.unit}</span> : null}</div>
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums text-slate-600">{grp(s.opening, 1)} {s.unit}</td>
                           <td className="px-2 py-2 text-right tabular-nums text-slate-600">{grp(s.inbound, 1)}</td>
@@ -8229,7 +8227,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                         <tr key={line.key} className="border-t border-slate-100 align-top">
                           <td className="px-3 py-2 border-r border-slate-100 sticky left-0 bg-white z-10">
                             <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{line.route_id}</div>
-                            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1"><IptPill ipt={line.ipt} /><WsPill ws={line.section_id} /><span>{line.material_type || "—"} · {vehShort(line.vehicle_type) || "—"}</span></div>
+                            <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1"><IptPill ipt={line.ipt} /><WsPill ws={line.section_id} /><span>{line.material_type || "—"} · {vehShort(line.vehicle_type) || "—"}</span></div>
                             {line.reopened.length > 0 && (
                               <div className="text-xs mt-0.5" style={{ color: "var(--red)" }}
                                 title="These weeks were created while the month was approved. Reopening it does not delete them.">
@@ -9226,7 +9224,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
       <div className={(flush ? "" : "bg-white rounded-xl border border-slate-200 overflow-hidden") + (fill ? " flex-1 flex flex-col min-h-0" : "")}>
         {/* 14 Oct 2026: on a filled big screen the map takes the whole card; its ResizeObserver follows */}
         <div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />
-        <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 flex flex-wrap gap-x-3">
+        <div className="px-3 py-2 text-[13px] text-slate-400 border-t border-slate-100 flex flex-wrap gap-x-3">
           <span>Routed loaded leg per line, coloured by {TEAM().toLowerCase()} · dark dot = origin · red dot = destination · hover a line for its week.</span>
           {unbaked.length > 0 && <span className="text-amber-700">Not drawn (no route worked out): {unbaked.join(", ")}</span>}
           {err && <span style={{ color: "var(--red)" }}>{err}</span>}
@@ -9284,7 +9282,7 @@ function RoutePlanning({ route, token, onSaved }){
   return (
     <div className="border-t border-slate-200 pt-3 mt-3 space-y-2">
       <div className="text-sm font-semibold text-slate-700">Planning · Look-ahead</div>
-      <p className="text-[11px] text-slate-400">Typed, never seeded. Rates are SUMMED where filled (a base per load plus a per-{DU()} rate is a common haulage quote). Blank = no rate on this route: the Look-ahead then prices it at the target rate from Config (marked "target") — or prints "rate not set" when none is set either. A typed rate here is used ALONE; it is never mixed with the target.</p>
+      <p className="text-[13px] text-slate-400">Rates are added together. Blank = the target rate from Config, marked "target".</p>
       <div className="grid grid-cols-2 gap-2">
         <F k="max_vehicles_per_day" label="Max vehicles / day (flag only)" />
         <label className="block">
@@ -9421,14 +9419,14 @@ function RouteSheetText({ route, token, onSaved }){
       <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
       <textarea className={box} rows={3} placeholder={hint} value={v[k]} aria-label={label}
         onChange={e => setV(x => ({ ...x, [k]: e.target.value }))} />
-      <span className={"block text-[11px]" + (over(k) ? "" : " text-slate-400")} style={over(k) ? { color: "var(--red)" } : undefined}>
+      <span className={"block text-[13px]" + (over(k) ? "" : " text-slate-400")} style={over(k) ? { color: "var(--red)" } : undefined}>
         {v[k].trim().length} of {SHEET_TEXT_MAX} characters{over(k) ? ": too long for the route sheet" : ""}</span>
     </label>
   );
   return (
     <div className="border-t border-slate-200 pt-3 mt-3 space-y-2" data-route-sheet-text="1">
       <div className="text-sm font-semibold text-slate-700">Route sheet · drivers</div>
-      <p className="text-[11px] text-slate-400">Printed on this route's sheet for drivers and on the public map's route card, as typed. Blank = "Not typed" on the sheet.</p>
+      <p className="text-[13px] text-slate-400">Printed on the route sheet and on the public map's route card.</p>
       {T({ k: "route_reason", label: "Why this route", hint: "e.g. agreed in the CLP: keeps lorries out of the village centre and away from the school" })}
       {T({ k: "permitted_deviations", label: "Permitted diversions", hint: "e.g. if the A-road is closed, the signed diversion only" })}
       <div className="grid grid-cols-2 gap-2">
@@ -9491,8 +9489,8 @@ const ZONE_KINDS = [
 // because its failure mode (geometry only as good as the drawing) is visible, and via's
 // (a confident wrong route through roads HERE does know) is not.
 const HAUL_MODES = [
-  ["splice", "Splice — HERE does not map this road (default, safe)"],
-  ["via", "Via — HERE already maps this road"],
+  ["splice", "Splice — not on the map yet (default)"],
+  ["via", "Via — already on the map"],
 ];
 
 // The sub-tabs share one map, so instead of toggling layers we lean the styling towards
@@ -9715,24 +9713,19 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
     <div className="rounded-lg border border-slate-200 bg-white p-2.5 mb-3">
       <div className="flex items-center justify-between gap-2 mb-1.5">
         {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road words read var(--haul-text), the map line keeps ZONE_HAUL */}
-        <span className="text-[11px] uppercase tracking-wide" style={{ color: "var(--haul-text)" }}>
+        <span className="text-xs uppercase tracking-wide" style={{ color: "var(--haul-text)" }}>
           Temporary haul roads on this route
         </span>
-        {plan && plan.here_calls_per_bake != null && !!attached.length && (
-          <span className="text-[10px] text-slate-400">
-            routing this route again costs {plan.here_calls_per_bake} HERE call(s)
-          </span>
-        )}
       </div>
 
       {!attached.length && (
-        <p className="text-[11px] text-slate-500">
-          None. This route is routed by HERE end to end.
+        <p className="text-[13px] text-slate-500">
+          None.
         </p>
       )}
 
       {!!attached.length && (
-        <table className="text-[11px] w-full mb-2">
+        <table className="text-[13px] w-full mb-2">
           <thead className="text-slate-400">
             <tr>
               <th className="px-1 py-0.5 text-left font-semibold">Order</th>
@@ -9763,9 +9756,8 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
                     <span className="font-medium text-slate-700">{z.name || l.zone_id}</span>
                     <span className="text-slate-400"> {l.zone_id}</span>
                     {!inPlan && (
-                      <span className="block text-[10px]" style={{ color: "var(--red)" }}>
-                        not in force today — inactive, outside its dates, or not open to traffic,
-                        so no route is threaded through it
+                      <span className="block text-xs" style={{ color: "var(--red)" }}>
+                        not in force today (inactive, outside its dates or not open)
                       </span>
                     )}
                   </td>
@@ -9785,7 +9777,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
                   </td>
                   <td className="px-1 py-1 text-right">
                     <button onClick={() => detach(l.zone_id)} disabled={busy}
-                      className="text-[10px] font-semibold text-[color:var(--red)] hover:underline disabled:opacity-40">Detach</button>
+                      className="text-[13px] font-semibold text-[color:var(--red)] hover:underline disabled:opacity-40">Detach</button>
                   </td>
                 </tr>
               );
@@ -9796,7 +9788,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
 
       <div className="flex items-center gap-2">
         <select value={pick} onChange={e => setPick(e.target.value)} disabled={busy || !available.length}
-          className="border border-slate-200 rounded-lg px-2 py-1 text-[11px] bg-white disabled:opacity-40">
+          className="border border-slate-200 rounded-lg px-2 py-1 text-[13px] bg-white disabled:opacity-40">
           <option value="">{available.length ? "Add a haul road…" : "No other haul roads drawn"}</option>
           {available.map(z => (
             <option key={z.id} value={z.id}>
@@ -9806,30 +9798,26 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
         </select>
         {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road fill reads var(--haul-text) (white on it 5.23:1; dark text in the dark look) */}
         <button onClick={attach} disabled={busy || !pick}
-          className="text-[11px] font-semibold px-2 py-1 rounded-md text-white disabled:opacity-40"
+          className="text-[13px] font-semibold px-2 py-1 rounded-md text-white disabled:opacity-40"
           style={{ background: "var(--haul-text)" }}>Attach</button>
       </div>
 
       {!!attached.length && (
-        <p className="text-[10px] text-slate-400 mt-1.5">
-          Order is the outbound direction; the return leg meets them in reverse and enters each
-          road from the other end. Which end is entry is worked out for each leg, so
-          the order you drew a road in does not matter.
+        <p className="text-[13px] text-slate-400 mt-1.5">
+          Order = the outbound direction; the return leg uses them in reverse.
         </p>
       )}
       {!!noSpeed.length && (
-        <p className="text-[10px] mt-1" style={{ color: "var(--red)" }}>
-          {noSpeed.length} of these has no assigned speed, so its stretch adds distance but no time
-          to the cycle. Set one on the Zones tab.
+        <p className="text-[13px] mt-1" style={{ color: "var(--red)" }}>
+          {noSpeed.length} of these has no speed set, so it adds no time. Set one on Zones.
         </p>
       )}
       {!!attached.length && (
-        <p className="text-[10px] text-amber-700 mt-1">
-          A leg routed through a haul road comes back as a <strong>single option</strong> — there
-          are no alternatives to promote on this route while a haul road is attached.
+        <p className="text-[13px] text-amber-700 mt-1">
+          With a haul road attached, this route has no alternatives.
         </p>
       )}
-      {msg && <p className="text-[11px] text-slate-600 mt-1.5">{msg}</p>}
+      {msg && <p className="text-[13px] text-slate-600 mt-1.5">{msg}</p>}
     </div>
   );
 }
@@ -9864,11 +9852,11 @@ function RouteRestrictions({ routeId }){
   const prov = (TENANT.restrictions && TENANT.restrictions.short) || "the road authority";
   if(!TENANT.restrictions) return null;          // no provider for this tenant's country
   if(err) return (
-    <p className="text-[11px] text-slate-400 mb-3">
+    <p className="text-[13px] text-slate-400 mb-3">
       Road restrictions unavailable — {prov} could not be reached ({err}).
     </p>
   );
-  if(!data) return <p className="text-[11px] text-slate-400 mb-3">Checking road restrictions…</p>;
+  if(!data) return <p className="text-[13px] text-slate-400 mb-3">Checking road restrictions…</p>;
   if(!data.baked) return null;
   const dated = !!(TENANT.restrictions && TENANT.restrictions.dated);
 
@@ -9876,15 +9864,13 @@ function RouteRestrictions({ routeId }){
   const breaches = hits.filter(h => h.severity === "breach");
   const warns = hits.filter(h => h.severity === "warn");
   const fetchErr = data.fetch_errors && Object.keys(data.fetch_errors).length;
-  const incomplete = fetchErr
-    ? " ⚠️ Some layers could not be fetched, so this is not a complete check." : "";
-  const expired = data.expired_or_future_excluded
-    ? ` ${data.expired_or_future_excluded} record(s) outside their date window were excluded.` : "";
+  const incomplete = fetchErr ? " ⚠ Not a complete check: some data could not be read." : "";
+  const expired = "";   // 22 Oct 2026 (the user: no back-end detail on screens): the count of records outside their dates left the screen
 
   if(!hits.length) return (
-    <p className="text-[11px] text-slate-400 mb-3">
-      {dated ? `No ${prov} planned closures (current or future) within ${data.match_m} m of this route.`
-             : `No ${prov} restrictions in force within ${data.match_m} m of this route.`}{expired}{incomplete}
+    <p className="text-[13px] text-slate-400 mb-3">
+      {dated ? `No ${prov} planned closures within ${data.match_m} m of this route.`
+             : `No ${prov} restrictions within ${data.match_m} m of this route.`}{incomplete}
     </p>
   );
 
@@ -9898,17 +9884,17 @@ function RouteRestrictions({ routeId }){
     <div className={"rounded-lg border p-2.5 mb-3 " + tone.border}>
       <button onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between gap-2 text-left">
-        <span className="text-[11px] uppercase tracking-wide" style={{ color: tone.head }}>
+        <span className="text-xs uppercase tracking-wide" style={{ color: tone.head }}>
           {dated ? "Planned closures on this route" : "Road restrictions on this route"}
           {breaches.length ? ` · ${breaches.length} EXCEEDED` : ""}
           {warns.length ? ` · ${warns.length} to check` : ""}
           {!breaches.length && !warns.length ? ` · ${hits.length} note(s)` : ""}
         </span>
-        <span className="text-[10px] text-slate-400">{open ? "hide" : "show"}</span>
+        <span className="text-[13px] text-slate-400">{open ? "hide" : "show"}</span>
       </button>
 
       {open && (
-        <table className="text-[11px] w-full mt-2">
+        <table className="text-[13px] w-full mt-2">
           <thead className="text-slate-400">
             <tr>
               <th className="px-1 py-0.5 text-left font-semibold">Restriction</th>
@@ -9927,15 +9913,15 @@ function RouteRestrictions({ routeId }){
                     {h.severity === "breach" ? "■ " : h.severity === "warn" ? "▲ " : "· "}
                     {h.headline || h.what}
                   </span>
-                  <span className="block text-[10px] text-slate-400">
+                  <span className="block text-xs text-slate-400">
                     {h.road_name || (h.road_nr ? `road ${h.road_nr}` : "")}
                     {h.from || h.to ? ` · ${h.from || "open"} → ${h.to || "open"}` : ""}
                   </span>
                   {h.extra_info && (
-                    <span className="block text-[10px] text-slate-500 mt-0.5">{h.extra_info}</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">{h.extra_info}</span>
                   )}
                   {h.description && !(h.headline || "").includes(h.description) && (
-                    <span className="block text-[10px] text-slate-500 mt-0.5">{h.description}{h.event_number ? ` [${h.event_number}]` : ""}</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">{h.description}{h.event_number ? ` [${h.event_number}]` : ""}</span>
                   )}
                 </td>
                 <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
@@ -9957,7 +9943,7 @@ function RouteRestrictions({ routeId }){
                     ? <span style={{ color: "var(--ok-text)" }}>within · {h.margin}{h.unit ? ` ${h.unit}` : ""} spare</span>
                     : <span className="text-slate-400" title={h.note || ""}>not comparable</span>}
                   {h.verdict === "unknown" && h.note && (
-                    <span className="block text-[10px] text-slate-400 whitespace-normal">{h.note}</span>
+                    <span className="block text-xs text-slate-400 whitespace-normal">{h.note}</span>
                   )}
                 </td>
                 <td className="px-1 py-1 text-right tabular-nums">{h.distance_m} m</td>
@@ -9970,13 +9956,11 @@ function RouteRestrictions({ routeId }){
         </table>
       )}
 
-      <p className="text-[10px] text-slate-400 mt-1.5">
-        Advisory only. The router is never given this data, and a match means the
-        {dated ? "closure" : "restriction"} sits within {data.match_m} m of the routed line — not that it is
-        necessarily on your carriageway.{dated
-          ? " A planned closure counts on the Look-ahead only in the weeks its dates overlap."
-          : " Mass, height and width are compared for real; a weak bridge's load class is not a tonnage and is left for a human."}
-        {" "}Source: {data.attribution || (TENANT.restrictions && TENANT.restrictions.attribution) || prov}.{expired}{incomplete}
+      <p className="text-[13px] text-slate-400 mt-1.5">
+        Advisory: within {data.match_m} m of the route, not necessarily on your side of the road.{dated
+          ? " Counted on the Look-ahead only in the weeks it applies."
+          : " A weak bridge's load class is left for a person to check."}
+        {" "}Source: {data.attribution || (TENANT.restrictions && TENANT.restrictions.attribution) || prov}.{incomplete}
       </p>
     </div>
   );
@@ -10058,12 +10042,10 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
         {pick("Origin gate", originId, "origin_gate_id")}
         {pick("Destination gate", destId, "dest_gate_id")}
       </div>
-      <p className="text-[11px] text-slate-400 mt-1.5">
-        A one-way gate is used only for the direction it serves; the other direction falls
-        back to the site&rsquo;s default. Changing a gate moves where HERE routes to, so the
-        stored route has to be re-routed before the distances mean anything.
+      <p className="text-[13px] text-slate-400 mt-1.5">
+        A one-way gate serves its own direction only. After changing a gate, press Route before reading the distances.
       </p>
-      {msg && <p className="text-[11px] text-slate-500 mt-1">{msg}</p>}
+      {msg && <p className="text-[13px] text-slate-500 mt-1">{msg}</p>}
     </div>
   );
 }
@@ -10181,7 +10163,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                           onClick={(e) => { e.stopPropagation(); onPromote(r.profile, r.alt_index); }}
                           disabled={promoting === `${r.profile}|${r.alt_index}`}
                           title="Use this option as the primary route for this vehicle"
-                          className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-slate-300 hover:bg-white disabled:opacity-40">
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded border border-slate-300 hover:bg-white disabled:opacity-40">
                           {promoting === `${r.profile}|${r.alt_index}` ? "…" : "Make primary"}
                         </button>
                       )}
@@ -10191,31 +10173,21 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                 })}
               </tbody>
             </table>
-            <p className="text-[11px] text-slate-400 mt-2">
-              Cycle = out + back + turnaround. Turnaround is the vehicle's own load and unload
-              time from Config → Vehicles, plus — where gates record them — induction at each gate
-              and gate-to-face travel (‡). Trips/day is what fits in a driver's day: the {data.planning.shift_hours_per_day} h
-              shift less the break the UK drivers' hours rules require, with driving (out, back and gate to face) at most
-              9 h; loading, unloading and check-in are other work. § = fewer than the shift alone would hold (hover for why);
-              a 0 is a round trip that does not fit a driver's day, counted as one lorry a trip. A planning figure: weekly
-              limits and the day's other duties are not modelled.{data.planning.shift_note ? " " + data.planning.shift_note : ""}{" "}
-              t/month assumes {data.planning.working_days_per_month} working days.
-              {data.rows.some(r => r.return_estimated) && " * return leg not routed — assumed to mirror the outbound."}
+            <p className="text-[13px] text-slate-400 mt-2">
+              Cycle = out + back + turnaround (load, unload and gate time ‡). Trips/day = round trips that fit a{" "}
+              {data.planning.shift_hours_per_day} h shift with the legal break and at most 9 h driving (§ = fewer; hover for why;
+              0 = one lorry a trip). A planning figure.{data.planning.shift_note ? " " + data.planning.shift_note : ""}{" "}
+              t/month at {data.planning.working_days_per_month} working days.
+              {data.rows.some(r => r.return_estimated) && " * return leg assumed to mirror the outbound."}
             </p>
             {data.rows.some(r => r.haul_speed_applied) && (
               // 22 Oct 2026 (UI fix 6, card 6): the note reads var(--haul-text) (5.05:1 on the expanded row)
-              <p className="text-[11px] mt-1" style={{ color: "var(--haul-text)" }}>
-                † part of this cycle runs on a temporary haul road at an <strong>assigned</strong> speed,
-                not a speed HERE measured. HERE will not accept a custom speed, so the haul stretch is
-                timed at <em>drawn length ÷ assigned speed</em> and substituted in. Hover the cycle for
-                what the figure would be on HERE&rsquo;s own timing. It is a planning assumption, and it
-                is only as good as the line somebody drew.
+              <p className="text-[13px] mt-1" style={{ color: "var(--haul-text)" }}>
+                † includes a haul road timed at its set speed. Hover the cycle for the time without it.
               </p>
             )}
-            <p className="text-[11px] text-slate-400 mt-1">
-              Click a row to draw that option on the map — it turns red, the vehicle's other
-              options stay grey. “Make primary” swaps an alternative into first place so it
-              becomes the route the network is planned around; re-routing restores HERE's ranking.
+            <p className="text-[13px] text-slate-400 mt-1">
+              Click a row to show that option on the map. “Make primary” makes an alternative the route the plan uses.
             </p>
           </div>
         )}
@@ -10237,152 +10209,6 @@ function CatChips({ list, dir }){
           style={{ background: bg, color: fg }}>{c}</span>
       ))}
     </span>
-  );
-}
-
-// Why the analysis table can look like it ignores the vehicle. Three different faults
-// present identically — a profile whose name no longer matches factors.json, a deployed
-// factors.json that isn't the one you think, and vehicles that genuinely share a figure.
-// This shows the resolved numbers so they can be told apart, and can put a real question
-// to HERE about one route.
-function Diagnostics({ token, routeId }){
-  const [fx, setFx] = useState(null);
-  const [cmp, setCmp] = useState(null);
-  const [busy, setBusy] = useState("");
-  const [err, setErr] = useState("");
-  const qs = () => (token ? `?token=${encodeURIComponent(token)}` : "");
-
-  const loadFactors = async () => {
-    setBusy("factors"); setErr("");
-    try {
-      const r = await fetch(`${API}/admin/diagnostics/factors${qs()}`);
-      if(!r.ok) throw new Error(`${r.status} — ${r.status === 403 ? "admin token rejected" : await r.text()}`);
-      setFx(await r.json());
-    } catch(e){ setErr(e.message); }
-    setBusy("");
-  };
-
-  const probeHere = async () => {
-    if(!routeId){ setErr("Pick a route on the Routes tab first."); return; }
-    setBusy("probe"); setErr("");
-    try {
-      const p = new URLSearchParams({ probe: "true" });
-      if(token) p.set("token", token);
-      const r = await fetch(`${API}/admin/diagnostics/compare/${encodeURIComponent(routeId)}?${p}`);
-      if(!r.ok) throw new Error(`${r.status} — ${r.status === 403 ? "admin token rejected" : await r.text()}`);
-      setCmp(await r.json());
-    } catch(e){ setErr(e.message); }
-    setBusy("");
-  };
-
-  return (
-    <div className="card p-4">
-      <div className="text-sm font-semibold text-slate-700 mb-1">Diagnostics</div>
-      <p className="text-[11px] text-slate-400 mb-2">
-        Use these when vehicles look interchangeable — identical distances, cycle times or CO₂.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <button onClick={loadFactors} disabled={!!busy}
-          className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
-          {busy === "factors" ? "Checking…" : "Check factors.json"}
-        </button>
-        <button onClick={probeHere} disabled={!!busy || !routeId} title={routeId ? `Ask HERE about ${routeId}` : "Select a route first"}
-          className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
-          {busy === "probe" ? "Asking HERE…" : `Probe HERE${routeId ? ` · ${routeId}` : ""}`}
-        </button>
-      </div>
-      {err && <p className="text-xs mt-2" style={{ color: "var(--red)" }}>{err}</p>}
-
-      {fx && (
-        <div className="mt-3">
-          {fx.warnings.map((w, i) => (
-            <p key={i} className="text-[11px] rounded-md px-2 py-1.5 mb-1"
-              style={{ background: "rgba(255,193,1,.14)", color: "#8a6d00" }}>⚠ {w}</p>
-          ))}
-          {!fx.warnings.length && (
-            <p className="text-[11px] rounded-md px-2 py-1.5 mb-1"
-              style={{ background: "rgba(3,158,134,.10)", color: "var(--ok-text)" }}>
-              Every profile resolves to a distinct entry in factors.json.
-            </p>
-          )}
-          <div className="overflow-x-auto">
-            <table className="text-[11px] w-full">
-              <thead className="text-slate-400">
-                <tr>
-                  <th className="text-left font-semibold py-1">Vehicle</th>
-                  <th className="text-right font-semibold px-1">Payload</th>
-                  <th className="text-right font-semibold px-1">CO₂/km</th>
-                  <th className="text-right font-semibold px-1">Laden</th>
-                  <th className="text-right font-semibold px-1">Tare</th>
-                  {/* the UNLOADING half only. A vehicle has no route, so it has no gates
-                      and therefore no induction or gate-to-face time — this figure and a
-                      route's turnaround are different quantities from Phase 5a onward,
-                      and the header says so rather than inviting the comparison. */}
-                  <th className="text-right font-semibold px-1" title="Load + unload for this vehicle. A route's turnaround also includes gate induction and gate-to-face travel.">Load/unload</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fx.vehicles.map(v => (
-                  <tr key={v.profile} className="border-t border-slate-100">
-                    <td className="py-1 whitespace-nowrap">
-                      {!v.in_factors && <span style={{ color: "var(--red)" }} title="Not a key in factors.json — falls back to _default">⚠ </span>}
-                      {vehShort(v.profile)}
-                      {v.in_database && <span className="text-slate-500" title="Present in cached geometry"> ●</span>}
-                    </td>
-                    <td className="text-right tabular-nums px-1">{v.payload_t}t</td>
-                    <td className="text-right tabular-nums px-1">{v.emissions_kg_co2e_per_km}</td>
-                    <td className="text-right tabular-nums px-1">{v.gross_weight_kg ? (v.gross_weight_kg/1000)+"t" : "—"}</td>
-                    <td className="text-right tabular-nums px-1">{v.tare_weight_kg ? (v.tare_weight_kg/1000)+"t" : "—"}</td>
-                    <td className="text-right tabular-nums px-1">{Math.round((v.unloading_hr||0)*60)}m</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">● = appears in cached geometry. ⚠ = name not found in factors.json.</p>
-        </div>
-      )}
-
-      {cmp && (
-        <div className="mt-3">
-          <p className="text-[11px] mb-1" style={{ color: cmp.all_identical ? "#8a6d00" : "var(--ok-text)" }}>
-            {cmp.note}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="text-[11px] w-full">
-              <thead className="text-slate-400">
-                <tr>
-                  <th className="text-left font-semibold py-1">Vehicle</th>
-                  <th className="text-right font-semibold px-1">Gross</th>
-                  <th className="text-right font-semibold px-1">Live km</th>
-                  <th className="text-right font-semibold px-1">Options</th>
-                  <th className="text-center font-semibold px-1">HGV params</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cmp.rows.map(r => (
-                  <tr key={r.profile} className="border-t border-slate-100">
-                    <td className="py-1 whitespace-nowrap">{vehShort(r.profile)}</td>
-                    <td className="text-right tabular-nums px-1">{r.gross_weight_kg ? (r.gross_weight_kg/1000)+"t" : "—"}</td>
-                    <td className="text-right tabular-nums px-1">{r.error ? "err" : (r.live_km ?? "—")}</td>
-                    <td className="text-right tabular-nums px-1">{r.routes_returned ?? "—"}</td>
-                    <td className="text-center px-1">
-                      {r.truck_params_present === undefined ? "—"
-                        : r.truck_params_present ? <span style={{ color: "var(--ok-text)" }}>✓</span>
-                        : <span style={{ color: "var(--red)" }} title="No vehicle[...] params were sent — HERE routed this as a generic HGV">✗</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            “Options” is how many routes HERE actually returned — 1 means it found no
-            meaningfully different alternative, which is common on a sparse network.
-          </p>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -11846,7 +11672,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             </div>
 
             {mode === "view" && (
-              <p className="text-[11px] text-slate-400">Click a node to edit it, or drag it to move — routes it touches re-route automatically for the profiles ticked below. Deleting a location also removes routes that use it.</p>
+              <p className="text-[13px] text-slate-400">Click a marker to edit it, or drag it to move it. Deleting a location deletes its routes.</p>
             )}
 
             {form && (
@@ -11921,13 +11747,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <span className="block text-sm font-medium text-slate-700 mb-1">Stock held (optional)</span>
                   <div className="grid grid-cols-3 gap-2 mt-1">
                     <label className="block">
-                      <span className="text-[10px] text-slate-400">Max capacity</span>
+                      <span className="text-[13px] text-slate-400">Max capacity</span>
                       <input value={form.capacity_qty} onChange={e => setField("capacity_qty", e.target.value)}
                         inputMode="decimal" placeholder="—"
                         className="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                     </label>
                     <label className="block">
-                      <span className="text-[10px] text-slate-400">Unit</span>
+                      <span className="text-[13px] text-slate-400">Unit</span>
                       <select value={form.capacity_unit} onChange={e => setField("capacity_unit", e.target.value)}
                         className={"mt-0.5 w-full " + sel}>
                         <option value="t">tonnes</option>
@@ -11935,16 +11761,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </select>
                     </label>
                     <label className="block">
-                      <span className="text-[10px] text-slate-400">Opening stock</span>
+                      <span className="text-[13px] text-slate-400">Opening stock</span>
                       <input value={form.opening_qty} onChange={e => setField("opening_qty", e.target.value)}
                         inputMode="decimal" placeholder="0"
                         className="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                     </label>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">
-                    Leave max blank if you don't know it — the balance still works and the Look-ahead shows
-                    "—" rather than pretending the stockpile holds nothing. Opening stock is what was there at the
-                    start of the horizon. Over capacity is flagged on the Look-ahead, never blocked.
+                  <p className="text-[13px] text-slate-400 mt-1.5">
+                    Blank = not known. Opening stock = what was there at the start. Over capacity is flagged, never blocked.
                   </p>
                 </div>
                 )}
@@ -11959,10 +11783,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       className="mt-0.5 w-40 border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                     <span className="ml-2 text-xs text-slate-500">lorry visits a day</span>
                   </label>
-                  <p className="text-[11px] text-slate-400 mt-1.5">
-                    The most lorries a day the Construction Logistics Plan allows at this site. One visit is one lorry in
-                    and out: a delivery, or a lorry coming to load. Leave it blank if the plan sets none. Planned visits
-                    over it are flagged on the Dashboard, never blocked.
+                  <p className="text-[13px] text-slate-400 mt-1.5">
+                    The most lorries a day the CLP allows here; one visit = in and out. Blank = none. Over it is flagged, never blocked.
                   </p>
                 </div>
 
@@ -11976,10 +11798,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       aria-label="Site rules for drivers"
                       className="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                   </label>
-                  <p className={"text-[11px] mt-1" + ((form.site_rules || "").trim().length > SHEET_TEXT_MAX ? "" : " text-slate-400")}
+                  <p className={"text-[13px] mt-1" + ((form.site_rules || "").trim().length > SHEET_TEXT_MAX ? "" : " text-slate-400")}
                      style={(form.site_rules || "").trim().length > SHEET_TEXT_MAX ? { color: "var(--red)" } : undefined}>
-                    {(form.site_rules || "").trim().length} of {SHEET_TEXT_MAX} characters. Printed on the route sheet of every
-                    route that loads or delivers here, as typed.
+                    {(form.site_rules || "").trim().length} of {SHEET_TEXT_MAX} characters · printed on the route sheets.
                   </p>
                 </div>
 
@@ -12009,7 +11830,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="block text-sm font-medium text-slate-700 mb-1">Access gate (optional)</span>
                     {(form.gate_lat !== "" || form.gate_lon !== "") && (
                       <button onClick={() => setForm(f => ({ ...f, gate_lat: "", gate_lon: "" }))}
-                        className="text-[11px] text-slate-500 hover:underline">Clear</button>
+                        className="text-[13px] text-slate-500 hover:underline">Clear</button>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-1">
@@ -12020,9 +11841,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       inputMode="decimal" placeholder="Gate lon"
                       className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">
-                    Where vehicles join the public road. Leave blank to route to the marker itself.
-                    Changing it re-routes everything touching this location.
+                  <p className="text-[13px] text-slate-400 mt-1.5">
+                    Where lorries join the public road. Blank = the marker.
                   </p>
                 </div>
 
@@ -12038,16 +11858,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="block text-sm font-medium text-slate-700 mb-1">Gates</span>
                     {!gateForm && (
                       <button onClick={newGate}
-                        className="text-[11px] font-semibold text-[color:var(--blue)] hover:underline">
+                        className="text-[13px] font-semibold text-[color:var(--blue)] hover:underline">
                         + Add gate
                       </button>
                     )}
                   </div>
 
                   {!gateList.length && !gateForm && (
-                    <p className="text-[11px] text-slate-400 mt-1.5">
-                      No gates recorded. Routing falls back to the access gate above, then to the
-                      marker — the same behaviour as before gates existed.
+                    <p className="text-[13px] text-slate-400 mt-1.5">
+                      No gates yet: routes use the access gate above, or the marker.
                     </p>
                   )}
 
@@ -12055,7 +11874,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <ul className="mt-1.5 space-y-1">
                       {gateList.map(g => (
                         <li key={g.id}
-                          className={"flex items-center gap-2 text-xs rounded px-1.5 py-1 " +
+                          className={"flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs rounded px-1.5 py-1 " +
                                      (g.active ? "hover:bg-slate-50" : "opacity-60 bg-slate-50")}>
                           <span className="font-medium text-slate-700">{g.name}</span>
                           <span className="text-slate-400">{g.id}</span>
@@ -12063,29 +11882,29 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             {g.direction === "access" ? "in only"
                               : g.direction === "egress" ? "out only" : "in + out"}
                           </span>
-                          {g.is_default && <span className="text-[10px] text-slate-500">default</span>}
-                          {!g.active && <span className="text-[10px]" style={{ color: "var(--red)" }}>deactivated</span>}
-                          {g.safety_minutes ? <span className="text-[10px] text-slate-500"
+                          {g.is_default && <span className="text-slate-500">default</span>}
+                          {!g.active && <span style={{ color: "var(--red)" }}>deactivated</span>}
+                          {g.safety_minutes ? <span className="text-slate-500"
                             title="Induction time, applied to whatever arrives at this gate">
                             {g.safety_minutes}m induction</span> : null}
-                          {g.internal_travel_minutes ? <span className="text-[10px] text-slate-500"
+                          {g.internal_travel_minutes ? <span className="text-slate-500"
                             title="Flat gate-to-face travel. Ignored on a route that has a drawn haul road — that road already carries these minutes.">
                             {g.internal_travel_minutes}m internal</span> : null}
-                          {g.open_from && g.open_to ? <span className="text-[10px] text-slate-500" data-gate-hours={g.id}>
+                          {g.open_from && g.open_to ? <span className="text-slate-500" data-gate-hours={g.id}>
                             open {g.open_from}–{g.open_to}{gateDaysWords(g.open_days) ? ` · ${gateDaysWords(g.open_days)}` : ""}</span> : null}
-                          {(g.shut_windows || []).length ? <span className="text-[10px] text-slate-500" data-gate-shut={g.id}>
+                          {(g.shut_windows || []).length ? <span className="text-slate-500" data-gate-shut={g.id}>
                             shut {gateBandWords(g.shut_windows)}</span> : null}
                           {/* 16 Oct 2026: every gate should have its access road drawn from the public road */}
                           {g.access_zone_id
-                            ? <span className="text-[10px] text-slate-500" data-gate-access={g.id}>
+                            ? <span className="text-slate-500" data-gate-access={g.id}>
                                 access road: {((haulRoadList || []).find(z => z.id === g.access_zone_id) || {}).name || g.access_zone_id}</span>
-                            : <span className="text-[10px] text-amber-700" data-gate-access-missing={g.id}
+                            : <span className="text-amber-700" data-gate-access-missing={g.id}
                                 title="Draw a haul road on Zones from the public road to this gate, then pick it here">no access road drawn</span>}
                           <span className="ml-auto flex gap-2">
                             <button onClick={() => editGate(g)}
-                              className="text-[11px] text-slate-500 hover:underline">Edit</button>
+                              className="text-slate-500 hover:underline">Edit</button>
                             <button onClick={() => deleteGate(g.id)}
-                              className="text-[11px] text-slate-400 hover:underline">Delete</button>
+                              className="text-slate-400 hover:underline">Delete</button>
                           </span>
                         </li>
                       ))}
@@ -12149,10 +11968,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           <option value="">None drawn</option>
                           {(haulRoadList || []).map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
                         </select>
-                        <span className="block text-[11px] text-slate-400 mt-1">
-                          The haul road from the public road to this gate: the bellmouth, long enough for a lorry or two to
-                          pull off the road. Draw it on Zones as a haul road. Every route arriving by this gate ends along it and
-                          every route leaving by it starts along it.
+                        <span className="block text-[13px] text-slate-400 mt-1">
+                          The haul road from the public road to this gate. Draw it on Zones.
                         </span>
                       </label>
                       {/* 14 Oct 2026 (bundle G, W17): when the gate is open, for its capacity (open minutes ÷ the
@@ -12209,14 +12026,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                                 return { ...g, shut_windows: [...ws, { from: ph.from, to: ph.to }] }; })}>Add a shut time</button>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          Blank hours use the default gate hours set on Config → Planning ({GATE_DEFAULT_HOURS.from}–{GATE_DEFAULT_HOURS.to}
-                          unless the scheme changed them). Shut times are when the gate takes no lorries inside its hours, for
-                          example a school run or a lunch, every day it is open; at most {GATE_SHUT_MAX}. What the gate can check
-                          in a day is its open minutes ÷ the induction minutes a lorry, less its shut times and any no-delivery
-                          peak bands set on Config (an overlap counts once). A lorry may set off before the gate opens; the
-                          Simulation has it arrive from the opening. Arrivals on a closed day are flagged on the Look-ahead,
-                          never blocked.
+                        <p className="text-[13px] text-slate-400 mt-1">
+                          Blank hours = the default on Config → Planning ({GATE_DEFAULT_HOURS.from}–{GATE_DEFAULT_HOURS.to}). Shut times: when the gate
+                          takes no lorries, every open day (e.g. a school run); at most {GATE_SHUT_MAX}. Arrivals outside them are flagged, never blocked.
                         </p>
                       </div>
                       <div className="flex items-center gap-4 text-xs text-slate-600">
@@ -12231,15 +12043,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           Active
                         </label>
                       </div>
-                      <p className="text-[11px] text-slate-400">
-                        {/* Copy from the 2026-09-02 feedback, verbatim. The model behind it is
-                            unchanged: both are per-gate planning assumptions, both NULL on every
-                            migrated gate, and an empty box means 0. */}
-                        <strong>Induction</strong> — safety / briefing at this gate, once per arrival.
-                        {" "}<strong>Gate → face</strong> — drive from this gate to the face; ignored if the
-                        route uses a drawn haul road, so the minutes are not counted twice. Both are
-                        planning assumptions; an empty box means 0. Deactivating a gate a route has
-                        selected makes that route refuse to route, by name.
+                      <p className="text-[13px] text-slate-400">
+                        {/* 22 Oct 2026 (the user: fewer words): shortened from the 2026-09-02 feedback copy; the model is unchanged — both
+                            per-gate planning assumptions, NULL on every migrated gate, an empty box means 0. */}
+                        <strong>Induction</strong>: minutes at the gate, each lorry.{" "}<strong>Gate → face</strong>: drive to the face (not counted
+                        when a haul road is drawn). Empty = 0. A route using a deactivated gate will not route.
                       </p>
                       <div className="flex items-center gap-2">
                         <button onClick={saveGate}
@@ -12252,11 +12060,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </div>
                     </div>
                   )}
-                  {gateMsg && <p className="text-[11px] text-slate-500 mt-1.5">{gateMsg}</p>}
+                  {gateMsg && <p className="text-[13px] text-slate-500 mt-1.5">{gateMsg}</p>}
                 </div>
                 )}
                 {!form.id && (
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[13px] text-slate-400">
                     Gates can be added once the location has been created.
                   </p>
                 )}
@@ -12272,7 +12080,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       className="ml-auto px-3 py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--red)" }}>Delete</button>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-400">The admin token is taken from the field at the top of this page.</p>
               </div>
             )}
             {locMsg && <p className="text-xs text-slate-500 mt-2">{locMsg}</p>}
@@ -12297,25 +12104,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
             {!zoneForm && (
               <div className="space-y-2">
-                <p className="text-[11px] text-slate-400">
-                  A zone is one drawn area with a date range. Tick <strong>Affects routing</strong> and HERE is
-                  told to avoid it, and every worked-out route crossing it is re-routed. Leave it unticked and the
-                  zone is drawn on both maps for information only — the router never hears about it.
+                <p className="text-[13px] text-slate-400">
+                  A zone is an area with dates. Tick <strong>Affects routing</strong> and routes avoid it; unticked, it is only drawn on the maps.
                 </p>
-                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                  HERE&rsquo;s avoid-areas parameter takes <strong>bounding boxes, not polygons</strong>. Whatever
-                  you draw is sent as the rectangle around it, so a long diagonal or L-shaped closure blocks
-                  more ground than it looks like. Draw several smaller zones instead of one large one where
-                  that matters — the panel shows the box each zone actually sends.
+                <p className="text-[13px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  Routes avoid the <strong>rectangle</strong> around what you draw: draw a long or L-shaped closure as several small zones.
                 </p>
-                <p className="text-[11px] text-slate-600 border border-slate-200 rounded p-2">
+                <p className="text-[13px] text-slate-600 border border-slate-200 rounded p-2">
                   {/* 22 Oct 2026 (UI fix 6, card 6): the words read var(--haul-text) */}
-                  <strong style={{ color: "var(--haul-text)" }}>Temporary haul roads</strong> are the one kind that
-                  works the other way round: drawn as an open <em>line</em> with a speed, and routes are sent
-                  <em> through</em> them rather than around. A haul road is never put in HERE&rsquo;s avoid
-                  list — that would steer the router away from the road it is meant to use. It does nothing
-                  until you attach it to a route, which is done by expanding that route on the
-                  <strong> Routes</strong> tab.
+                  <strong style={{ color: "var(--haul-text)" }}>Temporary haul roads</strong> work the other way: routes go <em>through</em>{" "}
+                  them. Attach one to a route on the <strong>Routes</strong> page (open the route's row).
                 </p>
               </div>
             )}
@@ -12344,24 +12142,20 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <input type="date" value={zoneForm.ends_on} onChange={e => setZField("ends_on", e.target.value)} className={"mt-1 w-full " + sel} />
                   </label>
                 </div>
-                <p className="text-[11px] text-slate-400 -mt-1">Leave a date blank for open-ended. Both ends are inclusive.</p>
+                <p className="text-[13px] text-slate-400 -mt-1">Blank date = open-ended. Both dates are included.</p>
 
                 {isHaul(zoneForm) && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5 space-y-2.5">
                     {/* 22 Oct 2026 (UI fix 6, card 6): the label reads var(--haul-text) (5.13:1 on the amber wash) */}
-                    <div className="text-[11px] uppercase tracking-wide" style={{ color: "var(--haul-text)" }}>Haul road</div>
+                    <div className="text-xs uppercase tracking-wide" style={{ color: "var(--haul-text)" }}>Haul road</div>
                     <label className="block">
                       <span className="block text-sm font-medium text-slate-700 mb-1">Assigned speed (km/h)</span>
                       <input type="number" min="1" step="1" value={zoneForm.speed_kph}
                         onChange={e => setZField("speed_kph", e.target.value)}
                         placeholder="e.g. 25"
                         className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
-                      <span className="block text-[11px] text-slate-500 mt-1">
-                        HERE will not accept a custom speed, so this is applied afterwards:
-                        the haul stretch is timed at <em>length ÷ speed</em> and that figure
-                        goes into the cycle time the dashboard and route analysis read.
-                        <strong> Leave it blank and HERE&rsquo;s own timing stands</strong> —
-                        blank means &ldquo;not set&rdquo;, not zero.
+                      <span className="block text-[13px] text-slate-500 mt-1">
+                        Time on this road = its length ÷ this speed. Blank = not set.
                       </span>
                     </label>
                     <label className="block">
@@ -12370,21 +12164,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         <option value="">Default (splice)</option>
                         {HAUL_MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
-                      <span className="block text-[11px] text-slate-500 mt-1">
-                        This is a fact about HERE&rsquo;s map, not a preference. <strong>Splice</strong>
-                        assumes HERE has never heard of this road: it routes to one end, uses the
-                        line you drew, then routes on from the other end — two HERE calls per leg
-                        instead of one, and the drawn line is exactly what you get.
-                        <strong> Via</strong> assumes HERE already maps it and lets HERE find its own
-                        way through — one call, snapped to real roads, and <em>wrong without warning</em>
-                        if the road is not in HERE&rsquo;s data. Run the haul-road diagnostic with
-                        <span className="font-mono"> probe=true</span> before choosing Via.
+                      <span className="block text-[13px] text-slate-500 mt-1">
+                        Splice if the road is not on the map yet; Via if it is. Not sure: Splice.
                       </span>
                     </label>
-                    <p className="text-[11px] text-amber-800">
-                      A haul road does nothing until it is <strong>attached to a route</strong> —
-                      expand a route on the Routes tab to do that. Drawing one near a route
-                      changes nothing on its own, deliberately: nothing gets re-routed by accident.
+                    <p className="text-[13px] text-amber-800">
+                      Does nothing until it is <strong>attached to a route</strong> (Routes page, open the route's row).
                     </p>
                   </div>
                 )}
@@ -12394,10 +12179,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     onChange={e => setZField("affects_routing", e.target.checked)} className="mt-1" />
                   <span>
                     <span className="font-medium">{isHaul(zoneForm) ? "Open to traffic" : "Affects routing"}</span>
-                    <span className="block text-[11px] text-slate-400">
+                    <span className="block text-[13px] text-slate-400">
                       {isHaul(zoneForm)
-                        ? "Untick and the road is drawn on both maps but no route is threaded through it — a haul road that is planned but not open yet."
-                        : "Sends this area to HERE as avoid-areas and re-routes every routed leg that crosses it."}
+                        ? "Unticked: drawn on the maps, used by no route (planned, not open yet)."
+                        : "Routes avoid this area; routes that cross it are worked out again."}
                     </span>
                   </span>
                 </label>
@@ -12406,7 +12191,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     onChange={e => setZField("active", e.target.checked)} className="mt-1" />
                   <span>
                     <span className="font-medium">Active</span>
-                    <span className="block text-[11px] text-slate-400">Untick to retire a zone without deleting it — the record of why past routes went the way they did survives.</span>
+                    <span className="block text-[13px] text-slate-400">Untick to retire it without deleting it.</span>
                   </span>
                 </label>
                 <label className="block">
@@ -12436,12 +12221,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         className="text-xs px-2 py-0.5 rounded-md border border-slate-200 text-slate-600 disabled:opacity-40">Clear</button>
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[13px] text-slate-400">
                     {zoneDraw
                       ? (isHaul(zoneForm)
-                         ? "Click along the road. Two or more points makes a line, and it stays open — the order you click is the order it is drawn, not the direction of travel."
-                         : "Click the map to drop a corner. Three or more makes a shape.")
-                      : "Editing a shape means redrawing it — points cannot be dragged individually."}
+                         ? "Click along the road: two or more points."
+                         : "Click the map to drop a corner: three or more.")
+                      : "To change a shape, redraw it."}
                   </p>
                   {isHaul(zoneForm) && drawPts.length >= 2 && (() => {
                     // drawn length, computed the same way the backend does, so the figure
@@ -12455,18 +12240,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       km += 2 * 6371.0088 * Math.asin(Math.min(1, Math.sqrt(a)));
                     }
                     const sp = Number(zoneForm.speed_kph);
-                    return <p className="text-[11px] text-slate-500">
+                    return <p className="text-[13px] text-slate-500">
                       Drawn length <span className="font-mono">{fmtDist(km, 2)} {DU()}</span>
                       {sp > 0
                         ? <> · at {(+speed(sp)).toFixed(0)} {SPD()} that is <span className="font-mono">{(km / sp * 60).toFixed(0)} min</span> each way</>
                         : <> · no speed set, so this stretch adds no time to the cycle</>}
-                    </p>;
-                  })()}
-                  {!isHaul(zoneForm) && drawPts.length >= 3 && (() => {
-                    const lons = drawPts.map(p => p[0]), lats = drawPts.map(p => p[1]);
-                    const w = Math.min(...lons), e2 = Math.max(...lons), so = Math.min(...lats), n = Math.max(...lats);
-                    return <p className="text-[11px] font-mono text-slate-500 break-all">
-                      Sent to HERE as bbox:{w.toFixed(4)},{so.toFixed(4)},{e2.toFixed(4)},{n.toFixed(4)}
                     </p>;
                   })()}
                 </div>
@@ -12480,16 +12258,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 disabled:opacity-40">Cancel</button>
                 </div>
                 {zoneForm.affects_routing && !isHaul(zoneForm) && (
-                  <p className="text-[11px] text-amber-700">
-                    Saving clears the stored route this zone invalidates and immediately re-routes it — one
-                    HERE call per leg. The count is reported as it runs.
+                  <p className="text-[13px] text-amber-700">
+                    Saving works out again every route that crosses this zone.
                   </p>
                 )}
                 {isHaul(zoneForm) && (
-                  <p className="text-[11px] text-amber-700">
+                  <p className="text-[13px] text-amber-700">
                     {zoneForm.id
-                      ? "Saving re-routes every leg routed through this road, and every leg of every route it is attached to. A spliced road costs two HERE calls per leg, not one — the count is reported before it runs."
-                      : "A new haul road is attached to nothing, so saving re-routes nothing. Attach it to a route on the Routes tab to make it do something."}
+                      ? "Saving works out again every route through this road."
+                      : "A new haul road changes nothing until it is attached to a route (Routes page)."}
                   </p>
                 )}
               </div>
@@ -12569,14 +12346,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           onChange={() => (editingRoute ? toggleEVehicle(v) : toggleRVehicle(v))}
                           style={{ accentColor: "var(--navy)" }} />
                         {vehLabel(v)}
-                        {tag && <span className="text-[10px] font-semibold" style={{ color: tag[1] }}>· {tag[0]}</span>}
+                        {tag && <span className="font-semibold" style={{ color: tag[1] }}>· {tag[0]}</span>}
                       </label>
                     );
                   })}
                 </div>
                 {editingRoute && (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Removing a vehicle deletes both legs and every alternative for it on this route. Adding one costs HERE calls.
+                  <p className="text-[13px] text-slate-400 mt-1">
+                    Unticking a vehicle deletes its route and alternatives here.
                   </p>
                 )}
               </div>
@@ -12616,14 +12393,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               </button>
               )}
               {routeMsg && <p className="text-xs text-slate-500">{routeMsg}</p>}
-              <p className="text-[11px] text-slate-400">Destinations sharing no material with the origin are greyed out. Ticked vehicles are routed through HERE as soon as the route is created.</p>
+              <p className="text-[13px] text-slate-400">Destinations with no shared material are greyed out. Ticked vehicles are routed when the route is created.</p>
               {editingRoute && <RoutePlanning route={(status || []).find(r => r.id === editingRoute) || {}} token={token} onSaved={reloadNetwork} />}
               {editingRoute && <RouteSheetText route={(status || []).find(r => r.id === editingRoute) || {}} token={token} onSaved={reloadNetwork} />}
             </div>
           </div>
           )}
-
-          <Diagnostics token={token} routeId={selected} />
 
           <div className="card p-4">
             <div className="text-sm font-semibold text-slate-700 mb-2">Legend</div>
@@ -12647,15 +12422,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   backgroundImage: `repeating-linear-gradient(to right, ${FAILED_COLOR} 0 4px, transparent 4px 7px)` }} />No route found
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">Routes are drawn one colour here — this view is about the shape of the network. Material colouring lives on the Dashboard and the public map.</p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Every route is routed twice: laden out, empty back — the empty lorry is lighter,
-              so it can use roads the loaded one legally can't. A green vehicle chip means both
-              directions are stored; <span className="font-semibold">amber ↦</span> means only the
-              outbound is, which is enough to draw but not to work out a cycle time. Open a route
-              row (▶) for the haul-cycle figures.
+            <p className="text-[13px] text-slate-400 mt-2">One colour here: this page shows the network's shape.</p>
+            <p className="text-[13px] text-slate-400 mt-1">
+              Each route has a laden leg out and an empty leg back. Green vehicle chip: both worked out;{" "}
+              <span className="font-semibold">amber ↦</span>: outbound only, no cycle time yet. Open a row (▶) for the cycle figures.
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia ortho" : "Satellite"} to see routes sit exactly on the roads.</p>
+            <p className="text-[13px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia ortho" : "Satellite"} to see routes sit exactly on the roads.</p>
           </div>
         </div>
       </div>
