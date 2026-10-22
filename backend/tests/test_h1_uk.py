@@ -736,7 +736,8 @@ ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the
    and "lorry-km      = trips × the routed (baked) route distance" in read("frontend/help/technical/index.html")
    and "+ {DU()} × running" in fe and "+ km × running" not in fe)
 ok("🔴 the route form's rate help names no country and reads the tenant's unit",
-   "usual Estonian quote" not in fe and "per-{DU()} rate is a common haulage quote" in fe)
+   # NARROWED 22 Oct 2026 (UI fix 7, the user: fewer words): the help is one line and names no unit at all
+   "usual Estonian quote" not in fe and 'Rates are added together. Blank = the target rate from Config, marked "target".' in fe)
 # NARROWED 11 Oct 2026 (review): the column is gated on vehLangEditable("ee") — the COUNTRY rule alone. Gated on
 # vehLangShown("ee") it also needed a vehicle to carry an Estonian name already, so an Estonian organisation on
 # the new seed (English names only) could never type its first one. The header buttons keep vehLangShown.
@@ -1060,7 +1061,8 @@ for _a in _ACC:
 ok("...in the dark look --control-fg reads 4.5:1 on both fills in every accent (#1F2024 on #FF8C14 6.99:1, on #FFA10A 8.02:1; #141518 on #5B8FF0 5.77:1, on #8FB3F5 8.64:1) — the Ink/Light --blue fill stays white (3.68:1 on #3B82F6, the gate-place toggle; not this fix)",
    not _bad1 and round(_cr("#1F2024", "#FF8C14"), 2) == 6.99 and round(_cr("#FFFFFF", "#FF8C14"), 2) == 2.33, "; ".join(_bad1))
 ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values went with UI fix 4 (decision 3, 17 Oct)",
-   '<div className="text-[10px] uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
+   # NARROWED 22 Oct 2026 (UI fix 7): the labels are 12 px now (text-xs)
+   '<div className="text-xs uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
    and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' not in fe
    and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}' in fe)
 
@@ -1154,7 +1156,8 @@ ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-
    and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2
    and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
 ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
-   ".rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
+   # NARROWED 22 Oct 2026 (UI fix 7, card 9, the user's choice): 12 px
+   ".rail-group{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
    and round(_cr(_over("rgba(100,116,139,.85)", "#FAFAF9"), "#FAFAF9"), 2) == 3.45
    and "9aa1ac" not in fe.lower() and round(_cr("#9AA1AC", "#FFFFFF"), 2) == 2.60
    and '"#94a3b8"' not in fe and 'style={{ color: tone || "var(--muted)" }}>{title}</div>' in fe

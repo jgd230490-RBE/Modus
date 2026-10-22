@@ -833,8 +833,10 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
     # the desk rule the phone rule builds on is as it was: 5 px rows in a fixed 280 px column
     ok3("decision 10 (%s): the desk contents are untouched — a fixed 280 px column, 5 px 8 px rows" % _nm,
         "#nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;" in _pg and "#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}" in _pg)
-ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19)",
-   len(re.findall(r'<li class="l[12]"', src)) == 59 and len(re.findall(r'<li class="l[12]"', _tg2)) == 19)
+# NARROWED 22 Oct 2026 (UI fix 7): the technical guide gains one row, T2 "What the screens leave out"
+ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19, + 1 since UI fix 7)",
+   len(re.findall(r'<li class="l[12]"', src)) == 59 and len(re.findall(r'<li class="l[12]"', _tg2)) == 20
+   and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
