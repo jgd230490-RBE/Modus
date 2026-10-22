@@ -977,6 +977,54 @@ ok("STRUCTURES: an unrouted movement cannot be checked (draw first); with no fet
    and "OpenStreetMap" in AR.STRUCTURES_WORDS and "the survey decides" in AR.STRUCTURES_WORDS
    and A.delete(_nr["id"], PLANNER)["ok"] and AR.check_structures("AL999", _structures=[])["error"] == "no such abnormal load")
 AR.check_structures(_b["id"], by="Planner", _structures=FEATS, _fetched="2026-10-23T09:00:00Z")
+# ---- 22 Oct 2026 (phase 3, D73): the documents — the notice calendar (XLSX / PDF) and the ESDAL details sheet ---------
+import abnormal_docs as AD  # noqa: E402
+import io as _io  # noqa: E402
+import openpyxl as _openpyxl  # noqa: E402
+from portable import pdf_text as _pdf_text  # noqa: E402
+_C = AD.calendar(PLANNER, today="2027-01-15", generated="2027-01-15T09:00:00Z")
+_ids = [r["id"] for r in _C["rows"]]
+_key = {r["id"]: (r["notify_by"] or "9999-12-31", r["apply_by"] or "9999-12-31", r["date_from"] or "", r["id"]) for r in _C["rows"]}
+_u_row = next(r for r in _C["rows"] if r["id"] == _u["id"])
+_u_adv = A.decorate(A.get(_u["id"]), today=R._date("2027-01-15"))["advice"]
+ok("⭐ CALENDAR: one row a movement the caller may see, withdrawn ones out, sorted by notify-by, then apply-by, then the window; the units' row carries its size, its from → to, its window, the police date and the same notify-by as the advice; a team login's calendar is its own team's",
+   _C["count"] == len(_C["rows"]) >= 3 and all(r["status_key"] != "withdrawn" for r in _C["rows"]) and _ids == sorted(_ids, key=lambda i: _key[i])
+   and _u_row["size"] == "4.6 × 3.9 × 16.5 m · 40 t" and "→" in _u_row["from_to"] and _u_row["window"] == "12–14 Apr 2027"
+   and _u_row["police_by"] and _u_row["notify_by"] == _u_adv["notify_by"] and _u_row["status"] == "Approved"
+   and {r["id"] for r in AD.calendar(NORTH, today="2027-01-15")["rows"]} == {m["id"] for m in A.rows(NORTH) if m["status"] != "withdrawn"}
+   and _C["today"] == "2027-01-15" and "GOV.UK bank holidays" in _C["holidays"] and AD.calendar_file_name(_C, "xlsx") == "abnormal-loads-notice-calendar-2027-01-15.xlsx",
+   str([(r["id"], r["notify_by"], r["apply_by"]) for r in _C["rows"]]))
+_wb = _openpyxl.load_workbook(_io.BytesIO(AD.build_calendar_xlsx(_C)))
+_ws = _wb["Notice calendar"]
+_hrow = next(i for i in range(1, 12) if _ws.cell(row=i, column=1).value == "Load")
+ok("CALENDAR as XLSX: the rows under one header on the first sheet (every column named), About on the second with the bank holidays' source and the advice words",
+   _wb.sheetnames == ["Notice calendar", "About"] and [_ws.cell(row=_hrow, column=j).value for j in range(1, len(AD.CALENDAR_HEAD) + 1)] == AD.CALENDAR_HEAD
+   and str(_ws.cell(row=_hrow + 1, column=1).value).startswith(_ids[0] + " · ") and _ws.cell(row=_hrow + len(_ids), column=16).value in ("Pending", "Approved", "Notified", "Moved")
+   and any(_wb["About"].cell(row=i, column=1).value == "Bank holidays" and "GOV.UK" in str(_wb["About"].cell(row=i, column=2).value) for i in range(1, 14))
+   and any("Advice worked out" in str(_wb["About"].cell(row=i, column=2).value) for i in range(1, 14)), str([_ws.cell(row=_hrow + 1, column=j).value for j in range(1, 6)]))
+_cpdf = AD.build_calendar_pdf(_C)
+_ct = " ".join(_pdf_text(_cpdf).split())
+ok("CALENDAR as PDF: A4 landscape, the title, the sub line with the count and the sorting, every load's id in the table, the column heads, the advice and the not-modelled words",
+   _cpdf[:4] == b"%PDF" and "notice calendar" in _ct and f"{_C['count']} abnormal loads as at 15 Jan 2027" in _ct and "Sorted by the date the first notice" in _ct
+   and all(i in _ct for i in _ids) and "Police notice by" in _ct and "Notify by" in _ct and "Advice worked out from the typed figures" in _ct
+   and "Not worked out here" in _ct, _ct[:400])
+_S = AD.esdal_sheet(_b["id"], PLANNER, today="2027-01-15", generated="2027-01-15T09:00:00Z")
+ok("⭐ ESDAL SHEET: one movement's data — the haulier's blanks, the load, the dimensions and weights as typed, the route with its roads once drawn, the notices as advised, the references, every pinch point with its grade (the planner's own marked), the words that say it is not an application",
+   _S and _S["id"] == _b["id"] and _S["fill_in"][0] == ("Haulier", "") and ("Overall length", "36 m") in _S["dims"] and ("Overall width", f"{AD._nw(A.get(_b['id'])['width_m'])} m") in _S["dims"]
+   and _S["notices"][1] == ("Permission", "Special Order (BE16): apply 10 weeks ahead (the aide memoire; the BE16 form itself says 8: plan on 10)")
+   and next(r for r in _C["rows"] if r["id"] == _b["id"])["permission"].startswith("Special Order (BE16)") and _u_row["permission"] == "none beyond the notices"
+   and _S["weights"][0] == ("Gross weight", "78 t") and ("Axles", "8") in _S["weights"] and _S["load"][-1] == ("Vehicle type", "Modular trailer")
+   and _S["route"][0][0] == "From" and "Roman Way" in _S["route"][3][1] and "STGO" in _S["notices"][0][1] and _S["notices"][5][0] == "Notify by"
+   and any(x.startswith("T1 · Welland bridge: Arch bridge") and "(the planner's own)" in x and "Red" in x for x in _S["pinch"]) and len(_S["pinch"]) >= 8
+   and "not an application" in _S["words"]["sheet"] and AD.esdal_file_name(_S) == f"esdal-details-{_b['id']}.pdf"
+   and AD.esdal_sheet("AL999", PLANNER) is None and (AD.esdal_sheet(_u["id"], NORTH) is None) == (not A._visible(A.get(_u["id"]), NORTH)),
+   str(_S and (_S["dims"], _S["weights"], _S["notices"][:3], _S["pinch"][:3])))
+_epdf = AD.build_esdal_pdf(_S)
+_et = " ".join(_pdf_text(_epdf).split())
+ok("ESDAL SHEET as PDF: the title, the sections, the typed figures, the roads, the planner's pinch point, the not-an-application words, the advice words",
+   _epdf[:4] == b"%PDF" and "ESDAL details sheet" in _et and "For the haulier to fill in" in _et and "Overall length" in _et and "36 m" in _et
+   and "Roman Way" in _et and "Welland bridge" in _et and "not an application" in _et and "Advice worked out from the typed figures" in _et
+   and "Potential pinch points" in _et, _et[:400])
 _main3 = read("backend/main.py")
 ok("ENDPOINTS: GET /api/abnormal/summary (any sign-in) and PUT /api/abnormal/{id}/pinch (an approver), the summary before the {movement_id} read",
    re.search(r'@app\.get\("/api/abnormal/summary"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
@@ -988,6 +1036,13 @@ ok("ENDPOINTS (phase 3): POST /api/abnormal/{id}/structures (an approver, no HER
    and 'return abnormal_route.feature_collection(ms, public=True)' in _main3 and A.PUBLIC_STATUSES == ("approved", "notified", "moved")
    and A.STAFF_VIEW == {"role": "planner", "ipt": None, "label": "Staff (map)"} and 'acc = abnormal.STAFF_VIEW' in _main3
    and '"/api/public/",' in read("backend/gate.py"))
+ok("ENDPOINTS (phase 3, D73): GET /api/abnormal/calendar.xlsx and .pdf (any sign-in, declared before the {movement_id} read) and GET /api/abnormal/{id}/esdal.pdf (any sign-in that may see it; 404 otherwise); each a file with a name and no-store",
+   re.search(r'@app\.get\("/api/abnormal/calendar\.xlsx"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
+   and re.search(r'@app\.get\("/api/abnormal/calendar\.pdf"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
+   and re.search(r'@app\.get\("/api/abnormal/\{movement_id\}/esdal\.pdf"\)\ndef \w+\(movement_id: str\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
+   and _main3.index('"/api/abnormal/calendar.xlsx"') < _main3.index('@app.get("/api/abnormal/{movement_id}")')
+   and _main3.count('abnormal_docs.calendar_file_name(C, ') == 2 and 'raise HTTPException(404, "no such abnormal load")' in _main3[_main3.index('def abnormal_esdal_pdf'):][:900]
+   and _main3[_main3.index('def abnormal_calendar_xlsx'):].count('"Cache-Control": "no-store"') >= 3)
 
 try:
     remove_scratch_db(db, TMP)

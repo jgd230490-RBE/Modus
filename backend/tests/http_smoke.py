@@ -1821,6 +1821,15 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and _ck.get("/api/abnormal").status_code == 401, str(_cm))
     ok("...the collection with the cookie carries every movement a planner sees once drawn: none drawn here (no HERE key), so count 0 both ways, and the cookie's read is byte-identical to the header's",
        _ck.get("/api/abnormal/geojson").json() == c.get("/api/abnormal/geojson", headers=PLAN).json())
+    _cal = c.get("/api/abnormal/calendar.xlsx", headers=PLAN)
+    _calp = c.get("/api/abnormal/calendar.pdf", headers=PLAN)
+    _es = c.get(f"/api/abnormal/{_cm}/esdal.pdf", headers=PLAN)
+    ok("abnormal loads, phase 3 (D73): the notice calendar as XLSX and PDF and a movement's ESDAL details sheet — any sign-in (401 signed out), the right media types and file names, a missing movement a 404",
+       c.get("/api/abnormal/calendar.xlsx").status_code == 401 and c.get(f"/api/abnormal/{_cm}/esdal.pdf").status_code == 401
+       and _cal.status_code == 200 and "spreadsheetml" in _cal.headers.get("content-type", "") and "notice-calendar" in _cal.headers.get("content-disposition", "")
+       and _calp.status_code == 200 and _calp.headers.get("content-type") == "application/pdf" and _calp.content[:4] == b"%PDF"
+       and _es.status_code == 200 and _es.content[:4] == b"%PDF" and f"esdal-details-{_cm}" in _es.headers.get("content-disposition", "")
+       and c.get("/api/abnormal/AL999/esdal.pdf", headers=PLAN).status_code == 404, f"{_cal.status_code} {_calp.status_code} {_es.status_code}")
     _chk = c.post(f"/api/abnormal/{_cm}/structures", headers=dict(PLAN, **{"X-Wayscope": "1"}))
     ok("abnormal loads, phase 3: Check the roads again — a team code may not (403), a missing movement is a 404, an unrouted one a 400 in words (draw first), no HERE call needed",
        c.post(f"/api/abnormal/{_cm}/structures", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403

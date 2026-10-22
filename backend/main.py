@@ -3049,6 +3049,58 @@ def abnormal_create(body: AbnormalIn):
     return _abnormal_result(abnormal.create(sent, acc, by=acc.get("name") or acc.get("label")))
 
 
+@app.get("/api/abnormal/calendar.xlsx")
+def abnormal_calendar_xlsx():
+    """22 Oct 2026 (phase 3, D73): the NOTICE CALENDAR as an XLSX — one row a movement the caller may see (a team login
+    its own team's), sorted by the date the first notice must be received. Any sign-in."""
+    acc = _require_access()
+    import abnormal_docs
+    from fastapi.responses import Response
+    C = abnormal_docs.calendar(acc)
+    try:
+        data = abnormal_docs.build_calendar_xlsx(C)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{abnormal_docs.calendar_file_name(C, "xlsx")}"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/api/abnormal/calendar.pdf")
+def abnormal_calendar_pdf():
+    """The same calendar as an A4 landscape PDF."""
+    acc = _require_access()
+    import abnormal_docs
+    from fastapi.responses import Response
+    C = abnormal_docs.calendar(acc)
+    try:
+        data = abnormal_docs.build_calendar_pdf(C)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{abnormal_docs.calendar_file_name(C, "pdf")}"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/api/abnormal/{movement_id}/esdal.pdf")
+def abnormal_esdal_pdf(movement_id: str):
+    """22 Oct 2026 (phase 3, D73): one movement's ESDAL DETAILS SHEET — the fields ESDAL and the notices ask for, as advised,
+    for the haulier to copy across. Nothing is submitted. Any sign-in that may see the movement (404 otherwise)."""
+    acc = _require_access()
+    import abnormal_docs
+    from fastapi.responses import Response
+    S = abnormal_docs.esdal_sheet(movement_id, acc)
+    if not S:
+        raise HTTPException(404, "no such abnormal load")
+    try:
+        data = abnormal_docs.build_esdal_pdf(S)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{abnormal_docs.esdal_file_name(S)}"',
+                             "Cache-Control": "no-store"})
+
+
 @app.get("/api/abnormal/summary")
 def abnormal_summary():
     """The Dashboard's strip (phase 2): loads in the next 4 weeks, notices due or late this week, permissions still to

@@ -833,8 +833,19 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
     # the desk rule the phone rule builds on is as it was: 5 px rows in a fixed 280 px column
     ok3("decision 10 (%s): the desk contents are untouched — a fixed 280 px column, 5 px 8 px rows" % _nm,
         "#nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;" in _pg and "#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}" in _pg)
-ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19)",
-   len(re.findall(r'<li class="l[12]"', src)) == 59 and len(re.findall(r'<li class="l[12]"', _tg2)) == 19)
+# NARROWED 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 (one row + three sections) and the technical guide's T1 entry
+ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 + 4 and 19 + 1 since the abnormal loads' chapter, 22 Oct)",
+   len(re.findall(r'<li class="l[12]"', src)) == 63 and len(re.findall(r'<li class="l[12]"', _tg2)) == 20)
+ok("⭐ 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 — planning one, the route and the potential pinch points, where they show and the documents — says advice never permission, lorry never truck, counted apart; its three rows in the contents; the technical guide's T1 entry names the sources, the calendars, HERE's parameters, the structures pass and what is not modelled",
+   '<h1 id="14-abnormal-loads">14. Abnormal loads</h1>' in src and src.count('<h2 id="14-') == 3
+   and '<li class="l1"><a href="#14-abnormal-loads">14. Abnormal loads</a></li>' in src and src.count('<li class="l2"><a href="#14-') == 3
+   and "Advice, never permission" in src and "ESDAL, the police and the road and bridge authorities decide" in src and "counted apart" in src
+   and "Check the roads again" in src and "Notice calendar" in src and "ESDAL details sheet" in src and "approved movements only" in src
+   and not re.search(r"trucks?", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
+   and not re.search(r"(compliant|approved by|real-time|optimi[sz]e|predict)", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
+   and '<h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>' in _tg2 and '<li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li>' in _tg2
+   and "STGO 2003 Schedule 1" in _tg2 and "osm_structures" in _tg2 and "vehicle[grossWeight / weightPerAxle / height / width / length / axleCount]" in _tg2
+   and "/api/public/abnormal" in _tg2 and "Not modelled" in _tg2)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

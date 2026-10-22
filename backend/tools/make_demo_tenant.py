@@ -607,7 +607,18 @@ def build(with_areas=False, out=None):
         vendor="Welland Ready-Mix Ltd (fictional)",
         detail="Ready-mixed concrete for the southern structures (Langton and Harborough Compounds), commissioned May "
                "2027. Fictional: no such plant.")
-    assert [loc[k] for k in ("Q1", "BP", "AP", "WR")] == ["L001", "L014", "L015", "L016"], loc
+    # 22 Oct 2026 (D75, abnormal loads phase 3): where the three fictional abnormal loads start. The precast works beside
+    # the A47 west of Earl Shilton (Hinckley and Bosworth; the HERE probe's point C) sends the 32 m bridge beams; the crane
+    # depot off the A46 at Syston sends the 250 t-class crane for the beam lift. Neither carries a lorry line.
+    add("EP", "Earl Shilton Precast Works (fictional)", "origin", "Precast works", -1.3290, 52.5765, supplies=[PRECAST],
+        vendor="Wolds Precast Ltd (fictional)",
+        detail="Precast bridge beams, parapet and culvert units. Beams over 27.4 m long go as Special Order abnormal loads "
+               "(the Melton junction bridges). Fictional: no such works.")
+    add("CD", "Soar Valley Crane Hire (fictional)", "origin", "Depot", -1.0790, 52.7030,
+        vendor="Soar Valley Crane Hire Ltd (fictional)",
+        detail="Mobile cranes for the beam lifts; the 250 t-class crane travels in and out as an abnormal load in its own right. "
+               "Fictional: no such depot.")
+    assert [loc[k] for k in ("Q1", "BP", "AP", "WR", "EP", "CD")] == ["L001", "L014", "L015", "L016", "L017", "L018"], loc
 
     # --- routes (R001–R043, in ROUTES order) -------------------------------------------
     team_of = {"C1": "IPT3", "C2": "IPT2", "C3": "IPT1", "C4": "IPT1", "S1": "IPT3", "S2": "IPT1", "S3": "IPT1",
@@ -1106,6 +1117,44 @@ def build(with_areas=False, out=None):
     for name, geom, kind, s_on, e_on, note in ADVISORY:
         z = zones.create_zone(name, geom, kind=kind, affects_routing=False, starts_on=s_on, ends_on=e_on, note=note)
         assert "error" not in z, z
+
+    # --- D75 (22 Oct 2026, abnormal loads phase 3): three fictional abnormal loads ------------------------------------
+    # Each is its own planned movement (D66a), counted apart from the lorries (D70, D71), unrouted in the package: a
+    # planner presses Draw the route on live (one HERE call each; the demo's HERE key lives on Render). Statuses: the
+    # units approved (so the public map shows one once drawn, D68), the crane and the beams pending (a planner's call).
+    G["EP"] = gate("EP", "Works gate", 140, -80, "both", default=True, safety=3, internal=4,
+                   note="Beams are loaded on the yard's gantry; the escort forms up on the works road (fictional).")
+    G["CD"] = gate("CD", "Depot gate", -120, 60, "both", default=True, safety=3, internal=3)
+    import abnormal
+    PLANNER_ACC = {"role": "planner", "ipt": None, "label": "Planner"}
+    ABNORMAL_LOADS = [
+        ("approved", {"name": "Modular office units, 4.6 m wide, for Langton Compound", "ipt": "IPT2", "origin_id": loc["RH"],
+                      "origin_gate_id": G["RH"], "dest_id": loc["C2"], "dest_gate_id": G["C2"], "date_from": "2027-03-08", "date_to": "2027-03-12",
+                      "time_band": "day", "movements": 1, "width_m": 4.6, "height_m": 3.9, "length_m": 16.5, "gross_t": 40.0, "max_axle_t": 9.0,
+                      "axle_count": 6, "vehicle_type": "low_loader", "indivisible": True, "escort_planned": "private",
+                      "note": "Two-storey office units for the compound set-up, rail-delivered to the terminal; 4.6 m wide so the police are "
+                              "told and an escort goes with it (fictional)."}),
+        ("pending", {"name": "250 t-class mobile crane for the Melton beam lift, in and out", "ipt": "IPT1", "origin_id": loc["CD"],
+                     "origin_gate_id": G["CD"], "dest_id": loc["C4"], "dest_gate_id": G["C4"], "date_from": "2027-04-05", "date_to": "2027-04-06",
+                     "time_band": "day", "movements": 2, "return_abnormal": True, "width_m": 3.0, "height_m": 4.0, "length_m": 16.0,
+                     "gross_t": 72.0, "max_axle_t": 12.0, "axle_count": 6, "vehicle_type": "mobile_crane", "indivisible": True,
+                     "escort_planned": "none",
+                     "note": "Travels under its own power at 72 t (STGO Category 2); the counterweight comes as ordinary loads. Back out "
+                             "after the lift (fictional)."}),
+        ("pending", {"name": "32 m precast bridge beams for the Melton junction bridges", "ipt": "IPT1", "origin_id": loc["EP"],
+                     "origin_gate_id": G["EP"], "dest_id": loc["C4"], "dest_gate_id": G["C4"], "date_from": "2027-04-12", "date_to": "2027-04-14",
+                     "time_band": "night", "movements": 9, "width_m": 2.8, "height_m": 4.2, "length_m": 36.0, "gross_t": 78.0, "max_axle_t": 11.0,
+                     "axle_count": 8, "vehicle_type": "modular_trailer", "indivisible": True, "escort_planned": "private",
+                     "note": "Nine beams, one a night, for the A606 overbridge deck; 36 m overall, so a Special Order (over 30 m), applied "
+                             "for ten weeks ahead; the A606 night closures are booked for the lift (fictional)."}),
+    ]
+    for status, body in ABNORMAL_LOADS:
+        r = abnormal.create(body, PLANNER_ACC, by="tools/make_demo_tenant.py")
+        assert r.get("ok"), r
+        if status != "pending":
+            st = abnormal.set_status(r["movement"]["id"], status, PLANNER_ACC, by="tools/make_demo_tenant.py")
+            assert st.get("ok"), st
+    assert [m["id"] for m in abnormal.rows(PLANNER_ACC)] == ["AL001", "AL002", "AL003"]
 
     # --- D105: the carbon target, shipped -----------------------------------------------------------------------
     # A % target agreed at programme start from two decisions: Langton's surplus cut to the soil recycling hub (R019 →
