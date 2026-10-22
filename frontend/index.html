@@ -1008,6 +1008,89 @@ function postJSON(path, body){
     }, () => { throw { status: 0, detail: "" }; });
 }
 
+// ---- A failed reply in words (22 Oct 2026, claude/error-words) ---------------------------------------------------
+// The approved mockup notes\ui-fix-errors-mockup-1022\: a message on screen is "what did not happen." plus ONE "why"
+// sentence from errWords, never a status number, JSON or an HTML page. The raw reply goes to the browser console
+// (F12, a line starting "Wayscope:") for whoever has to debug it. Every failure path in this file goes through these.
+const ERR_WORDS = {
+  admin: "Not allowed: sign in as an admin, or type the admin token.",
+  signedOut: "You are signed out. Sign in again.",
+  invalid: "A value was not accepted. Check the form and try again.",
+  notFound: "Not found. Reload the page and try again.",
+  tooMany: "Too many tries. Wait a minute and try again.",
+  failed: "Wayscope could not do this just now. Try again in a minute.",
+  noAnswer: "No answer from Wayscope. Check your connection and try again.",
+};
+// the server's own sentence, as a sentence: a capital letter and a full stop
+function errSentence(t){
+  t = String(t == null ? "" : t).trim();
+  if(!t) return "";
+  t = t[0].toUpperCase() + t.slice(1);
+  return /[.!?…]$/.test(t) ? t : t + ".";
+}
+// status: the reply's HTTP status (0 = no answer); body: its text, or its JSON already parsed
+function errWords(status, body){
+  let j = body;
+  if(typeof body === "string"){ try { j = JSON.parse(body); } catch(e){ j = null; } }
+  const d = (j && typeof j === "object") ? j.detail : undefined;
+  const said = typeof d === "string" ? d : ((j && typeof j === "object" && typeof j.error === "string") ? j.error : "");
+  if(!status) return ERR_WORDS.noAnswer;
+  // Q1: a refusal about the admin token, or one that says nothing; a planner-only refusal keeps its own sentence
+  if(status === 403) return (!said || /token/i.test(said)) ? ERR_WORDS.admin : errSentence(said);
+  if(said) return errSentence(said);
+  if(d && typeof d === "object" && !Array.isArray(d)){
+    const v = Object.values(d).find(x => typeof x === "string");
+    if(v) return errSentence(v);
+  }
+  if(status === 422 || Array.isArray(d)) return ERR_WORDS.invalid;
+  if(status === 401) return ERR_WORDS.signedOut;
+  if(status === 404) return ERR_WORDS.notFound;
+  if(status === 429) return ERR_WORDS.tooMany;
+  return ERR_WORDS.failed;
+}
+function errLog(where, status, body){
+  try { console.warn("Wayscope:", where || "", status, typeof body === "string" ? body.slice(0, 2000) : body); } catch(e){}
+}
+// an Error that already carries the words (errMsg passes it through unchanged)
+function errOf(status, body, tail){
+  errLog("", status, body);
+  const w = errWords(status, body);
+  const e = new Error(tail ? w.replace(/[.!?…]$/, "") + tail + "." : w);
+  e.status = status; e.words = true;
+  return e;
+}
+// a failed fetch Response -> that Error; the raw reply to the console
+async function errFrom(r){
+  let txt = "";
+  try { txt = await r.text(); } catch(e){}
+  errLog(r.url, r.status, txt);
+  const e = new Error(errWords(r.status, txt));
+  e.status = r.status; e.words = true;
+  return e;
+}
+// fetch(…).then(okJSON): the JSON of a 2xx reply, otherwise the words as an Error
+async function okJSON(r){
+  if(r.ok) return r.json();
+  throw await errFrom(r);
+}
+// anything a catch receives -> the "why" sentence
+function errMsg(e){
+  if(e && e.words) return e.message;
+  const kind = e && typeof e === "object" ? e.name : "";   // by name, not instanceof: true across frames too
+  if(kind === "TypeError"){   // fetch's own "Failed to fetch" (offline) — or a fault in this page
+    errLog("", 0, String(e.message));
+    return /fetch|network|load failed/i.test(String(e.message)) ? ERR_WORDS.noAnswer : ERR_WORDS.failed;
+  }
+  if(kind === "SyntaxError"){ errLog("", 0, String(e.message)); return ERR_WORDS.failed; }   // a reply that is not JSON
+  if(typeof e === "number") return errWords(e, "");
+  if(e && typeof e === "object" && !("message" in e) && "status" in e)   // postJSON's {status, detail}
+    return errWords(e.status, e.detail ? { detail: e.detail } : "");
+  if(e && e.message) return errSentence(e.message);   // a sentence this page threw itself
+  return ERR_WORDS.failed;
+}
+// "Not saved." + why
+function errSay(what, e){ return `${what} ${errMsg(e)}`; }
+
 // ---- Appearance (5 Oct 2026) ----------------------------------------------------
 // Three looks — "ink" (the 29 Sep rebrand, default), "light" (white header bar), "dark"
 // (dark surfaces, orange controls) — set as html[data-theme] and read as CSS tokens (see
@@ -2007,9 +2090,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   useEffect(() => {
     if(initialWeek) return;
     let live = true;
-    fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+    fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`).then(okJSON).then(j => {
       if(live){ setWeek(j); setWeekErr(""); }
-    }).catch(e => { if(live) setWeekErr(`Couldn't load this week (${e}).`); });
+    }).catch(e => { if(live) setWeekErr(errSay("Couldn't load this week.", e)); });
     return () => { live = false; };
   }, [tick]);
   // the carbon target: its own read, so a failure never hides the programme figures. Once on
@@ -2865,9 +2948,9 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
   useEffect(() => {
     let live = true;
     fetch(`${API}/stockpiles?from_month=${thisM}&to_month=${toM}`)
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(okJSON)
       .then(j => { if(live){ setData(j); setErr(""); } })
-      .catch(e => { if(live) setErr(`Couldn't load stock (${e}).`); });
+      .catch(e => { if(live) setErr(errSay("Couldn't load stock.", e)); });
     return () => { live = false; };
   }, [thisM, toM, tick]);
   const sps = (data && data.stockpiles) || [];
@@ -3109,10 +3192,7 @@ function ClpMonitoring({ months, initial }){
     try {
       const r = await fetch(`${API}/clp/pack.${ext}?month=${month}`);
       if(!r.ok){
-        const txt = await r.text();
-        let d = "";
-        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
-        throw new Error(d || `error ${r.status}`);
+        throw await errFrom(r);
       }
       const blob = await r.blob();
       const cd = (r.headers && r.headers.get && r.headers.get("Content-Disposition")) || "";
@@ -3122,7 +3202,7 @@ function ClpMonitoring({ months, initial }){
       a.download = m ? m[1] : `wayscope-clp-pack.${ext}`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    } catch(e){ setPackErr("The CLP pack could not be made: " + (e.message || e)); }
+    } catch(e){ setPackErr(errSay("The CLP pack could not be made.", e)); }
     setPackBusy("");
   };
   const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
@@ -3201,10 +3281,7 @@ function BulletinMenu({ months }){
     try {
       const r = await fetch(`${API}/bulletin/month.pdf?month=${m}`);
       if(!r.ok){
-        const txt = await r.text();
-        let d = "";
-        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
-        throw new Error(d || `error ${r.status}`);
+        throw await errFrom(r);
       }
       const blob = await r.blob();
       const a = document.createElement("a");
@@ -3212,7 +3289,7 @@ function BulletinMenu({ months }){
       a.download = `bulletin-${months.start_year + Math.floor((m - 1) / 12)}-${String((m - 1) % 12 + 1).padStart(2, "0")}.pdf`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    } catch(e){ setErr("The bulletin could not be made: " + (e.message || e)); }
+    } catch(e){ setErr(errSay("The bulletin could not be made.", e)); }
     setBusy(false);
   };
   return (
@@ -3667,9 +3744,9 @@ function CommunityPanel({ access }){
   const start = () => {
     setMsg("Starting…");
     fetch(`${API}/community/refresh`, { method: "POST" })
-      .then(r => r.json().then(j => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(j.detail || "Not started."); })
-      .catch(e => setMsg("Not started: " + (e && e.message || e)));
+      .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, j })))
+      .then(({ ok, status, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(errSay("Not started.", errOf(status, j))); })
+      .catch(e => setMsg(errSay("Not started.", e)));
   };
   const day = (s) => { if(!s) return "—"; const d = new Date(s.length > 10 ? s : s + "T12:00:00Z"); return isNaN(d) ? s : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
   return (
@@ -3720,9 +3797,9 @@ function CollisionPanel({ access }){
   const start = () => {
     setMsg("Starting…");
     fetch(`${API}/collisions/refresh`, { method: "POST" })
-      .then(r => r.json().then(j => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(j.detail || "Not started."); })
-      .catch(e => setMsg("Not started: " + (e && e.message || e)));
+      .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, j })))
+      .then(({ ok, status, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(errSay("Not started.", errOf(status, j))); })
+      .catch(e => setMsg(errSay("Not started.", e)));
   };
   const day = (s) => { if(!s) return "—"; const d = new Date(s.length > 10 ? s : s + "T12:00:00Z"); return isNaN(d) ? s : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
   return (
@@ -3790,10 +3867,7 @@ function RouteMapExportMenu({ months, ipts, picked }){
       if(addColl) q.set("collisions", "1");
       const r = await fetch(`${API}/routes/map-export.${kind}?${q.toString()}`);
       if(!r.ok){
-        const txt = await r.text();
-        let d = "";
-        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
-        throw new Error(d || `error ${r.status}`);
+        throw await errFrom(r);
       }
       const blob = await r.blob();
       const cd = r.headers.get("content-disposition") || "";
@@ -3803,7 +3877,7 @@ function RouteMapExportMenu({ months, ipts, picked }){
       a.download = fm ? fm[1] : `route-map.${kind}`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    } catch(e){ setErr("The route map could not be made: " + (e.message || e)); }
+    } catch(e){ setErr(errSay("The route map could not be made.", e)); }
     setBusy(false);
   };
   const noPlace = !!(spec && spec.centred && !(opts.places || []).length);
@@ -3999,7 +4073,7 @@ function AccountMenu({ role, onSignOut }){
     setBusy(true); setMsg(null);
     postJSON("/auth/password", { current: cur, new: nw })
       .then(() => { setCur(""); setNw(""); setNw2(""); setMsg({ ok: true, t: "Password changed. Your other devices are signed out." }); })
-      .catch(e => setMsg({ ok: false, t: e.detail || `Not changed (${e.status || "no answer"}).` }))
+      .catch(e => setMsg({ ok: false, t: errSay("Not changed.", e) }))
       .finally(() => setBusy(false));
   };
   return (
@@ -4077,7 +4151,7 @@ function Login({ onSignIn, onBack, savedName, notice }){
     setBusy(true); setErr(""); setMsg("");
     postJSON("/auth/signin", { email: email.trim(), password: pass, remember })
       .then(info => onSignIn(info))
-      .catch(e => setErr((e.status === 401 || e.status === 429) && e.detail ? e.detail : `Couldn't sign in (${e.status || "no answer"}).`))
+      .catch(e => setErr((e.status === 401 || e.status === 429) && e.detail ? e.detail : errSay("Couldn't sign in.", e)))
       .finally(() => setBusy(false));
   };
   const askLink = () => {
@@ -4144,9 +4218,9 @@ function Login({ onSignIn, onBack, savedName, notice }){
     setBusy(true); setErr("");
     fetch(`${API}/auth`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }) })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(okJSON)
       .then(info => onSignIn(info, name, code))
-      .catch(e => setErr(e === 401 ? "That access code isn't recognised." : `Couldn't sign in (${e}).`))
+      .catch(e => setErr(e && e.status === 401 ? "That access code isn't recognised." : errSay("Couldn't sign in.", e)))
       .finally(() => setBusy(false));
   };
   return (
@@ -4218,7 +4292,7 @@ function SetPassword({ link, onSignIn, onBack }){
     setBusy(true); setErr("");
     postJSON("/auth/reset", { token: link.token, password: pw, remember })
       .then(info => onSignIn(info))
-      .catch(e => { if(e.status === 410) setBad(e.detail); else setErr(e.detail || `Couldn't save the password (${e.status || "no answer"}).`); })
+      .catch(e => { if(e.status === 410) setBad(e.detail); else setErr(errSay("Couldn't save the password.", e)); })
       .finally(() => setBusy(false));
   };
   if(bad) return <AuthNote title="This link no longer works" body={bad + " On the sign-in screen, \u201cForgot your password?\u201d sends a new one."}
@@ -4317,10 +4391,8 @@ function UsersPage({ access }){
   const call = async (path, method, body) => {
     const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
                                              body: body ? JSON.stringify(body) : undefined });
-    const j = await r.json().catch(() => ({}));
-    if(!r.ok) throw new Error(typeof j.detail === "string" && r.status !== 403 ? j.detail
-      : r.status === 403 ? "Only an admin can open this. Sign in with an admin login, or type the admin token above." : `Not done (${r.status}).`);
-    return j;
+    if(!r.ok) throw await errFrom(r);
+    return r.json().catch(() => ({}));
   };
   const load = () => call(`/admin/users${qs()}`).then(j => { setData(j); setErr(""); }).catch(e => { setData(null); setErr(e.message); });
   const loadLeads = () => call(`/admin/leads${qs()}`).then(j => setLeads(j.leads || [])).catch(e => setErr(e.message));
@@ -4336,7 +4408,7 @@ function UsersPage({ access }){
     return { ok: true, text: j.email === "unsent" ? `Email is not set up here, so pass this link to ${who} yourself:`
                                                  : `The email to ${who} did not go (${j.email}). Pass this link on yourself:`, link: j.link };
   };
-  const act = async (fn) => { setBusy(true); setNote(null); try { await fn(); } catch(e){ setNote({ ok: false, text: e.message }); } setBusy(false); };
+  const act = async (fn) => { setBusy(true); setNote(null); try { await fn(); } catch(e){ setNote({ ok: false, text: errSay("Not done.", e) }); } setBusy(false); };
   const add = () => act(async () => {
     if(!form.name.trim() || !form.email.trim() || !form.choice) throw new Error("Fill in the name, the email and the team or role.");
     const j = await call(`/admin/users${qs()}`, "POST", { name: form.name.trim(), email: form.email.trim(), ...fromChoice(form.choice) });
@@ -5188,9 +5260,9 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
       fetch(`${API}/costing/preview`, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ route_id: routeId, vehicle_type: vehicle, material_type: material, unit,
                                cells: inRange.filter(([, q]) => +q > 0).map(([mi, q]) => ({ month_index: mi, quantity: +q })) }) })
-        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(okJSON)
         .then(j => { if(live){ setCost(j); setCostErr(""); } })
-        .catch(e => { if(live){ setCost(null); setCostErr(`Couldn't price these cells (${e}).`); } });
+        .catch(e => { if(live){ setCost(null); setCostErr(errSay("Couldn't price these cells.", e)); } });
     }, 400);
     return () => { live = false; clearTimeout(t); };
   }, [routeId, vehicle, material, unit, cellsKey]);
@@ -5300,7 +5372,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         ipt: (iptLocked ? access.ipt : ipt) || null,
       }),
     })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(okJSON)
       .then(j => {
         setMsg({ ok: true, text: `Saved ${rangeLabel} forecast for ${routeId}${discipline ? ` · ${discipline}` : ""}. Sent for approval.` });
         // not an error — two disciplines on one route is the case the taxonomy exists
@@ -5308,7 +5380,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         // lorries without ever seeing each other's line
         setCaution(j && j.caution ? j.caution : null);
       })
-      .catch(e => setMsg({ ok: false, text: `Couldn't save (${e}). Try again.` }))
+      .catch(e => setMsg({ ok: false, text: errSay("Not saved.", e) }))
       .finally(() => setBusy(false));
   };
   // Clears only what is on screen. With a range open, wiping vals outright would also
@@ -6012,9 +6084,9 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
   const [draft, setDraft] = useState({});
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
-  const load = () => fetch(`${API}/costing`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+  const load = () => fetch(`${API}/costing`).then(okJSON)
     .then(j => { setData(j); setDraft({}); })
-    .catch(e => setMsg({ ok: false, text: `Couldn't load the costing settings (${e}).` }));
+    .catch(e => setMsg({ ok: false, text: errSay("Couldn't load the costing settings.", e) }));
   useEffect(() => { load(); }, []);
   const tg = (data && data.target) || {};
   const save = async () => {
@@ -6031,10 +6103,10 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
       const r = await fetch(`${API}/admin/costing/target${qs}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if(!r.ok) throw new Error((await r.text()).slice(0, 300).replace(/^\{"detail":"|"\}$/g, ""));
+      if(!r.ok) throw await errFrom(r);
       setData(await r.json()); setDraft({});
       setMsg({ ok: true, text: "Saved. Every route without a rate of its own now prices at the target, marked \"target\" on the Look-ahead." });
-    } catch(e){ setMsg({ ok: false, text: "Not saved — " + e.message }); }
+    } catch(e){ setMsg({ ok: false, text: errSay("Not saved.", e) }); }
     setBusy(false);
   };
   const inp = "ctl ctl-sm w-full tabular-nums";
@@ -6181,9 +6253,9 @@ function ConfigPage({ meta, who, access }){
   const [rawErr, setRawErr] = useState("");
   const [fileDoc, setFileDoc] = useState(null);
 
-  const load = () => fetch(`${API}/config/factors`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+  const load = () => fetch(`${API}/config/factors`).then(okJSON)
     .then(j => { setDoc(j.doc); setOrig(JSON.stringify(j.doc)); setStatus(j.status); setRaw(JSON.stringify(j.doc, null, 2)); setRawErr(""); setFileDoc(j.file || null); })
-    .catch(e => setMsg({ ok: false, text: `Couldn't load the configuration (${e}).` }));
+    .catch(e => setMsg({ ok: false, text: errSay("Couldn't load the configuration.", e) }));
   useEffect(() => { load(); }, []);
 
   const dirty = doc && JSON.stringify(doc) !== orig;
@@ -6203,11 +6275,10 @@ function ConfigPage({ meta, who, access }){
     try {
       const r = await fetch(`${API}/admin/config/factors${qs}`, { method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doc: body, updated_by: who || null }) });
-      const t = await r.text();
-      if(!r.ok) throw new Error(t.slice(0, 600));
+      if(!r.ok) throw await errFrom(r);
       setMsg({ ok: true, text: "Saved. Every figure now uses it." });
       await load();
-    } catch(e){ setMsg({ ok: false, text: "Not saved — " + e.message.replace(/^\{"detail":"|"\}$/g, "") }); }
+    } catch(e){ setMsg({ ok: false, text: errSay("Not saved.", e) }); }
     setBusy(false);
   };
   const reset = async () => {
@@ -6217,9 +6288,9 @@ function ConfigPage({ meta, who, access }){
     const qs = new URLSearchParams({ updated_by: who || "" }); if(token) qs.set("token", token);
     try {
       const r = await fetch(`${API}/admin/config/factors/reset?${qs}`, { method: "POST" });
-      if(!r.ok) throw new Error((await r.text()).slice(0, 300));
+      if(!r.ok) throw await errFrom(r);
       setMsg({ ok: true, text: "Reset to the starting values." }); await load();
-    } catch(e){ setMsg({ ok: false, text: "Reset failed — " + e.message }); }
+    } catch(e){ setMsg({ ok: false, text: errSay("Not reset.", e) }); }
     setBusy(false);
   };
 
@@ -6603,7 +6674,9 @@ function carbonTargetError(status, txt){
   try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
   if(status === 401) return "Sign in again to see the carbon target.";
   if(status === 403) return "Only a planner or admin code can change the carbon target.";
-  return d || `The carbon target could not be reached (error ${status}). Try again.`;
+  if(d) return errSentence(d);
+  errLog("carbon target", status, txt);
+  return `The carbon target could not be reached. ${errWords(status, txt)}`;
 }
 
 // One numbered step card. Top level (never defined inside CarbonPage), so the inputs inside a step
@@ -6671,9 +6744,9 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
       fetch(`${API}/carbon/scenario`, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ alternatives: levers.length ? [{ name: "Alternative", levers }] : [],
                                spend_gbp_m: (spend === "" || isNaN(+spend)) ? null : +spend }) })
-        .then(async r => { const txt = await r.text(); if(!r.ok) throw new Error(txt.replace(/^\{"detail":"|"\}$/g, "").slice(0, 400)); return JSON.parse(txt); })
+        .then(okJSON)
         .then(j => { if(live){ setData(j); setErr(null); } })
-        .catch(e => { if(live) setErr(e.message || "Couldn't compute the scenario."); })
+        .catch(e => { if(live) setErr(errMsg(e)); })   // shown as "Not updated: {why}"
         .finally(() => { if(live) setBusy(false); });
     }, 350);
     return () => { live = false; clearTimeout(t); };
@@ -6764,10 +6837,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
         body: JSON.stringify({ alternatives: levers.length ? [{ name: "Alternative", levers }] : [],
                                spend_gbp_m: (spend === "" || isNaN(+spend)) ? null : +spend, commentary: note || null }) });
       if(!r.ok){
-        const txt = await r.text();
-        let d = "";
-        try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
-        throw new Error(d || `error ${r.status}`);
+        throw await errFrom(r);
       }
       const blob = await r.blob();
       const a = document.createElement("a");
@@ -6775,7 +6845,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
       a.download = "carbon-summary.pdf";
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    } catch(e){ setPdfErr("The summary could not be made: " + (e.message || e)); }
+    } catch(e){ setPdfErr(errSay("The summary could not be made.", e)); }
     setPdfBusy(false);
   };
 
@@ -7454,9 +7524,9 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState(() => { try { return localStorage.getItem("modus_admin_token") || ""; } catch(e){ return ""; } });
   const canType = !!(access && access.can_approve);
-  const load = (lazy) => fetch(`${API}/fuel-index?lazy=${lazy ? 1 : 0}`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+  const load = (lazy) => fetch(`${API}/fuel-index?lazy=${lazy ? 1 : 0}`).then(okJSON)
     .then(j => { setFetched(j); return j; })
-    .catch(e => { setErr(`Couldn't read the fuel index (${e}).`); return null; });
+    .catch(e => { setErr(errSay("Couldn't read the fuel index.", e)); return null; });
   useEffect(() => {
     let live = true, timer = null;
     const poll = (j) => {
@@ -7479,10 +7549,10 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
       if(admin){ try { localStorage.setItem("modus_admin_token", token); } catch(e){} }
       const qs = admin && token ? `?token=${encodeURIComponent(token)}` : "";
       const r = await fetch(`${API}${path}${qs}`, { method: method || "PUT", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-      if(!r.ok) throw new Error((await r.text()).slice(0, 200).replace(/^\{"detail":"|"\}$/g, ""));
+      if(!r.ok) throw await errFrom(r);
       const j = await r.json(); setFetched(j); setDraft({});
       if(onChanged) onChanged();
-    } catch(e){ setErr(String(e.message || e)); }
+    } catch(e){ setErr(errSay("Not saved.", e)); }
     setBusy(false);
   };
   const saveSetting = (k) => {
@@ -7618,17 +7688,17 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const refreshTarkTee = async () => {
     try {
       const r = await fetch(`${API}/forecast-weeks/restrictions/refresh`, { method: "POST" });
-      if(!r.ok) throw new Error(`${r.status}`);
+      if(!r.ok) throw await errFrom(r);
       setTtPolling(true);
-    } catch(e){ setErr("Couldn't start the road-restriction check: " + e.message); }
+    } catch(e){ setErr(errSay("Couldn't start the road-restriction check.", e)); }
   };
   useEffect(() => {
     let live = true;
     setErr("");
     fetch(`${API}/lookahead?bucket=${bucket}`)
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(okJSON)
       .then(j => { if(live){ setPage(j); setDraft({}); } })
-      .catch(e => { if(live) setErr(`Couldn't load the look-ahead (${e}).`); });
+      .catch(e => { if(live) setErr(errSay("Couldn't load the look-ahead.", e)); });
     return () => { live = false; };
   }, [bucket, tick]);
   useEffect(() => {
@@ -7651,9 +7721,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
     setBusy(path);
     return fetch(`${API}${path}`, { method: method || "POST",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-      .then(async r => { if(!r.ok){ throw new Error((await r.text()).slice(0, 200)); } return r.json(); })
+      .then(okJSON)
       .then((j) => { setTick(t => t + 1); setErr(""); return j; })
-      .catch(e => { setErr(String(e.message || e)); return null; })
+      .catch(e => { setErr(errSay("Not saved.", e)); return null; })
       .finally(() => setBusy(""));
   };
 
@@ -7738,14 +7808,14 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
     setBusy("export");
     try {
       const r = await fetch(`${API}/forecast-weeks/export?format=${format}&bucket=${bucket}`);
-      if(!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 140)}`);
+      if(!r.ok) throw await errFrom(r);
       const blob = await r.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `lookahead-${cw.from || "week"}.${format}`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    } catch(e){ setErr("Export failed: " + e.message); }
+    } catch(e){ setErr(errSay("Export failed.", e)); }
     setBusy("");
   };
 
@@ -8356,9 +8426,9 @@ function PhoneLookAhead({ meta, initialPage }){
     let live = true;
     setErr(""); setPage(null);
     fetch(`${API}/lookahead?bucket=${bucket}`)
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(okJSON)
       .then(j => { if(live) setPage(j); })
-      .catch(e => { if(live) setErr(`Couldn't load the look-ahead (${e}).`); });
+      .catch(e => { if(live) setErr(errSay("Couldn't load the look-ahead.", e)); });
     return () => { live = false; };
   }, [bucket]);
   useEffect(() => { setAll(false); setOpened({}); }, [day, bucket]);
@@ -8392,7 +8462,7 @@ function PhoneLookAhead({ meta, initialPage }){
     setBusy(true);
     try {
       const r = await fetch(`${API}/forecast-weeks/day-sheet?bucket=${bucket}&day=${shown}`);
-      if(!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 140)}`);
+      if(!r.ok) throw await errFrom(r);
       const blob = await r.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -8400,7 +8470,7 @@ function PhoneLookAhead({ meta, initialPage }){
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       setErr("");
-    } catch(e){ setErr("The day sheet did not download: " + e.message); }
+    } catch(e){ setErr(errSay("The day sheet did not download.", e)); }
     setBusy(false);
   };
 
@@ -9140,9 +9210,9 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
     if(!ids.length){ setGeo({ routes: [] }); return; }
     const vehicles = ids.map(id => ((byRoute[id] || [])[0] || {}).vehicle_type || "");
     fetch(`${API}/lookahead/geometry?ids=${encodeURIComponent(ids.join(","))}&vehicles=${encodeURIComponent(vehicles.join(","))}`)
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(okJSON)
       .then(j => { if(live){ setGeo(j); setErr(""); } })
-      .catch(e => { if(live) setErr(`Couldn't load the week's routes for the map (${e}).`); });
+      .catch(e => { if(live) setErr(errSay("Couldn't load the week's routes for the map.", e)); });
     return () => { live = false; };
   }, [idKey, bucket, tick]);
 
@@ -9266,11 +9336,11 @@ function RoutePlanning({ route, token, onSaved }){
       body.km_basis = v.km_basis;
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(route.id)}/planning${qs}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0, 140)}`); }
+      if(!res.ok) throw await errFrom(res);
       await res.json();
       setMsg("Saved planning figures.");
       if(onSaved) await onSaved();
-    } catch(e){ setMsg("Couldn't save: " + e.message); }
+    } catch(e){ setMsg(errSay("Not saved.", e)); }
     setBusy(false);
   };
   const inp = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
@@ -9316,10 +9386,7 @@ const SHEET_TEXT_MAX = 400;
 async function downloadRouteSheet(routeId){
   const r = await fetch(`${API}/routes/${encodeURIComponent(routeId)}/route-sheet.pdf`);
   if(!r.ok){
-    const txt = await r.text();
-    let d = "";
-    try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
-    throw new Error(d || `error ${r.status}`);
+    throw await errFrom(r);
   }
   const blob = await r.blob();
   const cd = r.headers.get("content-disposition") || "";
@@ -9335,7 +9402,7 @@ function RouteSheetButton({ routeId }){
   const [err, setErr] = useState(null);
   const go = async () => {
     setBusy(true); setErr(null);
-    try { await downloadRouteSheet(routeId); } catch(e){ setErr("The route sheet could not be made: " + (e.message || e)); }
+    try { await downloadRouteSheet(routeId); } catch(e){ setErr(errSay("The route sheet could not be made.", e)); }
     setBusy(false);
   };
   return (
@@ -9354,10 +9421,7 @@ function RouteSheetButton({ routeId }){
 async function downloadCollisionEvidence(routeId, kind){
   const r = await fetch(`${API}/routes/${encodeURIComponent(routeId)}/collision-evidence.${kind}`);
   if(!r.ok){
-    const txt = await r.text();
-    let d = "";
-    try { const j = JSON.parse(txt); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
-    throw new Error(d || `error ${r.status}`);
+    throw await errFrom(r);
   }
   const blob = await r.blob();
   const cd = r.headers.get("content-disposition") || "";
@@ -9373,7 +9437,7 @@ function CollisionEvidenceButton({ routeId }){
   const [err, setErr] = useState(null);
   const go = async (kind) => {
     setBusy(kind); setErr(null);
-    try { await downloadCollisionEvidence(routeId, kind); } catch(e){ setErr("The collision evidence could not be made: " + (e.message || e)); }
+    try { await downloadCollisionEvidence(routeId, kind); } catch(e){ setErr(errSay("The collision evidence could not be made.", e)); }
     setBusy(null);
   };
   const tip = routeId ? "Police-reported injury collisions on and near the route picked in the list, for the route risk assessment" : "Pick a route in the list first";
@@ -9405,15 +9469,12 @@ function RouteSheetText({ route, token, onSaved }){
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ route_reason: v.route_reason.trim() || null, permitted_deviations: v.permitted_deviations.trim() || null }) });
       if(!res.ok){
-        const t = await res.text();
-        let d = "";
-        try { const j = JSON.parse(t); d = (j && typeof j.detail === "string") ? j.detail : ""; } catch(e){ d = ""; }
-        throw new Error(d || `${res.status}`);
+        throw await errFrom(res);
       }
       await res.json();
       setMsg("Saved the route sheet words.");
       if(onSaved) await onSaved();
-    } catch(e){ setMsg("Couldn't save: " + e.message); }
+    } catch(e){ setMsg(errSay("Not saved.", e)); }
     setBusy(false);
   };
   const over = k => v[k].trim().length > SHEET_TEXT_MAX;
@@ -9673,13 +9734,13 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
         if(onChanged) m += await onChanged(inv);
       }
       setMsg(m);
-    } catch(e){ setMsg("Failed: " + e.message); }
+    } catch(e){ setMsg(errSay("Not done.", e)); }
     setBusy(false);
   };
 
   const post = async (url, opts) => {
     const res = await fetch(url, opts);
-    if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0, 160)}`); }
+    if(!res.ok) throw await errFrom(res);
     return res.json();
   };
 
@@ -9847,9 +9908,9 @@ function RouteRestrictions({ routeId }){
     let live = true;
     setData(null); setErr("");
     fetch(`${API}/routes/${encodeURIComponent(routeId)}/restrictions`)
-      .then(r => r.json())
-      .then(j => { if(!live) return; j.error ? setErr(j.error) : setData(j); })
-      .catch(e => { if(live) setErr(e.message); });
+      .then(okJSON)
+      .then(j => { if(!live) return; j.error ? setErr(errSentence(j.error)) : setData(j); })
+      .catch(e => { if(live) setErr(errMsg(e)); });
     return () => { live = false; };
   }, [routeId]);
 
@@ -9985,14 +10046,14 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
   useEffect(() => {
     let live = true;
     Promise.all([
-      fetch(`${API}/gates`).then(r => r.json()),
-      fetch(`${API}/routes/status`).then(r => r.json()),
+      fetch(`${API}/gates`).then(okJSON),
+      fetch(`${API}/routes/status`).then(okJSON),
     ]).then(([g, st]) => {
       if(!live) return;
       setGates(g.gates || []);
       const row = (st || []).find(x => x.id === routeId) || {};
       setSel({ origin_gate_id: row.origin_gate_id || "", dest_gate_id: row.dest_gate_id || "" });
-    }).catch(e => { if(live){ setGates([]); setMsg(e.message); } });
+    }).catch(e => { if(live){ setGates([]); setMsg(errSay("Couldn't load the gates.", e)); } });
     return () => { live = false; };
   }, [routeId]);
 
@@ -10005,12 +10066,12 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
         { method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ [key]: value || null }) });
       const j = await res.json();
-      if(!res.ok || j.error) throw new Error(j.error || res.status);
+      if(!res.ok || j.error) throw errOf(res.status, j);
       setMsg(j.rebake_needed
         ? "Saved — this route still goes to the old gate until it is routed again. Re-route it."
         : "Saved.");
       if(j.rebake_needed && onChanged) onChanged();
-    } catch(e){ setMsg("Couldn't save: " + e.message); }
+    } catch(e){ setMsg(errSay("Not saved.", e)); }
   };
 
   if(gates === null) return null;
@@ -10064,9 +10125,9 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
     let live = true;
     setData(null); setErr("");
     fetch(`${API}/routes/${encodeURIComponent(routeId)}/analysis`)
-      .then(r => r.json())
-      .then(j => { if(!live) return; j.error ? setErr(j.error) : setData(j); })
-      .catch(e => { if(live) setErr(e.message); });
+      .then(okJSON)
+      .then(j => { if(!live) return; j.error ? setErr(errSentence(j.error)) : setData(j); })
+      .catch(e => { if(live) setErr(errMsg(e)); });
     return () => { live = false; };
   }, [routeId]);
 
@@ -10625,10 +10686,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(tokenRef.current) p.set("token", tokenRef.current);
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(selected)}/promote-alt?${p}`,
         { method: "POST" });
-      if(!res.ok){
-        const t = await res.text();
-        throw new Error(res.status === 403 ? "admin token rejected" : `${res.status} ${t.slice(0,120)}`);
-      }
+      if(!res.ok) throw await errFrom(res);
       const j = await res.json();
       if(j.error) throw new Error(j.error);
       const gj = await fetch(`${API}/routes/${encodeURIComponent(selected)}/geometries`).then(r => r.json());
@@ -10636,7 +10694,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       setActiveGeom({ profile, leg: leg || showLeg, alt_index: 0 });
       await reloadNetwork();
       setRouteMsg(`${selected}: alternative ${alt_index} is now the main route for ${vehShort(profile)}. Routing again puts the original order back.`);
-    } catch(e){ setRouteMsg("Couldn't promote: " + e.message); }
+    } catch(e){ setRouteMsg(errSay("Couldn't use this alternative.", e)); }
     setPromoting("");
   };
 
@@ -10668,9 +10726,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(tokenRef.current) q.set("token", tokenRef.current);
       try {
         const r = await fetch(`${API}/admin/bake-route?${q.toString()}`, { method: "POST" });
+        if(!r.ok){ failed.push(`${vehShort(prof)}: ${errMsg(await errFrom(r))}`); continue; }
         const j = await r.json();
         if(j.error) failed.push(`${vehShort(prof)}: ${j.error}`);
-      } catch(e){ failed.push(`${vehShort(prof)}: ${e.message}`); }
+      } catch(e){ failed.push(`${vehShort(prof)}: ${errMsg(e)}`); }
     }
     return failed;
   };
@@ -10791,7 +10850,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       const url = form.id ? `${API}/admin/locations/${encodeURIComponent(form.id)}${qs}` : `${API}/admin/locations${qs}`;
       const res = await fetch(url, { method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,140)}`); }
+      if(!res.ok) throw await errFrom(res);
       const j = await res.json();
       if(j.error) throw new Error(j.error);
       const affected = j.affected_routes || [];
@@ -10810,8 +10869,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               capacity_unit: form.capacity_unit || "t",
               opening_qty: form.opening_qty === "" ? null : +form.opening_qty,
             }) });
-          if(!cr.ok) throw new Error(String(cr.status));
-        } catch(ce){ setLocMsg("Location saved, but the capacity didn't: " + ce.message); }
+          if(!cr.ok) throw await errFrom(cr);
+        } catch(ce){ setLocMsg(errSay("Location saved, but the capacity was not.", ce)); }
       }
       await reloadNetwork();
       if(form.id && affected.length){
@@ -10827,7 +10886,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         setLocMsg(form.id ? "Saved." : "Location created.");
       }
       setForm(null); setMode("view");
-    } catch(e){ setLocMsg("Couldn't save: " + e.message); }
+    } catch(e){ setLocMsg(errSay("Not saved.", e)); }
     setSavingLoc(false);
   };
 
@@ -10843,9 +10902,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!locId){ setGateList([]); return; }
     try {
       const res = await fetch(`${API}/gates?location_id=${encodeURIComponent(locId)}`);
-      const j = await res.json();
+      const j = await okJSON(res);
       setGateList(j.gates || []);
-    } catch(e){ setGateList([]); setGateMsg("Couldn't load gates: " + e.message); }
+    } catch(e){ setGateList([]); setGateMsg(errSay("Couldn't load the gates.", e)); }
   };
 
   useEffect(() => {
@@ -10902,7 +10961,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(gateForm.id ? payload : { ...payload, location_id: form.id }) });
       const j = await res.json();
-      if(!res.ok || j.error) throw new Error(j.error || res.status);
+      if(!res.ok || j.error) throw errOf(res.status, j);
       await loadGates(form.id);
       setGateForm(null);
       // the cost is quoted, then spent — a gate move invalidates cached geometry
@@ -10919,7 +10978,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           ? `Saved. ${affected.length} route(s) still hold a route worked out to the old point.`
           : "Saved.");
       }
-    } catch(e){ setGateMsg("Couldn't save gate: " + e.message); }
+    } catch(e){ setGateMsg(errSay("Couldn't save the gate.", e)); }
   };
 
   const deleteGate = async (gid) => {
@@ -10928,11 +10987,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     try {
       const res = await fetch(`${API}/admin/gates/${encodeURIComponent(gid)}${qs}`, { method: "DELETE" });
       const j = await res.json();
-      if(!res.ok || j.error) throw new Error(
-        (j.error || res.status) + (j.routes ? ` (${j.routes.join(", ")})` : ""));
+      if(!res.ok || j.error) throw errOf(res.status, j, j.routes ? ` (${j.routes.join(", ")})` : "");
       await loadGates(form.id);
       setGateMsg(`Deleted ${gid}.`);
-    } catch(e){ setGateMsg("Delete failed: " + e.message); }
+    } catch(e){ setGateMsg(errSay("Not deleted.", e)); }
   };
 
   const deleteLoc = async () => {
@@ -10943,13 +11001,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
       const res = await fetch(`${API}/admin/locations/${encodeURIComponent(form.id)}${qs}`, { method: "DELETE" });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,140)}`); }
+      if(!res.ok) throw await errFrom(res);
       const j = await res.json();
       if(j.error) throw new Error(j.error);
       await reloadNetwork();
       setLocMsg(`Deleted. Removed ${(j.deleted_routes || []).length} dependent route(s).`);
       setForm(null); setMode("view");
-    } catch(e){ setLocMsg("Delete failed: " + e.message); }
+    } catch(e){ setLocMsg(errSay("Not deleted.", e)); }
     setSavingLoc(false);
   };
 
@@ -10976,7 +11034,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       const res = await fetch(`${API}/admin/locations/${encodeURIComponent(id)}${qs}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const j = await res.json();
-      if(!res.ok || j.error) throw new Error(j.error || res.status);
+      if(!res.ok || j.error) throw errOf(res.status, j);
       const affected = j.affected_routes || [];
       if(affected.length){
         const { rebaked, skipped } = await rebakeAffected(affected);
@@ -10989,7 +11047,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         setLocMsg("Moved.");
       }
     } catch(e){
-      setLocMsg("Move failed: " + e.message);
+      setLocMsg(errSay("Not moved.", e));
       await reloadNetwork();   // snap the node back to server truth
     }
   };
@@ -11064,7 +11122,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         body: JSON.stringify({ origin_id: rOrigin, dest_id: rDest,
           route_id: (rId || "").trim() || null, ipt: (rIpt || "").trim() || null }),
       });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,140)}`); }
+      if(!res.ok) throw await errFrom(res);
       const j = await res.json();
       if(j.error) throw new Error(j.error);
       const newId = j.id;
@@ -11078,9 +11136,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           if(tokenRef.current) bqs.set("token", tokenRef.current);
           try {
             const br = await fetch(`${API}/admin/bake-route?${bqs.toString()}`, { method: "POST" });
+            if(!br.ok){ failed.push(`${vehShort(prof)}: ${errMsg(await errFrom(br))}`); continue; }
             const bj = await br.json();
             if(bj.error) failed.push(`${vehShort(prof)}: ${bj.error}`);
-          } catch(e){ failed.push(`${vehShort(prof)}: ${e.message}`); }
+          } catch(e){ failed.push(`${vehShort(prof)}: ${errMsg(e)}`); }
         }
       }
       await reloadNetwork();
@@ -11091,7 +11150,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         : `Route ${newId} created — no vehicles ticked, so it has no route yet.`
       );
       setRDest(""); setRIpt(""); setRIdTouched(false);   // next id repopulates
-    } catch(e){ setRouteMsg("Couldn't create route: " + e.message); }
+    } catch(e){ setRouteMsg(errSay("Couldn't create the route.", e)); }
     setRouteBusy(false);
   };
 
@@ -11162,7 +11221,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ origin_id: rOrigin, dest_id: rDest,
           material_category: rMaterial || null, ipt: (rIpt || "").trim() || null }) });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,140)}`); }
+      if(!res.ok) throw await errFrom(res);
       await res.json();
       await reloadNetwork();
 
@@ -11177,7 +11236,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           const p = new URLSearchParams({ route_id: editingRoute, profile: prof });
           if(tokenRef.current) p.set("token", tokenRef.current);
           const dr = await fetch(`${API}/admin/clear-geometry?${p}`, { method: "POST" });
-          if(!dr.ok) notes.push(`${vehShort(prof)} not removed (${dr.status})`);
+          if(!dr.ok){ await errFrom(dr); notes.push(`${vehShort(prof)} not removed`); }
         }
         if(drop.length) notes.push(`removed ${drop.length} vehicle(s)`);
       }
@@ -11196,7 +11255,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       setRouteMsg(`Saved ${editingRoute}${notes.length ? " — " + notes.join("; ") : "."}`);
       setEditingRoute(null); setRDest(""); setRIpt(""); setRMaterial(""); setRIdTouched(false);
       setEVehicles([]);
-    } catch(e){ setRouteMsg("Couldn't save: " + e.message); }
+    } catch(e){ setRouteMsg(errSay("Not saved.", e)); }
     setRouteBusy(false);
   };
 
@@ -11206,11 +11265,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(id)}${qs}`, { method: "DELETE" });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,120)}`); }
+      if(!res.ok) throw await errFrom(res);
       if(selected === id) setSelected(null);
       await reloadNetwork();
       setRouteMsg(`Deleted ${id}.`);
-    } catch(e){ setRouteMsg("Delete failed: " + e.message); }
+    } catch(e){ setRouteMsg(errSay("Not deleted.", e)); }
   };
 
   // 17 Oct 2026 (Route all 502s): one batch request, shared by Route all and the re-route after a
@@ -11221,18 +11280,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const ROUTE_RETRY_S = [30, 60, 90];
   const postRouteBatch = async (q, say) => {
     for(let attempt = 0; ; attempt++){
-      let res = null, why = "";
+      let res = null;
       try { res = await fetch(`${API}/admin/bake-routes?${q}`, { method: "POST" }); }
-      catch(e){ why = "no answer"; }
+      catch(e){ errLog("bake-routes", 0, String(e && e.message)); }
       if(res && res.ok) return res.json();
-      if(res && ![502, 503, 504].includes(res.status)){
-        const t = await res.text();
-        throw new Error(res.status === 403 ? "admin token rejected" : `${res.status} ${t.slice(0,120)}`);
-      }
-      if(res) why = String(res.status);
-      if(attempt >= ROUTE_RETRY_S.length) throw new Error(`${why} — tried ${attempt + 1} times`);
+      if(res && ![502, 503, 504].includes(res.status)) throw await errFrom(res);
+      if(res) errLog(res.url, res.status, "");   // a 502 / 503 / 504: tried again, its page never shown
+      if(attempt >= ROUTE_RETRY_S.length) throw new Error(`No answer after ${attempt + 1} tries.`);
       const wait = ROUTE_RETRY_S[attempt];
-      say(`Wayscope did not answer (${why}). Trying again in ${wait} s (${attempt + 1} of ${ROUTE_RETRY_S.length})…`);
+      say(`Wayscope did not answer. Trying again in ${wait} s (${attempt + 1} of ${ROUTE_RETRY_S.length})…`);
       await new Promise(r => setTimeout(r, wait * 1000));
     }
   };
@@ -11277,7 +11333,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       await reloadNetwork();
       setRouteMsg(`Routing the whole network finished for ${profs.map(vehShort).join(", ")}. Check the Vehicles column for anything still amber or red.`);
     } catch(e){
-      setRouteMsg("Routing the whole network stopped: " + e.message + " — routes already worked out are kept, so you can run it again.");
+      setRouteMsg(`Routing the whole network stopped. ${errMsg(e)} Routes already worked out are kept, so you can run it again.`);
     }
     setRouteBusy(false);
   };
@@ -11290,12 +11346,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
       const res = await fetch(`${API}/admin/clear-routes${qs}`, { method: "POST" });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,120)}`); }
+      if(!res.ok) throw await errFrom(res);
       const j = await res.json();
       setSelected(null);
       await reloadNetwork();
       setRouteMsg(`Cleared ${j.cleared ?? 0} route(s). Locations kept.`);
-    } catch(e){ setRouteMsg("Clear failed: " + e.message); }
+    } catch(e){ setRouteMsg(errSay("Not cleared.", e)); }
     setRouteBusy(false);
   };
 
@@ -11452,7 +11508,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,160)}`); }
+      if(!res.ok) throw await errFrom(res);
       const j = await res.json();
       await reloadZones();
       const inv = j.invalidated || {};
@@ -11462,7 +11518,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(inv.leg_count) msg += await rebakeAfterZone(inv);
       setZoneMsg(msg);
       setZoneForm(null); setDrawPts([]); setZoneDraw(false);
-    } catch(e){ setZoneMsg("Save failed: " + e.message); }
+    } catch(e){ setZoneMsg(errSay("Not saved.", e)); }
     setZoneBusy(false);
   };
 
@@ -11484,7 +11540,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     try {
       const qs = tokenRef.current ? `?token=${encodeURIComponent(tokenRef.current)}` : "";
       const res = await fetch(`${API}/admin/zones/${encodeURIComponent(z.id)}${qs}`, { method: "DELETE" });
-      if(!res.ok){ const t = await res.text(); throw new Error(`${res.status} ${t.slice(0,160)}`); }
+      if(!res.ok) throw await errFrom(res);
       const j = await res.json();
       await reloadZones();
       const inv = j.invalidated || {};
@@ -11495,7 +11551,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       setZoneMsg(msg);
       if(zoneSel === z.id) setZoneSel(null);
       if(zoneForm && zoneForm.id === z.id) cancelZone();
-    } catch(e){ setZoneMsg("Delete failed: " + e.message); }
+    } catch(e){ setZoneMsg(errSay("Not deleted.", e)); }
     setZoneBusy(false);
   };
 

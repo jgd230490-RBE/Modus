@@ -204,9 +204,11 @@ async function carbonTargetDom(){
   const puts = () => calls.filter(c => c.url === "/api/carbon/target" && c.method === "PUT");
   ok("CARBON DOM: the page reads the target once on mount (GET), and the read fails (a 500)",
      calls.filter(c => c.url === "/api/carbon/target").length === 1 && calls[0].method === "GET" && !!step6());
+  // NARROWED 22 Oct 2026 (claude/error-words): "what did not happen." + the server's sentence as a sentence (capital, full stop)
   ok("⭐ CARBON DOM: with the read failed, Set is disabled and says why; Try again is offered; the server's error is shown",
      setBtn() && setBtn().disabled && step6().textContent.includes("The scheme's current carbon target did not load, so a new one cannot be set yet.")
-     && !!byText(step6(), "button", "Try again") && step6().textContent.includes("The carbon target could not be reached (error 500). Try again."));
+     && !!byText(step6(), "button", "Try again") && step6().textContent.includes("The carbon target could not be reached. Wayscope could not do this just now. Try again in a minute.")
+     && !/error 500|\(500\)/.test(step6().textContent));
   const elec = [...host.querySelectorAll("label")].find(l => /Battery electric lorries/.test(l.textContent)).querySelector("input");
   act(() => { elec.click(); });
   await settle(450);
@@ -255,21 +257,25 @@ async function carbonTargetDom(){
   await setVal(kg, "5");
   await settle(450);
   const s5 = host.querySelector("#carbon-step-5").textContent, foot = (host.querySelector("[data-sticky-foot]") || { textContent: "" }).textContent;
+  // NARROWED 22 Oct 2026 (claude/error-words): "what did not happen." + the server's sentence as a sentence (capital, full stop)
   ok("⭐ CARBON DOM: a refused scenario says 'Not updated' with the server's sentence in step 5, and calls the old figures the previous choices",
-     s5.includes("Not updated: an EPD override needs its source (the EPD's reference) The figures below are from your previous choices."));
+     s5.includes("Not updated: An EPD override needs its source (the EPD's reference). The figures below are from your previous choices."));
+  // NARROWED 22 Oct 2026 (claude/error-words): "what did not happen." + the server's sentence as a sentence (capital, full stop)
   ok("⭐ CARBON DOM: ...the strip at the foot says it too, in place of the old result",
-     foot.includes("Not updated: an EPD override needs its source") && !foot.includes("Result:"));
+     foot.includes("Not updated: An EPD override needs its source") && !foot.includes("Result:"));
+  // NARROWED 22 Oct 2026 (claude/error-words): "what did not happen." + the server's sentence as a sentence (capital, full stop)
   ok("🔴 CARBON DOM: ...and Set is disabled, its reason the same sentence",
-     setBtn().disabled && step6().textContent.includes("Not updated: an EPD override needs its source (the EPD's reference)"));
+     setBtn().disabled && step6().textContent.includes("Not updated: An EPD override needs its source (the EPD's reference)."));
   ok("CARBON DOM: ...the EPD fields say what they need, and the material says an EPD is in use",
      host.textContent.includes("Add the EPD reference: the result does not update until it has one.")
      && host.textContent.includes("Supplier EPD in use: 5 kgCO2e per tonne, so recycled content and reuse do not apply"));
   act(() => { byText(host, "button", "Download the summary (PDF)").click(); });
   await settle(100);
   const dl = byText(host, "button", "Download the summary (PDF)");
+  // NARROWED 22 Oct 2026 (claude/error-words): "what did not happen." + the server's sentence as a sentence (capital, full stop)
   ok("⭐ CARBON DOM: a failed summary is said under its own button, in the server's words, and does not touch the scenario's error",
-     dl && dl.nextElementSibling && dl.nextElementSibling.textContent === "The summary could not be made: the PDF library is not installed here"
-     && host.querySelector("#carbon-step-5").textContent.includes("Not updated: an EPD override needs its source"));
+     dl && dl.nextElementSibling && dl.nextElementSibling.textContent === "The summary could not be made. The PDF library is not installed here."
+     && host.querySelector("#carbon-step-5").textContent.includes("Not updated: An EPD override needs its source"));
   const ref = host.querySelectorAll('input[placeholder="for example, the EPD number"]')[0];
   await setVal(ref, "EPD-123");
   await settle(450);
@@ -342,9 +348,10 @@ async function carbonTargetDom(){
   act(() => { byText(d4.el, "button", "Download the PDF").click(); });
   await settle(50);
   const bmErr = d4.el.querySelector(".bm-err");
+  // NARROWED 22 Oct 2026 (claude/error-words): "what did not happen." + the server's sentence as a sentence (capital, full stop)
   ok("⭐ BULLETIN DOM: Download asks the server for that month's PDF; a refusal is said under it, in the server's words",
      bulletinCalls.length === 1 && bulletinCalls[0] === "/api/bulletin/month.pdf?month=10" && !!bmErr
-     && bmErr.textContent === "The bulletin could not be made: reportlab is not installed: test" && saved.length === 0);
+     && bmErr.textContent === "The bulletin could not be made. Reportlab is not installed: test." && saved.length === 0);
   pdfReply = () => reply(200, "%PDF-");
   act(() => { byText(d4.el, "button", "Download the PDF").click(); });
   await settle(50);
@@ -546,8 +553,9 @@ async function clpDom(){
      calls.length === 1 && calls[0].url === `/api/clp/pack.pdf?month=${thisMonth}` && made[0] === "wayscope-clp-pack-2026-10.pdf", JSON.stringify(calls) + " " + JSON.stringify(made));
   const xBtn = [...el.querySelectorAll("[data-clp-pack] button")].find(b => b.textContent === "CLP pack (XLSX)");
   await act(async () => { xBtn.click(); await sleep(30); });
+  // NARROWED 22 Oct 2026 (claude/error-words): "what did not happen." + the server's sentence as a sentence (capital, full stop)
   ok("CLP DOM (W10): a refused pack says why, in words",
-     !!el.querySelector('[data-clp-pack-error="1"]') && el.querySelector('[data-clp-pack-error="1"]').textContent === "The CLP pack could not be made: openpyxl is not installed");
+     !!el.querySelector('[data-clp-pack-error="1"]') && el.querySelector('[data-clp-pack-error="1"]').textContent === "The CLP pack could not be made. Openpyxl is not installed.");
   w.HTMLAnchorElement.prototype.click = realClick; w.URL.createObjectURL = realCreate;
   act(() => { r.unmount(); }); el.remove();
 }
