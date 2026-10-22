@@ -4307,10 +4307,10 @@ function AbnormalPage({ meta, access, who }){
     const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
                                              body: body ? JSON.stringify(body) : undefined });
     const j = await r.json().catch(() => ({}));
-    if(!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : `Not done (${r.status}).`);
+    if(!r.ok) throw errOf(r.status, j);   // the server's own sentence, else the words; never the status number
     return j;
   };
-  const load = () => call("/abnormal").then(j => { setData(j); setErr(""); setBans(null); }).catch(e => { setErr(e.message); });
+  const load = () => call("/abnormal").then(j => { setData(j); setErr(""); setBans(null); }).catch(e => { setErr(errMsg(e)); });
   useEffect(() => { load(); }, []);
   // the live panel: the rules for the figures as typed, a moment after the last keystroke
   const figKey = form ? JSON.stringify(AL_FIGURE_KEYS.map(k => form[k])) : "";
@@ -4323,7 +4323,7 @@ function AbnormalPage({ meta, access, who }){
     const t = setTimeout(() => { call(`/abnormal/rules?${q.toString()}`).then(setPreview).catch(() => {}); }, 350);
     return () => clearTimeout(t);
   }, [figKey]);
-  const act = async (fn) => { setBusy(true); setNote(null); try { await fn(); } catch(e){ setNote({ ok: false, text: e.message }); } setBusy(false); };
+  const act = async (fn) => { setBusy(true); setNote(null); try { await fn(); } catch(e){ setNote({ ok: false, text: errMsg(e) }); } setBusy(false); };
   const startNew = () => { setForm({ ...AL_BLANK, ipt: teamLocked ? access.ipt : "" }); setPreview(null); setNote(null); };
   const startEdit = (m) => {
     const f = { ...AL_BLANK };
@@ -4375,7 +4375,7 @@ function AbnormalPage({ meta, access, who }){
   // phase 3 (D73): the documents come through the app's fetch (the sign-in's headers), never a bare link
   const dl = (path, fallback) => act(async () => {
     const r = await fetch(`${API}${path}`);
-    if(!r.ok){ let d = ""; try { d = (await r.json()).detail || ""; } catch(e){ d = ""; } throw new Error(d || `error ${r.status}`); }
+    if(!r.ok) throw await errFrom(r);
     const blob = await r.blob();
     const cd = (r.headers && r.headers.get && r.headers.get("Content-Disposition")) || "";
     const mm = cd.match(/filename="([^"]+)"/);

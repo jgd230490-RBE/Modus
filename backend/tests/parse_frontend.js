@@ -4017,6 +4017,16 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   }
 }
 
+// 22 Oct 2026 (UI fix 8 branch): the abnormal loads page (#124) merged after the ERROR WORDS guard (#125) with two raw-status
+// messages ("Not done (403)." / "error 500"), which turned main's CI red. Its fetches now go through the shared helper.
+{
+  const i = src.indexOf("function AbnormalPage("), _ab = i < 0 ? "" : src.slice(i, src.indexOf("\nfunction ", i + 10));
+  ok("🔴 ERROR WORDS (abnormal loads): the page's call() throws errOf(status, reply), its documents errFrom(r)",
+     _ab.includes("if(!r.ok) throw errOf(r.status, j);") && _ab.includes("if(!r.ok) throw await errFrom(r);"));
+  ok("🔴 ERROR WORDS (abnormal loads): what the page shows goes through errMsg (load and act), never a bare e.message",
+     _ab.includes(".catch(e => { setErr(errMsg(e)); });") && _ab.includes("setNote({ ok: false, text: errMsg(e) })") && !/r\.status\}|text: e\.message|setErr\(e\.message\)/.test(_ab));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
