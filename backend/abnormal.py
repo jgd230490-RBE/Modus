@@ -441,6 +441,11 @@ def update(movement_id, payload, acc, by=None):
     merged.update(vals)
     merged["updated_by"], merged["updated_at"] = by, _now()
     _write_typed(movement_id, merged)
+    # 22 Oct 2026 (phase 2): a changed end, gate or size makes a stored line stale — it is dropped, never kept
+    # under figures it was not drawn for (the typed pinch-point rows stay)
+    import abnormal_route as _ar
+    if row.get("geometry_json") and any(k in vals and vals[k] != row.get(k) for k in _ar.ROUTE_FIELDS):
+        _ar.clear_route(movement_id, by=by)
     return {"ok": True, "movement": decorate(get(movement_id))}
 
 
@@ -530,13 +535,32 @@ def decorate(row, today=None, feed=None, bans=None, locs=None, gates=None, label
                                holidays_feed=feed, nation=nat, time_bans=bans)
     d["flags"] = d["advice"]["flags"]
     d["public"] = d.get("status") in ("approved", "notified", "moved")      # D68: approved-or-later reaches the public map
-    for k in ("geometry_json", "return_geometry_json", "here_notices_json", "limits_hits_json", "pinch_json", "via_json"):
+    for k in ("geometry_json", "return_geometry_json", "here_notices_json", "actions_json", "roads_json", "limits_hits_json",
+              "pinch_json", "via_json"):
         v = d.pop(k, None)
         try:
             d[k[:-5]] = json.loads(v) if v else None
         except Exception:
             d[k[:-5]] = None
     d["routed"] = bool(d.get("geometry"))
+    # 22 Oct 2026 (phase 2): the line's facts for the page and the map — the roads in words, HERE's notes (a size HERE
+    # capped, a return leg not drawn), the candidates and the typed rows apart, the limit hits over the line
+    if d["routed"]:
+        import abnormal_route as _ar
+        hn = d.get("here_notices") or {}
+        d["roads_words"] = _ar.roads_sentence(d.get("roads") or [])
+        d["route_notes"] = list(hn.get("notes") or [])
+        d["has_motorway"] = bool(hn.get("has_motorway"))
+        d["candidates"] = [c for c in (d.get("pinch") or []) if c.get("source") != "typed"]
+        d["typed_points"] = [c for c in (d.get("pinch") or []) if c.get("source") == "typed"]
+        d["limit_exceeds"] = [h for h in (d.get("limits_hits") or []) if h.get("verdict") == "exceeds"]
+        if d["limit_exceeds"]:
+            d["flags"] = list(d["flags"]) + [{"code": "AIL_ROAD_LIMIT",
+                                             "text": f"{len(d['limit_exceeds'])} signed limit{'s' if len(d['limit_exceeds']) != 1 else ''} on the line the load is over: "
+                                                     + "; ".join(h.get("headline") or "" for h in d["limit_exceeds"][:3])}]
+        d["route_words"] = _ar.INDICATIVE_WORDS
+    else:
+        d["candidates"], d["typed_points"], d["limit_exceeds"], d["route_notes"] = [], [c for c in (d.get("pinch") or []) if c.get("source") == "typed"], [], []
     return d
 
 

@@ -1785,6 +1785,18 @@ with TestClient(main.app, base_url="https://testserver") as c:
        c.get("/api/abnormal/AL001", headers={"X-Access-Code": "central-code-xyz"}).status_code in (401, 404)
        and c.delete("/api/abnormal/AL001", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
        and c.get("/api/abnormal", headers=PLAN).json().get("count") == 0)
+    # 22 Oct 2026 (phase 2): the route at the typed size — no HERE key on this harness, so the bake says so; via points; the staff map's collection
+    ok("🔴 abnormal loads, the route: the map cookie gets 401 on the staff collection; a team code may not route (403); a planner's bake with no HERE key is a 400 in words",
+       c.get("/api/abnormal/geojson").status_code == 401 and c.get("/api/abnormal/geojson", headers=NORTH).status_code == 200
+       and c.post("/api/abnormal", json={"name": "Beams", "ipt": "IPT1", "origin_id": "L002", "dest_id": "L008", "date_from": "2027-04-12", "width_m": 2.8,
+                                         "height_m": 4.2, "length_m": 36, "gross_t": 78, "max_axle_t": 11, "axle_count": 8}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.post("/api/abnormal/AL001/route", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
+       and c.post("/api/abnormal/AL001/route", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
+       and "HERE_API_KEY" in c.post("/api/abnormal/AL001/route", headers=dict(PLAN, **{"X-Wayscope": "1"})).json().get("detail", "")
+       and c.put("/api/abnormal/AL001/via", json={"via": [[52.6, -0.9]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
+       and c.put("/api/abnormal/AL001/via", json={"via": [[95, 0]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
+       and c.get("/api/abnormal/geojson", headers=PLAN).json().get("count") == 0
+       and c.delete("/api/abnormal/AL001", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",

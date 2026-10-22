@@ -3049,6 +3049,59 @@ def abnormal_create(body: AbnormalIn):
     return _abnormal_result(abnormal.create(sent, acc, by=acc.get("name") or acc.get("label")))
 
 
+@app.get("/api/abnormal/geojson")
+def abnormal_geojson(request: Request = None):
+    """
+    22 Oct 2026 (phase 2, D67): the abnormal loads' own lines and their potential pinch points for the STAFF map's
+    group — every movement the caller may see, as GeoJSON (a LineString per drawn leg, a Point per candidate). Staff
+    only like the community layer: a valid code, a login or the staff cookie; the map password's cookie gets 401.
+    The public map's layer (approved-or-later, the words a visitor may read) is phase 3's own endpoint.
+    """
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the abnormal loads are for staff")
+    import abnormal_route
+    acc = access.current()
+    return abnormal_route.feature_collection(abnormal.page(acc)["movements"], public=False)
+
+
+class ViaIn(BaseModel):
+    via: List[list] = []
+
+
+@app.post("/api/abnormal/{movement_id}/route")
+def abnormal_route_bake(movement_id: str):
+    """
+    Draw the movement's own line with HERE at the typed size (D67) — one HERE call, two with an abnormal return leg —
+    and store the line, HERE's turn-by-turn, the roads in words, the signed-limit hits at the load's size and the
+    potential pinch points. A planner or an admin (a HERE call is spent); a team code may look, not route.
+    """
+    acc = _require_approver()
+    import abnormal_route
+    row = abnormal.get(movement_id)
+    if not row or not abnormal._visible(row, acc):
+        raise HTTPException(404, "no such abnormal load")
+    res = abnormal_route.bake(movement_id, by=acc.get("name") or acc.get("label"))
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("error") or "the line could not be drawn")
+    res["movement"] = abnormal.decorate(abnormal.get(movement_id))
+    return res
+
+
+@app.put("/api/abnormal/{movement_id}/via")
+def abnormal_via(movement_id: str, body: ViaIn):
+    """The planner's via points ([[latitude, longitude], …] in travel order, at most 10) to follow the haulier's agreed
+    route; the line is drawn again on the next Route press. A planner or an admin."""
+    acc = _require_approver()
+    import abnormal_route
+    row = abnormal.get(movement_id)
+    if not row or not abnormal._visible(row, acc):
+        raise HTTPException(404, "no such abnormal load")
+    res = abnormal_route.set_via(movement_id, body.via, by=acc.get("name") or acc.get("label"))
+    if not res.get("ok"):
+        raise HTTPException(400, "; ".join(res.get("problems") or ["not saved"]))
+    return res
+
+
 @app.get("/api/abnormal/{movement_id}")
 def abnormal_one(movement_id: str):
     acc = _require_access()

@@ -645,6 +645,185 @@ ok("the audit middleware logs the writes like any other (none of the paths is in
 ok("the preview returns the same shape as a stored movement's advice",
    set(A.preview(BEAM, date_from="2027-04-12")) == set(A.decorate(A.get("AL001"))["advice"]))
 
+# =========================================================================== #
+#  15. Phase 2: the route at the typed size and the potential pinch points      #
+# =========================================================================== #
+# The HERE answer below is SYNTHETIC, shaped exactly as the probe of 22 Oct 2026 showed HERE's to be
+# (notes/abnormal-loads-1022-probe, not in git): sections with a polyline, summary, actions (action / direction /
+# severity / exit / offset / length / duration / instruction) and spans (offset / length / names / routeNumbers /
+# functionalClass); offsets index the section's points. No real HERE line is committed.
+import abnormal_route as AR  # noqa: E402
+import limits as LIM  # noqa: E402
+LIM.init_db()
+_SENT = []
+
+
+def _here_stub(points, actions=None, spans=None, notices=None, sections=1):
+    """A here_routing.routes() stand-in: one route, `sections` sections over the same points (the join is what is tested)."""
+    def _routes(o_lat, o_lon, d_lat, d_lon, profile, **kw):
+        _SENT.append({"origin": (o_lat, o_lon), "dest": (d_lat, d_lon), **kw})
+        parts = []
+        if sections == 1:
+            parts.append({"geometry": points, "distance_km": 10.0, "duration_hr": 0.25, "actions": actions or [], "spans": spans or [],
+                          **({"notices": notices} if notices else {})})
+        else:
+            cut = len(points) // 2
+            parts.append({"geometry": points[:cut + 1], "distance_km": 5.0, "duration_hr": 0.12, "actions": [a for a in (actions or []) if a["offset"] <= cut],
+                          "spans": [s for s in (spans or []) if s["offset"] <= cut]})
+            parts.append({"geometry": points[cut:], "distance_km": 5.0, "duration_hr": 0.13,
+                          "actions": [dict(a, offset=a["offset"] - cut) for a in (actions or []) if a["offset"] > cut],
+                          "spans": [dict(s, offset=s["offset"] - cut) for s in (spans or []) if s["offset"] > cut]})
+        return [{"geometry": points, "distance_km": 10.0, "duration_hr": 0.25, "sections": parts}]
+    return _routes
+
+
+# a line of 12 points heading north-east, with a sharp zigzag at points 8-10 (a 90° bend inside 30 m)
+PTS = [[-0.92 + i * 0.001, 52.48 + i * 0.0008] for i in range(8)]
+PTS += [[PTS[-1][0] + 0.0002, PTS[-1][1]], [PTS[-1][0] + 0.0002, PTS[-1][1] + 0.0002], [PTS[-1][0] + 0.0004, PTS[-1][1] + 0.0002], [PTS[-1][0] + 0.002, PTS[-1][1] + 0.0018]]
+ACTS = [{"action": "depart", "offset": 0, "length": 100, "duration": 10, "instruction": "Head northeast on Roman Way. Go for 100 m."},
+        {"action": "turn", "direction": "right", "severity": "quite", "offset": 2, "length": 183, "duration": 27, "instruction": "Turn right onto Doddridge Road. Go for 183 m."},
+        {"action": "roundaboutExit", "direction": "left", "exit": 2, "offset": 4, "length": 1346, "duration": 101, "instruction": "Take the 2nd exit from roundabout onto Leicester Road (B6047). Go for 1.3 km."},
+        {"action": "roundaboutPass", "direction": "left", "offset": 5, "length": 15043, "duration": 905, "instruction": "Pass 3 roundabouts and continue on Leicester Road (A607). Go for 15.0 km."},
+        {"action": "ramp", "direction": "right", "offset": 6, "length": 1705, "duration": 78, "instruction": "Take right ramp onto A46 toward Newark/Syston. Go for 1.7 km."},
+        {"action": "arrive", "offset": 11, "length": 0, "duration": 0, "instruction": "Arrive at your destination."}]
+SPANS = [{"offset": 0, "length": 300, "names": [{"value": "Roman Way", "language": "en"}], "functionalClass": 5},
+         {"offset": 2, "length": 400, "names": [{"value": "Doddridge Road", "language": "en"}], "functionalClass": 5},
+         {"offset": 4, "length": 1346, "names": [{"value": "Leicester Road", "language": "en"}], "routeNumbers": [{"value": "B6047", "language": "en"}], "functionalClass": 3},
+         {"offset": 6, "length": 9000, "routeNumbers": [{"value": "M1", "language": "en"}], "functionalClass": 1}]
+reset_db()
+tenant_package.import_rows("locations", [{"id": "L020", "name": "Precast works", "loc_type": "Precast works", "role": "origin", "lat": 52.5765, "lon": -1.329}])
+os.environ.pop("HERE_API_KEY", None)
+_u = A.create(dict(BEAM, name="Units", ipt="IPT2", origin_id="L001", dest_id="L006", dest_gate_id="G009", width_m=4.6, height_m=3.9, length_m=16.5, gross_t=40, max_axle_t=9, axle_count=6), PLANNER)["movement"]
+_b = A.create(dict(BEAM, name="Beams", ipt="IPT1", origin_id="L020", dest_id="L008", dest_gate_id="G012", return_abnormal=False), PLANNER)["movement"]
+_vp, _vn = AR.vehicle_params(A.get(_b["id"]))
+ok("⭐ ROUTE: HERE's truck parameters come from the typed figures (kg and cm), and a length over HERE's 30 m maximum is drawn at 30 m and SAID",
+   _vp == {"transportMode": "truck", "vehicle[grossWeight]": 78000, "vehicle[weightPerAxle]": 11000, "vehicle[height]": 420, "vehicle[width]": 280,
+           "vehicle[length]": 3000, "vehicle[axleCount]": 8}
+   and _vn == ["HERE takes a length of at most 30 m: the line is drawn for 30 m, the load is 36 m"] and AR.HERE_MAX_CM == {"height": 5000, "width": 5000, "length": 3000})
+ok("ROUTE: a movement with no heaviest axle or axle count sends neither",
+   "vehicle[weightPerAxle]" not in AR.vehicle_params(dict(BEAM, max_axle_t=None, axle_count=None))[0] and "vehicle[axleCount]" not in AR.vehicle_params(dict(BEAM, max_axle_t=None, axle_count=None))[0])
+_nk = AR.bake(_u["id"])
+ok("🔴 ROUTE: with no HERE key nothing is drawn, the reason is stored on the movement and returned, nothing raised",
+   not _nk["ok"] and "HERE_API_KEY" in _nk["error"] and A.get(_u["id"])["bake_error"] == _nk["error"] and A.get(_u["id"])["geometry_json"] is None)
+_r = AR.bake(_u["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])
+_m = A.decorate(A.get(_u["id"]))
+ok("⭐ ROUTE: the bake sends the typed vehicle and the probe's extras (actions, instructions; spans names, routeNumbers, functionalClass, length, notices), "
+   "gate to gate (the destination's named gate), no via",
+   _r["ok"] and _SENT[-1]["vehicle"]["vehicle[width]"] == 460 and _SENT[-1]["extras"] == AR.EXTRAS and _SENT[-1]["dest"] == (52.554, -0.894)
+   and _SENT[-1]["via"] is None and _SENT[-1]["alternatives"] == 1)
+ok("⭐ ROUTE: the line, its length and time, HERE's turn-by-turn and the roads in words are stored; the movement reads as routed",
+   _m["routed"] and len(_m["geometry"]) == 12 and _m["distance_km"] == 10.0 and _m["duration_hr"] == 0.25 and _m["baked_at"] and _m["bake_error"] is None
+   and [a["action"] for a in _m["actions"]] == ["depart", "turn", "roundaboutExit", "roundaboutPass", "ramp", "arrive"]
+   and _m["roads_words"] == "Roman Way, Doddridge Road, B6047 Leicester Road, M1" and _m["has_motorway"] is True)
+_c = {c["kind"]: c for c in _m["candidates"]}
+ok("⭐ CANDIDATES: a turn (with HERE's severity word), a roundabout exit (with its number), a 'pass N roundabouts' stretch (N read from HERE's words); "
+   "no slip road for a load that is not long; each placed on the line at HERE's offset; every one Grey, 'here'",
+   [c["kind"] for c in _m["candidates"]] == ["turn", "roundabout", "roundabout"]
+   and _c["turn"]["words"] == "Turn right onto Doddridge Road" and _c["turn"]["detail"] == "HERE calls it a quite turn"
+   and any(c["words"] == "Roundabout: 2nd exit onto Leicester Road (B6047)" for c in _m["candidates"])
+   and any(c["words"] == "Passes 3 roundabouts on Leicester Road (A607)" for c in _m["candidates"])
+   and _c["turn"]["lon"] == PTS[2][0] and _c["turn"]["lat"] == PTS[2][1] and all(c["grade"] == "grey" and c["source"] == "here" for c in _m["candidates"])
+   and [c["id"] for c in _m["candidates"]] == ["P1", "P2", "P3"], str(_m["candidates"])[:300])
+ok("CANDIDATES: no bends for a load that is not long (16.5 m)", not any(c["kind"] == "bend" for c in _m["candidates"]))
+_r2 = AR.bake(_b["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])
+_mb = A.decorate(A.get(_b["id"]))
+ok("⭐ CANDIDATES: for a LONG load (36 m) the slip road joins the list and the zigzag in the line is a sharp bend, placed on the line, worded with its angle and its road",
+   [c["kind"] for c in _mb["candidates"]] == ["turn", "roundabout", "roundabout", "slip_road", "bend"]
+   and any(c["words"] == "Take right ramp onto A46 toward Newark/Syston" for c in _mb["candidates"])
+   and any(c["kind"] == "bend" and c["words"].startswith("Sharp bend (90°)") and "on M1" in c["words"] and c["lon"] == PTS[8][0] for c in _mb["candidates"]),
+   str([c["words"] for c in _mb["candidates"]]))
+ok("CANDIDATES: the bend rule is 60° within 40 m, a bend within 30 m of a HERE turn is that turn; a long load is over 25.9 m overall or 18.75 m rigid",
+   AR.BEND_DEG == 60.0 and AR.BEND_WINDOW_M == 40.0 and AR.BEND_NEAR_M == 30.0 and AR.is_long({"length_m": 25.9}) is False and AR.is_long({"length_m": 25.91}) is True
+   and AR.bends(PTS, {"length_m": 36}, SPANS, taken_points=[PTS[8]]) == []
+   and AR.is_long({"length_m": 16, "rigid_length_m": 18.76}) is True)
+ok("ROUTE: the capped length is a note on the movement, read by the page", _mb["route_notes"] == ["HERE takes a length of at most 30 m: the line is drawn for 30 m, the load is 36 m"])
+# the signed limits at the LOAD's size: a 4.0 m height limit along the line, a 4.2 m load
+_lim = [{"source": "osm", "ext_id": "w1", "kind": "height", "value": 4.0, "unit": "m", "signed": "4.0 m", "name": "Melton Road", "ref": None, "exceptions": None,
+         "geom_type": "LineString", "geometry": [PTS[3], PTS[4], PTS[5]], "length_m": 200.0, "anchor_lon": PTS[4][0], "anchor_lat": PTS[4][1]},
+        {"source": "osm", "ext_id": "w2", "kind": "weight", "value": 7.5, "unit": "t", "signed": None, "name": "Back Lane", "ref": None, "exceptions": "except for access",
+         "geom_type": "LineString", "geometry": [[0.5, 51.0], [0.5, 51.01]], "length_m": 1100.0, "anchor_lon": 0.5, "anchor_lat": 51.0},
+        {"source": "osm", "ext_id": "n1", "kind": "axle", "value": 10.0, "unit": "t", "signed": None, "name": "Bridge", "ref": None, "exceptions": None,
+         "geom_type": "Point", "geometry": PTS[6], "length_m": None, "anchor_lon": PTS[6][0], "anchor_lat": PTS[6][1]}]
+_r3 = AR.bake(_b["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS), _limits=_lim)
+_mb = A.decorate(A.get(_b["id"]))
+_hits = {h["ext_id"]: h for h in _mb["limits_hits"]}
+ok("⭐ LIMITS AT THE LOAD'S SIZE: the 4.0 m height limit the line runs along is 'exceeds' for a 4.2 m load (judged against the TYPED height, not a lorry profile); "
+   "the 10 t axle point limit is 'exceeds' for an 11 t axle (a lorry's check could never compare an axle); the limit off the line is not a hit",
+   _hits["w1"]["verdict"] == "exceeds" and _hits["w1"]["vehicle_value"] == 4.2 and _hits["w1"]["margin"] == -0.2 and _hits["w1"]["vehicle_profile"] == "the load"
+   and _hits["n1"]["verdict"] == "exceeds" and _hits["n1"]["point"] is True and "w2" not in _hits and _r3["exceeds"] == 2, str(_mb["limits_hits"])[:400])
+ok("⭐ …each 'exceeds' is a candidate too (Grey, 'limits', placed at the limit's anchor), and the movement carries the AIL_ROAD_LIMIT flag naming the limits",
+   [c["kind"] for c in _mb["candidates"]].count("limit") == 2 and any(c["words"].startswith("Height limit 4") and "4.2 m is over it" in c["words"] for c in _mb["candidates"])
+   and [f["code"] for f in _mb["flags"]][-1] == "AIL_ROAD_LIMIT" and "Height limit" in _mb["flags"][-1]["text"] and len(_mb["limit_exceeds"]) == 2,
+   str([c["words"] for c in _mb["candidates"] if c["kind"] == "limit"]) + str(_mb["flags"]))
+ok("LIMITS: 'at the limit' is a candidate, 'within' is a hit only; a load with no axle typed gets 'unknown' on an axle limit, never a guess",
+   LIM.assess_dims({"kind": "height", "value": 4.2}, {"height_m": 4.2})["verdict"] == "at_limit"
+   and LIM.assess_dims({"kind": "height", "value": 4.5}, {"height_m": 4.2})["verdict"] == "within"
+   and LIM.assess_dims({"kind": "axle", "value": 10.0}, {"axle_t": None})["verdict"] == "unknown"
+   and AR.limit_candidates([{"verdict": "within", "headline": "x", "vehicle_value": 1, "unit": "m"}]) == [])
+# two HERE sections (a via point): the offsets are made global so every candidate lands on the joined line
+_r4 = AR.bake(_u["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS, sections=2), _limits=[])
+_mu = A.decorate(A.get(_u["id"]))
+ok("⭐ ROUTE: with via points HERE answers in sections; the geometry, the actions and the spans are joined and the offsets made global, so the candidates sit where they did",
+   len(_mu["geometry"]) == 12 and [c["lon"] for c in _mu["candidates"]] == [PTS[2][0], PTS[4][0], PTS[5][0]] and _mu["roads_words"] == "Roman Way, Doddridge Road, B6047 Leicester Road, M1")
+ok("VIA: a planner's via points are kept as [lat, lon] pairs (at most 10), a bad pair refused in words, and sent to HERE on the next bake",
+   AR.set_via(_u["id"], [[52.5, -0.9], [52.51, -0.89]], by="P")["ok"] and AR.via_points(A.get(_u["id"])) == [[52.5, -0.9], [52.51, -0.89]]
+   and not AR.set_via(_u["id"], [[95, 0]])["ok"] and not AR.set_via(_u["id"], [[52.5, -0.9]] * 11)["ok"]
+   and AR.bake(_u["id"], _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])["ok"] and _SENT[-1]["via"] == [[52.5, -0.9], [52.51, -0.89]])
+# the return leg
+_cr = A.create(dict(BEAM, name="Crane", ipt="IPT1", origin_id="L001", dest_id="L008", return_abnormal=True, length_m=16, width_m=3.0, gross_t=72, max_axle_t=12, axle_count=6), PLANNER)["movement"]
+_r5 = AR.bake(_cr["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])
+ok("⭐ RETURN LEG: drawn only when the return is abnormal too (a crane): two HERE calls, the second back the other way; the beams' empty trailer gets none",
+   _r5["return_drawn"] and A.decorate(A.get(_cr["id"]))["return_geometry"] == PTS and _SENT[-1]["origin"] == (52.741, -0.872) and _SENT[-1]["dest"] == (52.6, -1.3)
+   and not _r2["return_drawn"] and A.decorate(A.get(_b["id"]))["return_geometry"] is None, str(_SENT[-1]["origin"]) + str(_SENT[-1]["dest"]))
+# stale lines
+_typed = [{"source": "typed", "kind": "bridge", "place": "Welland bridge", "words": "Arch bridge, 3.9 m at the kerb", "grade": "amber"}]
+A._write_typed  # the planner's own rows live in pinch_json beside the candidates
+db.execute("UPDATE abnormal_loads SET pinch_json = ? WHERE tenant_id = ? AND id = ?",
+           (json.dumps(A.decorate(A.get(_b["id"]))["pinch"] + _typed), db.current_tenant(), _b["id"]))
+A.update(_b["id"], {"note": "a note"}, PLANNER)
+ok("STALE: a change that does not touch the ends or the size keeps the line", A.decorate(A.get(_b["id"]))["routed"])
+A.update(_b["id"], {"width_m": 3.5}, PLANNER)
+_mb2 = A.decorate(A.get(_b["id"]))
+ok("🔴 STALE: a changed size (or end, gate, axle, return) drops the stored line, HERE's words, the hits and the found candidates — the planner's own rows stay",
+   not _mb2["routed"] and _mb2["geometry"] is None and _mb2["roads"] is None and _mb2["limits_hits"] is None and _mb2["candidates"] == []
+   and _mb2["typed_points"] == [dict(_typed[0], id="T1")] and _mb2["flags"] == [] and AR.ROUTE_FIELDS == ("origin_id", "origin_gate_id", "dest_id", "dest_gate_id", "width_m", "height_m", "length_m", "gross_t", "max_axle_t", "axle_count", "return_abnormal"))
+_r6 = AR.bake(_b["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])
+ok("…and a re-bake keeps the typed rows beside the new candidates, numbered apart (P… and T…)",
+   [c["id"] for c in A.decorate(A.get(_b["id"]))["typed_points"]] == ["T1"] and A.decorate(A.get(_b["id"]))["candidates"][0]["id"] == "P1")
+# HERE failing
+_r7 = AR.bake(_cr["id"], _routes=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("HTTP 400: E605024")))
+ok("ROUTE: a HERE error is stored on the movement in words and returned, never raised; the old line is kept until a bake succeeds",
+   not _r7["ok"] and "HERE could not draw the line" in _r7["error"] and "E605024" in A.get(_cr["id"])["bake_error"] and A.get(_cr["id"])["geometry_json"])
+# the collections
+A.set_status(_u["id"], "approved", PLANNER)
+_all = A.page(PLANNER)["movements"]
+_fs = AR.feature_collection(_all)
+_fp = AR.feature_collection(_all, public=True)
+ok("⭐ MAP (staff): a LineString per drawn leg (the crane's two), a Point per candidate with its words, grade and kind word; the count is the movements drawn",
+   _fs["count"] == 3 and len([f for f in _fs["features"] if f["geometry"]["type"] == "LineString"]) == 4
+   and all(f["properties"]["grade_word"] == "Grey — to survey" for f in _fs["features"] if f["geometry"]["type"] == "Point")
+   and any(f["properties"]["kind_word"] == "Roundabout" and f["properties"]["movement"] == "Units" for f in _fs["features"] if f["geometry"]["type"] == "Point")
+   and _fs["words"]["candidates"] == AR.CANDIDATE_WORDS and [g["key"] for g in _fs["grades"]] == ["grey", "green", "amber", "red", "black"])
+ok("🔴 MAP (public, D68): approved-or-later only (the units), no Points, and only the words a visitor may read — the kind, the window and the band (never an hour), "
+   "'escorted', the roads in words, 'Indicative route; the agreed route may differ.' — never the team, the size, the references, the candidates",
+   _fp["count"] == 1 and all(f["geometry"]["type"] == "LineString" for f in _fp["features"]) and _fp["features"][0]["properties"]["id"] == _u["id"]
+   and set(_fp["features"][0]["properties"]) == {"id", "name", "date_from", "date_to", "time_band", "movements", "escorted", "roads", "indicative", "kind", "public_words", "leg"}
+   and _fp["features"][0]["properties"]["public_words"] == "Indicative route; the agreed route may differ." and _fp["words"]["candidates"] is None and _fp["grades"] is None)
+ok("MAP: the words — indicative line (HERE at the load's size; ESDAL and the survey govern), counted apart", "ESDAL route and route survey govern" in AR.INDICATIVE_WORDS
+   and "not in the movement counts" in _fs["words"]["counted_apart"])
+ok("ROUTE: the here_routing call takes a typed vehicle and extras in place of a profile, and keeps HERE's actions, spans and notices on each section; nothing changes for a bake that passes neither",
+   'def routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,\n           alternatives=1, laden=True, via=None, pass_through=False,\n           departure_time=None, vehicle=None, extras=None):' in read("backend/here_routing.py")
+   and 'params.update(vehicle if vehicle else _truck_params(profile, factors, laden=laden))' in read("backend/here_routing.py")
+   and 'for k in ("actions", "spans", "notices"):\n                if sec.get(k):\n                    part[k] = sec[k]' in read("backend/here_routing.py"))
+_main2 = read("backend/main.py")
+ok("ENDPOINTS: POST /api/abnormal/{id}/route and PUT …/via are a planner's (an approver), GET /api/abnormal/geojson is staff only (the map cookie 401), all before the {movement_id} read",
+   re.search(r'@app\.post\("/api/abnormal/\{movement_id\}/route"\)\ndef \w+\(movement_id: str\):\n(?:\s+""".*?"""\n)?\s+acc = _require_approver\(\)', _main2, re.S)
+   and re.search(r'@app\.put\("/api/abnormal/\{movement_id\}/via"\)\ndef \w+\(movement_id: str, body: ViaIn\):\n(?:\s+""".*?"""\n)?\s+acc = _require_approver\(\)', _main2, re.S)
+   and re.search(r'@app\.get\("/api/abnormal/geojson"\)\ndef \w+\(request: Request = None\):\n(?:\s+""".*?"""\n)?\s+if not _staff_request\(request\):', _main2, re.S)
+   and _main2.index('"/api/abnormal/geojson"') < _main2.index('@app.get("/api/abnormal/{movement_id}")'))
+ok("the words in the route module: lorry never truck, no compliant, no approved by, nothing predicted",
+   not re.search(r"\btrucks?\b|\bcompliant\b|\bapproved by\b|predict", re.sub(r"#.*", "", read("backend/abnormal_route.py")).replace('"transportMode": "truck"', "").replace("transportMode", ""), re.I))
+
 try:
     remove_scratch_db(db, TMP)
 except Exception:

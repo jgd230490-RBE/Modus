@@ -1405,6 +1405,8 @@ _TENANT_DDL = {
             baked_at           TEXT,
             bake_error         TEXT,
             here_notices_json  TEXT,
+            actions_json       TEXT,
+            roads_json         TEXT,
             limits_hits_json   TEXT,
             limits_checked_at  TEXT,
             pinch_json         TEXT,
