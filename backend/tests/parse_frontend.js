@@ -3758,6 +3758,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("UI FIX 7: what left the screens and is still worth knowing is in the technical guide, T2 'What the screens leave out'",
      _tg.includes('<h2 id="t2-left-out">What the screens leave out</h2>') && _tg.includes("Splice is always right and costs two calls a leg")
      && _tg.includes("A route with haul roads attached costs <code>here_calls_per_bake</code>"));
+  // 22 Oct 2026 (UI fix 7, follow-up): the guide's older lines no longer describe the card and the note this branch removed
+  ok("UI FIX 7: the technical guide no longer places Diagnostics on Data → Routes or an admin-token note under the Locations form",
+     !_tg.includes("<strong>Diagnostics</strong> (Data → Routes) shows") && !_tg.includes("The Data → Locations note now points at the field")
+     && !_tg.includes("tab and the Diagnostics panel)") && _tg.includes("<strong>Diagnostics</strong> left Data → Routes on 22 Oct 2026"));
 }
 
 // ---- report ------------------------------------------------------------------
