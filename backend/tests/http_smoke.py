@@ -511,8 +511,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and _pe["rollup"]["headline"]["routes_in_use"] == 0 and _pe["rollup"]["routes_not_drawn"]["lines"] == 18
        and len(_pe["rollup"]["routes_not_drawn"]["routes"]) == 13
        # NARROWED 12 Oct 2026 (the review and fix pass): plain words, "with no stored road route yet", not "not yet baked"
+       # NARROWED 22 Oct 2026 (words sweep): "not routed yet", as the map says it
        and _pe["rollup"]["note"] == ("No approved forecast on a route the map draws in this month: 18 lines on 13 routes "
-                                     "with no stored road route yet, listed below and not counted.")
+                                     "not routed yet, listed below and not counted.")
        and _pe["conditions"]["route_caps"]["wording"] == "planning flag", f"{r.status_code} {str(_pe)[:300]}")
     # NARROWED 12 Oct 2026 (the tests-and-regressions review): the carbon figures on that empty roll-up are
     # BOTH None (co2_t_a_day used to read 0.0), and there is no co2_error to carry
@@ -1331,7 +1332,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("...empty runs, the month, the loaded leg, the planning block's working days and a note naming the undrawn lines",
        rl.get("runs") == [] and rl.get("month") == 10 and rl.get("leg") == "loaded" and (rl.get("working_days") or 0) > 0
        and rl.get("totals", {}).get("runs") == 0 and rl.get("totals", {}).get("lines") == 0
-       and any("no stored road route" in n and "routes_not_drawn" in n for n in rl.get("notes", [])), str(rl.get("notes")))
+       # NARROWED 22 Oct 2026 (words sweep): the note reads on the map, so it names no field ("routes_not_drawn" left it)
+       and any("18 lines not routed yet, not counted" in n for n in rl.get("notes", []))
+       and not any("routes_not_drawn" in n for n in rl.get("notes", [])), str(rl.get("notes")))
     # NARROWED 14 Oct 2026: 22 October lines on 21 routes (the concrete pour). RE-PINNED 17 Oct 2026 (R2, §3a): 18 on 13
     ok("...and the October demo volume is NOT in the totals (the map draws none of it): all 18 lines named in routes_not_drawn",
        rl.get("totals", {}).get("routes_with_volume") == 0 and rl.get("totals", {}).get("trips") == 0

@@ -264,15 +264,15 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
 
     n = len(m_veh)
     not_drawn_block = {"lines": sum(not_drawn.values()), "routes": sorted(not_drawn),
-                       "note": ("Lines on routes the map does not draw (no stored road route for any vehicle) "
-                                "are not in these figures. They are listed here, not counted as zero.")
+                       "note": ("Lines not routed yet are not in these figures. They are listed here, "
+                                "not counted as zero.")
                        if not_drawn else None}
     if not n:
         nd_lines, nd_routes = sum(not_drawn.values()), len(not_drawn)
         empty_note = ("No approved forecast in this month." if not not_drawn else
                       f"No approved forecast on a route the map draws in this month: {nd_lines} line"
                       f"{'' if nd_lines == 1 else 's'} on {nd_routes} route{'' if nd_routes == 1 else 's'} "
-                      "with no stored road route yet, listed below and not counted.")
+                      "not routed yet, listed below and not counted.")
         return {"empty": True, "months_with_volume": 0, "working_days": wd,
                 "headline": {"two_way_a_day": None, "movements_in_month": None,
                              "working_days": wd, "routes_in_use": 0, "tonnes": None},
@@ -286,7 +286,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
 
     fleet_peak = max(m_fleet)                                    # rule 5: busiest month
     two_way_a_day = _avg(m_veh) / wd
-    unb_label = (f"excludes {unbaked_lines} {_lines(unbaked_lines)} with no stored road route for the vehicle"
+    unb_label = (f"excludes {unbaked_lines} {_lines(unbaked_lines)} not routed yet for the vehicle"
                  if unbaked_lines else None)
 
     # rule 9: the busiest routes, with the four figures the page prints per route
@@ -426,7 +426,7 @@ def _carbon_block(co2_month, co2_day, co2_unbaked, payloads, routes, wd, co2_lin
         "to_date_excludes_unbaked_lines": to_date_unbaked,
         # 12 Oct 2026 (the review and fix pass): plain words for a council reader — "baked" is the
         # team's word for a stored road route; the JSON keys keep it
-        "label_day": ("CO₂e a day" + (f" (excl. {co2_unbaked} {_lines(co2_unbaked)} with no stored road route)"
+        "label_day": ("CO₂e a day" + (f" (excl. {co2_unbaked} {_lines(co2_unbaked)} not routed yet)"
                                       if co2_unbaked else "")),
         "stamp": carbon.SUMMARY_STAMP,
         "rule": "CO₂e = routed km × the vehicle's kg CO₂e/km, approved plan only.",

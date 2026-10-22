@@ -454,7 +454,7 @@ def _council_movements(mi, wd, month_long, A=None, prev=None, prev_long=None, di
         "scheme_line": f"Whole scheme: {_mv(tot.get('movements_per_day'))} two-way movements a day.",
         "footnote": (areas.DOUBLE_COUNT + f" Lorry-{mi_words}: loaded and empty, on the district's roads."),
         "county_lines": county_lines,
-        "notes": [x for x in (A.get("notes") or []) if "clipped" in x or "no stored road route" in x],
+        "notes": [x for x in (A.get("notes") or []) if "not placed in a council" in x or "not routed yet" in x],
     }
 
 
@@ -1122,7 +1122,7 @@ def _svg_scale(v, w, h):
 def _svg_map(S, w=720, h=420):
     P, img, v = _map_view(map_points(S), w, h, 28)
     if P is None:
-        return '<p class="muted">No route with a stored road route to draw this month.</p>'
+        return '<p class="muted">No route is worked out yet to draw this month.</p>'
     label = "Map of this month's planned lorry routes" if img else "Schematic of this month's planned lorry routes"
     out = [f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{label}" class="map">',
            img or f'<rect x="0" y="0" width="{w}" height="{h}" fill="#FAFAF9" stroke="#D6D3D1"/>']
@@ -1412,7 +1412,7 @@ def _routes_html(S):
     e = _e
     rows = S["routes"]
     if not rows:
-        return '<p class="muted">No route with a stored road route carries approved lorries this month.</p>'
+        return '<p class="muted">No worked-out route carries approved lorries this month.</p>'
     vmax = max([r["a_day"] or 0 for r in rows] + [r["cap"] or 0 for r in rows] + [1])
     prev = (S["prev_long"] or "")[:3] or "Last month"
     out = []

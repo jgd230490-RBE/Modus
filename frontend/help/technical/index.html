@@ -51,6 +51,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-carbon">Carbon</a></li>
 <li class="l2"><a href="#t1-cost">Planned cost</a></li>
 <li class="l2"><a href="#t1-fair">Fair cost (the model)</a></li>
+<li class="l2"><a href="#t1-baf">Fuel index and BAF</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li>
 <li class="l2"><a href="#t1-clp">CLP monitoring</a></li>
@@ -61,6 +62,13 @@ main:focus{outline:0}
 <li class="l1"><a href="#t5-errors">T5 Errors and what they mean</a></li>
 <li class="l1"><a href="#t6-words">T6 Old words, new words</a></li>
 <li class="l1"><a href="#t7-reference">T7 Sourced and assumed figures</a></li>
+<li class="l2"><a href="#t7-number">How a haulage number is made</a></li>
+<li class="l2"><a href="#t7-sourced">Sourced or assumed</a></li>
+<li class="l2"><a href="#t7-live">The live sources</a></li>
+<li class="l2"><a href="#t7-not-finished">What is not finished</a></li>
+<li class="l1"><a href="#t8-community">T8 Community considerations</a></li>
+<li class="l1"><a href="#t9-collisions">T9 Collision history</a></li>
+<li class="l1"><a href="#t10-public-map">T10 The public map</a></li>
 </ol></nav>
 <main id="guide-text" tabindex="-1">
 
@@ -163,7 +171,24 @@ negotiation, never a quote, never mixed with a typed rate. Three coefficients ha
 as assumptions. The starting coefficients come from <code>factors.json</code>: <code>fair_price_by_country</code> holds a
 set per country (Great Britain, in £), and <code>fair_price</code> is the set for every other organisation (an Estonian
 set, in EUR). A coefficient missing from the organisation's own block is read from its country's set, and the page offers
-the country's set in one click when the figures differ.</p>
+the country's set in one click when the figures differ. Each coefficient's source is in the file beside it (the screen no longer says &ldquo;see the file&rdquo;): for Great Britain the driver rate is ONS Annual Survey of Hours and Earnings 2025 pay as quoted by DfT, with an assumed employer on-cost multiplier; vehicle standing, running and margin are assumptions (running cross-checked against RHA Cost Tables 2026).</p>
+
+<h2 id="t1-baf">Fuel index and fuel surcharge (BAF)</h2>
+<ul>
+<li><strong>The index.</strong> Great Britain: DESNZ's weekly road fuel prices (ULSD pump price, incl. duty and VAT; the
+widget also shows it ex-VAT). EU countries: the EU Weekly Oil Bulletin. Refreshed in the background, never on a page read;
+an admin can press &ldquo;Fetch this week's DESNZ price now&rdquo; / &ldquo;Get this week's price now&rdquo;. A failed
+refresh keeps the last stored price (its error kept as <code>last_error</code> / <code>last_attempt_at</code>; the widget
+shows &ldquo;update failed …; showing the last price&rdquo; with the raw text on hover). The price reads &ldquo;stale&rdquo;
+once its bulletin date is more than 8 days old.</li>
+<li><strong>Typed index.</strong> Elsewhere, or with no country set, or when nothing is published, an admin types it with
+&ldquo;Use this index&rdquo;: the same index row, marked typed. It is the index, not the yard price.</li>
+<li><strong>Yard &pound;/L</strong> is what the haulier pays at the yard; optional, never replaces the index.</li>
+<li><strong>BAF</strong> = (index &divide; base &minus; 1) &times; fuel share, shown as a second figure beside each quote;
+the quote itself is never replaced. The base is locked by the first Confirm week that finds an index and no base; later
+confirms never move it. One base per organisation, not per haulier. &ldquo;Reset the BAF base&rdquo; clears it, and the
+next Confirm week locks a fresh one.</li>
+</ul>
 
 <h2 id="t1-gates">Gate arrivals</h2>
 <p>Read from <code>GET /api/gates/arrivals?month=N</code> (<code>backend/gate_arrivals.py</code>). The same trips rule,
@@ -254,7 +279,18 @@ and each is spliced between the same two access roads.</li>
 <li><strong>Restrictions.</strong> Checked against the stored route when it is baked and refreshed on demand; the
 check reports what lies within its distance of the baked line, not that it is on your carriageway. The Look-ahead says
 which providers were not checked since baking.</li>
-<li><strong>Cost.</strong> Each bake spends HERE calls; the confirm dialogs say how many before anything runs.</li>
+<li><strong>Cost.</strong> Each bake spends HERE calls. Since 22 Oct 2026 the confirm dialogs no longer count them (the
+words sweep): one call a leg, two for a spliced haul road, both legs per vehicle unless Laden only.</li>
+<li><strong>The cycle source.</strong> <code>cycle_source</code> is <code>here</code> (both legs baked) or
+<code>here_return_estimated</code> (the return taken as the outbound; the screens mark it &ldquo;return estimated&rdquo; and
+&ddagger;). The screens used to print &ldquo;HERE&rdquo; / &ldquo;HERE&ddagger;&rdquo;.</li>
+<li><strong>Average haul speed</strong> (<code>planning.avg_haul_speed_kmh</code>) is read only by the public map's estimate
+for a route with no baked drive time.</li>
+<li><strong>Haul roads and the avoid list.</strong> A haul road is never sent as an avoid-area; routes attached to it are sent
+through it. HERE's own time for a spliced stretch is kept beside the substituted one, so the change is auditable.</li>
+<li><strong>Moving a route's ends.</strong> Its forecast lines (and their month rows) and Look-ahead weeks keep the route id
+and now describe the new haul; the stored route for each vehicle is cleared and baked again.</li>
+<li><strong>Zones in the panel.</strong> The zone panel prints the exact rectangle that will be sent before saving.</li>
 </ul>
 
 <h2 id="t2-left-out">What the screens leave out</h2>
@@ -324,25 +360,36 @@ Users → Activity or <code>GET /api/admin/audit.csv</code>.</li>
 the login ends. The leads CSV gains login, expiry, sign-ins, first and last seen, pages.</li>
 <li><strong>The admin token.</strong> Admin actions (saving Configuration, changing routes, zones and gates, the fuel
 index, Users) pass on an admin LOGIN, or with the token typed in the admin token field (Config → More, the Data pages'
-header, the fuel widget, Users); it is remembered in this browser. It is checked against <code>ADMIN_TOKEN</code> on Render.
+header, the fuel widget, Users); it is remembered in this browser. Since 22 Oct 2026 the field is hidden for an admin login, which never needs it; it shows
+for a shared code and a planner login. It is checked against <code>ADMIN_TOKEN</code> on Render. The first admin is added
+with it: signed in with the shared admin code (or with no admin login yet), open Users, type the admin token, add yourself
+as an Admin, open the link in the email, choose a password, then sign out and sign in with your email.
 Since 12 Oct 2026 an unset <code>ADMIN_TOKEN</code> refuses those actions (it used to open them). The Data &rarr; Locations note about this field (it used to name a bake panel that no longer exists) left the screen on 22 Oct 2026: the field in the page header is the place.</li>
 <li><strong>Routing key.</strong> Routing needs <code>HERE_API_KEY</code> in Render → Environment for the
 <code>modus-web</code> service. Without it the Data → Routes banner says routing is not set up, and nothing bakes.</li>
 <li><strong>Configuration.</strong> The live source is the configuration table; <code>backend/factors.json</code> is the
-reset-to-default (Config → More → Reset to file). Vehicle ids are the keys forecast lines and stored routes are keyed
+reset-to-default (Config → More → Reset to defaults; it was &ldquo;Reset to file&rdquo; until 22 Oct 2026). The header's
+&ldquo;changed from the defaults&rdquo; (was &ldquo;differs from the file in the repo&rdquo;) means the saved configuration no
+longer matches <code>backend/factors.json</code>. A country's own vehicle list is <code>vehicle_sets</code>, edited on the
+Everything (JSON) tab; the Planning tick does not change it. Tip and recycling location types come from the tenant package. Vehicle ids are the keys forecast lines and stored routes are keyed
 on, so they cannot be renamed, and a vehicle the network is baked for cannot be removed. Routing dimensions and notes
 are edited on the &ldquo;Everything (JSON)&rdquo; tab.</li>
 <li><strong>Clearing every route</strong> (Data → Routes) deletes every route and its stored geometry; locations are
 kept. It was built to retire the first seed (the V2 seed).</li>
+<li><strong>Users &rarr; Activity.</strong> A write with no words of its own shows as &ldquo;Changed a record&rdquo;; the
+CSV keeps the path. The carbon target's write carries the decisions, never a figure: Wayscope works every figure out.</li>
 <li><strong>Diagnostics</strong> left Data → Routes on 22 Oct 2026 (the user: no back-end detail on screens). The same two checks, with the admin token, are in <a href="#t2-left-out">What the screens leave out</a>: ● a profile appears in stored geometry; ⚠ its name is not a key in <code>factors.json</code> and falls back to <code>_default</code> (identical payload and CO₂ for every such profile, which looks like the vehicle being ignored).</li>
 </ul>
 
 <h1 id="t5-errors">T5 Errors and what they mean</h1>
-<div class="tbl"><table><thead><tr><th>The screen says</th><th>What happened</th></tr></thead><tbody>
+<div class="tbl" tabindex="0" role="region" aria-label="Errors and what they mean"><table><thead><tr><th>The screen says</th><th>What happened</th></tr></thead><tbody>
 <tr><td class="k">Wayscope did not answer in time</td><td>The request to the server timed out or failed. Nothing typed is lost; try again.</td></tr>
 <tr><td class="k">Wayscope may still be starting up</td><td>The Render service was starting or redeploying, so the first read failed. Refresh the page.</td></tr>
 <tr><td class="k">admin token rejected</td><td>The server answered 403: the token typed does not match <code>ADMIN_TOKEN</code>.</td></tr>
-<tr><td class="k">Codes are checked by Wayscope</td><td>Sign-in codes are checked on the server (<code>POST /api/auth</code>), never in the browser.</td></tr>
+<tr><td class="k">That access code isn't recognised</td><td>Sign-in codes are checked on the server (<code>POST /api/auth</code>), never in the browser.</td></tr>
+<tr><td class="k">The PDF map is a drawn schematic</td><td>The Mapbox static image could not be fetched when the PDF was built; the sheet is otherwise identical.</td></tr>
+<tr><td class="k">Every vehicle on a route shows the same payload and CO₂</td><td>A vehicle name fell to <code>_default</code> in <code>factors.json</code>; run the factors check in T2 &ldquo;What the screens leave out&rdquo;. Config refuses removing a vehicle routes use, so this is now rare.</td></tr>
+<tr><td class="k">Could not load … (the public map)</td><td>A read failed; the console has the status. See T10.</td></tr>
 </tbody></table></div>
 
 <h1 id="t6-words">T6 Old words, new words</h1>
@@ -353,18 +400,106 @@ kept. It was built to retire the first seed (the V2 seed).</li>
 <tr><td class="k">line-month</td><td>forecast month (one month of one forecast line)</td></tr>
 <tr><td class="k">the server</td><td>Wayscope</td></tr>
 <tr><td class="k">UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED</td></tr>
+<tr><td class="k">stored road route, no stored route (public map, bulletin)</td><td>not routed yet</td></tr>
+<tr><td class="k">HERE calls, routed by HERE, Which HERE option</td><td>(not said: routed, route option)</td></tr>
+<tr><td class="k">Reset to file; differs from the file in the repo</td><td>Reset to defaults; changed from the defaults</td></tr>
+<tr><td class="k">the stored result / bulletin stands</td><td>showing the last check / price</td></tr>
 </tbody></table></div>
 <p>The XLSX and PDF exports and the clash text made on the server still say &ldquo;baked&rdquo; (decided 13 Oct 2026:
 the words bundle covers the staff app and the user guide only). Field names in the data (<code>baked</code>,
 <code>UNBAKED</code>, <code>geometry</code>) do not change.</p>
 
-<h1 id="t7-reference">T7 Sourced and assumed figures</h1>
-<p>The user guide's Appendix D (admins) keeps the plain-words reference: how a haulage number is made (D.1), which
-figures are sourced and which are assumed (D.2), the live sources and how they fail (D.3), and what must not be
-described as finished (D.4). <a href="/help/#appendix-d-technical-reference">Open Appendix D</a>. The endpoints it
-used to name for loading an organisation are: <code>POST /api/admin/tenant/import</code> (into an empty organisation),
-<code>PUT /api/admin/overlay</code> (the map overlay) and <code>GET /api/admin/tenant/export</code> (the organisation
-as one file). After an import, bake the network: imported routes read &ldquo;not routed yet&rdquo; until then.</p>
+<h1 id="t7-reference">T7 Sourced and assumed figures, live sources, and what is not finished</h1>
+<p>Moved here from the user guide&rsquo;s Appendix D on 22 Oct 2026 (the user: no back-end detail in the user guide). It answers &ldquo;where does that number come from?&rdquo; in a meeting.</p>
+
+<h2 id="t7-number">How a haulage number is made</h2>
+<pre>cycle          = drive out (laden) + drive back (tare) + turnaround
+trips per day  = the most round trips in a driver's day: n × cycle + the required break ≤ the shift
+                 (at most 13 h), and n × driving ≤ 9 h  (driving = out + back + gate to face;
+                 break 45 min once driving passes 4½ h or work 9 h, else 30 min once work passes
+                 6 h; the 45 may be taken as 15 + 30). 0 = not one round trip fits: one lorry a trip
+trips needed   = ceil(tonnes / payload)
+vehicles       = ceil(movements per day / trips per day)</pre>
+<p>Both drive legs are routed <strong>separately</strong> — the return at tare weight, so the way back
+is not assumed to be the way out reversed and different weight limits can apply. Turnaround is the
+vehicle's own load and unload minutes, plus gate induction, plus either gate-to-face time or a drawn
+haul road — never both.</p>
+<div class="callout note"><div class="ct">Trips are not vehicles</div><p>A trip is one loaded run; a
+vehicle makes several a day. A fleet figure worked out as tonnes ÷ payload alone is a trip count, and overstates the fleet by
+whatever that multiple is — typically three to six times.</p></div>
+
+<h2 id="t7-sourced">Which figures are sourced, and which are assumed</h2>
+<div class="tbl" tabindex="0" role="region" aria-label="Sourced and assumed figures"><table><thead><tr><th>Figure</th><th>Standing</th></tr></thead><tbody>
+<tr><td class="k">Route distance and duration</td><td><strong>Measured</strong> — returned by the routing
+service for a lorry profile with that vehicle's weight and dimensions. Nothing in the platform invents a road.</td></tr>
+<tr><td class="k">Payloads</td><td><strong>Planning assumption.</strong> A typical carrying limit, not a
+plated maximum. It drives trips per tonne, so it is one of the two figures that most changes a fleet size.</td></tr>
+<tr><td class="k">Emissions (kg CO₂e per vehicle-km)</td><td><strong>Checked 9 Oct 2026</strong> against the
+UK Government conversion factors 2026 flat file (v1.2, revised 31 July 2026): the rigid over-17 t and articulated
+over-33 t figures match it exactly. The 7.5 t rigid was moved to its 2026 row (0.49944) on 10 Oct 2026; it is on no
+GB route. The Dashboard, the map and the Look-ahead use one average-laden factor on both legs, tailpipe only. The
+Carbon planner adds Government material and waste disposal factors (the all-in figure), shows a well-to-wheel figure
+beside the total, works out electric lorries as kWh per km × UK electricity, and, for comparison only, shows the
+National Highways Carbon Tool method (tonne-km, one-way distance with the return added, 2024 factors with
+well-to-tank), which reads higher. Each factor on the Carbon planner shows its source, year and status.</td></tr>
+<tr><td class="k">Working days per month, shift hours per day</td><td><strong>Planning assumptions</strong> —
+and they decide every &ldquo;lorries per day&rdquo; figure in the platform. Check these two first when a fleet
+size looks wrong.</td></tr>
+<tr><td class="k">Diesel index</td><td><strong>Live</strong> for EU countries — the EU Weekly Oil Bulletin price for
+the organisation's country, fetched by Wayscope (the feed does not state whether the series is with or without
+taxes; it is taken as the taxed series and the widget says so) — and for Great Britain, the DESNZ weekly road fuel
+price (ULSD pump price, pence per litre incl. duty and VAT; the widget also shows it ex-VAT). <strong>Typed</strong>
+everywhere else, and for an organisation with no country set — an admin enters the weekly price, and every figure
+built on it says it was typed. There is no fallback to another country's price.</td></tr>
+<tr><td class="k">Fair price</td><td><strong>A model, not a quote.</strong> Three of its coefficients have no
+public source and are labelled as assumptions. It reads as a floor for negotiation, which is what it is
+labelled as everywhere. It is never printed on a supplier's sheet.</td></tr>
+<tr><td class="k">Rail alignment and chainage</td><td><strong>Tenant data</strong> — the overlay package the
+organisation supplies (an admin loads it once). Chainage in metres on one datum, which may start below zero.
+Its accuracy is the survey's: where a survey has no main track drawn, a package boundary can have no line
+beneath it, and the map says so rather than drawing a confident colour.</td></tr>
+<tr><td class="k">Existing rail corridor</td><td><strong>Optional tenant data</strong> — as supplied in the
+overlay package, carrying the package's own caveat.</td></tr>
+<tr><td class="k">Demo organisation</td><td><strong>Fictional.</strong> The demo package — the Wolds Link, a
+road-dualling scheme in the English East Midlands — is invented end to end: names, quantities, rates and the
+alignment. It is not a real road scheme or a proposal for one. Every screen and export says so: the bar reads "DEMO · Fictional scheme" and each map carries a "Demo - fictional scheme" tag.</td></tr>
+</tbody></table></div>
+
+<h2 id="t7-live">The live sources, and how they fail</h2>
+<ul>
+<li><strong>Lorry routing</strong> — every routed distance and drive time. Its road graph lags the physical
+road, which on a construction programme matters: roads are realigned for years, and a route routed before a
+realignment can follow a road that is no longer there.</li>
+<li><strong>Road restrictions</strong> (where a provider is connected for the country) — kept for a short while, and stored per route with
+the date it was checked. Mass, height and width give a real verdict; a weak bridge gives a load
+<em>class</em>, not a tonnage, so it is reported unjudged. The whole layer is advisory. The source carries
+expired records. The provider's data is read at most every 30 minutes. When a refresh cannot reach the provider the stored result stays in use and the Look-ahead says so (&ldquo;could not reach …; showing the last check&rdquo;).</li>
+<li><strong>Diesel price</strong> — for EU countries and Great Britain, refreshed in the background, never on the
+page read. A failed fetch keeps the last good figure and says when it failed. Elsewhere there is nothing to fetch:
+the price is typed.</li>
+<li><strong>Loading an organisation</strong> — an admin imports a whole organisation as one package file
+(<code>POST /api/admin/tenant/import</code>, into an empty organisation) and loads the map overlay
+(<code>PUT /api/admin/overlay</code>); <code>GET /api/admin/tenant/export</code> writes the organisation back
+out as one file. After an import, bake the network: imported routes read &ldquo;not routed yet&rdquo; until then.</li>
+<li><strong>Basemaps and Street View</strong> — optional. With no key the popups simply show no photo. With a key the map asks Google's Street View metadata first and fetches a picture only where one exists within 50 m, so no picture request is paid for where there is none.</li>
+<li><strong>The PDF's map</strong> — drawn from the Mapbox static image service. When it cannot be reached the PDF draws a schematic instead and its caption says why; the sheet is otherwise identical.</li>
+</ul>
+<div class="callout warn"><div class="ct">What leaves the platform</div><p>Normal operation sends site and
+route coordinates to the routing, mapping and restriction services, and a coordinate to Street View where it
+is used. No quantity, rate or forecast leaves. This is inherent to any routed map product — the alternative is
+not having routing — but it is a fair question and better answered before it is asked.</p></div>
+
+<h2 id="t7-not-finished">What must not be described as finished</h2>
+<p>Since 14 October 2026 each person signs in with their <strong>own login</strong> (email and password, a
+limit on wrong passwords, password links by email), and every change is recorded with who made it. Three things
+are still shared: the <strong>shared codes per role</strong>, which keep working until they are deleted on the
+hosting service (planned for Saturday 31 October 2026); the <strong>map password</strong>, by design, for councils
+and residents; and the <strong>admin token</strong>, for scripts. There is no two-factor sign-in. <strong>Do not describe the deployment as secure</strong>
+on the strength of this: that is a decision for whoever runs it.</p>
+<p>Admin actions need an admin login or the admin token. Since 12 October 2026, with no admin token set they are
+refused, not open.</p>
+<p>The carbon target's "Set by" is the name on the login (or, on a shared code, the name typed with it). Only the
+latest version of the target is kept; the activity log keeps every change.</p>
 
 <h1 id="t8-community">T8 The community considerations layer</h1>
 <p>Staff only (14 Oct 2026). <code>GET /api/community</code> serves what is stored as one GeoJSON FeatureCollection with the
@@ -468,6 +603,53 @@ answered 503 on the day it was built.</p>
 <p>The rows live per organisation (<code>collision_records</code>, <code>collision_meta</code>) and travel in its package.
 The words on every output: &ldquo;police-reported injury collisions&rdquo;, the period beside every count, and &ldquo;evidence for a
 route risk assessment, not the assessment&rdquo;. No score, rate, ranking or colour status.</p>
+
+<p><strong>What the user guide no longer spells out (22 Oct 2026, the words sweep).</strong> The guide's collision history
+item is ten sentences; the rest is here. The XLSX has a <em>Stretches sheet</em>. On the evidence map the collisions with a
+goods vehicle over 3.5 t are violet squares. The lorry details and DfT's urban / rural flag are read from the next Fetch now
+(until then the rows say so). The national urban rates include city-centre roads, so a ring road often sits below the range;
+a stretch with no DfT count (most B roads) says so. Collisions near an alternative route only (<code>alternatives_only</code>)
+appear while Alternative routes is ticked, and the route map plans leave them out. Only where a vulnerable road user was hurt
+is a filter on the map group. The export card and the Routes page can add the collisions to the plans (killed or seriously
+injured only on the regional plan).</p>
+
+<h1 id="t10-public-map">T10 The public map</h1>
+<p>What the map's screens leave out since 22 Oct 2026 (the words sweep).</p>
+<ul>
+<li><strong>Movements a day.</strong> One load = one two-way movement (out laden, back empty, counted once): the month's
+approved loads &divide; its working days. With Show forecast routes on, the figure is averaged over the months with
+volume. Vehicles are rounded up per line on the busiest month, using the drivers' hours rule (T1 Vehicles). A line not
+routed yet is counted in the movements, left out of the vehicles and the carbon, and named (&ldquo;not routed yet&rdquo;).
+A line whose vehicle has no payload in <code>factors.json</code> uses the fallback payload, and the bar's note says how
+many.</li>
+<li><strong>Carbon.</strong> The same <code>costlines</code> figure as the Dashboard: DESNZ 2026 average-laden factor per
+vehicle-km, both legs, tailpipe only, set per vehicle on Config. The route card sums every line of the route.</li>
+<li><strong>Heat map.</strong> Volume stops are fixed, so a colour means the same volume every month. When the map's unit
+is not vehicles, routes are painted on stops twenty times the section stops. Carbon stops are set from the programme's
+largest month. Shared road sections are indexed on ONE vehicle profile (<code>road_sections.py</code>), so a route not
+routed for that profile is on no shared road but still in the totals. The map's count unit (vehicles, tonnes or m&sup3;)
+is <code>FORECAST_UNIT</code> in <code>map/config.js</code> (vehicles as shipped); with tonnes or m&sup3; the bar adds a t / day or m&sup3; / day figure.</li>
+<li><strong>Flow lanes.</strong> One lane per direction, drawn left of travel (UK only), summed per direction on shared
+roads. Bands are fixed. The dashes move only while Play runs, and stay still under reduced motion.</li>
+<li><strong>By council.</strong> A route counts in every district its laden leg enters; edge routes (under 200 m inside)
+count km and carbon there, not movements. Carbon is split by the km inside each district. A route is &ldquo;not yet placed
+in a council&rdquo; until the clip runs, on the next bake or council-areas import. Council bands are on Config &rarr; Map and
+bulletin; the district bands differ from the route carbon bands.</li>
+<li><strong>Closures and zones.</strong> National Highways closures are never passed to HERE, so routes do not avoid them
+(&ldquo;For information only&rdquo;). A zone marked Affects routing is avoided (T2).</li>
+<li><strong>Alternatives.</strong> The other options HERE returned and the plan does not use. A route along a haul road
+has none (T2).</li>
+<li><strong>3D buildings</strong> come from Mapbox's vector tiles, from zoom 14; a raster basemap (the Estonia
+orthophoto) has none. The basemap names no longer say &ldquo;Mapbox&rdquo;; Mapbox's own credit stays on the map.</li>
+<li><strong>Alignment overlay.</strong> Gaps in the survey file are interpolated so the corridor reads continuously; the
+popup says which stretches are measured and how far the nearest surveyed track is.</li>
+<li><strong>Empty map.</strong> &ldquo;No routes are worked out yet&rdquo; means nothing is baked: run Route all on
+Data &rarr; Routes.</li>
+<li><strong>Errors.</strong> When a read fails the map shows a fixed sentence (&ldquo;Could not load the routes.&rdquo;,
+&ldquo;Could not load this layer.&rdquo; …); the status code and the server's text go to the browser console (and, for the
+carbon legend, the hover title). The reads: map-data, route-forecasts, forecast-matrix, road-load, areas/months, limits, community, collisions and
+map-export (401 = not staff), all under <code>/api/</code>.</li>
+</ul>
 
 </main>
 <a id="top" href="#">↑ top</a>

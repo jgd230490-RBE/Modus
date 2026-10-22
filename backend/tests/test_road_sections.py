@@ -756,7 +756,8 @@ try:
        and all(s["co2_t"] is None for x in broken["runs"] for s in x["route_shares"])
        and broken["totals"]["co2_t"] is None and "RuntimeError" in str(broken.get("co2_error", ""))
        and "factors document broken" not in str(broken.get("co2_error", ""))
-       and any("co2_error" in n for n in broken["notes"]), str(broken.get("co2_error")))
+       and any("The carbon figures could not be read" in n for n in broken["notes"])   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no field name in the note
+       and not any("co2_error" in n for n in broken["notes"]), str(broken.get("co2_error")))
 except Exception as e:  # pragma: no cover — the assertion reports it
     ok("5. ⭐ when costlines fails the month read still answers: the runs and movements intact, every CO2e null (never 0), co2_error naming the reason",
        False, repr(e))

@@ -311,7 +311,7 @@ ok("…and NOT ceil once over R1's two artic lines together (the breaking case: 
 # NARROWED 12 Oct 2026 (the review and fix pass): plain words for a council reader — "no stored road route", not the team's "unbaked"
 ok("⭐ rule 4 (unbaked named, not zeroed): the rigid line is in the movements, out of the fleet, and the label says so",
    R["vehicles"]["excludes_unbaked_lines"] == 1
-   and R["vehicles"]["label"] == "Vehicles needed (excludes 1 line with no stored road route for the vehicle)"
+   and R["vehicles"]["label"] == "Vehicles needed (excludes 1 line not routed yet for the vehicle)"   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet", as the map
    and "unbaked" not in R["vehicles"]["label"]
    and R["vehicles"]["not_baked"] is False and near(H["two_way_a_day"] - (LOADS - loads_r1_b) / WD, loads_r1_b / WD, 1e-3),
    str(R["vehicles"]))
@@ -333,7 +333,7 @@ CO2 = sum(l["co2_t"] for l in P10["lines"] if l["co2_t"] is not None and l["rout
 ok("⭐ rule 7 (carbon): CO₂e a day = Σ co2_t ÷ wd, the month's total, 1 unbaked line named, the Carbon page's stamp",
    near(R["carbon"]["co2_t_a_day"], CO2 / WD, 1e-3) and near(R["carbon"]["co2_t_in_month"], CO2, 1e-3)
    and R["carbon"]["excludes_unbaked_lines"] == 1
-   and R["carbon"]["label_day"] == "CO₂e a day (excl. 1 line with no stored road route)"  # NARROWED 12 Oct 2026 (wording)
+   and R["carbon"]["label_day"] == "CO₂e a day (excl. 1 line not routed yet)"  # NARROWED 12 Oct 2026 (wording); NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
    and R["carbon"]["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"
    and CO2 > 0, str(R["carbon"]))
 ok("…co2 to date follows the payload's programme-to-date list over the drawn routes",
@@ -347,7 +347,7 @@ ok("⭐ when no counted line carries carbon the figures read None and not_baked 
    "not 0.0 t; the volumes are untouched",
    R_NOCO2["carbon"]["co2_t_a_day"] is None and R_NOCO2["carbon"]["co2_t_in_month"] is None
    and R_NOCO2["carbon"]["not_baked"] is True and R_NOCO2["carbon"]["excludes_unbaked_lines"] == 4
-   and R_NOCO2["carbon"]["label_day"] == "CO₂e a day (excl. 4 lines with no stored road route)" and R_NOCO2["headline"] == H
+   and R_NOCO2["carbon"]["label_day"] == "CO₂e a day (excl. 4 lines not routed yet)" and R_NOCO2["headline"] == H   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
    and R_NOCO2["vehicles"] == R["vehicles"], str(R_NOCO2["carbon"]))
 _real_cl = costlines.lines
 
@@ -478,8 +478,9 @@ R_UNDRAWN = bulletin.rollup_payloads([dict(P10, lines=[l for l in P10["lines"] i
 ok("…a month whose only lines sit on undrawn routes is empty too, but the note NAMES them rather than saying there is no forecast",
    R_UNDRAWN["empty"] is True and R_UNDRAWN["routes_not_drawn"] == {"lines": 1, "routes": ["R3"], "note": R_UNDRAWN["routes_not_drawn"]["note"]}
    # NARROWED 12 Oct 2026 (wording): "with no stored road route yet", not "not yet baked"
+   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"
    and R_UNDRAWN["note"] == ("No approved forecast on a route the map draws in this month: 1 line on 1 route "
-                             "with no stored road route yet, listed below and not counted."), R_UNDRAWN["note"])
+                             "not routed yet, listed below and not counted."), R_UNDRAWN["note"])
 
 # =========================================================================== #
 #  4. The harness comparison: calculateKPIs's rules, written again, independently
@@ -860,7 +861,8 @@ ok("⭐ page 1: the one-line definition; the counting line and the map's kpi-not
    bulletin_doc.DEFINITION in PAGES[0] and bulletin_doc.DEFINITION in HTML_TEXT
    and "Counts are two-way movements: one lorry out laden and back empty is one delivery, counted once, never doubled." in PAGESR[-1]
    and _KPI in PAGESR[-1] and _KPI in HTML_TEXT and _KPI not in PAGESR[0]
-   and "Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty." in MAP)
+   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the map's hover note is short now; the bulletin's Sources keeps the full sentence
+   and "Two-way movements = deliveries a working day (out laden, back empty)." in MAP)
 # NARROWED 14 Oct 2026 (the publishing check): in Sources (page 4), with "Other schemes count differently" in the Two-way movement term
 ok("…and the other-schemes line (HS2 counts HGVs visiting the site; EKFB printed each way)",
    "HS2 prints HGVs visiting the site" in PAGESR[-1] and "EKFB 2020 printed maximum HGV each way" in PAGESR[-1]
@@ -1428,7 +1430,8 @@ ok("W11: with no shared-section index the map draws the routes only, and the not
 # bulletin's note word for word, and the long "Each route is painted by its own figure; … summed, and labelled" is gone
 # NARROWED 19 Oct 2026 (the user: "remove too much wording and put it into an info box"): the foot moved behind the heat
 # map's "i" (`more`, written to #heat-info-more); it still OPENS with the bulletin's note word for word
-_mapfoot = re.search(r"more = 'Where routes share a road, its colour shows their total \(' \+ n \+ ' shared section' \+ \(n === 1 \? '' : 's'\) \+ '\)\. ' \+", MAP)
+# NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the map's foot opens with the bulletin's sentence word for word (the shared-section count left it)
+_mapfoot = re.search(r"more = 'Where routes share a road, its colour shows their total\. A colour means the same volume every month\. ' \+", MAP)
 # NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the bulletin's note says the rule in one sentence
 ok("⭐ W11: the note says the map's rule in one sentence (shared roads show the routes' total), and the map's foot opens with it",
    bool(_mapfoot) and bulletin_doc.map_note(3) == "Where routes share a road, its colour shows their total."

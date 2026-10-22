@@ -1337,7 +1337,8 @@ async function rowDetailsDom(){
       facts.push(["distance a trip", F.grp(F.dist(c.km_trip))], ["outbound only", c.return_baked ? null : "outbound only"],
         ["distance this week", F.grp(F.dist(wd.km))], ["peak vehicles", F.grp(wd.vehicles_peak)], ["tonne-distance", F.grp(F.dist(wd.tonne_km))],
         ["tonne-distance basis", c.km_basis === "loaded" ? "loaded leg" : "round trip"], ["cycle", `${F.grp(c.cycle_min)} min`],
-        ["cycle source", c.cycle_source === "here" ? "HERE" : "HERE‡ (return estimated)"], ["cycles a vehicle a day", String(c.cycles_per_vehicle_day)]);
+        // NARROWED 22 Oct 2026 (words sweep): the provider is not named; only an estimated return is said
+        ["cycle source", c.cycle_source === "here" ? null : "return estimated"], ["cycles a vehicle a day", String(c.cycles_per_vehicle_day)]);
     } else facts.push(["unrouted: payload", `${F.grp(c.payload_t, 1)} t planning payload`]);
     facts.push(["planned cost", wd.eur == null ? "Rate not set" : `${cur} ${F.grp(wd.eur)}`], ["target rate", c.rate_source === "target" && wd.eur != null ? "target rate" : null],
       ["+ BAF", wd.eur_adj != null ? `${cur} ${F.grp(wd.eur_adj)}` : null]);

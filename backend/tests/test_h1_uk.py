@@ -656,7 +656,7 @@ except ImportError:
 _mp_src = read("map/index.html")
 ok("🔴 the map's legend carries no first-tenant figure ('~60 km' unsurveyed, '7 package edges') — the words are generic",
    "~60" not in _mp_src and "7 package edges" not in _mp_src
-   and "Where the alignment file has no surveyed main track the line is interpolated" in _mp_src
+   and "Gaps in the survey are filled in. Click the line to see which stretches are measured." in _mp_src   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "alignment file"
    and "Package edges · ticks from zoom 11" in _mp_src)
 
 # =========================================================================== #
@@ -754,7 +754,7 @@ ok("🔴 the Look-ahead's UNBAKED text reads the tenant's unit (clashes._dist_wo
 mp = read("map/index.html")
 ok("the map hides the Estonian orthophoto unless the tenant is Estonian and labels Satellite as Aerial for GB",
    "bm.hidden = (TENANT.country || '').toUpperCase() !== 'EE';" in mp
-   and "'Aerial (Mapbox Satellite)' : 'Satellite (Mapbox)'" in mp)
+   and "'Aerial' : 'Satellite'" in mp)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the basemap names no longer say Mapbox
 ok("the map's restriction panel heading and source come from the API's provider",
    "cat.provider.ui_label" in mp and "restriction-heading" in mp and "Estonian Transport Administration" not in mp.split("<script>")[0])
 hp = read("frontend/help/index.html")
