@@ -11,6 +11,7 @@ in use. SQL is written with '?' placeholders and translated to '%s' for Postgres
 """
 import contextvars
 import os
+import re
 import sqlite3
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
@@ -520,9 +521,22 @@ def init_network_db():
         # 16 Oct 2026: the collision history (CLOCS v5 C1). Born with tenant_id in the key.
         _create_tenanted(cur, "collision_records")
         _create_tenanted(cur, "collision_meta")
-        # 22 Oct 2026: the abnormal loads (S16 / B5). Born with tenant_id in the key.
+        # 22 Oct 2026: the abnormal loads (S16 / B5). Born with tenant_id in the key. A column the DDL gained after a
+        # database first made the table (phase 2's actions_json / roads_json on a copy booted at phase 1) is ADDed here,
+        # plain ADD COLUMN on both backends — the table's columns are all nullable TEXT / REAL / BOOLEAN with defaults.
         _create_tenanted(cur, "abnormal_loads")
         conn.commit()
+        try:
+            have = set(_columns_of(cur, "abnormal_loads"))
+            for col in _ddl_columns(_TENANT_DDL["abnormal_loads"]):
+                if col in have:
+                    continue
+                typ = _ddl_column_type(_TENANT_DDL["abnormal_loads"], col)
+                cur.execute(f"ALTER TABLE abnormal_loads ADD COLUMN {col} {typ}")
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print("⚠️  abnormal_loads: a missing column could not be added:", e)
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
         # list of zone ids ('' = baked with no zones in force). Nullable, and NULL means
@@ -1806,6 +1820,17 @@ def _column_types_of(cur, table):
         return {r[1]: (r[2] or "").upper() for r in cur.fetchall()}
     except Exception:
         return {}
+
+
+def _ddl_column_type(ddl, col):
+    """
+    The declaration a column carries in one of the _TENANT_DDL blocks ("TEXT", "REAL", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    for an ADD COLUMN on a database that made the table before the column existed. The `--` comments go first, as in
+    _ddl_columns(), and for the same reason. Falls back to TEXT when the column is not found.
+    """
+    body = "\n".join(line.split("--", 1)[0] for line in ddl.splitlines())
+    m = re.search(r"(?:^|,|\()\s*" + re.escape(col) + r"\s+([A-Za-z]+(?:\s+NOT NULL)?(?:\s+DEFAULT\s+[^,\)]+)?)", body)
+    return m.group(1).strip() if m else "TEXT"
 
 
 def _ddl_columns(ddl):

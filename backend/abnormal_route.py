@@ -259,7 +259,7 @@ def candidates_from_actions(actions, geometry, m, spans=None):
         sev = a.get("severity")
         if kind == "turn":
             k, words = "turn", f"Turn {a.get('direction') or ''} onto {road}".replace("  ", " ") if road else f"Turn {a.get('direction') or ''}".strip()
-            detail = f"HERE calls it a {sev} turn" if sev else None
+            detail = f"HERE's turn severity: {sev}" if sev else None
         elif kind == "uTurn":
             k, words, detail = "turn", f"U-turn{(' at ' + road) if road else ''}", None
         elif kind == "roundaboutExit":

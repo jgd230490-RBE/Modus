@@ -3,6 +3,7 @@
  "label": "Sep 2026",
  "working_days": 22.0,
  "shift_hours": 10.0,
+ "abnormal_total": 0,
  "open_minutes": 600.0,
  "default_hours": "07:00–17:00",
  "scope": "scheme",
@@ -55,7 +56,8 @@
     "R1",
     "R2",
     "R3"
-   ]
+   ],
+   "abnormal": []
   },
   {
    "gate_id": "G003",
@@ -101,7 +103,8 @@
     }
    ],
    "origin_share_note": null,
-   "fallthrough_routes": []
+   "fallthrough_routes": [],
+   "abnormal": []
   },
   {
    "gate_id": "G004",
@@ -142,7 +145,8 @@
     }
    ],
    "origin_share_note": null,
-   "fallthrough_routes": []
+   "fallthrough_routes": [],
+   "abnormal": []
   }
  ],
  "notes": [

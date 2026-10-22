@@ -4182,7 +4182,7 @@ function AbnormalPage({ meta, access, who }){
   const draw = (m) => act(async () => {
     const j = await call(`/abnormal/${encodeURIComponent(m.id)}/route`, "POST");
     const notes = (j.notes || []).length ? ` ${j.notes.join(" ")}` : "";
-    setNote({ ok: true, text: `${m.name}: the line is drawn, ${dist(j.distance_km)} ${DU()}, ${j.candidates} potential pinch point${j.candidates === 1 ? "" : "s"} to survey${j.exceeds ? `, ${j.exceeds} signed limit${j.exceeds === 1 ? "" : "s"} the load is over` : ""}.${notes}` });
+    setNote({ ok: true, text: `${m.name}: the line is drawn, ${fmtDist(j.distance_km)} ${DU()}, ${j.candidates} potential pinch point${j.candidates === 1 ? "" : "s"} to survey${j.exceeds ? `, ${j.exceeds} signed limit${j.exceeds === 1 ? "" : "s"} the load is over` : ""}.${notes}` });
     setOpen(m.id);
     await load();
   });
@@ -4374,7 +4374,7 @@ function AbnormalPage({ meta, access, who }){
                     <td><div>{m.advice && m.advice.notify_by ? alDay(m.advice.notify_by) : "—"}{" "}{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}</div>
                       {m.advice && m.advice.apply_by && <div className="text-[13px] text-slate-500">apply by {alDay(m.advice.apply_by)}</div>}</td>
                     <td data-al-route-cell={m.routed ? "drawn" : "none"}>{m.routed
-                      ? <><div>{dist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>
+                      ? <><div>{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>
                           <div className="text-[13px] text-slate-500">{(m.candidates || []).length} to survey{(m.route_notes || []).some(n => /at most/.test(n)) ? " · drawn at 30 m" : ""}{(m.limit_exceeds || []).length ? ` · ${m.limit_exceeds.length} limit${m.limit_exceeds.length === 1 ? "" : "s"} over` : ""}</div></>
                       : <span className="text-[13px] text-slate-500">{m.bake_error ? "not drawn (see the row)" : "not drawn"}</span>}</td>
                     <td><StatusWord status={{ pending: "Pending", approved: "Approved", notified: "Approved", moved: "confirmed", withdrawn: "Rejected" }[m.status]} label={m.status_word} /></td>
@@ -4395,7 +4395,7 @@ function AbnormalPage({ meta, access, who }){
                           {m.routed && <>
                             <h4 className="al-h4">The route · indicative, drawn by HERE for the load's size</h4>
                             <dl className="al-dl">
-                              <dt>Length, time</dt><dd>{dist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min (HERE's own){m.return_geometry ? " · the return leg drawn too" : ""}</dd>
+                              <dt>Length, time</dt><dd>{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min (HERE's own){m.return_geometry ? " · the return leg drawn too" : ""}</dd>
                               <dt>Roads</dt><dd>{m.roads_words || "—"}</dd>
                               {(m.route_notes || []).map((n, i) => <React.Fragment key={i}><dt>Note</dt><dd style={{ color: "var(--warn-text)" }}>{n}</dd></React.Fragment>)}
                               <dt>Motorway</dt><dd>{m.has_motorway ? "on the line: the escort rule's motorway figures apply there" : "none on the line (the escort rule's other-roads figures apply)"}</dd>
@@ -7795,7 +7795,7 @@ function AbnormalWeek({ ab }){
               <td><div className="font-medium text-slate-800">{m.name}</div><div className="text-[13px] text-slate-500">{m.team_name} · {m.origin_name} → {m.dest_name}{m.dest_gate_name ? `, ${m.dest_gate_name}` : ""}</div></td>
               <td><div>{alWindow(m.date_from, m.date_to)}</div><div className="text-[13px] text-slate-500">{m.time_band} · {m.movements} movement{m.movements === 1 ? "" : "s"} · {esc(m.escort_planned)}</div></td>
               <td><AlChip tone={ct}>{cw}</AlChip><div className="text-[13px] text-slate-500">{(m.summary || "").replace(/^(Special Order|VR1|STGO Cat [123]|C&U)( · )?/, "")}</div></td>
-              <td>{m.routed ? <>{dist(m.distance_km)} {DU()} <AlChip tone="grey">{m.candidates} to survey</AlChip></> : <span className="text-slate-500">not drawn</span>}</td>
+              <td>{m.routed ? <>{fmtDist(m.distance_km)} {DU()} <AlChip tone="grey">{m.candidates} to survey</AlChip></> : <span className="text-slate-500">not drawn</span>}</td>
               <td><span className={"sw"}>{m.status_word}</span> {(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}
                 {m.notify_by && <div className="text-[13px] text-slate-500">notify by {alDay(m.notify_by)}</div>}</td>
             </tr>);

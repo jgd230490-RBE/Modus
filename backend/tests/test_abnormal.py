@@ -363,8 +363,8 @@ ok("🔴 escort expected: 4.6 m is none on motorways, 4.61 is; 4.1 m none elsewh
    and adv(fig(length_m=30.6))["escort_expected"] == "other_roads")
 ok("the escort line says no law requires one and the police decide; a movement with no escort planned gets a note",
    any("No law requires an escort" in l for l in adv(fig(width_m=4.5))["lines"])
-   and any("no escort is planned" in n for n in adv(fig(width_m=4.5))["notes"])
-   and not any("no escort is planned" in n for n in adv(fig(width_m=4.5), escort_planned="private")["notes"]))
+   and any("No escort is planned" in n for n in adv(fig(width_m=4.5))["notes"])
+   and not any("No escort is planned" in n for n in adv(fig(width_m=4.5), escort_planned="private")["notes"]))
 ok("🔴 height: 3.0 m no cab line, 3.01 yes; 4.95 no check line, 4.96 yes; 5.49 the 18 ft grid, 6.1 beyond the 20 ft grid",
    adv(fig(height_m=3.0, width_m=3.2))["height"] == [] and any("cab" in h for h in adv(fig(height_m=3.01, width_m=3.2))["height"])
    and not any("4.95" in h for h in adv(fig(height_m=4.95, width_m=3.2))["height"])
@@ -719,7 +719,7 @@ _c = {c["kind"]: c for c in _m["candidates"]}
 ok("⭐ CANDIDATES: a turn (with HERE's severity word), a roundabout exit (with its number), a 'pass N roundabouts' stretch (N read from HERE's words); "
    "no slip road for a load that is not long; each placed on the line at HERE's offset; every one Grey, 'here'",
    [c["kind"] for c in _m["candidates"]] == ["turn", "roundabout", "roundabout"]
-   and _c["turn"]["words"] == "Turn right onto Doddridge Road" and _c["turn"]["detail"] == "HERE calls it a quite turn"
+   and _c["turn"]["words"] == "Turn right onto Doddridge Road" and _c["turn"]["detail"] == "HERE's turn severity: quite"
    and any(c["words"] == "Roundabout: 2nd exit onto Leicester Road (B6047)" for c in _m["candidates"])
    and any(c["words"] == "Passes 3 roundabouts on Leicester Road (A607)" for c in _m["candidates"])
    and _c["turn"]["lon"] == PTS[2][0] and _c["turn"]["lat"] == PTS[2][1] and all(c["grade"] == "grey" and c["source"] == "here" for c in _m["candidates"])
@@ -857,7 +857,14 @@ import gate_arrivals as GA  # noqa: E402
 _ga = GA.arrivals(16, PLANNER)
 ok("⭐ GATE ARRIVALS: the panel's read carries the markers on the gate's row and names the count in a note; the figures are unchanged (no lorry line here: 0 arrivals)",
    _ga["abnormal_total"] == 3 and any("counted apart" in n for n in _ga["notes"])
+   and any("3 abnormal loads this month are marked on their gates and counted apart" in n for n in _ga["notes"])
    and all("abnormal" in g for g in _ga["gates"]) and all(g["arrivals_per_day"] == 0 or g["laden_per_day"] + g["empty_per_day"] > 0 for g in _ga["gates"]))
+_solo = A.create(dict(BEAM, name="Solo", ipt="IPT2", origin_id="L001", dest_id="L006", dest_gate_id="G009", date_from="2027-06-07", date_to="2027-06-07", return_abnormal=False), PLANNER)["movement"]
+_ga1 = GA.arrivals(A.month_index_of("2027-06-07"), PLANNER)
+ok("GATE ARRIVALS: the note agrees with its count — one load reads 'is marked on its gate' (seen wrong on the local copy, 22 Oct), several 'are marked on their gates'",
+   _ga1["abnormal_total"] == 1 and any("1 abnormal load this month is marked on its gate and counted apart" in n for n in _ga1["notes"])
+   and not any("1 abnormal load this month are" in n for n in _ga1["notes"]), str(_ga1["notes"]))
+assert A.delete(_solo["id"], PLANNER)["ok"]
 ok("LOOK-AHEAD: the page read carries the week block (lookahead.page sets `abnormal` from abnormal.week on the commit week's dates, guarded)",
    'out["abnormal"] = _abnormal.week(days.bucket_dates(mi, wi), acc, today=today)' in read("backend/lookahead.py")
    and 'g["abnormal"] = _markers.get(g["gate_id"], [])' in read("backend/gate_arrivals.py"))

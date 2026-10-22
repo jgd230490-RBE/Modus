@@ -617,7 +617,7 @@ def advice(f, date_from=None, date_to=None, time_band="day", escort_planned=None
         lines.append(f"Escort vehicle expected {where} (National Highways code of practice para 4.4: "
                      + "; ".join(esc["other"] or esc["motorway"]) + "). No law requires an escort; the police decide.")
         if escort_planned in (None, "", "none"):
-            notes.append("no escort is planned for this movement: say what the haulier will provide")
+            notes.append("No escort is planned for this movement: say what the haulier will provide")
     h = g["height_m"]
     height = []
     if h is not None and h > HEIGHT_CAB_NOTICE_M:

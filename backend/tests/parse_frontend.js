@@ -1506,7 +1506,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const al = src.slice(a0, a1).split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
   ok("⭐ AL2 page: a Route column after Notify by (length and time in the tenant's unit, 'N to survey', 'drawn at 30 m' when HERE capped the length, 'N limits over'); Draw the route is a planner's, after Edit, one HERE call",
      al.includes('["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""]') && al.includes('data-al-route-cell={m.routed ? "drawn" : "none"}')
-     && al.includes("{dist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min") && al.includes('{(m.candidates || []).length} to survey')
+     && al.includes("{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min") && !al.includes("{dist(m.distance_km)}") && !al.includes("${dist(j.distance_km)}") && al.includes('{(m.candidates || []).length} to survey')
      && al.includes('/at most/.test(n)) ? " · drawn at 30 m" : ""') && al.includes("{canApprove && <>{\" \"}<button type=\"button\" className=\"link-btn\" disabled={busy} onClick={() => draw(m)}")
      && al.includes("await call(`/abnormal/${encodeURIComponent(m.id)}/route`, \"POST\")") && al.includes('{m.routed ? "Draw the route again" : "Draw the route"}'));
   ok("⭐ AL2 row: the route block first in the opened row — the facts (length, roads, HERE's notes in the warning colour, motorway yes / no, when drawn, via points), the candidates table " +

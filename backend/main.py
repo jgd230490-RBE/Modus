@@ -3085,6 +3085,11 @@ def abnormal_geojson(request: Request = None):
         raise HTTPException(401, "sign in — the abnormal loads are for staff")
     import abnormal_route
     acc = access.current()
+    if acc is None:
+        # The STAFF gate cookie alone: the map page of a staff member signed in with a shared code (until the codes go,
+        # 31 Oct) sends no header and holds no session, so there is no account to scope by — the scheme's staff view,
+        # as the community and collision groups read (seen empty on a local copy, 22 Oct). A login's own scope applies.
+        acc = {"role": "planner", "ipt": None, "label": "Staff (map)"}
     return abnormal_route.feature_collection(abnormal.page(acc)["movements"], public=False)
 
 

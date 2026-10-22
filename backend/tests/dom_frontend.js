@@ -1765,7 +1765,7 @@ async function abnormalDom(){
   const unitsAdv = { ...beamAdv, regime: "stgo", permission: "none", category: "cat1", category_words: "STGO Category 1 (up to 50 t on 6 or more axles)", lead_words: null,
     apply_by: null, apply_by_be16: null, notify_by: "2027-03-03", summary: "STGO Cat 1 · police 2 days · attendant · escort expected",
     lines: ["Police notice: 2 clear working days to every force on the route (width over 3 m (STGO)); receive by 2027-03-03."],
-    notes: ["no escort is planned for this movement: say what the haulier will provide"],
+    notes: ["No escort is planned for this movement: say what the haulier will provide"],
     flags: [{ code: "NOTICE_LATE", text: "notify by 2027-03-03 has passed and the movement is not marked notified" }] };
   const mv = (id, name, ipt, team, status, adv, extra) => ({ id, name, ipt, team_name: team, status, status_word: status[0].toUpperCase() + status.slice(1),
     origin_id: "L004", origin_name: "Harborough Rail Freight Terminal", dest_id: "L006", dest_name: "Langton Compound", dest_gate_name: "Main gate",

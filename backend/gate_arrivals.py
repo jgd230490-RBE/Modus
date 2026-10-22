@@ -391,7 +391,8 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         g["abnormal"] = _markers.get(g["gate_id"], [])
     abnormal_total = len({m["id"] for ms in _markers.values() for m in ms})
     if abnormal_total:
-        notes.append(f"{abnormal_total} abnormal load{'s' if abnormal_total != 1 else ''} this month are marked on their gates "
+        notes.append(f"{abnormal_total} abnormal load{'s' if abnormal_total != 1 else ''} this month "
+                     f"{'are marked on their gates' if abnormal_total != 1 else 'is marked on its gate'} "
                      f"and counted apart: not in the arrivals, the gap or the capacity.")
 
     return {

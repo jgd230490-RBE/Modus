@@ -1797,6 +1797,23 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and c.put("/api/abnormal/AL001/via", json={"via": [[95, 0]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
        and c.get("/api/abnormal/geojson", headers=PLAN).json().get("count") == 0
        and c.delete("/api/abnormal/AL001", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200)
+    # 22 Oct 2026 (seen on a local copy): the map page sends the STAFF gate cookie and no header, so access.current() is None
+    # and the staff collection came back EMPTY for a code sign-in. Now the cookie alone reads the scheme's staff view.
+    _ck = TestClient(main.app, base_url="https://testserver")
+    _ck.post("/api/auth", json={"code": "plan-code-xyz"})
+    _cm = c.post("/api/abnormal", json={"name": "Cookie check", "ipt": "IPT1", "origin_id": "L002", "dest_id": "L008", "date_from": "2027-04-12",
+                                        "width_m": 3.2, "height_m": 4.2, "length_m": 18, "gross_t": 48, "max_axle_t": 10, "axle_count": 6},
+                 headers=dict(PLAN, **{"X-Wayscope": "1"})).json().get("movement", {}).get("id")
+    ok("🔴 abnormal loads, the staff map's collection: the STAFF gate cookie alone (the map page of a code sign-in, no header) reads the same "
+       "collection a planner's header does — the words, the grades and the movement's candidates — not an empty one; the map cookie still gets 401",
+       gate.COOKIE in _ck.cookies and _ck.get("/api/abnormal/geojson").status_code == 200
+       and _ck.get("/api/abnormal/geojson").json().get("grades") == c.get("/api/abnormal/geojson", headers=PLAN).json().get("grades")
+       and _ck.get("/api/abnormal/geojson").json().get("words", {}).get("candidates")
+       and c.get("/api/abnormal", headers=PLAN).json().get("count") == 1
+       and _ck.get("/api/abnormal").status_code == 401, str(_cm))
+    ok("...the collection with the cookie carries every movement a planner sees once drawn: none drawn here (no HERE key), so count 0 both ways, and the cookie's read is byte-identical to the header's",
+       _ck.get("/api/abnormal/geojson").json() == c.get("/api/abnormal/geojson", headers=PLAN).json()
+       and c.delete(f"/api/abnormal/{_cm}", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200)
     ok("abnormal loads, phase 2: the Dashboard's summary (any sign-in; 401 signed out) and the pinch rows (a planner's)",
        c.get("/api/abnormal/summary").status_code == 401 and c.get("/api/abnormal/summary", headers=NORTH).status_code == 200
        and c.get("/api/abnormal/summary", headers=NORTH).json().get("planned") == 0
