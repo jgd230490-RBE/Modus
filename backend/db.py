@@ -78,6 +78,9 @@ TENANTED_TABLES = {
     # 22 Oct 2026 (S16 / B5, abnormal loads): each abnormal load a tenant plans — its typed dimensions and weights, its
     # window, its status and references, and (from phase 2) its own routed line. One tenant's data, carried in its package.
     "abnormal_loads",
+    # 22 Oct 2026 (evidence v3, traffic.py): DfT's traffic counts (AADF) at the count points along ITS routes, for the
+    # evidence sheet's "expected for roads like these". One tenant's data, carried in its package.
+    "traffic_counts",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -537,6 +540,17 @@ def init_network_db():
         except Exception as e:
             conn.rollback()
             print("⚠️  abnormal_loads: a missing column could not be added:", e)
+        _create_tenanted(cur, "traffic_counts")     # 22 Oct 2026 (evidence v3). Born with tenant_id in the key.
+        conn.commit()
+        # 22 Oct 2026 (evidence v3): the vehicle details, NULL until the next fetch
+        try:
+            if IS_PG:
+                cur.execute("ALTER TABLE collision_records ADD COLUMN IF NOT EXISTS detail_json TEXT")
+            else:
+                cur.execute("ALTER TABLE collision_records ADD COLUMN detail_json TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()  # column already present — fine
         _migrate_route_geometry_key(conn, cur)
         # Phase 3: which zones were avoided when this leg was baked, as a comma-separated
         # list of zone ids ('' = baked with no zones in force). Nullable, and NULL means
@@ -1351,7 +1365,33 @@ _TENANT_DDL = {
             routes_json    TEXT,
             sites_json     TEXT,
             fetched_at     TEXT,
+            -- 22 Oct 2026 (evidence v3): the vehicle details the sheet reads (goods vehicle weight classes, articulated, a
+            -- goods vehicle / any vehicle turning or waiting to turn left, a goods vehicle on a work journey) and DfT's
+            -- urban / rural flag, as JSON. Listed here AND ALTERed in init_db(); NULL until the next fetch.
+            detail_json    TEXT,
             PRIMARY KEY (tenant_id, collision_id)
+        )
+    """,
+    # 22 Oct 2026 (evidence v3, traffic.py): DfT road traffic statistics, the annual average daily flow at each count
+    # point within the strip of a route, one row per point and year: the road, where, its link length, all motor
+    # vehicles, pedal cycles and HGVs a day, and whether that year was counted or estimated. Fetched with the collisions.
+    "traffic_counts": """
+        CREATE TABLE traffic_counts (
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            count_point_id  TEXT NOT NULL,
+            year            INTEGER NOT NULL,
+            road_name       TEXT,
+            road_type       TEXT,
+            lon             REAL,
+            lat             REAL,
+            link_km         REAL,
+            aadf_all        REAL,
+            aadf_cycles     REAL,
+            aadf_hgvs       REAL,
+            method          TEXT,
+            authority       TEXT,
+            fetched_at      TEXT,
+            PRIMARY KEY (tenant_id, count_point_id, year)
         )
     """,
     # 16 Oct 2026: which years the collision history holds, the files read, when, by whom, and the state of a fetch.
@@ -1772,6 +1812,7 @@ _TENANT_PK = {
     "collision_records": "(tenant_id, collision_id)",
     "collision_meta": "(tenant_id, meta_id)",
     "abnormal_loads": "(tenant_id, id)",
+    "traffic_counts": "(tenant_id, count_point_id, year)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

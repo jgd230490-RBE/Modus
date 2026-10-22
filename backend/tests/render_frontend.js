@@ -404,6 +404,24 @@ if (loaded) {
         wOut.includes("This week&#x27;s lines on the map") && !/€/.test(wOut.slice(wOut.indexOf("Today · "), wOut.indexOf("Delivered to date"))));
       ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(wOut));
       ok("...and a weekday's strip never says \"nothing planned today\"", !wOut.includes("nothing planned today"));
+      // 22 Oct 2026 (UI fix 6, card 5; decision 6): the Today card on the big screen. Effects never run here, so nothing is
+      // measured yet: in Rotate / One section (fill) the list is marked to fit and draws every row with no count line until
+      // it is measured (dom_frontend.js mounts the measuring); "All sections" (card 4, held) and the desk are as before.
+      const DT = sandbox.DashboardToday;
+      const tvFill = render("UI FIX 6 card 5: the Today card renders on the big screen in Rotate / One section (wall + fill)", h(DT, { meta: dMeta, week: wk, wall: true, fill: true }));
+      const tvAll = render("UI FIX 6 card 5: ...and in All sections (wall, not fill)", h(DT, { meta: dMeta, week: wk, wall: true, fill: false }));
+      const tvDesk = render("UI FIX 6 card 5: ...and on the working Dashboard", h(DT, { meta: dMeta, week: wk, wall: false, fill: false }));
+      ok("UI FIX 6 card 5: in Rotate / One section the list is marked to fit (data-today-fit) and, until it is measured, draws every row and no count line; both bars are there (the user: keep the progress bars)",
+        tvFill.includes('data-today-fit="1"') && (tvFill.match(/<tr class="rd-row /g) || []).length === todayRows.length && todayRows.length > 0
+        && !tvFill.includes("today-cut") && !tvFill.includes("today-more")
+        && tvFill.includes("This week to date") && tvFill.includes("Last week") && (tvFill.match(/h-2 rounded-full bg-slate-100/g) || []).length === 2);
+      // REVERSED 22 Oct 2026 (card 4, the user's yes): All sections is marked to fit now, like Rotate / One section, in its 260 px
+      // box (no count line until measured); the working Dashboard is still unchanged
+      ok("UI FIX 6 card 4: All sections is marked to fit in its 260 px box (no count line until it is measured); the working Dashboard carries no fit marker and no count line, in its 190 px box as before",
+        tvAll.includes('data-today-fit="1"') && !tvAll.includes("today-more") && tvAll.includes("max-height:260px")
+        && tvAll.includes("This week to date") && tvAll.includes("Last week")
+        && !tvDesk.includes("data-today-fit") && !tvDesk.includes("today-more") && tvDesk.includes("max-height:190px")
+        && (tvAll.match(/<tr class="rd-row /g) || []).length === todayRows.length && (tvDesk.match(/<tr class="rd-row /g) || []).length === todayRows.length);
       // 2026-10-11: the weekend, rendered on purpose every day rather than only when the harness happens
       // to run on one: the same week with the server's today on its Sunday (the week's days already carry
       // Sat and Sun at 0 planned). Today has no line; the week's figures are still there.
@@ -992,6 +1010,23 @@ if (loaded) {
     // 13 Oct 2026 (W3, narrowed): the footer's rule is in the Variance header's info box (dom_frontend opens it)
     ok("...and the Variance header carries the not-reported rule's info box",
       acctOut.includes('aria-label="About: Variance"') && !acctOut.includes("Empty actual is not zero"));
+    // 22 Oct 2026 (UI fix 6, cards 1 and 2): the Account table keeps its 1,220 px with the Action column pinned and 13 px
+    // headings, and a short line's 'spread on this week' is the standard small button. The fixture has no short line, so
+    // its first account row is made one here (action spread, 12.5 short).
+    const spreadFix = JSON.parse(JSON.stringify(fixture));
+    spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false };
+    const spOut = render("UI FIX 6: the Account view renders a short line (action spread)",
+      h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account" }));
+    const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(191,46,85,.05)">'));
+    ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
+      spOut.includes('style="background:rgba(191,46,85,.05)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Carry +12.5 into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.">spread on this week</button>')
+      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>spread on this week</g) || []).length === 1);
+    ok("⭐ UI FIX 6 cards 1 and 2: the table keeps 1,220 px in its padded scroller under 13 px headings (la-acct-head); the Action heading and every Action cell are pinned (la-pin), the short line's cell painting the row's rose (la-pin-short)",
+      spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px"><thead class="la-acct-head">')
+      && spOut.includes('<th class="px-2 py-2 text-right font-semibold la-pin">Action<button')
+      && (spOut.match(/<td class="px-2 py-2 text-right whitespace-nowrap la-pin( la-pin-short)?">/g) || []).length === spreadFix.account.rows.length
+      && (spOut.match(/la-pin la-pin-short/g) || []).length === 1 && spRow.includes('<td class="px-2 py-2 text-right whitespace-nowrap la-pin la-pin-short">')
+      && !acctOut.includes("la-pin-short") && !/<thead class="[^"]*text-\[10px\] uppercase[^"]*"><tr><th class="px-3 py-2 text-left font-semibold">Line</.test(spOut));
 
     const hzOut = render("the Horizon view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "horizon" }));
@@ -999,6 +1034,15 @@ if (loaded) {
       hzOut.includes("COMMIT") && hzOut.includes("MAKE-READY") && hzOut.includes("EARLY WARNING")
       && !hzOut.includes(">Confirm week<"));
     ok("...and NO stockpile grid under it any more (10 Sep)", !hzOut.includes("max · opening") && !hzOut.includes("Type what came out"));
+    // 22 Oct 2026 (UI fix 6, card 3; finding #11 and the user's yes to finding #37)
+    const hzT = hzOut.slice(hzOut.indexOf("<table"));
+    ok("⭐ UI FIX 6 card 3: the Horizon's role words, month line and outcome lines are 12 px — no 9 or 10 px text left in the table; the commit week's heading is text-blue-700 (once) and its role word slate-600",
+      hzT.length > 1000 && !/text-\[(9|10)px\]/.test(hzT)
+      && hzT.includes('<div class="text-xs uppercase tracking-wide text-slate-600">COMMIT</div>')
+      && hzT.includes('<div class="text-xs uppercase tracking-wide text-slate-400">MAKE-READY</div>')
+      && /<div class="font-semibold text-blue-700">W\d+ · /.test(hzT) && (hzT.match(/text-blue-700/g) || []).length === 1
+      && hzT.includes('<div class="text-xs font-normal text-slate-400">') && /<div class="text-xs tabular-nums">/.test(hzT)
+      && !hzT.includes('style="color:var(--navy)"'));
     ok("...the Account view carries the account week's stockpiles with one 'out' box each",
       acctOut.includes("Stockpiles · ") && acctOut.includes('aria-label="About: Stockpiles"')   // 13 Oct 2026 (W3, narrowed): the how-to is in the info box
       && (acctOut.match(/placeholder="out —"/g) || []).length === fixture.account.stock.length && fixture.account.stock.length >= 1);
@@ -1058,7 +1102,7 @@ if (loaded) {
         h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {}, doc: { vehicles: {} }, upd: () => {}, fileDoc }));
       ok("...with the file's values in the inputs, the 'no block yet' note, and the three assumption labels",
         fCfg2.includes('data-fair-price-section="1"') && fCfg2.includes('value="20"') && fCfg2.includes('value="23.6"')
-        && fCfg2.includes("the live document has no fair_price block yet") && (fCfg2.match(/ASSUMPTION/g) || []).length === 3 && !/undefined|NaN/.test(fCfg2));
+        && fCfg2.includes("These are the starting values. Save once to keep them.") && !fCfg2.includes("fair_price block") /* NARROWED 22 Oct 2026 (words sweep): plain words */ && (fCfg2.match(/ASSUMPTION/g) || []).length === 3 && !/undefined|NaN/.test(fCfg2));
       const fCfg3 = render("...and from the DOCUMENT when it has one",
         h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {}, doc: { fair_price: { ...fileDoc.fair_price, driver_eur_per_h: 25 } }, upd: () => {}, fileDoc }));
       ok("...the document's value wins and the note is gone", fCfg3.includes('value="25"') && !fCfg3.includes("no fair_price block yet"));
@@ -1075,7 +1119,7 @@ if (loaded) {
       const fGbNone = cfgGb({ tenant: { country: "GB" } });
       ok("...with no block on the document the inputs show the GB set (31 rigid, 24 driver), not the EE one, and no offer",
         fGbNone.includes('value="24"') && fGbNone.includes('value="31"') && !fGbNone.includes('value="27"')
-        && !fGbNone.includes("data-fair-country-offer") && fGbNone.includes("the live document has no fair_price block yet"));
+        && !fGbNone.includes("data-fair-country-offer") && fGbNone.includes("These are the starting values. Save once to keep them."));   // NARROWED 22 Oct 2026 (words sweep): plain words
       const fGbSame = cfgGb({ tenant: { country: "gb" }, fair_price: { ...gbSet, _README: "edited words only", _driver_source: "x" } });
       ok("...the document already holding the GB numbers (sources reworded, country in lower case) gets no offer",
         !fGbSame.includes("data-fair-country-offer") && fGbSame.includes('value="24"'));

@@ -63,6 +63,7 @@
         #community-group h3, #community-group .control-item{ font-size:14px; }
         #collision-group h3, #collision-group .control-item{ font-size:14px; }
         #abnormal-group h3, #abnormal-group .control-item{ font-size:14px; }
+        #restrictions-group h3{ font-size:14px; }   /* 22 Oct 2026 (UI fix 6, card 9): the road-closures heading at 14 px like its sibling groups in More layers (was the shared 13 px) */
         .control-item { display:flex; align-items:center; justify-content:space-between; font-size:13.5px; padding:7px 2px; }
         .control-item + .control-item{ border-top:1px solid var(--line); }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
@@ -136,14 +137,23 @@
            On a demo tenant the notice is now a 26 px strip across the top at every width (the phone layout
            already did this), the bar, the panel and the map controls move down by 26 px, and the Guide
            button sits at the right end of the strip. */
+        /* 22 Oct 2026 (UI fix 6, card 7): the desk strip is 14 px on ONE line (it took the base rule's 10.5 px), line-height 1
+           as the app's bar, still 26 px tall (every offset below is 26 px); 3 + 18 + 2 px + the 3 px rule fill it, and 84 px each
+           side keep the words centred and end a long notice in an ellipsis before the Guide instead of running under it.
+           22 Oct 2026 (UI fix 6, card 8): the Guide is 14 px in the app bar's 21 px box (top 2 px: inside the band, above the rule). */
         @media (min-width:1024px){
-            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:4px 10px 3px; height:26px; }
+            body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; text-align:center; padding:3px 84px 2px; font-size:14px; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; height:26px; }
             body.has-demo-notice #kpi-hud{ top:26px; }
             body.has-demo-notice .sidebar{ top:26px; }
             body.has-demo-notice #menu-toggle{ top:40px; }
             body.has-demo-notice .mapboxgl-ctrl-top-right{ top:98px; }
             body.has-demo-notice #tl-warnings{ top:110px; }
-            body.has-demo-notice #guide-btn{ left:auto !important; right:10px; top:2px; padding:1px 10px; font-size:11px; }
+            body.has-demo-notice #guide-btn{ left:auto !important; right:10px; top:2px; height:21px; padding:0 10px; font-size:14px; line-height:21px; }
+            /* 22 Oct 2026 (UI fix 6, card 7): the DEMO tag on an 18 px line, the app bar's tag. The wall screen keeps its own
+               22 px notice exactly as before: wrapping, line-height 1.4, the tag on the notice's own line */
+            body.has-demo-notice #demo-notice::before{ line-height:18px; }
+            body.wall-mode.has-demo-notice #demo-notice{ line-height:1.4; white-space:normal; overflow:visible; }
+            body.wall-mode.has-demo-notice #demo-notice::before{ line-height:inherit; }
         }
         .kpi-title{ font-size:16px; font-weight:600; color:var(--navy-deep); line-height:1.2;
                     letter-spacing:-.01em; min-width:120px; white-space:nowrap; }
@@ -765,8 +775,12 @@
             #m-sheet[data-state="half"]{ height:calc(100% - var(--notice-h, 0px) - 24px); }
         }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
-            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:600 11.5px/1.5 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12);}
+            /* 22 Oct 2026 (UI fix 6, card 8): 14 px in a 21 px box like the app bar's Guide, an inset ring for the border (was 11.5 px, 4 px 12 px padding) */
+            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:0;border-radius:999px;height:21px;padding:0 10px;font:600 14px/21px system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line),0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
+            /* 22 Oct 2026 (UI fix 6, card 8, review): on a touch screen the 21 px Guide keeps a 44 px tap area through an
+               invisible ::after, like the app bar's Guide (decision 9); the visible pill is unchanged */
+            @media (pointer:coarse){ #guide-btn::after{content:"";position:absolute;inset:-12px -8px;} }
   /* 11 Oct 2026 — the guide, options 4 + 1 + 2 (the user): Google-style bubbles, slightly transparent; a light
      one-line strip that offers the tour; small pulsing dots on the features. Nothing pops up uninvited. */
   #guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:8px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
@@ -854,7 +868,7 @@
         <div class="ctl-head" style="margin-top:8px"><span class="area-legend-title">About these figures</span><button type="button" class="info-i" aria-expanded="false" aria-controls="info-council" onclick="toggleInfo(this)" title="About the council figures" aria-label="About the council figures"><span aria-hidden="true">i</span></button></div>
         <div class="info-pop" id="info-council" hidden>
         <div class="area-note" id="area-unitary-note"></div>
-        <div class="area-note" id="area-focus-note" hidden>While By council is on, every other layer is switched off and the heat map is off, so the councils read by themselves. Tick any layer to add it back (routes show thin and grey); unticking By council brings back the layers you had on.</div>
+        <div class="area-note" id="area-focus-note" hidden>By council turns the other layers and the heat map off. Tick a layer to add it back. Untick By council to get your layers back.</div>
         <div class="area-note" id="area-when"></div>
         <div class="area-note" id="area-attribution"></div>
         </div>
@@ -897,7 +911,7 @@
         <select id="basemap-select" onchange="changeBasemap(this.value)" aria-label="Basemap">
             <option value="mapbox://styles/mapbox/light-v11" selected>Light</option>
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
-            <option value="mapbox://styles/mapbox/satellite-streets-v12" id="basemap-satellite">Satellite (Mapbox)</option>
+            <option value="mapbox://styles/mapbox/satellite-streets-v12" id="basemap-satellite">Satellite</option>
             <option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia orthophoto (Maa-amet)</option>
         </select>
     </div>
@@ -910,7 +924,7 @@
              colours are defined. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alignment" checked onchange="toggleAlignment(this.checked)"> Alignment (by package)</label><span class="color-dot" id="ipt-alignment-swatch" style="background:#94a3b8; border-radius:0; width:13px; height:3px;"></span></div>
         <div id="ipt-legend" style="padding-left:23px;margin:-2px 0 4px;"></div>
-        <div id="ipt-legend-note" style="padding-left:23px;margin:-2px 0 6px;font-size:12px;color:var(--note);line-height:1.45;">Drawn continuously. Where the alignment file has no surveyed main track the line is interpolated &mdash; click it to see whether a stretch is measured.</div>
+        <div id="ipt-legend-note" style="padding-left:23px;margin:-2px 0 6px;font-size:12px;color:var(--note);line-height:1.45;">Gaps in the survey are filled in. Click the line to see which stretches are measured.</div>
         <div class="control-item"><label><input type="checkbox" id="layer-ws-bounds" checked onchange="toggleWsBounds(this.checked)"> Work section boundaries</label><span class="color-dot" style="background:#334155; border-radius:0; width:3px; height:13px;"></span></div>
         <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">Package edges · ticks from zoom 11, labels from 13</span></div>
         <!-- The alignment as it was drawn before the IPT overlay: every track type, one
@@ -939,7 +953,7 @@
              it should stay that way: this is a 200 km corridor and the buildings only
              mean anything at site zoom. Not an ortho mesh — the brief is explicit. -->
         <div class="control-item"><label><input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label><span class="color-dot" style="background:#cbd5e1;"></span></div>
-        <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 14 · Mapbox basemaps only</span></div>
+        <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 14</span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-gates" checked onchange="toggleGates(this.checked)"> Site gates</label><span class="color-dot" style="background:#64748B;"></span></div>
         <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 10 · hollow = deactivated</span></div>
         <!-- Phase 3 / D24 (12 Oct 2026). One symbol per KIND, and one toggle per kind under
@@ -958,11 +972,11 @@
             <div class="control-item zone-kind" data-kind="haul_road"><label><input type="checkbox" id="layer-zone-haul_road" checked onchange="toggleZoneKind('haul_road', this.checked)"> Haul road</label><span class="color-dot" style="background:#C2790B;"></span></div>
             <div class="control-item zone-kind" data-kind="other"><label><input type="checkbox" id="layer-zone-other" checked onchange="toggleZoneKind('other', this.checked)"> Advisory</label><span class="color-dot" style="background:rgba(100,116,139,.3); border:2px solid #64748B;"></span></div>
         </div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:14px;color:var(--note);">amber = closure or works · boxed = a weight or height limit · grey = advisory · a dimmed row has none in force in the month on screen</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:14px;color:var(--note);">A dimmed row has none in force this month.</span></div>
         <!-- The EXISTING railway (the package's `rail`), not the alignment being built.
              Dim until an origin filter picks a Railhead, then bold. Default ON. -->
         <div class="control-item"><label><input type="checkbox" id="layer-rail" checked onchange="toggleRail(this.checked)"> Existing rail network</label><span class="color-dot" style="background:repeating-linear-gradient(90deg,#64748B 0 2px,transparent 2px 6px); border-radius:0; width:13px; height:3px;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);" id="rail-note">provisional geometry · bolds when a railhead is the origin</span></div>
+        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);" id="rail-note">approximate line · bold when a railhead is the origin</span></div>
     </div>
 
     <div class="control-group">
@@ -1036,10 +1050,11 @@
     </div>
 
     <div class="control-group" id="restrictions-group" hidden>
-        <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
+        <!-- 22 Oct 2026 (UI fix 6, card 9): the source's name at 13 px in the muted grey (4.76:1), as the fold's other captions (was #8a9099 at the small's ~10.8 px, 3.22:1) -->
+        <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;font-size:13px;text-transform:none;letter-spacing:0;color:var(--muted);"></small></h3>
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
         <div class="control-item" style="padding-left:2px;margin-top:-2px;">
-            <span id="restriction-source" style="font-size:12px;color:var(--note);">Advisory — the router is not given this data.</span>
+            <span id="restriction-source" style="font-size:12px;color:var(--note);">For information only: routes do not avoid these.</span>
         </div>
     </div>
 
@@ -1272,7 +1287,7 @@
   <label class="rme-check"><input type="checkbox" id="rme-collisions"> Add the collision history (killed or seriously injured only on the regional plan)</label>
   <div class="share-row"><button type="button" class="btn" id="rme-go" onclick="downloadRouteExport('pdf')">Download PDF</button>
     <button type="button" class="btn btn-ghost" id="rme-go-png" onclick="downloadRouteExport('png')">Download PNG</button></div>
-  <p class="rme-note">Just the map, with its legend, scale and north arrow on it. The PDF prints at the stated scale on A4 at 100 %. The PNG is for a Word document: once it is resized, use the scale bar.</p>
+  <p class="rme-note">PDF: to scale on A4 at 100 %. PNG: for Word; after resizing, use the scale bar.</p>
   <div id="rme-status" role="status" aria-live="polite"></div>
   <p class="mt-note">Approved lines only, for the routes the filters show. A planning document, not an approved CLP.</p>
 </div>
@@ -1372,7 +1387,7 @@
         if (bm) bm.hidden = (TENANT.country || '').toUpperCase() !== 'EE';
         // H1 (29 Sep 2026): a British tenant reads Mapbox Satellite as its "Aerial" basemap
         const sat = document.getElementById('basemap-satellite');
-        if (sat) sat.textContent = (TENANT.country || '').toUpperCase() === 'GB' ? 'Aerial (Mapbox Satellite)' : 'Satellite (Mapbox)';
+        if (sat) sat.textContent = (TENANT.country || '').toUpperCase() === 'GB' ? 'Aerial' : 'Satellite';
         // H2 (5 Oct 2026): a tenant whose overlay carries no existing railway has no use for
         // the rail layer — hide its control instead of showing an empty, ticked layer. The
         // demo scheme is a road; the first tenant's corridor had a railway under it.
@@ -1784,8 +1799,8 @@
             const n = (alts_data.features || []).length;
             const note = document.getElementById('alts-note');
             if (note) note.textContent = n
-                ? n + ' alternative leg(s) HERE offered but the plan does not use'
-                : 'none stored — a route through a haul road has no alternatives';
+                ? n + ' other ways the routes could go (not used)'
+                : 'none: a route along a haul road has none';
             console.log('[alts] ' + n + ' alternative geometries');
         } catch(e){
             console.warn('route alternatives unavailable', e);
@@ -2585,7 +2600,7 @@
             if (note) note.firstChild.textContent = 'not available on this basemap';
             return false;
         }
-        if (note) note.firstChild.textContent = 'from zoom 14 · Mapbox basemaps only';
+        if (note) note.firstChild.textContent = 'from zoom 14';
         if (!map.getLayer('buildings-3d')) {
             map.addLayer({
                 id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',
@@ -2793,7 +2808,7 @@
             set('kpi-vehicles-label', 'Vehicles needed');
             set('kpi-routes', n); set('kpi-routes-label', 'Active routes');
             setHTML('kpi-breakdown', ''); setHTML('kpi-switch', ''); setHTML('kpi-busiest', '');
-            set('kpi-note', 'Turn on Show forecast or the timeline for daily rates. Active routes = every route with a stored road route that matches the filters.');
+            set('kpi-note', 'Pick a month or press Play for daily figures. Active routes = the routes on the map that match the filters.');
             return;
         }
 
@@ -2897,8 +2912,8 @@
             const fleet = Math.max(...mFleet);
             // 12 Oct 2026 (the base merge, Track B's merge-time item): what a person reads says "no stored road route",
             // never the team's word "baked" / "unbaked"
-            set('kpi-vehicles', unbakedLines && !fleet ? 'no stored route' : fmtN(fleet, 0) + (unbakedLines ? '+' : ''));
-            set('kpi-vehicles-label', unbakedLines ? `Vehicles needed (${unbakedLines} line${unbakedLines === 1 ? '' : 's'} with no stored road route)` : 'Vehicles needed');
+            set('kpi-vehicles', unbakedLines && !fleet ? 'not routed yet' : fmtN(fleet, 0) + (unbakedLines ? '+' : ''));
+            set('kpi-vehicles-label', unbakedLines ? `Vehicles needed (${unbakedLines} line${unbakedLines === 1 ? '' : 's'} not routed yet)` : 'Vehicles needed');
             set('kpi-material', fmtN(qtyDay, unitLbl === 'vehicles' ? 1 : 0));
             set('kpi-routes', mRoutes.size); set('kpi-routes-label', 'Routes in ' + label);
             // CO2e: tonnes a day for the month(s), and the programme to the end of the last
@@ -2907,7 +2922,7 @@
             // not read the carbon; every co2_t is then null. The bar prints a dash and says so, never a zero dressed as a
             // figure and never "(excl. N …)", which would blame a missing road route for a failed read.
             const co2Err = payloads.some(p => p && p.co2_error);
-            const noRoute = k => `${k} line${k === 1 ? '' : 's'} with no stored road route`;
+            const noRoute = k => `${k} line${k === 1 ? '' : 's'} not routed yet`;
             const co2Day = avg(mCo2) / wd;
             if (co2Err) {
                 set('kpi-co2-day', '—'); set('kpi-co2-total', '—');
@@ -2950,8 +2965,8 @@
                 .map(([rid, b, mv]) => `<button type="button" class="busy-row" onclick="selectRoute('${esc(rid)}')" title="Show ${esc(rid)} on the map">` +
                     `<span>${esc((b.rp.origin || rid) + ' \u2192 ' + (b.rp.dest || ''))}</span><span class="chip-n">${fmtN(mv, 0)} two-way a day</span></button>`).join('');
             setHTML('kpi-busiest', busiest);
-            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, averaged over ${n} months with volume` : ''}. Two-way movements = loads (deliveries) per working day (${wd}/month); each is a lorry out laden and back empty. Vehicles = movements ÷ what one vehicle can do per day on that route (the cycle time of its stored road route) in a driver's day under the UK drivers' hours (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers' own hours not checked), rounded up per line${n > 1 ? ', busiest month' : ''}. CO\u2082e = routed km × the vehicle's kg CO\u2082e/km, approved plan only.`
-                + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload because their vehicle is not in factors.json.` : ''));
+            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, average of ${n} months` : ''}. Two-way movements = deliveries a working day (out laden, back empty). Vehicles = lorries needed in a driver's day (a planning figure)${n > 1 ? ', busiest month' : ''}. CO\u2082e = road km × the lorry's factor.`
+                + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload (no payload set for their lorry).` : ''));
             // the method note reads as a tooltip on the month, not as a paragraph in the bar
             const tt = document.getElementById('kpi-title'); if (tt) tt.title = document.getElementById('kpi-note').innerText;
         };
@@ -3872,9 +3887,7 @@
                         // without putting the visual distinction back.
                         + (p.is_bridge
                             ? `<div style="margin-top:5px;padding:5px 7px;background:#fef3c7;border-radius:3px;font-size:11.5px;color:#7c5e10;">`
-                              + `<b>No surveyed alignment on this stretch.</b> The line here is `
-                              + `interpolated across a hole in the survey file, drawn so the `
-                              + `corridor reads continuously. It is not measured geometry.</div>`
+                              + `<b>No survey on this stretch.</b> The line is filled in, not measured.</div>`
                             : '')
                         + `<div><b>Chainage:</b> ${ch(p.chain_from_m)} – ${ch(p.chain_to_m)}</div>`
                         + (undOn
@@ -3889,7 +3902,7 @@
                         + (wsMeta.note
                             ? `<div style="margin-top:5px;font-size:12px;color:var(--note);">⚠ ${wsMeta.note}.</div>`
                             : '')
-                        + `<div style="margin-top:6px;font-size:12px;color:var(--note);">Reference geometry. Band boundaries from the scope diagram.</div>`
+                        + `<div style="margin-top:6px;font-size:12px;color:var(--note);">Band edges from the scope diagram.</div>`
                         + `</div>`
                     )
                     .addTo(map);
@@ -3922,10 +3935,8 @@
                         + `<div><b>To:</b> ${nameOf(p.to_ws)}</div>`
                         + (gone
                             ? `<div style="margin-top:6px;padding:5px 7px;background:#fef3c7;border-radius:3px;font-size:11.5px;color:#7c5e10;">`
-                              + `<b>No surveyed alignment here.</b> The nearest drawn Main Track is `
-                              + `${p.track_gap_m} m away — this boundary falls in one of the gaps in `
-                              + `the alignment file, so there is no line to mark. The chainage is right; `
-                              + `the survey data is short.</div>`
+                              + `<b>No survey here.</b> The nearest surveyed track is ${p.track_gap_m} m away. `
+                              + `The chainage is right.</div>`
                             : '')
                         + (p.provisional === true || p.provisional === 'true'
                             ? `<div style="margin-top:6px;padding:5px 7px;background:#fef3c7;border-radius:3px;font-size:11.5px;color:#7c5e10;">`
@@ -4034,7 +4045,7 @@
         try {
             a1_data = await loadNetwork();
         } catch (e) {
-            if (status) status.textContent = 'Could not load the route network: ' + e.message;
+            if (status) status.textContent = 'Could not load the routes.';
             console.error('map-data failed', e);
             settleNetworkBounds(null);     // no bounds: the closures feed falls back to the national set
             return;
@@ -4060,8 +4071,7 @@
         const lines = a1_data.features.filter(f => f.geometry.type === 'LineString');
         const routes = new Set(lines.map(f => f.properties.route_id));
         if (routes.size === 0 && status) {
-            status.textContent = 'No routes have cached geometry yet. Bake the network on the '
-                + 'Routes page and this map will fill in.';
+            status.textContent = 'No routes are worked out yet.';
         }
         // say plainly when a route is being drawn with a vehicle other than the default,
         // rather than letting one map quietly mix profiles
@@ -4474,7 +4484,7 @@
         return '<div class="area-legend-title">' + title + '</div>'
             + rows.map(r => '<div class="area-lg"><span class="area-sw" style="background:' + r[1] + '"></span>' + r[0] + '</div>').join('')
             // Track C review: two carbon ramps can be on the map at once; this one is not the route / section legend's
-            + (mode === 'carbon' ? '<div class="area-note">These stops are fixed for districts (t in the month) and differ from the Carbon legend\'s for routes and sections.</div>' : '');
+            + (mode === 'carbon' ? '<div class="area-note">District bands differ from the route carbon bands.</div>' : '');
     }
     function areaCardHTML(a, payload, when) {
         const esc = s => String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -4493,9 +4503,9 @@
                  nRoutes + ' of the ' + nAll + ' routes with approved volume' + (when ? ' in ' + esc(when) : '') + ' enter it laden'
                  + ((a.return_only_routes || []).length ? ' · ' + a.return_only_routes.length + ' more run back through it empty' : '')
                  + ((a.edge_routes || []).length ? ' · ' + a.edge_routes.length + ' more only cross its edge (under 200 m inside): their km and carbon count here, not their movements' : '')
-                 + (a.unclipped ? ' · ' + a.unclipped + ' route' + (a.unclipped === 1 ? '' : 's') + ' with volume not clipped yet: in no area until the clip runs' : '')
+                 + (a.unclipped ? ' · ' + a.unclipped + ' route' + (a.unclipped === 1 ? '' : 's') + ' with volume not yet placed in a council' : '')
                  + ' · one load = one two-way movement');
-        if (a.co2_t === null || a.co2_t === undefined) co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), 'no figure', 'no carbon for the routes here (not stored for the lines’ vehicle, or the read failed)');
+        if (a.co2_t === null || a.co2_t === undefined) co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), 'no figure', 'no carbon figure for the routes here yet');
         else co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), fmt(a.co2_t, 1) + ' t' + (tot.co2_t ? ' of ' + fmt(tot.co2_t, 0) + ' t' : ''),
                       fmt(a.co2_t_per_day || 0, 2) + ' t a day · split by the km inside'
                       // Track C review: a partial figure names what it leaves out (the bar's rule), never silently
@@ -4908,7 +4918,7 @@
             const ui = cat.provider.ui_label || '';
             if (hd) hd.textContent = ui.includes('(') ? ui.slice(0, ui.indexOf('(')).trim() : (ui || 'Road restrictions');
             const sv = document.getElementById('restriction-source');
-            if (sv && cat.provider.name) sv.textContent = 'Source: ' + cat.provider.name + (cat.provider.site ? ' (' + cat.provider.site + ')' : '') + '. Advisory — the router is not given this data.';
+            if (sv && cat.provider.name) sv.textContent = 'Source: ' + cat.provider.name + (cat.provider.site ? ' (' + cat.provider.site + ')' : '') + '. For information only: routes do not avoid these.';
             RESTR.layers = cat.layers || [];
             RESTR.colour = {};
             RESTR.layers.forEach(l => { RESTR.colour[l.key] = l.colour; });
@@ -5165,7 +5175,7 @@
         if (provisional) {
             h += `<p style='margin:6px 0 4px 0;padding:5px 6px;background:rgba(191,46,85,.08);` +
                  `border-left:3px solid #DC2626;font-size:11.5px;line-height:1.45;'>` +
-                 `<b>Provisional geometry.</b> ${p.accuracy_note || ''}</p>`;
+                 `<b>Approximate line.</b> ${p.accuracy_note || ''}</p>`;
         }
         h += `<p style='margin:4px 0;font-size:12px;color:var(--note);line-height:1.4;'>` +
              `Source: ${p.source || 'unknown'}</p></div>`;
@@ -5183,13 +5193,12 @@
                 `${p.name}</h3>` +
                 `<p style='margin:4px 0;'><b>Site:</b> ${p.location_name || p.location_id}</p>` +
                 `<p style='margin:4px 0;'><b>Direction:</b> ${dir}</p>`;
-        if (!active) h += `<p style='margin:4px 0;color:#DC2626;'><b>Deactivated</b> — routes that ` +
-                          `select this gate will not bake.</p>`;
+        if (!active) h += `<p style='margin:4px 0;color:#DC2626;'><b>Not in use</b>: a route through this ` +
+                          `gate cannot be worked out.</p>`;
         if (p.safety_minutes) h += `<p style='margin:4px 0;'><b>Induction:</b> ${p.safety_minutes} min</p>`;
         if (p.internal_travel_minutes) h += `<p style='margin:4px 0;'><b>Gate to face:</b> ` +
                                             `${p.internal_travel_minutes} min</p>`;
-        h += `<p style='margin:6px 0 0 0;font-size:12px;color:var(--note);'>${p.gate_id} · ` +
-             `access point, not the site itself</p></div>`;
+        h += `<p style='margin:6px 0 0 0;font-size:12px;color:var(--note);'>Access point, not the site itself</p></div>`;
         return h;
     }
 
@@ -5214,8 +5223,7 @@
               + (km !== null ? ' — ' + Math.round(km / speed * 60) + ' min each way' : '') + '</div>'
               // the honest caveat: this is not a measured speed and the geometry is a drawing
               + '<div style="font-size:10.5px;margin-top:4px;color:#92400e;">'
-              + 'Assigned, not measured — HERE will not accept a custom speed, so this timing is '
-              + 'substituted into the cycle afterwards and is only as good as the drawn line.</div>'
+              + 'Assigned, not measured: only as good as the drawn line.</div>'
             : '<div style="font-size:11.5px;margin-top:2px;color:#92400e;">No speed assigned — this '
               + 'stretch adds distance but no time to any cycle.</div>';
         body += '<div style="font-size:11.5px;margin-top:6px;color:#6b7280;">Used by '
@@ -5238,7 +5246,7 @@
             '<div style="font-size:11.5px;margin-top:6px;color:' +
                 (p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : '#6b7280') + ';font-weight:600;">' +   // ink, not red: red is kept for a clash or a cap breach
                 (p.affects_routing === true || p.affects_routing === 'true'
-                    ? 'Routing avoids this area' : 'Advisory only — routing unaffected') + '</div>' +
+                    ? 'Routes avoid this area' : 'For information only: routes not changed') + '</div>' +
             (p.note ? '<div style="font-size:11.5px;margin-top:6px;color:#374151;">' + p.note + '</div>' : '') +
             '</div>';
     }
@@ -5715,7 +5723,7 @@
                     <!-- 19 Oct 2026 (the user: "too many month tabs"): a year row and its twelve months (renderMonthPicker)
                          replace the 12 Oct (D14) chip per month — 60 chips on the four-year demo. The phone sheet keeps its chips. -->
                     <div class="ctl-head"><h3 id="fc-month-label">Month</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-month" onclick="toggleInfo(this)" title="About the month" aria-label="About the month"><span aria-hidden="true">i</span></button></div>
-                    <div class="info-pop" id="info-month" hidden><p>Approved forecasts only, never actuals.</p><p>A grey month has nothing approved; you can still pick it. Play steps through the months; the bar at the foot of the map shows the whole horizon. Show forecast routes draws the routes over a range of months instead of one.</p></div>
+                    <div class="info-pop" id="info-month" hidden><p>Approved forecasts only.</p><p>A grey month has nothing approved. Play steps month by month. Show forecast routes averages every month with volume.</p></div>
                     <div class="month-picker" id="fc-months" role="group" aria-labelledby="fc-month-label"></div>
                     <button type="button" class="btn" id="tl-open" onclick="startTimeline()">▶ Play forecast timeline</button>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
@@ -5895,7 +5903,7 @@
             }
 
             const unit = CONFIG.FORECAST_UNIT || 'vehicles';
-            status.innerHTML = "Fetching approved forecasts\u2026";
+            status.innerHTML = "Loading approved forecasts\u2026";
             status.style.color = CONFIG.COLORS.forecast;
 
             try {
@@ -5977,7 +5985,7 @@
                     if (bd) bd.style.display = 'none';
                 }
             } catch (e) {
-                status.innerHTML = "\u274c Failed: " + e.message;
+                status.innerHTML = "Could not load the forecasts.";
                 status.style.color = CONFIG.COLORS.peak;
             }
         }
@@ -6126,13 +6134,13 @@
             '<div class="an-title">'+routeId+'</div>'+
             '<div class="an-route">'+(info.origin||'—')+' → '+(info.dest||'—')+dirLink+'</div>'+
             '<div class="an-grid">'+
-                card(fmtDist(dist, 1)+' '+DU(),'One-way distance','Routed road geometry')+
+                card(fmtDist(dist, 1)+' '+DU(),'One-way distance','by road')+
                 card(fmtDist(round, 1)+' '+DU(),'Round trip','Loaded out, empty back')+
                 (fromServer && typeof info.cycle_hr==='number'
-                    ? card(info.cycle_hr.toFixed(2)+' h','Haul cycle','Routed drive, both legs, + gate and handling')
+                    ? card(info.cycle_hr.toFixed(2)+' h','Haul cycle','driving both ways, plus gate and handling')
                     : card(cycleH.toFixed(2)+' h','Est. haul cycle','Drive + '+(P.load_minutes+P.unload_minutes)+' min handling'))+
                 card(String(tripsPerDay),'Trips / day / lorry', tripsPerDay>0
-                    ? (fromServer ? 'routed cycle, '+Math.min(13, P.shift_hours_per_day)+' h shift less the required break, at most 9 h driving'
+                    ? (fromServer ? Math.min(13, P.shift_hours_per_day)+' h shift less the break, max 9 h driving'
                                   : '@ '+Math.min(13, P.shift_hours_per_day)+' h shift less breaks, at most 9 h driving, '+Math.round(distU(P.avg_haul_speed_kmh))+' '+SPD())
                     : 'one round trip does not fit a driver\'s day')+
             '</div>'+
@@ -6181,13 +6189,13 @@
                 const co2Card=mtx.co2_error
                     ? card('—','CO₂e (est.)','carbon could not be read')
                     : anyBaked
-                    ? card(co2t.toFixed(1)+' t','CO₂e (est.)','both legs'+(unbakedM?' · excl. '+unbakedM+' month'+(unbakedM>1?'s':'')+' with no stored road route':''))
-                    : card('—','CO₂e (est.)','no road route stored for this vehicle yet');
+                    ? card(co2t.toFixed(1)+' t','CO₂e (est.)','both legs'+(unbakedM?' · excl. '+unbakedM+' month'+(unbakedM>1?'s':'')+' not routed yet':''))
+                    : card('—','CO₂e (est.)','not routed for this lorry yet');
                 const intCard=mtx.co2_error
                     ? card('—','Carbon intensity','carbon could not be read')
                     : anyBaked
-                    ? card(intensity.toFixed(1)+' kg/t','Carbon intensity','per tonne, months with a stored route')
-                    : card('—','Carbon intensity','needs a stored road route');
+                    ? card(intensity.toFixed(1)+' kg/t','Carbon intensity','per tonne, routed months only')
+                    : card('—','Carbon intensity','not routed yet');
                 // 17 Oct 2026: not one round trip in a driver's day counts one lorry a trip (the server's floor)
                 const trucksPeak=Math.ceil(peakLoads/(Math.max(1, tripsPerDay)*P.working_days_per_month));
                 // Track A's caption: a route with several approved lines names each material · vehicle pair
@@ -6205,14 +6213,14 @@
                         card(Math.round(peakT).toLocaleString()+' t','Peak month','busiest month in window')+
                         card(trucksPeak,'Lorries for peak','to clear peak month')+
                     '</div>'+
-                    '<div class="an-sub" style="margin-top:10px;">Carbon: DESNZ 2026 kg CO₂e per vehicle-km, average laden, applied to both legs, tailpipe only; set per vehicle on the Config page. Read from the server: the costlines figure the bar above and the Dashboard use, summed over every line on this route.'+
+                    '<div class="an-sub" style="margin-top:10px;">Carbon: DESNZ 2026 factors, both legs, tailpipe only. The same figure as the bar above.'+
                     (mtx.carbon_stamp?' '+mtx.carbon_stamp+'.':'')+'</div>';
             } else {
-                extra='<div class="an-sub" style="margin-top:12px;">No approved forecast for this route in the selected window, so tonnage &amp; carbon are hidden. Distance and cycle time above come from the road geometry.</div>';
+                extra='<div class="an-sub" style="margin-top:12px;">No approved forecast for this route, so no tonnes or carbon.</div>';
             }
             const slot=document.getElementById('an-fc-slot'); if(slot) slot.outerHTML=extra;
         }catch(e){
-            const slot=document.getElementById('an-fc-slot'); if(slot) slot.outerHTML='<div class="an-sub" style="margin-top:12px;">Couldn\'t load forecast ('+e.message+').</div>';
+            const slot=document.getElementById('an-fc-slot'); if(slot) slot.outerHTML='<div class="an-sub" style="margin-top:12px;">Couldn\'t load the forecast.</div>';
         }
     }
 
@@ -6245,7 +6253,7 @@
                 '<div class="an-route">Window '+monthLabel(lo)+' – '+monthLabel(hi)+' · '+routes.length+' route(s) · sorted by total</div>'+
                 '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">'+leg+'</div>'+
                 '<div style="overflow:auto;"><table class="fc-matrix"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
-        }catch(e){ box.innerHTML='<div class="an-sub">Couldn\'t load forecast detail ('+e.message+').</div>'; }
+        }catch(e){ box.innerHTML='<div class="an-sub">Couldn\'t load the forecast detail.</div>'; }
     }
 
     // ===== Directional flow animation + playable forecast timeline =====
@@ -6696,8 +6704,8 @@
             if (rl) {
                 const data = m ? RL.cache[m] : null;
                 if (!m) rlBox.innerHTML = '<div class="mode-note">' + needMonth + '</div>';
-                else if (RL.error[m]) rlBox.innerHTML = '<div class="mode-note">The shared sections could not be read for ' + rlEsc(monthLabel(m)) + ' (' + rlEsc(RL.error[m]) + '); the routes are painted by their own figure.</div>';
-                else if (!data) rlBox.innerHTML = '<div class="mode-note">Reading the shared sections for ' + rlEsc(monthLabel(m)) + '…</div>';
+                else if (RL.error[m]) rlBox.innerHTML = '<div class="mode-note">Shared roads could not be loaded for ' + rlEsc(monthLabel(m)) + '. Each route shows its own figure.</div>';
+                else if (!data) rlBox.innerHTML = '<div class="mode-note">Loading ' + rlEsc(monthLabel(m)) + '…</div>';
                 else {
                     const n = roadLoadFeatures(data, modeRoutesPassing()).length;
                     const other = ROUTE_VOLUME_STOPS !== VOLUME_STOPS;
@@ -6708,10 +6716,10 @@
                         '<div class="ml-row ml-key">' + MV_PILL_HTML + 'two-way lorry movements a day on that stretch</div>';
                     // 14 Oct 2026 (the user took the recommendation): shortened to match the bulletin's map note — its first
                     // sentence is bulletin_doc.map_note() word for word; the rest keeps only the facts a reader needs
-                    more = 'Where routes share a road, its colour shows their total (' + n + ' shared section' + (n === 1 ? '' : 's') + '). ' +
-                        'One load = one two-way movement; the loaded leg is counted once. Fixed stops: a colour means the same volume every month. ' +
-                        'A stretch under 1 a day carries no number. Hover or click a route for its own figure, a stretch for the routes on it.' +
-                        (other ? ' Routes are painted in ' + rlEsc(CONFIG.FORECAST_UNIT) + ' a day on stops twenty times these.' : '') +
+                    // 22 Oct 2026 (words sweep): cut to what a reader needs; the shared-section count, one load = one movement
+                    // and the x20 route stops are in the technical guide (T10)
+                    more = 'Where routes share a road, its colour shows their total. A colour means the same volume every month. ' +
+                        'A stretch under 1 a day has no number. Click a route or a stretch for its figures.' +
                         ((data.notes || []).length ? ' ' + data.notes.map(rlEsc).join(' ') : '');
                 }
             }
@@ -6721,8 +6729,8 @@
             if (co2) {
                 const mtx = (typeof TL !== 'undefined') ? TL.matrix : null;
                 if (!m) coBox.innerHTML = '<div class="mode-note">' + needMonth + '</div>';
-                else if (!mtx) coBox.innerHTML = '<div class="mode-note">Reading carbon for ' + rlEsc(monthLabel(m)) + '…</div>';
-                else if (mtx.co2Error) coBox.innerHTML = '<div class="mode-note">' + rlEsc(mtx.co2Error) + ' Every line is grey: no figure.</div>';
+                else if (!mtx) coBox.innerHTML = '<div class="mode-note">Loading ' + rlEsc(monthLabel(m)) + '…</div>';
+                else if (mtx.co2Error) coBox.innerHTML = '<div class="mode-note" title="' + rlEsc(mtx.co2Error) + '">Carbon could not be read. Every line is grey.</div>';
                 else {
                     const sc = carbonScale(false), s = sc.stops, per = 'per route';
                     const ranges = stepRanges(s, ' t');
@@ -6730,13 +6738,11 @@
                     coBox.innerHTML = '<b>Carbon · t CO₂e in ' + rlEsc(monthLabel(m)) + ', ' + per + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
                         ranges.map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
-                        '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>No stored road route · no figure</div>' +
+                        '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>Not routed yet · no figure</div>' +
                         // 19 Oct 2026: the badges' key
                         '<div class="ml-row ml-key"><span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month</div>' +
-                        (miss ? '<div class="ml-foot">Excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route.</div>' : '');
-                    more = 'Approved plan only, average-laden factor on both legs' +
-                        (miss ? ', excludes ' + miss + ' line' + (miss === 1 ? '' : 's') + ' with no stored road route' : '') +
-                        '. Stops are fixed from the programme\'s largest ' + sc.what + ' (' + fmtTonnes(sc.max || 0) + '), so a colour means the same tonnes in every month.' +
+                        (miss ? '<div class="ml-foot">Leaves out ' + miss + ' line' + (miss === 1 ? '' : 's') + ' not routed yet.</div>' : '');
+                    more = 'Approved plan only, both legs. A colour means the same tonnes every month.' +
                         (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '');
                 }
             }
@@ -7126,8 +7132,7 @@
         box.innerHTML = '<b>Closer dashes = more ' + unit + '</b>' +
             '<div class="ml-sub">Each way, ' + when + '</div>' +
             stepRanges(FLOW_STOPS, '').map((t, i) => '<div class="ml-row">' + flowSample(FLOW_PERIODS[i]) + t + '</div>').join('') +
-            '<div class="ml-foot">Each direction has its own lane, on the left as driven; its dashes move the way the lorries go while the timeline plays. ' +
-            'Where routes share a road, the dashes show their total. Fixed bands: a spacing means the same number in every month.</div>';
+            '<div class="ml-foot">Each direction has its own lane, on the left. Where routes share a road, the dashes show their total.</div>';
     }
     // ===== end of the flow =====
 
@@ -8630,12 +8635,12 @@
         const st = document.getElementById('rme-status');
         try {
             const r = await fetch('/api/routes/map-export/places?' + routeExportQuery().toString(), { credentials: 'same-origin' });
-            if (!r.ok) throw new Error(r.status === 401 ? 'only staff can export the route map: sign in to the app' : 'error ' + r.status);
+            if (!r.ok) throw new Error(r.status === 401 ? 'only staff can export the route map: sign in to the app' : 'could not load the places. Try again.');
             const j = await r.json();
             RME.plans = j.plans || []; RME.places = j.places || []; RME.fitted = j.regional_fitted || null;
             const at = document.getElementById('rme-at');
             if (at) at.innerHTML = RME.places.map(n => '<option value="' + escHtml(n) + '">' + escHtml(n) + '</option>').join('');
-        } catch (e) { if (st) st.textContent = 'Not ready: ' + (e && e.message || e); }
+        } catch (e) { if (st) st.textContent = 'Not ready: ' + (e && e.message || 'try again'); }
         syncRouteExport();
     }
     function openRouteExport() {
@@ -8683,7 +8688,7 @@
             if (!r.ok) {
                 let d = '';
                 try { const j = await r.json(); d = (j && typeof j.detail === 'string') ? j.detail : ''; } catch (e) { d = ''; }
-                throw new Error(r.status === 401 ? 'only staff can export the route map: sign in to the app' : (d || 'the export failed (' + r.status + ')'));
+                throw new Error(r.status === 401 ? 'only staff can export the route map: sign in to the app' : (d || 'try again'));
             }
             const blob = await r.blob();
             const cd = r.headers.get('content-disposition') || '';
@@ -8823,7 +8828,7 @@
               att = document.getElementById('community-attribution');
         const D = COMM.data;
         if (!box || !when) return;
-        if (!D) { box.hidden = true; when.textContent = COMM.loading ? 'Reading the layer…' : ''; return; }
+        if (!D) { box.hidden = true; when.textContent = COMM.loading ? 'Loading…' : ''; return; }
         const total = (D.features || []).length;
         box.hidden = !COMM.on || !total;
         box.innerHTML = (D.kinds || []).map(k => `<div class="control-item" style="padding-left:23px"><label style="display:flex;gap:6px;align-items:center">` +
@@ -8833,8 +8838,8 @@
         const src = (D.sources || []).filter(s => s.fetched_at).map(s => `${s.name} (${day(s.data_date || s.fetched_at)})`);
         when.textContent = !total && !D.fetched_at
             ? 'Not fetched yet. A planner fetches it on Config → Map and bulletin.'
-            : `Fetched ${day(D.fetched_at)} from ${src.join(', ')}. Within ${D.strip.route_m} m of the routes and ${D.strip.site_m} m of the sites. ` +
-              'Fetched again on Config → Map and bulletin.' + (D.error ? ' ' + D.error + '.' : '');
+            : `Within ${D.strip.route_m} m of the routes and ${D.strip.site_m} m of the sites. From ${src.join(', ')}.` +
+              (D.error ? ' The last fetch did not finish; the earlier data is kept.' : '');
         if (att) att.textContent = D.credit || '';
     }
     function loadCommunity() {
@@ -8843,7 +8848,7 @@
         fetch('/api/community', { credentials: 'same-origin' })
             .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 401 ? 'only staff can see this layer' : 'not read (' + r.status + ')')))
             .then(j => { COMM.data = j; COMM.loading = false; renderCommunityPanel(); ensureCommunityLayers(); })
-            .catch(e => { COMM.loading = false; const w = document.getElementById('community-when'); if (w) w.textContent = 'Not read: ' + (e && e.message || e); });
+            .catch(e => { COMM.loading = false; const w = document.getElementById('community-when'); if (w) w.textContent = 'Could not load this layer.'; });
     }
     function toggleCommunity(on) {
         COMM.on = !!on && COMM.staff;
@@ -8937,7 +8942,7 @@
               att = document.getElementById('collision-attribution'), leg = document.getElementById('collision-legend');
         const D = COLL.data;
         if (!box || !when) return;
-        if (!D) { box.hidden = true; when.textContent = COLL.loading ? 'Reading the layer…' : ''; return; }
+        if (!D) { box.hidden = true; when.textContent = COLL.loading ? 'Loading…' : ''; return; }
         const n = D.counts || { all: 0, ksi: 0 };
         const alt = D.alternatives_only || { all: 0, ksi: 0 };
         box.hidden = !COLL.on || !(n.all || alt.all);
@@ -8948,12 +8953,11 @@
         const day = s => { if (!s) return null; const d = new Date(s.length > 10 ? s : s + 'T12:00:00Z'); return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
         when.textContent = !D.fetched_at
             ? 'Not fetched yet. A planner fetches it on Config → Map and bulletin.'
-            : `Police-reported injury collisions, ${D.period}: ${n.all} within ${D.strip.route_m} m of the routes or ${D.strip.site_m} m of the sites, ` +
-              `${n.ksi} of them killed or seriously injured.` +
-              (alt.all ? ` Another ${alt.all} (${alt.ksi} killed or seriously injured) are along the alternative routes only: ` +
+            : `${n.all} police-reported injury collisions, ${D.period}, near the routes and sites (${n.ksi} killed or seriously injured).` +
+              (alt.all ? ` Another ${alt.all} are along the alternative routes only: ` +
                          (altsShown() ? 'drawn while Alternative routes is ticked.' : 'tick Alternative routes to see them.') : '') +
-              ` Fetched ${day(D.fetched_at)}. Evidence for a route risk assessment, not the assessment.` +
-              (D.error ? ' ' + D.error + '.' : '');
+              ' Evidence, not a risk assessment.' +
+              (D.error ? ' The last fetch did not finish; the earlier data is kept.' : '');
         if (att) att.textContent = D.credit || '';
     }
     function loadCollisions() {
@@ -8962,7 +8966,7 @@
         fetch('/api/collisions', { credentials: 'same-origin' })
             .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 401 ? 'only staff can see this layer' : 'not read (' + r.status + ')')))
             .then(j => { COLL.data = j; COLL.loading = false; renderCollisionPanel(); ensureCollisionLayers(); })
-            .catch(e => { COLL.loading = false; const w = document.getElementById('collision-when'); if (w) w.textContent = 'Not read: ' + (e && e.message || e); });
+            .catch(e => { COLL.loading = false; const w = document.getElementById('collision-when'); if (w) w.textContent = 'Could not load this layer.'; });
     }
     function toggleCollisions(on) {
         COLL.on = !!on && COLL.staff;
@@ -9052,7 +9056,7 @@
         const p = f.properties || {};
         const html = `<div style="font:14px system-ui;max-width:300px"><b>${escHtml(p.pinch_id || '')} · ${escHtml(p.words || '')}</b><br>` +
             `${escHtml(p.movement || '')}${p.detail ? ' · ' + escHtml(p.detail) : ''}<br>` +
-            `<span style="color:#475569">${escHtml(p.grade_word || 'Grey — to survey')} · found by Wayscope from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'the stored signed limits' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'HERE'}; the route survey decides.</span></div>`;
+            `<span style="color:#475569">${escHtml(p.grade_word || 'Grey — to survey')} · found by Wayscope from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'the stored signed limits' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'the route’s directions'}; the route survey decides.</span></div>`;
         new mapboxgl.Popup({ maxWidth: '320px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
     function renderAbnormalPanel() {
@@ -9060,7 +9064,7 @@
         if (!box || !when) return;
         box.hidden = !ABN.on;
         if (ABN.loading) { when.textContent = 'Reading the abnormal loads…'; return; }
-        if (!ABN.data) { when.textContent = ABN.on ? '' : 'Each abnormal load’s own line, drawn by HERE for its size, with the potential pinch points found on it. Staff only.'; return; }
+        if (!ABN.data) { when.textContent = ABN.on ? '' : 'Each abnormal load’s own line, drawn for its size, with the potential pinch points found on it. Staff only.'; return; }
         const D = ABN.data, n = D.count || 0, dots = (D.features || []).filter(f => f.geometry && f.geometry.type === 'Point').length;
         when.textContent = n ? `${n} abnormal load${n === 1 ? '' : 's'} drawn, ${dots} potential pinch point${dots === 1 ? '' : 's'}. ${(D.words && D.words.indicative) || ''} ${(D.words && D.words.counted_apart) || ''}`
                              : 'No abnormal load has a line drawn yet (a planner draws it on Plan → Abnormal loads).';
@@ -9076,7 +9080,7 @@
         fetch('/api/abnormal/geojson', { credentials: 'same-origin' })
             .then(r => { if (!r.ok) throw new Error(r.status === 401 ? 'sign in as staff to see the abnormal loads' : 'HTTP ' + r.status); return r.json(); })
             .then(j => { ABN.data = j; ABN.loading = false; renderAbnormalPanel(); ensureAbnormalLayers(); })
-            .catch(e => { ABN.loading = false; const w = document.getElementById('abnormal-when'); if (w) w.textContent = 'Not read: ' + (e && e.message || e); });
+            .catch(e => { ABN.loading = false; const w = document.getElementById('abnormal-when'); if (w) w.textContent = /sign in/.test(String(e && e.message)) ? 'Sign in as staff to see the abnormal loads.' : 'The abnormal loads could not be read: try again.'; });
     }
     function toggleAbnormal(on) {
         ABN.on = !!on;
@@ -9128,7 +9132,7 @@
         fetch('/api/public/abnormal', { credentials: 'same-origin' })
             .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
             .then(j => { ABP.data = j; ABP.loading = false; renderAbnormalPublicPanel(); ensureAbnormalPublicLayers(); })
-            .catch(e => { ABP.loading = false; const w = document.getElementById('abnormal-public-when'); if (w) w.textContent = 'Not read: ' + (e && e.message || e); });
+            .catch(() => { ABP.loading = false; const w = document.getElementById('abnormal-public-when'); if (w) w.textContent = 'The abnormal loads could not be read: try again.'; });
     }
     function toggleAbnormalPublic(on) {
         ABP.on = !!on;
@@ -9320,8 +9324,8 @@
         document.querySelectorAll('.concern-slot').forEach(slot => {
             const html = addr
                 ? '<a class="concern-link" href="' + escHtml(concernMailto(addr, TENANT.name, TL.on ? monthLabel(TL.month) : null, VIEW.ready ? shareUrl() : null)) + '">Report a concern by email</a>'
-                : '<span class="concern-unset">Report a concern: no contact address has been typed for this scheme'
-                  + (TENANT.demo_notice ? ' (a placeholder on the fictional demo scheme)' : '') + '.</span>';
+                : '<span class="concern-unset">Report a concern: no contact address yet'
+                  + (TENANT.demo_notice ? ' (fictional demo)' : '') + '.</span>';
             if (slot.innerHTML !== html) slot.innerHTML = html;
         });
     }
@@ -9358,7 +9362,7 @@
         return { rows, undrawn: [...undrawn].sort() };
     }
     function vehiclesText(r) {
-        if (r.unbaked && !r.vehicles) return 'no stored road route';
+        if (r.unbaked && !r.vehicles) return 'not routed yet';
         return fmtN(r.vehicles, 0) + (r.unbaked ? '+' : '');
     }
     function openMonthText() {
@@ -9412,9 +9416,9 @@
             + '</tbody></table>';
         const sites = live.filter(i => i.kind === 's');
         if (sites.length) html += '<p><b>Sites:</b> ' + sites.map(i => escHtml(i.noun + ' — ' + i.what)).join(' ') + '</p>';
-        if (t.undrawn.length) html += '<p class="mt-note">Not on the map and not counted (no stored road route): ' + escHtml(t.undrawn.join(', ')) + '.</p>';
-        html += '<p class="mt-note">Two-way movements a day = loads (deliveries) ÷ ' + escHtml(String(wd)) + ' working days in the month, from the plan; each is a lorry out laden and back empty, counted once. '
-            + 'Vehicles = per line, movements a day ÷ what one vehicle can do in a driver\'s day on that route (the shift less the required break, at most 9 h driving; a planning figure, weekly limits and drivers\' own hours not checked), rounded up. Rows are rounded, so they may not add to the bar.</p>';
+        if (t.undrawn.length) html += '<p class="mt-note">Not on the map and not counted (not routed yet): ' + escHtml(t.undrawn.join(', ')) + '.</p>';
+        html += '<p class="mt-note">Two-way movements = deliveries ÷ ' + escHtml(String(wd)) + ' working days; each is a lorry out laden and back empty. '
+            + 'Vehicles: a planning figure, rounded up per line. Rows are rounded, so may not add up to the bar.</p>';
         html += '<div class="concern-slot"></div>';
         body.innerHTML = html;
         renderConcernLinks();
@@ -9579,8 +9583,8 @@
         const conds = (month && WARN.liveMonth === month ? (WARN.live || []) : []).filter(i => i.who === rid);
         html += conds.length ? '<h3>Conditions on this route</h3>' + condRowsHTML(conds) : '';
         html += routeWordsHTML(rid);
-        html += '<p class="mt-note">Hours, the responsible organisation and the consent reference have not been typed for this scheme'
-              + (TENANT.demo_notice ? ' (placeholders on the fictional demo scheme)' : '') + '.</p>'
+        html += '<p class="mt-note">Hours, responsible organisation, consent reference: not given yet'
+              + (TENANT.demo_notice ? ' (fictional demo)' : '') + '.</p>'
               + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the route card</button>';
         return html;
     }

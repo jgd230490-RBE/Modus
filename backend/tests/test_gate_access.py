@@ -453,7 +453,8 @@ ok("⭐ the gate form: 'Access road from the public road', a choice of the drawn
    and "access_zone_id: gateForm.access_zone_id || null," in _fe and 'access_zone_id: g.access_zone_id || "", shut_windows:' in _fe)
 ok("⭐ the gate list says each gate's access road, or 'no access road drawn' in amber",
    "access road: {((haulRoadList || []).find(z => z.id === g.access_zone_id) || {}).name || g.access_zone_id}" in _fe
-   and 'className="text-[10px] text-amber-700" data-gate-access-missing={g.id}' in _fe and "no access road drawn" in _fe)
+   # NARROWED 22 Oct 2026 (UI fix 7): the gate row's words take the row's 12 px (no 10 px class)
+   and '<span className="text-amber-700" data-gate-access-missing={g.id}' in _fe and "no access road drawn" in _fe)
 ok("🔴 the word rule on the new text: no bake / geometry / server / endpoint / token",
    not re.search(r"\b(bake[sd]?|geometry|server|endpoint|token)\b",
                  _fe[_fe.index("Access road from the public road"):_fe.index("Access road from the public road") + 900], re.I))

@@ -996,6 +996,11 @@ finally:
 ok("⭐ the map password page shows the demo tenant's notice, escaped, above the logo",
    '<div class="demo-notice">Fictional demo scheme · &lt;nothing&gt; here is real</div>' in _demo_pg
    and _demo_pg.index('class="demo-notice"') < _demo_pg.index('class="logo"'))
+# 22 Oct 2026 (UI fix 6, card 8; finding #12): the password page's notice pill is 14 px, the app's demo bar size (was 11 px)
+_dn_rule = (re.search(r"\.demo-notice \{([^}]*)\}", _demo_pg) or [None, ""])[1]
+ok("⭐ UI fix 6, card 8: the map password page's notice pill is 14 px (was 11 px), bold red capitals on the pale grey as before",
+   "font-size:14px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;" in _dn_rule
+   and "font-size:11px" not in _dn_rule and "background:#F1F5F9; color:#B91C1C; border:1px solid #DC2626;" in _dn_rule, _dn_rule)
 ok("...a real tenant (no notice) gets no notice box and no leftover marker",
    'class="demo-notice"' not in _real_pg and "<!--demo-notice-->" not in _real_pg
    and _real_pg.replace("\n", "") == main._MAP_PASSWORD_PAGE.replace("<!--demo-notice-->", "").replace("\n", ""))

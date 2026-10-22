@@ -62,12 +62,12 @@ GRADES = ("grey", "green", "amber", "red", "black")
 GRADE_WORDS = {"grey": "Grey — to survey", "green": "Green — passable", "amber": "Amber — passable with care or measures",
                "red": "Red — needs works or a permit", "black": "Black — impassable"}
 KIND_WORDS = {"turn": "Turn", "roundabout": "Roundabout", "slip_road": "Slip road", "bend": "Sharp bend",
-              "limit": "Signed limit", "notice": "HERE notice", "bridge": "Bridge", "railway": "Railway crossed",
+              "limit": "Signed limit", "notice": "Routing notice", "bridge": "Bridge", "railway": "Railway crossed",
               "level_crossing": "Level crossing", "calming": "Traffic calming", "overhead": "Overhead line",
               "width": "Narrow road", "junction": "Junction", "furniture": "Street furniture", "other": "Other"}
-INDICATIVE_WORDS = ("Indicative line drawn by HERE for the load's size. The haulier's ESDAL route and route survey govern; "
+INDICATIVE_WORDS = ("Indicative line, drawn for the load's size. The haulier's ESDAL route and route survey govern; "
                     "structures are checked by their owners through ESDAL.")
-CANDIDATE_WORDS = ("Potential pinch points found by Wayscope from HERE's turn-by-turn, the line itself and the stored signed "
+CANDIDATE_WORDS = ("Potential pinch points found by Wayscope from the route's turn-by-turn directions, the line itself and the stored signed "
                    "limits, each graded Grey (to survey). The route survey decides: no structure rating, no swept path, "
                    "no overhead clearance is worked out here.")
 _ORD = {1: "1st", 2: "2nd", 3: "3rd"}
@@ -259,7 +259,7 @@ def candidates_from_actions(actions, geometry, m, spans=None):
         sev = a.get("severity")
         if kind == "turn":
             k, words = "turn", f"Turn {a.get('direction') or ''} onto {road}".replace("  ", " ") if road else f"Turn {a.get('direction') or ''}".strip()
-            detail = f"HERE's turn severity: {sev}" if sev else None
+            detail = f"turn severity: {sev} (the router's word)" if sev else None
         elif kind == "uTurn":
             k, words, detail = "turn", f"U-turn{(' at ' + road) if road else ''}", None
         elif kind == "roundaboutExit":
@@ -268,7 +268,7 @@ def candidates_from_actions(actions, geometry, m, spans=None):
         elif kind == "roundaboutPass":
             mm = re.search(r"Pass (\d+) roundabouts?", a.get("instruction") or "")
             n = mm.group(1) if mm else "several"
-            k, words, detail = "roundabout", f"Passes {n} roundabouts" + (f" on {road}" if road else ""), "straight over each; HERE counts them in its words"
+            k, words, detail = "roundabout", f"Passes {n} roundabouts" + (f" on {road}" if road else ""), "straight over each; the directions count them"
         elif kind in ("ramp", "keep") and long_load:
             k, words = "slip_road", (a.get("instruction") or "Slip road").split(". Go for")[0]
             detail = "a long load on a slip road or a lane change: the swept path is the survey's question"
@@ -332,7 +332,7 @@ def notice_candidates(notices, geometry):
     out = []
     for n in notices or []:
         out.append({"source": "here", "kind": "notice", "place": None,
-                    "words": f"HERE notice: {n.get('title') or n.get('code') or 'a restriction HERE could not keep to'}",
+                    "words": f"Routing notice: {n.get('title') or n.get('code') or 'a restriction the route could not keep to'}",
                     "detail": f"code {n.get('code')}, severity {n.get('severity')}", "grade": "grey",
                     "lon": geometry[0][0] if geometry else None, "lat": geometry[0][1] if geometry else None, "offset": 0})
     return out
@@ -689,7 +689,7 @@ def bake(movement_id, by=None, _routes=None, _limits=None, _structures=None, _fe
         return {"ok": False, "error": "no such abnormal load"}
     call = _routes or here_routing.routes
     if _routes is None and not here_routing.configured():
-        err = "HERE_API_KEY is not set on this deployment, so no line can be drawn"
+        err = "no routing key is set on this deployment, so no line can be drawn"
         _store(movement_id, {"bake_error": err, "baked_at": _now()})
         return {"ok": False, "error": err}
     locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
@@ -706,7 +706,7 @@ def bake(movement_id, by=None, _routes=None, _limits=None, _structures=None, _fe
     try:
         opts = call(a["lat"], a["lon"], b["lat"], b["lon"], None, vehicle=params, extras=dict(EXTRAS), via=via or None, alternatives=1)
     except Exception as e:  # noqa: BLE001 — the answer is the error, stored on the movement
-        err = f"HERE could not draw the line: {str(e)[:240]}"
+        err = f"the line could not be drawn: {str(e)[:240]}"
         _store(movement_id, {"bake_error": err, "baked_at": _now()})
         return {"ok": False, "error": err}
     best = opts[0]

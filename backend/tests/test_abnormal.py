@@ -704,7 +704,7 @@ ok("ROUTE: a movement with no heaviest axle or axle count sends neither",
    "vehicle[weightPerAxle]" not in AR.vehicle_params(dict(BEAM, max_axle_t=None, axle_count=None))[0] and "vehicle[axleCount]" not in AR.vehicle_params(dict(BEAM, max_axle_t=None, axle_count=None))[0])
 _nk = AR.bake(_u["id"])
 ok("🔴 ROUTE: with no HERE key nothing is drawn, the reason is stored on the movement and returned, nothing raised",
-   not _nk["ok"] and "HERE_API_KEY" in _nk["error"] and A.get(_u["id"])["bake_error"] == _nk["error"] and A.get(_u["id"])["geometry_json"] is None)
+   not _nk["ok"] and "no routing key" in _nk["error"] and A.get(_u["id"])["bake_error"] == _nk["error"] and A.get(_u["id"])["geometry_json"] is None)
 _r = AR.bake(_u["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])
 _m = A.decorate(A.get(_u["id"]))
 ok("⭐ ROUTE: the bake sends the typed vehicle and the probe's extras (actions, instructions; spans names, routeNumbers, functionalClass, length, notices), "
@@ -719,7 +719,7 @@ _c = {c["kind"]: c for c in _m["candidates"]}
 ok("⭐ CANDIDATES: a turn (with HERE's severity word), a roundabout exit (with its number), a 'pass N roundabouts' stretch (N read from HERE's words); "
    "no slip road for a load that is not long; each placed on the line at HERE's offset; every one Grey, 'here'",
    [c["kind"] for c in _m["candidates"]] == ["turn", "roundabout", "roundabout"]
-   and _c["turn"]["words"] == "Turn right onto Doddridge Road" and _c["turn"]["detail"] == "HERE's turn severity: quite"
+   and _c["turn"]["words"] == "Turn right onto Doddridge Road" and _c["turn"]["detail"] == "turn severity: quite (the router's word)"
    and any(c["words"] == "Roundabout: 2nd exit onto Leicester Road (B6047)" for c in _m["candidates"])
    and any(c["words"] == "Passes 3 roundabouts on Leicester Road (A607)" for c in _m["candidates"])
    and _c["turn"]["lon"] == PTS[2][0] and _c["turn"]["lat"] == PTS[2][1] and all(c["grade"] == "grey" and c["source"] == "here" for c in _m["candidates"])
@@ -793,7 +793,7 @@ ok("…and a re-bake keeps the typed rows beside the new candidates, numbered ap
 # HERE failing
 _r7 = AR.bake(_cr["id"], _routes=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("HTTP 400: E605024")))
 ok("ROUTE: a HERE error is stored on the movement in words and returned, never raised; the old line is kept until a bake succeeds",
-   not _r7["ok"] and "HERE could not draw the line" in _r7["error"] and "E605024" in A.get(_cr["id"])["bake_error"] and A.get(_cr["id"])["geometry_json"])
+   not _r7["ok"] and "the line could not be drawn" in _r7["error"] and "E605024" in A.get(_cr["id"])["bake_error"] and A.get(_cr["id"])["geometry_json"])
 # the collections
 A.set_status(_u["id"], "approved", PLANNER)
 _all = A.page(PLANNER)["movements"]

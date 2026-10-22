@@ -2937,6 +2937,10 @@ def build_route_sheet_pdf(S):
 # collision in order along the route, with the community considerations near each; on every page DfT's caveats, "not
 # the assessment" and the credit line. Counts only: no score, no rate, no ranking, no colour status (R5).
 CE_INK = "#27272A"               # the collision symbol: one ink, size by severity (a hue would claim a meaning)
+# 22 Oct 2026 (evidence v3, the user: "highlight where a hgv was involved"): a collision with a goods vehicle over 3.5 t
+# is drawn as a square in its own ink — an identifying colour, not a status colour (no red / amber / green)
+CE_LORRY = "#6D28D9"
+CE_ALT = "#71717A"               # an alternative route: dashed grey under the route
 CE_RADIUS = {1: 4.4, 2: 3.2, 3: 2.2}
 CE_MAP_H_MM = 92.0
 
@@ -2967,7 +2971,7 @@ def _ce_tag(c, x, y, n):
 def collision_evidence_view(S, w_mm, h_mm):
     import basemap
     import route_sheet as rs
-    pts = list(S["loaded"]) + list(S["return"])
+    pts = list(S["loaded"]) + list(S["return"]) + [p for _, l in S.get("alt_lines") or [] for p in l]
     if not pts:
         return None
     return basemap.view(pts, int(round(w_mm * rs.PX_PER_MM)), int(round(h_mm * rs.PX_PER_MM)), pad_px=60, max_zoom=15.0)
@@ -3002,7 +3006,7 @@ def _ce_mark(c, x, y, sev, vru=False, goods=False, s=1.0):
     """22 Oct 2026 (v2): one collision on the strip and the inset — size and fill by severity (the map's), a SQUARE when
     a goods vehicle over 3.5 t was involved, a RING round it when a vulnerable road user was hurt. One ink."""
     r = {1: 2.7, 2: 2.15, 3: 1.75}.get(sev, 1.75) * s
-    ink = _hex_rgb(CE_INK)
+    ink = _hex_rgb(CE_LORRY if goods else CE_INK)
     c.saveState()
     c.setStrokeColorRGB(*ink); c.setLineWidth(0.7 * s)
     if sev in (1, 2):
@@ -3097,20 +3101,107 @@ def collision_stretch_cells(S):
     for st in S.get("stretches") or []:
         lo_hi = st.get("lorries")
         lorries = "—" if not lo_hi else (str(lo_hi[0]) if lo_hi[0] == lo_hi[1] else f"{lo_hi[0]}–{lo_hi[1]}")
-        rows.append([str(st["no"]), st["name"], f"{st['from_words']}–{st['to_words']}", f"{st['length_words']} {du}",
+        rows.append([str(st["no"]), st["name"], f"{st['from_words']}–{st['to_words']} ({st['length_words']} {du})",
                      str(st["n"]), str(st["ksi"]) + (f" ({st['fatal']} fatal)" if st["fatal"] else ""), str(st["vru_ksi"]),
-                     str(st["goods"]),
+                     f"{st.get('cyclist', 0)} ({st.get('cyclist_ksi', 0)})", str(st["goods"]),
                      (f"{st['places']} (nos {st['place_nos'][0]}–{st['place_nos'][1]})" if st["places"] > 1
                       else (f"1 (no {st['place_nos'][0]})" if st["places"] == 1 else "0")),
+                     (f"{st['beside']} {du} · {st['meets']}" if st.get("beside") is not None else "—"),
                      lorries, f"{st['schools']} · {st['health']}"])
     sts = S.get("stretches") or []
     if sts:
         tot = lambda k: sum(st[k] for st in sts)       # noqa: E731
         fatal = tot("fatal")
-        rows.append(["", "The whole route", f"{sts[0]['from_words']}–{sts[-1]['to_words']}", "", str(tot("n")),
-                     str(tot("ksi")) + (f" ({fatal} fatal)" if fatal else ""), str(tot("vru_ksi")), str(tot("goods")),
-                     str(tot("places")), "", f"{tot('schools')} · {tot('health')}"])
+        hl = (S.get("headline") or [{}])[0]
+        rows.append(["", "The whole route", f"{sts[0]['from_words']}–{sts[-1]['to_words']}", str(tot("n")),
+                     str(tot("ksi")) + (f" ({fatal} fatal)" if fatal else ""), str(tot("vru_ksi")),
+                     f"{sum(st.get('cyclist', 0) for st in sts)} ({sum(st.get('cyclist_ksi', 0) for st in sts)})", str(tot("goods")),
+                     str(tot("places")), (f"{hl.get('beside')} {du} · {hl.get('meets')}" if hl.get("beside") is not None else "—"),
+                     "", f"{tot('schools')} · {tot('health')}"])
     return rows
+
+
+def _exp_cell(h):
+    """The headline's 'expected for roads like these' cell (22 Oct 2026, v3 part 2): a count and a range, or why not."""
+    e = h.get("expected")
+    if not e:
+        return "—"
+    if "expected" not in e:
+        return f"for {e['covers']}"
+    return f"{e['expected']:.0f} ({e['range'][0]}–{e['range'][1]})"
+
+
+def collision_expected_rows(S):
+    """22 Oct 2026 (v3 part 2): per stretch, the collisions beside what a typical road of its type would see with its
+    traffic, as rows of strings; a stretch it cannot be worked out for says why."""
+    rows = []
+    for st in S.get("stretches") or []:
+        e = st.get("expected") or {}
+        if "expected" not in e:
+            rows.append([str(st["no"]), st["name"], "—", "—", str(st["n"]), e.get("why", "—"), "", "", "", ""])
+            continue
+        aadf = e.get("aadf")
+        traffic_w = (f"{aadf[0]:,.0f}" if aadf and aadf[0] == aadf[1] else (f"{aadf[0]:,.0f}–{aadf[1]:,.0f}" if aadf else "—"))
+        rows.append([str(st["no"]), st["name"], traffic_w, e["class_words"], str(st["n"]),
+                     f"{e['expected']:.0f} ({e['range'][0]}–{e['range'][1]})", e["reading"],
+                     (f"{e['obs_fsc']:.0f}" if e["fsc_basis"] == "adjusted" else f"{e['obs_fsc']}"),
+                     f"{e['expected_fsc']:.0f} ({e['range_fsc'][0]}–{e['range_fsc'][1]})", e["reading_fsc"]])
+    return rows
+
+
+def collision_headline_rows(S):
+    """22 Oct 2026 (v3): this route beside each alternative, as rows of strings [label, route, alt 1, ...]."""
+    du = S.get("unit") or "km"
+    H = S.get("headline") or []
+
+    def cells(f):
+        return [f(h) for h in H]
+    rows = [
+        ["Length"] + cells(lambda h: h.get("length") or "—"),
+        [f"Collisions on the route ({S['on_route_m']} m), {S['period']}"] + cells(lambda h: str(h["on"])),
+        ["…killed or seriously injured (KSI)"] + cells(lambda h: f"{h['ksi']}" + (f" ({h['fatal']} fatal)" if h["fatal"] else "")),
+        ["…a vulnerable road user KSI"] + cells(lambda h: str(h["vru_ksi"])),
+        ["…a cyclist hurt (KSI)"] + cells(lambda h: f"{h['cyclist']} ({h['cyclist_ksi']})"),
+        ["…a goods vehicle over 3.5 t involved"] + cells(lambda h: str(h["goods"])),
+        ["Expected for roads like these (typical range)"] + cells(_exp_cell),
+        [f"Beside a cycle route ({du})"] + cells(lambda h: h["beside"] if h.get("beside") is not None else "—"),
+        ["Places where a cycle route meets it"] + cells(lambda h: str(h["meets"]) if h.get("meets") is not None else "—"),
+        ["Left turns · near a cycle route"] + cells(lambda h: f"{h['turns']} · {h['turns_cycle']}" if h.get("turns_cycle") is not None else str(h["turns"])),
+        ["Lorry movements a day planned" + (f" ({S['plan']['month_words']})" if S.get("plan") else "")]
+        + cells(lambda h: (str(int(h["lorries"] + 0.5)) if h["lorries"] >= 1 else f"{h['lorries']:.1f}") if h.get("lorries") is not None
+                else ("—" if h is H[0] else "not planned")),
+    ]
+    return rows
+
+
+# 22 Oct 2026 (v3): which CLOCS Standard v5 clause each part of the sheet supports — clause numbers with neutral words;
+# CLOCS's own "safest routes" and "high-risk roads" stay off the sheet (notes, collision-evidence-v3-mockup-1022)
+CLOCS_MAP = [
+    ("This route beside its alternatives (page 1)", "5.6a assess and select routes · 5.6f reasons for the route"),
+    ("Collisions by severity, five years, the stretches", "4.1a and 5.1a historical crash data"),
+    ("Roads, junctions, places with more than one", "5.1a roads, junctions and routes from crash data"),
+    ("Vulnerable road users; cycle routes; left turns", "5.6a conflict with vulnerable road users · §2.7"),
+    ("Goods vehicles over 3.5 t involved", "§2.4 scope · 4.1a, 5.1a type of vehicle movements"),
+    ("The plan's lorry movements beside the counts", "4.1a, 5.1a volume, frequency and type of movements"),
+    ("Schools, health, community considerations", "§2.7 · CLP template §2.2, §2.4"),
+    ("The last page, for the assessor", "5.6a preliminary route assessment · 5.2c review"),
+]
+CLOCS_NOTE = ("Police-reported collisions only: the project's own incidents (5.1a) are not in this data.")
+
+# 22 Oct 2026 (v3): the last page — questions drawn from the clauses (no CLOCS document gives a question list or a
+# form); each points at the evidence; the boxes are the assessor's
+ASSESSOR_QUESTIONS = [
+    ("Which vehicles use this route, how many movements a day at the peak, and at what hours?", "page 1; the stretch table · 4.1a, 5.1a, 5.5a iii", "Finding", "Measures / action"),
+    ("What does the police-reported collision record along the route show: where, how severe, who was hurt?", "the map, the strip, the counts · 4.1a, 5.1a", "Finding", "Measures / action"),
+    ("Which roads, junctions or lengths carry a recorded collision history, and what is your finding for each?", "the stretches; the appendix · 5.1a", "Finding", "Measures / action"),
+    ("Where could the lorries meet vulnerable road users: cycle routes, crossings, left turns, busy footways?", "cycle routes and left turns; the vulnerable road user rows · 5.6a, §2.7", "Finding", "Measures / action"),
+    ("Were goods vehicles over 3.5 t involved in collisions on the route, and with whom?", "the lorry table · §2.4, 4.1a, 5.1a", "Finding", "Measures / action"),
+    ("Which schools, health sites and other community considerations lie along the route; do they call for timing or other measures?", "the stretch table; the appendix · §2.7, CLP template §2.4", "Finding", "Measures / action"),
+    ("How does this route compare with the alternatives, and why is it the route proposed?", "page 1 · 5.6a, 5.6f", "Finding", "Reasons for the route"),
+    ("What are the acceptable reasons for leaving the route, and which diversions are permitted?", "not on this sheet: the driver route sheet · 5.2b iii, 5.6d", "Finding", "Measures / action"),
+    ("What other road user demand is there (traffic, walking and cycling flows), and from what source?", "not on this sheet · 4.1a, 5.1a", "Finding", "Source"),
+    ("What measures are proposed, what are the project's own incidents so far, and when is this next reviewed?", "not on this sheet · 5.1a, 5.2c", "Measures (committed / proposed)", "Next review (before phase …)"),
+]
 
 
 def collision_count_fold(S):
@@ -3159,18 +3250,22 @@ def build_collision_evidence_pdf(S):
     c = rl_canvas.Canvas(buf, pagesize=A4)
     c.setTitle(_pdf_safe(f"{S['tenant']} · {S['title']} · {S['route_id']}"))
     c.setAuthor("Wayscope")
-    footer_h = 40
+    footer_h = 64
     page = [1]
     S["pages"] = 1
     du = S.get("unit") or "km"
 
     def footer():
         foot = [S["caveat"], S["not_a_verdict"], S["credit"]]
+        if S.get("community_credit"):        # 22 Oct 2026 (v3): schools, health, bus stops and cycle routes are credited
+            foot.append(S["community_credit"])
+        if S.get("traffic_credit"):          # ...and the traffic counts and the national rates
+            foot.append(S["traffic_credit"])
         if S.get("basemap"):
             foot.append("Map © Mapbox © OpenStreetMap.")
         fy = m + footer_h - 8
         c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.5); c.line(m, m + footer_h - 2, W - m, m + footer_h - 2)
-        for ln in _wrap(" ".join(foot), R, 6.6, cw - 40)[:4]:
+        for ln in _wrap(" ".join(foot), R, 6.6, cw - 40)[:7]:
             c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawString(m, fy, ln)
             fy -= 8.2
         c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawRightString(W - m, m + footer_h - 10, f"Page {page[0]}")
@@ -3186,6 +3281,8 @@ def build_collision_evidence_pdf(S):
 
     def para(text, y, size=7.2, colour=None, width=None):
         for ln in _wrap(text, R, size, width or cw):
+            if y - size - 2 < m + footer_h:       # 22 Oct 2026 (v3): a note never runs into the footer
+                y = new_page()
             c.setFillColorRGB(*(colour or GREY)); c.setFont(R, size); c.drawString(m, y - size, ln)
             y -= size + 1.8
         return y
@@ -3211,6 +3308,54 @@ def build_collision_evidence_pdf(S):
         y -= 11
     y -= 4
 
+    # page 1 opens with this route beside its alternatives (left) and the CLOCS box (right) — 22 Oct 2026 (v3)
+    if S["fetched"] and S.get("headline"):
+        top = y
+        hw = cw * 0.58
+        hrows = collision_headline_rows(S)
+        ncol = len(S["headline"])
+        lab_w = hw - ncol * 46
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "This route and its alternatives" if ncol > 1 else "This route")
+        y -= 14
+        c.setFillColorRGB(*BAND); c.rect(m, y - 11, hw, 11, stroke=0, fill=1)
+        for j, h in enumerate(S["headline"]):
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.8)
+            c.drawRightString(m + lab_w + (j + 1) * 46 - 3, y - 8, _pdf_safe(h["label"]))
+        y -= 12
+        for i, row in enumerate(hrows):
+            if i % 2 == 1:
+                c.setFillColorRGB(0.975, 0.977, 0.98); c.rect(m, y - 9.6, hw, 10, stroke=0, fill=1)
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 6.9); c.drawString(m + 2, y - 7.2, _pdf_safe(row[0]))
+            for j, val in enumerate(row[1:]):
+                c.setFont(B if j == 0 else R, 6.9)
+                if i == 5:
+                    c.setFillColorRGB(*_hex_rgb(CE_LORRY))
+                else:
+                    c.setFillColorRGB(*NAVY_RGB)
+                c.drawRightString(m + lab_w + (j + 1) * 46 - 3, y - 7.2, _pdf_safe(val))
+            y -= 10
+        y = para("Side by side, counts only. Evidence for the assessor, not a verdict on either route.", y - 1, 6.4)
+        bx = m + hw + 10
+        bw = cw - hw - 10
+        yy = top
+        lines = []
+        for part, clause in CLOCS_MAP:
+            lines.append((_wrap(part, B, 6.4, bw - 10), _wrap(clause, R, 6.2, bw - 10)))
+        bh = 18 + sum(len(a) * 7.2 + len(b_) * 7.0 + 3 for a, b_ in lines) + len(_wrap(CLOCS_NOTE, R, 6.0, bw - 10)) * 7 + 4
+        c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.9); c.setFillColorRGB(1, 1, 1); c.rect(bx, yy - bh, bw, bh, stroke=1, fill=1)
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 8); c.drawString(bx + 5, yy - 11, "For the CLOCS route risk assessment")
+        yy -= 17
+        for a, b_ in lines:
+            for ln in a:
+                c.setFont(B, 6.4); c.setFillColorRGB(*NAVY_RGB); c.drawString(bx + 5, yy - 6.4, ln); yy -= 7.2
+            for ln in b_:
+                c.setFont(R, 6.2); c.setFillColorRGB(*GREY); c.drawString(bx + 5, yy - 6.2, ln); yy -= 7.0
+            yy -= 3
+        for ln in _wrap(CLOCS_NOTE, R, 6.0, bw - 10):
+            c.setFont(R, 6.0); c.setFillColorRGB(*GREY); c.drawString(bx + 5, yy - 6, ln); yy -= 7
+        S["clocs_box"] = True
+        y = min(y, top - bh) - 8
+
     # the map: the collisions ON the route (v2), the stretches labelled, an inset where they bunch
     h1 = CE_MAP_H_MM * mm
     v = collision_evidence_view(S, cw / mm, CE_MAP_H_MM)
@@ -3234,12 +3379,21 @@ def build_collision_evidence_pdf(S):
     else:
         c.setFillColorRGB(0.965, 0.969, 0.973); c.rect(0, 0, cw, h1, stroke=0, fill=1)
     if v:
+        import community as _cm
+        cyc_rgb = _hex_rgb(_cm.KIND_BY_KEY["cycle"]["colour"])
+        for _n, cl_line in S.get("cycle_lines") or []:      # 22 Oct 2026 (v3): cycle routes, thin, under everything
+            _rs_line(c, P, cl_line, _cm.KIND_BY_KEY["cycle"]["colour"], 1.1)
+        for _lab, al in S.get("alt_lines") or []:            # ...the alternatives, dashed grey
+            _rs_line(c, P, al, CE_ALT, 1.8, (5, 3))
         _rs_line(c, P, S["loaded"], RS_LOADED, 2.6)
         _rs_line(c, P, S["return"], RS_RETURN, 1.6, (4, 3), offset=3.0)
         for sev in (3, 2, 1):            # slight first, so the KSI sit on top
             for r in drawn:
-                if r["severity"] == sev:
+                if r["severity"] == sev and not r["goods"]:
                     _ce_dot(c, *P(r["lon"], r["lat"]), sev)
+        for r in drawn:                  # lorry-involved last, as squares in their own ink
+            if r["goods"]:
+                _ce_mark(c, *P(r["lon"], r["lat"]), r["severity"], False, True, 1.2)
     else:
         c.setFillColorRGB(*GREY); c.setFont(R, 9)
         c.drawCentredString(cw / 2, h1 / 2, "No road route has been worked out for this route yet.")
@@ -3255,6 +3409,8 @@ def build_collision_evidence_pdf(S):
         clip = c.beginPath(); clip.rect(0, 0, cw, h1); c.clipPath(clip, stroke=0, fill=0)
         busy = [P(*q) for q in (S["loaded"][:: max(1, len(S["loaded"]) // 200)] + S["return"][:: max(1, len(S["return"]) // 200)])]
         busy += [P(r["lon"], r["lat"]) for r in drawn]
+        for _lab, al in S.get("alt_lines") or []:      # 22 Oct 2026 (v3): an inset must not hide an alternative
+            busy += [P(*q) for q in al[:: max(1, len(al) // 200)]]
         taken = [(0, h1 - 24, 130, h1), (cw - 30, h1 - 40, cw, h1), (cw - 64 * mm, 0, cw, 40)]   # tag, arrow, scale
 
         def free(x0, y0, x1, y1, pts=True):
@@ -3272,19 +3428,26 @@ def build_collision_evidence_pdf(S):
             fr = [P(*q) for q in ipts]
             fx0, fy0 = min(p[0] for p in fr) - 6, min(p[1] for p in fr) - 6
             fx1, fy1 = max(p[0] for p in fr) + 6, max(p[1] for p in fr) + 6
-            iw, ih = cw * 0.40, h1 * 0.48
             import route_sheet as rs
-            vi = basemap.view(ipts, int(round(iw / mm * rs.PX_PER_MM)), int(round((ih - 12) / mm * rs.PX_PER_MM)),
-                              pad_px=50, max_zoom=16.5)
-            mag = ((iw / vi["w"]) * 2 ** vi["zoom"]) / (k * 2 ** v["zoom"]) if vi else 0
             taken.append((fx0, fy0, fx1, fy1 + 10))
-            spot = None
-            if mag >= 2:
+            spot, vi, mag = None, None, 0
+            # 22 Oct 2026 (v3): a smaller inset when no corner is free at the full size (the alternatives take room)
+            for iw, ih in ((cw * 0.40, h1 * 0.48), (cw * 0.32, h1 * 0.40), (cw * 0.26, h1 * 0.36)):
+                vi = basemap.view(ipts, int(round(iw / mm * rs.PX_PER_MM)), int(round((ih - 12) / mm * rs.PX_PER_MM)),
+                                  pad_px=50, max_zoom=16.5)
+                mag = ((iw / vi["w"]) * 2 ** vi["zoom"]) / (k * 2 ** v["zoom"]) if vi else 0
+                if mag < 2:
+                    continue
                 # bottom left first: clear of the map's Mapbox logo, else over it whole (the inset carries its own logo and credit)
-                for x_, y_ in ((6, 22), (2, 2), (6, h1 - ih - 26), (cw - iw - 34, h1 - ih - 6), (cw - iw - 6, 44)):
+                # ...then anywhere clear on the map, bottom first (22 Oct 2026, v3: the alternatives can fill every corner)
+                corners = [(6, 22), (2, 2), (6, h1 - ih - 26), (cw - iw - 34, h1 - ih - 6), (cw - iw - 6, 44)]
+                scan = [(x_, y_) for y_ in range(22, int(h1 - ih), 8) for x_ in range(6, int(cw - iw), 8)]
+                for x_, y_ in corners + scan:
                     if free(x_, y_, x_ + iw, y_ + ih):
                         spot = (x_, y_)
                         break
+                if spot:
+                    break
             if spot:
                 ix, iy = spot
                 c.saveState(); c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6); c.setDash(3, 2)
@@ -3312,6 +3475,8 @@ def build_collision_evidence_pdf(S):
                 c.restoreState()
                 c.setFillColorRGB(1, 1, 1); c.rect(ix, iy + ihm, iw, 12, stroke=0, fill=1)
                 words = f"Inset: {win[0] / (1609.344 if du == 'mi' else 1000):.1f}–{win[1] / (1609.344 if du == 'mi' else 1000):.1f} {du} from A, {mag:.0f}× the scale of the map"
+                if c.stringWidth(_pdf_safe(words), B, 6.8) > iw - 8:      # the smaller inset: the short form
+                    words = words.replace(" the scale of the map", " scale")
                 c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.8); c.drawString(ix + 4, iy + ihm + 3.6, _pdf_safe(words))
                 c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.7); c.rect(ix, iy, iw, ih, stroke=1, fill=0)
                 taken.append((ix, iy, ix + iw, iy + ih))
@@ -3355,6 +3520,20 @@ def build_collision_evidence_pdf(S):
         c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 20, y - 6.6, words)
         lx += 20 + c.stringWidth(words, R, 7.6) + 12
+    y -= 12
+    lx = m
+    _ce_mark(c, lx + 5, y - 4, 2, False, True, 1.2)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, "A goods vehicle over 3.5 t involved")
+    lx += 12 + c.stringWidth("A goods vehicle over 3.5 t involved", R, 7.6) + 12
+    if S.get("alt_lines"):
+        c.saveState(); c.setStrokeColorRGB(*_hex_rgb(CE_ALT)); c.setLineWidth(1.8); c.setDash(5, 3); c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
+        c.setFillColorRGB(*NAVY_RGB); c.drawString(lx + 20, y - 6.6, "Alternative route")
+        lx += 20 + c.stringWidth("Alternative route", R, 7.6) + 12
+    if S.get("cycle_lines"):
+        import community as _cm
+        c.saveState(); c.setStrokeColorRGB(*_hex_rgb(_cm.KIND_BY_KEY["cycle"]["colour"])); c.setLineWidth(1.4); c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
+        c.setFillColorRGB(*NAVY_RGB); c.drawString(lx + 20, y - 6.6, "Cycle route (OpenStreetMap)")
+        lx += 20 + c.stringWidth("Cycle route (OpenStreetMap)", R, 7.6) + 12
     if S.get("stretches") and S["stretches"][0].get("road"):
         c.setFillColorRGB(1, 1, 1); c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6)
         c.roundRect(lx, y - 9, 12, 10, 2, stroke=1, fill=1)
@@ -3409,15 +3588,16 @@ def build_collision_evidence_pdf(S):
     else:
         lead += " No Approved lines for this route yet, so no lorry figures."
     y = para(lead, y, 7.6, NAVY_RGB) - 3
-    heads = ["", "Stretch", ("Miles from A" if du == "mi" else "Kilometres from A"), "Length", "Collisions on the route",
-             "Killed or seriously injured (KSI)", "A vulnerable road user KSI", "A goods vehicle over 3.5 t involved",
-             "Places with more than one (appendix)",
+    heads = ["", "Stretch", ("Miles from A" if du == "mi" else "Kilometres from A") + " (length)", "Collisions on the route",
+             "Killed or seriously injured (KSI)", "A vulnerable road user KSI", "A cyclist hurt (KSI)",
+             "A goods vehicle over 3.5 t involved", "Places with more than one (appendix)",
+             f"Beside a cycle route ({du}) · places one meets it",
              "Scheme lorry movements a day here" + (f", all routes, {plan['month_words']}" if plan else ""),
              "Schools · health within 250 m"]
-    widths = [5, 27, 17, 13, 15, 19, 17, 18, 21, 22, 0]
+    widths = [5, 24, 22, 13, 16, 13, 13, 13, 18, 17, 17, 0]
     widths[-1] = cw / mm - sum(widths)
     widths = [w_ * mm for w_ in widths]
-    num = {3, 4, 5, 6, 7, 8, 9, 10}
+    num = {3, 4, 5, 6, 7, 8, 9, 10, 11}
 
     wrapped = [_wrap(h_, B, 6.6, w_ - 4) or [""] for h_, w_ in zip(heads, widths)]
     hh = max(len(w_) for w_ in wrapped) * 7.6 + 4
@@ -3436,7 +3616,7 @@ def build_collision_evidence_pdf(S):
     rows = collision_stretch_cells(S)
     for n, row in enumerate(rows):
         total = n == len(rows) - 1 and len(rows) > 1
-        wr = [_wrap(t_, B if (j == 1 or total or j == 4) else R, 7.0, w_ - 4) or [""] for j, (t_, w_) in enumerate(zip(row, widths))]
+        wr = [_wrap(t_, B if (j == 1 or total or j == 3) else R, 7.0, w_ - 4) or [""] for j, (t_, w_) in enumerate(zip(row, widths))]
         hgt = max(len(w_) for w_ in wr) * 8.2 + 3
         if y - hgt < m + footer_h:
             y = new_page()
@@ -3446,7 +3626,7 @@ def build_collision_evidence_pdf(S):
         for j, (lines_, w_) in enumerate(zip(wr, widths)):
             yy = y - 7.6
             for ln in lines_:
-                c.setFillColorRGB(*NAVY_RGB); c.setFont(B if (j == 1 or total or j == 4) else R, 7.0)
+                c.setFillColorRGB(*(_hex_rgb(CE_LORRY) if j == 7 else NAVY_RGB)); c.setFont(B if (j == 1 or total or j == 3) else R, 7.0)
                 if j in num:
                     c.drawRightString(x + w_ - 3, yy, ln)
                 else:
@@ -3462,7 +3642,150 @@ def build_collision_evidence_pdf(S):
              f"{split_words} is split where its recorded speed limits change between 20–40 and 50–70 mph: the boundaries "
              f"come from the collisions, to the nearest 0.1 {du}, not from a road map. Lorry movements: the Approved lines "
              "of every route on that stretch in the month named, one movement being one load there and back; two figures "
-             "are the lowest and the highest along the stretch.", y - 2, 6.8) - 8
+             "are the lowest and the highest along the stretch. A cycle route is beside the route within "
+             f"{cl.CYCLE_BESIDE_M} m and meets it within {cl.CYCLE_MEETS_M} m.", y - 2, 6.8) - 8
+
+    # compared with roads like these — 22 Oct 2026 (v3 part 2; the user: "nothing to compare it to"; R5 reversed for this
+    # one comparison, at the user's word): a count and the range a typical road would show, never a ratio or a verdict
+    erows = collision_expected_rows(S) if S.get("traffic_shown") else []
+    if S.get("stretches") and not erows:
+        why = {(st.get("expected") or {}).get("why") for st in S["stretches"]} - {None}
+        y = para("Compared with roads like these: " + ("DfT's traffic counts have not been fetched yet (Config, Map and bulletin, "
+                 "Fetch now)." if why == {"traffic counts not fetched yet"} else "no stretch of this route has a DfT traffic count "
+                 "and a road type to compare with.") , y, 7.2, NAVY_RGB) - 6
+    if erows:
+        if y - 90 < m + footer_h:
+            y = new_page()
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "Compared with roads like these")
+        y -= 14
+        y = para(f"The collisions on each stretch, {S['period']}, beside what a typical road of the same type in Great Britain "
+                 "would see with the same traffic, and the range its count would fall in 95 times in 100.", y, 7.4, NAVY_RGB) - 3
+        eh = ["", "Stretch", "Traffic, vehicles a day (latest year)", "Compared with", "Collisions on the route",
+              "Expected (typical range)", "", "Fatal or serious", "Expected (typical range)", ""]
+        ew = [5, 24, 22, 24, 14, 20, 18, 12, 20, 0]
+        ew[-1] = cw / mm - sum(ew)
+        ew = [w_ * mm for w_ in ew]
+        enum_ = {2, 4, 5, 7, 8}
+        hw_ = [_wrap(h_, B, 6.6, w_ - 4) or [""] for h_, w_ in zip(eh, ew)]
+        hh_ = max(len(x_) for x_ in hw_) * 7.6 + 4
+        c.setFillColorRGB(*BAND); c.rect(m, y - hh_, cw, hh_, stroke=0, fill=1)
+        x = m
+        for i_, (lines_, w_) in enumerate(zip(hw_, ew)):
+            for j_, ln in enumerate(lines_):
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.6)
+                yy = y - hh_ + 3 + (len(lines_) - 1 - j_) * 7.6
+                if i_ in enum_:
+                    c.drawRightString(x + w_ - 3, yy, ln)
+                else:
+                    c.drawString(x + 2, yy, ln)
+            x += w_
+        y -= hh_ + 1
+        for row in erows:
+            wr = [_wrap(t_, R, 7.0, w_ - 4) or [""] for t_, w_ in zip(row, ew)]
+            hgt = max(len(w_) for w_ in wr) * 8.2 + 3
+            if y - hgt < m + footer_h:
+                y = new_page()
+            x = m
+            for j_, (lines_, w_) in enumerate(zip(wr, ew)):
+                yy = y - 7.6
+                for ln in lines_:
+                    c.setFillColorRGB(*NAVY_RGB); c.setFont(B if j_ in (1, 4) else R, 7.0)
+                    if j_ in enum_:
+                        c.drawRightString(x + w_ - 3, yy, ln)
+                    else:
+                        c.drawString(x + 2, yy, ln)
+                    yy -= 8.2
+                x += w_
+            c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.4); c.line(m, y - hgt, W - m, y - hgt)
+            y -= hgt + 1
+        notes_ = ["Expected = DfT's traffic counts at the count points on the stretch (annual average daily flow, weighted by "
+                  "link length, most of them estimated from a count every few years) × the stretch's length × DfT's national "
+                  "collision rate for that type of road that year (Reported road casualties GB, table RAS0302), over the years "
+                  "shown. Urban or rural is DfT's own flag on the stretch's collisions. Fatal or serious uses DfT's adjusted "
+                  "severity, as the rates do."]
+        if any((st.get("expected") or {}).get("class", "").startswith("urban") for st in S.get("stretches") or []):
+            notes_.append("The national urban figures include city-centre roads, so a ring road or a dual carriageway will "
+                          "often sit below the range: that says as much about the yardstick as about the road.")
+        notes_.append("Small numbers: over five years only a large difference falls outside the range. This is evidence for the "
+                      "assessor, not a verdict on the road.")
+        y = para(" ".join(notes_), y - 2, 6.6) - 8
+
+    # cycle routes and the route's own left turns — 22 Oct 2026 (v3; the user asked for cycle routes and the turns where
+    # a lorry could cut across a cyclist: said as a fact, never as a verdict on the turn)
+    if y - 70 < m + footer_h:
+        y = new_page()
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "Cycle routes and the route's left turns")
+    y -= 14
+    turns = S.get("turns") or []
+    if S.get("cycle_shown"):
+        meets = (S.get("cycle") or {}).get("meets") or []
+        y = para(f"{(S.get('cycle') or {}).get('beside')} {du} of this route run beside a cycle route (within {cl.CYCLE_BESIDE_M} m); "
+                 f"a cycle route meets it (within {cl.CYCLE_MEETS_M} m) at {len(meets)} place{'' if len(meets) == 1 else 's'}"
+                 + (": at " + ", ".join(x["words"] for x in meets[:24]) + (" …" if len(meets) > 24 else "") if meets else "") + ".",
+                 y, 7.4, NAVY_RGB)
+    else:
+        y = para("No cycle routes: the community considerations have not been fetched (Config, Map and bulletin).", y, 7.4, NAVY_RGB)
+    tw = ", ".join(x["words"] + (f" ({x['cycle']} {x['cycle_m']} m)" if x.get("cycle") else "") for x in turns)
+    near_n = sum(1 for x in turns if x.get("cycle"))
+    y = para(f"The route makes {len(turns)} left turn{'' if len(turns) == 1 else 's'} of {cl.TURN_MIN_DEG}° or more"
+             + (f": at {tw}" if turns else "") + "."
+             + (f" {near_n} of them {'is' if near_n == 1 else 'are'} within {cl.TURN_CYCLE_M} m of a cycle route, where a lorry "
+                "turning left crosses the cyclist's path." if S.get("cycle_shown") else ""), y, 7.4, NAVY_RGB)
+    if S.get("details"):
+        n_cl = (S["columns"][0]["on"] or {}).get("cyclist_left", 0)
+        y = para(f"In {n_cl} of the collisions on the route a cyclist was hurt while a vehicle was turning or waiting to turn left.",
+                 y, 7.4, NAVY_RGB)
+    y = para(f"Left turns are worked out from the stored road route (the heading over the next {cl.TURN_WINDOW_M} m against the last), "
+             "so a roundabout's gentle entry may not count. Cycle routes are OpenStreetMap's National Cycle Network and cycle paths "
+             "(the community layer), mapped by volunteers: one can be missing.", y - 1, 6.6) - 8
+
+    # the collisions on the route involving a goods vehicle over 3.5 t, listed — 22 Oct 2026 (v3)
+    ll = S.get("lorry_list") or []
+    if y - 60 < m + footer_h:
+        y = new_page()
+    c.setFillColorRGB(*_hex_rgb(CE_LORRY)); c.setFont(B, 10.5)
+    c.drawString(m, y - 10.5, "Collisions on the route involving a goods vehicle over 3.5 t")
+    y -= 15
+    if not ll:
+        y = para(f"None on the route in {S['period']}.", y, 7.4, NAVY_RGB) - 6
+    else:
+        lheads = ["From A", "Road", "Severity", "Goods vehicle", "Turning left", "On a work journey", "Vulnerable road user hurt", "Year"]
+        lw = [15, 50, 15, 34, 15, 17, 26, 0]
+        lw[-1] = cw / mm - sum(lw)
+        lw = [w_ * mm for w_ in lw]
+        hw_ = [_wrap(h_, B, 6.6, w_ - 4) or [""] for h_, w_ in zip(lheads, lw)]
+        hh_ = max(len(x_) for x_ in hw_) * 7.6 + 4
+        c.setFillColorRGB(*BAND); c.rect(m, y - hh_, cw, hh_, stroke=0, fill=1)
+        x = m
+        for lines_, w_ in zip(hw_, lw):
+            for j_, ln in enumerate(lines_):
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.6); c.drawString(x + 2, y - 8 - j_ * 7.6, ln)
+            x += w_
+        y -= hh_ + 1
+        for L_ in ll:
+            cells = [L_["words"], L_["road"] + (", " + L_["junction"][0].lower() + L_["junction"][1:] if L_.get("junction") else ""),
+                     L_["severity"],
+                     ((L_["goods_words"] or "") + (", articulated" if L_["artic"] else "")) if S.get("details") else "—",
+                     ("yes" if L_["left"] else "—") if S.get("details") else "—",
+                     ("yes" if L_["work"] else "—") if S.get("details") else "—",
+                     ", ".join(L_["vru_words"]) or "—", str(L_["year"])]
+            wr = [_wrap(t_, R, 7.0, w_ - 4) or [""] for t_, w_ in zip(cells, lw)]
+            hgt = max(len(w_) for w_ in wr) * 8.2 + 3
+            if y - hgt < m + footer_h:
+                y = new_page()
+            x = m
+            for j, (lines_, w_) in enumerate(zip(wr, lw)):
+                yy = y - 7.4
+                for ln in lines_:
+                    c.setFillColorRGB(*(_hex_rgb(CE_LORRY) if j == 3 else NAVY_RGB)); c.setFont(R, 7.0); c.drawString(x + 2, yy, ln)
+                    yy -= 8.2
+                x += w_
+            c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.4); c.line(m, y - hgt, W - m, y - hgt)
+            y -= hgt + 1
+        y = para(("Month and year only. \"Weight not recorded\" is DfT's goods vehicle whose weight the police did not record, "
+                  "counted as over 3.5 t as DfT counts it. DfT has no construction vehicle category." if S.get("details") else
+                  "The weight, articulation and manoeuvre are read from the next fetch of the collision history "
+                  "(Config, Map and bulletin, Fetch now)."), y - 2, 6.6) - 8
 
     # the counts table: rows 0 in every column folded into a sentence (v2)
     cols = S["columns"]
@@ -3555,6 +3878,38 @@ def build_collision_evidence_pdf(S):
                 x += w_
             c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.4); c.line(m, y - hgt, W - m, y - hgt)
             y -= hgt + 1
+
+    # the last page: for the route risk assessment — 22 Oct 2026 (v3)
+    y = new_page()
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 13); c.drawString(m, y - 13, "For the route risk assessment")
+    y -= 18
+    y = para("Questions drawn from CLOCS Standard v5 clauses 4.1a, 5.1a, 5.2c and 5.6a; not a CLOCS form. "
+             f"{S['not_a_verdict']} The boxes are the assessor's.", y, 7.4, NAVY_RGB) - 4
+    for i, (q, ev, b1, b2) in enumerate(ASSESSOR_QUESTIONS, 1):
+        ql = _wrap(f"{i}. {q}", B, 7.6, cw)
+        el = _wrap("Evidence: " + ev, R, 6.6, cw)
+        need = len(ql) * 9 + len(el) * 8 + 36
+        if y - need < m + footer_h:
+            y = new_page()
+        for ln in ql:
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 7.6); c.drawString(m, y - 7.6, ln); y -= 9
+        for ln in el:
+            c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawString(m, y - 6.6, ln); y -= 8
+        bw2 = (cw - 8) / 2
+        for k, lab in enumerate((b1, b2)):
+            bx2 = m + k * (bw2 + 8)
+            c.saveState(); c.setStrokeColorRGB(0.63, 0.63, 0.67); c.setLineWidth(0.6); c.setDash(2, 2)
+            c.rect(bx2, y - 30, bw2, 28, stroke=1, fill=0); c.restoreState()
+            c.setFillColorRGB(*GREY); c.setFont(R, 6.2); c.drawString(bx2 + 3, y - 9, lab)
+        y -= 36
+    if y - 30 < m + footer_h:
+        y = new_page()
+    y -= 6
+    for k, lab in enumerate(("Assessed by", "Role", "Date", "Review before phase")):
+        bx2 = m + k * (cw / 4)
+        c.setStrokeColorRGB(0.63, 0.63, 0.67); c.setLineWidth(0.6); c.line(bx2, y - 18, bx2 + cw / 4 - 10, y - 18)
+        c.setFillColorRGB(*GREY); c.setFont(R, 6.4); c.drawString(bx2, y - 26, lab)
+    S["assessor_page"] = page[0]
     footer()
     c.showPage()
     c.save()
@@ -3621,6 +3976,58 @@ def build_collision_evidence_xlsx(S):
             wt.cell(row=i, column=j, value=v)
     wt.freeze_panes = "A4"
 
+    # 22 Oct 2026 (v3): the routes compared, the lorry-involved collisions, the cycle routes and left turns
+    wr_ = wb.create_sheet("Routes compared")
+    hrows = collision_headline_rows(S) if S.get("headline") else []
+    header(wr_, ["What"] + [h["label"] for h in S.get("headline") or []])
+    wr_.column_dimensions["A"].width = 48
+    for i, row in enumerate(hrows, 2):
+        for j, v in enumerate(row, 1):
+            wr_.cell(row=i, column=j, value=v)
+    wl = wb.create_sheet("Lorries")
+    header(wl, [f"Distance from A ({du})", "Road", "Junction", "Severity", "Goods vehicle", "Articulated", "Turning or waiting to turn left",
+                "On a journey for work", "Vulnerable road users hurt", "Year", "DfT collision reference"])
+    for i, L_ in enumerate(S.get("lorry_list") or [], 2):
+        known = bool(S.get("details"))
+        vals = [round(L_["mi"] / (1609.344 if du == "mi" else 1000.0), 2) if L_.get("mi") is not None else None, L_["road"],
+                L_.get("junction"), L_["severity"], L_["goods_words"] if known else "not read yet",
+                ("yes" if L_["artic"] else "") if known else None, ("yes" if L_["left"] else "") if known else None,
+                ("yes" if L_["work"] else "") if known else None, ", ".join(L_["vru_words"]), L_["year"], L_["collision_id"]]
+        for j, v in enumerate(vals, 1):
+            wl.cell(row=i, column=j, value=v)
+    # 22 Oct 2026 (v3 part 2): compared with roads like these, per stretch, as numbers
+    we_ = wb.create_sheet("Compared with roads like these")
+    header(we_, ["No", "Stretch", "Road type compared with", "Traffic, vehicles a day (latest year, lowest)",
+                 "Traffic, vehicles a day (latest year, highest)", "Years counted (not estimated)", "DfT count points",
+                 "Collisions on the route", "Expected", "Typical range, lowest", "Typical range, highest", "Where it sits",
+                 "Fatal or serious (observed)", "Severity basis", "Fatal or serious, expected", "Typical range, lowest",
+                 "Typical range, highest", "Where it sits", "Why not worked out"])
+    for i, st in enumerate(S.get("stretches") or [], 2):
+        e = st.get("expected") or {}
+        has = "expected" in e
+        vals = [st["no"], st["name"], e.get("class_words"), (e.get("aadf") or (None, None))[0] if has else None,
+                (e.get("aadf") or (None, None))[1] if has else None, ", ".join(str(y) for y in e.get("counted") or []) if has else None,
+                ", ".join(e.get("points") or []) if has else None, st["n"],
+                round(e["expected"], 1) if has else None, e["range"][0] if has else None, e["range"][1] if has else None,
+                e.get("reading"), round(e["obs_fsc"], 1) if has else None, e.get("fsc_basis"),
+                round(e["expected_fsc"], 1) if has else None, e["range_fsc"][0] if has else None,
+                e["range_fsc"][1] if has else None, e.get("reading_fsc"), None if has else e.get("why")]
+        for j, v in enumerate(vals, 1):
+            we_.cell(row=i, column=j, value=v)
+
+    wt2 = wb.create_sheet("Cycle and left turns")
+    header(wt2, ["What", f"Distance from A ({du})", "Detail"])
+    r_ = 2
+    for x_ in S.get("turns") or []:
+        for j, v in enumerate(["The route's left turn", float(x_["words"].split()[0]),
+                               f"{x_['deg']}°" + (f"; {x_['cycle']} {x_['cycle_m']} m away" if x_.get("cycle") else "")], 1):
+            wt2.cell(row=r_, column=j, value=v)
+        r_ += 1
+    for x_ in (S.get("cycle") or {}).get("meets") or []:
+        for j, v in enumerate(["A cycle route meets the route", float(x_["words"].split()[0]), x_.get("name")], 1):
+            wt2.cell(row=r_, column=j, value=v)
+        r_ += 1
+
     wp = wb.create_sheet("Places")
     pt = ["No", "Where (along the route from A)", "Fatal", "Serious", "Slight", "Vulnerable road users hurt",
           "Goods vehicle over 3.5 t", "Years", "Nearby (within 250 m)", "DfT collision references", "Stretch"]
@@ -3636,7 +4043,9 @@ def build_collision_evidence_xlsx(S):
     ct = ["DfT collision reference", "Year", "Month", "Severity", "Road", "Second road", "Junction", "Road type",
           "Speed limit (mph)", "Light", "Vulnerable road users hurt", "Of them killed or seriously injured",
           "Goods vehicle over 3.5 t", "Metres from this route", f"On the route ({S['on_route_m']} m)",
-          "Longitude", "Latitude", "Highway authority (ONS code)", f"Distance from A ({du})", "Stretch"]
+          "Longitude", "Latitude", "Highway authority (ONS code)", f"Distance from A ({du})", "Stretch",
+          "Goods vehicle weight", "Articulated goods vehicle", "Goods vehicle turning left", "Goods vehicle on a work journey",
+          "A vehicle turning or waiting to turn left", "Urban or rural (DfT)"]
     header(wc, ct)
     to_du = 1609.344 if du == "mi" else 1000.0
     rows = sorted((r for r in S["records"] if key in r["routes"]), key=lambda r: (r["routes"][key], r["collision_id"]))
@@ -3647,6 +4056,12 @@ def build_collision_evidence_xlsx(S):
                 round(r["routes"][key]), "yes" if r["routes"][key] <= S["on_route_m"] else "",
                 r["lon"], r["lat"], r["authority"],
                 (round(r["along_m"] / to_du, 2) if r.get("along_m") is not None else None), r.get("stretch")]
+        d_ = r.get("detail") or {}
+        known = "goods_types" in d_
+        vals += [", ".join(cl.GOODS_WORDS[g] for g in d_.get("goods_types") or []) if known else None,
+                 ("yes" if d_.get("goods_artic") else "") if known else None, ("yes" if d_.get("goods_left") else "") if known else None,
+                 ("yes" if d_.get("goods_work") else "") if known else None, ("yes" if d_.get("left_turn") else "") if known else None,
+                 {1: "urban", 2: "rural"}.get(d_.get("urban"))]
         for j, v in enumerate(vals, 1):
             wc.cell(row=i, column=j, value=v)
     wc.freeze_panes = "A2"

@@ -659,7 +659,7 @@ except ImportError:
 _mp_src = read("map/index.html")
 ok("🔴 the map's legend carries no first-tenant figure ('~60 km' unsurveyed, '7 package edges') — the words are generic",
    "~60" not in _mp_src and "7 package edges" not in _mp_src
-   and "Where the alignment file has no surveyed main track the line is interpolated" in _mp_src
+   and "Gaps in the survey are filled in. Click the line to see which stretches are measured." in _mp_src   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "alignment file"
    and "Package edges · ticks from zoom 11" in _mp_src)
 
 # =========================================================================== #
@@ -739,7 +739,8 @@ ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the
    and "lorry-km      = trips × the routed (baked) route distance" in read("frontend/help/technical/index.html")
    and "+ {DU()} × running" in fe and "+ km × running" not in fe)
 ok("🔴 the route form's rate help names no country and reads the tenant's unit",
-   "usual Estonian quote" not in fe and "per-{DU()} rate is a common haulage quote" in fe)
+   # NARROWED 22 Oct 2026 (UI fix 7, the user: fewer words): the help is one line and names no unit at all
+   "usual Estonian quote" not in fe and 'Rates are added together. Blank = the target rate from Config, marked "target".' in fe)
 # NARROWED 11 Oct 2026 (review): the column is gated on vehLangEditable("ee") — the COUNTRY rule alone. Gated on
 # vehLangShown("ee") it also needed a vehicle to carry an Estonian name already, so an Estonian organisation on
 # the new seed (English names only) could never type its first one. The header buttons keep vehLangShown.
@@ -756,7 +757,7 @@ ok("🔴 the Look-ahead's UNBAKED text reads the tenant's unit (clashes._dist_wo
 mp = read("map/index.html")
 ok("the map hides the Estonian orthophoto unless the tenant is Estonian and labels Satellite as Aerial for GB",
    "bm.hidden = (TENANT.country || '').toUpperCase() !== 'EE';" in mp
-   and "'Aerial (Mapbox Satellite)' : 'Satellite (Mapbox)'" in mp)
+   and "'Aerial' : 'Satellite'" in mp)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the basemap names no longer say Mapbox
 ok("the map's restriction panel heading and source come from the API's provider",
    "cat.provider.ui_label" in mp and "restriction-heading" in mp and "Estonian Transport Administration" not in mp.split("<script>")[0])
 hp = read("frontend/help/index.html")
@@ -1028,17 +1029,23 @@ ok("...only :root and the dark block define the pair (no accent touches it), and
 # the old remap selector matched nothing and every primary button in Dark was white on orange, 2.33:1). The rule at the end
 # of the DARK-REMAP block matches the inline form; here every text-white in the markup is classified by the fill it sits on.
 _TW = re.compile(r"text-white(?!/)")
+# 22 Oct 2026 (UI fix 6, card 6): one more known fill, the haul-road buttons' var(--haul-text) (decision 13)
 _FILLS = [("navy", 'var(--navy)'), ("blue", 'var(--blue)'), ("slate-800", "bg-slate-800"), ("team palette", "IPT_PALETTE_C"),
-          ("zone colour", "ZONE_HAUL"), ("zone colour", "ZONE_ROUTING"), ("red", 'var(--red)'), ("green", 'var(--green)'), ("ok-btn", 'var(--ok-btn)')]
+          ("zone colour", "ZONE_HAUL"), ("zone colour", "ZONE_ROUTING"), ("red", 'var(--red)'), ("green", 'var(--green)'), ("ok-btn", 'var(--ok-btn)'),
+          ("haul text", 'var(--haul-text)')]
 _sites = {}
 for _m in _TW.finditer(_fe_wo):
     _start = _fe_wo.rfind("<", 0, _m.start())
     _win = _fe_wo[_start:_start + 600]
     _found = sorted((_win.find(mark), kind) for kind, mark in _FILLS if mark in _win)
     _sites.setdefault(_found[0][1] if _found else "unknown", []).append(_win)
-ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 14 on an inline var(--navy) and 1 on var(--blue) (the dark rule maps them to --control-fg), 2 on bg-slate-800 (remapped), the team pill, 4 zone buttons (finding 7, open) — none on var(--green) or the Confirm pair, none unknown",
-   len(_sites.get("navy", [])) == 14 and len(_sites.get("blue", [])) == 1 and len(_sites.get("slate-800", [])) == 2
-   and len(_sites.get("team palette", [])) == 1 and len(_sites.get("zone colour", [])) == 4
+# NARROWED 22 Oct 2026 (UI fix 6): the Account's "spread on this week" is the standard btn-pri btn-sm now (card 2), so 13
+# text-white sit on var(--navy), not 14; and the four haul-road buttons sit on var(--haul-text) (card 6, decision 13), which
+# their own dark rule maps to --control-fg, so no text-white is left on a FIXED zone colour (finding 7 closed). The routing
+# zone's "Stop placing" shares its button with the haul one and keeps ZONE_ROUTING #DC2626 (white on it 4.83:1, every look).
+ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on an inline var(--navy) and 1 on var(--blue) (the dark rule maps them to --control-fg), 2 on bg-slate-800 (remapped), the team pill, the 4 haul-road buttons on var(--haul-text) (their own dark rule, 22 Oct) and none on a fixed zone colour — none on var(--green) or the Confirm pair, none unknown",
+   len(_sites.get("navy", [])) == 13 and len(_sites.get("blue", [])) == 1 and len(_sites.get("slate-800", [])) == 2
+   and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
    len(_sites.get("red", [])) == 1 and ">Delete</button>" in _sites.get("red", [""])[0])
@@ -1057,7 +1064,8 @@ for _a in _ACC:
 ok("...in the dark look --control-fg reads 4.5:1 on both fills in every accent (#1F2024 on #FF8C14 6.99:1, on #FFA10A 8.02:1; #141518 on #5B8FF0 5.77:1, on #8FB3F5 8.64:1) — the Ink/Light --blue fill stays white (3.68:1 on #3B82F6, the gate-place toggle; not this fix)",
    not _bad1 and round(_cr("#1F2024", "#FF8C14"), 2) == 6.99 and round(_cr("#FFFFFF", "#FF8C14"), 2) == 2.33, "; ".join(_bad1))
 ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values went with UI fix 4 (decision 3, 17 Oct)",
-   '<div className="text-[10px] uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
+   # NARROWED 22 Oct 2026 (UI fix 7): the labels are 12 px now (text-xs)
+   '<div className="text-xs uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
    and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' not in fe
    and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}' in fe)
 
@@ -1122,7 +1130,10 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    and '.sim-warn{color:var(--warn-text);}' in fe and ".sim-warn{color:var(--gold)" not in fe
    and 'style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span>' in fe
    and 'style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>' in fe
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 9 and _fe_wo.count("var(--warn-text)") == 6
+   # NARROWED 22 Oct 2026 (finding #40): bad-text 6 -> 8, the Horizon commit column's short and month-changed words;
+   # and (abnormal loads, the same day) bad-text 8 -> 11, warn-text 2 -> 6: the .al-bad / .al-warn chips, the route-error line, the limits over, .al-notes, the route and candidate notes
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 11 and _fe_wo.count("var(--warn-text)") == 6
+   and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)
 ok("UI fix 4 (decision 1): 🔴 one rule maps text-slate-400 to --muted in the Ink and Light looks, written html:where(:not([data-theme=\"dark\"])) so it weighs as little as the utility and hover:text-slate-700 still wins; the dark look keeps its remap, whose value IS the dark --muted",
@@ -1149,7 +1160,8 @@ ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-
    and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2
    and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
 ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
-   ".rail-group{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
+   # NARROWED 22 Oct 2026 (UI fix 7, card 9, the user's choice): 12 px
+   ".rail-group{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
    and round(_cr(_over("rgba(100,116,139,.85)", "#FAFAF9"), "#FAFAF9"), 2) == 3.45
    and "9aa1ac" not in fe.lower() and round(_cr("#9AA1AC", "#FFFFFF"), 2) == 2.60
    and '"#94a3b8"' not in fe and 'style={{ color: tone || "var(--muted)" }}>{title}</div>' in fe
@@ -1191,6 +1203,105 @@ for _line in _dark.splitlines():
             _dead.append(_sel.strip())
 ok("UI fix 2: every selector in the DARK-REMAP block has a use in the markup — the four stale remaps found this way on 17 Oct (bg-[rgba(37,99,235,.06)], bg-slate-200, hover:text-slate-800 / -900: utilities no longer in the file) are gone",
    not _dead and _dark.count('html[data-theme="dark"]') >= 48 and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
+
+# --- 22 Oct 2026: UI fix 6 (claude/ui-fix-layout) — the approved mockup notes/ui-fix-layout-mockup-1022/ (the user: "i agree to
+# all apart from 4"): the contrast of cards 2, 3, 5 and 6 and of the two extras the user said yes to (the Horizon's commit-week
+# heading, finding #37; the Avoided chip). Every ratio by the WCAG 2.x relative-luminance formula above (_cr); a tint laid over
+# its surface by _over; the tokens per look × accent from _eff. Tailwind's own values are v3's palette (the CDN build).
+_TW_BLUE700, _TW_SLATE600 = "#1D4ED8", "#475569"
+def _rule_colour(sel):
+    m = _re.search(_re.escape(sel) + r"\{color:(#[0-9A-Fa-f]{6})\}", _css)
+    return m.group(1) if m else None
+# card 6 (decision 13): the haul-road colour as words and fills
+_HT, _HT_DARK = {"haul-text": "#9A5F08", "haul-soft": "#FBF0DF"}, {"haul-text": "#F0A838", "haul-soft": "#3A2E1C"}
+ok("UI fix 6 card 6 (decision 13): two haul-road tokens, once in :root and once in the dark block and nowhere else — haul-text #9A5F08 and haul-soft #FBF0DF, dark #F0A838 and #3A2E1C; no accent touches them",
+   all(_ROOT.get(k) == v for k, v in _HT.items()) and all(_DARK.get(k) == v for k, v in _HT_DARK.items())
+   and _css.count("--haul-text:") == 2 and _css.count("--haul-soft:") == 2
+   and all(_eff(a, l)["haul-text"] == (_HT_DARK if l == "dark" else _HT)["haul-text"] for a in _ACC for l in ("ink", "light", "dark")))
+_badH = []
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        _dk = _l == "dark"
+        for name, a, b in [("a haul-road button's text on its fill (white; the control's text colour in Dark)", t["control-fg"] if _dk else "#FFFFFF", t["haul-text"]),
+                           ("the words on a card", t["haul-text"], t["surface"]),
+                           ("the words on the page", t["haul-text"], t["bg"]),
+                           ("the dagger and its note on the expanded Routes row (slate-50/70)", t["haul-text"], _over("rgba(27,29,33,.7)", t["surface"]) if _dk else _over("rgba(248,250,252,.7)", "#FFFFFF")),
+                           ("the 'Haul road' label on the amber wash (amber-50/60)", t["haul-text"], _over("rgba(251,191,36,.10)", t["surface"]) if _dk else _over("rgba(255,251,235,.6)", "#FFFFFF")),
+                           ("the words on a slate-50 surface", t["haul-text"], t["surface-2"] if _dk else "#F8FAFC"),
+                           ("a chip's words on its solid haul-soft", t["haul-text"], t["haul-soft"])]:
+            r = _cr(a, b)
+            if r < 4.5:
+                _badH.append(f"{_a}/{_l}: {name} {a} on {b} = {r:.2f}")
+ok("UI fix 6 card 6: 🔴 in all 12 looks × accents the haul-road colour reads 4.5:1 or better — a button's text on its fill, the words on a card, the page, the expanded Routes row, the amber wash, a slate-50 surface and a chip's solid haul-soft",
+   not _badH, "; ".join(_badH[:6]))
+ok("...the figures: white on #9A5F08 5.23:1 and #9A5F08 on white 5.23, on the expanded row 5.05, on the amber wash 5.13, on slate-50 5.00, on the chip's #FBF0DF 4.64; Dark: #1F2024 on #F0A838 8.03 (#141518 in the blue accents 9.01), #F0A838 on the surface 8.03, on the chip's #3A2E1C 6.53, on the amber wash 6.48",
+   round(_cr("#FFFFFF", "#9A5F08"), 2) == 5.23 and round(_cr("#9A5F08", _over("rgba(248,250,252,.7)", "#FFFFFF")), 2) == 5.05
+   and round(_cr("#9A5F08", _over("rgba(255,251,235,.6)", "#FFFFFF")), 2) == 5.13 and round(_cr("#9A5F08", "#F8FAFC"), 2) == 5.00
+   and round(_cr("#9A5F08", "#FBF0DF"), 2) == 4.64 and round(_cr("#1F2024", "#F0A838"), 2) == 8.03 and round(_cr("#141518", "#F0A838"), 2) == 9.01
+   and round(_cr("#F0A838", "#1F2024"), 2) == 8.03 and round(_cr("#F0A838", "#3A2E1C"), 2) == 6.53
+   and round(_cr("#F0A838", _over("rgba(251,191,36,.10)", "#1F2024")), 2) == 6.48)
+ok("...and why: the map line's #C2790B failed as text and fill (white on it 3.48:1; the chips 3.06 on white and 2.82 on a selected row under the see-through tint); the new brown under that tint falls to 4.24 on a selected row, so the chips are solid; white on the dark #F0A838 would be 2.03, so the dark fills take the control's text colour",
+   round(_cr("#FFFFFF", "#C2790B"), 2) == 3.48 and round(_cr("#C2790B", _over("rgba(194,121,11,.12)", "#FFFFFF")), 2) == 3.06
+   and round(_cr("#C2790B", _over("rgba(194,121,11,.12)", "#EFF6FF")), 2) == 2.82 and round(_cr("#9A5F08", _over("rgba(194,121,11,.12)", "#EFF6FF")), 2) == 4.24
+   and round(_cr("#FFFFFF", "#F0A838"), 2) == 2.03 and 'const ZONE_HAUL = "#C2790B";' in fe)
+ok("UI fix 6 card 6: the dark rule maps text-white on an inline var(--haul-text) to --control-fg (the navy / blue rule kept verbatim above it); the three fills are written background: \"var(--haul-text)\" and Stop placing takes it only for a haul road (a routing zone keeps ZONE_ROUTING #DC2626, white on it 4.83:1)",
+   'html[data-theme="dark"] .text-white[style*="var(--haul-text)"]{color:var(--control-fg)}' in _dark
+   and _dark.index('.text-white[style*="var(--blue)"]{color:var(--control-fg)}') < _dark.index('.text-white[style*="var(--haul-text)"]')
+   and _fe_wo.count('background: "var(--haul-text)"') == 3 and 'style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>' in fe
+   and 'const ZONE_ROUTING = "#DC2626";' in fe and round(_cr("#FFFFFF", "#DC2626"), 2) == 4.83 and "(finding 7, open)" not in fe)
+ok("UI fix 6 (the user's extra): the 'Avoided' chip is #B91C1C on its pink #FDE8EE, 5.53:1 (was #DC2626, 4.13:1), a fixed pair the same in every look — var(--bad-text) is #F87171 in the dark look and would read 2.36:1 on the pink",
+   '<span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>' in fe
+   and round(_cr("#B91C1C", "#FDE8EE"), 2) == 5.53 and round(_cr("#DC2626", "#FDE8EE"), 2) == 4.13
+   and round(_cr(_DARK["bad-text"], "#FDE8EE"), 2) == 2.36 and "FDE8EE" not in _dark)
+# card 3 (finding #11) + the user's yes to finding #37: the Horizon's commit week, heading and role word, on its shade
+_b700 = {"os": _rule_colour(':root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700'),
+         "dark": _rule_colour('html[data-theme="dark"] .text-blue-700'), "dark-blue": _rule_colour('html[data-theme="dark"][data-accent^="blue"] .text-blue-700')}
+_s600_dark = _rule_colour('html[data-theme="dark"] .text-slate-600')
+_badHz, _hzr = [], {}
+for _a in _ACC:
+    for _l in ["ink", "light", "dark"]:
+        t = _eff(_a, _l)
+        _dk = _l == "dark"
+        shade = _over(t["navy-soft"], t["surface-2"] if _dk else "#F8FAFC")      # the thead is bg-slate-50 (dark: --surface-2)
+        head = (_b700["dark-blue"] if _a.startswith("blue") else _b700["dark"]) if _dk else (_b700["os"] if _a == "orange-shades" else _TW_BLUE700)
+        role = _s600_dark if _dk else _TW_SLATE600
+        for name, a in [("the commit week's heading (text-blue-700)", head), ("its role word (text-slate-600)", role)]:
+            if not a:
+                _badHz.append(f"{_a}/{_l}: {name} has no colour")
+                continue
+            r = _cr(a, shade)
+            _hzr[(_a, _l, name[:20])] = r
+            if r < 4.5:
+                _badHz.append(f"{_a}/{_l}: {name} {a} on {shade} = {r:.2f}")
+ok("UI fix 6 card 3: 🔴 on the Horizon's commit-week shade the heading (text-blue-700, the accent's darker shade) and the role word (text-slate-600) read 4.5:1 or better in all 12 looks × accents",
+   not _badHz and len(_hzr) == 24, "; ".join(_badHz[:6]))
+ok("...the figures: the shade #E7EEFB (Ink and Light, Orange and Blue), heading #1D4ED8 5.75:1 (var(--navy) #2563EB was 4.44), Blue shades 5.66, Orange shades #9A3412 on #F4EBE9 6.23 (#C2410C was 4.42); Dark #FFB454 on #3B2D1F 7.53, Dark blue #8FB3F5 on #202632 7.17; the role word #475569 on #E7EEFB 6.50 (--muted would be 4.08), Dark #D5D8DE 9.30 / 10.62",
+   _over(_ROOT["navy-soft"], "#F8FAFC") == "#E7EEFB" and round(_cr("#1D4ED8", "#E7EEFB"), 2) == 5.75 and round(_cr("#2563EB", "#E7EEFB"), 2) == 4.44
+   and round(_cr("#1D4ED8", _over("rgba(29,78,216,.08)", "#F8FAFC")), 2) == 5.66
+   and _over("rgba(194,65,12,.08)", "#F8FAFC") == "#F4EBE9" and round(_cr("#9A3412", "#F4EBE9"), 2) == 6.23 and round(_cr("#C2410C", "#F4EBE9"), 2) == 4.42
+   and _over("rgba(255,140,20,.14)", "#1B1D21") == "#3B2D1F" and round(_cr("#FFB454", "#3B2D1F"), 2) == 7.53
+   and _over("rgba(91,143,240,.08)", "#1B1D21") == "#202632" and round(_cr("#8FB3F5", "#202632"), 2) == 7.17
+   and round(_cr("#475569", "#E7EEFB"), 2) == 6.50 and round(_cr("#64748B", "#E7EEFB"), 2) == 4.08
+   and round(_cr("#D5D8DE", "#3B2D1F"), 2) == 9.30 and round(_cr("#D5D8DE", "#202632"), 2) == 10.62
+   and _b700 == {"os": "#9A3412", "dark": "#FFB454", "dark-blue": "#8FB3F5"} and _s600_dark == "#D5D8DE")
+ok("...var(--navy-deep) passes too (13.97:1 in Ink, 12.07 in Dark) but it is the ink colour, not the darker blue the mockup offered and the user said yes to, so the heading takes the remapped text-blue-700",
+   round(_cr(_ROOT["navy-deep"], "#E7EEFB"), 2) == 13.97 and round(_cr(_DARK["navy-deep"], "#3B2D1F"), 2) == 12.07
+   and '<div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>' in fe)
+# card 2 (finding #11): the Account's headings and button; card 5: the count line; card 1: the pinned short-row cell
+ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 (Ink and Light), 6.48:1 (Dark), 4.5 or better in all 12 — and the button is the accent pair (white on #C2410C 5.18:1, on #2563EB 5.17; checked in all 12 by W16 above)",
+   all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface-2"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
+   and round(_cr("#64748B", "#FAFAF9"), 2) == 4.56 and round(_cr("#9AA1AB", "#1B1D21"), 2) == 6.48
+   and round(_cr("#FFFFFF", "#C2410C"), 2) == 5.18 and round(_cr("#FFFFFF", "#2563EB"), 2) == 5.17
+   and ".la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;" in fe and 'className="btn-pri btn-sm disabled:opacity-40"' in fe)
+ok("UI fix 6 card 5: the big screen's '+ N more lines today' line is --muted on the card — 4.76:1 (Ink and Light), 6.25:1 (Dark), 4.5 or better in all 12",
+   all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
+   and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25
+   and ".today-more{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-weight:600;color:var(--muted);}" in fe)
+ok("UI fix 6 card 1: a short row's pinned Action cell paints the row's own colour — the 5 % rose over the surface, #FCF5F6 (Dark #272126) — so no stripe runs down the table",
+   _over("rgba(191,46,85,.05)", _eff("orange", "ink")["surface"]) == "#FCF5F6" and _over("rgba(191,46,85,.05)", _eff("orange", "dark")["surface"]) == "#272126"
+   and ".la-pin.la-pin-short{background:linear-gradient(rgba(191,46,85,.05),rgba(191,46,85,.05)),var(--surface);}" in fe
+   and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

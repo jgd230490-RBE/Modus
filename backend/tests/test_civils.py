@@ -552,7 +552,7 @@ ok("7: server — limits read the name on display, not the stored vehicle_label 
 ok("7: server — carbon's factor list and note, the road-load note, the bulletin's fallback and the alternatives error use the name",
    "label=conversions.vehicle_label(doc, vname)" in _srv["carbon.py"] and "label=vname," not in _srv["carbon.py"]
    and "conversions.vehicle_label(ctx['doc'], s['vehicle'])" in _srv["carbon.py"]
-   and "{conversions.vehicle_label(conversions.load_factors(), profile)} road routes" in _srv["road_sections.py"]
+   and "have no {conversions.vehicle_label(conversions.load_factors(), profile)} route" in _srv["road_sections.py"]   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the note is shorter, still the name
    and "fb_name = conversions.vehicle_label(conversions.load_factors(), fb_name)" in _srv["bulletin.py"]
    and "cached for {conversions.vehicle_label(conversions.load_factors(), profile)} /" in _srv["network.py"])
 ok("7: the guide names the four categories and the Concrete mixers with their sources",

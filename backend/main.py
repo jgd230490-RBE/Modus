@@ -204,7 +204,8 @@ _GATE_CSS = """
   a { color:#2563EB; }
   .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:999px;
                  background:#F1F5F9; color:#B91C1C; border:1px solid #DC2626; text-align:center;
-                 font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+                 font-size:14px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  /* 22 Oct 2026 (UI fix 6, card 8): the notice pill at 14 px, the size of the app's demo bar (was 11 px) */
   /* 13 Oct 2026 (D45, Option A): the app's demo bar colours, with the red DEMO tag */
   .demo-notice::before { content:"DEMO"; content:"DEMO" / ""; display:inline-block; margin-right:8px; padding:0 6px;
                          border-radius:3px; background:#B91C1C; color:#FFFFFF; letter-spacing:.08em; }

@@ -81,6 +81,8 @@ ORDER = [
     "community_features", "community_meta",
     # 16 Oct 2026: the collision history (CLOCS v5 C1; fetched along the routes; no foreign keys)
     "collision_records", "collision_meta",
+    # 22 Oct 2026 (evidence v3): DfT's traffic counts along the routes (fetched with the collisions; no foreign keys)
+    "traffic_counts",
 ]
 
 # "Empty" for import purposes: the tables a person's work lands in. config is not in

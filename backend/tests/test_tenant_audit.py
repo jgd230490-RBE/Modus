@@ -100,6 +100,9 @@ TENANTED = {
     # 22 Oct 2026 (the abnormal loads, S16 / B5). Each abnormal load one tenant plans. Registered in the same edit as
     # the table — twelve.
     "abnormal_loads",
+    # 22 Oct 2026 (evidence v3, traffic.py): DfT's traffic counts at the count points along one tenant's routes.
+    # Registered in the same edit as the table — twelve.
+    "traffic_counts",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

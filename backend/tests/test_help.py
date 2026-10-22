@@ -21,6 +21,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MAIN = os.path.join(ROOT, "backend", "main.py")
 HELP = os.path.join(ROOT, "frontend", "help", "index.html")
 MEDIA = os.path.join(ROOT, "frontend", "help", "media")
+TECH = os.path.join(ROOT, "frontend", "help", "technical", "index.html")   # 22 Oct 2026 (words sweep): read early too, Appendix D moved there
 
 passed = failed = 0
 
@@ -120,19 +121,22 @@ ok("\u2b50 the Data pages and the planner's approve section are gated to planner
        ("7-data-pages-planners-and-admins", "7-1-locations", "7-2-routes",
         "7-3-zones-and-temporary-haul-roads", "7-4-config",
         "5-1-for-planners-approving-and-rejecting")))
+# REVERSED 22 Oct 2026 (words sweep): Appendix D moved to the technical guide's T7; the admin view keeps only 9.6 Users
 ok("\U0001f534 the technical appendix is ADMIN ONLY, and so is every heading inside it",
-   len(re.findall(r'data-role="admin"', src)) >= 5
-   and 'id="appendix-d-technical-reference" data-role="admin"' in src)
+   len(re.findall(r'data-role="admin"', src)) >= 1 and 'id="appendix-d-technical-reference"' not in src
+   and '<h1 id="t7-reference">' in open(TECH, encoding="utf-8").read())
+# REVERSED 22 Oct 2026 (words sweep): Appendix D moved to the technical guide's T7; the guide no longer carries a summary of it
 ok("...and it is honest that it is a summary of the full technical guide, not a replacement",
-   "not the full technical guide" in src)
+   "not the full technical guide" not in src and "Moved here from the user guide" in open(TECH, encoding="utf-8").read())
 # NARROWED 9 Oct 2026: the one 'Unaudited' row (emission factors) was checked against gov.uk that
 # day, so the distinction is now measured / planning assumption / checked-and-dated.
 ok("...it keeps the sourcing distinction: what is measured vs assumed vs checked",
-   "Planning assumption" in src and "Measured" in src and "Checked 9 Oct 2026" in src)
+   "Planning assumption" in src and "<strong>Measured</strong>" in open(TECH, encoding="utf-8").read()   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the sourcing table is T7's now
+   and "Checked 9 Oct 2026" in open(TECH, encoding="utf-8").read())
 ok("\U0001f534 ...and it repeats that the deployment must not be called secure",
-   "Do not describe the deployment as secure" in src)
+   "Do not describe the deployment as secure" in open(TECH, encoding="utf-8").read() and "Do not describe the deployment as secure" not in src)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): in T7
 ok("...and names what leaves the platform to third parties",
-   "What leaves the platform" in src and "No quantity, rate or forecast leaves" in src)
+   "What leaves the platform" in open(TECH, encoding="utf-8").read() and "No quantity, rate or forecast leaves" in open(TECH, encoding="utf-8").read())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): in T7
 
 # troubleshooting
 ok("the troubleshooting picker has a mount point and is built by the script",
@@ -142,7 +146,8 @@ ok("\u2b50 ...and at least ten symptoms, each with a verdict on whether it is a 
 ok("...it leads with the one that caught us: an empty map is usually no month selected",
    "No month on screen" in src)
 ok("...and it covers the unbaked route, the missing rate and the low carbon figure",
-   "has not been baked" in src and "rate not set" in src and "Only baked routes contribute" in src)
+   "has not been worked out for this vehicle yet" in src and "rate not set" in src and "Only routed lines count distance" in src   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): plain words
+   and "has not been baked" not in src)
 
 # 9 Oct 2026: the carbon factors were checked against gov.uk; the guide says so and no longer calls them untraced
 ok("\U0001f534 the guide no longer says the carbon factors are untraced or unaudited",
@@ -225,7 +230,7 @@ ok("...planning estimates, not a Carbon Tool return; all-in with the life-cycle 
 
 # the carbon target: who sets it, the two ways to hold it, how to read it, what a team code sees
 ok("⭐ who sets the carbon target: a planner or admin code, with no admin token; a team code reads it and cannot set it",
-   "a planner or admin records them as the scheme's carbon target" in src and "No admin token is needed." in src
+   "a planner or admin records them as the scheme's carbon target" in src and "No admin token is needed." not in src   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the token is not mentioned where it is not needed
    and "you cannot set, switch or clear the target" in src and "Your planner sets the scheme's carbon target." in src)
 ok("⭐ ...the two ways to hold it, as the page names them, and what each does",
    "% below the approved plan</strong> (it follows the plan as more lines are approved)" in src
@@ -245,7 +250,7 @@ ok("...the target is all-in and shows on the Dashboard, Forecasts and Submit for
 ok("...a team code: its own share of the target (split by each team's plan with the agreed decisions), its figures with a verdict",
    "not split by team" not in text and "with no verdict" not in text
    and "the scheme's target split by each team's plan with the agreed decisions" in text
-   and "so the shares add up to the target" in text and "with a verdict on each" in text)
+   and "the shares add up to the target" in text and "with a verdict on each" in text)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): §6.5 shorter
 ok("🔴 setting the carbon target and the money settings are gated to planner and above, like the Data pages",
    '"6-4-for-planners-setting-the-carbon-target": "planner"' in src and '"9-5-money-settings": "planner"' in src
    and 'id="6-4-for-planners-setting-the-carbon-target"' in src and 'id="9-5-money-settings"' in src)
@@ -271,7 +276,7 @@ ok("⭐ G3: Users (9.6) is in the guide for admins only, in the nav too, and nam
    '<h2 id="9-6-users" data-role="admin">9.6 Users and activity (admins)</h2>' in src
    and '<li class="l2" data-navrole="admin"><a href="#9-6-users">' in src
    and all(f"<strong>{w}</strong>" in src for w in ("People.", "Demo leads", "Activity", "Send a personal login", "Add and send the link"))
-   and "That is how the first admin is added" in text)
+   and "The technical guide says how the first admin is added." in text and "open Users, type the admin token, add yourself" in open(TECH, encoding="utf-8").read())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the steps are in T4
 ok("🔴 G3: the guide no longer says per-person logins are planned, nor that an unset admin token opens admin actions",
    "Per-person logins are planned" not in text and "Per-person logins\nare planned" not in text and "are planned next" not in text
    and "open to anyone who can reach them" not in text)
@@ -390,7 +395,7 @@ ok("Data pages: the token box at the top right, More ▾ on Configuration; Make 
 ok("...a route with no rate is priced at the target rate and marked target; rate not set only when neither exists",
    "only when neither exists does it read \"rate not set\"" in text and "Nothing is pre-filled; a route reads" not in text)
 ok("🔴 Configuration: six sections with Costing · fuel, and Reset to file is not an undo (it resets the organisation's settings and the demo notice)",
-   "<strong>Costing · fuel</strong>" in src and "Reset to file is not an undo" in src
+   "<strong>Costing · fuel</strong>" in src and "Reset to defaults is not an undo" in src and "Reset to file" not in src   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): question 6
    and "the demo notice" in text and "on five tabs" not in text)
 ok("⭐ money settings: the target rate, the fuel surcharge formula and its locked base, the fair price as a floor, never a quote",
    "<strong>Target rate</strong>" in src and "(index ÷ base − 1) × fuel share" in text
@@ -405,7 +410,7 @@ ok("⭐ roles moved to section 10: the admin code opens what the planner code op
 # carbon factors and sources
 ok("🔴 the 7.5 t rigid carries its 2026 factor (0.49944, factors.json) and the Carbon Tool method IS shown now, for comparison",
    "0.49944" in text and "a 2025 figure" not in text and "still carries a 2025 figure" not in text
-   and "is not reproduced here" not in text and "for comparison only" in text)
+   and "is not reproduced here" not in text and "for comparison only" in text.lower())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): A.1 says it, capitalised
 ok("...the carbon sources are named, with no web address (DESNZ 2026, the Carbon Tool v2.7, ZEHID, Net Zero Highways)",
    "UK Government greenhouse gas conversion factors 2026 (DESNZ)" in text and "National Highways Carbon Tool v2.7" in text
    and "ZEHID annual report 2026" in text and "Net Zero Highways annual progress report 2025-26" in text)
@@ -415,7 +420,7 @@ ok("...transport CO2e and all-in carbon are told apart in What the figures mean"
 # house style the old guide broke
 ok("🔴 house style: no real-time, telematics or 'security phase' in the guide (the one 'secure' is D.4's)",
    not re.search(r"real-time|telematics|security phase", text, re.I)
-   and len(re.findall(r"\bsecure\b", text, re.I)) == 1)
+   and len(re.findall(r"\bsecure\b", text, re.I)) == 0)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): D.4's 'secure' moved to T7 with Appendix D
 
 # troubleshooting: the carbon symptoms
 ok("⭐ the picker covers the carbon symptoms people will hit (all-in vs transport, over as forecast, team, greyed Set, decisions gone, Carbon Tool)",
@@ -467,7 +472,7 @@ ok("...the Forecasts badge counts Pending or Mixed lines, and the guide says so 
 
 # the demo bar and the tour
 ok("the shared demo: one callout names what not to press, and the map's first tour has no welcome",
-   "On the shared demo, show these but do not press them" in text and "Route all</strong> (it spends routing calls)" in src   # 13 Oct 2026 (W3, narrowed): the button reads Route all
+   "On the shared demo, show these but do not press them" in text and "Route all</strong> (it works every route out again)" in src   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): no routing calls   # 13 Oct 2026 (W3, narrowed): the button reads Route all
    and "Your first tour in the app starts with a two-step welcome; the map's tour has none." in text
    and "Opened at the site address followed by /map/, the map shows the notice at its top, with Guide beside it." in text)
 
@@ -507,7 +512,7 @@ ok("the Look-ahead: weekends are held at 0 and not shown (the grid is Monday to 
    and "Saturday and Sunday are held at 0 and not shown" in fe_src)   # 13 Oct 2026 (W3, narrowed): the screen's note moved into the commit grid's info box
 ok("...the KPI strip is a list; the check line's two other states; Esc saves a day",
    "The <strong>KPI strip</strong> reads:</p>\n<ul>" in src and "not checked since the route was worked out" in text and "not checked since the route was worked out" in fe_src   # 13 Oct 2026 (W3, narrowed): the screen's words
-   and "the stored result stands" in text and "Esc, or clicking elsewhere, saves too" in text
+   and "showing the last check" in text and "the stored result stands" not in text and "Esc, or clicking elsewhere, saves too" in text   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the screen's new words
    and 'e.key === "Enter" || e.key === "Escape") e.currentTarget.blur()' in fe_src)
 
 # the public map
@@ -518,7 +523,8 @@ ok("\U0001f534 the map: compound and railhead are the only squares; a tip draws 
 ok("...the filters skip stockpiles; the quick buttons are named; the t / day figure is hidden in vehicles",
    "the route conditions (not to stockpiles over capacity)" in text
    and "Light, Dark, Satellite and Streets (Streets is not in the Basemap list)" in text
-   and "Material a day appears too" not in text and "as shipped it counts in vehicles, so that figure is not shown" in text)
+   and "Material a day appears too" not in text and "as shipped it counts in vehicles" not in text   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the count unit is in T10
+   and "FORECAST_UNIT" in open(TECH, encoding="utf-8").read())
 ok("...an unbaked line is counted as unknown; a route with no geometry is left out of the bar",
    # 13 Oct 2026 (W3, narrowed): the same two rules in the screen's words
    "A line whose route is not routed for its vehicle is counted as unknown" in text
@@ -528,7 +534,7 @@ ok("...an unbaked line is counted as unknown; a route with no geometry is left o
 # Data pages and settings
 ok("Data pages: a tip keeps its imported type; the Planning tick does not lead a country with its own vehicle set",
    "a tip or recycling site keeps the type it was imported with" in text
-   and "the Planning tick does not change the lists" in text and "vehicle_sets" in text)
+   and "the Planning tick does not change the lists" in text and "vehicle_sets" not in text and "vehicle_sets" in open(TECH, encoding="utf-8").read())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the key is in T4
 ok("...the money settings split into three bullets; the token paragraph says a team code cannot open those pages",
    "<li><strong>Diesel index</strong> —" in src and "<li><strong>Fuel surcharge (BAF)</strong> —" in src
    and "whichever of the planner or admin codes they signed in with (a team code cannot open those pages)" in text
@@ -556,7 +562,7 @@ ok("...A.2: every electric version is 3.5 t lighter; the glossary says CO₂e an
 
 # cross-references: text a team submitter sees never points at a section hidden from them
 _gated = re.findall(r'"([0-9a-z-]+)": "planner"', src)
-_vis = src[:src.find('<h1 id="appendix-d-technical-reference"')]
+_vis = src[:src.find("</main>")]   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): Appendix D left; the guide's text ends at </main>
 for _gid in _gated:
     _m = re.search(r'<(h[12]) id="%s">' % re.escape(_gid), _vis)
     if not _m:
@@ -575,7 +581,7 @@ _bad_refs = [r for r in re.findall(r"§([0-9]+(?:\.[0-9]+)?)", _vis)
 ok("\U0001f534 a team submitter's view never refers to a section hidden from it (%d gated sections: %s)"
    % (len(_hidden_nums), ", ".join(sorted(_hidden_nums))), _hidden_nums and not _bad_refs)
 ok("...and the one pointer to the admin appendix says it is in the admin view",
-   "Appendix D, in the admin view of this guide" in text and "see Appendix D." not in text)
+   "Appendix D" not in text and "your organisation's alignment has not been loaded yet: ask your administrator." in text)   # REVERSED 22 Oct 2026 (words sweep): Appendix D moved to the technical guide's T7; the pointer asks the administrator
 
 # the pictures: each placeholder's title is its figure caption; no developer instructions on them; no truck
 _holders = dict(re.findall(r'\n  ([SM]\d\d): \["([^"]+)"', gen_src))
@@ -682,8 +688,8 @@ ok("...it maps the old screen words to the new ones, and says the exports keep t
    "baked / not baked / unbaked</td><td>routed / not routed yet" in tg and "line-month</td><td>forecast month" in tg
    and "UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED" in tg and "The XLSX and PDF exports and the clash text made on the server still say" in tg)
 ok("...and the user guide's Appendix D points at it (the first client's Word document is no longer mentioned)",
-   '<a href="/help/technical/">technical guide</a> (staff only)' in src and "Word document" not in src and "fifty pages" not in src
-   and '<a href="/help/#appendix-d-technical-reference">Open Appendix D</a>' in tg)
+   "Word document" not in src and "fifty pages" not in src   # REVERSED 22 Oct 2026 (words sweep): Appendix D moved to the technical guide's T7; the technical guide holds Appendix D's text, so it links back to nothing
+   and "appendix-d-technical-reference" not in tg and "Appendix D" not in src)
 
 # the word rule on the user guide's own text (the technical guide may use any word)
 _BAN = re.compile(r"(/api\b|\bendpoints?\b|\bservers?\b|\bJSON\b|\bcached?\b|\bgeometry\b|\bbak(?:e|ed|es|ing)\b|\bunbaked\b|\bre-?bak\w*|"
@@ -703,6 +709,39 @@ for _t in _vis:
         _hits.append(_m.group(0) + ": " + " ".join(_t.split())[:80])
 ok3("⭐ W3 word rule on the user guide: no banned word in its text outside <code> (%d text pieces read)" % len(_vis),
    len(_vis) > 500 and not _hits, " | ".join(_hits[:6]))
+# ---- 22 Oct 2026 (the words sweep; the user: "no info about api or backend stuff ... not even in the user guide") ----
+# The rule above skips <code>, <pre> and <script>; this one reads the WHOLE guide text, the troubleshooter's answers (the
+# TS array in the script) included, for the back-end words the sweep took out. HERE stays only as a source credit in A.1.
+_ws_text = re.sub(r"<style\b.*?</style>", " ", src, flags=re.S)
+_ws_ts = _ws_text[_ws_text.find("var TS = ["):_ws_text.find("var q = document.getElementById")] if "var TS = [" in _ws_text else ""
+_ws_text = re.sub(r"<script\b.*?</script>", " ", _ws_text, flags=re.S)
+_ws_text = re.sub(r"<[^>]+>", " ", _ws_text) + " " + _ws_ts
+_WS_BAN = re.compile(r"(routing service|provider is connected|\bfeed\b|stored (?:road )?route|stored check|stored decisions|"
+                     r"stored alternative|fetched by Wayscope|database|\bbak(?:e|ed|es|ing)\b|factors\.json|\bprobe\b|"
+                     r"bounding box|vehicle_sets|/api/|the repo\b|in the repository|hosting service|for scripts|"
+                     r"Diagnostics card|HERE calls?|routing calls?)", re.I)
+_ws_hits = sorted(set(m.group(0) for m in _WS_BAN.finditer(_ws_text)))
+ok("⭐ words sweep: no back-end word anywhere in the user guide, the troubleshooter's answers included (%d characters read)"
+   % len(_ws_text), len(_ws_text) > 100000 and len(_ws_ts) > 2000 and not _ws_hits)
+_ws_here = re.findall(r".{0,40}\bHERE\b.{0,40}", _ws_text)
+ok("...HERE is named only as A.1's source (the source table row and its limits cell): %d mentions" % len(_ws_here),
+   0 < len(_ws_here) <= 4 and all(("HERE Routing (lorry profile)" in h or "HERE's road map" in h or "HERE's line" in h) for h in _ws_here))
+ok("...and the rule would catch the old words (the troubleshooter's 'baked', the routing service, the database reads)",
+   all(_WS_BAN.search(x) for x in ("That route has not been baked", "the routing service offered", "small database reads",
+                                   "Probe HERE runs a live routing call", "POST /api/admin/tenant/import")))
+ok("...Appendix D left the user guide for the technical guide's T7 (its facts and its two pins moved with it)",
+   'id="appendix-d-technical-reference"' not in src and "Appendix D" not in _ws_text
+   and 'id="t7-number"' in tg and 'id="t7-not-finished"' in tg and "What leaves the platform" in tg
+   and "No quantity, rate or forecast leaves" in tg and "Do not describe the deployment as secure" in tg
+   and "Checked 9 Oct 2026" in tg and "Planning assumption" in tg and "<strong>Measured</strong>" in tg)
+ok("...the technical guide gained T10 (the public map) and the fuel and BAF section, and lists T8, T9 and T10 in its contents",
+   'id="t10-public-map"' in tg and 'id="t1-baf"' in tg and all('href="#%s"' % i in tg for i in ("t8-community", "t9-collisions", "t10-public-map"))
+   and "One base per organisation, not per haulier" in tg)
+ok("...the guide's facts that were wrong on 22 Oct are fixed (team shares, logins, Set by, the demo bar, the batching)",
+   "It does not share the carbon target out between teams" not in src and "It does not know who you are" not in src
+   and "Codes are shared, so the name is not checked" not in src and "FICTIONAL DEMO SCHEME strip" not in src
+   and "Batching them is a planned improvement" not in src and "where your deployment has one" not in src
+   and '"Set by" shows the name on the login' in src and "DEMO · FICTIONAL SCHEME strip" in src)
 ok("...the guide names the buttons the screens now show (Route all, not routed)",
    "<strong>Route all</strong>" in src and "Bake all" not in src and "not routed" in src)
 
@@ -791,10 +830,10 @@ ok("\U0001f534 #15 the technical guide's <pre> blocks wrap (pre-wrap, overflow-w
    "overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}" in _tg2)
 _tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
 ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
-   [l for _, l in _tgr] == ["Where each screen reads from", "", "Old words, new words", "The community considerations layer: sources", ""]
+   [l for _, l in _tgr] == ["Where each screen reads from", "Errors and what they mean", "Old words, new words", "Sourced and assumed figures", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep): T5 (longer now) and T7's sourcing table (from Appendix D) scroll on a phone too, so they are named regions (the UI audit's axe found them)
    # NARROWED 18 Oct 2026 (decision 10): the fourth tabindex is main's -1, the "Skip to the text" link's target
-   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 3
-   and _tg2.count("tabindex=") == 4, str(_tgr))
+   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 5
+   and _tg2.count("tabindex=") == 6, str(_tgr))
 # RE-PINNED 17 Oct 2026 (D114 fix): the opening sentence now also names the fallback (no approved line in the window ->
 # the months that have them), and the big-screen sentence says "the months the page opened on" instead of "this month ± 6"
 ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",
@@ -833,9 +872,10 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
     # the desk rule the phone rule builds on is as it was: 5 px rows in a fixed 280 px column
     ok3("decision 10 (%s): the desk contents are untouched — a fixed 280 px column, 5 px 8 px rows" % _nm,
         "#nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;" in _pg and "#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}" in _pg)
-# NARROWED 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 (one row + three sections) and the technical guide's T1 entry
-ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 + 4 and 19 + 1 since the abnormal loads' chapter, 22 Oct)",
-   len(re.findall(r'<li class="l[12]"', src)) == 63 and len(re.findall(r'<li class="l[12]"', _tg2)) == 20)
+# NARROWED 22 Oct 2026 (UI fix 7): the technical guide gains one row, T2 "What the screens leave out"
+ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19, + 1 since UI fix 7; 58 + 4 and 28 + 1 since the abnormal loads' chapter 14 and its T1 entry, 22 Oct)",
+   len(re.findall(r'<li class="l[12]"', src)) == 62 and len(re.findall(r'<li class="l[12]"', _tg2)) == 29   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 ok("⭐ 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 — planning one, the route and the potential pinch points, where they show and the documents — says advice never permission, lorry never truck, counted apart; its three rows in the contents; the technical guide's T1 entry names the sources, the calendars, HERE's parameters, the structures pass and what is not modelled",
    '<h1 id="14-abnormal-loads">14. Abnormal loads</h1>' in src and src.count('<h2 id="14-') == 3
    and '<li class="l1"><a href="#14-abnormal-loads">14. Abnormal loads</a></li>' in src and src.count('<li class="l2"><a href="#14-') == 3

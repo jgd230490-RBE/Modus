@@ -389,8 +389,9 @@ _temps_before = {d for d in os.listdir(tempfile.gettempdir()) if d.startswith("w
 st = cl.refresh(by="Pat Planner", fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
 ok("4: done: the five final years 2021-2025, the period in words", st["state"] == "done" and st["years"] == [2021, 2022, 2023, 2024, 2025]
    and st["period"] == "2021–2025", str(st))
+# NARROWED 22 Oct 2026 (evidence v3): the fetch also asks for DfT's traffic counts; the road safety files are as before
 ok("4: the five years' collision files asked for; vehicles and casualties only for the year with collisions in the strip",
-   sorted(u.rsplit("/", 1)[-1] for u in CALLS) == sorted(
+   sorted(u.rsplit("/", 1)[-1] for u in CALLS if "data.dft.gov.uk" in u) == sorted(
        [f"dft-road-casualty-statistics-collision-{y}.csv" for y in range(2021, 2026)]
        + ["dft-road-casualty-statistics-vehicle-2025.csv", "dft-road-casualty-statistics-casualty-2025.csv"]), str(CALLS))
 # NARROWED 16 Oct 2026 (found on live): the counts are the collisions along the routes and round the sites; C4, near the
@@ -544,16 +545,21 @@ ok("7: the counts table, both columns, the route and the alternative",
 ok("7: the place, along the route, with the school near it",
    not _t or ("Appendix: places with more than one collision" in _t and "km: A6" in _t and "from A: A6" not in _t
               and "Stretch 1 · A6" in _t and "Schools: Test Primary" in _t), _t[-1400:])
+# NARROWED 22 Oct 2026 (evidence v3): the assessor's last page also says it, once more, in its lead
 ok("7: every page says it is evidence, not the assessment, with DfT's caveats and the credit",
-   not _t or (_t.count("It is not the assessment") == E["pages"] and "no legal duty" in _t
+   not _t or (_t.count("It is not the assessment") == E["pages"] + 1 and "no legal duty" in _t
               and "Open Government Licence v3.0 (DfT road safety data)" in _t), _t[-900:])
 ok("7: no verdict word on the sheet", not _t or not VERDICT.search(_t), str(VERDICT.findall(_t)))
 _x = export.build_collision_evidence_xlsx(E)
 import openpyxl  # noqa: E402
 wb = openpyxl.load_workbook(io.BytesIO(_x))
 # NARROWED 22 Oct 2026 (evidence v2): the Stretches sheet after the Summary
-ok("7: the XLSX: Summary, Stretches, Places, Collisions, About",
-   wb.sheetnames == ["Summary", "Stretches", "Places", "Collisions", "About"], str(wb.sheetnames))
+# NARROWED 22 Oct 2026 (evidence v3): the routes compared, the lorries, the cycle routes and left turns
+ok("7: the XLSX: Summary, Stretches, Routes compared, Lorries, Cycle and left turns, Places, Collisions, About",
+   # NARROWED 22 Oct 2026 (v3 part 2): and the comparison with roads like these
+   wb.sheetnames == ["Summary", "Stretches", "Routes compared", "Lorries", "Compared with roads like these", "Cycle and left turns",
+                     "Places", "Collisions", "About"],
+   str(wb.sheetnames))
 wc = wb["Collisions"]
 _hdr = [c.value for c in wc[1]]
 ok("7: one row per collision near the route, with the month and never the day", wc.max_row - 1 == 4 and "Month" in _hdr
@@ -699,16 +705,231 @@ ok("7b: the XLSX Stretches sheet: one row a stretch, the counts and the lorries 
    _sh[:3] == ["No", "Stretch", "Road"] and _wt.cell(row=4, column=2).value == "A6" and _wt.cell(row=4, column=8).value == 3
    and _wt.cell(row=4, column=15).value == _lo and _wt.cell(row=4, column=16).value == _hi and _wt.max_row == 4, str(_sh))
 ok("7b: the XLSX Collisions sheet adds the distance from A and the stretch (blank off the route)",
-   _hdr[-2:] == ["Distance from A (km)", "Stretch"]
-   and sorted(wc.cell(row=i, column=len(_hdr)).value or 0 for i in range(2, 6)) == [0, 1, 1, 1])
+   _hdr[_hdr.index("Distance from A (km)") + 1] == "Stretch"           # NARROWED 22 Oct 2026 (v3): detail columns follow
+   and sorted(wc.cell(row=i, column=_hdr.index("Stretch") + 1).value or 0 for i in range(2, 6)) == [0, 1, 1, 1])
 ok("7b: the inset is drawn only at twice the map's scale or more, in a free corner, and says its window and scale",
-   "if mag >= 2:" in _b and (E["inset"] is None or (E["inset"]["mag"] >= 2 and "× the scale of the map" in E["inset"]["words"])))
+   "if mag < 2:" in _b and (E["inset"] is None or (E["inset"]["mag"] >= 2 and "× the scale of the map" in E["inset"]["words"])))
 _lay = export.collision_strip_layout(E, 500)
 ok("7b: the strip: one mark per collision on the route, stacked by distance from A, bins at least 6.5 pt wide",
    sum(len(v) for v in _lay["bins"].values()) == 3 and _lay["top"] >= 1
    and (_lay["pw"] * _lay["bin"] * _lay["unit_m"] / _lay["length_m"]) >= 6.5)
 ok("7b: no verdict word in the new words", not VERDICT.search(" ".join(cl.PDF_NEARBY_M) + _b + " ".join(
    s["name"] for s in E["stretches"])))
+
+# --------------------------------------------------------------------------- #
+#  7c. Evidence v3 (22 Oct 2026, the user's yes to notes\collision-evidence-   #
+#      v3-mockup-1022): lorries, cycle routes, left turns, the routes compared, #
+#      the CLOCS box, the assessor's page                                       #
+# --------------------------------------------------------------------------- #
+VX_HEAD = ("collision_index,collision_year,collision_ref_no,vehicle_reference,vehicle_type,towing_and_articulation,"
+           "vehicle_manoeuvre_historic,vehicle_manoeuvre,journey_purpose_of_driver_historic,journey_purpose_of_driver")
+_vk = {k: dict(keep[k], goods=False, detail={}) for k in (f"{Y}C1", f"{Y}C3", f"{Y}C8")}
+cl.read_vehicles(write("vx.csv", "\n".join([
+    VX_HEAD,
+    f"{Y}C1,{Y},C1,1,21,1,-1,7,-1,1",      # 7.5 t+, articulated, turning left (2024 field), journey for work
+    f"{Y}C1,{Y},C1,2,98,0,-1,19,-1,6",     # a second goods vehicle, weight not recorded, going ahead
+    f"{Y}C3,{Y},C3,1,20,0,8,-1,1,-1",      # 3.5-7.5 t waiting to turn left (only the _historic field filled), work (historic)
+    f"{Y}C8,{Y},C8,1,9,0,-1,7,-1,9",       # a car turning left: not a goods vehicle, but a left turn
+]) + "\n"), _vk)
+_d1, _d3, _d8 = (_vk[f"{Y}{k}"]["detail"] for k in ("C1", "C3", "C8"))
+ok("7c: read_vehicles: weight classes in order (7.5 t+, 3.5-7.5 t, not recorded), articulated, turning left, work journey",
+   _d1.get("goods_types") == ["21", "98"] and _d1.get("goods_artic") is True and _d1.get("goods_left") is True
+   and _d1.get("goods_work") is True and _vk[f"{Y}C1"]["goods"] is True, str(_d1))
+ok("7c: ...the years before 2024 fill only the _historic fields: they are read when the new field is -1",
+   _d3.get("goods_types") == ["20"] and _d3.get("goods_left") is True and _d3.get("goods_work") is True and _d3.get("goods_artic") is False, str(_d3))
+ok("7c: ...a car turning left is a left turn, not a goods vehicle",
+   _d8.get("left_turn") is True and _d8.get("goods_types") == [] and _vk[f"{Y}C8"]["goods"] is False, str(_d8))
+ok("7c: the goods words: 'weight not recorded' is DfT's 98, counted as over 3.5 t", cl.GOODS_WORDS["98"] == "weight not recorded"
+   and cl.GOODS_TYPES == {"20", "21", "98"} and cl.LEFT_MANOEUVRES == {"7", "8"})
+_ux = cl.read_collisions(write("cu.csv", C_HEAD + ",urban_or_rural_area\n" + collision_rows(Y).split("\n")[1] + ",2\n"), DIX, year=Y)
+ok("7c: DfT's urban / rural flag is kept (2 = rural); missing reads None",
+   next(iter(_ux.values()))["detail"]["urban"] == 2 and keep[f"{Y}C1"]["detail"]["urban"] is None)
+_cols3 = [c.lower() for c in db._columns_of(db.get_conn().cursor(), "collision_records")]
+ok("7c: stored as detail_json (one column, migrated on boot); still no day, date or time column",
+   "detail_json" in _cols3 and not any(c in _cols3 for c in ("date", "day", "time", "day_of_week")))
+ok("7c: the fetch says it read the vehicle details", cl.status()["vehicle_details"] is True)
+_rr = cl.records(["R1"])
+ok("7c: the details come back from storage", any((c.get("detail") or {}).get("goods_types") == ["21"] for c in _rr), str([c.get("detail") for c in _rr]))
+ok("7c: has_details only when every counted collision carries them (C2 has no vehicle row in the fixture)",
+   cl.has_details([{"detail": {"goods_types": []}}]) and not cl.has_details([{"detail": {"goods_types": []}}, {"detail": {"urban": 1}}])
+   and E["details"] is False and not any(k in E["columns"][0]["on"] for k, _ in cl.DETAIL_ROWS))
+_drows = cl.ROWS + cl.DETAIL_ROWS
+_syn = [dict(c, detail={"goods_types": ["21"], "goods_artic": True, "goods_left": True, "left_turn": True}, vru=["cyclist"],
+             routes={"R1": 5.0}) for c in _rr[:1]]
+_cf = cl.counts_for(_syn, "R1", _drows)
+ok("7c: the detail rows count when the details are there",
+   (_cf["on"]["goods_75"], _cf["on"]["goods_artic"], _cf["on"]["goods_left"], _cf["on"]["cyclist_left"], _cf["on"]["cyclist_any"]) == (1, 1, 1, 1, 1))
+# the route's own left turns, on an L: east 600 m then north 600 m (anticlockwise = a left turn); east then south = a right
+_E = [[-0.95 + i * 50 * DLON, LAT0] for i in range(13)]
+_left = _E + [[_E[-1][0], LAT0 + i * 50 * DLAT] for i in range(1, 13)]
+_right = _E + [[_E[-1][0], LAT0 - i * 50 * DLAT] for i in range(1, 13)]
+_lt = cl.left_turns(DIX, _left)
+ok("7c: left_turns: a 90 degree turn to the left is one turn, about 600 m from A; a right turn is none",
+   len(_lt) == 1 and 80 <= _lt[0]["deg"] <= 100 and abs(_lt[0]["m"] - 600) < 40 and cl.left_turns(DIX, _right) == [], str(_lt))
+_cyc = [("Test cycle path", [[-0.95 + 100 * DLON, LAT0 + 10 * DLAT], [-0.95 + 500 * DLON, LAT0 + 10 * DLAT]]),
+        ("NCN test", [[-0.95 + 590 * DLON, LAT0 - 100 * DLAT], [-0.95 + 590 * DLON, LAT0 + 100 * DLAT]])]
+_g = cl._SegGrid(DIX, _cyc)
+_ca = cl.cycle_along(DIX, _E, _g)
+ok("7c: cycle_along: 400 m beside a cycle path 10 m away (within 20 m), one crossing route meets it (within 8 m)",
+   380 <= len(_ca["beside_m"]) * 10 <= 500 and [n for _, n in _ca["meets"]] == ["NCN test"] and abs(_ca["meets"][0][0] - 590) < 20,
+   str((len(_ca["beside_m"]), _ca["meets"])))
+ok("7c: a left turn within 30 m of a cycle route names it", cl.left_turns(DIX, _left, _g)[0]["cycle"] == "NCN test")
+ok("7c: the measures are fixed and said on the sheet", (cl.CYCLE_BESIDE_M, cl.CYCLE_MEETS_M, cl.TURN_MIN_DEG, cl.TURN_CYCLE_M) == (20, 8, 45, 30))
+# the cycle routes on the fixture route, then the evidence again
+for i, (n, ln) in enumerate(_cyc):
+    db.execute("INSERT INTO community_features (tenant_id, feature_id, kind, source, source_ref, name, detail, geometry_json, "
+               "dist_m, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+               (T, f"osm:c{i}", "cycle", "osm", f"c{i}", n, None, json.dumps({"type": "LineString", "coordinates": ln}), 5.0, "2026-10-16"))
+E3 = cl.evidence("R1", now=date(2026, 10, 16))
+H3 = E3["headline"]
+ok("7c: the routes compared: this route and Alternative 1, side by side; the plan's lorries for this route only",
+   [h["label"] for h in H3] == ["This route", "Alternative 1"] and H3[0]["on"] == 3 and H3[1]["on"] == 0
+   and H3[0]["lorries"] is not None and H3[1]["lorries"] is None and H3[0]["goods"] == 1 and H3[0]["cyclist"] == 1, str(H3))
+ok("7c: ...and the cycle figures for each (beside, meets, left turns)",
+   H3[0]["beside"] is not None and H3[0]["meets"] == 1 and H3[0]["turns"] == 0 and "turns_cycle" in H3[1], str(H3))
+ok("7c: the lorry list: each collision on the route with a goods vehicle, from A",
+   [L_["collision_id"][4:] for L_ in E3["lorry_list"]] == ["C1"] and E3["lorry_list"][0]["severity"] == "Serious")
+ok("7c: the alternatives are drawn (dashed) and the cycle routes too", [l for l, _ in E3["alt_lines"]] == ["Alternative 1"]
+   and len(E3["cycle_lines"]) == 2 and E3["cycle_shown"] is True)
+ok("7c: the community credit is on the sheet (schools, health, bus stops and cycle routes come from that layer)",
+   "OpenStreetMap contributors (ODbL)" in (E3["community_credit"] or ""))
+_pdf3 = export.build_collision_evidence_pdf(E3)
+_t3 = " ".join(pdf_text(_pdf3, "").split()) if shutil.which("pdftotext") else ""
+ok("7c: the PDF: page 1 opens with the routes compared and the CLOCS box",
+   not _t3 or ("This route and its alternatives" in _t3 and "For the CLOCS route risk assessment" in _t3
+               and "5.6a assess and select routes" in _t3 and "the project's own incidents (5.1a) are not in this data" in _t3), _t3[:1500])
+ok("7c: ...the cycle routes and the route's left turns, said as facts with how they are measured",
+   not _t3 or ("Cycle routes and the route's left turns" in _t3 and "run beside a cycle route (within 20 m)" in _t3
+               and "The route makes 0 left turns" in _t3 and "mapped by volunteers" in _t3), _t3[:3000])
+ok("7c: ...the lorry table, and a note that the details come with the next fetch (C2 has none in the fixture)",
+   not _t3 or ("Collisions on the route involving a goods vehicle over 3.5 t" in _t3 and "read from the next fetch" in _t3))
+ok("7c: ...the last page is for the assessor: ten questions, the boxes, the sign-off, and it says it is not a CLOCS form",
+   not _t3 or ("For the route risk assessment" in _t3 and "not a CLOCS form" in _t3 and "10. What measures are proposed" in _t3
+               and "Assessed by" in _t3 and "Review before phase" in _t3) and E3["assessor_page"] == E3["pages"], _t3[-1500:])
+ok("7c: ...the community credit in the footer", not _t3 or "OpenStreetMap contributors (ODbL)" in _t3)
+ok("7c: no verdict word anywhere on the v3 sheet, and none of CLOCS's own 'safest' / 'high-risk'",
+   not _t3 or not VERDICT.search(_t3), str(VERDICT.findall(_t3)))
+_cw = " ".join(a + " " + b for a, b in export.CLOCS_MAP) + export.CLOCS_NOTE + " ".join(" ".join(q) for q in export.ASSESSOR_QUESTIONS)
+ok("7c: the CLOCS box and the questions: clause numbers with neutral words, never 'safe' (whole word) or 'high-risk'",
+   not VERDICT.search(_cw) and not re.search(r"\bsafe\b|\bsafety\b", _cw, re.I) and len(export.ASSESSOR_QUESTIONS) == 10
+   and len(export.CLOCS_MAP) == 8)
+ok("7c: the lorry ink is its own: not a reserved colour, not a community kind's, not the collision ink",
+   export.CE_LORRY.upper() not in RESERVED and export.CE_LORRY.upper() not in {k["colour"].upper() for k in community.KINDS}
+   and export.CE_LORRY != export.CE_INK)
+_wb3 = openpyxl.load_workbook(io.BytesIO(export.build_collision_evidence_xlsx(E3)))
+_rc = _wb3["Routes compared"]
+ok("7c: the XLSX: the routes compared (one column each), the lorries, the cycle routes and left turns",
+   [c.value for c in _rc[1]] == ["What", "This route", "Alternative 1"] and _wb3["Lorries"].max_row == 2
+   and _wb3["Cycle and left turns"].cell(row=2, column=1).value == "A cycle route meets the route", str([c.value for c in _rc[1]]))
+db.execute("DELETE FROM community_features WHERE tenant_id = ? AND kind = 'cycle'", (T,))   # later sections as before
+
+
+# --------------------------------------------------------------------------- #
+#  7d. Evidence v3 part 2 (22 Oct 2026): compared with roads like these —      #
+#      DfT's traffic counts × DfT's national rates (traffic.py; R5 reversed    #
+#      for this one comparison, at the user's word)                            #
+# --------------------------------------------------------------------------- #
+import traffic  # noqa: E402
+ok("7d: road_class: motorway; A or other, urban or rural by DfT's flag; nothing without the flag",
+   traffic.road_class("M1", None) == "motorway" and traffic.road_class("A6", 2) == "rural_a" and traffic.road_class("A563", 1) == "urban_a"
+   and traffic.road_class("B4114", 2) == "rural_other" and traffic.road_class("A6", None) is None and traffic.road_class(None, 1) is None)
+ok("7d: urban_of: the majority of DfT's flags on the stretch; a tie or none says nothing",
+   traffic.urban_of([{"detail": {"urban": 2}}, {"detail": {"urban": 2}}, {"detail": {"urban": 1}}]) == 2
+   and traffic.urban_of([{"detail": {"urban": 2}}, {"detail": {"urban": 1}}]) is None and traffic.urban_of([{}]) is None)
+ok("7d: poisson_range: the counts a typical road with 41.9 expected shows 95 times in 100 are 30-55 (the research's figure)",
+   traffic.poisson_range(41.9) == (30, 55) and traffic.poisson_range(13.3) == (7, 21) and traffic.poisson_range(0) == (0, 0),
+   str((traffic.poisson_range(41.9), traffic.poisson_range(13.3))))
+ok("7d: reading: below / within / above the range — words, never a verdict",
+   [traffic.reading(k, (30, 55)) for k in (29, 30, 55, 56)] == ["below the range", "within the range", "within the range", "above the range"])
+ok("7d: the rates are RAS0302's 2021-2025 (rural A 2025 = 155.1, urban A FSC 2021 = 136.2)",
+   traffic.RATES["rural_a"]["all"][2025] == 155.1 and traffic.RATES["urban_a"]["fsc"][2021] == 136.2
+   and all(set(v["all"]) == set(range(2021, 2026)) for v in traffic.RATES.values()))
+LA_CSV = '"local_authority_id","local_authority_name","local_authority_code","year","link_length_km"\n60,"Leicestershire","E10000018",2025,1\n153,"Leicester","E06000016",2025,1\n'
+AADF_HEAD = ("count_point_id,year,road_name,road_type,latitude,longitude,link_length_km,estimation_method,pedal_cycles,"
+             "all_hgvs,all_motor_vehicles")
+
+
+def aadf_rows():
+    out = [AADF_HEAD]
+    for y in range(2019, 2026):
+        lon, lat = P(200, 20)
+        out.append(f"901,{y},A6,Major,{lat},{lon},3.0,{'Counted' if y == 2023 else 'Estimated'},50,400,10000")
+        out.append(f"902,{y},A6,Major,52.0,-0.5,2.0,Estimated,0,0,99999")                 # far away
+        out.append(f"903,{y},U,Minor,{lat},{lon},,Estimated,0,0,500")                     # a minor road's sample point
+    return "\n".join(out) + "\n"
+
+
+ok("7d: authority_ids: DfT's id for each ONS code the collisions name", traffic.authority_ids(write("la.csv", LA_CSV), {"E10000018"}) == {"E10000018": "60"})
+_ar = traffic.read_aadf(write("aadf.csv", aadf_rows()), DIX, set(range(2021, 2026)))
+ok("7d: read_aadf: the major-road count points near a route, for the years asked; not the far one, not a minor road's",
+   sorted({r["count_point_id"] for r in _ar}) == ["901"] and sorted(r["year"] for r in _ar) == list(range(2021, 2026))
+   and _ar[0]["link_km"] == 3.0 and _ar[0]["aadf_all"] == 10000.0, str(_ar[:1]))
+_yrs = list(range(2021, 2026))
+_exv = traffic.expected_for(DIX, ROUTE, 0.0, 3400.0, "A6", 2, _yrs, _ar)
+_want = sum((10000 + 50) * 365 * (3400.0 / 1609.344) / 1e9 * traffic.RATES["rural_a"]["all"][y] for y in _yrs)
+_want_f = sum((10000 + 50) * 365 * (3400.0 / 1609.344) / 1e9 * traffic.RATES["rural_a"]["fsc"][y] for y in _yrs)
+ok("7d: expected_for: (AADF + pedal cycles) × 365 × the stretch's miles × each year's rate, summed; the range; what was used",
+   abs(_exv["expected"] - _want) < 1e-9 and abs(_exv["expected_fsc"] - _want_f) < 1e-9 and _exv["range"] == traffic.poisson_range(_want)
+   and _exv["class_words"] == "rural A roads" and _exv["counted"] == [2023] and _exv["points"] == ["901"] and _exv["aadf"] == (10000.0, 10000.0),
+   str(_exv))
+ok("7d: ...and says why not: another road's count, urban or rural not known, an unnumbered road, a year with no count",
+   traffic.expected_for(DIX, ROUTE, 0, 3400, "A47", 2, _yrs, _ar) == {"why": "no traffic count on this road"}
+   and traffic.expected_for(DIX, ROUTE, 0, 3400, "A6", None, _yrs, _ar) == {"why": "urban or rural not known"}
+   and traffic.expected_for(DIX, ROUTE, 0, 3400, "Unclassified road", 2, _yrs, _ar) == {"why": "no numbered road"}
+   and traffic.expected_for(DIX, ROUTE, 0, 3400, "A6", 2, _yrs + [2026], _ar)["why"].startswith("no traffic count or rate for 2026"))
+
+
+def with_urban(table, y):
+    text = only_2025(table, y)
+    if table != "collision" or y != 2025:
+        return text
+    lines = text.strip().split("\n")
+    return "\n".join([lines[0] + ",urban_or_rural_area,collision_adjusted_severity_serious"]
+                     + [ln + ",2,0.5" for ln in lines[1:]]) + "\n"
+
+
+def traffic_dl(url, dest):
+    if "local_authority_traffic.csv" in url:
+        text = LA_CSV
+    elif "dft_aadf_local_authority_id_60" in url:
+        text = aadf_rows()
+    elif "data.dft.gov.uk" in url:
+        return stub_download(with_urban)(url, dest)
+    else:
+        raise RuntimeError(f"could not download {url}: HTTP 404")
+    with open(dest, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    return url, len(text)
+
+
+_st7 = cl.refresh(fetchers={"download": traffic_dl}, today=date(2026, 10, 16))
+ok("7d: the fetch reads the traffic counts for the authorities the collisions name, beside the collisions",
+   _st7["state"] == "done" and len(traffic.stored()) == 5 and "traffic counts E10000018" in " ".join(_st7["files"])
+   and cl._detail(cl._meta_row()).get("traffic_points") == 1, str(_st7.get("files")))
+E4 = cl.evidence("R1", now=date(2026, 10, 16))
+_s4 = E4["stretches"][0]["expected"]
+ok("7d: the stretch compared: expected, its range, where the observed sits; fatal or serious on DfT's adjusted basis",
+   "expected" in _s4 and _s4["class"] == "rural_a" and _s4["reading"] in ("below the range", "within the range", "above the range")
+   and _s4["fsc_basis"] == "adjusted" and abs(_s4["obs_fsc"] - (0 + 0.5 * 3)) < 1e-9, str(_s4))
+ok("7d: the headline gives the whole route's expected when every stretch has one; the alternatives none",
+   E4["headline"][0]["expected"]["covers"] == "all" and abs(E4["headline"][0]["expected"]["expected"] - _s4["expected"]) < 1e-9
+   and E4["headline"][1].get("expected") is None and export._exp_cell(E4["headline"][1]) == "—")
+_t4 = " ".join(pdf_text(export.build_collision_evidence_pdf(E4), "").split()) if shutil.which("pdftotext") else ""
+ok("7d: the PDF: Compared with roads like these, the road type, the range, the yardstick's caveats and the credit",
+   not _t4 or ("Compared with roads like these" in _t4 and "rural A roads" in _t4 and "(typical range)" in _t4
+               and "RAS0302" in _t4 and "Small numbers" in _t4 and "DfT road traffic statistics" in _t4
+               and "Expected for roads like these" in _t4), _t4[:3000])
+ok("7d: ...never a ratio, a score or a verdict on the road", not _t4 or (not VERDICT.search(_t4)
+   and not re.search(r"\b(O/E|ratio|times the (national )?average|safer|worse than)\b", _t4, re.I)), str(VERDICT.findall(_t4)))
+_wb4 = openpyxl.load_workbook(io.BytesIO(export.build_collision_evidence_xlsx(E4)))
+_ce = _wb4["Compared with roads like these"]
+_ch = [c.value for c in _ce[1]]
+ok("7d: the XLSX: one row a stretch, the expected and its range as numbers, the count points used",
+   _ce.cell(row=2, column=_ch.index("Expected") + 1).value == round(_s4["expected"], 1)
+   and _ce.cell(row=2, column=_ch.index("DfT count points") + 1).value == "901", str(_ch))
+ok("7d: a sheet with no traffic counts says so in one line (no empty table, no rate words)",
+   not _t or ("Compared with roads like these: DfT's traffic counts have not been fetched yet" in _t))
+cl.refresh(fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))     # the fixture as before
 # not fetched yet
 db.execute("DELETE FROM collision_records WHERE tenant_id = ?", (T,))
 db.execute("DELETE FROM collision_meta WHERE tenant_id = ?", (T,))
@@ -846,7 +1067,7 @@ ok("10: map — a tick on an existing layer goes straight on (the filter is not 
 ok("10: map — the group's words count the alternatives' apart and say how to see them",
    "are along the alternative routes only: " in MAP and "tick Alternative routes to see them." in MAP)
 ok("10: app — the Config panel counts them apart too",
-   "are along the stored alternative routes only: on the Route map while Alternative routes is ticked" in APP)
+   " are near alternative routes only.`" in APP and "stored alternative routes" not in APP)   # NARROWED 22 Oct 2026 (words sweep; the user: few words on screens): shorter
 ok("10: map — re-added after a basemap switch", "if (typeof COLL !== 'undefined' && COLL.data) ensureCollisionLayers();" in MAP)
 ok("10: map — the export card's box adds collisions=1, off by default",
    "if (col && col.checked) q.set('collisions', '1');" in MAP and 'id="rme-collisions"' in MAP
@@ -860,7 +1081,8 @@ ok("10: app — Config → Map and bulletin carries the panel; a planner or admi
    and 'access.role === "planner" || access.role === "admin"' in _cp and "setTimeout(read, 5000)" in _cp
    and APP.count("/collisions/status") == 1)
 ok("10: app — the panel says it is not the assessment, staff only, never the public map or bulletin, and when to fetch again",
-   "It is not the assessment." in _cp and "never on the public map or the bulletin" in _cp and "late-July release" in _cp)
+   "it is not the assessment." in _cp and "Staff only." in _cp and "Fetch again after changing routes, and each August." in _cp   # NARROWED 22 Oct 2026 (words sweep; the user: few words on screens): the panel is three short sentences; where it never shows is in the guide and T9
+   and "never on the public map or the bulletin" in read("frontend/help/index.html"))
 _cb = APP.split("function CollisionEvidenceButton(")[1].split("\nfunction ")[0]
 ok("10: app — the Routes page's buttons (PDF and XLSX) for the route picked in the list",
    "<CollisionEvidenceButton routeId={selected} />" in APP and 'go("pdf")' in _cb and 'go("xlsx")' in _cb
@@ -873,7 +1095,7 @@ ok("10: the public map's data and the bulletin never read the collision history 
    and "import collisions" not in read("backend/bulletin.py") and "import collisions" not in read("backend/bulletin_doc.py"))
 ok("10: the tables are tenanted, in the package (last) and in the audit's registry",
    {"collision_records", "collision_meta"} <= set(db.TENANTED_TABLES)
-   and tenant_package.ORDER[-2:] == ["collision_records", "collision_meta"]
+   and tenant_package.ORDER[-3:-1] == ["collision_records", "collision_meta"]     # NARROWED 22 Oct 2026: traffic_counts last
    and '"collision_records", "collision_meta",' in read("backend/tests/test_tenant_audit.py"))
 GUIDE, TECH = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
 _g = GUIDE.split("<li><strong>Collision history</strong>")[1].split("</li>")[0] if "<li><strong>Collision history</strong>" in GUIDE else ""
@@ -882,12 +1104,23 @@ ok("10: the user guide says what it is, who sees it, where it comes from, what i
    and "police" in _g and "2016" in _g and "never the day or time" in _g and "Collision evidence (PDF)" in _g)
 ok("10: v2 (22 Oct 2026): the user guide describes the stretches, the strip, the lorries beside (never a rate), the fold "
    "and the appendix's Nearby rule; the technical guide the rules behind them",
-   "<em>stretch by stretch</em>" in _g and "never divided into a rate" in _g and "folded into one sentence" in _g
-   and "bus stops within 100 m" in _g and "Stretches sheet" in _g
+   "<em>stretch by stretch</em>" in _g and "never divided into a rate" in _g   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): the fold, the Nearby rule and the sheet are in T9
+   and "folded into a sentence" in TECH and "100 m" in TECH and "<em>Stretches sheet</em>" in TECH
    and "The evidence sheet, v2 (22 Oct 2026)." in TECH and "<code>vru_goods</code>" in TECH and "<code>PDF_NEARBY_M</code>" in TECH
    and "keep the year and month only (R6)" in TECH)
+ok("10: v3 (22 Oct 2026): the user guide describes the routes compared, the CLOCS box, the lorries, the cycle routes, the "
+   "left turns and the assessor's page; the technical guide the fields and the measures",
+   "the route beside its alternatives" in _g and "not a CLOCS form" in _g   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): the squares and the next-fetch rule are in T9
+   and "violet squares" in TECH and "read from the next Fetch now" in TECH and "The evidence sheet, v3 (22 Oct 2026)." in TECH and "<code>detail_json</code>" in TECH
+   and "<code>DETAIL_ROWS</code>" in TECH and "45&deg;" in TECH)
+ok("10: v3 part 2: the guides say how 'compared with roads like these' is worked out, that it is a range never a score, "
+   "and its caveats",
+   "<em>Compared with roads like these</em>" in _g and "never a score" in _g and "city-centre roads" in TECH   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): the caveat is in T9
+   and "<code>traffic.py</code>" in TECH and "<code>traffic.RATES</code>" in TECH and "never a ratio" in TECH
+   and "dft_aadf_local_authority_id_" in TECH)
 ok("10: the guides say the alternatives' collisions show with Alternative routes and the plans leave them out",
-   "those near a stored alternative route only appear while <em>Alternative routes</em>" in _g
+   "those near an alternative route only appear while <em>Alternative routes</em>" in _g   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): "stored" left; the plans rule is in T9
+   and "the route map plans leave them out" in TECH
    and "<code>alternatives_only</code>" in TECH)
 ok("10: the technical guide: the endpoints, the files, the years rule, the codes, the licence",
    'id="t9-collisions"' in TECH and "/api/collisions" in TECH and "data.dft.gov.uk" in TECH and "late July" in TECH
