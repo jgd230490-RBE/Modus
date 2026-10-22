@@ -71,7 +71,8 @@ what each figure means in a sentence. This page holds what the screens leave out
 reads behind each screen, how routing is stored, and the settings that live on the deployment.</p>
 <div class="callout note"><div class="ct">The words on the screens</div><p>Since 13 Oct 2026 a screen does not say
 <em>API, endpoint, server, JSON, cache, geometry, bake</em> or <em>token</em> (except the admin token's own field, the
-admin panel behind Config → More, the &ldquo;Everything (JSON)&rdquo; tab and the Diagnostics panel). Those words are
+admin panel behind Config → More and the &ldquo;Everything (JSON)&rdquo; tab; the Diagnostics panel left the screens on 22 Oct 2026, see
+<a href="#t2-left-out">What the screens leave out</a>). Those words are
 used here. <a href="#t6-words">T6</a> maps the old screen words to the new ones.</p></div>
 
 <h1 id="t1-figures">T1 How each figure is made</h1>
@@ -324,8 +325,7 @@ the login ends. The leads CSV gains login, expiry, sign-ins, first and last seen
 <li><strong>The admin token.</strong> Admin actions (saving Configuration, changing routes, zones and gates, the fuel
 index, Users) pass on an admin LOGIN, or with the token typed in the admin token field (Config → More, the Data pages'
 header, the fuel widget, Users); it is remembered in this browser. It is checked against <code>ADMIN_TOKEN</code> on Render.
-Since 12 Oct 2026 an unset <code>ADMIN_TOKEN</code> refuses those actions (it used to open them). The Data → Locations note now points at the field in the page
-header (it used to name a bake panel that no longer exists).</li>
+Since 12 Oct 2026 an unset <code>ADMIN_TOKEN</code> refuses those actions (it used to open them). The Data &rarr; Locations note about this field (it used to name a bake panel that no longer exists) left the screen on 22 Oct 2026: the field in the page header is the place.</li>
 <li><strong>Routing key.</strong> Routing needs <code>HERE_API_KEY</code> in Render → Environment for the
 <code>modus-web</code> service. Without it the Data → Routes banner says routing is not set up, and nothing bakes.</li>
 <li><strong>Configuration.</strong> The live source is the configuration table; <code>backend/factors.json</code> is the
@@ -334,10 +334,7 @@ on, so they cannot be renamed, and a vehicle the network is baked for cannot be 
 are edited on the &ldquo;Everything (JSON)&rdquo; tab.</li>
 <li><strong>Clearing every route</strong> (Data → Routes) deletes every route and its stored geometry; locations are
 kept. It was built to retire the first seed (the V2 seed).</li>
-<li><strong>Diagnostics</strong> (Data → Routes) shows each vehicle profile against <code>factors.json</code>: ● it
-appears in stored geometry; ⚠ the name is not a key in <code>factors.json</code> and falls back to
-<code>_default</code> (identical payload and CO₂ for every such profile, which looks like the vehicle being
-ignored).</li>
+<li><strong>Diagnostics</strong> left Data → Routes on 22 Oct 2026 (the user: no back-end detail on screens). The same two checks, with the admin token, are in <a href="#t2-left-out">What the screens leave out</a>: ● a profile appears in stored geometry; ⚠ its name is not a key in <code>factors.json</code> and falls back to <code>_default</code> (identical payload and CO₂ for every such profile, which looks like the vehicle being ignored).</li>
 </ul>
 
 <h1 id="t5-errors">T5 Errors and what they mean</h1>
