@@ -6137,6 +6137,31 @@ function qrRead(mod) {
      && abnStrings.length > 40 && !abnStrings.some(x => /\b(truck|real-time|live tracking|telematics|optimi[sz]e|predict|compliant|approved by)\b/i.test(x) || /\bsecure\b|\bAI\b/.test(x)));
 }
 
+// ---- 22 Oct 2026: the abnormal loads, phase 3 — the public map's approved layer (D68), the structures' dots ------------
+{
+  const grp = html.slice(html.indexOf('<div class="control-group" id="abnormal-public-group">'), html.indexOf('<div class="control-group" id="restrictions-group" hidden>'));
+  ok("⭐ ABP: the public map's abnormal loads — an 'Abnormal loads (approved)' box for every visitor, a layer-* box (in a shared link as abnormal-public), off by default, with the indicative words; hidden for staff, whose own group shows everything",
+     grp.length > 200 && grp.includes('<input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)"> Abnormal loads (approved)')
+     && !grp.includes(" checked") && grp.includes('id="abnormal-public-when"') && grp.includes("Indicative: the agreed route may differ.")
+     && src.includes("const pg = document.getElementById('abnormal-public-group');") && src.includes("if (pg) pg.hidden = ABN.staff;"));
+  ok("🔴 ABP: read ONCE from /api/public/abnormal when ticked (behind the map password), drawn as the same violet dashes on its own layer, back after a basemap change like the staff layers; the popup prints the window, the movements, 'escorted', the roads and the indicative words — never the size, the team, the references or a dot",
+     (src.match(/fetch\('\/api\/public\/abnormal'/g) || []).length === 1 && src.includes("const ABP = { on: false, data: null, loading: false };")
+     && src.includes("map.addLayer({ id: 'abnormal-public-lines', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],")
+     && src.includes("paint: { 'line-color': ABN_LINE, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.5, 13, 5], 'line-dasharray': [2, 1.5], 'line-opacity': 0.9 } });\n        map.on('click', 'abnormal-public-lines', e => abnormalPublicPopup(e));")
+     && (src.match(/if \(typeof ABP !== 'undefined' && ABP\.data\) ensureAbnormalPublicLayers\(\);/g) || []).length === 2
+     && (() => { const pop = src.slice(src.indexOf("function abnormalPublicPopup(e) {"), src.indexOf("function renderAbnormalPublicPanel() {"));
+                 return pop.includes("p.public_words || 'Indicative route; the agreed route may differ.'") && pop.includes("abnWhen(p.date_from, p.date_to, p.time_band)")
+                     && !pop.includes("p.size") && !pop.includes("p.team_name") && !pop.includes("p.name") && !pop.includes("p.candidates") && !pop.includes("esdal"); })());
+  ok("ABP: the panel line counts the approved loads drawn and lists their windows; nothing drawn says so; the words never promise the route",
+     src.includes("when.textContent = n ? `${n} approved: ${lines.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`")
+     && src.includes("'No approved abnormal load has a line drawn yet.'"));
+  ok("ABN (phase 3): the structure kinds have their own dot colours in the community layer's palette (bridge, railway, level crossing, calming, overhead line), in the match and the legend; a dot found in OpenStreetMap says so in its popup",
+     src.includes("bridge: '#1F2024', railway: '#4338CA', level_crossing: '#DB2777', calming: '#A16207', overhead: '#0891B2' };")
+     && src.includes("'bridge', ABN_DOT.bridge, 'railway', ABN_DOT.railway, 'level_crossing', ABN_DOT.level_crossing,")
+     && src.includes("['bridge', 'bridge'], ['railway', 'railway'], ['level_crossing', 'level crossing'], ['calming', 'traffic calming'], ['overhead', 'overhead line']]")
+     && src.includes("p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'HERE'") && src.includes("The structures are OpenStreetMap’s, as fetched."));
+}
+
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
   for (const f of fail) console.log("  FAIL:", f);

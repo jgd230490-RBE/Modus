@@ -977,6 +977,8 @@ ok("STRUCTURES: an unrouted movement cannot be checked (draw first); with no fet
    and "OpenStreetMap" in AR.STRUCTURES_WORDS and "the survey decides" in AR.STRUCTURES_WORDS
    and A.delete(_nr["id"], PLANNER)["ok"] and AR.check_structures("AL999", _structures=[])["error"] == "no such abnormal load")
 AR.check_structures(_b["id"], by="Planner", _structures=FEATS, _fetched="2026-10-23T09:00:00Z")
+ok("STRUCTURES: the page read carries the structures' sentence for the row's foot (phase 3), beside the advice and the counted-apart words",
+   A.page(PLANNER)["words"]["structures"] == AR.STRUCTURES_WORDS and A.page(PLANNER)["words"]["advice"] == R.ADVICE_WORDS)
 # ---- 22 Oct 2026 (phase 3, D73): the documents — the notice calendar (XLSX / PDF) and the ESDAL details sheet ---------
 import abnormal_docs as AD  # noqa: E402
 import io as _io  # noqa: E402

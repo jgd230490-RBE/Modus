@@ -897,6 +897,10 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .al-route{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px;}
   .al-ptbl{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 8px;} .al-ptbl th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line);}
   .al-ptbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top;} .al-ptbl .ctl-sm{padding:2px 6px;font-size:12px;}
+  /* 22 Oct 2026 (phase 3): the pinch-point heading with Check the roads again beside it; the planner's own rows */
+  .al-h4row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;} .al-h4row .al-h4{margin:0;}
+  .al-typed{margin:6px 0 8px;} .al-typed-more{display:flex;flex-wrap:wrap;gap:4px;} .al-typed-more .ctl-sm{width:118px;}
+  .al-typed-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;}
   .al-via{margin-top:8px;max-width:520px;} .al-via .ctl{font-family:ui-monospace,Consolas,monospace;font-size:12px;}
   .al-mark{margin-left:6px;font-weight:600;}
   .al-strip{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13px;background:var(--surface);margin-top:12px;}
@@ -3668,7 +3672,7 @@ function CommunityPanel({ access }){
   return (
     <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="community">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Community considerations</h3>
-      <p className="text-[14px] text-slate-600 mb-3">The schools, hospitals, health centres, community centres, sports facilities, stations, cycle routes, bus stops and homes near the routes: within {st ? st.strip.route_m : 250} m of every route and {st ? st.strip.site_m : 500} m of every site. Staff only: on the Route map and on the route map plans, never on the public map. Fetched again from the public sources when you press the button, never on a page view, so fetch again after adding or changing routes.</p>
+      <p className="text-[14px] text-slate-600 mb-3">The schools, hospitals, health centres, community centres, sports facilities, stations, cycle routes, bus stops and homes near the routes: within {st ? st.strip.route_m : 250} m of every route and {st ? st.strip.site_m : 500} m of every site. Staff only: on the Route map and on the route map plans, never on the public map. Fetched again from the public sources when you press the button, never on a page view, so fetch again after adding or changing routes. The same fetch keeps the bridges, railways, level crossings, traffic calming, overhead lines and tagged limits along the roads — the abnormal loads' potential pinch points — and the strip takes in each abnormal load's own drawn line, so fetch again after drawing one.</p>
       {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
         <>
           <p className="text-[14px] text-slate-700 mb-2" data-community-state={st.state}>
@@ -4053,6 +4057,9 @@ const AL_KIND_WORDS = { turn: "Turn", roundabout: "Roundabout", slip_road: "Slip
                         width: "Narrow road", junction: "Junction", furniture: "Street furniture", other: "Other" };
 const AL_GRADES = [["grey", "Grey — to survey"], ["green", "Green — passable"], ["amber", "Amber — passable with care or measures"],
                    ["red", "Red — needs works or a permit"], ["black", "Black — impassable"]];
+// phase 3: the planner's own rows (the survey's list) — the kinds a person types, and a blank row
+const AL_TYPED_KINDS = ["bridge", "junction", "furniture", "level_crossing", "overhead", "railway", "calming", "width", "other"];
+const AL_TYPED_BLANK = { kind: "other", place: "", words: "", grade: "grey", note: "", owner: "", measure: "", permit: "", works: "", link: "" };
 const AL_CANDIDATE_WORDS = "Potential pinch points found by Wayscope from HERE's turn-by-turn, the line itself and the stored signed limits, each graded Grey (to survey). The route survey decides: no structure rating, no swept path, no overhead clearance is worked out here.";
 // the one-word class chip: the permission first, then the STGO weight category, then the regime
 function alClass(adv){
@@ -4130,6 +4137,7 @@ function AbnormalPage({ meta, access, who }){
   const [showSettings, setShowSettings] = useState(false);
   const [bans, setBans] = useState(null);          // the time bans being edited (planner)
   const [viaText, setViaText] = useState({});      // phase 2: the via points being typed, per movement
+  const [typedDraft, setTypedDraft] = useState({}); // phase 3: the planner's own pinch-point rows being edited, per movement
   const call = async (path, method, body) => {
     const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
                                              body: body ? JSON.stringify(body) : undefined });
@@ -4199,6 +4207,39 @@ function AbnormalPage({ meta, access, who }){
     setNote({ ok: true, text: `${m.name}: ${pts.length} via point${pts.length === 1 ? "" : "s"} saved. Press Draw the route again to draw the line through them.` });
     await load();
   });
+  // phase 3 (D73): the documents come through the app's fetch (the sign-in's headers), never a bare link
+  const dl = (path, fallback) => act(async () => {
+    const r = await fetch(`${API}${path}`);
+    if(!r.ok){ let d = ""; try { d = (await r.json()).detail || ""; } catch(e){ d = ""; } throw new Error(d || `error ${r.status}`); }
+    const blob = await r.blob();
+    const cd = (r.headers && r.headers.get && r.headers.get("Content-Disposition")) || "";
+    const mm = cd.match(/filename="([^"]+)"/);
+    const a = document.createElement("a");
+    a.href = (window.URL && URL.createObjectURL) ? URL.createObjectURL(blob) : "#";
+    a.download = mm ? mm[1] : fallback;
+    document.body.appendChild(a); a.click(); a.remove();
+    if(a.href !== "#") setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+  // phase 3: look again along the drawn line for OpenStreetMap's structures and limits — no HERE call
+  const checkRoads = (m) => act(async () => {
+    const j = await call(`/abnormal/${encodeURIComponent(m.id)}/structures`, "POST");
+    const n = j.structures || 0;
+    setNote({ ok: true, text: `${m.name}: ${n} structure${n === 1 ? "" : "s"} or tagged limit${n === 1 ? "" : "s"} from OpenStreetMap along the line${j.structures_fetched ? ` (fetched ${alDay(String(j.structures_fetched).slice(0, 10))})` : ""}.${j.note ? " " + j.note : ""}` });
+    await load();
+  });
+  // phase 3: the planner's own pinch-point rows — edited in a draft, saved in one press with the found candidates' grades
+  const typedRows = (m) => typedDraft[m.id] !== undefined ? typedDraft[m.id] : (m.typed_points || []);
+  const editTyped = (m, i, k, v) => setTypedDraft(d => { const rows = typedRows(m).map(r => ({ ...r })); rows[i] = { ...rows[i], [k]: v }; return { ...d, [m.id]: rows }; });
+  const addTyped = (m) => setTypedDraft(d => ({ ...d, [m.id]: typedRows(m).concat([{ ...AL_TYPED_BLANK }]) }));
+  const removeTyped = (m, i) => setTypedDraft(d => ({ ...d, [m.id]: typedRows(m).filter((_, j) => j !== i) }));
+  const saveTyped = (m) => act(async () => {
+    const rows = (typedDraft[m.id] || []).map(r => ({ ...r, source: "typed" }));
+    const j = await call(`/abnormal/${encodeURIComponent(m.id)}/pinch`, "PUT", { pinch: (m.candidates || []).map(c => ({ id: c.id, grade: c.grade || "grey", note: c.note || null })).concat(rows) });
+    setTypedDraft(d => { const n = { ...d }; delete n[m.id]; return n; });
+    const n = (j.pinch || []).filter(r => r.source === "typed").length;
+    setNote({ ok: true, text: `${m.name}: ${n} of your own pinch point${n === 1 ? "" : "s"} saved.` });
+    await load();
+  });
   const fetchHolidays = () => act(async () => {
     const j = await call("/abnormal/bank-holidays/refresh", "POST");
     setNote({ ok: true, text: `Bank holidays fetched: ${(j.status && j.status.words) || "done"}.` });
@@ -4235,6 +4276,10 @@ function AbnormalPage({ meta, access, who }){
         actions={<>
           <button type="button" className="btn-pri" onClick={startNew} disabled={!data || !!form} data-guide="al-plan">Plan an abnormal load</button>
           <button type="button" className="btn-sec" onClick={() => setShowSettings(s => !s)} aria-expanded={showSettings}>Settings · bank holidays and time bans</button>
+          <button type="button" className="btn-sec" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.xlsx", "abnormal-loads-notice-calendar.xlsx")} data-al-doc="calendar-xlsx"
+            title="Every load you may see with its apply-by, police, authorities and notify-by dates, as a spreadsheet (nothing is sent anywhere)">Notice calendar · XLSX</button>
+          <button type="button" className="btn-sec" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.pdf", "abnormal-loads-notice-calendar.pdf")} data-al-doc="calendar-pdf"
+            title="The same calendar as an A4 landscape PDF">Notice calendar · PDF</button>
         </>} />
       {err && <EmptyState kind="error" title="Couldn't open the abnormal loads" body={err} action={<button type="button" className="btn-sec" onClick={load}>Try again</button>} />}
       {note && <div className="card p-3 mb-4 text-sm" role="status" style={{ borderColor: note.ok ? "var(--green)" : "var(--red)" }}>{note.text}</div>}
@@ -4383,6 +4428,8 @@ function AbnormalPage({ meta, access, who }){
                       <button type="button" className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>
                       {canApprove && <>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => draw(m)}
                         title={m.routed ? "Draw the line again with HERE at the load's size (one HERE call)" : "Draw the line with HERE at the load's size (one HERE call)"}>{m.routed ? "Draw the route again" : "Draw the route"}</button></>}
+                      {" "}<button type="button" className="link-btn" disabled={busy} onClick={() => dl(`/abnormal/${encodeURIComponent(m.id)}/esdal.pdf`, `esdal-details-${m.id}.pdf`)}
+                        title="The fields ESDAL asks for, as typed and as advised, for the haulier to copy across — a PDF; nothing is sent">ESDAL sheet</button>
                       {nextOf(m).map(s => <React.Fragment key={s}>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => setStatus(m, s)}>{AL_NEXT_WORD[s] || s}</button></React.Fragment>)}
                       {canDelete(m) && <>{" "}<button type="button" className="link-btn" style={{ color: "var(--red)" }} disabled={busy} onClick={() => del(m)}>Delete</button></>}
                     </td>
@@ -4402,8 +4449,10 @@ function AbnormalPage({ meta, access, who }){
                               <dt>Motorway</dt><dd>{m.has_motorway ? "on the line: the escort rule's motorway figures apply there" : "none on the line (the escort rule's other-roads figures apply)"}</dd>
                               <dt>Drawn</dt><dd>{m.baked_at ? alDay(m.baked_at.slice(0, 10)) : "—"}{(m.via || []).length ? ` · ${m.via.length} via point${m.via.length === 1 ? "" : "s"}` : ""}</dd>
                             </dl>
-                            <h4 className="al-h4">Potential pinch points · {(m.candidates || []).length} found, graded Grey (to survey) · the route survey decides</h4>
-                            {(m.candidates || []).length === 0 && <p className="text-sm text-slate-500">None found on this line: no turn, roundabout, sharp bend or signed limit the load is over.</p>}
+                            <div className="al-h4row"><h4 className="al-h4">Potential pinch points · {(m.candidates || []).length} found, graded Grey (to survey) · the route survey decides</h4>
+                              {canApprove && <button type="button" className="btn-sec btn-sm" disabled={busy} onClick={() => checkRoads(m)} data-al-check={m.id}
+                                title="Look again along the drawn line for OpenStreetMap's structures and limits (after Fetch now on Config → Map and bulletin); no HERE call">Check the roads again</button>}</div>
+                            {(m.candidates || []).length === 0 && <p className="text-sm text-slate-500">None found on this line: no turn, roundabout, sharp bend, structure, crossing or signed limit the load is over.</p>}
                             {(m.candidates || []).length > 0 && <table className="al-ptbl" data-al-pinch={m.id}>
                               <thead><tr><th></th><th>Kind</th><th>Where / what</th><th>From</th><th>Grade</th></tr></thead>
                               <tbody>{m.candidates.map(c => (
@@ -4424,7 +4473,34 @@ function AbnormalPage({ meta, access, who }){
                                 {h.headline}: the load's {h.vehicle_value != null ? `${h.vehicle_value} ${h.unit}` : "figure"} {h.verdict === "exceeds" ? "is over it" : h.verdict === "at_limit" ? "is exactly at it" : h.verdict === "within" ? "is within it" : "could not be compared"}{h.note ? ` — ${h.note}` : ""}</li>)}</ul>
                             </>}
                             <p className="al-foot">{AL_CANDIDATE_WORDS}</p>
+                            {words.structures && <p className="al-foot">{words.structures}</p>}
                           </>}
+                          {(typedRows(m).length > 0 || canApprove) && <div className="al-typed" data-al-typed={m.id}>
+                            <h4 className="al-h4">Your own pinch points · {typedRows(m).length} · the survey's list</h4>
+                            {typedRows(m).length > 0 && <table className="al-ptbl"><thead><tr><th></th><th>Kind</th><th>Where</th><th>What</th><th>Grade</th><th>Owner · measure · permit · works · link · note</th>{canApprove && <th></th>}</tr></thead>
+                              <tbody>{typedRows(m).map((t, i) => canApprove ? (
+                                <tr key={i} className="al-typed-row">
+                                  <td className="font-semibold whitespace-nowrap">{t.id || `T${i + 1}`}</td>
+                                  <td><select className="ctl ctl-sm" value={t.kind || "other"} aria-label={`Kind of ${t.id || "the new row"}`} onChange={e => editTyped(m, i, "kind", e.target.value)}>
+                                    {AL_TYPED_KINDS.map(k => <option key={k} value={k}>{AL_KIND_WORDS[k]}</option>)}</select></td>
+                                  <td><input className="ctl ctl-sm" value={t.place || ""} aria-label="Where" placeholder="Welland bridge" onChange={e => editTyped(m, i, "place", e.target.value)} /></td>
+                                  <td><input className="ctl ctl-sm" value={t.words || ""} aria-label="What" placeholder="Arch bridge, headroom 3.9 m at the kerb" onChange={e => editTyped(m, i, "words", e.target.value)} /></td>
+                                  <td><select className="ctl ctl-sm" value={t.grade || "grey"} aria-label={`Grade of ${t.id || "the new row"}`} onChange={e => editTyped(m, i, "grade", e.target.value)}>
+                                    {AL_GRADES.map(([k, w]) => <option key={k} value={k}>{w}</option>)}</select></td>
+                                  <td className="al-typed-more">{[["owner", "Owner"], ["measure", "Measure"], ["permit", "Permit"], ["works", "Works"], ["link", "Link"], ["note", "Note"]].map(([k, l]) =>
+                                    <input key={k} className="ctl ctl-sm" value={t[k] || ""} aria-label={l} placeholder={l} onChange={e => editTyped(m, i, k, e.target.value)} />)}</td>
+                                  <td className="text-right whitespace-nowrap"><button type="button" className="link-btn" style={{ color: "var(--red)" }} disabled={busy} onClick={() => removeTyped(m, i)}>Remove</button></td>
+                                </tr>) : (
+                                <tr key={i} className="al-typed-row">
+                                  <td className="font-semibold whitespace-nowrap">{t.id}</td><td>{AL_KIND_WORDS[t.kind] || t.kind}</td><td>{t.place}</td><td>{t.words}</td>
+                                  <td><AlChip tone={t.grade === "grey" || !t.grade ? "grey" : t.grade === "green" ? "okc" : t.grade === "amber" ? "warn" : "bad"}>{(AL_GRADES.find(g => g[0] === (t.grade || "grey")) || ["", t.grade])[1]}</AlChip></td>
+                                  <td className="text-slate-500">{[t.owner, t.measure, t.permit, t.works, t.link, t.note].filter(Boolean).join(" · ")}</td>
+                                </tr>))}</tbody></table>}
+                            {canApprove && <div className="al-typed-actions">
+                              <button type="button" className="btn-sec btn-sm" disabled={busy} onClick={() => addTyped(m)}>+ Add your own pinch point</button>
+                              {typedDraft[m.id] !== undefined && <button type="button" className="btn-pri btn-sm" disabled={busy} onClick={() => saveTyped(m)}>Save your own rows</button>}
+                              <span className="text-[13px] text-slate-500">What the data cannot know, with its owner, the measure needed, the permit, the works dates and a link to the drawing. A found pinch point's grade saves as you change it.</span></div>}
+                          </div>}
                           {canApprove && <div className="al-via">
                             <label className="al-fld">Via points, one a line as latitude, longitude (in travel order, up to 10; the line is drawn again on the next Draw)
                               <textarea className="ctl ctl-sm" rows={2} value={viaText[m.id] !== undefined ? viaText[m.id] : (m.via || []).map(p => `${p[0]}, ${p[1]}`).join("\n")}

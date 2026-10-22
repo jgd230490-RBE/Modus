@@ -568,6 +568,15 @@ def decorate(row, today=None, feed=None, bans=None, locs=None, gates=None, label
     return d
 
 
+def _structures_words():
+    """22 Oct 2026 (phase 3): the sentence under the pinch-point table about OpenStreetMap's structures (abnormal_route's)."""
+    try:
+        import abnormal_route
+        return abnormal_route.STRUCTURES_WORDS
+    except Exception:       # noqa: BLE001
+        return None
+
+
 def page(acc=None, today=None):
     """The whole read for Plan → Abnormal loads: the movements (decorated), the settings, the words, the pickers."""
     import taxonomy
@@ -580,7 +589,7 @@ def page(acc=None, today=None):
         "movements": movements, "count": len(movements), "by_status": by_status,
         "flagged": sum(1 for m in movements if m["flags"]),
         "settings": {"holidays": holiday_status(), "time_bans": bans, "nation": nat},
-        "words": {"advice": rules.ADVICE_WORDS, "not_modelled": rules.NOT_MODELLED_WORDS,
+        "words": {"advice": rules.ADVICE_WORDS, "not_modelled": rules.NOT_MODELLED_WORDS, "structures": _structures_words(),
                   "counted_apart": ("Abnormal loads are counted on their own: never in the lorry counts, the CLP caps, "
                                     "the gate capacity or the carbon totals (D70, D71).")},
         "choices": {"statuses": [{"key": k, "word": rules.STATUS_WORDS[k]} for k in rules.STATUSES],

@@ -1026,6 +1026,15 @@
         <div class="area-note" id="abnormal-when"></div>
     </div>
 
+    <!-- 22 Oct 2026 (abnormal loads, phase 3, D68): the APPROVED abnormal loads for every visitor — each as its drawn line and
+         its window, never the size, the team, the references or the pinch points. Off by default; a layer-* box, so it
+         travels in a shared link (&layers=abnormal-public). Hidden for staff, whose own group above shows everything. -->
+    <div class="control-group" id="abnormal-public-group">
+        <h3>Abnormal loads</h3>
+        <div class="control-item"><label><input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)"> Abnormal loads (approved)</label></div>
+        <div class="area-note" id="abnormal-public-when">Approved abnormal loads as their route and window — a violet dashed line each. Indicative: the agreed route may differ.</div>
+    </div>
+
     <div class="control-group" id="restrictions-group" hidden>
         <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;text-transform:none;letter-spacing:0;color:#8a9099;"></small></h3>
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
@@ -3784,6 +3793,7 @@
         if (typeof COLL !== 'undefined' && COLL.data) ensureCollisionLayers();
         // 22 Oct 2026: and the abnormal loads (staff only)
         if (typeof ABN !== 'undefined' && ABN.data) ensureAbnormalLayers();
+        if (typeof ABP !== 'undefined' && ABP.data) ensureAbnormalPublicLayers();
         // and so do the Tark Tee restriction layers. Already-fetched data is re-added
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
@@ -5126,6 +5136,7 @@
         // 16 Oct 2026: the collisions along the alternatives come and go with them
         if (typeof COLL !== 'undefined' && COLL.data) { ensureCollisionLayers(); renderCollisionPanel(); }
         if (typeof ABN !== 'undefined' && ABN.data) ensureAbnormalLayers();
+        if (typeof ABP !== 'undefined' && ABP.data) ensureAbnormalPublicLayers();
     }
 
     function gatesVisible() {
@@ -8970,11 +8981,15 @@
     const ABN = { staff: false, on: false, data: null, loading: false, dots: true, approved: false };
     const ABN_LAYERS = ['abnormal-lines', 'abnormal-points'];
     const ABN_LINE = '#7C3AED';                       // violet dashes: unlike the blue routes, the green / amber legs, the red breach
-    const ABN_DOT = { turn: '#1D4ED8', roundabout: '#0E7490', slip_road: '#6D28D9', bend: '#B91C1C', limit: '#B45309', notice: '#B45309' };
+    const ABN_DOT = { turn: '#1D4ED8', roundabout: '#0E7490', slip_road: '#6D28D9', bend: '#B91C1C', limit: '#B45309', notice: '#B45309',
+                      // 22 Oct 2026 (phase 3): the structures from OpenStreetMap, in the community layer's colours
+                      bridge: '#1F2024', railway: '#4338CA', level_crossing: '#DB2777', calming: '#A16207', overhead: '#0891B2' };
     function abnormalStaff(staff) {
         ABN.staff = !!staff;
         const g = document.getElementById('abnormal-group');
         if (g) g.hidden = !ABN.staff;
+        const pg = document.getElementById('abnormal-public-group');      // phase 3: staff have their own group above
+        if (pg) pg.hidden = ABN.staff;
         if (!ABN.staff) { ABN.on = false; ABN_LAYERS.forEach(l => { try { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'none'); } catch (e) {} }); }
     }
     function abnormalLineFilter() { return ABN.approved ? ['all', ['==', ['geometry-type'], 'LineString'], ['in', ['get', 'status'], ['literal', ['approved', 'notified', 'moved']]]] : ['==', ['geometry-type'], 'LineString']; }
@@ -8999,7 +9014,9 @@
                 layout: { visibility: (ABN.on && ABN.dots) ? 'visible' : 'none' },
                 paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 3.5, 13, 6.5], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
                          'circle-color': ['match', ['get', 'kind'], 'turn', ABN_DOT.turn, 'roundabout', ABN_DOT.roundabout, 'slip_road', ABN_DOT.slip_road,
-                                          'bend', ABN_DOT.bend, 'limit', ABN_DOT.limit, 'notice', ABN_DOT.notice, '#64748B'] } });
+                                          'bend', ABN_DOT.bend, 'limit', ABN_DOT.limit, 'notice', ABN_DOT.notice,
+                                          'bridge', ABN_DOT.bridge, 'railway', ABN_DOT.railway, 'level_crossing', ABN_DOT.level_crossing,
+                                          'calming', ABN_DOT.calming, 'overhead', ABN_DOT.overhead, '#64748B'] } });
             map.on('click', 'abnormal-points', e => abnormalPointPopup(e));
             map.on('click', 'abnormal-lines', e => abnormalLinePopup(e));
             ['abnormal-points', 'abnormal-lines'].forEach(l => { map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; }); map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; }); });
@@ -9035,7 +9052,7 @@
         const p = f.properties || {};
         const html = `<div style="font:14px system-ui;max-width:300px"><b>${escHtml(p.pinch_id || '')} · ${escHtml(p.words || '')}</b><br>` +
             `${escHtml(p.movement || '')}${p.detail ? ' · ' + escHtml(p.detail) : ''}<br>` +
-            `<span style="color:#475569">${escHtml(p.grade_word || 'Grey — to survey')} · found by Wayscope from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'the stored signed limits' : p.source === 'typed' ? 'the planner' : 'HERE'}; the route survey decides.</span></div>`;
+            `<span style="color:#475569">${escHtml(p.grade_word || 'Grey — to survey')} · found by Wayscope from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'the stored signed limits' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'HERE'}; the route survey decides.</span></div>`;
         new mapboxgl.Popup({ maxWidth: '320px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
     function renderAbnormalPanel() {
@@ -9048,9 +9065,10 @@
         when.textContent = n ? `${n} abnormal load${n === 1 ? '' : 's'} drawn, ${dots} potential pinch point${dots === 1 ? '' : 's'}. ${(D.words && D.words.indicative) || ''} ${(D.words && D.words.counted_apart) || ''}`
                              : 'No abnormal load has a line drawn yet (a planner draws it on Plan → Abnormal loads).';
         if (leg) leg.innerHTML = 'Violet dashes: the load’s own line. Dots: ' +
-            [['turn', 'turn'], ['roundabout', 'roundabout'], ['slip_road', 'slip road'], ['bend', 'sharp bend'], ['limit', 'signed limit the load is over']]
+            [['turn', 'turn'], ['roundabout', 'roundabout'], ['slip_road', 'slip road'], ['bend', 'sharp bend'], ['limit', 'signed limit'],
+             ['bridge', 'bridge'], ['railway', 'railway'], ['level_crossing', 'level crossing'], ['calming', 'traffic calming'], ['overhead', 'overhead line']]
             .map(([k, w]) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${ABN_DOT[k]};border:1px solid #fff;box-shadow:0 0 0 1px #94A3B8;vertical-align:middle"></span> ${w}`).join(' · ') +
-            '. Each Grey — to survey; the route survey decides.';
+            '. Each Grey — to survey; the route survey decides. The structures are OpenStreetMap’s, as fetched.';
     }
     function loadAbnormal() {
         if (ABN.loading) return;
@@ -9065,6 +9083,58 @@
         if (ABN.on && !ABN.data) loadAbnormal();
         renderAbnormalPanel();
         if (ABN.data) ensureAbnormalLayers();
+    }
+    // ---------------------------------------------------------------- the public map's abnormal loads (22 Oct 2026, phase 3, D68)
+    // The approved, notified and moved movements only, read from /api/public/abnormal (behind the map password like the rest
+    // of the public reads) when the box is ticked: a violet dashed line each (the staff group's style), a popup with the window,
+    // the movements, 'escorted', the roads and the indicative words. No dots, no size, no team, no references.
+    const ABP = { on: false, data: null, loading: false };
+    function ensureAbnormalPublicLayers() {
+        if (!ABP.data) return;
+        const vis = ABP.on ? 'visible' : 'none';
+        if (map.getLayer('abnormal-public-lines')) { try { map.setLayoutProperty('abnormal-public-lines', 'visibility', vis); } catch (e) {} return; }
+        if (!map.isStyleLoaded()) { map.once('idle', ensureAbnormalPublicLayers); return; }
+        if (!map.getSource('abnormal-public-source')) map.addSource('abnormal-public-source', { type: 'geojson', data: ABP.data });
+        else map.getSource('abnormal-public-source').setData(ABP.data);
+        map.addLayer({ id: 'abnormal-public-lines', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],
+            layout: { 'line-cap': 'round', 'line-join': 'round', visibility: vis },
+            paint: { 'line-color': ABN_LINE, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.5, 13, 5], 'line-dasharray': [2, 1.5], 'line-opacity': 0.9 } });
+        map.on('click', 'abnormal-public-lines', e => abnormalPublicPopup(e));
+        map.on('mouseenter', 'abnormal-public-lines', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'abnormal-public-lines', () => { map.getCanvas().style.cursor = ''; });
+    }
+    function abnormalPublicPopup(e) {
+        const f = e.features && e.features[0]; if (!f) return;
+        const p = f.properties || {};
+        const html = `<div style="font:14px system-ui;max-width:300px"><b>Abnormal load</b><br>` +
+            `${escHtml(abnWhen(p.date_from, p.date_to, p.time_band))} · ${p.movements || ''} movement${p.movements === 1 ? '' : 's'}${p.escorted === true || p.escorted === 'true' ? ' · escorted' : ''}${p.leg === 'return' ? ' · the return leg' : ''}<br>` +
+            `${p.roads ? '<span style="color:#475569">Roads: ' + escHtml(p.roads) + '</span><br>' : ''}` +
+            `<span style="color:#475569">${escHtml(p.public_words || 'Indicative route; the agreed route may differ.')}</span></div>`;
+        new mapboxgl.Popup({ maxWidth: '320px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
+    }
+    function renderAbnormalPublicPanel() {
+        const when = document.getElementById('abnormal-public-when');
+        if (!when) return;
+        if (ABP.loading) { when.textContent = 'Reading the approved abnormal loads…'; return; }
+        if (!ABP.data || !ABP.on) { when.textContent = 'Approved abnormal loads as their route and window — a violet dashed line each. Indicative: the agreed route may differ.'; return; }
+        const lines = (ABP.data.features || []).filter(f => f.geometry && f.geometry.type === 'LineString' && f.properties && f.properties.leg !== 'return');
+        const n = ABP.data.count || lines.length;
+        when.textContent = n ? `${n} approved: ${lines.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`
+                             : 'No approved abnormal load has a line drawn yet.';
+    }
+    function loadAbnormalPublic() {
+        if (ABP.loading) return;
+        ABP.loading = true; renderAbnormalPublicPanel();
+        fetch('/api/public/abnormal', { credentials: 'same-origin' })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(j => { ABP.data = j; ABP.loading = false; renderAbnormalPublicPanel(); ensureAbnormalPublicLayers(); })
+            .catch(e => { ABP.loading = false; const w = document.getElementById('abnormal-public-when'); if (w) w.textContent = 'Not read: ' + (e && e.message || e); });
+    }
+    function toggleAbnormalPublic(on) {
+        ABP.on = !!on;
+        if (ABP.on && !ABP.data) loadAbnormalPublic();
+        renderAbnormalPublicPanel();
+        if (ABP.data) ensureAbnormalPublicLayers();
     }
     function abnormalFilterChanged() {
         const d = document.getElementById('abn-dots'), a = document.getElementById('abn-approved');

@@ -1497,6 +1497,37 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      al.includes("{m.team_name || \"—\"}") && al.includes("{t.label || teamName(t.id)}") && !/\bIPT[1-6]\b/.test(al));
 }
 
+// ---- 22 Oct 2026: the abnormal loads, phase 3 — the documents, the structures, the planner's own rows, the fourth source ----
+{
+  const a0 = src.indexOf("// ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)");
+  const a1 = src.indexOf("// ================================================================= Public map\n");
+  const al = src.slice(a0, a1).split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
+  ok("⭐ AL3: the documents come through the app's fetch — Notice calendar XLSX and PDF in the header, ESDAL sheet in every row — never a bare link (a code sign-in sends its header only through fetch)",
+     al.includes('onClick={() => dl("/abnormal/calendar.xlsx", "abnormal-loads-notice-calendar.xlsx")}') && al.includes('onClick={() => dl("/abnormal/calendar.pdf", "abnormal-loads-notice-calendar.pdf")}')
+     && al.includes('onClick={() => dl(`/abnormal/${encodeURIComponent(m.id)}/esdal.pdf`, `esdal-details-${m.id}.pdf`)}') && al.includes(">ESDAL sheet</button>")
+     && al.includes("const dl = (path, fallback) => act(async () => {") && al.includes("const r = await fetch(`${API}${path}`);") && !/href=\{`\$\{API\}\/abnormal/.test(al)
+     && al.includes('title="The fields ESDAL asks for, as typed and as advised, for the haulier to copy across — a PDF; nothing is sent"'));
+  ok("⭐ AL3: Check the roads again beside the pinch-point heading (a planner's; no HERE call), its note with the count and the fetch date; the structures' words under the table from the server; OpenStreetMap named as a source",
+     al.includes('data-al-check={m.id}') && al.includes("const checkRoads = (m) => act(async () => {") && al.includes("/structures`, \"POST\")")
+     && al.includes("from OpenStreetMap along the line${j.structures_fetched ? ` (fetched ${alDay(String(j.structures_fetched).slice(0, 10))})` : \"\"}") && al.includes("{words.structures && <p className=\"al-foot\">{words.structures}</p>}")
+     && al.includes('osm: "OpenStreetMap"') && al.includes("no turn, roundabout, sharp bend, structure, crossing or signed limit the load is over"));
+  ok("⭐ AL3: the planner's own rows — a draft per movement, Add / Remove, Where and What inputs, the kind from AL_TYPED_KINDS, the survey fields (owner, measure, permit, works, link, note), saved in ONE PUT with the found candidates' grades; read-only rows for a team",
+     al.includes('const [typedDraft, setTypedDraft] = useState({});') && al.includes('const AL_TYPED_KINDS = ["bridge", "junction", "furniture", "level_crossing", "overhead", "railway", "calming", "width", "other"];')
+     && al.includes('data-al-typed={m.id}') && al.includes(">+ Add your own pinch point</button>") && al.includes(">Save your own rows</button>") && al.includes('aria-label="Where"') && al.includes('aria-label="What"')
+     && al.includes('[["owner", "Owner"], ["measure", "Measure"], ["permit", "Permit"], ["works", "Works"], ["link", "Link"], ["note", "Note"]]')
+     && al.includes('const rows = (typedDraft[m.id] || []).map(r => ({ ...r, source: "typed" }));')
+     && al.includes('{ pinch: (m.candidates || []).map(c => ({ id: c.id, grade: c.grade || "grey", note: c.note || null })).concat(rows) }')
+     && al.includes("A found pinch point's grade saves as you change it.") && al.includes("{typedRows(m).map((t, i) => canApprove ? ("));
+  const cfg = src.slice(src.indexOf('<div className="mt-6 pt-5 border-t border-slate-200" data-cfg="community">'), src.indexOf('<div className="mt-6 pt-5 border-t border-slate-200" data-cfg="collisions">'));
+  ok("AL3: Config → Map and bulletin says the same fetch keeps the structures and tagged limits along the roads and takes in each abnormal load's line (the fourth source's row comes from the table the page already draws)",
+     cfg.includes("The same fetch keeps the bridges, railways, level crossings, traffic calming, overhead lines and tagged limits along the roads") && cfg.includes("so fetch again after drawing one")
+     && cfg.includes("st.sources.map("));
+  const al3 = [al.slice(al.indexOf("const dl = (path, fallback)"), al.indexOf("const fetchHolidays")), al.slice(al.indexOf('data-al-typed={m.id}'), al.indexOf('data-al-typed={m.id}') + 4000)].join("\n");
+  const strs = al3.match(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g) || [];
+  ok("AL3 wording: lorry never truck; none of the banned words; no 'compliant', no 'approved by'",
+     strs.length > 30 && !strs.some(x => /\b(truck|real-time|live tracking|telematics|optimi[sz]e|predict|compliant|approved by)\b/i.test(x) || /\bsecure\b|\bAI\b/.test(x)));
+}
+
 // ---- 22 Oct 2026: the abnormal loads on the other screens (phase 2) ------------------------
 ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and the time-ban table's remove are 24 px tall boxes — the audit's targets-24px and axe target-size failed on the 18 px link buttons (run 2026-10-22_162849, 8 new failures on the abnormal stops)",
    html.includes(".al-tbl .link-btn, .al-set .link-btn{display:inline-block;min-height:24px;line-height:24px;padding:0 2px;}"));
