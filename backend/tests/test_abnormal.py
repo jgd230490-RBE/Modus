@@ -824,6 +824,68 @@ ok("ENDPOINTS: POST /api/abnormal/{id}/route and PUT …/via are a planner's (an
 ok("the words in the route module: lorry never truck, no compliant, no approved by, nothing predicted",
    not re.search(r"\btrucks?\b|\bcompliant\b|\bapproved by\b|predict", re.sub(r"#.*", "", read("backend/abnormal_route.py")).replace('"transportMode": "truck"', "").replace("transportMode", ""), re.I))
 
+# =========================================================================== #
+#  16. Phase 2: what the Look-ahead, the Dashboard and Gate arrivals read       #
+# =========================================================================== #
+_wk = A.week([datetime.date(2027, 4, 12) + datetime.timedelta(days=i) for i in range(7)], PLANNER, today="2027-04-08")
+ok("⭐ WEEK: the movements whose window touches the week's dates (Mon 12 – Sun 18 Apr 2027: all three move 12–14 Apr, oldest window and id first), "
+   "as briefs — no advice lines, no geometry — with the words that they are never in the week's figures",
+   [m["name"] for m in _wk["movements"]] == ["Units", "Beams", "Crane"] and _wk["count"] == 3 and _wk["from"] == "2027-04-12" and _wk["to"] == "2027-04-18"
+   and set(_wk["movements"][0]) >= {"id", "name", "team_name", "origin_name", "dest_name", "date_from", "date_to", "time_band", "movements", "escort_planned",
+                                   "status", "status_word", "summary", "permission", "notify_by", "apply_by", "flags", "routed", "distance_km", "candidates", "limit_exceeds"}
+   and "geometry" not in _wk["movements"][0] and "lines" not in _wk["movements"][0] and "never in the week's tonnes" in _wk["words"], str(_wk)[:300])
+ok("WEEK: a window that starts in the week's last day or ends on its first counts; one outside does not; no dates, nothing",
+   A.week(["2027-04-14"], PLANNER)["count"] == 3 and A.week(["2027-04-15"], PLANNER)["count"] == 0 and A.week([], PLANNER)["count"] == 0
+   and A.window_overlaps({"date_from": "2027-04-12", "date_to": "2027-04-14"}, datetime.date(2027, 4, 14), datetime.date(2027, 4, 20))
+   and not A.window_overlaps({"date_from": "2027-04-12", "date_to": None}, datetime.date(2027, 4, 13), datetime.date(2027, 4, 20)))
+_sm = A.summary(PLANNER, today="2027-03-20")
+ok("⭐ SUMMARY (the Dashboard's strip): loads in the next 4 weeks (all three, 12 Apr), notices due or late (none on 20 Mar), the Special Order to "
+   "apply for (the beams, apply by 1 Feb), limits exceeded (none), the counted-apart words",
+   _sm["today"] == "2027-03-20" and _sm["weeks_ahead"] == 4 and _sm["ahead"] == 3 and _sm["planned"] == 3
+   and _sm["to_apply"] == 1 and _sm["notices_due"] == 0 and _sm["road_limit"] == 0 and "Counted apart" in _sm["words"], str(_sm))
+ok("SUMMARY: on Wed 7 Apr 2027 the beams' notice (by 6 Apr, calendar days) is late; the units' (police 2 STGO days: by Wed 7 Apr) and the "
+   "crane's (authorities 2 days: by Wed 7 Apr) are due that day: 3 due or late, 1 late",
+   A.summary(PLANNER, today="2027-04-07")["notices_due"] == 3 and A.summary(PLANNER, today="2027-04-07")["notices_late"] == 1)
+ok("SUMMARY: a team login's strip counts its own movements only", A.summary(NORTH, today="2027-03-20")["planned"] == 2 and A.summary(CENTRAL, today="2027-03-20")["planned"] == 1)
+_gm = A.gate_markers(16, PLANNER)      # April 2027 = month 16 (Jan 2026 = 1)
+ok("⭐ GATE MARKERS (D70): April 2027 — the units arrive at Langton's Main gate (G009), the beams and the crane at Melton's North gate (G012); the crane "
+   "leaves by the precast works, which has no gate, so no leaving marker; a marker is a brief with `leaving`, never a lorry count",
+   sorted(_gm) == ["G009", "G012"] and [m["name"] for m in _gm["G009"]] == ["Units"] and sorted(m["name"] for m in _gm["G012"]) == ["Beams", "Crane"]
+   and all(m["leaving"] is False for ms in _gm.values() for m in ms)
+   and A.gate_markers(15, PLANNER) == {} and A.gate_markers("x", PLANNER) == {}, str({k: [(m["name"], m["leaving"]) for m in v] for k, v in _gm.items()}))
+import gate_arrivals as GA  # noqa: E402
+_ga = GA.arrivals(16, PLANNER)
+ok("⭐ GATE ARRIVALS: the panel's read carries the markers on the gate's row and names the count in a note; the figures are unchanged (no lorry line here: 0 arrivals)",
+   _ga["abnormal_total"] == 3 and any("counted apart" in n for n in _ga["notes"])
+   and all("abnormal" in g for g in _ga["gates"]) and all(g["arrivals_per_day"] == 0 or g["laden_per_day"] + g["empty_per_day"] > 0 for g in _ga["gates"]))
+ok("LOOK-AHEAD: the page read carries the week block (lookahead.page sets `abnormal` from abnormal.week on the commit week's dates, guarded)",
+   'out["abnormal"] = _abnormal.week(days.bucket_dates(mi, wi), acc, today=today)' in read("backend/lookahead.py")
+   and 'g["abnormal"] = _markers.get(g["gate_id"], [])' in read("backend/gate_arrivals.py"))
+# the pinch rows written back
+_pb = A.decorate(A.get(_b["id"]))
+_first = _pb["candidates"][0]["id"]
+_sp = AR.set_pinch(_b["id"], [{"id": _first, "grade": "amber", "note": "checked on site: 3.9 m at the kerb"},
+                              {"source": "typed", "kind": "bridge", "place": "Welland bridge", "words": "Arch bridge, headroom 3.9 m at the kerb", "grade": "red",
+                               "owner": "Leicestershire CC", "measure": "run on the crown", "permit": "asked 20 Oct", "works": None, "link": "https://example.test/drawing"}], by="Planner")
+_pb2 = A.decorate(A.get(_b["id"]))
+ok("⭐ PINCH: a found candidate takes the planner's grade and note and keeps its words; a typed row is kept whole (T1) with the survey fields; the rest untouched",
+   _sp["ok"] and _pb2["candidates"][0]["grade"] == "amber" and _pb2["candidates"][0]["note"] == "checked on site: 3.9 m at the kerb"
+   and _pb2["candidates"][0]["words"] == _pb["candidates"][0]["words"] and _pb2["candidates"][1]["grade"] == "grey"
+   and _pb2["typed_points"] == [{"id": "T1", "source": "typed", "kind": "bridge", "place": "Welland bridge", "words": "Arch bridge, headroom 3.9 m at the kerb", "grade": "red",
+                                 "note": None, "owner": "Leicestershire CC", "measure": "run on the crown", "permit": "asked 20 Oct", "works": None, "link": "https://example.test/drawing",
+                                 "lon": None, "lat": None}], str(_pb2["typed_points"]) + str(_pb2["candidates"][0]))
+ok("PINCH: a bad grade, a bad kind or a typed row with nothing said is refused in sentences",
+   any("grade" in p for p in AR.pinch_problems([{"id": _first, "grade": "purple"}])) and any("kind" in p for p in AR.pinch_problems([{"source": "typed", "kind": "volcano", "words": "x"}]))
+   and any("say where" in p for p in AR.pinch_problems([{"source": "typed", "kind": "bridge"}])) and AR.GRADES == ("grey", "green", "amber", "red", "black"))
+ok("PINCH: a re-bake keeps the planner's grade on a found candidate that comes back? No — found candidates are drawn afresh (Grey) and the typed rows stay; the stale rule says so",
+   AR.bake(_b["id"], _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])["ok"] and A.decorate(A.get(_b["id"]))["candidates"][0]["grade"] == "grey"
+   and A.decorate(A.get(_b["id"]))["typed_points"][0]["place"] == "Welland bridge")
+_main3 = read("backend/main.py")
+ok("ENDPOINTS: GET /api/abnormal/summary (any sign-in) and PUT /api/abnormal/{id}/pinch (an approver), the summary before the {movement_id} read",
+   re.search(r'@app\.get\("/api/abnormal/summary"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
+   and re.search(r'@app\.put\("/api/abnormal/\{movement_id\}/pinch"\)\ndef \w+\(movement_id: str, body: PinchIn\):\n(?:\s+""".*?"""\n)?\s+acc = _require_approver\(\)', _main3, re.S)
+   and _main3.index('"/api/abnormal/summary"') < _main3.index('@app.get("/api/abnormal/{movement_id}")'))
+
 try:
     remove_scratch_db(db, TMP)
 except Exception:

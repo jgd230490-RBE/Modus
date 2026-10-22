@@ -379,11 +379,27 @@ def arrivals(month_index, acc, factors=None, working_days=None):
                  + (f" ({dw} where none are typed)" if any(g["open_basis"] == "default" for g in out_gates) else "")
                  + (", less " + " and ".join(off) if off else "") + ". No hourly peak is typed.")
 
+    # 22 Oct 2026 (abnormal loads, phase 2, D70): a marker on a gate's row for each abnormal load arriving there in the
+    # month (and leaving, for a crane) — NEVER in laden, empty, arrivals, the gap or the capacity. A database without the
+    # table must not take the panel down.
+    try:
+        import abnormal as _abnormal
+        _markers = _abnormal.gate_markers(month_index, acc)
+    except Exception:                            # noqa: BLE001
+        _markers = {}
+    for g in out_gates:
+        g["abnormal"] = _markers.get(g["gate_id"], [])
+    abnormal_total = len({m["id"] for ms in _markers.values() for m in ms})
+    if abnormal_total:
+        notes.append(f"{abnormal_total} abnormal load{'s' if abnormal_total != 1 else ''} this month are marked on their gates "
+                     f"and counted apart: not in the arrivals, the gap or the capacity.")
+
     return {
         "month": int(month_index),
         "label": label,
         "working_days": wd,
         "shift_hours": sh,
+        "abnormal_total": abnormal_total,
         # 17 Oct 2026: the default gate day (was the shift's minutes) and its hours, for the screen's words
         "open_minutes": open_m,
         "default_hours": dw,

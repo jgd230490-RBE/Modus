@@ -1797,6 +1797,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and c.put("/api/abnormal/AL001/via", json={"via": [[95, 0]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
        and c.get("/api/abnormal/geojson", headers=PLAN).json().get("count") == 0
        and c.delete("/api/abnormal/AL001", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200)
+    ok("abnormal loads, phase 2: the Dashboard's summary (any sign-in; 401 signed out) and the pinch rows (a planner's)",
+       c.get("/api/abnormal/summary").status_code == 401 and c.get("/api/abnormal/summary", headers=NORTH).status_code == 200
+       and c.get("/api/abnormal/summary", headers=NORTH).json().get("planned") == 0
+       and c.put("/api/abnormal/AL001/pinch", json={"pinch": []}, headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)
     # 12 Oct 2026 (D18 / D31 / whoami): the MAP cookie — the outside viewer with the shared password
     _codes_map = {p: c.get(p).status_code for p in NETWORK_READS}
     ok("⭐ D18: the map cookie opens all twelve network reads (the public-safe reads the map draws from)",

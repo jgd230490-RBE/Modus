@@ -3049,6 +3049,30 @@ def abnormal_create(body: AbnormalIn):
     return _abnormal_result(abnormal.create(sent, acc, by=acc.get("name") or acc.get("label")))
 
 
+@app.get("/api/abnormal/summary")
+def abnormal_summary():
+    """The Dashboard's strip (phase 2): loads in the next 4 weeks, notices due or late this week, permissions still to
+    apply for, limits exceeded — the caller's own movements (a team code its team's). Counted apart from the lorries."""
+    acc = _require_access()
+    return abnormal.summary(acc)
+
+
+class PinchIn(BaseModel):
+    pinch: List[dict] = []
+
+
+@app.put("/api/abnormal/{movement_id}/pinch")
+def abnormal_pinch(movement_id: str, body: PinchIn):
+    """The pinch points written back: the grade (and a note) on each found candidate, and the planner's own rows whole
+    (phase 3's survey findings). A planner or an admin."""
+    acc = _require_approver()
+    import abnormal_route
+    row = abnormal.get(movement_id)
+    if not row or not abnormal._visible(row, acc):
+        raise HTTPException(404, "no such abnormal load")
+    return _abnormal_result(abnormal_route.set_pinch(movement_id, body.pinch, by=acc.get("name") or acc.get("label")))
+
+
 @app.get("/api/abnormal/geojson")
 def abnormal_geojson(request: Request = None):
     """

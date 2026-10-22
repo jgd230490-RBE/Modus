@@ -342,4 +342,12 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     # 14 Oct 2026 (bundle G, W17): the committed week at each gate (the rail's GATE_OVER / GATE_NEAR come from it)
     out["gates_week"] = cl.pop("gates_week", None)
     out["clashes"] = cl
+    # 22 Oct 2026 (abnormal loads, phase 2): the movements whose window touches the committed week — a block of their
+    # own under the gates' week, never a line and never in the week's figures (D70). A database without the table
+    # (an old scratch file) must not take the page down.
+    try:
+        import abnormal as _abnormal
+        out["abnormal"] = _abnormal.week(days.bucket_dates(mi, wi), acc, today=today)
+    except Exception as e:                       # noqa: BLE001
+        out["abnormal"] = {"movements": [], "count": 0, "error": str(e)[:120]}
     return out

@@ -599,6 +599,108 @@ def preview(figures, **kw):
     return rules.advice(figures, **kw)
 
 
+# --------------------------------------------------------------------------- #
+#  The reads the other screens take (phase 2, 22 Oct 2026): the Look-ahead's     #
+#  week, the Dashboard's strip, the gate markers. Counted apart (D70): none of   #
+#  these is a lorry figure, and none changes one.                                #
+# --------------------------------------------------------------------------- #
+def window_overlaps(m, d0, d1):
+    """The movement's window touches the closed date range d0..d1 (dates)."""
+    a = rules._date(m.get("date_from"))
+    b = rules._date(m.get("date_to")) or a
+    if not a:
+        return False
+    return a <= d1 and b >= d0
+
+
+def brief(m):
+    """One movement as the week block, the strip and the markers carry it (no advice lines, no geometry)."""
+    adv = m.get("advice") or {}
+    return {"id": m["id"], "name": m.get("name"), "ipt": m.get("ipt"), "team_name": m.get("team_name"),
+            "origin_name": m.get("origin_name"), "dest_name": m.get("dest_name"), "dest_gate_name": m.get("dest_gate_name"),
+            "origin_gate_name": m.get("origin_gate_name"),
+            "date_from": m.get("date_from"), "date_to": m.get("date_to"), "time_band": m.get("time_band"),
+            "movements": m.get("movements"), "return_abnormal": bool(m.get("return_abnormal")),
+            "escort_planned": m.get("escort_planned") or "none", "status": m.get("status"), "status_word": m.get("status_word"),
+            "summary": adv.get("summary"), "permission": adv.get("permission"), "category": adv.get("category"),
+            "notify_by": adv.get("notify_by"), "apply_by": adv.get("apply_by"), "notified_on": m.get("notified_on"),
+            "flags": list(m.get("flags") or []), "routed": bool(m.get("routed")), "distance_km": m.get("distance_km"),
+            "candidates": len(m.get("candidates") or []), "limit_exceeds": len(m.get("limit_exceeds") or [])}
+
+
+def week(dates, acc=None, today=None):
+    """The movements whose window touches the week's dates — the Look-ahead's "Abnormal loads this week" block."""
+    ds = [rules._date(d) for d in (dates or []) if rules._date(d)]
+    if not ds:
+        return {"movements": [], "count": 0, "from": None, "to": None, "words": None}
+    d0, d1 = min(ds), max(ds)
+    pg = page(acc, today=today)
+    rows = [brief(m) for m in pg["movements"] if m.get("status") != "withdrawn" and window_overlaps(m, d0, d1)]
+    return {"movements": rows, "count": len(rows), "from": d0.isoformat(), "to": d1.isoformat(),
+            "flagged": sum(1 for r in rows if r["flags"]),
+            "words": "Abnormal loads are never in the week's tonnes, loads, lorries, gate counts or carbon (D70). "
+                     "What each needs is advice from its typed figures: check with the haulier."}
+
+
+def summary(acc=None, today=None, weeks_ahead=4):
+    """The Dashboard's strip: loads in the next N weeks, notices due or late this week, permissions still to apply for."""
+    t = _today(today)
+    pg = page(acc, today=t)
+    live = [m for m in pg["movements"] if m.get("status") in ("pending", "approved", "notified")]
+    ahead = [m for m in live if window_overlaps(m, t, t + datetime.timedelta(days=7 * weeks_ahead))]
+    due = [m for m in live if any(f.get("code") in ("NOTICE_DUE", "NOTICE_LATE") for f in m.get("flags") or [])]
+    late = [m for m in due if any(f.get("code") == "NOTICE_LATE" for f in m.get("flags") or [])]
+    to_apply = [m for m in live if any(f.get("code") == "SO_LEAD_TIME" for f in m.get("flags") or [])]
+    road = [m for m in live if any(f.get("code") == "AIL_ROAD_LIMIT" for f in m.get("flags") or [])]
+    return {"today": t.isoformat(), "weeks_ahead": weeks_ahead, "planned": len(pg["movements"]),
+            "ahead": len(ahead), "ahead_names": [m["name"] for m in ahead][:4],
+            "notices_due": len(due), "notices_late": len(late), "to_apply": len(to_apply), "road_limit": len(road),
+            "words": "Counted apart: none of these is in the cards, the charts or the carbon target (D70, D71)."}
+
+
+def gate_markers(month_index, acc=None, today=None):
+    """{gate id: [brief + leaving]} — each movement arriving at a gate in the calendar month (the destination's entry gate),
+    and leaving by one when the return leg is abnormal too (the origin's exit gate). Never a count of lorries."""
+    import weeks as _weeks
+    try:
+        d0, d1 = _weeks.month_span(int(month_index))
+    except Exception:
+        return {}
+    pg = page(acc, today=today)
+    locs = _locations()
+    gbl = gates_by_location()
+    out = {}
+    for m in pg["movements"]:
+        if m.get("status") == "withdrawn" or not window_overlaps(m, d0, d1):
+            continue
+        b = brief(m)
+        ends = [("dest_id", "dest_gate_id", "entry", False)]
+        if m.get("return_abnormal"):
+            ends.append(("origin_id", "origin_gate_id", "exit", True))
+        for loc_key, gate_key, role, leaving in ends:
+            loc = locs.get(m.get(loc_key))
+            if not loc:
+                continue
+            try:
+                import gates as _gates
+                r = _gates.resolve(loc, role, m.get(gate_key), gates=gbl.get(loc["id"]))
+            except Exception:
+                continue
+            gid = r.get("gate_id")
+            if not gid:
+                continue
+            out.setdefault(gid, []).append(dict(b, leaving=leaving))
+    return out
+
+
+def gates_by_location():
+    try:
+        import gates as _gates
+        return _gates.gates_by_location()
+    except Exception:
+        return {}
+
+
 def month_index_of(iso_date):
     """The product's absolute month number for a date (weeks.month_index_of), for the tiles and the markers."""
     import weeks

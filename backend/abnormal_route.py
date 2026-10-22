@@ -475,6 +475,78 @@ def clear_route(movement_id, by=None):
                          "updated_by": by, "updated_at": _now()})
 
 
+PINCH_TEXT_MAX = 400
+
+
+def pinch_problems(rows, found_ids=()):
+    """Why a pinch-point list cannot be saved. A row naming a found candidate (its P… id) changes only the grade and a note;
+    a typed row (the planner's own) carries kind, place, words, grade, note, owner, measure, permit, works, link."""
+    if not isinstance(rows, list):
+        return ["the pinch points must be a list"]
+    if len(rows) > 200:
+        return ["at most 200 pinch points"]
+    p = []
+    found = set(found_ids or ())
+    for i, r in enumerate(rows):
+        n = i + 1
+        if not isinstance(r, dict):
+            p.append(f"row {n}: not an object")
+            continue
+        if r.get("grade") not in (None, "") and r.get("grade") not in GRADES:
+            p.append(f"row {n}: the grade must be one of " + ", ".join(GRADES))
+        src = "found" if r.get("id") in found else (r.get("source") or "typed")
+        if src == "typed":
+            if r.get("kind") not in (None, "") and r.get("kind") not in KIND_WORDS:
+                p.append(f"row {n}: the kind must be one of " + ", ".join(KIND_WORDS))
+            if not str(r.get("words") or r.get("place") or "").strip():
+                p.append(f"row {n}: say where or what the pinch point is")
+        for k in ("place", "words", "note", "owner", "measure", "permit", "works", "link"):
+            if r.get(k) is not None and len(str(r.get(k))) > PINCH_TEXT_MAX:
+                p.append(f"row {n}: {k} is too long (at most {PINCH_TEXT_MAX} characters)")
+    return p
+
+
+def set_pinch(movement_id, rows, by=None):
+    """Write the grades (and notes) the planner set on the found candidates, and the planner's own rows whole."""
+    import abnormal
+    m = abnormal.get(movement_id)
+    if not m:
+        return {"ok": False, "error": "no such abnormal load"}
+    try:
+        cur = json.loads(m.get("pinch_json") or "[]")
+    except Exception:
+        cur = []
+    found = {c.get("id"): c for c in cur if isinstance(c, dict) and c.get("source") != "typed"}
+    probs = pinch_problems(rows, found_ids=found.keys())
+    if probs:
+        return {"ok": False, "problems": probs}
+    sent = {r.get("id"): r for r in rows if isinstance(r, dict) and r.get("id") in found}
+    out = []
+    for cid, c in found.items():
+        r = sent.get(cid)
+        if r:
+            c = dict(c, grade=(r.get("grade") or c.get("grade") or "grey"), note=(str(r.get("note")).strip() or None) if r.get("note") is not None else c.get("note"))
+        out.append(c)
+    typed = []
+    for r in rows:
+        if not isinstance(r, dict) or r.get("id") in found or (r.get("source") or "typed") != "typed":
+            continue
+        typed.append({"id": r.get("id") or "", "source": "typed", "kind": r.get("kind") or "other", "place": (str(r.get("place")).strip() or None) if r.get("place") else None,
+                      "words": (str(r.get("words")).strip() or None) if r.get("words") else None, "grade": r.get("grade") or "grey",
+                      "note": (str(r.get("note")).strip() or None) if r.get("note") else None,
+                      "owner": (str(r.get("owner")).strip() or None) if r.get("owner") else None,
+                      "measure": (str(r.get("measure")).strip() or None) if r.get("measure") else None,
+                      "permit": (str(r.get("permit")).strip() or None) if r.get("permit") else None,
+                      "works": (str(r.get("works")).strip() or None) if r.get("works") else None,
+                      "link": (str(r.get("link")).strip() or None) if r.get("link") else None,
+                      "lon": r.get("lon") if isinstance(r.get("lon"), (int, float)) else None,
+                      "lat": r.get("lat") if isinstance(r.get("lat"), (int, float)) else None})
+    for i, t in enumerate(typed):
+        t["id"] = f"T{i + 1}"
+    _store(movement_id, {"pinch_json": json.dumps(out + typed), "updated_by": by, "updated_at": _now()})
+    return {"ok": True, "pinch": out + typed}
+
+
 #: the typed fields whose change makes a stored line stale
 ROUTE_FIELDS = ("origin_id", "origin_gate_id", "dest_id", "dest_gate_id", "width_m", "height_m", "length_m", "gross_t",
                 "max_axle_t", "axle_count", "return_abnormal")
