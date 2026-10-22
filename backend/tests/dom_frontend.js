@@ -1694,7 +1694,8 @@ async function phoneShellDom(){
   const sheet = () => t.el.querySelector("#phone-more");
   ok("PHONE: More opens a sheet (a dialog) with the pages made for a desk this role can see, and the user guide",
      !!sheet() && sheet().getAttribute("role") === "dialog" && tabs(t.el)[3].getAttribute("aria-expanded") === "true"
-     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner"
+     // NARROWED 22 Oct 2026 (abnormal loads, S16 / B5): + Abnormal loads, a Plan-group desk page a team sees
+     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads"
      && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
   ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
   await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -1722,7 +1723,8 @@ async function phoneShellDom(){
   click(tabs(p.el)[3]);
   // NARROWED 14 Oct 2026 (merged with G3): a planner on a shared CODE also sees Users (G3's first-admin step), a desk page too
   ok("PHONE: the planner's sheet adds the Data pages, Config and Users (each a desk page)",
-     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Locations|Routes|Zones|Config|Users");
+     // NARROWED 22 Oct 2026 (abnormal loads): + Abnormal loads after the Carbon planner
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Locations|Routes|Zones|Config|Users");
   click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Users/.test(b.textContent)));
   ok("PHONE (with G3): Users on a phone is the card, the Users page never mounted",
      !!p.el.querySelector("[data-desk-only]") && p.el.querySelector("[data-desk-only] h2").textContent === "Users" && !p.el.querySelector("main table, main input"));
@@ -1748,6 +1750,131 @@ async function phoneShellDom(){
 // fixture's own dated flags fall on every weekday, so they cannot show the difference). Checked on three days: each
 // line's status, its details and the "N lines flagged" count; then the desk grid with the same page, whose row is the
 // whole week and so keeps every flag.
+// ---- 22 Oct 2026: the Abnormal loads page (S16 / B5) ---------------------------------
+async function abnormalDom(){
+  const meta = { ...metaMin, months: { start_year: 2026, count: 60 }, ipts: [{ id: "IPT1", label: "North Team" }, { id: "IPT2", label: "Central Team" }] };
+  // the engine's real answers for two of the demo loads (abnormal_rules.advice, 22 Oct 2026), as the page read carries them
+  const beamAdv = { abnormal: true, regime: "special_order", permission: "special_order", category: "special_order",
+    category_words: "Special Order (outside the STGO categories)", lead_words: "Special Order (BE16): apply 10 weeks ahead (the aide memoire; the BE16 form itself says 8: plan on 10)",
+    apply_by: "2027-02-01", apply_by_be16: "2027-02-15", notify_by: "2027-04-06", notices: { police_days: 5, rba_days: 5 },
+    summary: "Special Order · police 5 days · authorities 5 days · attendant · escort expected",
+    lines: ["Special Order needed: length 36 m is over 30 m. The National Highways Abnormal Loads Team decides; approval is not automatic, and road may be refused where water is feasible.",
+            "Police notice: 5 clear working days to every force on the route (a Special Order case; overall length over 25.9 m (STGO)); receive by 2027-04-06."],
+    notes: [], flags: [{ code: "SO_LEAD_TIME", text: "Special Order not applied for and the lead time has started (apply by 2027-02-01)" }],
+    advice_words: "Advice worked out from the typed figures under the rules as read on 16 Oct 2026. Check with the haulier: ESDAL, the police and the road and bridge authorities decide." };
+  const unitsAdv = { ...beamAdv, regime: "stgo", permission: "none", category: "cat1", category_words: "STGO Category 1 (up to 50 t on 6 or more axles)", lead_words: null,
+    apply_by: null, apply_by_be16: null, notify_by: "2027-03-03", summary: "STGO Cat 1 · police 2 days · attendant · escort expected",
+    lines: ["Police notice: 2 clear working days to every force on the route (width over 3 m (STGO)); receive by 2027-03-03."],
+    notes: ["no escort is planned for this movement: say what the haulier will provide"],
+    flags: [{ code: "NOTICE_LATE", text: "notify by 2027-03-03 has passed and the movement is not marked notified" }] };
+  const mv = (id, name, ipt, team, status, adv, extra) => ({ id, name, ipt, team_name: team, status, status_word: status[0].toUpperCase() + status.slice(1),
+    origin_id: "L004", origin_name: "Harborough Rail Freight Terminal", dest_id: "L006", dest_name: "Langton Compound", dest_gate_name: "Main gate",
+    date_from: "2027-03-08", date_to: "2027-03-12", time_band: "day", movements: 3, return_abnormal: false, width_m: 4.6, height_m: 3.9, length_m: 16.5,
+    gross_t: 40, max_axle_t: 9, axle_count: 6, vehicle_type: "low_loader", vehicle_word: "Low-loader", indivisible: true, escort_planned: "none",
+    advice: adv, flags: adv.flags, public: status !== "pending", ...(extra || {}) });
+  const pageFor = (acc) => {
+    const all = [mv("AL001", "Modular office units (4.6 m wide)", "IPT2", "Central Team", "approved", unitsAdv),
+                 mv("AL002", "32 m precast bridge beams, Melton junction", "IPT1", "North Team", "pending", beamAdv,
+                    { date_from: "2027-04-12", date_to: "2027-04-14", time_band: "night", movements: 9, width_m: 2.8, height_m: 4.2, length_m: 36, gross_t: 78, max_axle_t: 11, axle_count: 8, vehicle_word: "Modular trailer" })];
+    const mine = acc.ipt ? all.filter(m => m.ipt === acc.ipt) : all;
+    const by = {}; mine.forEach(m => { by[m.status] = (by[m.status] || 0) + 1; });
+    return { movements: mine, count: mine.length, by_status: by, flagged: mine.filter(m => m.flags.length).length,
+      settings: { holidays: { source: "seed", words: "GOV.UK bank holidays (Open Government Licence), the copy shipped with Wayscope (fetched 22 Oct 2026); dates to 2028-12-26", count: { "england-and-wales": 83, scotland: 94, "northern-ireland": 103 } }, time_bans: [], nation: "england-and-wales" },
+      words: { advice: beamAdv.advice_words, not_modelled: "Not worked out here: bridges and structures and their ratings.", counted_apart: "Abnormal loads are counted on their own: never in the lorry counts, the CLP caps, the gate capacity or the carbon totals (D70, D71)." },
+      choices: { statuses: [], vehicle_types: [{ key: "low_loader", word: "Low-loader" }, { key: "modular_trailer", word: "Modular trailer" }], escorts: ["none", "attendant", "private", "police"], time_bands: ["day", "night"],
+        locations: [{ id: "L004", name: "Harborough Rail Freight Terminal" }, { id: "L006", name: "Langton Compound" }],
+        gates: [{ id: "G009", location_id: "L006", name: "Main gate", active: true }],
+        transitions: { pending: ["approved", "withdrawn"], approved: ["notified", "moved", "withdrawn", "pending"], notified: ["moved", "withdrawn", "approved"], moved: ["notified"], withdrawn: ["pending"] },
+        planner_only: ["approved", "pending"] }, today: "2027-03-04" };
+  };
+  const calls = [];
+  let acc = plannerAcc;
+  w.fetch = (url, opt) => {
+    const method = (opt && opt.method) || "GET"; calls.push({ url, method, body: opt && opt.body ? JSON.parse(opt.body) : null });
+    if (url === "/api/abnormal" && method === "GET") return reply(200, pageFor(acc));
+    if (url.startsWith("/api/abnormal/rules?")) return reply(200, unitsAdv);
+    if (url === "/api/abnormal" && method === "POST") return reply(200, { ok: true, movement: { name: "Test load", status: "pending" } });
+    if (/^\/api\/abnormal\/AL00\d\/status$/.test(url)) return reply(200, { ok: true, movement: { status: "approved", status_word: "Approved" } });
+    return reply(404, { detail: "no" });
+  };
+  const mount = async (role) => { acc = role; const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    await act(async () => { r.render(w.React.createElement(w.AbnormalPage, { meta, access: role, who: "Tester" })); }); await settle(20);
+    return { el, done: async () => { await act(async () => { r.unmount(); }); el.remove(); } }; };
+  const TEAM_N = { role: "ipt", label: "North Team", ipt: "IPT1", can_approve: false, ipt_locked: true, ipt_required: false, demo: false, ipts: ["IPT1", "IPT2"] };
+  const btns = (el) => [...el.querySelectorAll("button")].map(b => b.textContent.trim());
+  const rowOf = (el, id) => el.querySelector(`[data-al-row="${id}"]`);
+
+  const p = await mount(plannerAcc);
+  ok("⭐ AL DOM: ONE read of /api/abnormal mounts the page: the header, the four tiles (2 planned, 1 approved or later, 1 notice due or late, 1 to apply for), the holidays' words",
+     calls.filter(c => c.url === "/api/abnormal").length === 1 && p.el.querySelector("h2").textContent === "Abnormal loads"
+     && [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|") === "2|1|1|1"
+     && p.el.querySelector(".al-holidays").textContent.includes("the copy shipped with Wayscope (fetched 22 Oct 2026)"), [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|"));
+  ok("⭐ AL DOM: a row a movement with the team's NAME, the class chip from the server's advice, the notify-by date and the flag with its tone, the apply-by line",
+     !!rowOf(p.el, "AL001") && rowOf(p.el, "AL001").textContent.includes("Central Team") && rowOf(p.el, "AL001").querySelector(".al-chip.al-stgo").textContent === "STGO Cat 1"
+     && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-chip.al-bad").textContent === "NOTICE LATE"
+     && rowOf(p.el, "AL002").querySelector(".al-chip.al-so").textContent === "Special Order" && rowOf(p.el, "AL002").textContent.includes("apply by 1 Feb 2027")
+     && rowOf(p.el, "AL002").querySelector(".al-chip.al-bad").textContent === "SO LEAD TIME" && !/IPT[12]/.test(p.el.textContent));
+  ok("AL DOM: the window reads as one span (8–12 Mar 2027, day, 3 movements) and the size line as the figures typed",
+     rowOf(p.el, "AL001").textContent.includes("8–12 Mar 2027") && rowOf(p.el, "AL001").textContent.includes("day · 3 movements")
+     && rowOf(p.el, "AL001").textContent.includes("Low-loader · 4.6 × 3.9 × 16.5 m · 40 t · 6 axles · 9 t axle"));
+  ok("⭐ AL DOM: a planner's actions follow the server's transitions: Approve and Withdraw on a pending movement, Mark notified / Mark moved / Withdraw / Reopen on an approved one, Delete on both",
+     [...rowOf(p.el, "AL002").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Approve|Withdraw|Delete"
+     && [...rowOf(p.el, "AL001").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Mark notified|Mark moved|Withdraw|Reopen|Delete");
+  await act(async () => { rowOf(p.el, "AL002").querySelector("button.al-tri").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  const det = p.el.querySelector('[data-al-details="AL002"]');
+  ok("⭐ AL DOM: the chevron opens the row: the server's advice lines word for word, the category words, the typed figures, the references, the advice footer",
+     !!det && rowOf(p.el, "AL002").querySelector("button.al-tri").getAttribute("aria-expanded") === "true"
+     && det.textContent.includes("Special Order needed: length 36 m is over 30 m.") && det.textContent.includes("Special Order (outside the STGO categories)")
+     && det.textContent.includes("78 t") && det.textContent.includes("(spacings not typed)") && det.textContent.includes("(not applied for)")
+     && det.textContent.includes("Check with the haulier"));
+  await act(async () => { byText(p.el, "button", "Approve").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await settle(20);
+  ok("AL DOM: Approve posts the status and reads the page again; the note says so",
+     calls.some(c => c.url === "/api/abnormal/AL002/status" && c.method === "POST" && c.body.status === "approved")
+     && calls.filter(c => c.url === "/api/abnormal" && c.method === "GET").length === 2 && p.el.querySelector('[role="status"]').textContent.includes("approved"));
+  await act(async () => { byText(p.el, "button", "Plan an abnormal load").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  const form = () => p.el.querySelector("[data-al-form]");
+  ok("AL DOM: the form opens with the three columns and the empty advice panel asking for the four figures",
+     !!form() && form().querySelectorAll(".al-h4").length >= 3 && form().textContent.includes("Type the width, height, length and gross weight to see what the rules say.")
+     && !form().querySelector('select[aria-label="Team"]').disabled);
+  const inp = (label) => form().querySelector(`input[aria-label="${label}"]`);
+  const before = calls.filter(c => c.url.startsWith("/api/abnormal/rules?")).length;
+  await setVal(inp("Overall width *"), "4.6"); await setVal(inp("Travelling height *"), "3.9"); await setVal(inp("Overall length *"), "16.5");
+  await settle(50);
+  const midway = calls.filter(c => c.url.startsWith("/api/abnormal/rules?")).length;
+  await setVal(inp("Gross weight *"), "40");
+  await settle(450);
+  const previews = calls.filter(c => c.url.startsWith("/api/abnormal/rules?"));
+  ok("⭐ AL DOM: no preview until the fourth required figure, then ONE read after the pause, and the panel shows the server's summary and lines",
+     before === 0 && midway === 0 && previews.length === 1 && previews[0].url.includes("width_m=4.6") && previews[0].url.includes("gross_t=40")
+     && form().querySelector("[data-al-advice]").textContent.includes("STGO Cat 1") && form().querySelector("[data-al-advice]").textContent.includes("receive by 2027-03-03"),
+     `${before} ${midway} ${previews.length} ${previews[0] && previews[0].url}`);
+  await setVal(inp("What it is"), "Test load"); await setVal(inp("Earliest *"), "2027-03-08");
+  await act(async () => { const s = form().querySelector('select[aria-label="Team"]'); s.value = "IPT1"; s.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  await act(async () => { byText(p.el, "button", "Save as pending").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await settle(20);
+  const posted = calls.find(c => c.url === "/api/abnormal" && c.method === "POST");
+  ok("⭐ AL DOM: Save posts the typed fields as numbers and dates, blanks as null, the team the planner chose; the form closes and the page is read again",
+     !!posted && posted.body.name === "Test load" && posted.body.width_m === "4.6" && posted.body.gross_t === "40" && posted.body.date_from === "2027-03-08"
+     && posted.body.ipt === "IPT1" && posted.body.rigid_length_m === null && posted.body.indivisible === false && !form(), JSON.stringify(posted && posted.body).slice(0, 200));
+  await act(async () => { byText(p.el, "button", "Settings · bank holidays and time bans").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  const set = () => p.el.querySelector("[data-al-settings]");
+  ok("AL DOM: a planner's settings card: the holidays' words and the Fetch button, an empty time-ban table with Add and Save, England and Wales named",
+     !!set() && set().textContent.includes("England and Wales 83 days, Scotland 94, Northern Ireland 103") && !!byText(set(), "button", "Fetch now from gov.uk")
+     && set().textContent.includes("None typed.") && !!byText(set(), "button", "+ Add a force") && set().textContent.includes("England and Wales (Config"));
+  await p.done();
+
+  const t = await mount(TEAM_N);
+  ok("⭐ AL DOM: a team login sees its own movement only, no Approve or Reopen (the planner's), Delete only while pending; its Settings card has no Fetch and no Add",
+     !!rowOf(t.el, "AL002") && !rowOf(t.el, "AL001")
+     && [...rowOf(t.el, "AL002").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Withdraw|Delete"
+     && !btns(t.el).includes("Fetch now from gov.uk"));
+  await act(async () => { byText(t.el, "button", "Plan an abnormal load").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  ok("AL DOM: a team login's form has the team locked to its own", t.el.querySelector('select[aria-label="Team"]').disabled && t.el.querySelector('select[aria-label="Team"]').value === "IPT1");
+  await t.done();
+  w.fetch = () => new Promise(() => {});
+}
+
 async function phoneDayFlagsDom(){
   const LA = FIX("lookahead_page.json");
   w.fetch = () => new Promise(() => {});
@@ -2101,6 +2228,8 @@ async function routesDriversDom(){
   catch (e) { ok("PHONE: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await phoneDayFlagsDom(); ok("PHONE DAY FLAGS: the section ran to the end", true); }
   catch (e) { ok("PHONE DAY FLAGS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  try { await abnormalDom(); ok("AL DOM: the section ran to the end", true); }
+  catch (e) { ok("AL DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

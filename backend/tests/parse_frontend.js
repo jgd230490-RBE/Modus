@@ -1445,6 +1445,58 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && src.includes('<RdItem t={`Lorry-${DU()}`}>{r.baked ? grp(dist(r.km))') && src.includes('["km", `Lorry-${DU()}`]') && />HGV params<\/th>/.test(src));
 }
 
+// ---- 22 Oct 2026: the Abnormal loads page (S16 / B5) -------------------------------
+// One read of /abnormal (the movements with the rules' advice on them), the rules preview as the figures are typed,
+// the writes through the movement calls; every rule stays on the server. A team code plans its own team's; a planner
+// approves. Desk only. Every word advice; lorry never truck; counted apart from the lorries.
+{
+  const a0 = src.indexOf("// ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)");
+  const a1 = src.indexOf("// ================================================================= Public map\n");
+  const alSrc = a0 > 0 && a1 > a0 ? src.slice(a0, a1) : "";
+  const al = alSrc.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
+  ok("⭐ AL: the page exists as one section before the Public map, with its component and its helpers", alSrc.length > 8000
+     && /function AbnormalPage\(\{ meta, access, who \}\)/.test(al) && /function AlAdvice\(/.test(al) && /function alClass\(adv\)/.test(al));
+  ok("⭐ AL: a Plan-group rail item after the Carbon planner, its own line icon, and the page switch on a desk only (a phone gets the desk-only card)",
+     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
+     && code.includes('{page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}')
+     && !/PHONE_PAGES = \[[^\]]*abnormal/.test(code));
+  ok("🔴 AL: ONE read of the page (/abnormal), the preview from /abnormal/rules, and the writes: plan (POST), change (PUT), status, delete, the holidays fetch, the time bans",
+     (al.match(/call\("\/abnormal"\)/g) || []).length === 1 && al.includes("call(`/abnormal/rules?${q.toString()}`)")
+     && al.includes('await call("/abnormal", "POST", body)') && al.includes('await call(`/abnormal/${encodeURIComponent(form.id)}`, "PUT", body)')
+     && al.includes('call(`/abnormal/${encodeURIComponent(m.id)}/status`, "POST", { status: s })') && al.includes('call(`/abnormal/${encodeURIComponent(m.id)}`, "DELETE")')
+     && al.includes('call("/abnormal/bank-holidays/refresh", "POST")') && al.includes('call("/abnormal/time-bans", "PUT", { time_bans: bans })'));
+  ok("🔴 AL: no rule is worked out in the browser — the advice panel prints the server's summary, lines, notes and words, nothing else",
+     al.includes("{(adv.lines || []).map((l, i) => <li key={i}>{l}</li>)}") && al.includes("{adv.notes.map((n, i) => <li key={i}>{n}</li>)}")
+     && al.includes("{adv.advice_words}") && !/\b(44|2\.9|18\.65|3\.05|6\.1|150)\b/.test(al.replace(/"[^"]*11\.5 t, not 10 t[^"]*"/, "")));
+  ok("⭐ AL: a team login is locked to its team (the select disabled, the team left out of the body); approving, reopening and deleting an approved movement are a planner's",
+     al.includes("const teamLocked = !!(access && access.ipt);") && al.includes("disabled={teamLocked}") && al.includes("if(teamLocked) delete body.ipt;")
+     && al.includes("const canApprove = !!(access && access.can_approve);")
+     && al.includes("(transitions[m.status] || []).filter(s => canApprove || !plannerOnly.has(s))")
+     && al.includes('const canDelete = (m) => canApprove || ["pending", "withdrawn"].includes(m.status);'));
+  ok("⭐ AL: the preview waits for the four required figures and a pause after the last keystroke (one read, not one a keystroke)",
+     al.includes('if(!q.has("width_m") || !q.has("height_m") || !q.has("length_m") || !q.has("gross_t")){ setPreview(null); return; }')
+     && al.includes("const t = setTimeout(() => { call(`/abnormal/rules?${q.toString()}`).then(setPreview).catch(() => {}); }, 350);"));
+  const alStrings = (al.match(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g) || []).concat(al.match(/>[^<>{}]+</g) || []);
+  const alBanned = (x) => /\b(compliant|secure|NH-approved|real-time|predict\w*|optimi[sz]\w*|trucks?|approved by)\b/i.test(x) || /\bAI\b/.test(x);
+  ok("🔴 AL: none of the banned words in anything a person reads: compliant, approved by, secure, real-time, AI, predict, optimise, truck",
+     alStrings.length > 80 && !alStrings.some(alBanned), alStrings.filter(alBanned).join(" | "));
+  ok("AL: the page's words — check with the haulier, counted apart, the flags' words and tones (NOTICE DUE amber, NOTICE LATE and SO LEAD TIME red), the status words",
+     al.includes("check with the haulier; ESDAL, the police and the road and bridge authorities decide. Counted apart from the lorries, the CLP caps, the gate capacity and the carbon totals.")
+     && al.includes('const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME" };')
+     && al.includes('const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad" };')
+     && al.includes('const AL_NEXT_WORD = { approved: "Approve", pending: "Reopen", notified: "Mark notified", moved: "Mark moved", withdrawn: "Withdraw" };'));
+  ok("AL: the guide has three steps for the page (the header, the Plan button, the list), each anchored to a mark the page carries",
+     /\n  abnormal: \[\n    \{ anchor: "page-header", title: "Each abnormal load on its own\."/.test(code)
+     && /\{ anchor: "al-plan", title: "Plan one\."/.test(code) && /\{ anchor: "al-list", title: "The list\."/.test(code)
+     && al.includes('data-guide="al-plan"') && al.includes('data-guide="al-list"'));
+  ok("AL: the styles are in the page's own block (chips with a dark-look pair, the three-column form, the details grid, the 24 px chevron)",
+     html.includes(".al-chip{display:inline-block;font-size:12px;font-weight:600;") && html.includes('html[data-theme="dark"] .al-so{')
+     && html.includes(".al-form{display:grid;grid-template-columns:1fr 1fr 1.2fr;") && html.includes("@media (max-width:1100px){.al-form,.al-set,.al-det{grid-template-columns:1fr;}}")
+     && html.includes("min-width:24px;min-height:24px;") && !al.includes('{isOpen ? "▼" : "▶"}'));
+  ok("AL: the team's NAME on every row and in the form (teamName / the meta's labels), never a slot id as text",
+     al.includes("{m.team_name || \"—\"}") && al.includes("{t.label || teamName(t.id)}") && !/\bIPT[1-6]\b/.test(al));
+}
+
 // ---- 10 Oct 2026: the Carbon planner page (phase 3) ------------------------------
 // One read (POST /api/carbon/scenario), no carbon arithmetic in the browser, distances in the
 // tenant's unit, every factor's source / year / status on hover, the Planned panel and the
@@ -1454,8 +1506,12 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const s1 = src.indexOf("// ================================================================= Look-ahead v2 (2026-09-09)");
   const cbSrc = s0 > 0 && s1 > s0 ? src.slice(s0, s1) : "";
   const cb = cbSrc.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+  // NARROWED 22 Oct 2026 (abnormal loads, S16 / B5): "Abnormal loads" follows it in the Plan group, so the Carbon planner is
+  // after Forecasts but no longer the group's last item
   ok("⭐ the Carbon planner is a Plan-group page after Forecasts (not admin-gated: a team code sees its own lines)",
-     /\{ id: "forecasts", label: "Forecasts", glyph: "☰" \},\n    \{ id: "carbon", label: "Carbon planner", glyph: "◐" \},\n  \]\},/.test(code)
+     /\{ id: "forecasts", label: "Forecasts", glyph: "☰" \},\n    \{ id: "carbon", label: "Carbon planner", glyph: "◐" \},\n/.test(code)
+     && code.indexOf('{ id: "carbon", label: "Carbon planner"') < code.indexOf('{ id: "abnormal", label: "Abnormal loads"')
+     && code.indexOf('{ id: "abnormal", label: "Abnormal loads"') < code.indexOf('{ group: "Track"')
      && !/group: "Plan", admin/.test(code));
   // NARROWED 11 Oct 2026 (the process layout: the page switch also hands the Carbon page the typed sign-in name, the "set by" of a target)
   // NARROWED 14 Oct 2026 (D9): on a desktop only (on a phone the Carbon planner is the desk-only card)
