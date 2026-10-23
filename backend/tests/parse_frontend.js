@@ -3551,7 +3551,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
      _regions.length === 3 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
-  ok("#15: the Locations rows are still mouse-only (open question 16 — pinned as found, not fixed here)",
+  // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
+  // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
+  // <tr> itself is not a tab stop.
+  ok("#15 → decision 16: the Locations row click stays for a mouse and the <tr> is not a tab stop (the keyboard path is the name button)",
      src.includes('<tr key={l.id} onClick={() => locateNode(l.id)}\n') && !/<tr key=\{l\.id\} onClick=\{\(\) => locateNode\(l\.id\)\}[^\n]*tabIndex/.test(src));
   ok("🔴 #15: the Carbon planner's two step-5 reference tables wrap their cells (tbl-wrap; the figures stay on one line), so the Reference column no longer scrolls off",
      html.includes(".tbl.tbl-wrap td{white-space:normal;} .tbl.tbl-wrap td.num{white-space:nowrap;}")
@@ -4025,6 +4028,40 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      _ab.includes("if(!r.ok) throw errOf(r.status, j);") && _ab.includes("if(!r.ok) throw await errFrom(r);"));
   ok("🔴 ERROR WORDS (abnormal loads): what the page shows goes through errMsg (load and act), never a bare e.message",
      _ab.includes(".catch(e => { setErr(errMsg(e)); });") && _ab.includes("setNote({ ok: false, text: errMsg(e) })") && !/r\.status\}|text: e\.message|setErr\(e\.message\)/.test(_ab));
+}
+
+// 23 Oct 2026 (UI fix 9, decision 16 + audit #38): a Data table row opens from the keyboard through a real button on its name
+// (Locations, Zones) or its code (Routes); the row click stays for a mouse; the editor's heading takes the focus. dom_frontend
+// presses the buttons; these pin the source.
+{
+  const i = src.indexOf("function DataManagement("), dm = i < 0 ? "" : src.slice(i, src.indexOf("\nfunction ", i + 10));
+  ok("⭐ UI FIX 9: the CSS has .row-open (looks like the text: inherit font and colour, no border or background, 24 px tall) with a 2 px var(--navy) focus ring",
+     /\.row-open\{font:inherit;color:inherit;background:none;border:0;[^}]*min-height:24px;/.test(html)
+     && html.includes(".row-open:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}"));
+  ok("UI FIX 9: the editor heading's ring shows for the keyboard only (.ed-head:focus none, :focus-visible the navy ring)",
+     html.includes(".ed-head:focus{outline:none;}") && html.includes(".ed-head:focus-visible{outline:2px solid var(--navy);"));
+  ok("⭐ UI FIX 9 LOCATIONS: the name is a <button type=button className=row-open data-loc-open> named `Edit ${l.name}`, opening through openLocFromKeys",
+     dm.includes('<button type="button" className="row-open" data-loc-open={l.id} aria-label={`Edit ${l.name}`}')
+     && dm.includes("onClick={(e) => { e.stopPropagation(); openLocFromKeys(l.id); }}>{l.name}</button>"));
+  ok("⭐ UI FIX 9 ZONES: the zone's name is a button named `Edit ${z.name}`, opening through openZoneFromKeys (the row offered only Delete)",
+     dm.includes('<button type="button" className="row-open" data-zone-open={z.id} aria-label={`Edit ${z.name}`}')
+     && dm.includes("onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>"));
+  ok("⭐ UI FIX 9 ROUTES: the route's code is a button named `Show ${r.id} on the map` that picks it (selectRoute), so Route sheet / Collision evidence work from the keyboard",
+     dm.includes('<button type="button" className="row-open" data-route-open={r.id} aria-label={`Show ${r.id} on the map`}')
+     && dm.includes("onClick={(e) => { e.stopPropagation(); selectRoute(r.id); }}>{r.id}</button>"));
+  ok("UI FIX 9: the three row clicks are kept for a mouse (locateNode, selectRoute, editZone on the <tr>)",
+     dm.includes("<tr key={l.id} onClick={() => locateNode(l.id)}") && dm.includes("<tr onClick={() => selectRoute(r.id)}") && dm.includes("<tr key={z.id} onClick={() => editZone(z)}"));
+  ok("UI FIX 9: the open row's button says so (aria-current) in all three tables",
+     dm.includes('aria-current={(form && form.id === l.id) ? "true" : undefined}') && dm.includes('aria-current={selected === r.id ? "true" : undefined}')
+     && dm.includes('aria-current={zoneSel === z.id ? "true" : undefined}'));
+  ok("UI FIX 9: both editor headings take the focus (ref + tabIndex -1 + ed-head); the zones panel's only while a zone is open",
+     dm.includes('<div ref={locHeadRef} tabIndex={-1} className="ed-head ') && dm.includes('<div ref={zoneHeadRef} tabIndex={zoneForm ? -1 : undefined} className="ed-head '));
+  ok("UI FIX 9: the focus goes back when an editor closes: to the name it was opened from, else the table (Locations) or the first zone",
+     dm.includes("const el = document.querySelector(back.sel) || (back.fallback && document.querySelector(back.fallback));")
+     && dm.includes(`fallback: '[aria-label="Locations table"]'`) && dm.includes('fallback: "[data-zone-open]"'));
+  ok("UI FIX 9: no <tr> in the Data tables is a tab stop", !/<tr[^>]*tabIndex/.test(dm));
+  ok("⭐ UI FIX 9 card 4 (#38): + Add gate is var(--navy) text (was var(--blue), 3.67:1); no text-[color:var(--blue)] left in the Data pages",
+     /text-\[color:var\(--navy\)\] hover:underline">[^\n]*\n\s*\+ Add gate/.test(dm) && !dm.includes("text-[color:var(--blue)]"));
 }
 
 // ---- report ------------------------------------------------------------------
