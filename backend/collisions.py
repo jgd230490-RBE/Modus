@@ -22,7 +22,10 @@ the next.
 THE STRIP (R2)
 --------------
 The community layer's: 250 m each side of every stored road route (both legs, every vehicle) and 500 m round every
-site. Stored alternatives (alt_index 1-2) are in it too, so a route's alternatives can be set side by side. Every kept
+site. Stored alternatives (alt_index 1-2) are in it too, so a route's alternatives can be set side by side. Since
+23 Oct 2026 (the user: the strip should include the abnormal lines) each abnormal load's own drawn line is in it as
+well, under the load's id (both legs; a withdrawn load's is left out), so the load's road has its own evidence and
+the counts and the staff map take it in like a route (its key carries no '@', so it is never 'alternative'). Every kept
 collision carries its distance to each route it is near; "on the route" is within ON_ROUTE_M (25 m: the 2025 data
 flattens after 20 m, and 25 m allows for a dual carriageway).
 
@@ -210,7 +213,8 @@ def _coords(g):
 
 def index_from_db():
     """The tenant's RouteIndex: every stored road route (primary and alternatives, both legs, every vehicle; a line
-    drawn twice kept once per key) and every site with a position."""
+    drawn twice kept once per key), each abnormal load's drawn line under the load's id (23 Oct 2026; both legs; not a
+    withdrawn load's) and every site with a position."""
     import community
     tenant = db.current_tenant()
     lines, seen = [], set()
@@ -226,6 +230,22 @@ def index_from_db():
             continue
         seen.add(sig)
         lines.append((key, thin))
+    # 23 Oct 2026 (the user: "the strip should include the abnormal lines"): each load's own drawn line, both legs,
+    # under the load's id — community.strip_from_db's rule. A withdrawn load's line is left out; a load not drawn yet
+    # has no line. The key carries no "@", so its collisions count and draw like a route's (along == "route").
+    for r in db.query("SELECT id, geometry_json, return_geometry_json FROM abnormal_loads WHERE tenant_id = ? "
+                      "AND status != 'withdrawn' ORDER BY id", (tenant,)):
+        for col in ("geometry_json", "return_geometry_json"):
+            coords = _coords(r.get(col))
+            if len(coords) < 2:
+                continue
+            thin = community._thin(coords)
+            key = str(r["id"])
+            sig = (key, tuple((round(c[0], 3), round(c[1], 3)) for c in thin[:: max(1, len(thin) // 20)]))
+            if sig in seen:
+                continue
+            seen.add(sig)
+            lines.append((key, thin))
     sites = [(l["id"], l.get("name") or l["id"], float(l["lon"]), float(l["lat"])) for l in db.query(
         "SELECT id, name, lon, lat FROM locations WHERE tenant_id = ? AND lat IS NOT NULL AND lon IS NOT NULL", (tenant,))]
     return RouteIndex(lines, sites)
