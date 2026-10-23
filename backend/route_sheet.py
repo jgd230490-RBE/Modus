@@ -8,7 +8,8 @@ contractor to "distribute maps or other routing information to all operators acc
 communicate "routes and site rules to the operator" (§5.5a.v), the permitted deviations (§5.6d), the reasons for the
 route (§5.6f) and "route information upon egress from site" (§5.6g), and to define the "last mile" (§5.2b.iii).
 
-    the whole route        the loaded leg (solid) and the empty return (dashed) on a basemap, A = load point, B = site
+    the whole route        the loaded leg (green) and the empty return (amber), solid with a white edge, each left of its
+                           travel, a stretch on a haul road dotted and thinner, on a basemap, A = load point, B = site
     the last mile          the last ~1.5 km into the site and the first ~1.5 km out, with the community considerations
     arriving / leaving     the gate in, its open hours and closed days, the scheme's no-delivery windows; the gate out
     the typed words        why this route, the permitted diversions (routes), the site rules (locations) — C2 / C3
@@ -223,6 +224,8 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         team = r.get("ipt")
     notice = export._demo_notice() or None
     as_at = (now or datetime.date.today())
+    roads = _haul_roads()
+    last_in, last_out = within(loaded, LAST_MILE_M, from_end=True), within(ret, LAST_MILE_M)
     return {
         "route_id": route_id,
         "title": "Route sheet",
@@ -233,8 +236,10 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         "vehicle": used, "vehicle_text": vehicle_text, "baked_vehicles": baked,
         "loaded": loaded, "return": ret,
         "loaded_words": leg_words(legs.get("loaded")), "return_words": leg_words(legs.get("return")),
-        "last_mile_in": within(loaded, LAST_MILE_M, from_end=True),
-        "last_mile_out": within(ret, LAST_MILE_M),
+        "last_mile_in": last_in,
+        "last_mile_out": last_out,
+        "haul_loaded": haul_pieces(loaded, roads), "haul_return": haul_pieces(ret, roads),
+        "haul_last_in": haul_pieces(last_in, roads), "haul_last_out": haul_pieces(last_out, roads),
         "last_mile_m": LAST_MILE_M,
         "load_exit": load_exit, "load_entry": load_entry, "entry": entry, "exit": exit_site,
         "peak_words": gate_hours.peak_words(bands),
@@ -245,6 +250,60 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         "issued": f"{as_at:%d %b %Y}".lstrip("0"),
         "drawn": bool(loaded),
     }
+
+
+# 23 Oct 2026 (the route line redesign): a leg's stretch on a drawn haul road is drawn dotted and thinner, as on the public
+# map (withHaulPieces there, this here): every point of the leg within HAUL_NEAR_M of a haul road, each run of two or more
+# points one piece. The spliced points sit on the drawn road to the metre, so 9 m takes in a public-road point only where
+# it IS the road's end.
+HAUL_NEAR_M = 9.0
+
+
+def haul_pieces(coords, roads, near_m=HAUL_NEAR_M):
+    """The runs of `coords` ([(lon, lat), …]) on one of `roads` ([(lon, lat), …] each), as lists of (lon, lat)."""
+    import math as _m
+    if not coords or not roads:
+        return []
+    lat0 = coords[len(coords) // 2][1]
+    kx, ky = _m.cos(_m.radians(lat0)) * 111320.0, 110540.0
+    segs = []
+    for line in roads:
+        pts = [(p[0] * kx, p[1] * ky) for p in line]
+        segs += list(zip(pts, pts[1:]))
+    if not segs:
+        return []
+    n2 = near_m * near_m
+
+    def near(lon, lat):
+        x, y = lon * kx, lat * ky
+        for (ax, ay), (bx, by) in segs:
+            dx, dy = bx - ax, by - ay
+            l2 = dx * dx + dy * dy
+            t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / l2)) if l2 else 0.0
+            px, py = ax + t * dx - x, ay + t * dy - y
+            if px * px + py * py <= n2:
+                return True
+        return False
+    pieces, run = [], []
+    for q in coords:
+        if near(q[0], q[1]):
+            run.append((q[0], q[1]))
+        else:
+            if len(run) >= 2:
+                pieces.append(run)
+            run = []
+    if len(run) >= 2:
+        pieces.append(run)
+    return pieces
+
+
+def _haul_roads():
+    """The drawn haul roads in force, as lines."""
+    import zones
+    try:
+        return [ln for ln in (zones.as_line(z["geometry"]) for z in zones.haul_roads()) if ln]
+    except Exception:
+        return []
 
 
 def views(S):

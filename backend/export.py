@@ -449,13 +449,14 @@ def mapbox_static_png(routes, size="1200x600", timeout=12, token=None):
         overlays.append("path-3+1F2024-0.9(" + urllib.parse.quote(_encode_polyline(thin), safe="") + ")")
         overlays.append(f"pin-s-{chr(97 + (i % 26))}+1F2024({thin[0][0]:.5f},{thin[0][1]:.5f})")
         overlays.append(f"pin-s-{chr(97 + (i % 26))}+DC2626({thin[-1][0]:.5f},{thin[-1][1]:.5f})")
-    url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays)
-           + f"/auto/{size}@2x?padding=40&access_token=" + urllib.parse.quote(token))
+    # 23 Oct 2026 (the route line redesign): the lines go UNDER the road names (basemap.LABELS_LAYER), as on the map
+    import basemap
+    q = f"padding=40&before_layer={basemap.LABELS_LAYER}&access_token=" + urllib.parse.quote(token)
+    url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays) + f"/auto/{size}@2x?" + q)
     if len(url) > 8000:                       # the API's URL limit; drop pins, thin harder
         overlays = ["path-3+1F2024-0.9(" + urllib.parse.quote(_encode_polyline(_thin(c, 60)), safe="") + ")"
                     for (_, _, _, c) in routes]
-        url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays)
-               + f"/auto/{size}@2x?padding=40&access_token=" + urllib.parse.quote(token))
+        url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays) + f"/auto/{size}@2x?" + q)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Wayscope/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -2599,12 +2600,18 @@ def route_map_png(pdf_bytes, dpi=ROUTE_MAP_PNG_DPI):
 
 # =====================================================================================================================
 # 16 Oct 2026 (CLOCS v5 C3; notes/clocs-v5-gap-1016.md) — the ROUTE SHEET for drivers: one A4 portrait page per route
-# (route_sheet.py gathers it). Top to bottom: the heading; the whole route (loaded solid, empty return dashed, A = load
-# point, B = site); the last mile beside "Arriving" / "Leaving" / "Lorry limits"; then the typed words (why this route,
+# (route_sheet.py gathers it). Top to bottom: the heading; the whole route (the loaded leg green, the empty return amber,
+# both solid with a white edge and each left of its own travel, a stretch on a haul road dotted and thinner — the public
+# map's look since 23 Oct 2026; until then loaded blue and the return dashed slate; A = load point, B = site); the last
+# mile beside "Arriving" / "Leaving" / "Lorry limits"; then the typed words (why this route,
 # the permitted diversions, the site rules at B and A) in two columns; the footer. The body text steps down a size
 # until the page fits, so the longest typed words (network.SHEET_TEXT_MAX each) still make ONE page.
-RS_LOADED = "#2563EB"            # the staff Data map's route blue: the loaded leg
-RS_RETURN = "#475569"            # slate, dashed: the empty return
+RS_LOADED = "#059669"            # 23 Oct 2026 (the route line redesign): the public map's loaded green
+RS_RETURN = "#f59e0b"            # …and its empty amber, solid (it was slate, dashed)
+RS_CASING = "#ffffff"            # the white edge under each leg
+RS_W, RS_CASING_EXTRA = 2.8, 1.6  # pt: the leg and how much wider its edge is
+RS_HAUL_W, RS_HAUL_GAP = 1.7, 4.4 # pt: a haul-road stretch is dots (zero-length dashes, round caps), thinner, 4.4 pt apart
+RS_OFFSET = 1.8                  # pt: each leg sits this far left of its own travel, so a road used both ways shows both
 RS_IN, RS_OUT = "#15803D", "#B91C1C"      # the gate a lorry comes in by / leaves by (squares on the last mile)
 RS_BOTH = "#1F2024"              # one gate both ways (navy)
 RS_BODY_SIZES = (8.4, 7.8, 7.2)
@@ -2631,7 +2638,9 @@ def _rs_offset(pts, d):
     return out
 
 
-def _rs_line(c, P, coords, colour, width, dash=None, offset=0.0):
+def _rs_line(c, P, coords, colour, width, dots=False, offset=0.0, edge=None):
+    """A leg (solid, in its colour, a white edge under it) or, with `dots`, a haul-road stretch: thinner dots over a white
+    cut-out the leg's full width (so the leg in the picture beneath does not show through). `offset` points left of travel."""
     if len(coords) < 2:
         return
     pts = _rs_offset([P(*q) for q in coords], offset)
@@ -2641,14 +2650,31 @@ def _rs_line(c, P, coords, colour, width, dash=None, offset=0.0):
         p.lineTo(*q)
     c.saveState()
     c.setLineCap(1); c.setLineJoin(1)
-    if not dash:                 # a white edge under a solid line; none under dashes, which ride on the loaded line
-        c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(width + 1.6)
-        c.drawPath(p, stroke=1, fill=0)
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(width + (RS_CASING_EXTRA if edge is None else edge))
+    c.drawPath(p, stroke=1, fill=0)
     c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(width)
-    if dash:
-        c.setDash(*dash)
+    if dots:
+        c.setDash([0, RS_HAUL_GAP], 0)
     c.drawPath(p, stroke=1, fill=0)
     c.restoreState()
+
+
+def _rs_overlays(v, w, legs):
+    """The legs as Static Images path overlays — every leg's white edge first, then every leg's colour, each left of its
+    travel and simplified to the picture's pixels — or None when even the thinnest form would overflow the API's URL
+    (basemap.URL_MAX): then _rs_map draws them over the picture, as it did before 23 Oct 2026."""
+    import basemap
+    ppt = v["w"] / w                      # picture pixels per page point
+    for tol, with_edge in ((0.8, True), (0.8, False), (2.0, False)):
+        lines = [(basemap.offset_lonlat(v, basemap.simplify_px(v, coords, tol), offset * ppt), colour)
+                 for coords, colour, offset in legs if len(coords) >= 2]
+        if not lines:
+            return None
+        out = ([basemap.path_overlay(line, (RS_W + RS_CASING_EXTRA) * ppt, RS_CASING) for line, _ in lines] if with_edge else []) \
+            + [basemap.path_overlay(line, RS_W * ppt, colour) for line, colour in lines]
+        if len(basemap.url(v, "", overlays=out, before_layer=basemap.LABELS_LAYER)) <= basemap.URL_MAX:
+            return out
+    return None
 
 
 def _rs_pin(c, x, y, letter, rgb=NAVY_RGB, r=5.2):
@@ -2663,14 +2689,26 @@ def _rs_gate(c, x, y, colour):
     c.setFillColorRGB(*_hex_rgb(colour)); c.rect(x - 3.6, y - 3.6, 7.2, 7.2, stroke=1, fill=1)
 
 
-def _rs_map(c, S, v, x, y, w, h, coords_sets, *, pins=(), gates=(), community=None, empty_words=""):
-    """One map box at (x, y), w x h points: the basemap, the legs, the pins, the scale bar, the north arrow.
-    Returns True when a basemap was drawn."""
+def _rs_map(c, S, v, x, y, w, h, legs, *, pins=(), gates=(), community=None, empty_words="", haul=()):
+    """One map box at (x, y), w x h points: the basemap, the legs, the haul-road stretches, the pins, the scale bar, the
+    north arrow. 23 Oct 2026 (the route line redesign): the legs go INTO the basemap request as path overlays under the
+    road names (basemap.LABELS_LAYER) whenever the URL fits — the names print over the lines as on the public map; else
+    they are drawn here over the picture, as before. The haul-road stretches (`haul`: dots over a cut-out), the community
+    layer, the gates and the pins are always drawn here. Returns True when a basemap was drawn."""
     import basemap
     c.saveState()
     c.translate(x, y)
     clip = c.beginPath(); clip.rect(0, 0, w, h); c.clipPath(clip, stroke=0, fill=0)
-    png = basemap.fetch(v) if (v and not getattr(_SIZING, "on", False)) else None
+    sizing = getattr(_SIZING, "on", False)
+    overlays = _rs_overlays(v, w, legs) if (v and legs and not sizing) else None
+    png = None
+    if v and not sizing:
+        png = basemap.fetch(v, overlays=overlays, before_layer=basemap.LABELS_LAYER if overlays else None)
+        if png is None and overlays:          # the request with the legs was refused: the plain picture, the legs drawn over it
+            overlays = None
+            png = basemap.fetch(v)
+    in_picture = bool(png and overlays)
+    S["map_legs_in_basemap"] = in_picture
     if png:
         c.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=w, height=h)
     else:
@@ -2683,8 +2721,11 @@ def _rs_map(c, S, v, x, y, w, h, coords_sets, *, pins=(), gates=(), community=No
     if v:
         if community:
             _draw_community(c, {"community": community}, P, "under")
-        for coords, colour, dash in coords_sets:       # the return (dashed) 3 points to the side of the loaded line
-            _rs_line(c, P, coords, colour, 1.8 if dash else 2.8, dash, offset=3.2 if dash else 0.0)
+        if not in_picture:
+            for coords, colour, offset in legs:
+                _rs_line(c, P, coords, colour, RS_W, offset=offset)
+        for coords, colour, offset in haul:
+            _rs_line(c, P, coords, colour, RS_HAUL_W, dots=True, offset=offset, edge=RS_W + RS_CASING_EXTRA - RS_HAUL_W)
         if community:
             _draw_community(c, {"community": community}, P, "over")
     else:
@@ -2751,7 +2792,7 @@ def route_sheet_lines(S):
                 else "No-delivery windows: none typed for the scheme"]
     leaving = [f"Gate out: {x_['name'] or 'the site (no gate typed)'}"
                + (f" (shut {x_['shut']})" if x_.get("shut") and x_.get("at") != e.get("at") else ""),
-               "Then follow the dashed route back to A" + (f": {S['return_words']}." if S.get("return_words") else ".")]
+               "Then follow the amber route back to A" + (f": {S['return_words']}." if S.get("return_words") else ".")]
     if li.get("name"):
         # 17 Oct 2026 (review): A's gate in, with its hours or the default (said so), closed days and shut times
         hw = ("open " + li["hours"]) if li.get("hours") else (
@@ -2818,18 +2859,23 @@ def build_route_sheet_pdf(S):
         h1 = rs.MAP1_H_MM * mm
         if draw:
             S["basemap"] = _rs_map(c, S, S.get("view1"), m, y - h1, cw, h1,
-                                   [(S["loaded"], RS_LOADED, None), (S["return"], RS_RETURN, (4, 3))],
+                                   [(S["loaded"], RS_LOADED, RS_OFFSET), (S["return"], RS_RETURN, RS_OFFSET)],
+                                   haul=[(p, RS_LOADED, RS_OFFSET) for p in S.get("haul_loaded") or []]
+                                        + [(p, RS_RETURN, RS_OFFSET) for p in S.get("haul_return") or []],
                                    pins=((S["loaded"][0] if S["loaded"] else None, "A"),
                                          (S["loaded"][-1] if S["loaded"] else None, "B")),
                                    empty_words="No road route has been worked out for this route yet.")
         y -= h1 + 4
         if draw:                                   # the legend under it
             lx = m
-            for colour, dash, words in ((RS_LOADED, None, "Loaded, A to B" + (f": {S['loaded_words']}" if S.get("loaded_words") else "")),
-                                        (RS_RETURN, (4, 3), "Empty, back to A")):
-                c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(1.8 if dash else 2.8)
-                if dash:
-                    c.setDash(*dash)
+            swatches = [(RS_LOADED, False, "Loaded, A to B" + (f": {S['loaded_words']}" if S.get("loaded_words") else "")),
+                        (RS_RETURN, False, "Empty, back to A")]
+            if S.get("haul_loaded") or S.get("haul_return"):
+                swatches.append((RS_LOADED, True, "On a haul road"))
+            for colour, dots, words in swatches:
+                c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(RS_HAUL_W if dots else RS_W)
+                if dots:
+                    c.setDash([0, RS_HAUL_GAP], 0)
                 c.line(lx, y - 4, lx + 18, y - 4); c.restoreState()
                 t = _pdf_safe(words)
                 c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.8); c.drawString(lx + 22, y - 6.6, t)
@@ -2847,7 +2893,9 @@ def build_route_sheet_pdf(S):
         top2 = y - 14
         if draw:
             _rs_map(c, S, S.get("view2"), m, top2 - h2, w2, h2,
-                    [(S["last_mile_in"], RS_LOADED, None), (S["last_mile_out"], RS_RETURN, (4, 3))],
+                    [(S["last_mile_in"], RS_LOADED, RS_OFFSET), (S["last_mile_out"], RS_RETURN, RS_OFFSET)],
+                    haul=[(p, RS_LOADED, RS_OFFSET) for p in S.get("haul_last_in") or []]
+                         + [(p, RS_RETURN, RS_OFFSET) for p in S.get("haul_last_out") or []],
                     pins=((S["loaded"][-1] if S["loaded"] else None, "B"),),
                     gates=(((e.get("at"), RS_BOTH),) if S.get("same_gate") else ((e.get("at"), RS_IN), (x_.get("at"), RS_OUT)))
                           if S.get("drawn") else (),
@@ -2940,7 +2988,7 @@ CE_INK = "#27272A"               # the collision symbol: one ink, size by severi
 # 22 Oct 2026 (evidence v3, the user: "highlight where a hgv was involved"): a collision with a goods vehicle over 3.5 t
 # is drawn as a square in its own ink — an identifying colour, not a status colour (no red / amber / green)
 CE_LORRY = "#6D28D9"
-CE_ALT = "#71717A"               # an alternative route: dashed grey under the route
+CE_ALT = "#71717A"               # an alternative route: grey under the route (solid since 23 Oct 2026, as on the map)
 CE_RADIUS = {1: 4.4, 2: 3.2, 3: 2.2}
 CE_MAP_H_MM = 92.0
 
@@ -3383,10 +3431,10 @@ def build_collision_evidence_pdf(S):
         cyc_rgb = _hex_rgb(_cm.KIND_BY_KEY["cycle"]["colour"])
         for _n, cl_line in S.get("cycle_lines") or []:      # 22 Oct 2026 (v3): cycle routes, thin, under everything
             _rs_line(c, P, cl_line, _cm.KIND_BY_KEY["cycle"]["colour"], 1.1)
-        for _lab, al in S.get("alt_lines") or []:            # ...the alternatives, dashed grey
-            _rs_line(c, P, al, CE_ALT, 1.8, (5, 3))
+        for _lab, al in S.get("alt_lines") or []:            # ...the alternatives, grey (solid since 23 Oct 2026)
+            _rs_line(c, P, al, CE_ALT, 1.8)
         _rs_line(c, P, S["loaded"], RS_LOADED, 2.6)
-        _rs_line(c, P, S["return"], RS_RETURN, 1.6, (4, 3), offset=3.0)
+        _rs_line(c, P, S["return"], RS_RETURN, 2.2, offset=3.0)     # amber, solid, beside the loaded leg (was dashed slate)
         for sev in (3, 2, 1):            # slight first, so the KSI sit on top
             for r in drawn:
                 if r["severity"] == sev and not r["goods"]:
@@ -3467,7 +3515,7 @@ def build_collision_evidence_pdf(S):
                 else:
                     c.setFillColorRGB(0.975, 0.977, 0.98); c.rect(ix, iy, iw, ihm, stroke=0, fill=1)
                 _rs_line(c, Q, S["loaded"], RS_LOADED, 3.2)
-                _rs_line(c, Q, S["return"], RS_RETURN, 1.8, (4, 3), offset=3.6)
+                _rs_line(c, Q, S["return"], RS_RETURN, 2.6, offset=3.6)
                 for sev in (3, 2, 1):
                     for r in in_on:
                         if r["severity"] == sev:
@@ -3513,10 +3561,8 @@ def build_collision_evidence_pdf(S):
         _ce_dot(c, lx + 5, y - 4, sev)
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, word)
         lx += 12 + c.stringWidth(word, R, 7.6) + 12
-    for colour, dash, words in ((RS_LOADED, None, "Loaded, A to B"), (RS_RETURN, (4, 3), "Empty, back to A")):
-        c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(1.6 if dash else 2.6)
-        if dash:
-            c.setDash(*dash)
+    for colour, words in ((RS_LOADED, "Loaded, A to B"), (RS_RETURN, "Empty, back to A")):
+        c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(2.6)
         c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 20, y - 6.6, words)
         lx += 20 + c.stringWidth(words, R, 7.6) + 12
@@ -3526,7 +3572,7 @@ def build_collision_evidence_pdf(S):
     c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, "A goods vehicle over 3.5 t involved")
     lx += 12 + c.stringWidth("A goods vehicle over 3.5 t involved", R, 7.6) + 12
     if S.get("alt_lines"):
-        c.saveState(); c.setStrokeColorRGB(*_hex_rgb(CE_ALT)); c.setLineWidth(1.8); c.setDash(5, 3); c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
+        c.saveState(); c.setStrokeColorRGB(*_hex_rgb(CE_ALT)); c.setLineWidth(1.8); c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
         c.setFillColorRGB(*NAVY_RGB); c.drawString(lx + 20, y - 6.6, "Alternative route")
         lx += 20 + c.stringWidth("Alternative route", R, 7.6) + 12
     if S.get("cycle_lines"):
