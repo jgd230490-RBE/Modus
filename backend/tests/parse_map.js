@@ -6233,9 +6233,9 @@ function qrRead(mod) {
      && src.includes("if (ABN.on && !ABN.data) loadAbnormal();") && src.includes("fetch('/api/abnormal/geojson', { credentials: 'same-origin' })")
      && (src.match(/fetch\('\/api\/abnormal\/geojson'/g) || []).length === 1);
   // REVERSED 23 Oct 2026 (the user: not purple): ink on a white edge, solid; the pinch points hollow rings in the kind's colour
-  ok("⭐ ABN / 23 Oct: the line is INK, solid, on a white edge (its own style: not the blue routes, the green / amber legs or the red breach), the pinch points hollow rings coloured by kind; " +
+  ok("⭐ ABN / 23 Oct: the line is RASPBERRY (NARROWED 23 Oct 2026 afternoon; ink that morning), solid, on a white edge (its own style: not the blue routes, the green / amber legs or the red breach), the pinch points hollow rings coloured by kind; " +
      "the layers come back after a basemap change like the collision layers",
-     src.includes("const ABN_LINE = '#1F2024';") && src.includes("'line-width': ABN_WIDTH, 'line-opacity': 1 } }, labelAnchor());") && src.includes("'circle-color': '#ffffff', 'circle-stroke-width': 1.8,")
+     src.includes("const ABN_LINE = '#BE185D';") && src.includes("'line-width': ABN_WIDTH, 'line-opacity': 1 } }, labelAnchor());")   /* NARROWED 23 Oct 2026 (afternoon): raspberry, the user's pick from the mockup; ink that morning */ && src.includes("'circle-color': '#ffffff', 'circle-stroke-width': 1.8,")
      && src.includes("'circle-stroke-color': ['match', ['get', 'kind'], 'turn', ABN_DOT.turn, 'roundabout', ABN_DOT.roundabout, 'slip_road', ABN_DOT.slip_road,")
      && src.includes("const ABN_LAYERS = ['abnormal-casing', 'abnormal-lines', 'abnormal-points'];") && src.includes("map.addLayer({ id: 'abnormal-casing', type: 'line', source: 'abnormal-source', filter: abnormalLineFilter(),")
      && (src.match(/if \(typeof ABN !== 'undefined' && ABN\.data\) ensureAbnormalLayers\(\);/g) || []).length === 2);
@@ -6262,12 +6262,12 @@ function qrRead(mod) {
 // ---- 22 Oct 2026: the abnormal loads, phase 3 — the public map's approved layer (D68), the structures' dots ------------
 {
   const grp = html.slice(html.indexOf('<div class="control-group" id="abnormal-public-group">'), html.indexOf('<div class="control-group" id="restrictions-group" hidden>'));
-  ok("⭐ ABP: the public map's abnormal loads — an 'Abnormal loads (approved)' box for every visitor, a layer-* box (in a shared link as abnormal-public), off by default, with the indicative words; hidden for staff, whose own group shows everything",
-     grp.length > 200 && grp.includes('<input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)"> Abnormal loads (approved)')
-     && !grp.includes(" checked") && grp.includes('id="abnormal-public-when"') && grp.includes("Indicative: the agreed route may differ.")
+  ok("⭐ ABP: the public map's abnormal loads — an 'Abnormal loads (approved)' box for every visitor, a layer-* box (in a shared link as abnormal-public), ON by default (NARROWED 23 Oct 2026: the user wants the loads in the animation), with the indicative words; hidden for staff, whose own group shows everything",
+     grp.length > 200 && grp.includes('<input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)" checked> Abnormal loads (approved)')
+     && grp.includes('id="abnormal-public-when"') && grp.includes("Indicative: the agreed route may differ.")
      && src.includes("const pg = document.getElementById('abnormal-public-group');") && src.includes("if (pg) pg.hidden = ABN.staff;"));
-  ok("🔴 ABP: read ONCE from /api/public/abnormal when ticked (behind the map password), drawn as the same ink line on its own layers (a white edge under it; REVERSED 23 Oct 2026), back after a basemap change like the staff layers; the popup prints the window, the movements, 'escorted', the roads and the indicative words — never the size, the team, the references or a dot",
-     (src.match(/fetch\('\/api\/public\/abnormal'/g) || []).length === 1 && src.includes("const ABP = { on: false, data: null, loading: false };")
+  ok("🔴 ABP: read ONCE from /api/public/abnormal at page load (NARROWED 23 Oct 2026: on by default; behind the map password), drawn as the same raspberry line on its own layers (a white edge under it; REVERSED 23 Oct 2026), back after a basemap change like the staff layers; the popup prints the window, the movements, 'escorted', the roads and the indicative words — never the size, the team, the references or a dot",
+     (src.match(/fetch\('\/api\/public\/abnormal'/g) || []).length === 1 && src.includes("const ABP = { on: true, data: null, loading: false, month: null, active: [], len: {} };")
      && src.includes("map.addLayer({ id: 'abnormal-public-lines', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],")
      && src.includes("paint: { 'line-color': ABN_LINE, 'line-width': ABN_WIDTH, 'line-opacity': 1 } }, labelAnchor());\n        map.on('click', 'abnormal-public-lines', e => abnormalPublicPopup(e));")
      && src.includes("map.addLayer({ id: 'abnormal-public-casing', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],")
@@ -6276,7 +6276,7 @@ function qrRead(mod) {
                  return pop.includes("p.public_words || 'Indicative route; the agreed route may differ.'") && pop.includes("abnWhen(p.date_from, p.date_to, p.time_band)")
                      && !pop.includes("p.size") && !pop.includes("p.team_name") && !pop.includes("p.name") && !pop.includes("p.candidates") && !pop.includes("esdal"); })());
   ok("ABP: the panel line counts the approved loads drawn and lists their windows; nothing drawn says so; the words never promise the route",
-     src.includes("when.textContent = n ? `${n} approved: ${lines.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`")
+     src.includes("when.textContent = n ? `${n} ${ids ? 'this month' : 'approved'}: ${shown.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`")   /* NARROWED 23 Oct 2026: by the month on screen */
      && src.includes("'No approved abnormal load has a line drawn yet.'"));
   ok("ABN (phase 3): the structure kinds have their own dot colours in the community layer's palette (bridge, railway, level crossing, calming, overhead line), in the match and the legend; a dot found in OpenStreetMap says so in its popup",
      src.includes("bridge: '#1F2024', railway: '#475569', level_crossing: '#DB2777', calming: '#A16207', overhead: '#0891B2' };")   // NARROWED 23 Oct 2026: the railway slate, the slip road sea-blue, no indigo or violet
@@ -6352,9 +6352,48 @@ function qrRead(mod) {
   ok("⭐ 23 Oct: the abnormal loads — ink on a white edge, solid, under the labels, for staff and for the public layer alike; rings, not dots",
      (code.match(/'line-color': '#ffffff', 'line-width': ABN_CASING_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
      && (code.match(/'line-color': ABN_LINE, 'line-width': ABN_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
-     && (src.match(/an ink line each/g) || []).length >= 2 && src.includes("'The ink line: the load’s own line. Rings: '") && src.includes("background:#fff;border:2px solid ${ABN_DOT[k]}"));
+     && (src.match(/an ink line each/g) || []).length === 0 && !html.includes("an ink line each") && (src.match(/each as its route in the month it moves/g) || []).length >= 1 && html.includes("each as its route in the month it moves") && src.includes("'The raspberry line: the load’s own line. Rings: '")   /* NARROWED 23 Oct 2026 afternoon: raspberry */ && src.includes("background:#fff;border:2px solid ${ABN_DOT[k]}"));
   ok("23 Oct: the words follow — no 'violet dash', no 'Closer dashes' left in the page; the flow legend says wider lane",
      !/violet dash/i.test(code) && !/Closer dashes/.test(code) && /Wider lane = more/.test(code) && !/Violet dashes:/.test(code));   // code, not src: a comment may say what was
+}
+
+// ---- 23 Oct 2026 (afternoon): the abnormal loads on the public map's figures bar and in the animation — the user's five answers
+//      to notes/abnormal-public-mockup-1023 (raspberry; none in the other months; a load counts 1; the dot kept; beside Routes, the value coloured)
+{
+  const card = html.slice(html.indexOf('<div class="kpi-card" id="kpi-abnormal-card">'), html.indexOf('<div class="kpi-sep"></div>'));
+  ok("⭐ 23 Oct: the bar's card beside Routes — 'Abnormal loads this month', a count (never 'a day'), '—' until a month is on screen; the value raspberry when there is one and muted when none",
+     card.length > 50 && card.includes('<div class="kpi-value" id="kpi-abnormal">—</div>') && card.includes('id="kpi-abnormal-label"') && card.includes('>Abnormal loads this month</div>')
+     && html.indexOf('id="kpi-abnormal-card"') > html.indexOf('id="kpi-routes-label"') && html.indexOf('id="kpi-abnormal-card"') < html.indexOf('<div class="kpi-sep"></div>')
+     && html.includes("#kpi-abnormal.abn-on{ color:#BE185D; } #kpi-abnormal.abn-zero{ color:var(--muted); font-weight:400; }")
+     && src.includes("el.textContent = String(ids.size); el.classList.add(ids.size ? 'abn-on' : 'abn-zero');") && src.includes("if (!payloads) { el.textContent = '\\u2014'; return; }"));
+  ok("23 Oct: each load counted ONCE across the months on screen (a Set of the month figures' abnormal_loads ids), set in the month branch and the empty-month branch, cleared with no month or while loading",
+     src.includes("payloads.forEach(p => ((p && p.abnormal_loads) || []).forEach(id => ids.add(id)));")
+     && (src.match(/setAbnormalKpi\(payloads\);/g) || []).length === 2 && (src.match(/setAbnormalKpi\(null\);/g) || []).length === 2);
+  ok("⭐ 23 Oct: with a month on screen only the loads whose window touches it are drawn (the features' own date_from / date_to), a ring at each line's end; with no month, every approved load; the hook runs with the filters",
+     src.includes("function abnormalPublicMonthIds(m){") && src.includes("if (a && a <= last && b >= first) ids.add(String(p.id));")
+     && src.includes("const lineFilter = ids ? ['all', ['==', ['geometry-type'], 'LineString'], ['in', ['get', 'id'], ['literal', ids]]] : ['==', ['geometry-type'], 'LineString'];")
+     && src.includes("try { if (typeof ABP !== 'undefined' && ABP.data) applyAbnormalPublicMonth(); } catch (e) {}")
+     && src.includes("map.addLayer({ id: 'abnormal-public-ends', type: 'circle', source: 'abnormal-public-ends',")
+     && src.includes("['abnormal-public-casing', 'abnormal-public-lines'].forEach(l => map.moveLayer(l, labelAnchor())); ['abnormal-public-ends', 'abnormal-public-dot'].forEach(l => map.moveLayer(l));"));   // above the month's blue routes, under the names
+  ok("⭐ 23 Oct: the load travels its route while Play runs — one dot a line at the flow's frame, cleared when it stops; the line's length cached per feature",
+     src.includes("map.addLayer({ id: 'abnormal-public-dot', type: 'circle', source: 'abnormal-public-dot',")
+     && src.includes("if(typeof setAbnormalDots === 'function') try { setAbnormalDots(((ts*ABN_DOT_SPEED)/1000)%1); } catch(e){}")
+     && src.includes("function abnormalPointAlong(ix, frac){") && src.includes("ABP.len[key] = { coords: c, cum, total: cum[cum.length - 1] || 1 }")
+     && (src.match(/setAbnormalDots\(null\)/g) || []).length >= 2);
+  ok("23 Oct: the public loads are read at page load for every visitor (the box ticked) and nothing switches the layer off for staff (they keep their own group as well); the legend row says what the colour and the dot are",
+     src.includes("    checkRouteExportStaff();\n    loadAbnormalPublic();") && !src.includes("ABP.on = false;") && src.includes("staff keep the public layer too")
+     && html.includes('<div class="mode-legend" id="abnormal-legend-public" hidden></div>') && src.includes("'<b>Abnormal load this month</b>'") && src.includes("On its way while Play runs"));
+  const dotFn = new Function(src.slice(src.indexOf("function abnormalPointAlong(ix, frac){"), src.indexOf("function setAbnormalDots(t){")) + "; return abnormalPointAlong;")();
+  const ix = { coords: [[0, 0], [1, 0], [1, 1]], cum: [0, 100, 200], total: 200 };
+  ok("23 Oct: the point along a line: the start at 0, the corner at half, the end at 1, a straight share between",
+     JSON.stringify(dotFn(ix, 0)) === "[0,0]" && JSON.stringify(dotFn(ix, 0.5)) === "[1,0]" && JSON.stringify(dotFn(ix, 0.75)) === "[1,0.5]" && JSON.stringify(dotFn(ix, 1)) === "[1,1]");
+  const idsFn = new Function("CONFIG", "ABP", src.slice(src.indexOf("function abnormalPublicMonthIds(m){"), src.indexOf("function applyAbnormalPublicMonth(){")) + "; return abnormalPublicMonthIds;");
+  const fx = { features: [{ geometry: { type: 'LineString' }, properties: { id: 'AL001', date_from: '2027-03-08', date_to: '2027-03-12' } },
+                          { geometry: { type: 'LineString' }, properties: { id: 'AL001', leg: 'return', date_from: '2027-03-08', date_to: '2027-03-12' } },
+                          { geometry: { type: 'LineString' }, properties: { id: 'AL009', date_from: '2027-03-30', date_to: '2027-04-02' } }] };
+  const f15 = idsFn({ START_YEAR: 2026 }, { data: fx })(15), f16 = idsFn({ START_YEAR: 2026 }, { data: fx })(16), f14 = idsFn({ START_YEAR: 2026 }, { data: fx })(14);
+  ok("23 Oct: the month's ids from the features' windows: Mar 2027 (month 15) holds AL001 once (both legs) and the load that spans into April; April holds that one only; February none; no month gives null",
+     JSON.stringify(f15) === '["AL001","AL009"]' && JSON.stringify(f16) === '["AL009"]' && JSON.stringify(f14) === '[]' && idsFn({ START_YEAR: 2026 }, { data: fx })(null) === null);
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

@@ -843,6 +843,20 @@ ok("WEEK: a window that starts in the week's last day or ends on its first count
    A.week(["2027-04-14"], PLANNER)["count"] == 3 and A.week(["2027-04-15"], PLANNER)["count"] == 0 and A.week([], PLANNER)["count"] == 0
    and A.window_overlaps({"date_from": "2027-04-12", "date_to": "2027-04-14"}, datetime.date(2027, 4, 14), datetime.date(2027, 4, 20))
    and not A.window_overlaps({"date_from": "2027-04-12", "date_to": None}, datetime.date(2027, 4, 13), datetime.date(2027, 4, 20)))
+# ---- 23 Oct 2026: the public movements by month (the public map's figures bar and its month filter) ----
+_T23 = db.current_tenant()
+for _q_id, _q_st, _q_a, _q_b in (("ALX1", "approved", "2027-05-30", "2027-06-02"), ("ALX2", "pending", "2027-06-10", None),
+                                 ("ALX3", "withdrawn", "2027-06-11", None), ("ALX4", "notified", None, None)):
+    db.execute("INSERT INTO abnormal_loads (tenant_id, id, name, ipt, status, date_from, date_to) VALUES (?, ?, ?, ?, ?, ?, ?)",
+               (_T23, _q_id, "Load " + _q_id, "IPT1", _q_st, _q_a, _q_b))
+_m5, _m6, _m7 = A.month_index_of("2027-05-15"), A.month_index_of("2027-06-15"), A.month_index_of("2027-07-15")
+_by = A.public_ids_by_month([_m5, _m6, _m7])
+ok("⭐ 23 Oct: public_ids_by_month — a public load in each month its window touches (May and June for 30 May – 2 Jun), each once; a "
+   "pending or withdrawn load never; a public load with no date in no month",
+   "ALX1" in _by[_m5] and "ALX1" in _by[_m6] and "ALX1" not in _by[_m7]
+   and all("ALX2" not in v and "ALX3" not in v and "ALX4" not in v for v in _by.values()), str(_by))
+db.execute("DELETE FROM abnormal_loads WHERE tenant_id = ? AND id IN ('ALX1', 'ALX2', 'ALX3', 'ALX4')", (_T23,))
+
 _sm = A.summary(PLANNER, today="2027-03-20")
 ok("⭐ SUMMARY (the Dashboard's strip): loads in the next 4 weeks (all three, 12 Apr), notices due or late (none on 20 Mar), the Special Order to "
    "apply for (the beams, apply by 1 Feb), limits exceeded (none), the counted-apart words",

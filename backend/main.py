@@ -2599,6 +2599,12 @@ def _month_kpis_payloads(months, unit):
         if co2_error:
             out["co2_error"] = co2_error
         out_by_month[month] = out
+    # 23 Oct 2026 (the user): the public abnormal loads moving in each month — ids, each once — for the bar's "Abnormal
+    # loads this month" and the map's month filter. Appended LAST so the older keys keep their order (the bulk harness
+    # holds the month read byte for byte against its reference without this key).
+    _abn = abnormal.public_ids_by_month(list(out_by_month))
+    for month, out in out_by_month.items():
+        out["abnormal_loads"] = _abn.get(int(month), [])
     return out_by_month
 
 

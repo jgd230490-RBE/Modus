@@ -381,9 +381,11 @@ ok("1. the bulk answer is {unit, months}: one entry for each of the 60 months, k
 _diff = [m for m in range(1, MC + 1) if dumps(BULK["months"][str(m)]) != dumps(ONE[m])]
 ok("1. ⭐ every month of the bulk read is the month read's answer byte for byte (all 60 months, vehicles)",
    not _diff, str(_diff[:5]))
-_diff = [m for m in SPREAD if dumps(ONE[m]) != dumps(REF[m])]
+# NARROWED 23 Oct 2026: abnormal_loads (the public abnormal loads' ids a month, for the public map's figures bar) is appended
+# LAST to every month's answer; without it the answer is still what main 10a308d gave
+_diff = [m for m in SPREAD if dumps({k: v for k, v in ONE[m].items() if k != "abnormal_loads"}) != dumps(REF[m])]
 ok("1. ⭐ ...and the month read is byte for byte what it answered on main 10a308d (a spread of 14 months, the dearest "
-   "last month included)", not _diff, str(_diff[:5]))
+   "last month included; abnormal_loads left out)", not _diff, str(_diff[:5]))
 _lines = sum(len(ONE[m]["lines"]) for m in ONE)
 _trips = [l["trips_per_vehicle_day"] for m in REF for l in REF[m]["lines"]]
 _co2 = [l["co2_t"] for m in REF for l in REF[m]["lines"]]
@@ -399,8 +401,8 @@ ok("1. ...a month with no lines (if the programme has one) still carries its car
    and len(ONE[MC]["co2_to_date"]) >= len(ONE[1]["co2_to_date"]) and ONE[MC]["co2_to_date"], str(_empty))
 with quiet():
     BULK_T = main.public_month_kpis_months(unit="t")
-_diff = [m for m in (1, 12, 31, 47, 60) if dumps(BULK_T["months"][str(m)]) != dumps(reference_month_kpis(m, "t"))]
-ok("1. ⭐ in tonnes too: the bulk read equals the old month read for a spread of months", not _diff, str(_diff))
+_diff = [m for m in (1, 12, 31, 47, 60) if dumps({k: v for k, v in BULK_T["months"][str(m)].items() if k != "abnormal_loads"}) != dumps(reference_month_kpis(m, "t"))]
+ok("1. ⭐ in tonnes too: the bulk read equals the old month read for a spread of months (NARROWED 23 Oct 2026: abnormal_loads, appended last, left out)", not _diff, str(_diff))
 
 
 def raises(fn, **k):
@@ -636,6 +638,15 @@ ok("6. the map asks for the bulk read and keeps the month read as its fallback",
    "/public/month-kpis/months?unit=" in _mp and "/public/month-kpis?month=" in _mp)
 
 remove_scratch_db(db, TMP)
+# ---- 23 Oct 2026: the public abnormal loads per month (the user: the count on the public map's figures bar) ----
+_abn = {m: ONE[m].get("abnormal_loads") for m in ONE}
+ok("⭐ 23 Oct: every month carries abnormal_loads, the ids of the PUBLIC movements whose window touches it, appended last: the demo's "
+   "approved AL001 (8–12 Mar 2027) in month 15 only; the pending crane and beams in none",
+   all(isinstance(v, list) for v in _abn.values()) and _abn[15] == ["AL001"] and all(not v for m, v in _abn.items() if m != 15)
+   and all(list(ONE[m].keys())[-1] == "abnormal_loads" for m in ONE), str({m: v for m, v in _abn.items() if v}))
+ok("23 Oct: ...and the bulk read carries the same in every month",
+   all(BULK["months"][str(m)].get("abnormal_loads") == _abn[m] for m in ONE))
+
 print()
 for f in FAIL:
     print("  FAIL:", f)
