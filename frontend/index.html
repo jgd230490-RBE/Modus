@@ -5167,7 +5167,7 @@ function UsersPage({ access }){
               <div className="card overflow-auto">
                 <table className="tbl">
                   <caption><b>{TEAMS()}</b> · {teamRows.teams.length}</caption>
-                  <thead><tr>{[TEAM(), "Logins", "Lines", "Status", ""].map((h, i) => <th key={i} scope="col" className={i === 1 || i === 2 ? "text-right" : undefined}>{h}</th>)}</tr></thead>
+                  <thead><tr>{[TEAM(), "Logins", "Lines", "Status", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
                   <tbody>
                     {teamRows.teams.map(t => (
                       <tr key={t.id}>
@@ -5175,8 +5175,8 @@ function UsersPage({ access }){
                           ? <input className="ctl ctl-sm" style={{ minWidth: 220 }} maxLength={60} value={editTeam.label} autoFocus
                               onChange={e => setEditTeam({ ...editTeam, label: e.target.value })} aria-label={`New name for ${t.label}`} />
                           : <span className={t.active ? "font-medium text-slate-800" : "font-medium text-slate-500"}>{t.label}</span>}</td>
-                        <td className="text-right text-sm">{t.logins}</td>
-                        <td className="text-right text-sm">{t.lines}</td>
+                        <td className="text-sm">{t.logins}</td>
+                        <td className="text-sm">{t.lines}</td>
                         <td><StatusWord status={t.active ? "Approved" : "none"} label={t.active ? "In use" : "Stopped"} /></td>
                         <td className="text-right whitespace-nowrap">
                           {editTeam && editTeam.id === t.id ? <>
