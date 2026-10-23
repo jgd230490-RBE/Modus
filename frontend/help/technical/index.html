@@ -639,7 +639,7 @@ largest month. Shared road sections are indexed on ONE vehicle profile (<code>ro
 routed for that profile is on no shared road but still in the totals. The map's count unit (vehicles, tonnes or m&sup3;)
 is <code>FORECAST_UNIT</code> in <code>map/config.js</code> (vehicles as shipped); with tonnes or m&sup3; the bar adds a t / day or m&sup3; / day figure.</li>
 <li><strong>Flow lanes.</strong> One lane per direction, drawn left of travel (UK only), summed per direction on shared
-roads. Bands are fixed. The dashes move only while Play runs, and stay still under reduced motion.</li>
+roads. Bands are fixed. A light runs along each lane only while Play runs, and the lanes stand still under reduced motion; the lane's width is its band.</li>
 <li><strong>By council.</strong> A route counts in every district its laden leg enters; edge routes (under 200 m inside)
 count km and carbon there, not movements. Carbon is split by the km inside each district. A route is &ldquo;not yet placed
 in a council&rdquo; until the clip runs, on the next bake or council-areas import. Council bands are on Config &rarr; Map and
