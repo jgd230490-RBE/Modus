@@ -3900,7 +3900,7 @@ function CollisionPanel({ access }){
   return (
     <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="collisions">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Collision history</h3>
-      <p className="text-[14px] text-slate-600 mb-3">Injury collisions from DfT road safety data (the latest five years) within {st ? st.strip.route_m : 250} m of a route and {st ? st.strip.site_m : 500} m of a site. Evidence for the CLOCS route risk assessment; it is not the assessment. Staff only. Fetch again after changing routes, and each August.</p>
+      <p className="text-[14px] text-slate-600 mb-3">Injury collisions from DfT road safety data (the latest five years) within {st ? st.strip.route_m : 250} m of a route, the abnormal loads' too, and {st ? st.strip.site_m : 500} m of a site. Evidence for the CLOCS route risk assessment; it is not the assessment. Staff only. Fetch again after changing routes, and each August.</p>
       {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
         <>
           <p className="text-[14px] text-slate-700 mb-2" data-collision-state={st.state}>

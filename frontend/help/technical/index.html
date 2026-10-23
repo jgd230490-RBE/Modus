@@ -554,7 +554,8 @@ a year, about 250 MB for five years), read row by row, and deleted before the ne
 Collisions outside the strip's box are dropped before any distance is worked out; vehicles and casualties are read only for
 the collisions kept. All or nothing: a failure keeps what was stored.</td></tr>
 <tr><td class="k">The strip</td><td>The community layer's: 250 m each side of every stored road route (both legs, every vehicle, and the
-stored alternatives, each under its own key) and 500 m round every site. Each collision keeps its distance to each route it is
+stored alternatives, each under its own key), each abnormal load&rsquo;s drawn line under the load&rsquo;s id (23 Oct 2026; both legs; a
+withdrawn load&rsquo;s is left out, a load not drawn yet has none) and 500 m round every site. Each collision keeps its distance to each route it is
 near. &ldquo;On the route&rdquo; = within 25 m (on the 2025 data the count flattens after 20 m; 25 m allows for a dual carriageway).
 Places = two or more collisions within 50 m of each other (single linkage), ordered along the primary loaded leg.
 Each collision is marked <code>along</code> = <code>route</code> (near a primary route or a site) or <code>alternative</code> (near a stored

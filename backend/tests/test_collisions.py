@@ -1126,6 +1126,66 @@ ok("10: the technical guide: the endpoints, the files, the years rule, the codes
    'id="t9-collisions"' in TECH and "/api/collisions" in TECH and "data.dft.gov.uk" in TECH and "late July" in TECH
    and "casualty_class" in TECH and "Open Government Licence v3.0" in TECH)
 
+# --------------------------------------------------------------------------- #
+#  11. The abnormal loads' lines (23 Oct 2026; the user: "yes the strip should  #
+#      include the abnormal lines")                                            #
+# --------------------------------------------------------------------------- #
+# a load drawn 2 km south of R1 (both legs), one withdrawn load drawn 3 km south, one load not drawn yet
+ABN = [[-0.95, LAT0 - 2000 * DLAT], [-0.925, LAT0 - 2000 * DLAT], [-0.90, LAT0 - 2000 * DLAT]]
+ABN_GONE = [[-0.95, LAT0 - 3000 * DLAT], [-0.90, LAT0 - 3000 * DLAT]]
+for _id, _st, _g in (("AL1", "approved", ABN), ("AL2", "withdrawn", ABN_GONE), ("AL3", "pending", None)):
+    db.execute("INSERT INTO abnormal_loads (tenant_id, id, name, ipt, status, geometry_json, return_geometry_json) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?)",
+               (T, _id, "Load " + _id, "IPT1", _st, json.dumps(_g) if _g else None, json.dumps(list(reversed(_g))) if _g else None))
+AIX = cl.index_from_db()
+ok("⭐ 11: index_from_db takes in the drawn load's line under its id (both legs, kept once), never a withdrawn load's nor a load "
+   "not drawn yet; the routes and sites as before",
+   {k for k, _ in AIX.lines} == {"R1", "R1@1", "AL1"} and sum(1 for k, _ in AIX.lines if k == "AL1") == 2
+   and len(AIX.sites) == 2 and AIX.in_box(mid, LAT0 - 2000 * DLAT), str([k for k, _ in AIX.lines]))
+ok("11: a point on the load's line is near AL1 only (not R1, not a site), and 'along' calls it a route (no '@' in the key)",
+   (lambda rs: list(rs[0].keys()) == ["AL1"] and rs[0]["AL1"] < 25 and not rs[1])(AIX.near(*P(0, -1990)))
+   and cl.along({"routes": {"AL1": 3.0}, "sites": {}}) == "route")
+
+
+def with_abn(table, y):
+    """The 2025 rows plus C9, 10 m from the load's line and about 2 km from R1, its alternative and both sites."""
+    text = only_2025(table, y)
+    if table == "collision" and y == 2025:
+        lon, lat = P(0, -1990)
+        text += f"{y}C9,{y},C9,0,0,{lon},{lat},33,2,2,1,05/05/{y},3,08:15,E10000018,3,6,6,30,0,-1,0,1\n"
+    return text
+
+
+CALLS.clear()
+sta = cl.refresh(fetchers={"download": stub_download(with_abn)}, today=date(2026, 10, 16))
+ok("⭐ 11: a fetch stores the collision on the load's line and counts it with the routes': 6 along the routes and round the "
+   "sites (was 5), 4 KSI (C9 is serious), the one near the alternative only still apart",
+   sta["state"] == "done" and sta["counts"] == {"all": 6, "ksi": 4, "vru": 5} and sta["alternatives_only"] == {"all": 1, "ksi": 1},
+   str((sta.get("counts"), sta.get("alternatives_only"))))
+_c9 = [f for f in cl.payload()["features"] if "AL1" in f["properties"]["routes"]]
+_lon9, _lat9 = P(0, -1990)
+ok("11: the payload carries it near AL1 ONLY (R1's own evidence, which reads a collision's routes, is untouched: 2 km "
+   "away), along = route, so the staff map draws it with the routes' and not only with Alternative routes",
+   len(_c9) == 1 and _c9[0]["properties"]["routes"] == ["AL1"] and _c9[0]["properties"]["along"] == "route"
+   and abs(_c9[0]["geometry"]["coordinates"][0] - _lon9) < 1e-6 and abs(_c9[0]["geometry"]["coordinates"][1] - _lat9) < 1e-6
+   and _c9[0]["properties"]["dist_m"] <= 25,
+   str(_c9)[:300])
+db.execute("UPDATE abnormal_loads SET status = 'withdrawn' WHERE tenant_id = ? AND id = 'AL1'", (T,))
+stb = cl.refresh(fetchers={"download": stub_download(with_abn)}, today=date(2026, 10, 16))
+ok("11: once the load is withdrawn its line leaves the strip: the next fetch drops C9 (back to 5 / 3)",
+   stb["counts"] == {"all": 5, "ksi": 3, "vru": 5} and not any("AL1" in f["properties"]["routes"] for f in cl.payload()["features"]),
+   str(stb.get("counts")))
+db.execute("DELETE FROM abnormal_loads WHERE tenant_id = ? AND id IN ('AL1', 'AL2', 'AL3')", (T,))
+cl.refresh(fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
+_ix = read("frontend/index.html")
+ok("11: the words: the Config card says the abnormal loads' routes are in the strip; so do both guides",
+   "m of a route, the abnormal loads' too, and " in _ix
+   and "within 250 m of every route (the abnormal loads&rsquo; routes too) and 500 m of every site" in read("frontend/help/index.html")
+   and "each abnormal load&rsquo;s drawn line under the load&rsquo;s id" in read("frontend/help/technical/index.html"))
+ok("11: collisions.index_from_db reads the abnormal loads' lines the way community.strip_from_db does (both legs, not withdrawn)",
+   "FROM abnormal_loads WHERE tenant_id = ? \"\n                      \"AND status != 'withdrawn'" in read("backend/collisions.py")
+   and read("backend/collisions.py").count('"return_geometry_json"') >= 1)
+
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)
