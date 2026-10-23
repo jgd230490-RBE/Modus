@@ -4971,6 +4971,7 @@ function describeActivity(r){
     [/^forecast-weeks\/calibrate$/, "Calibrated a week"], [/^forecast-weeks$/, "Edited a week"], [/^forecast-days\/actual$/, "Typed a day's actual"],
     [/^forecast-days$/, "Edited a day"], [/^stockpiles\/consume$/, "Recorded stockpile use"], [/^carbon\/target$/, "Changed the carbon target"],
     [/^admin\/config\/factors\/reset$/, "Reset the configuration to the defaults"], [/^admin\/config\/factors$/, "Saved the configuration"],
+    [/^admin\/teams\/[^/]+$/, "Changed a " + TEAM().toLowerCase()], [/^admin\/teams$/, "Added a " + TEAM().toLowerCase()],
     [/^admin\/users\/[^/]+\/reset$/, "Sent a login its link"], [/^admin\/users\/[^/]+$/, "Changed a login"], [/^admin\/users$/, "Added a login"],
     [/^admin\/leads\/[^/]+\/login$/, "Gave a lead a personal login"], [/^admin\/tenant\/import$/, "Imported the organisation's data"]];
   for(const [rx, w] of known){ if(rx.test(p)) return w; }
@@ -4991,6 +4992,10 @@ function UsersPage({ access }){
   const [note, setNote] = useState(null);   // {ok, text, link}
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", choice: "" });
+  // 23 Oct 2026 — the Teams tab (admins only; at most six teams, John). A team is always shown by its NAME.
+  const [teamRows, setTeamRows] = useState(null);
+  const [newTeam, setNewTeam] = useState("");
+  const [editTeam, setEditTeam] = useState(null);   // {id, label}
   const call = async (path, method, body) => {
     const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
                                              body: body ? JSON.stringify(body) : undefined });
@@ -5001,7 +5006,8 @@ function UsersPage({ access }){
   const loadLeads = () => call(`/admin/leads${qs()}`).then(j => setLeads(j.leads || [])).catch(e => setErr(e.message));
   const loadRows = () => call(`/admin/audit${qs(who ? { user: who } : {})}`).then(j => setRows(j.rows || [])).catch(e => setErr(e.message));
   useEffect(() => { load(); }, [token]);
-  useEffect(() => { if(tab === "leads") loadLeads(); if(tab === "activity") loadRows(); }, [tab, who, token]);
+  const loadTeams = () => call(`/admin/teams${qs()}`).then(j => setTeamRows(j)).catch(e => setErr(e.message));
+  useEffect(() => { if(tab === "leads") loadLeads(); if(tab === "activity") loadRows(); if(tab === "teams") loadTeams(); }, [tab, who, token]);
   const teams = (data && data.teams) || [];
   const teamLabel = (id) => (teams.find(t => t.id === id) || {}).label || teamName(id);
   const choices = [...teams.map(t => ["team:" + t.id, t.label]), ["planner", "Planner"], ["admin", "Admin"]];
@@ -5021,10 +5027,26 @@ function UsersPage({ access }){
   });
   const change = (u, body, done) => act(async () => { await call(`/admin/users/${u.id}${qs()}`, "PATCH", body); setNote({ ok: true, text: done }); await load(); });
   const sendLink = (u) => act(async () => { const j = await call(`/admin/users/${u.id}/reset${qs()}`, "POST"); setNote(sent(j, u.name)); });
+  // a team write answers with the new list; the names go straight into the app's own team words, so every page
+  // of this tab names the team as typed without a reload
+  const teamDone = (j, text) => { setTeamRows(j); (j.teams || []).forEach(t => { TEAM_LABELS[iptKey(t.id)] = t.label; }); setNote({ ok: true, text }); };
+  const addTeam = () => act(async () => {
+    if(!newTeam.trim()) throw new Error(`Type the ${TEAM().toLowerCase()}'s name.`);
+    const j = await call(`/admin/teams${qs()}`, "POST", { label: newTeam.trim() });
+    setNewTeam(""); teamDone(j, `Added ${j.team.label}. Add its people on People.`); await load();
+  });
+  const saveTeamName = () => act(async () => {
+    const j = await call(`/admin/teams/${editTeam.id}${qs()}`, "PATCH", { label: editTeam.label });
+    setEditTeam(null); teamDone(j, `Renamed to ${j.team.label}.`); await load();
+  });
+  const setTeamActive = (t, on) => act(async () => {
+    const j = await call(`/admin/teams/${t.id}${qs()}`, "PATCH", { active: on });
+    teamDone(j, on ? `${t.label} is in use again.` : `${t.label} is stopped. Its lines stay.`); await load();
+  });
   const leadLogin = (l) => act(async () => { const j = await call(`/admin/leads/${l.id}/login${qs()}`, "POST"); setNote(sent(j, l.name)); await loadLeads(); await load(); });
   const people = (data && data.users) || [];
   const staff = people.filter(u => u.kind !== "demo"), demos = people.filter(u => u.kind === "demo");
-  const tabs = [["people", "People"], ["leads", "Demo leads"], ["activity", "Activity"]];
+  const tabs = [["people", "People"], ["teams", TEAMS()], ["leads", "Demo leads"], ["activity", "Activity"]];
   const csvHref = (path, extra) => `${API}${path}${qs(extra)}`;
   const statusOf = (u) => { const [st, label] = USER_STATUS[u.status] || ["none", u.status]; return <StatusWord status={st} label={label} />; };
   return (
@@ -5126,6 +5148,57 @@ function UsersPage({ access }){
                 </div>
               )}
             </>
+          )}
+          {tab === "teams" && teamRows && (
+            <div data-users-teams="1">
+              <div className="card p-4 mb-4">
+                <h3 className="text-[15px] font-semibold text-slate-800 mb-2">Add a {TEAM().toLowerCase()}</h3>
+                {teamRows.can_add ? (
+                  <>
+                    <div className="flex flex-wrap gap-2 items-end">
+                      <label className="text-sm">Name<br /><input className="ctl ctl-sm" style={{ minWidth: 260 }} maxLength={60} value={newTeam}
+                        onChange={e => setNewTeam(e.target.value)} aria-label={`New ${TEAM().toLowerCase()}'s name`} /></label>
+                      <button type="button" className="btn-pri" disabled={busy} onClick={addTeam}>Add the {TEAM().toLowerCase()}</button>
+                    </div>
+                    <p className="text-[13px] text-slate-500 mt-2">{teamRows.used} of {teamRows.max} {TEAMS().toLowerCase()}. Then add its people on People.</p>
+                  </>
+                ) : <p className="text-sm text-slate-600">All {teamRows.max} {TEAM().toLowerCase()} places are used.</p>}
+              </div>
+              <div className="card overflow-auto">
+                <table className="tbl">
+                  <caption><b>{TEAMS()}</b> · {teamRows.teams.length}</caption>
+                  <thead><tr>{[TEAM(), "Logins", "Lines", "Status", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {teamRows.teams.map(t => (
+                      <tr key={t.id}>
+                        <td>{editTeam && editTeam.id === t.id
+                          ? <input className="ctl ctl-sm" style={{ minWidth: 220 }} maxLength={60} value={editTeam.label} autoFocus
+                              onChange={e => setEditTeam({ ...editTeam, label: e.target.value })} aria-label={`New name for ${t.label}`} />
+                          : <span className={t.active ? "font-medium text-slate-800" : "font-medium text-slate-500"}>{t.label}</span>}</td>
+                        <td className="text-sm">{t.logins}</td>
+                        <td className="text-sm">{t.lines}</td>
+                        <td><StatusWord status={t.active ? "Approved" : "none"} label={t.active ? "In use" : "Stopped"} /></td>
+                        <td className="text-right whitespace-nowrap">
+                          {editTeam && editTeam.id === t.id ? <>
+                            <button type="button" className="btn-pri" disabled={busy} onClick={saveTeamName}>Save</button>{" "}
+                            <button type="button" className="btn-sec" disabled={busy} onClick={() => setEditTeam(null)}>Cancel</button>
+                          </> : <>
+                            <button type="button" className="btn-sec" disabled={busy} onClick={() => setEditTeam({ id: t.id, label: t.named ? t.label : "" })}
+                              aria-label={`Rename ${t.label}`}>Rename</button>{" "}
+                            {t.active
+                              ? <button type="button" className="btn-sec" disabled={busy} style={{ color: "var(--red)" }} onClick={() => setTeamActive(t, false)}
+                                  aria-label={`Stop using ${t.label}`}>Stop using</button>
+                              : <button type="button" className="btn-sec" disabled={busy} onClick={() => setTeamActive(t, true)}
+                                  aria-label={`Use ${t.label} again`}>Use again</button>}
+                          </>}
+                        </td>
+                      </tr>
+                    ))}
+                    {!teamRows.teams.length && <tr><td colSpan={5} className="text-sm text-slate-500">No {TEAMS().toLowerCase()} yet. Add the first one above.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
           {tab === "leads" && (
             <div className="card overflow-auto">
@@ -7985,7 +8058,7 @@ function IptPill({ ipt }){
   const k = iptKey(ipt);
   if(!k) return <span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>;
   return <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"
-    style={{ background: IPT_PALETTE_C[k] || "#64748B" }} title={k}>{teamName(k)}</span>;
+    style={{ background: IPT_PALETTE_C[k] || "#64748B" }}>{teamName(k)}</span>;
 }
 function WsPill({ ws }){
   if(!ws) return null;

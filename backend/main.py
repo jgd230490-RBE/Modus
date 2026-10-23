@@ -29,6 +29,7 @@ import db
 import network
 import here_routing
 import taxonomy
+import teams
 import zones
 import haul          # Phase 4 — temporary haul roads
 import restrictions  # Phase 2.5a Tark Tee; H1 (29 Sep) a provider per country (NH closures for GB)
@@ -816,6 +817,25 @@ class UserPatch(BaseModel):
     extend_days: Optional[int] = None
 
 
+class TeamIn(BaseModel):
+    label: str
+
+
+class TeamPatch(BaseModel):
+    label: Optional[str] = None
+    active: Optional[bool] = None
+
+
+def _team_ok(role, team):
+    """23 Oct 2026: a login goes into one of the organisation's ACTIVE teams only (a stopped team, or a slot it has no
+    team for, is refused). Only the admin endpoints check this; a lead's demo login keeps its own slot rule."""
+    if (role or "").strip().lower() != "team":
+        return
+    slot = access.canonical_ipt(team)
+    if slot and slot not in access.tenant_team_ids():
+        raise HTTPException(400, "Pick the team this person belongs to.")
+
+
 def _admin_actor():
     acc = access.current()
     if acc and acc.get("via") == "login":
@@ -881,6 +901,7 @@ def admin_user_add(body: UserIn, token: Optional[str] = None):
     that holds a lead's DEMO login is turned into a staff login (users.promote_demo): a lead who becomes
     a customer keeps their history in the activity log."""
     _check_admin(token)
+    _team_ok(body.role, body.team)
     label = _admin_actor()[2]
     existing = users.find_by_email(body.email)
     if existing and existing.get("kind") == "demo":
@@ -899,6 +920,8 @@ def admin_user_change(user_id: str, body: UserPatch, token: Optional[str] = None
     """Change a login's name, team or role, disable or enable it, or give a demo login more days."""
     _check_admin(token)
     fields = {k: getattr(body, k) for k in ("name", "role", "team", "disabled") if getattr(body, k) is not None}
+    if body.team is not None:
+        _team_ok(body.role or "team", body.team)
     if body.role is not None and body.role != "team":
         fields["team"] = None
     if body.extend_days is not None:
@@ -912,6 +935,46 @@ def admin_user_change(user_id: str, body: UserPatch, token: Optional[str] = None
     if err:
         raise HTTPException(404 if err == "No such login." else 400, err)
     return {"user": users.public(user)}
+
+
+@app.get("/api/admin/teams")
+def admin_teams(token: Optional[str] = None):
+    """23 Oct 2026 — the Teams tab: every team by NAME, in slot order, with its logins and lines (teams.py). Admins
+    only (John, 23 Oct). The limit is six."""
+    _check_admin(token)
+    return teams.listing()
+
+
+@app.post("/api/admin/teams")
+def admin_team_add(body: TeamIn, token: Optional[str] = None):
+    """Add a team in the lowest slot never used. Refused at six, for a duplicate name, an id-like name."""
+    _check_admin(token)
+    team, err = teams.add(body.label)
+    if err:
+        raise HTTPException(409 if "same moment" in err else 400, err)
+    return {"team": _team_out(team), **teams.listing()}
+
+
+@app.patch("/api/admin/teams/{team_id}")
+def admin_team_change(team_id: str, body: TeamPatch, token: Optional[str] = None):
+    """Rename a team, or stop / resume it. Stopping is refused while a login of the team can sign in."""
+    _check_admin(token)
+    team = None
+    if body.label is not None:
+        team, err = teams.rename(team_id, body.label)
+        if err:
+            raise HTTPException(404 if err == "No such team." else 400, err)
+    if body.active is not None:
+        team, err = teams.set_active(team_id, body.active)
+        if err:
+            raise HTTPException(404 if err == "No such team." else 400, err)
+    if team is None:
+        raise HTTPException(400, "Nothing to change.")
+    return {"team": _team_out(team), **teams.listing()}
+
+
+def _team_out(row):
+    return {"id": row["id"], "label": taxonomy.team_name(row["id"]), "active": bool(row["active"])}
 
 
 @app.post("/api/admin/users/{user_id}/reset")
@@ -3603,9 +3666,10 @@ def public_alignment(request: Request):
     stamp = tenant_package.get_overlay_stamp()
     tenant = config.tenant_settings(conversions)
     # the tenant's names for its team slots, so the map shows "North Team", not an id
-    teams = [{"id": r["id"], "label": r.get("label") or r["id"]}
-             for r in taxonomy.list_ipts(active_only=False)]
-    words = hashlib.sha1(json.dumps({"tenant": tenant, "teams": teams}, sort_keys=True, ensure_ascii=False,
+    # 23 Oct 2026: an unnamed team is "<team word> n" (taxonomy.team_name), never its id
+    team_rows = [{"id": r["id"], "label": taxonomy.team_name(r["id"])}
+                 for r in taxonomy.list_ipts(active_only=False)]
+    words = hashlib.sha1(json.dumps({"tenant": tenant, "teams": team_rows}, sort_keys=True, ensure_ascii=False,
                                     default=str).encode("utf-8")).hexdigest()[:12]
     tag = '"' + str(stamp or "none") + "-" + words + '"'
     if request.headers.get("if-none-match") == tag:
@@ -3618,7 +3682,7 @@ def public_alignment(request: Request):
         except Exception:
             doc = {}
     doc["tenant"] = tenant
-    doc["teams"] = teams
+    doc["teams"] = team_rows
     return Response(content=json.dumps(doc, ensure_ascii=False), media_type="application/json",
                     headers={"ETag": tag, "Cache-Control": "no-cache"})
 

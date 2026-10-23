@@ -277,6 +277,14 @@ ok("⭐ G3: Users (9.6) is in the guide for admins only, in the nav too, and nam
    and '<li class="l2" data-navrole="admin"><a href="#9-6-users">' in src
    and all(f"<strong>{w}</strong>" in src for w in ("People.", "Demo leads", "Activity", "Send a personal login", "Add and send the link"))
    and "The technical guide says how the first admin is added." in text and "open Users, type the admin token, add yourself" in open(TECH, encoding="utf-8").read())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the steps are in T4
+_tech = open(TECH, encoding="utf-8").read()
+ok("TEAMS (23 Oct 2026): 9.6 names the Teams tab, up to six, and its three buttons; no slot id in the user guide",
+   "<li><strong>Teams</strong> lists your organisation's teams (up to six)" in src
+   and all(f"<strong>{w}</strong>" in src for w in ("Add the team", "Rename", "Stop using", "Use again"))
+   and not re.search(r"\bIPT ?\d", text))
+ok("TEAMS: the technical guide carries the detail (the endpoints, the slot rule, the six from access.IPT_IDS)",
+   "<li><strong>Teams (23 Oct 2026).</strong>" in _tech and "<code>GET/POST /api/admin/teams</code>" in _tech
+   and "the lowest slot nothing has ever carried" in _tech and "<code>access.IPT_IDS</code>" in _tech)
 ok("🔴 G3: the guide no longer says per-person logins are planned, nor that an unset admin token opens admin actions",
    "Per-person logins are planned" not in text and "Per-person logins\nare planned" not in text and "are planned next" not in text
    and "open to anyone who can reach them" not in text)

@@ -1959,6 +1959,31 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("G3: the Users list carries the team's NAME beside the slot, and no hash",
        [u for u in _ul["users"] if u["email"] == "bob@example.org"][0]["team_label"] not in (None, "", "IPT1")
        and "password_hash" not in json.dumps(_ul) and "scrypt$" not in json.dumps(_ul))
+    # 23 Oct 2026 — Users -> Teams through the real app (admins only; at most six; John)
+    _tl = c.get("/api/admin/teams").json()
+    ok("TEAMS: Ada (an admin login, no token) reads the demo's three teams by name, three of six used",
+       [t["label"] for t in _tl["teams"]] == ["North Team", "Central Team", "South Team"] and _tl["used"] == 3 and _tl["max"] == 6, json.dumps(_tl)[:200])
+    r = c.post("/api/admin/teams", json={"label": "Drainage package"}, headers=W)
+    _new = r.json().get("team") or {}
+    ok("⭐ TEAMS: Ada adds a fourth team by its name; it takes a slot nothing has carried",
+       r.status_code == 200 and _new.get("label") == "Drainage package" and _new.get("id") not in ("IPT1", "IPT2", "IPT3"), r.text[:200])
+    ok("TEAMS: ...it is in the staff team pickers at once (by name)", "Drainage package" in [i["label"] for i in c.get("/api/meta").json()["ipts"]])
+    _a = c.get("/api/admin/audit", params={"kind": "write"}).json()["rows"]
+    ok("⭐ TEAMS: the middleware recorded the add: Ada, the path, the name",
+       any(x["path"] == "/api/admin/teams" and x["method"] == "POST" and x["actor_label"] == "Ada Lovelace <ada@example.org>"
+           and "Drainage package" in (x["detail"] or "") for x in _a), json.dumps(_a[:2])[:300])
+    r = c.post("/api/admin/teams", json={"label": "north team"}, headers=W)
+    ok("TEAMS: a second team with a name already used is refused, in words", r.status_code == 400 and "already a team with that name" in r.text, r.text[:120])
+    r = c.patch(f"/api/admin/teams/{_new.get('id')}", json={"label": "Drainage and ducts"}, headers=W)
+    ok("TEAMS: rename", r.status_code == 200 and r.json()["team"]["label"] == "Drainage and ducts", r.text[:160])
+    r = c.patch("/api/admin/teams/IPT1", json={"active": False}, headers=W)
+    ok("🔴 TEAMS: North Team cannot be stopped while its logins can sign in", r.status_code == 400 and "first" in r.text, r.text[:160])
+    r = c.patch(f"/api/admin/teams/{_new.get('id')}", json={"active": False}, headers=W)
+    ok("TEAMS: the new, empty team can be stopped; it leaves the pickers", r.status_code == 200
+       and "Drainage and ducts" not in [i["label"] for i in c.get("/api/meta").json()["ipts"]])
+    r = c.post("/api/admin/users", json={"email": "dee@example.org", "name": "Dee Drain", "role": "team", "team": _new.get("id")}, headers=W)
+    ok("🔴 TEAMS: nobody can be invited into a stopped team", r.status_code == 400, f"{r.status_code} {r.text[:120]}")
+    ok("TEAMS: the rest of the page reads the demo's three teams again", len(c.get("/api/meta").json()["ipts"]) == 3)
     _ada_jar = dict(c.cookies)
     c.cookies.clear()
     r = c.post("/api/auth/reset", json={"token": _bob_inv, "password": "bob's long password"}, headers=W)

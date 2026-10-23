@@ -280,7 +280,7 @@ def ipt_for_save(requested, acc=None):
         return acc["ipt"], None
     got = canonical_ipt(requested)
     if requested and not got:
-        return None, f"ipt {requested!r} is not one of IPT1..IPT6"
+        return None, "That team is not set up here."   # 23 Oct 2026: no id, no range on a screen
     if acc["role"] in ("planner", "admin") and not demo_mode():
         # real codes are configured: a planner must say which IPT the line is for
         if not got:

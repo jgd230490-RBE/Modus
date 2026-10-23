@@ -4064,6 +4064,29 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      /text-\[color:var\(--navy\)\] hover:underline">[^\n]*\n\s*\+ Add gate/.test(dm) && !dm.includes("text-[color:var(--blue)]"));
 }
 
+// ---- 23 Oct 2026: the Teams tab and the team words (claude/team-words; John: the limit stays six, admins only) -----
+{
+  const pill = (code.match(/function IptPill\(\{ ipt \}\)\{[\s\S]*?\n\}/) || [""])[0];
+  ok("🔴 TEAM WORDS: the team pill has no tooltip (it showed the raw id, e.g. IPT3); the name is the whole pill",
+     pill.includes("{teamName(k)}</span>") && !/title=\{k\}/.test(pill) && !/title=/.test(pill));
+  const up = (code.match(/function UsersPage\(\{ access \}\)\{[\s\S]*?\n\}\n/) || [""])[0];
+  ok("TEAMS: the Users page has a Teams tab (the tenant's word), between People and Demo leads",
+     up.includes('const tabs = [["people", "People"], ["teams", TEAMS()], ["leads", "Demo leads"], ["activity", "Activity"]];'));
+  ok("TEAMS: the tab reads and writes /admin/teams with the same qs() as the rest of Users (the token only for a code sign-in)",
+     up.includes("call(`/admin/teams${qs()}`)") && up.includes('call(`/admin/teams${qs()}`, "POST", { label: newTeam.trim() })')
+     && up.includes('call(`/admin/teams/${editTeam.id}${qs()}`, "PATCH", { label: editTeam.label })')
+     && up.includes('call(`/admin/teams/${t.id}${qs()}`, "PATCH", { active: on })'));
+  const tb = (up.match(/\{tab === "teams" && teamRows && \([\s\S]*?\n          \)\}/) || [""])[0];
+  ok("🔴 TEAMS: the tab shows a team by its label only: t.id is a value for the buttons, never rendered",
+     tb.length > 500 && tb.includes("{t.label}") && !/\{t\.id\}/.test(tb.replace(/key=\{t\.id\}/g, "")) && !/IPT\d/.test(tb));
+  ok("TEAMS: Rename, Stop using and Use again are named for the team; the full case is one sentence",
+     tb.includes("aria-label={`Rename ${t.label}`}") && tb.includes("aria-label={`Stop using ${t.label}`}") && tb.includes("aria-label={`Use ${t.label} again`}")
+     && tb.includes("All {teamRows.max} {TEAM().toLowerCase()} places are used."));
+  ok("TEAMS: a change goes straight into the app's team words (TEAM_LABELS), so the names follow without a reload",
+     up.includes("(j.teams || []).forEach(t => { TEAM_LABELS[iptKey(t.id)] = t.label; });"));
+  ok("TEAMS: the Activity tab words the two writes", code.includes('[/^admin\\/teams\\/[^/]+$/, "Changed a " + TEAM().toLowerCase()], [/^admin\\/teams$/, "Added a " + TEAM().toLowerCase()],'));
+}
+
 // ---- report ------------------------------------------------------------------
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

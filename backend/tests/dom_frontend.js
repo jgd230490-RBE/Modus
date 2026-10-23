@@ -2069,7 +2069,7 @@ async function phoneDayFlagsDom(){
 // sending its page opens, and the set-password screen (mounted on its own: the link is read once as the page loads).
 // NOT covered: the real cookie (http_smoke.py), how it looks (the browser check).
 async function g3LoginsDom(){
-  const answer = (status, data) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(data) });
+  const answer = (status, data) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)) });
   const ADMIN = { role: "admin", label: "Admin", ipt: null, can_approve: true, ipt_locked: false, ipt_required: true, demo: false,
                   ipts: [], via: "login", codes: false, name: "Ada Lovelace", email: "ada@example.org", kind: "staff", user_id: "u1" };
   const TEAMLOGIN = { ...ADMIN, role: "ipt", label: "North Team", ipt: "IPT1", can_approve: false, ipt_locked: true, ipt_required: false,
@@ -2083,6 +2083,12 @@ async function g3LoginsDom(){
         status: "active", kind: "demo", disabled: false, has_password: false, expires_at: "2026-10-28T09:00:00Z", last_sign_in_at: null }],
     teams: [{ id: "IPT1", label: "North Team" }, { id: "IPT2", label: "Central Team" }], codes: true, mail: false, me: "u1" };
   const calls = [];
+  // 23 Oct 2026 — the Teams tab (admins only, at most six teams)
+  const TEAMS_LIST = { teams: [{ id: "IPT1", label: "North Team", named: true, active: true, logins: 2, lines: 612 },
+                               { id: "IPT2", label: "Central Team", named: true, active: true, logins: 1, lines: 188 }],
+                       used: 2, max: 6, can_add: true };
+  const TEAMS_FULL = { teams: [...TEAMS_LIST.teams, { id: "IPT3", label: "Drainage package", named: true, active: true, logins: 0, lines: 0 }],
+                       used: 6, max: 6, can_add: false };
   let signinAnswer = () => answer(200, ADMIN), meAnswer = () => answer(200, { signed_in: false, access: null, codes: false });
   w.fetch = (url, o) => {
     const u = String(url); calls.push({ u, o });
@@ -2090,12 +2096,20 @@ async function g3LoginsDom(){
     if (/\/api\/auth\/me$/.test(u)) return meAnswer();
     if (/\/api\/auth\/signin$/.test(u)) return signinAnswer();
     if (/\/api\/auth\/signout$/.test(u)) return answer(200, { ok: true });
+    if (/\/api\/admin\/teams(\?|$)/.test(u) && o && o.method === "POST")
+      return answer(200, { team: { id: "IPT3", label: "Drainage package", active: true }, ...TEAMS_FULL });
+    if (/\/api\/admin\/teams(\?|$)/.test(u)) return answer(200, TEAMS_LIST);
+    if (/\/api\/admin\/teams\/IPT2/.test(u) && JSON.parse(o.body).active === false) return answer(400, { detail: "Move or disable its 1 login first." });
+    if (/\/api\/admin\/teams\/IPT2/.test(u)) return answer(200, { team: { id: "IPT2", label: "Central Civils", active: true },
+      ...TEAMS_FULL, teams: TEAMS_FULL.teams.map(t => t.id === "IPT2" ? { ...t, label: "Central Civils" } : t) });
     if (/\/api\/admin\/users(\?|$)/.test(u) && !(o && o.method === "POST")) return answer(200, USERS);
     if (/\/api\/admin\/users(\?|$)/.test(u)) return answer(200, { user: { ...USERS.users[1], id: "u9", name: "Cy New" }, email: "unsent", purpose: "invite",
                                                                     link: "https://app.wayscope.co.uk/#invite=abcdefghijklmnopqrstuvwxyz" });
     if (/\/api\/admin\/audit/.test(u)) return answer(200, { rows: [
       { id: "a1", at: "2026-10-14T10:00:00Z", kind: "write", actor_label: "Ada Lovelace <ada@example.org>", method: "POST", path: "/api/forecasts/bulk", detail: "{\"rows\":1}" },
-      { id: "a2", at: "2026-10-14T09:00:00Z", kind: "page", actor_label: "Lea Lead <lea@example.org>", target: "dashboard" }] });
+      { id: "a2", at: "2026-10-14T09:00:00Z", kind: "page", actor_label: "Lea Lead <lea@example.org>", target: "dashboard" },
+      { id: "a3", at: "2026-10-14T08:00:00Z", kind: "write", actor_label: "Ada Lovelace <ada@example.org>", method: "POST", path: "/api/admin/teams", detail: "{}" },
+      { id: "a4", at: "2026-10-14T07:00:00Z", kind: "write", actor_label: "Ada Lovelace <ada@example.org>", method: "PATCH", path: "/api/admin/teams/IPT2", detail: "{}" }] });
     if (/\/api\/admin\/leads/.test(u)) return answer(200, { leads: [
       { id: "r1", created_at: "2026-10-09T12:00:00Z", name: "Old Lead", email: "old@example.org", organisation: "O", role: "Other", login: "none",
         login_expires_at: "", sign_ins: "", first_seen: "", last_seen: "", pages: "" }] });
@@ -2166,6 +2180,39 @@ async function g3LoginsDom(){
      && !/token=/.test(add.u));
   ok("G3 USERS: with no email set up, the page shows the invite link to pass on, with Copy",
      /pass this link/.test(a.box.textContent) && /#invite=abcdefghijklmnopqrstuvwxyz/.test(a.box.textContent) && !!btnT(a.box, "Copy"));
+  // the Teams tab (23 Oct 2026)
+  ok("TEAMS: the Users page has a Teams tab between People and Demo leads",
+     [...a.box.querySelectorAll('nav[aria-label="Users sections"] button')].map(b => b.textContent.trim()).join("|") === "People|Teams|Demo leads|Activity");
+  click(btnT(a.box, "Teams")); await tick(); await tick();
+  const teamsBox = () => a.box.querySelector('[data-users-teams="1"]');
+  ok("⭐ TEAMS: the tab lists each team by NAME with its logins and lines, and how many of six are used",
+     !!teamsBox() && /North Team/.test(teamsBox().textContent) && /Central Team/.test(teamsBox().textContent) && /612/.test(teamsBox().textContent)
+     && /2 of 6 teams/.test(teamsBox().textContent) && calls.some(c => /\/api\/admin\/teams(\?|$)/.test(c.u) && !/token=/.test(c.u)));
+  ok("🔴 TEAMS: no team id anywhere in the tab", !/IPT ?\d/.test(teamsBox().textContent));
+  ok("TEAMS: each row offers Rename and Stop using, named for the team",
+     !!a.box.querySelector('button[aria-label="Rename Central Team"]') && !!a.box.querySelector('button[aria-label="Stop using Central Team"]'));
+  await setVal(a.box.querySelector('input[aria-label="New team\'s name"]'), "  Drainage package ");
+  await act(async () => { btnT(a.box, "Add the team").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  const tadd = calls.find(c => /\/api\/admin\/teams(\?|$)/.test(c.u) && c.o && c.o.method === "POST");
+  ok("⭐ TEAMS: Add posts the trimmed name and nothing else", tadd && JSON.stringify(JSON.parse(tadd.o.body)) === JSON.stringify({ label: "Drainage package" }));
+  ok("TEAMS: the new team is in the list and the page says what to do next",
+     /Drainage package/.test(teamsBox().textContent) && /Added Drainage package\. Add its people on People\./.test(a.box.textContent));
+  ok("TEAMS: with every place used the add box gives way to one sentence",
+     /All 6 team places are used\./.test(teamsBox().textContent) && !a.box.querySelector('input[aria-label="New team\'s name"]'));
+  click(a.box.querySelector('button[aria-label="Rename Central Team"]')); await tick();
+  const ren = a.box.querySelector('input[aria-label="New name for Central Team"]');
+  ok("TEAMS: Rename turns the name into a box holding it", !!ren && ren.value === "Central Team");
+  await setVal(ren, "Central Civils");
+  await act(async () => { btnT(a.box, "Save").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  const tren = calls.find(c => /\/api\/admin\/teams\/IPT2/.test(c.u) && JSON.parse(c.o.body).label);
+  ok("⭐ TEAMS: Save sends the new name for that team's slot, and the row shows it",
+     tren && tren.o.method === "PATCH" && JSON.parse(tren.o.body).label === "Central Civils" && /Central Civils/.test(teamsBox().textContent)
+     && /Renamed to Central Civils\./.test(a.box.textContent));
+  click(a.box.querySelector('button[aria-label="Stop using Central Civils"]')); await tick(); await tick();
+  ok("TEAMS: a refused stop shows the server's sentence (its logins first)", /Move or disable its 1 login first\./.test(a.box.textContent)
+     && calls.some(c => /\/api\/admin\/teams\/IPT2/.test(c.u) && JSON.parse(c.o.body).active === false));
   click(btnT(a.box, "Demo leads")); await tick(); await tick();
   ok("G3 USERS → Demo leads: a lead who had the shared code gets 'Send a personal login'",
      /Old Lead/.test(a.box.textContent) && /had the shared code/.test(a.box.textContent) && !!btnT(a.box, "Send a personal login"));
@@ -2173,6 +2220,8 @@ async function g3LoginsDom(){
   ok("G3 USERS → Activity: rows read in words — who, and what they did — not paths",
      /Ada Lovelace/.test(a.box.textContent) && /Saved forecast lines/.test(a.box.textContent) && /Opened dashboard/.test(a.box.textContent)
      && !/\/api\/forecasts/.test([...a.box.querySelectorAll("tbody td")].map(t => t.textContent).join(" ").replace(/Details[\s\S]*$/, "")));
+  ok("TEAMS → Activity: the Teams tab's writes read 'Added a team' and 'Changed a team'",
+     /Added a team/.test(a.box.textContent) && /Changed a team/.test(a.box.textContent));
   // sign out
   await act(async () => { btnT(a.box, "Sign out").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   await tick();

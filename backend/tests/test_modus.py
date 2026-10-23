@@ -711,8 +711,9 @@ _ra = json.loads(main.public_alignment(_Request()).body)
 ok("map: the overlay response carries the team names the map shows",
    {t["id"]: t["label"] for t in _ra["teams"]} == labels, str(_ra.get("teams")))
 fe_src = read("frontend/index.html")
-ok("frontend: the team pill shows the name, with the id only as a tooltip",
-   "title={k}>{teamName(k)}</span>" in fe_src)
+# REVERSED 23 Oct 2026 (claude/team-words): the tooltip showed the raw slot id to a person; the pill is the name only
+ok("frontend: the team pill shows the name, and no tooltip with the id",
+   '"#64748B" }}>{teamName(k)}</span>' in fe_src and "title={k}>{teamName(k)}</span>" not in fe_src)
 ok("frontend: the submit picker has no hard-coded six-team fallback",
    '["IPT1","IPT2","IPT3","IPT4","IPT5","IPT6"]' not in fe_src and "Object.keys(TEAM_LABELS)" in fe_src)
 # NARROWED 14 Oct 2026 (D9): + the phone's More sheet (the header, the rail's foot, and More)
